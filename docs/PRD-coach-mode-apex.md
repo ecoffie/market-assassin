@@ -1,17 +1,26 @@
-# PRD: Coach Mode (APEX Accelerators)
+# PRD: Coach Mode / Org White-Label (APEX is one instance)
 
-> A counselor at an APEX Accelerator manages MANY client small businesses. Coach
-> Mode lets one counselor switch between their assigned clients — each with its
-> own pipeline, vault, and market profile — plus an "APEX Tab" that aggregates
-> assigned-client deadlines, alerts, and internal news. The Knowledge Base is
-> the APEX "Custom Workbench" (institutional memory). We designed this for the
-> APEX Illinois proposal but never built it.
+> **Generalized:** a coach/counselor at ANY partner organization (APEX
+> Accelerator, SBDC, Chamber, FHC) manages MANY client businesses. Coach Mode
+> lets one coach switch between assigned clients — each with its own pipeline,
+> vault, and market profile — plus a per-org "Org Tab" (assigned-client
+> deadlines, alerts, internal news). The Knowledge Base is the org's "Custom
+> Workbench". APEX Illinois is the first instance, but this is the **white-label
+> org tier**, not an APEX-only feature.
 
 **Status:** Draft / scoping — 2026-06-05. Build after sign-off.
-**Trigger:** Eric: "Build Coach mode for APEX accelerators — we did a design but
-never built it. Coach access should let me [manage clients, team interaction,
-event finder, custom APEX Tab via the Workbench]." Source: APEX Illinois proposal
-(Feb 20, 2026).
+**Trigger:** Eric: "Build Coach mode for APEX — we designed it, never built it.
+And we'll do the same white-label for ANY/ALL organizations who have members
+(see the MD files)." Sources: APEX Illinois proposal (Feb 20, 2026);
+`docs/strategy/MI-UNIFIED-PRODUCT-ARCHITECTURE.md` (MI Team / Enterprise /
+White-Glove tiers — seats, white-label, dedicated coach, all **❌ NEEDS BUILD**);
+`tasks/COACH-ENTERPRISE-BD-PLAN.md`; `docs/strategy/APEX-GROWTH-STRATEGY.md`
+(90+ APEX locations, 300+ counselors, 30K businesses/yr).
+
+**This is NOT APEX-specific.** APEX = the proving instance. The build is the
+generic **organization white-label + coach/multi-client** layer that any partner
+org (SBDC, Chamber, FHC, accelerator) gets. "APEX Tab" → "Org Tab" (branded per
+org). Aligns with the documented Team / Enterprise / White-Glove tiers.
 
 ---
 
@@ -90,14 +99,31 @@ New infra needed (small):
 
 ---
 
-## 3. v2+ (NOT v1)
+## 3. White-label / org generalization (APEX = instance #1)
+
+This is the **org white-label tier** from MI-UNIFIED-PRODUCT-ARCHITECTURE.md, not
+an APEX feature. The same build serves any partner org:
+
+- **organizations table** — id, name, slug, branding (logo, color, "Org Tab"
+  label), tier. APEX Illinois is one row.
+- **org membership** — coaches + clients belong to an org. A coach's clients are
+  org-scoped.
+- **Per-org branding** — the "Org Tab" shows the org's name/logo; reports can be
+  white-labeled (Enterprise tier's "white-label reports — NEEDS BUILD").
+- **Reusable** — SBDC, Chamber, FHC get the same model with their own org row.
+
+So everywhere this PRD says "APEX Tab", read **"Org Tab (branded per org)"**.
+
+## 4. v2+ (NOT v1)
 
 - **Deep integrations:** Slack notifications, Outlook draft-replies, Google
   Drive pull. External OAuth + per-tool APIs — a real phase of its own.
-- **APEX-branded skin** (logo, "APEX Tab" naming per org).
+- **Full white-label skin** (logo, colors, branded reports, custom domain).
+- **SSO/SAML** (Enterprise tier — NEEDS BUILD).
 - **Coach analytics:** counselor activity, client outcomes, ROI reporting for
-  the APEX center's DoD funder.
+  the org's funder (APEX → DoD).
 - **Bulk client onboarding** (import a roster).
+- **Org admin dashboard** + seat management.
 
 ---
 
