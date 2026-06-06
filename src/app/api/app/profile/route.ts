@@ -68,8 +68,16 @@ export async function POST(request: NextRequest) {
     };
 
     // Only update fields that were provided
+    let deriveKw: string[] = [];
     if (expandedNaicsCodes.length > 0) {
       updateData.naics_codes = expandedNaicsCodes;
+      // Auto-derive search keywords from the NAICS so search widens beyond NAICS
+      // (Eric's "drone problem"). Applied AFTER the update below, only when the
+      // user has no keywords yet — never clobbers tuned keywords.
+      try {
+        const { deriveKeywordsFromNaics } = await import('@/lib/utils/derive-keywords');
+        deriveKw = deriveKeywordsFromNaics(expandedNaicsCodes);
+      } catch { /* non-fatal */ }
     }
 
     if (Array.isArray(setAsides)) {
@@ -135,6 +143,23 @@ export async function POST(request: NextRequest) {
         });
 
     const { error: updateError } = await settingsWrite;
+
+    // Fill auto-derived keywords ONLY if the user has none (never clobber tuned).
+    if (!updateError && deriveKw.length > 0) {
+      try {
+        const { data: cur } = await supabase
+          .from('user_notification_settings')
+          .select('keywords')
+          .eq('user_email', normalizedEmail)
+          .maybeSingle();
+        const hasKw = Array.isArray(cur?.keywords) && cur!.keywords.length > 0;
+        if (!hasKw) {
+          await supabase.from('user_notification_settings')
+            .update({ keywords: deriveKw })
+            .eq('user_email', normalizedEmail);
+        }
+      } catch { /* non-fatal */ }
+    }
 
     if (updateError) {
       console.error('[Mindy Profile] Update error:', updateError);
