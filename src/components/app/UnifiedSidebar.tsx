@@ -48,6 +48,7 @@ export type AppPanel =
   | 'vault'          // My Vault — persistent knowledge base (identity, past perf, capabilities, team, boilerplate)
   | 'library'        // My Library — searchable history of every AI output
   | 'knowledge-base' // Knowledge Base — searchable corpus Mindy Chat cites
+  | 'coach'          // Coach Mode — manage multiple client businesses (org/consultant)
   | 'pricing'        // Pricing Intel — labor rates, GSA/SCA wages (Estimating section)
   | 'proposals'      // AI Proposal Assist (Estimating section)
   | 'target-list'    // My Target List — saved BD targets (Pipeline section, Slice 3 of TMR roadmap)
@@ -278,6 +279,15 @@ const NAV_SECTIONS: NavSection[] = [
         description: 'Seats + roles',
         tier: ['team', 'enterprise'],
         badge: 'Teams',
+      },
+      {
+        // Coach Mode — manage multiple client businesses (APEX counselor or solo
+        // consultant). Each client = its own workspace; switch between them.
+        id: 'coach',
+        label: 'My Clients',
+        icon: BookOpen,
+        description: 'Manage multiple businesses',
+        tier: ['free', 'pro', 'team', 'enterprise'],
       },
       {
         id: 'settings',

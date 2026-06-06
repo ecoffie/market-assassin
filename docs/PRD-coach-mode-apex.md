@@ -22,6 +22,23 @@ generic **organization white-label + coach/multi-client** layer that any partner
 org (SBDC, Chamber, FHC, accelerator) gets. "APEX Tab" → "Org Tab" (branded per
 org). Aligns with the documented Team / Enterprise / White-Glove tiers.
 
+**Two personas, ONE machinery (Eric, 2026-06-05):**
+A solo **consultant managing multiple entities** is the SAME use case as a coach
+— each entity = a workspace with its own profile/pipeline/vault, switch between
+them, see a cross-entity dashboard. The only difference is provisioning weight:
+
+| | Org (APEX) | Consultant (solo) |
+|---|---|---|
+| Tenant | the organization (many coaches + clients) | the consultant IS the org (sole admin+coach) |
+| Setup | white-label org provisioned (branding, multiple coaches) | lightweight — "Add a client" creates the entity workspace, no org branding |
+| Entry | org-admin invites coaches | consultant self-serves: turn on "Manage clients" |
+
+Same `organizations` + `org_clients` + switcher under the hood. v1 should expose
+a **lightweight Consultant entry point** (a solo user flips on multi-client
+management; an org row is auto-created with them as sole admin+coach) so a
+consultant isn't forced through APEX-org setup. The APEX/white-label org is the
+same model with branding + multiple coaches added.
+
 ---
 
 ## 0. What ALREADY exists (the proposal is ~80% built)
@@ -166,13 +183,18 @@ So everywhere this PRD says "APEX Tab", read **"Org Tab (branded per org)"**.
 
 ---
 
-## 7. Open questions (resolve before/early build)
+## 7. Open questions — RESOLVED (2026-06-05)
 
-- Coach→client link: workspace `role='coach'` vs `coach_clients` table?
-- Active-workspace mechanism: session cookie, header, or URL param?
-- Who posts "APEX internal news" — an APEX admin role, or Mindy super-admin?
-- Billing: per-coach-seat vs per-client (affects nothing in v1 build, but decide
-  before GA).
+- **Coach→client link:** `organizations` table + org membership with a `role`
+  (`coach` | `client_owner` | `org_admin`). A coach's clients = client
+  workspaces in the same org the coach is assigned to. (Reuses workspaces.)
+- **Active-workspace mechanism:** an explicit **`x-active-workspace` header**
+  (+ a localStorage-backed client picker) that workspace-scoped routes read to
+  operate as the selected client. Falls back to the user's own workspace.
+- **Org news:** an **org-admin role** posts to their org's news feed (not Mindy
+  super-admin). [non-blocking call]
+- **Billing:** **per-coach-seat** at the org level (matches Enterprise tier).
+  Decide pricing before GA; the data model supports it now. [non-blocking call]
 
 ---
 

@@ -15,6 +15,13 @@ export function getMIApiHeaders(email?: string | null, init?: HeadersInit) {
     if (twoFactorToken && !headers.has('x-mi-2fa-token')) {
       headers.set('x-mi-2fa-token', twoFactorToken);
     }
+    // Coach Mode: when a coach/consultant has switched to a client, every
+    // workspace-scoped route can operate as that client via this header. Routes
+    // that opt in read x-active-workspace; others fall back to the user's own.
+    const activeWs = localStorage.getItem('mindy_active_workspace');
+    if (activeWs && !headers.has('x-active-workspace')) {
+      headers.set('x-active-workspace', activeWs);
+    }
   }
 
   return headers;

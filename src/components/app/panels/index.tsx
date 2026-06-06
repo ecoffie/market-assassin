@@ -22,6 +22,7 @@ const MyTargetListPanel = lazy(() => import('./MyTargetListPanel'));
 const GrantsPanel = lazy(() => import('./GrantsPanel'));
 const VaultPanel = lazy(() => import('./VaultPanel'));
 const KnowledgeBasePanel = lazy(() => import('./KnowledgeBasePanel'));
+const CoachPanel = lazy(() => import('./CoachPanel'));
 const LibraryPanel = lazy(() => import('./LibraryPanel'));
 
 interface PanelContainerProps {
@@ -82,6 +83,8 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
         return <MyTargetListPanel email={email} tier={tier} onPanelChange={onPanelChange} />;
       case 'knowledge-base':
         return <KnowledgeBasePanel email={email} initialDocId={typeof panelContext?.doc === 'string' ? panelContext.doc : undefined} />;
+      case 'coach':
+        return <CoachPanel email={email} />;
       case 'grants':
         return <GrantsPanel email={email} tier={tier} />;
       case 'vault':
