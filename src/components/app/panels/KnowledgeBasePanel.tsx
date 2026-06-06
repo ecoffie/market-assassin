@@ -26,6 +26,8 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
   const [selected, setSelected] = useState<KbDoc | null>(null);
   const [docText, setDocText] = useState<string>('');
   const [docLoading, setDocLoading] = useState(false);
+  // Playable URL (YT Live / podcast / webinar) so the doc isn't a dead end.
+  const [play, setPlay] = useState<{ url: string; label: string } | null>(null);
   const headers = useCallback(() => getMIApiHeaders(email), [email]);
   const didInitialDoc = useRef(false);
 
@@ -52,11 +54,12 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
 
   const openDoc = useCallback(async (doc: KbDoc) => {
     setSelected(doc);
-    setDocLoading(true); setDocText('');
+    setDocLoading(true); setDocText(''); setPlay(null);
     try {
       const res = await fetch(`/api/app/rag-doc?id=${doc.id}&email=${encodeURIComponent(email || '')}`, { headers: headers() });
       const d = await res.json();
       setDocText(d.full_text || d.text || 'No text available for this document.');
+      if (d.play_url) setPlay({ url: d.play_url, label: d.play_label || '▶ Open source' });
     } catch {
       setDocText('Could not load this document.');
     }
@@ -76,6 +79,7 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
         const d = await res.json();
         setSelected({ id: initialDocId, title: d.title || 'Document', docType: d.doc_type || '', docTypeLabel: d.doc_type || '', summary: '', naics: null, words: d.word_count || 0, pages: null });
         setDocText(d.full_text || d.text || 'No text available.');
+        if (d.play_url) setPlay({ url: d.play_url, label: d.play_label || '▶ Open source' });
       } catch { /* ignore */ }
       setDocLoading(false);
     })();
@@ -137,9 +141,23 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
         <div className="border border-slate-800 rounded-xl bg-slate-900 overflow-hidden">
           {selected ? (
             <div className="flex flex-col h-full">
-              <div className="px-5 py-3 border-b border-slate-800">
-                <div className="text-base font-semibold text-white">{selected.title}</div>
-                <div className="text-xs text-slate-500 mt-0.5">{selected.docTypeLabel}</div>
+              <div className="px-5 py-3 border-b border-slate-800 flex items-start justify-between gap-3">
+                <div>
+                  <div className="text-base font-semibold text-white">{selected.title}</div>
+                  <div className="text-xs text-slate-500 mt-0.5">{selected.docTypeLabel}</div>
+                </div>
+                {/* Watch/Listen — so YT Live / podcast / webinar docs aren't a
+                    dead end (Eric). Opens the episode in a new tab. */}
+                {play && (
+                  <a
+                    href={play.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="shrink-0 inline-flex items-center gap-1.5 rounded-lg bg-red-600 hover:bg-red-500 px-4 py-2 text-sm font-medium text-white transition-colors"
+                  >
+                    {play.label}
+                  </a>
+                )}
               </div>
               <div className="px-5 py-4 overflow-y-auto max-h-[560px]">
                 {docLoading ? (

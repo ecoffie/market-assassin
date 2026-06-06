@@ -65,12 +65,32 @@ export async function GET(request: NextRequest) {
   // those leak our directory layout and aren't useful client-side.
   const safeSource = data.source_path?.startsWith('/') ? null : data.source_path;
 
+  // Derive a PLAYABLE url so YT Live / podcast / webinar docs aren't a dead end
+  // (Eric: "YT Live takes you to the KB but nothing to watch"). Sources:
+  //   - "libsyn:host/slug"  → https://host/slug  (the episode page)
+  //   - any http(s) source  → use as-is
+  //   - a YouTube link in the body → use that
+  let playUrl: string | null = null;
+  let playLabel: string | null = null;
+  if (safeSource?.startsWith('libsyn:')) {
+    playUrl = `https://${safeSource.slice('libsyn:'.length)}`;
+    playLabel = '▶ Listen to this episode';
+  } else if (safeSource?.startsWith('http')) {
+    playUrl = safeSource;
+    playLabel = /youtu/i.test(safeSource) ? '▶ Watch on YouTube' : '▶ Open source';
+  } else {
+    const yt = (data.full_text || '').match(/https?:\/\/(?:www\.)?(?:youtube\.com\/watch\?v=|youtu\.be\/)[\w-]+/i);
+    if (yt) { playUrl = yt[0]; playLabel = '▶ Watch on YouTube'; }
+  }
+
   return NextResponse.json({
     id: data.id,
     title: data.title,
     doc_type: data.doc_type,
     folder: data.doc_top_level_folder,
     source_path: safeSource,
+    play_url: playUrl,
+    play_label: playLabel,
     full_text: data.full_text,
     word_count: data.word_count,
   });
