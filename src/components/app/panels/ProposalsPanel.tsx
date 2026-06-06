@@ -1519,6 +1519,16 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           rfpText={uploadedRfp?.text || ''}
           rfpFileName={uploadedRfp?.fileName || ''}
           hasVault={!!vaultSummary?.hasIdentity || (vaultSummary?.past_performance ?? 0) > 0 || (vaultSummary?.capabilities ?? 0) > 0}
+          files={sourceDocuments.map(d => ({ fileName: d.fileName, charCount: d.charCount, pageCount: d.pageCount }))}
+          onAddFile={handleRfpFile}
+          onRemoveFile={(name) => {
+            setSourceDocuments(prev => {
+              const next = prev.filter(d => d.fileName !== name);
+              setUploadedRfp(combineUploadedDocuments(next));
+              return next;
+            });
+          }}
+          uploading={uploading}
         />
       )}
 
