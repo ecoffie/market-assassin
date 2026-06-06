@@ -12,21 +12,32 @@
  * Use: const text = await callLLM({ system, user, json: true, maxTokens });
  */
 
+// Per-JOB chains (Eric: Claude's limits hit fast + it's pricey — use it ONLY for
+// low-volume high-value calls, NEVER bulk extraction). The job determines which
+// providers are eligible, so Claude is simply absent from the high-volume path.
+export type LlmJob = 'extraction' | 'drafting' | 'referee';
+
 export interface LlmOpts {
   system: string;
   user: string;
   json?: boolean;        // request JSON object output
   maxTokens?: number;
   temperature?: number;
-  preferQuality?: boolean; // route to the quality tier (Claude) first when set
+  job?: LlmJob;          // picks the per-job provider chain (default 'extraction')
 }
 
 type Provider = 'groq70b' | 'groq8b' | 'claude' | 'openai' | 'grok';
 
-// Default chain: fast/cheap first, then quality, then deep fallback. Override
-// with env LLM_CHAIN="claude,groq70b,..." (e.g. preferQuality flips to claude).
-const DEFAULT_CHAIN: Provider[] = ['groq70b', 'groq8b', 'claude', 'openai', 'grok'];
-const QUALITY_CHAIN: Provider[] = ['claude', 'groq70b', 'openai', 'groq8b', 'grok'];
+// EXTRACTION = high volume (every doc, chunked) → cheap/fast only, NO Claude.
+//   The cache absorbs most of these anyway.
+// DRAFTING   = low volume (user-triggered) → Groq quality, Claude as fallback.
+// REFEREE    = once per proposal, must differ from drafter → Claude first.
+const JOB_CHAINS: Record<LlmJob, Provider[]> = {
+  extraction: ['groq8b', 'groq70b', 'openai', 'grok'],   // no Claude — bulk
+  drafting:   ['groq70b', 'claude', 'openai', 'grok'],
+  referee:    ['claude', 'openai', 'groq70b'],            // Claude OK — 1x/proposal
+};
+const DEFAULT_CHAIN: Provider[] = JOB_CHAINS.extraction;
 
 function envChain(): Provider[] | null {
   const raw = process.env.LLM_CHAIN;
@@ -99,7 +110,10 @@ async function callProvider(p: Provider, opts: LlmOpts): Promise<CallResult | { 
  * provider answered. Throws only if EVERY available provider failed.
  */
 export async function callLLM(opts: LlmOpts): Promise<{ text: string; provider: Provider }> {
-  const chain = (envChain() || (opts.preferQuality ? QUALITY_CHAIN : DEFAULT_CHAIN)).filter(hasKey);
+  // env LLM_CHAIN overrides everything; otherwise pick the per-job chain so
+  // Claude is only eligible for drafting/referee, never bulk extraction.
+  const jobChain = JOB_CHAINS[opts.job ?? 'extraction'] ?? DEFAULT_CHAIN;
+  const chain = (envChain() || jobChain).filter(hasKey);
   if (chain.length === 0) throw new Error('No LLM provider keys configured');
   let lastErr = '';
   for (const p of chain) {

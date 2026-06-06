@@ -109,6 +109,7 @@ async function extractChunk(_apiKey: string, fileName: string | undefined, chunk
       json: true,
       maxTokens: 4000,
       temperature: 0.2,
+      job: 'extraction', // high volume — Groq only, never Claude
     });
     const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const parsed = JSON.parse(cleaned);
