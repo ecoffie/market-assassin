@@ -5,7 +5,11 @@
 > the existing 1,364-doc knowledge base, so chat citations link to a real page
 > and users can browse/search it directly — like a company knowledge base.
 
-**Status:** Draft / scoping — 2026-06-05. Build later.
+**Status:** **SHIPPED 2026-06-05.** Knowledge Base page (search + doc_type
+facets + split-pane reader over 1,310 docs) live in the Research nav; Mindy Chat
+source chips deep-link into it (?doc=id). PII/internal-types excluded; owner
+identity not exposed. vault.govcongiants.org NOT migrated (still out of scope).
+Possible follow-up: semantic (embedding) search; download/copy where rights allow.
 **Trigger:** Eric: "Mindy chat parses info great but getting to the documents
 gets lost. Companies build a searchable repository that lists answers on a whole
 new page. We have the Vault — reuse + expand it. (And the naming: vault.gov-

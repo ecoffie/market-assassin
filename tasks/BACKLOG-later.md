@@ -97,7 +97,7 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
 
 ## 🟠 P1 — Scoped features / meaningful UX
 
-### 3a. Knowledge Base — searchable repository page
+### 3a. Knowledge Base — searchable repository ✅ SHIPPED 2026-06-05
 - **What:** Mindy Chat answers well but getting to the SOURCE docs "gets lost."
   Build a searchable repository page over `mindy_rag_documents` (**1,364 docs**
   already there — templates, cap statements, past perf, training…). Chat
