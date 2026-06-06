@@ -7,7 +7,10 @@
 > separate .docx (to send subs for pricing/bids) alongside a section-tagged
 > compliance matrix.
 
-**Status:** Draft / scoping — 2026-06-05. Build toward June 19.
+**Status:** **v1 PARTIALLY SHIPPED 2026-06-05.** ✅ RAG-as-standard in Manual
+Drive; ✅ SOW/PWS → .docx for subs; ✅ compliance matrix grouped by section.
+Remaining v1: documented ingestion criteria + admin ingest path; full-proposal
+smoke test. v2: notes/collab/versions.
 **Trigger:** Eric: "Test it, feed it documents, train the model — determine an
 ingestion criteria. Get through a full proposal. Extract the SOW/PWS to a
 separate doc for sub pricing/bids. Compliance matrix tagged by sections (we have

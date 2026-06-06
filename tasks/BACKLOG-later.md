@@ -29,6 +29,14 @@ Verify-on-SAM link. Loads ALL pursuit PDFs (was 1). PRD-proposal-manual-mode.
 - DoDAAC office names: stripped FPDS code prefixes (W7NC… → real names).
 - Decision Makers "Track" shows where it went (→ My Target List).
 
+**Proposal RAG-as-standard + SOW (PRD-proposal-ingestion-rag-standard, v1 partial):**
+- Manual Drive chat now retrieves the proposal RAG (winning volumes/templates)
+  as the build STANDARD — not just RFP+Vault. Auto already did.
+- SOW/PWS → standalone .docx ("📄 SOW for subs") for sub pricing/bids.
+- Compliance matrix grouped BY section (L / M / C headers).
+- **Remaining v1:** ingestion criteria doc + admin ingest path; full-proposal
+  smoke test. **v2:** notes, who/status, draft versions.
+
 **Growth/virality (earlier today):** Share button restored, share links →
 getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
 
