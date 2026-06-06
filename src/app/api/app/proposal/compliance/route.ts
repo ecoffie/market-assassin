@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { logToolError, ToolNames, AIProviders, classifyError } from '@/lib/tool-errors';
 import { normalizeCategory } from '@/lib/proposal/section-alignment';
+import { createClient } from '@supabase/supabase-js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -19,11 +20,14 @@ interface ComplianceRequirement {
   category: 'submission' | 'evaluation' | 'technical' | 'past_performance' | 'pricing' | 'admin' | 'other';
   section?: string;
   source_quote?: string;
+  source_doc?: string;   // which doc this came from (e.g. "Amendment 0004")
+  revised?: boolean;     // true when an amendment changed this requirement
 }
 
 interface RequestBody {
   text?: string;
   fileName?: string;
+  pipeline_id?: string;  // multi-doc mode: extract from base + amendments + Q&A
 }
 
 const SYSTEM_PROMPT = `You are a federal proposal compliance analyst. Read the solicitation excerpt and extract EVERY explicit requirement, instruction, or evaluation factor a bidder must address.
@@ -78,17 +82,30 @@ function chunkText(text: string, maxChars: number): string[] {
   return chunks;
 }
 
-/** Extract requirements from ONE chunk. 70B first; fall back to 8B on rate-
- *  limit / too-large. Returns [] on parse failure, null on hard failure. */
-async function extractChunk(apiKey: string, fileName: string | undefined, chunk: string): Promise<ComplianceRequirement[] | null> {
+// Amendments + Q&A don't use "shall" — they state CHANGES ("the purpose of this
+// amendment is to extend the closing date to X", "Question 5: … Answer: …").
+// A dedicated prompt catches those so revised deadlines/specs/answers aren't
+// missed (Eric QC: amendments touched the deadline but extracted 0).
+const AMENDMENT_PROMPT = `You are a federal proposal analyst reading an AMENDMENT or Q&A document. Extract every CHANGE or clarification a bidder must now follow:
+- Revised dates (new closing/response date, extended deadline)
+- Revised specifications, quantities, scope, or page limits
+- Questions & their answers that change or clarify a requirement
+- New documents/attachments that must be submitted
+Phrase each as the CURRENT requirement (e.g. "Submit offers by the revised closing date of June 30, 2026", "Q12: tile must be commercial-grade per the answer").
+Return ONLY JSON {"requirements":[{"id","requirement","category","section"}]} category in submission|evaluation|technical|past_performance|pricing|admin|other. Skip the SF30 boilerplate (copies, acknowledgment instructions). If the amendment makes no substantive change, return an empty array.`;
+
+/** Extract requirements from ONE chunk. Uses the amendment/Q&A prompt when
+ *  isChange. 70B first; fall back to 8B on rate-limit/too-large. */
+async function extractChunk(apiKey: string, fileName: string | undefined, chunk: string, isChange = false): Promise<ComplianceRequirement[] | null> {
+  const prompt = isChange ? AMENDMENT_PROMPT : SYSTEM_PROMPT;
   const call = async (model: string) => fetch(GROQ_API_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
       model,
       messages: [
-        { role: 'system', content: SYSTEM_PROMPT },
-        { role: 'user', content: `Solicitation: ${fileName || 'untitled'}\n\n--- SOURCE TEXT ---\n${chunk}` },
+        { role: 'system', content: prompt },
+        { role: 'user', content: `${isChange ? 'Amendment/Q&A' : 'Solicitation'}: ${fileName || 'untitled'}\n\n--- SOURCE TEXT ---\n${chunk}` },
       ],
       temperature: 0.2,
       max_tokens: 4000,
@@ -111,6 +128,57 @@ async function extractChunk(apiKey: string, fileName: string | undefined, chunk:
   } catch { return []; }
 }
 
+/**
+ * Multi-doc extraction with AMENDMENT PRECEDENCE (Eric QC). Pull the pursuit's
+ * classified docs (base solicitation + Q&A + amendments in order), extract
+ * requirements from each, then merge: a later amendment that revises a base
+ * requirement WINS and is flagged `revised`. Returns the current, accurate set.
+ */
+async function extractMultiDoc(apiKey: string, pipelineId: string, email: string): Promise<{ requirements: ComplianceRequirement[]; sources: string[] } | null> {
+  const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  const { data: docs } = await supabase
+    .from('pursuit_documents')
+    .select('filename, doc_kind, extracted_text, downloaded_at')
+    .eq('pipeline_id', pipelineId)
+    .in('doc_kind', ['solicitation', 'qa', 'amendment', 'instructions', 'eval_factors', 'sow_pws'])
+    .not('extracted_text', 'is', null);
+  if (!docs || docs.length === 0) return null;
+
+  // Order: base/scope first, amendments LAST (so they override) by amd number.
+  const amdNum = (fn: string) => parseInt((fn.match(/amd[_ -]?(\d+)/i)?.[1]) || '0', 10);
+  const ordered = [...docs].sort((a, b) => {
+    const aw = a.doc_kind === 'amendment' ? 1000 + amdNum(a.filename || '') : 0;
+    const bw = b.doc_kind === 'amendment' ? 1000 + amdNum(b.filename || '') : 0;
+    return aw - bw;
+  });
+
+  // Merge into a map keyed by a normalized requirement signature. Amendments
+  // overwrite a matching base requirement (flag revised); new amendment reqs add.
+  const map = new Map<string, ComplianceRequirement>();
+  const sources: string[] = [];
+  const sigOf = (r: ComplianceRequirement) => (r.requirement || '').toLowerCase().replace(/\s+/g, ' ').slice(0, 60);
+  for (const doc of ordered) {
+    const text = (doc.extracted_text || '').slice(0, MAX_INPUT_CHARS);
+    const label = doc.doc_kind === 'amendment'
+      ? `Amendment ${String(amdNum(doc.filename || '')).padStart(4, '0')}`
+      : (doc.doc_kind || 'document');
+    const isChange = doc.doc_kind === 'amendment' || doc.doc_kind === 'qa';
+    const chunks = chunkText(text, 14000);
+    const reqs: ComplianceRequirement[] = [];
+    for (const c of chunks) { const r = await extractChunk(apiKey, doc.filename, c, isChange); if (r) reqs.push(...r); }
+    if (reqs.length) sources.push(`${label} (${reqs.length})`);
+    for (const r of reqs) {
+      const sig = sigOf(r);
+      if (!sig) continue;
+      const isAmendment = doc.doc_kind === 'amendment';
+      const tagged = { ...r, source_doc: label, revised: isAmendment && map.has(sig) };
+      map.set(sig, tagged); // later docs (amendments) overwrite → precedence
+    }
+  }
+  const requirements = Array.from(map.values()).map((r, i) => ({ ...r, id: `REQ-${String(i + 1).padStart(3, '0')}` }));
+  return { requirements, sources };
+}
+
 export async function POST(request: NextRequest) {
   const email = request.nextUrl.searchParams.get('email');
   if (!email) {
@@ -127,14 +195,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Invalid JSON body' }, { status: 400 });
   }
 
-  const sourceText = (body.text || '').trim();
-  if (!sourceText) {
-    return NextResponse.json(
-      { success: false, error: 'No source text provided. Upload an RFP first.' },
-      { status: 400 }
-    );
-  }
-
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
     return NextResponse.json(
@@ -143,21 +203,44 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // MULTI-DOC mode (Eric QC: amendments revise the base — deadlines/specs — so a
+  // base-only matrix is STALE and would pass a non-compliant bid). When a
+  // pipeline_id is sent, extract from base solicitation + AMENDMENTS + Q&A, and
+  // merge with AMENDMENT PRECEDENCE (later amendments win; flag what changed).
+  let sourceText = (body.text || '').trim();
+  let multiDocResult: { requirements: ComplianceRequirement[]; sources: string[] } | null = null;
+  if (body.pipeline_id && email) {
+    multiDocResult = await extractMultiDoc(apiKey, body.pipeline_id, email);
+  }
+  if (!multiDocResult && !sourceText) {
+    return NextResponse.json(
+      { success: false, error: 'No source text provided. Upload an RFP first.' },
+      { status: 400 }
+    );
+  }
+
   const wasTruncated = sourceText.length > MAX_INPUT_CHARS;
   const inputText = wasTruncated ? sourceText.slice(0, MAX_INPUT_CHARS) : sourceText;
 
   try {
-    // CHUNKED extraction (Eric QC: a real 89K-char solicitation returned
-    // "Request too large" on 70B + 429'd on rate limit → the matrix was silently
-    // empty). Split into ~14K chunks, extract per chunk (8B fallback on rate-
-    // limit/too-large), merge + dedupe.
-    const chunks = chunkText(inputText, 14000);
-    const merged: ComplianceRequirement[] = [];
-    let anyOk = false;
-    for (const chunk of chunks) {
-      const reqs = await extractChunk(apiKey, body.fileName, chunk);
-      if (reqs !== null) { anyOk = true; merged.push(...reqs); }
+    let merged: ComplianceRequirement[];
+    let anyOk: boolean;
+    let docSources: string[] = [];
+    if (multiDocResult) {
+      merged = multiDocResult.requirements;
+      anyOk = merged.length > 0;
+      docSources = multiDocResult.sources;
+    } else {
+      // Single-doc (legacy): chunk the flat text, extract, merge.
+      const chunks = chunkText(inputText, 14000);
+      merged = [];
+      anyOk = false;
+      for (const chunk of chunks) {
+        const reqs = await extractChunk(apiKey, body.fileName, chunk);
+        if (reqs !== null) { anyOk = true; merged.push(...reqs); }
+      }
     }
+    void docSources;
     const response = { ok: anyOk, status: anyOk ? 200 : 500 };
 
     if (!response.ok) {

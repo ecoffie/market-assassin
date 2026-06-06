@@ -75,6 +75,8 @@ interface ComplianceRequirementRow {
   category: ComplianceCategory;
   section?: string;
   source_quote?: string;
+  source_doc?: string;  // which doc (e.g. "Amendment 0004")
+  revised?: boolean;    // changed by an amendment
   owner: string;     // user-editable
   status: ComplianceStatus; // user-editable
 }
@@ -400,7 +402,10 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       const res = await fetch(`/api/app/proposal/compliance?email=${encodeURIComponent(email)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({ text: uploadedRfp.text, fileName: uploadedRfp.fileName }),
+        // Send pipeline_id so the matrix uses MULTI-DOC extraction with amendment
+        // precedence (base + amendments + Q&A) when we have a tracked pursuit;
+        // falls back to the uploaded text otherwise.
+        body: JSON.stringify({ text: uploadedRfp.text, fileName: uploadedRfp.fileName, pipeline_id: activePursuitId || undefined }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
@@ -413,6 +418,8 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         category: (r.category as ComplianceCategory) || 'other',
         section: r.section,
         source_quote: r.source_quote,
+        source_doc: r.source_doc,
+        revised: r.revised,
         owner: '',
         status: 'open',
       }));
@@ -1904,6 +1911,14 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                           <td className="px-3 py-2 font-mono text-xs text-slate-500">{r.id}</td>
                           <td className="px-3 py-2 text-slate-200">
                             {r.requirement}
+                            {r.revised && (
+                              <span className="ml-2 inline-block rounded bg-amber-500/20 border border-amber-500/40 px-1.5 py-0.5 text-[10px] font-semibold text-amber-300" title={`This requirement was revised by ${r.source_doc || 'an amendment'} — the current value is shown`}>
+                                ⚠️ revised by {r.source_doc || 'amendment'}
+                              </span>
+                            )}
+                            {!r.revised && r.source_doc && /Amendment/i.test(r.source_doc) && (
+                              <span className="ml-2 text-[10px] text-blue-400/70" title="New requirement added by this amendment">+ {r.source_doc}</span>
+                            )}
                             {r.source_quote && (
                               <details className="mt-1">
                                 <summary className="text-xs text-slate-500 cursor-pointer hover:text-slate-300">Source quote</summary>
