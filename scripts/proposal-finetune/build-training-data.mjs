@@ -31,6 +31,39 @@ const SYSTEM_BY_TYPE = {
   proposal_template: 'You are a senior federal proposal writer. Produce a clean, compliant proposal section in federal capture voice.',
 };
 
+// --- Fake-entity generators (deterministic-ish rotation so a doc reads
+// coherently). Eric: substitute made-up names instead of blanking, so the model
+// learns "a name goes here", and no real PII trains. ---
+const FAKE_PEOPLE = ['Jordan Avery', 'Morgan Blake', 'Casey Donovan', 'Taylor Reese', 'Riley Carmichael', 'Alex Whitfield'];
+const FAKE_COMPANIES = ['Summit Federal Builders LLC', 'Cornerstone Government Services', 'Apex Infrastructure Group', 'Meridian Construction Partners', 'Vanguard Federal Solutions', 'Keystone Contracting Co.'];
+let _pIdx = 0, _cIdx = 0;
+function fakePerson() { return FAKE_PEOPLE[_pIdx++ % FAKE_PEOPLE.length]; }
+function fakeCompany() { return FAKE_COMPANIES[_cIdx++ % FAKE_COMPANIES.length]; }
+
+// Swap KNOWN real entities from our own corpus (the firms whose proposals these
+// are) for a single consistent fake — so unlabeled table mentions ("Evankoff",
+// "Tavares LLC") don't leak. Add to this list as the review surfaces more.
+// Companies → a fake company; people → a fake person. Order matters (longer/
+// company patterns first). Add more as the review surfaces them.
+const KNOWN_COMPANIES = [
+  /\bEvankoff(?:\s+(?:Construction|LLC|Inc))?\b/gi,
+  /\bTavares\s+LLC\b/gi,
+  /\bBenchmar(?:k|g)\s+Investments\b/gi,
+  /\bWorldWide\s+Flight\s+Services\b/gi,
+  /\bMiami\s+WIIPICA\s+LLC\b/gi,
+];
+const KNOWN_PEOPLE = [
+  /\bFernando\s+Tavares\b/gi,
+  /\b(?:Eric\s+)?Coffie\b/gi,
+  /\bTavares\b/gi, // bare surname (after the LLC/full-name passes)
+];
+function swapKnownEntities(text) {
+  let t = text;
+  for (const re of KNOWN_COMPANIES) t = t.replace(re, 'Summit Federal Builders LLC');
+  for (const re of KNOWN_PEOPLE) t = t.replace(re, 'Jordan Avery');
+  return t;
+}
+
 // CLEAN a doc into training-worthy prose: strip letterhead/contact blocks, PII
 // (names/emails/phones/DUNS/CAGE — also cannot legally go to OpenAI), page
 // furniture, and leading list-fragments. Returns cleaned text.
@@ -41,6 +74,15 @@ function cleanText(raw) {
   t = t.replace(/\b(?:DUNS|CAGE\s*Code|CAGE|UEI|EIN|TIN)\s*:?\s*[A-Z0-9-]+/gi, '');
   t = t.replace(/\b\d{3}[.\-\s]\d{3}[.\-\s]\d{4}\b/g, '[phone]'); // phone numbers
   t = t.replace(/\b\d{1,5}\s+[A-Z][a-z]+\s+(?:Street|St|Avenue|Ave|Road|Rd|Drive|Dr|Suite|Ste|Lane|Blvd|Boulevard)\b[^\n]*/g, '[address]');
+  // Replace labeled PII with PLAUSIBLE FAKE values (Eric: substitute made-up
+  // names, don't blank them — so the model learns a NAME goes there, not an
+  // empty slot). Keeps the structure/voice, leaks no real PII.
+  t = t.replace(/\b(Point of Contact|POC|Contact|Contracting Officer|Contract Specialist|Attn|Prepared by|Submitted by)\s*:\s*[^\n]+/gi, (_m, label) => `${label}: ${fakePerson()}`);
+  t = t.replace(/\b(Owner|Reference|Client)\s*:\s*[^\n]+/gi, (_m, label) => `${label}: ${fakeCompany()}`);
+  t = t.replace(/\b(Email Address|E-?mail)\s*:\s*[^\n]+/gi, '$1: contact@example.com');
+  t = t.replace(/\b(Phone|Fax|Tel)\s*:\s*[^\n]+/gi, '$1: (555) 555-0100');
+  // "Dear <Name>," → a fake recipient (keeps the salutation form).
+  t = t.replace(/\bDear\s+(?:Mr|Ms|Mrs|Dr)\.?\s+[A-Z][a-z]+(?:\s+[A-Z]\.?\s*[A-Z][a-z]+)?,/g, () => `Dear ${fakePerson()},`);
   // Strip a leading letterhead/salutation block (everything up to and incl.
   // "Dear ...," when present in the first ~800 chars — that's the letter header).
   const dear = t.slice(0, 900).search(/\bDear\s+[A-Z][^,\n]{0,40},/);
@@ -51,6 +93,7 @@ function cleanText(raw) {
   // or a bare number), cut to the first real heading or capitalized sentence.
   const startMatch = t.search(/(?:^|\n)\s*(?:[A-Z][a-z]+\s){2,}|(?:SECTION|VOLUME|[0-9]+\.[0-9]?\s+[A-Z])/);
   if (startMatch > 0 && /^\s*(?:\d+\.|[a-z])/.test(t)) t = t.slice(startMatch);
+  t = swapKnownEntities(t); // unlabeled real firm/person names → consistent fake
   return t.replace(/\n{3,}/g, '\n\n').replace(/[ \t]{2,}/g, ' ').trim();
 }
 
@@ -79,7 +122,7 @@ function userPrompt(docType, title, text) {
     past_performance: 'a past performance write-up',
     proposal_template: 'a proposal section',
   }[docType] || 'a proposal section';
-  return `Write ${label} for this opportunity: ${subject || title}`;
+  return swapKnownEntities(`Write ${label} for this opportunity: ${subject || title}`);
 }
 
 // Slice a long technical volume into section-sized chunks at heading boundaries.
