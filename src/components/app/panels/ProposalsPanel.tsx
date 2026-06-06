@@ -8,6 +8,7 @@ import type { LoiFields } from '@/lib/proposal/loi-fields';
 import { loiFieldsHaveContent } from '@/lib/proposal/loi-fields';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 import ProposalChat from './ProposalChat';
+import DocManifest from './DocManifest';
 
 interface ProposalsPanelProps {
   email: string | null;
@@ -1331,6 +1332,14 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               {autoLoadStatus === 'error' && '✕ '}
             </span>
             {autoLoadStatus === 'loading' ? 'Loading pursuit documents…' : autoLoadMessage}
+          </div>
+        )}
+
+        {/* Doc manifest — all attachments classified + grouped, so you can hand
+            the SOW/pricing/wage-det to the right person. Shows on a pursuit. */}
+        {activePursuitId && email && (
+          <div className="mb-4">
+            <DocManifest email={email} pursuitId={activePursuitId} />
           </div>
         )}
 

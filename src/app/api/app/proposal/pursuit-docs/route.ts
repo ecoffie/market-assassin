@@ -149,7 +149,7 @@ export async function GET(request: NextRequest) {
   // RFP / SOW (typically the first / largest) before amendments.
   const { data: docs, error: docsErr } = await supabase
     .from('pursuit_documents')
-    .select('id, sam_file_id, sam_url, filename, mime_type, size_bytes, page_count, char_count, extracted_text, downloaded_at, extraction_error')
+    .select('id, sam_file_id, sam_url, filename, mime_type, size_bytes, page_count, char_count, extracted_text, doc_kind, doc_kind_confidence, storage_path, downloaded_at, extraction_error')
     .eq('pipeline_id', pipelineId)
     .order('size_bytes', { ascending: false });
 
