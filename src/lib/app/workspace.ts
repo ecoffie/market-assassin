@@ -333,3 +333,47 @@ export async function recordAppActivity({
     console.error('[MI Beta Activity] Failed to record activity:', error);
   }
 }
+
+/**
+ * Coach Mode: resolve the workspace a request should operate on.
+ *
+ * If the caller sent `x-active-workspace` (a coach/consultant switched to a
+ * client) AND is authorized for that client workspace (org_clients + an active
+ * coach/org_admin membership in the same org), operate as that client. Otherwise
+ * fall back to the user's own workspace (ensureWorkspaceMember).
+ *
+ * Drop-in for routes: `const { workspaceId } = await resolveActiveWorkspace(email, request);`
+ */
+export async function resolveActiveWorkspace(
+  email: string,
+  request: { headers: { get(name: string): string | null } },
+): Promise<{ workspaceId: string; asClient: boolean }> {
+  const activeWs = request.headers.get('x-active-workspace');
+  if (activeWs) {
+    const supabase = getAppSupabase();
+    const normalized = normalizeEmail(email);
+    // Is this active workspace a client of an org the user coaches/admins?
+    const { data: client } = await supabase
+      .from('org_clients')
+      .select('org_id, assigned_coach')
+      .eq('workspace_id', activeWs)
+      .eq('status', 'active')
+      .maybeSingle();
+    if (client) {
+      const { data: membership } = await supabase
+        .from('org_members')
+        .select('role')
+        .eq('org_id', client.org_id)
+        .eq('user_email', normalized)
+        .eq('status', 'active')
+        .in('role', ['coach', 'org_admin'])
+        .maybeSingle();
+      // org_admin sees any client; a coach must be the assigned one.
+      const authorized = membership && (membership.role === 'org_admin' || client.assigned_coach === normalized);
+      if (authorized) return { workspaceId: activeWs, asClient: true };
+    }
+    // Header present but not authorized → ignore it (no cross-client leak).
+  }
+  const { workspaceId } = await ensureWorkspaceMember(email);
+  return { workspaceId, asClient: false };
+}

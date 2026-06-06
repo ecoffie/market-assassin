@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
-import { ensureWorkspaceMember, recordAppActivity } from '@/lib/app/workspace';
+import { ensureWorkspaceMember, recordAppActivity, resolveActiveWorkspace } from '@/lib/app/workspace';
 import { fetchPursuitDocsAuto } from '@/lib/grants/fetch-grant-docs';
 import { isValidSamNoticeId } from '@/lib/sam/utils';
 import { isCleanValueEstimate } from '@/lib/pipeline/value-estimate';
@@ -88,7 +88,10 @@ export async function GET(request: NextRequest) {
   const authSession = requireMIAuthSession(request, email);
   if (!authSession.ok) return authSession.response;
   const normalizedEmail = email.toLowerCase().trim();
-  const { workspaceId } = await ensureWorkspaceMember(normalizedEmail);
+  // Coach Mode: if switched to a client, scope to THAT client's workspace only
+  // (don't OR in the coach's own email — that would leak the coach's personal
+  // pursuits into the client view).
+  const { workspaceId, asClient } = await resolveActiveWorkspace(normalizedEmail, request);
 
   try {
     const buildQuery = (useWorkspace: boolean) => {
@@ -96,9 +99,11 @@ export async function GET(request: NextRequest) {
         .from('user_pipeline')
         .select('*');
 
-      query = useWorkspace
-        ? query.or(`workspace_id.eq.${workspaceId},user_email.eq.${normalizedEmail}`)
-        : query.eq('user_email', normalizedEmail);
+      query = asClient
+        ? query.eq('workspace_id', workspaceId)
+        : useWorkspace
+          ? query.or(`workspace_id.eq.${workspaceId},user_email.eq.${normalizedEmail}`)
+          : query.eq('user_email', normalizedEmail);
 
       query = query.order('response_deadline', { ascending: true, nullsFirst: false });
 
@@ -438,7 +443,7 @@ export async function PATCH(request: NextRequest) {
 
     const authSession = requireMIAuthSession(request, user_email);
     if (!authSession.ok) return authSession.response;
-    const { workspaceId } = await ensureWorkspaceMember(user_email);
+    const { workspaceId } = await resolveActiveWorkspace(user_email, request);
     updates.updated_by = user_email.toLowerCase();
     updates.workspace_id = updates.workspace_id || workspaceId;
 

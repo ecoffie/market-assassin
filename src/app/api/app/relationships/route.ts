@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
-import { ensureWorkspaceMember, recordAppActivity } from '@/lib/app/workspace';
+import { ensureWorkspaceMember, recordAppActivity, resolveActiveWorkspace } from '@/lib/app/workspace';
 import { searchContractors } from '@/lib/contractor-database';
 import { getAllCommands, getEnhancedAgencyInfo, type SmallBusinessOffice } from '@/lib/utils/command-info';
 
@@ -770,7 +770,7 @@ export async function GET(request: NextRequest) {
   try {
     await ensureRelationshipSchema();
     const normalizedEmail = normalizeEmail(email);
-    const { workspaceId } = await ensureWorkspaceMember(normalizedEmail);
+    const { workspaceId } = await resolveActiveWorkspace(normalizedEmail, request);
 
     if (mode === 'pursuits') {
       // Only LIVE pursuits should appear in the "Save + attach to:" dropdown.
@@ -891,7 +891,7 @@ export async function POST(request: NextRequest) {
 
     const authSession = requireMIAuthSession(request, email);
     if (!authSession.ok) return authSession.response;
-    const { workspaceId } = await ensureWorkspaceMember(email);
+    const { workspaceId } = await resolveActiveWorkspace(email, request);
 
     if (action === 'link_contact') {
       if (!body.contact_id || !body.pipeline_id) {
@@ -1021,7 +1021,7 @@ export async function PATCH(request: NextRequest) {
 
     const authSession = requireMIAuthSession(request, email);
     if (!authSession.ok) return authSession.response;
-    const { workspaceId } = await ensureWorkspaceMember(email);
+    const { workspaceId } = await resolveActiveWorkspace(email, request);
 
     // Only include provided fields (don't null out untouched columns).
     const updates: Record<string, unknown> = {
