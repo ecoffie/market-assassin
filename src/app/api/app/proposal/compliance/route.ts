@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { logToolError, ToolNames, AIProviders, classifyError } from '@/lib/tool-errors';
+import { normalizeCategory } from '@/lib/proposal/section-alignment';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -152,7 +153,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    const requirements = Array.isArray(parsed.requirements) ? parsed.requirements : [];
+    // Normalize categories — the model often ignores our enum and uses the
+    // doc's own headings ("Project Objectives") which broke alignment + would
+    // mislead the compliance referee (Eric's QC catch). Remap to our 7 so every
+    // requirement routes to a real section.
+    const rawReqs = Array.isArray(parsed.requirements) ? parsed.requirements : [];
+    const requirements = rawReqs.map((r) => ({
+      ...r,
+      category: normalizeCategory(r.category as string | undefined, r.requirement),
+    }));
 
     return NextResponse.json({
       success: true,

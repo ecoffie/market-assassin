@@ -11,11 +11,46 @@
  */
 import type { SectionType } from './types';
 
+export type ReqCategory = 'submission' | 'evaluation' | 'technical' | 'past_performance' | 'pricing' | 'admin' | 'other';
+
 export interface ComplianceReq {
   id?: string;
   requirement: string;
-  category: 'submission' | 'evaluation' | 'technical' | 'past_performance' | 'pricing' | 'admin' | 'other';
+  category: ReqCategory;
   section?: string;       // e.g. "L.3.2", "M.2", "C.5", "SOW 3.4"
+}
+
+/**
+ * Normalize the model's category (which often ignores our enum and uses the
+ * doc's own headings — "Project Objectives", "special_standards_of_
+ * responsibility") back to one of our 7. Uses the category text + the
+ * requirement text so we never lose a requirement to an unknown bucket (the QC
+ * bug Eric caught: free-text categories broke alignment + the referee).
+ */
+const KNOWN_CATEGORIES: ReqCategory[] = ['submission', 'evaluation', 'technical', 'past_performance', 'pricing', 'admin', 'other'];
+export function normalizeCategory(rawCategory: string | undefined, requirementText = ''): ReqCategory {
+  const c = (rawCategory || '').toLowerCase();
+  if (KNOWN_CATEGORIES.includes(c as ReqCategory)) return c as ReqCategory;
+  // The category LABEL is the strongest hint (the model usually names the right
+  // theme even if it's free-text); the requirement TEXT is the tiebreaker.
+  const label = c;
+  const text = requirementText.toLowerCase();
+  const hay = `${label} ${text}`;
+
+  // Past performance — check first (specific, easy to mis-route). NOTE: no
+  // trailing \b on word-prefixes (past[ _-]?perform must match "performance").
+  if (/(past[ _-]?perform|cpars|references?|prior[ _-]?contract|relevant[ _-]?experience|standards?[ _-]?of[ _-]?responsib|similar[ _-]?(work|project|contract))/.test(hay)) return 'past_performance';
+  if (/\b(pric|cost|clin|fee|labor[ _-]?rate|schedule[ _-]?b|quote|invoice|dollar)\b/.test(hay)) return 'pricing';
+  // Evaluation — the LABEL must signal it (a requirement about technical merit
+  // is technical; only the M-factor framing is "evaluation").
+  if (/(evaluat|award[ _-]?basis|rated|trade[ _-]?off|best[ _-]?value|section[ _-]?m|basis[ _-]?(for|of)[ _-]?award)/.test(label) ||
+      /(government will evaluate|evaluation factor|will[ _-]?be[ _-]?evaluated|government will assess)/.test(text)) return 'evaluation';
+  if (/\b(submit|submission|page[ _-]?limit|format|due|deadline|portal|copies|font|margin|\bvolume\b|section[ _-]?l|sf[ _-]?1449|no later than)\b/.test(hay)) return 'submission';
+  if (/\b(cert|representation|reps?[ _-]?(and|&)?[ _-]?cert|registration|sam\.gov|clause|far[ _-]?52|\badmin\b)\b/.test(hay)) return 'admin';
+  // Technical — the broad default for scope/approach/objectives/deliverables and
+  // "the contractor shall <do work>" (an objective IS technical scope).
+  if (/\b(technical|approach|methodolog|scope|\btask\b|deliverabl|sow|pws|objective|install|design|construct|provide|perform|restore|maintain|repair|service|replace|upgrade|furnish|complete[ _-]?the)\b/.test(hay)) return 'technical';
+  return 'other';
 }
 
 // Which draft section a requirement category belongs to. Submission/admin/eval
