@@ -120,9 +120,15 @@ function generateHtmlBody(briefing: AIGeneratedBriefing, date: string, userEmail
       </p>
     </div>
 
-    <!-- Header -->
+    <!-- Header (Mindy-branded) -->
     <div class="header">
-      <h1>📊 Weekly Deep Dive</h1>
+      <div style="display:inline-block; vertical-align:middle;">
+        <img src="https://getmindy.ai/brand/mindy-logo-icon.png" width="40" height="40" alt="Mindy" style="vertical-align:middle; border-radius:8px; margin-right:10px;" />
+      </div>
+      <div style="display:inline-block; vertical-align:middle; text-align:left;">
+        <div style="font-size:13px; font-weight:600; letter-spacing:1px; opacity:0.85; text-transform:uppercase;">Mindy · Weekly Deep Dive</div>
+        <h1 style="margin:2px 0 0; font-size:26px;">Your recompete intel for the week</h1>
+      </div>
       <p>${date}</p>
     </div>
 
@@ -186,33 +192,34 @@ function generateHtmlBody(briefing: AIGeneratedBriefing, date: string, userEmail
  * Render a single opportunity in HTML
  */
 function renderOpportunity(opp: AIBriefingOpportunity): string {
+  // Modernized card (Eric): rank chip + title row, a prominent VALUE pill on the
+  // right, a clean 2-up meta grid, and the displacement angle as a highlighted
+  // callout. More scannable than the old flat label/value list.
   return `
-    <div class="opportunity">
-      <h3 class="opp-title">
-        <span class="opp-rank">${opp.rank}</span>
-        ${escapeHtml(opp.contractName)}
-      </h3>
-      <div class="opp-meta">
-        <div class="opp-meta-item">
-          <span class="opp-meta-label">Agency:</span>
-          <span class="opp-meta-value">${escapeHtml(opp.agency)}</span>
-        </div>
-        <div class="opp-meta-item">
-          <span class="opp-meta-label">Incumbent:</span>
-          <span class="opp-meta-value">${escapeHtml(opp.incumbent)}</span>
-        </div>
-        <div class="opp-meta-item">
-          <span class="opp-meta-label">Value:</span>
-          <span class="opp-meta-value opp-value">${escapeHtml(opp.value)}</span>
-        </div>
-        <div class="opp-meta-item">
-          <span class="opp-meta-label">Window:</span>
-          <span class="opp-meta-value">${escapeHtml(opp.window)}</span>
-        </div>
-      </div>
-      <div class="opp-displacement">
-        <div class="opp-displacement-label">Displacement Angle</div>
-        <p class="opp-displacement-text">${escapeHtml(opp.displacementAngle)}</p>
+    <div style="background:#ffffff; border:1px solid #e5e7eb; border-radius:12px; padding:18px 20px; margin-bottom:14px; box-shadow:0 1px 2px rgba(0,0,0,0.04);">
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation"><tr>
+        <td style="vertical-align:top;">
+          <span class="opp-rank">${opp.rank}</span>
+          <span style="font-size:16px; font-weight:700; color:#111827; vertical-align:middle;">${escapeHtml(opp.contractName)}</span>
+        </td>
+        <td style="vertical-align:top; text-align:right; white-space:nowrap; padding-left:12px;">
+          <span style="display:inline-block; background:#ecfdf5; color:#059669; font-weight:700; font-size:15px; padding:6px 12px; border-radius:8px;">${escapeHtml(opp.value)}</span>
+        </td>
+      </tr></table>
+
+      <table width="100%" cellpadding="0" cellspacing="0" role="presentation" style="margin-top:12px;">
+        <tr>
+          <td width="50%" style="font-size:13px; padding:2px 0;"><span style="color:#9ca3af;">Agency</span><br><strong style="color:#374151;">${escapeHtml(opp.agency)}</strong></td>
+          <td width="50%" style="font-size:13px; padding:2px 0;"><span style="color:#9ca3af;">Incumbent</span><br><strong style="color:#374151;">${escapeHtml(opp.incumbent)}</strong></td>
+        </tr>
+        <tr>
+          <td width="50%" style="font-size:13px; padding:2px 0;"><span style="color:#9ca3af;">Window</span><br><strong style="color:#374151;">${escapeHtml(opp.window)}</strong></td>
+        </tr>
+      </table>
+
+      <div style="margin-top:14px; background:#fffbeb; border-left:3px solid #f59e0b; border-radius:0 8px 8px 0; padding:10px 14px;">
+        <div style="font-size:11px; font-weight:700; text-transform:uppercase; letter-spacing:0.5px; color:#b45309; margin-bottom:4px;">⚡ Displacement Angle</div>
+        <p style="margin:0; font-size:14px; color:#374151; line-height:1.5;">${escapeHtml(opp.displacementAngle)}</p>
       </div>
     </div>
   `;
