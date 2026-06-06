@@ -108,11 +108,11 @@ ${inputText}
 JSON only.`;
 
   try {
-    const response = await fetch(GROQ_API_URL, {
+    const callOutline = (model: string) => fetch(GROQ_API_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
       body: JSON.stringify({
-        model: GROQ_MODEL,
+        model,
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
@@ -122,6 +122,10 @@ JSON only.`;
         response_format: { type: 'json_object' },
       }),
     });
+    // 70B has a small daily quota → fall back to 8B on 429 (same as v2).
+    const FALLBACK = process.env.PROPOSAL_FALLBACK_MODEL || 'llama-3.1-8b-instant';
+    let response = await callOutline(GROQ_MODEL);
+    if (response.status === 429 && GROQ_MODEL !== FALLBACK) response = await callOutline(FALLBACK);
     if (!response.ok) {
       console.warn(`[proposal/draft-all] outline ${response.status}`);
       return sectionTypes.map(s => ({ sectionType: s, emphasis: '', keyAngles: [] }));

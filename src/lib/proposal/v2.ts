@@ -27,6 +27,8 @@ import { buildTemplateCorpusQuery, getTemplateCorpusDocTypes } from './template-
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = process.env.PROPOSAL_GROQ_MODEL || 'llama-3.3-70b-versatile';
+// Fallback when the primary (70B, small daily quota) is rate-limited.
+const PROPOSAL_FALLBACK_MODEL = process.env.PROPOSAL_FALLBACK_MODEL || 'llama-3.1-8b-instant';
 const MAX_INPUT_CHARS = 40000;
 
 // ---- Prompt builder -------------------------------------------------
@@ -160,22 +162,29 @@ export async function generateV2Draft(opts: {
   const built = await buildV2Prompt(opts);
   const sectionMeta = getSectionMeta(opts.sectionType);
 
-  const response = await fetch(GROQ_API_URL, {
+  // The 70B model has a SMALL daily token quota (100K TPD) that proposals burn
+  // through fast → 429 "rate limit reached" → drafts silently failed (Eric:
+  // "draft generation failed"). Fall back to 8B-instant (separate, larger quota
+  // bucket) on a 429/rate-limit so a draft ALWAYS comes back.
+  const callGroq = async (model: string) => fetch(GROQ_API_URL, {
     method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${apiKey}`,
-    },
+    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
     body: JSON.stringify({
-      model: GROQ_MODEL,
+      model,
       messages: [
         { role: 'system', content: built.systemPrompt },
         { role: 'user', content: built.userPrompt },
       ],
-      temperature: 0.5,  // slightly higher than v1 to let lenses produce variety
+      temperature: 0.5,
       max_tokens: 2200,
     }),
   });
+
+  let response = await callGroq(GROQ_MODEL);
+  if (response.status === 429 && GROQ_MODEL !== PROPOSAL_FALLBACK_MODEL) {
+    console.warn(`[proposal/v2] ${GROQ_MODEL} rate-limited (429) → falling back to ${PROPOSAL_FALLBACK_MODEL}`);
+    response = await callGroq(PROPOSAL_FALLBACK_MODEL);
+  }
 
   if (!response.ok) {
     const errText = await response.text().catch(() => '');
