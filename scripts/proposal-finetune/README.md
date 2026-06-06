@@ -47,3 +47,26 @@ node build-training-data.mjs          # → jsonl + review.md  (REVIEW FIRST)
 OPENAI_API_KEY=... node submit-finetune.mjs
 OPENAI_API_KEY=... node check-status.mjs
 ```
+
+## Model strategy — DATA-DRIVEN (queried SAM cache 2026-06-06)
+
+10,907 respondable opps: **73% full-proposal** (Combined Synopsis 41% +
+Solicitation 32%), **9% Sources Sought** (LOI). RFQ/IDIQ/BPA/OTA are <1% by
+keyword — they're CONTRACT VEHICLES, not response styles.
+
+**→ Train 2 voice fine-tunes, not a model per type:**
+- `govcon-loi` — Sources Sought / LOI (market-research responses). 11 examples.
+- `govcon-technical` — full proposal / technical volume (the 73%). 125 examples.
+
+**Everything else → RAG**, not new models:
+- OTA / IDIQ / BPA / vehicle-specific + agency quirks → add winning examples to
+  the `mindy_rag_documents` corpus, tagged by type. Instantly available at
+  generation (retrieved as "write like this"), no retraining.
+- RFQ → a pricing/quote template + the technical voice for any narrative.
+
+**Getting better over time = hybrid:**
+- Breadth: new response type → add docs to RAG (instant, free, no model).
+- Depth: as you win more bids → add to RAG; periodically RE-RUN the 2 fine-tunes
+  on the grown corpus to lift the baseline.
+Fine-tune = house VOICE (stable, 2 models). RAG = situation KNOWLEDGE (grows
+forever). This is how Perplexity/Harvey-class products scale.
