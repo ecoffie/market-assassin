@@ -31,6 +31,8 @@ interface RelationshipContact {
   notes?: string;
   context?: string;
   created_at?: string;
+  target_agency?: string;       // v2: which target agency this relationship is for
+  relationship_stage?: string;  // v2: prospect | warm | contacted | met | champion
 }
 
 interface Pursuit {
@@ -69,6 +71,24 @@ function contactTypeLabel(type?: string) {
     case 'subcontractor': return 'Sub';
     case 'internal': return 'Internal';
     default: return 'Partner';
+  }
+}
+
+// v2: relationship stages — the develop-before-pursue progression.
+const STAGES: Array<{ id: string; label: string; emoji: string }> = [
+  { id: 'prospect', label: 'Prospect', emoji: '○' },
+  { id: 'warm', label: 'Warm', emoji: '🟡' },
+  { id: 'contacted', label: 'Contacted', emoji: '📨' },
+  { id: 'met', label: 'Met', emoji: '🤝' },
+  { id: 'champion', label: 'Champion', emoji: '⭐' },
+];
+function stageColor(stage: string): string {
+  switch (stage) {
+    case 'warm': return 'bg-amber-500/15 text-amber-300';
+    case 'contacted': return 'bg-sky-500/15 text-sky-300';
+    case 'met': return 'bg-emerald-500/15 text-emerald-300';
+    case 'champion': return 'bg-purple-500/15 text-purple-300';
+    default: return 'bg-slate-800 text-slate-400';
   }
 }
 
@@ -266,6 +286,20 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
     return () => clearTimeout(t);
   }, [activeTab, searchQuery, naicsFilter, agencyFilter, searchCandidates]);
 
+  // v2: update a saved relationship's stage (prospect→warm→…→champion).
+  // Optimistic; PATCH persists (graceful degrade pre-migration).
+  const updateStage = async (contactId: string, stage: string) => {
+    if (!email) return;
+    setSavedContacts(prev => prev.map(c => c.id === contactId ? { ...c, relationship_stage: stage } : c));
+    try {
+      await fetch('/api/app/relationships', {
+        method: 'PATCH',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ user_email: email, id: contactId, relationship_stage: stage }),
+      });
+    } catch { /* optimistic — non-fatal */ }
+  };
+
   const saveContact = async (contact: RelationshipContact) => {
     if (!email) return;
     setSavingId(contact.id);
@@ -380,7 +414,14 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
     }
   };
 
-  const displayedContacts = activeTab === 'network' ? savedContacts : candidates;
+  // v2: on My Network, sort by agency so contacts cluster — "who do I know at
+  // each target agency" (Eric). Group headers are rendered inline on change.
+  const networkSorted = useMemo(() => {
+    const agOf = (c: RelationshipContact) => (c.target_agency || c.agency || 'Unassigned');
+    return [...savedContacts].sort((a, b) => agOf(a).localeCompare(agOf(b)) || (a.full_name || '').localeCompare(b.full_name || ''));
+  }, [savedContacts]);
+  const displayedContacts = activeTab === 'network' ? networkSorted : candidates;
+  const agencyOf = (c: RelationshipContact) => (c.target_agency || c.agency || 'Unassigned');
   const activeTabConfig = TABS.find(tab => tab.id === activeTab) || TABS[0];
 
   if (loading) {
@@ -611,16 +652,37 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
         </div>
 
         <div className="divide-y divide-slate-800">
-          {displayedContacts.map(contact => {
+          {displayedContacts.map((contact, idx) => {
             const key = `${contact.contact_type}:${(contact.email || contact.source_record_id || contact.full_name).toLowerCase()}`;
             const isSaved = savedKeys.has(key);
             const attached = linkedByContact.get(contact.id) || [];
+            // v2: agency group header on the network tab when the agency changes.
+            const showAgencyHeader = activeTab === 'network'
+              && (idx === 0 || agencyOf(displayedContacts[idx - 1]) !== agencyOf(contact));
 
             return (
-              <div key={contact.id} className="p-5 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
+              <div key={contact.id}>
+              {showAgencyHeader && (
+                <div className="px-5 py-2 bg-slate-900/60 border-y border-slate-800 text-xs font-semibold uppercase tracking-wider text-emerald-300">
+                  {agencyOf(contact)}
+                </div>
+              )}
+              <div className="p-5 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2 mb-2">
                     <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">{contactTypeLabel(contact.contact_type)}</span>
+                    {/* v2: relationship STAGE — develop-before-pursue tracking.
+                        Network tab only; quick inline change. */}
+                    {activeTab === 'network' && (
+                      <select
+                        value={contact.relationship_stage || 'prospect'}
+                        onChange={(e) => updateStage(contact.id, e.target.value)}
+                        className={`rounded px-2 py-1 text-xs border-0 outline-none cursor-pointer ${stageColor(contact.relationship_stage || 'prospect')}`}
+                        title="Where this relationship stands"
+                      >
+                        {STAGES.map(s => <option key={s.id} value={s.id}>{s.emoji} {s.label}</option>)}
+                      </select>
+                    )}
                     {contact.source && <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-500">{contact.source}</span>}
                     {attached.length > 0 && <span className="rounded bg-emerald-500/10 px-2 py-1 text-xs text-emerald-300">Attached to {attached.length} pursuit{attached.length === 1 ? '' : 's'}</span>}
                   </div>
@@ -663,6 +725,7 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
                     </button>
                   )}
                 </div>
+              </div>
               </div>
             );
           })}

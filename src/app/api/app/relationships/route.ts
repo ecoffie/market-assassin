@@ -45,6 +45,8 @@ interface RelationshipContactInput {
   phone?: string;
   organization?: string;
   agency?: string;
+  target_agency?: string;       // v2: the target-agency this relationship is for
+  relationship_stage?: string;  // v2: prospect | warm | contacted | met | champion
   office?: string;
   sub_tier?: string;
   source?: string;
@@ -930,6 +932,12 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'full_name is required' }, { status: 400 });
     }
 
+    // v2 fields (target_agency, relationship_stage) live in a separate object
+    // so we can drop them and retry if the migration hasn't run yet.
+    const v2 = {
+      target_agency: input.target_agency || input.agency || null,
+      relationship_stage: input.relationship_stage || 'prospect',
+    };
     const payload = {
       workspace_id: workspaceId,
       user_email: email,
@@ -948,6 +956,7 @@ export async function POST(request: NextRequest) {
       owner_email: email,
       created_by: email,
       updated_by: email,
+      ...v2,
     };
 
     if (payload.email || payload.source_record_id) {
@@ -968,12 +977,18 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const { data, error } = await getSupabase()
+    let { data, error } = await getSupabase()
       .from('mi_beta_contacts')
       .insert(payload)
       .select()
       .single();
 
+    // Migration not run yet → retry without the v2 columns (graceful degrade).
+    if (error && /target_agency|relationship_stage|schema cache|column/.test(error.message || '')) {
+      const { target_agency: _ta, relationship_stage: _rs, ...base } = payload;
+      void _ta; void _rs;
+      ({ data, error } = await getSupabase().from('mi_beta_contacts').insert(base).select().single());
+    }
     if (error) throw error;
 
     await recordAppActivity({
@@ -1008,23 +1023,32 @@ export async function PATCH(request: NextRequest) {
     if (!authSession.ok) return authSession.response;
     const { workspaceId } = await ensureWorkspaceMember(email);
 
-    const updates = {
-      notes: body.notes,
-      title: body.title,
-      phone: body.phone,
-      email: body.email,
+    // Only include provided fields (don't null out untouched columns).
+    const updates: Record<string, unknown> = {
       updated_by: email,
       updated_at: new Date().toISOString(),
     };
+    if (body.notes !== undefined) updates.notes = body.notes;
+    if (body.title !== undefined) updates.title = body.title;
+    if (body.phone !== undefined) updates.phone = body.phone;
+    if (body.email !== undefined) updates.email = body.email;
+    if (body.relationship_stage !== undefined) updates.relationship_stage = body.relationship_stage; // v2
+    if (body.target_agency !== undefined) updates.target_agency = body.target_agency;               // v2
 
-    const { data, error } = await getSupabase()
+    const runUpdate = (u: Record<string, unknown>) => getSupabase()
       .from('mi_beta_contacts')
-      .update(updates)
+      .update(u)
       .eq('id', body.id)
       .or(`workspace_id.eq.${workspaceId},user_email.eq.${email}`)
       .select()
       .single();
 
+    let { data, error } = await runUpdate(updates);
+    if (error && /target_agency|relationship_stage|schema cache|column/.test(error.message || '')) {
+      const { relationship_stage: _rs, target_agency: _ta, ...base } = updates;
+      void _rs; void _ta;
+      ({ data, error } = await runUpdate(base));
+    }
     if (error) throw error;
     return NextResponse.json({ success: true, contact: data });
   } catch (error) {
