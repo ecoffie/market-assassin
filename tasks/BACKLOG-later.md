@@ -37,6 +37,25 @@ Verify-on-SAM link. Loads ALL pursuit PDFs (was 1). PRD-proposal-manual-mode.
 - **Remaining v1:** ingestion criteria doc + admin ingest path; full-proposal
   smoke test. **v2:** notes, who/status, draft versions.
 
+**Knowledge Base repository (PRD-knowledge-base-repository — SHIPPED):**
+- Searchable repository page over `mindy_rag_documents` (1,310 user-facing docs)
+  in Research nav; split-pane reader + doc_type facets. PII/internal excluded.
+- Mindy Chat source chips deep-link into it (`?doc=id`) — "show me the source"
+  lands on the real page. NOT a separate domain (in-app panel, per architecture).
+
+**Pursuit change/amendment alerts (SHIPPED, scale-ready):**
+- Monitors tracked pursuits (notice_id, non-archived) for: deadline moves,
+  amendments (SAM last_modified), notice-type changes (incl. cancelled/awarded),
+  new documents. Email digest (sendEmail/Resend) + "⚠️ N changes" badge on
+  pursuit cards (ack to clear). Owner-attributed (workspace-safe).
+- **Scale:** BATCH + RESUMABLE like daily-alerts — `BATCH_SIZE` env
+  (`PURSUIT_CHANGES_BATCH_SIZE`, default 100), least-recently-checked cursor,
+  45s soft budget, returns `remaining`. On the dispatcher as a window
+  (`*/15 13,21 * * *`) that drains remaining. Bounded load at 1000s of pursuits.
+- Migrations RUN: `20260605_pursuit_change_alerts.sql` (pursuit_change_log +
+  pursuit_monitor_state). 32 baselined. First run snapshots (no false alerts).
+- **Manual Drive → Perplexity Spaces layout** (files rail + instructions).
+
 **Growth/virality (earlier today):** Share button restored, share links →
 getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
 

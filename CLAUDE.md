@@ -723,6 +723,23 @@ Complete conversion funnel from free Opportunity Hunter to paid Market Intellige
 | precompute-pursuit-briefs | Fri 4:00-6:00 PM | Pursuit templates by NAICS profile |
 | send-pursuit-fast | Sat 3:00-4:30 AM (every 10 min) | Send pursuit briefs |
 | weekly-alerts | Sun 7:00-7:50 PM + Mon 8:00-8:30 PM UTC-equivalent catch-up window | Free/weekly saved-search digest |
+| pursuit-changes | `*/15 13,21 * * *` UTC (dispatcher window, 2x/day) | Amendment/change alerts on tracked pursuits |
+
+**Pursuit change/amendment alerts (June 5, 2026):**
+- Monitors `user_pipeline` (non-archived, has `notice_id`) for deadline moves,
+  amendments (SAM `last_modified` bump), notice-type changes (incl. cancelled/
+  awarded), and new documents. Diffs live `sam_opportunities` vs the snapshot in
+  `pursuit_monitor_state`. Writes `pursuit_change_log` (drives the in-app "⚠️ N
+  changes" badge on pursuit cards) + emails the OWNER a digest via `sendEmail()`.
+- **Owner-attributed:** uses `owner_email || user_email` for both badge + email
+  (workspace-safe). In-app feed: `GET/POST /api/app/pursuit-changes` (ack clears
+  badge).
+- **Batch + resumable (scale):** processes `PURSUIT_CHANGES_BATCH_SIZE` (env,
+  default 100) least-recently-checked pursuits per invocation, 45s soft budget,
+  returns `remaining`; the dispatcher window re-fires until drained. Bounded load
+  at 1000s of pursuits. First run snapshots only (no false alerts).
+- Tables: `pursuit_change_log`, `pursuit_monitor_state` (migration
+  `20260605_pursuit_change_alerts.sql`).
 
 **Weekly alerts (April 25, 2026):**
 - Scheduled as a 10-invocation batch window in `vercel.json`
