@@ -4,6 +4,40 @@
 
 ---
 
+## Session Handoff — 2026-06-05 PM (Proposal Manual Drive + Target-List hub + QA)
+
+All shipped & deployed to getmindy.ai. Standalone backlog: `tasks/BACKLOG-later.md`.
+
+### Proposal Assist — Manual Drive (v1, PRD-proposal-manual-mode)
+- [x] Auto↔Manual·Sport toggle (moved to top / Start-Here per QA).
+- [x] `/api/app/proposal/chat` — Perplexity-style proposal LLM grounded in the
+  user's RFP + Vault (reuses Mindy Chat SSE/Groq engine, no fabrication).
+- [x] `ProposalChat.tsx` streaming panel; "Verify on SAM.gov" trust link.
+- [x] Loads ALL pursuit PDFs (was only 1 — `combineUploadedDocuments`).
+- [ ] **v2 (NOT June 19):** notes, compliance who/status, draft versions.
+
+### Target-List hub (PRD-relationships-from-target-list — v1 + v2 SHIPPED)
+- [x] Decision Makers defaults to ⭐ My Targets (user's target agencies).
+- [x] Relationships: attach to AGENCY not pursuit; pursuit-attach optional.
+- [x] My Target List row → 🤝 "Relationships at this agency" (pre-scoped).
+- [x] v2: My Network grouped by agency + relationship stages (prospect→warm→
+  contacted→met→champion). Migration `20260605_relationships_v2.sql` RUN +
+  verified (7/7 backfilled).
+- [x] Team Access moved Pipeline → Account.
+
+### QA bug fixes (Eric's live walk-through)
+- [x] Stat cards/tabs scroll to results + show filter state (were filtering
+  below the fold → looked dead).
+- [x] Contractor award drawer uses BQ (BL Harbert → 11yrs/$11B, was empty).
+- [x] Forecasts: DoD early signals on the default "All agencies" view.
+- [x] DoDAAC names: stripped FPDS code prefixes (W7NC… → real names; 4,813 re-run).
+- [x] Decision Makers "Track" → confirmation (→ My Target List).
+
+### ⚠️ Reminder
+- **Hard-refresh getmindy.ai** (Cmd+Shift+R) — cached JS bundle hid earlier deploys.
+
+---
+
 ## Session Handoff — 2026-06-05 (Growth/virality: share loop + newcomer clarity)
 
 Eric: the Today's Intel **Share** button was lost beta→new (the viral loop); also "what does the share preview show?" and "a student asked what Mindy was." Closed the whole loop. All deployed, verified live.

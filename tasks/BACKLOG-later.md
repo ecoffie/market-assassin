@@ -13,10 +13,13 @@
 `/api/app/proposal/chat` grounded in user's RFP+Vault, ProposalChat.tsx,
 Verify-on-SAM link. Loads ALL pursuit PDFs (was 1). PRD-proposal-manual-mode.
 
-**Target-List hub** (PRD-relationships-from-target-list, v1):
+**Target-List hub** (PRD-relationships-from-target-list, **v1 + v2 SHIPPED**):
 - Decision Makers defaults to **⭐ My Targets** (user's target agencies).
 - Relationships: attach to **AGENCY not pursuit**; pursuit-attach optional.
 - My Target List row → **🤝 Relationships at this agency →** (pre-scoped).
+- **v2:** My Network grouped by agency + relationship **stages** (prospect→warm
+  →contacted→met→champion, color chips, persist). Migration
+  `20260605_relationships_v2.sql` RUN + verified (7/7 backfilled, writes work).
 - Team Access moved **Pipeline → Account**.
 
 **QA bug fixes (from Eric's live walk-through):**
@@ -55,15 +58,13 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
 
 ## 🔴 P0 — Big features with a PRD, ready to build
 
-### 1a. Relationships driven by Target List (BD workflow fix)
-- **What:** Relationships is a disconnected silo today. Make My Target List the
-  ENTRY POINT: click a target agency → its Gov Buyers / OSBP / Find-Partners,
-  pre-filtered. Save attaches to the AGENCY (long-game BD), not a pursuit —
-  relationships are developed BEFORE pursuing. My Network grouped by agency.
-- **Mostly rewiring:** reuse Target List + Relationships panels + existing data
-  (federal_contacts, OSBP, teaming). Add a target_agency link to saved contacts.
+### 1a. Relationships driven by Target List — ✅ v1 + v2 SHIPPED
+- **Done:** entry from Target List, attach-to-agency, grouped My Network +
+  relationship stages (see Shipped section). Migration run + verified.
+- **Remaining v2 polish (optional, later):** smarter per-agency partner
+  suggestions; tie relationship stages into outreach tracking; a true per-agency
+  "who do I know here" rollup count on each Target List row.
 - **PRD:** `docs/PRD-relationships-from-target-list.md`
-- **Related (done today):** Team Access already moved Pipeline → Account.
 
 ### 1. DoD Forecast Coverage (the real one)
 - **What:** DoD is the ~$400B largest buyer but we have **0 formal forecasts**.
