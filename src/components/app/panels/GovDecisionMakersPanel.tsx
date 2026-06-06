@@ -45,6 +45,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [trackedOffices, setTrackedOffices] = useState<Set<string>>(new Set());
+  const [trackNote, setTrackNote] = useState<string | null>(null);
 
   // Add a contracting office to My Target List (CRM). Sends the DoDAAC as
   // office_code — the API resolves the canonical name + sub-agency from the
@@ -66,6 +67,9 @@ export default function GovDecisionMakersPanel({ email }: Props) {
       });
       if (res.ok) {
         setTrackedOffices(prev => new Set(prev).add(c.dodaac!));
+        // Tell the user WHERE it went (Eric QA: "where does Track go?").
+        setTrackNote(`✓ ${c.derivedOffice || c.dodaac} added to My Target List (Pipeline → My Target List).`);
+        setTimeout(() => setTrackNote(null), 5000);
       } else if (res.status === 402) {
         setError('Saved target lists are a Mindy Pro feature.');
       }
@@ -203,6 +207,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
       )}
 
       {error && <div className="p-4 bg-red-500/10 text-red-300 rounded-lg text-sm">{error}</div>}
+      {trackNote && <div className="px-4 py-2.5 bg-emerald-500/10 border border-emerald-500/30 text-emerald-300 rounded-lg text-sm">{trackNote}</div>}
 
       {/* Results table */}
       {!loading && contacts.length > 0 && (

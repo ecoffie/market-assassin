@@ -10,7 +10,14 @@ import { bqQuery, BQ_TABLES } from '@/lib/bigquery/client';
 // Strip a leading copy of the code from FPDS names ("FA7000  10 CONS LGC").
 function cleanName(code: string, raw: string): string {
   let n = (raw || '').trim();
+  // Strip a leading copy of the DoDAAC ("FA7000  10 CONS LGC" → "10 CONS LGC").
   if (n.toUpperCase().startsWith(code.toUpperCase())) n = n.slice(code.length).trim();
+  // FPDS names also often start with a 4-6 char ALT office code
+  // ("W7NC USPFO ACTIVITY MEANG 101" → "USPFO ACTIVITY MEANG 101") which reads
+  // like a code, not a name (Eric QA). Strip a leading uppercase-alnum token of
+  // 4-6 chars that contains a digit — but only when real words follow.
+  const m = /^([A-Z0-9]{4,6})\s+(.+)$/.exec(n);
+  if (m && /\d/.test(m[1]) && /[A-Z]{3,}/.test(m[2])) n = m[2].trim();
   return n || raw || code;
 }
 
