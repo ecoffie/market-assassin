@@ -65,22 +65,48 @@ function detectChanges(
   return out;
 }
 
+// BATCH + RESUMABLE (Eric: this can hit the 1000s fast — must scale like
+// daily-alerts). Each invocation processes up to BATCH_SIZE pursuits, picking
+// the LEAST-recently-checked first (via pursuit_monitor_state.last_checked_at),
+// and returns `remaining` so the dispatcher fires it across a window until the
+// whole pipeline is swept. A soft time budget guarantees we never get killed
+// mid-run. Tunable via env without a deploy.
+const BATCH_SIZE = parseInt(process.env.PURSUIT_CHANGES_BATCH_SIZE || '100', 10);
+const TIME_BUDGET_MS = 45_000; // stay well under the 60s function cap
+
 export async function GET(request: NextRequest) {
+  const startedAt = Date.now();
   const supabase = sb();
   const testEmail = request.nextUrl.searchParams.get('email');
 
-  // Tracked pursuits with a SAM notice_id (the only ones we can monitor).
+  // All monitorable pursuits (has SAM notice_id, not archived).
   let pq = supabase
     .from('user_pipeline')
     .select('id, user_email, owner_email, notice_id, title, stage, response_deadline, docs_count')
     .not('notice_id', 'is', null)
     .neq('is_archived', true);
   if (testEmail) pq = pq.eq('user_email', testEmail);
-  const { data: pursuits } = await pq;
+  const { data: allPursuits } = await pq;
+  const totalMonitorable = allPursuits?.length || 0;
 
-  if (!pursuits?.length) {
-    return NextResponse.json({ success: true, monitored: 0, changes: 0 });
+  if (!totalMonitorable) {
+    return NextResponse.json({ success: true, monitored: 0, changes: 0, remaining: 0 });
   }
+
+  // Order by least-recently-checked: pursuits with no snapshot first, then
+  // oldest last_checked_at. One cheap read of the cursor table.
+  const { data: stateRows } = await supabase
+    .from('pursuit_monitor_state')
+    .select('pursuit_id, last_checked_at');
+  const checkedAt = new Map<string, string>();
+  for (const s of (stateRows || [])) checkedAt.set(s.pursuit_id, s.last_checked_at);
+  const ordered = [...allPursuits].sort((a: { id: string }, b: { id: string }) => {
+    const ta = checkedAt.get(a.id) || ''; // '' (never checked) sorts first
+    const tb = checkedAt.get(b.id) || '';
+    return ta.localeCompare(tb);
+  });
+  const pursuits = ordered.slice(0, BATCH_SIZE);
+  const remaining = Math.max(0, totalMonitorable - pursuits.length);
 
   // Batch-load live SAM state for all notice_ids in one query.
   const noticeIds = Array.from(new Set(pursuits.map((p: { notice_id: string }) => p.notice_id)));
@@ -99,8 +125,14 @@ export async function GET(request: NextRequest) {
 
   const changesByUser = new Map<string, Array<{ title: string; changes: Change[] }>>();
   let totalChanges = 0;
+  let processed = 0;
 
   for (const p of pursuits) {
+    // Soft time budget: stop cleanly before the function cap; the remaining
+    // pursuits get swept on the next dispatcher fire (they're least-recently-
+    // checked, so they bubble to the front).
+    if (Date.now() - startedAt > TIME_BUDGET_MS) break;
+    processed++;
     const sam = samByNotice.get(p.notice_id);
     // Live state — prefer SAM cache; fall back to the pursuit's own fields.
     const live = {
@@ -169,5 +201,16 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ success: true, monitored: pursuits.length, changes: totalChanges, emailsSent });
+  // `remaining` = pursuits not yet touched this run (batch cap) PLUS any
+  // skipped by the time budget. The dispatcher re-fires until remaining hits 0.
+  const remainingThisRun = remaining + (pursuits.length - processed);
+  return NextResponse.json({
+    success: true,
+    totalMonitorable,
+    processed,
+    changes: totalChanges,
+    emailsSent,
+    remaining: remainingThisRun,
+    batchSize: BATCH_SIZE,
+  });
 }
