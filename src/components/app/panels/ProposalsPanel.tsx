@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import { classifyNoticeType, noticeTypeLabel, noticeTypeToDetected } from '@/lib/utils/notice-type';
@@ -513,11 +513,19 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   }, [email, uploadedRfp?.text, uploadedRfp?.fileName, getAuthHeaders]);
 
   const filteredCompliance = useMemo(() => {
-    return compliance.filter(r => {
+    const rows = compliance.filter(r => {
       if (statusFilter !== 'all' && r.status !== statusFilter) return false;
       if (categoryFilter !== 'all' && r.category !== categoryFilter) return false;
       return true;
     });
+    // Group BY section (Eric: matrix tagged + grouped by section, like the RAG
+    // example). Sort by the top-level section letter (L, M, C…) then full ref.
+    const sortKey = (s?: string) => {
+      if (!s) return 'zzz';
+      const letter = (s.match(/^[A-Za-z]/)?.[0] || 'z').toUpperCase();
+      return `${letter}:${s}`;
+    };
+    return [...rows].sort((a, b) => sortKey(a.section).localeCompare(sortKey(b.section), undefined, { numeric: true }));
   }, [compliance, statusFilter, categoryFilter]);
 
   // Section drafts. Holds slots for BOTH RFP + LOI/response
@@ -1852,10 +1860,20 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredCompliance.map(r => {
+                    {filteredCompliance.map((r, i) => {
                       const cat = CATEGORY_LABELS[r.category] || CATEGORY_LABELS.other;
+                      // Section group header when the top-level section changes.
+                      const sectionGroup = (s?: string) => (s ? `Section ${(s.match(/^[A-Za-z]/)?.[0] || '?').toUpperCase()}` : 'Unsectioned');
+                      const grp = sectionGroup(r.section);
+                      const showGroup = i === 0 || sectionGroup(filteredCompliance[i - 1].section) !== grp;
                       return (
-                        <tr key={r.id} className="border-t border-slate-800 hover:bg-slate-800/30 align-top">
+                        <Fragment key={r.id}>
+                        {showGroup && (
+                          <tr className="bg-slate-900/70">
+                            <td colSpan={6} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-purple-300 border-t border-slate-700">{grp}</td>
+                          </tr>
+                        )}
+                        <tr className="border-t border-slate-800 hover:bg-slate-800/30 align-top">
                           <td className="px-3 py-2 font-mono text-xs text-slate-500">{r.id}</td>
                           <td className="px-3 py-2 text-slate-200">
                             {r.requirement}
@@ -1893,6 +1911,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                             </select>
                           </td>
                         </tr>
+                        </Fragment>
                       );
                     })}
                   </tbody>
