@@ -492,8 +492,28 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
                     )}
                   </div>
 
+                  {/* Detail badges — at-a-glance signals from the numbers we
+                      already have (Eric: add valuable detail to the card). */}
+                  {(() => {
+                    const count = Number(contractor.contract_count) || 0;
+                    const avg = count > 0 ? contractor.contract_value_num / count : 0;
+                    const scale = contractor.contract_value_num >= 1e9 ? 'Mega prime ($1B+)'
+                      : contractor.contract_value_num >= 1e8 ? 'Large ($100M+)'
+                      : contractor.contract_value_num >= 1e7 ? 'Mid ($10M+)' : 'Emerging';
+                    return (
+                      <div className="flex flex-wrap gap-2 mt-3 text-[11px]">
+                        {avg > 0 && (
+                          <span className="rounded bg-slate-800 px-2 py-0.5 text-slate-300" title="Average obligated per contract">
+                            ~{formatCurrency(avg)}/contract avg
+                          </span>
+                        )}
+                        <span className="rounded bg-slate-800 px-2 py-0.5 text-slate-300">{scale}</span>
+                        {count >= 50 && <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-emerald-300" title="High volume of federal awards">Active performer</span>}
+                      </div>
+                    );
+                  })()}
                   {/* NAICS & Agencies */}
-                  <div className="flex flex-wrap gap-3 mt-3 text-xs text-slate-500">
+                  <div className="flex flex-wrap gap-3 mt-2 text-xs text-slate-500">
                     {contractor.naics && contractor.naics !== 'N/A' && (
                       <span>NAICS: {contractor.naics.slice(0, 50)}{contractor.naics.length > 50 ? '...' : ''}</span>
                     )}
