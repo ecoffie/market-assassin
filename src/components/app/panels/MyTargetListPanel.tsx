@@ -12,7 +12,7 @@
  * a per-target detail page — left as a follow-up.
  */
 import { useState, useEffect, useCallback } from 'react';
-import type { AppTier } from '../UnifiedSidebar';
+import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { useToast } from '../Toast';
 import { useAppTracker } from '../track';
 
@@ -81,9 +81,11 @@ function fmtMoney(n: number): string {
 export default function MyTargetListPanel({
   email,
   tier,
+  onPanelChange,
 }: {
   email: string | null;
   tier: AppTier;
+  onPanelChange?: (panel: AppPanel, context?: Record<string, unknown>) => void;
 }) {
   const [targets, setTargets] = useState<TargetRow[]>([]);
   const [loading, setLoading] = useState(true);
@@ -751,6 +753,19 @@ export default function MyTargetListPanel({
                           web for events this agency is running that
                           aren't in SAM.gov or our static catalog. */}
                       <div className="mt-3 flex items-center gap-3 flex-wrap">
+                        {/* Target List drives Relationships (Eric: from a target
+                            agency, see its buyers/OSBP/partners). Opens the
+                            Relationships panel pre-scoped to this agency. */}
+                        {onPanelChange && (
+                          <button
+                            type="button"
+                            onClick={() => onPanelChange('contacts', { agency: t.agency_name })}
+                            className="inline-flex items-center gap-1.5 text-xs px-3 py-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-emerald-300 hover:bg-emerald-500/20 hover:text-emerald-200 transition-colors"
+                            title={`See gov buyers, OSBP contacts, and teaming partners at ${t.agency_name}`}
+                          >
+                            🤝 Relationships at this agency →
+                          </button>
+                        )}
                         <button
                           type="button"
                           onClick={() => discoverEvents(t)}

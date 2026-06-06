@@ -7,6 +7,9 @@ import { getMIApiHeaders } from '../authHeaders';
 interface RelationshipsPanelProps {
   email: string | null;
   tier: AppTier;
+  // When the user clicks "Relationships at this agency" from My Target List,
+  // we land here pre-scoped to that agency.
+  panelContext?: Record<string, unknown>;
 }
 
 type ContactType = 'government_buyer' | 'osbp' | 'prime' | 'subcontractor' | 'partner' | 'internal';
@@ -76,7 +79,7 @@ function typeForTab(tab: TabId): ContactType | 'all' {
   return 'all';
 }
 
-export default function RelationshipsPanel({ email, tier }: RelationshipsPanelProps) {
+export default function RelationshipsPanel({ email, tier, panelContext }: RelationshipsPanelProps) {
   void tier;
   const [activeTab, setActiveTab] = useState<TabId>('network');
   const [savedContacts, setSavedContacts] = useState<RelationshipContact[]>([]);
@@ -115,13 +118,19 @@ export default function RelationshipsPanel({ email, tier }: RelationshipsPanelPr
         const ags = Array.from(new Set(((d?.targets || []) as Array<{ agency_name?: string }>)
           .map(t => (t.agency_name || '').trim()).filter(Boolean)));
         setTargetAgencies(ags);
-        if (ags.length > 0) {
+        const fromContext = typeof panelContext?.agency === 'string' ? panelContext.agency as string : '';
+        if (fromContext) {
+          // Came from a Target List row → scope to THAT agency + show buyers.
+          setAttachAgency(fromContext);
+          setAgencyFilter(fromContext);
+          setActiveTab('buyers');
+        } else if (ags.length > 0) {
           setAttachAgency(ags[0]);          // default attach target = first target agency
           setAgencyFilter(prev => prev || ags[0]); // scope discovery to a target agency
         }
       })
       .catch(() => {});
-  }, [email]);
+  }, [email, panelContext]);
 
   // Stats computed from saved contacts
   const stats = useMemo(() => {

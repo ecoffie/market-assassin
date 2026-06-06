@@ -68,7 +68,7 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
       case 'pipeline':
         return <PipelinePanel email={email} tier={tier} onPanelChange={onPanelChange} />;
       case 'contacts':
-        return <RelationshipsPanel email={email} tier={tier} />;
+        return <RelationshipsPanel email={email} tier={tier} panelContext={panelContext} />;
       case 'team':
         return <TeamPanel email={email} tier={tier} />;
       case 'settings':
@@ -78,7 +78,7 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
       case 'pricing':
         return <PricingIntelPanel email={email} tier={tier} />;
       case 'target-list':
-        return <MyTargetListPanel email={email} tier={tier} />;
+        return <MyTargetListPanel email={email} tier={tier} onPanelChange={onPanelChange} />;
       case 'grants':
         return <GrantsPanel email={email} tier={tier} />;
       case 'vault':
