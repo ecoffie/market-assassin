@@ -1,0 +1,4 @@
+# Generated training data — proprietary proposal corpus, don't commit
+proposal_finetune.jsonl
+proposal_finetune_review.md
+finetune_job.txt
