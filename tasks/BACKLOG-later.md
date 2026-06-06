@@ -133,6 +133,20 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
 
 ## 🟠 P1 — Scoped features / meaningful UX
 
+### Interactive product tour (in-app "click here" walkthrough)
+- **What:** a guided click-through that runs INSIDE Mindy AFTER profile setup —
+  spotlights each tab + has the user DO things (add first pursuit, run first
+  proposal, add an agency, fill the Vault, Today's-Intel track/review/share,
+  Contractors search/add, Expiring all-vs-yours toggle). NOT the setup wizard.
+- **Net-new:** no tour engine installed. Recommend driver.js (~5KB) + data-tour
+  anchors; drive nav via onPanelChange; tour_completed flag (localStorage + DB).
+  Auto-start once + "Replay tour" in Settings.
+- **Risk:** lazy-loaded panels (must poll for target before highlighting); empty
+  states; mobile target drift.
+- **v1:** ~6 core-workflow tabs. **v2:** rest + interactive checkpoints + analytics.
+- **PRD:** `docs/PRD-interactive-product-tour.md`
+
+
 ### 3a. Knowledge Base — searchable repository ✅ SHIPPED 2026-06-05
 - **What:** Mindy Chat answers well but getting to the SOURCE docs "gets lost."
   Build a searchable repository page over `mindy_rag_documents` (**1,364 docs**
