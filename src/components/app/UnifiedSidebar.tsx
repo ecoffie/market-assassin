@@ -19,6 +19,7 @@ import {
   Banknote,
   Building2,
   Landmark,
+  BookOpen,
   FolderKanban,
   Library,
   Settings,
@@ -46,6 +47,7 @@ export type AppPanel =
   | 'settings'       // Unified account settings
   | 'vault'          // My Vault — persistent knowledge base (identity, past perf, capabilities, team, boilerplate)
   | 'library'        // My Library — searchable history of every AI output
+  | 'knowledge-base' // Knowledge Base — searchable corpus Mindy Chat cites
   | 'pricing'        // Pricing Intel — labor rates, GSA/SCA wages (Estimating section)
   | 'proposals'      // AI Proposal Assist (Estimating section)
   | 'target-list'    // My Target List — saved BD targets (Pipeline section, Slice 3 of TMR roadmap)
@@ -239,6 +241,13 @@ const NAV_SECTIONS: NavSection[] = [
         icon: Landmark,
         description: 'Gov contacts by agency',
         tier: ['pro', 'team', 'enterprise'],
+      },
+      {
+        id: 'knowledge-base',
+        label: 'Knowledge Base',
+        icon: BookOpen,
+        description: 'The docs Mindy cites',
+        tier: ['free', 'pro', 'team', 'enterprise'],
       },
     ],
   },

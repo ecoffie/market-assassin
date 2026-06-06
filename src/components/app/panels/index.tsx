@@ -21,6 +21,7 @@ const PricingIntelPanel = lazy(() => import('./PricingIntelPanel'));
 const MyTargetListPanel = lazy(() => import('./MyTargetListPanel'));
 const GrantsPanel = lazy(() => import('./GrantsPanel'));
 const VaultPanel = lazy(() => import('./VaultPanel'));
+const KnowledgeBasePanel = lazy(() => import('./KnowledgeBasePanel'));
 const LibraryPanel = lazy(() => import('./LibraryPanel'));
 
 interface PanelContainerProps {
@@ -50,7 +51,7 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
   const renderPanel = () => {
     switch (activePanel) {
       case 'chat':
-        return <MindyChatPanel email={email} tier={tier} />;
+        return <MindyChatPanel email={email} tier={tier} onPanelChange={onPanelChange} />;
       case 'dashboard':
         return <DashboardPanel email={email} tier={tier} onPanelChange={onPanelChange} />;
       case 'alerts':
@@ -79,6 +80,8 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
         return <PricingIntelPanel email={email} tier={tier} />;
       case 'target-list':
         return <MyTargetListPanel email={email} tier={tier} onPanelChange={onPanelChange} />;
+      case 'knowledge-base':
+        return <KnowledgeBasePanel email={email} initialDocId={typeof panelContext?.doc === 'string' ? panelContext.doc : undefined} />;
       case 'grants':
         return <GrantsPanel email={email} tier={tier} />;
       case 'vault':

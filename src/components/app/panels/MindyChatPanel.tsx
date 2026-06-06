@@ -16,12 +16,13 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
-import type { AppTier } from '../UnifiedSidebar';
+import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 
 interface MindyChatPanelProps {
   email: string | null;
   tier: AppTier;
+  onPanelChange?: (panel: AppPanel, context?: Record<string, unknown>) => void;
 }
 
 interface CitedSource {
@@ -63,7 +64,7 @@ function renderMessageContent(content: string) {
   return <span className="whitespace-pre-wrap">{cleaned}</span>;
 }
 
-export default function MindyChatPanel({ email, tier: _tier }: MindyChatPanelProps) {
+export default function MindyChatPanel({ email, tier: _tier, onPanelChange }: MindyChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
@@ -444,16 +445,22 @@ export default function MindyChatPanel({ email, tier: _tier }: MindyChatPanelPro
                       <div className="flex flex-wrap gap-1.5">
                         {msg.citations.slice(0, 6).map((c, i) => {
                           const label = c.title.slice(0, 50) + (c.title.length > 50 ? '…' : '');
-                          // Internal doc (course material etc) — open in drawer
+                          // Source doc → deep-link into the Knowledge Base page
+                          // (the browsable repository), so "show me the source"
+                          // lands on the real, searchable doc — not a dead end.
+                          // Falls back to the inline drawer if navigation isn't
+                          // wired.
                           if (c.document_id) {
                             return (
                               <button
                                 key={i}
-                                onClick={() => setDrawerDocId(c.document_id)}
+                                onClick={() => onPanelChange
+                                  ? onPanelChange('knowledge-base', { doc: c.document_id })
+                                  : setDrawerDocId(c.document_id)}
                                 className="text-[11px] px-2 py-1 rounded bg-slate-800/60 border border-slate-700/60 text-slate-300 hover:border-purple-500/40 hover:text-purple-200 transition-colors cursor-pointer text-left"
-                                title={c.doc_type}
+                                title={`Open in Knowledge Base · ${c.doc_type || ''}`}
                               >
-                                {label}
+                                📄 {label}
                               </button>
                             );
                           }
