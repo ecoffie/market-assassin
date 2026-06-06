@@ -232,6 +232,37 @@ export async function GET(request: NextRequest) {
       const activeSources = coverage?.length || byAgency.length;
       const totalCoverage = coverage?.reduce((sum, s) => sum + (s.estimated_spend_coverage || 0), 0) || 0;
 
+      // DoD has 0 formal forecasts, so the default "All agencies" view showed
+      // nothing for the biggest buyer (Eric QA 2026-06-05). Surface recent DoD
+      // early signals (SAM Sources Sought / RFIs) here too, so they appear on
+      // the landing view — labeled as early signals, with decoded offices.
+      const dodaacNames = await loadDodaacNames();
+      const since = new Date(Date.now() - 180 * 86400000).toISOString();
+      const { data: sigData } = await supabase
+        .from('sam_opportunities')
+        .select('solicitation_number, title, description, naics_code, department, office, posted_date, response_deadline, set_aside_description, notice_type')
+        .ilike('department', '%defense%')
+        .in('notice_type', ['Sources Sought', 'Special Notice', 'Presolicitation'])
+        .gte('posted_date', since)
+        .order('posted_date', { ascending: false })
+        .limit(40);
+      const defaultDodSignals = (sigData || []).map((s) => ({
+        id: `sam:${s.solicitation_number}`,
+        title: s.title,
+        description: String(s.description || '').substring(0, 200),
+        agency: 'Department of Defense',
+        department: s.department,
+        office: formatDodaacOffice(String(s.solicitation_number || ''), dodaacNames) || s.office || null,
+        naics: s.naics_code,
+        setAside: s.set_aside_description,
+        status: 'early_signal',
+        lastSynced: s.posted_date,
+        signalType: 'dod_early_signal' as const,
+        noticeType: s.notice_type,
+        solicitationNumber: s.solicitation_number,
+        responseDeadline: s.response_deadline,
+      }));
+
       return NextResponse.json({
         success: true,
         summary: {
@@ -240,6 +271,8 @@ export async function GET(request: NextRequest) {
           estimatedSpendCoverage: `${totalCoverage.toFixed(1)}%`,
         },
         byAgency,
+        forecasts: defaultDodSignals,
+        dodEarlySignalCount: defaultDodSignals.length,
         topNaics: topNaics || [],
         coverage: coverage || [],
         usage: {
