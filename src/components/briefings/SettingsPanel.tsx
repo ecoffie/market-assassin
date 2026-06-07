@@ -441,6 +441,18 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 
               </div>
             )}
 
+            {/* Help & product tour (Eric: keep the tour out of the sidebar). */}
+            <button
+              onClick={() => { onClose(); window.dispatchEvent(new Event('mindy:start-tour')); }}
+              className="w-full flex items-center gap-3 p-3 bg-purple-500/10 border border-purple-500/20 rounded-xl hover:bg-purple-500/15 transition-colors text-left"
+            >
+              <span className="text-xl shrink-0">🧭</span>
+              <div>
+                <div className="text-sm font-medium text-white">Take the product tour</div>
+                <div className="text-xs text-gray-400">A quick walkthrough of the core workflow.</div>
+              </div>
+            </button>
+
             {/* Smart Profile Setup */}
             {!businessDescription.trim() && (
               <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl">
