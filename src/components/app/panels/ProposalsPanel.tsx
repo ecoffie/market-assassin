@@ -1588,6 +1588,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       {responseOutputsReady && driveMode === 'manual' && email && (
         <ProposalChat
           email={email}
+          pipelineId={activePursuitId}
           rfpText={uploadedRfp?.text || ''}
           rfpFileName={uploadedRfp?.fileName || ''}
           hasVault={!!vaultSummary?.hasIdentity || (vaultSummary?.past_performance ?? 0) > 0 || (vaultSummary?.capabilities ?? 0) > 0}

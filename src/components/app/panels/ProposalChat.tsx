@@ -21,10 +21,11 @@ const STARTERS = [
 ];
 
 export default function ProposalChat({
-  email, rfpText, rfpFileName, hasVault, files, onAddFile, onRemoveFile, uploading,
+  email, rfpText, rfpFileName, hasVault, files, onAddFile, onRemoveFile, uploading, pipelineId,
 }: {
   email: string; rfpText: string; rfpFileName: string; hasVault: boolean;
   files: FileRow[]; onAddFile: (f: File) => void; onRemoveFile: (name: string) => void; uploading?: boolean;
+  pipelineId?: string | null;
 }) {
   const [messages, setMessages] = useState<Msg[]>([]);
   const [input, setInput] = useState('');
@@ -49,7 +50,9 @@ export default function ProposalChat({
       const res = await fetch('/api/app/proposal/chat', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, message: fullMsg, rfpText, rfpFileName, history }),
+        // Send pipeline_id so the server reuses the already-extracted docs +
+        // cached matrix (Eric) instead of us re-sending the full text.
+        body: JSON.stringify({ email, message: fullMsg, rfpText, rfpFileName, history, pipeline_id: pipelineId || undefined }),
       });
       if (!res.body) throw new Error('No stream');
       const reader = res.body.getReader();
