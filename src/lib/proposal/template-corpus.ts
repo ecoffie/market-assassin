@@ -84,17 +84,21 @@ export function getTemplateCorpusDocTypes(sectionType: SectionType, sourceText: 
     ];
   }
 
+  // Prefer REAL winning NARRATIVES over meta "outline writer" templates (Eric QC:
+  // a technical draft pulled a 'Proposal Outline Writer Prompt' template and
+  // wrote "Agile sprints" for a CONSTRUCTION job). Lead with the actual volume
+  // examples; proposal_template/course_material are last-resort filler only.
   if (sectionType === 'past_performance' || sectionType === 'cap_past_performance') {
-    return ['past_performance', 'proposal_template', 'technical_volume', 'cap_statement', 'course_material'];
+    return ['past_performance', 'technical_volume', 'cap_statement', 'proposal_template'];
   }
   if (sectionType === 'technical') {
-    return ['technical_volume', 'proposal_template', 'past_performance', 'course_material', 'teaching_handout'];
+    return ['technical_volume', 'past_performance', 'cap_statement', 'proposal_template'];
   }
   if (sectionType === 'management') {
-    return ['management_volume', 'proposal_template', 'technical_volume', 'course_material', 'teaching_handout'];
+    return ['management_volume', 'technical_volume', 'past_performance', 'proposal_template'];
   }
   if (sectionType === 'pricing') {
-    return ['pricing_volume', 'rfq_response', 'proposal_template', 'course_material', 'teaching_handout'];
+    return ['pricing_volume', 'rfq_response', 'technical_volume', 'proposal_template'];
   }
 
   return ['proposal_template', 'technical_volume', 'course_material', 'webinar_resource', 'teaching_handout'];

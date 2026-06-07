@@ -34,7 +34,10 @@ type Provider = 'groq70b' | 'groq8b' | 'claude' | 'openai' | 'grok';
 // REFEREE    = once per proposal, must differ from drafter → Claude first.
 const JOB_CHAINS: Record<LlmJob, Provider[]> = {
   extraction: ['groq8b', 'groq70b', 'openai', 'grok'],   // no Claude — bulk
-  drafting:   ['groq70b', 'claude', 'openai', 'grok'],
+  // Drafting leads with Claude for QUALITY (Eric QC: Groq wrote "Agile sprints"
+  // for a construction job). Low volume — user-triggered per section — so
+  // Claude's limits are fine; Groq 70B is the fast fallback.
+  drafting:   ['claude', 'groq70b', 'openai', 'grok'],
   referee:    ['claude', 'openai', 'groq70b'],            // Claude OK — 1x/proposal
 };
 const DEFAULT_CHAIN: Provider[] = JOB_CHAINS.extraction;
