@@ -892,10 +892,8 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 
               <div className="space-y-2">
                 {([
                   { opt: 'daily', label: 'Daily', desc: 'Every morning at 7 AM' },
-                  { opt: 'weekdays', label: 'Weekdays only', desc: 'Mon–Fri at 7 AM, skip weekends' },
                   { opt: 'mwf', label: 'Mon / Wed / Fri', desc: 'Every other weekday — less inbox, still timely' },
                   { opt: 'tth', label: 'Tue / Thu', desc: 'Twice a week — for light readers' },
-                  { opt: 'weekends', label: 'Weekends only', desc: 'Sat & Sun at 7 AM' },
                   { opt: 'weekly', label: 'Weekly', desc: 'Sunday digest' },
                   { opt: 'paused', label: 'Paused', desc: 'Keep settings but pause emails' },
                 ] as const).map(({ opt, label, desc }) => (

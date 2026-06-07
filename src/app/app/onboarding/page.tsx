@@ -325,7 +325,7 @@ export default function OnboardingPage() {
   const [selectedAgencies, setSelectedAgencies] = useState<string[]>([]);
   const [customAgencies, setCustomAgencies] = useState('');
   const [selectedSetAsides, setSelectedSetAsides] = useState<string[]>([]);
-  const [frequency, setFrequency] = useState<'daily' | 'weekdays' | 'weekends' | 'weekly' | 'paused'>('daily');
+  const [frequency, setFrequency] = useState<'daily' | 'mwf' | 'tth' | 'weekly' | 'paused'>('daily');
   const [profileSuggestions, setProfileSuggestions] = useState<ProfileSuggestions | null>(null);
   const [showSamplePicker, setShowSamplePicker] = useState(false);
   const [calibratedFromSamples, setCalibratedFromSamples] = useState(false);
@@ -890,8 +890,8 @@ export default function OnboardingPage() {
               <div className="space-y-3">
                 {([
                   { value: 'daily', title: 'Daily', detail: 'Every morning with fresh matching opportunities' },
-                  { value: 'weekdays', title: 'Weekdays only', detail: 'Mon–Fri mornings, skip weekends' },
-                  { value: 'weekends', title: 'Weekends only', detail: 'Sat & Sun mornings' },
+                  { value: 'mwf', title: 'Mon / Wed / Fri', detail: 'Every other weekday — less inbox, still timely' },
+                  { value: 'tth', title: 'Tue / Thu', detail: 'Twice a week — for light readers' },
                   { value: 'weekly', title: 'Weekly', detail: 'A weekly digest of the best matches' },
                   { value: 'paused', title: 'Paused', detail: 'Save my settings but hold the emails for now' },
                 ] as const).map(option => (

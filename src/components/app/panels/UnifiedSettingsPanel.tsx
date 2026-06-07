@@ -228,8 +228,8 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                   className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white outline-none focus:border-emerald-500"
                 >
                   <option value="daily">Daily</option>
-                  <option value="weekdays">Weekdays only</option>
-                  <option value="weekends">Weekends only</option>
+                  <option value="mwf">Mon / Wed / Fri</option>
+                  <option value="tth">Tue / Thu</option>
                   <option value="weekly">Weekly</option>
                   <option value="paused">Paused</option>
                 </select>
@@ -311,6 +311,15 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
               <ChecklistItem label="2FA enabled" done={form.two_factor_required} />
               <ChecklistItem label="Ready state complete" done={form.onboarding_completed} />
             </div>
+            {/* Distinct way to (re)launch the guided tour (Eric: was unclear how
+                to access it). */}
+            <button
+              onClick={() => window.dispatchEvent(new Event('mindy:start-tour'))}
+              className="mt-4 w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-500 rounded-lg transition-colors"
+            >
+              🧭 Take the product tour
+            </button>
+            <p className="text-[11px] text-slate-500 mt-1.5 text-center">A 2-minute guided walkthrough of the core workflow.</p>
           </div>
 
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
@@ -415,6 +424,15 @@ function BillingCard({
 
       {loading ? (
         <div className="h-12 rounded-lg bg-slate-800/60 animate-pulse" />
+      ) : (tier === 'team' || tier === 'enterprise') ? (
+        // Already Pro+ via Team/Enterprise — NO upgrade CTA (Eric: on Team plan
+        // means you're already Pro). They may have no personal Stripe sub.
+        <div className="rounded-lg border border-emerald-700/40 bg-emerald-900/15 p-3">
+          <span className="text-sm font-medium text-emerald-200">{tierLabel(tier)}</span>
+          <p className="text-xs text-slate-400 mt-1">
+            {tier === 'team' ? 'You have full Pro access through your team.' : 'Enterprise — full access.'}
+          </p>
+        </div>
       ) : state?.hasSubscription && sub ? (
         <div className="space-y-3">
           <div className="rounded-lg border border-slate-800 bg-slate-800/40 p-3">
