@@ -114,7 +114,7 @@ export async function POST(request: NextRequest) {
   if (!('body' in sow) || !sow.body || (('found' in sow) && !sow.found)) {
     return NextResponse.json({
       success: false,
-      error: 'Could not find a Statement of Work / scope document for this pursuit. It may be in an attachment we couldn’t read — check the document manifest, or paste the SOW text.',
+      error: 'No standalone Statement of Work in this notice — the scope is spread across the solicitation + attachments. Use the document manifest above to send subs the right files (the Pricing Schedule / CLINs are the quickest read on what the work actually is).',
     }, { status: 422 });
   }
   const outName = 'name' in sow ? sow.name : fileName;

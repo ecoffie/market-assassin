@@ -1329,7 +1329,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               <button
                 onClick={() => setDriveMode('auto')}
                 className={`px-3 py-1.5 rounded-md transition-colors ${driveMode === 'auto' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
-                title="Mindy drafts the whole response for you"
+                title="Mindy drafts a first pass of each section — you review, fill placeholders, and finalize"
               >
                 ⚡ Auto
               </button>
