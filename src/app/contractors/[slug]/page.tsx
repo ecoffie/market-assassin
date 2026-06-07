@@ -109,13 +109,17 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function ContractorPage({ params }: PageProps) {
   const { slug } = await params;
   const recipient = await getRollupBySlug(slug);
-  if (!recipient) notFound();
+  if (!recipient) {
+    // Slug doesn't match any rollup NAME. Before 404ing, check whether it's a
+    // subsidiary slug (a child UEI's own name) that should consolidate onto its
+    // parent — if so, 308 there. Only genuinely unknown slugs fall through.
+    const canonical = await resolveCanonicalSlug(slug);
+    if (canonical) permanentRedirect(`/contractors/${canonical}`);
+    notFound();
+  }
 
-  // If this slug belongs to a subsidiary (or a same-name orphan) rather than
-  // the canonical rollup, 308-redirect to the canonical parent URL so link
-  // equity consolidates onto one page. getRollupBySlug already resolved us to
-  // the dominant rollup; this guards the case where the requested slug differs
-  // from that rollup's own canonical slug.
+  // Same-name orphan that resolved to a higher-spend rollup with a different
+  // canonical slug → consolidate onto the canonical parent URL.
   if (recipient.canonical_slug !== slug) {
     permanentRedirect(`/contractors/${recipient.canonical_slug}`);
   }

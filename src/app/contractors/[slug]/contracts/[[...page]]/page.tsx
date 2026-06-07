@@ -16,6 +16,7 @@ import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 import {
   getRollupBySlug,
+  resolveCanonicalSlug,
   getPaginatedAwardsForRecipient,
 } from '@/lib/bigquery/recipients';
 import { SubpageLayout } from '@/components/contractors/SubpageLayout';
@@ -83,11 +84,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function ContractorContractsPage({ params }: PageProps) {
   const { slug, page } = await params;
   const pageNum = parsePage(page);
+  const tail = pageNum > 1 ? `/contracts/${pageNum}` : '/contracts';
   const recipient = await getRollupBySlug(slug);
-  if (!recipient) notFound();
+  if (!recipient) {
+    const canonical = await resolveCanonicalSlug(slug);
+    if (canonical) permanentRedirect(`/contractors/${canonical}${tail}`);
+    notFound();
+  }
   if (recipient.canonical_slug !== slug) {
     // Preserve the page number when consolidating a sibling slug onto the parent.
-    const tail = pageNum > 1 ? `/contracts/${pageNum}` : '/contracts';
     permanentRedirect(`/contractors/${recipient.canonical_slug}${tail}`);
   }
   const slugForLinks = recipient.canonical_slug;

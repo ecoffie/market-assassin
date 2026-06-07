@@ -13,6 +13,7 @@ import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 import {
   getRollupBySlug,
+  resolveCanonicalSlug,
   getAllNaicsForRecipient,
   SUBPAGE_MIN_ROWS,
 } from '@/lib/bigquery/recipients';
@@ -72,7 +73,11 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function ContractorNaicsPage({ params }: PageProps) {
   const { slug } = await params;
   const recipient = await getRollupBySlug(slug);
-  if (!recipient) notFound();
+  if (!recipient) {
+    const canonical = await resolveCanonicalSlug(slug);
+    if (canonical) permanentRedirect(`/contractors/${canonical}/naics`);
+    notFound();
+  }
   if (recipient.canonical_slug !== slug) {
     permanentRedirect(`/contractors/${recipient.canonical_slug}/naics`);
   }
