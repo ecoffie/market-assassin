@@ -304,7 +304,10 @@ export default function GovDecisionMakersPanel({ email }: Props) {
                   <td className="px-4 py-3 text-slate-400">
                     <div className="flex items-start gap-2">
                       <div className="min-w-0">
-                        {c.derivedOffice || c.office || c.sub_tier || '—'}
+                        {/* derivedOffice is cleaned/validated server-side; the
+                            raw c.office is messy SAM data (cities/codes) so we
+                            fall back to the clean sub-agency, not c.office. */}
+                        {c.derivedOffice || c.sub_tier || '—'}
                         {c.instrumentType && <span className="block text-[11px] text-slate-600">{c.instrumentType}{c.dodaac ? ` · ${c.dodaac}` : ''}</span>}
                       </div>
                       {/* Track this contracting office to My Target List (CRM).

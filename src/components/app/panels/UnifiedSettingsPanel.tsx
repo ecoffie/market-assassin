@@ -303,23 +303,24 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
           {tier === 'pro' && <TeamUpgradeCard email={email} getAuthHeaders={getAuthHeaders} />}
 
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-            <h2 className="font-semibold text-white">Onboarding</h2>
-            <div className="mt-4 space-y-3">
+            <h2 className="font-semibold text-white">Getting started</h2>
+            <p className="text-sm text-slate-400 mt-1">New to Mindy? Take the 2-minute guided tour of the core workflow.</p>
+            {/* PRIMARY action: launch the tour (Eric: this card should let you
+                TAKE the tour, not mark it complete). */}
+            <button
+              onClick={() => window.dispatchEvent(new Event('mindy:start-tour'))}
+              className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-500 rounded-lg transition-colors"
+            >
+              🧭 Take the product tour
+            </button>
+            {/* Quiet setup-progress underneath (informational, not the CTA). */}
+            <div className="mt-4 pt-4 border-t border-slate-800 space-y-2">
+              <p className="text-[11px] uppercase tracking-wider text-slate-500">Setup progress</p>
               <ChecklistItem label="Profile saved" done={Boolean(form.display_name || form.company_name)} />
               <ChecklistItem label="NAICS selected" done={parseList(form.naics_codes).length > 0} />
               <ChecklistItem label="Agencies selected" done={parseList(form.target_agencies).length > 0} />
               <ChecklistItem label="2FA enabled" done={form.two_factor_required} />
-              <ChecklistItem label="Ready state complete" done={form.onboarding_completed} />
             </div>
-            {/* Distinct way to (re)launch the guided tour (Eric: was unclear how
-                to access it). */}
-            <button
-              onClick={() => window.dispatchEvent(new Event('mindy:start-tour'))}
-              className="mt-4 w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-500 rounded-lg transition-colors"
-            >
-              🧭 Take the product tour
-            </button>
-            <p className="text-[11px] text-slate-500 mt-1.5 text-center">A 2-minute guided walkthrough of the core workflow.</p>
           </div>
 
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">

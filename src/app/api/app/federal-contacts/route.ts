@@ -42,6 +42,33 @@ const AGENCY_TTL_MS = 6 * 60 * 60 * 1000; // 6h
 //   pocLabel    — "Primary"/"Secondary" when the title is just the POC slot
 // The UI shows the role when present, else the POC label as a muted hint.
 const REAL_ROLE_RE = /(contracting officer|contract specialist|contracting specialist|program manager|program analyst|specialist|director|administrator|procurement|small business|osbp|chief|officer|analyst|manager|coordinator|liaison|buyer)/i;
+
+// US state abbreviations — used to detect "CITY, ST" location strings that got
+// mis-stored in the office column.
+const US_STATES = /\b(AL|AK|AZ|AR|CA|CO|CT|DE|FL|GA|HI|ID|IL|IN|IA|KS|KY|LA|ME|MD|MA|MI|MN|MS|MO|MT|NE|NV|NH|NJ|NM|NY|NC|ND|OH|OK|OR|PA|RI|SC|SD|TN|TX|UT|VT|VA|WA|WV|WI|WY|DC)\b/;
+// Words that signal a real CONTRACTING office (vs. a city/junk).
+const OFFICE_WORDS = /\b(contracting|contract|acquisition|procurement|contr|cons|squadron|battalion|command|center|division|directorate|office|agency|activity|wing|installation|depot|arsenal|naval|army|air force|marine|garrison|district|region|district|logistics|systems|naysup|navsup|navfac|usace|dla|gsa|fisc|mcma)\b/i;
+
+/**
+ * Clean a raw `office` value (Eric QC: Decision Makers showed "CONSTANTA,
+ * ROMANIA", "USPFO ACTIVITY MEANG 101" instead of a real office name). The SAM
+ * POC `office` column is messy — frequently a foreign CITY or a bare base code.
+ * Return a usable office string, or null if it's clearly junk (let the UI fall
+ * back to the clean sub-agency).
+ */
+function cleanRawOffice(raw: string): string | null {
+  const s = raw.trim().replace(/,\s*$/, '');
+  if (s.length < 3) return null;
+  // Looks like an office? keep it.
+  if (OFFICE_WORDS.test(s)) return s;
+  // "CITY, ST" or "CITY, FOREIGN PLACE" with no office words → it's a location.
+  if (/,/.test(s) && !US_STATES.test(s)) return null;      // foreign city
+  if (/,\s*[A-Z]{2}$/.test(s) && !OFFICE_WORDS.test(s)) return null; // US "CITY, ST" location
+  // A single token that's all-caps and short with no office word → likely junk
+  // (GIZA, HONDA, KAUNAS). Keep multi-word strings that might be real.
+  if (!/\s/.test(s) && s === s.toUpperCase()) return null;
+  return s;
+}
 const JUNK_TITLE_RE = /^(mr|mrs|ms|miss|dr|none|n\/a|na|gm|khan|rector|head of organization|business poc|government business poc|electronic business poc)\.?$/i;
 
 function normalizeTitle(title: string | null): { role: string | null; pocLabel: string | null } {
@@ -203,7 +230,15 @@ export async function GET(request: NextRequest) {
     const rawOffice = dod?.dodaac
       ? (dodaacNames.get(dod.dodaac) || dod.officeName || dod.dodaac)
       : null;
-    const officeName = rawOffice ? expandOfficeName(rawOffice) : null;
+    let officeName = rawOffice ? expandOfficeName(rawOffice) : null;
+    // Fallback: if no DoDAAC office, try the raw `office` column — but it's messy
+    // SAM POC data (often a foreign CITY like "CONSTANTA, ROMANIA" or a bare
+    // base code). Expand what we can; reject obvious junk so the UI shows the
+    // clean sub-agency instead of garbage (Eric QC: office codes/cities showing).
+    if (!officeName && r.office) {
+      const cleaned = cleanRawOffice(String(r.office));
+      if (cleaned) officeName = expandOfficeName(cleaned);
+    }
     return {
       ...r,
       ...normalizeTitle(r.contact_title),
