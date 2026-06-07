@@ -76,11 +76,14 @@ export const BQ_DATASET = `\`${PROJECT_ID}.${DATASET}\``;
 export const BQ_TABLES = {
   awards: `\`${PROJECT_ID}.${DATASET}.awards\``,
   recipients: `\`${PROJECT_ID}.${DATASET}.recipients\``,
-  // One row per PARENT org (COALESCE(parent_uei, recipient_uei)), built in
-  // build-derived.sql. Contractor SEO pages read this so primes show their
-  // full footprint instead of a single scattered UEI. Carries child_ueis[]
-  // for filtering awards by the parent's whole UEI set.
-  recipientsRollup: `\`${PROJECT_ID}.${DATASET}.recipients_rollup\``,
+  // Contractor SEO pages read recipients_rollup_merged: one row per company,
+  // built in build-derived.sql by (1) rolling per-UEI awards up to parent_uei,
+  // then (2) collapsing same-normalized-name parent rollups (LOCKHEED MARTIN
+  // CORP + CORPORATION → one). Column-compatible with the intermediate
+  // recipients_rollup; carries child_ueis[] (the company's whole UEI set) for
+  // filtering awards. This makes each prime ONE canonical page with its full
+  // footprint instead of several scattered/duplicate pages.
+  recipientsRollup: `\`${PROJECT_ID}.${DATASET}.recipients_rollup_merged\``,
   recipientExecutives: `\`${PROJECT_ID}.${DATASET}.recipient_executives\``,
   naicsSummary: `\`${PROJECT_ID}.${DATASET}.naics_summary\``,
   agencySummary: `\`${PROJECT_ID}.${DATASET}.agency_summary\``,

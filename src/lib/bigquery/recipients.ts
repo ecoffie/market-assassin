@@ -131,7 +131,7 @@ const COMPUTED_SLUG_SQL = (col: string) => `
  */
 export async function getRollupBySlug(slug: string): Promise<RollupProfile | null> {
   const rows = await queryCached<RollupProfile>({
-    cacheKey: `rollup:by-slug:${slug}:v1`,
+    cacheKey: `rollup:by-slug:${slug}:v2-merged`,
     query: `
       WITH slugged AS (
         SELECT
@@ -174,7 +174,7 @@ export async function getRollupBySlug(slug: string): Promise<RollupProfile | nul
  */
 export async function resolveCanonicalSlug(slug: string): Promise<string | null> {
   const rows = await queryCached<{ canonical_slug: string }>({
-    cacheKey: `rollup:canonical-of:${slug}:v1`,
+    cacheKey: `rollup:canonical-of:${slug}:v2-merged`,
     query: `
       WITH rollups AS (
         SELECT
@@ -285,7 +285,7 @@ export async function getTopAgenciesForRecipient(
   limit = 10,
 ): Promise<TopAgencyRow[]> {
   return queryCached<TopAgencyRow>({
-    cacheKey: `rollup:${rollupUei}:top-agencies:${limit}:v4`,
+    cacheKey: `rollup:${rollupUei}:top-agencies:${limit}:v4-m`,
     // Single-pass, and deliberately NO COUNT(DISTINCT award_id): that
     // column is the widest read in the query and ~doubled the scan
     // (5.9→3.0 GiB on mega-primes). The agency breakdown shows $ + %
@@ -327,7 +327,7 @@ export async function getTopNaicsForRecipient(
   limit = 10,
 ): Promise<TopNaicsRow[]> {
   return queryCached<TopNaicsRow>({
-    cacheKey: `rollup:${rollupUei}:top-naics:${limit}:v2`,
+    cacheKey: `rollup:${rollupUei}:top-naics:${limit}:v2-m`,
     query: `
       SELECT
         naics_code,
@@ -371,7 +371,7 @@ export async function getRecentAwardsForRecipient(
   // break our formatDate(). Also filter to dollar-bearing transactions —
   // $0 modifications dominate the recent timeline but tell users nothing.
   return queryCached<RecentAwardRow>({
-    cacheKey: `rollup:${rollupUei}:recent-awards:${limit}:v3`,
+    cacheKey: `rollup:${rollupUei}:recent-awards:${limit}:v3-m`,
     query: `
       SELECT
         award_id,
@@ -409,7 +409,7 @@ export async function getYearlyTotalsForRecipient(
   rollupUei: string,
 ): Promise<YearlyTotalRow[]> {
   return queryCached<YearlyTotalRow>({
-    cacheKey: `rollup:${rollupUei}:yearly-totals:v2`,
+    cacheKey: `rollup:${rollupUei}:yearly-totals:v2-m`,
     query: `
       SELECT
         fiscal_year,
@@ -458,7 +458,7 @@ export async function getPaginatedAwardsForRecipient(
   const offset = (page - 1) * pageSize;
   const [rows, totalRows] = await Promise.all([
     queryCached<RecentAwardRow>({
-      cacheKey: `rollup:${rollupUei}:awards-page:${page}:${pageSize}:v2`,
+      cacheKey: `rollup:${rollupUei}:awards-page:${page}:${pageSize}:v2-m`,
       query: `
         SELECT
           award_id,
@@ -485,7 +485,7 @@ export async function getPaginatedAwardsForRecipient(
       maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
     }),
     queryCached<{ total: number }>({
-      cacheKey: `rollup:${rollupUei}:awards-total:v2`,
+      cacheKey: `rollup:${rollupUei}:awards-total:v2-m`,
       query: `
         SELECT COUNT(*) AS total
         FROM ${BQ_TABLES.awards}
@@ -507,7 +507,7 @@ export async function getAllNaicsForRecipient(
   rollupUei: string,
 ): Promise<TopNaicsRow[]> {
   return queryCached<TopNaicsRow>({
-    cacheKey: `rollup:${rollupUei}:all-naics:v2`,
+    cacheKey: `rollup:${rollupUei}:all-naics:v2-m`,
     query: `
       SELECT
         naics_code,
@@ -533,7 +533,7 @@ export async function getAllAgenciesForRecipient(
   rollupUei: string,
 ): Promise<TopAgencyRow[]> {
   return queryCached<TopAgencyRow>({
-    cacheKey: `rollup:${rollupUei}:all-agencies:v4`,
+    cacheKey: `rollup:${rollupUei}:all-agencies:v4-m`,
     // Heaviest query on the site (82% of daily BQ scan per
     // INFORMATION_SCHEMA). Two fixes vs. the original:
     //  1) removed the correlated `WITH totals` subquery that scanned
@@ -569,7 +569,7 @@ export async function getYearlyByAgencyForRecipient(
   rollupUei: string,
 ): Promise<YearlyByAgencyRow[]> {
   return queryCached<YearlyByAgencyRow>({
-    cacheKey: `rollup:${rollupUei}:yearly-by-agency:v2`,
+    cacheKey: `rollup:${rollupUei}:yearly-by-agency:v2-m`,
     query: `
       SELECT
         fiscal_year,
@@ -599,7 +599,7 @@ export async function getExecutivesForRecipient(
   rollupUei: string,
 ): Promise<ExecutiveRow[]> {
   return queryCached<ExecutiveRow>({
-    cacheKey: `rollup:${rollupUei}:executives:v3`,
+    cacheKey: `rollup:${rollupUei}:executives:v3-m`,
     // Executives are reported per-UEI in FFATA. For a parent rollup we take
     // the highest-ranked exec rows across the child set, then re-rank — the
     // canonical parent's officers dominate by award value. DISTINCT on name
@@ -668,8 +668,8 @@ export async function getTopRecipientsForSitemap(
   limit = 12000,
 ): Promise<SitemapRecipientRow[]> {
   return queryCached<SitemapRecipientRow>({
-    // :v3 — source switched from per-UEI recipients to recipients_rollup.
-    cacheKey: `sitemap:top-recipients:${limit}:v3`,
+    // :v4 — source switched to recipients_rollup_merged (one row per company).
+    cacheKey: `sitemap:top-recipients:${limit}:v4`,
     query: `
       SELECT
         rollup_name AS recipient_name,
@@ -703,7 +703,7 @@ export async function getSimilarRecipients(
   // as competitors.
   const currentYear = new Date().getFullYear();
   return queryCached<SimilarRecipientRow>({
-    cacheKey: `rollup:${rollupUei}:similar:${topNaicsCode}:${limit}:v2`,
+    cacheKey: `rollup:${rollupUei}:similar:${topNaicsCode}:${limit}:v2-m`,
     query: `
       SELECT
         COALESCE(parent_uei, recipient_uei) AS recipient_uei,
