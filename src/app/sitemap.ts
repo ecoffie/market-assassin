@@ -22,6 +22,7 @@ import type { MetadataRoute } from 'next';
 import {
   getTopRecipientsForSitemap,
   recipientSlug,
+  SUBPAGE_MIN_ROWS,
 } from '@/lib/bigquery/recipients';
 import { glossaryTerms } from '@/data/glossary';
 import { BLOG_POSTS } from '@/data/blog-posts';
@@ -42,14 +43,9 @@ const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://getmindy.ai';
 // weekly-ish USAspending refresh cadence with margin to spare.
 export const revalidate = 86400;
 
-// Minimum distinct agencies / NAICS codes a contractor needs before we
-// emit its /agencies or /naics sub-page in the sitemap. Below this the
-// table is near-empty (1-2 rows) and Google parks it as "Crawled -
-// currently not indexed", burning crawl budget. 5 is the knee where the
-// page has enough unique data to read as substantive. /contracts is
-// never gated — every recipient has award rows and it's the primary
-// brand-search SEO target.
-const SUBPAGE_MIN_ROWS = 5;
+// Sub-page thin-content threshold (SUBPAGE_MIN_ROWS) is imported from the
+// recipients lib so the sitemap and the sub-pages' own robots directives
+// can't drift apart — see the constant's doc comment for why they must agree.
 
 export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
   // 1) Top-level marketing + intro pages. Priority 1.0 because

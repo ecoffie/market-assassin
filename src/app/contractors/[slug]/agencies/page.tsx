@@ -15,6 +15,7 @@ import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 import {
   getRecipientBySlug,
   getAllAgenciesForRecipient,
+  SUBPAGE_MIN_ROWS,
 } from '@/lib/bigquery/recipients';
 import { SubpageLayout } from '@/components/contractors/SubpageLayout';
 
@@ -51,9 +52,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const title = `${name} Federal Agency Customers | Mindy`;
   const description = `${recipient.distinct_agency_count} federal agencies have awarded ${name} contracts. See top customers, agency-by-agency breakdown, and award totals.`;
 
+  // Thin-content gate: a contractor with fewer than SUBPAGE_MIN_ROWS agencies
+  // renders a near-empty table. The sitemap already omits these URLs, but the
+  // overview page's tab nav links to them unconditionally, so Google discovers
+  // and crawls them anyway. noindex,follow keeps them out of the index while
+  // still letting Google walk the links to the agency profile pages. Mirrors
+  // the sitemap's emit gate — both read the same SUBPAGE_MIN_ROWS constant.
+  const isThin = (recipient.distinct_agency_count || 0) < SUBPAGE_MIN_ROWS;
+
   return {
     title,
     description,
+    robots: isThin ? { index: false, follow: true } : undefined,
     alternates: { canonical: `${SITE_URL}/contractors/${slug}/agencies` },
     openGraph: {
       title,

@@ -14,6 +14,7 @@ import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 import {
   getRecipientBySlug,
   getAllNaicsForRecipient,
+  SUBPAGE_MIN_ROWS,
 } from '@/lib/bigquery/recipients';
 import { SubpageLayout } from '@/components/contractors/SubpageLayout';
 import { NAICS_TOP_100 } from '@/data/naics-top100';
@@ -46,9 +47,16 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const title = `${name} NAICS Codes & Industry Activity | Mindy`;
   const description = `${name} federal contract activity across ${recipient.distinct_naics_count} NAICS codes. See industry concentration, top codes, and award totals.`;
 
+  // Thin-content gate: fewer than SUBPAGE_MIN_ROWS NAICS codes renders a
+  // near-empty table that Google parks as "Crawled - currently not indexed".
+  // noindex,follow keeps it out of the index while preserving the links to
+  // NAICS landing pages. Mirrors the sitemap emit gate (same constant).
+  const isThin = (recipient.distinct_naics_count || 0) < SUBPAGE_MIN_ROWS;
+
   return {
     title,
     description,
+    robots: isThin ? { index: false, follow: true } : undefined,
     alternates: { canonical: `${SITE_URL}/contractors/${slug}/naics` },
     openGraph: {
       title,

@@ -56,6 +56,22 @@ export interface RecipientProfile {
 }
 
 /**
+ * Minimum distinct rows a contractor needs before its /agencies or /naics
+ * sub-page is treated as substantive enough to index. Below this the table
+ * is near-empty (1-4 rows); Google crawls it, sees almost no unique content,
+ * and parks it as "Crawled - currently not indexed", wasting crawl budget.
+ *
+ * Single source of truth — imported by BOTH the sitemap (to decide which
+ * sub-page URLs to emit) and the sub-pages themselves (to decide their
+ * robots directive). These two MUST agree: the sitemap can omit a thin URL,
+ * but Google still discovers it through the always-rendered tab nav, so the
+ * page itself must also declare noindex or the gate leaks. /contracts is
+ * never gated — every recipient has award rows and it's the core
+ * brand-search SEO target.
+ */
+export const SUBPAGE_MIN_ROWS = 5;
+
+/**
  * Get the recipient summary by slug. Returns the highest-spending
  * match if multiple UEIs share the same normalized name (rare but
  * happens — e.g. parent/subsidiary with same brand name).
