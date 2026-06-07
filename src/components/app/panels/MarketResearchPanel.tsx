@@ -1512,9 +1512,14 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               type="button"
               onClick={() => {
                 setResearchMode('sport');
-                // Start blank so the user researches a NEW industry from scratch.
+                // Fully on-demand (Eric): blank the inputs AND clear the saved-
+                // profile report so nothing shows until the user runs their own.
                 setFormData({ businessType: '', naicsCode: '', pscCode: '', zipCode: '', veteranStatus: 'Not Applicable', companyName: '', excludeDOD: false });
                 setSelectedAgency('');
+                setReportData(null);
+                setActiveReportId(null);
+                setSportKeyword('');
+                setSportSuggestions(null);
               }}
               className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-colors ${researchMode === 'sport' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
               title="Research any industry — manual inputs, doesn't change your saved settings"
@@ -1702,8 +1707,9 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         </div>
       )}
 
-      {/* Filter context strip — mirrors Source Feed so free users see their scope */}
-      {profileLoading ? (
+      {/* Filter context strip — mirrors Source Feed so free users see their
+          scope. Hidden in Sport mode (Eric: fully on-demand, no saved profile). */}
+      {researchMode === 'sport' ? null : profileLoading ? (
         <div className="rounded-lg border border-slate-800 bg-slate-900/60 px-4 py-2 text-xs text-slate-500">
           Loading profile...
         </div>
