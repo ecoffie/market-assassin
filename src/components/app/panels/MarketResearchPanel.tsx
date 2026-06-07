@@ -597,6 +597,10 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     excludeDOD: false,
   });
   const [selectedAgency, setSelectedAgency] = useState('');
+  // Auto vs Sport mode (Eric): Auto uses your saved profile; Sport lets you
+  // research ANY industry (manual NAICS/PSC/set-aside) without touching your
+  // saved settings — for exploring expansion lanes / a report for someone else.
+  const [researchMode, setResearchMode] = useState<'auto' | 'sport'>('auto');
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -1062,7 +1066,8 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
 
         setSavedProfile(profile);
 
-        if (profile) {
+        // Don't clobber Sport-mode manual inputs with the saved profile.
+        if (profile && researchMode === 'auto') {
           applySavedProfile(profile);
         }
       })
@@ -1463,7 +1468,37 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     <div className="p-6 space-y-6">
       {/* Header: title + actions on top, full filter strip below (matches Source Feed) */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
-        <h1 className="text-2xl font-bold text-white">Market Research</h1>
+        <div className="flex items-center gap-3">
+          <h1 className="text-2xl font-bold text-white">Market Research</h1>
+          {/* Auto / Sport mode toggle — Mindy colors (purple/emerald). */}
+          <div className="inline-flex rounded-lg bg-slate-800/60 p-0.5 text-xs">
+            <button
+              type="button"
+              onClick={() => {
+                setResearchMode('auto');
+                // Restore the saved profile into the inputs.
+                if (savedProfile) applySavedProfile(savedProfile);
+              }}
+              className={`px-3 py-1.5 rounded-md font-medium transition-colors ${researchMode === 'auto' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              title="Use your saved profile"
+            >
+              ⚡ Auto
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setResearchMode('sport');
+                // Start blank so the user researches a NEW industry from scratch.
+                setFormData({ businessType: '', naicsCode: '', pscCode: '', zipCode: '', veteranStatus: 'Not Applicable', companyName: '', excludeDOD: false });
+                setSelectedAgency('');
+              }}
+              className={`px-3 py-1.5 rounded-md font-medium transition-colors ${researchMode === 'sport' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              title="Research any industry — manual inputs, doesn't change your saved settings"
+            >
+              🏎 Sport
+            </button>
+          </div>
+        </div>
         <div className="flex items-center gap-3">
           {/* Market Focus Pills (Pro only, inline) */}
           {tier !== 'free' && marketFocuses.length > 0 && (
@@ -1525,6 +1560,64 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           </button>
         </div>
       </div>
+
+      {/* SPORT MODE — manual inputs to research ANY industry (Eric: old-MA flow,
+          Mindy colors). Doesn't touch saved settings; runs a one-off report. */}
+      {researchMode === 'sport' && (
+        <div className="rounded-xl border border-purple-500/30 bg-purple-500/[0.04] p-4">
+          <div className="flex items-center justify-between mb-3">
+            <div>
+              <h3 className="text-sm font-semibold text-white">🏎 Research any industry</h3>
+              <p className="text-xs text-slate-400 mt-0.5">Explore a new lane, cross industries, or run a report for someone else. This won&apos;t change your saved profile.</p>
+            </div>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <label className="text-xs text-slate-400">
+              NAICS code(s)
+              <input
+                value={formData.naicsCode}
+                onChange={(e) => setFormData({ ...formData, naicsCode: e.target.value })}
+                placeholder="e.g. 236220, 541512"
+                className="mt-1 w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm outline-none focus:border-purple-500"
+              />
+            </label>
+            <label className="text-xs text-slate-400">
+              PSC code (optional)
+              <input
+                value={formData.pscCode}
+                onChange={(e) => setFormData({ ...formData, pscCode: e.target.value })}
+                placeholder="e.g. D310, 7030"
+                className="mt-1 w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm outline-none focus:border-purple-500"
+              />
+            </label>
+            <label className="text-xs text-slate-400">
+              Set-aside / business type
+              <select
+                value={formData.businessType}
+                onChange={(e) => setFormData({ ...formData, businessType: e.target.value as BusinessType })}
+                className="mt-1 w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm outline-none focus:border-purple-500"
+              >
+                <option value="">Any / Small Business</option>
+                <option value="8(a)">8(a)</option>
+                <option value="WOSB">WOSB / EDWOSB</option>
+                <option value="SDVOSB">SDVOSB / VOSB</option>
+                <option value="HUBZone">HUBZone</option>
+                <option value="Full and Open">Full & Open</option>
+              </select>
+            </label>
+            <label className="text-xs text-slate-400">
+              Zip (optional)
+              <input
+                value={formData.zipCode}
+                onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
+                placeholder="e.g. 20001"
+                className="mt-1 w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm outline-none focus:border-purple-500"
+              />
+            </label>
+          </div>
+          <p className="text-[11px] text-slate-500 mt-2">Enter at least a NAICS or PSC, then click <span className="text-purple-300">Build Market Map</span> above.</p>
+        </div>
+      )}
 
       {/* Filter context strip — mirrors Source Feed so free users see their scope */}
       {profileLoading ? (
