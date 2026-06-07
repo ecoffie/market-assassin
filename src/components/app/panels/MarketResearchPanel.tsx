@@ -1936,11 +1936,16 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               so the layout is visible/scannable from Slice 1. */}
           <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <SpendingByAgencyChart buyers={chartBuyers} />
-            <SetAsideMixChart
-              buyers={chartBuyers}
-              satTotal={chartSatTotal || (reportData?.simplifiedAcquisition?.summary?.totalSATSpending) || 0}
-              totalSpend={chartTotalSpending || buyerSummary?.totalSpending || 0}
-            />
+            {/* Small Business Mix is about YOUR profile's SBA goaling — not a
+                one-off industry exploration. Remove it in Sport (Eric: "serves a
+                different function"). */}
+            {researchMode === 'auto' && (
+              <SetAsideMixChart
+                buyers={chartBuyers}
+                satTotal={chartSatTotal || (reportData?.simplifiedAcquisition?.summary?.totalSATSpending) || 0}
+                totalSpend={chartTotalSpending || buyerSummary?.totalSpending || 0}
+              />
+            )}
             <TrendPlaceholderChart
               totalSpend={chartTotalSpending || buyerSummary?.totalSpending || 0}
               agencyCount={chartBuyers.length}
