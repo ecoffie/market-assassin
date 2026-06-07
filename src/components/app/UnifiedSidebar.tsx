@@ -243,13 +243,10 @@ const NAV_SECTIONS: NavSection[] = [
         description: 'Gov contacts by agency',
         tier: ['pro', 'team', 'enterprise'],
       },
-      {
-        id: 'knowledge-base',
-        label: 'Knowledge Base',
-        icon: BookOpen,
-        description: 'The docs Mindy cites',
-        tier: ['free', 'pro', 'team', 'enterprise'],
-      },
+      // Knowledge Base intentionally NOT in the sidebar (Eric: it's reference,
+      // surfaced via Mindy Chat citations — not a daily-use tab). The panel still
+      // exists; chat "view source" links open it via onPanelChange. A "Sources"
+      // link inside Mindy Chat is its entry point.
     ],
   },
   {

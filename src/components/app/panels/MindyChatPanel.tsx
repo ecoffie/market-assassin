@@ -381,14 +381,27 @@ export default function MindyChatPanel({ email, tier: _tier, onPanelChange }: Mi
               </p>
             </div>
           </div>
-          {messages.length > 0 && !isStreaming && (
-            <button
-              onClick={startNewChat}
-              className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded border border-slate-700 hover:border-slate-600 transition-colors"
-            >
-              New chat
-            </button>
-          )}
+          <div className="flex items-center gap-2 shrink-0">
+            {/* KB entry point (Eric: KB lives off the sidebar; reached from chat
+                where its citations come from). */}
+            {onPanelChange && (
+              <button
+                onClick={() => onPanelChange('knowledge-base')}
+                className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded border border-slate-700 hover:border-slate-600 transition-colors"
+                title="Browse the documents Mindy cites"
+              >
+                📚 Browse sources
+              </button>
+            )}
+            {messages.length > 0 && !isStreaming && (
+              <button
+                onClick={startNewChat}
+                className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded border border-slate-700 hover:border-slate-600 transition-colors"
+              >
+                New chat
+              </button>
+            )}
+          </div>
         </div>
       </header>
 
