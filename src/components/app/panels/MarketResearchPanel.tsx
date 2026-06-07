@@ -1523,7 +1523,9 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                 setResearchMode('sport');
                 // Fully on-demand (Eric): blank the inputs AND clear the saved-
                 // profile report so nothing shows until the user runs their own.
-                setFormData({ businessType: '', naicsCode: '', pscCode: '', zipCode: '', veteranStatus: 'Not Applicable', companyName: '', excludeDOD: false });
+                // Default set-aside to Small Business (Eric) — most users are SBs
+                // exploring lanes; they can change it.
+                setFormData({ businessType: 'Small Business', naicsCode: '', pscCode: '', zipCode: '', veteranStatus: 'Not Applicable', companyName: '', excludeDOD: false });
                 setSelectedAgency('');
                 setReportData(null);
                 setActiveReportId(null);
@@ -1665,6 +1667,20 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                     </div>
                   </div>
                 )}
+                {/* One click: apply the suggested codes + default Small Business
+                    (Eric: "use the codes you suggested, default to small biz"). */}
+                <button
+                  type="button"
+                  onClick={() => setFormData(f => ({
+                    ...f,
+                    naicsCode: sportSuggestions.naics.slice(0, 3).map(s => s.code).join(', '),
+                    pscCode: sportSuggestions.psc.slice(0, 2).map(s => s.code).join(', '),
+                    businessType: f.businessType || 'Small Business',
+                  }))}
+                  className="mt-1 w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 py-2 text-xs font-semibold text-white"
+                >
+                  ✓ Use these codes (Small Business) — then Build Market Map
+                </button>
               </div>
             )}
           </div>
@@ -1695,7 +1711,8 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                 onChange={(e) => setFormData({ ...formData, businessType: e.target.value as BusinessType })}
                 className="mt-1 w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm outline-none focus:border-purple-500"
               >
-                <option value="">Any / Small Business</option>
+                <option value="Small Business">Small Business (default)</option>
+                <option value="">Any business type</option>
                 <option value="8(a)">8(a)</option>
                 <option value="WOSB">WOSB / EDWOSB</option>
                 <option value="SDVOSB">SDVOSB / VOSB</option>
