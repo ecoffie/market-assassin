@@ -212,7 +212,42 @@ interface SuggestCodesResponse {
   success: boolean;
   naicsSuggestions: CodeSuggestion[];
   pscSuggestions: CodeSuggestion[];
+  source?: 'usaspending' | 'llm';
   error?: string;
+}
+
+/**
+ * Ground NAICS + PSC suggestions in REAL USASpending award data for a keyword
+ * (Eric's principle: suggest the codes that ACTUALLY have spending under the
+ * term, not an LLM guess). Queries spending_by_category for the last FY.
+ */
+async function groundCodesFromUsaspending(keyword: string, maxResults: number): Promise<{ naicsSuggestions: CodeSuggestion[]; pscSuggestions: CodeSuggestion[] } | null> {
+  const base = 'https://api.usaspending.gov/api/v2/search/spending_by_category';
+  const filters = {
+    keywords: [keyword],
+    time_period: [{ start_date: '2023-10-01', end_date: '2024-09-30' }],
+    award_type_codes: ['A', 'B', 'C', 'D'],
+  };
+  const fetchCat = async (cat: 'naics' | 'psc'): Promise<CodeSuggestion[]> => {
+    try {
+      const res = await fetch(`${base}/${cat}/`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filters, limit: maxResults }),
+      });
+      if (!res.ok) return [];
+      const j = await res.json();
+      return (j.results || []).filter((r: { code?: string; amount?: number }) => r.code && (r.amount || 0) > 0)
+        .map((r: { code: string; name?: string; amount: number }) => ({
+          code: r.code,
+          name: r.name || r.code,
+          confidence: 'high' as const,
+          reason: `$${(r.amount / 1e6).toFixed(1)}M in federal awards under "${keyword}"`,
+        }));
+    } catch { return []; }
+  };
+  const [naicsSuggestions, pscSuggestions] = await Promise.all([fetchCat('naics'), fetchCat('psc')]);
+  if (naicsSuggestions.length === 0 && pscSuggestions.length === 0) return null;
+  return { naicsSuggestions, pscSuggestions };
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse<SuggestCodesResponse>> {
@@ -230,6 +265,16 @@ export async function POST(request: NextRequest): Promise<NextResponse<SuggestCo
         pscSuggestions: [],
         error: 'Please enter what you want to research (e.g. "drones", "medical supplies").',
       }, { status: 400 });
+    }
+
+    // GROUND IN REAL DATA FIRST (Eric: "drone" → the LLM guessed Site Prep
+    // Contractors; USASpending shows the REAL codes are 336411/334511/541715).
+    // Query USASpending for the NAICS/PSC that ACTUALLY have spending under this
+    // keyword, so suggestions are award-backed, not invented. LLM is the
+    // fallback only when the keyword returns no awards.
+    const grounded = await groundCodesFromUsaspending(description.trim(), maxResults);
+    if (grounded && (grounded.naicsSuggestions.length > 0 || grounded.pscSuggestions.length > 0)) {
+      return NextResponse.json({ success: true, source: 'usaspending', ...grounded });
     }
 
     const prompt = `You are a federal government contracting expert. A small business owner has described their services:
