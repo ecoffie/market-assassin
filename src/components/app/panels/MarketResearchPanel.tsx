@@ -3013,24 +3013,31 @@ function TopPrimesChart({ primes, tier2 = [], tribal = [], email }: TopPrimesCha
     );
   };
 
-  // SEPARATE sections per tier (Eric: "make a list for each so the distinction
-  // is clear").
-  const section = (label: string, hint: string, items: PrimeLike[]) => items.length === 0 ? null : (
-    <div>
-      <div className="text-[11px] font-semibold text-slate-300">{label} <span className="text-slate-600">({items.length})</span></div>
-      <div className="text-[10px] text-slate-500 mb-1">{hint}</div>
+  // Each tier as its OWN FPDS-Top-10-style card (Eric: "good idea poor design —
+  // put them in the FPDS top 10 format, separate each, not a run-on list").
+  const tierCard = (title: string, hint: string, items: PrimeLike[]) => items.length === 0 ? null : (
+    <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-3">
+      <div className="mb-2">
+        <h4 className="text-xs font-bold text-white uppercase tracking-wider">{title}</h4>
+        <p className="text-[10px] text-slate-500">{hint}</p>
+      </div>
       <ul className="space-y-1.5">{items.map(renderRow)}</ul>
     </div>
   );
 
   return (
-    <ChartShell title="Teaming Candidates" subtitle={subtitle} footer={footer}>
-      <div className="space-y-3">
-        {section('🪶 Tribal / Native-owned (8(a))', 'Sole-source eligible — the fastest teaming path for small business.', tribalList)}
-        {section('🥈 Tier 2 subcontractors', 'Mid-size firms that sub on this work — realistic prime/sub partners.', tier2List)}
-        {section('🏢 Tier 1 primes', 'The big incumbents — sub under them, or know who you’re up against.', tier1List)}
+    <div className="lg:col-span-2">
+      <div className="mb-2">
+        <h3 className="text-sm font-semibold text-white">Teaming Candidates</h3>
+        <p className="text-[11px] text-slate-500">{subtitle}</p>
       </div>
-    </ChartShell>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+        {tierCard('🪶 Tribal / Native-owned', 'Sole-source eligible — fastest teaming path for small business.', tribalList)}
+        {tierCard('🥈 Tier 2 Subcontractors', 'Mid-size firms that sub on this work — realistic partners.', tier2List)}
+        {tierCard('🏢 Tier 1 Primes', 'The incumbents — sub under them or size up the competition.', tier1List)}
+      </div>
+      <div className="mt-2">{footer}</div>
+    </div>
   );
 }
 
