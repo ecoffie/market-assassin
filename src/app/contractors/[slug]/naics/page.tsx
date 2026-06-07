@@ -8,11 +8,11 @@
  */
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 import {
-  getRecipientBySlug,
+  getRollupBySlug,
   getAllNaicsForRecipient,
   SUBPAGE_MIN_ROWS,
 } from '@/lib/bigquery/recipients';
@@ -40,28 +40,29 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const recipient = await getRecipientBySlug(slug);
+  const recipient = await getRollupBySlug(slug);
   if (!recipient) return { title: 'Contractor Not Found | Mindy' };
 
-  const name = fmtCompanyName(recipient.recipient_name);
+  const name = fmtCompanyName(recipient.rollup_name);
   const title = `${name} NAICS Codes & Industry Activity | Mindy`;
   const description = `${name} federal contract activity across ${recipient.distinct_naics_count} NAICS codes. See industry concentration, top codes, and award totals.`;
 
-  // Thin-content gate: fewer than SUBPAGE_MIN_ROWS NAICS codes renders a
-  // near-empty table that Google parks as "Crawled - currently not indexed".
-  // noindex,follow keeps it out of the index while preserving the links to
-  // NAICS landing pages. Mirrors the sitemap emit gate (same constant).
+  // Thin-content gate on the PARENT-rollup NAICS count: fewer than
+  // SUBPAGE_MIN_ROWS codes renders a near-empty table Google parks as
+  // "Crawled - currently not indexed". noindex,follow keeps it out of the
+  // index while preserving links to NAICS landing pages.
   const isThin = (recipient.distinct_naics_count || 0) < SUBPAGE_MIN_ROWS;
+  const canonical = recipient.canonical_slug;
 
   return {
     title,
     description,
     robots: isThin ? { index: false, follow: true } : undefined,
-    alternates: { canonical: `${SITE_URL}/contractors/${slug}/naics` },
+    alternates: { canonical: `${SITE_URL}/contractors/${canonical}/naics` },
     openGraph: {
       title,
       description,
-      url: `${SITE_URL}/contractors/${slug}/naics`,
+      url: `${SITE_URL}/contractors/${canonical}/naics`,
       type: 'website',
       siteName: 'Mindy',
     },
@@ -70,11 +71,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function ContractorNaicsPage({ params }: PageProps) {
   const { slug } = await params;
-  const recipient = await getRecipientBySlug(slug);
+  const recipient = await getRollupBySlug(slug);
   if (!recipient) notFound();
+  if (recipient.canonical_slug !== slug) {
+    permanentRedirect(`/contractors/${recipient.canonical_slug}/naics`);
+  }
 
-  const naicsRows = await getAllNaicsForRecipient(recipient.recipient_uei);
-  const displayName = fmtCompanyName(recipient.recipient_name);
+  const naicsRows = await getAllNaicsForRecipient(recipient.child_ueis, recipient.rollup_uei);
+  const displayName = fmtCompanyName(recipient.rollup_name);
+  const slugForLinks = recipient.canonical_slug;
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -82,8 +87,8 @@ export default async function ContractorNaicsPage({ params }: PageProps) {
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
       { '@type': 'ListItem', position: 2, name: 'Contractors', item: `${SITE_URL}/contractors` },
-      { '@type': 'ListItem', position: 3, name: displayName, item: `${SITE_URL}/contractors/${slug}` },
-      { '@type': 'ListItem', position: 4, name: 'NAICS', item: `${SITE_URL}/contractors/${slug}/naics` },
+      { '@type': 'ListItem', position: 3, name: displayName, item: `${SITE_URL}/contractors/${slugForLinks}` },
+      { '@type': 'ListItem', position: 4, name: 'NAICS', item: `${SITE_URL}/contractors/${slugForLinks}/naics` },
     ],
   };
 
@@ -91,7 +96,7 @@ export default async function ContractorNaicsPage({ params }: PageProps) {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <SubpageLayout
-        slug={slug}
+        slug={slugForLinks}
         displayName={displayName}
         totalObligated={fmtMoney(recipient.total_obligated)}
         awardCount={recipient.award_count}

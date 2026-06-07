@@ -4,6 +4,9 @@
 -- Tables built:
 --   awards                — flattened transactions, typed, partitioned, clustered
 --   recipients            — one row per UEI, rolled-up totals
+--   recipients_rollup     — one row per PARENT org (COALESCE(parent_uei,uei)),
+--                           used by the contractor SEO pages so primes show
+--                           their full footprint instead of a single scattered UEI
 --   recipient_executives  — top 5 highly_compensated_officers per recipient (FFATA)
 --   naics_summary         — per-NAICS totals
 --   agency_summary        — per-agency totals
@@ -98,6 +101,104 @@ SELECT
 FROM `market-assasin.usaspending.awards`
 WHERE recipient_uei IS NOT NULL
 GROUP BY recipient_uei;
+
+-- 2b) recipients_rollup — one row per PARENT organization.
+--
+-- Why: USAspending awards scatter across many subsidiary/legal-entity UEIs
+-- that share one parent_uei. The per-UEI `recipients` table above therefore
+-- under-counts household-name primes: e.g. Lockheed Martin's awards split
+-- across 8+ UEIs, so the single-UEI page shows only ~4 agencies / $221B when
+-- the true parent footprint is 27 agencies / 234 NAICS / $495B. That under-
+-- count was tripping the contractor sub-page thin-content noindex gate
+-- (SUBPAGE_MIN_ROWS) on 55.7% of $1B+ primes — exactly the pages we most
+-- want indexed. This table rolls everything up to the parent.
+--
+-- Grouping key: COALESCE(parent_uei, recipient_uei) — a recipient with no
+-- distinct parent is its own rollup. Distinct agency/NAICS counts are
+-- recomputed at the parent level (you CANNOT sum the per-UEI distinct counts —
+-- siblings overlap on agencies/NAICS).
+--
+-- rollup_name: prefer parent_name; fall back to the highest-spend child's
+-- recipient_name when parent_name is absent. Picked deterministically.
+-- child_ueis: every member UEI — the pages filter awards by
+-- `recipient_uei IN UNNEST(child_ueis)` (preserves cluster pruning) and the
+-- slug-redirect resolver maps a subsidiary slug back to its parent.
+CREATE OR REPLACE TABLE `market-assasin.usaspending.recipients_rollup`
+CLUSTER BY rollup_uei
+AS
+WITH
+-- One pass over awards, grouped to the parent. All the heavy aggregates
+-- (distinct counts, sums) compute here exactly once per rollup.
+agg AS (
+  SELECT
+    COALESCE(parent_uei, recipient_uei) AS rollup_uei,
+    ANY_VALUE(cage_code)                AS cage_code,
+    ANY_VALUE(recipient_address)        AS address,
+    ANY_VALUE(recipient_city)           AS city,
+    ANY_VALUE(recipient_state)          AS state,
+    ANY_VALUE(recipient_zip)            AS zip,
+    ANY_VALUE(recipient_country)        AS country,
+    SUM(obligation_amount)              AS total_obligated,
+    COUNT(DISTINCT award_id)            AS award_count,
+    COUNT(*)                            AS transaction_count,
+    MIN(action_date)                    AS first_action_date,
+    MAX(action_date)                    AS last_action_date,
+    COUNT(DISTINCT awarding_agency)     AS distinct_agency_count,
+    COUNT(DISTINCT naics_code)          AS distinct_naics_count
+  FROM `market-assasin.usaspending.awards`
+  WHERE recipient_uei IS NOT NULL
+  GROUP BY rollup_uei
+),
+-- Per-UEI spend within each rollup — drives the deterministic canonical
+-- name pick and the child_ueis membership array.
+per_uei AS (
+  SELECT
+    COALESCE(parent_uei, recipient_uei) AS rollup_uei,
+    recipient_uei,
+    ANY_VALUE(recipient_name)           AS recipient_name,
+    ANY_VALUE(parent_name)              AS parent_name,
+    SUM(obligation_amount)              AS uei_obligated
+  FROM `market-assasin.usaspending.awards`
+  WHERE recipient_uei IS NOT NULL
+  GROUP BY rollup_uei, recipient_uei
+),
+-- Collapse per_uei to one row per rollup: the canonical name (prefer any
+-- parent_name, else highest-spend child's recipient_name) and the full
+-- child UEI set.
+names AS (
+  SELECT
+    rollup_uei,
+    COALESCE(
+      -- highest-spend non-null parent_name in the group
+      ARRAY_AGG(parent_name IGNORE NULLS ORDER BY uei_obligated DESC LIMIT 1)[SAFE_OFFSET(0)],
+      -- else highest-spend child recipient_name
+      ARRAY_AGG(recipient_name ORDER BY uei_obligated DESC LIMIT 1)[SAFE_OFFSET(0)]
+    ) AS rollup_name,
+    ARRAY_AGG(recipient_uei ORDER BY uei_obligated DESC) AS child_ueis,
+    COUNT(*) AS child_count
+  FROM per_uei
+  GROUP BY rollup_uei
+)
+SELECT
+  agg.rollup_uei,
+  names.rollup_name,
+  names.child_ueis,
+  names.child_count,
+  agg.cage_code,
+  agg.address,
+  agg.city,
+  agg.state,
+  agg.zip,
+  agg.country,
+  agg.total_obligated,
+  agg.award_count,
+  agg.transaction_count,
+  agg.first_action_date,
+  agg.last_action_date,
+  agg.distinct_agency_count,
+  agg.distinct_naics_count
+FROM agg
+JOIN names USING (rollup_uei);
 
 -- 3) Top-5 executives per recipient (from FFATA disclosures)
 -- One row per (recipient, exec) — picked from most recent transaction

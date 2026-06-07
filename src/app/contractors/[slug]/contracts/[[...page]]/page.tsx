@@ -11,11 +11,11 @@
  */
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 import {
-  getRecipientBySlug,
+  getRollupBySlug,
   getPaginatedAwardsForRecipient,
 } from '@/lib/bigquery/recipients';
 import { SubpageLayout } from '@/components/contractors/SubpageLayout';
@@ -53,14 +53,15 @@ function parsePage(page?: string[]): number {
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug, page } = await params;
   const pageNum = parsePage(page);
-  const recipient = await getRecipientBySlug(slug);
+  const recipient = await getRollupBySlug(slug);
   if (!recipient) return { title: 'Contractor Not Found | Mindy' };
 
-  const name = fmtCompanyName(recipient.recipient_name);
+  const name = fmtCompanyName(recipient.rollup_name);
+  const canonical = recipient.canonical_slug;
   const pageLabel = pageNum > 1 ? ` — Page ${pageNum}` : '';
   const title = `${name} Federal Contracts${pageLabel} | Mindy`;
   const description = `Browse ${recipient.award_count.toLocaleString()} federal contracts awarded to ${name}. ${fmtMoney(recipient.total_obligated)} obligated across ${recipient.distinct_agency_count} agencies.`;
-  const canonicalPath = pageNum === 1 ? `/contractors/${slug}/contracts` : `/contractors/${slug}/contracts/${pageNum}`;
+  const canonicalPath = pageNum === 1 ? `/contractors/${canonical}/contracts` : `/contractors/${canonical}/contracts/${pageNum}`;
 
   return {
     title,
@@ -82,11 +83,18 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 export default async function ContractorContractsPage({ params }: PageProps) {
   const { slug, page } = await params;
   const pageNum = parsePage(page);
-  const recipient = await getRecipientBySlug(slug);
+  const recipient = await getRollupBySlug(slug);
   if (!recipient) notFound();
+  if (recipient.canonical_slug !== slug) {
+    // Preserve the page number when consolidating a sibling slug onto the parent.
+    const tail = pageNum > 1 ? `/contracts/${pageNum}` : '/contracts';
+    permanentRedirect(`/contractors/${recipient.canonical_slug}${tail}`);
+  }
+  const slugForLinks = recipient.canonical_slug;
 
   const { rows: awards, total } = await getPaginatedAwardsForRecipient(
-    recipient.recipient_uei,
+    recipient.child_ueis,
+    recipient.rollup_uei,
     pageNum,
     PAGE_SIZE,
   );
@@ -94,7 +102,7 @@ export default async function ContractorContractsPage({ params }: PageProps) {
   // If user asks for a page past the end, treat as not-found
   if (pageNum > 1 && awards.length === 0) notFound();
 
-  const displayName = fmtCompanyName(recipient.recipient_name);
+  const displayName = fmtCompanyName(recipient.rollup_name);
   const start = (pageNum - 1) * PAGE_SIZE + 1;
   const end = Math.min(start + awards.length - 1, total);
 
@@ -105,8 +113,8 @@ export default async function ContractorContractsPage({ params }: PageProps) {
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
       { '@type': 'ListItem', position: 2, name: 'Contractors', item: `${SITE_URL}/contractors` },
-      { '@type': 'ListItem', position: 3, name: displayName, item: `${SITE_URL}/contractors/${slug}` },
-      { '@type': 'ListItem', position: 4, name: 'Contracts', item: `${SITE_URL}/contractors/${slug}/contracts` },
+      { '@type': 'ListItem', position: 3, name: displayName, item: `${SITE_URL}/contractors/${slugForLinks}` },
+      { '@type': 'ListItem', position: 4, name: 'Contracts', item: `${SITE_URL}/contractors/${slugForLinks}/contracts` },
     ],
   };
 
@@ -114,7 +122,7 @@ export default async function ContractorContractsPage({ params }: PageProps) {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <SubpageLayout
-        slug={slug}
+        slug={slugForLinks}
         displayName={displayName}
         totalObligated={fmtMoney(recipient.total_obligated)}
         awardCount={recipient.award_count}
@@ -183,7 +191,7 @@ export default async function ContractorContractsPage({ params }: PageProps) {
             <div className="flex flex-wrap gap-2">
               {pageNum > 1 && (
                 <Link
-                  href={pageNum === 2 ? `/contractors/${slug}/contracts` : `/contractors/${slug}/contracts/${pageNum - 1}`}
+                  href={pageNum === 2 ? `/contractors/${slugForLinks}/contracts` : `/contractors/${slugForLinks}/contracts/${pageNum - 1}`}
                   className="px-3 py-1.5 rounded-md border border-slate-700 hover:border-purple-500 text-slate-300 hover:text-white"
                 >
                   ← Prev
@@ -191,7 +199,7 @@ export default async function ContractorContractsPage({ params }: PageProps) {
               )}
               {pageNum < totalPages && (
                 <Link
-                  href={`/contractors/${slug}/contracts/${pageNum + 1}`}
+                  href={`/contractors/${slugForLinks}/contracts/${pageNum + 1}`}
                   className="px-3 py-1.5 rounded-md border border-slate-700 hover:border-purple-500 text-slate-300 hover:text-white"
                 >
                   Next →

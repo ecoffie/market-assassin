@@ -9,11 +9,11 @@
  */
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 import {
-  getRecipientBySlug,
+  getRollupBySlug,
   getAllAgenciesForRecipient,
   SUBPAGE_MIN_ROWS,
 } from '@/lib/bigquery/recipients';
@@ -45,30 +45,30 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const recipient = await getRecipientBySlug(slug);
+  const recipient = await getRollupBySlug(slug);
   if (!recipient) return { title: 'Contractor Not Found | Mindy' };
 
-  const name = fmtCompanyName(recipient.recipient_name);
+  const name = fmtCompanyName(recipient.rollup_name);
   const title = `${name} Federal Agency Customers | Mindy`;
   const description = `${recipient.distinct_agency_count} federal agencies have awarded ${name} contracts. See top customers, agency-by-agency breakdown, and award totals.`;
 
-  // Thin-content gate: a contractor with fewer than SUBPAGE_MIN_ROWS agencies
-  // renders a near-empty table. The sitemap already omits these URLs, but the
-  // overview page's tab nav links to them unconditionally, so Google discovers
-  // and crawls them anyway. noindex,follow keeps them out of the index while
-  // still letting Google walk the links to the agency profile pages. Mirrors
-  // the sitemap's emit gate — both read the same SUBPAGE_MIN_ROWS constant.
+  // Thin-content gate: an org with fewer than SUBPAGE_MIN_ROWS agencies renders
+  // a near-empty table. The gate now reads the PARENT-rollup agency count, so
+  // primes like Lockheed (27 agencies) correctly clear it instead of being
+  // suppressed by per-UEI scatter. noindex,follow keeps genuinely thin pages
+  // out of the index while letting Google walk links to agency profile pages.
   const isThin = (recipient.distinct_agency_count || 0) < SUBPAGE_MIN_ROWS;
+  const canonical = recipient.canonical_slug;
 
   return {
     title,
     description,
     robots: isThin ? { index: false, follow: true } : undefined,
-    alternates: { canonical: `${SITE_URL}/contractors/${slug}/agencies` },
+    alternates: { canonical: `${SITE_URL}/contractors/${canonical}/agencies` },
     openGraph: {
       title,
       description,
-      url: `${SITE_URL}/contractors/${slug}/agencies`,
+      url: `${SITE_URL}/contractors/${canonical}/agencies`,
       type: 'website',
       siteName: 'Mindy',
     },
@@ -77,11 +77,15 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function ContractorAgenciesPage({ params }: PageProps) {
   const { slug } = await params;
-  const recipient = await getRecipientBySlug(slug);
+  const recipient = await getRollupBySlug(slug);
   if (!recipient) notFound();
+  if (recipient.canonical_slug !== slug) {
+    permanentRedirect(`/contractors/${recipient.canonical_slug}/agencies`);
+  }
 
-  const agencies = await getAllAgenciesForRecipient(recipient.recipient_uei);
-  const displayName = fmtCompanyName(recipient.recipient_name);
+  const agencies = await getAllAgenciesForRecipient(recipient.child_ueis, recipient.rollup_uei);
+  const displayName = fmtCompanyName(recipient.rollup_name);
+  const slugForLinks = recipient.canonical_slug;
 
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -89,8 +93,8 @@ export default async function ContractorAgenciesPage({ params }: PageProps) {
     itemListElement: [
       { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
       { '@type': 'ListItem', position: 2, name: 'Contractors', item: `${SITE_URL}/contractors` },
-      { '@type': 'ListItem', position: 3, name: displayName, item: `${SITE_URL}/contractors/${slug}` },
-      { '@type': 'ListItem', position: 4, name: 'Agencies', item: `${SITE_URL}/contractors/${slug}/agencies` },
+      { '@type': 'ListItem', position: 3, name: displayName, item: `${SITE_URL}/contractors/${slugForLinks}` },
+      { '@type': 'ListItem', position: 4, name: 'Agencies', item: `${SITE_URL}/contractors/${slugForLinks}/agencies` },
     ],
   };
 
@@ -98,7 +102,7 @@ export default async function ContractorAgenciesPage({ params }: PageProps) {
     <>
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
       <SubpageLayout
-        slug={slug}
+        slug={slugForLinks}
         displayName={displayName}
         totalObligated={fmtMoney(recipient.total_obligated)}
         awardCount={recipient.award_count}

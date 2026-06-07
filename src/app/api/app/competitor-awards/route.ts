@@ -21,7 +21,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { verifyMIAccess } from '@/lib/api-auth';
 import {
   recipientSlug,
-  getRecipientBySlug,
+  getRollupBySlug,
   getRecentAwardsForRecipient,
   getTopAgenciesForRecipient,
 } from '@/lib/bigquery/recipients';
@@ -46,24 +46,25 @@ export async function GET(request: NextRequest) {
 
   try {
     const slug = recipientSlug(name);
-    const recipient = await getRecipientBySlug(slug);
+    const recipient = await getRollupBySlug(slug);
     if (!recipient) {
       // Not found in the federal-awards dataset (or BQ quota degraded to
       // empty). Honest empty response — the UI shows "no award history".
       return NextResponse.json({ success: true, found: false, awards: [], topAgencies: [] });
     }
 
+    // Parent-rollup competitor view: aggregate across the org's whole UEI set.
     const [awards, topAgencies] = await Promise.all([
-      getRecentAwardsForRecipient(recipient.recipient_uei, 8),
-      getTopAgenciesForRecipient(recipient.recipient_uei, 5),
+      getRecentAwardsForRecipient(recipient.child_ueis, recipient.rollup_uei, 8),
+      getTopAgenciesForRecipient(recipient.child_ueis, recipient.rollup_uei, 5),
     ]);
 
     return NextResponse.json({
       success: true,
       found: true,
       recipient: {
-        name: recipient.recipient_name,
-        uei: recipient.recipient_uei,
+        name: recipient.rollup_name,
+        uei: recipient.rollup_uei,
         slug,
         totalObligated: recipient.total_obligated,
         awardCount: recipient.award_count,

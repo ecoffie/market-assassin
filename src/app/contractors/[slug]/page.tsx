@@ -20,9 +20,10 @@
 import type { Metadata } from 'next';
 import MeetMindyStrip from '@/components/MeetMindyStrip';
 import Link from 'next/link';
-import { notFound } from 'next/navigation';
+import { notFound, permanentRedirect } from 'next/navigation';
 import {
-  getRecipientBySlug,
+  getRollupBySlug,
+  resolveCanonicalSlug,
   getYearlyTotalsForRecipient,
   getYearlyByAgencyForRecipient,
   getTopAgenciesForRecipient,
@@ -76,22 +77,24 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const recipient = await getRecipientBySlug(slug);
+  const recipient = await getRollupBySlug(slug);
   if (!recipient) {
     return { title: 'Contractor Not Found | Mindy' };
   }
-  const displayName = fmtCompanyName(recipient.recipient_name);
+  const displayName = fmtCompanyName(recipient.rollup_name);
   const title = `${displayName} — Federal Contract Awards & Sales History | Mindy`;
   const description = `${displayName} federal contracting profile: ${fmtMoney(recipient.total_obligated)} across ${Number(recipient.award_count || 0).toLocaleString()} awards from ${Number(recipient.distinct_agency_count || 0)} agencies. UEI, NAICS, recent contracts, year-over-year trends.`;
 
+  // Canonical always points at the rollup's own slug, even when this page
+  // was reached via a sibling-UEI slug (which 308s before render anyway).
   return {
     title,
     description,
-    alternates: { canonical: `${SITE_URL}/contractors/${slug}` },
+    alternates: { canonical: `${SITE_URL}/contractors/${recipient.canonical_slug}` },
     openGraph: {
       title,
       description,
-      url: `${SITE_URL}/contractors/${slug}`,
+      url: `${SITE_URL}/contractors/${recipient.canonical_slug}`,
       type: 'profile',
       siteName: 'Mindy',
     },
@@ -105,11 +108,25 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function ContractorPage({ params }: PageProps) {
   const { slug } = await params;
-  const recipient = await getRecipientBySlug(slug);
+  const recipient = await getRollupBySlug(slug);
   if (!recipient) notFound();
 
-  const displayName = fmtCompanyName(recipient.recipient_name);
-  const uei = recipient.recipient_uei;
+  // If this slug belongs to a subsidiary (or a same-name orphan) rather than
+  // the canonical rollup, 308-redirect to the canonical parent URL so link
+  // equity consolidates onto one page. getRollupBySlug already resolved us to
+  // the dominant rollup; this guards the case where the requested slug differs
+  // from that rollup's own canonical slug.
+  if (recipient.canonical_slug !== slug) {
+    permanentRedirect(`/contractors/${recipient.canonical_slug}`);
+  }
+
+  const displayName = fmtCompanyName(recipient.rollup_name);
+  // Parent rollup: every awards query filters by the org's whole UEI set;
+  // cache keys use the stable rollup_uei. Subaward queries stay keyed on the
+  // canonical rollup UEI (subaward prime/sub linkage is per-UEI and doesn't
+  // map cleanly to the parent set — a separate rollup if/when needed).
+  const ueis = recipient.child_ueis;
+  const rollupUei = recipient.rollup_uei;
 
   // Fetch sub-sections in parallel — independent queries
   const [
@@ -123,30 +140,30 @@ export default async function ContractorPage({ params }: PageProps) {
     subPaidOutSummary,
     subReceivedSummary,
   ] = await Promise.all([
-    getYearlyTotalsForRecipient(uei),
-    getYearlyByAgencyForRecipient(uei),
-    getTopAgenciesForRecipient(uei, 10),
-    getTopNaicsForRecipient(uei, 25), // wider NAICS set for treemap (more visual diversity than agencies)
-    getTopNaicsForRecipient(uei, 10),
-    getRecentAwardsForRecipient(uei, 25),
-    getExecutivesForRecipient(uei),
-    getSubawardsPaidOutSummary(uei),
-    getSubawardsReceivedSummary(uei),
+    getYearlyTotalsForRecipient(ueis, rollupUei),
+    getYearlyByAgencyForRecipient(ueis, rollupUei),
+    getTopAgenciesForRecipient(ueis, rollupUei, 10),
+    getTopNaicsForRecipient(ueis, rollupUei, 25), // wider NAICS set for treemap (more visual diversity than agencies)
+    getTopNaicsForRecipient(ueis, rollupUei, 10),
+    getRecentAwardsForRecipient(ueis, rollupUei, 25),
+    getExecutivesForRecipient(ueis, rollupUei),
+    getSubawardsPaidOutSummary(rollupUei),
+    getSubawardsReceivedSummary(rollupUei),
   ]);
 
   // If the contractor has any subaward activity (in either direction),
   // fetch the top partners. We do this conditionally because most
   // contractors have neither — no point burning BQ on empty queries.
   const [topSubawardees, topPrimes] = await Promise.all([
-    subPaidOutSummary ? getTopSubawardeesForPrime(uei, 15) : Promise.resolve([]),
-    subReceivedSummary ? getTopPrimesForSubawardee(uei, 15) : Promise.resolve([]),
+    subPaidOutSummary ? getTopSubawardeesForPrime(rollupUei, 15) : Promise.resolve([]),
+    subReceivedSummary ? getTopPrimesForSubawardee(rollupUei, 15) : Promise.resolve([]),
   ]);
 
-  // Related contractors (same top NAICS, exclude self). Fall back to
-  // empty array if recipient has no NAICS history.
+  // Related contractors (same top NAICS, exclude this org's whole UEI set).
+  // Fall back to empty array if recipient has no NAICS history.
   const topNaicsCode = topNaics[0]?.naics_code;
   const related = topNaicsCode
-    ? await getSimilarRecipients(uei, topNaicsCode, 8)
+    ? await getSimilarRecipients(ueis, rollupUei, topNaicsCode, 8)
     : [];
 
   // JSON-LD: Organization + BreadcrumbList. NO `isAccessibleForFree:
@@ -158,10 +175,10 @@ export default async function ContractorPage({ params }: PageProps) {
     '@graph': [
       {
         '@type': 'Organization',
-        '@id': `${SITE_URL}/contractors/${slug}#org`,
+        '@id': `${SITE_URL}/contractors/${recipient.canonical_slug}#org`,
         name: displayName,
         identifier: [
-          { '@type': 'PropertyValue', propertyID: 'UEI', value: uei },
+          { '@type': 'PropertyValue', propertyID: 'UEI', value: rollupUei },
           ...(recipient.cage_code
             ? [{ '@type': 'PropertyValue', propertyID: 'CAGE', value: recipient.cage_code }]
             : []),
@@ -178,17 +195,14 @@ export default async function ContractorPage({ params }: PageProps) {
               },
             }
           : {}),
-        ...(recipient.parent_name
-          ? { parentOrganization: { '@type': 'Organization', name: fmtCompanyName(recipient.parent_name) } }
-          : {}),
-        url: `${SITE_URL}/contractors/${slug}`,
+        url: `${SITE_URL}/contractors/${recipient.canonical_slug}`,
       },
       {
         '@type': 'BreadcrumbList',
         itemListElement: [
           { '@type': 'ListItem', position: 1, name: 'Home', item: SITE_URL },
           { '@type': 'ListItem', position: 2, name: 'Contractors', item: `${SITE_URL}/contractors` },
-          { '@type': 'ListItem', position: 3, name: displayName, item: `${SITE_URL}/contractors/${slug}` },
+          { '@type': 'ListItem', position: 3, name: displayName, item: `${SITE_URL}/contractors/${recipient.canonical_slug}` },
         ],
       },
     ],
@@ -265,9 +279,14 @@ export default async function ContractorPage({ params }: PageProps) {
       <section className="mx-auto max-w-6xl px-6 pb-10">
         <h2 className="text-2xl font-bold mb-4">Company Profile</h2>
         <div className="rounded-xl border border-slate-800 bg-slate-900 p-6 grid gap-4 md:grid-cols-2">
-          <Field label="UEI (Unique Entity Identifier)" value={uei} mono />
+          <Field label="Parent UEI (Unique Entity Identifier)" value={rollupUei} mono />
           {recipient.cage_code && <Field label="CAGE Code" value={recipient.cage_code} mono />}
-          {recipient.parent_name && <Field label="Parent Organization" value={fmtCompanyName(recipient.parent_name)} />}
+          {recipient.child_count > 1 && (
+            <Field
+              label="Registered Entities (UEIs)"
+              value={`${recipient.child_count.toLocaleString()} under this organization`}
+            />
+          )}
           {(recipient.address || recipient.city) && (
             <Field
               label="Address"

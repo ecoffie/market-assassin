@@ -72,6 +72,145 @@ export interface RecipientProfile {
 export const SUBPAGE_MIN_ROWS = 5;
 
 /**
+ * Parent-org rollup profile — the contractor pages' primary data shape.
+ *
+ * Backed by `recipients_rollup` (one row per COALESCE(parent_uei,
+ * recipient_uei)). Where RecipientProfile describes a single UEI,
+ * RollupProfile describes the whole parent organization, so a household-
+ * name prime shows its full footprint instead of one scattered subsidiary
+ * UEI. `child_ueis` is the parent's complete UEI set — detail queries
+ * filter awards by `recipient_uei IN UNNEST(child_ueis)` (which preserves
+ * the awards table's recipient_uei cluster pruning, unlike filtering on
+ * parent_uei). `canonical_slug` is the slug of `rollup_name`.
+ */
+export interface RollupProfile {
+  rollup_uei: string;
+  rollup_name: string;
+  canonical_slug: string;
+  child_ueis: string[];
+  child_count: number;
+  cage_code: string | null;
+  address: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  country: string | null;
+  total_obligated: number;
+  award_count: number;
+  transaction_count: number;
+  first_action_date: string;
+  last_action_date: string;
+  distinct_agency_count: number;
+  distinct_naics_count: number;
+}
+
+// Shared SQL fragment: the computed-slug expression mirrors recipientSlug()
+// exactly (lowercase, & → " and ", non-alphanum → "-", trim, 120 cap). Used
+// by both the rollup slug lookup and the sibling-redirect resolver.
+const COMPUTED_SLUG_SQL = (col: string) => `
+  SUBSTR(
+    REGEXP_REPLACE(
+      REGEXP_REPLACE(
+        LOWER(REPLACE(${col}, '&', ' and ')),
+        r'[^a-z0-9]+', '-'
+      ),
+      r'^-+|-+$', ''
+    ),
+    1, 120
+  )`;
+
+/**
+ * Resolve a slug to its parent-org rollup. This is the contractor pages'
+ * primary entry point (replaces getRecipientBySlug for the page render).
+ *
+ * Slugs aren't unique: same-name orphan UEIs (null/self parent) can produce
+ * the same slug as the true parent rollup. We resolve to the highest-spend
+ * match — the dominant rollup wins (e.g. the 167-child "Lockheed Martin
+ * Corp" beats two single-UEI orphans of the same name). Tiny orphans then
+ * canonical-tag back to this same URL, so Google dedupes them.
+ */
+export async function getRollupBySlug(slug: string): Promise<RollupProfile | null> {
+  const rows = await queryCached<RollupProfile>({
+    cacheKey: `rollup:by-slug:${slug}:v1`,
+    query: `
+      WITH slugged AS (
+        SELECT
+          *,
+          ${COMPUTED_SLUG_SQL('rollup_name')} AS computed_slug
+        FROM ${BQ_TABLES.recipientsRollup}
+        WHERE rollup_name IS NOT NULL
+      )
+      SELECT
+        rollup_uei,
+        rollup_name,
+        computed_slug AS canonical_slug,
+        child_ueis,
+        child_count,
+        cage_code, address, city, state, zip, country,
+        total_obligated, award_count, transaction_count,
+        CAST(first_action_date AS STRING) AS first_action_date,
+        CAST(last_action_date AS STRING) AS last_action_date,
+        distinct_agency_count, distinct_naics_count
+      FROM slugged
+      WHERE computed_slug = @slug
+      ORDER BY total_obligated DESC
+      LIMIT 1
+    `,
+    params: { slug },
+  });
+  return rows[0] ?? null;
+}
+
+/**
+ * Sibling-redirect resolver. Given the slug actually requested, return the
+ * canonical rollup slug it should 301/308 to — or null if the requested
+ * slug IS already canonical (so the page renders without redirecting).
+ *
+ * "Canonical" = the slug of the highest-spend rollup that owns this slug.
+ * A subsidiary whose own name slugifies differently from its parent's
+ * rollup_name would 404 today (only the top-spend name per slug resolves);
+ * this maps any child UEI's name-slug to the parent's canonical slug so old
+ * inbound links land on the live parent page instead of a 404.
+ */
+export async function resolveCanonicalSlug(slug: string): Promise<string | null> {
+  const rows = await queryCached<{ canonical_slug: string }>({
+    cacheKey: `rollup:canonical-of:${slug}:v1`,
+    query: `
+      WITH rollups AS (
+        SELECT
+          ${COMPUTED_SLUG_SQL('rollup_name')} AS canonical_slug,
+          rollup_uei, total_obligated, child_ueis
+        FROM ${BQ_TABLES.recipientsRollup}
+        WHERE rollup_name IS NOT NULL
+      ),
+      -- Direct hit: the slug matches a rollup name. Canonical = highest-spend.
+      direct AS (
+        SELECT canonical_slug, total_obligated, 0 AS tiebreak
+        FROM rollups
+        WHERE canonical_slug = @slug
+      ),
+      -- Indirect hit: the slug matches a CHILD UEI's recipient name. Map to
+      -- the rollup that contains that child.
+      child_match AS (
+        SELECT r.canonical_slug, r.total_obligated, 1 AS tiebreak
+        FROM ${BQ_TABLES.recipients} c
+        JOIN rollups r ON c.recipient_uei IN UNNEST(r.child_ueis)
+        WHERE c.recipient_name IS NOT NULL
+          AND ${COMPUTED_SLUG_SQL('c.recipient_name')} = @slug
+      )
+      SELECT canonical_slug
+      FROM (SELECT * FROM direct UNION ALL SELECT * FROM child_match)
+      ORDER BY tiebreak ASC, total_obligated DESC
+      LIMIT 1
+    `,
+    params: { slug },
+  });
+  const canonical = rows[0]?.canonical_slug ?? null;
+  // null when unknown slug; null when already canonical (no redirect needed).
+  return canonical && canonical !== slug ? canonical : null;
+}
+
+/**
  * Get the recipient summary by slug. Returns the highest-spending
  * match if multiple UEIs share the same normalized name (rare but
  * happens — e.g. parent/subsidiary with same brand name).
@@ -141,11 +280,12 @@ export interface TopAgencyRow {
 }
 
 export async function getTopAgenciesForRecipient(
-  uei: string,
+  ueis: string[],
+  rollupUei: string,
   limit = 10,
 ): Promise<TopAgencyRow[]> {
   return queryCached<TopAgencyRow>({
-    cacheKey: `recipient:${uei}:top-agencies:${limit}:v3`,
+    cacheKey: `rollup:${rollupUei}:top-agencies:${limit}:v4`,
     // Single-pass, and deliberately NO COUNT(DISTINCT award_id): that
     // column is the widest read in the query and ~doubled the scan
     // (5.9→3.0 GiB on mega-primes). The agency breakdown shows $ + %
@@ -158,7 +298,7 @@ export async function getTopAgenciesForRecipient(
           awarding_agency,
           SUM(obligation_amount) AS total_amount
         FROM ${BQ_TABLES.awards}
-        WHERE recipient_uei = @uei AND awarding_agency IS NOT NULL
+        WHERE recipient_uei IN UNNEST(@ueis) AND awarding_agency IS NOT NULL
         GROUP BY awarding_agency
       )
       SELECT
@@ -169,7 +309,7 @@ export async function getTopAgenciesForRecipient(
       ORDER BY total_amount DESC
       LIMIT @limit
     `,
-    params: { uei, limit },
+    params: { ueis, limit },
     maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
   });
 }
@@ -182,11 +322,12 @@ export interface TopNaicsRow {
 }
 
 export async function getTopNaicsForRecipient(
-  uei: string,
+  ueis: string[],
+  rollupUei: string,
   limit = 10,
 ): Promise<TopNaicsRow[]> {
   return queryCached<TopNaicsRow>({
-    cacheKey: `recipient:${uei}:top-naics:${limit}`,
+    cacheKey: `rollup:${rollupUei}:top-naics:${limit}:v2`,
     query: `
       SELECT
         naics_code,
@@ -194,12 +335,12 @@ export async function getTopNaicsForRecipient(
         SUM(obligation_amount) AS total_amount,
         COUNT(DISTINCT award_id) AS award_count
       FROM ${BQ_TABLES.awards}
-      WHERE recipient_uei = @uei AND naics_code IS NOT NULL
+      WHERE recipient_uei IN UNNEST(@ueis) AND naics_code IS NOT NULL
       GROUP BY naics_code
       ORDER BY total_amount DESC
       LIMIT @limit
     `,
-    params: { uei, limit },
+    params: { ueis, limit },
     maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
   });
 }
@@ -221,7 +362,8 @@ export interface RecentAwardRow {
 }
 
 export async function getRecentAwardsForRecipient(
-  uei: string,
+  ueis: string[],
+  rollupUei: string,
   limit = 25,
 ): Promise<RecentAwardRow[]> {
   // CAST DATE columns to STRING so we get 'YYYY-MM-DD' strings back
@@ -229,7 +371,7 @@ export async function getRecentAwardsForRecipient(
   // break our formatDate(). Also filter to dollar-bearing transactions —
   // $0 modifications dominate the recent timeline but tell users nothing.
   return queryCached<RecentAwardRow>({
-    cacheKey: `recipient:${uei}:recent-awards:${limit}:v2`,
+    cacheKey: `rollup:${rollupUei}:recent-awards:${limit}:v3`,
     query: `
       SELECT
         award_id,
@@ -246,12 +388,12 @@ export async function getRecentAwardsForRecipient(
         pop_state,
         set_aside
       FROM ${BQ_TABLES.awards}
-      WHERE recipient_uei = @uei
+      WHERE recipient_uei IN UNNEST(@ueis)
         AND obligation_amount > 0
       ORDER BY action_date DESC
       LIMIT @limit
     `,
-    params: { uei, limit },
+    params: { ueis, limit },
     maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
   });
 }
@@ -262,20 +404,23 @@ export interface YearlyTotalRow {
   award_count: number;
 }
 
-export async function getYearlyTotalsForRecipient(uei: string): Promise<YearlyTotalRow[]> {
+export async function getYearlyTotalsForRecipient(
+  ueis: string[],
+  rollupUei: string,
+): Promise<YearlyTotalRow[]> {
   return queryCached<YearlyTotalRow>({
-    cacheKey: `recipient:${uei}:yearly-totals`,
+    cacheKey: `rollup:${rollupUei}:yearly-totals:v2`,
     query: `
       SELECT
         fiscal_year,
         SUM(obligation_amount) AS total_obligated,
         COUNT(DISTINCT award_id) AS award_count
       FROM ${BQ_TABLES.awards}
-      WHERE recipient_uei = @uei
+      WHERE recipient_uei IN UNNEST(@ueis)
       GROUP BY fiscal_year
       ORDER BY fiscal_year ASC
     `,
-    params: { uei },
+    params: { ueis },
     maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
   });
 }
@@ -305,14 +450,15 @@ export interface YearlyByAgencyRow {
  * value is "what money moved", not "which admin paperwork was filed".
  */
 export async function getPaginatedAwardsForRecipient(
-  uei: string,
+  ueis: string[],
+  rollupUei: string,
   page: number,
   pageSize: number = 50,
 ): Promise<{ rows: RecentAwardRow[]; total: number }> {
   const offset = (page - 1) * pageSize;
   const [rows, totalRows] = await Promise.all([
     queryCached<RecentAwardRow>({
-      cacheKey: `recipient:${uei}:awards-page:${page}:${pageSize}`,
+      cacheKey: `rollup:${rollupUei}:awards-page:${page}:${pageSize}:v2`,
       query: `
         SELECT
           award_id,
@@ -329,23 +475,23 @@ export async function getPaginatedAwardsForRecipient(
           pop_state,
           set_aside
         FROM ${BQ_TABLES.awards}
-        WHERE recipient_uei = @uei
+        WHERE recipient_uei IN UNNEST(@ueis)
           AND obligation_amount > 0
         ORDER BY action_date DESC
         LIMIT @pageSize
         OFFSET @offset
       `,
-      params: { uei, pageSize, offset },
+      params: { ueis, pageSize, offset },
       maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
     }),
     queryCached<{ total: number }>({
-      cacheKey: `recipient:${uei}:awards-total`,
+      cacheKey: `rollup:${rollupUei}:awards-total:v2`,
       query: `
         SELECT COUNT(*) AS total
         FROM ${BQ_TABLES.awards}
-        WHERE recipient_uei = @uei AND obligation_amount > 0
+        WHERE recipient_uei IN UNNEST(@ueis) AND obligation_amount > 0
       `,
-      params: { uei },
+      params: { ueis },
       maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
     }),
   ]);
@@ -356,9 +502,12 @@ export async function getPaginatedAwardsForRecipient(
  * Full NAICS breakdown for a recipient — used on /contractors/[slug]/naics.
  * Returns all NAICS the contractor has activity in, not just top N.
  */
-export async function getAllNaicsForRecipient(uei: string): Promise<TopNaicsRow[]> {
+export async function getAllNaicsForRecipient(
+  ueis: string[],
+  rollupUei: string,
+): Promise<TopNaicsRow[]> {
   return queryCached<TopNaicsRow>({
-    cacheKey: `recipient:${uei}:all-naics`,
+    cacheKey: `rollup:${rollupUei}:all-naics:v2`,
     query: `
       SELECT
         naics_code,
@@ -366,11 +515,11 @@ export async function getAllNaicsForRecipient(uei: string): Promise<TopNaicsRow[
         SUM(obligation_amount) AS total_amount,
         COUNT(DISTINCT award_id) AS award_count
       FROM ${BQ_TABLES.awards}
-      WHERE recipient_uei = @uei AND naics_code IS NOT NULL
+      WHERE recipient_uei IN UNNEST(@ueis) AND naics_code IS NOT NULL
       GROUP BY naics_code
       ORDER BY total_amount DESC
     `,
-    params: { uei },
+    params: { ueis },
     maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
   });
 }
@@ -379,9 +528,12 @@ export async function getAllNaicsForRecipient(uei: string): Promise<TopNaicsRow[
  * Full agency breakdown for a recipient — used on /contractors/[slug]/agencies.
  * Returns all agencies, not just top N. Caller can paginate display-side.
  */
-export async function getAllAgenciesForRecipient(uei: string): Promise<TopAgencyRow[]> {
+export async function getAllAgenciesForRecipient(
+  ueis: string[],
+  rollupUei: string,
+): Promise<TopAgencyRow[]> {
   return queryCached<TopAgencyRow>({
-    cacheKey: `recipient:${uei}:all-agencies:v3`,
+    cacheKey: `rollup:${rollupUei}:all-agencies:v4`,
     // Heaviest query on the site (82% of daily BQ scan per
     // INFORMATION_SCHEMA). Two fixes vs. the original:
     //  1) removed the correlated `WITH totals` subquery that scanned
@@ -397,7 +549,7 @@ export async function getAllAgenciesForRecipient(uei: string): Promise<TopAgency
           awarding_agency,
           SUM(obligation_amount) AS total_amount
         FROM ${BQ_TABLES.awards}
-        WHERE recipient_uei = @uei AND awarding_agency IS NOT NULL
+        WHERE recipient_uei IN UNNEST(@ueis) AND awarding_agency IS NOT NULL
         GROUP BY awarding_agency
       )
       SELECT
@@ -407,16 +559,17 @@ export async function getAllAgenciesForRecipient(uei: string): Promise<TopAgency
       FROM per_agency
       ORDER BY total_amount DESC
     `,
-    params: { uei },
+    params: { ueis },
     maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
   });
 }
 
 export async function getYearlyByAgencyForRecipient(
-  uei: string,
+  ueis: string[],
+  rollupUei: string,
 ): Promise<YearlyByAgencyRow[]> {
   return queryCached<YearlyByAgencyRow>({
-    cacheKey: `recipient:${uei}:yearly-by-agency`,
+    cacheKey: `rollup:${rollupUei}:yearly-by-agency:v2`,
     query: `
       SELECT
         fiscal_year,
@@ -424,12 +577,12 @@ export async function getYearlyByAgencyForRecipient(
         SUM(obligation_amount) AS total_amount,
         COUNT(DISTINCT award_id) AS award_count
       FROM ${BQ_TABLES.awards}
-      WHERE recipient_uei = @uei
+      WHERE recipient_uei IN UNNEST(@ueis)
         AND awarding_agency IS NOT NULL
       GROUP BY fiscal_year, awarding_agency
       ORDER BY fiscal_year ASC, total_amount DESC
     `,
-    params: { uei },
+    params: { ueis },
     maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
   });
 }
@@ -441,20 +594,35 @@ export interface ExecutiveRow {
   reported_at: string;
 }
 
-export async function getExecutivesForRecipient(uei: string): Promise<ExecutiveRow[]> {
+export async function getExecutivesForRecipient(
+  ueis: string[],
+  rollupUei: string,
+): Promise<ExecutiveRow[]> {
   return queryCached<ExecutiveRow>({
-    cacheKey: `recipient:${uei}:executives:v2`,
+    cacheKey: `rollup:${rollupUei}:executives:v3`,
+    // Executives are reported per-UEI in FFATA. For a parent rollup we take
+    // the highest-ranked exec rows across the child set, then re-rank — the
+    // canonical parent's officers dominate by award value. DISTINCT on name
+    // collapses the same officer reported under multiple sibling UEIs.
     query: `
       SELECT
-        exec_rank,
+        ROW_NUMBER() OVER (ORDER BY exec_amount DESC) AS exec_rank,
         exec_name,
         exec_amount,
-        CAST(reported_at AS STRING) AS reported_at
-      FROM ${BQ_TABLES.recipientExecutives}
-      WHERE recipient_uei = @uei
-      ORDER BY exec_rank ASC
+        reported_at
+      FROM (
+        SELECT
+          exec_name,
+          MAX(exec_amount) AS exec_amount,
+          CAST(MAX(reported_at) AS STRING) AS reported_at
+        FROM ${BQ_TABLES.recipientExecutives}
+        WHERE recipient_uei IN UNNEST(@ueis)
+        GROUP BY exec_name
+      )
+      ORDER BY exec_amount DESC
+      LIMIT 5
     `,
-    params: { uei },
+    params: { ueis },
   });
 }
 
@@ -470,28 +638,28 @@ export interface SimilarRecipientRow {
 }
 
 /**
- * Top recipients for the sitemap — name + spend, ordered by spend.
+ * Top recipients for the sitemap — PARENT-ROLLUP name + spend, ordered by
+ * spend.
  *
- * The sitemap MUST source from the same table the pages query
- * (recipients), or it emits URLs that 404. The legacy contractors.json
- * source had ~529 names with no matching recipient row (parent/holding
- * companies whose awards land under subsidiary legal names), which
- * Googlebot crawled into thousands of 404s.
+ * Sources from `recipients_rollup` (one row per parent org), NOT the per-UEI
+ * `recipients` table. This is essential: the pages now resolve slugs to
+ * rollups, so the sitemap must emit one URL per parent — emitting per-UEI
+ * names would point at sibling-UEI slugs that 301 to the parent (wasted
+ * crawl) or fragment link equity across near-duplicate names.
  *
- * Capped: Google allows 50k URLs per sitemap file. We emit 4 URLs per
- * contractor (overview + contracts/agencies/naics), so the cap keeps
- * the contractor block under 48k and leaves room for the other blocks.
- * Top-by-spend is also the right SEO call — the biggest primes are what
- * people brand-search for.
+ * Capped: Google allows 50k URLs per sitemap file. We emit up to 3 URLs per
+ * contractor (overview + contracts, plus agencies/naics when substantive),
+ * so the cap keeps the contractor block well under 48k. Top-by-spend is the
+ * right SEO call — the biggest primes are what people brand-search for.
  */
 export interface SitemapRecipientRow {
+  // Field name kept as `recipient_name` for call-site compatibility, but the
+  // value is the rollup (parent) name. recipientSlug() runs on it unchanged.
   recipient_name: string;
   total_obligated: number;
-  // Used to gate thin sub-pages out of the sitemap. A contractor with
-  // only 1-2 agencies (or NAICS codes) renders a near-empty /agencies
-  // (or /naics) sub-page that Google crawls and then parks as
-  // "Crawled - currently not indexed". Emitting those URLs just wastes
-  // crawl budget, so the sitemap skips them below SUBPAGE_MIN_ROWS.
+  // Gate thin sub-pages out of the sitemap (see SUBPAGE_MIN_ROWS). These are
+  // now PARENT-level distinct counts, so primes like Lockheed (27 agencies)
+  // correctly clear the gate instead of being suppressed by per-UEI scatter.
   distinct_agency_count: number;
   distinct_naics_count: number;
 }
@@ -500,17 +668,16 @@ export async function getTopRecipientsForSitemap(
   limit = 12000,
 ): Promise<SitemapRecipientRow[]> {
   return queryCached<SitemapRecipientRow>({
-    // cache key bumped to :v2 — the v1 cached payload predates the
-    // distinct_*_count columns, so the old entry would be missing them.
-    cacheKey: `sitemap:top-recipients:${limit}:v2`,
+    // :v3 — source switched from per-UEI recipients to recipients_rollup.
+    cacheKey: `sitemap:top-recipients:${limit}:v3`,
     query: `
       SELECT
-        recipient_name,
+        rollup_name AS recipient_name,
         total_obligated,
         distinct_agency_count,
         distinct_naics_count
-      FROM ${BQ_TABLES.recipients}
-      WHERE recipient_name IS NOT NULL AND recipient_name != ''
+      FROM ${BQ_TABLES.recipientsRollup}
+      WHERE rollup_name IS NOT NULL AND rollup_name != ''
       ORDER BY total_obligated DESC
       LIMIT @limit
     `,
@@ -519,7 +686,8 @@ export async function getTopRecipientsForSitemap(
 }
 
 export async function getSimilarRecipients(
-  uei: string,
+  ueis: string[],
+  rollupUei: string,
   topNaicsCode: string,
   limit = 8,
 ): Promise<SimilarRecipientRow[]> {
@@ -528,25 +696,30 @@ export async function getSimilarRecipients(
   // and partition-pruning on fiscal_year, this scans ~500MB instead
   // of 3GB. "Related" means actively competing — old contractors that
   // exited the NAICS aren't useful related links anyway.
+  //
+  // Group results to the PARENT (COALESCE(parent_uei, recipient_uei)) so the
+  // "Related Contractors" links point at parent pages, and exclude THIS
+  // contractor's whole child set so a prime never lists its own subsidiaries
+  // as competitors.
   const currentYear = new Date().getFullYear();
   return queryCached<SimilarRecipientRow>({
-    cacheKey: `recipient:${uei}:similar:${topNaicsCode}:${limit}`,
+    cacheKey: `rollup:${rollupUei}:similar:${topNaicsCode}:${limit}:v2`,
     query: `
       SELECT
-        recipient_uei,
-        ANY_VALUE(recipient_name) AS recipient_name,
+        COALESCE(parent_uei, recipient_uei) AS recipient_uei,
+        ANY_VALUE(COALESCE(parent_name, recipient_name)) AS recipient_name,
         SUM(obligation_amount) AS total_obligated
       FROM ${BQ_TABLES.awards}
       WHERE naics_code = @naics
-        AND recipient_uei != @uei
         AND recipient_uei IS NOT NULL
+        AND recipient_uei NOT IN UNNEST(@ueis)
         AND fiscal_year BETWEEN @minYear AND @maxYear
-      GROUP BY recipient_uei
+      GROUP BY COALESCE(parent_uei, recipient_uei)
       ORDER BY total_obligated DESC
       LIMIT @limit
     `,
     params: {
-      uei,
+      ueis,
       naics: topNaicsCode,
       limit,
       minYear: currentYear - 3,
@@ -707,13 +880,22 @@ export async function getBqContractorHistory(opts: { uei?: string; slug?: string
     : null;
   if (!profile) return null;
   const uei = profile.recipient_uei;
+  // In-app drawer fallback is a single-UEI view (resolved by exact UEI or
+  // slug). Pass the lone UEI as a one-element set; the detail fns key their
+  // cache on this UEI. (The public contractor pages use the parent rollup
+  // via getRollupBySlug; this surface intentionally stays per-UEI.)
+  const ueiSet = [uei];
+  // Distinct cache namespace from the parent-rollup pages: this is a single-
+  // UEI result, but for a parent UEI the same key string would otherwise
+  // collide with the page's full-child-set result. Prefix keeps them separate.
+  const cacheKey = `single:${uei}`;
 
   const [yearly, agencies, naics, recent, yearlyByAgency] = await Promise.all([
-    getYearlyTotalsForRecipient(uei),
-    getTopAgenciesForRecipient(uei, 8),
-    getTopNaicsForRecipient(uei, 8),
-    getRecentAwardsForRecipient(uei, 25),
-    getYearlyByAgencyForRecipient(uei), // per-year agency split → chart drill-down
+    getYearlyTotalsForRecipient(ueiSet, cacheKey),
+    getTopAgenciesForRecipient(ueiSet, cacheKey, 8),
+    getTopNaicsForRecipient(ueiSet, cacheKey, 8),
+    getRecentAwardsForRecipient(ueiSet, cacheKey, 25),
+    getYearlyByAgencyForRecipient(ueiSet, cacheKey), // per-year agency split → chart drill-down
   ]);
 
   // Group the per-(year,agency) rows so each fiscal year carries its agency

@@ -76,6 +76,11 @@ export const BQ_DATASET = `\`${PROJECT_ID}.${DATASET}\``;
 export const BQ_TABLES = {
   awards: `\`${PROJECT_ID}.${DATASET}.awards\``,
   recipients: `\`${PROJECT_ID}.${DATASET}.recipients\``,
+  // One row per PARENT org (COALESCE(parent_uei, recipient_uei)), built in
+  // build-derived.sql. Contractor SEO pages read this so primes show their
+  // full footprint instead of a single scattered UEI. Carries child_ueis[]
+  // for filtering awards by the parent's whole UEI set.
+  recipientsRollup: `\`${PROJECT_ID}.${DATASET}.recipients_rollup\``,
   recipientExecutives: `\`${PROJECT_ID}.${DATASET}.recipient_executives\``,
   naicsSummary: `\`${PROJECT_ID}.${DATASET}.naics_summary\``,
   agencySummary: `\`${PROJECT_ID}.${DATASET}.agency_summary\``,
