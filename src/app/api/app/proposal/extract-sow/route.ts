@@ -42,6 +42,32 @@ function extractSow(text: string): { found: boolean; title: string; body: string
   return { found: true, title, body };
 }
 
+/**
+ * Build a "Scope at a Glance" from a CLIN/pricing schedule (Eric: the CLINs tell
+ * you what the work is). Parses "CLIN, Description, …" rows into a readable scope
+ * list a sub can act on. Returns null if no CLIN rows are found.
+ */
+function buildClinScope(pricingText: string): string | null {
+  const lines = pricingText.split('\n');
+  const items: string[] = [];
+  for (const line of lines) {
+    // CLIN row: a 4-digit CLIN, then a description that may be QUOTED (with
+    // internal commas — room lists) or unquoted. Capture the quoted form first.
+    let m = line.match(/^[",\s]*(\d{4}[A-Z]?)\s*,\s*"([^"]{12,})"/);       // quoted desc
+    if (!m) m = line.match(/^[",\s]*(\d{4}[A-Z]?)\s*,\s*([^",][^,]{11,}?)\s*,/); // unquoted
+    if (m) {
+      const desc = m[2].replace(/\s+/g, ' ').trim();
+      if (desc && !/^\$?0?\.?0+$/.test(desc)) items.push(`CLIN ${m[1]}: ${desc}`);
+    }
+  }
+  if (items.length === 0) return null;
+  return [
+    'This scope is reconstructed from the solicitation’s pricing schedule (CLINs). Each line is a unit of work the contractor must price and perform. Use it to brief subcontractors — then confirm details against the full solicitation + drawings.',
+    '',
+    ...items,
+  ].join('\n');
+}
+
 function buildDocx(title: string, body: string, sourceName: string): Promise<Buffer> {
   const lines = body.split('\n');
   const paras: Paragraph[] = [
@@ -78,14 +104,24 @@ export async function POST(request: NextRequest) {
   // scope, no regex hunt needed.
   const pipelineId = String(body.pipeline_id || '').trim();
   let standaloneSow: { title: string; body: string; name: string } | null = null;
+  let clinScope: { title: string; body: string; name: string } | null = null;
   if (pipelineId) {
     const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
     const { data: docs } = await sb.from('pursuit_documents')
       .select('filename, doc_kind, extracted_text, char_count')
       .eq('pipeline_id', pipelineId)
-      .in('doc_kind', ['sow_pws', 'attachment_other', 'solicitation'])
+      .in('doc_kind', ['sow_pws', 'attachment_other', 'solicitation', 'pricing'])
       .not('extracted_text', 'is', null)
       .order('char_count', { ascending: false });
+
+    // CLIN scope (Eric: "the CLINs give you an idea of the SOW — you just have to
+    // find the full scope"). Build a clean scope-at-a-glance from the pricing
+    // schedule's CLIN lines as a fallback when there's no standalone SOW.
+    const pricingDoc = docs?.find(d => d.doc_kind === 'pricing' && /clin/i.test(d.extracted_text || ''));
+    if (pricingDoc?.extracted_text) {
+      const clinScope_ = buildClinScope(pricingDoc.extracted_text);
+      if (clinScope_) clinScope = { title: 'Scope at a Glance (from the CLINs)', body: clinScope_, name: pricingDoc.filename || 'pricing' };
+    }
     // Prefer a REAL standalone SOW/PWS doc (Eric: design specs are reference
     // material for the design, NOT the scope of work — don't substitute them).
     // Only an actual sow_pws or a filename that clearly says SOW/PWS/Statement
@@ -108,13 +144,16 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'No solicitation text provided.' }, { status: 400 });
   }
 
-  // Use the standalone scope doc if we found one; else regex-extract the SOW
-  // section from the solicitation.
-  const sow = standaloneSow || extractSow(text);
-  if (!('body' in sow) || !sow.body || (('found' in sow) && !sow.found)) {
+  // Priority: a real standalone SOW → the SOW section regex'd from the
+  // solicitation → the CLIN scope summary (Eric). Honest error only if none.
+  const regexSow = standaloneSow ? null : extractSow(text);
+  const sow = standaloneSow
+    || (regexSow && regexSow.found ? regexSow : null)
+    || clinScope;
+  if (!sow || !('body' in sow) || !sow.body) {
     return NextResponse.json({
       success: false,
-      error: 'No standalone Statement of Work in this notice — the scope is spread across the solicitation + attachments. Use the document manifest above to send subs the right files (the Pricing Schedule / CLINs are the quickest read on what the work actually is).',
+      error: 'No standalone Statement of Work in this notice — the scope is spread across the solicitation + attachments. Use the document manifest above to send subs the right files.',
     }, { status: 422 });
   }
   const outName = 'name' in sow ? sow.name : fileName;

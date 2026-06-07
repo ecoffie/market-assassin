@@ -15,9 +15,10 @@ interface FileRow { fileName: string; charCount?: number; pageCount?: number }
 
 const STARTERS = [
   'What does this RFP require for past performance?',
-  'Draft the technical approach section.',
+  'When is it due and how do I submit?',
   'Summarize the key evaluation criteria.',
-  'Write a capability statement opener using my Vault.',
+  'Draft the technical approach using my Vault.',
+  'What scope is in the CLINs?',
 ];
 
 export default function ProposalChat({
@@ -116,7 +117,9 @@ export default function ProposalChat({
         <div ref={scrollRef} className="flex-1 overflow-y-auto space-y-3 pr-1" style={{ maxHeight: 380 }}>
           {messages.length === 0 ? (
             <div className="text-sm text-slate-400">
-              <p className="mb-3">Tell Mindy what to write. She reads your Files (right) + Vault + the proposal corpus, and drafts grounded in your real info.</p>
+              <p className="mb-1 text-slate-300 font-medium">Mindy already knows this bid.</p>
+              <p className="mb-3">Unlike a blank-slate chatbot, she reads <span className="text-slate-300">this solicitation</span>, its extracted requirements, your Vault, and winning-proposal examples. Best for questions about <span className="text-slate-300">this opportunity</span> and drafting grounded in your real info.</p>
+              <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-1.5">Try asking</p>
               <div className="flex flex-wrap gap-2">
                 {STARTERS.map(s => (
                   <button key={s} onClick={() => send(s)} className="rounded-lg border border-slate-700 bg-slate-800/60 px-3 py-1.5 text-xs text-slate-300 hover:border-purple-500/50 hover:text-white">
