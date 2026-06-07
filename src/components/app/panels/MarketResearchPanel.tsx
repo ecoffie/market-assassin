@@ -2949,7 +2949,7 @@ function FpdsLeaderboards({
         />
         <FpdsLeaderboardCard
           title="Top 10 Vendors"
-          subtitle="Primes winning the awards (click for history)"
+          subtitle="The incumbents to KNOW — too big to team with. For partners, see Tier 2 below."
           rows={data?.top_vendors || []}
           loading={loading}
           linkVendor
