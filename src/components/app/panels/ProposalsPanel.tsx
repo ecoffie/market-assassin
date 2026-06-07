@@ -754,6 +754,36 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   // Review checklist
   const [checklist, setChecklist] = useState<ChecklistItemState[]>(DEFAULT_CHECKLIST);
   const checklistChecked = useMemo(() => checklist.filter(c => c.checked).length, [checklist]);
+
+  // Compliance referee — independent Claude check of the assembled draft vs the
+  // requirements (Eric's "run the final against an independent evaluator").
+  const [refereeRunning, setRefereeRunning] = useState(false);
+  const [refereeResult, setRefereeResult] = useState<{ verdicts: Array<{ id: string; requirement: string; status: 'met' | 'partial' | 'missing'; evidence?: string }>; summary: { total: number; met: number; partial: number; missing: number; score: number } } | null>(null);
+  const [refereeError, setRefereeError] = useState<string | null>(null);
+  const runReferee = useCallback(async () => {
+    if (!email) return;
+    setRefereeRunning(true); setRefereeError(null);
+    try {
+      // Assemble the drafted sections into one document for the referee to read.
+      const assembled = currentSectionTabs
+        .map(t => drafts[t.id]?.draft ? `## ${t.label}\n\n${drafts[t.id]!.draft}` : '')
+        .filter(Boolean).join('\n\n');
+      if (!assembled) { setRefereeError('Draft at least one section first.'); setRefereeRunning(false); return; }
+      if (compliance.length === 0) { setRefereeError('Generate the compliance matrix first.'); setRefereeRunning(false); return; }
+      const res = await fetch(`/api/app/proposal/referee?email=${encodeURIComponent(email)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({ requirements: compliance.map(r => ({ id: r.id, requirement: r.requirement, category: r.category, section: r.section })), draft: assembled }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data.success) { setRefereeError(data.error || 'Referee check failed.'); return; }
+      setRefereeResult({ verdicts: data.verdicts, summary: data.summary });
+    } catch {
+      setRefereeError('Referee check failed. Try again.');
+    } finally {
+      setRefereeRunning(false);
+    }
+  }, [email, currentSectionTabs, drafts, compliance, getAuthHeaders]);
   const toggleChecklistItem = useCallback((id: string) => {
     setChecklist(prev => prev.map(c => (c.id === id ? { ...c, checked: !c.checked } : c)));
   }, []);
@@ -2210,6 +2240,54 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               </div>
             )}
           </div>
+
+          {/* Compliance Referee — independent Claude check (Eric's vision). */}
+          {!isLoiResponseMode && (
+            <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/5 p-4 mb-4">
+              <div className="flex items-center justify-between gap-3 mb-2">
+                <div>
+                  <h3 className="text-sm font-semibold text-white">⚖️ Independent Compliance Check</h3>
+                  <p className="text-xs text-slate-400 mt-0.5">A separate AI reviewer checks your draft against every requirement — catches gaps before a Contracting Officer does.</p>
+                </div>
+                <button
+                  onClick={runReferee}
+                  disabled={refereeRunning}
+                  className="shrink-0 rounded-lg bg-indigo-600 hover:bg-indigo-500 disabled:opacity-50 px-4 py-2 text-sm font-semibold text-white"
+                >
+                  {refereeRunning ? 'Checking…' : refereeResult ? 'Re-check' : 'Run check'}
+                </button>
+              </div>
+              {refereeError && <div className="text-xs text-red-300 mt-2">{refereeError}</div>}
+              {refereeResult && (
+                <div className="mt-3">
+                  <div className="flex items-center gap-4 mb-3">
+                    <div className="text-2xl font-bold text-white">{refereeResult.summary.score}%<span className="text-xs font-normal text-slate-500 ml-1">compliant</span></div>
+                    <div className="flex gap-3 text-xs">
+                      <span className="text-emerald-400">✓ {refereeResult.summary.met} met</span>
+                      <span className="text-amber-400">◐ {refereeResult.summary.partial} partial</span>
+                      <span className="text-red-400">✗ {refereeResult.summary.missing} missing</span>
+                    </div>
+                  </div>
+                  {/* Show the gaps first — what needs fixing before submission. */}
+                  <div className="space-y-1.5 max-h-72 overflow-y-auto">
+                    {[...refereeResult.verdicts]
+                      .sort((a, b) => ({ missing: 0, partial: 1, met: 2 }[a.status] - { missing: 0, partial: 1, met: 2 }[b.status]))
+                      .map(v => (
+                        <div key={v.id} className="flex gap-2 text-xs">
+                          <span className={`shrink-0 ${v.status === 'met' ? 'text-emerald-400' : v.status === 'partial' ? 'text-amber-400' : 'text-red-400'}`}>
+                            {v.status === 'met' ? '✓' : v.status === 'partial' ? '◐' : '✗'}
+                          </span>
+                          <div>
+                            <span className="text-slate-300">{v.requirement}</span>
+                            {v.evidence && <span className="text-slate-500"> — {v.evidence}</span>}
+                          </div>
+                        </div>
+                      ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
 
           {isLoiResponseMode ? (
             <div className="rounded-lg border border-slate-700/60 bg-slate-950/40 p-3 mb-4">
