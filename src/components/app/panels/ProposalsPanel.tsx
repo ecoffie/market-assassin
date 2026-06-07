@@ -11,6 +11,7 @@ import ProposalChat from './ProposalChat';
 import DocManifest from './DocManifest';
 import BidDecisionGate from './BidDecisionGate';
 import { alignRequirement, priorityOf, type ReqPriority } from '@/lib/proposal/section-alignment';
+import { Zap, Gauge } from 'lucide-react';
 
 interface ProposalsPanelProps {
   email: string | null;
@@ -1331,18 +1332,18 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 className={`px-3 py-1.5 rounded-md transition-colors ${driveMode === 'auto' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
                 title="Mindy drafts a first pass of each section — you review, fill placeholders, and finalize"
               >
-                ⚡ Auto
+                <Zap className="w-3.5 h-3.5 inline" strokeWidth={2} /> Auto
               </button>
               <button
                 onClick={() => setDriveMode('manual')}
                 className={`px-3 py-1.5 rounded-md transition-colors ${driveMode === 'manual' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
                 title="You drive — upload files + chat to write the proposal yourself"
               >
-                🏎 Manual · Sport
+                <Gauge className="w-3.5 h-3.5 inline" strokeWidth={2} /> Manual · Sport
               </button>
             </div>
             <p className="mt-1.5 text-xs text-slate-500">
-              {driveMode === 'auto' ? '⚡ Auto: Mindy drafts it for you (safe mode).' : '🏎 Sport: you direct Mindy with your own files.'}
+              {driveMode === 'auto' ? 'Auto: Mindy drafts it for you (safe mode).' : 'Sport: you direct Mindy with your own files.'}
             </p>
           </div>
           {/* Verify on SAM.gov — cross-check every doc + the notice text against
