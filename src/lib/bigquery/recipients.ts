@@ -119,6 +119,34 @@ const COMPUTED_SLUG_SQL = (col: string) => `
     1, 120
   )`;
 
+// Legal-suffix words stripped when normalizing a company name for the
+// name-merge. MUST stay in sync with the regex in build-derived.sql's
+// recipients_rollup_merged block, and with normalizeCompanyName() below.
+const MERGE_SUFFIX_RE =
+  /\b(corporation|corp|incorporated|inc|llc|l\.?l\.?c|company|co|ltd|limited|lp|l\.?p|plc|holdings|holding|group|the)\b/g;
+
+// SQL form of the suffix-strip normalization (operates on a name column).
+const NORMALIZED_NAME_SQL = (col: string) => `
+  TRIM(REGEXP_REPLACE(
+    REGEXP_REPLACE(
+      LOWER(${col}),
+      r'\\b(corporation|corp|incorporated|inc|llc|l\\.?l\\.?c|company|co|ltd|limited|lp|l\\.?p|plc|holdings|holding|group|the)\\b', ''
+    ),
+    r'[^a-z0-9]+', ' '
+  ))`;
+
+// JS form of the same normalization, applied to a slug (dashes → spaces first
+// so word boundaries match). Used to normalize the REQUESTED slug before the
+// name-merge resolver arm. Mirrors recipients_rollup_merged + NORMALIZED_NAME_SQL.
+export function normalizeCompanyName(slugOrName: string): string {
+  return slugOrName
+    .toLowerCase()
+    .replace(/-/g, ' ')
+    .replace(MERGE_SUFFIX_RE, '')
+    .replace(/[^a-z0-9]+/g, ' ')
+    .trim();
+}
+
 /**
  * Resolve a slug to its parent-org rollup. This is the contractor pages'
  * primary entry point (replaces getRecipientBySlug for the page render).
@@ -173,12 +201,19 @@ export async function getRollupBySlug(slug: string): Promise<RollupProfile | nul
  * inbound links land on the live parent page instead of a 404.
  */
 export async function resolveCanonicalSlug(slug: string): Promise<string | null> {
+  // Normalized (suffix-stripped) form of the requested slug, for the name-merge
+  // arm — catches pre-merge ROLLUP-name variants (e.g. the slug
+  // "general-dynamics-corporation" whose rollup got merged into
+  // "general-dynamics-corp"; that variant is no longer a rollup name nor an
+  // exact child recipient_name, so only the normalized form finds it).
+  const normSlug = normalizeCompanyName(slug);
   const rows = await queryCached<{ canonical_slug: string }>({
-    cacheKey: `rollup:canonical-of:${slug}:v2-merged`,
+    cacheKey: `rollup:canonical-of:${slug}:v3-merged`,
     query: `
       WITH rollups AS (
         SELECT
           ${COMPUTED_SLUG_SQL('rollup_name')} AS canonical_slug,
+          ${NORMALIZED_NAME_SQL('rollup_name')} AS norm_name,
           rollup_uei, total_obligated, child_ueis
         FROM ${BQ_TABLES.recipientsRollup}
         WHERE rollup_name IS NOT NULL
@@ -197,13 +232,26 @@ export async function resolveCanonicalSlug(slug: string): Promise<string | null>
         JOIN rollups r ON c.recipient_uei IN UNNEST(r.child_ueis)
         WHERE c.recipient_name IS NOT NULL
           AND ${COMPUTED_SLUG_SQL('c.recipient_name')} = @slug
+      ),
+      -- Name-merge hit: the slug's normalized (suffix-stripped) form matches a
+      -- merged rollup's normalized name. Catches legal-suffix variants that the
+      -- merge collapsed (corp vs corporation). Lowest priority so an exact slug
+      -- always wins over a normalized match.
+      norm_match AS (
+        SELECT canonical_slug, total_obligated, 2 AS tiebreak
+        FROM rollups
+        WHERE norm_name = @normSlug AND norm_name != ''
       )
       SELECT canonical_slug
-      FROM (SELECT * FROM direct UNION ALL SELECT * FROM child_match)
+      FROM (
+        SELECT * FROM direct
+        UNION ALL SELECT * FROM child_match
+        UNION ALL SELECT * FROM norm_match
+      )
       ORDER BY tiebreak ASC, total_obligated DESC
       LIMIT 1
     `,
-    params: { slug },
+    params: { slug, normSlug },
   });
   const canonical = rows[0]?.canonical_slug ?? null;
   // null when unknown slug; null when already canonical (no redirect needed).
