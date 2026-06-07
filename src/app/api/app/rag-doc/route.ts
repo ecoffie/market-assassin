@@ -91,7 +91,32 @@ export async function GET(request: NextRequest) {
     source_path: safeSource,
     play_url: playUrl,
     play_label: playLabel,
-    full_text: data.full_text,
+    full_text: cleanGarbledText(data.full_text || ''),
     word_count: data.word_count,
   });
+}
+
+/**
+ * Clean spaced-letter PDF-extraction artifacts (Eric QC: KB showed "C hooSe
+ * YourSelf", "A L L R I G H T S R E S E R V E D"). Some scanned PDFs extract
+ * with a space between every character. We collapse runs of single chars back
+ * into words, conservatively, so normal text is untouched.
+ */
+function cleanGarbledText(text: string): string {
+  if (!text) return text;
+  return text.split('\n').map(line => {
+    const tokens = line.split(' ');
+    // If a line is mostly single characters (the garble signature), rejoin
+    // single-char runs into words.
+    const singleRatio = tokens.filter(t => t.length === 1).length / Math.max(tokens.length, 1);
+    if (singleRatio < 0.4 || tokens.length < 4) return line; // normal line — leave it
+    const out: string[] = [];
+    let buf = '';
+    for (const t of tokens) {
+      if (t.length === 1 && /[A-Za-z]/.test(t)) { buf += t; }
+      else { if (buf) { out.push(buf); buf = ''; } if (t) out.push(t); }
+    }
+    if (buf) out.push(buf);
+    return out.join(' ');
+  }).join('\n');
 }
