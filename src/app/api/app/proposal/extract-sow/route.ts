@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { createClient } from '@supabase/supabase-js';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -67,22 +68,58 @@ export async function POST(request: NextRequest) {
   const auth = requireMIAuthSession(request, email);
   if (!auth.ok) return auth.response;
 
-  const text = String(body.text || '');
-  const fileName = String(body.fileName || 'solicitation');
-  if (text.trim().length < 200) {
+  let text = String(body.text || '');
+  let fileName = String(body.fileName || 'solicitation');
+
+  // Prefer the CLASSIFIED SOW document (Eric QC: the export was scanning the
+  // entire combined 11-doc blob → grabbed a 507-page mashup with the wrong
+  // boundaries, often the wrong section). Pull the CLASSIFIED scope doc for THIS
+  // pursuit and export the whole thing — a standalone SOW/design-spec IS the
+  // scope, no regex hunt needed.
+  const pipelineId = String(body.pipeline_id || '').trim();
+  let standaloneSow: { title: string; body: string; name: string } | null = null;
+  if (pipelineId) {
+    const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    const { data: docs } = await sb.from('pursuit_documents')
+      .select('filename, doc_kind, extracted_text, char_count')
+      .eq('pipeline_id', pipelineId)
+      .in('doc_kind', ['sow_pws', 'attachment_other', 'solicitation'])
+      .not('extracted_text', 'is', null)
+      .order('char_count', { ascending: false });
+    // Prefer a doc classified as the scope: a real sow_pws, else a design-spec/
+    // scope attachment (filename hints), else fall back to regex over the
+    // solicitation below.
+    const sowDoc = docs?.find(d => d.doc_kind === 'sow_pws')
+      || docs?.find(d => /sow|statement of work|pws|scope|spec|design/i.test(d.filename || '') && d.doc_kind !== 'solicitation');
+    if (sowDoc?.extracted_text && sowDoc.extracted_text.length > 600) {
+      // Export the standalone scope doc whole (cap to a sane size).
+      standaloneSow = {
+        title: /design|spec/i.test(sowDoc.filename || '') ? 'Scope / Design Specifications' : 'Statement of Work',
+        body: sowDoc.extracted_text.slice(0, 120000),
+        name: sowDoc.filename || fileName,
+      };
+    } else {
+      const sol = docs?.find(d => d.doc_kind === 'solicitation');
+      if (sol?.extracted_text) { text = sol.extracted_text; fileName = sol.filename || fileName; }
+    }
+  }
+
+  if (!standaloneSow && text.trim().length < 200) {
     return NextResponse.json({ success: false, error: 'No solicitation text provided.' }, { status: 400 });
   }
 
-  const sow = extractSow(text);
-  if (!sow.found) {
+  // Use the standalone scope doc if we found one; else regex-extract the SOW
+  // section from the solicitation.
+  const sow = standaloneSow || extractSow(text);
+  if (!('body' in sow) || !sow.body || (('found' in sow) && !sow.found)) {
     return NextResponse.json({
       success: false,
-      error: 'Could not find a Statement of Work / PWS heading in this document. The SOW may be in a separate attachment — upload it directly, or paste the SOW text.',
+      error: 'Could not find a Statement of Work / scope document for this pursuit. It may be in an attachment we couldn’t read — check the document manifest, or paste the SOW text.',
     }, { status: 422 });
   }
-
-  const buffer = await buildDocx(sow.title, sow.body, fileName);
-  const safe = `${sow.title.replace(/\s+/g, '-')}-${fileName.replace(/\.[^.]+$/, '').slice(0, 40)}.docx`;
+  const outName = 'name' in sow ? sow.name : fileName;
+  const buffer = await buildDocx(sow.title, sow.body, outName);
+  const safe = `${sow.title.replace(/\s+/g, '-')}-${outName.replace(/\.[^.]+$/, '').slice(0, 40)}.docx`;
   return new NextResponse(new Uint8Array(buffer), {
     headers: {
       'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',

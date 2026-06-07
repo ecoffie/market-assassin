@@ -509,7 +509,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       const res = await fetch('/api/app/proposal/extract-sow', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({ email, text, fileName: uploadedRfp?.fileName || 'solicitation' }),
+        // Send pipeline_id so the export pulls the CLASSIFIED SOW doc, not the
+        // combined 11-doc blob (Eric QC: was extracting a 507-page mashup).
+        body: JSON.stringify({ email, text, fileName: uploadedRfp?.fileName || 'solicitation', pipeline_id: activePursuitId || undefined }),
       });
       if (!res.ok) {
         const j = await res.json().catch(() => ({}));
