@@ -1262,22 +1262,26 @@ const _contactsCache = new Map<string, TargetContact[]>();
 const isJunkPhone = (p?: string | null) => !p || /^0+$/.test(p.replace(/\D/g, ''));
 const isJunkTitle = (t?: string | null) => !t || /^(primary|secondary)\s*(contact)?$/i.test(t.trim());
 
+const PREVIEW_COUNT = 8; // curated preview size; rest behind search (SaaS pattern)
 function TargetContacts({ agency, email }: { agency: string; email: string }) {
   const cacheKey = `${email}:${agency}`;
   const [contacts, setContacts] = useState<TargetContact[]>(() => _contactsCache.get(cacheKey) || []);
   const [loading, setLoading] = useState(() => !_contactsCache.has(cacheKey));
+  const [total, setTotal] = useState(0);
+  const [search, setSearch] = useState('');
 
   useEffect(() => {
     if (_contactsCache.has(cacheKey)) { setContacts(_contactsCache.get(cacheKey)!); setLoading(false); return; }
     let active = true;
     setLoading(true);
-    const p = new URLSearchParams({ email, agency, limit: '60' });
+    // Pull a generous set we can search client-side (a card preview + filter).
+    const p = new URLSearchParams({ email, agency, limit: '250' });
     fetch(`/api/app/federal-contacts?${p.toString()}`)
       .then(r => r.json())
       .then(d => {
         const list: TargetContact[] = d?.contacts || d?.results || [];
         _contactsCache.set(cacheKey, list);
-        if (active) setContacts(list);
+        if (active) { setContacts(list); setTotal(d?.total || list.length); }
       })
       .catch(() => {})
       .finally(() => { if (active) setLoading(false); });
@@ -1312,11 +1316,17 @@ function TargetContacts({ agency, email }: { agency: string; email: string }) {
         <p className="text-[9px] text-slate-500 mt-1">SAM only names the people below (mostly contracting). For OSBP/program, call the agency’s small-business office and ask.</p>
       </div>
 
-      {/* OSBP / Small-Business office first (separate source — the one to call
-          for set-asides), then the named SAM POCs. */}
+      {/* OSBP / Small-Business office first (separate source). Then a curated
+          PREVIEW of contracting POCs + a search box to filter the full set —
+          the proven pattern (old Relationships was search-first; SaaS shows a
+          preview + search, not a 350-name wall). */}
       {(() => {
         const osbp = contacts.filter(c => c.role === 'OSBP' || c.role_category === 'small_business');
         const rest = contacts.filter(c => !(c.role === 'OSBP' || c.role_category === 'small_business'));
+        const q = search.trim().toLowerCase();
+        const filtered = q
+          ? rest.filter(c => `${c.contact_fullname} ${c.contact_title || ''} ${c.contact_email || ''} ${c.derivedOffice || ''}`.toLowerCase().includes(q))
+          : rest.slice(0, PREVIEW_COUNT);
         const renderContact = (c: TargetContact, accent = false) => {
           const office = c.derivedOffice || c.sub_tier;
           return (
@@ -1340,8 +1350,23 @@ function TargetContacts({ agency, email }: { agency: string; email: string }) {
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">{osbp.map(c => renderContact(c, true))}</div>
               </div>
             )}
-            <p className="text-[10px] text-slate-500 mb-1.5">Named on this agency’s solicitations (contracting POCs):</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">{rest.map(c => renderContact(c))}</div>
+            {/* Search the agency's full contact set (find a specific person). */}
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <p className="text-[10px] text-slate-500">Contracting POCs on this agency’s solicitations:</p>
+              <input
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                placeholder={`🔍 Search ${rest.length}…`}
+                className="w-36 px-2 py-1 bg-slate-800 border border-slate-700 rounded text-[11px] text-white outline-none focus:border-purple-500"
+              />
+            </div>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">{filtered.map(c => renderContact(c))}</div>
+            {!q && rest.length > PREVIEW_COUNT && (
+              <p className="text-[10px] text-slate-500 mt-2">
+                Showing {PREVIEW_COUNT} of {total > rest.length ? total : rest.length}. Search above to find anyone — or use <span className="text-purple-300">Decision Makers</span> to browse all agencies.
+              </p>
+            )}
+            {q && filtered.length === 0 && <p className="text-[10px] text-slate-500 mt-1">No match for “{search}”.</p>}
           </>
         );
       })()}
