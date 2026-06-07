@@ -714,7 +714,7 @@ export default function MyTargetListPanel({
                           onClick={() => setContactsId(contactsId === t.id ? null : t.id)}
                           className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
                         >
-                          {contactsId === t.id ? '▼ Hide contacts' : '👤 Who to contact'}
+                          {contactsId === t.id ? '▼ Hide contacts' : '▸ Who to contact'}
                         </button>
                         {/* Slice 3D — toggle for the outreach log. Click
                             to expand the activity timeline + log-new
@@ -1244,50 +1244,83 @@ function fmtRelative(iso: string): string {
 interface TargetContact {
   id: string;
   contact_fullname: string;
+  contact_title?: string | null;
   role?: string | null;
+  role_category?: string | null;
   pocLabel?: string | null;
   contact_email?: string | null;
   contact_phone?: string | null;
   derivedOffice?: string | null;
   sub_tier?: string | null;
 }
+// Group contacts by role so the user sees WHO + WHY (Eric: the richness — gov
+// buyers, OSBP/small-business, etc. — all under "Who to contact"). Maps the raw
+// role_category to a labeled group with a one-line "why contact them".
+const ROLE_GROUPS: Array<{ key: string; label: string; why: string; match: RegExp }> = [
+  { key: 'co', label: '🖊 Contracting Officers & Specialists', why: 'They run the buy — your direct line for solicitations and questions.', match: /contracting|contract specialist|\bco\b|\bko\b|procurement|buyer/i },
+  { key: 'osbp', label: '🤝 Small Business / OSBP', why: 'Small-business advocates — get on their radar for set-asides + sources sought.', match: /small business|osbp|sbs|sblo|liaison/i },
+  { key: 'pm', label: '📋 Program & Technical', why: 'They define the requirement — shape it early, before the RFP.', match: /program|technical|engineer|project manager|cor\b/i },
+  { key: 'other', label: '👤 Other points of contact', why: 'Additional named contacts on this agency’s notices.', match: /.*/ },
+];
+function groupContact(c: TargetContact): string {
+  const hay = `${c.role_category || ''} ${c.role || ''} ${c.pocLabel || ''} ${c.contact_title || ''}`;
+  for (const g of ROLE_GROUPS) if (g.key !== 'other' && g.match.test(hay)) return g.key;
+  return 'other';
+}
+
 function TargetContacts({ agency, email }: { agency: string; email: string }) {
   const [contacts, setContacts] = useState<TargetContact[]>([]);
   const [loading, setLoading] = useState(true);
   useEffect(() => {
     let active = true;
     setLoading(true);
-    const p = new URLSearchParams({ email, agency, limit: '12' });
+    // Pull the full set (was capped at 12 → Eric saw too few). No email/phone
+    // filter — show everyone, with whatever contact info exists.
+    const p = new URLSearchParams({ email, agency, limit: '60' });
     fetch(`/api/app/federal-contacts?${p.toString()}`)
       .then(r => r.json())
-      .then(d => { if (active) setContacts((d?.contacts || d?.results || []).filter((c: TargetContact) => c.contact_email || c.contact_phone)); })
+      .then(d => { if (active) setContacts(d?.contacts || d?.results || []); })
       .catch(() => {})
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
   }, [agency, email]);
 
+  // Group + only render groups that have people.
+  const grouped = ROLE_GROUPS.map(g => ({ ...g, items: contacts.filter(c => groupContact(c) === g.key) })).filter(g => g.items.length > 0);
+
   return (
     <div className="mt-3 rounded-lg border border-purple-500/20 bg-purple-500/[0.04] p-3">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-semibold text-purple-300">👤 Who to contact at {agency}</span>
-        <span className="text-[10px] text-slate-500">Decision makers from SAM</span>
+        <span className="text-xs font-semibold text-purple-300">Who to contact at {agency}</span>
+        <span className="text-[10px] text-slate-500">{contacts.length} from SAM · gov buyers, small-business, program</span>
       </div>
       {loading ? (
         <div className="text-xs text-slate-500">Loading contacts…</div>
       ) : contacts.length === 0 ? (
-        <div className="text-xs text-slate-500">No contacts with email/phone found for this agency yet.</div>
+        <div className="text-xs text-slate-500">No SAM contacts found for this agency yet.</div>
       ) : (
-        <div className="space-y-1.5">
-          {contacts.map(c => (
-            <div key={c.id} className="flex items-center justify-between gap-2 text-xs">
-              <div className="min-w-0">
-                <span className="text-slate-200">{c.contact_fullname}</span>
-                {(c.role || c.pocLabel) && <span className="text-slate-500"> · {c.role || c.pocLabel}</span>}
-                {(c.derivedOffice || c.sub_tier) && <span className="block text-[10px] text-slate-600">{c.derivedOffice || c.sub_tier}</span>}
-              </div>
-              <div className="flex items-center gap-2 shrink-0">
-                {c.contact_email && <a href={`mailto:${c.contact_email}`} className="text-purple-400 hover:text-purple-300" title={c.contact_email}>✉ Email</a>}
-                {c.contact_phone && <a href={`tel:${c.contact_phone}`} className="text-emerald-400 hover:text-emerald-300" title={c.contact_phone}>📞 Call</a>}
+        <div className="space-y-3">
+          {grouped.map(g => (
+            <div key={g.key}>
+              <div className="text-[11px] font-semibold text-slate-300">{g.label} <span className="text-slate-600">({g.items.length})</span></div>
+              <div className="text-[10px] text-slate-500 mb-1">{g.why}</div>
+              <div className="space-y-1 pl-1">
+                {g.items.map(c => (
+                  <div key={c.id} className="text-xs">
+                    <span className="text-slate-200">{c.contact_fullname}</span>
+                    {c.contact_title && <span className="text-slate-500"> · {c.contact_title}</span>}
+                    {(c.derivedOffice || c.sub_tier) && <span className="text-slate-600"> · {c.derivedOffice || c.sub_tier}</span>}
+                    {/* Contact info shown as text (Eric: don't call/email from
+                        the app — just show it). */}
+                    {(c.contact_email || c.contact_phone) && (
+                      <div className="text-[11px] text-slate-500 pl-3">
+                        {c.contact_email && <span className="text-purple-300/80 select-all">{c.contact_email}</span>}
+                        {c.contact_email && c.contact_phone && <span className="text-slate-700"> · </span>}
+                        {c.contact_phone && <span className="text-emerald-300/80 select-all">{c.contact_phone}</span>}
+                      </div>
+                    )}
+                  </div>
+                ))}
               </div>
             </div>
           ))}
