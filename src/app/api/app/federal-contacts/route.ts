@@ -185,7 +185,17 @@ export async function GET(request: NextRequest) {
     // name OR title match
     q = q.or(`contact_fullname.ilike.%${search}%,contact_title.ilike.%${search}%`);
   }
-  if (agency) q = q.ilike('department_ind_agency', `%${agency}%`);
+  if (agency) {
+    // federal_contacts stores "INTERIOR, DEPARTMENT OF" while target-list passes
+    // "Department of the Interior" — match on the DISTINCTIVE keyword (drop the
+    // generic "department of/agency/the" words) so the formats reconcile.
+    const keyword = agency
+      .replace(/\b(department|dept|of|the|agency|administration|us|u\.s\.|,)\b/gi, ' ')
+      .replace(/\s{2,}/g, ' ').trim();
+    q = keyword.length >= 3
+      ? q.ilike('department_ind_agency', `%${keyword}%`)
+      : q.ilike('department_ind_agency', `%${agency}%`);
+  }
   if (office) q = q.ilike('office', `%${office}%`);
   if (role) q = q.eq('role_category', role);
   // subAgency is DERIVED (from email domain / solicitation prefix), not a

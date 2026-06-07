@@ -94,6 +94,9 @@ export default function MyTargetListPanel({
   // Slice 3D — which target row is expanded to show its outreach
   // log. Only one expanded at a time keeps the UI focused.
   const [expandedId, setExpandedId] = useState<string | null>(null);
+  // Which target's CONTACTS (Decision Makers) are expanded inline (Eric: fold
+  // Relationships into Target List — target the people from the agency card).
+  const [contactsId, setContactsId] = useState<string | null>(null);
   // Slice 4 — Event Radar. Map of target_id → upcoming events. One
   // fetch covers every target (the endpoint loops server-side so the
   // client makes a single round trip regardless of list size).
@@ -703,6 +706,16 @@ export default function MyTargetListPanel({
                           );
                         })()}
 
+                        {/* Contacts (Decision Makers) for this agency — inline,
+                            so you target the people right from the agency card
+                            (Eric: fold Relationships into Target List). */}
+                        <button
+                          type="button"
+                          onClick={() => setContactsId(contactsId === t.id ? null : t.id)}
+                          className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
+                        >
+                          {contactsId === t.id ? '▼ Hide contacts' : '👤 Who to contact'}
+                        </button>
                         {/* Slice 3D — toggle for the outreach log. Click
                             to expand the activity timeline + log-new
                             form inline beneath the card. */}
@@ -817,6 +830,13 @@ export default function MyTargetListPanel({
                       revealed when the row is expanded. Lazy: the
                       OutreachLog component only fetches when mounted,
                       so collapsed rows don't trigger API calls. */}
+                  {/* Inline contacts (Decision Makers) for this agency. */}
+                  {contactsId === t.id && email && (
+                    <TargetContacts
+                      agency={t.agency_name}
+                      email={email}
+                    />
+                  )}
                   {expandedId === t.id && email && (
                     <OutreachLog
                       targetId={t.id}
@@ -1216,6 +1236,65 @@ function fmtRelative(iso: string): string {
   if (diffDays < 30) return `${Math.floor(diffDays / 7)}w ago`;
   if (diffDays < 365) return `${Math.floor(diffDays / 30)}mo ago`;
   return d.toLocaleDateString();
+}
+
+// TargetContacts — Decision Makers for a target agency, inline (Eric: fold
+// Relationships into Target List). Pulls federal_contacts for the agency; each
+// contact has call/email actions so you reach out + log + move on, one window.
+interface TargetContact {
+  id: string;
+  contact_fullname: string;
+  role?: string | null;
+  pocLabel?: string | null;
+  contact_email?: string | null;
+  contact_phone?: string | null;
+  derivedOffice?: string | null;
+  sub_tier?: string | null;
+}
+function TargetContacts({ agency, email }: { agency: string; email: string }) {
+  const [contacts, setContacts] = useState<TargetContact[]>([]);
+  const [loading, setLoading] = useState(true);
+  useEffect(() => {
+    let active = true;
+    setLoading(true);
+    const p = new URLSearchParams({ email, agency, limit: '12' });
+    fetch(`/api/app/federal-contacts?${p.toString()}`)
+      .then(r => r.json())
+      .then(d => { if (active) setContacts((d?.contacts || d?.results || []).filter((c: TargetContact) => c.contact_email || c.contact_phone)); })
+      .catch(() => {})
+      .finally(() => { if (active) setLoading(false); });
+    return () => { active = false; };
+  }, [agency, email]);
+
+  return (
+    <div className="mt-3 rounded-lg border border-purple-500/20 bg-purple-500/[0.04] p-3">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-semibold text-purple-300">👤 Who to contact at {agency}</span>
+        <span className="text-[10px] text-slate-500">Decision makers from SAM</span>
+      </div>
+      {loading ? (
+        <div className="text-xs text-slate-500">Loading contacts…</div>
+      ) : contacts.length === 0 ? (
+        <div className="text-xs text-slate-500">No contacts with email/phone found for this agency yet.</div>
+      ) : (
+        <div className="space-y-1.5">
+          {contacts.map(c => (
+            <div key={c.id} className="flex items-center justify-between gap-2 text-xs">
+              <div className="min-w-0">
+                <span className="text-slate-200">{c.contact_fullname}</span>
+                {(c.role || c.pocLabel) && <span className="text-slate-500"> · {c.role || c.pocLabel}</span>}
+                {(c.derivedOffice || c.sub_tier) && <span className="block text-[10px] text-slate-600">{c.derivedOffice || c.sub_tier}</span>}
+              </div>
+              <div className="flex items-center gap-2 shrink-0">
+                {c.contact_email && <a href={`mailto:${c.contact_email}`} className="text-purple-400 hover:text-purple-300" title={c.contact_email}>✉ Email</a>}
+                {c.contact_phone && <a href={`tel:${c.contact_phone}`} className="text-emerald-400 hover:text-emerald-300" title={c.contact_phone}>📞 Call</a>}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
 }
 
 function OutreachLog({

@@ -156,13 +156,10 @@ const NAV_SECTIONS: NavSection[] = [
         description: 'Saved offices to work',
         tier: ['pro', 'team', 'enterprise'],
       },
-      {
-        id: 'contacts',
-        label: 'My Network',
-        icon: Users,
-        description: 'Buyers + partners',
-        tier: ['pro', 'team', 'enterprise'],
-      },
+      // Relationships ("My Network") REMOVED from the sidebar (Eric: research
+      // proved Gov Buyers = Decision Makers, Find Partners = Contractors — only
+      // OSBP was distinct). Contacts now live INLINE under My Target List per
+      // agency card. The panel still exists for any deep links.
     ],
   },
   {
