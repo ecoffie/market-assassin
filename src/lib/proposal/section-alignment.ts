@@ -86,6 +86,30 @@ export type AlignedSection = SectionType | 'all';
 // from the requirement TEXT since "management" isn't one of the 7 categories.
 const MANAGEMENT_TEXT = /\b(key[ _-]?personnel|resume|project[ _-]?manager|superintendent|staffing[ _-]?plan|organizational?[ _-]?chart|org[ _-]?chart|management[ _-]?(plan|approach|volume)|quality[ _-]?control[ _-]?plan|\bqc[ _-]?plan|safety[ _-]?plan|em[ _-]?385|subcontract(ing)?[ _-]?plan|project[ _-]?schedule|schedule[ _-]?with[ _-]?milestones|risk[ _-]?management|transition[ _-]?plan|labor[ _-]?categories)\b/i;
 
+// PRIORITY TIERS (Eric: page counts are LOW priority — only matter after the
+// proposal is finalized — but due dates / required plans / safety standards /
+// certs must be accounted for FIRST). Sort the matrix by this so the eye lands
+// on what eliminates you, not on formatting trivia.
+export type ReqPriority = 'critical' | 'standard' | 'final';
+
+// Critical = miss it and you lose (deadlines, mandatory plans/certs/licenses).
+// NOTE: no trailing \b on word-prefixes (licens must match "license/licensed";
+// perform must match "performance").
+const CRITICAL_TEXT = /(due[ _-]?date|deadline|closing[ _-]?date|no[ _-]?later[ _-]?than|submit(ted)?[ _-]?by|safety[ _-]?(plan|program)|em[ _-]?385|quality[ _-]?control|\bqc[ _-]?plan|required[ _-]?plan|certif|licens|bond(ing|ed)?|insurance|sam\.gov|mandatory|key[ _-]?personnel|past[ _-]?perform|registration|accredit)/i;
+// Final-polish = only matters after the draft is written (formatting trivia).
+const FINAL_TEXT = /(page[ _-]?(limit|count|maximum|max)|(not[ _-]?(to[ _-]?)?exceed|maximum|within|up[ _-]?to)[ _-]?\d+[ _-]?pages?|\d+[ _-]?pages?|font|\d+[ _-]?point|margins?|line[ _-]?spacing|single[ _-]?spaced|double[ _-]?spaced|file[ _-]?nam|cover[ _-]?page|table[ _-]?of[ _-]?contents|header|footer|tab(bed)?[ _-]?divider)/i;
+
+/** Tier a requirement so Critical surfaces first, formatting/page-count last. */
+export function priorityOf(req: ComplianceReq): ReqPriority {
+  const t = req.requirement || '';
+  // Final-polish FIRST — "20-page technical proposal" is formatting, not a
+  // technical obligation, even though it mentions "technical".
+  if (FINAL_TEXT.test(t)) return 'final';
+  if (CRITICAL_TEXT.test(t)) return 'critical';
+  if (req.category === 'admin' && /cert|licens|registr|bond/i.test(t)) return 'critical';
+  return 'standard';
+}
+
 /** Map ONE requirement to its target draft section. */
 export function alignRequirement(req: ComplianceReq): AlignedSection {
   // Section-ref hint wins (most explicit).

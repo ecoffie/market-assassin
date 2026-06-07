@@ -9,7 +9,7 @@ import { loiFieldsHaveContent } from '@/lib/proposal/loi-fields';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 import ProposalChat from './ProposalChat';
 import DocManifest from './DocManifest';
-import { alignRequirement } from '@/lib/proposal/section-alignment';
+import { alignRequirement, priorityOf, type ReqPriority } from '@/lib/proposal/section-alignment';
 
 interface ProposalsPanelProps {
   email: string | null;
@@ -393,6 +393,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   const [complianceMeta, setComplianceMeta] = useState<{ truncated?: boolean; originalChars?: number; inputChars?: number } | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | ComplianceStatus>('all');
   const [categoryFilter, setCategoryFilter] = useState<'all' | ComplianceCategory>('all');
+  const [priorityFilter, setPriorityFilter] = useState<'all' | ReqPriority>('all');
 
   const generateCompliance = useCallback(async () => {
     if (!email || !uploadedRfp) return;
@@ -531,17 +532,24 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     const rows = compliance.filter(r => {
       if (statusFilter !== 'all' && r.status !== statusFilter) return false;
       if (categoryFilter !== 'all' && r.category !== categoryFilter) return false;
+      if (priorityFilter !== 'all' && priorityOf({ requirement: r.requirement, category: r.category, section: r.section }) !== priorityFilter) return false;
       return true;
     });
-    // Group BY section (Eric: matrix tagged + grouped by section, like the RAG
-    // example). Sort by the top-level section letter (L, M, C…) then full ref.
+    // Sort by PRIORITY first (Eric: critical first, page-counts last), then by
+    // section within a tier.
+    const prRank = { critical: 0, standard: 1, final: 2 };
     const sortKey = (s?: string) => {
       if (!s) return 'zzz';
       const letter = (s.match(/^[A-Za-z]/)?.[0] || 'z').toUpperCase();
       return `${letter}:${s}`;
     };
-    return [...rows].sort((a, b) => sortKey(a.section).localeCompare(sortKey(b.section), undefined, { numeric: true }));
-  }, [compliance, statusFilter, categoryFilter]);
+    return [...rows].sort((a, b) => {
+      const pa = prRank[priorityOf({ requirement: a.requirement, category: a.category, section: a.section })];
+      const pb = prRank[priorityOf({ requirement: b.requirement, category: b.category, section: b.section })];
+      if (pa !== pb) return pa - pb;
+      return sortKey(a.section).localeCompare(sortKey(b.section), undefined, { numeric: true });
+    });
+  }, [compliance, statusFilter, categoryFilter, priorityFilter]);
 
   // Section drafts. Holds slots for BOTH RFP + LOI/response
   // sections; only the active tab set is shown at any time based on
@@ -1891,6 +1899,37 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
 
               {compliance.length > 0 && (
                 <>
+                  {/* Calming priority summary (Eric: 172 raw rows is intimidating;
+                      lead with what MATTERS — critical first, page-counts last). */}
+                  {(() => {
+                    const crit = compliance.filter(r => priorityOf({ requirement: r.requirement, category: r.category, section: r.section }) === 'critical').length;
+                    const fin = compliance.filter(r => priorityOf({ requirement: r.requirement, category: r.category, section: r.section }) === 'final').length;
+                    const std = compliance.length - crit - fin;
+                    return (
+                      <div className="rounded-xl border border-slate-700/60 bg-slate-950/40 p-4 mb-4">
+                        <p className="text-sm text-slate-200 mb-3">
+                          Mindy pulled <span className="font-semibold text-white">{compliance.length}</span> requirements from this solicitation. Don&apos;t let the number scare you — here&apos;s the order to tackle them:
+                        </p>
+                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
+                          <button onClick={() => setPriorityFilter('critical')} className={`text-left rounded-lg border p-2.5 transition-colors ${priorityFilter === 'critical' ? 'border-red-500/60 bg-red-500/10' : 'border-red-500/25 bg-red-500/[0.04] hover:bg-red-500/10'}`}>
+                            <div className="font-semibold text-red-300">🔴 {crit} Critical</div>
+                            <div className="text-slate-400 mt-0.5">Do these first — deadlines, required plans, certs. Miss one and you&apos;re out.</div>
+                          </button>
+                          <button onClick={() => setPriorityFilter('standard')} className={`text-left rounded-lg border p-2.5 transition-colors ${priorityFilter === 'standard' ? 'border-amber-500/60 bg-amber-500/10' : 'border-amber-500/25 bg-amber-500/[0.04] hover:bg-amber-500/10'}`}>
+                            <div className="font-semibold text-amber-300">🟡 {std} Standard</div>
+                            <div className="text-slate-400 mt-0.5">The real content — your technical, management, past performance.</div>
+                          </button>
+                          <button onClick={() => setPriorityFilter('final')} className={`text-left rounded-lg border p-2.5 transition-colors ${priorityFilter === 'final' ? 'border-emerald-500/60 bg-emerald-500/10' : 'border-emerald-500/25 bg-emerald-500/[0.04] hover:bg-emerald-500/10'}`}>
+                            <div className="font-semibold text-emerald-300">🟢 {fin} Final polish</div>
+                            <div className="text-slate-400 mt-0.5">Save for last — page limits, fonts, formatting. After the draft is done.</div>
+                          </button>
+                        </div>
+                        {priorityFilter !== 'all' && (
+                          <button onClick={() => setPriorityFilter('all')} className="text-[11px] text-purple-400 hover:text-purple-300 mt-2">← Show all priorities</button>
+                        )}
+                      </div>
+                    );
+                  })()}
                   <div className="flex flex-wrap items-center gap-2 mb-3 text-xs">
                     <span className="text-slate-500">{compliance.length} requirement{compliance.length === 1 ? '' : 's'}</span>
                 <span className="text-slate-700">·</span>
