@@ -9,6 +9,7 @@ import { loiFieldsHaveContent } from '@/lib/proposal/loi-fields';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 import ProposalChat from './ProposalChat';
 import DocManifest from './DocManifest';
+import BidDecisionGate from './BidDecisionGate';
 import { alignRequirement, priorityOf, type ReqPriority } from '@/lib/proposal/section-alignment';
 
 interface ProposalsPanelProps {
@@ -394,6 +395,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   const [statusFilter, setStatusFilter] = useState<'all' | ComplianceStatus>('all');
   const [categoryFilter, setCategoryFilter] = useState<'all' | ComplianceCategory>('all');
   const [priorityFilter, setPriorityFilter] = useState<'all' | ReqPriority>('all');
+  const [bidProceeded, setBidProceeded] = useState(false); // Step-1 bid decision made
 
   const generateCompliance = useCallback(async () => {
     if (!email || !uploadedRfp) return;
@@ -1677,7 +1679,15 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         </section>
       )}
 
-      {responseOutputsReady && !isSimpleResponseMode && driveMode === 'auto' && (
+      {/* Step 1 — Bid/No-Bid gate (Eric: decide before the matrix). Shown until
+          the user makes a decision, then the outputs unlock. */}
+      {responseOutputsReady && !isSimpleResponseMode && driveMode === 'auto' && !bidProceeded && (
+        <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <BidDecisionGate onProceed={() => setBidProceeded(true)} />
+        </section>
+      )}
+
+      {responseOutputsReady && !isSimpleResponseMode && driveMode === 'auto' && bidProceeded && (
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
