@@ -70,6 +70,7 @@ function AppDashboard() {
   // Interactive product tour (PRD-interactive-product-tour). Auto-starts once
   // for a new user; replayable from Settings via the 'mindy:start-tour' event.
   const [runTour, setRunTour] = useState(false);
+  const [tourRunId, setTourRunId] = useState(0);
   // Voice capture FAB state — mobile-first surface, also reachable
   // via the in-panel button on Pipeline. Single mount so the modal
   // doesn't double up when Pipeline is also showing one.
@@ -352,7 +353,9 @@ function AppDashboard() {
     };
   }, [email, activePanel, tier, trackEngagement, flushPanelTime]);
 
-  // Tour: auto-start once for a new user; allow replay from Settings.
+  // Tour: auto-start once for a new user; allow replay from Settings. We bump a
+  // `tourRunId` each start so ProductTour remounts fresh every time (a boolean
+  // wouldn't re-fire reliably after dismiss → replay).
   useEffect(() => {
     if (!email || isLoading) return;
     if (typeof window === 'undefined') return;
@@ -364,7 +367,11 @@ function AppDashboard() {
   }, [email, isLoading]);
 
   useEffect(() => {
-    const replay = () => { localStorage.removeItem('mindy_tour_completed'); setRunTour(true); };
+    const replay = () => {
+      localStorage.removeItem('mindy_tour_completed');
+      setTourRunId((n) => n + 1);   // force a fresh remount
+      setRunTour(true);
+    };
     window.addEventListener('mindy:start-tour', replay);
     return () => window.removeEventListener('mindy:start-tour', replay);
   }, []);
@@ -923,7 +930,7 @@ function AppDashboard() {
   return (
     <div className="min-h-screen bg-slate-950 flex">
       {/* Interactive product tour — drives the app for new users. */}
-      <ProductTour run={runTour} onPanelChange={handlePanelChange} onFinish={finishTour} />
+      <ProductTour key={tourRunId} run={runTour} onPanelChange={handlePanelChange} onFinish={finishTour} />
       {/* Sidebar */}
       <UnifiedSidebar
         activePanel={activePanel}
