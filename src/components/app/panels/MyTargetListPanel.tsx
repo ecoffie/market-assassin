@@ -1262,15 +1262,6 @@ const _contactsCache = new Map<string, TargetContact[]>();
 const isJunkPhone = (p?: string | null) => !p || /^0+$/.test(p.replace(/\D/g, ''));
 const isJunkTitle = (t?: string | null) => !t || /^(primary|secondary)\s*(contact)?$/i.test(t.trim());
 
-// A real role label when we have one (CO / OSBP / program); else null.
-function roleLabel(c: TargetContact): string | null {
-  const hay = `${c.role_category || ''} ${c.role || ''} ${c.pocLabel || ''} ${c.contact_title || ''}`.toLowerCase();
-  if (/small business|osbp|sblo|liaison/.test(hay)) return 'Small Business / OSBP';
-  if (/contracting|contract specialist|procurement/.test(hay)) return 'Contracting';
-  if (/program|technical|engineer|\bcor\b/.test(hay)) return 'Program';
-  return null;
-}
-
 function TargetContacts({ agency, email }: { agency: string; email: string }) {
   const cacheKey = `${email}:${agency}`;
   const [contacts, setContacts] = useState<TargetContact[]>(() => _contactsCache.get(cacheKey) || []);
@@ -1305,16 +1296,34 @@ function TargetContacts({ agency, email }: { agency: string; email: string }) {
         <span className="text-xs font-semibold text-purple-300">Who to contact at {agency}</span>
         <span className="text-[10px] text-slate-500">{contacts.length} contacts · from SAM notices</span>
       </div>
-      <p className="text-[10px] text-slate-500 mb-2">People named on this agency’s solicitations — your warm intros for BD outreach.</p>
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
-        {contacts.map(c => {
-          const role = roleLabel(c);
+
+      {/* Mindy insight: WHO to seek out (Eric — the roles to ask for even when
+          they're not named in SAM data: KO, OSBP, program, end user, engineer).
+          Grounds the user on the right people to build relationships with. */}
+      <div className="mb-2.5 rounded-md bg-purple-500/[0.06] border border-purple-500/15 p-2">
+        <div className="text-[11px] font-semibold text-purple-200/90 mb-1">💡 Mindy: the 5 people to find</div>
+        <ul className="text-[10px] text-slate-400 space-y-0.5">
+          <li><span className="text-slate-300">Contracting Officer (KO)</span> — signs the award; your formal channel.</li>
+          <li><span className="text-slate-300">Small Business Specialist / OSBP</span> — ask the agency directly; gets you on the set-aside radar.</li>
+          <li><span className="text-slate-300">Program Manager / COR</span> — owns the requirement; shape it before the RFP.</li>
+          <li><span className="text-slate-300">End user</span> — who actually uses what’s bought; reveals the real need.</li>
+          <li><span className="text-slate-300">Technical lead / Engineer</span> — defines the specs you’ll be evaluated on.</li>
+        </ul>
+        <p className="text-[9px] text-slate-500 mt-1">SAM only names the people below (mostly contracting). For OSBP/program, call the agency’s small-business office and ask.</p>
+      </div>
+
+      {/* OSBP / Small-Business office first (separate source — the one to call
+          for set-asides), then the named SAM POCs. */}
+      {(() => {
+        const osbp = contacts.filter(c => c.role === 'OSBP' || c.role_category === 'small_business');
+        const rest = contacts.filter(c => !(c.role === 'OSBP' || c.role_category === 'small_business'));
+        const renderContact = (c: TargetContact, accent = false) => {
           const office = c.derivedOffice || c.sub_tier;
           return (
             <div key={c.id} className="text-xs leading-tight">
               <div>
-                <span className="text-slate-200 font-medium">{fmtName(c.contact_fullname)}</span>
-                {role && <span className="ml-1.5 text-[9px] uppercase tracking-wide text-purple-300/70">{role}</span>}
+                <span className={`font-medium ${accent ? 'text-amber-200' : 'text-slate-200'}`}>{fmtName(c.contact_fullname)}</span>
+                {accent && <span className="ml-1.5 text-[9px] uppercase tracking-wide text-amber-300/80">Small Business / OSBP</span>}
               </div>
               {!isJunkTitle(c.contact_title) && <div className="text-[10px] text-slate-500">{c.contact_title}</div>}
               {office && <div className="text-[10px] text-slate-600">{office}</div>}
@@ -1322,8 +1331,20 @@ function TargetContacts({ agency, email }: { agency: string; email: string }) {
               {!isJunkPhone(c.contact_phone) && <div className="text-[11px] text-emerald-300/80 select-all">{c.contact_phone}</div>}
             </div>
           );
-        })}
-      </div>
+        };
+        return (
+          <>
+            {osbp.length > 0 && (
+              <div className="mb-2.5 rounded-md border border-amber-500/20 bg-amber-500/[0.05] p-2">
+                <div className="text-[10px] font-semibold text-amber-300/90 mb-1">🤝 Small Business / OSBP — start here for set-asides</div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">{osbp.map(c => renderContact(c, true))}</div>
+              </div>
+            )}
+            <p className="text-[10px] text-slate-500 mb-1.5">Named on this agency’s solicitations (contracting POCs):</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">{rest.map(c => renderContact(c))}</div>
+          </>
+        );
+      })()}
     </div>
   );
 }

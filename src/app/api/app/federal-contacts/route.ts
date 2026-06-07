@@ -17,6 +17,7 @@ import { getOfficesForAgency } from '@/lib/bigquery/agencies';
 import { deriveSubAgency } from '@/lib/gov-contacts/derive-subagency';
 import { decodeDodaac, expandOfficeName } from '@/lib/gov-contacts/dodaac';
 import { loadDodaacNames } from '@/lib/gov-contacts/dodaac-directory';
+import { getEnhancedAgencyInfo } from '@/lib/utils/command-info';
 
 export const dynamic = 'force-dynamic';
 
@@ -223,11 +224,12 @@ export async function GET(request: NextRequest) {
   // the page still fills after filtering.
   const fetchLimit = subAgency ? Math.min(limit * 8, 1000) : limit;
 
-  // Surface contacts that are actually reachable first (have email/phone),
-  // then alphabetical by agency so the directory reads cleanly.
+  // Order by MOST RECENT posting (Eric: alphabetical-by-email made every result
+  // start with "A" — useless). Recency surfaces active, relevant POCs + gives a
+  // varied set, not the A-front. Reachable (has email) still preferred via the
+  // posted_date sort landing real contacts first.
   q = q
-    .order('contact_email', { ascending: true, nullsFirst: false })
-    .order('department_ind_agency', { ascending: true })
+    .order('posted_date', { ascending: false, nullsFirst: false })
     .range(offset, offset + fetchLimit - 1);
 
   const { data, error, count } = await q;
@@ -285,6 +287,27 @@ export async function GET(request: NextRequest) {
   if (subAgency) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     contacts = contacts.filter((c: any) => c.subAgency === subAgency).slice(0, limit);
+  }
+
+  // OSBP / Small-Business office (Eric: OSBP was a SEPARATE source — the
+  // command-info directory, NOT federal_contacts). Prepend the agency's
+  // small-business contact so the user gets the OSBP person, not just KOs.
+  if (agency) {
+    const osbp = getEnhancedAgencyInfo(agency, agency, agency).smallBusinessContact;
+    if (osbp?.director && osbp.director !== `${agency} OSBP Director`) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      (contacts as any[]).unshift({
+        id: `osbp:${agency}`,
+        contact_fullname: osbp.director,
+        contact_title: osbp.name || 'Office of Small Business Programs',
+        contact_email: osbp.email || null,
+        contact_phone: osbp.phone || null,
+        role_category: 'small_business',
+        role: 'OSBP',
+        derivedOffice: osbp.name || null,
+        sub_tier: null,
+      });
+    }
   }
 
   return NextResponse.json({
