@@ -1,10 +1,48 @@
 # TODO: Parent-UEI Rollup for Contractor Profiles (SEO + data quality)
 
-**Status:** Open
+**Status:** ✅ DONE (shipped 2026-06-07) — except cross-variant brand dedup (deferred, see bottom)
 **Created:** 2026-06-07
 **Priority:** High — suppresses our highest-value brand-search SEO pages
-**Owner:** TBD
+**Owner:** Eric / Claude
 **Related:** `tasks/PRD-seo-contractor-pages-agent.md`, `src/app/sitemap.ts`, `src/lib/bigquery/recipients.ts`
+**Commits:** `41d66cb` (rollup), `bb55b63` (sibling-redirect fix). Live on getmindy.ai.
+
+---
+
+## ✅ Shipped (2026-06-07)
+
+- `recipients_rollup` BQ table (319,091 rows) added to `build-derived.sql`, keyed
+  by `COALESCE(parent_uei, recipient_uei)`; distinct counts recomputed at parent
+  level; carries `child_ueis[]` + canonical `rollup_name`.
+- `recipients.ts`: `RollupProfile`, `getRollupBySlug`, `resolveCanonicalSlug`;
+  all detail queries filter `recipient_uei IN UNNEST(child_ueis)`; sitemap +
+  similar-contractors source the rollup.
+- Contractor pages (overview/agencies/naics/contracts) resolve via rollup,
+  308-redirect sibling-UEI slugs to the canonical parent (page number preserved),
+  gate reads parent-level counts.
+- **Verified live:** Lockheed `/lockheed-martin-corp/agencies` → 200, indexable,
+  27 agencies (was 4, noindexed). 5 primes (GD 36, Northrop 23, Leidos 35,
+  Raytheon 15, Booz Allen 31 agencies) all indexable. Siblings 308 correctly
+  (`hp-enterprise-services-llc` → `hp-inc`, `dva-healthcare-renal-care-inc` →
+  `davita-inc`), page-number preserved on `/contracts/2`.
+- **Impact:** $1B+ primes gated thin **55.7% → 34.1%**. The residual 34% is
+  *correct* — genuinely concentrated primes (Electric Boat = Navy only; DOE
+  national-lab managers; military health like TriWest/Humana).
+
+## ⏭ Deferred: cross-variant brand dedup
+
+USAspending has MULTIPLE parent_uei groups for some primes whose names slugify
+differently (e.g. `lockheed-martin-corp` $495B/27 agencies vs a SEPARATE
+`lockheed-martin-corporation` $46.8B/8 agencies parent). Both render as their
+own indexable pages → brand equity splits across 2+ URLs. Same-slug orphans
+already consolidate; cross-variant (corp vs corporation) does NOT, because they
+are distinct parent_uei groups with different normalized names.
+
+Fix options (Eric chose "ship core, defer this" 2026-06-07): (a) curated alias
+map for top ~50 primes → canonical rollup; or (b) rebuild rollup unifying parent
+groups by suffix-stripped normalized name (risk: fusing genuinely distinct
+same-named entities — needs validation). Proxy estimate: ~226 of top-1000
+rollups share a 2-word name prefix with another (includes false positives).
 
 ---
 
