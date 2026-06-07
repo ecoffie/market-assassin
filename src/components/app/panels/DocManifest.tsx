@@ -16,6 +16,9 @@ interface PursuitDoc {
   doc_kind_confidence?: string | null;
   size_bytes?: number | null;
   page_count?: number | null;
+  extracted_text?: string | null;
+  extraction_error?: string | null;
+  sam_url?: string | null;
 }
 
 const KIND_LABEL: Record<string, string> = {
@@ -64,15 +67,27 @@ export default function DocManifest({ email, pursuitId }: { email: string | null
   if (loading) return <div className="text-xs text-slate-500">Loading document manifest…</div>;
   if (docs.length === 0) return null;
 
-  // Group by kind.
+  // Split readable vs couldn't-read (Eric QC: a 32MB drawings PDF + .xlsx pricing
+  // were silently dropped). Surface the skipped ones with a SAM.gov link so the
+  // user knows they exist and can grab them manually.
+  const readable = docs.filter(d => d.extracted_text);
+  const skipped = docs.filter(d => !d.extracted_text);
+
+  // Group readable by kind.
   const groups: Record<string, PursuitDoc[]> = {};
-  for (const d of docs) (groups[d.doc_kind || 'attachment_other'] ||= []).push(d);
+  for (const d of readable) (groups[d.doc_kind || 'attachment_other'] ||= []).push(d);
   const orderedKinds = ORDER.filter(k => groups[k]?.length);
+
+  const skipReason = (d: PursuitDoc) => {
+    if (/unsupported/i.test(d.extraction_error || '')) return 'unsupported type (.xlsx/.zip)';
+    if ((d.size_bytes || 0) > 20e6) return 'too large to fetch';
+    return d.extraction_error || 'not readable';
+  };
 
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-white">📂 All documents ({docs.length}) — sorted by type</h3>
+        <h3 className="text-sm font-semibold text-white">📂 Documents — {readable.length} readable{skipped.length ? ` · ${skipped.length} need manual download` : ''}</h3>
         <span className="text-[11px] text-slate-500">Hand the right file to the right person</span>
       </div>
       <div className="space-y-3">
@@ -101,6 +116,33 @@ export default function DocManifest({ email, pursuitId }: { email: string | null
           </div>
         ))}
       </div>
+
+      {/* Couldn't-read docs — surfaced honestly with a SAM.gov link so the user
+          knows they exist and can grab them manually (Eric QC). */}
+      {skipped.length > 0 && (
+        <div className="mt-3 pt-3 border-t border-slate-800">
+          <div className="flex items-center gap-2 mb-1">
+            <span className="text-sm">⚠️</span>
+            <span className="text-xs font-semibold text-amber-300/90">Not auto-loaded ({skipped.length}) — download from SAM.gov</span>
+          </div>
+          <div className="space-y-1 pl-6">
+            {skipped.map(d => (
+              <div key={d.id} className="flex items-center justify-between gap-2 text-xs">
+                <span className="truncate text-slate-400" title={d.filename}>
+                  {d.filename}
+                  <span className="ml-1 text-amber-500/60">· {skipReason(d)}</span>
+                </span>
+                <div className="flex items-center gap-2 shrink-0">
+                  <span className="text-slate-600">{fmtSize(d.size_bytes)}</span>
+                  {d.sam_url
+                    ? <a href={d.sam_url} target="_blank" rel="noreferrer" className="text-purple-400 hover:text-purple-300">↗ SAM.gov</a>
+                    : <button onClick={() => download(d.id)} className="text-purple-400 hover:text-purple-300">⬇ Try</button>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

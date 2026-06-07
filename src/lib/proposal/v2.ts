@@ -17,6 +17,7 @@
  */
 
 import { retrieveRagContext, formatChunksForPrompt } from '@/lib/rag/retrieve';
+import { callLLM } from '@/lib/llm/call-llm';
 import { loadBidderProfile, loadVaultContext, formatProfileForPrompt, formatVaultForPrompt } from './loaders';
 import { buildAgencyContext, formatAgencyContextForPrompt } from './agency-context';
 import { pickLens } from './lenses';
@@ -162,38 +163,19 @@ export async function generateV2Draft(opts: {
   const built = await buildV2Prompt(opts);
   const sectionMeta = getSectionMeta(opts.sectionType);
 
-  // The 70B model has a SMALL daily token quota (100K TPD) that proposals burn
-  // through fast → 429 "rate limit reached" → drafts silently failed (Eric:
-  // "draft generation failed"). Fall back to 8B-instant (separate, larger quota
-  // bucket) on a 429/rate-limit so a draft ALWAYS comes back.
-  const callGroq = async (model: string) => fetch(GROQ_API_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({
-      model,
-      messages: [
-        { role: 'system', content: built.systemPrompt },
-        { role: 'user', content: built.userPrompt },
-      ],
-      temperature: 0.5,
-      max_tokens: 2200,
-    }),
+  // PROVIDER-AGNOSTIC drafting (Eric QC: "5 sections failed" — Groq's daily quota
+  // was exhausted and the old 70B→8B fallback is BOTH Groq, so both died). Use
+  // the 'drafting' chain (Groq 70B → Claude → OpenAI → Grok) so a draft ALWAYS
+  // comes back even when Groq is fully throttled. Low volume, so Claude is safe.
+  const { text: rawDraftRaw, provider } = await callLLM({
+    system: built.systemPrompt,
+    user: built.userPrompt,
+    temperature: 0.5,
+    maxTokens: 2200,
+    job: 'drafting',
   });
-
-  let response = await callGroq(GROQ_MODEL);
-  if (response.status === 429 && GROQ_MODEL !== PROPOSAL_FALLBACK_MODEL) {
-    console.warn(`[proposal/v2] ${GROQ_MODEL} rate-limited (429) → falling back to ${PROPOSAL_FALLBACK_MODEL}`);
-    response = await callGroq(PROPOSAL_FALLBACK_MODEL);
-  }
-
-  if (!response.ok) {
-    const errText = await response.text().catch(() => '');
-    throw new Error(`Groq ${response.status}: ${errText.slice(0, 300)}`);
-  }
-
-  const completion = await response.json();
-  const rawDraft = (completion.choices?.[0]?.message?.content || '').trim();
-  if (!rawDraft) throw new Error('AI returned empty draft');
+  const rawDraft = (rawDraftRaw || '').trim();
+  if (!rawDraft) throw new Error('AI returned empty draft (all providers)');
 
   // ---- Humanization pass ----
   const { text: humanizedDraft } = humanizeProposalDraft(rawDraft);
@@ -206,7 +188,7 @@ export async function generateV2Draft(opts: {
     wordCount,
     targetWords: sectionMeta.targetWords,
     meta: {
-      model: GROQ_MODEL,
+      model: provider,
       pipeline: 'v2',
       inputChars: built.context.inputChars,
       truncated: built.context.wasTruncated,

@@ -987,10 +987,19 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           const detected = detectNoticeTypeFromText(combined?.text || '');
           setDetectedNoticeType(detected);
           setAutoLoadStatus('loaded');
+          // Be HONEST about what couldn't be read (Eric QC: "9" vs "11" with no
+          // explanation). Count docs with no text + name the unsupported types.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const skipped = (docs as any[]).filter(d => !d.extracted_text);
+          const unsupported = skipped.filter(d => /unsupported/i.test(d.extraction_error || '')).length;
+          const oversized = skipped.length - unsupported;
+          const note = skipped.length > 0
+            ? ` (${skipped.length} couldn't be read${unsupported ? `: ${unsupported} unsupported file type${unsupported > 1 ? 's' : ''} like .xlsx pricing` : ''}${oversized ? `${unsupported ? ',' : ':'} ${oversized} too large` : ''} — download from the manifest to handle manually)`
+            : '';
           setAutoLoadMessage(
             loadedDocs.length > 1
-              ? `Loaded all ${loadedDocs.length} documents from this pursuit (combined for drafting). Add or replace any below.`
-              : `Loaded ${loadedDocs[0].fileName} from this pursuit`
+              ? `Loaded ${loadedDocs.length} of ${docs.length} documents for drafting${note}.`
+              : `Loaded ${loadedDocs[0].fileName} from this pursuit${note}`
           );
         } else if (docs[0]?.extraction_error) {
           setAutoLoadStatus('error');
@@ -1881,11 +1890,11 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               </div>
 
               <div className="overflow-x-auto border border-slate-800 rounded-lg">
-                <table className="w-full text-sm">
+                <table className="w-full text-sm min-w-[820px]">
                   <thead className="bg-slate-950/60 text-slate-400 text-xs uppercase tracking-wider">
                     <tr>
                       <th className="text-left px-3 py-2 font-medium w-20">ID</th>
-                      <th className="text-left px-3 py-2 font-medium">Requirement</th>
+                      <th className="text-left px-3 py-2 font-medium min-w-[280px]">Requirement</th>
                       <th className="text-left px-3 py-2 font-medium w-28">Category</th>
                       <th className="text-left px-3 py-2 font-medium w-24">Section</th>
                       <th className="text-left px-3 py-2 font-medium w-36">Drafted in</th>

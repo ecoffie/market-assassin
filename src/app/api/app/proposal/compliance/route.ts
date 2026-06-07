@@ -175,12 +175,16 @@ async function extractMultiDoc(apiKey: string, pipelineId: string, email: string
   const sources: string[] = [];
   const sigOf = (r: ComplianceRequirement) => (r.requirement || '').toLowerCase().replace(/\s+/g, ' ').slice(0, 60);
   for (const doc of ordered) {
-    const text = (doc.extracted_text || '').slice(0, MAX_INPUT_CHARS);
+    // Chunk the WHOLE document (Eric QC: a 350K-char solicitation was sliced to
+    // 50K → 86% of requirements missed). Cap chunks per doc so a giant drawing-
+    // set PDF can't run away, but cover the real requirement-bearing text.
+    const text = doc.extracted_text || '';
     const label = doc.doc_kind === 'amendment'
       ? `Amendment ${String(amdNum(doc.filename || '')).padStart(4, '0')}`
       : (doc.doc_kind || 'document');
     const isChange = doc.doc_kind === 'amendment' || doc.doc_kind === 'qa';
-    const chunks = chunkText(text, 14000);
+    const MAX_CHUNKS_PER_DOC = 30; // 30 × 14K ≈ 420K chars covered per doc
+    const chunks = chunkText(text, 14000).slice(0, MAX_CHUNKS_PER_DOC);
     const reqs: ComplianceRequirement[] = [];
     for (const c of chunks) { const r = await extractChunk(apiKey, doc.filename, c, isChange); if (r) reqs.push(...r); }
     if (reqs.length) sources.push(`${label} (${reqs.length})`);
@@ -313,10 +317,13 @@ export async function POST(request: NextRequest) {
       meta: {
         model: GROQ_MODEL,
         inputChars: inputText.length,
-        truncated: wasTruncated,
+        // Multi-doc mode chunks each doc fully (no 50K slice), so it's not
+        // truncated; the single-doc legacy path still reports its cap.
+        truncated: multiDocResult ? false : wasTruncated,
         originalChars: sourceText.length,
         count: requirements.length,
         sources: multiDocResult?.sources,
+        multiDoc: !!multiDocResult,
         cached: multiDocResult?.cached || false,
       },
     });
