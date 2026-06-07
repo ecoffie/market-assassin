@@ -1,0 +1,142 @@
+'use client';
+import { useEffect, useRef } from 'react';
+import { driver, type DriveStep } from 'driver.js';
+import 'driver.js/dist/driver.css';
+import type { AppPanel } from './UnifiedSidebar';
+
+/**
+ * Interactive product tour (PRD-interactive-product-tour). A guided "click here"
+ * walkthrough that DRIVES the app — switches panels, waits for them to mount,
+ * spotlights the real controls. v1: 6 core-workflow tabs, show-and-tell (no
+ * forced actions, works against empty panels). driver.js engine.
+ *
+ * Each step optionally has a `panel` — we switch to it and wait for the target
+ * selector to exist before highlighting (panels are lazy-loaded).
+ */
+
+type TourStep = {
+  panel?: AppPanel;          // switch here before highlighting
+  element?: string;          // data-tour selector (omit for a centered modal)
+  title: string;
+  description: string;
+};
+
+const STEPS: TourStep[] = [
+  {
+    title: '👋 Welcome to Mindy',
+    description: "Let's take 2 minutes to walk the core workflow — find opportunities, decide what to bid, and draft a response. You can skip anytime (Esc).",
+  },
+  {
+    panel: 'dashboard',
+    element: '[data-tour="nav-dashboard"]',
+    title: "Today's Intel — your daily feed",
+    description: 'Fresh opportunities matched to your profile land here every day. Each card lets you Review Fit, ＋ Track it, or Share it.',
+  },
+  {
+    panel: 'pipeline',
+    element: '[data-tour="nav-pipeline"]',
+    title: 'My Pursuits — what you\'re working',
+    description: 'Everything you Track moves through these stages: tracking → pursuing → bidding → submitted. This is your bid pipeline.',
+  },
+  {
+    panel: 'proposals',
+    element: '[data-tour="nav-proposals"]',
+    title: 'Proposal Assist — draft a response',
+    description: 'Pick a pursuit and Mindy reads the whole solicitation: a bid/no-bid gate, a compliance matrix, grounded draft sections, and an independent compliance check. Auto mode drafts for you; Sport mode lets you direct it.',
+  },
+  {
+    panel: 'target-list',
+    element: '[data-tour="nav-target-list"]',
+    title: 'My Target List — agencies you\'re going after',
+    description: 'Pick the agencies you want to win work with. Mindy focuses your decision-makers, relationships, and research around them.',
+  },
+  {
+    panel: 'vault',
+    element: '[data-tour="nav-vault"]',
+    title: 'My Vault — the profile that powers every draft',
+    description: 'Add your capability statement, past performance, key personnel, and resumes once. Mindy pulls from your Vault so drafts use YOUR real info — not placeholders.',
+  },
+  {
+    panel: 'contractors',
+    element: '[data-tour="nav-contractors"]',
+    title: 'Contractors — partners to team with, primes to beat',
+    description: 'Search 3,500+ federal contractors. Find a prime to team with on a bid, or size up the competition.',
+  },
+  {
+    title: "🎉 You're set",
+    description: 'That\'s the core loop. Start by Tracking an opportunity from Today\'s Intel, then open Proposal Assist. Replay this tour anytime from Settings.',
+  },
+];
+
+// Wait for a selector to appear (panels are lazy-loaded after a switch).
+function waitForEl(selector: string, timeoutMs = 2500): Promise<Element | null> {
+  return new Promise((resolve) => {
+    const existing = document.querySelector(selector);
+    if (existing) return resolve(existing);
+    const started = Date.now();
+    const iv = setInterval(() => {
+      const el = document.querySelector(selector);
+      if (el || Date.now() - started > timeoutMs) { clearInterval(iv); resolve(el); }
+    }, 100);
+  });
+}
+
+export default function ProductTour({
+  run, onPanelChange, onFinish,
+}: {
+  run: boolean;
+  onPanelChange: (p: AppPanel) => void;
+  onFinish: () => void;
+}) {
+  const driverRef = useRef<ReturnType<typeof driver> | null>(null);
+
+  useEffect(() => {
+    if (!run) return;
+    let cancelled = false;
+
+    const buildSteps = async (): Promise<DriveStep[]> => STEPS.map((s) => ({
+      element: s.element,
+      popover: {
+        title: s.title,
+        description: s.description,
+        side: s.element?.includes('nav-') ? 'right' : 'bottom',
+        align: 'start',
+      },
+      onHighlightStarted: async () => {
+        // Switch panel + wait for the target before driver highlights it.
+        if (s.panel) {
+          onPanelChange(s.panel);
+          if (s.element) await waitForEl(s.element);
+        }
+      },
+    }));
+
+    (async () => {
+      const steps = await buildSteps();
+      if (cancelled) return;
+      const d = driver({
+        showProgress: true,
+        progressText: 'Step {{current}} of {{total}}',
+        nextBtnText: 'Next →',
+        prevBtnText: '← Back',
+        doneBtnText: 'Done',
+        allowClose: true,
+        steps,
+        onDestroyed: () => { onFinish(); },
+        popoverClass: 'mindy-tour',
+      });
+      driverRef.current = d;
+      // Drive the first step's panel switch, then start.
+      const first = STEPS[0];
+      if (first.panel) onPanelChange(first.panel);
+      d.drive();
+    })();
+
+    return () => {
+      cancelled = true;
+      try { driverRef.current?.destroy(); } catch { /* */ }
+    };
+  }, [run, onPanelChange, onFinish]);
+
+  return null;
+}

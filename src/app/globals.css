@@ -237,3 +237,48 @@ body {
   -webkit-overflow-scrolling: touch;
   scroll-behavior: smooth;
 }
+
+/* Mindy product tour (driver.js) — dark theme to match the app. */
+.driver-popover.mindy-tour {
+  background: #0f172a;
+  color: #e2e8f0;
+  border: 1px solid #6d28d9;
+  border-radius: 12px;
+  box-shadow: 0 10px 40px rgba(0, 0, 0, 0.5);
+  max-width: 320px;
+}
+.driver-popover.mindy-tour .driver-popover-title {
+  color: #fff;
+  font-size: 15px;
+}
+.driver-popover.mindy-tour .driver-popover-description {
+  color: #cbd5e1;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.driver-popover.mindy-tour .driver-popover-progress-text {
+  color: #94a3b8;
+  font-size: 11px;
+}
+.driver-popover.mindy-tour .driver-popover-navigation-btns button {
+  background: #7c3aed;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 6px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  text-shadow: none;
+}
+.driver-popover.mindy-tour .driver-popover-navigation-btns button:hover {
+  background: #8b5cf6;
+}
+.driver-popover.mindy-tour .driver-popover-prev-btn {
+  background: #334155 !important;
+}
+.driver-popover.mindy-tour .driver-popover-close-btn {
+  color: #94a3b8;
+}
+.driver-popover.mindy-tour .driver-popover-arrow {
+  border-color: #0f172a;
+}

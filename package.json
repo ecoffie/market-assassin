@@ -33,6 +33,7 @@
     "@vercel/kv": "^3.0.0",
     "@vercel/speed-insights": "^2.0.0",
     "docx": "^9.6.1",
+    "driver.js": "^1.4.0",
     "jspdf": "^4.0.0",
     "lucide-react": "^1.16.0",
     "mammoth": "^1.12.0",

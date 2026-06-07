@@ -558,6 +558,7 @@ export default function UnifiedSidebar({
                   return (
                     <Link
                       key={item.id}
+                      data-tour={`nav-${item.id}`}
                       href={item.href}
                       onClick={() => onMobileClose?.()}
                       onMouseEnter={(e) => { setHoveredItem(item.id); showTooltip(e, display.label, item.badge, !canAccess); }}
@@ -572,6 +573,7 @@ export default function UnifiedSidebar({
                 return (
                   <button
                     key={item.id}
+                    data-tour={`nav-${item.id}`}
                     onClick={() => {
                       if (canAccess) {
                         onPanelChange(item.id);
@@ -611,6 +613,16 @@ export default function UnifiedSidebar({
             (SaaS standard: Firecrawl, Gamma, Linear). The header arrow was
             easy to miss when collapsed, so surface an obvious, labeled toggle
             here that works in both states. */}
+        {/* Replay the product tour (PRD-interactive-product-tour). */}
+        <button
+          onClick={() => window.dispatchEvent(new Event('mindy:start-tour'))}
+          className={`w-full flex items-center rounded-lg px-3 py-2 text-sm text-slate-400 hover:bg-slate-800 hover:text-white transition-colors ${isCollapsed ? 'justify-center' : 'gap-2'}`}
+          title="Take a quick product tour"
+          aria-label="Take a quick product tour"
+        >
+          <span className="text-base shrink-0">🧭</span>
+          {!isCollapsed && <span>Take a tour</span>}
+        </button>
         {onToggleCollapse && (
           <button
             onClick={onToggleCollapse}

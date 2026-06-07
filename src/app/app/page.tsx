@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import UnifiedSidebar, { type AppPanel, type AppTier } from '@/components/app/UnifiedSidebar';
+import ProductTour from '@/components/app/ProductTour';
 import PanelContainer from '@/components/app/panels';
 import VoiceCaptureModal from '@/components/app/voice/VoiceCaptureModal';
 import { Mic, Menu } from 'lucide-react';
@@ -66,6 +67,9 @@ function AppDashboard() {
   const [isLoading, setIsLoading] = useState(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  // Interactive product tour (PRD-interactive-product-tour). Auto-starts once
+  // for a new user; replayable from Settings via the 'mindy:start-tour' event.
+  const [runTour, setRunTour] = useState(false);
   // Voice capture FAB state — mobile-first surface, also reachable
   // via the in-panel button on Pipeline. Single mount so the modal
   // doesn't double up when Pipeline is also showing one.
@@ -347,6 +351,28 @@ function AppDashboard() {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [email, activePanel, tier, trackEngagement, flushPanelTime]);
+
+  // Tour: auto-start once for a new user; allow replay from Settings.
+  useEffect(() => {
+    if (!email || isLoading) return;
+    if (typeof window === 'undefined') return;
+    if (!localStorage.getItem('mindy_tour_completed')) {
+      // Small delay so the dashboard has mounted before the tour drives it.
+      const t = setTimeout(() => setRunTour(true), 1200);
+      return () => clearTimeout(t);
+    }
+  }, [email, isLoading]);
+
+  useEffect(() => {
+    const replay = () => { localStorage.removeItem('mindy_tour_completed'); setRunTour(true); };
+    window.addEventListener('mindy:start-tour', replay);
+    return () => window.removeEventListener('mindy:start-tour', replay);
+  }, []);
+
+  const finishTour = useCallback(() => {
+    setRunTour(false);
+    if (typeof window !== 'undefined') localStorage.setItem('mindy_tour_completed', '1');
+  }, []);
 
   const handlePanelChange = useCallback((nextPanel: AppPanel, context?: Record<string, unknown>) => {
     if (nextPanel === activePanelRef.current && !context) return;
@@ -896,6 +922,8 @@ function AppDashboard() {
   // Logged in - show dashboard
   return (
     <div className="min-h-screen bg-slate-950 flex">
+      {/* Interactive product tour — drives the app for new users. */}
+      <ProductTour run={runTour} onPanelChange={handlePanelChange} onFinish={finishTour} />
       {/* Sidebar */}
       <UnifiedSidebar
         activePanel={activePanel}
