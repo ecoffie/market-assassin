@@ -1,6 +1,48 @@
 # GovCon Giants - Tasks by Priority
 
-**Last Updated:** June 5, 2026
+**Last Updated:** June 7, 2026
+
+---
+
+## Session Handoff — 2026-06-07 (Proposal Assist v1.0 SHIPPED + LLM scale layer)
+
+All shipped & deployed to getmindy.ai. Full proposal workflow is live, end-to-end.
+Detail: `docs/PRD-proposal-extraction-compliance.md`. Memories: `[[proposal_assist_v1]]`,
+`[[llm_provider_strategy]]`.
+
+### Proposal Assist v1.0 — the full workflow (all SHIPPED)
+- [x] **Doc manifest + classification** — `classify-doc.ts` (11 types), wired into
+  SAM fetch + backfilled; `DocManifest.tsx` (routing hints, downloads, honest
+  "needs manual download"). Migration `20260606_pursuit_doc_kind.sql` (RUN).
+- [x] **Bid/No-Bid gate (Step 1, before matrix)** — `/api/app/proposal/bid-gates`
+  derives high-signal eliminators from THIS solicitation (past-perf, bonding,
+  licenses, CMMC, vehicle holder, clearances — NOT generic SAM/small-biz) +
+  Eric's 10-factor scorecard. `bid-decision.ts`, `BidDecisionGate.tsx`.
+- [x] **Multi-doc compliance matrix** — base+amendments+Q&A, amendment precedence,
+  chunked (350K docs), category-normalized, provider-agnostic. Shared cache:
+  `compliance_matrix_cache` (migration `20260606_compliance_cache.sql`, RUN).
+- [x] **Section alignment + priority tiers** — critical/standard/final, page-counts
+  last. Calming priority summary makes 172 reqs palatable.
+- [x] **Grounded drafts** — Claude + winning-narrative RAG (killed "Agile sprints
+  for construction" generic output).
+- [x] **Independent compliance referee** — `/api/app/proposal/referee` (Claude).
+- [x] **Bid-aware Manual/Sport chat** — reuses extracted docs + cached matrix
+  (pipeline_id), provider fallback. Positioned vs ChatGPT (it knows THIS bid).
+- [x] **CLIN scope + SOW-for-subs** — `extract-sow` (real SOW → regex → CLIN
+  "Scope at a Glance" → honest fallback). xlsx extraction added.
+
+### LLM scale/provider layer (Groq paid tier is CLOSED → provider independence)
+- [x] `src/lib/llm/call-llm.ts` — per-JOB fallback chains: extraction (Groq only,
+  no Claude — bulk), drafting (Claude-led), referee (Claude). Falls through
+  Groq→Claude→OpenAI→Grok on 429/etc. Claude FUNDED + protected from bulk.
+- [x] Shared compliance cache (extract a SAM notice once, serve all bidders).
+
+### NEXT (real-usage driven, not guessing)
+- [ ] **Interactive product tour** — driver.js + `data-tour` anchors + 6 core
+  steps (Today's Intel, Pursuits, Proposal, Target List, Vault, Contractors),
+  show-and-tell (action optional for v1). `docs/PRD-interactive-product-tour.md`.
+  IN PROGRESS — building now.
+- [ ] v1.1: multi-source adapters (NECO/GSA eBuy/labs); per-doc notes/versions.
 
 ---
 

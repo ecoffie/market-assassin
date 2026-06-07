@@ -6,7 +6,39 @@
 > INDEPENDENT 3rd-party LLM to verify it meets every requirement (compliance
 > referee). The foundation under the proposal writer.
 
-**Status:** Draft / scoping — 2026-06-06. Build next (foundation for proposals).
+**Status:** ✅ SHIPPED v1.0 — 2026-06-07. All phases live on getmindy.ai.
+
+## ✅ SHIPPED (2026-06-07) — what was built
+The full proposal workflow, end-to-end, all deployed:
+1. **Doc manifest + classification** — `classify-doc.ts` (11 types). Wired into
+   the SAM fetch + backfilled. `DocManifest.tsx` groups by type + routing hints +
+   downloads; skipped docs (xlsx/too-large) shown honestly with SAM links.
+   `doc-download` endpoint. Migration `20260606_pursuit_doc_kind.sql`.
+2. **Bid/No-Bid gate (Step 1, BEFORE the matrix)** — derived from THIS
+   solicitation (`/api/app/proposal/bid-gates`: set-aside/NAICS/deadline + LLM
+   high-signal eliminators — past-perf, bonding, licenses, CMMC, vehicle holder
+   GSA/IDIQ/GWAC, clearances; EXCLUDES near-universal SAM/small-business) + Eric's
+   10-factor scorecard (`bid-decision.ts`, `BidDecisionGate.tsx`).
+3. **Multi-doc compliance matrix** — `compliance/route.ts`: base + amendments +
+   Q&A with AMENDMENT PRECEDENCE; chunked (handles 350K docs); category
+   normalization; provider-agnostic. Shared cache (`compliance_matrix_cache`,
+   migration `20260606_compliance_cache.sql`).
+4. **Section alignment + priority tiers** — `section-alignment.ts`:
+   `alignRequirement` (incl. Management), `priorityOf` (critical/standard/final).
+   Matrix UI: calming priority summary + "Drafted in" column.
+5. **Grounded drafts** — Claude + winning-narrative RAG; killed generic output.
+6. **Independent compliance referee** — `/api/app/proposal/referee` (Claude).
+7. **Bid-aware Manual chat** — reuses extracted docs + cached matrix.
+8. **CLIN scope + SOW-for-subs** — real SOW → solicitation regex → CLIN "Scope at
+   a Glance" → honest fallback. Design specs are NOT the SOW. xlsx extraction.
+
+**Provider/scale:** `src/lib/llm/call-llm.ts` per-job fallback chains. See
+[[llm_provider_strategy]] + [[proposal_assist_v1]] memories. Principle: ASSIST,
+not WRITER — first passes, fail honestly, ship-over-perfect.
+
+---
+
+### Original scope (below) — 2026-06-06.
 **Trigger:** Eric: "With as many as 10 documents on some combined synopsis
 solicitations, make sure we get ALL the data — properly separate + disseminate
 the right files to the right people, and get the sections we need aligned to our

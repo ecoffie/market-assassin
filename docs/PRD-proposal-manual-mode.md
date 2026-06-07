@@ -6,8 +6,12 @@
 > way people are used to working with LLMs on proposals. Gives the user autonomy
 > over the outcome.
 
-**Status:** **v1 SHIPPED 2026-06-05** (toggle + proposal chat + Verify-on-SAM
-link, all deployed + verified live — ahead of the June 19 target). Notes +
+**Status:** **v1 SHIPPED 2026-06-05; UPGRADED 2026-06-07.** Toggle + proposal
+chat + Verify-on-SAM link, all live. 2026-06-07: chat now REUSES the extracted
+docs + cached compliance matrix (pass `pipeline_id`), relevance-selects from the
+full solicitation (was first-8K-only → generic answers), provider fallback
+(Groq→Claude→OpenAI, no more 429 deaths), and is positioned as the BID-AWARE
+assistant (knows THIS solicitation — vs a blank-slate ChatGPT). Notes +
 collaboration = v2 (not done).
 **Trigger:** Eric: "Proposal Assist should have a Perplexity-style function —
 upload files, it reads them, you type what you want, like Mindy Chat but for the

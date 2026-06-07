@@ -108,12 +108,23 @@ Mindy Pro is in polish, QA, and migration work. The core value loop is present: 
 - VA can be selected and recommended when the profile includes SDVOSB, VOSB, veteran-owned, or service-disabled veteran-owned status.
 - If a VA Sources Sought, RFI, or Special Notice appears for a non-veteran profile, keep it visible as a lower-priority research signal instead of treating it like a top pursuit.
 
-## 6. Full Proposal Assist Later
+## 6. Full Proposal Assist — ✅ SHIPPED v1.0 (2026-06-07)
 
-- [x] Add RFP upload/parsing. (PDF, DOCX, TXT — `/api/app/proposal/upload`)
-- [x] Generate compliance matrix from source docs. (Groq llama-3.3-70b — `/api/app/proposal/compliance`)
-- [x] Draft proposal sections. (5 sections, profile-grounded — `/api/app/proposal/draft`)
-- [x] Add review checklist and export workflow. (11-item checklist + .docx package — `/api/app/proposal/export`)
+- [x] RFP upload/parsing (PDF, DOCX, TXT, **XLSX** — `/api/app/proposal/upload`)
+- [x] Compliance matrix — **multi-doc (base+amendments+Q&A) w/ amendment
+  precedence, chunked for 350K docs, provider-agnostic + shared cache**.
+- [x] Draft sections — **Claude + winning-narrative RAG (grounded, not generic)**.
+- [x] Review checklist + .docx export.
+- [x] **Doc manifest + classification** (11 types, routing hints, downloads).
+- [x] **Bid/No-Bid gate (Step 1)** — derived from the real solicitation + Eric's
+  10-factor scorecard. `/api/app/proposal/bid-gates`, `BidDecisionGate.tsx`.
+- [x] **Section alignment + priority tiers** (critical/standard/final).
+- [x] **Independent compliance referee** — `/api/app/proposal/referee` (Claude).
+- [x] **Bid-aware Manual/Sport chat** — reuses extracted docs + cached matrix.
+- [x] **CLIN scope + SOW-for-subs** export.
+- Full detail: `docs/PRD-proposal-extraction-compliance.md`.
+- [ ] **v1.1 (real-usage driven):** multi-source adapters (NECO/GSA/labs),
+  interactive product tour (`docs/PRD-interactive-product-tour.md`).
 
 ## 7. Verification Checklist
 

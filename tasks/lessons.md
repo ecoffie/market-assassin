@@ -1348,3 +1348,35 @@ if (keywords.length > 0) {
 **Diagnostic lesson:** "Keeps breaking" with NO errors in tool-health, NO guardrail trips, and the parallel pipeline (briefings) healthy → suspect an **eligibility/tier/flag change**, not an exception. The tell here was zero new `alert_log` rows (not a flood of `skipped` rows) + a date-aligned cliff. Confirm audience math via `/api/admin/dashboard` (`postBetaPaidDailyEligible` vs `dailyFrequencyConfigured`) before touching send/cache code.
 
 **Also note:** `/api/admin/alert-status` reads the DROPPED `user_alert_settings` table (returns `total_users: 0`) — it's stale; use `/api/admin/dashboard` or `/api/admin/briefing-status` for real alert numbers.
+
+---
+
+## 2026-06-07 — "Generic, not from the docs" (Proposal Assist QC, caught 4×)
+
+**Pattern:** Across Proposal Assist, AI outputs repeatedly read as generic/template
+instead of using the actual solicitation. Eric caught it four times — in drafts
+("Agile sprints" for a construction job), Manual chat (template fluff for "how
+many past-perf refs?"), bid gates (a generic checklist), and the SOW export (a
+507-page mashup / wrong section). Same root cause each time.
+
+**Root cause:** the code was GENERATING from a weak/blank context or scanning a
+truncated/combined blob — instead of grounding in the documents we'd ALREADY
+extracted + classified + cached.
+
+**Rule:** Always X, not Y because Z → **Always ground AI output in the already-
+extracted, classified, cached documents (pass pipeline_id, pull the real doc by
+doc_kind, reuse the cached matrix), not in raw re-sent text or a blank prompt —
+because Z: a frontier model with no specific context produces plausible generic
+filler that looks fine in a demo but is wrong on the user's actual bid, and that
+destroys trust faster than any bug.** The product's whole moat is "it knows THIS
+bid" — every feature must actually use that.
+
+**Corollaries:**
+- Truncation hides this: `slice(0, 8000)` on a 350K doc → the answer is past the
+  cutoff → the model invents. Chunk + relevance-select the FULL doc, or pass the
+  cached structured requirements (the distilled matrix) first.
+- "Assist, not Writer" (Eric): when grounding genuinely can't produce the right
+  answer (no standalone SOW exists), FAIL HONESTLY ("here's where to look") — that
+  reads as trustworthy; a confident wrong answer does not.
+- Provider note: Groq's paid tier is CLOSED — never single-source an LLM. Use
+  `callLLM` per-job chains. Claude runs out fast → never use it for bulk.
