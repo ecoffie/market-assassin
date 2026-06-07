@@ -1,6 +1,6 @@
 # TODO: Parent-UEI Rollup for Contractor Profiles (SEO + data quality)
 
-**Status:** ✅ DONE (shipped 2026-06-07) — except cross-variant brand dedup (deferred, see bottom)
+**Status:** ✅ FULLY DONE (shipped 2026-06-07) — parent-UEI rollup AND cross-variant name-merge both live
 **Created:** 2026-06-07
 **Priority:** High — suppresses our highest-value brand-search SEO pages
 **Owner:** Eric / Claude
@@ -29,20 +29,34 @@
   *correct* — genuinely concentrated primes (Electric Boat = Navy only; DOE
   national-lab managers; military health like TriWest/Humana).
 
-## ⏭ Deferred: cross-variant brand dedup
+## ✅ Cross-variant name-merge (SHIPPED 2026-06-07 — was deferred, now done)
 
-USAspending has MULTIPLE parent_uei groups for some primes whose names slugify
-differently (e.g. `lockheed-martin-corp` $495B/27 agencies vs a SEPARATE
-`lockheed-martin-corporation` $46.8B/8 agencies parent). Both render as their
-own indexable pages → brand equity splits across 2+ URLs. Same-slug orphans
-already consolidate; cross-variant (corp vs corporation) does NOT, because they
-are distinct parent_uei groups with different normalized names.
+USAspending assigns MULTIPLE parent_uei groups to one company whose names differ
+only by legal suffix (`lockheed-martin-corp` vs a separate
+`lockheed-martin-corporation` parent), splitting brand equity across pages.
 
-Fix options (Eric chose "ship core, defer this" 2026-06-07): (a) curated alias
-map for top ~50 primes → canonical rollup; or (b) rebuild rollup unifying parent
-groups by suffix-stripped normalized name (risk: fusing genuinely distinct
-same-named entities — needs validation). Proxy estimate: ~226 of top-1000
-rollups share a 2-word name prefix with another (includes false positives).
+**Fix (commits `23482e4` table+repoint, `91bfd6c` resolver):** chose pure
+name-merge (option b) after a top-40-by-spend audit found every fused group
+genuinely the same entity. The scary CRANE tail case turned out CORRECT —
+USAspending's own parent lineage already links Crane Co. (industrial) + Crane &
+Co. CAGE-overlap guard was tested and dropped (it only created gaps on
+zero-dollar sub-rollups; the source already encodes lineage).
+
+- `recipients_rollup_merged` (292,848 rows): strips legal suffixes, groups parent
+  rollups by normalized name into the highest-spend one, unions child_ueis,
+  recomputes distinct counts from awards. "GENERAL ELECTRIC" does NOT fuse with
+  "GENERAL DYNAMICS" (full normalized name must match).
+- `BQ_TABLES.recipientsRollup` → merged table (column-compatible). Detail +
+  rollup cache keys bumped (child_ueis sets grew).
+- `resolveCanonicalSlug` got a 3rd arm: normalized-name match, so pre-merge
+  rollup-name variants (e.g. `general-dynamics-corporation`, no longer a rollup
+  name nor exact child name) resolve to the canonical merged slug.
+
+**Verified live:** Lockheed ONE page — 31 agencies / 242 NAICS / $628.8B (was
+27/234/$495.6B across two pages). Variants 308 to canonical
+(lockheed/raytheon/general-dynamics/booz-allen *-corporation/-inc →
+canonical). GE stays its own page. All canonical prime /agencies indexable
+(Lockheed 31, GD 39, Raytheon 17, Booz Allen 32 agencies).
 
 ---
 
