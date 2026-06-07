@@ -1684,7 +1684,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           the user makes a decision, then the outputs unlock. */}
       {responseOutputsReady && !isSimpleResponseMode && driveMode === 'auto' && !bidProceeded && (
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-          <BidDecisionGate onProceed={() => setBidProceeded(true)} />
+          <BidDecisionGate onProceed={() => setBidProceeded(true)} email={email || undefined} pipelineId={activePursuitId} />
         </section>
       )}
 

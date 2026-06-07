@@ -1,20 +1,42 @@
 'use client';
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { BID_GATES, BID_FACTORS, evaluateBidDecision } from '@/lib/proposal/bid-decision';
+import { getMIApiHeaders } from '../authHeaders';
+
+interface DerivedGate { id: string; question: string; detail?: string; help?: string; source?: string }
 
 /**
  * Step 1 — Bid / No-Bid (Eric's workflow: decide if you can/should bid BEFORE
  * the compliance matrix). Hard GATES first (any No = No-Bid, stop), then Eric's
  * 10-factor self-assessment SCORECARD → %  → pursue/watch/skip. On a bid
  * decision, calls onDecision so the parent can unlock the matrix.
+ *
+ * The gates are derived from THIS solicitation when a pipelineId is available
+ * (Eric QC: generic gates felt like generic data) — falling back to the
+ * universal eliminators otherwise.
  */
-export default function BidDecisionGate({ onProceed }: { onProceed: () => void }) {
+export default function BidDecisionGate({ onProceed, email, pipelineId }: { onProceed: () => void; email?: string; pipelineId?: string | null }) {
   const [gates, setGates] = useState<Record<string, boolean | undefined>>({});
   const [ratings, setRatings] = useState<Record<string, number>>({});
   const [showScorecard, setShowScorecard] = useState(false);
+  // Opportunity-specific gates (loaded from the solicitation); fall back to the
+  // generic eliminators if we can't derive any.
+  const [derivedGates, setDerivedGates] = useState<DerivedGate[] | null>(null);
+  const [loadingGates, setLoadingGates] = useState(false);
 
-  const gateAnswered = BID_GATES.every(g => typeof gates[g.id] === 'boolean');
-  const failedGate = BID_GATES.find(g => gates[g.id] === false);
+  useEffect(() => {
+    if (!email || !pipelineId) return;
+    setLoadingGates(true);
+    fetch(`/api/app/proposal/bid-gates?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(pipelineId)}`, { headers: getMIApiHeaders(email) })
+      .then(r => r.json())
+      .then(d => { if (d.success && d.gates?.length) setDerivedGates(d.gates); })
+      .catch(() => {})
+      .finally(() => setLoadingGates(false));
+  }, [email, pipelineId]);
+
+  const activeGates: DerivedGate[] = derivedGates || BID_GATES.map(g => ({ id: g.id, question: g.question, detail: g.help }));
+  const gateAnswered = activeGates.every(g => typeof gates[g.id] === 'boolean');
+  const failedGate = activeGates.find(g => gates[g.id] === false);
 
   const result = useMemo(() => evaluateBidDecision({
     gates: gates as Record<string, boolean>,
@@ -36,14 +58,17 @@ export default function BidDecisionGate({ onProceed }: { onProceed: () => void }
         <p className="text-xs text-slate-400 mt-0.5">Before the compliance matrix: a few deal-breakers, then a quick fit score. Don&apos;t spend days on a bid you can&apos;t win.</p>
       </div>
 
-      {/* Part 1 — hard gates */}
+      {/* Part 1 — hard gates (opportunity-specific when available) */}
       <div className="space-y-2 mb-3">
-        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">Deal-breakers — any &quot;No&quot; means walk away</p>
-        {BID_GATES.map(g => (
+        <p className="text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+          {derivedGates ? 'Deal-breakers from THIS solicitation — any “No” means walk away' : 'Deal-breakers — any “No” means walk away'}
+        </p>
+        {loadingGates && <div className="text-xs text-slate-500">Reading the solicitation for deal-breakers…</div>}
+        {activeGates.map(g => (
           <div key={g.id} className="flex items-start justify-between gap-3 rounded-lg border border-slate-800 bg-slate-950/40 p-2.5">
             <div className="text-xs">
               <div className="text-slate-200">{g.question}</div>
-              <div className="text-slate-500 mt-0.5">{g.help}</div>
+              {(g.detail || g.help) && <div className="text-slate-500 mt-0.5">{g.detail || g.help}{g.source && <span className="text-slate-600"> · {g.source}</span>}</div>}
             </div>
             <div className="flex gap-1 shrink-0">
               <button onClick={() => setGates(p => ({ ...p, [g.id]: true }))} className={`rounded px-2.5 py-1 text-xs font-medium ${gates[g.id] === true ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400 hover:bg-slate-700'}`}>Yes</button>
