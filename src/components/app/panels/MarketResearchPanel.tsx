@@ -1944,10 +1944,13 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
             />
             <TopPrimesChart
               primes={reportData?.primeContractor?.suggestedPrimes || []}
-              tier2={reportData?.tier2Subcontracting?.suggestedPrimes || []}
+              tier2={(reportData?.tier2Subcontracting?.suggestedPrimes || []).map(p => ({
+                name: p.name, reason: p.reason, email: p.email, phone: p.phone,
+              }))}
               tribal={(reportData?.tribalContracting?.suggestedTribes || []).map(t => ({
                 name: t.name,
                 reason: t.region || (t.capabilities && t.capabilities.length > 0 ? t.capabilities[0] : undefined),
+                region: t.region,
               }))}
               email={email}
             />
@@ -2821,6 +2824,9 @@ interface PrimeLike {
   agencies?: string[];  // Optional agency footprint, used by TopPrimesChart
                         // to filter against the user's saved target list.
   tier?: 'tier1' | 'tier2' | 'tribal';  // Source tier for badge + priority
+  email?: string | null;   // POC contact (Eric: show POC, skip award history)
+  phone?: string | null;
+  region?: string | null;  // for tribal (region/state)
 }
 
 interface TopPrimesChartProps {
@@ -2936,9 +2942,14 @@ function TopPrimesChart({ primes, tier2 = [], tribal = [], email }: TopPrimesCha
   const hasContextualTier1 = contextualTier1.length > 0;
   const tribalCount = tribal.length;
   const tier2Count = tier2.length;
-  const top = merged.slice(0, 10);  // 5 → 10 per Eric: "the list is not full"
+  // SEPARATE lists per tier (Eric: "make a list for each so the distinction is
+  // clear" — was one blurred tribal-dominated list). Cap each so the card stays
+  // scannable.
+  const tribalList = merged.filter(p => p.tier === 'tribal').slice(0, 6);
+  const tier2List = merged.filter(p => p.tier === 'tier2').slice(0, 6);
+  const tier1List = merged.filter(p => p.tier === 'tier1').slice(0, 5);
 
-  if (!targetsLoaded || top.length === 0) {
+  if (!targetsLoaded || merged.length === 0) {
     return (
       <ChartShell title="Teaming Candidates" subtitle="Tribal + Tier 2 partners you can pursue first">
         <div className="flex items-center justify-center h-full text-xs text-slate-500">
@@ -2963,28 +2974,59 @@ function TopPrimesChart({ primes, tier2 = [], tribal = [], email }: TopPrimesCha
     return { bg: 'bg-purple-500/20', border: 'border-purple-500/40', text: 'text-purple-300', label: 'T1' };
   };
 
+  const renderRow = (p: PrimeLike, i: number) => {
+    const style = tierStyle(p.tier);
+    // Eric: for teaming candidates, show the POC (how to reach them) — not award
+    // history (many aren't in the awards DB → "Contractor not found"). Tier 1
+    // primes keep the award-history link (they ARE in the data).
+    const hasPoc = !!(p.email || p.phone);
+    const samUrl = `https://sam.gov/search/?index=ei&q=${encodeURIComponent(p.name)}`;
+    return (
+      <li key={`${p.name}-${i}`} className="flex items-start gap-2.5">
+        <div className={`shrink-0 w-5 h-5 rounded-full ${style.bg} border ${style.border} flex items-center justify-center text-[8px] font-semibold ${style.text}`}>
+          {style.label}
+        </div>
+        <div className="min-w-0 flex-1">
+          {p.tier === 'tier1' ? (
+            <ContractorLink name={p.name} email={email} variant="plain" className="text-xs font-medium block truncate">
+              {p.name}
+            </ContractorLink>
+          ) : (
+            <span className="text-xs font-medium text-slate-200 block truncate">{p.name}</span>
+          )}
+          {p.reason && <div className="text-[10px] text-slate-500 truncate">{p.reason}</div>}
+          {/* POC contact (Eric: POC is sufficient, skip history). */}
+          {hasPoc ? (
+            <div className="text-[10px] text-slate-500">
+              {p.email && <span className="text-purple-300/80 select-all break-all">{p.email}</span>}
+              {p.email && p.phone && <span className="text-slate-700"> · </span>}
+              {p.phone && <span className="text-emerald-300/80 select-all">{p.phone}</span>}
+            </div>
+          ) : p.tier !== 'tier1' && (
+            <a href={samUrl} target="_blank" rel="noreferrer" className="text-[10px] text-purple-400/80 hover:text-purple-300">↗ Look up on SAM.gov</a>
+          )}
+        </div>
+      </li>
+    );
+  };
+
+  // SEPARATE sections per tier (Eric: "make a list for each so the distinction
+  // is clear").
+  const section = (label: string, hint: string, items: PrimeLike[]) => items.length === 0 ? null : (
+    <div>
+      <div className="text-[11px] font-semibold text-slate-300">{label} <span className="text-slate-600">({items.length})</span></div>
+      <div className="text-[10px] text-slate-500 mb-1">{hint}</div>
+      <ul className="space-y-1.5">{items.map(renderRow)}</ul>
+    </div>
+  );
+
   return (
     <ChartShell title="Teaming Candidates" subtitle={subtitle} footer={footer}>
-      <ul className="space-y-2">
-        {top.map((p, i) => {
-          const style = tierStyle(p.tier);
-          return (
-            <li key={`${p.name}-${i}`} className="flex items-start gap-3">
-              <div className={`shrink-0 w-6 h-6 rounded-full ${style.bg} border ${style.border} flex items-center justify-center text-[9px] font-semibold ${style.text}`}>
-                {style.label}
-              </div>
-              <div className="min-w-0 flex-1">
-                <ContractorLink name={p.name} email={email} variant="plain" className="text-xs font-medium block truncate">
-                  {p.name}
-                </ContractorLink>
-                {p.reason && (
-                  <div className="text-[10px] text-slate-500 truncate">{p.reason}</div>
-                )}
-              </div>
-            </li>
-          );
-        })}
-      </ul>
+      <div className="space-y-3">
+        {section('🪶 Tribal / Native-owned (8(a))', 'Sole-source eligible — the fastest teaming path for small business.', tribalList)}
+        {section('🥈 Tier 2 subcontractors', 'Mid-size firms that sub on this work — realistic prime/sub partners.', tier2List)}
+        {section('🏢 Tier 1 primes', 'The big incumbents — sub under them, or know who you’re up against.', tier1List)}
+      </div>
     </ChartShell>
   );
 }
