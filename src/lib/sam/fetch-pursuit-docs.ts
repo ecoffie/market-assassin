@@ -22,7 +22,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import { getRotatedSAMKey } from './utils';
-import { extractPdf, extractDocx, extractTxt } from './pdf-extract';
+import { extractPdf, extractDocx, extractTxt, extractXlsx } from './pdf-extract';
 import { classifyDoc } from '@/lib/proposal/classify-doc';
 
 const SAM_OPPS_URL = 'https://api.sam.gov/opportunities/v2/search';
@@ -53,13 +53,19 @@ interface SamFileRef {
 // ./pdf-extract — shared module with DOMMatrix/ImageData/Path2D
 // polyfills installed before pdf-parse loads.
 
-function inferKind(filename: string, mime: string | null, buffer?: Buffer): 'pdf' | 'docx' | 'txt' | null {
+function inferKind(filename: string, mime: string | null, buffer?: Buffer): 'pdf' | 'docx' | 'txt' | 'xlsx' | null {
   const lower = filename.toLowerCase();
   if (mime === 'application/pdf' || lower.endsWith('.pdf')) return 'pdf';
   if (
     mime === 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' ||
     lower.endsWith('.docx')
   ) return 'docx';
+  // Spreadsheets (pricing schedules) — Eric QC: CLINs/line items matter.
+  if (
+    mime === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+    mime === 'application/vnd.ms-excel' ||
+    lower.endsWith('.xlsx') || lower.endsWith('.xls') || lower.endsWith('.csv')
+  ) return 'xlsx';
   if (mime === 'text/plain' || lower.endsWith('.txt')) return 'txt';
 
   // SAM downloads frequently come back as 'application/octet-stream'
@@ -72,9 +78,10 @@ function inferKind(filename: string, mime: string | null, buffer?: Buffer): 'pdf
     const head = buffer.slice(0, 4).toString('ascii');
     if (head === '%PDF') return 'pdf';
     if (head.startsWith('PK')) {
-      // Could be DOCX, XLSX, ZIP, etc. — look for 'word/' marker.
+      // Could be DOCX, XLSX, ZIP, etc. — look for the part marker.
       const probe = buffer.slice(0, 2048).toString('ascii');
       if (probe.includes('word/')) return 'docx';
+      if (probe.includes('xl/')) return 'xlsx';
     }
     // Heuristic for plain text: scan first 1KB for null bytes (binary
     // files almost always have them, text files don't).
@@ -589,6 +596,13 @@ export async function fetchPursuitDocs(opts: {
           extractedText = (result.text || '').slice(0, MAX_EXTRACTED_TEXT_CHARS);
         } catch (err) {
           extractionError = err instanceof Error ? err.message : 'DOCX parse failed';
+        }
+      } else if (kind === 'xlsx') {
+        try {
+          const result = await extractXlsx(dl.buffer);
+          extractedText = (result.text || '').slice(0, MAX_EXTRACTED_TEXT_CHARS);
+        } catch (err) {
+          extractionError = err instanceof Error ? err.message : 'XLSX parse failed';
         }
       } else if (kind === 'txt') {
         extractedText = dl.buffer.toString('utf-8').slice(0, MAX_EXTRACTED_TEXT_CHARS);

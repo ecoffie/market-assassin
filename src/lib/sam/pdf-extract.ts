@@ -131,3 +131,22 @@ export async function extractDocx(buffer: Buffer): Promise<ExtractResult> {
 export function extractTxt(buffer: Buffer): ExtractResult {
   return { text: buffer.toString('utf-8') };
 }
+
+/**
+ * Extract a spreadsheet (xlsx/xls/csv) to readable text — pricing schedules
+ * carry CLINs / line items / quantities that the matrix + drafting need (Eric
+ * QC). Renders each sheet as a labeled table so the LLM reads the structure.
+ */
+export async function extractXlsx(buffer: Buffer): Promise<ExtractResult> {
+  const XLSX = await import('xlsx');
+  const wb = XLSX.read(buffer, { type: 'buffer' });
+  const parts: string[] = [];
+  for (const name of wb.SheetNames) {
+    const sheet = wb.Sheets[name];
+    if (!sheet) continue;
+    // CSV keeps row/column structure compactly; prefix with the sheet name.
+    const csv = XLSX.utils.sheet_to_csv(sheet, { blankrows: false });
+    if (csv.trim()) parts.push(`=== Sheet: ${name} ===\n${csv}`);
+  }
+  return { text: parts.join('\n\n') };
+}
