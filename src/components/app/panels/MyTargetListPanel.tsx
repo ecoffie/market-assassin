@@ -1253,79 +1253,77 @@ interface TargetContact {
   derivedOffice?: string | null;
   sub_tier?: string | null;
 }
-// Group contacts by role so the user sees WHO + WHY (Eric: the richness — gov
-// buyers, OSBP/small-business, etc. — all under "Who to contact"). Maps the raw
-// role_category to a labeled group with a one-line "why contact them".
-const ROLE_GROUPS: Array<{ key: string; label: string; why: string; match: RegExp }> = [
-  { key: 'co', label: '🖊 Contracting Officers & Specialists', why: 'They run the buy — your direct line for solicitations and questions.', match: /contracting|contract specialist|\bco\b|\bko\b|procurement|buyer/i },
-  { key: 'osbp', label: '🤝 Small Business / OSBP', why: 'Small-business advocates — get on their radar for set-asides + sources sought.', match: /small business|osbp|sbs|sblo|liaison/i },
-  { key: 'pm', label: '📋 Program & Technical', why: 'They define the requirement — shape it early, before the RFP.', match: /program|technical|engineer|project manager|cor\b/i },
-  { key: 'other', label: '👤 Other points of contact', why: 'Additional named contacts on this agency’s notices.', match: /.*/ },
-];
-function groupContact(c: TargetContact): string {
-  const hay = `${c.role_category || ''} ${c.role || ''} ${c.pocLabel || ''} ${c.contact_title || ''}`;
-  for (const g of ROLE_GROUPS) if (g.key !== 'other' && g.match.test(hay)) return g.key;
-  return 'other';
+// Cache contacts per agency so re-expanding is INSTANT (Eric: "why does it have
+// to load?"). The directory doesn't change mid-session.
+const _contactsCache = new Map<string, TargetContact[]>();
+
+// Junk filters: SAM POC data has placeholder phones (0000000000) + a useless
+// "Primary Contact" title. Suppress them so the UI is clean.
+const isJunkPhone = (p?: string | null) => !p || /^0+$/.test(p.replace(/\D/g, ''));
+const isJunkTitle = (t?: string | null) => !t || /^(primary|secondary)\s*(contact)?$/i.test(t.trim());
+
+// A real role label when we have one (CO / OSBP / program); else null.
+function roleLabel(c: TargetContact): string | null {
+  const hay = `${c.role_category || ''} ${c.role || ''} ${c.pocLabel || ''} ${c.contact_title || ''}`.toLowerCase();
+  if (/small business|osbp|sblo|liaison/.test(hay)) return 'Small Business / OSBP';
+  if (/contracting|contract specialist|procurement/.test(hay)) return 'Contracting';
+  if (/program|technical|engineer|\bcor\b/.test(hay)) return 'Program';
+  return null;
 }
 
 function TargetContacts({ agency, email }: { agency: string; email: string }) {
-  const [contacts, setContacts] = useState<TargetContact[]>([]);
-  const [loading, setLoading] = useState(true);
+  const cacheKey = `${email}:${agency}`;
+  const [contacts, setContacts] = useState<TargetContact[]>(() => _contactsCache.get(cacheKey) || []);
+  const [loading, setLoading] = useState(() => !_contactsCache.has(cacheKey));
+
   useEffect(() => {
+    if (_contactsCache.has(cacheKey)) { setContacts(_contactsCache.get(cacheKey)!); setLoading(false); return; }
     let active = true;
     setLoading(true);
-    // Pull the full set (was capped at 12 → Eric saw too few). No email/phone
-    // filter — show everyone, with whatever contact info exists.
     const p = new URLSearchParams({ email, agency, limit: '60' });
     fetch(`/api/app/federal-contacts?${p.toString()}`)
       .then(r => r.json())
-      .then(d => { if (active) setContacts(d?.contacts || d?.results || []); })
+      .then(d => {
+        const list: TargetContact[] = d?.contacts || d?.results || [];
+        _contactsCache.set(cacheKey, list);
+        if (active) setContacts(list);
+      })
       .catch(() => {})
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [agency, email]);
+  }, [agency, email, cacheKey]);
 
-  // Group + only render groups that have people.
-  const grouped = ROLE_GROUPS.map(g => ({ ...g, items: contacts.filter(c => groupContact(c) === g.key) })).filter(g => g.items.length > 0);
+  // Format the name "Last, First" → "First Last".
+  const fmtName = (n: string) => /,/.test(n) ? n.split(',').reverse().map(s => s.trim()).join(' ') : n;
+
+  if (loading) return <div className="mt-3 text-xs text-slate-500">Loading contacts…</div>;
+  if (contacts.length === 0) return <div className="mt-3 text-xs text-slate-500">No SAM contacts found for this agency yet.</div>;
 
   return (
     <div className="mt-3 rounded-lg border border-purple-500/20 bg-purple-500/[0.04] p-3">
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-semibold text-purple-300">Who to contact at {agency}</span>
-        <span className="text-[10px] text-slate-500">{contacts.length} from SAM · gov buyers, small-business, program</span>
+        <span className="text-[10px] text-slate-500">{contacts.length} contacts · from SAM notices</span>
       </div>
-      {loading ? (
-        <div className="text-xs text-slate-500">Loading contacts…</div>
-      ) : contacts.length === 0 ? (
-        <div className="text-xs text-slate-500">No SAM contacts found for this agency yet.</div>
-      ) : (
-        <div className="space-y-3">
-          {grouped.map(g => (
-            <div key={g.key}>
-              <div className="text-[11px] font-semibold text-slate-300">{g.label} <span className="text-slate-600">({g.items.length})</span></div>
-              <div className="text-[10px] text-slate-500 mb-1">{g.why}</div>
-              <div className="space-y-1 pl-1">
-                {g.items.map(c => (
-                  <div key={c.id} className="text-xs">
-                    <span className="text-slate-200">{c.contact_fullname}</span>
-                    {c.contact_title && <span className="text-slate-500"> · {c.contact_title}</span>}
-                    {(c.derivedOffice || c.sub_tier) && <span className="text-slate-600"> · {c.derivedOffice || c.sub_tier}</span>}
-                    {/* Contact info shown as text (Eric: don't call/email from
-                        the app — just show it). */}
-                    {(c.contact_email || c.contact_phone) && (
-                      <div className="text-[11px] text-slate-500 pl-3">
-                        {c.contact_email && <span className="text-purple-300/80 select-all">{c.contact_email}</span>}
-                        {c.contact_email && c.contact_phone && <span className="text-slate-700"> · </span>}
-                        {c.contact_phone && <span className="text-emerald-300/80 select-all">{c.contact_phone}</span>}
-                      </div>
-                    )}
-                  </div>
-                ))}
+      <p className="text-[10px] text-slate-500 mb-2">People named on this agency’s solicitations — your warm intros for BD outreach.</p>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
+        {contacts.map(c => {
+          const role = roleLabel(c);
+          const office = c.derivedOffice || c.sub_tier;
+          return (
+            <div key={c.id} className="text-xs leading-tight">
+              <div>
+                <span className="text-slate-200 font-medium">{fmtName(c.contact_fullname)}</span>
+                {role && <span className="ml-1.5 text-[9px] uppercase tracking-wide text-purple-300/70">{role}</span>}
               </div>
+              {!isJunkTitle(c.contact_title) && <div className="text-[10px] text-slate-500">{c.contact_title}</div>}
+              {office && <div className="text-[10px] text-slate-600">{office}</div>}
+              {c.contact_email && <div className="text-[11px] text-purple-300/80 select-all break-all">{c.contact_email}</div>}
+              {!isJunkPhone(c.contact_phone) && <div className="text-[11px] text-emerald-300/80 select-all">{c.contact_phone}</div>}
             </div>
-          ))}
-        </div>
-      )}
+          );
+        })}
+      </div>
     </div>
   );
 }

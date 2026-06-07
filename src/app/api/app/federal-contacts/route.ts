@@ -56,6 +56,23 @@ const OFFICE_WORDS = /\b(contracting|contract|acquisition|procurement|contr|cons
  * Return a usable office string, or null if it's clearly junk (let the UI fall
  * back to the clean sub-agency).
  */
+// Map a sub-agency/bureau to its PARENT department keyword (federal_contacts is
+// keyed by parent). Returns null if no mapping (use the name as-is).
+const SUBAGENCY_PARENT: Array<{ re: RegExp; parent: string }> = [
+  { re: /land management|\bblm\b|national park|\bnps\b|fish (and|&) wildlife|\bfws\b|bureau of indian|reclamation|geological survey|\busgs\b|ocean energy|\bboem\b|surface mining|interior/i, parent: 'INTERIOR' },
+  { re: /forest service|agricultural research|\bars\b|natural resources conservation|\bnrcs\b|rural development|farm service|food safety|animal (and|&) plant|\baphis\b|agriculture/i, parent: 'AGRICULTURE' },
+  { re: /\barmy\b|\bnavy\b|air force|marine corps|defense logistics|\bdla\b|\busace\b|corps of engineers|navfac|navsup|defense health|missile defense|\bdod\b|defense/i, parent: 'DEFENSE' },
+  { re: /customs (and|&) border|\bcbp\b|immigration|\bice\b|coast guard|\buscg\b|secret service|\bfema\b|cybersecurity|\bcisa\b|transportation security|\btsa\b|homeland/i, parent: 'HOMELAND SECURITY' },
+  { re: /veterans health|veterans benefits|national cemetery|\bva\b|veterans affairs/i, parent: 'VETERANS AFFAIRS' },
+  { re: /centers for medicare|\bcms\b|\bnih\b|national institutes|\bfda\b|food (and|&) drug|\bcdc\b|disease control|indian health|\bihs\b|health (and|&) human/i, parent: 'HEALTH AND HUMAN' },
+  { re: /federal aviation|\bfaa\b|federal highway|\bfhwa\b|federal transit|maritime administration|transportation/i, parent: 'TRANSPORTATION' },
+  { re: /internal revenue|\birs\b|\bmint\b|engraving (and|&) printing|comptroller|treasury/i, parent: 'TREASURY' },
+];
+function subAgencyToParent(name: string): string | null {
+  for (const m of SUBAGENCY_PARENT) if (m.re.test(name)) return m.parent;
+  return null;
+}
+
 function cleanRawOffice(raw: string): string | null {
   const s = raw.trim().replace(/,\s*$/, '');
   if (s.length < 3) return null;
@@ -186,10 +203,13 @@ export async function GET(request: NextRequest) {
     q = q.or(`contact_fullname.ilike.%${search}%,contact_title.ilike.%${search}%`);
   }
   if (agency) {
-    // federal_contacts stores "INTERIOR, DEPARTMENT OF" while target-list passes
-    // "Department of the Interior" — match on the DISTINCTIVE keyword (drop the
-    // generic "department of/agency/the" words) so the formats reconcile.
-    const keyword = agency
+    // federal_contacts stores by PARENT department ("INTERIOR, DEPARTMENT OF"),
+    // but a target may be a SUB-agency ("Bureau of Land Management" → 0 matches).
+    // Map common sub-agencies to their parent keyword first.
+    const parentKeyword = subAgencyToParent(agency);
+    // Otherwise reconcile name formats: drop the generic "department of/the"
+    // words and match on the distinctive keyword.
+    const keyword = parentKeyword || agency
       .replace(/\b(department|dept|of|the|agency|administration|us|u\.s\.|,)\b/gi, ' ')
       .replace(/\s{2,}/g, ' ').trim();
     q = keyword.length >= 3
