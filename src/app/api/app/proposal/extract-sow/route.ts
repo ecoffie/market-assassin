@@ -86,15 +86,15 @@ export async function POST(request: NextRequest) {
       .in('doc_kind', ['sow_pws', 'attachment_other', 'solicitation'])
       .not('extracted_text', 'is', null)
       .order('char_count', { ascending: false });
-    // Prefer a doc classified as the scope: a real sow_pws, else a design-spec/
-    // scope attachment (filename hints), else fall back to regex over the
-    // solicitation below.
+    // Prefer a REAL standalone SOW/PWS doc (Eric: design specs are reference
+    // material for the design, NOT the scope of work — don't substitute them).
+    // Only an actual sow_pws or a filename that clearly says SOW/PWS/Statement
+    // of Work counts. Otherwise fall back to regex over the solicitation.
     const sowDoc = docs?.find(d => d.doc_kind === 'sow_pws')
-      || docs?.find(d => /sow|statement of work|pws|scope|spec|design/i.test(d.filename || '') && d.doc_kind !== 'solicitation');
+      || docs?.find(d => /\b(sow|pws)\b|statement of work|performance work statement/i.test(d.filename || '') && d.doc_kind !== 'solicitation' && !/design|spec/i.test(d.filename || ''));
     if (sowDoc?.extracted_text && sowDoc.extracted_text.length > 600) {
-      // Export the standalone scope doc whole (cap to a sane size).
       standaloneSow = {
-        title: /design|spec/i.test(sowDoc.filename || '') ? 'Scope / Design Specifications' : 'Statement of Work',
+        title: 'Statement of Work',
         body: sowDoc.extracted_text.slice(0, 120000),
         name: sowDoc.filename || fileName,
       };
