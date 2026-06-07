@@ -23,6 +23,34 @@ import { requireMIAuthSession } from '@/lib/two-factor-session';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
+/**
+ * Humanize a raw filename-ish title (Eric QC: KB showed "CYGTW", "red A01+1202SC
+ * 24R2100_Natl+MFSU+RFP_4.4.25_compressed"). Strips extensions, separators,
+ * version/date/junk tokens, and title-cases. Falls back to the summary if the
+ * cleaned title is still cryptic. Keeps already-clean titles (podcasts) as-is.
+ */
+function cleanTitle(raw: string, summary?: string, docTypeLabel?: string): string {
+  // A real human title (spaces + lowercase words, e.g. podcast titles) → keep.
+  if (raw && /\s/.test(raw) && /[a-z]{3,}/.test(raw) && raw.split(/\s+/).length >= 3) return raw;
+  let t = (raw || '')
+    .replace(/\.[a-z0-9]{2,4}$/i, '')                       // extension
+    .replace(/[_+%!]+/g, ' ')                                // separators/junk
+    .replace(/\b(compressed|final|rev\s*\d*|v\d+|draft|copy|sanitized|clean|redacted|volume|vol)\b/gi, '')
+    .replace(/\b\d{1,2}[.\-/]\d{1,2}[.\-/]\d{2,4}\b/g, '')   // dates
+    .replace(/\b[A-Z0-9]{5,}\b/g, '')                        // solicitation IDs / hashes
+    .replace(/\broman\s+numeral\b|\b[IVX]{1,4}\b/gi, '')     // stray volume numerals
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+  const words = t.split(' ').filter(w => /[a-z]{3,}/i.test(w));
+  // If after cleaning there aren't ≥2 real words, the filename is junk — prefer
+  // the SUMMARY (describes what it actually is), then a type label fallback.
+  if (words.length < 2) {
+    if (summary && summary.length > 8) return summary.slice(0, 80).replace(/\s+\S*$/, '') + (summary.length > 80 ? '…' : '');
+    return docTypeLabel ? `${docTypeLabel} (untitled)` : 'Untitled document';
+  }
+  return t.split(' ').map(w => /^[A-Z]{2,5}$/.test(w) ? w : w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()).join(' ').trim();
+}
+
 // Doc types that are NOT user-facing reference material.
 const EXCLUDED_TYPES = ['planner_app_code', 'meta_doc', 'qa_dataset'];
 
@@ -99,7 +127,7 @@ export async function GET(request: NextRequest) {
     total: count || 0,
     docs: (data || []).map((d: any) => ({
       id: d.id,
-      title: d.title || 'Untitled',
+      title: cleanTitle(d.title || '', d.one_line_summary, DOC_TYPE_LABELS[d.doc_type as string] || (d.doc_type as string)),
       docType: d.doc_type,
       docTypeLabel: DOC_TYPE_LABELS[d.doc_type as string] || (d.doc_type as string),
       summary: d.one_line_summary || '',

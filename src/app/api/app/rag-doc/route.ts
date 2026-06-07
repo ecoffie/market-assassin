@@ -50,7 +50,7 @@ export async function GET(request: NextRequest) {
   const supabase = getSupabase();
   const { data, error } = await supabase
     .from('mindy_rag_documents')
-    .select('id, title, doc_type, doc_top_level_folder, source_path, full_text, word_count')
+    .select('id, title, doc_type, top_level_folder, source_path, full_text, word_count, one_line_summary')
     .eq('id', id)
     .maybeSingle();
 
@@ -87,7 +87,7 @@ export async function GET(request: NextRequest) {
     id: data.id,
     title: data.title,
     doc_type: data.doc_type,
-    folder: data.doc_top_level_folder,
+    folder: data.top_level_folder,
     source_path: safeSource,
     play_url: playUrl,
     play_label: playLabel,
