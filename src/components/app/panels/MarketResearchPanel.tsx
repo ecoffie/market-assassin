@@ -607,6 +607,11 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   const [sportKeyword, setSportKeyword] = useState('');
   const [sportSuggesting, setSportSuggesting] = useState(false);
   const [sportSuggestions, setSportSuggestions] = useState<{ naics: Array<{ code: string; name: string }>; psc: Array<{ code: string; name: string }> } | null>(null);
+  // Has a report been explicitly run since entering Sport? Gates the whole
+  // results area so the saved-profile report never shows in Sport (Eric).
+  const [sportReportRan, setSportReportRan] = useState(false);
+  // True when results should render: always in Auto; in Sport only after a run.
+  const showResults = researchMode === 'auto' || sportReportRan;
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -877,6 +882,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
 
       if (data.success && data.report) {
         setReportData(data.report);
+        setSportReportRan(true);
         loadRecommendedOpportunities();
         // Mark all free reports as generated, and pro reports if user has access
         const generated = new Set<string>();
@@ -1518,6 +1524,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                 setSelectedAgency('');
                 setReportData(null);
                 setActiveReportId(null);
+                setSportReportRan(false);
                 setSportKeyword('');
                 setSportSuggestions(null);
               }}
@@ -1909,7 +1916,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           renders the 4 headline stat cards + 4 chart placeholder
           tiles + Mindy Says placeholder. Slices 2-5 fill in the
           real charts, AI narrative, and export. */}
-      {viewMode === 'map' && reportData && (
+      {showResults && viewMode === 'map' && reportData && (
         <div className="space-y-6">
           {/* Headline stats — same 4 numbers as the reports view's
               MetricCards but with stronger visual hierarchy here. */}
@@ -2009,7 +2016,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         </div>
       )}
 
-      {viewMode === 'reports' && reportData && (
+      {showResults && viewMode === 'reports' && reportData && (
         <>
           <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <MetricCard label="Agencies to review" value={(chartBuyers.length || buyerSummary?.totalAgencies || buyers.length).toLocaleString()} />

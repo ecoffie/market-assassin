@@ -220,12 +220,15 @@ export async function POST(request: NextRequest): Promise<NextResponse<SuggestCo
     const body = await request.json();
     const { description, maxResults = 5 } = body;
 
-    if (!description || typeof description !== 'string' || description.trim().length < 10) {
+    // Allow short single-word industry queries ("drones", "HVAC", "janitorial")
+    // — a 10-char minimum blocked legitimate keyword lookups (Eric: "drone does
+    // nothing"). Just need 2+ chars of a real word.
+    if (!description || typeof description !== 'string' || description.trim().length < 2) {
       return NextResponse.json({
         success: false,
         naicsSuggestions: [],
         pscSuggestions: [],
-        error: 'Please provide a more detailed description (at least 10 characters)',
+        error: 'Please enter what you want to research (e.g. "drones", "medical supplies").',
       }, { status: 400 });
     }
 
