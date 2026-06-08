@@ -85,8 +85,11 @@ export async function POST(request: NextRequest) {
         console.log(`   Expanded ${inputCodes.length} inputs to ${expandedCodes.length} NAICS codes`);
         naicsCorrectionMessage = `Searching ${inputCodes.length} NAICS codes/sectors: ${inputCodes.join(', ')} (${expandedCodes.length} total codes)`;
       } else {
-        // SINGLE NAICS MODE: Use existing validation and expansion logic
-        let trimmedNaics = naicsCode.trim();
+        // SINGLE NAICS MODE: Use existing validation and expansion logic.
+        // Use the PARSED code, not the raw string (Eric: "236220," with a
+        // trailing comma was failing validation → invalid_naics). parseNAICSInput
+        // already stripped the comma; fall back to a defensive strip.
+        let trimmedNaics = (inputCodes[0] || naicsCode).replace(/[,\s]+/g, '').trim();
 
       // Validate the NAICS code first
       const validation = validateNaicsCode(trimmedNaics);

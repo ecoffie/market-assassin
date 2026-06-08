@@ -1725,20 +1725,42 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                     </div>
                   </div>
                 )}
-                {/* One click: apply the suggested codes + default Small Business
-                    (Eric: "use the codes you suggested, default to small biz"). */}
-                <button
-                  type="button"
-                  onClick={() => setFormData(f => ({
-                    ...f,
-                    naicsCode: sportSuggestions.naics.slice(0, 3).map(s => s.code).join(', '),
-                    pscCode: sportSuggestions.psc.slice(0, 2).map(s => s.code).join(', '),
-                    businessType: f.businessType || 'Small Business',
-                  }))}
-                  className="mt-1 w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 py-2 text-xs font-semibold text-white"
-                >
-                  ✓ Use these codes (Small Business) — then Build Market Map
-                </button>
+                {/* One click: apply the suggested codes + default Small Business.
+                    SHOW the codes it'll apply so the user can verify (Eric: "I
+                    can't see the codes it's suggesting — how do I check?"). */}
+                {(() => {
+                  const naicsToApply = sportSuggestions.naics.slice(0, 3);
+                  const pscToApply = sportSuggestions.psc.slice(0, 2);
+                  return (
+                    <div className="mt-1 rounded-lg border border-emerald-600/30 bg-emerald-500/[0.06] p-2.5">
+                      <div className="text-[11px] text-slate-400 mb-1.5">These codes will be applied — verify they fit:</div>
+                      <div className="flex flex-wrap gap-1 mb-2">
+                        {naicsToApply.map(s => (
+                          <span key={s.code} className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-300" title={s.name}>
+                            {s.code} · {s.name.slice(0, 24)}
+                          </span>
+                        ))}
+                        {pscToApply.map(s => (
+                          <span key={s.code} className="rounded bg-purple-500/15 px-1.5 py-0.5 text-[10px] text-purple-300" title={s.name}>
+                            PSC {s.code}
+                          </span>
+                        ))}
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setFormData(f => ({
+                          ...f,
+                          naicsCode: naicsToApply.map(s => s.code).join(', '),
+                          pscCode: pscToApply.map(s => s.code).join(', '),
+                          businessType: f.businessType || 'Small Business',
+                        }))}
+                        className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 py-2 text-xs font-semibold text-white"
+                      >
+                        ✓ Use these codes (Small Business) — then Build Market Map
+                      </button>
+                    </div>
+                  );
+                })()}
               </div>
             )}
           </div>
