@@ -923,9 +923,18 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       // is_archived soft-delete flag — you don't write a proposal for a
       // finished or shelved pursuit. (Previously no_bid + is_archived
       // leaked through, so the picker showed non-bidding pursuits.)
-      const active = (data.opportunities || []).filter((opp: PipelineOpportunity & { is_archived?: boolean }) => (
+      const activeRaw = (data.opportunities || []).filter((opp: PipelineOpportunity & { is_archived?: boolean }) => (
         !opp.is_archived && !isTerminalPipelineStage(opp.stage)
       ));
+      // Dedupe — the same notice can be saved to the pipeline more than once,
+      // which made the picker list it twice (Eric). Key by notice_id, else title.
+      const seenKeys = new Set<string>();
+      const active = (activeRaw as PipelineOpportunity[]).filter((opp) => {
+        const key = (opp.notice_id || opp.title || opp.id || '').toLowerCase().trim();
+        if (!key || seenKeys.has(key)) return false;
+        seenKeys.add(key);
+        return true;
+      });
       setOpportunities(active);
       const activeIds = new Set(active.map((opp: PipelineOpportunity) => opp.id));
       setLocalPursuitId((current) => (current && activeIds.has(current) ? current : null));

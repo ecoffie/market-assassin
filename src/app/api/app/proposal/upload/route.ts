@@ -39,7 +39,22 @@ async function extractDocx(buffer: Buffer): Promise<ExtractResult> {
   return { text: result.value || '' };
 }
 
-function inferKind(name: string, mime: string): 'pdf' | 'docx' | 'txt' | null {
+// Pricing schedules are usually .xlsx (Eric: "we DID support xlsx, what
+// changed?"). The xlsx lib is already a dependency; flatten every sheet to text
+// (CSV per sheet) so pricing line items + CLINs become readable.
+async function extractXlsx(buffer: Buffer): Promise<ExtractResult> {
+  const XLSX = await import('xlsx');
+  const wb = XLSX.read(buffer, { type: 'buffer' });
+  const parts: string[] = [];
+  for (const sheetName of wb.SheetNames) {
+    const sheet = wb.Sheets[sheetName];
+    const csv = XLSX.utils.sheet_to_csv(sheet, { blankrows: false });
+    if (csv.trim()) parts.push(`### Sheet: ${sheetName}\n${csv}`);
+  }
+  return { text: parts.join('\n\n') };
+}
+
+function inferKind(name: string, mime: string): 'pdf' | 'docx' | 'txt' | 'xlsx' | null {
   const lower = name.toLowerCase();
   if (mime === 'application/pdf' || lower.endsWith('.pdf')) return 'pdf';
   if (
@@ -47,6 +62,13 @@ function inferKind(name: string, mime: string): 'pdf' | 'docx' | 'txt' | null {
     lower.endsWith('.docx')
   ) {
     return 'docx';
+  }
+  if (
+    mime === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+    mime === 'application/vnd.ms-excel' ||
+    lower.endsWith('.xlsx') || lower.endsWith('.xls')
+  ) {
+    return 'xlsx';
   }
   if (mime === 'text/plain' || lower.endsWith('.txt')) return 'txt';
   return null;
@@ -86,7 +108,7 @@ export async function POST(request: NextRequest) {
   const kind = inferKind(file.name, file.type);
   if (!kind) {
     return NextResponse.json(
-      { success: false, error: 'Unsupported file type. Upload PDF, DOCX, or TXT.' },
+      { success: false, error: 'Unsupported file type. Upload PDF, DOCX, XLSX, or TXT.' },
       { status: 415 }
     );
   }
@@ -97,6 +119,7 @@ export async function POST(request: NextRequest) {
     let extract: ExtractResult;
     if (kind === 'pdf') extract = await extractPdf(buffer);
     else if (kind === 'docx') extract = await extractDocx(buffer);
+    else if (kind === 'xlsx') extract = await extractXlsx(buffer);
     else extract = { text: buffer.toString('utf-8') };
 
     const text = (extract.text || '').trim();
