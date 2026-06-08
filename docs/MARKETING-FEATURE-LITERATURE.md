@@ -28,16 +28,34 @@ spend, who holds the work now, and which offices to target. No codes to memorize
 
 **Why it's different:** Other tools make you already know your NAICS code. Mindy
 suggests codes backed by **actual federal spending** under your keyword — so you
-can verify they make sense before you commit. ("drones" → 336411 Aircraft Mfg,
-334511 Search/Detection — the codes where drone money actually flows.)
+can verify they make sense before you commit.
+
+**🎯 THE DRONE PROOF POINT (the headline stat — real FY2025 USASpending data):**
+"Drones" isn't ONE NAICS code — it's a *capability* that **70+ different NAICS
+codes buy** ($245M in FY2025 alone). The obvious code, 336411 Aircraft
+Manufacturing, is only **28% of the drone market.** The other **72% is hidden in
+non-obvious codes** — Search & Detection (334511), R&D (541715), Computer
+Programming (541511), even Air Transport (481211) and Fabricated Metal (332999).
+
+> **If you set your alerts on the one obvious code, you miss 72% of the
+> opportunities — three out of every four drone dollars.**
+
+That's the difference between a tool that makes you *guess* your code and Mindy,
+which shows you **every code where the money actually flows** — so one missed code
+doesn't cost you a $50M opportunity. Same story for any product: cybersecurity,
+medical supplies, construction — the spend is always spread across codes nobody
+would think to search.
 
 **SEO angles / blog titles:**
+- "Drones don't have ONE NAICS code — they have 70+. Here's why that matters."
+- "The hidden 72%: why one NAICS code costs you most of your market"
 - "How to find your NAICS code (without knowing your NAICS code)"
 - "What is my NAICS code for [industry]? A faster way"
 - "Federal market research in 60 seconds: who buys what you sell"
 
 **Proof point:** Codes come from USASpending's live award data, FY-labeled, with
-the dollar amount as proof ("$8.7M in FY2025 awards under 'medical supplies'").
+the dollar amount as proof. Verified: "drones" FY2025 → 70+ buying NAICS, $245M,
+28% in the obvious code / 72% scattered across the rest.
 
 ---
 
