@@ -1206,11 +1206,20 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                   <div className="absolute z-20 mt-1 w-full max-h-72 overflow-auto rounded-lg border border-slate-700 bg-slate-900 shadow-xl">
                     {(() => {
                       const q = pursuitSearch.trim().toLowerCase();
-                      const filtered = opportunities.filter(o =>
-                        !q || `${o.title} ${o.agency || ''} ${noticeTypeLabel(o.notice_type) || ''}`.toLowerCase().includes(q));
-                      if (filtered.length === 0) return <div className="px-3 py-3 text-xs text-slate-500">No pursuit matches “{pursuitSearch}”.</div>;
-                      return filtered.map(opp => {
+                      const matches = (o: PipelineOpportunity) =>
+                        !q || `${o.title} ${o.agency || ''} ${noticeTypeLabel(o.notice_type) || ''}`.toLowerCase().includes(q);
+
+                      // Rank: actively-worked stages first, then by soonest deadline
+                      // (#56 — Eric: users bid 3-8 at a time but save many; show the
+                      // few they're working, search reveals the rest).
+                      const STAGE_RANK: Record<string, number> = { bidding: 0, pursuing: 1, submitted: 2, tracking: 3 };
+                      const rank = (o: PipelineOpportunity) => STAGE_RANK[o.stage || 'tracking'] ?? 4;
+                      const deadline = (o: PipelineOpportunity) => o.response_deadline ? new Date(o.response_deadline).getTime() : Infinity;
+                      const sorted = [...opportunities].sort((a, b) => rank(a) - rank(b) || deadline(a) - deadline(b));
+
+                      const renderRow = (opp: PipelineOpportunity) => {
                         const nt = noticeTypeLabel(opp.notice_type);
+                        const active = opp.stage === 'bidding' || opp.stage === 'pursuing';
                         return (
                           <button
                             key={opp.id}
@@ -1219,13 +1228,36 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                             className={`flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-slate-800 ${selectedId === opp.id ? 'bg-purple-500/10' : ''}`}
                           >
                             {nt && <span className="mt-0.5 shrink-0 rounded bg-slate-700 px-1.5 py-0.5 text-[10px] font-medium text-slate-300">{nt}</span>}
-                            <span className="min-w-0">
+                            <span className="min-w-0 flex-1">
                               <span className="block truncate text-sm text-slate-200">{opp.title}</span>
                               {opp.agency && <span className="block truncate text-[11px] text-slate-500">{opp.agency}</span>}
                             </span>
+                            {active && <span className="mt-0.5 shrink-0 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-300 capitalize">{opp.stage}</span>}
                           </button>
                         );
-                      });
+                      };
+
+                      // No search → show ACTIVE group first (the short list users work),
+                      // then a divider, then the rest. With a search → flat filtered list.
+                      if (!q) {
+                        const active = sorted.filter(o => o.stage === 'bidding' || o.stage === 'pursuing');
+                        const rest = sorted.filter(o => !(o.stage === 'bidding' || o.stage === 'pursuing'));
+                        return (
+                          <>
+                            {active.length > 0 && (
+                              <div className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider text-emerald-400/70">Active ({active.length})</div>
+                            )}
+                            {active.map(renderRow)}
+                            {active.length > 0 && rest.length > 0 && (
+                              <div className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider text-slate-600 border-t border-slate-800">All saved ({rest.length}) — type to search</div>
+                            )}
+                            {rest.map(renderRow)}
+                          </>
+                        );
+                      }
+                      const filtered = sorted.filter(matches);
+                      if (filtered.length === 0) return <div className="px-3 py-3 text-xs text-slate-500">No pursuit matches “{pursuitSearch}”.</div>;
+                      return filtered.map(renderRow);
                     })()}
                   </div>
                 </>
