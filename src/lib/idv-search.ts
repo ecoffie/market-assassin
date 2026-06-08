@@ -196,9 +196,12 @@ export async function searchIDVContracts(options: IDVSearchOptions = {}): Promis
     pscDescription: c['Product or Service Code Description'] as string || '',
     recipientState: c['Recipient State Code'] as string || '',
     popState: c['Place of Performance State Code'] as string || '',
-    generatedId: c['generated_unique_award_id'] as string || '',
-    usaSpendingUrl: c['generated_unique_award_id']
-      ? `https://www.usaspending.gov/award/${c['generated_unique_award_id']}`
+    // USASpending's spending_by_award returns the id as `generated_internal_id`
+    // (NOT generated_unique_award_id, which is null — Eric QA: drill-down + the
+    // /award/ deep link were empty). This id powers the award-detail drill-down.
+    generatedId: (c['generated_internal_id'] || c['generated_unique_award_id'] || '') as string,
+    usaSpendingUrl: (c['generated_internal_id'] || c['generated_unique_award_id'])
+      ? `https://www.usaspending.gov/award/${c['generated_internal_id'] || c['generated_unique_award_id']}`
       : `https://www.usaspending.gov/keyword_search/${encodeURIComponent(c['Award ID'] as string || '')}`
   }));
 

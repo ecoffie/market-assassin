@@ -38,6 +38,7 @@ interface ExpiringContract {
 // vehicles + task orders behind the recompetes, same data different award type.
 interface IDVRow {
   awardId: string;
+  generatedId?: string;          // generated_unique_award_id — for award drill-down (#51)
   recipientName: string;
   recipientUei: string;
   awardAmount: number;
@@ -51,6 +52,16 @@ interface IDVRow {
   popState: string;
   usaSpendingUrl: string;
   locationMatch?: LocationMatch; // vs. user's service area (the "in your area" signal)
+}
+
+// The full Contract Summary (#50 award-detail), fetched on drill-down.
+interface AwardDetail {
+  obligated: number; ceiling: number;
+  parentIdvPiid: string | null; parentIdvId: string | null;
+  popStart: string | null; popEnd: string | null; popPotentialEnd: string | null;
+  recipientCity: string; recipientState: string; recipientCongressionalDistrict: string;
+  naicsDescription: string; pscDescription: string; fundingAccount: string | null;
+  usaSpendingUrl: string;
 }
 
 interface ContractSummary {
@@ -264,6 +275,23 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
   const [awardType, setAwardType] = useState<'definitive' | 'task'>('definitive');
   const [idvContracts, setIdvContracts] = useState<IDVRow[]>([]);
   const [idvLoading, setIdvLoading] = useState(false);
+  // Award drill-down (#51): the expanded award + its fetched Contract Summary.
+  const [drillAwardId, setDrillAwardId] = useState<string | null>(null);
+  const [drillDetail, setDrillDetail] = useState<Record<string, AwardDetail | 'loading' | 'error'>>({});
+
+  // Fetch the full Contract Summary for an award on first expand (cached).
+  const loadAwardDetail = useCallback(async (row: IDVRow) => {
+    const key = row.generatedId || row.awardId;
+    if (!key || drillDetail[key]) return;
+    setDrillDetail(d => ({ ...d, [key]: 'loading' }));
+    try {
+      const res = await fetch(`/api/app/award-detail?id=${encodeURIComponent(key)}`, { headers: getMIApiHeaders(email) });
+      const data = await res.json();
+      setDrillDetail(d => ({ ...d, [key]: data?.success ? (data.detail as AwardDetail) : 'error' }));
+    } catch {
+      setDrillDetail(d => ({ ...d, [key]: 'error' }));
+    }
+  }, [drillDetail, email]);
 
   const toggleExpandedContract = (contractId: string) => {
     setExpandedContracts(prev => {
@@ -856,6 +884,19 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                           </span>
                         )}
                       </div>
+
+                      {/* Award drill-down toggle (#51) — the full Contract Summary. */}
+                      <button
+                        type="button"
+                        onClick={() => {
+                          const willOpen = drillAwardId !== c.awardId;
+                          setDrillAwardId(willOpen ? c.awardId : null);
+                          if (willOpen) loadAwardDetail(c);
+                        }}
+                        className="mt-1.5 text-xs text-amber-400 hover:text-amber-300 transition-colors"
+                      >
+                        {drillAwardId === c.awardId ? '▼ Hide award detail' : '▸ Award detail (ceiling, vehicle, dates)'}
+                      </button>
                     </div>
 
                     {/* Value & period */}
@@ -882,6 +923,51 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                       </div>
                     </div>
                   </div>
+
+                  {/* Award detail drawer (#51) — the real Contract Summary:
+                      obligated→ceiling, parent vehicle, period of performance,
+                      recipient detail. Grounds the subcontracting decision. */}
+                  {drillAwardId === c.awardId && (() => {
+                    const key = c.generatedId || c.awardId;
+                    const det = drillDetail[key];
+                    if (det === 'loading' || !det) return <div className="mt-3 rounded-lg border border-slate-700 bg-slate-950/50 p-3 text-xs text-slate-500">Loading award detail from USASpending…</div>;
+                    if (det === 'error') return <div className="mt-3 rounded-lg border border-slate-700 bg-slate-950/50 p-3 text-xs text-slate-500">Couldn’t load the award detail. <a href={c.usaSpendingUrl} target="_blank" rel="noreferrer" className="text-amber-400">View on USASpending ↗</a></div>;
+                    const d = det as AwardDetail;
+                    return (
+                      <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/[0.04] p-4">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wider text-slate-500">Obligated → Ceiling</div>
+                            <div className="text-sm font-semibold text-emerald-300">{formatCurrency(d.obligated)} → {formatCurrency(d.ceiling)}</div>
+                            <div className="text-[10px] text-slate-600">the real prize size</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wider text-slate-500">Parent vehicle (IDV)</div>
+                            <div className="text-sm font-medium text-white truncate">{d.parentIdvPiid || d.parentIdvId || '—'}</div>
+                            <div className="text-[10px] text-slate-600">{d.parentIdvId ? 'get on this to compete' : 'standalone award'}</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wider text-slate-500">Period of performance</div>
+                            <div className="text-sm font-medium text-white">{d.popStart ? formatDate(d.popStart) : '?'} → {d.popPotentialEnd ? formatDate(d.popPotentialEnd) : (d.popEnd ? formatDate(d.popEnd) : '?')}</div>
+                            <div className="text-[10px] text-slate-600">recompete window</div>
+                          </div>
+                          <div>
+                            <div className="text-[10px] uppercase tracking-wider text-slate-500">Incumbent</div>
+                            <div className="text-sm font-medium text-white truncate">{[d.recipientCity, d.recipientState].filter(Boolean).join(', ') || '—'}</div>
+                            <div className="text-[10px] text-slate-600">{d.recipientCongressionalDistrict ? `CD ${d.recipientState}-${d.recipientCongressionalDistrict}` : ''}{d.fundingAccount ? ` · ${d.fundingAccount.slice(0, 22)}` : ''}</div>
+                          </div>
+                        </div>
+                        {(d.naicsDescription || d.pscDescription) && (
+                          <div className="mt-2 text-[11px] text-slate-500">
+                            {d.naicsDescription && <span>NAICS: {d.naicsDescription}</span>}
+                            {d.naicsDescription && d.pscDescription && <span className="text-slate-700"> · </span>}
+                            {d.pscDescription && <span>PSC: {d.pscDescription}</span>}
+                          </div>
+                        )}
+                        <a href={d.usaSpendingUrl} target="_blank" rel="noreferrer" className="mt-2 inline-block text-[11px] text-amber-400 hover:text-amber-300">Full Contract Summary on USASpending ↗</a>
+                      </div>
+                    );
+                  })()}
                 </div>
               );
             })}
