@@ -335,6 +335,12 @@ export async function GET(request: NextRequest) {
     };
   });
 
+  // SECOND-PASS foreign filter (QA caught: the overseas signal is in the
+  // DoDAAC-DECODED office name "NAVSUP FLT LOG CTR YOKOSUKA" / "DISA/DITCO EUROPE",
+  // which only exists AFTER the map — the raw r.office is null. Drop them here.)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  contacts = contacts.filter((c: any) => !FOREIGN_OFFICE_RE.test(c.derivedOffice || ''));
+
   // Filter by derived sub-agency (JS, since it's not a column).
   if (subAgency) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -356,6 +362,7 @@ export async function GET(request: NextRequest) {
         contact_phone: osbp.phone || null,
         role_category: 'small_business',
         role: 'OSBP',
+        roleCategory: 'Small Business',
         derivedOffice: osbp.name || null,
         sub_tier: null,
       });
