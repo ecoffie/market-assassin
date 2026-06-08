@@ -16,6 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { callLLM } from '@/lib/llm/call-llm';
+import { isUserOverBudget } from '@/lib/llm/usage-cost';
 import { createClient } from '@supabase/supabase-js';
 import { loadBidderProfile, formatProfileForPrompt, loadVaultContext } from '@/lib/proposal/loaders';
 import { retrieveRagContext, formatChunksForPrompt } from '@/lib/rag/retrieve';
@@ -235,7 +236,10 @@ export async function POST(request: NextRequest) {
           body: JSON.stringify({ model, messages, temperature: TEMPERATURE, max_tokens: MAX_TOKENS, stream: true }),
         });
         let groqRes: Response | null = null;
-        if (openaiKey) {
+        // Budget cap (#37): a user past their monthly LLM budget is downgraded to
+        // cheap Groq (never blocked — degraded, not denied). Protects $149 margin.
+        const overBudget = await isUserOverBudget(email).catch(() => false);
+        if (openaiKey && !overBudget) {
           const r = await streamFrom('https://api.openai.com/v1/chat/completions', openaiKey, process.env.LLM_OPENAI_MODEL || 'gpt-4o-mini');
           if (r.ok && r.body) groqRes = r;
         }

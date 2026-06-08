@@ -39,6 +39,7 @@ import { logToolError, recordToolSuccess, ToolNames, classifyError, AIProviders 
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
 import { fiscalYearTimePeriod } from '@/lib/utils/fiscal-year';
 import { callLLM } from '@/lib/llm/call-llm';
+import { recordLlmUsage } from '@/lib/llm/usage-cost';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -280,6 +281,8 @@ export async function POST(request: NextRequest) {
     });
     content = result.text;
     usage = result.usage as { prompt_tokens?: number; completion_tokens?: number } | undefined;
+    // Track cost per user/tool (#37). Fire-and-forget.
+    recordLlmUsage({ userEmail: email, tool: 'bid_no_bid', job: 'reasoning', provider: result.provider, model: result.model, usage }).catch(() => {});
   } catch (err) {
     await logToolError({
       tool: ToolNames.ANALYST,
