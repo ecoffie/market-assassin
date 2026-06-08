@@ -47,6 +47,12 @@ export default function GovDecisionMakersPanel({ email }: Props) {
   const [error, setError] = useState<string | null>(null);
   const [trackedOffices, setTrackedOffices] = useState<Set<string>>(new Set());
   const [trackNote, setTrackNote] = useState<string | null>(null);
+  // Office roster (#16) — the COMPLETE contact list for a specific buying office
+  // (DoDAAC-decoded, domestic). Loaded on agency select; one office expandable.
+  const [officeRosters, setOfficeRosters] = useState<Array<{ name: string; count: number }>>([]);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [openRoster, setOpenRoster] = useState<{ office: string; people: any[] } | null>(null);
+  const [rosterLoading, setRosterLoading] = useState(false);
   // The user's target agencies (from My Target List) — Decision Makers should
   // default to THESE (Eric QA: "it should already track my 9 pre-selected
   // agencies"). 'targets' scope filters contacts to any target agency.
@@ -112,6 +118,8 @@ export default function GovDecisionMakersPanel({ email }: Props) {
     setOfficeDetail([]);
     setSubAgency('');
     setSubAgencies([]);
+    setOfficeRosters([]);
+    setOpenRoster(null);
     if (!email || !agency) return;
     fetch(`/api/app/federal-contacts?facets=offices&agency=${encodeURIComponent(agency)}&email=${encodeURIComponent(email)}`)
       .then(r => r.json())
@@ -123,7 +131,29 @@ export default function GovDecisionMakersPanel({ email }: Props) {
       .then(r => r.json())
       .then(d => { if (d.success) setSubAgencies(d.subAgencies || []); })
       .catch(() => {});
+    // Office rosters (#16) — the buying offices with a COMPLETE contact list
+    // (DoDAAC-decoded, domestic). Populated for DoD/DLA/Navy; empty for civilian.
+    fetch(`/api/app/federal-contacts?facets=office-roster&agency=${encodeURIComponent(agency)}&email=${encodeURIComponent(email)}`)
+      .then(r => r.json())
+      .then(d => { if (d.success) setOfficeRosters(d.offices || []); })
+      .catch(() => {});
   }, [email, agency]);
+
+  // Load the full roster for one office on click.
+  const openOfficeRoster = useCallback(async (officeName: string) => {
+    if (!email || !agency) return;
+    if (openRoster?.office === officeName) { setOpenRoster(null); return; }
+    setRosterLoading(true);
+    try {
+      const res = await fetch(`/api/app/federal-contacts?facets=office-roster&agency=${encodeURIComponent(agency)}&office=${encodeURIComponent(officeName)}&email=${encodeURIComponent(email)}`);
+      const d = await res.json();
+      setOpenRoster(d.success ? { office: officeName, people: d.roster || [] } : null);
+    } catch {
+      setOpenRoster(null);
+    } finally {
+      setRosterLoading(false);
+    }
+  }, [email, agency, openRoster]);
 
   const load = useCallback(async () => {
     if (!email) return;
@@ -252,6 +282,50 @@ export default function GovDecisionMakersPanel({ email }: Props) {
             ))}
           </div>
           <p className="text-[10px] text-slate-600 mt-2">From federal award data. The contacts below are SAM points of contact, which don&apos;t carry office — use the office list to know which commands buy, then search by name.</p>
+        </div>
+      )}
+
+      {/* Office rosters (#16) — the COMPLETE contact list for a specific buying
+          OFFICE, not an agency slice. Available where solicitation numbers decode
+          to a DoDAAC (DoD / DLA / Navy). Click an office → its full roster. */}
+      {agency && officeRosters.length > 0 && (
+        <div className="bg-slate-900 border border-emerald-500/20 rounded-xl p-4">
+          <div className="flex items-baseline justify-between mb-1">
+            <h3 className="text-sm font-semibold text-white">📇 Full contact rosters by buying office</h3>
+            <span className="text-xs text-slate-500">{officeRosters.length} offices · 100% list</span>
+          </div>
+          <p className="text-[11px] text-slate-500 mb-3">The complete people list for a specific contracting office — not an agency sample. Click an office to see everyone.</p>
+          <div className="flex flex-wrap gap-2">
+            {officeRosters.slice(0, 16).map((o) => (
+              <button
+                key={o.name}
+                type="button"
+                onClick={() => openOfficeRoster(o.name)}
+                className={`text-xs rounded px-2.5 py-1.5 transition-colors ${openRoster?.office === o.name ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              >
+                {o.name} <span className="text-emerald-400 font-medium">{o.count}</span>
+              </button>
+            ))}
+          </div>
+          {rosterLoading && <div className="mt-3 text-xs text-slate-500">Loading roster…</div>}
+          {openRoster && (
+            <div className="mt-4 rounded-lg border border-slate-800 bg-slate-950/50 p-3">
+              <div className="text-xs font-semibold text-emerald-300 mb-2">{openRoster.office} — {openRoster.people.length} contacts (complete)</div>
+              <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5 max-h-80 overflow-auto">
+                {openRoster.people.map((c, i) => (
+                  <div key={i} className="flex items-start gap-2 text-xs">
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-slate-200 truncate">{c.contact_fullname || '—'}</span>
+                      <span className="block text-slate-500 truncate">
+                        {c.roleCategory && <span className="text-emerald-400/80">{c.roleCategory} · </span>}
+                        {c.contact_email || c.contact_phone || 'no contact info'}
+                      </span>
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
 

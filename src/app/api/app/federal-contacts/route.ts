@@ -208,6 +208,61 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // Facet: OFFICE ROSTER (#16) — the COMPLETE contact list for a specific
+  // contracting OFFICE, not an agency slice. We group by the DoDAAC-decoded
+  // office (the clean DOMESTIC signal — DLA Land & Maritime, NAVSUP WSS, NAVFAC
+  // Mid-Atlantic — vs the raw `office` column which is embassy-contaminated).
+  // Returns offices that have a real roster (3+ people) so the UI can show a
+  // full buying-location list. Honest: this works for DoD/DLA/Navy where
+  // solicitations decode to DoDAACs; civilian agencies fall back to preview.
+  if (sp.get('facets') === 'office-roster') {
+    const facetAgency = (sp.get('agency') || '').trim();
+    const officeName = (sp.get('office') || '').trim();   // optional: drill into one office
+    if (!facetAgency) return NextResponse.json({ success: true, offices: [], rosters: {} });
+    const rosterDodaacNames = await loadDodaacNames();
+    // The agency column is stored "DEFENSE, DEPARTMENT OF" (not "Department of
+    // Defense"), so match on the most distinctive word, not the full phrase.
+    const agencyKeyword = facetAgency.replace(/department of|dept of|the|,/gi, '').trim().split(/\s+/)[0] || facetAgency;
+    const { data } = await sb
+      .from('federal_contacts')
+      .select('contact_fullname, contact_email, contact_phone, contact_title, solicitation_number, office, department_ind_agency')
+      .ilike('department_ind_agency', `%${agencyKeyword}%`)
+      .not('solicitation_number', 'is', null)
+      .limit(8000);
+    // Group contacts by decoded office, dropping overseas + dupes.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const byOffice = new Map<string, any[]>();
+    const seen = new Set<string>();
+    for (const r of (data || []) as Record<string, string | null>[]) {
+      const dod = decodeDodaac(r.solicitation_number);
+      const office = dod?.dodaac ? (rosterDodaacNames.get(dod.dodaac) || dod.officeName || '') : '';
+      if (!office) continue;
+      if (FOREIGN_OFFICE_RE.test(office)) continue;       // domestic only (#43)
+      const key = (r.contact_email || `${r.contact_fullname}`).toLowerCase();
+      if (!key.trim() || seen.has(key)) continue;
+      seen.add(key);
+      const { role, pocLabel, roleCategory } = normalizeTitle(r.contact_title);
+      const list = byOffice.get(office) || [];
+      list.push({
+        contact_fullname: r.contact_fullname, contact_email: r.contact_email,
+        contact_phone: r.contact_phone, role, pocLabel, roleCategory,
+        dodaac: dod?.dodaac || null,
+      });
+      byOffice.set(office, list);
+    }
+    // Offices with a real roster (3+), sorted by size.
+    const offices = Array.from(byOffice.entries())
+      .filter(([, list]) => list.length >= 3)
+      .sort((a, b) => b[1].length - a[1].length)
+      .map(([name, list]) => ({ name, count: list.length }));
+    // If a specific office was requested, return its full roster.
+    if (officeName) {
+      const roster = byOffice.get(officeName) || [];
+      return NextResponse.json({ success: true, office: officeName, roster, total: roster.length });
+    }
+    return NextResponse.json({ success: true, offices });
+  }
+
   // Facet: derived SUB-AGENCIES present in a (broad) agency's CONTACTS — e.g.
   // DoD → Air Force / Navy / Army / DLA. SAM has no sub-agency field for these,
   // so we derive it from each contact's email domain / solicitation prefix and
