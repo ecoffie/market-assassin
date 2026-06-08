@@ -32,7 +32,7 @@ function sizeStandardFor(naics: string): string {
 const DERIVE_PROMPT = `You are reading a federal solicitation to find the GO/NO-GO eliminators that would actually DISQUALIFY a typical small-business bidder — the things where a "No" is both LIKELY and FATAL. Extract ONLY concrete, opportunity-specific eliminators that genuinely separate qualified from unqualified bidders:
 - Required SPECIALTY licenses / certifications a bidder might NOT have (e.g. specific state electrical license, security clearance, ISO cert) — NOT generic ones.
 - Minimum past-performance with real thresholds (e.g. "3 similar projects over $1M in the last 5 years" — quote the real numbers).
-- Bonding / insurance with amounts (bid bond %, payment/performance bond) that require real capacity.
+- BONDING that requires real capacity (bid bond %, payment/performance bonds on large-dollar work) — bonding capacity genuinely eliminates undercapitalized bidders.
 - Mandatory site visit a bidder must attend to be eligible.
 - Key personnel minimums (e.g. "PM with 10 years + PE license").
 
@@ -46,7 +46,8 @@ DO NOT include near-universal requirements that almost everyone already satisfie
 - SAM.gov / SAM registration (everyone bidding is registered)
 - Being a small business / meeting the size standard (already handled separately)
 - Generic "submit a complete proposal" / "acknowledge amendments" / standard FAR reps & certs
-- General insurance every contractor carries
+- General/commercial liability insurance at ORDINARY amounts (e.g. $100K–$2M per occurrence) — Eric's rule: "you won't be bidding if you didn't already have it." It is NOT a differentiator. ONLY surface insurance if it is a SPECIALTY type many lack (pollution/environmental, professional/E&O for A-E, marine, aviation) OR an unusually high amount (>$5M) that signals real risk capacity.
+- Standard wage determinations / SCA / Davis-Bacon compliance (applies to everyone on that work)
 
 Return ONLY JSON: {"gates":[{"question":"a yes/no question phrased for the bidder","detail":"the specific requirement, with real numbers/names from the text","source":"the clause or section if visible"}]}
 If nothing rises to a real eliminator, return {"gates":[]}. Quote REAL specifics — never generic placeholders. Aim for 2-4 high-signal gates, not a long checklist.`;
@@ -100,14 +101,27 @@ export async function GET(request: NextRequest) {
         system: DERIVE_PROMPT,
         user: doc.extracted_text.slice(0, 40000),
         json: true, maxTokens: 1200, temperature: 0.1,
-        job: 'extraction',
+        // reasoning = GPT-4o-mini first (Eric: Groq let "liability insurance"
+        // noise through, but Claude isn't scalable at $149). GPT-mini is
+        // near-Claude on this judgment at a fraction of the cost.
+        job: 'reasoning',
       });
       const parsed = JSON.parse(text.replace(/```json\n?|```\n?/g, '').trim());
       // Drop near-universal items that slip through — they're not eliminators
       // (Eric: most are SAM-registered + small businesses).
       const UNIVERSAL = /\bsam\b|sam\.gov|registration|registered|system for award|small[ -]?business[ -]?(size|status|concern)|size[ -]?standard|acknowledge[ -]?(all[ -]?)?amendments|complete[ -]?proposal|reps?[ -]?(and|&)[ -]?certs?/i;
+      // Ordinary liability insurance is noise (Eric: "you won't be bidding if you
+      // didn't have it"). Drop generic insurance gates UNLESS they name a
+      // specialty type or a >$5M amount.
+      const isOrdinaryInsurance = (g: { question?: string; detail?: string }) => {
+        const hay = `${g.question || ''} ${g.detail || ''}`.toLowerCase();
+        if (!/insurance|liability/.test(hay)) return false;
+        const specialty = /pollution|environmental|professional|e&o|errors? and omissions|marine|aviation|cyber/.test(hay);
+        const bigAmount = /\$\s?([5-9]|[1-9]\d)[\d,]*\s?(million|m\b)|\$\s?[5-9][,\d]{6,}/.test(hay);
+        return !specialty && !bigAmount;
+      };
       const derived = (parsed.gates || [])
-        .filter((g: { question?: string; detail?: string }) => g.question && !UNIVERSAL.test(`${g.question} ${g.detail || ''}`));
+        .filter((g: { question?: string; detail?: string }) => g.question && !UNIVERSAL.test(`${g.question} ${g.detail || ''}`) && !isOrdinaryInsurance(g));
       // Order by what's most DISTINCT + eliminating (Eric). Vehicle/CMMC/clearance
       // prerequisites FIRST — if you don't hold the vehicle, nothing else matters
       // — then past performance, then bonding/financial, then licenses/personnel.

@@ -15,7 +15,7 @@
 // Per-JOB chains (Eric: Claude's limits hit fast + it's pricey — use it ONLY for
 // low-volume high-value calls, NEVER bulk extraction). The job determines which
 // providers are eligible, so Claude is simply absent from the high-volume path.
-export type LlmJob = 'extraction' | 'drafting' | 'referee';
+export type LlmJob = 'extraction' | 'drafting' | 'referee' | 'reasoning';
 
 export interface LlmOpts {
   system: string;
@@ -39,6 +39,11 @@ const JOB_CHAINS: Record<LlmJob, Provider[]> = {
   // Claude's limits are fine; Groq 70B is the fast fallback.
   drafting:   ['claude', 'groq70b', 'openai', 'grok'],
   referee:    ['claude', 'openai', 'groq70b'],            // Claude OK — 1x/proposal
+  // REASONING = user-facing RFP extraction/judgment (chat, bid-gates) where Groq
+  // is too weak BUT Claude isn't scalable at $149/mo (Eric: a user could run a
+  // $200 Claude bill). GPT-4o-mini is near-Claude quality at ~20-40x lower cost →
+  // the default. Groq is the cheap fallback; Claude is a last resort only.
+  reasoning:  ['openai', 'groq70b', 'claude'],
 };
 const DEFAULT_CHAIN: Provider[] = JOB_CHAINS.extraction;
 

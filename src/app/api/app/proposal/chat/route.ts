@@ -36,7 +36,9 @@ const MAX_TOKENS = 1400;
 const HISTORY_LIMIT = 6;
 const RFP_MAX_CHARS = 200000;   // accept the FULL combined doc text (we select
                                 // the relevant slices below, not first-8K)
-const RFP_CONTEXT_BUDGET = 14000; // chars of RFP we actually put in the prompt
+const RFP_CONTEXT_BUDGET = 40000; // chars of RFP in the prompt — Claude (primary
+                                  // for Manual Drive) has the window for it, so
+                                  // feed more so the answer's section is present
 
 /**
  * Pick the parts of a big solicitation most RELEVANT to the user's question
@@ -221,6 +223,26 @@ export async function POST(request: NextRequest) {
 
         // Stream from Groq; on rate-limit/failure fall back to a non-streaming
         // provider (Claude/OpenAI) so the chat NEVER dies on a 429 (Eric QC).
+        // GPT-4o-mini FIRST for Manual Drive (Eric: Groq gave generic "no
+        // past-perf requirement" filler; GPT-mini extracts the exact clause like
+        // Claude does, but is scalable at $149 — Claude could run a $200 bill).
+        // Groq is the cheap fallback; Claude only as last resort.
+        try {
+          const { text } = await callLLM({
+            system: SYSTEM_PROMPT,
+            user: messages[messages.length - 1].content,
+            maxTokens: MAX_TOKENS,
+            temperature: TEMPERATURE,
+            job: 'reasoning', // openai(gpt-4o-mini) → groq70b → claude
+          });
+          if (text && text.trim()) {
+            send({ type: 'token', content: text });
+            send({ type: 'done' });
+            controller.close();
+            return;
+          }
+        } catch { /* fall through to Groq streaming */ }
+
         const streamModel = async (model: string) => fetch('https://api.groq.com/openai/v1/chat/completions', {
           method: 'POST',
           headers: { Authorization: `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
@@ -229,26 +251,10 @@ export async function POST(request: NextRequest) {
         let groqRes = await streamModel(GROQ_MODEL);
         if (groqRes.status === 429) groqRes = await streamModel('llama-3.3-70b-versatile');
         if (!groqRes.ok || !groqRes.body) {
-          // Groq exhausted → fall back to the provider chain (non-streaming).
-          try {
-            const { text } = await callLLM({
-              system: SYSTEM_PROMPT,
-              user: messages[messages.length - 1].content,
-              maxTokens: MAX_TOKENS,
-              temperature: TEMPERATURE,
-              job: 'drafting', // low-volume chat — Claude is fine
-            });
-            // Emit as a few chunks so the UI renders it.
-            send({ type: 'token', content: text });
-            send({ type: 'done' });
-            controller.close();
-            return;
-          } catch {
-            send({ type: 'error', message: 'AI is busy right now — try again in a moment.' });
-            send({ type: 'done' });
-            controller.close();
-            return;
-          }
+          send({ type: 'error', message: 'AI is busy right now — try again in a moment.' });
+          send({ type: 'done' });
+          controller.close();
+          return;
         }
 
         const reader = groqRes.body.getReader();
