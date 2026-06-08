@@ -74,18 +74,55 @@ function subAgencyToParent(name: string): string | null {
   return null;
 }
 
+// OVERSEAS markers (Eric: "why are offices in Japan/Europe in my list?"). A US
+// small business won't bid on these — drop the contact entirely.
+const FOREIGN_OFFICE_RE = /\b(yokosuka|okinawa|guam|sasebo|atsugi|japan|korea|seoul|osan|kunsan|europe|german|ramstein|kaiserslautern|italy|aviano|naples|sigonella|spain|rota|uk\b|united kingdom|england|raf\b|bahrain|qatar|kuwait|djibouti|far east|pacific command|africa command|european command|central command|overseas|apo\b|fpo\b)\b/i;
+
+// Decode cryptic military org codes → readable names (Eric: "NAVSUP/USPFO mean
+// nothing to a user"). Longest-match first.
+const OFFICE_ACRONYMS: Array<[RegExp, string]> = [
+  [/\bUSPFO\b/i, 'US Property & Fiscal Office (National Guard)'],
+  [/\bNAVSUP\s+FLT\s+LOG\s+CTR\b/i, 'Naval Supply Fleet Logistics Center'],
+  [/\bNAVSUP\b/i, 'Naval Supply Systems Command'],
+  [/\bNAVFACSYSCOM\b/i, 'Naval Facilities Engineering Command'],
+  [/\bNAVFAC\b/i, 'Naval Facilities Engineering Command'],
+  [/\bNAVSEA\b/i, 'Naval Sea Systems Command'],
+  [/\bNAVAIR\b/i, 'Naval Air Systems Command'],
+  [/\bNSWC\b/i, 'Naval Surface Warfare Center'],
+  [/\bNUWC\b/i, 'Naval Undersea Warfare Center'],
+  [/\bDITCO\b/i, 'Defense Information Technology Contracting Org'],
+  [/\bDISA\b/i, 'Defense Information Systems Agency'],
+  [/\bDLA\b/i, 'Defense Logistics Agency'],
+  [/\bUSACE\b/i, 'US Army Corps of Engineers'],
+  [/\bACC\b/i, 'Army Contracting Command'],
+  [/\bMICC\b/i, 'Mission & Installation Contracting Command'],
+  [/\bACA\b/i, 'Army Contracting Agency'],
+  [/\bAFLCMC\b/i, 'Air Force Life Cycle Management Center'],
+  [/\bAFICA\b/i, 'Air Force Installation Contracting Agency'],
+  [/\bSPAWAR\b/i, 'Space & Naval Warfare Systems Command'],
+  [/\bFISC\b/i, 'Fleet & Industrial Supply Center'],
+];
+function expandOfficeAcronyms(s: string): string {
+  let out = s;
+  for (const [re, full] of OFFICE_ACRONYMS) {
+    if (re.test(out)) { out = out.replace(re, full); break; } // expand the primary code
+  }
+  return out;
+}
+
 function cleanRawOffice(raw: string): string | null {
   const s = raw.trim().replace(/,\s*$/, '');
   if (s.length < 3) return null;
-  // Looks like an office? keep it.
-  if (OFFICE_WORDS.test(s)) return s;
+  if (FOREIGN_OFFICE_RE.test(s)) return null;               // overseas → drop (Eric)
+  // Looks like an office? keep it (expand cryptic codes to readable names).
+  if (OFFICE_WORDS.test(s)) return expandOfficeAcronyms(s);
   // "CITY, ST" or "CITY, FOREIGN PLACE" with no office words → it's a location.
   if (/,/.test(s) && !US_STATES.test(s)) return null;      // foreign city
   if (/,\s*[A-Z]{2}$/.test(s) && !OFFICE_WORDS.test(s)) return null; // US "CITY, ST" location
   // A single token that's all-caps and short with no office word → likely junk
   // (GIZA, HONDA, KAUNAS). Keep multi-word strings that might be real.
   if (!/\s/.test(s) && s === s.toUpperCase()) return null;
-  return s;
+  return expandOfficeAcronyms(s);
 }
 const JUNK_TITLE_RE = /^(mr|mrs|ms|miss|dr|none|n\/a|na|gm|khan|rector|head of organization|business poc|government business poc|electronic business poc)\.?$/i;
 
@@ -246,6 +283,10 @@ export async function GET(request: NextRequest) {
   const dodaacNames = await loadDodaacNames();
   const seen = new Set<string>();
   let contacts = (data || []).filter((r: any) => {
+    // Drop OVERSEAS contacts entirely (Eric: "why are Japan/Europe offices in my
+    // list?") — a US small business won't bid these. Check office + email host.
+    const hay = `${r.office || ''} ${r.sub_tier || ''} ${r.contact_email || ''}`;
+    if (FOREIGN_OFFICE_RE.test(hay)) return false;
     const key = (r.contact_email || `${r.contact_fullname}|${r.department_ind_agency}`).toLowerCase();
     if (seen.has(key)) return false;
     seen.add(key);
