@@ -25,6 +25,7 @@ interface Contact {
   office: string | null;
   sub_tier: string | null;
   role_category: string | null;
+  roleCategory: string | null;  // classified role badge (KO / Small Business / Program …)
   role: string | null;       // real job title if we could identify one
   pocLabel: string | null;   // "Primary"/"Secondary" SAM POC designation
   subAgency: string | null;  // derived branch/command (Air Force, Navy, DLA…)
@@ -290,7 +291,18 @@ export default function GovDecisionMakersPanel({ email }: Props) {
                   <td className="px-4 py-3 text-white font-medium">{c.contact_fullname || '—'}</td>
                   <td className="px-4 py-3">
                     {c.role ? (
-                      <span className="text-slate-200">{c.role}</span>
+                      <div>
+                        {/* Real role category badge (Eric: who to call for what). */}
+                        {c.roleCategory && (
+                          <span className={`inline-block px-1.5 py-0.5 rounded text-[10px] font-semibold mr-1.5 ${
+                            c.roleCategory === 'Contracting Officer' ? 'bg-emerald-500/20 text-emerald-300'
+                            : c.roleCategory === 'Small Business' ? 'bg-amber-500/20 text-amber-300'
+                            : c.roleCategory === 'Program / Technical' ? 'bg-blue-500/20 text-blue-300'
+                            : 'bg-slate-700 text-slate-300'
+                          }`}>{c.roleCategory}</span>
+                        )}
+                        <span className="text-slate-300 text-xs">{c.role}</span>
+                      </div>
                     ) : c.pocLabel ? (
                       <span className="text-slate-500 italic" title="SAM point-of-contact designation, not a job title">{c.pocLabel} POC</span>
                     ) : (

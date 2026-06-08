@@ -126,15 +126,26 @@ function cleanRawOffice(raw: string): string | null {
 }
 const JUNK_TITLE_RE = /^(mr|mrs|ms|miss|dr|none|n\/a|na|gm|khan|rector|head of organization|business poc|government business poc|electronic business poc)\.?$/i;
 
-function normalizeTitle(title: string | null): { role: string | null; pocLabel: string | null } {
+// Classify a real role into a scannable category (Eric: "who to call for what").
+function classifyRole(t: string): string | null {
+  if (/contracting officer|\bKO\b|\bACO\b|\bPCO\b/i.test(t)) return 'Contracting Officer';
+  if (/small business|osbp|sblo|sadbu|disadvantaged business/i.test(t)) return 'Small Business';
+  if (/contract specialist|contracting specialist|procurement|buyer|purchasing/i.test(t)) return 'Contract Specialist';
+  if (/program (manager|analyst|director|lead)|\bPM\b|\bCOR\b|technical|engineer/i.test(t)) return 'Program / Technical';
+  if (/director|chief|administrator|head/i.test(t)) return 'Leadership';
+  return null;
+}
+
+function normalizeTitle(title: string | null): { role: string | null; pocLabel: string | null; roleCategory: string | null } {
   const t = (title || '').trim();
-  if (!t) return { role: null, pocLabel: null };
+  if (!t) return { role: null, pocLabel: null, roleCategory: null };
   const pocMatch = /^(primary|secondary)\s+contact$/i.exec(t);
-  if (pocMatch) return { role: null, pocLabel: pocMatch[1][0].toUpperCase() + pocMatch[1].slice(1).toLowerCase() };
-  if (JUNK_TITLE_RE.test(t)) return { role: null, pocLabel: null };
-  if (REAL_ROLE_RE.test(t)) return { role: t, pocLabel: null };
+  if (pocMatch) return { role: null, pocLabel: pocMatch[1][0].toUpperCase() + pocMatch[1].slice(1).toLowerCase(), roleCategory: null };
+  if (JUNK_TITLE_RE.test(t)) return { role: null, pocLabel: null, roleCategory: null };
+  if (REAL_ROLE_RE.test(t)) return { role: t, pocLabel: null, roleCategory: classifyRole(t) };
   // Unknown but non-junk title — keep it as a role (could be a real one).
-  return { role: t.length <= 60 ? t : null, pocLabel: null };
+  const role = t.length <= 60 ? t : null;
+  return { role, pocLabel: null, roleCategory: role ? classifyRole(role) : null };
 }
 
 export async function GET(request: NextRequest) {
