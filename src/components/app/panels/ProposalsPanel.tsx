@@ -223,6 +223,8 @@ function combineUploadedDocuments(documents: UploadedRfp[]): UploadedRfp | null 
 export default function ProposalsPanel({ email, tier, panelContext }: ProposalsPanelProps) {
   const [opportunities, setOpportunities] = useState<PipelineOpportunity[]>([]);
   const [selectedId, setSelectedId] = useState('');
+  const [pursuitSearch, setPursuitSearch] = useState('');   // #45 searchable picker
+  const [pickerOpen, setPickerOpen] = useState(false);
   const [pipelineLoaded, setPipelineLoaded] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -1187,21 +1189,48 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             Pick one of your live pursuits. Mindy will pull cached SAM documents when available, then show the outputs you can generate.
           </p>
           <div className="flex flex-wrap items-center gap-3">
-            <select
-              value={selectedId}
-              onChange={(e) => setSelectedId(e.target.value)}
-              className="flex-1 min-w-[240px] rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
-            >
-              <option value="">Choose a pursuit…</option>
-              {opportunities.map(opp => {
-                const nt = noticeTypeLabel(opp.notice_type);
-                return (
-                  <option key={opp.id} value={opp.id}>
-                    {opp.title}{opp.agency ? ` — ${opp.agency}` : ''}{nt ? ` · ${nt}` : ''}
-                  </option>
-                );
-              })}
-            </select>
+            {/* Searchable pursuit picker (#45) — the native <select> piled up
+                into an unscannable list. Search + a clean dropdown with notice-
+                type chip + agency. */}
+            <div className="relative flex-1 min-w-[260px]">
+              <input
+                value={pickerOpen ? pursuitSearch : (opportunities.find(o => o.id === selectedId)?.title || '')}
+                onChange={(e) => { setPursuitSearch(e.target.value); setPickerOpen(true); }}
+                onFocus={() => { setPickerOpen(true); setPursuitSearch(''); }}
+                placeholder={`Search ${opportunities.length} saved pursuits…`}
+                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
+              />
+              {pickerOpen && (
+                <>
+                  <div className="fixed inset-0 z-10" onClick={() => setPickerOpen(false)} />
+                  <div className="absolute z-20 mt-1 w-full max-h-72 overflow-auto rounded-lg border border-slate-700 bg-slate-900 shadow-xl">
+                    {(() => {
+                      const q = pursuitSearch.trim().toLowerCase();
+                      const filtered = opportunities.filter(o =>
+                        !q || `${o.title} ${o.agency || ''} ${noticeTypeLabel(o.notice_type) || ''}`.toLowerCase().includes(q));
+                      if (filtered.length === 0) return <div className="px-3 py-3 text-xs text-slate-500">No pursuit matches “{pursuitSearch}”.</div>;
+                      return filtered.map(opp => {
+                        const nt = noticeTypeLabel(opp.notice_type);
+                        return (
+                          <button
+                            key={opp.id}
+                            type="button"
+                            onClick={() => { setSelectedId(opp.id); setPickerOpen(false); setPursuitSearch(''); }}
+                            className={`flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-slate-800 ${selectedId === opp.id ? 'bg-purple-500/10' : ''}`}
+                          >
+                            {nt && <span className="mt-0.5 shrink-0 rounded bg-slate-700 px-1.5 py-0.5 text-[10px] font-medium text-slate-300">{nt}</span>}
+                            <span className="min-w-0">
+                              <span className="block truncate text-sm text-slate-200">{opp.title}</span>
+                              {opp.agency && <span className="block truncate text-[11px] text-slate-500">{opp.agency}</span>}
+                            </span>
+                          </button>
+                        );
+                      });
+                    })()}
+                  </div>
+                </>
+              )}
+            </div>
             {(() => {
               const picked = opportunities.find(o => o.id === selectedId);
               const respondable = classifyNoticeType(picked?.notice_type).respondability !== 'none';
