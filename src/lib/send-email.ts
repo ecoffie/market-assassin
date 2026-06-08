@@ -43,6 +43,47 @@ interface SendEmailParams {
   eventSource?: string;
   tags?: Record<string, string | number | boolean | null | undefined>;
   metadata?: Record<string, unknown>;
+  // Transactional emails (auth, 2FA, password reset, purchase receipts) BYPASS the
+  // suppression list + daily cap — the user expects them in response to an action.
+  // Default false = it's a digest/alert/marketing email and IS guarded (#58).
+  transactional?: boolean;
+}
+
+// Email types that are ALWAYS transactional even if the caller forgets the flag —
+// belt-and-suspenders so we never suppress/cap an auth/receipt email. Matched by
+// keyword against the real emailType strings (two_factor_code, mi_account_setup,
+// mi_password_reset, mindy_free_signup, purchase_receipt, access_grant, invite…).
+const TRANSACTIONAL_RE = /(two_factor|2fa|account_setup|password_reset|signup|magic_link|receipt|access_grant|invite|verification|verify|setup|confirm)/i;
+function isTransactionalType(emailType?: string): boolean {
+  return !!emailType && TRANSACTIONAL_RE.test(emailType);
+}
+
+/**
+ * Global send guard (#58) — checks BEFORE any provider call, across ALL ~15 email
+ * streams. Returns a reason string to BLOCK, or null to allow. Transactional
+ * emails always pass. Eric: krithi@datanetiix.com got 12 emails/day → churned;
+ * no single stream was at fault, there was just no global cap.
+ */
+const DAILY_EMAIL_CAP = Number(process.env.EMAIL_DAILY_CAP || 3); // non-transactional / recipient / day
+async function emailGuardBlock(to: string, emailType: string | undefined, transactional: boolean): Promise<string | null> {
+  if (transactional || isTransactionalType(emailType)) return null;
+  const email = to.toLowerCase().trim();
+  try {
+    const sb = getSupabase();
+    // 1) Suppression list (unsubscribe / complaint / bounce / frequency).
+    const { data: supp } = await sb.from('email_suppressions').select('reason').eq('user_email', email).maybeSingle();
+    if (supp) return `suppressed:${supp.reason}`;
+    // 2) Per-recipient daily cap across every stream.
+    const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+    const { count } = await sb.from('email_provider_sends')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_email', email).gte('sent_at', since);
+    if ((count ?? 0) >= DAILY_EMAIL_CAP) return `daily_cap:${count}/${DAILY_EMAIL_CAP}`;
+  } catch (e) {
+    // Fail OPEN (send) on guard errors — never let a guard bug block real email.
+    console.error('[SendEmail] guard check failed (allowing):', e);
+  }
+  return null;
 }
 
 function sanitizeResendTagValue(value: unknown): string {
@@ -112,7 +153,16 @@ export async function sendEmail({
   eventSource,
   tags,
   metadata,
+  transactional,
 }: SendEmailParams): Promise<boolean> {
+  // GLOBAL SEND GUARD (#58) — suppression + per-recipient daily cap, across every
+  // stream, BEFORE we touch any provider. Transactional bypasses.
+  const block = await emailGuardBlock(to, emailType, !!transactional);
+  if (block) {
+    console.log(`[SendEmail] 🛑 blocked ${to} (${emailType || 'general'}): ${block}`);
+    return false;
+  }
+
   // Use alerts@govcongiants.com (verified in Resend)
   const fromEmail = process.env.EMAIL_FROM || 'alerts@govcongiants.com';
   const fromName = process.env.MINDY_FROM_NAME || "Mindy";
