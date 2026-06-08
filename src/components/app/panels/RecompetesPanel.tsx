@@ -44,9 +44,12 @@ interface IDVRow {
   startDate: string;
   endDate: string;
   agency: string;
+  subAgency?: string;
   naicsCode: string;
   pscCode: string;
+  popState: string;
   usaSpendingUrl: string;
+  locationMatch?: LocationMatch; // vs. user's service area (the "in your area" signal)
 }
 
 interface ContractSummary {
@@ -405,13 +408,21 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
       if (naics) params.set('naics', naics.split(/[, ]+/)[0]);
       const res = await fetch(`/api/app/idv-contracts?${params.toString()}`, { headers: getMIApiHeaders(email) });
       const data = await res.json();
-      setIdvContracts((data?.contracts || []) as IDVRow[]);
+      // Tag each with "in your area" vs the saved profile (Eric's tribe story:
+      // a firm winning a task order IN YOUR AREA is the BD trigger), then sort
+      // area-matches first.
+      const geo = { hqState: profileDefaults?.hqState, serviceStates: profileDefaults?.states || [] };
+      const rows = ((data?.contracts || []) as IDVRow[]).map(r => ({
+        ...r, locationMatch: classifyLocation(r.popState, geo),
+      }));
+      rows.sort((a, b) => MATCH_META[a.locationMatch || 'unknown'].rank - MATCH_META[b.locationMatch || 'unknown'].rank);
+      setIdvContracts(rows);
     } catch {
       setIdvContracts([]);
     } finally {
       setIdvLoading(false);
     }
-  }, [email]);
+  }, [email, profileDefaults]);
 
   // Switch view; load task-order data on demand.
   const switchAwardType = useCallback((type: 'definitive' | 'task') => {
@@ -751,23 +762,81 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
             </h3>
             <span className="text-[11px] text-slate-500">Primes winning task orders — approach to sub</span>
           </div>
+          {/* Mirrors the Expiring row format (Eric: copy that — it's distinct +
+              useful). Project + location prominent, prime clickable, area badge. */}
           <div className="divide-y divide-slate-800">
-            {idvContracts.map((c) => (
-              <div key={c.awardId} className="px-5 py-3">
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0">
-                    <div className="text-sm font-medium text-white truncate">{c.recipientName}</div>
-                    <div className="text-[11px] text-slate-500 truncate">{c.agency}{c.naicsCode ? ` · NAICS ${c.naicsCode}` : ''}{c.pscCode ? ` · PSC ${c.pscCode}` : ''}</div>
-                    {c.description && <div className="text-[11px] text-slate-600 truncate mt-0.5">{c.description}</div>}
-                    <div className="text-[10px] text-slate-600 mt-0.5">UEI {c.recipientUei || '—'}{c.endDate ? ` · ends ${formatDate(c.endDate)}` : ''}</div>
-                  </div>
-                  <div className="text-right shrink-0">
-                    <div className="text-sm font-semibold text-emerald-400">{formatCurrency(c.awardAmount)}</div>
-                    <div className="text-[10px] text-slate-500">task-order value</div>
+            {idvContracts.map((c) => {
+              const inArea = c.locationMatch === 'hq' || c.locationMatch === 'service' || c.locationMatch === 'neighbor';
+              return (
+                <div key={c.awardId} className={`p-5 hover:bg-slate-800/50 transition-colors ${inArea ? 'bg-emerald-500/5' : ''}`}>
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="flex-1 min-w-0">
+                      {/* Badges */}
+                      <div className="flex items-center gap-2 mb-2 flex-wrap">
+                        <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-500/20 text-amber-300">Task order</span>
+                        {c.naicsCode && <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-700 text-slate-300">NAICS {c.naicsCode}</span>}
+                        {c.pscCode && <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-700 text-slate-300">PSC {c.pscCode}</span>}
+                      </div>
+
+                      {/* PROJECT (description) — the "what project" Eric wanted up front */}
+                      <h4 className="text-white font-medium line-clamp-2 mb-1">
+                        {c.description || `${c.recipientName} — task order`}
+                      </h4>
+
+                      {/* Agency */}
+                      <p className="text-slate-400 text-sm mb-1">
+                        {c.agency}{c.subAgency && c.subAgency !== c.agency && <span className="text-slate-500"> • {c.subAgency}</span>}
+                      </p>
+
+                      {/* Prime = the subcontracting contact (clickable → award history) */}
+                      <div className="flex items-center gap-1.5 mb-2">
+                        <span className="text-xs text-emerald-500">Prime (sub to them):</span>
+                        <ContractorLink name={c.recipientName} email={email} variant="inline" className="text-xs font-medium">
+                          {c.recipientName}
+                        </ContractorLink>
+                      </div>
+
+                      {/* WHERE — project location + "in your area" badge (the tribe-story trigger) */}
+                      <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500 mt-0.5">
+                        <span>📍 {c.popState || 'Location not specified'}</span>
+                        {inArea && (
+                          <span title={MATCH_META[c.locationMatch!].hint} className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
+                            c.locationMatch === 'hq' ? 'bg-emerald-500/20 text-emerald-300'
+                            : c.locationMatch === 'service' ? 'bg-blue-500/20 text-blue-300'
+                            : 'bg-amber-500/20 text-amber-300'}`}>
+                            {MATCH_META[c.locationMatch!].label}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Value & period */}
+                    <div className="text-right shrink-0 min-w-[150px] flex flex-col items-end">
+                      <div className="text-lg font-bold text-emerald-400">{formatCurrency(c.awardAmount)}</div>
+                      <div className="text-xs text-slate-500">Task-order value</div>
+                      {c.endDate && <div className="text-sm font-medium text-white mt-2">Ends {formatDate(c.endDate)}</div>}
+                      <div className="text-[10px] text-slate-600 mt-1">UEI {c.recipientUei || '—'}</div>
+                      <div className="mt-3 flex flex-col items-end gap-1">
+                        <div className="text-[11px] uppercase tracking-wider text-slate-600">Add to My Pursuits</div>
+                        <SaveToPipelineButton
+                          opportunity={{
+                            title: c.description || `${c.recipientName} — subcontracting target`,
+                            noticeId: c.awardId,
+                            solicitationNumber: c.awardId,
+                            agency: c.agency,
+                            naicsCode: c.naicsCode || undefined,
+                            valueEstimate: formatCurrency(c.awardAmount),
+                            source: 'mi_beta_subcontracting',
+                          }}
+                          email={email || ''}
+                          variant="small"
+                        />
+                      </div>
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
             {!idvLoading && idvContracts.length === 0 && (
               <div className="px-5 py-6 text-center text-sm text-slate-500">No task orders for this NAICS. Try a NAICS in the search above.</div>
             )}
