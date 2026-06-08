@@ -80,7 +80,10 @@ export async function generatePainPointsForAgency(
     };
   }
 
-  const oversightText = formatOversightContextForPrompt(context);
+  // Format the oversight context defensively — a malformed/empty context must
+  // never throw (and "no data" must short-circuit, not crash).
+  let oversightText = '';
+  try { oversightText = formatOversightContextForPrompt(context) || ''; } catch { oversightText = ''; }
   const neededCount = targetCount - existingPainPoints.length;
 
   // GROUND GUARD (Eric): if there's no REAL oversight data, do NOT generate —
