@@ -531,10 +531,12 @@ export async function POST(request: NextRequest) {
       // category aggregate is only the right number for a SUB-AGENCY-level row
       // (no distinct contractingOffice) — never stamp it on every office.
       const isOfficeLevel = !!(a.contractingOffice && a.contractingOffice !== a.subAgency && a.contractingOffice !== a.parentAgency);
-      // find-agencies accumulates per-office spend into setAsideSpending (with no
-      // set-aside filter that IS the office's total). totalSpendingByOffice is
-      // the no-filter pass keyed by officeId when available.
-      const officeOwnTotal = totalSpendingByOffice[lookupOfficeKey] || a.setAsideSpending || 0;
+      // The office's OWN accumulated award spend (find-agencies sums real awards
+      // per office into setAsideSpending). This is the per-office number — use it
+      // FIRST. Do NOT use totalSpendingByOffice[lookupOfficeKey] for office rows:
+      // lookupOfficeKey falls back to subAgencyCode when officeId is empty, so it
+      // returns the whole sub-agency total (the $22.5B-on-every-Army-office bug).
+      const officeOwnTotal = a.setAsideSpending || totalSpendingByOffice[a.officeId || ''] || 0;
       const catKey = normalizeAgencyKey(a.subAgency || a.parentAgency || a.name || '');
       const accurateTotal = categoryTotalByKey[catKey];
       // Office row → its own spend. Agency/sub-agency rollup row → the accurate
