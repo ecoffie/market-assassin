@@ -38,6 +38,7 @@ import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { logToolError, recordToolSuccess, ToolNames, classifyError, AIProviders } from '@/lib/tool-errors';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
 import { fiscalYearTimePeriod } from '@/lib/utils/fiscal-year';
+import { callLLM } from '@/lib/llm/call-llm';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -249,8 +250,8 @@ export async function POST(request: NextRequest) {
     .eq('user_email', email)
     .maybeSingle();
 
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
+  // callLLM (job:'reasoning') picks from openai/groq/claude — just need one key.
+  if (!process.env.OPENAI_API_KEY && !process.env.GROQ_API_KEY && !process.env.ANTHROPIC_API_KEY) {
     return NextResponse.json(
       { success: false, error: 'AI service not configured' },
       { status: 500 }
@@ -263,28 +264,22 @@ export async function POST(request: NextRequest) {
   const realCompetitors = await getRealPrimesForNaics(opp.naics_code);
   const prompt = buildPrompt(opp, profile || {}, realCompetitors);
 
-  let response: Response;
+  // job:'reasoning' = gpt-4o-mini first (Eric: go/no-go judgment — gpt-mini is
+  // BOTH cheaper than Groq 70B AND better at this; the audit's clear win). Groq
+  // is the fallback; the chain handles 429/failure.
+  let content: string | undefined;
+  let usage: { prompt_tokens?: number; completion_tokens?: number } | undefined;
   try {
-    response = await fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        Authorization: `Bearer ${apiKey}`,
-      },
-      body: JSON.stringify({
-        model: GROQ_MODEL,
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a federal contracting BD analyst. You return only valid JSON in the exact shape requested — no markdown, no prose, no code fences.',
-          },
-          { role: 'user', content: prompt },
-        ],
-        temperature: 0.2,
-        max_tokens: 1200,
-        response_format: { type: 'json_object' },
-      }),
+    const result = await callLLM({
+      system: 'You are a federal contracting BD analyst. You return only valid JSON in the exact shape requested — no markdown, no prose, no code fences.',
+      user: prompt,
+      json: true,
+      maxTokens: 1200,
+      temperature: 0.2,
+      job: 'reasoning',
     });
+    content = result.text;
+    usage = result.usage as { prompt_tokens?: number; completion_tokens?: number } | undefined;
   } catch (err) {
     await logToolError({
       tool: ToolNames.ANALYST,
@@ -294,33 +289,8 @@ export async function POST(request: NextRequest) {
       aiProvider: AIProviders.GROQ,
       aiModel: GROQ_MODEL,
     }).catch(() => {});
-    return NextResponse.json(
-      { success: false, error: 'Could not reach AI service' },
-      { status: 502 }
-    );
+    return NextResponse.json({ success: false, error: 'Could not reach AI service' }, { status: 502 });
   }
-
-  if (!response.ok) {
-    const upstreamText = await response.text().catch(() => '');
-    await logToolError({
-      tool: ToolNames.ANALYST,
-      errorType: response.status === 429 ? 'ai_rate_limit' : 'api_error',
-      errorMessage: `Groq ${response.status}: ${upstreamText.slice(0, 500)}`,
-      requestPath: '/api/analyst/bid-no-bid',
-      aiProvider: AIProviders.GROQ,
-      aiModel: GROQ_MODEL,
-    }).catch(() => {});
-    return NextResponse.json(
-      { success: false, error: `AI service returned ${response.status}` },
-      { status: 502 }
-    );
-  }
-
-  const payload = await response.json().catch(() => null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const content = (payload as any)?.choices?.[0]?.message?.content as string | undefined;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const usage = (payload as any)?.usage as { prompt_tokens?: number; completion_tokens?: number } | undefined;
 
   if (!content) {
     await logToolError({

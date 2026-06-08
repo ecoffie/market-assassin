@@ -65,7 +65,8 @@ function hasKey(p: Provider): boolean {
   }
 }
 
-interface CallResult { text: string; provider: Provider }
+interface TokenUsage { prompt_tokens?: number; completion_tokens?: number; total_tokens?: number }
+interface CallResult { text: string; provider: Provider; model?: string; usage?: TokenUsage }
 
 async function callProvider(p: Provider, opts: LlmOpts): Promise<CallResult | { retry: true } | null> {
   const max = opts.maxTokens ?? 2000;
@@ -84,7 +85,9 @@ async function callProvider(p: Provider, opts: LlmOpts): Promise<CallResult | { 
       if (res.status === 429 || res.status === 529 || res.status === 400) return { retry: true };
       if (!res.ok) return { retry: true };
       const j = await res.json();
-      return { text: j.content?.[0]?.text || '', provider: p };
+      // Anthropic usage shape → normalize to {prompt,completion,total}.
+      const u = j.usage ? { prompt_tokens: j.usage.input_tokens, completion_tokens: j.usage.output_tokens, total_tokens: (j.usage.input_tokens || 0) + (j.usage.output_tokens || 0) } : undefined;
+      return { text: j.content?.[0]?.text || '', provider: p, model, usage: u };
     }
     // OpenAI-compatible providers (Groq, OpenAI, Grok all share the schema).
     const cfg = {
@@ -107,7 +110,7 @@ async function callProvider(p: Provider, opts: LlmOpts): Promise<CallResult | { 
     if ([429, 413, 400, 403, 401, 503].includes(res.status)) return { retry: true };
     if (!res.ok) return { retry: true };
     const j = await res.json();
-    return { text: j.choices?.[0]?.message?.content || '', provider: p };
+    return { text: j.choices?.[0]?.message?.content || '', provider: p, model: cfg.model, usage: j.usage };
   } catch {
     return { retry: true };
   }
@@ -117,7 +120,7 @@ async function callProvider(p: Provider, opts: LlmOpts): Promise<CallResult | { 
  * Call the LLM with automatic provider fallback. Returns the text + which
  * provider answered. Throws only if EVERY available provider failed.
  */
-export async function callLLM(opts: LlmOpts): Promise<{ text: string; provider: Provider }> {
+export async function callLLM(opts: LlmOpts): Promise<{ text: string; provider: Provider; model?: string; usage?: TokenUsage }> {
   // env LLM_CHAIN overrides everything; otherwise pick the per-job chain so
   // Claude is only eligible for drafting/referee, never bulk extraction.
   const jobChain = JOB_CHAINS[opts.job ?? 'extraction'] ?? DEFAULT_CHAIN;

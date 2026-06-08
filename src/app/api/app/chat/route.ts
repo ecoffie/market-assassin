@@ -371,25 +371,29 @@ export async function POST(request: NextRequest) {
           : message;
         messages.push({ role: 'user', content: userTurn });
 
-        // Stream from Groq
-        const groqRes = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+        // GPT-4o-mini first, Groq fallback (Eric: Groq too weak for grounded
+        // Q&A, but Claude isn't scalable at $149 — gpt-4o-mini is the quality/
+        // cost sweet spot). Both speak the OpenAI streaming format, so the SSE
+        // parser below is unchanged and we keep streaming UX.
+        const openaiKey = process.env.OPENAI_API_KEY;
+        const streamFrom = (url: string, key: string, model: string) => fetch(url, {
           method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${groqKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: GROQ_MODEL,
-            messages,
-            temperature: TEMPERATURE,
-            max_tokens: MAX_TOKENS,
-            stream: true,
-          }),
+          headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
+          body: JSON.stringify({ model, messages, temperature: TEMPERATURE, max_tokens: MAX_TOKENS, stream: true }),
         });
+
+        let groqRes: Response | null = null;
+        if (openaiKey) {
+          const r = await streamFrom('https://api.openai.com/v1/chat/completions', openaiKey, process.env.LLM_OPENAI_MODEL || 'gpt-4o-mini');
+          if (r.ok && r.body) groqRes = r;
+        }
+        if (!groqRes) {
+          groqRes = await streamFrom('https://api.groq.com/openai/v1/chat/completions', groqKey || '', GROQ_MODEL);
+        }
 
         if (!groqRes.ok || !groqRes.body) {
           const errText = await groqRes.text().catch(() => '(no body)');
-          send({ type: 'error', message: `Groq ${groqRes.status}: ${errText.slice(0, 200)}` });
+          send({ type: 'error', message: `AI ${groqRes.status}: ${errText.slice(0, 200)}` });
           send({ type: 'done' });
           controller.close();
           return;

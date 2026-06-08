@@ -223,34 +223,32 @@ export async function POST(request: NextRequest) {
 
         // Stream from Groq; on rate-limit/failure fall back to a non-streaming
         // provider (Claude/OpenAI) so the chat NEVER dies on a 429 (Eric QC).
-        // GPT-4o-mini FIRST for Manual Drive (Eric: Groq gave generic "no
-        // past-perf requirement" filler; GPT-mini extracts the exact clause like
-        // Claude does, but is scalable at $149 — Claude could run a $200 bill).
-        // Groq is the cheap fallback; Claude only as last resort.
-        try {
-          const { text } = await callLLM({
-            system: SYSTEM_PROMPT,
-            user: messages[messages.length - 1].content,
-            maxTokens: MAX_TOKENS,
-            temperature: TEMPERATURE,
-            job: 'reasoning', // openai(gpt-4o-mini) → groq70b → claude
-          });
-          if (text && text.trim()) {
-            send({ type: 'token', content: text });
-            send({ type: 'done' });
-            controller.close();
-            return;
-          }
-        } catch { /* fall through to Groq streaming */ }
-
-        const streamModel = async (model: string) => fetch('https://api.groq.com/openai/v1/chat/completions', {
+        // GPT-4o-mini FIRST, STREAMING (Eric: Groq gave generic "no past-perf
+        // requirement" filler; gpt-4o-mini extracts the exact clause like Claude,
+        // but is scalable at $149 — Claude could run a $200 bill). Both speak the
+        // OpenAI stream format → same SSE parser, streaming UX kept. Groq is the
+        // cheap fallback; callLLM('reasoning') the deep fallback (Claude last).
+        const openaiKey = process.env.OPENAI_API_KEY;
+        const streamFrom = (url: string, key: string, model: string) => fetch(url, {
           method: 'POST',
-          headers: { Authorization: `Bearer ${groqKey}`, 'Content-Type': 'application/json' },
+          headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
           body: JSON.stringify({ model, messages, temperature: TEMPERATURE, max_tokens: MAX_TOKENS, stream: true }),
         });
-        let groqRes = await streamModel(GROQ_MODEL);
-        if (groqRes.status === 429) groqRes = await streamModel('llama-3.3-70b-versatile');
+        let groqRes: Response | null = null;
+        if (openaiKey) {
+          const r = await streamFrom('https://api.openai.com/v1/chat/completions', openaiKey, process.env.LLM_OPENAI_MODEL || 'gpt-4o-mini');
+          if (r.ok && r.body) groqRes = r;
+        }
+        if (!groqRes) {
+          groqRes = await streamFrom('https://api.groq.com/openai/v1/chat/completions', groqKey, GROQ_MODEL);
+          if (groqRes.status === 429) groqRes = await streamFrom('https://api.groq.com/openai/v1/chat/completions', groqKey, 'llama-3.3-70b-versatile');
+        }
         if (!groqRes.ok || !groqRes.body) {
+          // Last resort: non-streaming callLLM (Claude/OpenAI) so chat never dies.
+          try {
+            const { text } = await callLLM({ system: SYSTEM_PROMPT, user: messages[messages.length - 1].content, maxTokens: MAX_TOKENS, temperature: TEMPERATURE, job: 'reasoning' });
+            if (text?.trim()) { send({ type: 'token', content: text }); send({ type: 'done' }); controller.close(); return; }
+          } catch { /* fall to error */ }
           send({ type: 'error', message: 'AI is busy right now — try again in a moment.' });
           send({ type: 'done' });
           controller.close();
