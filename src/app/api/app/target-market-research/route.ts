@@ -51,6 +51,7 @@ import {
 } from '@/lib/agency-hierarchy/pain-points-linker';
 import { getPrimesByAgency } from '@/lib/utils/prime-contractors';
 import { getEnhancedAgencyInfo, getAllCommands } from '@/lib/utils/command-info';
+import { keywordCoverage } from '@/lib/market/keyword-coverage';
 
 const FREE_TIER_ROW_LIMIT = 10;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -198,7 +199,8 @@ export async function POST(request: NextRequest) {
     }
 
     const {
-      naicsCode,
+      naicsCode: rawNaicsCode,
+      keyword,
       businessType = '',
       veteranStatus = '',
       zipCode = '',
@@ -207,6 +209,7 @@ export async function POST(request: NextRequest) {
       email,
     } = body as {
       naicsCode?: string;
+      keyword?: string;        // KEYWORD-FIRST (#59): "drones" → Mindy auto-derives the NAICS set
       businessType?: string;
       veteranStatus?: string;
       zipCode?: string;
@@ -218,13 +221,28 @@ export async function POST(request: NextRequest) {
     if (!email) {
       return NextResponse.json({ error: 'email is required' }, { status: 400 });
     }
-    // At least one classifier required — NAICS OR PSC (roadmap Slice
-    // 5b: PSC is first-class, not a NAICS add-on). find-agencies
-    // crosswalks PSC→NAICS when NAICS is absent, so PSC-only is valid.
+
+    // KEYWORD-FIRST resolution (#59 — Eric: NAICS is the wrong primary key; a
+    // keyword like "drones" sprawls across 70+ codes and the obvious code is both
+    // over-broad AND incomplete). When a keyword is given (and no explicit NAICS),
+    // auto-derive the NAICS set that covers ~90% of that keyword's real market —
+    // the user never manages codes. We attach coverage stats for the UI.
+    let naicsCode = rawNaicsCode;
+    let coverage: Awaited<ReturnType<typeof keywordCoverage>> | null = null;
+    if (keyword && keyword.trim() && !(rawNaicsCode && rawNaicsCode.trim())) {
+      coverage = await keywordCoverage(keyword.trim());
+      if (coverage && coverage.coverageCodes.length) {
+        naicsCode = coverage.coverageCodes.join(', ');
+      }
+    }
+
+    // At least one classifier required — NAICS OR PSC OR a resolvable keyword.
     const hasNaics = !!(naicsCode && naicsCode.trim());
     const hasPsc = !!(pscCode && pscCode.trim());
     if (!hasNaics && !hasPsc) {
-      return NextResponse.json({ error: 'naicsCode or pscCode is required' }, { status: 400 });
+      return NextResponse.json({
+        error: keyword ? `Couldn't find a federal market for "${keyword}". Try a broader term.` : 'naicsCode, pscCode, or keyword is required',
+      }, { status: 400 });
     }
     // Normalize to definite strings for all downstream uses (cache key
     // + find-agencies bodies). Either may be '' now that PSC-only is
@@ -682,6 +700,17 @@ export async function POST(request: NextRequest) {
       total_count: rows.length,
       total_spending: findData.totalSpending || 0,
       sat_summary: findData.satSummary,
+      // KEYWORD-FIRST coverage (#59) — when researched by keyword, tell the UI the
+      // full market: "drones = $245M across 70+ codes; we covered 90%". Lets the
+      // panel show coverage instead of asking the user to manage codes.
+      keyword_coverage: coverage ? {
+        keyword: coverage.keyword,
+        total_market: coverage.totalMarket,
+        naics_count: coverage.naicsCount,
+        codes_used: coverage.coverageCodes.length,
+        coverage_pct: Math.round(coverage.coveragePct * 100),
+        top_code_pct: Math.round(coverage.topCodePct * 100),
+      } : null,
       cached: false,
       generation_ms: Date.now() - startedAt,
       source_versions: {
