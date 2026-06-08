@@ -609,8 +609,9 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      {summary && (
+      {/* Summary Cards — reflect the ACTIVE view (Eric: was stuck on the 804
+          expiring numbers when switched to Subcontracting). */}
+      {awardType === 'definitive' && summary && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
             <div className="text-2xl font-bold text-white">{summary.totalContracts}</div>
@@ -636,6 +637,28 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
             <div className="text-2xl font-bold text-red-400">{summary.urgentContracts}</div>
             <div className="text-xs text-slate-500">Ending Soon</div>
             <div className="text-[11px] text-slate-600 mt-1">Within 90 days</div>
+          </div>
+        </div>
+      )}
+      {/* Subcontracting view gets its OWN summary so the count reflects reality. */}
+      {awardType === 'task' && (
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <div className="text-2xl font-bold text-white">{idvLoading ? '…' : idvContracts.length.toLocaleString()}</div>
+            <div className="text-xs text-slate-500">Subcontracting Targets</div>
+            <div className="text-[11px] text-slate-600 mt-1">Primes winning task orders</div>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <div className="text-2xl font-bold text-emerald-400">{formatCurrency(idvContracts.reduce((s, c) => s + (c.awardAmount || 0), 0))}</div>
+            <div className="text-xs text-slate-500">Combined Task-Order $</div>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <div className="text-2xl font-bold text-blue-400">{idvContracts.filter(c => c.locationMatch === 'hq' || c.locationMatch === 'service' || c.locationMatch === 'neighbor').length}</div>
+            <div className="text-xs text-slate-500">In or near your area</div>
+          </div>
+          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+            <div className="text-2xl font-bold text-amber-400">{new Set(idvContracts.map(c => c.recipientName)).size}</div>
+            <div className="text-xs text-slate-500">Distinct primes</div>
           </div>
         </div>
       )}
@@ -731,7 +754,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
             </button>
           </div>
         </div>
-        {usingProfileDefaults && allContracts.length > shownContractsCount && (
+        {awardType === 'definitive' && usingProfileDefaults && allContracts.length > shownContractsCount && (
           <div className="rounded-lg border border-slate-700 bg-slate-950/50 p-3 text-sm text-slate-400">
             Showing {shownContractsCount.toLocaleString()} matches from your saved profile. The full database has {allContracts.length.toLocaleString()} expiring awards.
             <button
@@ -788,12 +811,22 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                         {c.agency}{c.subAgency && c.subAgency !== c.agency && <span className="text-slate-500"> • {c.subAgency}</span>}
                       </p>
 
-                      {/* Prime = the subcontracting contact (clickable → award history) */}
+                      {/* Prime = the subcontracting contact. These task-order
+                          winners often AREN'T in the cached contractor DB (Eric:
+                          ContractorLink → "Contractor not found"). We have the
+                          REAL award though — link the name to its USASpending
+                          award page, which has the full company detail. Same
+                          resolution as the #19 teaming fix: don't open the empty
+                          cached drawer for entities not in the DB. */}
                       <div className="flex items-center gap-1.5 mb-2">
                         <span className="text-xs text-emerald-500">Prime (sub to them):</span>
-                        <ContractorLink name={c.recipientName} email={email} variant="inline" className="text-xs font-medium">
-                          {c.recipientName}
-                        </ContractorLink>
+                        {c.usaSpendingUrl ? (
+                          <a href={c.usaSpendingUrl} target="_blank" rel="noreferrer" className="text-xs font-medium text-amber-300 hover:text-amber-200 underline decoration-dotted">
+                            {c.recipientName} ↗
+                          </a>
+                        ) : (
+                          <span className="text-xs font-medium text-slate-200">{c.recipientName}</span>
+                        )}
                       </div>
 
                       {/* WHERE — project location + "in your area" badge (the tribe-story trigger) */}
