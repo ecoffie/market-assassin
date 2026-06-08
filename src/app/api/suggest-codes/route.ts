@@ -17,6 +17,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { logToolError, recordToolSuccess, ToolNames, classifyError, AIProviders } from '@/lib/tool-errors';
+import { fiscalYearTimePeriod, fiscalYearLabel } from '@/lib/utils/fiscal-year';
 
 // Groq API configuration
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -225,7 +226,7 @@ async function groundCodesFromUsaspending(keyword: string, maxResults: number): 
   const base = 'https://api.usaspending.gov/api/v2/search/spending_by_category';
   const filters = {
     keywords: [keyword],
-    time_period: [{ start_date: '2023-10-01', end_date: '2024-09-30' }],
+    time_period: [fiscalYearTimePeriod()],
     award_type_codes: ['A', 'B', 'C', 'D'],
   };
   const fetchCat = async (cat: 'naics' | 'psc'): Promise<CodeSuggestion[]> => {
@@ -241,7 +242,7 @@ async function groundCodesFromUsaspending(keyword: string, maxResults: number): 
           code: r.code,
           name: r.name || r.code,
           confidence: 'high' as const,
-          reason: `$${(r.amount / 1e6).toFixed(1)}M in federal awards under "${keyword}"`,
+          reason: `$${(r.amount / 1e6).toFixed(1)}M in ${fiscalYearLabel()} federal awards under "${keyword}"`,
         }));
     } catch { return []; }
   };

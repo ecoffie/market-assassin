@@ -37,6 +37,7 @@ import { verifyMIAccess } from '@/lib/api-auth';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { logToolError, recordToolSuccess, ToolNames, classifyError, AIProviders } from '@/lib/tool-errors';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
+import { fiscalYearTimePeriod } from '@/lib/utils/fiscal-year';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -70,7 +71,7 @@ async function getRealPrimesForNaics(naicsCode?: string): Promise<string[]> {
     const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_category/recipient/', {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        filters: { naics_codes: [naicsCode], time_period: [{ start_date: '2023-10-01', end_date: '2024-09-30' }], award_type_codes: ['A', 'B', 'C', 'D'] },
+        filters: { naics_codes: [naicsCode], time_period: [fiscalYearTimePeriod()], award_type_codes: ['A', 'B', 'C', 'D'] },
         limit: 6,
       }),
     });

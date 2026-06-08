@@ -14,6 +14,7 @@ import {
   RecompeteUserProfile,
 } from './types';
 import { getAgencyAcronym, formatContractValue } from './data-aggregator';
+import { fiscalYearTimePeriod } from '@/lib/utils/fiscal-year';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
@@ -170,7 +171,7 @@ async function getRealPrimesForAgency(agency: string, limit = 5): Promise<string
       body: JSON.stringify({
         filters: {
           keywords: [agency],
-          time_period: [{ start_date: '2023-10-01', end_date: '2024-09-30' }],
+          time_period: [fiscalYearTimePeriod()],
           award_type_codes: ['A', 'B', 'C', 'D'],
         },
         limit,
