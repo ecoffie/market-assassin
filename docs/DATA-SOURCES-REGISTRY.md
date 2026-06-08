@@ -98,3 +98,8 @@ the Command Center Data Sources view (last-built + record count, like the Foreca
 1. Define a staleness SLA per source (SAM ≤24h, budgets ≤1mo, contractors ≤3mo).
 2. Convert manual refresh scripts → scheduled crons (priority: contractors, forecasts, intel).
 3. Keep this registry current — it IS the data-lineage doc a buyer's diligence will ask for.
+
+### Tooling (live — #30/#31)
+- **Registry table:** `data_sources` (migration `20260608_data_sources_registry.sql`), seeded from this doc.
+- **Command Center view:** `GET /api/admin/data-sources?password=...` — every source by category + freshness + a `needsRefresh` list.
+- **Freshness watchdog:** `GET /api/cron/check-data-freshness` — weekly (Mon 13:00 UTC). Flags any curated source past its cadence (quarterly >100d, annual >380d) + names the refresh script. The discipline that keeps the data layer provably MAINTAINED.
