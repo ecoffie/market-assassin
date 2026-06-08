@@ -1183,10 +1183,10 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           pursuit and the workbench will extract available SAM docs. */}
       {email && !activePursuitId && opportunities.length > 0 && (
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-          <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Start here</p>
+          <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">① Start here</p>
           <h2 className="text-lg font-semibold text-white mb-1">Start from a saved pursuit</h2>
           <p className="text-sm text-slate-400 mb-3">
-            Pick one of your live pursuits. Mindy will pull cached SAM documents when available, then show the outputs you can generate.
+            Pick one of your live pursuits and click <span className="text-purple-300 font-medium">Open workbench</span> — Mindy pulls the cached SAM documents and opens your workbench below. (No pursuit? Skip to ② and upload a document directly.)
           </p>
           <div className="flex flex-wrap items-center gap-3">
             {/* Searchable pursuit picker (#45) — the native <select> piled up
@@ -1352,6 +1352,15 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
 
       {/* Document Workbench */}
       <section id="proposal-source-document" className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+        {/* Step cue (#55 — Eric: the start screen looked like Open workbench did
+            nothing because the docs section sat below it with no relationship).
+            Make it an explicit numbered step that reflects whether a pursuit is
+            open yet. */}
+        <div className={`mb-4 rounded-lg border px-3 py-2 text-xs ${activePursuitId ? 'border-emerald-500/30 bg-emerald-500/[0.06] text-emerald-300' : 'border-purple-500/30 bg-purple-500/[0.06] text-purple-200'}`}>
+          {activePursuitId
+            ? '✓ Workbench open — add or extract your documents below, then generate the outputs.'
+            : '② This is your workbench. Pick a pursuit above and click “Open workbench”, or upload a document right here to start — Mindy reads it either way.'}
+        </div>
         <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
           <div>
             <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Source Documents</p>
