@@ -61,6 +61,33 @@ interface PipelineOpportunity {
 }
 
 type PipelineStage = PipelineOpportunity['stage'];
+
+// Compute an OBVIOUS next action when the user hasn't set one (Eric: the column
+// was all blank dead space). Driven by stage + deadline + draft status.
+function suggestedNextAction(opp: PipelineOpportunity): string {
+  if (opp.next_action) return opp.next_action;
+  const days = opp.response_deadline
+    ? Math.ceil((new Date(opp.response_deadline).getTime() - Date.now()) / 86400000)
+    : null;
+  const dueSoon = days !== null && days >= 0 && days <= 7;
+  switch (opp.stage) {
+    case 'tracking':
+      return 'Review fit → decide pursue or pass';
+    case 'pursuing':
+      return opp.has_drafts ? 'Continue draft in Proposal Assist' : 'Open in Proposal Assist → draft response';
+    case 'bidding':
+      return dueSoon ? `Finalize + submit — due in ${days}d` : 'Finish draft → run compliance check';
+    case 'submitted':
+      return 'Await award · log outcome when decided';
+    case 'won':
+      return 'Kick off — set up the contract';
+    case 'lost':
+    case 'no_bid':
+      return 'Request debrief · capture lessons';
+    default:
+      return '—';
+  }
+}
 type PipelinePriority = NonNullable<PipelineOpportunity['priority']>;
 
 interface TeamingPartner {
@@ -175,7 +202,20 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
           setError(data.error);
         }
       } else {
-        const opps: PipelineOpportunity[] = data.opportunities || [];
+        const rawOpps: PipelineOpportunity[] = data.opportunities || [];
+        // Dedupe (#54 — Eric: "we still have duplicates in our pipeline"). Same
+        // notice_id (or title when no notice_id) under the same owner = one
+        // pursuit. Keep the most recently created so stage edits aren't lost.
+        const byKey = new Map<string, PipelineOpportunity>();
+        for (const o of rawOpps) {
+          const owner = (o.owner_email || o.user_email || '').toLowerCase();
+          const key = `${owner}::${(o.notice_id || o.title || o.id).toLowerCase().trim()}`;
+          const existing = byKey.get(key);
+          if (!existing || new Date(o.created_at || 0) > new Date(existing.created_at || 0)) {
+            byKey.set(key, o);
+          }
+        }
+        const opps: PipelineOpportunity[] = Array.from(byKey.values());
         // Annotate has_drafts + draft_count from the library auto-archive.
         // Per Eric (2026-05-27): "how do we know which ones have [drafts]".
         // We match library entries to pursuits by title containment since
@@ -1255,20 +1295,18 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                         )}
                       </td>
 
-                      {/* Next Action */}
+                      {/* Next Action — computed when the user hasn't set one (#54). */}
                       <td className="px-4 py-3 max-w-[200px]">
-                        {opp.next_action ? (
-                          <div>
-                            <div className="text-xs text-slate-300 line-clamp-1">{opp.next_action}</div>
-                            {opp.next_action_date && (
-                              <div className="text-[10px] text-slate-500 mt-0.5">
-                                Due: {formatDate(opp.next_action_date)}
-                              </div>
-                            )}
+                        <div>
+                          <div className={`text-xs line-clamp-1 ${opp.next_action ? 'text-slate-300' : 'text-slate-400 italic'}`}>
+                            {suggestedNextAction(opp)}
                           </div>
-                        ) : (
-                          <span className="text-xs text-slate-600">-</span>
-                        )}
+                          {opp.next_action_date && (
+                            <div className="text-[10px] text-slate-500 mt-0.5">
+                              Due: {formatDate(opp.next_action_date)}
+                            </div>
+                          )}
+                        </div>
                       </td>
 
                       {/* Archive button column. Separate from the stage
