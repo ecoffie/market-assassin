@@ -39,6 +39,7 @@ import { logToolError, recordToolSuccess, ToolNames, classifyError, AIProviders 
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
 import { fiscalYearTimePeriod } from '@/lib/utils/fiscal-year';
 import { callLLM } from '@/lib/llm/call-llm';
+import { findPredecessorAward, summarizePredecessor } from '@/lib/usaspending/find-predecessor';
 import { recordLlmUsage } from '@/lib/llm/usage-cost';
 
 export const dynamic = 'force-dynamic';
@@ -84,7 +85,7 @@ async function getRealPrimesForNaics(naicsCode?: string): Promise<string[]> {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildPrompt(opp: any, profile: any, realCompetitors: string[] = []): string {
+function buildPrompt(opp: any, profile: any, realCompetitors: string[] = [], predecessorBlock = ''): string {
   const naicsList = (profile?.naics_codes || []).slice(0, 8).join(', ') || 'not set';
   const setAsides = (profile?.set_aside_preferences || []).join(', ') || 'not set';
   const agencies = (profile?.target_agencies || profile?.agencies || []).slice(0, 5).join(', ') || 'not set';
@@ -118,6 +119,7 @@ OPPORTUNITY:
 - Solicitation #: ${opp.solicitation_number || '(none)'}
 - Attachments available: ${Array.isArray(opp.attachments) && opp.attachments.length > 0 ? `yes (${opp.attachments.length})` : 'no'}
 ${realCompetitors.length > 0 ? `\nTOP PRIMES IN THIS NAICS (real USASpending FY data — use ONLY these for competitors_likely):\n${realCompetitors.map(c => `- ${c}`).join('\n')}` : ''}
+${predecessorBlock ? `\nLIKELY INCUMBENT CONTRACT (real USASpending data — this is the work being recompeted; use it for competitors_likely, effort_estimate, and next_step):\n${predecessorBlock}` : ''}
 
 DESCRIPTION (truncated to 6K chars):
 ${description}
@@ -262,8 +264,15 @@ export async function POST(request: NextRequest) {
   // GROUND the competitors (Eric: was an LLM guess of incumbent names). Pull the
   // REAL top primes for this NAICS from USASpending and pass them in, so
   // competitors_likely is award-backed, not invented.
-  const realCompetitors = await getRealPrimesForNaics(opp.naics_code);
-  const prompt = buildPrompt(opp, profile || {}, realCompetitors);
+  // GROUND the recompete intel (#52): find the likely INCUMBENT award (real
+  // ceiling, expiry, parent vehicle) so the analyst reasons about THIS contract,
+  // not a generic market. Best-match inference, labeled as "likely."
+  const [realCompetitors, predecessor] = await Promise.all([
+    getRealPrimesForNaics(opp.naics_code),
+    findPredecessorAward({ naicsCode: opp.naics_code, agencyName: opp.department, keyword: opp.title }),
+  ]);
+  const predecessorBlock = predecessor ? summarizePredecessor(predecessor) : '';
+  const prompt = buildPrompt(opp, profile || {}, realCompetitors, predecessorBlock);
 
   // job:'reasoning' = gpt-4o-mini first (Eric: go/no-go judgment — gpt-mini is
   // BOTH cheaper than Groq 70B AND better at this; the audit's clear win). Groq
