@@ -102,4 +102,5 @@ the Command Center Data Sources view (last-built + record count, like the Foreca
 ### Tooling (live — #30/#31)
 - **Registry table:** `data_sources` (migration `20260608_data_sources_registry.sql`), seeded from this doc.
 - **Command Center view:** `GET /api/admin/data-sources?password=...` — every source by category + freshness + a `needsRefresh` list.
-- **Freshness watchdog:** `GET /api/cron/check-data-freshness` — weekly (Mon 13:00 UTC). Flags any curated source past its cadence (quarterly >100d, annual >380d) + names the refresh script. The discipline that keeps the data layer provably MAINTAINED.
+- **Freshness watchdog:** `GET /api/cron/check-data-freshness` — **quarterly** (dispatcher cron_jobs, `0 13 1 1,4,7,10 *`). Flags any curated source past its cadence (quarterly >100d, annual >380d) + names the refresh script. When overdue it **EMAILS the refresh checklist** (cron runs unattended). The refreshes are HUMAN-run scrapers — we never auto-stamp `last_built` (that would fake freshness); after running a script, mark it done with `?stamp=<source key>`. The discipline that keeps the data layer provably MAINTAINED.
+- **Office rosters (#16):** `GET /api/app/federal-contacts?facets=office-roster&agency=&office=` builds COMPLETE per-buying-office contact lists from DoDAAC-decoded offices (DoD/DLA/Navy; civilian = agency preview). Foreign-filtered.

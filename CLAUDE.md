@@ -224,6 +224,54 @@ npm run test:pre-deploy
 
 **Note:** USASpending MCP fixed April 5, 2026 (added required `award_type_codes` filter).
 
+---
+
+## Award Intelligence + Office Rosters (June 8, 2026)
+
+The USASpending **award-detail spine** — built once, woven through every surface
+that shows an award/incumbent/recompete. Core principle: award detail only on
+AWARDS; incumbent intel on OPEN opps (don't put the wrong data in the wrong place).
+
+| Layer | File / route | What it returns |
+|-------|--------------|-----------------|
+| **Award detail (foundation)** | `src/lib/usaspending/award-detail.ts` + `GET /api/app/award-detail?id=<generated_internal_id>` OR `?piid=<PIID>` | obligated→**ceiling** (base_and_all_options_value), parent IDV/vehicle, period of performance, recipient (city/state/CD), NAICS/PSC, funding account. `resolvePiidToId()` resolves a raw PIID (USASpending forbids mixing contract+IDV type groups → tries each). |
+| **Predecessor / incumbent** | `src/lib/usaspending/find-predecessor.ts` + `GET /api/app/incumbent?naics=&agency=&title=` | Likely incumbent (largest recent matching award) → name, ceiling, expiry, vehicle, confidence. Best-match inference, honest "not found" miss. |
+| **Reusable UI** | `src/components/app/awards/AwardDetailDrawer.tsx` (awards) + `IncumbentIntel.tsx` (open opps, on-demand "▸ Who holds this now?") | One component each, dropped everywhere. |
+
+**Wired into:** task-order/subcontracting rows (RecompetesPanel), Expiring Contracts
+detail, Bid/No-Bid grounding (`/api/analyst/bid-no-bid`), My Pursuits drawer,
+Today's Intel Review Fit.
+
+**Key gotcha:** idv-search must read `generated_internal_id` (NOT
+`generated_unique_award_id`, which is null) — that's the id the award API needs +
+the `/award/` deep link.
+
+### Office contact rosters (#16)
+
+`GET /api/app/federal-contacts?facets=office-roster&agency=<name>` → buying offices
+with a COMPLETE roster (3+ people); `&office=<name>` → that office's full people
+list. Built off **DoDAAC-decoded** offices (clean DOMESTIC — DLA Aviation=42,
+NAVSUP=41), NOT the raw `office` column (embassy-contaminated). Foreign-filtered.
+**Scope: DoD/DLA/Navy only** (DoDAAC path, 917/1000 decode); civilian = agency
+preview. UI: Decision Makers "📇 Full contact rosters by buying office". Agency
+matched by keyword ("DEFENSE, DEPARTMENT OF" not "Department of Defense").
+
+### LLM cost discipline
+
+`callLLM({ job: 'reasoning' })` → **gpt-4o-mini first** (Claude not scalable at
+$149/mo), groq70b → claude fallback. Per-user $15/mo budget cap
+(`src/lib/llm/usage-cost.ts`), dashboard `GET /api/admin/llm-cost`.
+
+### Quarterly data refresh (honest, no auto-fake)
+
+`GET /api/cron/check-data-freshness` (dispatcher cron_jobs row, quarterly
+`0 13 1 1,4,7,10 *`). Curated sources (SBLO scrape, DoD/OSBP dir, pain points) are
+HUMAN-run scrapers — never auto-stamp (fakes freshness). When overdue → **emails
+the refresh checklist**; `?stamp=<key>` records the real refresh after you run the
+script. Registry: `docs/DATA-SOURCES-REGISTRY.md`, view `/api/admin/data-sources`.
+
+---
+
 ### Rate Limits & Caching
 
 - **Standard tier:** 1,000 requests/day, 10/min
@@ -1378,4 +1426,4 @@ getmindy.ai purchases feed a **unified cross-site dashboard** hosted at `govcong
 
 ---
 
-*Last Updated: June 3, 2026 — Daily alerts: removed the hardcoded BETA_END_DATE that silently collapsed the daily send ~922→1 on May 28; free-daily is now the permanent model (env-gated via DAILY_ALERT_BETA). Prev Jun 2: Mindy purchase attribution → unified cross-site sales dashboard (PR #5, PURCHASE_SITE=mindy). May 20: Mindy OAuth custom domain cutover (auth.getmindy.ai), Proposal Assist V2, mi-beta → app rename, session TTL 30d*
+*Last Updated: June 8, 2026 — Award Intelligence spine (award-detail + incumbent intel woven through task orders / Expiring Contracts / bid-no-bid / My Pursuits / Today's Intel), office contact rosters (#16, DoDAAC-decoded), Vault POC fields, SOW export tables, active-first pursuit picker, pipeline next-action + dedup, LLM cost discipline (gpt-4o-mini reasoning + $15 cap), quarterly data-refresh cron (honest stamp, no auto-fake). See "Award Intelligence + Office Rosters" section. Prev Jun 3: Daily alerts free-daily permanent (DAILY_ALERT_BETA). Jun 2: purchase attribution → unified sales dashboard. May 20: OAuth custom domain (auth.getmindy.ai), Proposal Assist V2, mi-beta → app rename, session TTL 30d*
