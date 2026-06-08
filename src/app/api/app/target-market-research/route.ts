@@ -229,9 +229,12 @@ export async function POST(request: NextRequest) {
     // the user never manages codes. We attach coverage stats for the UI.
     let naicsCode = rawNaicsCode;
     let coverage: Awaited<ReturnType<typeof keywordCoverage>> | null = null;
-    if (keyword && keyword.trim() && !(rawNaicsCode && rawNaicsCode.trim())) {
+    if (keyword && keyword.trim()) {
+      // Always compute coverage when a keyword is present — it powers the LESSON
+      // banner (total market, code count, hidden %). When no explicit NAICS was
+      // given, ALSO use the derived coverage set as the search codes.
       coverage = await keywordCoverage(keyword.trim());
-      if (coverage && coverage.coverageCodes.length) {
+      if (coverage && coverage.coverageCodes.length && !(rawNaicsCode && rawNaicsCode.trim())) {
         naicsCode = coverage.coverageCodes.join(', ');
       }
     }

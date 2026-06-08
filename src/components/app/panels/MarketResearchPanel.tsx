@@ -949,23 +949,34 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   // real USASpending codes and build with them — no dead-end error.
   const handleSportBuild = useCallback(async () => {
     const hasCodes = formData.naicsCode.trim() || formData.pscCode.trim();
+    // If the user pinned codes, build with those. Otherwise build from the
+    // KEYWORD — we leave naicsCode EMPTY so the target-market-research effect
+    // (#59) sends the keyword and the backend auto-derives the FULL 90%-coverage
+    // set (not the top-3), and returns the coverage lesson banner. We still fetch
+    // the suggestion chips for display so the user sees the codes Mindy is using.
     if (hasCodes || !sportKeyword.trim()) { handleGenerateAll(); return; }
     setSportSuggesting(true);
     try {
       const res = await fetch('/api/suggest-codes', {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({ description: sportKeyword.trim(), maxResults: 5 }),
+        body: JSON.stringify({ description: sportKeyword.trim(), maxResults: 8 }),
       });
       const d = await res.json();
-      const naics = (d.naicsSuggestions || []).slice(0, 3).map((s: { code: string }) => s.code).join(', ');
-      const psc = (d.pscSuggestions || []).slice(0, 2).map((s: { code: string }) => s.code).join(', ');
-      if (!naics && !psc) { showToast({ message: 'No federal codes found for that — try different words.', variant: 'error' }); return; }
-      const nextFormData = { ...formData, naicsCode: naics, pscCode: psc, businessType: formData.businessType || 'Small Business' };
-      setFormData(nextFormData);
+      if (!(d.naicsSuggestions || []).length && !(d.pscSuggestions || []).length) {
+        showToast({ message: 'No federal codes found for that — try different words.', variant: 'error' });
+        return;
+      }
       setSportSuggestions({
         naics: (d.naicsSuggestions || []).map((s: { code: string; name: string }) => ({ code: s.code, name: s.name })),
         psc: (d.pscSuggestions || []).map((s: { code: string; name: string }) => ({ code: s.code, name: s.name })),
       });
+      // Apply the FULL coverage set (#59 — up to 8 codes covering ~90%, not the
+      // old top-3 that silently missed 72%). The keyword still flows to TMR so the
+      // coverage lesson banner renders.
+      const coverageNaics = (d.naicsSuggestions || []).slice(0, 8).map((s: { code: string }) => s.code).join(', ');
+      const coveragePsc = (d.pscSuggestions || []).slice(0, 4).map((s: { code: string }) => s.code).join(', ');
+      const nextFormData = { ...formData, naicsCode: coverageNaics, pscCode: coveragePsc, businessType: formData.businessType || 'Small Business' };
+      setFormData(nextFormData);
       handleGenerateAll({ nextFormData });
     } catch {
       showToast({ message: 'Could not look up codes — try the Suggest codes button.', variant: 'error' });
@@ -1175,13 +1186,24 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   //
   // Skipped when: no email, no NAICS yet (profile incomplete).
   useEffect(() => {
-    if (!email || !formData.naicsCode.trim()) return;
+    // Fire when we have EITHER explicit codes OR a Sport keyword (#59 — keyword
+    // lets the backend auto-derive the full 90%-coverage NAICS set instead of the
+    // top-3, so the user doesn't silently miss 72% of their market). Only use the
+    // keyword once a report has actually been requested (sportReportRan) so we
+    // don't fetch on every keystroke.
+    const sportKw = (researchMode === 'sport' && sportReportRan) ? sportKeyword.trim() : '';
+    if (!email || (!formData.naicsCode.trim() && !sportKw)) return;
     let cancelled = false;
     fetch('/api/app/target-market-research', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email,
+        // Pass the keyword whenever the user researched by keyword (#59) — the
+        // backend uses explicit codes for the search but still computes the
+        // coverage LESSON (total market, NAICS/PSC count, top code %) from the
+        // keyword so the banner renders. Codes take precedence for the search.
+        keyword: sportKw || undefined,
         naicsCode: formData.naicsCode,
         pscCode: formData.pscCode,
         businessType: formData.businessType,
@@ -1211,6 +1233,9 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     formData.veteranStatus,
     formData.zipCode,
     formData.excludeDOD,
+    researchMode,
+    sportKeyword,
+    sportReportRan,
   ]);
 
   // SBA Goaling bulk fetch — fires after tmrRows arrives. Looks up

@@ -470,7 +470,29 @@ export default function OnboardingPage() {
         return;
       }
 
-      const suggestions = inferProfileSuggestions(businessDescription);
+      // Ground the day-1 codes in REAL USASpending data (#59) — NOT the hardcoded
+      // 3-per-industry map, which silently misses 72% of the user's market and
+      // breaks their alerts forever. /api/suggest-codes returns the full coverage
+      // set so new users start with COMPLETE codes. Local map is the fallback.
+      let suggestions = inferProfileSuggestions(businessDescription);
+      try {
+        const res = await fetch('/api/suggest-codes', {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ description: businessDescription.trim(), maxResults: 8 }),
+        });
+        const d = await res.json();
+        const realNaics = (d.naicsSuggestions || []).map((s: { code: string }) => s.code);
+        if (realNaics.length) {
+          suggestions = {
+            industries: suggestions?.industries || [],
+            naicsCodes: realNaics,                  // the FULL grounded set, not 3
+            agencies: suggestions?.agencies || [],
+            states: suggestions?.states || [],
+            setAsides: suggestions?.setAsides || [],
+            reasons: ['Grounded in real federal award data — these are the codes where the money actually flows for your work'],
+          };
+        }
+      } catch { /* keep the local-map fallback */ }
       setProfileSuggestions(suggestions);
       if (suggestions) {
         applyProfileSuggestions(suggestions);
