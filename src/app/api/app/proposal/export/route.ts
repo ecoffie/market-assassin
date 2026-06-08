@@ -194,55 +194,83 @@ function heading(text: string, level: typeof HeadingLevel[keyof typeof HeadingLe
   return new Paragraph({ heading: level, children: [new TextRun({ text, bold: true })] });
 }
 
-function paragraphsFromMarkdown(md: string): Paragraph[] {
-  // Lightweight markdown → docx: handle # headings, blank-line paragraphs, bullets.
+// Build a Word table from markdown table lines (Eric: the "FUNCTION/DESCRIPTION"
+// table was flattening into a paragraph on export).
+function tableFromMarkdown(rows: string[]): Table {
+  const cells = (line: string) =>
+    line.replace(/^\s*\|/, '').replace(/\|\s*$/, '').split('|').map(c => c.trim());
+  // Skip the separator row (|---|---|).
+  const dataRows = rows.filter(r => !/^\s*\|?[\s:|-]+\|?\s*$/.test(r));
+  const tableRows = dataRows.map((line, i) => new TableRow({
+    children: cells(line).map(text => new TableCell({
+      children: [new Paragraph({ children: parseInlineMarkdown(text), spacing: { before: 20, after: 20 } })],
+    })),
+    tableHeader: i === 0,
+  }));
+  return new Table({
+    rows: tableRows,
+    width: { size: 100, type: WidthType.PERCENTAGE },
+    layout: TableLayoutType.AUTOFIT,
+  });
+}
+
+function paragraphsFromMarkdown(md: string): (Paragraph | Table)[] {
   const lines = md.replace(/\r\n/g, '\n').split('\n');
-  const out: Paragraph[] = [];
+  const out: (Paragraph | Table)[] = [];
   let buffer: string[] = [];
 
   const flushBuffer = () => {
     if (buffer.length === 0) return;
     const joined = buffer.join(' ').trim();
-    if (joined) out.push(new Paragraph({ children: parseInlineMarkdown(joined) }));
+    if (joined) out.push(new Paragraph({ children: parseInlineMarkdown(joined), spacing: { after: 120 } }));
     buffer = [];
   };
 
-  for (const rawLine of lines) {
-    const line = rawLine.trimEnd();
+  for (let idx = 0; idx < lines.length; idx++) {
+    const line = lines[idx].trimEnd();
 
-    if (!line.trim()) {
+    if (!line.trim()) { flushBuffer(); continue; }
+
+    // Markdown TABLE: a line with pipes followed by a separator row. Gather the
+    // whole block and render as a real Word table.
+    if (/\|/.test(line) && idx + 1 < lines.length && /^\s*\|?[\s:|-]{3,}\|?\s*$/.test(lines[idx + 1])) {
       flushBuffer();
+      const block: string[] = [line];
+      let j = idx + 1;
+      while (j < lines.length && /\|/.test(lines[j])) { block.push(lines[j].trimEnd()); j++; }
+      out.push(tableFromMarkdown(block));
+      idx = j - 1;
       continue;
     }
 
-    // Heading levels
+    // Markdown # headings.
     const h = /^(#{1,6})\s+(.*)/.exec(line);
     if (h) {
       flushBuffer();
       const level = h[1].length;
-      const headingLevel =
-        level === 1 ? HeadingLevel.HEADING_2 :
-        level === 2 ? HeadingLevel.HEADING_3 :
-        HeadingLevel.HEADING_4;
-      out.push(new Paragraph({ heading: headingLevel, children: [new TextRun({ text: h[2], bold: true })] }));
+      const headingLevel = level === 1 ? HeadingLevel.HEADING_2 : level === 2 ? HeadingLevel.HEADING_3 : HeadingLevel.HEADING_4;
+      out.push(new Paragraph({ heading: headingLevel, children: [new TextRun({ text: h[2], bold: true })], spacing: { before: 160, after: 80 } }));
       continue;
     }
 
-    // Bullet (with inline markdown preserved)
+    // Decimal-numbered SECTION headings (5.0, 5.2, 5.10 …) — these are SOW
+    // section titles, not list items. Make them real headings (Eric: they ran
+    // together as dense paragraphs). Title = the section number + its heading
+    // text up to the first sentence end, kept on its own line.
+    const section = /^(\d+\.\d+)\s+(.+)/.exec(line);
+    if (section && section[2].length < 90 && !/[.;]\s/.test(section[2])) {
+      flushBuffer();
+      out.push(new Paragraph({ heading: HeadingLevel.HEADING_3, children: [new TextRun({ text: `${section[1]} ${section[2]}`, bold: true })], spacing: { before: 140, after: 60 } }));
+      continue;
+    }
+
+    // Bullets.
     const bullet = /^[-*]\s+(.*)/.exec(line);
-    if (bullet) {
-      flushBuffer();
-      out.push(new Paragraph({ children: parseInlineMarkdown(bullet[1]), bullet: { level: 0 } }));
-      continue;
-    }
+    if (bullet) { flushBuffer(); out.push(new Paragraph({ children: parseInlineMarkdown(bullet[1]), bullet: { level: 0 } })); continue; }
 
-    // Numbered (with inline markdown preserved)
+    // Plain numbered list (1. 2. 3.).
     const numbered = /^\d+\.\s+(.*)/.exec(line);
-    if (numbered) {
-      flushBuffer();
-      out.push(new Paragraph({ children: parseInlineMarkdown(numbered[1]), bullet: { level: 0 } }));
-      continue;
-    }
+    if (numbered) { flushBuffer(); out.push(new Paragraph({ children: parseInlineMarkdown(numbered[1]), numbering: undefined, bullet: { level: 0 } })); continue; }
 
     buffer.push(line);
   }
