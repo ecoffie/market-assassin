@@ -32,6 +32,15 @@ interface IdentityProfile {
   hq_city?: string | null;
   service_states?: string[];
   contract_vehicles?: string[];
+  // Point of contact + cert-package fields (#41)
+  contact_name?: string | null;
+  contact_title?: string | null;
+  contact_phone?: string | null;
+  contact_email?: string | null;
+  website?: string | null;
+  office_address?: string | null;
+  bonding_single?: string | null;
+  bonding_aggregate?: string | null;
 }
 
 interface PastPerf {
@@ -369,6 +378,22 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
         onChange={(v) => onArrayField('contract_vehicles', v)}
         placeholder="GSA Schedule, OASIS, CIO-SP3"
       />
+
+      {/* Point of contact (#41) — proposals fill "Responsible Office / Contact
+          Person" + Point-of-Contact sections from these instead of [placeholders]. */}
+      <div className="pt-2 mt-2 border-t border-slate-800">
+        <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Point of Contact (for proposals)</div>
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <Field label="Contact name" value={form.contact_name || ''} onChange={(v) => onField('contact_name', v)} placeholder="Eric Coffie" hint="The responsible person on cert packages" />
+          <Field label="Contact title" value={form.contact_title || ''} onChange={(v) => onField('contact_title', v)} placeholder="Founder / President" />
+          <Field label="Contact phone" value={form.contact_phone || ''} onChange={(v) => onField('contact_phone', v)} placeholder="(305) 555-0100" />
+          <Field label="Contact email" value={form.contact_email || ''} onChange={(v) => onField('contact_email', v)} placeholder="eric@company.com" />
+          <Field label="Website" value={form.website || ''} onChange={(v) => onField('website', v)} placeholder="www.company.com" />
+          <Field label="Office address" value={form.office_address || ''} onChange={(v) => onField('office_address', v)} placeholder="123 Main St, Miami, FL 33101" />
+          <Field label="Single bonding capacity" value={form.bonding_single || ''} onChange={(v) => onField('bonding_single', v)} placeholder="$5M" />
+          <Field label="Aggregate bonding capacity" value={form.bonding_aggregate || ''} onChange={(v) => onField('bonding_aggregate', v)} placeholder="$20M" />
+        </div>
+      </div>
 
       <div className="flex items-center gap-3 pt-2">
         <button

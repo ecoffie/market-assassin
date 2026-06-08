@@ -25,6 +25,10 @@ const WRITABLE_FIELDS = [
   'one_liner', 'elevator_pitch',
   'hq_state', 'hq_city', 'service_states',
   'contract_vehicles',
+  // Point of contact + cert-package fields (#41) — proposals need these to fill
+  // "Responsible Office / Contact Person" instead of [placeholders].
+  'contact_name', 'contact_title', 'contact_phone', 'contact_email', 'website',
+  'office_address', 'bonding_single', 'bonding_aggregate',
 ];
 
 export async function PUT(request: NextRequest) {

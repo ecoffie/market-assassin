@@ -126,8 +126,17 @@ export function formatVaultForPrompt(ctx: VaultContext): string {
     if (id.one_liner) lines.push(`One-liner: ${id.one_liner}`);
     if (id.elevator_pitch) lines.push(`Elevator pitch: ${id.elevator_pitch}`);
     if (id.hq_state || id.hq_city) lines.push(`HQ: ${[id.hq_city, id.hq_state].filter(Boolean).join(', ')}`);
+    if (id.office_address) lines.push(`Office address: ${id.office_address}`);
     if (Array.isArray(id.service_states) && id.service_states.length) lines.push(`Service states: ${id.service_states.join(', ')}`);
     if (Array.isArray(id.contract_vehicles) && id.contract_vehicles.length) lines.push(`Contract vehicles: ${id.contract_vehicles.join(', ')}`);
+    if (id.bonding_single) lines.push(`Single bonding capacity: ${id.bonding_single}`);
+    if (id.bonding_aggregate) lines.push(`Aggregate bonding capacity: ${id.bonding_aggregate}`);
+    // Point of contact (#41) — fills cert-package "Responsible Office / Contact
+    // Person" + Point-of-Contact sections instead of [placeholders].
+    if (id.contact_name) lines.push(`Contact person: ${id.contact_name}${id.contact_title ? `, ${id.contact_title}` : ''}`);
+    if (id.contact_phone) lines.push(`Contact phone: ${id.contact_phone}`);
+    if (id.contact_email) lines.push(`Contact email: ${id.contact_email}`);
+    if (id.website) lines.push(`Website: ${id.website}`);
     if (lines.length) blocks.push(`### Bidder identity (FACTUAL — use verbatim)\n${lines.join('\n')}`);
   }
 
