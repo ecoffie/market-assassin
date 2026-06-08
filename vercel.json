@@ -290,10 +290,6 @@
       "schedule": "0 */6 * * *"
     },
     {
-      "path": "/api/cron/check-data-freshness",
-      "schedule": "0 13 * * 1"
-    },
-    {
       "path": "/api/cron/check-alert-throughput",
       "schedule": "0 14 * * *"
     },
