@@ -33,6 +33,22 @@ interface ExpiringContract {
   locationMatch?: LocationMatch; // computed vs. the user's service area
 }
 
+// IDV/IDIQ + task-order row from /api/app/idv-contracts (USASpending). Eric: the
+// vehicles + task orders behind the recompetes, same data different award type.
+interface IDVRow {
+  awardId: string;
+  recipientName: string;
+  recipientUei: string;
+  awardAmount: number;
+  description: string;
+  startDate: string;
+  endDate: string;
+  agency: string;
+  naicsCode: string;
+  pscCode: string;
+  usaSpendingUrl: string;
+}
+
 interface ContractSummary {
   totalContracts: number;
   totalValue: number;
@@ -239,6 +255,13 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
   const [monthsFilter, setMonthsFilter] = useState('24');
   const [competitionFilter, setCompetitionFilter] = useState('');
 
+  // Award-type view (Eric: IDV is the same USASpending data, a different slice —
+  // a toggle here, not a separate panel). 'definitive' = current recompete view.
+  const [awardType, setAwardType] = useState<'definitive' | 'idv' | 'task'>('definitive');
+  const [idvContracts, setIdvContracts] = useState<IDVRow[]>([]);
+  const [idvLoading, setIdvLoading] = useState(false);
+  const [idvTotal, setIdvTotal] = useState(0);
+
   const toggleExpandedContract = (contractId: string) => {
     setExpandedContracts(prev => {
       const next = new Set(prev);
@@ -374,6 +397,29 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
     }
   }, [allContracts, applyFilters, email, profileDefaults, usingProfileDefaults]);
 
+  // Fetch IDV vehicles / task orders when the toggle is on those views.
+  const fetchIdv = useCallback(async (mode: 'idv' | 'task', naics: string) => {
+    setIdvLoading(true);
+    try {
+      const params = new URLSearchParams({ mode, limit: '50' });
+      if (naics) params.set('naics', naics.split(/[, ]+/)[0]);
+      const res = await fetch(`/api/app/idv-contracts?${params.toString()}`, { headers: getMIApiHeaders(email) });
+      const data = await res.json();
+      setIdvContracts((data?.contracts || []) as IDVRow[]);
+      setIdvTotal(data?.totalCount || 0);
+    } catch {
+      setIdvContracts([]); setIdvTotal(0);
+    } finally {
+      setIdvLoading(false);
+    }
+  }, [email]);
+
+  // Switch award-type view; load IDV/task data on demand.
+  const switchAwardType = useCallback((type: 'definitive' | 'idv' | 'task') => {
+    setAwardType(type);
+    if (type !== 'definitive') fetchIdv(type, naicsFilter);
+  }, [fetchIdv, naicsFilter]);
+
   // Load the shared profile defaults once, then apply them to the full recompete dataset.
   useEffect(() => {
     if (!email) return;
@@ -454,6 +500,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
   }, [applyFilters, email]);
 
   const handleSearch = () => {
+    if (awardType !== 'definitive') { fetchIdv(awardType, naicsFilter); return; }
     setUsingProfileDefaults(false);
     searchContracts(naicsFilter, monthsFilter, competitionFilter);
   };
@@ -609,6 +656,31 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
             </button>
           )}
         </div>
+
+        {/* Award-type toggle (Eric: IDV/IDIQ is the same USASpending data, a
+            different award-type slice — surface it here, not a separate panel). */}
+        <div className="flex flex-wrap gap-1.5 mb-4">
+          {([
+            { id: 'definitive', label: 'Expiring contracts', hint: 'Awards ending soon — recompete targets' },
+            { id: 'idv', label: 'IDVs / vehicles', hint: 'The IDIQ vehicles primes hold' },
+            { id: 'task', label: 'Task orders', hint: 'Orders flowing under those vehicles' },
+          ] as const).map(t => (
+            <button
+              key={t.id}
+              onClick={() => switchAwardType(t.id)}
+              title={t.hint}
+              className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
+                awardType === t.id ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+          <span className="self-center ml-1 text-[11px] text-slate-500">
+            {awardType === 'definitive' ? 'Definitive contracts ending soon' : awardType === 'idv' ? 'IDIQ/GWAC vehicles (USASpending)' : 'Delivery & task orders (USASpending)'}
+          </span>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           <div>
             <label className="block text-xs text-slate-500 mb-1">NAICS Code(s)</label>
@@ -677,8 +749,43 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
         </div>
       )}
 
+      {/* IDV / Task-order list (USASpending) — shown when those views are active. */}
+      {awardType !== 'definitive' && (
+        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
+              {idvLoading ? 'Loading…' : `${idvTotal.toLocaleString()} ${awardType === 'idv' ? 'IDV / IDIQ vehicles' : 'Task orders'}`}
+            </h3>
+            <span className="text-[11px] text-slate-500">Source: USASpending awards</span>
+          </div>
+          <div className="divide-y divide-slate-800">
+            {idvContracts.map((c) => (
+              <div key={c.awardId} className="px-5 py-3">
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <div className="text-sm font-medium text-white truncate">{c.recipientName}</div>
+                    <div className="text-[11px] text-slate-500 truncate">{c.agency}{c.naicsCode ? ` · NAICS ${c.naicsCode}` : ''}{c.pscCode ? ` · PSC ${c.pscCode}` : ''}</div>
+                    {c.description && <div className="text-[11px] text-slate-600 truncate mt-0.5">{c.description}</div>}
+                    <div className="text-[10px] text-slate-600 mt-0.5">UEI {c.recipientUei || '—'}{c.endDate ? ` · ends ${c.endDate}` : ''}</div>
+                  </div>
+                  <div className="text-right shrink-0">
+                    <div className="text-sm font-semibold text-emerald-400">${(c.awardAmount / 1e6).toFixed(1)}M</div>
+                    {c.usaSpendingUrl && (
+                      <a href={c.usaSpendingUrl} target="_blank" rel="noreferrer" className="text-[11px] text-amber-400 hover:text-amber-300">View on USASpending ↗</a>
+                    )}
+                  </div>
+                </div>
+              </div>
+            ))}
+            {!idvLoading && idvContracts.length === 0 && (
+              <div className="px-5 py-6 text-center text-sm text-slate-500">No {awardType === 'idv' ? 'vehicles' : 'task orders'} for this NAICS. Try a NAICS in the search above.</div>
+            )}
+          </div>
+        </div>
+      )}
+
       {/* Contract List */}
-      {contracts.length > 0 && (
+      {awardType === 'definitive' && contracts.length > 0 && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-800">
             <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">

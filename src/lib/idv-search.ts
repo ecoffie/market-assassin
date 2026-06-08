@@ -21,6 +21,8 @@ export interface IDVSearchOptions {
   stateFilterType?: 'recipient' | 'pop';
   limit?: number;
   page?: number;
+  /** Explicit award-type slice (Eric: drive the toggle, not the state hack). */
+  searchType?: 'idv' | 'task';
 }
 
 export interface IDVContract {
@@ -65,10 +67,12 @@ export async function searchIDVContracts(options: IDVSearchOptions = {}): Promis
     state,
     stateFilterType = 'recipient',
     limit = 50,
-    page = 1
+    page = 1,
+    searchType
   } = options;
 
-  const isTaskOrderSearch = state && stateFilterType === 'pop';
+  // Explicit searchType wins; legacy fallback = the old state+pop heuristic.
+  const isTaskOrderSearch = searchType === 'task' || (!searchType && state && stateFilterType === 'pop');
 
   const requestBody: Record<string, unknown> = {
     filters: {
