@@ -49,13 +49,22 @@ interface SendEmailParams {
   transactional?: boolean;
 }
 
-// Email types that are ALWAYS transactional even if the caller forgets the flag —
-// belt-and-suspenders so we never suppress/cap an auth/receipt email. Matched by
-// keyword against the real emailType strings (two_factor_code, mi_account_setup,
-// mi_password_reset, mindy_free_signup, purchase_receipt, access_grant, invite…).
-const TRANSACTIONAL_RE = /(two_factor|2fa|account_setup|password_reset|signup|magic_link|receipt|access_grant|invite|verification|verify|setup|confirm)/i;
+// Transactional emailTypes that ALWAYS bypass the cap/suppression — an EXPLICIT
+// allowlist, not keyword-matching (audit #58 caught `bootcamp_profile_setup`
+// false-matching "setup" — a bulk marketing blast must NOT bypass the cap; and
+// `welcome_alerts` was being capped when it should always deliver). Keep this list
+// in sync with the real emailType strings each sender passes.
+const TRANSACTIONAL_TYPES = new Set([
+  'two_factor_code', 'mi_account_setup', 'mi_password_reset', 'mindy_free_signup',
+  'team_invite', 'welcome_alerts', 'magic_link', 'purchase_receipt', 'access_grant',
+  'email_verification', 'mi_signup', 'account_verification', 'access_code',
+]);
 function isTransactionalType(emailType?: string): boolean {
-  return !!emailType && TRANSACTIONAL_RE.test(emailType);
+  if (!emailType) return false;
+  if (TRANSACTIONAL_TYPES.has(emailType)) return true;
+  // Narrow keyword fallback for genuinely transactional-only words (NOT "setup",
+  // which appears in marketing onboarding nudges like bootcamp_profile_setup).
+  return /(two_factor|password_reset|magic_link|_receipt|access_grant|verification)/i.test(emailType);
 }
 
 /**

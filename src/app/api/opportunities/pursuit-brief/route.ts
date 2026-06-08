@@ -107,6 +107,8 @@ export async function POST(request: NextRequest) {
       subject: `🎯 PURSUIT BRIEF: ${brief.contractName} - Score: ${brief.opportunityScore}/100`,
       html: emailHtml,
       text: emailText,
+      emailType: 'pursuit_brief',   // #58 audit — was untagged (defaulted to general)
+      eventSource: 'pursuit-brief',
     });
 
     const processingTime = Date.now() - startTime;
