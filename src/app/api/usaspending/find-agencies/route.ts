@@ -1164,6 +1164,11 @@ export async function POST(request: NextRequest) {
       satFriendlyAgencies: agencies.filter((a: any) => a.contractCount > 0 && (a.satContractCount || 0) / a.contractCount > 0.5).length,
     };
 
+    // Normalize uniqueVendorCount to a number on EVERY agency (Eric: DoD office
+    // rows from the FPDS replacement path left it undefined → vendors=0/blank).
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    agencies.forEach((a: any) => { a.uniqueVendorCount = a.uniqueVendorCount ?? 0; });
+
     return NextResponse.json({
       success: true,
       agencies,

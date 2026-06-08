@@ -633,6 +633,10 @@ export async function fetchFPDSForDoD(
   // Fetch by NAICS first
   const naicsResults = await fetchFPDSByNaics(naicsCode, { maxRecords });
 
+  // Track distinct prime vendors per office (Eric: DoD offices showed vendors=0 —
+  // the FPDS path built offices but never counted recipients). FPDS awards carry
+  // vendorName, so we can.
+  const vendorsByOffice = new Map<string, Set<string>>();
   for (const award of naicsResults.awards) {
     allAwards.push(award);
 
@@ -644,6 +648,14 @@ export async function fetchFPDSForDoD(
     } else {
       allOffices.set(officeKey, { ...award.contractingOffice });
     }
+    if (award.vendorName && award.vendorName !== 'Unknown Vendor' && award.vendorName !== 'TBD') {
+      if (!vendorsByOffice.has(officeKey)) vendorsByOffice.set(officeKey, new Set());
+      vendorsByOffice.get(officeKey)!.add(award.vendorName.trim().toUpperCase());
+    }
+  }
+  // Stamp the distinct-vendor count onto each office.
+  for (const [key, office] of allOffices) {
+    (office as FPDSContractingOffice & { uniqueVendorCount?: number }).uniqueVendorCount = vendorsByOffice.get(key)?.size || 0;
   }
 
   return {
@@ -826,6 +838,7 @@ export function mapFPDSToAgencies(fpdsResult: FPDSSearchResult): Array<{
   officeId: string;
   subAgencyCode: string;
   command?: string; // The specific DoD command for pain points matching
+  uniqueVendorCount?: number;
 }> {
   const agencies: Array<{
     id: string;
@@ -839,6 +852,7 @@ export function mapFPDSToAgencies(fpdsResult: FPDSSearchResult): Array<{
     officeId: string;
     subAgencyCode: string;
     command?: string;
+    uniqueVendorCount?: number;
   }> = [];
 
   for (const [key, office] of fpdsResult.offices) {
@@ -863,6 +877,8 @@ export function mapFPDSToAgencies(fpdsResult: FPDSSearchResult): Array<{
       officeId: office.officeId,
       subAgencyCode: office.agencyId,
       command: command || undefined, // Include command if detected
+      // Distinct primes at this office (Eric: was undefined for DoD → vendors=0).
+      uniqueVendorCount: (office as FPDSContractingOffice & { uniqueVendorCount?: number }).uniqueVendorCount || 0,
     });
   }
 
