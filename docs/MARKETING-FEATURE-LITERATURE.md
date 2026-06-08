@@ -175,6 +175,74 @@ codes decoded, overseas filtered.
 
 ---
 
+## 8. "Who holds this now?" — instant incumbent intel on any opportunity
+
+**What it does:** On any opportunity — in your pipeline or today's feed — one click
+shows the **likely incumbent**: the company that holds the work now, their contract
+**ceiling** (the real prize size), when it **expires**, and the **contract vehicle**
+you'd need to compete on. Pulled live from real federal award data.
+
+**Why it's different:** Most opportunities are recompetes — someone already has the
+work. Knowing who, how big, when it ends, and what vehicle it's under is the
+difference between bidding blind and bidding to win. Mindy answers "is this worth
+pursuing?" the moment you look at the opportunity, not after weeks of research.
+
+**SEO angles:**
+- "How to find the incumbent on a government contract"
+- "Is this opportunity worth pursuing? The 4 things to check first"
+- "Recompete research: who holds the contract now?"
+
+**Proof point:** Likely incumbent inferred from USASpending (best match by NAICS +
+agency + title), full contract detail pulled live, confidence-labeled, with a
+"verify on USASpending" link. Honest when no clear incumbent exists.
+
+---
+
+## 9. Full contact rosters by buying office — the complete list, not a sample
+
+**What it does:** Drill past the agency to a **specific contracting office** (DLA
+Aviation, NAVSUP Weapon Systems Support, NAVFAC Mid-Atlantic) and see the
+**complete contact roster** — every person who buys at that location, with their
+role and contact info — not a department-wide sample.
+
+**Why it's different:** "Here are some Department of Defense contacts" is a sample
+of a giant agency. "Here are all 42 people at DLA Aviation" is a real BD target
+list. Mindy resolves contacts down to the actual buying office and shows the whole
+roster.
+
+**SEO angles:**
+- "How to find every buyer at a federal contracting office"
+- "DLA, NAVSUP, NAVFAC: who actually buys and how to reach them"
+- "Federal contracting office contact lists for small business"
+
+**Proof point:** Built from SAM POCs decoded to the contracting office via DoDAAC,
+overseas-filtered. Honest scope: complete for DoD/DLA/Navy commands where the data
+supports it; agency preview elsewhere.
+
+---
+
+## 10. A pipeline that tells you what to do next
+
+**What it does:** Your pursuit pipeline shows a **clear next action** on every
+opportunity — "Review fit → pursue or pass", "Open in Proposal Assist → draft",
+"Finalize + submit — due in 5 days" — driven by the stage and deadline. No blank
+columns, no guessing what to do.
+
+**Why it's different:** Most pipeline trackers are just lists. Mindy's pipeline is a
+**next-step engine** — it always knows where each pursuit is and what moves it
+forward. Plus a searchable picker that surfaces the few you're actively bidding,
+not everything you've ever saved.
+
+**SEO angles:**
+- "How to manage a government contracting pipeline"
+- "Bid pipeline stages: from tracking to award"
+- "Federal proposal workflow: what to do at each stage"
+
+**Proof point:** Next action computed from stage + deadline + draft status;
+duplicates auto-deduped; picker defaults to active/bidding pursuits.
+
+---
+
 ## The data-sources story (the trust / acquisition angle)
 
 Every Mindy feature is grounded in **real, documented, continuously-maintained
@@ -207,8 +275,10 @@ investors/acquirers).
 **Pillar 1 — "Find your federal market"** (Market Research, codes, office intel)
 → NAICS finder, market research how-to, contracting-office explainer.
 
-**Pillar 2 — "Win the recompete"** (award detail, incumbent intel, bid/no-bid)
-→ recompete guide, contract-ceiling explainer, incumbent-research how-to.
+**Pillar 2 — "Win the recompete"** (award detail, incumbent intel, bid/no-bid,
+"who holds this now")
+→ recompete guide, contract-ceiling explainer, incumbent-research how-to,
+"is this opportunity worth pursuing?" checklist, contract-vehicle explainer.
 
 **Pillar 3 — "Write the winning proposal"** (Proposal Assist, compliance, Vault)
 → AI proposal-writing guide, compliance-matrix how-to, capability-statement guide.

@@ -1,6 +1,99 @@
 # GovCon Giants - Tasks by Priority
 
-**Last Updated:** June 7, 2026
+**Last Updated:** June 8, 2026
+
+---
+
+## Session Handoff — 2026-06-08 (Award Intelligence arc + contact rosters + Proposal/Pipeline UX — all SHIPPED)
+
+Big session toward the Juneteenth drop. Built the **USASpending award-intelligence
+spine** once and wove it through every surface where it belongs, plus contact
+quality, proposal/pipeline UX, and the office-roster "future" feature.
+
+### Award Intelligence arc (SHIPPED) — the connective tissue
+- [x] **Shared award-detail foundation** — `src/lib/usaspending/award-detail.ts` +
+  `/api/app/award-detail` (accepts generated_internal_id OR raw PIID, resolved
+  server-side). Returns obligated→ceiling, parent IDV/vehicle, period of
+  performance, recipient (city/state/CD), NAICS/PSC, funding account.
+- [x] **Sport / task-order drill-down** — "▸ Award detail" inline on subcontracting
+  rows (RecompetesPanel). Fixed idv-search to use `generated_internal_id` (was
+  null `generated_unique_award_id`) — also repaired /award/ deep links everywhere.
+- [x] **Bid/No-Bid grounding** — `findPredecessorAward()` infers the likely
+  incumbent (real ceiling/expiry/vehicle); wired into `/api/analyst/bid-no-bid`.
+- [x] **Reusable `<AwardDetailDrawer>`** wired into Expiring Contracts detail
+  (PIID-resolved). One component, consistent everywhere.
+- [x] **"Who holds this now?"** — `<IncumbentIntel>` + `/api/app/incumbent`,
+  on-demand per card (no bulk API cost). On My Pursuits detail + Today's Intel
+  Review Fit. Honest "no clear incumbent" miss; confidence-labeled.
+
+### Contact quality + rosters (SHIPPED)
+- [x] **Office rosters (was the "future" #16)** — `?facets=office-roster` groups
+  contacts by DoDAAC-decoded office (clean DOMESTIC, not embassy-contaminated raw
+  office), foreign-filtered. Decision Makers "📇 Full contact rosters by buying
+  office" → click office → complete roster. 70 DoD offices, DLA Aviation=42.
+  Honest scope: DoD/DLA/Navy only (DoDAAC path); civilian = preview.
+- [x] **Foreign filter** — drop overseas contacts (incl. via DoDAAC-decoded office,
+  the 2nd-pass QA catch); decode cryptic codes (NAVSUP/USPFO/NSWC→plain English).
+- [x] **Real role badges** — classify KO / Small Business / Contract Specialist /
+  Program-Technical / Leadership from title text.
+
+### Proposal Assist + Pipeline UX (SHIPPED)
+- [x] **Vault point-of-contact fields** — contact name/title/phone/email/website +
+  bonding + office address (migration RUN). Proposals fill them instead of
+  [placeholders].
+- [x] **SOW export formatting** — markdown tables → real Word tables; decimal-
+  numbered sections (5.2/5.10) → headings.
+- [x] **Searchable + active-first pursuit picker** — replaces dense `<select>`;
+  defaults to Active (bidding/pursuing) group, search reveals all.
+- [x] **Start-screen flow** — ①picker → ②workbench step cue (Open workbench no
+  longer looks like it does nothing).
+- [x] **Pipeline Next Action computed** (was blank) + **duplicate pursuits deduped**.
+
+### LLM cost discipline (SHIPPED)
+- [x] **GPT-4o-mini `reasoning` job** for user-facing reasoning (Claude not scalable
+  at $149/mo); per-user $15 budget cap + cost dashboard `/api/admin/llm-cost`.
+
+### Market Research fixes (SHIPPED)
+- [x] DoD surfaces in **multi-NAICS** (was civilian-only); **invalid_naics** trailing
+  comma fix; **suggested codes shown before apply**; per-office spend distinct.
+
+### Marketing
+- [x] `docs/MARKETING-FEATURE-LITERATURE.md` updated — 10 features + data-sources
+  story + content calendar for the SEO team.
+
+### Old-todo items this session CLOSED (cross-referenced)
+- [x] "Interactive product tour" → tour fixed (+ Market Research/Expiring steps)
+- [x] "validate money cards $M/$B/$T" → formatMindyCurrency everywhere
+- [x] "Office → contact join (solicitation prefix → office)" → office rosters
+- [x] "Expand DoDAAC name lookup" → 170 commands + decode platform-wide
+- [x] "5-role gov contacts (only contracting)" → role classification added
+
+### ⚠️ WHAT'S REALLY LEFT (the genuine open list, June 8)
+**v1.1 / deferred (NOT blocking Juneteenth):**
+- [ ] **Content Reaper woven in** — "Mindy writes your BD content" (#13). PRD:
+  `docs/PRD-mindy-bd-content-v1.1.md`.
+- [ ] **Interactive year selector** in Market Research (#26) — multi-year trends.
+- [ ] **DoD forecast scrapers (Option A)** — component LRAF scrapers into
+  `agency_forecasts`. PRD: `docs/PRD-dod-forecast-scrapers.md`. Big data project.
+- [ ] **Civilian office decode** (GSA/VA/HHS) — extends office rosters beyond DoD.
+  The decoder is DoD-only by design; needs civilian solicitation formats or an
+  `awards.awarding_office` join.
+- [ ] **Real gov roles via commercial enrichment** (HigherGov/LinkedIn-grade) —
+  gate on demand. PM/engineer/end-user roles are null at the SAM/FPDS source.
+- [ ] **Contractors NAICS+state combo** — state filter is name-search only (rollup
+  has no location); costlier location-aware path.
+
+**Launch polish (branding/ops — owner's call, mostly non-code):**
+- [ ] **Mindy logo + Free/Pro/Teams language** across app chrome, emails, auth.
+- [ ] **"Open Mindy Dashboard" link** in every alert/briefing email.
+- [ ] **Final domain migration** — getmindy.ai canonical, mi→getmindy permanent
+  301. Runbook READY (`tasks/mi-to-getmindy-cutover-runbook.md`). Execute on go.
+- [ ] **Full Pro-loop browser QA** — sign-in/OAuth → onboarding → research →
+  recommendations → proposal → sign-out (manual pass before launch).
+- [ ] **"Complete your profile" nudge** when ranking confidence is low.
+
+**Deliberately OFF (do not enable):**
+- Email Mindy Insights (#91) — crashed the batch; gated off.
 
 ---
 
