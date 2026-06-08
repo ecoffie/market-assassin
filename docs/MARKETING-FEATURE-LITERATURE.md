@@ -42,9 +42,22 @@ Programming (541511), even Air Transport (481211) and Fabricated Metal (332999).
 
 That's the difference between a tool that makes you *guess* your code and Mindy,
 which shows you **every code where the money actually flows** — so one missed code
-doesn't cost you a $50M opportunity. Same story for any product: cybersecurity,
-medical supplies, construction — the spend is always spread across codes nobody
-would think to search.
+doesn't cost you a $50M opportunity.
+
+**It's not a drone fluke — the pattern holds across every market (real FY2025
+data):**
+
+| What you sell | Buying NAICS codes | Total market | Obvious code = | You'd miss |
+|---------------|--------------------|--------------|----------------|------------|
+| **Drones**          | 70+ | $245M  | 28% | **72%** |
+| **Cybersecurity**   | 72+ | $2.07B | 26% | **74%** |
+| **Medical supplies**| 48+ | $25M   | 26% | **74%** |
+
+Every product tells the same story: **the obvious NAICS code is only ~1/4 of the
+market, and ~3/4 of the money hides in codes you'd never think to search.**
+Cybersecurity sellers who only watch 541512 (Computer Systems Design) miss $1.5B
+flowing through Engineering Services, R&D, and a dozen other codes. This is the
+single most expensive mistake in federal BD — and Mindy fixes it in one screen.
 
 **SEO angles / blog titles:**
 - "Drones don't have ONE NAICS code — they have 70+. Here's why that matters."
