@@ -524,14 +524,24 @@ export async function POST(request: NextRequest) {
       const naicsAligned = naicsAlignedPainAgencies.has((lookupKey || '').toLowerCase());
 
       const lookupOfficeKey = a.officeId || a.subAgencyCode || a.agencyCode || a.id || '';
-      // Prefer the ACCURATE aggregate total (spending_by_category, matched by
-      // normalized sub-agency or parent name) so the real giants (Army/Navy/
-      // USACE/NAVFAC) rank correctly. Fall back to the sampled total, then set-
-      // aside, so a row is never an obvious zero.
+      // PER-OFFICE spend (Eric bug: every Army office showed the same $22.5B —
+      // the sub-agency-wide category total was being stamped on each office row).
+      // For an office-level row, use the office's OWN accumulated award spend
+      // (a.totalSpending / a.setAsideSpending from find-agencies). The sub-agency
+      // category aggregate is only the right number for a SUB-AGENCY-level row
+      // (no distinct contractingOffice) — never stamp it on every office.
+      const isOfficeLevel = !!(a.contractingOffice && a.contractingOffice !== a.subAgency && a.contractingOffice !== a.parentAgency);
+      // find-agencies accumulates per-office spend into setAsideSpending (with no
+      // set-aside filter that IS the office's total). totalSpendingByOffice is
+      // the no-filter pass keyed by officeId when available.
+      const officeOwnTotal = totalSpendingByOffice[lookupOfficeKey] || a.setAsideSpending || 0;
       const catKey = normalizeAgencyKey(a.subAgency || a.parentAgency || a.name || '');
       const accurateTotal = categoryTotalByKey[catKey];
-      const sampledTotal = totalSpendingByOffice[lookupOfficeKey] ?? (a.setAsideSpending || 0);
-      const totalSpending = (accurateTotal && accurateTotal > sampledTotal) ? accurateTotal : sampledTotal;
+      // Office row → its own spend. Agency/sub-agency rollup row → the accurate
+      // category total (so the real giants still rank correctly).
+      const totalSpending = isOfficeLevel
+        ? officeOwnTotal
+        : ((accurateTotal && accurateTotal > officeOwnTotal) ? accurateTotal : officeOwnTotal);
 
       return {
         id: a.id,
