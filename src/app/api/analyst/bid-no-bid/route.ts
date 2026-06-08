@@ -63,7 +63,25 @@ function getSupabase() {
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function buildPrompt(opp: any, profile: any): string {
+/** Real top primes for a NAICS from USASpending (Eric: ground competitors). */
+async function getRealPrimesForNaics(naicsCode?: string): Promise<string[]> {
+  if (!naicsCode) return [];
+  try {
+    const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_category/recipient/', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filters: { naics_codes: [naicsCode], time_period: [{ start_date: '2023-10-01', end_date: '2024-09-30' }], award_type_codes: ['A', 'B', 'C', 'D'] },
+        limit: 6,
+      }),
+    });
+    if (!res.ok) return [];
+    const j = await res.json();
+    return (j.results || []).filter((r: { name?: string }) => r.name).map((r: { name: string }) => r.name);
+  } catch { return []; }
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildPrompt(opp: any, profile: any, realCompetitors: string[] = []): string {
   const naicsList = (profile?.naics_codes || []).slice(0, 8).join(', ') || 'not set';
   const setAsides = (profile?.set_aside_preferences || []).join(', ') || 'not set';
   const agencies = (profile?.target_agencies || profile?.agencies || []).slice(0, 5).join(', ') || 'not set';
@@ -96,6 +114,7 @@ OPPORTUNITY:
 - Place of performance: ${[opp.pop_city, opp.pop_state, opp.pop_country].filter(Boolean).join(', ') || '(unknown)'}
 - Solicitation #: ${opp.solicitation_number || '(none)'}
 - Attachments available: ${Array.isArray(opp.attachments) && opp.attachments.length > 0 ? `yes (${opp.attachments.length})` : 'no'}
+${realCompetitors.length > 0 ? `\nTOP PRIMES IN THIS NAICS (real USASpending FY data — use ONLY these for competitors_likely):\n${realCompetitors.map(c => `- ${c}`).join('\n')}` : ''}
 
 DESCRIPTION (truncated to 6K chars):
 ${description}
@@ -107,7 +126,7 @@ Return ONLY valid JSON matching exactly this shape — no markdown, no commentar
   "score": <integer 0-100>,
   "why_pursue": [<short reasons this is a good fit, max 5, each under 100 chars>],
   "concerns": [<risks or unknowns the user should verify, max 4, each under 100 chars>],
-  "competitors_likely": [<likely incumbents or strong primes, max 3, each under 60 chars; use "(unknown without further research)" if you cannot infer>],
+  "competitors_likely": [<max 3 — use ONLY names from the "TOP PRIMES IN THIS NAICS" list above (real award data). If that list is empty, return ["(research the predecessor contract on USASpending)"]. NEVER invent company names.>],
   "effort_estimate": "<one short sentence covering proposal effort + team needs>",
   "next_step": "<one short imperative sentence the user should do next>"
 }
@@ -237,7 +256,11 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  const prompt = buildPrompt(opp, profile || {});
+  // GROUND the competitors (Eric: was an LLM guess of incumbent names). Pull the
+  // REAL top primes for this NAICS from USASpending and pass them in, so
+  // competitors_likely is award-backed, not invented.
+  const realCompetitors = await getRealPrimesForNaics(opp.naics_code);
+  const prompt = buildPrompt(opp, profile || {}, realCompetitors);
 
   let response: Response;
   try {

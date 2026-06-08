@@ -83,6 +83,17 @@ export async function generatePainPointsForAgency(
   const oversightText = formatOversightContextForPrompt(context);
   const neededCount = targetCount - existingPainPoints.length;
 
+  // GROUND GUARD (Eric): if there's no REAL oversight data, do NOT generate —
+  // the LLM would invent fake GAO/IG citations. Return what we have instead.
+  if (oversightText.trim().length < 20) {
+    return {
+      agency: agencyName,
+      painPoints: existingPainPoints,
+      source: 'existing',
+      oversightContext: [],
+    };
+  }
+
   const existingSection = existingPainPoints.length > 0
     ? `\n\nEXISTING PAIN POINTS (already written — do NOT repeat these):\n${existingPainPoints.map((p, i) => `${i + 1}. ${p}`).join('\n')}`
     : '';

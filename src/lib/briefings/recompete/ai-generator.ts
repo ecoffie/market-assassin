@@ -158,10 +158,33 @@ function generateTimingSignal(contract: RawRecompeteData['expiringContracts'][0]
 /**
  * Generate teaming plays from opportunities
  */
+/**
+ * Real top primes for an agency from USASpending awards (Eric: ground teaming —
+ * was hardcoded "cyber → SAIC" by theme, wrong for non-IT NAICS). Returns the
+ * companies that ACTUALLY win the most in this agency.
+ */
+async function getRealPrimesForAgency(agency: string, limit = 5): Promise<string[]> {
+  try {
+    const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_category/recipient/', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filters: {
+          keywords: [agency],
+          time_period: [{ start_date: '2023-10-01', end_date: '2024-09-30' }],
+          award_type_codes: ['A', 'B', 'C', 'D'],
+        },
+        limit,
+      }),
+    });
+    if (!res.ok) return [];
+    const j = await res.json();
+    return (j.results || []).filter((r: { name?: string }) => r.name).map((r: { name: string }) => r.name);
+  } catch { return []; }
+}
+
 async function generateTeamingPlays(
   opportunities: RecompeteOpportunity[]
 ): Promise<TeamingPlay[]> {
-  const apiKey = process.env.GROQ_API_KEY;
 
   // Group opportunities by theme
   const cyberOpps = opportunities.filter(o =>
@@ -184,45 +207,64 @@ async function generateTeamingPlays(
     )
   );
 
+  // GROUND the primes: pull the REAL top winners for each play's agency from
+  // USASpending (Eric), and ALWAYS include the actual incumbent (it's in the
+  // data). Falls back to nothing rather than a wrong hardcoded guess.
+  const primesFor = async (opps: RecompeteOpportunity[]): Promise<string[]> => {
+    if (opps.length === 0) return [];
+    const incumbents = opps.map(o => o.incumbent).filter((x): x is string => !!x && x !== 'Unknown');
+    const agency = opps[0]?.agency;
+    const realPrimes = agency ? await getRealPrimesForAgency(agency, 5) : [];
+    // Incumbent(s) first (the surest teaming target), then real top primes, deduped.
+    const seen = new Set<string>();
+    const out: string[] = [];
+    for (const n of [...incumbents, ...realPrimes]) {
+      const k = n.toLowerCase().trim();
+      if (k && !seen.has(k)) { seen.add(k); out.push(n); }
+      if (out.length >= 4) break;
+    }
+    return out;
+  };
+  const [cyberPrimes, itPrimes, setAsidePrimes] = await Promise.all([
+    primesFor(cyberOpps), primesFor(itModernizationOpps), primesFor(setAsideOpps),
+  ]);
+
   const plays: TeamingPlay[] = [];
 
   // Play A: Cyber cluster
-  if (cyberOpps.length > 0) {
-    const primes = ['SAIC', 'Booz Allen', 'ManTech', 'Leidos', 'Peraton'];
+  if (cyberOpps.length > 0 && cyberPrimes.length > 0) {
     plays.push({
       id: 'play-cyber',
       playName: 'Cyber outcome swap',
       targetOpportunityIds: cyberOpps.slice(0, 2).map(o => o.id),
       targetOpportunityNames: cyberOpps.slice(0, 2).map(o => o.contractName),
-      primesToApproach: primes.slice(0, 4),
+      primesToApproach: cyberPrimes,
       suggestedOpener: `"We're tracking the ${cyberOpps[0]?.agency || 'DHS'} cyber recompetes and can help you improve P(win) on measurable SOC outcomes, not just labor mix. We can bring a 2-week displacement brief mapping likely incumbent weak points and a transition-safe staffing wedge. Open to a quick fit call this week?"`,
       theme: 'Help primes strengthen measurable SOC outcomes and transition confidence.',
     });
   }
 
   // Play B: IT Modernization
-  if (itModernizationOpps.length > 0) {
-    const primes = ['GDIT', 'Accenture Federal', 'CGI Federal', 'Guidehouse', 'Peraton'];
+  if (itModernizationOpps.length > 0 && itPrimes.length > 0) {
     plays.push({
       id: 'play-it-mod',
       playName: 'Mission-ops + modernization surge',
       targetOpportunityIds: itModernizationOpps.slice(0, 3).map(o => o.id),
       targetOpportunityNames: itModernizationOpps.slice(0, 3).map(o => o.contractName),
-      primesToApproach: primes.slice(0, 4),
+      primesToApproach: itPrimes,
       suggestedOpener: `"We specialize in mixed legacy/cloud operating environments where SLA misses happen during scale events. We can plug in as a surgical subcontractor focused on stability + cycle-time reduction without disrupting your prime delivery model. Worth a 30-minute whiteboard this week?"`,
       theme: 'Support primes with transition architecture and delivery velocity.',
     });
   }
 
   // Play C: Set-aside leverage
-  if (setAsideOpps.length > 0) {
-    const primes = ['VETS 2 holders', 'PACTS III SB primes', 'CIO-SP3 SB positioned firms'];
+  if (setAsideOpps.length > 0 && setAsidePrimes.length > 0) {
     plays.push({
       id: 'play-setaside',
       playName: 'Set-aside execution play',
       targetOpportunityIds: setAsideOpps.slice(0, 2).map(o => o.id),
       targetOpportunityNames: setAsideOpps.slice(0, 2).map(o => o.contractName),
-      primesToApproach: primes,
+      primesToApproach: setAsidePrimes,
       suggestedOpener: `"You have vehicle access; we bring a displacement-ready technical narrative and rapid proposal support. Let's build a 'lower risk with measurable outcomes' story before amendment season tightens. Open to a quick teaming discussion?"`,
       theme: 'Combine set-aside alignment with low-friction transition artifacts.',
     });
@@ -231,12 +273,15 @@ async function generateTeamingPlays(
   // If we don't have themed plays, create generic ones
   if (plays.length === 0 && opportunities.length > 0) {
     const topThree = opportunities.slice(0, 3);
-    plays.push({
+    // Ground the generic play too: the actual incumbents on these recompetes +
+    // real primes for the agency — never hardcoded names (Eric).
+    const genericPrimes = await primesFor(topThree);
+    if (genericPrimes.length > 0) plays.push({
       id: 'play-generic',
       playName: 'Displacement rapid-response',
       targetOpportunityIds: topThree.map(o => o.id),
       targetOpportunityNames: topThree.map(o => o.contractName),
-      primesToApproach: ['Leidos', 'CACI', 'Peraton', 'Booz Allen'],
+      primesToApproach: genericPrimes,
       suggestedOpener: `"We built a rapid-response pursuit cell that turns forecast signals into partner-ready capture actions in 10 business days. If you're deciding where to bid/no-bid on ${new Date().getFullYear()} recompetes, we can show where displacement odds are highest. Interested in a quick capture-fit diagnostic?"`,
       theme: 'Rapid pursuit support for high-value recompetes.',
     });
