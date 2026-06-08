@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { Mic } from 'lucide-react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
+import IncumbentIntel from '../awards/IncumbentIntel';
 import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
 import { getNaics } from '@/lib/codes/lookup';
@@ -1704,6 +1705,16 @@ function PipelineEditDrawer({
             <p className="text-xs text-slate-500 uppercase tracking-wider">Pipeline Pursuit</p>
             <h2 className="text-lg font-semibold text-white mt-1 line-clamp-2">{opportunity.title}</h2>
             <p className="text-sm text-slate-500 mt-1">{opportunity.agency || 'Unknown Agency'}</p>
+            {/* On-demand incumbent intel (#57) — who holds this work now (real
+                ceiling/expiry/vehicle), fetched on click. Grounds "is this worth
+                pursuing?" without bulk API cost. */}
+            <IncumbentIntel
+              naics={opportunity.naics_code}
+              agency={opportunity.agency}
+              title={opportunity.title}
+              email={email}
+              className="mt-2"
+            />
           </div>
           <button
             onClick={onClose}
