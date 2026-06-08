@@ -15,6 +15,7 @@ import { useState, useEffect, useCallback } from 'react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { useToast } from '../Toast';
 import { useAppTracker } from '../track';
+import SaveContactButton from '../contacts/SaveContactButton';
 
 interface TargetRow {
   id: string;
@@ -97,6 +98,7 @@ export default function MyTargetListPanel({
   // Which target's CONTACTS (Decision Makers) are expanded inline (Eric: fold
   // Relationships into Target List — target the people from the agency card).
   const [contactsId, setContactsId] = useState<string | null>(null);
+  const [savedId, setSavedId] = useState<string | null>(null);   // My Contacts (#40)
   // Slice 4 — Event Radar. Map of target_id → upcoming events. One
   // fetch covers every target (the endpoint loops server-side so the
   // client makes a single round trip regardless of list size).
@@ -716,6 +718,15 @@ export default function MyTargetListPanel({
                         >
                           {contactsId === t.id ? '▼ Hide contacts' : '▸ Who to contact'}
                         </button>
+                        {/* My Contacts (#40) — the people you've SAVED for this
+                            agency, from anywhere in Mindy. */}
+                        <button
+                          type="button"
+                          onClick={() => setSavedId(savedId === t.id ? null : t.id)}
+                          className="text-xs text-amber-400 hover:text-amber-300 transition-colors"
+                        >
+                          {savedId === t.id ? '▼ Hide my contacts' : '⭐ My contacts'}
+                        </button>
                         {/* Slice 3D — toggle for the outreach log. Click
                             to expand the activity timeline + log-new
                             form inline beneath the card. */}
@@ -836,6 +847,10 @@ export default function MyTargetListPanel({
                       agency={t.agency_name}
                       email={email}
                     />
+                  )}
+                  {/* My saved contacts for this agency (#40). */}
+                  {savedId === t.id && email && (
+                    <SavedContacts agency={t.agency_name} email={email} />
                   )}
                   {expandedId === t.id && email && (
                     <OutreachLog
@@ -1331,9 +1346,25 @@ function TargetContacts({ agency, email }: { agency: string; email: string }) {
           const office = c.derivedOffice || c.sub_tier;
           return (
             <div key={c.id} className="text-xs leading-tight">
-              <div>
-                <span className={`font-medium ${accent ? 'text-amber-200' : 'text-slate-200'}`}>{fmtName(c.contact_fullname)}</span>
-                {accent && <span className="ml-1.5 text-[9px] uppercase tracking-wide text-amber-300/80">Small Business / OSBP</span>}
+              <div className="flex items-start justify-between gap-2">
+                <span className={`font-medium ${accent ? 'text-amber-200' : 'text-slate-200'}`}>
+                  {fmtName(c.contact_fullname)}
+                  {accent && <span className="ml-1.5 text-[9px] uppercase tracking-wide text-amber-300/80">Small Business / OSBP</span>}
+                </span>
+                {/* One unified save action (#40) → pins this person under the agency. */}
+                <SaveContactButton
+                  email={email}
+                  size="xs"
+                  contact={{
+                    full_name: fmtName(c.contact_fullname),
+                    title: isJunkTitle(c.contact_title) ? null : c.contact_title,
+                    email: c.contact_email || null,
+                    phone: isJunkPhone(c.contact_phone) ? null : c.contact_phone,
+                    organization: office || null,
+                    agency,
+                    source: accent ? 'osbp' : 'decision_makers',
+                  }}
+                />
               </div>
               {!isJunkTitle(c.contact_title) && <div className="text-[10px] text-slate-500">{c.contact_title}</div>}
               {office && <div className="text-[10px] text-slate-600">{office}</div>}
@@ -1370,6 +1401,62 @@ function TargetContacts({ agency, email }: { agency: string; email: string }) {
           </>
         );
       })()}
+    </div>
+  );
+}
+
+// My Contacts (#40): the people the user has SAVED for this agency, from any
+// surface (Decision Makers, task-order primes, OSBP, SBLOs). Reads the existing
+// contact CRM (GET /api/app/relationships?mode=saved&agency=).
+interface SavedContactRow {
+  id: string;
+  full_name: string;
+  title?: string | null;
+  email?: string | null;
+  phone?: string | null;
+  organization?: string | null;
+  source?: string | null;
+}
+function SavedContacts({ agency, email }: { agency: string; email: string }) {
+  const [rows, setRows] = useState<SavedContactRow[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const load = useCallback(() => {
+    setLoading(true);
+    const p = new URLSearchParams({ email, mode: 'saved', agency });
+    fetch(`/api/app/relationships?${p.toString()}`)
+      .then(r => r.json())
+      .then(d => setRows(((d?.contacts || d?.saved || d?.results || []) as SavedContactRow[])))
+      .catch(() => setRows([]))
+      .finally(() => setLoading(false));
+  }, [agency, email]);
+
+  useEffect(() => { load(); }, [load]);
+
+  return (
+    <div className="mt-2 rounded-lg border border-amber-500/15 bg-amber-500/[0.04] p-3">
+      <div className="flex items-center justify-between mb-2">
+        <span className="text-xs font-semibold text-amber-300">⭐ My contacts at {agency}</span>
+        <span className="text-[10px] text-slate-500">{rows.length} saved</span>
+      </div>
+      {loading ? (
+        <div className="text-[11px] text-slate-500">Loading…</div>
+      ) : rows.length === 0 ? (
+        <p className="text-[11px] text-slate-500">No saved contacts yet. Use <span className="text-purple-300">▸ Who to contact</span> (or Decision Makers / task orders) and hit <span className="text-purple-300">+ Save contact</span> to pin people here.</p>
+      ) : (
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
+          {rows.map(c => (
+            <div key={c.id} className="text-xs leading-tight">
+              <div className="text-slate-200 font-medium">{c.full_name}</div>
+              {c.title && <div className="text-[10px] text-slate-500">{c.title}</div>}
+              {c.organization && <div className="text-[10px] text-slate-600">{c.organization}</div>}
+              {c.email && <div className="text-[11px] text-purple-300/80 select-all break-all">{c.email}</div>}
+              {c.phone && <div className="text-[11px] text-emerald-300/80 select-all">{c.phone}</div>}
+              {c.source && <div className="text-[9px] text-slate-600 uppercase tracking-wide">via {c.source.replace(/_/g, ' ')}</div>}
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

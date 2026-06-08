@@ -6,6 +6,7 @@ import { getMIApiHeaders } from '../authHeaders';
 import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
 import ContractorLink from '../contractors/ContractorLink';
+import SaveContactButton from '../contacts/SaveContactButton';
 import { classifyLocation, MATCH_META, type LocationMatch } from '@/lib/geo/location-match';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 import { useDodaacNames } from '@/components/app/useDodaacNames';
@@ -827,6 +828,20 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                         ) : (
                           <span className="text-xs font-medium text-slate-200">{c.recipientName}</span>
                         )}
+                        {/* Unified save (#40) — pin this prime as a subcontracting
+                            contact under the agency. */}
+                        <SaveContactButton
+                          email={email}
+                          size="xs"
+                          contact={{
+                            full_name: c.recipientName,
+                            organization: c.recipientName,
+                            agency: c.subAgency || c.agency,
+                            office: c.agency,
+                            source: 'task_order',
+                            source_record_id: c.awardId,
+                          }}
+                        />
                       </div>
 
                       {/* WHERE — project location + "in your area" badge (the tribe-story trigger) */}
