@@ -939,14 +939,20 @@ export async function POST(request: NextRequest) {
             const dodFpdsAgencies = fpdsAgencies.filter(a => {
               const parentUpper = (a.parentAgency || '').toUpperCase();
               const subUpper = (a.subAgency || '').toUpperCase();
+              // Drop OVERSEAS commands (Eric: "Engineer District Europe" leaked in).
+              if (/\b(europe|far east|pacific|japan|korea|germany|italy|overseas)\b/i.test(a.name || '')) return false;
               return dodParentAgencies.some(p => parentUpper.includes(p)) ||
                      dodSubAgencies.some(s => subUpper.includes(s));
             });
 
             console.log(`   Found ${dodFpdsAgencies.length} specific DoD commands from FPDS`);
 
-            // Only replace if FPDS returned meaningful DoD data (at least as many as we're removing)
-            if (dodFpdsAgencies.length >= dodAgenciesNeedingDetail.length) {
+            // Merge FPDS commands whenever we got ANY (Eric: multi-NAICS surfaced
+            // FEWER FPDS commands than generic DoD rows, so the old ">=" gate
+            // SKIPPED the merge → DoD never broke into commands. Now: merge the
+            // commands we have + keep generic DoD rows FPDS didn't cover, then
+            // let the static expander fill the rest below.)
+            if (dodFpdsAgencies.length > 0) {
               // Remove the generic DoD entries and replace with FPDS data
               const genericDoDIds = new Set(dodAgenciesNeedingDetail.map(a => a.id));
               const nonDoDAgencies = agencies.filter(a => !genericDoDIds.has(a.id));
