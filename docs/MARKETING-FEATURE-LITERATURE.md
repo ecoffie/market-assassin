@@ -59,8 +59,19 @@ Cybersecurity sellers who only watch 541512 (Computer Systems Design) miss $1.5B
 flowing through Engineering Services, R&D, and a dozen other codes. This is the
 single most expensive mistake in federal BD — and Mindy fixes it in one screen.
 
+**🎓 THE NAICS-vs-PSC LESSON (a GovCon-pro insight, in the product):** When you
+research by keyword, Mindy shows a **Market Coverage** panel that teaches *why*
+this works — **NAICS describes WHO the seller is; PSC describes WHAT was bought.**
+For drones, the top NAICS is "Aircraft Manufacturing" (a vendor catch-all that
+includes jets and helicopters), but the top PSC is **"1550 Unmanned Aircraft"** —
+the literal product. That's why pros search by what's *bought*, not by the
+vendor's industry bucket. Mindy turns that hard-won insight into a one-glance
+lesson every user sees: "drones = $243M across 70+ NAICS / 59 PSC codes; the
+obvious code is only 28%."
+
 **SEO angles / blog titles:**
 - "Drones don't have ONE NAICS code — they have 70+. Here's why that matters."
+- "NAICS vs PSC: why pros search by what's BOUGHT, not who the seller is"
 - "The hidden 72%: why one NAICS code costs you most of your market"
 - "How to find your NAICS code (without knowing your NAICS code)"
 - "What is my NAICS code for [industry]? A faster way"

@@ -9,6 +9,7 @@ import {
 import { Zap, Gauge } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
+import MarketCoverageBanner, { type MarketCoverage } from '../market/MarketCoverageBanner';
 import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
 import ContractorLink from '../contractors/ContractorLink';
@@ -648,6 +649,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   // The TMR endpoint is independently cacheable (24h) and idempotent
   // so firing it eagerly costs nothing.
   const [tmrRows, setTmrRows] = useState<AgencyTableRow[]>([]);
+  const [marketCoverage, setMarketCoverage] = useState<MarketCoverage | null>(null);  // #59
   // Agencies the user STARRED in the agency table. When non-empty, the
   // reports (pain points / OSBP / buyers / needs) generate for THESE
   // instead of the typed/recommended set — so report content matches
@@ -1193,6 +1195,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         if (cancelled) return;
         if (data?.success) {
           setTmrRows((data.agencies || []) as AgencyTableRow[]);
+          setMarketCoverage(data.keyword_coverage || null);   // #59 — the coverage lesson
         }
       })
       .catch((err) => {
@@ -2018,6 +2021,9 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           real charts, AI narrative, and export. */}
       {showResults && viewMode === 'map' && reportData && (
         <div className="space-y-6">
+          {/* Market coverage lesson (#59) — how many codes make up this market +
+              the keyword-vs-one-code teaching. Only when researched by keyword. */}
+          <MarketCoverageBanner coverage={marketCoverage} />
           {/* Headline stats — same 4 numbers as the reports view's
               MetricCards but with stronger visual hierarchy here. */}
           <section className="grid grid-cols-1 gap-4 md:grid-cols-4">

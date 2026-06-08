@@ -710,6 +710,8 @@ export async function POST(request: NextRequest) {
         codes_used: coverage.coverageCodes.length,
         coverage_pct: Math.round(coverage.coveragePct * 100),
         top_code_pct: Math.round(coverage.topCodePct * 100),
+        psc_count: coverage.pscCount,
+        top_psc: coverage.topPsc,           // "what was bought" — the teachable PSC lesson
       } : null,
       cached: false,
       generation_ms: Date.now() - startedAt,
