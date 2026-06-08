@@ -4,6 +4,42 @@
 
 ---
 
+## Session Handoff — 2026-06-08 PM (Keyword-first research + Email send guard — SHIPPED)
+
+### Keyword-first market research (#59) — NAICS is the wrong primary key
+- [x] **The insight (Eric):** "drones" = 70+ NAICS codes ($243M); the obvious code
+  (336411) is only 28% → search it alone, miss 72%. And 336411 is BOTH over-broad
+  (all aircraft) AND incomplete. Keyword is precise + complete. NAICS auto-derived
+  invisibly (real job = set-aside size eligibility).
+- [x] **3-axis model:** keyword=discovery, PSC=what-was-bought (1550 Unmanned
+  Aircraft vs 336411 Aircraft Mfg — the pro insight), NAICS=size/eligibility.
+- [x] `src/lib/market/keyword-coverage.ts` — keyword → total market, all NAICS, 90%
+  set, top PSC. **Phrase-resilient** (USASpending=exact-phrase → tries candidates).
+- [x] `target-market-research` accepts `keyword`, auto-derives + returns
+  keyword_coverage.
+- [x] `<MarketCoverageBanner>` teaches the lesson (renders only for keyword research).
+- [x] Sport Mode keyword build → FULL coverage (~8 codes, not top-3).
+- [x] **Onboarding grounds day-1 codes** (was hardcoded 3-per-industry → broke new
+  users' alerts by missing 72%). Now real /api/suggest-codes coverage.
+- [x] **QA caught:** sentences ("cybersecurity consulting") fell to LLM — fixed with
+  candidate fallback in BOTH keyword-coverage + suggest-codes.
+
+### Email send guard (#58) — fixes the 12-emails/day churn (krithi/Allen)
+- [x] ROOT CAUSE: ~15 email streams, no global coordination; central
+  email_provider_sends log table never existed (silent fail → couldn't count/cap).
+- [x] Migration: email_provider_sends + email_suppressions (krithi seeded).
+- [x] sendEmail() GLOBAL guard: suppression check + per-recipient daily cap
+  (EMAIL_DAILY_CAP=3) BEFORE any provider. Transactional (auth/2FA/receipt/welcome)
+  BYPASSES via explicit allowlist. Fails OPEN.
+- [x] **emailType audit** caught: bootcamp_profile_setup (bulk marketing) was
+  BYPASSING the cap via "setup" keyword → fixed with allowlist; welcome_alerts was
+  wrongly capped → fixed.
+- [x] `/api/admin/email-guard` — diagnose any user's volume + manage suppressions.
+- [ ] **Add Allen White's REAL email to suppressions** (placeholder removed; get
+  address, POST {action:'suppress'} to the admin endpoint).
+
+---
+
 ## Session Handoff — 2026-06-08 (Award Intelligence arc + contact rosters + Proposal/Pipeline UX — all SHIPPED)
 
 Big session toward the Juneteenth drop. Built the **USASpending award-intelligence

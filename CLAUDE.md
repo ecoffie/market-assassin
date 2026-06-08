@@ -272,6 +272,46 @@ script. Registry: `docs/DATA-SOURCES-REGISTRY.md`, view `/api/admin/data-sources
 
 ---
 
+## Keyword-first market research (June 8, 2026)
+
+**The principle (Eric):** NAICS is the WRONG primary key. A product like "drones"
+sprawls across **70+ NAICS codes** ($243M FY2025); the single obvious code (336411
+Aircraft Mfg) is only **28%** → searching it alone MISSES 72% of the market. Worse,
+336411 is BOTH over-broad (all aircraft) AND incomplete. So: **keyword is the
+discovery key; NAICS is auto-derived invisibly** (its real job is set-aside SIZE
+eligibility, not discovery). User never manages 70 codes.
+
+**The 3-axis model** (memory: `naics-vs-psc-search`):
+- **Keyword** = discovery (what's this about — most complete + precise; matches the
+  contract text)
+- **PSC** = what was BOUGHT (1550 "Unmanned Aircraft" — the literal product; the
+  GovCon-pro insight is PSC > NAICS for search accuracy)
+- **NAICS** = who the SELLER is + size/set-aside eligibility (the qualification axis)
+
+**Implementation:**
+- `src/lib/market/keyword-coverage.ts` — `keywordCoverage(keyword)` → total market
+  $, all buying NAICS ranked, the smallest set covering ~90%, + top PSC ("what was
+  bought"). **Phrase-resilient**: USASpending keyword search is EXACT-PHRASE, so it
+  tries candidates most→least specific (full phrase → significant words, stopwords
+  stripped) — otherwise sentences silently fall to the LLM.
+- `target-market-research` accepts `keyword`; auto-derives the 90%-coverage NAICS
+  set, returns `keyword_coverage` (total_market, naics_count, codes_used,
+  coverage_pct, top_psc) for the lesson banner.
+- `src/components/app/market/MarketCoverageBanner.tsx` — teaches the lesson
+  ("drones = $243M across 70+ codes; obvious code = 28% → miss 72%; PSC = Unmanned
+  Aircraft"). Renders only for keyword research.
+- **Sport Mode**: keyword build applies the FULL coverage set (~8 codes), not top-3.
+- **Onboarding** (`src/app/app/onboarding/page.tsx`): the describe-your-business
+  step now grounds day-1 codes via `/api/suggest-codes` (full coverage), NOT the old
+  hardcoded 3-per-industry map that broke new users' alerts by missing 72%.
+- `suggest-codes` `groundCodesFromUsaspending` has the SAME phrase-candidate
+  fallback (onboarding sends sentences).
+
+**Gotcha:** USASpending keyword = exact phrase. Always reduce phrases to candidate
+terms or you ground nothing → LLM fallback (defeats the whole point).
+
+---
+
 ### Rate Limits & Caching
 
 - **Standard tier:** 1,000 requests/day, 10/min
@@ -1426,4 +1466,4 @@ getmindy.ai purchases feed a **unified cross-site dashboard** hosted at `govcong
 
 ---
 
-*Last Updated: June 8, 2026 — Award Intelligence spine (award-detail + incumbent intel woven through task orders / Expiring Contracts / bid-no-bid / My Pursuits / Today's Intel), office contact rosters (#16, DoDAAC-decoded), Vault POC fields, SOW export tables, active-first pursuit picker, pipeline next-action + dedup, LLM cost discipline (gpt-4o-mini reasoning + $15 cap), quarterly data-refresh cron (honest stamp, no auto-fake). See "Award Intelligence + Office Rosters" section. Prev Jun 3: Daily alerts free-daily permanent (DAILY_ALERT_BETA). Jun 2: purchase attribution → unified sales dashboard. May 20: OAuth custom domain (auth.getmindy.ai), Proposal Assist V2, mi-beta → app rename, session TTL 30d*
+*Last Updated: June 8, 2026 (PM) — Keyword-first market research (NAICS is the wrong primary key; "drones"=70+ codes, obvious code=28%/miss 72%; keyword auto-derives 90%-coverage NAICS; PSC=what's-bought lesson; Market Coverage banner; phrase-resilient; onboarding grounds day-1 codes so alerts aren't broken). Email send guard (#58 — global per-recipient daily cap + suppression, fixes 12-emails/day churn; emailType audit). Award Intelligence spine (award-detail + incumbent intel woven through task orders / Expiring Contracts / bid-no-bid / My Pursuits / Today's Intel), office contact rosters (#16, DoDAAC-decoded), Vault POC fields, SOW export tables, active-first pursuit picker, pipeline next-action + dedup, LLM cost discipline (gpt-4o-mini reasoning + $15 cap), quarterly data-refresh cron (honest stamp). See "Keyword-first market research" + "Award Intelligence + Office Rosters" sections. Prev Jun 3: Daily alerts free-daily permanent (DAILY_ALERT_BETA). Jun 2: purchase attribution → unified sales dashboard. May 20: OAuth custom domain (auth.getmindy.ai), Proposal Assist V2, mi-beta → app rename, session TTL 30d*
