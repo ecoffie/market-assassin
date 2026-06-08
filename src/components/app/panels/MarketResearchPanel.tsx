@@ -929,6 +929,34 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     }
   }, [canAccessReport, email, formData, getAuthHeaders, loadRecommendedOpportunities, selectedAgency, starredAgencies, validateForm, showToast, tier, track]);
 
+  // Smart Build for Sport (Eric: typed "staffing", hit Build → "naicsCode
+  // required"). If there's a keyword but no codes yet, resolve the keyword to
+  // real USASpending codes and build with them — no dead-end error.
+  const handleSportBuild = useCallback(async () => {
+    const hasCodes = formData.naicsCode.trim() || formData.pscCode.trim();
+    if (hasCodes || !sportKeyword.trim()) { handleGenerateAll(); return; }
+    setSportSuggesting(true);
+    try {
+      const res = await fetch('/api/suggest-codes', {
+        method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({ description: sportKeyword.trim(), maxResults: 5 }),
+      });
+      const d = await res.json();
+      const naics = (d.naicsSuggestions || []).slice(0, 3).map((s: { code: string }) => s.code).join(', ');
+      const psc = (d.pscSuggestions || []).slice(0, 2).map((s: { code: string }) => s.code).join(', ');
+      if (!naics && !psc) { showToast({ message: 'No federal codes found for that — try different words.', variant: 'error' }); return; }
+      const nextFormData = { ...formData, naicsCode: naics, pscCode: psc, businessType: formData.businessType || 'Small Business' };
+      setFormData(nextFormData);
+      setSportSuggestions({
+        naics: (d.naicsSuggestions || []).map((s: { code: string; name: string }) => ({ code: s.code, name: s.name })),
+        psc: (d.pscSuggestions || []).map((s: { code: string; name: string }) => ({ code: s.code, name: s.name })),
+      });
+      handleGenerateAll({ nextFormData });
+    } catch {
+      showToast({ message: 'Could not look up codes — try the Suggest codes button.', variant: 'error' });
+    } finally { setSportSuggesting(false); }
+  }, [sportKeyword, formData, getAuthHeaders, handleGenerateAll, showToast]);
+
   const applySavedProfile = useCallback((profile: SavedResearchProfile) => {
     setFormData((current) => ({
       ...current,
@@ -1591,13 +1619,13 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           )}
           <button
             onClick={() => {
-              handleGenerateAll();
-              loadRecommendedOpportunities();
+              if (researchMode === 'sport') { handleSportBuild(); }
+              else { handleGenerateAll(); loadRecommendedOpportunities(); }
             }}
-            disabled={isGenerating || profileLoading}
+            disabled={isGenerating || profileLoading || sportSuggesting}
             className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-700"
           >
-            {isGenerating ? 'Building...' : reportData ? 'Refresh' : 'Build Market Map'}
+            {isGenerating || sportSuggesting ? 'Building...' : reportData ? 'Refresh' : 'Build Market Map'}
           </button>
         </div>
       </div>
@@ -1730,7 +1758,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               />
             </label>
           </div>
-          <p className="text-[11px] text-slate-500 mt-2">Enter at least a NAICS or PSC, then click <span className="text-purple-300">Build Market Map</span> above.</p>
+          <p className="text-[11px] text-slate-500 mt-2">Enter a NAICS/PSC, or just type what you research above and hit <span className="text-purple-300">Build Market Map</span> — Mindy finds the codes for you.</p>
         </div>
       )}
 
@@ -2134,10 +2162,11 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           </p>
           <button
             type="button"
-            onClick={() => handleGenerateAll()}
-            className="mt-5 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500"
+            onClick={() => researchMode === 'sport' ? handleSportBuild() : handleGenerateAll()}
+            disabled={sportSuggesting}
+            className="mt-5 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:bg-slate-700"
           >
-            Build My Market Map
+            {sportSuggesting ? 'Looking up codes…' : 'Build My Market Map'}
           </button>
         </section>
       )}
