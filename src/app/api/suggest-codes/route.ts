@@ -222,18 +222,28 @@ interface SuggestCodesResponse {
  * (Eric's principle: suggest the codes that ACTUALLY have spending under the
  * term, not an LLM guess). Queries spending_by_category for the last FY.
  */
+// USASpending keyword search is EXACT-PHRASE (QA: onboarding sentences like
+// "cybersecurity consulting" returned nothing → silently fell to the LLM). Reduce
+// a phrase/sentence to candidates most→least specific so we stay grounded.
+const SUGGEST_STOP = new Set(['we', 'provide', 'offer', 'and', 'or', 'the', 'a', 'an', 'for', 'of', 'to', 'in', 'our', 'with', 'services', 'service', 'support', 'solutions', 'consulting', 'company', 'federal', 'government', 'agencies']);
+function suggestKeywordCandidates(input: string): string[] {
+  const kw = input.trim();
+  const out = [kw];
+  const words = kw.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 2 && !SUGGEST_STOP.has(w));
+  for (const w of [...new Set(words)].sort((a, b) => b.length - a.length)) if (!out.includes(w)) out.push(w);
+  return out.slice(0, 4);
+}
+
 async function groundCodesFromUsaspending(keyword: string, maxResults: number): Promise<{ naicsSuggestions: CodeSuggestion[]; pscSuggestions: CodeSuggestion[] } | null> {
   const base = 'https://api.usaspending.gov/api/v2/search/spending_by_category';
-  const filters = {
-    keywords: [keyword],
-    time_period: [fiscalYearTimePeriod()],
-    award_type_codes: ['A', 'B', 'C', 'D'],
-  };
-  const fetchCat = async (cat: 'naics' | 'psc'): Promise<CodeSuggestion[]> => {
+  const fetchCat = async (kw: string, cat: 'naics' | 'psc'): Promise<CodeSuggestion[]> => {
     try {
       const res = await fetch(`${base}/${cat}/`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filters, limit: maxResults }),
+        body: JSON.stringify({
+          filters: { keywords: [kw], time_period: [fiscalYearTimePeriod()], award_type_codes: ['A', 'B', 'C', 'D'] },
+          limit: maxResults,
+        }),
       });
       if (!res.ok) return [];
       const j = await res.json();
@@ -242,13 +252,18 @@ async function groundCodesFromUsaspending(keyword: string, maxResults: number): 
           code: r.code,
           name: r.name || r.code,
           confidence: 'high' as const,
-          reason: `$${(r.amount / 1e6).toFixed(1)}M in ${fiscalYearLabel()} federal awards under "${keyword}"`,
+          reason: `$${(r.amount / 1e6).toFixed(1)}M in ${fiscalYearLabel()} federal awards under "${kw}"`,
         }));
     } catch { return []; }
   };
-  const [naicsSuggestions, pscSuggestions] = await Promise.all([fetchCat('naics'), fetchCat('psc')]);
-  if (naicsSuggestions.length === 0 && pscSuggestions.length === 0) return null;
-  return { naicsSuggestions, pscSuggestions };
+  // Try candidates until one yields real award data (phrase resilience).
+  for (const cand of suggestKeywordCandidates(keyword)) {
+    const [naicsSuggestions, pscSuggestions] = await Promise.all([fetchCat(cand, 'naics'), fetchCat(cand, 'psc')]);
+    if (naicsSuggestions.length > 0 || pscSuggestions.length > 0) {
+      return { naicsSuggestions, pscSuggestions };
+    }
+  }
+  return null;
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse<SuggestCodesResponse>> {

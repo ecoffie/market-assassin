@@ -35,15 +35,38 @@ export interface KeywordCoverage {
  * Resolve a keyword to its market coverage. coverageTarget = the spend fraction
  * the derived code set should capture (default 0.9 = 90%).
  */
+// Stopwords stripped when reducing a phrase/sentence to its core term.
+const STOP = new Set(['we', 'provide', 'offer', 'and', 'or', 'the', 'a', 'an', 'for', 'of', 'to', 'in', 'our', 'with', 'services', 'service', 'support', 'solutions', 'consulting', 'company', 'federal', 'government', 'agencies']);
+
+/**
+ * USASpending keyword search is EXACT-PHRASE (QA: "cybersecurity consulting"
+ * returned nothing → LLM fallback). So build candidate keywords from most- to
+ * least-specific: the full phrase, then significant bigrams, then the single
+ * most-meaningful word. Return the first that yields real award data.
+ */
+function keywordCandidates(input: string): string[] {
+  const kw = input.trim();
+  const out: string[] = [kw];
+  const words = kw.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 2 && !STOP.has(w));
+  // significant single words, longest first (longest ≈ most specific industry term)
+  for (const w of [...new Set(words)].sort((a, b) => b.length - a.length)) {
+    if (!out.includes(w)) out.push(w);
+  }
+  return out.slice(0, 4);
+}
+
 export async function keywordCoverage(keyword: string, coverageTarget = 0.9): Promise<KeywordCoverage | null> {
-  const kw = (keyword || '').trim();
-  if (kw.length < 2) return null;
-  const filters = { keywords: [kw], time_period: [fiscalYearTimePeriod()], award_type_codes: ['A', 'B', 'C', 'D'] };
-  const fetchCat = async (cat: 'naics' | 'psc') => {
+  const raw = (keyword || '').trim();
+  if (raw.length < 2) return null;
+
+  const fetchCat = async (kw: string, cat: 'naics' | 'psc') => {
     try {
       const res = await fetch(`${BASE}/${cat}/`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ filters, category: cat, limit: 100 }),
+        body: JSON.stringify({
+          filters: { keywords: [kw], time_period: [fiscalYearTimePeriod()], award_type_codes: ['A', 'B', 'C', 'D'] },
+          category: cat, limit: 100,
+        }),
       });
       if (!res.ok) return [];
       const j = await res.json();
@@ -53,7 +76,15 @@ export async function keywordCoverage(keyword: string, coverageTarget = 0.9): Pr
     } catch { return []; }
   };
   try {
-    const [rows, pscRows] = await Promise.all([fetchCat('naics'), fetchCat('psc')]);
+    // Try candidates most→least specific until one yields real data (phrase
+    // resilience — onboarding sends sentences, not single words).
+    let rows: { code: string; name?: string; amount: number }[] = [];
+    let pscRows: { code: string; name?: string; amount: number }[] = [];
+    let kw = raw;
+    for (const cand of keywordCandidates(raw)) {
+      const [n, p] = await Promise.all([fetchCat(cand, 'naics'), fetchCat(cand, 'psc')]);
+      if (n.length > 0) { rows = n; pscRows = p; kw = cand; break; }
+    }
     if (rows.length === 0) return null;
 
     const total = rows.reduce((s: number, r: { amount: number }) => s + r.amount, 0);
