@@ -8,6 +8,7 @@ import { formatOpportunityLocation } from '@/lib/mindy/opportunity-location';
 import { getBuyerAgencyParts } from '@/lib/mindy/agency-display';
 import type { AppPanel, AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
+import IncumbentIntel from '../awards/IncumbentIntel';
 import { useToast } from '../Toast';
 import ContractorLink from '../contractors/ContractorLink';
 import { MindyInsightCard } from '../MindyInsightCard';
@@ -1464,6 +1465,18 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                               {item.actionLabel || 'View on SAM.gov'} →
                             </a>
                           )}
+                        </div>
+
+                        {/* Incumbent intel (#57 follow-on) — for an OPEN opp, who
+                            holds this work NOW (real ceiling/expiry/vehicle),
+                            fetched on click. Grounds "is this worth pursuing?" the
+                            moment the user reviews fit. */}
+                        <div className="mt-3 border-t border-slate-800 pt-3" onClick={(e) => e.stopPropagation()}>
+                          <IncumbentIntel
+                            agency={text(item.parentAgency, text(item.buyerName)) || undefined}
+                            title={text(item.title) || undefined}
+                            email={email}
+                          />
                         </div>
 
                         {/* Attachments — the actual SAM document files, same
