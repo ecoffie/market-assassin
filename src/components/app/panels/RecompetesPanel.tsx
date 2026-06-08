@@ -257,10 +257,9 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
 
   // Award-type view (Eric: IDV is the same USASpending data, a different slice —
   // a toggle here, not a separate panel). 'definitive' = current recompete view.
-  const [awardType, setAwardType] = useState<'definitive' | 'idv' | 'task'>('definitive');
+  const [awardType, setAwardType] = useState<'definitive' | 'task'>('definitive');
   const [idvContracts, setIdvContracts] = useState<IDVRow[]>([]);
   const [idvLoading, setIdvLoading] = useState(false);
-  const [idvTotal, setIdvTotal] = useState(0);
 
   const toggleExpandedContract = (contractId: string) => {
     setExpandedContracts(prev => {
@@ -397,27 +396,27 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
     }
   }, [allContracts, applyFilters, email, profileDefaults, usingProfileDefaults]);
 
-  // Fetch IDV vehicles / task orders when the toggle is on those views.
-  const fetchIdv = useCallback(async (mode: 'idv' | 'task', naics: string) => {
+  // Fetch task orders (subcontracting targets) on demand. limit=100 + the API
+  // reports the TRUE total (Eric: "50 looks like a sample not the whole").
+  const fetchIdv = useCallback(async (naics: string) => {
     setIdvLoading(true);
     try {
-      const params = new URLSearchParams({ mode, limit: '50' });
+      const params = new URLSearchParams({ mode: 'task', limit: '100' });
       if (naics) params.set('naics', naics.split(/[, ]+/)[0]);
       const res = await fetch(`/api/app/idv-contracts?${params.toString()}`, { headers: getMIApiHeaders(email) });
       const data = await res.json();
       setIdvContracts((data?.contracts || []) as IDVRow[]);
-      setIdvTotal(data?.totalCount || 0);
     } catch {
-      setIdvContracts([]); setIdvTotal(0);
+      setIdvContracts([]);
     } finally {
       setIdvLoading(false);
     }
   }, [email]);
 
-  // Switch award-type view; load IDV/task data on demand.
-  const switchAwardType = useCallback((type: 'definitive' | 'idv' | 'task') => {
+  // Switch view; load task-order data on demand.
+  const switchAwardType = useCallback((type: 'definitive' | 'task') => {
     setAwardType(type);
-    if (type !== 'definitive') fetchIdv(type, naicsFilter);
+    if (type === 'task') fetchIdv(naicsFilter);
   }, [fetchIdv, naicsFilter]);
 
   // Load the shared profile defaults once, then apply them to the full recompete dataset.
@@ -500,7 +499,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
   }, [applyFilters, email]);
 
   const handleSearch = () => {
-    if (awardType !== 'definitive') { fetchIdv(awardType, naicsFilter); return; }
+    if (awardType === 'task') { fetchIdv(naicsFilter); return; }
     setUsingProfileDefaults(false);
     searchContracts(naicsFilter, monthsFilter, competitionFilter);
   };
@@ -596,13 +595,6 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
           >
             View all {allContracts.length.toLocaleString()}
           </button>
-          <a
-            href="/recompete"
-            target="_blank"
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm rounded-lg transition-colors"
-          >
-            Full Expiring Contracts Tool →
-          </a>
         </div>
       </div>
 
@@ -657,13 +649,13 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
           )}
         </div>
 
-        {/* Award-type toggle (Eric: IDV/IDIQ is the same USASpending data, a
-            different award-type slice — surface it here, not a separate panel). */}
+        {/* Two views (Eric: IDVs already show in Expiring tagged "IDIQ" — drop
+            that toggle as redundant. Keep Task Orders = who's winning the work →
+            who to chase for SUBCONTRACTING). */}
         <div className="flex flex-wrap gap-1.5 mb-4">
           {([
-            { id: 'definitive', label: 'Expiring contracts', hint: 'Awards ending soon — recompete targets' },
-            { id: 'idv', label: 'IDVs / vehicles', hint: 'The IDIQ vehicles primes hold' },
-            { id: 'task', label: 'Task orders', hint: 'Orders flowing under those vehicles' },
+            { id: 'definitive', label: 'Expiring contracts', hint: 'Awards ending soon — recompete targets (incumbents, expiry, track)' },
+            { id: 'task', label: 'Subcontracting (task orders)', hint: 'Who is winning task orders now — your subcontracting targets' },
           ] as const).map(t => (
             <button
               key={t.id}
@@ -677,7 +669,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
             </button>
           ))}
           <span className="self-center ml-1 text-[11px] text-slate-500">
-            {awardType === 'definitive' ? 'Definitive contracts ending soon' : awardType === 'idv' ? 'IDIQ/GWAC vehicles (USASpending)' : 'Delivery & task orders (USASpending)'}
+            {awardType === 'definitive' ? 'Definitive contracts ending soon' : 'Primes winning task orders — approach them to sub'}
           </span>
         </div>
 
@@ -749,14 +741,15 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
         </div>
       )}
 
-      {/* IDV / Task-order list (USASpending) — shown when those views are active. */}
-      {awardType !== 'definitive' && (
+      {/* Task orders = subcontracting targets (USASpending). Stays in-app per
+          Eric: no external links; show $ with formatMindyCurrency (B/M/commas). */}
+      {awardType === 'task' && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
             <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
-              {idvLoading ? 'Loading…' : `${idvTotal.toLocaleString()} ${awardType === 'idv' ? 'IDV / IDIQ vehicles' : 'Task orders'}`}
+              {idvLoading ? 'Loading…' : `${idvContracts.length.toLocaleString()} Subcontracting Targets`}
             </h3>
-            <span className="text-[11px] text-slate-500">Source: USASpending awards</span>
+            <span className="text-[11px] text-slate-500">Primes winning task orders — approach to sub</span>
           </div>
           <div className="divide-y divide-slate-800">
             {idvContracts.map((c) => (
@@ -766,19 +759,17 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                     <div className="text-sm font-medium text-white truncate">{c.recipientName}</div>
                     <div className="text-[11px] text-slate-500 truncate">{c.agency}{c.naicsCode ? ` · NAICS ${c.naicsCode}` : ''}{c.pscCode ? ` · PSC ${c.pscCode}` : ''}</div>
                     {c.description && <div className="text-[11px] text-slate-600 truncate mt-0.5">{c.description}</div>}
-                    <div className="text-[10px] text-slate-600 mt-0.5">UEI {c.recipientUei || '—'}{c.endDate ? ` · ends ${c.endDate}` : ''}</div>
+                    <div className="text-[10px] text-slate-600 mt-0.5">UEI {c.recipientUei || '—'}{c.endDate ? ` · ends ${formatDate(c.endDate)}` : ''}</div>
                   </div>
                   <div className="text-right shrink-0">
-                    <div className="text-sm font-semibold text-emerald-400">${(c.awardAmount / 1e6).toFixed(1)}M</div>
-                    {c.usaSpendingUrl && (
-                      <a href={c.usaSpendingUrl} target="_blank" rel="noreferrer" className="text-[11px] text-amber-400 hover:text-amber-300">View on USASpending ↗</a>
-                    )}
+                    <div className="text-sm font-semibold text-emerald-400">{formatCurrency(c.awardAmount)}</div>
+                    <div className="text-[10px] text-slate-500">task-order value</div>
                   </div>
                 </div>
               </div>
             ))}
             {!idvLoading && idvContracts.length === 0 && (
-              <div className="px-5 py-6 text-center text-sm text-slate-500">No {awardType === 'idv' ? 'vehicles' : 'task orders'} for this NAICS. Try a NAICS in the search above.</div>
+              <div className="px-5 py-6 text-center text-sm text-slate-500">No task orders for this NAICS. Try a NAICS in the search above.</div>
             )}
           </div>
         </div>
@@ -1025,13 +1016,13 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
           <p className="text-slate-400 text-sm mb-4">
             Try a broader NAICS prefix, a longer expiration window, or all competition types.
           </p>
-          <a
-            href="/recompete"
-            target="_blank"
+          <button
+            type="button"
+            onClick={viewAllContracts}
             className="inline-block px-6 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition-colors"
           >
-            View Full Expiring Contracts Tool →
-          </a>
+            View all {allContracts.length.toLocaleString()} expiring awards
+          </button>
         </div>
       )}
     </div>
