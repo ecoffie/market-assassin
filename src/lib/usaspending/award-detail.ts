@@ -41,6 +41,36 @@ export interface AwardDetail {
 }
 
 const BASE = 'https://api.usaspending.gov/api/v2/awards';
+const SEARCH = 'https://api.usaspending.gov/api/v2/search/spending_by_award/';
+
+/**
+ * Resolve a raw PIID (e.g. "140F0822D0024") → the generated_internal_id the award
+ * API needs. Used by surfaces that only carry the display PIID (Expiring
+ * Contracts). USASpending forbids mixing contract + IDV type groups in one query,
+ * so we try each group. Returns null if not found (caller degrades gracefully).
+ */
+export async function resolvePiidToId(piid: string): Promise<string | null> {
+  const clean = (piid || '').trim();
+  if (!clean) return null;
+  // Already a generated id? pass through.
+  if (/^CONT_(AWD|IDV)_/i.test(clean)) return clean;
+  const groups = [['A', 'B', 'C', 'D'], ['IDV_A', 'IDV_B', 'IDV_C', 'IDV_D', 'IDV_E']];
+  for (const award_type_codes of groups) {
+    try {
+      const res = await fetch(SEARCH, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filters: { award_type_codes, keywords: [clean] }, fields: ['Award ID', 'generated_internal_id'], limit: 10 }),
+      });
+      if (!res.ok) continue;
+      const j = await res.json();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const hit = (j.results || []).find((r: any) => (r['Award ID'] || '').toUpperCase() === clean.toUpperCase());
+      if (hit?.generated_internal_id) return hit.generated_internal_id;
+    } catch { /* try next group */ }
+  }
+  return null;
+}
 
 /** Fetch + normalize the full award detail for a USASpending generated_internal_id. */
 export async function fetchAwardDetail(generatedId: string): Promise<AwardDetail | null> {

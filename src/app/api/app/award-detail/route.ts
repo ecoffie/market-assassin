@@ -5,7 +5,7 @@
  * Sport/Market Research drill-down (#51) and Proposal Assist grounding (#52).
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchAwardDetail } from '@/lib/usaspending/award-detail';
+import { fetchAwardDetail, resolvePiidToId } from '@/lib/usaspending/award-detail';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -17,8 +17,13 @@ const _cache = new Map<string, { at: number; detail: unknown }>();
 const TTL = 60 * 60 * 1000; // 1h
 
 export async function GET(request: NextRequest) {
-  const id = request.nextUrl.searchParams.get('id');
-  if (!id) return NextResponse.json({ success: false, error: 'id (generated_internal_id) is required' }, { status: 400 });
+  // Accept EITHER a generated_internal_id (`id`) OR a raw display PIID (`piid`).
+  // Surfaces that only carry the PIID (Expiring Contracts) pass piid; we resolve
+  // it to the generated id first (#53).
+  let id = request.nextUrl.searchParams.get('id');
+  const piid = request.nextUrl.searchParams.get('piid');
+  if (!id && piid) id = await resolvePiidToId(piid);
+  if (!id) return NextResponse.json({ success: false, error: piid ? 'Could not resolve this award on USASpending' : 'id or piid is required' }, { status: piid ? 404 : 400 });
 
   const cached = _cache.get(id);
   if (cached && Date.now() - cached.at < TTL) {

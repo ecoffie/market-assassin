@@ -6,6 +6,7 @@ import { getMIApiHeaders } from '../authHeaders';
 import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
 import ContractorLink from '../contractors/ContractorLink';
+import AwardDetailDrawer from '../awards/AwardDetailDrawer';
 import SaveContactButton from '../contacts/SaveContactButton';
 import { classifyLocation, MATCH_META, type LocationMatch } from '@/lib/geo/location-match';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
@@ -1113,6 +1114,17 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                           <p className="mt-2 text-sm leading-6 text-slate-300">
                             {getRecompeteOverview(contract)}
                           </p>
+                          {/* Live Contract Summary (#53) — the real obligated→
+                              ceiling, parent vehicle, period of performance, and
+                              incumbent location, resolved from the PIID. */}
+                          {contract.piid && (
+                            <AwardDetailDrawer
+                              piid={contract.piid}
+                              fallbackUrl={`https://www.usaspending.gov/keyword_search/${encodeURIComponent(contract.piid)}`}
+                              email={email}
+                              className="mt-3"
+                            />
+                          )}
                           <div className="mt-4 flex flex-wrap gap-2">
                             {contract.piid && (
                               <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">
