@@ -51,6 +51,18 @@ const STEPS: TourStep[] = [
     description: 'Pick the agencies you want to win work with. Mindy focuses your decision-makers, relationships, and research around them.',
   },
   {
+    panel: 'research',
+    element: '[data-tour="nav-research"]',
+    title: 'Market Research — your market map',
+    description: 'See who buys your NAICS, how much they spend, who holds the work now, and which offices to target. Auto mode runs off your profile; Sport mode lets you research any industry on demand.',
+  },
+  {
+    panel: 'recompetes',
+    element: '[data-tour="nav-recompetes"]',
+    title: 'Expiring Contracts — recompete + subcontracting targets',
+    description: 'Find awards ending soon you can rebid, plus the primes winning task orders in your area to subcontract with. Spot the opening before the next solicitation drops.',
+  },
+  {
     panel: 'vault',
     element: '[data-tour="nav-vault"]',
     title: 'My Vault — the profile that powers every draft',
