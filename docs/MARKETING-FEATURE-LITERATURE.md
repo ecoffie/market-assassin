@@ -1,0 +1,226 @@
+# Mindy — Marketing & Content Literature (June 2026 Feature Release)
+
+> **For the content/SEO team.** Every feature below is LIVE on getmindy.ai. Each
+> entry has: the plain-English value, the SEO angle, content hooks, and the proof
+> point. Mindy's core differentiator throughout: **every number is grounded in
+> real federal data (USASpending, SAM, SBA, GAO) — never an AI guess.**
+
+---
+
+## The one-line positioning
+
+**Mindy is the AI BD analyst for federal small businesses — she reads the
+solicitation, knows the incumbent's real contract, finds who's buying, and drafts
+the response. Grounded in real government data, not generic AI.**
+
+SEO primary keywords: *government contracting software, GovCon AI, federal proposal
+writing software, recompete intelligence, SAM.gov alternative, USASpending search
+tool, federal market research.*
+
+---
+
+## 1. Market Research "Sport Mode" — research ANY federal market on demand
+
+**What it does (plain English):** Type what you do in plain words ("drones",
+"janitorial", "medical supplies") and Mindy finds the right NAICS/PSC codes from
+**real award data** — then builds a full market map: who's buying, how much they
+spend, who holds the work now, and which offices to target. No codes to memorize.
+
+**Why it's different:** Other tools make you already know your NAICS code. Mindy
+suggests codes backed by **actual federal spending** under your keyword — so you
+can verify they make sense before you commit. ("drones" → 336411 Aircraft Mfg,
+334511 Search/Detection — the codes where drone money actually flows.)
+
+**SEO angles / blog titles:**
+- "How to find your NAICS code (without knowing your NAICS code)"
+- "What is my NAICS code for [industry]? A faster way"
+- "Federal market research in 60 seconds: who buys what you sell"
+
+**Proof point:** Codes come from USASpending's live award data, FY-labeled, with
+the dollar amount as proof ("$8.7M in FY2025 awards under 'medical supplies'").
+
+---
+
+## 2. Office-level buyer intelligence — drill past the agency to the real office
+
+**What it does:** See WHO buys your services down to the **contracting office**
+(U.S. Army Corps of Engineers, NAVFAC, GSA Public Buildings Service) — with the
+real per-office spend, contract count, distinct vendors, and the small-business
+office (OSBP) contact.
+
+**Why it's different:** "The Army spends $X" is useless. "Omaha District of USACE
+spends $2B on your NAICS and here's their small-business specialist" is a BD
+target. Mindy shows the office, not just the department.
+
+**SEO angles:**
+- "Who actually buys [your service] in the federal government?"
+- "Federal contracting offices explained: where the money is really spent"
+- "How to find the right contracting office for your business"
+
+**Proof point:** Per-office spend from USASpending awards; OSBP contacts from the
+170-command federal directory.
+
+---
+
+## 3. Subcontracting & teaming intelligence — find who to partner with
+
+**What it does:** See the **primes winning task orders in your area** — your
+subcontracting targets — plus tribal/8(a) and Tier-2 firms to team with. Each
+shows the project, location, "in your area" match, and the company to approach.
+
+**Why it's different:** Most BD tools point you at the giant primes (Lockheed,
+Booz Allen) you'll never reach. Mindy surfaces **realistic teaming partners** —
+tribal sole-source firms (the fastest path) and mid-size Tier-2 subs — grounded
+in who actually wins this work.
+
+**SEO angles:**
+- "How to find subcontracting opportunities in federal contracting"
+- "Teaming partners for government contracts: who to actually call"
+- "8(a) and tribal sole-source: the small-business fast lane"
+
+**Proof point:** Primes from real USASpending awards by agency/NAICS; tribal and
+Tier-2 from a scraped database built off SBA/DoD/DHS official directories.
+
+---
+
+## 4. Award drill-down — the full Contract Summary on any award
+
+**What it does:** Click any award and see the **real Contract Summary**: how much
+has been spent vs. the **ceiling** (the real prize size), the **parent contract
+vehicle** you'd need to compete, the **period of performance** (when it expires),
+and the **incumbent's location**.
+
+**Why it's different:** This is the data that tells you whether an opportunity is a
+$200K job or a $63M job — and whether you're even eligible to bid (you may need to
+be on a specific vehicle). Mindy puts USASpending's deep detail inline, pointed at
+YOUR market.
+
+**SEO angles:**
+- "How to research a federal contract before you bid"
+- "What is a contract ceiling and why it matters for your bid"
+- "IDIQ vs task order: how federal contract vehicles work"
+
+**Proof point:** Live from USASpending's award API — obligated→ceiling, parent
+IDV, period of performance, recipient detail.
+
+---
+
+## 5. Recompete intelligence in Proposal Assist — bid against the REAL incumbent
+
+**What it does:** When you open a proposal, Mindy finds the **likely incumbent
+contract** and grounds the bid/no-bid decision in it: "Likely incumbent: Jones
+Lang LaSalle; ceiling $55.9M; expires 2033; under vehicle 47PF0022A0012 (must hold
+to compete)."
+
+**Why it's different:** ~80% of federal opportunities are recompetes — you're
+taking work from someone. Knowing their real contract size, timing, and vehicle is
+the difference between bidding blind and bidding to win. Mindy hands you that
+automatically.
+
+**SEO angles:**
+- "What is a recompete in government contracting? (and how to win one)"
+- "How to research the incumbent on a federal bid"
+- "Bid/no-bid decision: the data that should drive it"
+
+**Proof point:** Incumbent inferred from USASpending (largest recent matching
+award), full Contract Summary pulled live, confidence-labeled.
+
+---
+
+## 6. Proposal Assist — Mindy reads the whole solicitation and drafts the response
+
+**What it does:** Pick a pursuit (or upload the docs). Mindy reads the entire
+solicitation, runs a **bid/no-bid gate** (real go/no-go eliminators, not noise),
+builds a **compliance matrix** (every shall/must/required), and drafts **grounded
+sections** that pull from YOUR real company profile — UEI, CAGE, past performance,
+contact person — so it fills real facts instead of [placeholders]. Exports clean,
+formatted Word docs (tables and headings preserved).
+
+**Why it's different:** ChatGPT doesn't know your company or your bid. Mindy
+grounds every draft in your Vault + the actual solicitation. It's called Proposal
+**Assist** for a reason — it's a first-pass partner that's honest about edge cases,
+not a magic button.
+
+**SEO angles:**
+- "AI proposal writing for government contracts: what works, what doesn't"
+- "Federal compliance matrix: how to never miss a 'shall'"
+- "Capability statement vs. proposal: how to ground both in real data"
+
+**Proof point:** Drafts pull from your Vault (real UEI/CAGE/past performance) +
+the extracted solicitation; compliance matrix extracts every requirement;
+formatted .docx export.
+
+---
+
+## 7. Decision-maker & contact intelligence — the right people, the right roles
+
+**What it does:** Find the federal buyers and small-business specialists for your
+target agencies — with their **real role** badged (Contracting Officer, Small
+Business Specialist, Program Manager), cryptic military codes decoded into plain
+English (NAVSUP → Naval Supply Systems Command), and overseas offices filtered out
+(you won't bid Japan/Europe). Save anyone to your agency's contact list with one
+click.
+
+**Why it's different:** Raw SAM contact dumps are full of noise — POC labels, base
+codes, foreign offices. Mindy cleans it, decodes it, and tells you **which role to
+call for what** (and which roles to seek when the data doesn't name them).
+
+**SEO angles:**
+- "How to find the contracting officer for a federal opportunity"
+- "Who is the OSBP and why they matter for small business"
+- "Federal contracting org structure: KO vs COR vs program manager"
+
+**Proof point:** SAM.gov POCs + the 170-command OSBP directory; roles classified,
+codes decoded, overseas filtered.
+
+---
+
+## The data-sources story (the trust / acquisition angle)
+
+Every Mindy feature is grounded in **real, documented, continuously-maintained
+federal data:**
+
+| Source | Powers |
+|---|---|
+| **USASpending.gov** | Market spend, codes, office drill-down, IDV/task orders, award detail, incumbent intel |
+| **SAM.gov** | Opportunities + contracting POCs |
+| **Grants.gov** | Federal grants |
+| **SBA / DoD CSP / DHS OSDBU directories** | The 2,700+ contractor + SBLO database |
+| **GAO high-risk reports + NDAA** | Agency pain points & priorities |
+| **Federal command directory** | 170 commands with OSBP contacts |
+
+**The message:** "Mindy never guesses. Every code, every dollar, every contact
+traces to a real government source — and we refresh them on a schedule." This is
+the trust differentiator vs. generic AI tools (and the due-diligence story for
+investors/acquirers).
+
+**SEO angles:**
+- "Where does federal contracting data come from? (and why most tools get it
+  wrong)"
+- "USASpending vs SAM.gov vs FPDS: the federal data sources explained"
+- "Why AI hallucinations are dangerous in government contracting"
+
+---
+
+## Suggested content calendar (pillar → cluster)
+
+**Pillar 1 — "Find your federal market"** (Market Research, codes, office intel)
+→ NAICS finder, market research how-to, contracting-office explainer.
+
+**Pillar 2 — "Win the recompete"** (award detail, incumbent intel, bid/no-bid)
+→ recompete guide, contract-ceiling explainer, incumbent-research how-to.
+
+**Pillar 3 — "Write the winning proposal"** (Proposal Assist, compliance, Vault)
+→ AI proposal-writing guide, compliance-matrix how-to, capability-statement guide.
+
+**Pillar 4 — "Know who to call"** (contacts, OSBP, teaming)
+→ contracting-officer guide, OSBP explainer, teaming-partner how-to.
+
+**Pillar 5 — "Trust the data"** (data sources, no hallucinations)
+→ federal-data-sources explainer, AI-grounding guide.
+
+---
+
+*All features live on getmindy.ai as of June 2026. Tone: plain language, no jargon
+(say "Target Market Research" not "ABM/ICP"; "BD outreach" not "sales"). Federal
+acronyms (NAICS, PSC, OSBP, IDIQ) are fine — define them once per piece.*
