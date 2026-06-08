@@ -50,6 +50,7 @@ import {
   getPainPointsByNaics,
 } from '@/lib/agency-hierarchy/pain-points-linker';
 import { getPrimesByAgency } from '@/lib/utils/prime-contractors';
+import { getEnhancedAgencyInfo, getAllCommands } from '@/lib/utils/command-info';
 
 const FREE_TIER_ROW_LIMIT = 10;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -79,6 +80,36 @@ function getSupabase() {
     );
   }
   return _supabase;
+}
+
+// OSBP resolver (#29): match the contracting OFFICE/command against the stable
+// 170-command directory FIRST (so NAVFAC → its own OSBP, not the Navy-wide one),
+// then fall back to sub-agency/parent. Built once, cached.
+type SmallBizOffice = { name?: string; director?: string; email?: string; phone?: string; address?: string };
+let _commandOsbpIndex: Array<{ keys: string[]; sb: SmallBizOffice }> | null = null;
+function commandOsbpIndex() {
+  if (_commandOsbpIndex) return _commandOsbpIndex;
+  _commandOsbpIndex = [];
+  for (const c of getAllCommands()) {
+    const sb = (c as { smallBusinessOffice?: SmallBizOffice }).smallBusinessOffice;
+    if (!sb?.director) continue;
+    const keys = [c.abbreviation, c.fullName].filter(Boolean).map(s => String(s).toUpperCase());
+    _commandOsbpIndex.push({ keys, sb });
+  }
+  return _commandOsbpIndex;
+}
+function resolveOsbp(office?: string, subAgency?: string, parentAgency?: string): SmallBizOffice | null {
+  const officeU = (office || '').toUpperCase();
+  if (officeU) {
+    // Command-specific match: the office name contains the command's abbrev/name.
+    for (const entry of commandOsbpIndex()) {
+      if (entry.keys.some(k => k.length >= 3 && (officeU.includes(k) || k.includes(officeU)))) return entry.sb;
+    }
+  }
+  // Fall back to the agency-level OSBP (sub-agency, then parent).
+  return getEnhancedAgencyInfo(office || subAgency || parentAgency || '', subAgency || '', parentAgency || '').smallBusinessContact
+    || getEnhancedAgencyInfo(subAgency || '', subAgency || '', parentAgency || '').smallBusinessContact
+    || null;
 }
 
 interface FindAgenciesAgency {
@@ -143,6 +174,7 @@ interface TargetMarketResearchRow {
 
   // Display flags so the UI can render chips inline with the row
   hasOSBP: boolean;                // We have an OSBP contact for this agency
+  osbp: { name?: string; director?: string; email?: string; phone?: string; address?: string } | null;  // Small Business office (stable command directory)
   isSubAgency: boolean;
   satRatio: number;                // 0..1, for the "Easy Entry" badge
 }
@@ -597,7 +629,16 @@ export async function POST(request: NextRequest) {
           return result;
         })(),
 
-        hasOSBP: false, // TODO: wire from agency-hierarchy lib in Slice 1.5D drawer pass
+        // OSBP from the stable 170-command directory (#29). Most-specific first:
+        // match the contracting OFFICE/command directly (NAVFAC → Noel Rodriguez,
+        // not the Navy-wide OSBP), else fall back to the sub-agency/parent OSBP.
+        ...(() => {
+          const sb = resolveOsbp(a.contractingOffice, a.subAgency, a.parentAgency);
+          const osbp = sb?.director && !/ OSBP Director$/.test(sb.director)
+            ? { name: sb.name, director: sb.director, email: sb.email, phone: sb.phone, address: sb.address }
+            : (sb ? { name: sb.name, email: sb.email, phone: sb.phone, address: sb.address } : null); // keep office even if director is generic
+          return { osbp, hasOSBP: !!osbp };
+        })(),
         isSubAgency: !!a.subAgency && a.subAgency !== a.parentAgency,
         satRatio,
       };

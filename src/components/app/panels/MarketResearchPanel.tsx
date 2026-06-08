@@ -5500,7 +5500,7 @@ function ReportViewer({
                     <div className="font-medium text-white">{agency.contractingOffice}</div>
                     {agency.osbp && (
                       <div className="mt-2 text-sm">
-                        {agency.osbp.director && <div className="text-slate-300">👤 {agency.osbp.director}</div>}
+                        {agency.osbp.director && <div className="text-slate-300">👤 {agency.osbp.director} <span className="text-[10px] text-slate-500">(as of Dec 2025 — verify)</span></div>}
                         {agency.osbp.email && <div className="text-blue-400">✉️ {agency.osbp.email}</div>}
                         {agency.osbp.phone && <div className="text-slate-400">📞 {agency.osbp.phone}</div>}
                       </div>
