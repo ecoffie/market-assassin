@@ -286,6 +286,10 @@
       "schedule": "45 12 * * *"
     },
     {
+      "path": "/api/cron/check-provider-health",
+      "schedule": "0 */6 * * *"
+    },
+    {
       "path": "/api/cron/check-alert-throughput",
       "schedule": "0 14 * * *"
     },
