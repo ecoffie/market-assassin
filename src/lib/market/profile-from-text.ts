@@ -122,6 +122,14 @@ export async function buildProfileFromText(text: string): Promise<ExtractedProfi
   // 1) The INDUSTRY phrase — LLM first (understands "facility services + janitorial
   //    = cleaning"), keyword fallback if the LLM is unavailable.
   const keywords = sanitizeKeywords(t.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)).slice(0, 12);
+
+  // Guard against the LLM hallucinating an industry for nonsense (QA: "asdfqwer
+  // zxcvbnm" → cyber codes). If the input has no real dictionary-ish words (no
+  // sanitizable keywords AND no recognizable industry token), don't fabricate a
+  // profile — be honest that we couldn't tell.
+  const looksMeaningful = keywords.length > 0 || /\b(it|hr|ai|qa)\b/i.test(t);
+  if (!looksMeaningful) return null;
+
   let industryPhrase = await llmIndustryPhrase(t);
   let source: 'llm' | 'keyword-fallback' = 'llm';
   if (!industryPhrase) {

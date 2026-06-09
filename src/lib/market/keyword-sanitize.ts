@@ -31,6 +31,14 @@ const STOPWORDS = new Set([
   'federal', 'government', 'agencies', 'inc', 'llc', 'corp', 'all', 'any', 'new',
 ]);
 
+// A "word" with no vowels or absurd consonant runs is keyboard mash (zxcvbnm,
+// asdfqwer), not a real industry term. Cheap heuristic to keep gibberish out.
+function looksLikeRealWord(w: string): boolean {
+  if (/[aeiouy]/.test(w) === false) return false;          // no vowel → mash
+  if (/[bcdfghjklmnpqrstvwxz]{5,}/.test(w)) return false;   // 5+ consonants in a row
+  return true;
+}
+
 /** True if a single keyword is specific enough to text-search without noise. */
 export function isSearchableKeyword(term: string): boolean {
   const t = (term || '').trim().toLowerCase();
@@ -38,7 +46,9 @@ export function isSearchableKeyword(term: string): boolean {
   if (STOPWORDS.has(t)) return false;
   if (t.includes(' ')) return true;                 // multi-word phrase = specific
   if (SAFE_ABBREVIATIONS.has(t)) return true;       // known clean abbreviation
-  return t.replace(/[^a-z0-9]/g, '').length >= 4;   // single word must be 4+ chars
+  const word = t.replace(/[^a-z0-9]/g, '');
+  if (word.length < 4) return false;                // single word must be 4+ chars
+  return looksLikeRealWord(word);                   // …and not keyboard mash
 }
 
 /**
