@@ -80,9 +80,10 @@ export default function CoachPanel({ email }: { email: string | null }) {
           const parts = [
             s.naics?.length ? `${s.naics.length} NAICS` : '',
             s.keywords?.length ? `${s.keywords.length} keywords` : '',
+            s.agencies ? `${s.agencies} target agencies` : '',
             s.states?.length ? s.states.join('/') : '',
           ].filter(Boolean);
-          setSeededNote(parts.length ? `✓ Seeded ${name}'s profile from the text — ${parts.join(' · ')}. Alerts will start flowing.` : `Added ${name}.`);
+          setSeededNote(parts.length ? `✓ Seeded ${name} from the text — ${parts.join(' · ')}. Alerts + who-to-contact are ready.` : `Added ${name}.`);
         }
         setNewName(''); setCapabilityText('');
         await load();

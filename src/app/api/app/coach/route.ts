@@ -34,7 +34,7 @@ const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','
 async function seedClientProfile(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any, workspaceId: string, businessName: string, text: string,
-): Promise<{ naics: string[]; psc: string[]; keywords: string[]; states: string[] }> {
+): Promise<{ naics: string[]; psc: string[]; keywords: string[]; states: string[]; agencies: number }> {
   // Keywords — significant terms from the text, sanitized (drop noise/abbrevs).
   const rawTerms = text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/);
   const keywords = sanitizeKeywords(rawTerms).slice(0, 10);
@@ -71,7 +71,45 @@ async function seedClientProfile(
     is_active: true,
   }, { onConflict: 'user_email' });
 
-  return { naics, psc, keywords, states: Array.from(states) };
+  // 5) PRE-LOAD CONTACTS (#63 follow-on) — the top agencies that buy this
+  //    client's NAICS go straight into their Target List, so the user opens the
+  //    client and already sees "who to talk to" (DoD/HHS/VA for staffing) instead
+  //    of an empty list. Decision Makers/contacts then populate off these.
+  let agenciesSeeded = 0;
+  if (naics.length) {
+    try {
+      const r = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_category/awarding_agency/', {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          filters: { naics_codes: naics, time_period: [{ start_date: '2024-10-01', end_date: '2025-09-30' }], award_type_codes: ['A', 'B', 'C', 'D'] },
+          category: 'awarding_agency', limit: 8,
+        }),
+      });
+      if (r.ok) {
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rows = ((await r.json()).results || []).filter((x: any) => x.name && (x.amount || 0) > 0);
+        if (rows.length) {
+          const clientEmail = `${workspaceId}@clients.getmindy.ai`;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const targets = rows.slice(0, 6).map((x: any) => ({
+            workspace_id: workspaceId,
+            user_email: clientEmail,
+            agency_name: x.name,
+            set_aside_spending: Math.round(x.amount || 0),
+            status: 'researching',
+            added_from: 'capability_text_seed',
+            source_naics: naics.join(','),
+          }));
+          // Plain insert — this is a brand-new client workspace, so no dupes to
+          // worry about (no unique constraint on agency_name; a re-seed is rare).
+          const { error } = await supabase.from('user_target_list').insert(targets);
+          if (!error) agenciesSeeded = targets.length;
+        }
+      }
+    } catch { /* non-fatal — profile + alerts still seeded */ }
+  }
+
+  return { naics, psc, keywords, states: Array.from(states), agencies: agenciesSeeded };
 }
 
 export const runtime = 'nodejs';
