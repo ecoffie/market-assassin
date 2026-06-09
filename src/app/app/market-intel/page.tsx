@@ -806,6 +806,32 @@ function MarketIntelDashboard() {
               )}
             </div>
           </div>
+          {/* Procurement-vehicle quick-search (#60) — the government is shifting
+              buying to OTAs / CSOs / BAAs (commercial). These cut across NAICS
+              codes (40% have NO naics_code in our cache) so they're invisible to
+              code search — keyword is the only way to find them. ALL SAM is the
+              right home (Today's Intel already badges the notice type). One click
+              sets the search; the fetch effect runs it. */}
+          <div className="flex flex-wrap items-center gap-1.5 mb-3">
+            <span className="text-xs text-gray-500 mr-0.5">Buying vehicles:</span>
+            {[
+              { kw: 'other transaction', label: 'OTA', hint: 'Other Transaction Authority — prototypes + follow-on production (Army MICC uses this for construction)' },
+              { kw: 'commercial solutions', label: 'CSO', hint: 'Commercial Solutions Opening — fast commercial buying' },
+              { kw: 'broad agency announcement', label: 'BAA', hint: 'Broad Agency Announcement — R&D / innovation' },
+              { kw: 'commercial off-the-shelf', label: 'COTS', hint: 'Commercial off-the-shelf products' },
+              { kw: 'IDIQ', label: 'IDIQ', hint: 'Indefinite delivery vehicles — the big enterprise contracts' },
+            ].map(v => (
+              <button
+                key={v.label}
+                type="button"
+                title={v.hint}
+                onClick={() => { setSearch(search.toLowerCase() === v.kw ? '' : v.kw); setPage(1); }}
+                className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${search.toLowerCase() === v.kw ? 'bg-purple-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}
+              >
+                {v.label}
+              </button>
+            ))}
+          </div>
           <form onSubmit={handleSearchSubmit} className="flex flex-wrap gap-3">
             <div className="flex-1 min-w-[200px]">
               <div className="relative">
@@ -816,7 +842,7 @@ function MarketIntelDashboard() {
                   type="text"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search titles, agencies..."
+                  placeholder="Search titles, agencies, keywords (try OTA, CSO, IDIQ)..."
                   className="w-full pl-10 pr-4 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white placeholder-gray-500 focus:border-purple-500 focus:outline-none"
                 />
               </div>

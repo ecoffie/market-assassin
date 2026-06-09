@@ -1226,30 +1226,6 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                 className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
               />
 
-              {/* Procurement-vehicle quick-search (#60) — the government is shifting
-                  buying to OTAs / BAAs / CSOs (commercial). These cut across NAICS
-                  codes (40% have NO NAICS) so they're invisible to code search —
-                  keyword is the only way to find them. Teaches users they exist. */}
-              <div className="flex flex-wrap items-center gap-1.5">
-                <span className="text-[11px] text-slate-500 mr-0.5">Buying vehicles:</span>
-                {[
-                  { kw: 'other transaction', label: 'OTA', hint: 'Other Transaction Authority — prototypes + follow-on production' },
-                  { kw: 'commercial solutions', label: 'CSO', hint: 'Commercial Solutions Opening — buy commercial fast' },
-                  { kw: 'broad agency announcement', label: 'BAA', hint: 'Broad Agency Announcement — R&D / innovation' },
-                  { kw: 'commercial off-the-shelf', label: 'COTS', hint: 'Commercial off-the-shelf products' },
-                  { kw: 'IDIQ', label: 'IDIQ', hint: 'Indefinite delivery vehicles (the big enterprise contracts)' },
-                ].map(v => (
-                  <button
-                    key={v.label}
-                    type="button"
-                    title={v.hint}
-                    onClick={() => setSearchTerm(searchTerm.toLowerCase() === v.kw ? '' : v.kw)}
-                    className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${searchTerm.toLowerCase() === v.kw ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
-                  >
-                    {v.label}
-                  </button>
-                ))}
-              </div>
 
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex flex-wrap gap-2">
