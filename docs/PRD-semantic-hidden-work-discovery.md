@@ -132,11 +132,31 @@ of 33K stubs.
 - A search box on ALL SAM: "describe what you do" → semantic results.
 - Lower stakes than alerts; lets us tune the threshold before it drives sends.
 
-### Phase 5 — RECOMPETE decomposition (Eric's second point)
-- For expiring/predecessor contracts (we already fetch the incumbent's real SOW
-  via `findPredecessorAward`, #52), semantic-tag the scope so a cyber contractor
-  finds a building-envelope **recompete** that's 30% cyber — surfaced as "this
-  recompete includes work like yours."
+### Phase 5 — RECOMPETE & FORECAST coverage (Eric: "did we include expiring + upcoming buys?")
+
+Semantic search only works where there is **real scope text to embed**. The three
+opportunity types differ structurally — measured June 2026 — so each gets the
+honest treatment, not a forced weak version:
+
+| Type | Scope text available | Semantic approach |
+|------|---------------------|-------------------|
+| **Active SAM opps** | ✅ Full SOW/PWS in attachments (the catalog, 6K–16K chars) | **Full semantic** — embed `sow_text`, match meaning. This is the core. |
+| **Expiring / recompetes** | ❌ USASpending award = a **29–50 char transaction line** ("IT HELP DESK SUPPORT SERVICES"), NOT the original SOW | **Semantic kicks in at the FRESH solicitation.** When the recompete actually posts to SAM (sources-sought / RFI / RFP), it carries its own SOW → it's an active opp → it's already covered by the catalog. The *expiring predecessor itself* stays keyword/NAICS-matched (no embeddable scope). So a building-envelope recompete IS found semantically — once it's a live solicitation, not while it's still just an expiring award. |
+| **Upcoming buys (forecasts)** | ❌ `agency_forecasts.description` = **~142 chars** (pre-solicitation stub; no SOW *exists* yet) | **Keyword/title match only**, by definition — there is no scope document before the solicitation drops. The forecast's value is the early *signal* ("this is coming"); semantic discovery of *what's hidden in it* isn't possible until the real RFP posts (at which point → active SAM → catalog). |
+
+**The honest through-line:** the moment any opportunity has a real SOW, it's an
+**active SAM opp**, and the catalog covers it. Recompetes and forecasts are
+*earlier stages* of the same opportunity — they're matched by keyword/NAICS while
+thin, then gain full semantic coverage the instant their solicitation (with a SOW)
+posts. We do NOT fake scope text we don't have (same principle that killed
+embedding the 94-char stubs).
+
+**Optional enrichment (deferred, hard):** link an expiring contract's PIID back to
+its *original* SAM solicitation's SOW so a recompete can be semantically matched on
+real scope before the new RFP drops. Feasibility is poor — old solicitations are
+often archived/purged and the PIID→original-notice link is unreliable. Investigate
+only if recompete semantic-match proves high-value via the fresh-solicitation path
+first.
 
 ---
 

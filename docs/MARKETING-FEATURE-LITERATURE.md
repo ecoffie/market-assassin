@@ -285,6 +285,155 @@ duplicates auto-deduped; picker defaults to active/bidding pursuits.
 
 ---
 
+## 11. Keyword-first market research — stop guessing NAICS codes
+
+**What it does:** Type what you do in plain words — "drones," "medical supplies,"
+"cybersecurity." Mindy finds the **entire federal market** for it and shows you the
+truth: a keyword like "drones" is **$243M spread across 70+ NAICS codes**, and the
+single "obvious" code is only **~28%** of the market — so searching that one code
+**misses 72%** of the work. Mindy auto-derives the full code set behind the scenes;
+you never manage 70 codes.
+
+**Why it's different:** Every other tool makes you pick NAICS codes first — and most
+people pick the wrong one or just one, silently missing three-quarters of their
+market. Mindy flips it: **keyword is how you discover; codes are derived for you.**
+It even teaches you the coverage ratio so you understand *why* one code isn't the
+market.
+
+**SEO angles:**
+- "Why one NAICS code misses 72% of your federal market"
+- "NAICS vs PSC vs keyword: how to actually find government opportunities"
+- "The hidden codes: where your real federal market lives"
+
+**Proof point:** Coverage computed live from USASpending; the 90%-coverage code set
+is derived and applied automatically. Verified: drones 72% hidden, cybersecurity
+74%, medical supplies 74%.
+
+---
+
+## 12. Auto-setup — paste what you do, get fully configured in 30 seconds
+
+**What it does:** Instead of a multi-step setup wizard, paste your **capability
+statement or one sentence** ("commercial janitorial in Florida, SDVOSB") and Mindy
+reads it like an expert: it identifies your real **industry**, grounds your **NAICS
++ PSC codes** in actual spending, detects your **location** and **set-aside certs
+(SDVOSB / 8(a) / WOSB / HUBZone)**, and pre-loads the **agencies that buy your work**.
+Then it shows you everything to confirm before anything saves — with one-click edits.
+
+**Why it's different:** New contractors don't know GovCon jargon, and the wrong
+setup quietly breaks every alert they'll ever get. Mindy is the expert that does the
+hard part for them — and it's honest: it shows the real code breakdown and lets them
+fix it, rather than guessing silently. (Consultants get the same engine to onboard
+each client in seconds.)
+
+**SEO angles:**
+- "Set up your federal contracting profile from your capability statement"
+- "What NAICS and PSC codes should I use? Let the data decide"
+- "The fastest way to start finding government contracts"
+
+**Proof point:** Industry identified by AI, every fact (codes, market size, buyers)
+grounded in real USASpending data — never an AI guess. Honest "we couldn't tell" on
+unclear input instead of a fabricated profile.
+
+---
+
+## 13. Procurement-vehicle search — find the buys NAICS can't see
+
+**What it does:** The government is shifting spend to **OTAs, CSOs, BAAs, and IDIQs**
+(commercial, R&D, and enterprise vehicles). One-click chips on the ALL SAM dashboard
+surface these — including the **40% that have no NAICS code at all** (filed as Special
+Notices) and are invisible to any code-based search. The Army's MICC is buying
+**construction via Other Transaction Authority**; Mindy finds it.
+
+**Why it's different:** A NAICS or PSC filter literally cannot see a vehicle that
+crosses codes or has none. As federal buying moves to these flexible vehicles, a
+code-only tool goes blind to a growing slice of the market. Mindy searches the way
+the work is actually described.
+
+**SEO angles:**
+- "OTAs, CSOs, BAAs: the federal vehicles small businesses miss"
+- "Why your NAICS search can't find Other Transaction opportunities"
+- "How the government is buying now (and how to find it)"
+
+**Proof point:** Real active counts in-cache (IDIQ 195, CSO 40, BPA 29, BAA 19,
+Other Transaction 11), terms chosen by verified result quality (no abbreviation
+noise).
+
+---
+
+## 14. Multi-client mode — run BD for every business you manage
+
+**What it does:** Consultants and counselors managing several companies get a
+**separate, isolated Mindy workspace per client** — own pipeline, vault, proposals,
+target list, and alerts — switchable in one click. Add a client by pasting their
+capability statement and Mindy seeds their whole profile (codes, location, certs,
+buying agencies) in seconds.
+
+**Why it's different:** Most tools are single-business. A consultant juggling ten
+staffing or services clients would need ten accounts. Mindy makes each client a
+clean workspace and onboards them from a one-pager — so managing ten is as easy as
+one.
+
+**SEO angles:**
+- "BD tools for government contracting consultants"
+- "Manage multiple federal contractors in one place"
+- "How APEX counselors track every client's pipeline"
+
+**Proof point:** Each client = an isolated workspace; profile seeded from pasted text
+via the same grounded engine, alerts flowing from day one.
+
+---
+
+## 15. "Has SOW/PWS" filter — only the opportunities you can actually evaluate
+
+**What it does:** Filter the opportunity feed to opps that include a real **Statement
+of Work** or **Performance Work Statement** — the serious ones with a scope document
+you can read, evaluate, and write a proposal against. Each card badges the doc type
+(📄 PWS / SOW / Combined) so you spot them at a glance.
+
+**Why it's different:** Most opportunity lists are a wall of titles, many of which are
+stubs with no detail. Mindy reads the attached documents, identifies the scope docs,
+and lets you cut straight to the bid-ready opportunities — instead of clicking into
+each one to find out if there's anything to evaluate.
+
+**SEO angles:**
+- "How to find government opportunities that actually have a Statement of Work"
+- "SOW vs PWS: what a scope document tells you before you bid"
+- "Filter out the noise: only real, evaluable federal opportunities"
+
+**Proof point:** Built by fetching and reading the real attached documents, detecting
+the scope doc by filename and content; honest about which opps have one.
+
+---
+
+## 16. Finding work hidden under "funny names" (coming) — match meaning, not words
+
+**What it does:** Government contracts often bundle scopes under names you'd never
+search — a "building envelope" contract that's actually **leasing + cybersecurity +
+construction**. A realtor searching "leasing" misses it; a cyber person searching
+"cybersecurity" misses it. Mindy (on the roadmap) will match on **meaning, not
+keywords** — reading the full scope document so a cybersecurity contractor surfaces
+that building-envelope opportunity even though it never says "cybersecurity" the way
+they'd phrase it.
+
+**Why it's different:** Every search tool — including keyword, NAICS, and PSC — assumes
+the opportunity describes itself in terms you'd think to search. The most valuable
+work hides under names you don't know. Semantic matching on the real scope text is
+the only way to find it. (Honest scope: this works where a real scope document
+exists — active solicitations; recompetes and forecasts gain coverage the moment
+their solicitation posts.)
+
+**SEO angles:**
+- "The opportunities you'll never find by keyword (and how to)"
+- "Why government contracts hide under names you don't know"
+- "Semantic search for federal opportunities: find work like yours"
+
+**Proof point:** Built on a catalog of real Statement-of-Work / Performance-Work-
+Statement documents; matches meaning against your capability. Honest about the data:
+no fabricated scope where none exists.
+
+---
+
 ## The data-sources story (the trust / acquisition angle)
 
 Every Mindy feature is grounded in **real, documented, continuously-maintained
