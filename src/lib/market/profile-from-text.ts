@@ -56,9 +56,12 @@ const ALL_STATE_CODES = Object.values(STATE_NAME_TO_CODE).concat(['VI', 'GU']);
 
 function detectStates(text: string): string[] {
   const found = new Set<string>();
-  const lower = ` ${text.toLowerCase()} `;
+  const lower = text.toLowerCase();
+  // Word-boundary match so "Florida." / "Puerto Rico," (with punctuation) still
+  // hit — QA caught space-padding silently dropping the user's state, which would
+  // make their alerts nationwide instead of local.
   for (const [name, code] of Object.entries(STATE_NAME_TO_CODE)) {
-    if (lower.includes(` ${name} `)) found.add(code);
+    if (new RegExp(`\\b${name.replace(/[.]/g, '\\.')}\\b`).test(lower)) found.add(code);
   }
   for (const code of ALL_STATE_CODES) {
     if (new RegExp(`\\b${code}\\b`).test(text)) found.add(code);
