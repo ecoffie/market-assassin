@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { isSearchableKeyword } from '@/lib/market/keyword-sanitize';
+import { naicsSubsectorPrefixes } from '@/lib/utils/naics-expansion';
 import { getMindyFeedbackSignals, scoreOpportunityWithMindyFeedback } from '@/lib/mindy/feedback-scoring';
 import { getBuyerAgencyParts } from '@/lib/mindy/agency-display';
 
@@ -369,7 +370,11 @@ export async function GET(request: NextRequest) {
     if (safeKw && !isSearchableKeyword(safeKw)) {
       safeKw = '';
     }
-    const naicsFilters = naicsCodes.map(code => `naics_code.like.${code}%`);
+    // Widen each code to its 3-digit SUBSECTOR prefix (#62) — 236220 → 236%, which
+    // catches +9% more RELEVANT building-construction opps (industrial/multifamily/
+    // remodelers) with no noise. 3-digit is the sweet spot (2-digit gets noisy).
+    const naicsPrefixes = naicsSubsectorPrefixes(naicsCodes);
+    const naicsFilters = naicsPrefixes.map(code => `naics_code.like.${code}%`);
     const keywordFilters = safeKw
       ? [`title.ilike.%${safeKw}%`, `description.ilike.%${safeKw}%`]
       : [];

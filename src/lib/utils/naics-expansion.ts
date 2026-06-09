@@ -278,6 +278,27 @@ export function isValidNAICSFormat(code: string): boolean {
 }
 
 /**
+ * Widen NAICS codes to their 3-digit SUBSECTOR prefix for opportunity matching
+ * (#62). Eric's study: searching "236" instead of "236220" catches +9% MORE
+ * RELEVANT opps (industrial/multifamily/remodelers — still building construction)
+ * with NO noise; going to 2-digit (23) adds +219% but loses relevance (barn
+ * sprinklers, utility work). So 3-digit is the sweet spot — the NAICS-depth
+ * equivalent of the keyword 90%-coverage rule.
+ *
+ * Returns the distinct 3-char prefixes. A code already <=3 digits passes through
+ * (e.g. a user who entered "541" stays "541"). Use to build `naics_code.like.X%`.
+ */
+export function naicsSubsectorPrefixes(codes: string[]): string[] {
+  const out = new Set<string>();
+  for (const raw of codes) {
+    const c = String(raw || '').replace(/[^\d]/g, '');
+    if (c.length < 2) continue;
+    out.add(c.length <= 3 ? c : c.slice(0, 3));
+  }
+  return Array.from(out);
+}
+
+/**
  * Get all known NAICS codes
  */
 export function getAllKnownNAICSCodes(): string[] {

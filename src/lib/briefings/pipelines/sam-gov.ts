@@ -1028,9 +1028,11 @@ function applySamCacheFilters(query: any, params: SAMSearchParams) {
   if (pscCodes.length > 0) {
     for (const psc of pscCodes) whatClauses.push(`psc_code.like.${psc}%`);
   }
-  if (keywords.length > 0) {
+  // SANITIZED keywords (#61) — drop short/ambiguous abbrevs that produce noise.
+  const safeKeywords = sanitizeKeywords(keywords);
+  if (safeKeywords.length > 0) {
     // Escape commas/parens that would break PostgREST .or() syntax.
-    for (const kw of keywords) {
+    for (const kw of safeKeywords) {
       const safe = kw.trim().replace(/[(),]/g, ' ').replace(/\s+/g, ' ');
       whatClauses.push(`title.ilike.%${safe}%`);
       whatClauses.push(`description.ilike.%${safe}%`);
