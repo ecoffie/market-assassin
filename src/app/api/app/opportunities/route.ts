@@ -301,6 +301,13 @@ export async function GET(request: NextRequest) {
   const naicsParam = searchParams.get('naics');
   const limit = parseInt(searchParams.get('limit') || '25', 10);
   const noticeType = searchParams.get('noticeType');
+  // KEYWORD search (#60) — true server-side search across ALL of SAM by
+  // title/description, NOT just within the NAICS-loaded set. Fixes "my active
+  // opps are NAICS-only / can I keyword search ALL SAM" — both NAICS-only before.
+  const keyword = (searchParams.get('keyword') || searchParams.get('q') || '').trim();
+  // When true, the keyword REPLACES the NAICS filter (browse-all-SAM mode). When
+  // false (default), keyword is OR'd with NAICS so the feed widens, not narrows.
+  const keywordOnly = searchParams.get('keywordOnly') === 'true';
 
   const authSession = requireMIAuthSession(request, email);
   if (!authSession.ok) return authSession.response;
@@ -349,9 +356,21 @@ export async function GET(request: NextRequest) {
       .order('response_deadline', { ascending: true })
       .limit(fetchLimit);
 
-    // Filter by NAICS (using OR for any match)
+    // Build the match filter. Keyword (#60) searches title + description across
+    // ALL SAM. Default: keyword OR NAICS (widens the feed — catches the 72% of a
+    // market that lives in non-obvious codes). keywordOnly=true: pure SAM search,
+    // ignore the user's NAICS (the "ALL SAM" browse).
+    // Escape PostgREST OR special chars in the user keyword.
+    const safeKw = keyword.replace(/[(),*]/g, ' ').trim();
     const naicsFilters = naicsCodes.map(code => `naics_code.like.${code}%`);
-    query = query.or(naicsFilters.join(','));
+    const keywordFilters = safeKw
+      ? [`title.ilike.%${safeKw}%`, `description.ilike.%${safeKw}%`]
+      : [];
+    if (safeKw && keywordOnly) {
+      query = query.or(keywordFilters.join(','));
+    } else {
+      query = query.or([...naicsFilters, ...keywordFilters].join(','));
+    }
 
     // Filter by user's location states when set. Strict mode — we
     // don't auto-expand to regions, so a user who selected FL sees
