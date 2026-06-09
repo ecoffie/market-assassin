@@ -9,6 +9,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { sanitizeKeywords } from '@/lib/market/keyword-sanitize';
 
 // Initialize Supabase client for cached opportunities
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
@@ -323,9 +324,12 @@ export async function fetchSamOpportunities(
     convertedPostedTo,
   }));
 
-  // Add keywords
-  if (keywords.length > 0) {
-    baseParams.set('q', keywords.join(' OR '));
+  // Add keywords — SANITIZED (#61): drop short/ambiguous abbreviations that
+  // produce noise in title/description search (Eric: "OTA" → potable/rota/total).
+  // A user who saved a 3-char keyword shouldn't get junk in their alerts.
+  const safeKeywords = sanitizeKeywords(keywords);
+  if (safeKeywords.length > 0) {
+    baseParams.set('q', safeKeywords.join(' OR '));
   }
 
   // Add set-asides

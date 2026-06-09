@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { isSearchableKeyword } from '@/lib/market/keyword-sanitize';
 import { getMindyFeedbackSignals, scoreOpportunityWithMindyFeedback } from '@/lib/mindy/feedback-scoring';
 import { getBuyerAgencyParts } from '@/lib/mindy/agency-display';
 
@@ -361,7 +362,13 @@ export async function GET(request: NextRequest) {
     // market that lives in non-obvious codes). keywordOnly=true: pure SAM search,
     // ignore the user's NAICS (the "ALL SAM" browse).
     // Escape PostgREST OR special chars in the user keyword.
-    const safeKw = keyword.replace(/[(),*]/g, ' ').trim();
+    let safeKw = keyword.replace(/[(),*]/g, ' ').trim();
+    // SANITIZE (#61) — drop short/ambiguous abbreviations that produce noise
+    // (Eric: "OTA" → potable/rota/total). A multi-word phrase or a verified
+    // abbreviation passes; a bare 3-char term is rejected so we don't return junk.
+    if (safeKw && !isSearchableKeyword(safeKw)) {
+      safeKw = '';
+    }
     const naicsFilters = naicsCodes.map(code => `naics_code.like.${code}%`);
     const keywordFilters = safeKw
       ? [`title.ilike.%${safeKw}%`, `description.ilike.%${safeKw}%`]
