@@ -1031,20 +1031,24 @@ function emptyForecastStats() {
 }
 
 function emptySowCatalog() {
-  return { hasSow: 0, checked: 0, remaining: 0, total: 0, pctComplete: 0, byType: {} as Record<string, number>, complete: false };
+  return { hasSow: 0, checked: 0, remaining: 0, total: 0, pctComplete: 0, recompeteRemaining: 0, byType: {} as Record<string, number>, complete: false };
 }
 
-// SOW/PWS catalog backfill progress (#66) — how far the /api/cron/sow-catalog
-// sweep has gotten through the ~38% of active opps that have an attachment.
+// SOW/PWS catalog backfill progress (#66). The cron does ACTIVE opps first
+// (biddable now), then INACTIVE (the recompete corpus — expired solicitations
+// whose SOWs we recover for Phase-6). We report active progress as the headline
+// and the recompete backlog separately so the bar doesn't look "stuck" once it
+// crosses into the ~55K inactive corpus.
 async function getSowCatalogStats() {
   const sb = getSupabase();
   const headCount = (q: ReturnType<typeof sb.from>) => q.then(({ count }: { count: number | null }) => count || 0);
 
-  const [hasSow, checkedWithAttach, remaining, totalWithAttach] = await Promise.all([
-    headCount(sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('active', true).eq('has_sow_doc', true)),
+  const [hasSow, checkedWithAttach, remaining, totalWithAttach, recompeteRemaining] = await Promise.all([
+    headCount(sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('has_sow_doc', true)),
     headCount(sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('active', true).not('attachments', 'is', null).not('sow_checked_at', 'is', null)),
     headCount(sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('active', true).not('attachments', 'is', null).is('sow_checked_at', null)),
     headCount(sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('active', true).not('attachments', 'is', null)),
+    headCount(sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('active', false).not('attachments', 'is', null).is('sow_checked_at', null)),
   ]);
 
   const byType: Record<string, number> = {};
@@ -1056,7 +1060,8 @@ async function getSowCatalogStats() {
   const pctComplete = totalWithAttach ? Math.round((checkedWithAttach / totalWithAttach) * 100) : 0;
   return {
     hasSow, checked: checkedWithAttach, remaining, total: totalWithAttach,
-    pctComplete, byType, complete: remaining === 0 && totalWithAttach > 0,
+    pctComplete, recompeteRemaining, byType,
+    complete: remaining === 0 && totalWithAttach > 0,
   };
 }
 

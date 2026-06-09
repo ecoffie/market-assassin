@@ -40,23 +40,42 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'SAM_API_KEY not set' }, { status: 500 });
   }
 
-  // Next batch: active, has attachments, least-recently-checked (null first).
-  const { data: rows, error } = await supabase
+  // Retention (#66 Phase-6 prep): catalog ACTIVE opps first (biddable now), then
+  // fall through to INACTIVE opps that still have their attachment URLs in cache —
+  // ~55K expired solicitations whose SOWs we'd otherwise lose. Recovering them now
+  // builds the recompete corpus (the incumbent's real scope, searchable later).
+  // Both keep sow_text after expiry (the sync upsert never touches sow_* columns).
+  const selectCols = 'id, notice_id, title, attachments';
+  const uncheckedWithAttach = () => supabase
     .from('sam_opportunities')
-    .select('id, notice_id, title, attachments')
-    .eq('active', true)
+    .select(selectCols)
     .not('attachments', 'is', null)
-    .is('sow_checked_at', null)
+    .is('sow_checked_at', null);
+
+  // Active backlog first.
+  let { data: rows, error } = await uncheckedWithAttach()
+    .eq('active', true)
     .order('id', { ascending: true })
     .limit(limit);
-
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
 
-  // Count what's left to do (for the dispatcher to know when to stop re-firing).
+  let phase = 'active';
+  // Active drained → recover inactive (recompete corpus). newest-expired first
+  // (those are the live recompetes; oldest are lowest-value).
+  if (!rows || rows.length === 0) {
+    const inactive = await uncheckedWithAttach()
+      .eq('active', false)
+      .order('archive_date', { ascending: false })
+      .limit(limit);
+    rows = inactive.data;
+    phase = 'inactive';
+  }
+
+  // Count what's left across BOTH phases (active + inactive) so the dispatcher
+  // keeps firing until the whole corpus — current + recompete — is built.
   const { count: remainingTotal } = await supabase
     .from('sam_opportunities')
     .select('*', { count: 'exact', head: true })
-    .eq('active', true)
     .not('attachments', 'is', null)
     .is('sow_checked_at', null);
 
@@ -95,6 +114,7 @@ export async function GET(request: NextRequest) {
   const remaining = Math.max(0, (remainingTotal || 0) - processed);
   return NextResponse.json({
     success: true,
+    phase,                 // 'active' (biddable now) or 'inactive' (recompete corpus)
     processed, sowFound, withText, failed,
     remaining,
     elapsedMs: Date.now() - startedAt,

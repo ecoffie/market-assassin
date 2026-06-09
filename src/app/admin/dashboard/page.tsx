@@ -203,6 +203,7 @@ interface DashboardData {
     remaining: number;
     total: number;
     pctComplete: number;
+    recompeteRemaining: number;
     byType: Record<string, number>;
     complete: boolean;
   };
@@ -2586,6 +2587,13 @@ export default function AdminDashboard() {
                   <span key={type} className="px-2 py-0.5 rounded bg-gray-700 text-gray-300">{type.toUpperCase()}: {n.toLocaleString()}</span>
                 ))}
               </div>
+              {/* Recompete corpus (#66 retention) — once active is done, the cron
+                  recovers SOWs from expired solicitations for recompete intel. */}
+              {data.sowCatalog.recompeteRemaining > 0 && (
+                <p className="text-[11px] text-gray-500 mt-2">
+                  🔁 Recompete corpus: {data.sowCatalog.recompeteRemaining.toLocaleString()} expired solicitations queued to recover SOWs from {data.sowCatalog.complete ? '(in progress)' : '(after active completes)'}
+                </p>
+              )}
             </div>
           )}
 
