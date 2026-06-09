@@ -290,14 +290,30 @@ duplicates auto-deduped; picker defaults to active/bidding pursuits.
 Every Mindy feature is grounded in **real, documented, continuously-maintained
 federal data:**
 
+**The numbers (real, live):**
+- **317,106 award-winning federal contractors** — searchable by NAICS, agency,
+  spend, contract count (BigQuery, the full USASpending recipients universe — not
+  a sample)
+- **125,000+ federal contacts** — contracting officers, specialists, small-
+  business POCs, refreshed daily
+- **88,000+ live SAM.gov opportunities** — solicitations, sources sought, OTAs/
+  CSOs, updated daily
+- **7,700+ agency forecasts** across 11+ agencies, **$94B+** coverage
+- **170 DoD commands** with OSBP small-business contacts
+
 | Source | Powers |
 |---|---|
-| **USASpending.gov** | Market spend, codes, office drill-down, IDV/task orders, award detail, incumbent intel |
-| **SAM.gov** | Opportunities + contracting POCs |
+| **USASpending.gov (BigQuery)** | **317K contractors**, market spend, codes, office drill-down, IDV/task orders, award detail, incumbent intel |
+| **SAM.gov** | 88K+ live opportunities + 125K+ contracting POCs |
 | **Grants.gov** | Federal grants |
-| **SBA / DoD CSP / DHS OSDBU directories** | The 2,700+ contractor + SBLO database |
+| **SBA / DoD CSP / DHS OSDBU directories** | Curated SBLO + small-business contact intelligence |
 | **GAO high-risk reports + NDAA** | Agency pain points & priorities |
 | **Federal command directory** | 170 commands with OSBP contacts |
+
+> Note: the **317K contractor search** is the full BigQuery recipients universe.
+> (A separate hand-curated set powers the public `/contractors` SEO pages — that's
+> a marketing-page count, not the searchable database. Always cite **317K** for
+> the contractor database.)
 
 **The message:** "Mindy never guesses. Every code, every dollar, every contact
 traces to a real government source — and we refresh them on a schedule." This is
