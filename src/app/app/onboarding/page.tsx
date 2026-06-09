@@ -492,6 +492,39 @@ export default function OnboardingPage() {
     });
   }
 
+  // Inline edit (#64) — remove a NAICS code the user doesn't want (the nurse-
+  // staffing case: drop generic 561320, keep healthcare 621111).
+  function removeAutoNaics(code: string) {
+    setAutoProfile((p: { naics?: string[] } | null) => p ? { ...p, naics: (p.naics || []).filter((c: string) => c !== code) } : p);
+  }
+
+  // Inline edit — the user fixes the industry phrase ("nurse staffing" not
+  // "professional services") → re-ground codes/agencies from the corrected phrase.
+  const [editingIndustry, setEditingIndustry] = useState(false);
+  const [industryDraft, setIndustryDraft] = useState('');
+  async function reExtractIndustry() {
+    const phrase = industryDraft.trim();
+    if (!phrase) { setEditingIndustry(false); return; }
+    setAutoLoading(true);
+    try {
+      const res = await fetch('/api/app/profile-from-text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ email, text: phrase }),
+      });
+      const d = await res.json();
+      if (res.ok && d.success) {
+        // keep the user's states/set-asides, replace the industry-derived parts.
+        setAutoProfile((prev: Record<string, unknown> | null) => ({
+          ...d.profile,
+          states: (prev?.states as string[]) || d.profile.states,
+          setAsides: (prev?.setAsides as string[]) || d.profile.setAsides,
+        }));
+      }
+    } catch { /* keep current */ }
+    setEditingIndustry(false); setAutoLoading(false);
+  }
+
   function applyProfileSuggestions(suggestions: ProfileSuggestions) {
     setSelectedIndustries(prev => addUnique(prev, suggestions.industries));
     setSelectedStates(prev => addUnique(prev, suggestions.states));
@@ -698,16 +731,36 @@ export default function OnboardingPage() {
           {/* AUTO confirm — the wow + safety net (editable states) */}
           {mode === 'auto' && autoProfile && (
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/10 p-5">
-              <div className="text-sm text-slate-400 mb-3">Here&rsquo;s what Mindy found — look right?</div>
+              <div className="text-sm text-slate-400 mb-3">Here&rsquo;s what Mindy found — look right? Anything off, just fix it.</div>
               <div className="space-y-3 text-sm">
+                {/* Industry — editable. Wrong guess? Retype it → Mindy re-grounds. */}
                 <div>
                   <span className="text-slate-500">Your work: </span>
-                  <span className="text-white font-medium capitalize">{autoProfile.industryPhrase}</span>
-                  {autoProfile.totalMarket ? <span className="text-slate-500"> · ${Math.round(autoProfile.totalMarket / 1e6)}M federal market across {autoProfile.naicsCount} codes</span> : null}
+                  {editingIndustry ? (
+                    <span className="inline-flex items-center gap-2">
+                      <input autoFocus value={industryDraft} onChange={e => setIndustryDraft(e.target.value)}
+                        onKeyDown={e => { if (e.key === 'Enter') reExtractIndustry(); }}
+                        placeholder="e.g. nurse staffing, medical supplies"
+                        className="px-2 py-1 bg-slate-800 border border-purple-500 rounded text-white text-sm w-56 focus:outline-none" />
+                      <button onClick={reExtractIndustry} disabled={autoLoading} className="text-xs text-emerald-400">{autoLoading ? '…' : 'Update'}</button>
+                      <button onClick={() => setEditingIndustry(false)} className="text-xs text-slate-500">cancel</button>
+                    </span>
+                  ) : (
+                    <>
+                      <span className="text-white font-medium capitalize">{autoProfile.industryPhrase}</span>
+                      <button onClick={() => { setIndustryDraft(autoProfile.industryPhrase); setEditingIndustry(true); }} className="ml-2 text-xs text-purple-400 hover:text-purple-300">edit</button>
+                      {autoProfile.totalMarket ? <span className="text-slate-500"> · ${Math.round(autoProfile.totalMarket / 1e6)}M market across {autoProfile.naicsCount} codes</span> : null}
+                    </>
+                  )}
                 </div>
+                {/* Codes — removable chips (the nurse case: drop generic 561320). */}
                 <div>
-                  <span className="text-slate-500">Codes: </span>
-                  {(autoProfile.naics || []).slice(0, 6).map((c: string) => <span key={c} className="inline-block rounded bg-slate-800 px-2 py-0.5 text-xs text-slate-200 mr-1">{c}</span>)}
+                  <span className="text-slate-500">Codes (click ✕ to remove): </span>
+                  {(autoProfile.naics || []).slice(0, 8).map((c: string) => (
+                    <span key={c} className="inline-flex items-center gap-1 rounded bg-slate-800 px-2 py-0.5 text-xs text-slate-200 mr-1 mb-1">
+                      {c}<button onClick={() => removeAutoNaics(c)} className="text-slate-500 hover:text-red-400">✕</button>
+                    </span>
+                  ))}
                   {autoProfile.topPsc && <span className="inline-block rounded bg-purple-500/20 px-2 py-0.5 text-xs text-purple-300 mr-1">PSC {autoProfile.topPsc.code}</span>}
                 </div>
                 {autoProfile.setAsides?.length > 0 && (

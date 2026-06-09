@@ -82,7 +82,15 @@ async function llmIndustryPhrase(text: string): Promise<string | null> {
       job: 'reasoning',
       json: true,
       maxTokens: 80,
-      system: 'You classify a US federal contractor by what they SELL/DO, for searching government spending data. Reply ONLY JSON: {"industry":"<2-4 word plain phrase a buyer would search, e.g. commercial janitorial, professional staffing, IT cybersecurity, building construction>"}. Use the SERVICE/PRODUCT, never the company name or a certification (SDVOSB/8a) or a location.',
+      system: [
+        'You classify a US federal contractor by what they SELL/DO, for searching government spending data.',
+        'Reply ONLY JSON: {"industry":"<specific 2-4 word phrase a buyer would search>"}.',
+        'Rules:',
+        '1. Be SPECIFIC to their actual niche — keep the distinguishing word. "nurse staffing" → "nurse staffing" (NOT "professional staffing"); "medical supplies" → "medical supplies" (NOT "professional services"); "commercial janitorial" → "commercial janitorial" (NOT "facilities"). The specific niche matters.',
+        '2. Use the SERVICE/PRODUCT, never the company name, a certification (SDVOSB/8a/WOSB), or a location.',
+        '3. Do NOT default to "professional services", "consulting", "IT services", or "cybersecurity" unless that is genuinely what they do. If the text clearly names a different industry (medical, janitorial, construction, staffing-of-a-specific-kind, logistics, food, etc.), use THAT.',
+        '4. If you truly cannot tell what they sell, reply {"industry":""} — do not guess a generic category.',
+      ].join('\n'),
       user: text.slice(0, 600),
     });
     const phrase = String(JSON.parse(out)?.industry || '').trim().toLowerCase();
