@@ -26,6 +26,8 @@ export default function CoachPanel({ email }: { email: string | null }) {
   const [orgTab, setOrgTab] = useState<OrgTab>({ deadlines: [], changes: [], news: [] });
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
+  const [capabilityText, setCapabilityText] = useState('');   // paste capability/website → seed profile
+  const [seededNote, setSeededNote] = useState<string | null>(null);
   const [activeWs, setActiveWs] = useState<string>('');
   const headers = useCallback(() => getMIApiHeaders(email), [email]);
 
@@ -64,12 +66,27 @@ export default function CoachPanel({ email }: { email: string | null }) {
     const name = newName.trim();
     if (!name || !email) return;
     setAdding(true);
+    setSeededNote(null);
     try {
       const res = await fetch('/api/app/coach', {
         method: 'POST', headers: { 'Content-Type': 'application/json', ...headers() },
-        body: JSON.stringify({ email, action: 'add_client', business_name: name }),
+        body: JSON.stringify({ email, action: 'add_client', business_name: name, capability_text: capabilityText.trim() || undefined }),
       });
-      if (res.ok) { setNewName(''); await load(); }
+      const d = await res.json().catch(() => null);
+      if (res.ok) {
+        // Tell the user what Mindy extracted, so they trust the seeded profile.
+        if (d?.seeded) {
+          const s = d.seeded;
+          const parts = [
+            s.naics?.length ? `${s.naics.length} NAICS` : '',
+            s.keywords?.length ? `${s.keywords.length} keywords` : '',
+            s.states?.length ? s.states.join('/') : '',
+          ].filter(Boolean);
+          setSeededNote(parts.length ? `✓ Seeded ${name}'s profile from the text — ${parts.join(' · ')}. Alerts will start flowing.` : `Added ${name}.`);
+        }
+        setNewName(''); setCapabilityText('');
+        await load();
+      }
     } catch { /* */ }
     setAdding(false);
   };
@@ -92,6 +109,18 @@ export default function CoachPanel({ email }: { email: string | null }) {
               {adding ? 'Adding…' : 'Add client'}
             </button>
           </div>
+          {/* Paste capability statement / website (Eric: "paste their info →
+              extract keywords + NAICS/PSC + location → so I track them + get
+              their alerts"). Optional — but seeds the profile so alerts flow
+              from day one instead of an empty workspace. */}
+          <textarea
+            value={capabilityText}
+            onChange={e => setCapabilityText(e.target.value)}
+            placeholder="Optional — paste their capability statement or website text. Mindy extracts the NAICS/PSC, keywords, and location so this client's alerts start immediately. (e.g. 'Professional staffing in or around Puerto Rico…')"
+            rows={3}
+            className="w-full mt-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-purple-500 focus:outline-none resize-y"
+          />
+          {seededNote && <p className="text-[12px] text-emerald-300 mt-2">{seededNote}</p>}
           <p className="text-[11px] text-slate-500 mt-2">Each client gets its own isolated workspace. You can switch anytime.</p>
         </div>
       </div>
@@ -128,6 +157,15 @@ export default function CoachPanel({ email }: { email: string | null }) {
             <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Add a client…" className="flex-1 h-9 px-3 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:border-purple-500 focus:outline-none" />
             <button onClick={addClient} disabled={adding || !newName.trim()} className="h-9 px-3 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 text-white text-xs font-medium rounded-lg">+ Add</button>
           </div>
+          {/* Paste capability text → seed the new client's NAICS/keywords/location (#63). */}
+          <textarea
+            value={capabilityText}
+            onChange={e => setCapabilityText(e.target.value)}
+            placeholder="Optional: paste their capability statement / website text — Mindy seeds the NAICS, keywords + location so their alerts start immediately."
+            rows={2}
+            className="w-full mt-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs placeholder-slate-500 focus:border-purple-500 focus:outline-none resize-y"
+          />
+          {seededNote && <p className="text-[11px] text-emerald-300 mt-1">{seededNote}</p>}
         </div>
 
         {/* Org Tab feed */}

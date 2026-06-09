@@ -14,6 +14,65 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { keywordCoverage } from '@/lib/market/keyword-coverage';
+import { sanitizeKeywords } from '@/lib/market/keyword-sanitize';
+
+// US state codes + a few aliases, to pull a location out of capability text
+// (Eric: "staffing in or around PR professional service" → PR).
+const STATE_ALIASES: Record<string, string> = {
+  'puerto rico': 'PR', 'pr': 'PR', 'washington dc': 'DC', 'd.c.': 'DC',
+};
+const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC','PR','VI','GU'];
+
+/**
+ * Seed a new client workspace's profile from pasted capability/website text
+ * (Eric: "paste their info → extract keywords + NAICS/PSC + location → so I track
+ * them + get their alerts"). Grounds codes in real USASpending (this session's
+ * keyword-first work), sanitizes keywords, pulls a state, and writes the
+ * workspace's notification settings (keyed by the client email) so alerts flow.
+ */
+async function seedClientProfile(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any, workspaceId: string, businessName: string, text: string,
+): Promise<{ naics: string[]; psc: string[]; keywords: string[]; states: string[] }> {
+  // Keywords — significant terms from the text, sanitized (drop noise/abbrevs).
+  const rawTerms = text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/);
+  const keywords = sanitizeKeywords(rawTerms).slice(0, 10);
+
+  // 1) Grounded codes — resolve on the CORE industry phrase, not the whole
+  //    sentence (a full sentence matches unrelated codes). Try the strongest 1-2
+  //    significant terms; keyword-coverage already does candidate fallback.
+  const corePhrase = keywords.slice(0, 2).join(' ') || keywords[0] || text.slice(0, 60);
+  const cov = await keywordCoverage(corePhrase).catch(() => null);
+  const naics = cov?.coverageCodes?.slice(0, 8) || [];
+  const psc = cov?.topPsc ? [cov.topPsc.code] : [];
+
+  // 3) Location — scan for a state name/code (PR for "Puerto Rico").
+  const lower = ` ${text.toLowerCase()} `;
+  const states = new Set<string>();
+  for (const [alias, code] of Object.entries(STATE_ALIASES)) {
+    if (lower.includes(` ${alias} `)) states.add(code);
+  }
+  for (const st of US_STATES) {
+    if (new RegExp(`\\b${st}\\b`).test(text)) states.add(st);
+  }
+
+  // 4) Write the workspace's notification profile (keyed by the client email).
+  const clientEmail = `${workspaceId}@clients.getmindy.ai`;
+  await supabase.from('user_notification_settings').upsert({
+    user_email: clientEmail,
+    naics_codes: naics,
+    keywords,
+    location_states: Array.from(states),
+    business_type: 'Small Business',
+    primary_industry: businessName,
+    alerts_enabled: true,
+    alert_frequency: 'weekly',     // start gentle for a tracked client, not daily spam
+    is_active: true,
+  }, { onConflict: 'user_email' });
+
+  return { naics, psc, keywords, states: Array.from(states) };
+}
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -140,7 +199,18 @@ export async function POST(request: NextRequest) {
       primary_email: body.primary_email || null, assigned_coach: email,
     }).select().single();
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-    return NextResponse.json({ success: true, client: { id: data.id, workspaceId, businessName } });
+
+    // SEED FROM CAPABILITY TEXT (Eric: "I paste their website/capability statement,
+    // you extract the keywords + NAICS/PSC + location → so I can track them + get
+    // their alerts"). Extract grounded codes (this session's keyword-first work) +
+    // a location, and write the workspace's notification profile so alerts flow.
+    let seeded: { naics: string[]; psc: string[]; keywords: string[]; states: string[] } | null = null;
+    const capabilityText = String(body.capability_text || '').trim();
+    if (capabilityText) {
+      seeded = await seedClientProfile(supabase, workspaceId, businessName, capabilityText);
+    }
+
+    return NextResponse.json({ success: true, client: { id: data.id, workspaceId, businessName }, seeded });
   }
 
   if (body.action === 'post_news' && membership.role === 'org_admin') {
