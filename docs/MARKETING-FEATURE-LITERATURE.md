@@ -434,6 +434,34 @@ no fabricated scope where none exists.
 
 ---
 
+## 17. Recompete SOW recovery (coming) — the incumbent's actual scope, 6-18 months early
+
+**What it does:** Every expiring federal contract **was a solicitation once**, with a
+real Statement of Work. Mindy (on the roadmap) recovers that original SOW — even from
+SAM's archive after it expired — and hands it to you: the **actual scope the incumbent
+is performing**, before the recompete re-posts. You see the requirements, deliverables,
+and structure 6-18 months early, and Mindy semantically flags "this recompete is your
+kind of work" even when it's only searchable by NAICS today.
+
+**Why it's different:** This is the single most valuable artifact in BD — the document
+people pay consultants thousands to dig up. Most tools show you an expiring contract as
+a one-line payment record ("IT HELP DESK SUPPORT SERVICES"). Mindy shows you the **whole
+scope of work** the incumbent is delivering, so you can build your solution and pricing
+while competitors are still blind. **Nobody else hands a small business the incumbent's
+real SOW on a recompete.**
+
+**SEO angles:**
+- "How to get the incumbent's Statement of Work before a recompete"
+- "Win the recompete: read the scope 18 months before the RFP"
+- "The expiring-contract intel every BD team wishes they had"
+
+**Proof point:** Expiring contracts sourced from USASpending (PIID + end date); the
+original SOW linked via solicitation number and recovered from SAM's archive
+(`archived=true`); embedded into the same scope-document catalog. Honest scope:
+starts with the high-value IDV/IDIQ vehicles and soon-expiring contracts.
+
+---
+
 ## The data-sources story (the trust / acquisition angle)
 
 Every Mindy feature is grounded in **real, documented, continuously-maintained

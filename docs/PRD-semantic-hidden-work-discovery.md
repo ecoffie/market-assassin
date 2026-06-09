@@ -151,12 +151,51 @@ thin, then gain full semantic coverage the instant their solicitation (with a SO
 posts. We do NOT fake scope text we don't have (same principle that killed
 embedding the 94-char stubs).
 
-**Optional enrichment (deferred, hard):** link an expiring contract's PIID back to
-its *original* SAM solicitation's SOW so a recompete can be semantically matched on
-real scope before the new RFP drops. Feasibility is poor — old solicitations are
-often archived/purged and the PIID→original-notice link is unreliable. Investigate
-only if recompete semantic-match proves high-value via the fresh-solicitation path
-first.
+---
+
+### Phase 6 — RECOMPETE SOW RECOVERY (Eric: the BD-intel prize)
+
+**The insight:** an expiring contract isn't *just* a payment record — it **was a SAM
+solicitation once, with a real SOW.** If we recover that original SOW, we don't only
+make the recompete *findable* (semantic), we hand the user **the incumbent's actual
+scope of work** — the single most valuable artifact in BD, the thing people pay
+consultants thousands to dig up — **6–18 months before the recompete re-posts.**
+
+**Two products from one pipeline:**
+1. **Discovery** — "this recompete is your kind of work" (semantic match on the SOW),
+   so it's not invisible just because it's only searchable by NAICS today.
+2. **Intel** — "and here's the actual SOW the incumbent is performing": scope,
+   deliverables, staffing, structure → build your solution + pricing early. *Nobody
+   else hands a small business the incumbent's real SOW on a recompete.* This is the
+   moat.
+
+**The data path (measured June 2026 — proven, not hoped):**
+- **USASpending** → expiring contracts carry **PIID + End Date**
+  (`W91ZLK22F0006 ends 2026-12-14`) = the recompete list + the 6–18mo trigger.
+- **solicitation_number link** → the original SAM solicitation. **40%** of award
+  notices still link to their original solicitation in our active cache.
+- **SAM archive** (`archived=true` + noticeid lookup) → recovers the SOW for the
+  other ~60% whose solicitation **expired out of our active-only cache** (the
+  retention gap: we measured only 1 of 12 linked solicitations still had its SOW).
+  The SAM v3 API still serves archived attachments → recoverable on demand.
+- Recovered SOW → flows into the **same SOW catalog + embeddings** built in #66.
+  Different front door (expiring contracts), same machinery.
+
+**Scope (v1 — disciplined, high-signal):** start with **IDV/IDIQ vehicles +
+high-value / soon-expiring contracts** — the recompetes worth the most, where the
+incumbent SOW is most valuable. Expand the window later. (Not all-expiring-at-once —
+that would overwhelm the SAM-archive fetch rate limits.)
+
+**Surface:** woven into the **existing Expiring Contracts feature (#27)** — which
+already lists recompetes with IDV/IDIQ filtering. Add (a) a semantic "💡 matches
+your work" flag and (b) a "📄 View incumbent SOW" button that opens the recovered
+scope document. Proactive "a recompete is coming that fits you" alerts are a
+fast-follow once the match threshold is tuned (respecting the #58 per-recipient cap).
+
+**Retention fix (do alongside):** stop *losing* SOWs going forward — when the #66
+catalog processes an active solicitation, **keep its `sow_text` even after it
+expires** (don't purge on inactive). Over time this builds the recompete corpus
+automatically and shrinks reliance on archive recovery.
 
 ---
 
