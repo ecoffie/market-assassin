@@ -79,6 +79,8 @@ interface Opportunity {
   psc_code: string | null;
   notice_type: string | null;
   notice_type_code: string | null;
+  has_sow_doc?: boolean | null;     // #66 SOW/PWS catalog
+  sow_doc_type?: string | null;
   set_aside_code: string | null;
   set_aside_description: string | null;
   posted_date: string | null;
@@ -213,6 +215,7 @@ function MarketIntelDashboard() {
   const [naicsFilter, setNaicsFilter] = useState('');
   const [stateFilter, setStateFilter] = useState('');
   const [agencyFilter, setAgencyFilter] = useState('');
+  const [hasSow, setHasSow] = useState(false);   // #66 "Has SOW/PWS" filter
   const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   // Lazy-loaded full descriptions keyed by notice_id. SAM.gov stores
@@ -459,6 +462,7 @@ function MarketIntelDashboard() {
       if (naicsFilter) params.set('naics', naicsFilter);
       if (stateFilter) params.set('state', stateFilter);
       if (agencyFilter) params.set('agency', agencyFilter);
+      if (hasSow) params.set('hasSow', 'true');
 
       const res = await fetch(`/api/mi-dashboard?${params.toString()}`);
       const data = await res.json();
@@ -471,7 +475,7 @@ function MarketIntelDashboard() {
     } finally {
       setLoadingOpps(false);
     }
-  }, [page, search, noticeType, urgency, setAside, naicsFilter, stateFilter, agencyFilter, email, isProfileFiltered]);
+  }, [page, search, noticeType, urgency, setAside, naicsFilter, stateFilter, agencyFilter, hasSow, email, isProfileFiltered]);
 
   useEffect(() => {
     // Don't fetch while we're still resolving the email for a profile-filtered
@@ -837,6 +841,17 @@ function MarketIntelDashboard() {
                 {v.label}
               </button>
             ))}
+            {/* "Has SOW/PWS" (#66) — only opps with a real scope document (the
+                serious, evaluable ones you can write a proposal against). */}
+            <span className="mx-1 text-gray-700">|</span>
+            <button
+              type="button"
+              title="Show only opportunities that include a Statement of Work / Performance Work Statement — the serious ones you can actually evaluate and bid."
+              onClick={() => { setHasSow(!hasSow); setPage(1); }}
+              className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${hasSow ? 'bg-emerald-600 text-white' : 'bg-gray-800 text-gray-300 hover:bg-gray-700'}`}
+            >
+              📄 Has SOW/PWS
+            </button>
           </div>
           <form onSubmit={handleSearchSubmit} className="flex flex-wrap gap-3">
             <div className="flex-1 min-w-[200px]">
@@ -1029,6 +1044,12 @@ function MarketIntelDashboard() {
                         <span className={`shrink-0 px-2 py-0.5 text-[10px] font-semibold rounded ${colors.bg} ${colors.text} border ${colors.border}`}>
                           {NOTICE_TYPE_LABELS[opp.notice_type || ''] || opp.notice_type || 'Notice'}
                         </span>
+                        {/* SOW/PWS badge (#66) — signals a real scope doc to evaluate. */}
+                        {opp.sow_doc_type && (
+                          <span title={`Includes a ${opp.sow_doc_type.toUpperCase()} — a real scope document you can evaluate and bid against`} className="shrink-0 px-2 py-0.5 text-[10px] font-semibold rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/30">
+                            📄 {opp.sow_doc_type.toUpperCase()}
+                          </span>
+                        )}
                         {/* Mobile-only inline: set-aside + urgency next to notice type */}
                         <div className="flex items-center gap-2 md:hidden ml-auto">
                           {opp.set_aside_code && opp.set_aside_code !== 'None' && (

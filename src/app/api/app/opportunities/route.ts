@@ -37,6 +37,8 @@ interface SAMOpportunity {
   set_aside?: string;
   set_aside_description?: string;
   notice_type?: string;
+  has_sow_doc?: boolean;          // #66 SOW/PWS catalog
+  sow_doc_type?: string;          // sow | pws | soo | combined | specs
   active?: boolean;
   pop_state?: string;
   pop_city?: string;
@@ -400,6 +402,12 @@ export async function GET(request: NextRequest) {
     // Optional notice type filter
     if (noticeType) {
       query = query.ilike('notice_type', `%${noticeType}%`);
+    }
+
+    // "Has SOW/PWS" filter (#66) — only opps with a real scope document (the
+    // serious, evaluable ones). Backfilled by /api/cron/sow-catalog.
+    if (searchParams.get('hasSow') === 'true') {
+      query = query.eq('has_sow_doc', true);
     }
 
     const { data: opportunities, error } = await query;

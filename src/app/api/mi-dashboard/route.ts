@@ -74,6 +74,8 @@ interface RawOpportunity {
   psc_code: string | null;
   notice_type: string | null;
   notice_type_code: string | null;
+  has_sow_doc?: boolean | null;     // #66 SOW/PWS catalog
+  sow_doc_type?: string | null;
   set_aside_code: string | null;
   set_aside_description: string | null;
   posted_date: string | null;
@@ -109,6 +111,8 @@ interface DashboardOpportunity {
   psc_code: string | null;
   notice_type: string | null;
   notice_type_code: string | null;
+  has_sow_doc?: boolean | null;     // #66 SOW/PWS catalog
+  sow_doc_type?: string | null;
   set_aside_code: string | null;
   set_aside_description: string | null;
   posted_date: string | null;
@@ -181,6 +185,11 @@ export async function GET(request: NextRequest) {
     // Apply filters
     if (search) {
       query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%,department.ilike.%${search}%`);
+    }
+    // "Has SOW/PWS" (#66) — only opps with a real scope document (the serious,
+    // evaluable ones). Backfilled by /api/cron/sow-catalog.
+    if (searchParams.get('hasSow') === 'true') {
+      query = query.eq('has_sow_doc', true);
     }
     if (noticeType) {
       query = query.eq('notice_type', noticeType);
@@ -521,6 +530,8 @@ export async function GET(request: NextRequest) {
         psc_code: opp.psc_code,
         notice_type: opp.notice_type,
         notice_type_code: opp.notice_type_code,
+        has_sow_doc: opp.has_sow_doc,        // #66 SOW/PWS catalog
+        sow_doc_type: opp.sow_doc_type,
         set_aside_code: opp.set_aside_code,
         set_aside_description: opp.set_aside_description,
         posted_date: opp.posted_date,
