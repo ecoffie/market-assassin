@@ -197,6 +197,15 @@ interface DashboardData {
     samCacheCount: number;
     samCacheLastUpdate: string | null;
   };
+  sowCatalog?: {
+    hasSow: number;
+    checked: number;
+    remaining: number;
+    total: number;
+    pctComplete: number;
+    byType: Record<string, number>;
+    complete: boolean;
+  };
   revenue: {
     available: boolean;
     thirtyDay?: {
@@ -2553,6 +2562,33 @@ export default function AdminDashboard() {
               </p>
             </div>
           </div>
+
+          {/* SOW/PWS catalog backfill progress (#66) — watch it fill */}
+          {data.sowCatalog && data.sowCatalog.total > 0 && (
+            <div className="mt-4 pt-4 border-t border-gray-700">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-gray-400 text-sm">
+                  📄 SOW/PWS Catalog{' '}
+                  {data.sowCatalog.complete
+                    ? <span className="text-emerald-400 font-medium">— complete ✓</span>
+                    : <span className="text-amber-400 font-medium">— backfilling ({data.sowCatalog.pctComplete}%)</span>}
+                </p>
+                <p className="text-xs text-gray-500">
+                  {data.sowCatalog.checked.toLocaleString()} / {data.sowCatalog.total.toLocaleString()} with-attachment opps checked · {data.sowCatalog.remaining.toLocaleString()} left
+                </p>
+              </div>
+              <div className="w-full h-2 bg-gray-700 rounded-full overflow-hidden mb-3">
+                <div className={`h-full ${data.sowCatalog.complete ? 'bg-emerald-500' : 'bg-amber-500'}`} style={{ width: `${data.sowCatalog.pctComplete}%` }} />
+              </div>
+              <div className="flex flex-wrap gap-2 text-xs">
+                <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300 border border-emerald-500/30">{data.sowCatalog.hasSow.toLocaleString()} with SOW/PWS</span>
+                {Object.entries(data.sowCatalog.byType).sort(([, a], [, b]) => b - a).map(([type, n]) => (
+                  <span key={type} className="px-2 py-0.5 rounded bg-gray-700 text-gray-300">{type.toUpperCase()}: {n.toLocaleString()}</span>
+                ))}
+              </div>
+            </div>
+          )}
+
           {Object.keys(data.dataHealth.byAgency).length > 0 && (
             <div className="mt-4 pt-4 border-t border-gray-700">
               <p className="text-gray-400 text-sm mb-2">Forecasts by Agency</p>

@@ -132,6 +132,7 @@ export async function GET(request: NextRequest) {
     briefingTrend,
     deadLetterStats,
     forecastStats,
+    sowCatalog,
     revenueMetrics,
     alerts,
     profileReminderLastRun
@@ -148,6 +149,7 @@ export async function GET(request: NextRequest) {
     safeMetric('briefing trend', () => getBriefingTrend(sevenDaysAgo), []),
     safeMetric('dead letter stats', getDeadLetterStats, emptyDeadLetterStats()),
     safeMetric('forecast stats', getForecastStats, emptyForecastStats()),
+    safeMetric('sow catalog', getSowCatalogStats, emptySowCatalog()),
     safeMetric('revenue metrics', getRevenueMetrics, { available: false, error: 'Unavailable' }),
     safeMetric('system alerts', () => getSystemAlerts(reportDate), []),
     safeKvGet(PROFILE_REMINDER_LAST_RUN_KEY)
@@ -192,6 +194,9 @@ export async function GET(request: NextRequest) {
 
     // Section 5: Data Health
     dataHealth: forecastStats,
+
+    // Section: SOW/PWS catalog backfill progress (#66)
+    sowCatalog,
 
     // Section 6: Revenue (if available)
     revenue: revenueMetrics,
@@ -1022,6 +1027,36 @@ function emptyForecastStats() {
     byAgency: {} as Record<string, number>,
     samCacheCount: 0,
     samCacheLastUpdate: null as string | null,
+  };
+}
+
+function emptySowCatalog() {
+  return { hasSow: 0, checked: 0, remaining: 0, total: 0, pctComplete: 0, byType: {} as Record<string, number>, complete: false };
+}
+
+// SOW/PWS catalog backfill progress (#66) — how far the /api/cron/sow-catalog
+// sweep has gotten through the ~38% of active opps that have an attachment.
+async function getSowCatalogStats() {
+  const sb = getSupabase();
+  const headCount = (q: ReturnType<typeof sb.from>) => q.then(({ count }: { count: number | null }) => count || 0);
+
+  const [hasSow, checkedWithAttach, remaining, totalWithAttach] = await Promise.all([
+    headCount(sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('active', true).eq('has_sow_doc', true)),
+    headCount(sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('active', true).not('attachments', 'is', null).not('sow_checked_at', 'is', null)),
+    headCount(sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('active', true).not('attachments', 'is', null).is('sow_checked_at', null)),
+    headCount(sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('active', true).not('attachments', 'is', null)),
+  ]);
+
+  const byType: Record<string, number> = {};
+  for (const t of ['pws', 'sow', 'soo', 'combined', 'specs']) {
+    const c = await headCount(sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('sow_doc_type', t));
+    if (c) byType[t] = c;
+  }
+
+  const pctComplete = totalWithAttach ? Math.round((checkedWithAttach / totalWithAttach) * 100) : 0;
+  return {
+    hasSow, checked: checkedWithAttach, remaining, total: totalWithAttach,
+    pctComplete, byType, complete: remaining === 0 && totalWithAttach > 0,
   };
 }
 
