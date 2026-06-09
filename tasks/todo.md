@@ -109,6 +109,12 @@ quality, proposal/pipeline UX, and the office-roster "future" feature.
 - [ ] **Content Reaper woven in** — "Mindy writes your BD content" (#13). PRD:
   `docs/PRD-mindy-bd-content-v1.1.md`.
 - [ ] **Interactive year selector** in Market Research (#26) — multi-year trends.
+- [ ] **Semantic "find work hiding under funny names"** (#65) — match MEANING not
+  words, so a cyber person finds a "building envelope" contract that's secretly
+  30% cyber + the recompete equivalent. PRD: `docs/PRD-semantic-hidden-work-discovery.md`.
+  Feasibility done: cached descriptions are 94-char stubs (only 5% usable) → needs
+  a full-SOW fetch+embed pipeline; reuses existing pgvector/RAG infra. Flagship
+  discovery feature — DON'T ship semantic-over-stubs (5% effective).
 - [ ] **DoD forecast scrapers (Option A)** — component LRAF scrapers into
   `agency_forecasts`. PRD: `docs/PRD-dod-forecast-scrapers.md`. Big data project.
 - [ ] **Civilian office decode** (GSA/VA/HHS) — extends office rosters beyond DoD.
