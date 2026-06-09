@@ -318,6 +318,14 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
+  // Auto vs Manual setup (#64). 'choose' = the two-door picker; 'auto' = paste →
+  // confirm; 'manual' = the existing step wizard.
+  const [mode, setMode] = useState<'choose' | 'auto' | 'manual'>('choose');
+  const [autoText, setAutoText] = useState('');
+  const [autoLoading, setAutoLoading] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [autoProfile, setAutoProfile] = useState<any | null>(null);   // the confirm-screen extraction
+
   const [businessDescription, setBusinessDescription] = useState('');
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
   const [customNaics, setCustomNaics] = useState('');
@@ -410,6 +418,78 @@ export default function OnboardingPage() {
     setError('');
     setStep(nextStep);
     track('onboarding_step', 'onboarding', { from_step: step, to_step: nextStep });
+  }
+
+  // AUTO MODE (#64): paste capability text → extract (LLM industry + real data) →
+  // show the confirm screen. The user reviews before anything commits.
+  async function runAutoExtract() {
+    const text = autoText.trim();
+    if (text.length < 4) { setError('Tell us what you do + where (e.g. "janitorial in Florida").'); return; }
+    setAutoLoading(true); setError('');
+    try {
+      const res = await fetch('/api/app/profile-from-text', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({ email, text }),
+      });
+      const d = await res.json();
+      if (!res.ok || !d.success) { setError(d.error || 'Couldn’t read that — try naming the service + state.'); return; }
+      setAutoProfile(d.profile);
+      track('onboarding_step', 'onboarding', { step: 'auto_extract', industry: d.profile?.industryPhrase });
+    } catch {
+      setError('Something went wrong extracting your profile. Try again or set up manually.');
+    } finally { setAutoLoading(false); }
+  }
+
+  // Confirm the Auto profile → push the extracted values into the normal state
+  // vars + save (reuses /api/mindy/profile, same as Manual).
+  async function confirmAuto() {
+    if (!autoProfile) return;
+    setSaving(true); setError('');
+    try {
+      const res = await fetch('/api/mindy/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        body: JSON.stringify({
+          email,
+          businessDescription: autoText.trim() || null,
+          naicsCodes: autoProfile.naics || [],
+          businessType: autoProfile.setAsides?.[0] || 'Small Business',
+          setAsides: autoProfile.setAsides || [],
+          targetAgencies: (autoProfile.agencies || []).map((a: { name: string }) => a.name),
+          locationStates: autoProfile.states || [],
+          alertFrequency: 'weekdays',
+          onboardingComplete: true,
+        }),
+      });
+      const d = await res.json();
+      if (!res.ok || !d.success) { setError(d.error || 'Failed to save. Try again.'); return; }
+      track('onboarding_step', 'onboarding', { step: 'completion', status: 'success', mode: 'auto' });
+      router.push(`/app?email=${encodeURIComponent(email)}`);
+    } catch {
+      setError('Failed to save your profile. Please try again.');
+    } finally { setSaving(false); }
+  }
+
+  // "Let me adjust" — carry the Auto extraction into the Manual wizard, pre-filled.
+  function adjustInManual() {
+    if (autoProfile) {
+      setCustomNaics((autoProfile.naics || []).join(', '));
+      setSelectedStates(autoProfile.states || []);
+      setSelectedSetAsides(autoProfile.setAsides || []);
+      setBusinessDescription(autoText);
+    }
+    setMode('manual'); setStep(1);
+  }
+
+  // Toggle a state on the Auto confirm screen (coverage control — Eric wants to
+  // add/remove states there).
+  function toggleAutoState(code: string) {
+    setAutoProfile((p: { states?: string[] } | null) => {
+      if (!p) return p;
+      const states = p.states || [];
+      return { ...p, states: states.includes(code) ? states.filter((s: string) => s !== code) : [...states, code] };
+    });
   }
 
   function applyProfileSuggestions(suggestions: ProfileSuggestions) {
@@ -563,6 +643,107 @@ export default function OnboardingPage() {
     return (
       <main className="min-h-screen bg-slate-950 flex items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
+      </main>
+    );
+  }
+
+  // ── AUTO vs MANUAL (#64) — the two-door picker + the Auto paste/confirm flow.
+  if (mode !== 'manual') {
+    return (
+      <main className="min-h-screen bg-slate-950 px-4 py-10 text-white">
+        <div className="mx-auto max-w-2xl">
+          <header className="mb-8 text-center">
+            <MindyLogo size={64} className="mx-auto mb-5" />
+            <h1 className="text-3xl font-bold">Set up your profile</h1>
+            <p className="mt-2 text-slate-400">Mindy finds the right federal opportunities for you</p>
+          </header>
+
+          {/* The two-door choice */}
+          {mode === 'choose' && (
+            <div className="grid sm:grid-cols-2 gap-4">
+              <button onClick={() => setMode('auto')} className="text-left rounded-xl border border-purple-500/40 bg-purple-950/20 p-5 hover:border-purple-400 transition-colors">
+                <div className="text-2xl mb-2">⚡</div>
+                <div className="text-lg font-semibold text-white">Auto setup</div>
+                <p className="text-sm text-slate-400 mt-1">Paste your capability statement or describe your business in a sentence. Mindy figures out your codes, market, and who buys — then you confirm.</p>
+                <div className="text-xs text-purple-300 mt-3 font-medium">Recommended — ~30 seconds →</div>
+              </button>
+              <button onClick={() => { setMode('manual'); setStep(1); }} className="text-left rounded-xl border border-slate-700 bg-slate-900 p-5 hover:border-slate-500 transition-colors">
+                <div className="text-2xl mb-2">✏️</div>
+                <div className="text-lg font-semibold text-white">Manual setup</div>
+                <p className="text-sm text-slate-400 mt-1">Go step by step — pick your NAICS codes, target agencies, and geography yourself, or browse real opportunities that fit.</p>
+                <div className="text-xs text-slate-500 mt-3 font-medium">For power users →</div>
+              </button>
+            </div>
+          )}
+
+          {/* AUTO — paste, then a LIGHT confirm screen */}
+          {mode === 'auto' && !autoProfile && (
+            <div className="rounded-xl border border-purple-500/30 bg-purple-950/20 p-5">
+              <button onClick={() => setMode('choose')} className="text-xs text-slate-400 hover:text-white mb-3">← Back</button>
+              <label className="block text-sm font-medium text-white mb-2">Tell Mindy what you do</label>
+              <textarea
+                value={autoText}
+                onChange={e => setAutoText(e.target.value)}
+                rows={4}
+                placeholder="Paste your capability statement / website text, or just describe it — e.g. 'We provide commercial janitorial and facility cleaning for federal buildings in Florida. SDVOSB.'  (One sentence like 'I do IT staffing in Texas' works too.)"
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-purple-500 focus:outline-none resize-y"
+              />
+              {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
+              <button onClick={runAutoExtract} disabled={autoLoading || autoText.trim().length < 4} className="mt-3 h-10 px-5 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 text-white text-sm font-medium rounded-lg">
+                {autoLoading ? 'Reading…' : 'Set me up →'}
+              </button>
+            </div>
+          )}
+
+          {/* AUTO confirm — the wow + safety net (editable states) */}
+          {mode === 'auto' && autoProfile && (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/10 p-5">
+              <div className="text-sm text-slate-400 mb-3">Here&rsquo;s what Mindy found — look right?</div>
+              <div className="space-y-3 text-sm">
+                <div>
+                  <span className="text-slate-500">Your work: </span>
+                  <span className="text-white font-medium capitalize">{autoProfile.industryPhrase}</span>
+                  {autoProfile.totalMarket ? <span className="text-slate-500"> · ${Math.round(autoProfile.totalMarket / 1e6)}M federal market across {autoProfile.naicsCount} codes</span> : null}
+                </div>
+                <div>
+                  <span className="text-slate-500">Codes: </span>
+                  {(autoProfile.naics || []).slice(0, 6).map((c: string) => <span key={c} className="inline-block rounded bg-slate-800 px-2 py-0.5 text-xs text-slate-200 mr-1">{c}</span>)}
+                  {autoProfile.topPsc && <span className="inline-block rounded bg-purple-500/20 px-2 py-0.5 text-xs text-purple-300 mr-1">PSC {autoProfile.topPsc.code}</span>}
+                </div>
+                {autoProfile.setAsides?.length > 0 && (
+                  <div><span className="text-slate-500">Set-asides detected: </span>{autoProfile.setAsides.map((s: string) => <span key={s} className="inline-block rounded bg-amber-500/20 px-2 py-0.5 text-xs text-amber-300 mr-1">{s}</span>)}</div>
+                )}
+                {/* States — editable coverage control (Eric: add/remove states here) */}
+                <div>
+                  <span className="text-slate-500">Where you&rsquo;ll get alerts (click to add/remove): </span>
+                  <div className="mt-1.5 flex flex-wrap gap-1">
+                    {[...US_STATES, 'PR'].map((code) => {
+                      const on = (autoProfile.states || []).includes(code);
+                      return (
+                        <button key={code} type="button" onClick={() => toggleAutoState(code)}
+                          className={`px-1.5 py-0.5 rounded text-[11px] ${on ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-500 hover:text-slate-300'}`}>
+                          {code}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  <p className="text-[11px] text-slate-600 mt-1">No states selected = nationwide alerts.</p>
+                </div>
+                <div>
+                  <span className="text-slate-500">Who buys this: </span>
+                  <span className="text-slate-300">{(autoProfile.agencies || []).slice(0, 5).map((a: { name: string }) => a.name.replace('Department of ', '')).join(', ')}</span>
+                </div>
+              </div>
+              {error && <p className="text-xs text-red-400 mt-3">{error}</p>}
+              <div className="mt-5 flex items-center gap-3">
+                <button onClick={confirmAuto} disabled={saving} className="h-10 px-5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white text-sm font-medium rounded-lg">
+                  {saving ? 'Setting up…' : 'Looks right — finish setup ✓'}
+                </button>
+                <button onClick={adjustInManual} className="h-10 px-4 text-sm text-slate-300 hover:text-white">Let me adjust the details</button>
+              </div>
+            </div>
+          )}
+        </div>
       </main>
     );
   }

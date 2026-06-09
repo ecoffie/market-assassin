@@ -14,102 +14,58 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
-import { keywordCoverage } from '@/lib/market/keyword-coverage';
-import { sanitizeKeywords } from '@/lib/market/keyword-sanitize';
-
-// US state codes + a few aliases, to pull a location out of capability text
-// (Eric: "staffing in or around PR professional service" → PR).
-const STATE_ALIASES: Record<string, string> = {
-  'puerto rico': 'PR', 'pr': 'PR', 'washington dc': 'DC', 'd.c.': 'DC',
-};
-const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC','PR','VI','GU'];
+import { buildProfileFromText } from '@/lib/market/profile-from-text';
 
 /**
- * Seed a new client workspace's profile from pasted capability/website text
- * (Eric: "paste their info → extract keywords + NAICS/PSC + location → so I track
- * them + get their alerts"). Grounds codes in real USASpending (this session's
- * keyword-first work), sanitizes keywords, pulls a state, and writes the
- * workspace's notification settings (keyed by the client email) so alerts flow.
+ * Seed a new client workspace from pasted capability text. Uses the SHARED
+ * buildProfileFromText engine (#64) — the SAME one onboarding uses — so a
+ * consultant adding a client they don't deeply understand gets Mindy's expert
+ * extraction: LLM picks the real INDUSTRY (not a company name / cert), grounds
+ * codes in USASpending, detects states + set-aside certs, and finds who buys.
+ * Then writes the workspace's notification profile + pre-loads target agencies.
  */
 async function seedClientProfile(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any, workspaceId: string, businessName: string, text: string,
-): Promise<{ naics: string[]; psc: string[]; keywords: string[]; states: string[]; agencies: number }> {
-  // Keywords — significant terms from the text, sanitized (drop noise/abbrevs).
-  const rawTerms = text.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/);
-  const keywords = sanitizeKeywords(rawTerms).slice(0, 10);
+): Promise<{ naics: string[]; psc: string[]; keywords: string[]; states: string[]; setAsides: string[]; agencies: number }> {
+  const p = await buildProfileFromText(text);
+  const naics = p?.naics || [];
+  const psc = p?.topPsc ? [p.topPsc.code] : [];
+  const keywords = p?.keywords || [];
+  const states = p?.states || [];
+  const setAsides = p?.setAsides || [];
 
-  // 1) Grounded codes — resolve on the CORE industry phrase, not the whole
-  //    sentence (a full sentence matches unrelated codes). Try the strongest 1-2
-  //    significant terms; keyword-coverage already does candidate fallback.
-  const corePhrase = keywords.slice(0, 2).join(' ') || keywords[0] || text.slice(0, 60);
-  const cov = await keywordCoverage(corePhrase).catch(() => null);
-  const naics = cov?.coverageCodes?.slice(0, 8) || [];
-  const psc = cov?.topPsc ? [cov.topPsc.code] : [];
-
-  // 3) Location — scan for a state name/code (PR for "Puerto Rico").
-  const lower = ` ${text.toLowerCase()} `;
-  const states = new Set<string>();
-  for (const [alias, code] of Object.entries(STATE_ALIASES)) {
-    if (lower.includes(` ${alias} `)) states.add(code);
-  }
-  for (const st of US_STATES) {
-    if (new RegExp(`\\b${st}\\b`).test(text)) states.add(st);
-  }
-
-  // 4) Write the workspace's notification profile (keyed by the client email).
   const clientEmail = `${workspaceId}@clients.getmindy.ai`;
   await supabase.from('user_notification_settings').upsert({
     user_email: clientEmail,
     naics_codes: naics,
     keywords,
-    location_states: Array.from(states),
+    location_states: states,
+    set_aside_certifications: setAsides,
     business_type: 'Small Business',
     primary_industry: businessName,
     alerts_enabled: true,
-    alert_frequency: 'weekly',     // start gentle for a tracked client, not daily spam
+    alert_frequency: 'weekly',     // gentle for a tracked client, not daily spam
     is_active: true,
   }, { onConflict: 'user_email' });
 
-  // 5) PRE-LOAD CONTACTS (#63 follow-on) — the top agencies that buy this
-  //    client's NAICS go straight into their Target List, so the user opens the
-  //    client and already sees "who to talk to" (DoD/HHS/VA for staffing) instead
-  //    of an empty list. Decision Makers/contacts then populate off these.
+  // Pre-load the top buying agencies into the client's Target List (who to talk to).
   let agenciesSeeded = 0;
-  if (naics.length) {
-    try {
-      const r = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_category/awarding_agency/', {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          filters: { naics_codes: naics, time_period: [{ start_date: '2024-10-01', end_date: '2025-09-30' }], award_type_codes: ['A', 'B', 'C', 'D'] },
-          category: 'awarding_agency', limit: 8,
-        }),
-      });
-      if (r.ok) {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const rows = ((await r.json()).results || []).filter((x: any) => x.name && (x.amount || 0) > 0);
-        if (rows.length) {
-          const clientEmail = `${workspaceId}@clients.getmindy.ai`;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const targets = rows.slice(0, 6).map((x: any) => ({
-            workspace_id: workspaceId,
-            user_email: clientEmail,
-            agency_name: x.name,
-            set_aside_spending: Math.round(x.amount || 0),
-            status: 'researching',
-            added_from: 'capability_text_seed',
-            source_naics: naics.join(','),
-          }));
-          // Plain insert — this is a brand-new client workspace, so no dupes to
-          // worry about (no unique constraint on agency_name; a re-seed is rare).
-          const { error } = await supabase.from('user_target_list').insert(targets);
-          if (!error) agenciesSeeded = targets.length;
-        }
-      }
-    } catch { /* non-fatal — profile + alerts still seeded */ }
+  if (p?.agencies?.length) {
+    const targets = p.agencies.slice(0, 6).map(a => ({
+      workspace_id: workspaceId,
+      user_email: clientEmail,
+      agency_name: a.name,
+      set_aside_spending: a.amount,
+      status: 'researching',
+      added_from: 'capability_text_seed',
+      source_naics: naics.join(','),
+    }));
+    const { error } = await supabase.from('user_target_list').insert(targets);
+    if (!error) agenciesSeeded = targets.length;
   }
 
-  return { naics, psc, keywords, states: Array.from(states), agencies: agenciesSeeded };
+  return { naics, psc, keywords, states, setAsides, agencies: agenciesSeeded };
 }
 
 export const runtime = 'nodejs';
@@ -242,7 +198,7 @@ export async function POST(request: NextRequest) {
     // you extract the keywords + NAICS/PSC + location → so I can track them + get
     // their alerts"). Extract grounded codes (this session's keyword-first work) +
     // a location, and write the workspace's notification profile so alerts flow.
-    let seeded: { naics: string[]; psc: string[]; keywords: string[]; states: string[] } | null = null;
+    let seeded: Awaited<ReturnType<typeof seedClientProfile>> | null = null;
     const capabilityText = String(body.capability_text || '').trim();
     if (capabilityText) {
       seeded = await seedClientProfile(supabase, workspaceId, businessName, capabilityText);
