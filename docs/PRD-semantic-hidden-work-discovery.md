@@ -65,6 +65,45 @@ the full SOW for 33K active opps** (rate-limited SAM calls). That's the build.
 
 ---
 
+## The "in-between" workaround (Eric, #66) — do this FIRST
+
+Don't process all 33K. **Target only the records that already have a scope
+document.** Measured against live data:
+
+- **~38% of active opps (~12,600) have attachments** (a doc to read). The other
+  63% are stubs with nothing to fetch — no hidden scope to find anyway.
+- The cache stores attachments as **opaque download URLs (no filename)** — BUT
+  **fetching returns a `content-disposition` header with the real filename**:
+  `filename=Performance+Work+Statement+Commercial+ISP.pdf`. So we **detect SOW/PWS
+  by filename CHEAPLY** (from the HTTP header, often without extracting the PDF).
+- **Measured hit-rate: 23% of FIRST-attachments are SOW/PWS/SOO/Specs by name** —
+  and higher across all files (the SOW is often the 2nd/3rd doc in a bundle).
+
+**Detection regex:** `/statement of work|performance work statement|\bSOW\b|\bPWS\b
+|\bSOO\b|scope of work|combined synopsis|specifications?/i` against the filename.
+
+**This is the affordable corpus:** ~12K not 33K, biased toward the records that
+actually describe their scope (exactly where "building envelope = cyber" hides).
+Cuts the rate-limited fetch work by ~62% vs the naive all-33K plan.
+
+### Foundation build (ships value on its own — do before semantic)
+1. **Schema** (hand-run SQL — no in-app DDL): add `has_sow_doc BOOLEAN`,
+   `sow_doc_type TEXT` (sow|pws|soo|combined|specs), `sow_text TEXT`,
+   `sow_checked_at TIMESTAMPTZ` to `sam_opportunities`.
+2. **Resumable batch cron** (dispatcher `cron_jobs` row, same pattern as
+   pursuit-changes): for active opps with attachments + `sow_checked_at IS NULL`,
+   fetch attachment headers → detect SOW/PWS by filename → stamp `has_sow_doc` +
+   `sow_doc_type`; for SOW/PWS hits, extract + cache `sow_text`. Soft time budget,
+   `remaining` count, re-fires until drained. Respects SAM rate limits.
+3. **Ships now: a "Has SOW/PWS" filter on the opportunity feed** — let users
+   filter/sort to opps with a real scope document (the serious ones you can
+   actually evaluate). Useful immediately, no semantic search required.
+
+Then the embedding phases below run over `sow_text` (the clean ~12K corpus) instead
+of 33K stubs.
+
+---
+
 ## Build plan
 
 ### Phase 1 — Full-SOW corpus
