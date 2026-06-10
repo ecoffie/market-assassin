@@ -24,6 +24,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyMIAccess } from '@/lib/api-auth';
 import { getAgencySatForNaics } from '@/lib/bigquery/agencies';
+import { internalBaseUrl } from '@/lib/utils/internal-base-url';
 
 // Normalize an agency name so the BQ SAT data ("DEPARTMENT OF VETERANS AFFAIRS")
 // matches the saved target's name ("Department of Veterans Affairs"). Strip
@@ -177,10 +178,9 @@ async function loadLiveFindAgencies(
   const primaryNaics = profile.naicsCodes[0]?.trim();
   if (!primaryNaics && !profile.pscCode.trim()) return [];
 
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
-    || (request.headers.get('x-forwarded-proto') && request.headers.get('host')
-      ? `${request.headers.get('x-forwarded-proto')}://${request.headers.get('host')}`
-      : 'https://tools.govcongiants.org');
+  // SAME-ORIGIN from the request — never a stale env var / hardcoded old domain that
+  // now 308-redirects (drops the POST body). See internalBaseUrl() for the full bug.
+  const baseUrl = internalBaseUrl(request);
 
   try {
     const res = await fetch(`${baseUrl}/api/usaspending/find-agencies`, {

@@ -52,6 +52,7 @@ import {
 import { getPrimesByAgency } from '@/lib/utils/prime-contractors';
 import { getEnhancedAgencyInfo, getAllCommands } from '@/lib/utils/command-info';
 import { keywordCoverage } from '@/lib/market/keyword-coverage';
+import { internalBaseUrl } from '@/lib/utils/internal-base-url';
 
 const FREE_TIER_ROW_LIMIT = 10;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -321,19 +322,21 @@ export async function POST(request: NextRequest) {
     // by naics + state). Lets USACE/NAVFAC surface as the giants they
     // are even though only a slice of their work is set-aside.
     const findAgenciesStart = Date.now();
-    const baseUrl = process.env.NEXT_PUBLIC_BASE_URL
-      || (request.headers.get('x-forwarded-proto') && request.headers.get('host')
-          ? `${request.headers.get('x-forwarded-proto')}://${request.headers.get('host')}`
-          : 'http://localhost:3000');
+    // SAME-ORIGIN base URL from the incoming request — never a stale env var that may
+    // point at an old (now-redirecting) domain. See internalBaseUrl() for the full bug.
+    const baseUrl = internalBaseUrl(request);
+    const findAgenciesInit = {
+      method: 'POST' as const,
+      headers: { 'Content-Type': 'application/json' },
+      redirect: 'follow' as const, // belt + suspenders if a redirect ever sneaks in
+    };
     const [findRes, totalRes] = await Promise.all([
       fetch(`${baseUrl}/api/usaspending/find-agencies`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        ...findAgenciesInit,
         body: JSON.stringify({ naicsCode: naics, businessType, veteranStatus, zipCode, pscCode: psc, excludeDOD }),
       }),
       fetch(`${baseUrl}/api/usaspending/find-agencies`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        ...findAgenciesInit,
         body: JSON.stringify({ naicsCode: naics, businessType: '', veteranStatus: '', zipCode, pscCode: psc, excludeDOD }),
       }),
     ]);
