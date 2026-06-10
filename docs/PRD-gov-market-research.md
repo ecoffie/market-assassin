@@ -1,6 +1,14 @@
 # PRD — Government Market Research (Mindy for the Buyer Side)
 
-**Status:** v1.1 candidate. **Partly built already** — see live surfaces below.
+> **⚠️ AUDIENCE: government BUYERS (contracting officers) — NOT our contractor users.**
+> Eric: "Gov market research doesn't benefit our users. Only government buyers."
+> This is a **separate buyer-side product line for a separate audience.** It does
+> NOT belong in the seller-facing v1.1 user-feature list or marketing. Pursue only
+> as a deliberate buyer-side GTM decision. (Moved out of v1.1; tracked under
+> "🏛️ Buyer-side products" in `docs/ROADMAP.md`.)
+
+**Status:** Buyer-side product (separate audience). **Partly built** — live skeleton
+at `/agency`.
 **Owner framing (Eric):** "Government is *required* to do market research. Mindy is
 the third alternative — digest their requirement and produce what they need."
 

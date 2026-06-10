@@ -19,10 +19,12 @@ release buckets. Pick an item, open its PRD/SPEC, build it.
 ## 🟢 v1.1 — fast-follow (existing infra)
 
 **Build order:** #1 Recompete SOW Match (the moat, corpus ready) → #3 Year-selector
-(quick win) → #8 Gov Market Research (strategic, mostly reuse) → #2 Content Reaper →
-rest as time allows.
+(quick win) → #2 Content Reaper → rest as time allows.
 
-Items #1–#3 are written as **build cards** (pick up and go). #4–#8 are index rows;
+> Gov Market Research moved OUT of v1.1 — it serves government BUYERS, not our
+> contractor users. See "🏛️ Buyer-side products" below.
+
+Items #1–#3 are written as **build cards** (pick up and go). #4–#7 are index rows;
 expand to a card when you start one. Each card: **first file → steps → blocker →
 done-when.** Run the **Data Feature Builder** agent on data features, `/ship` to deploy.
 
@@ -49,14 +51,6 @@ done-when.** Run the **Data Feature Builder** agent on data features, `/ship` to
 **Blocker:** none.
 **Done-when:** selecting a prior FY changes the numbers to that year's real data; multi-year shows a trend; verified 200.
 
-### ▸ #8 — Gov Market Research, buyer side  (M, partly built · strategic)
-**Goal:** Enhance the LIVE `/agency` tool — CO uploads draft requirement PDF → auto-fill §5 taxonomy → deepen §11–12 small-biz market depth + wire §9/§14/§16 into export. **~15–20% of the MRR (the slice SBS can't do), NOT the whole thing. Never auto-generate determinations/signatures.**
-**Full spec:** `docs/PRD-gov-market-research.md` + `docs/gov-mrr-template-reference.md` (real MAY-2026 MRR map).
-**First file:** `src/lib/gov-buyer/market-research.ts` (the live rubric engine) + `src/app/api/gov-buyer/market-research/route.ts`.
-**Steps:** (1) PDF-ingest entry on `/agency` → extract NAICS/PSC/scope (reuse `pdf-extract`+`profile-from-text`) → pre-fill §5. (2) Deepen §11 to performer-weighted (BQ recipients, not raw SAM reg). (3) Harden §12 Rule-of-Two. (4) Wire §9 procurement history + §14 technique checklist + §16 conclusion into the export. (5) Export memo maps to real MRR section numbers.
-**Blocker:** none (live feature, enhancement). Read the reference doc's coverage matrix first — it flags every "never auto-generate" section.
-**Done-when:** PDF auto-fills §5; §11 is performer-weighted; export maps to MRR §§; every figure traces to USASpending/SAM/BQ; out-of-scope sections labeled "(CO completes)".
-
 ### Index (expand to a card when you start)
 | # | Item | Effort | Reuses | PRD |
 |---|------|--------|--------|-----|
@@ -81,6 +75,20 @@ done-when.** Run the **Data Feature Builder** agent on data features, `/ship` to
 
 **The v2.0 dependency chain:** v1.1 #1 (embed engine) unlocks v2.0 B. Email-in (A)
 is the most-requested net-new capability and the natural v2.0 lead.
+
+---
+
+## 🏛️ Buyer-side products — DIFFERENT AUDIENCE (not for our sellers)
+
+> **Important (Eric):** these serve **government BUYERS (contracting officers)**, NOT
+> our contractor users. They do **not** benefit the people paying for Mindy today —
+> they're a *separate product line for a separate audience*. Track them here, but do
+> NOT list them as user features or in the seller-facing marketing. Pursue only as a
+> deliberate buyer-side GTM decision, not as a v1.1 user feature.
+
+| Item | Audience | Notes | PRD |
+|---|---|---|---|
+| **Gov Market Research** (CO does FAR Part 10 MRR market-depth) | Gov buyers (COs) | LIVE skeleton at `/agency` + `gov-buyer/market-research`. Enhancing it is buyer-side product work, not a seller feature. | `docs/PRD-gov-market-research.md` |
 
 ---
 

@@ -462,36 +462,13 @@ starts with the high-value IDV/IDIQ vehicles and soon-expiring contracts.
 
 ---
 
-## 18. Government market research, done (coming) — Mindy for the buyer side
+<!-- NOTE: Government Market Research (the CO/buyer-side MRR tool) is intentionally
+NOT in this doc. This literature is SELLER-facing (our contractor users). The
+buyer-side product serves a DIFFERENT audience (contracting officers) and does not
+benefit our sellers — it needs its own buyer-facing GTM/copy, kept separate. See
+docs/ROADMAP.md "🏛️ Buyer-side products". -->
 
-**What it does:** Every federal contracting officer is *required* to do market
-research before they buy (FAR Part 10). The hardest part — proving whether a
-set-aside is viable, and who's *actually performing* this work — is exactly what
-Mindy does. A CO (on the roadmap) uploads their draft requirement, and Mindy
-produces the **performer-weighted small-business market depth** that drops straight
-into their Market Research Report: who's winning this work, the real Rule-of-Two
-picture, set-aside feasibility — grounded in live award data.
-
-**Why it's different:** Today a CO has two options — do it manually, or pay a
-consultant. **Mindy is the third alternative:** faster than manual, cheaper than a
-consultant, and it answers the one question SAM's SBS structurally can't — not "how
-many vendors are *registered*" but "how many are *actually winning* this kind of
-work." It puts Mindy on **both sides of the table** — the market-intelligence layer
-for federal contracting, for buyers and sellers alike.
-
-**SEO angles:**
-- "How contracting officers can do market research faster (FAR Part 10)"
-- "Is a small-business set-aside viable? The Rule-of-Two, answered with real data"
-- "SAM's SBS shows registrations — here's how to see who actually performs the work"
-
-**Proof point:** Grounded in USASpending awards + SAM + the federal recipients
-universe; performer-weighted depth, not raw registration counts. Honest scope:
-Mindy automates the small-business market-depth slice of the MRR — never the legal
-determinations, signatures, or rationale a CO must author.
-
----
-
-## 19. Email any opportunity into Mindy (coming) — track it from ANY source
+## 18. Email any opportunity into Mindy (coming) — track it from ANY source
 
 **What it does:** Mindy tracks SAM.gov today — but you find opportunities
 *everywhere*: NIH/DARPA/NSF labs, Air Force and Army open solicitations, NECO, GSA
