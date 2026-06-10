@@ -13,7 +13,7 @@ this was written), THEN proceed through the sequence. Trigger phrase still works
 > **PAIR WITH `docs/PRD-migration-onboarding.md`** — this runbook moves the DOMAIN;
 > that PRD handles the AUDIENCE. Key: the real base is ~1,300 warm users (claim-
 > account → Auto-setup); ~83% are imported bootcamp leads → suppress generic alerts +
-> nurture, do NOT onboard. Don't run a mass cold-send during the cutover.
+> nurture, do NOT onboard. ACCESS: see `docs/PRD-trial-vs-paid-access.md` (full-paid = active Stripe + lifetime; everyone else = per-user trial with a MINDY_TRIAL_OPEN switch).
 **Related:** `docs/strategy/DOMAIN-BRAND-CONSOLIDATION.md` (strategy),
 `tasks/oauth-branding-runbook.md` (the OAuth/Supabase side — already done for
 `auth.getmindy.ai`; do NOT re-do, just verify).

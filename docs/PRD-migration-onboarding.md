@@ -6,7 +6,7 @@
 we should do something else with."
 
 > **READ ALSO:** `tasks/mi-to-getmindy-cutover-runbook.md` (the DOMAIN migration).
-> This PRD is the AUDIENCE/onboarding plan that runs alongside it.
+> This PRD is the AUDIENCE/onboarding plan. See also `docs/PRD-trial-vs-paid-access.md` (WHAT access each user gets: paid vs trial + the on/off switch).
 
 ---
 
