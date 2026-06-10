@@ -30,6 +30,7 @@
 import { NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
+import { hasProAccess } from '@/lib/access/resolve-access';
 import { retrieveRagContext, type RagChunkResult } from '@/lib/rag/retrieve';
 import { retrievePodcastEpisodes, formatPodcastCardsForPrompt, type PodcastEpisodeCard } from '@/lib/rag/podcast-search';
 import { loadBidderProfile, formatProfileForPrompt } from '@/lib/proposal/loaders';
@@ -306,6 +307,16 @@ export async function POST(request: NextRequest) {
   if (!auth.authenticated || !auth.email) {
     return new Response(JSON.stringify({ error: auth.error || 'Unauthorized' }), {
       status: 401,
+      headers: { 'Content-Type': 'application/json' },
+    });
+  }
+
+  // Pro gate: Mindy Chat retrieves from the proprietary knowledge base, so it's a
+  // paid feature. Enforced server-side (hiding the sidebar item isn't enough — a
+  // free user could call this API directly). 403 → the UI shows the upgrade prompt.
+  if (!(await hasProAccess(auth.email))) {
+    return new Response(JSON.stringify({ error: 'pro_required', upgrade: true }), {
+      status: 403,
       headers: { 'Content-Type': 'application/json' },
     });
   }

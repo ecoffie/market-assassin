@@ -16,6 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
+import { hasProAccess } from '@/lib/access/resolve-access';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -45,6 +46,12 @@ export async function GET(request: NextRequest) {
   const auth = await verifyUserOwnsEmail(request, email);
   if (!auth.authenticated || !auth.email) {
     return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
+  }
+
+  // Pro gate: this serves the proprietary KB document text (the source-of-truth for
+  // Mindy Chat). Paid feature — enforce server-side so Free can't read the KB.
+  if (!(await hasProAccess(auth.email))) {
+    return NextResponse.json({ error: 'pro_required', upgrade: true }, { status: 403 });
   }
 
   const supabase = getSupabase();

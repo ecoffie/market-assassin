@@ -107,7 +107,9 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'Mindy Chat',
         icon: MessageSquare,
         description: 'Ask anything, cited sources',
-        tier: ['free', 'pro', 'team', 'enterprise'],
+        // Pro-only: Mindy Chat retrieves from the proprietary knowledge base, so it's
+        // not given away on Free. Free users see it locked → upgrade prompt.
+        tier: ['pro', 'team', 'enterprise'],
         badge: 'BETA',
       },
       {
