@@ -192,6 +192,25 @@ your work" flag and (b) a "📄 View incumbent SOW" button that opens the recove
 scope document. Proactive "a recompete is coming that fits you" alerts are a
 fast-follow once the match threshold is tuned (respecting the #58 per-recipient cap).
 
+**⚠️ THE LINKING CONSTRAINT (measured June 2026 — this is why the corpus alone
+isn't enough):** an expiring contract is keyed by its **PIID** (`W91ZLK24P0041`,
+assigned at AWARD); a recovered SOW is keyed by its **solicitation_number**
+(`36C24126Q0443`, assigned at SOLICITATION, years earlier). These are different
+identifiers for different lifecycle stages, and SAM/USASpending store no crosswalk
+between them — **measured exact PIID↔sol# match = 0%** across a 30-contract sample.
+So you CANNOT join an expiring contract to "its" SOW by ID. The corpus has the
+SOWs (6,800+ recovered, 99% with a solicitation_number) but **the link to a
+specific recompete must be by MEANING** — embed the expiring contract's
+description + the SOW corpus, return the best semantic match as "likely the
+incumbent's SOW (X% confidence)". This is exactly why Phase 6 DEPENDS on the
+embedding engine (Phases 2-3) — it is not shippable as an ID-join. (A weak Tier-1
+"SOWs for similar NAICS+agency work" list was considered and rejected: it
+undersells the feature and reads as noise. Build the real 1:1 semantic match.)
+
+**Build order locked:** embeddings first (corpus is ready, 6,800+ SOWs in
+`sow_text`), THEN the Expiring-Contracts wiring. Do not wire by ID — there is no
+ID link.
+
 **Retention fix (do alongside):** stop *losing* SOWs going forward — when the #66
 catalog processes an active solicitation, **keep its `sow_text` even after it
 expires** (don't purge on inactive). Over time this builds the recompete corpus
