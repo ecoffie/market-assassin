@@ -4,10 +4,15 @@
 `mi.govcongiants.com` to a redirect-only role — *without* breaking auth,
 email links, Stripe flows, or in-flight users.
 
-**Status:** 🔻 **SCHEDULED FOR NEXT SESSION** (Eric, "do the final migration
-tomorrow"). On pickup, FIRST re-run the ref audit fresh (count may have grown since
-this was written), THEN proceed through the sequence. Trigger phrase still works:
-"do the final migration."
+**Status:** ✅ **EXECUTED & VERIFIED 2026-06-10.** getmindy.ai is canonical;
+mi.govcongiants.com → 308 permanent redirect (path+query preserving), verified live.
+Code deployed, Vercel env + Supabase URLs set, auth flows (sign-in/reset/OAuth) all
+passed on getmindy.ai. DO NOT re-run. Post-migration: (1) keep mi.govcongiants.com/**
+in Supabase redirect allow-list for the overlap window (remove in ~weeks); (2) NEVER
+delete the 308 — years of email links depend on it; (3) post-migration cleanup queued:
+public tier rename + checkout branding (docs/PRD-public-tier-naming.md), trial/paid
+access (docs/PRD-trial-vs-paid-access.md), unconfigured-user activation
+(docs/PRD-migration-onboarding.md).
 **Owner:** Eric (+ Claude for the code/verification steps).
 
 > **PAIR WITH `docs/PRD-migration-onboarding.md`** — this runbook moves the DOMAIN;
