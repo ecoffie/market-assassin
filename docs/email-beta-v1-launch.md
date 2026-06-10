@@ -4,7 +4,7 @@
 `trial_ends_at=2026-07-30`. They have full Mindy Pro right now; this email tells them
 the beta became v1.0 and drives the LOGIN (which creates their profile → Auto-setup).
 
-**From:** GovCon Giants <hello@govcongiants.com>
+**From:** GovCon Giants <hello@getmindy.ai>
 **Send via:** `sendEmail()` (Resend primary), batched per the #58 per-recipient cap.
 **Link:** `https://getmindy.ai/setup-account?email={{email}}` (email → set password →
 `/app/onboarding`). Pre-fills their email so it's one step.
