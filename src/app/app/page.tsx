@@ -89,6 +89,11 @@ function AppDashboard() {
   // When sign-in fails because the email has NO account yet (email-only beta user),
   // show a one-click "Set up my account" instead of a dead-end "forgot password".
   const [needsSetup, setNeedsSetup] = useState(false);
+  // Beta-user banner (the prominent path on the landing): most people arriving now are
+  // the email-only beta cohort who need to SET UP a password, not sign in.
+  const [betaEmail, setBetaEmail] = useState('');
+  const [betaSent, setBetaSent] = useState(false);
+  const [betaLoading, setBetaLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'google' | 'microsoft' | null>(null);
   const [isSignUpMode, setIsSignUpMode] = useState(false);
   const [signUpEmail, setSignUpEmail] = useState('');
@@ -608,7 +613,54 @@ function AppDashboard() {
             </p>
           </div>
 
-          {/* Email Entry */}
+          {/* BETA-USER BANNER — the prominent path. Most people arriving right now are the
+              email-only beta cohort who get alerts but never set a password. Lead with
+              setup; regular sign-in is the "everyone else" path below. */}
+          <div className="max-w-md mx-auto mb-6 rounded-2xl border-2 border-purple-500/50 bg-gradient-to-br from-blue-950/60 to-purple-950/60 p-6">
+            <div className="flex items-center gap-2 mb-2">
+              <span className="text-xs font-bold uppercase tracking-wider text-purple-300 bg-purple-500/20 px-2 py-1 rounded-full">Beta user?</span>
+            </div>
+            <h3 className="text-lg font-bold text-white mb-1">Already getting Mindy alerts? Set up your account.</h3>
+            <p className="text-sm text-gray-300 mb-4">
+              If you&apos;ve been getting our daily emails, you just need to set a password once.
+              Enter your email and we&apos;ll send your secure setup link.
+            </p>
+            {betaSent ? (
+              <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
+                ✅ Check your inbox — we sent your setup link. Click it to set a password and get in.
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="email"
+                  value={betaEmail}
+                  onChange={(e) => setBetaEmail(e.target.value)}
+                  placeholder="you@company.com"
+                  className="flex-1 rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 text-white placeholder:text-gray-500 outline-none focus:border-purple-500"
+                />
+                <button
+                  type="button"
+                  disabled={betaLoading || !betaEmail.includes('@')}
+                  onClick={async () => {
+                    setBetaLoading(true);
+                    try {
+                      await fetch('/api/auth/mindy-account-setup/request', {
+                        method: 'POST', headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: betaEmail.trim().toLowerCase() }),
+                      });
+                      setBetaSent(true);
+                    } catch { /* generic success message either way (no email enumeration) */ setBetaSent(true); }
+                    finally { setBetaLoading(false); }
+                  }}
+                  className="rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-3 text-sm font-semibold text-white hover:from-blue-500 hover:to-purple-500 disabled:opacity-50 whitespace-nowrap"
+                >
+                  {betaLoading ? 'Sending…' : 'Set up my account →'}
+                </button>
+              </div>
+            )}
+          </div>
+
+          {/* Email Entry — regular sign-in / create-account for everyone else */}
           <div className="bg-gray-900/50 rounded-2xl border border-gray-800 p-8 max-w-md mx-auto">
             {/* Sign-in / Sign-up toggle */}
             {!signUpSent && authStep === 'credentials' && (
