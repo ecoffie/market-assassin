@@ -17,7 +17,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { hasBriefingsAccess } from '@/lib/briefings/access';
+import { hasProAccess } from '@/lib/access/resolve-access';
 
 interface RecompeteContract {
   contractNumber: string;
@@ -118,8 +118,8 @@ export async function GET(request: NextRequest) {
     }, { status: 400 });
   }
 
-  // Check access via KV and paid entitlement fallback (but don't block - just note it)
-  const hasAccess = await hasBriefingsAccess(email);
+  // Pro access = paid OR active trial (but don't block - just note it)
+  const hasAccess = await hasProAccess(email);
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;

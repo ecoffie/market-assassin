@@ -10,7 +10,7 @@
 
 import { NextResponse, NextRequest } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { hasBriefingsAccess } from '@/lib/briefings/access';
+import { hasProAccess } from '@/lib/access/resolve-access';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 
 export async function GET(request: NextRequest) {
@@ -29,8 +29,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
   }
 
-  // Check briefing access via KV and paid entitlement fallback
-  const hasAccess = await hasBriefingsAccess(auth.email!);
+  // Pro access = paid (KV briefings: + entitlement) OR active trial (MINDY_TRIAL_OPEN).
+  const hasAccess = await hasProAccess(auth.email!);
   if (!hasAccess) {
     return NextResponse.json({ error: 'No briefing access' }, { status: 403 });
   }

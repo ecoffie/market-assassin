@@ -6,7 +6,7 @@
  */
 
 import { NextResponse } from 'next/server';
-import { hasBriefingsAccess } from '@/lib/briefings/access';
+import { hasProAccess } from '@/lib/access/resolve-access';
 
 export async function POST(request: Request) {
   try {
@@ -16,7 +16,8 @@ export async function POST(request: Request) {
       return NextResponse.json({ hasAccess: false }, { status: 400 });
     }
 
-    const hasAccess = await hasBriefingsAccess(email);
+    // Pro access = paid OR active trial (MINDY_TRIAL_OPEN).
+    const hasAccess = await hasProAccess(email);
     return NextResponse.json({ hasAccess });
   } catch {
     return NextResponse.json({ hasAccess: false }, { status: 500 });
