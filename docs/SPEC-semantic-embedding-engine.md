@@ -128,12 +128,35 @@ Pure functions so the cron, the backfill script, AND the API route reuse them.
    department/agency match (ilike first word). Pull `id, sow_text(truncated),
    sow_doc_type, sow_filename, title, department, naics_code, sow_embedding`.
    (Typically 50–300 rows.)
-3. Cosine-rank the candidates; return top 1–3 with a **confidence score**
-   (cosine → a 0–100% label; be honest — call it "likely match", not "the
-   incumbent's SOW", below a threshold).
-4. Each result: the SOW doc type, the source notice link, and a snippet / full
-   `sow_text` for the drawer.
+3. Cosine-rank the candidates. **Confidence = top score AND the gap to #2, not the
+   top score alone.** A high top score that barely beats the runner-up means the
+   query matched everything in the agency vaguely (LOW confidence); a top score
+   that clears #2 by a wide margin means it stands out (HIGH confidence). Compute:
+   `topScore`, `runnerUpScore`, `gap = topScore - runnerUpScore`. Only treat a
+   match as confident when **both** `topScore >= THRESHOLD` (start conservative,
+   e.g. 0.78) **and** `gap >= MIN_GAP` (e.g. 0.05). Otherwise return
+   `{ match: null, reason: "no_confident_match" }` — a clean miss beats a wrong
+   match.
+4. **Label honestly:** "**likely SOW match by semantic similarity**" — NEVER "the
+   incumbent's SOW". The document is a real recovered SOW; the *link to this
+   specific recompete* is a similarity inference, so the copy must say so.
+5. Each result: the SOW doc type, source notice link, snippet / full `sow_text`,
+   and the confidence label for the drawer.
+6. **TELEMETRY (required) — log on every call** so the threshold can be tuned from
+   real data, not guessed: `piid`, `agency_filter`, `naics_prefix`,
+   `candidate_count`, `top_score`, `runner_up_score`, `score_gap`, and the
+   confident/no-match verdict. Write to `tool_errors`/a log table or structured
+   console. This is how you set THRESHOLD + MIN_GAP empirically after the spot-check
+   phase.
+
 Ground every field in real data; no LLM-invented scope.
+
+**Build-order discipline (do NOT skip):** prove match quality at the API/data layer
+on real recompetes BEFORE building any UI. Spot-check ~5–10 known recompetes
+(janitorial, IT services, facilities) and read the top match + score + gap. Only
+once the confident matches are plausibly correct do you build Phase E. A wrong
+"incumbent SOW" damages trust faster than a missing one — the whole feature's value
+is its honesty.
 
 ### Phase E — Wire into Expiring Contracts UI
 `src/components/app/panels/RecompetesPanel.tsx`:
@@ -166,13 +189,19 @@ consider pgvector then. Surface on ALL SAM as semantic results.
 
 ## 7. Acceptance criteria
 - [ ] Migration applied; `sow_embedding` populated for all `has_sow_doc=true` rows.
-- [ ] `GET /api/app/recompete-sow?...` returns a ranked match with a confidence
-      score in <2s for a real PIID.
-- [ ] On a known recompete (e.g. a janitorial/IT-services expiring contract), the
-      top match is a plausibly-correct SOW of the same work at the same agency
-      (spot-check 5).
-- [ ] UI button on Expiring Contracts opens the SOW drawer; honest "no match" when
-      below threshold.
+- [ ] `GET /api/app/recompete-sow?...` returns top-1–3 with `top_score`,
+      `runner_up_score`, `score_gap`, and a confident/no-match verdict in <2s.
+- [ ] Confidence uses **both** top score AND the #1–#2 gap (not top score alone);
+      sub-threshold OR small-gap → `no_confident_match`.
+- [ ] Telemetry logged per call: piid, agency_filter, naics_prefix,
+      candidate_count, top_score, runner_up_score, score_gap, verdict.
+- [ ] **API-layer spot-check FIRST (before UI):** 5–10 known recompetes
+      (janitorial / IT services / facilities) → top confident match is plausibly
+      the same work at the same agency. Tune THRESHOLD + MIN_GAP from the logged
+      scores.
+- [ ] Only after spot-checks pass: UI button on Expiring Contracts opens the SOW
+      drawer; labeled "likely SOW match by semantic similarity" (never "incumbent
+      SOW"); honest "no confident match" when below threshold/gap.
 - [ ] Marketing literature updated; committed + deployed + verified 200.
 
 ## 8. Key files (quick map)
