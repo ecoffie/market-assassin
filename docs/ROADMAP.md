@@ -135,7 +135,7 @@ These have full PRDs (phasing/risks/success criteria worked out) — "open the d
 - **DoDAAC directory refresh is auto-cron'd** (dispatcher) — not a manual task anymore.
 - **Public tier rename — AFTER migration** (Eric, June 10): names describe WHO buys.
   `free`→**"Mindy"** (never "Mindy Free" publicly — that's internal), `pro`→
-  **"Soloprenuer"/"Mindy Pro"** (solo operator), `team`→**"Teams"** (consultants/
+  **"Solopreneur"/"Mindy Pro"** (solo operator), `team`→**"Teams"** (consultants/
   agencies, multi-client), `enterprise`→**"Enterprise"** (national orgs: APEX/USHCC —
   user mgmt, RBAC, cross-user sharing, group alerts, calendar invites; the org caps
   are a separate v2.0+ build). Rename = public surfaces only (keep `MITier` keys +

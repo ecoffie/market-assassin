@@ -11,18 +11,14 @@ just **Mindy** (not 'Mindy Free' — that's internal code). Mindy or Mindy Pro."
 | Internal code (`MITier`) | **Public name** | Who it's for | What's distinctive |
 |---|---|---|---|
 | `free` | **Mindy** | individual contractors — the entry product | (never shown as "Mindy Free"; just "Mindy") |
-| `pro` | **Soloprenuer** | a solo contractor running their own BD | full Mindy for one operator |
+| `pro` | **Solopreneur** | a solo contractor running their own BD | full Mindy for one operator |
 | `team` | **Teams** | **Consultants / Agencies** handling multiple clients | multi-client workspaces (the Coach/multi-client mode) |
 | `enterprise` | **Enterprise** | **National orgs** — APEX Accelerators, USHCC, etc. | many accounts + the org capabilities below |
 
 > **CRITICAL:** "Mindy Free" is **internal code only** (the `free` tier). Public copy
-> says **"Mindy"** for the base and **"Mindy Pro" / "Soloprenuer"** for paid. Admin/
+> says **"Mindy"** for the base and **"Mindy Pro" / "Solopreneur"** for paid. Admin/
 > internal dashboards (Command Center) keep "Mindy Free/Mindy Pro" — those aren't
 > public.
-
-*(Note the wording: Eric wrote "Soloprenuer" — confirm the canonical spelling before
-ship: "Solopreneur" is the dictionary form. Use whichever Eric wants as the brand
-spelling.)*
 
 ---
 
@@ -32,10 +28,10 @@ spelling.)*
 Entry product. The full daily-alerts + market-research starting point. Public name is
 simply **Mindy** — no "Free" suffix.
 
-### 🔵 Soloprenuer (`pro`, $149/mo) — the solo operator
+### 🔵 Solopreneur (`pro`, $149/mo) — the solo operator
 Everything for one contractor running their own BD: full market research, AI
 briefings, forecasts, pipeline, CRM, Proposal Assist. *"Mindy Pro"* and
-*"Soloprenuer"* are the same tier — lead with whichever converts.
+*"Solopreneur"* are the same tier — lead with whichever converts.
 
 ### 🟣 Teams — Consultants & Agencies (multiple clients)
 For a consultant or agency that **manages BD for several client businesses**. Built
@@ -63,7 +59,7 @@ rename + positioning. Enterprise is a real v2.0+ build, scope separately.)*
 
 ## 3. What to change (public surfaces only)
 - `src/components/UnifiedSidebar.tsx` `tierInfo` → public display names (`free` →
-  "Mindy", `pro` → "Soloprenuer"/"Mindy Pro", `team` → "Teams", `enterprise` →
+  "Mindy", `pro` → "Solopreneur"/"Mindy Pro", `team` → "Teams", `enterprise` →
   "Enterprise"). **Keep the `MITier` keys (`free/pro/team/enterprise`) — code only.**
 - `src/app/pricing/page.tsx` + `src/app/market-intelligence/page.tsx` — the public
   pricing/checkout copy.
@@ -79,13 +75,13 @@ admin-internal Command Center labels (not public).
 ## 4. Sequence
 **Execute AFTER the mi→getmindy migration** (Eric). Order: migrate domain → settle
 the trial/paid access (`PRD-trial-vs-paid-access.md`) → THEN the public rename
-(Mindy / Soloprenuer / Teams / Enterprise). Enterprise *capabilities* (user mgmt,
+(Mindy / Solopreneur / Teams / Enterprise). Enterprise *capabilities* (user mgmt,
 RBAC, sharing, group alerts) are a separate v2.0+ build, not part of the rename.
 
 ## 5. Open decisions
-- **Spelling:** "Soloprenuer" (Eric's) vs "Solopreneur" (standard) — Eric's call.
-- **"Mindy Pro" vs "Soloprenuer":** are these the SAME tier with two names (lead with
-  one), or is "Mindy Pro" retired in favor of "Soloprenuer"? Confirm.
+- **Spelling:** "Solopreneur" (confirmed — was a typo as "Soloprenuer").
+- **"Mindy Pro" vs "Solopreneur":** are these the SAME tier with two names (lead with
+  one), or is "Mindy Pro" retired in favor of "Solopreneur"? Confirm.
 - **Teams price** (sidebar shows $499/mo today) — confirm public price.
 - **Enterprise:** rename now (positioning) but gate the org capabilities as "contact
   sales / coming" until the user-management build ships?
