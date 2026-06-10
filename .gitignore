@@ -54,3 +54,4 @@ market-assasin-*.json
 # Exported call transcripts (proprietary, may contain PII — never commit)
 tasks/cache/calls/
 tasks/cache/fireflies-titles.txt
+backups/
