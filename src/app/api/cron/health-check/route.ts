@@ -123,11 +123,16 @@ const tests = [
     category: 'Critical Flows',
     critical: true,
     fn: async () => {
+      // Protected route (requires MI 2FA session). Unauthenticated probe SHOULD get
+      // 401 — that's healthy (route exists + enforces auth). A 200 to anonymous would
+      // be a security hole; a 5xx would be a real break.
       const res = await fetch(`${BASE_URL}/api/profile?email=test@example.com`);
-      const data = await res.json();
+      const authEnforced = res.status === 401 || res.status === 403;
       return {
-        passed: res.ok && data !== undefined,
-        message: res.ok ? 'Profile API responding' : `HTTP ${res.status}`,
+        passed: res.ok || authEnforced,
+        message: authEnforced
+          ? `Auth enforced (${res.status}) — healthy`
+          : res.ok ? 'Profile API responding' : `HTTP ${res.status}`,
       };
     },
   },
@@ -217,7 +222,14 @@ const tests = [
     category: 'Data APIs',
     critical: false,
     fn: async () => {
+      // Protected route (requires MI 2FA session) — moved behind auth as a paid-tier
+      // data feature. Unauthenticated probe SHOULD get 401 = healthy. Only a 5xx is
+      // a real break.
       const res = await fetch(`${BASE_URL}/api/pain-points?agency=Department%20of%20Defense`);
+      const authEnforced = res.status === 401 || res.status === 403;
+      if (authEnforced) {
+        return { passed: true, message: `Auth enforced (${res.status}) — healthy` };
+      }
       const data = await res.json();
       return {
         passed: res.ok && (data.painPoints?.length > 0 || data.priorities?.length > 0),
