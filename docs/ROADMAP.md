@@ -24,12 +24,14 @@ release buckets. Pick an item, open its PRD/SPEC, build it.
 | 2 | **Content Reaper woven in** (#13) | "Mindy writes your BD content" — LinkedIn posts / outreach from a tracked opp. | M | existing Content Reaper, `callLLM` | `docs/PRD-mindy-bd-content-v1.1.md` |
 | 3 | **Year-selector in Market Research** (#26) | Pick fiscal year + multi-year trend (today auto-rolls latest complete FY). | S (<1d) | market-research API, USASpending | — (small) |
 | 4 | **Interactive product tour** | In-app "click here" walkthrough for new users. | M | onboarding flow | `tasks/todo.md` P1 |
-| 5 | **Light / Dark mode** | Themeable Mindy. | S–M | app chrome | `tasks/todo.md` P1 |
+| 5 | **Light / Dark mode** | Themeable-tokens refactor; lives in user settings. PRD ready. | S–M | app chrome | `docs/PRD-light-mode.md` |
 | 6 | **Amendments INTO daily alerts** | Pursuit-change digest is a separate email today; optionally fold into the daily alert. | S | `pursuit-changes` cron (built), `daily-alerts` | — (small wiring) |
 | 7 | **Proposal Assist v2 polish** | per-doc notes, compliance who/status, draft versions. | M | Proposal Assist (shipped) | `tasks/todo.md` |
+| 8 | **Gov Market Research — buyer side** (Mindy as the 3rd alternative) | **Enhance the LIVE `/agency` tool**: CO uploads draft requirement PDF → auto-fill §5 taxonomy → deepen §11–12 small-biz market depth (performer-weighted, the slice SBS can't do) + wire §9/§14/§16 into the export. ~15–20% of the MRR but the highest-CO-pain slice. NOT the full MRR; never auto-generate determinations/signatures. | M (partly built) | LIVE: `/agency`, `gov-buyer/market-research` route + rubric engine + export; reuse `pdf-extract`, `profile-from-text`, BQ recipients | `docs/PRD-gov-market-research.md` + `docs/gov-mrr-template-reference.md` (real MAY-2026 MRR map) |
 
 **Recommended v1.1 build order:** (1) Recompete SOW Match — the moat, corpus is
-ready → (3) year-selector — quick win → (2) Content Reaper → rest as time allows.
+ready → (3) year-selector — quick win → (8) Gov Market Research — strategic (buyer
+side, mostly reuse) → (2) Content Reaper → rest as time allows.
 
 ---
 
