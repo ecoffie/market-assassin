@@ -4,7 +4,10 @@
 `mi.govcongiants.com` to a redirect-only role — *without* breaking auth,
 email links, Stripe flows, or in-flight users.
 
-**Status:** Planned, NOT executed. Run when Eric says "do the final migration."
+**Status:** 🔻 **SCHEDULED FOR NEXT SESSION** (Eric, "do the final migration
+tomorrow"). On pickup, FIRST re-run the ref audit fresh (count may have grown since
+this was written), THEN proceed through the sequence. Trigger phrase still works:
+"do the final migration."
 **Owner:** Eric (+ Claude for the code/verification steps).
 **Related:** `docs/strategy/DOMAIN-BRAND-CONSOLIDATION.md` (strategy),
 `tasks/oauth-branding-runbook.md` (the OAuth/Supabase side — already done for

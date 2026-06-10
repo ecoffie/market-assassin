@@ -18,20 +18,53 @@ release buckets. Pick an item, open its PRD/SPEC, build it.
 
 ## 🟢 v1.1 — fast-follow (existing infra)
 
-| # | Item | Scope (one line) | Effort | Reuses | PRD/SPEC |
-|---|------|------------------|--------|--------|----------|
-| 1 | **Recompete SOW Match** | On an expiring contract, semantic-match the recovered SOW corpus → "likely incumbent SOW (X% confident)". The BD-moat feature. | M (1–2d) | SOW corpus (7,009 SOWs, built), `RecompetesPanel`, OpenAI embed | `docs/SPEC-semantic-embedding-engine.md` |
-| 2 | **Content Reaper woven in** (#13) | "Mindy writes your BD content" — LinkedIn posts / outreach from a tracked opp. | M | existing Content Reaper, `callLLM` | `docs/PRD-mindy-bd-content-v1.1.md` |
-| 3 | **Year-selector in Market Research** (#26) | Pick fiscal year + multi-year trend (today auto-rolls latest complete FY). | S (<1d) | market-research API, USASpending | — (small) |
-| 4 | **Interactive product tour** | In-app "click here" walkthrough for new users. | M | onboarding flow | `tasks/todo.md` P1 |
-| 5 | **Light / Dark mode** | Themeable-tokens refactor; lives in user settings. PRD ready. | S–M | app chrome | `docs/PRD-light-mode.md` |
-| 6 | **Amendments INTO daily alerts** | Pursuit-change digest is a separate email today; optionally fold into the daily alert. | S | `pursuit-changes` cron (built), `daily-alerts` | — (small wiring) |
-| 7 | **Proposal Assist v2 polish** | per-doc notes, compliance who/status, draft versions. | M | Proposal Assist (shipped) | `tasks/todo.md` |
-| 8 | **Gov Market Research — buyer side** (Mindy as the 3rd alternative) | **Enhance the LIVE `/agency` tool**: CO uploads draft requirement PDF → auto-fill §5 taxonomy → deepen §11–12 small-biz market depth (performer-weighted, the slice SBS can't do) + wire §9/§14/§16 into the export. ~15–20% of the MRR but the highest-CO-pain slice. NOT the full MRR; never auto-generate determinations/signatures. | M (partly built) | LIVE: `/agency`, `gov-buyer/market-research` route + rubric engine + export; reuse `pdf-extract`, `profile-from-text`, BQ recipients | `docs/PRD-gov-market-research.md` + `docs/gov-mrr-template-reference.md` (real MAY-2026 MRR map) |
+**Build order:** #1 Recompete SOW Match (the moat, corpus ready) → #3 Year-selector
+(quick win) → #8 Gov Market Research (strategic, mostly reuse) → #2 Content Reaper →
+rest as time allows.
 
-**Recommended v1.1 build order:** (1) Recompete SOW Match — the moat, corpus is
-ready → (3) year-selector — quick win → (8) Gov Market Research — strategic (buyer
-side, mostly reuse) → (2) Content Reaper → rest as time allows.
+Items #1–#3 are written as **build cards** (pick up and go). #4–#8 are index rows;
+expand to a card when you start one. Each card: **first file → steps → blocker →
+done-when.** Run the **Data Feature Builder** agent on data features, `/ship` to deploy.
+
+---
+
+### ▸ #1 — Recompete SOW Match  (M, 1–2d · the BD-moat)
+**Goal:** On an expiring contract, surface "likely incumbent SOW (X% confident)".
+**Full spec:** `docs/SPEC-semantic-embedding-engine.md` (has the honesty/gap-confidence layer).
+**First file:** new `src/lib/market/embeddings.ts`.
+**Steps:**
+1. `/migrate` — add `sow_embedding JSONB` + `sow_embedded_at` to `sam_opportunities` (SQL in the SPEC).
+2. Build `embeddings.ts`: `embedText()` (OpenAI text-embedding-3-small), `cosineSimilarity()`, `topMatches()`.
+3. `scripts/sow-embed-drain.ts` (mirror `sow-catalog-drain.ts`) → backfill 6,901 SOWs locally (~mins, ~$0.001).
+4. `GET /api/app/recompete-sow` — embed contract desc → pre-filter SOWs by agency+3-digit-NAICS → cosine-rank → top 1–3 with `top_score`, `runner_up_score`, `gap`, verdict. **Confidence = score AND gap, not score alone.**
+5. **API spot-check 5–10 real recompetes BEFORE any UI** (tune THRESHOLD + MIN_GAP from logged telemetry).
+6. Only then: lazy "📄 Find incumbent SOW" button in `RecompetesPanel.tsx` → drawer; label "likely SOW match by semantic similarity".
+**Blocker:** none — SOW corpus (7,009) is built; OpenAI key set; in-app cosine (no pgvector needed).
+**Done-when:** API returns confident matches <2s; spot-checks plausible; honest "no match" below threshold; marketing literature updated; shipped + 200.
+
+### ▸ #3 — Year-selector in Market Research  (S, <1d · quick win)
+**Goal:** Let the user pick fiscal year + see multi-year trend (today auto-rolls latest complete FY).
+**First file:** the market-research API route (find `time_period` / FY logic) + `MarketResearchPanel.tsx`.
+**Steps:** add a `year` / `years` param to the research API (default = current behavior) → year dropdown in the panel → pass through to the USASpending `time_period`. Ground every figure in the selected FY's real data.
+**Blocker:** none.
+**Done-when:** selecting a prior FY changes the numbers to that year's real data; multi-year shows a trend; verified 200.
+
+### ▸ #8 — Gov Market Research, buyer side  (M, partly built · strategic)
+**Goal:** Enhance the LIVE `/agency` tool — CO uploads draft requirement PDF → auto-fill §5 taxonomy → deepen §11–12 small-biz market depth + wire §9/§14/§16 into export. **~15–20% of the MRR (the slice SBS can't do), NOT the whole thing. Never auto-generate determinations/signatures.**
+**Full spec:** `docs/PRD-gov-market-research.md` + `docs/gov-mrr-template-reference.md` (real MAY-2026 MRR map).
+**First file:** `src/lib/gov-buyer/market-research.ts` (the live rubric engine) + `src/app/api/gov-buyer/market-research/route.ts`.
+**Steps:** (1) PDF-ingest entry on `/agency` → extract NAICS/PSC/scope (reuse `pdf-extract`+`profile-from-text`) → pre-fill §5. (2) Deepen §11 to performer-weighted (BQ recipients, not raw SAM reg). (3) Harden §12 Rule-of-Two. (4) Wire §9 procurement history + §14 technique checklist + §16 conclusion into the export. (5) Export memo maps to real MRR section numbers.
+**Blocker:** none (live feature, enhancement). Read the reference doc's coverage matrix first — it flags every "never auto-generate" section.
+**Done-when:** PDF auto-fills §5; §11 is performer-weighted; export maps to MRR §§; every figure traces to USASpending/SAM/BQ; out-of-scope sections labeled "(CO completes)".
+
+### Index (expand to a card when you start)
+| # | Item | Effort | Reuses | PRD |
+|---|------|--------|--------|-----|
+| 2 | **Content Reaper woven in** (#13) — Mindy writes BD content from a tracked opp | M | Content Reaper, `callLLM` | `docs/PRD-mindy-bd-content-v1.1.md` |
+| 4 | **Interactive product tour** — in-app walkthrough | M | onboarding flow | `tasks/todo.md` P1 |
+| 5 | **Light / Dark mode** — themeable tokens, in user settings | S–M | app chrome | `docs/PRD-light-mode.md` |
+| 6 | **Amendments INTO daily alerts** — fold pursuit-change digest into the daily email | S | `pursuit-changes` cron, `daily-alerts` | — (small wiring) |
+| 7 | **Proposal Assist v2 polish** — per-doc notes, compliance who/status, draft versions | M | Proposal Assist | `tasks/todo.md` |
 
 ---
 
