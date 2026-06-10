@@ -195,7 +195,7 @@ export async function GET(request: NextRequest) {
     const facetAgency = (sp.get('agency') || '').trim();
     if (!facetAgency) return NextResponse.json({ success: true, offices: [] });
     try {
-      const rows = await getOfficesForAgency(facetAgency, 100);
+      const rows = await getOfficesForAgency(facetAgency, 100, true); // liveBq: authed Mindy
       // Return names for the dropdown, plus richer data the UI can show.
       return NextResponse.json({
         success: true,

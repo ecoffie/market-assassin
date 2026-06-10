@@ -25,7 +25,7 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const offices = await getOfficesForAgencyNaics(agency, naics, 12);
+    const offices = await getOfficesForAgencyNaics(agency, naics, 12, true); // liveBq: authed Mindy
     return NextResponse.json({
       success: true,
       offices: offices.map(o => ({

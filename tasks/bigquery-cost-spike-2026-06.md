@@ -48,6 +48,19 @@ BQ cost. After ANY DATA_VERSION bump:
 `market-research.ts:168` `fetchActivity` uses raw `bqQuery` (cheap, but uncached + the
 gov-buyer feature). Wrap in `queryCached` with a UEI-set+NAICS key. Low urgency.
 
+### 1c. ✅ SEO is CACHE-ONLY; Mindy gets live BQ (Eric, June 10 — launch priority)
+`queryCached` now defaults `cacheOnly: true` — a cache MISS returns `[]` (graceful
+empty) instead of a cold BQ scan. So the public SEO long-tail can NEVER drive a
+cold-miss cost storm from crawler traffic; pages stay indexable (empty/"updating" on
+a cold miss, real once warm). **Authenticated Mindy paths opt INTO live BQ** by passing
+`liveBq:true` through the shared wrappers (the 6 `/api/app/*` BQ routes + the
+gov-buyer fetchActivity + getBqContractorHistory). Convention going forward: **default
+cache-only; pass `liveBq:true` ONLY for authenticated Mindy callers.** Wrappers touched:
+`agencies.ts` (getOfficesForAgency, getOfficesForAgencyNaics, getAgencySatForNaics),
+`recipients.ts` (getRollupBySlug, getRecipientBySlug, getRecipientByUei,
+getTopAgenciesForRecipient, getRecentAwardsForRecipient, getTopNaicsForRecipient,
+getYearlyTotalsForRecipient, getYearlyByAgencyForRecipient).
+
 ### 4. Consider: rate-limit / noindex the deep long-tail
 If crawler-driven cold-misses keep hurting, either add `revalidate` (not
 `force-dynamic`) on listing pages, or noindex the deepest long-tail award URLs so

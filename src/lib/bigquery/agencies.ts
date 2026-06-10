@@ -93,7 +93,9 @@ export interface AgencyOfficeRow {
  * agency names (title-case "Department of Defense") differ from SAM's
  * ("DEPT OF DEFENSE") — caller passes whichever it has.
  */
-export async function getOfficesForAgency(agencyName: string, limit = 100): Promise<AgencyOfficeRow[]> {
+// liveBq: authenticated Mindy callers pass true to allow a cold BQ scan; public
+// SEO callers omit it → cache-only (no cold scan). See bigquery/cache.ts cacheOnly.
+export async function getOfficesForAgency(agencyName: string, limit = 100, liveBq = false): Promise<AgencyOfficeRow[]> {
   const needle = (agencyName || '').trim().toLowerCase();
   if (!needle) return [];
   // Take the most distinctive word from the SAM agency name to contains-match
@@ -102,6 +104,7 @@ export async function getOfficesForAgency(agencyName: string, limit = 100): Prom
   const STOP = new Set(['department', 'of', 'the', 'and', 'for', 'u.s.', 'us', 'office']);
   const key = needle.split(/[^a-z0-9]+/).filter(w => w.length > 2 && !STOP.has(w)).sort((a, b) => b.length - a.length)[0] || needle;
   return queryCached<AgencyOfficeRow>({
+    cacheOnly: !liveBq,
     cacheKey: `agency-offices:${key}:${limit}:v1`,
     query: `
       SELECT awarding_office, awarding_office_code, total_amount, award_count
@@ -125,6 +128,7 @@ export async function getOfficesForAgencyNaics(
   subAgencyName: string,
   naicsPrefix: string,
   limit = 12,
+  liveBq = false,
 ): Promise<AgencyOfficeRow[]> {
   const needle = (subAgencyName || '').trim().toLowerCase();
   const prefix = (naicsPrefix || '').replace(/[^0-9]/g, '');
@@ -132,6 +136,7 @@ export async function getOfficesForAgencyNaics(
   const STOP = new Set(['department', 'of', 'the', 'and', 'for', 'u.s.', 'us', 'office']);
   const key = needle.split(/[^a-z0-9]+/).filter(w => w.length > 2 && !STOP.has(w)).sort((a, b) => b.length - a.length)[0] || needle;
   return queryCached<AgencyOfficeRow>({
+    cacheOnly: !liveBq,
     cacheKey: `agency-offices-naics:${key}:${prefix}:${limit}:v1`,
     query: `
       SELECT awarding_office, awarding_office_code,
@@ -164,10 +169,11 @@ export interface AgencySatRow {
  * empty cache, leaving e.g. VA construction at 0% when it's actually 78%).
  * Cached; ~2-3 GB scan per NAICS prefix on a cold miss.
  */
-export async function getAgencySatForNaics(naicsPrefix: string): Promise<AgencySatRow[]> {
+export async function getAgencySatForNaics(naicsPrefix: string, liveBq = false): Promise<AgencySatRow[]> {
   const prefix = (naicsPrefix || '').replace(/[^0-9]/g, '').slice(0, 6);
   if (!prefix) return [];
   return queryCached<AgencySatRow>({
+    cacheOnly: !liveBq,
     cacheKey: `agency-sat:naics:${prefix}:v1`,
     query: `
       SELECT

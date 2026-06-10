@@ -273,7 +273,7 @@ async function enrichTargetsSat(
     const satByNaics = new Map<string, Map<string, number>>();
     for (const n of naicsNeeded) {
       try {
-        const rows = await getAgencySatForNaics(n);
+        const rows = await getAgencySatForNaics(n, true); // liveBq: authed Mindy
         satByNaics.set(n, new Map(rows.map((r) => [normalizeAgencyName(r.awarding_agency), r.sat_ratio])));
       } catch (e) {
         console.warn('[target-list] BQ SAT lookup failed for', n, (e as Error)?.message);

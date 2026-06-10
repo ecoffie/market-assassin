@@ -56,6 +56,15 @@ export interface QueryCacheOptions<T> extends BqQueryParams {
   // first request after a data refresh when caller knows the
   // cache is stale but DATA_VERSION wasn't bumped.
   forceRefresh?: boolean;
+  // SEO-SAFE-BY-DEFAULT (June 2026, tasks/bigquery-cost-spike-2026-06.md):
+  // When true (the DEFAULT), a cache MISS does NOT trigger a live BQ scan —
+  // it returns [] (the same graceful empty path used on a BQ failure), so the
+  // public SEO long-tail (/awards, /contractors, /agencies, /top) can NEVER
+  // drive a cold-miss BQ cost storm from crawler traffic. Pages stay indexable
+  // (render their empty/"updating" state on a cold miss, real data once warm).
+  // Authenticated Mindy paths pass cacheOnly:false to opt INTO live BQ.
+  // The dangerous direction (cold-scan) must be explicitly opted into.
+  cacheOnly?: boolean;
 }
 
 function buildKey(cacheKey: string): string {
@@ -78,6 +87,14 @@ export async function queryCached<T = Record<string, unknown>>(
       // KV failure shouldn't crash the page — just log and fall through to BQ
       console.warn(`[bq-cache] KV read failed for ${key}:`, err);
     }
+  }
+
+  // Cache MISS. SEO-safe default: unless the caller explicitly opted into live
+  // BQ (cacheOnly === false), do NOT cold-scan — return the graceful empty path.
+  // This is what stops crawler-driven cold misses from costing BQ money.
+  const cacheOnly = opts.cacheOnly ?? true;
+  if (cacheOnly) {
+    return [];
   }
 
   // Log only MISS+BQ events so we have visibility into cost-bearing

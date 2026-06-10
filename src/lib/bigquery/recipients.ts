@@ -157,8 +157,11 @@ export function normalizeCompanyName(slugOrName: string): string {
  * Corp" beats two single-UEI orphans of the same name). Tiny orphans then
  * canonical-tag back to this same URL, so Google dedupes them.
  */
-export async function getRollupBySlug(slug: string): Promise<RollupProfile | null> {
+// liveBq: authed Mindy callers pass true to allow a cold BQ scan; public SEO
+// callers omit it → cache-only (see bigquery/cache.ts cacheOnly).
+export async function getRollupBySlug(slug: string, liveBq = false): Promise<RollupProfile | null> {
   const rows = await queryCached<RollupProfile>({
+    cacheOnly: !liveBq,
     cacheKey: `rollup:by-slug:${slug}:v2-merged`,
     query: `
       WITH slugged AS (
@@ -269,8 +272,9 @@ export async function resolveCanonicalSlug(slug: string): Promise<string | null>
  *   3. trim leading/trailing dashes
  *   4. truncate at 120 chars
  */
-export async function getRecipientBySlug(slug: string): Promise<RecipientProfile | null> {
+export async function getRecipientBySlug(slug: string, liveBq = false): Promise<RecipientProfile | null> {
   const rows = await queryCached<RecipientProfile>({
+    cacheOnly: !liveBq,
     cacheKey: `recipient:by-slug:${slug}:v2`,
     query: `
       WITH slugged AS (
@@ -304,8 +308,9 @@ export async function getRecipientBySlug(slug: string): Promise<RecipientProfile
   return rows[0] ?? null;
 }
 
-export async function getRecipientByUei(uei: string): Promise<RecipientProfile | null> {
+export async function getRecipientByUei(uei: string, liveBq = false): Promise<RecipientProfile | null> {
   const rows = await queryCached<RecipientProfile>({
+    cacheOnly: !liveBq,
     cacheKey: `recipient:by-uei:${uei}:v2`,
     query: `
       SELECT
@@ -331,8 +336,10 @@ export async function getTopAgenciesForRecipient(
   ueis: string[],
   rollupUei: string,
   limit = 10,
+  liveBq = false,
 ): Promise<TopAgencyRow[]> {
   return queryCached<TopAgencyRow>({
+    cacheOnly: !liveBq,
     cacheKey: `rollup:${rollupUei}:top-agencies:${limit}:v4-m`,
     // Single-pass, and deliberately NO COUNT(DISTINCT award_id): that
     // column is the widest read in the query and ~doubled the scan
@@ -373,8 +380,10 @@ export async function getTopNaicsForRecipient(
   ueis: string[],
   rollupUei: string,
   limit = 10,
+  liveBq = false,
 ): Promise<TopNaicsRow[]> {
   return queryCached<TopNaicsRow>({
+    cacheOnly: !liveBq,
     cacheKey: `rollup:${rollupUei}:top-naics:${limit}:v2-m`,
     query: `
       SELECT
@@ -413,12 +422,14 @@ export async function getRecentAwardsForRecipient(
   ueis: string[],
   rollupUei: string,
   limit = 25,
+  liveBq = false,
 ): Promise<RecentAwardRow[]> {
   // CAST DATE columns to STRING so we get 'YYYY-MM-DD' strings back
   // instead of BigQuery's wrapper objects ({value: 'YYYY-MM-DD'}) which
   // break our formatDate(). Also filter to dollar-bearing transactions —
   // $0 modifications dominate the recent timeline but tell users nothing.
   return queryCached<RecentAwardRow>({
+    cacheOnly: !liveBq,
     cacheKey: `rollup:${rollupUei}:recent-awards:${limit}:v3-m`,
     query: `
       SELECT
@@ -455,8 +466,10 @@ export interface YearlyTotalRow {
 export async function getYearlyTotalsForRecipient(
   ueis: string[],
   rollupUei: string,
+  liveBq = false,
 ): Promise<YearlyTotalRow[]> {
   return queryCached<YearlyTotalRow>({
+    cacheOnly: !liveBq,
     cacheKey: `rollup:${rollupUei}:yearly-totals:v2-m`,
     query: `
       SELECT
@@ -615,8 +628,10 @@ export async function getAllAgenciesForRecipient(
 export async function getYearlyByAgencyForRecipient(
   ueis: string[],
   rollupUei: string,
+  liveBq = false,
 ): Promise<YearlyByAgencyRow[]> {
   return queryCached<YearlyByAgencyRow>({
+    cacheOnly: !liveBq,
     cacheKey: `rollup:${rollupUei}:yearly-by-agency:v2-m`,
     query: `
       SELECT
@@ -920,11 +935,13 @@ export async function searchRecipients(opts: {
  * (i.e. most of the 317K BQ recipients). Resolves by UEI (exact) or slug.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
+// This is the authenticated Mindy in-app drawer fallback → always LIVE BQ
+// (liveBq=true threaded into every child call). Public SEO never calls this.
 export async function getBqContractorHistory(opts: { uei?: string; slug?: string }): Promise<any | null> {
   const profile = opts.uei
-    ? await getRecipientByUei(opts.uei)
+    ? await getRecipientByUei(opts.uei, true)
     : opts.slug
-    ? await getRecipientBySlug(opts.slug)
+    ? await getRecipientBySlug(opts.slug, true)
     : null;
   if (!profile) return null;
   const uei = profile.recipient_uei;
@@ -939,11 +956,11 @@ export async function getBqContractorHistory(opts: { uei?: string; slug?: string
   const cacheKey = `single:${uei}`;
 
   const [yearly, agencies, naics, recent, yearlyByAgency] = await Promise.all([
-    getYearlyTotalsForRecipient(ueiSet, cacheKey),
-    getTopAgenciesForRecipient(ueiSet, cacheKey, 8),
-    getTopNaicsForRecipient(ueiSet, cacheKey, 8),
-    getRecentAwardsForRecipient(ueiSet, cacheKey, 25),
-    getYearlyByAgencyForRecipient(ueiSet, cacheKey), // per-year agency split → chart drill-down
+    getYearlyTotalsForRecipient(ueiSet, cacheKey, true),
+    getTopAgenciesForRecipient(ueiSet, cacheKey, 8, true),
+    getTopNaicsForRecipient(ueiSet, cacheKey, 8, true),
+    getRecentAwardsForRecipient(ueiSet, cacheKey, 25, true),
+    getYearlyByAgencyForRecipient(ueiSet, cacheKey, true), // per-year agency split → chart drill-down
   ]);
 
   // Group the per-(year,agency) rows so each fiscal year carries its agency

@@ -46,7 +46,7 @@ export async function GET(request: NextRequest) {
 
   try {
     const slug = recipientSlug(name);
-    const recipient = await getRollupBySlug(slug);
+    const recipient = await getRollupBySlug(slug, true); // liveBq: authed Mindy
     if (!recipient) {
       // Not found in the federal-awards dataset (or BQ quota degraded to
       // empty). Honest empty response — the UI shows "no award history".
@@ -55,8 +55,8 @@ export async function GET(request: NextRequest) {
 
     // Parent-rollup competitor view: aggregate across the org's whole UEI set.
     const [awards, topAgencies] = await Promise.all([
-      getRecentAwardsForRecipient(recipient.child_ueis, recipient.rollup_uei, 8),
-      getTopAgenciesForRecipient(recipient.child_ueis, recipient.rollup_uei, 5),
+      getRecentAwardsForRecipient(recipient.child_ueis, recipient.rollup_uei, 8, true), // liveBq
+      getTopAgenciesForRecipient(recipient.child_ueis, recipient.rollup_uei, 5, true), // liveBq
     ]);
 
     return NextResponse.json({
