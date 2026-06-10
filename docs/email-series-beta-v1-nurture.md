@@ -104,13 +104,16 @@ profiles → the "win" in several emails REQUIRES finishing setup (that's the nu
 >
 > Here's the problem: **the agency doesn't buy anything. A specific office does.**
 >
-> "The Army spends billions" is useless to you. But "the Omaha District of the Army
-> Corps of Engineers spends $2B a year on your NAICS — and here's their small-business
-> specialist by name" — *that's* a target you can actually work.
+> "The Army spends billions" is useless to you. But find the one *district* of the
+> Army Corps of Engineers that spends real money on your NAICS — with their
+> small-business specialist named — and *that's* a target you can actually work.
 >
 > The contractors who win aren't pitching departments. They've found the **buying
 > office**, the **person** who runs small business there, and they've built a
 > relationship before the solicitation ever drops.
+>
+> **[Branch A — has custom NAICS]** For you specifically, Mindy already ranks the top
+> buying offices in your market — **{{top_office}}** is one of them. Start there.
 >
 > Your homework: pick one agency you want in. Then go one level deeper — which *office*
 > inside it actually spends on what you sell? That office is your real target.
@@ -118,8 +121,8 @@ profiles → the "win" in several emails REQUIRES finishing setup (that's the nu
 > Eric
 >
 > *P.S. Mindy does that drill-down for you — office-level spend, vendor count, and the
-> OSBP contact by name. But it can only show YOUR offices once it knows your work.
-> [Finish your setup →](https://getmindy.ai/setup-account?email={{email}})*
+> OSBP contact by name. **[Branch B — no profile]** It just needs to know your work
+> first. [Finish your setup →](https://getmindy.ai/setup-account?email={{email}})*
 
 ---
 
@@ -170,14 +173,19 @@ profiles → the "win" in several emails REQUIRES finishing setup (that's the nu
 >
 > By the time it hits SAM.gov, the game is half over.
 >
+> **[Branch A — has custom NAICS]** In your market specifically, Mindy is tracking
+> **{{expiring_count}} contracts** set to expire in the next 18 months. Every one is a
+> head start someone else hasn't seen yet.
+>
 > Your homework: find the contracts in your NAICS that expire in the next 18 months.
 > Pick the one closest to your wheelhouse. That's where you start building a
 > relationship — today, not when the RFP lands.
 >
 > Eric
 >
-> *P.S. Mindy keeps that expiring-contract list for your market on tap — but it has to
-> know your NAICS to show the right ones. [Set yours →](https://getmindy.ai/setup-account?email={{email}})*
+> *P.S. Mindy keeps that expiring-contract list for your market on tap. **[Branch B —
+> no profile]** Set your NAICS and it'll show you exactly which ones are yours.
+> [Set yours →](https://getmindy.ai/setup-account?email={{email}})*
 
 ---
 
