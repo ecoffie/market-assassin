@@ -10,11 +10,11 @@ the others get TEMPORARY access to the new Mindy — so we can turn that switch 
 
 | Tier | Price | Access | Marked by |
 |---|---|---|---|
-| **MI Free** | $0 | Market Research (4 reports, 5/mo) + Daily Alerts | default |
-| **MI Pro** | $149/mo (or $49 loyalty) | **Everything** (10 reports, AI Briefings, Forecasts, Pipeline, CRM, FHC) | KV `briefings:{email}` + `tier:briefings` |
+| **Mindy Free** | $0 | Market Research (4 reports, 5/mo) + Daily Alerts | default |
+| **Mindy Pro** | $149/mo (or $49 loyalty) | **Everything** (10 reports, AI Briefings, Forecasts, Pipeline, CRM, FHC) | KV `briefings:{email}` + `tier:briefings` |
 
 **Grandfathered → map to access:** `legacy_bundle` (Starter/Pro Giant/Ultimate) →
-**lifetime MI Pro**; `legacy_briefings` ($49/mo) → briefings only; `legacy_oh_pro`
+**lifetime Mindy Pro**; `legacy_briefings` ($49/mo) → briefings only; `legacy_oh_pro`
 → agency search only.
 
 **Enforcement (the triple-write, `src/lib/access-codes.ts` + `src/lib/briefings/access.ts`):**
@@ -39,7 +39,7 @@ The "they really paid" set:
 
 ### B. TRIAL = per-user `trial_ends_at` (full access until then → drops to Free)
 Everyone not in the full-paid set gets a **temporary full-access trial** with a
-per-user expiry. After expiry → MI Free.
+per-user expiry. After expiry → Mindy Free.
 
 > **⚠️ THE SCAR (CLAUDE.md, never repeat):** a hardcoded global `BETA_END_DATE`
 > once silently collapsed daily sends 922→1 when the date passed. So the per-user
