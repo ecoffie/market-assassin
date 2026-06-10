@@ -6,14 +6,18 @@ just **Mindy** (not 'Mindy Free' — that's internal code). Mindy or Mindy Pro."
 
 ---
 
-## 1. The rename — names describe the buyer, not the feature set
+## 1. The rename — an ADDITIVE ladder; names describe WHO buys
 
-| Internal code (`MITier`) | **Public name** | Who it's for | What's distinctive |
+**Each tier INCLUDES everything below it and ADDS capability.** A tier is not a
+separate audience — it's the prior tier + more. ("For Teams you ADD, not take away
+the other classifications" — Eric.)
+
+| Internal code (`MITier`) | **Public name** | Who it's for | = prior tier PLUS |
 |---|---|---|---|
-| `free` | **Mindy** | individual contractors — the entry product | (never shown as "Mindy Free"; just "Mindy") |
-| `pro` | **Solopreneur** | a solo contractor running their own BD | full Mindy for one operator |
-| `team` | **Teams** | **Consultants / Agencies** handling multiple clients | multi-client workspaces (the Coach/multi-client mode) |
-| `enterprise` | **Enterprise** | **National orgs** — APEX Accelerators, USHCC, etc. | many accounts + the org capabilities below |
+| `free` | **Mindy** | an individual **curious about GovCon** (exploring, not yet operating) | the entry point (never shown as "Mindy Free"; just "Mindy") |
+| `pro` | **Solopreneur** | a **solo operator** running their own BD (just them) | Mindy **+** the full BD suite for one person |
+| `team` | **Teams** | a **small business WITH employees** AND **consultants / coaches / agencies handling multiple clients** | Solopreneur **+** multiple users (employees) **+** multi-client / Coach mode |
+| `enterprise` | **Enterprise** | **national orgs** (APEX, USHCC) AND **mid/large businesses with 5+ BD staff** who need shared access | Teams **+** org-scale user management & controls (below) |
 
 > **CRITICAL:** "Mindy Free" is **internal code only** (the `free` tier). Public copy
 > says **"Mindy"** for the base and **"Mindy Pro" / "Solopreneur"** for paid. Admin/
@@ -22,27 +26,34 @@ just **Mindy** (not 'Mindy Free' — that's internal code). Mindy or Mindy Pro."
 
 ---
 
-## 2. What each tier IS (the value prop, by audience)
+## 2. What each tier IS (additive value prop)
 
-### 🟢 Mindy (`free`) — the individual contractor
-Entry product. The full daily-alerts + market-research starting point. Public name is
-simply **Mindy** — no "Free" suffix.
+### 🟢 Mindy (`free`) — the curious individual
+The explorer entry point for someone **curious about GovCon** — daily alerts + a
+taste of market research, before they're operating. Public name is simply **Mindy**.
 
 ### 🔵 Solopreneur (`pro`, $149/mo) — the solo operator
-Everything for one contractor running their own BD: full market research, AI
-briefings, forecasts, pipeline, CRM, Proposal Assist. *"Mindy Pro"* and
-*"Solopreneur"* are the same tier — lead with whichever converts.
+**Everything in Mindy, plus** the full BD suite for one person running their own
+shop: full market research, AI briefings, forecasts, pipeline, CRM, Proposal Assist.
+*"Mindy Pro"* and *"Solopreneur"* are the same tier — lead with whichever converts.
 
-### 🟣 Teams — Consultants & Agencies (multiple clients)
-For a consultant or agency that **manages BD for several client businesses**. Built
-on the existing **multi-client / Coach mode** (isolated workspace per client, switch
-in one click, onboard a client from their capability statement). The pitch:
-*"Run BD for every client you manage, from one place."*
+### 🟣 Teams — multi-user (small businesses + consultants/agencies)
+**Everything in Solopreneur, plus multiple users.** Serves TWO shapes of "more than
+one person" with the same capability set:
+1. A **small business with employees** — several people collaborating in one company.
+2. A **consultant / coach / agency** managing **multiple clients** — built on the
+   existing **multi-client / Coach mode** (isolated workspace per client, switch in
+   one click, onboard a client from their capability statement).
 
-### 🟠 Enterprise — National organizations (many users)
-For organizations that need **many accounts / user profiles** — national orgs like
-**APEX Accelerators, USHCC**, etc. Distinctive capabilities (the reason it's a
-separate tier):
+The pitch: *"Mindy for your whole team — your employees, or every client you manage."*
+
+### 🟠 Enterprise — orgs that need org-scale shared access
+**Everything in Teams, plus org-scale management.** TWO audiences:
+1. **National organizations** — APEX Accelerators, USHCC, etc. (serving many members).
+2. **Mid / large businesses with 5+ BD staff** — a real company whose BD team has
+   grown past a handful and needs **shared access** across its people.
+
+Both need the org-scale capabilities:
 - **Full user management** — provision/deprovision dozens of user profiles
 - **Access controls** — roles/permissions across the org
 - **User tracking + reporting** — see activity/outcomes across all users
@@ -51,9 +62,10 @@ separate tier):
 - **Calendar invites** — coordinate the org around events/deadlines
 - Org-level admin dashboard
 
-*(Enterprise is the only tier that needs NET-NEW build — user-management, RBAC,
-cross-user sharing, group messaging. The other three already exist; this is a
-rename + positioning. Enterprise is a real v2.0+ build, scope separately.)*
+*(Enterprise's org capabilities are the main NET-NEW build — user-management, RBAC,
+cross-user sharing, group messaging. Mindy/Solopreneur exist; Teams' multi-client
+mode exists; the rename is public-surface, but Enterprise org features are a real
+v2.0+ build — scope separately.)*
 
 ---
 
