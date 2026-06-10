@@ -86,6 +86,9 @@ function AppDashboard() {
   const [authMessage, setAuthMessage] = useState<string | null>(null);
   const [authError, setAuthError] = useState<string | null>(null);
   const [authLoading, setAuthLoading] = useState(false);
+  // When sign-in fails because the email has NO account yet (email-only beta user),
+  // show a one-click "Set up my account" instead of a dead-end "forgot password".
+  const [needsSetup, setNeedsSetup] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'google' | 'microsoft' | null>(null);
   const [isSignUpMode, setIsSignUpMode] = useState(false);
   const [signUpEmail, setSignUpEmail] = useState('');
@@ -415,8 +418,11 @@ function AppDashboard() {
 
       if (!data.success) {
         setAuthError(data.error || 'Failed to sign in');
+        // No account yet → surface the "Set up my account" path (not forgot-password).
+        setNeedsSetup(Boolean(data.needsAccountSetup));
         return;
       }
+      setNeedsSetup(false);
 
       if (typeof window !== 'undefined') {
         localStorage.setItem(MI_AUTH_TOKEN_KEY, data.sessionToken);
@@ -900,6 +906,28 @@ function AppDashboard() {
               <div className="mt-4 rounded-lg border border-red-500/30 bg-red-500/10 px-4 py-3 text-sm text-red-300">
                 {authError}
               </div>
+            )}
+            {needsSetup && (
+              <button
+                type="button"
+                onClick={async () => {
+                  setAuthError(null); setAuthMessage(null); setAuthLoading(true);
+                  try {
+                    await fetch('/api/auth/mindy-account-setup/request', {
+                      method: 'POST', headers: { 'Content-Type': 'application/json' },
+                      body: JSON.stringify({ email: (email || '').trim().toLowerCase() }),
+                    });
+                    setNeedsSetup(false);
+                    setAuthMessage('Check your inbox — we sent a secure link to set your password and get you in.');
+                  } catch {
+                    setAuthError('Could not send the setup link. Try again in a moment.');
+                  } finally { setAuthLoading(false); }
+                }}
+                disabled={authLoading}
+                className="mt-3 w-full rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3 text-sm font-semibold text-white hover:from-blue-500 hover:to-purple-500 disabled:opacity-60"
+              >
+                Set up my account →
+              </button>
             )}
           </div>
 

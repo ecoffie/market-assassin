@@ -43,11 +43,26 @@ export async function POST(request: NextRequest) {
     });
 
     if (authError || !authData.user) {
+      // Distinguish "no account yet" (email-only beta user → needs SETUP, not a
+      // password reset) from "wrong password" (has an account → forgot-password is
+      // right). Supabase's sign-in error is identical for both (security), so we look
+      // up whether an auth user actually exists. This stops the dead-end where a
+      // beta user clicks "forgot password" for an account that was never created.
+      let hasAccount = false;
+      try {
+        const admin = getAuthSupabase();
+        // admin listUsers is the reliable existence check (no public reveal).
+        const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
+        hasAccount = (list?.users || []).some((u: { email?: string | null }) => (u.email || '').toLowerCase() === email);
+      } catch { /* fall through — default to setup guidance */ }
+
       return NextResponse.json(
         {
           success: false,
-          error: 'Invalid email or password. Use account setup or forgot password if needed.',
-          needsAccountSetup: true,
+          needsAccountSetup: !hasAccount,
+          error: hasAccount
+            ? 'Incorrect password. Use "Forgot password" to reset it.'
+            : "You haven't set up your password yet. Click \"Set up my account\" to get your secure link.",
         },
         { status: 401 }
       );
