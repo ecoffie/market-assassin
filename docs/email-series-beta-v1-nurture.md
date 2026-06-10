@@ -77,6 +77,13 @@ profiles → the "win" in several emails REQUIRES finishing setup (that's the nu
 > The fix is simple: **search by what you SELL, not by a code.** A keyword catches the
 > work no matter how the contracting officer classified it.
 >
+> **[Branch A — has custom NAICS, real number]** And it adds up fast: right now there
+> are **{{opp_count}} active opportunities** in your market in Mindy — and that's
+> *before* we widen past the obvious code.
+>
+> **[Branch B — no profile yet]** Want to know how big your real market is? Mindy will
+> show you the live count the moment it knows what you sell.
+>
 > Your homework: think of the ONE phrase a buyer would use for what you do. That's
 > your real search — not a code.
 >
@@ -235,7 +242,40 @@ profiles → the "win" in several emails REQUIRES finishing setup (that's the nu
 
 ---
 
+## ⚠️ DATA GROUNDING (Eric: "make sure we are pulling REAL data from Mindy")
+
+Every number in these emails must be real or clearly generic. Measured June 10:
+
+**REAL (keep, verified):**
+- `$243M drones / 70+ NAICS / 28% obvious code / miss 72%` — measured, in
+  MARKETING-FEATURE-LITERATURE.md. The email-2 teaching example is legit.
+
+**PLACEHOLDERS to fix (illustrative, NOT pulled — make generic OR real):**
+- "Omaha District spends $2B" (email 3), "$200K vs $63M job" (email 4), "142-page
+  solicitation in 4 minutes" (email 6) → reframe as clearly-illustrative ("for
+  instance…") OR replace with a real merge token below.
+
+**LIVE per-user tokens (the real upgrade — fed from Mindy queries at send time):**
+| Token | Source (real) | Feasible for |
+|-------|---------------|--------------|
+| `{{opp_count}}` | `sam_opportunities` count for the user's NAICS (3-digit prefix) | the **369** with custom NAICS |
+| `{{expiring_count}}` | expiring-contracts count for their NAICS | same 369 |
+| `{{top_office}}` | real top buying office for their NAICS (office-roster query) | same |
+
+**Cohort reality (725):** 369 have custom NAICS → inject the REAL number. 356 are
+default-only/empty → token blank → use the **"finish setup to see YOUR numbers"**
+variant. This makes data-grounding and profile-completion the SAME move: the missing
+number is the reason to log in.
+
+**Rule:** NEVER render a fabricated or blank number. Each personalized email needs a
+two-branch copy: (A) has-real-data → show it; (B) no-data → "finish setup and Mindy
+will show you exactly how many opportunities are in YOUR market." Generate the tokens
+in the send runner from live queries; fall back to (B) on any empty/error.
+
 ## Build order
 1. ✅ All 7 emails drafted value-first (above).
-2. HTML for #2–#7 (template = `email-beta-v1-launch-1.html`, the letter style).
-3. Wire send (gated: in-cohort, not converted, not unsubbed). Eric sends after review.
+2. **Ground the numbers** (above) — fix placeholders, add real {{opp_count}} etc. with
+   the (A)/(B) branches.
+3. HTML for #2–#7 (template = `email-beta-v1-launch-1.html`, the letter style).
+4. Send runner computes per-user tokens from live Mindy data; gated (in-cohort, not
+   converted, not unsubbed). Eric sends after review.
