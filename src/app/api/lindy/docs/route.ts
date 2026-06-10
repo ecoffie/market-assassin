@@ -12,7 +12,7 @@ export async function GET() {
   return NextResponse.json({
     api_name: 'GovCon Giants Lindy Integration API',
     version: '1.0.0',
-    base_url: 'https://mi.govcongiants.com/api/lindy',
+    base_url: 'https://getmindy.ai/api/lindy',
 
     endpoints: [
       {

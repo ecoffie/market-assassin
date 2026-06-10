@@ -1,5 +1,5 @@
 /**
- * Programmatic Open Graph card for getmindy.ai / mi.govcongiants.com.
+ * Programmatic Open Graph card for getmindy.ai / getmindy.ai.
  *
  * Next.js App Router convention: a default-exported component in
  * src/app/opengraph-image.tsx is rendered at build time into a 1200×630

@@ -14,7 +14,7 @@
  *
  * Configure in Twilio Console:
  *   Phone Numbers → your number → Messaging → "A message comes in"
- *   → Webhook: https://mi.govcongiants.com/api/briefings/sms-webhook (HTTP POST)
+ *   → Webhook: https://getmindy.ai/api/briefings/sms-webhook (HTTP POST)
  */
 
 import { NextResponse } from 'next/server';

@@ -124,7 +124,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Step 4: Generate magic link for passwordless login
-    const redirectUrl = `${request.headers.get('origin') || 'https://mi.govcongiants.com'}/content-generator/`;
+    const redirectUrl = `${request.headers.get('origin') || 'https://getmindy.ai'}/content-generator/`;
 
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',

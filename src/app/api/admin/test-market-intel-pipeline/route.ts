@@ -375,7 +375,7 @@ export async function POST(request: NextRequest) {
   }
 
   // Trigger the appropriate test
-  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://mi.govcongiants.com';
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || 'https://getmindy.ai';
   let testUrl = '';
 
   switch (component) {

@@ -1488,7 +1488,7 @@ function generateUpgradeNotificationEmail(
               <table role="presentation" width="100%" cellpadding="0" cellspacing="0">
                 <tr>
                   <td align="center" style="padding: 20px 0;">
-                    <a href="https://mi.govcongiants.com/briefings"
+                    <a href="https://getmindy.ai/briefings"
                        style="display: inline-block; background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: #ffffff; padding: 16px 40px; font-size: 18px; font-weight: 600; text-decoration: none; border-radius: 8px; box-shadow: 0 4px 14px rgba(16, 185, 129, 0.4);">
                       View Your Dashboard →
                     </a>

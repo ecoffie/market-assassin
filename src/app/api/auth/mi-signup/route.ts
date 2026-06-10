@@ -32,8 +32,8 @@ function normalizeEmail(email: unknown): string {
 }
 
 function getSupabaseAuthRedirectUrl(path: string): string {
-  // Use mi.govcongiants.com as the beta redirect until getmindy.ai/app is ready.
-  const authRedirectOrigin = process.env.MINDY_AUTH_REDIRECT_ORIGIN || process.env.SUPABASE_AUTH_REDIRECT_ORIGIN || 'https://mi.govcongiants.com';
+  // Use getmindy.ai as the beta redirect until getmindy.ai/app is ready.
+  const authRedirectOrigin = process.env.MINDY_AUTH_REDIRECT_ORIGIN || process.env.SUPABASE_AUTH_REDIRECT_ORIGIN || 'https://getmindy.ai';
   return `${authRedirectOrigin.replace(/\/$/, '')}${path}`;
 }
 

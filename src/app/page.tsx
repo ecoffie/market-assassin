@@ -16,7 +16,7 @@ export default function Home() {
             var path = type === 'recovery'
               ? '/app/reset-password'
               : (type === 'invite' || type === 'signup' ? '/app/setup-password' : null);
-      if (path) window.location.replace('https://mi.govcongiants.com' + path + hash);
+      if (path) window.location.replace('https://getmindy.ai' + path + hash);
           })();
         `}
       </Script>

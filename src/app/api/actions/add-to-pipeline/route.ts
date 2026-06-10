@@ -5,7 +5,7 @@
  * Uses GET for email link compatibility.
  *
  * Usage in email:
- * <a href="https://mi.govcongiants.com/api/actions/add-to-pipeline?email=user@example.com&notice_id=FA8773-24-R-0001&title=Navy%20IT%20Support&stage=tracking">
+ * <a href="https://getmindy.ai/api/actions/add-to-pipeline?email=user@example.com&notice_id=FA8773-24-R-0001&title=Navy%20IT%20Support&stage=tracking">
  *   Track This
  * </a>
  */

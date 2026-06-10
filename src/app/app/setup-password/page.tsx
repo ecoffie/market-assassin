@@ -16,8 +16,11 @@ export default function MISetupPasswordPage() {
   const [error, setError] = useState('');
 
   useEffect(() => {
-      if (window.location.hostname !== 'mi.govcongiants.com' && window.location.hostname !== 'localhost') {
-        window.location.replace(`https://mi.govcongiants.com/app/setup-password${window.location.search}${window.location.hash}`);
+      // Canonical is getmindy.ai. Allow getmindy.ai + mi.govcongiants.com (overlap
+      // window) + localhost. Foreign host → getmindy.ai.
+      const okHosts = ['getmindy.ai', 'mi.govcongiants.com', 'localhost'];
+      if (!okHosts.includes(window.location.hostname)) {
+        window.location.replace(`https://getmindy.ai/app/setup-password${window.location.search}${window.location.hash}`);
       return;
     }
 

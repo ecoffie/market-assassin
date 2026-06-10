@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 import { createClient } from '@supabase/supabase-js';
 
-const BASE_URL = 'https://mi.govcongiants.com';
+const BASE_URL = 'https://getmindy.ai';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 
 // Lazy init Supabase

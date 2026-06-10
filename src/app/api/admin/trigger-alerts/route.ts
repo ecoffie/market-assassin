@@ -370,7 +370,7 @@ async function sendAlertEmail(
       <a href="${unsubscribeUrl}" style="color: #6b7280;">Unsubscribe</a>
     </p>
     <p style="color: #9ca3af; font-size: 11px; margin: 10px 0 0 0;">
-      &copy; ${new Date().getFullYear()} Mindy | mi.govcongiants.com
+      &copy; ${new Date().getFullYear()} Mindy | getmindy.ai
     </p>
   </div>
 </body>

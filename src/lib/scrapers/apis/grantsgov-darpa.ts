@@ -175,7 +175,7 @@ export async function fetchDARPAOpportunities(
     // Use our internal API endpoint which has the Grants.gov integration
     const baseUrl = process.env.VERCEL_URL
       ? `https://${process.env.VERCEL_URL}`
-      : 'https://mi.govcongiants.com';
+      : 'https://getmindy.ai';
 
     const searchParams = new URLSearchParams({
       keyword: params.keywords ? `DARPA ${params.keywords}` : 'DARPA',

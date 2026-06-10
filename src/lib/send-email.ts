@@ -501,7 +501,7 @@ export async function sendOpportunityHunterProEmail({
   to,
   customerName,
 }: SendOpportunityHunterProEmailParams): Promise<boolean> {
-  const accessLink = 'https://mi.govcongiants.com/opportunity-hunter';
+  const accessLink = 'https://getmindy.ai/opportunity-hunter';
   const dailyAlertsLink = await createSecureAccessUrl(to, 'preferences');
 
   const htmlContent = `
@@ -873,7 +873,7 @@ export async function sendContentReaperEmail({
   customerName,
   tier = 'standard',
 }: SendContentReaperEmailParams): Promise<boolean> {
-  const accessLink = 'https://mi.govcongiants.com/content-generator';
+  const accessLink = 'https://getmindy.ai/content-generator';
   const isFullFix = tier === 'full_fix';
   const dailyAlertsLink = await createSecureAccessUrl(to, 'preferences');
 
@@ -1003,7 +1003,7 @@ export async function sendRecompeteEmail({
   to,
   customerName,
 }: SendRecompeteEmailParams): Promise<boolean> {
-  const accessLink = 'https://mi.govcongiants.com/recompete';
+  const accessLink = 'https://getmindy.ai/recompete';
   const dailyAlertsLink = await createSecureAccessUrl(to, 'preferences');
 
   const htmlContent = `
@@ -1143,59 +1143,59 @@ export async function sendBundleEmail({
     'starter': {
       name: 'GovCon Starter Bundle',
       tools: [
-        { name: 'Opportunity Hunter Pro', link: 'https://mi.govcongiants.com/opportunity-hunter', description: 'Find agencies that buy what you sell' },
-        { name: 'Recompete Tracker', link: 'https://mi.govcongiants.com/recompete', description: '6,900+ expiring contracts to pursue' },
-        { name: 'Federal Contractor Database', link: 'https://mi.govcongiants.com/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
+        { name: 'Opportunity Hunter Pro', link: 'https://getmindy.ai/opportunity-hunter', description: 'Find agencies that buy what you sell' },
+        { name: 'Recompete Tracker', link: 'https://getmindy.ai/recompete', description: '6,900+ expiring contracts to pursue' },
+        { name: 'Federal Contractor Database', link: 'https://getmindy.ai/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
       ],
     },
     'govcon-starter-bundle': {
       name: 'GovCon Starter Bundle',
       tools: [
-        { name: 'Opportunity Hunter Pro', link: 'https://mi.govcongiants.com/opportunity-hunter', description: 'Find agencies that buy what you sell' },
-        { name: 'Recompete Tracker', link: 'https://mi.govcongiants.com/recompete', description: '6,900+ expiring contracts to pursue' },
-        { name: 'Federal Contractor Database', link: 'https://mi.govcongiants.com/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
+        { name: 'Opportunity Hunter Pro', link: 'https://getmindy.ai/opportunity-hunter', description: 'Find agencies that buy what you sell' },
+        { name: 'Recompete Tracker', link: 'https://getmindy.ai/recompete', description: '6,900+ expiring contracts to pursue' },
+        { name: 'Federal Contractor Database', link: 'https://getmindy.ai/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
       ],
     },
     'pro': {
       name: 'Pro Giant Bundle',
       tools: [
-        { name: 'Federal Contractor Database', link: 'https://mi.govcongiants.com/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
-        { name: 'Recompete Tracker', link: 'https://mi.govcongiants.com/recompete', description: '6,900+ expiring contracts to pursue' },
-        { name: 'Market Assassin Standard', link: 'https://mi.govcongiants.com/market-assassin', description: 'Strategic market intelligence reports' },
-        { name: 'Content Reaper', link: 'https://mi.govcongiants.com/content-generator', description: 'AI-powered LinkedIn content generator' },
-        { name: 'Mindy AI - 1 Year Access', link: 'https://mi.govcongiants.com/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for 1 year' },
+        { name: 'Federal Contractor Database', link: 'https://getmindy.ai/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
+        { name: 'Recompete Tracker', link: 'https://getmindy.ai/recompete', description: '6,900+ expiring contracts to pursue' },
+        { name: 'Market Assassin Standard', link: 'https://getmindy.ai/market-assassin', description: 'Strategic market intelligence reports' },
+        { name: 'Content Reaper', link: 'https://getmindy.ai/content-generator', description: 'AI-powered LinkedIn content generator' },
+        { name: 'Mindy AI - 1 Year Access', link: 'https://getmindy.ai/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for 1 year' },
       ],
     },
     'pro-giant-bundle': {
       name: 'Pro Giant Bundle',
       tools: [
-        { name: 'Federal Contractor Database', link: 'https://mi.govcongiants.com/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
-        { name: 'Recompete Tracker', link: 'https://mi.govcongiants.com/recompete', description: '6,900+ expiring contracts to pursue' },
-        { name: 'Market Assassin Standard', link: 'https://mi.govcongiants.com/market-assassin', description: 'Strategic market intelligence reports' },
-        { name: 'Content Reaper', link: 'https://mi.govcongiants.com/content-generator', description: 'AI-powered LinkedIn content generator' },
-        { name: 'Mindy AI - 1 Year Access', link: 'https://mi.govcongiants.com/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for 1 year' },
+        { name: 'Federal Contractor Database', link: 'https://getmindy.ai/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
+        { name: 'Recompete Tracker', link: 'https://getmindy.ai/recompete', description: '6,900+ expiring contracts to pursue' },
+        { name: 'Market Assassin Standard', link: 'https://getmindy.ai/market-assassin', description: 'Strategic market intelligence reports' },
+        { name: 'Content Reaper', link: 'https://getmindy.ai/content-generator', description: 'AI-powered LinkedIn content generator' },
+        { name: 'Mindy AI - 1 Year Access', link: 'https://getmindy.ai/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for 1 year' },
       ],
     },
     'ultimate': {
       name: 'Ultimate GovCon Bundle',
       tools: [
-        { name: 'Content Reaper Full Fix', link: 'https://mi.govcongiants.com/content-generator', description: 'Advanced AI content with quote graphics' },
-        { name: 'Federal Contractor Database', link: 'https://mi.govcongiants.com/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
-        { name: 'Recompete Tracker', link: 'https://mi.govcongiants.com/recompete', description: '6,900+ expiring contracts to pursue' },
-        { name: 'Market Assassin Premium', link: 'https://mi.govcongiants.com/market-assassin', description: 'All 8 strategic intelligence reports' },
-        { name: 'Opportunity Hunter Pro', link: 'https://mi.govcongiants.com/opportunity-hunter', description: 'Find agencies that buy what you sell' },
-        { name: 'Mindy AI - Lifetime Access', link: 'https://mi.govcongiants.com/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for life' },
+        { name: 'Content Reaper Full Fix', link: 'https://getmindy.ai/content-generator', description: 'Advanced AI content with quote graphics' },
+        { name: 'Federal Contractor Database', link: 'https://getmindy.ai/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
+        { name: 'Recompete Tracker', link: 'https://getmindy.ai/recompete', description: '6,900+ expiring contracts to pursue' },
+        { name: 'Market Assassin Premium', link: 'https://getmindy.ai/market-assassin', description: 'All 8 strategic intelligence reports' },
+        { name: 'Opportunity Hunter Pro', link: 'https://getmindy.ai/opportunity-hunter', description: 'Find agencies that buy what you sell' },
+        { name: 'Mindy AI - Lifetime Access', link: 'https://getmindy.ai/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for life' },
       ],
     },
     'ultimate-govcon-bundle': {
       name: 'Ultimate GovCon Bundle',
       tools: [
-        { name: 'Content Reaper Full Fix', link: 'https://mi.govcongiants.com/content-generator', description: 'Advanced AI content with quote graphics' },
-        { name: 'Federal Contractor Database', link: 'https://mi.govcongiants.com/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
-        { name: 'Recompete Tracker', link: 'https://mi.govcongiants.com/recompete', description: '6,900+ expiring contracts to pursue' },
-        { name: 'Market Assassin Premium', link: 'https://mi.govcongiants.com/market-assassin', description: 'All 8 strategic intelligence reports' },
-        { name: 'Opportunity Hunter Pro', link: 'https://mi.govcongiants.com/opportunity-hunter', description: 'Find agencies that buy what you sell' },
-        { name: 'Mindy AI - Lifetime Access', link: 'https://mi.govcongiants.com/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for life' },
+        { name: 'Content Reaper Full Fix', link: 'https://getmindy.ai/content-generator', description: 'Advanced AI content with quote graphics' },
+        { name: 'Federal Contractor Database', link: 'https://getmindy.ai/contractor-database', description: '3,500+ prime contractors with SBLO contacts' },
+        { name: 'Recompete Tracker', link: 'https://getmindy.ai/recompete', description: '6,900+ expiring contracts to pursue' },
+        { name: 'Market Assassin Premium', link: 'https://getmindy.ai/market-assassin', description: 'All 8 strategic intelligence reports' },
+        { name: 'Opportunity Hunter Pro', link: 'https://getmindy.ai/opportunity-hunter', description: 'Find agencies that buy what you sell' },
+        { name: 'Mindy AI - Lifetime Access', link: 'https://getmindy.ai/market-intelligence', description: 'Daily federal opportunity intelligence and briefings included for life' },
       ],
     },
   };
@@ -1348,7 +1348,7 @@ export async function sendMarketIntelligenceWelcomeEmail({
         <p>Hi${customerName ? ` ${customerName}` : ''},</p>
         <p>Your GovCon Giants Mindy AI purchase is active. Use your purchase email, <strong>${to}</strong>, to access your dashboard and briefings.</p>
         <p style="margin: 28px 0;">
-          <a href="https://mi.govcongiants.com/market-intelligence" style="background: #1e40af; color: white; padding: 14px 22px; border-radius: 8px; text-decoration: none; font-weight: 700;">Open Mindy AI</a>
+          <a href="https://getmindy.ai/market-intelligence" style="background: #1e40af; color: white; padding: 14px 22px; border-radius: 8px; text-decoration: none; font-weight: 700;">Open Mindy AI</a>
         </p>
         <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 8px; padding: 18px; margin: 24px 0;">
           <strong>Set up your briefing preferences</strong>
@@ -1365,7 +1365,7 @@ Hi${customerName ? ` ${customerName}` : ''},
 Your GovCon Giants Mindy AI purchase is active.
 
 Access Mindy AI:
-https://mi.govcongiants.com/market-intelligence
+https://getmindy.ai/market-intelligence
 
 Set up briefing preferences:
 ${setupLink}
@@ -1387,7 +1387,7 @@ export async function sendFHCWelcomeEmail({
   customerName,
 }: SendFHCWelcomeEmailParams): Promise<boolean> {
   const fhcLink = 'https://federalhelpcenter.com';
-  const maLink = 'https://mi.govcongiants.com/market-assassin';
+  const maLink = 'https://getmindy.ai/market-assassin';
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -1513,7 +1513,7 @@ export async function sendAlertProWelcomeEmail({
   customerName,
 }: SendAlertProWelcomeEmailParams): Promise<boolean> {
   const preferencesLink = await createSecureAccessUrl(to, 'preferences');
-  const maLink = 'https://mi.govcongiants.com/market-assassin';
+  const maLink = 'https://getmindy.ai/market-assassin';
 
   const htmlContent = `
 <!DOCTYPE html>
@@ -1567,7 +1567,7 @@ export async function sendAlertProWelcomeEmail({
       Questions? Reply to this email or contact <a href="mailto:hello@govcongiants.com" style="color: #059669;">hello@govcongiants.com</a>
     </p>
     <p style="color: #94a3b8; font-size: 11px; margin: 8px 0 0 0;">
-      © ${new Date().getFullYear()} GovCon Giants • mi.govcongiants.com
+      © ${new Date().getFullYear()} GovCon Giants • getmindy.ai
     </p>
   </div>
 </body>

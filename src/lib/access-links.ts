@@ -18,11 +18,11 @@ function normalizeEmail(email: string): string {
 }
 
 function buildAccessUrl(token: string): string {
-  return `${process.env.NEXT_PUBLIC_APP_URL || 'https://mi.govcongiants.com'}/access?token=${encodeURIComponent(token)}`;
+  return `${process.env.NEXT_PUBLIC_APP_URL || 'https://getmindy.ai'}/access?token=${encodeURIComponent(token)}`;
 }
 
 function buildFallbackUrl(email: string, destination: AccessDestination): string {
-  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://mi.govcongiants.com';
+  const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://getmindy.ai';
   const normalizedEmail = normalizeEmail(email);
 
   if (destination === 'preferences') {

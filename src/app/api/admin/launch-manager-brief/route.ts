@@ -14,10 +14,10 @@ export const revalidate = 0;
 
 const domainPolicy = {
   publicSite: 'https://govcongiants.com',
-  miPlatform: 'https://mi.govcongiants.com',
-  commandCenter: 'https://mi.govcongiants.com/command-center',
+  miPlatform: 'https://getmindy.ai',
+  commandCenter: 'https://getmindy.ai/command-center',
   transitionSurfaces: ['.org', 'tools.govcongiants.org', 'shop URLs'],
-  rule: 'New public/sales/SEO links go to govcongiants.com. Beta Mindy product/account/app links stay on mi.govcongiants.com until getmindy.ai/app is ready.',
+  rule: 'New public/sales/SEO links go to govcongiants.com. Beta Mindy product/account/app links stay on getmindy.ai until getmindy.ai/app is ready.',
   warnings: [
     {
       label: 'Legacy .org/tool/MI links',

@@ -1401,7 +1401,7 @@ async function sendDailyAlertEmail(
       <a href="${trackedUrl(unsubscribeUrl, 'unsubscribe')}" style="color: #475569; text-decoration: none;">Unsubscribe</a>
     </p>
     <p style="color: #94a3b8; font-size: 11px; margin: 8px 0 0 0;">
-      © ${new Date().getFullYear()} Mindy • mi.govcongiants.com
+      © ${new Date().getFullYear()} Mindy • getmindy.ai
     </p>
   </div>
   ${trackingToken ? generateTrackingPixel(trackingToken) : ''}

@@ -50,7 +50,7 @@ export function generateStaticParams() {
 
 // Per-post metadata. Next 16 passes params as a Promise — must await
 // before using. Canonical points to getmindy.ai/blog/{slug} so the
-// host-rewrite on mi.govcongiants.com doesn't fragment ranking.
+// host-rewrite on getmindy.ai doesn't fragment ranking.
 export async function generateMetadata({
   params,
 }: {

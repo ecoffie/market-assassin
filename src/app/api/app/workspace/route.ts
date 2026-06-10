@@ -167,7 +167,7 @@ export async function POST(request: NextRequest) {
 
   // Send invite email to the invited user
   const workspaceName = workspaceId.includes('@') ? 'a personal workspace' : formatWorkspaceName(workspaceId);
-      const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://mi.govcongiants.com'}/app`;
+      const inviteUrl = `${process.env.NEXT_PUBLIC_APP_URL || process.env.NEXT_PUBLIC_BASE_URL || 'https://getmindy.ai'}/app`;
 
   await sendEmail({
     to: invitedEmail,

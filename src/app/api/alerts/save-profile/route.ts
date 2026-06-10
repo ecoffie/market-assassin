@@ -412,7 +412,7 @@ async function sendWelcomeEmailWithOpportunities(
         <p style="margin:0 0 16px;color:#e0e7ff;font-size:14px;">
           Upgrade to <strong>Market Intelligence Pro</strong> for AI briefings, win probability scoring, and weekly deep dives.
         </p>
-        <a href="https://mi.govcongiants.com/market-intelligence"
+        <a href="https://getmindy.ai/market-intelligence"
            style="display:inline-block;background:#ffffff;color:#7c3aed;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:600;font-size:14px;">
           Learn More →
         </a>

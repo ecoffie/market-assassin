@@ -5,7 +5,7 @@
  * Uses GET for email link compatibility.
  *
  * Usage in email:
- * <a href="https://mi.govcongiants.com/api/actions/mute-opportunity?email=user@example.com&notice_id=FA8773-24-R-0001&title=Navy%20IT%20Support">
+ * <a href="https://getmindy.ai/api/actions/mute-opportunity?email=user@example.com&notice_id=FA8773-24-R-0001&title=Navy%20IT%20Support">
  *   Not Interested
  * </a>
  */

@@ -23,11 +23,11 @@ export default function LindySetupPage() {
           <div className="bg-gray-900 border border-gray-800 rounded-lg p-4 font-mono text-sm overflow-x-auto">
             <p className="text-green-400 mb-2"># Latest briefing</p>
             <p className="text-gray-300">
-              GET https://mi.govcongiants.com/api/briefings/latest?email=<span className="text-amber-400">YOUR_EMAIL</span>
+              GET https://getmindy.ai/api/briefings/latest?email=<span className="text-amber-400">YOUR_EMAIL</span>
             </p>
             <p className="text-green-400 mt-4 mb-2"># Last 7 days</p>
             <p className="text-gray-300">
-              GET https://mi.govcongiants.com/api/briefings/latest?email=<span className="text-amber-400">YOUR_EMAIL</span>&days=7
+              GET https://getmindy.ai/api/briefings/latest?email=<span className="text-amber-400">YOUR_EMAIL</span>&days=7
             </p>
           </div>
           <p className="text-gray-500 text-sm mt-2">

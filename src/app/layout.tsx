@@ -22,12 +22,12 @@ const jetbrainsMono = JetBrains_Mono({
 // "priorities AND everything else" — Mindy reads SAM for you and tells
 // you which opps to bid on. The tagline is the GovCon-Giants positioning
 // line ("you have Mindy") for emotional anchor. Same metadata serves both
-// mi.govcongiants.com and getmindy.ai via the host-rewrites in
+// getmindy.ai and getmindy.ai via the host-rewrites in
 // next.config.ts; the wording is brand-neutral enough to work on both.
 export const metadata: Metadata = {
   // metadataBase + alternates.canonical tell Google that getmindy.ai is
   // the canonical hostname even when the page is served from the
-  // mi.govcongiants.com mirror. Without this, the two hostnames split
+  // getmindy.ai mirror. Without this, the two hostnames split
   // link equity and Google may pick the wrong one to rank.
   metadataBase: new URL("https://getmindy.ai"),
   alternates: {

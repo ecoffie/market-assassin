@@ -1,5 +1,5 @@
 import { redirect } from 'next/navigation';
 
 export default function MindyRedirectPage() {
-  redirect('https://mi.govcongiants.com');
+  redirect('https://getmindy.ai');
 }

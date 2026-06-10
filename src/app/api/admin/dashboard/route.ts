@@ -2618,7 +2618,7 @@ export async function POST(request: NextRequest) {
       case 'send-test-alert':
         // Trigger test alert to specified email
         const alertResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_BASE_URL || 'https://mi.govcongiants.com'}/api/cron/daily-alerts?password=${ADMIN_PASSWORD}&email=${encodeURIComponent(email)}&skipTimezone=true&forceResend=true`
+          `${process.env.NEXT_PUBLIC_BASE_URL || 'https://getmindy.ai'}/api/cron/daily-alerts?password=${ADMIN_PASSWORD}&email=${encodeURIComponent(email)}&skipTimezone=true&forceResend=true`
         );
         const alertResult = await alertResponse.json();
         return NextResponse.json({ success: true, action: 'send-test-alert', result: alertResult });
@@ -2626,7 +2626,7 @@ export async function POST(request: NextRequest) {
       case 'send-test-briefing':
         // Trigger test briefing to specified email
         const briefingResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_BASE_URL || 'https://mi.govcongiants.com'}/api/cron/send-briefings-fast?password=${ADMIN_PASSWORD}&email=${email}&test=true`
+          `${process.env.NEXT_PUBLIC_BASE_URL || 'https://getmindy.ai'}/api/cron/send-briefings-fast?password=${ADMIN_PASSWORD}&email=${email}&test=true`
         );
         const briefingResult = await briefingResponse.json();
         return NextResponse.json({ success: true, action: 'send-test-briefing', result: briefingResult });
@@ -2634,7 +2634,7 @@ export async function POST(request: NextRequest) {
       case 'process-dead-letter':
         // Retry all pending dead letter items
         const dlResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_BASE_URL || 'https://mi.govcongiants.com'}/api/admin/briefing-dead-letter?password=${ADMIN_PASSWORD}`,
+          `${process.env.NEXT_PUBLIC_BASE_URL || 'https://getmindy.ai'}/api/admin/briefing-dead-letter?password=${ADMIN_PASSWORD}`,
           {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -2647,7 +2647,7 @@ export async function POST(request: NextRequest) {
       case 'process-weekly-fallback':
         // Process the next weekly alert fallback batch. The cron endpoint owns its batch size.
         const weeklyFallbackResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_BASE_URL || 'https://mi.govcongiants.com'}/api/cron/weekly-alerts?password=${ADMIN_PASSWORD}&catchup=true`,
+          `${process.env.NEXT_PUBLIC_BASE_URL || 'https://getmindy.ai'}/api/cron/weekly-alerts?password=${ADMIN_PASSWORD}&catchup=true`,
           { method: 'GET' }
         );
         const weeklyFallbackResult = await weeklyFallbackResponse.json();
@@ -2656,7 +2656,7 @@ export async function POST(request: NextRequest) {
       case 'send-naics-reminder':
         // Send NAICS reminder to unconfigured users
         const reminderResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_BASE_URL || 'https://mi.govcongiants.com'}/api/admin/send-naics-reminder?password=${ADMIN_PASSWORD}&mode=execute&limit=50`,
+          `${process.env.NEXT_PUBLIC_BASE_URL || 'https://getmindy.ai'}/api/admin/send-naics-reminder?password=${ADMIN_PASSWORD}&mode=execute&limit=50`,
           { method: 'POST' }
         );
         const reminderResult = await reminderResponse.json();
@@ -2665,7 +2665,7 @@ export async function POST(request: NextRequest) {
       case 'preview-profile-reminders':
         const profilePreviewLimit = Number(body.limit || 50);
         const profilePreviewResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_BASE_URL || 'https://mi.govcongiants.com'}/api/admin/send-profile-reminders?password=${ADMIN_PASSWORD}&mode=preview&limit=${profilePreviewLimit}`,
+          `${process.env.NEXT_PUBLIC_BASE_URL || 'https://getmindy.ai'}/api/admin/send-profile-reminders?password=${ADMIN_PASSWORD}&mode=preview&limit=${profilePreviewLimit}`,
           { method: 'POST' }
         );
         const profilePreviewResult = await profilePreviewResponse.json();
@@ -2675,7 +2675,7 @@ export async function POST(request: NextRequest) {
         const profileSendLimit = Number(body.limit || 25);
         const profileSendBatchSize = Number(body.batchSize || 10);
         const profileSendResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_BASE_URL || 'https://mi.govcongiants.com'}/api/admin/send-profile-reminders?password=${ADMIN_PASSWORD}&mode=execute&limit=${profileSendLimit}&batchSize=${profileSendBatchSize}`,
+          `${process.env.NEXT_PUBLIC_BASE_URL || 'https://getmindy.ai'}/api/admin/send-profile-reminders?password=${ADMIN_PASSWORD}&mode=execute&limit=${profileSendLimit}&batchSize=${profileSendBatchSize}`,
           { method: 'POST' }
         );
         const profileSendResult = await profileSendResponse.json();
@@ -2684,7 +2684,7 @@ export async function POST(request: NextRequest) {
       case 'preview-naics-reminder':
         // Preview who would receive NAICS reminders
         const previewResponse = await fetch(
-          `${process.env.NEXT_PUBLIC_BASE_URL || 'https://mi.govcongiants.com'}/api/admin/send-naics-reminder?password=${ADMIN_PASSWORD}&mode=preview`
+          `${process.env.NEXT_PUBLIC_BASE_URL || 'https://getmindy.ai'}/api/admin/send-naics-reminder?password=${ADMIN_PASSWORD}&mode=preview`
         );
         const previewResult = await previewResponse.json();
         return NextResponse.json({ success: true, action: 'preview-naics-reminder', result: previewResult });

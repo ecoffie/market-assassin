@@ -241,7 +241,7 @@ function getDaysUntil(dateString: string): number {
 async function sendWelcomeOnlyEmail(email: string, user: AlertUser) {
   const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
   const unsubscribeUrl = `https://shop.govcongiants.com/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
-  const maUrl = 'https://mi.govcongiants.com/market-assassin';
+  const maUrl = 'https://getmindy.ai/market-assassin';
 
   const htmlContent = `
 <!DOCTYPE html>

@@ -55,7 +55,7 @@ export async function POST(request: NextRequest) {
     await kv.set(`matoken:${token}`, maToken);
     await kv.set(`maaccess:${email.toLowerCase()}`, { token, createdAt: maToken.createdAt });
 
-    const accessLink = `https://mi.govcongiants.com/api/ma-access/${token}`;
+    const accessLink = `https://getmindy.ai/api/ma-access/${token}`;
 
     console.log(`🎯 Admin granted Market Assassin access to ${email}, token: ${token}`);
 

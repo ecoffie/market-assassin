@@ -187,7 +187,7 @@ export async function POST(request: NextRequest) {
     ] : [
       'All tables exist! Next steps:',
       '1. Configure Stripe webhook: https://dashboard.stripe.com/webhooks',
-      '2. Webhook URL: https://mi.govcongiants.com/api/webhooks/stripe',
+      '2. Webhook URL: https://getmindy.ai/api/webhooks/stripe',
       '3. Events: customer.*, charge.succeeded, charge.refunded, customer.subscription.*',
       '4. Run backfill: POST /api/admin/backfill-stripe?password=xxx'
     ]

@@ -123,7 +123,7 @@ export async function POST(request: NextRequest) {
     // If pursuit brief requested, trigger async generation
     if (requestPursuitBrief) {
       // Fire and forget - call the pursuit brief endpoint
-      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://mi.govcongiants.com';
+      const baseUrl = process.env.NEXT_PUBLIC_SITE_URL || 'https://getmindy.ai';
       fetch(`${baseUrl}/api/opportunities/pursuit-brief`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

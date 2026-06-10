@@ -32,7 +32,7 @@ import { LISTICLES } from '@/data/top-listicles';
 
 // Canonical SEO domain. Per [memory: mindy-domain-routing] updated
 // May 22, 2026: getmindy.ai is the indexable face of the product.
-// Email + in-flight users still hit mi.govcongiants.com via host
+// Email + in-flight users still hit getmindy.ai via host
 // rewrite, but every Google-facing URL points at getmindy.ai so we
 // don't fragment domain authority across two hostnames.
 const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://getmindy.ai';

@@ -1,4 +1,4 @@
-export const MINDY_SITE_URL = process.env.NEXT_PUBLIC_MINDY_SITE_URL || 'https://mi.govcongiants.com';
+export const MINDY_SITE_URL = process.env.NEXT_PUBLIC_MINDY_SITE_URL || 'https://getmindy.ai';
 // While Mindy is in beta, email "Open Dashboard" CTAs MUST go to /briefings
 // (the existing EMAIL-ONLY dashboard) rather than /app (the OAuth/password-
 // gated new Mindy workbench). Beta alert/free users never set a password, so

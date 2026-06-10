@@ -122,7 +122,7 @@ async function runSyntheticTests(): Promise<{
 }[]> {
   const baseUrl = process.env.VERCEL_URL
     ? `https://${process.env.VERCEL_URL}`
-    : 'https://mi.govcongiants.com';
+    : 'https://getmindy.ai';
 
   const tests = [
     {

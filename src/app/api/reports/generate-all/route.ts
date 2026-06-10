@@ -1048,7 +1048,7 @@ async function saveAlertProfile(
     }
 
     const response = await fetch(
-      `${process.env.NEXT_PUBLIC_APP_URL || 'https://mi.govcongiants.com'}/api/alerts/save-profile`,
+      `${process.env.NEXT_PUBLIC_APP_URL || 'https://getmindy.ai'}/api/alerts/save-profile`,
       {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

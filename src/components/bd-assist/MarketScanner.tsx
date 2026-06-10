@@ -437,7 +437,7 @@ export default function MarketScanner({ email, initialNaics = '', initialState =
               <OpportunitySource
                 source="Agency Forecasts"
                 count={result.whatIsAvailable.forecasts.count}
-                url="https://mi.govcongiants.com/forecasts"
+                url="https://getmindy.ai/forecasts"
               />
             </div>
           </SectionCard>
