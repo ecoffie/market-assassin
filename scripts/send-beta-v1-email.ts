@@ -18,7 +18,13 @@ import dotenv from 'dotenv'; dotenv.config({ path: '.env.local' });
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { createClient } from '@supabase/supabase-js';
-import { sendEmail } from '../src/lib/send-email';
+
+// IMPORTANT: send-email.ts builds its Resend client from RESEND_API_KEY at
+// MODULE-LOAD time. A static `import` is hoisted ABOVE dotenv.config(), so the
+// key would be undefined → resend=null → it falls through to SMTP (no local
+// creds) and fails. Load it DYNAMICALLY inside main(), after dotenv has run.
+type SendEmailFn = (p: { to: string; subject: string; html: string; from?: string; emailType?: string; eventSource?: string }) => Promise<unknown>;
+let sendEmail: SendEmailFn;
 
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
 
@@ -32,6 +38,10 @@ const LIMIT = arg('limit') ? Number(arg('limit')) : Infinity;
 const COHORT = 'beta_preview_v1_extension';
 const CONCURRENCY = 4;            // gentle — protect domain reputation
 const PER_SEND_DELAY_MS = 250;
+// Beta emails send from the verified getmindy.ai Resend domain ONLY. This is a
+// per-send override — it does NOT change the global EMAIL_FROM that the daily
+// alerts depend on (alerts@govcongiants.com via Office365). Scoped + safe.
+const BETA_FROM = 'Mindy <hello@mail.getmindy.ai>';
 
 // Subject per email # (matches docs/email-series-beta-v1-nurture.md, approved)
 const SUBJECTS: Record<number, string> = {
@@ -61,6 +71,8 @@ async function liveOppCount(naics: string[] | null): Promise<number | null> {
 
 async function main() {
   if (!EMAIL_NUM || EMAIL_NUM < 1 || EMAIL_NUM > 7) { console.error('Pass --email=1..7'); process.exit(1); }
+  // Dynamic import AFTER dotenv (see note at top) so Resend initializes with the key.
+  ({ sendEmail } = (await import('../src/lib/send-email')) as unknown as { sendEmail: SendEmailFn });
   const html = readFileSync(join(process.cwd(), `docs/email-beta-v1-launch-${EMAIL_NUM}.html`), 'utf8');
   const subject = SUBJECTS[EMAIL_NUM];
   const emailType = `beta_v1_nurture_${EMAIL_NUM}`;
@@ -70,7 +82,7 @@ async function main() {
   // TEST: one send to yourself with sample tokens, then exit
   if (TEST_TO) {
     const body = tmpl(html, { first_name: 'there', email: encodeURIComponent(TEST_TO), opp_count: '634', top_office: 'NAVSUP Weapon Systems Support', expiring_count: '18' });
-    const r = await sendEmail({ to: TEST_TO, subject, html: body, emailType, eventSource: 'beta-v1-test' });
+    const r = await sendEmail({ to: TEST_TO, subject, html: body, from: BETA_FROM, emailType, eventSource: 'beta-v1-test' });
     console.log('  test send:', JSON.stringify(r));
     return;
   }
@@ -102,7 +114,7 @@ async function main() {
       });
       if (!DO_SEND) { skipped++; return; }                // dry run
       try {
-        const r = await sendEmail({ to: email, subject, html: body, emailType, eventSource: 'beta-v1-nurture' });
+        const r = await sendEmail({ to: email, subject, html: body, from: BETA_FROM, emailType, eventSource: 'beta-v1-nurture' });
         // sendEmail returns a result; treat suppression/cap as a non-failure skip
         if (r && (r as any).suppressed) skipped++; else sent++;
       } catch (e) { failed++; console.warn('  fail', email.slice(0, 18), (e as Error).message.slice(0, 60)); }
