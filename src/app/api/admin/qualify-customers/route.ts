@@ -334,7 +334,7 @@ export async function GET(request: NextRequest) {
 
         if (user.paid_status || user.treatment_type === 'briefings') {
           score += SCORE_WEIGHTS.ACTIVE_MI_PRO;
-          signals.push('Active MI Pro / Briefings (+25)');
+          signals.push('Active Mindy Pro / Briefings (+25)');
         }
       }
 

@@ -4,7 +4,7 @@ export const PRODUCTS = {
   // MI Pro ($149/mo) - The main product: All tools + AI Briefings + FHC Training
   MI_PRO: {
     id: 'mi-pro',
-    name: 'MI Pro',
+    name: 'Mindy Pro',
     tiers: {
       monthly: {
         price: 149,

@@ -247,7 +247,7 @@ function getOrCreateUser(users: Map<string, UserState>, email: string): UserStat
 
 function queueItem(user: UserState, reason: string, owner: string, nextAction: string, extraSignals: string[] = []): QueueUser {
   const signals = [
-    user.proEntitled ? 'MI Pro' : user.alertsEnabled ? 'MI Free' : 'Imported',
+    user.proEntitled ? 'Mindy Pro' : user.alertsEnabled ? 'Mindy Free' : 'Imported',
     user.hasCustomProfile ? 'custom profile' : user.hasDefaultProfile ? 'default profile only' : 'no profile',
     user.emailClicks > 0 ? `${user.emailClicks} email clicks` : '',
     user.appEvents > 0 ? `${user.appEvents} app events` : '',
@@ -507,7 +507,7 @@ export async function GET(request: NextRequest) {
     .slice(0, MAX_QUEUE_ITEMS)
     .map(user => queueItem(
       user,
-      'MI Free user is showing enough intent for an MI Pro conversation.',
+      'Mindy Free user is showing enough intent for a Mindy Pro conversation.',
       'Branden',
       'Offer Pro plan walkthrough tied to their active NAICS/profile.'
     ));
@@ -517,7 +517,7 @@ export async function GET(request: NextRequest) {
     .slice(0, MAX_QUEUE_ITEMS)
     .map(user => queueItem(
       user,
-      'High-intent MI Pro user may be ready for white-glove or founder outreach.',
+      'High-intent Mindy Pro user may be ready for white-glove or founder outreach.',
       'Eric / Branden',
       'Review activity, call fit, and decide whether to invite to white-glove.'
     ));
@@ -563,9 +563,9 @@ export async function GET(request: NextRequest) {
     } : null,
     proUpgrade.length > 0 ? {
       priority: 'medium',
-      lever: 'MI Pro upgrade',
+      lever: 'Mindy Pro upgrade',
       owner: 'Branden',
-      action: 'Invite high-intent MI Free users into a Pro walkthrough.',
+      action: 'Invite high-intent Mindy Free users into a Pro walkthrough.',
       why: `${proUpgrade.length} sampled users show intent without Pro entitlement.`,
     } : null,
     whiteGloveCandidate.length > 0 ? {

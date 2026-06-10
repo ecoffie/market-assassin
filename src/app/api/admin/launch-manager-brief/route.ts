@@ -29,13 +29,13 @@ const domainPolicy = {
 
 const launches = [
   {
-    name: 'MI Free Rollout',
+    name: 'Mindy Free Rollout',
     status: 'active',
     health: 'yellow',
     objective: 'Activate the audience, complete profiles, and identify users showing real intent.',
     blockers: [
       'Profile completion is still the biggest activation gate.',
-      'Free users should receive free alerts only when they are not already MI Pro.',
+      'Free users should receive free alerts only when they are not already Mindy Pro.',
     ],
     changes: [
       'Unified MI access model clarified: Free, Pro, Internal, White-Glove.',
@@ -57,7 +57,7 @@ const launches = [
     ],
   },
   {
-    name: 'MI Pro Launch',
+    name: 'Mindy Pro Launch',
     status: 'active',
     health: 'yellow',
     objective: 'Convert serious users into weekly MI intelligence workflows.',
@@ -66,7 +66,7 @@ const launches = [
       'Briefing dates/types must be unambiguous so daily, weekly, and pursuit views do not look duplicated.',
     ],
     changes: [
-      'MI Pro positioned as the paid intelligence layer, not another training product.',
+      'Mindy Pro positioned as the paid intelligence layer, not another training product.',
       'Pro users should not receive redundant free alerts.',
     ],
     actions: [

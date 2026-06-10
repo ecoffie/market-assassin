@@ -1154,7 +1154,7 @@ export default function AdminDashboard() {
               {/* MI Pro Upgrades */}
               <div className="bg-blue-950/30 rounded-lg border border-blue-800/30 p-4">
                 <h3 className="text-sm font-semibold text-blue-300 uppercase tracking-wide mb-3">
-                  MI Pro Upgrade Targets
+                  Mindy Pro Upgrade Targets
                 </h3>
                 <div className="space-y-2 max-h-64 overflow-y-auto">
                   {qualifiedCustomers.lists.upgradeTargets.length === 0 ? (
@@ -2339,7 +2339,7 @@ export default function AdminDashboard() {
           <div className="bg-gray-800 rounded-lg p-6">
             <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
               <div>
-                <h2 className="text-lg font-semibold text-white">7-Day Alert Delivery (MI Free)</h2>
+                <h2 className="text-lg font-semibold text-white">7-Day Alert Delivery (Mindy Free)</h2>
                 <p className="text-sm text-gray-400 mt-1">
                   Sent emails by completed send date. This is delivery volume, not subscriber growth.
                 </p>
@@ -2398,7 +2398,7 @@ export default function AdminDashboard() {
 
           {/* 7-Day Briefing Trend */}
           <div className="bg-gray-800 rounded-lg p-6">
-            <h2 className="text-lg font-semibold text-white mb-4">7-Day Briefing Trend (MI Pro)</h2>
+            <h2 className="text-lg font-semibold text-white mb-4">7-Day Briefing Trend (Mindy Pro)</h2>
             {/* Legend */}
             <div className="flex gap-4 mb-3 text-xs">
               <div className="flex items-center gap-1">

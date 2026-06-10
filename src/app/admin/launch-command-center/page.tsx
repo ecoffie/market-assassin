@@ -973,7 +973,7 @@ export default function LaunchCommandCenterPage() {
                     <p className="mt-1 font-mono text-sm text-emerald-200">{launchBrief.domainPolicy.publicSite}</p>
                   </div>
                   <div className="rounded-lg bg-slate-950/40 p-4">
-                    <p className="text-xs uppercase tracking-[0.16em] text-slate-400">MI Product Platform</p>
+                    <p className="text-xs uppercase tracking-[0.16em] text-slate-400">Mindy Product Platform</p>
                     <p className="mt-1 font-mono text-sm text-blue-200">{launchBrief.domainPolicy.miPlatform}</p>
                   </div>
                 </div>
