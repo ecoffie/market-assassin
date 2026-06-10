@@ -38,13 +38,15 @@ export async function GET(request: NextRequest) {
   try {
     const [
       profilesTotal,
-      paidBriefings,          // existing Pro gate (access_briefings=true)
+      paidColumn,             // user_profiles.access_briefings=true (column-only mirror — UNDERCOUNTS)
+      briefingsEnabled,       // user_notification_settings.briefings_enabled+active = the REAL current Pro audience
       trialActive,            // trial_ends_at in the future
       trialExpired,           // trial_ends_at in the past
       notifAudience,          // total alert audience (the ~9,910)
     ] = await Promise.all([
       n(sb.from('user_profiles').select('*', head)),
       n(sb.from('user_profiles').select('*', head).eq('access_briefings', true)),
+      n(sb.from('user_notification_settings').select('*', head).eq('briefings_enabled', true).eq('is_active', true)),
       n(sb.from('user_profiles').select('*', head).gt('trial_ends_at', nowIso)),
       n(sb.from('user_profiles').select('*', head).lt('trial_ends_at', nowIso)),
       n(sb.from('user_notification_settings').select('*', head)),
@@ -65,17 +67,26 @@ export async function GET(request: NextRequest) {
       success: true,
       as_of: nowIso,
       trial_switch: isTrialOpen() ? 'OPEN (MINDY_TRIAL_OPEN)' : 'CLOSED',
+      // THE REAL PAID SET = briefings_enabled+active (matches the dashboard ~749/481).
+      // KV `briefings:` is the runtime gate; access_briefings column is a partial mirror
+      // that UNDERCOUNTS (only ~26). NEVER seed a trial to a briefings_enabled user —
+      // they are a past/current MI Pro payer (would wrongly get a trial then a downgrade).
+      paid_pro_real: briefingsEnabled,
+      paid_pro_column_only: paidColumn,      // the under-counting mirror (diagnostic)
       profiles: {
         total: profilesTotal,
-        paid_pro: paidBriefings,             // permanent Pro (access_briefings)
         trial_active: trialActive,           // Pro via trial (while switch open)
         trial_expired: trialExpired,         // dropped to free
-        free: Math.max(0, profilesTotal - paidBriefings - trialActive),
+      },
+      seeding_safety: {
+        do_not_trial: briefingsEnabled,      // exclude these from any trial seeding
+        rule: 'Trials go ONLY to users who are NOT briefings_enabled AND fail the KV gate.',
       },
       alert_audience_total: notifAudience,   // the ~9,910 email-only + profiled
       access_source_breakdown: sourceBreakdown,
       note:
-        'paid_pro = existing briefings entitlement (the real "they paid" set). ' +
+        'paid_pro_real = briefings_enabled+active (the real current MI Pro audience; KV is the runtime gate). ' +
+        'paid_pro_column_only is the under-counting Supabase mirror — do not seed off it. ' +
         'trial_active counts only while MINDY_TRIAL_OPEN is open. Email-only users ' +
         '(no profile row) are not counted as profiles — they are the activation backlog.',
     });
