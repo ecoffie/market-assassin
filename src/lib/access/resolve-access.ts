@@ -56,18 +56,23 @@ export async function resolveAccess(email: string): Promise<AccessResult> {
   }
 
   // 2) Trial — per-user trial_ends_at, gated by the global switch.
+  // The date can live on EITHER table: user_profiles (once a user logs in + creates a
+  // profile) OR user_notification_settings (email-only beta users who haven't logged
+  // into v1.0 yet — the seed cohort lives here). Check both; earliest-existing wins.
   if (isTrialOpen()) {
     try {
       const sb = getSupabase();
       if (sb) {
-        const { data } = await sb
-          .from('user_profiles')
-          .select('trial_ends_at')
-          .eq('email', normalized)
-          .maybeSingle();
-        const ends = data?.trial_ends_at ? new Date(data.trial_ends_at).getTime() : 0;
-        if (ends && ends >= Date.now()) {
-          return { level: 'pro', source: 'trial', trialEndsAt: data!.trial_ends_at };
+        const [profileRes, notifRes] = await Promise.all([
+          sb.from('user_profiles').select('trial_ends_at').eq('email', normalized).maybeSingle(),
+          sb.from('user_notification_settings').select('trial_ends_at').eq('user_email', normalized).maybeSingle(),
+        ]);
+        const ends =
+          profileRes.data?.trial_ends_at ||
+          notifRes.data?.trial_ends_at ||
+          null;
+        if (ends && new Date(ends).getTime() >= Date.now()) {
+          return { level: 'pro', source: 'trial', trialEndsAt: ends };
         }
       }
     } catch (err) {
