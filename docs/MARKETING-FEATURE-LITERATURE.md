@@ -583,3 +583,28 @@ free," "BD software trial for government contractors."
 **Proof:** Real entitlement, grounded in real payment data — the paid set comes from
 Stripe + the access gate, not a guess. Access resolves in one place (`resolveAccess`):
 paid → trial → free, and it fails *open* to free so alerts always keep flowing.
+
+---
+
+## Market Research: invalid-NAICS recovery (no more "No matching agencies" dead end)
+
+**What:** When a saved profile holds a bad or half-replaced NAICS code, Market Research
+used to auto-run on page load, get zero agencies back, and show a generic "No matching
+agencies found for this NAICS" — with no way forward, and an empty Target List behind it.
+Now the panel tells you the code is invalid and shows real replacement codes (e.g.
+"512110 · Motion Picture and Video Production") so you can fix it in one glance. The
+agency search is also debounced and skips half-typed codes, so editing a NAICS no longer
+flashes a spurious error.
+
+**Why:** Email-only/beta users often arrive with a profile that was edited mid-onboarding,
+leaving a stale code. The market is fine — the *code* was bad — but the old message blamed
+the market and hid the fix. Honest, actionable errors beat dead ends, especially at launch
+when hundreds of profileless users hit this path.
+
+**SEO:** "no matching agencies," "NAICS code not working," "market research no results,"
+"fix federal market research."
+
+**Proof:** Grounded in the real validator — find-agencies' `validateNaicsCode` is the
+single source of truth for whether a sector exists, and the suggested codes it returns are
+the ones surfaced to the user (not an LLM guess). An admin scrub (`POST
+/api/admin/debug-profile`) removes invalid codes from every profile table so the fix sticks.

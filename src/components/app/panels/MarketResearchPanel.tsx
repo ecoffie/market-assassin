@@ -1192,8 +1192,16 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     // keyword once a report has actually been requested (sportReportRan) so we
     // don't fetch on every keystroke.
     const sportKw = (researchMode === 'sport' && sportReportRan) ? sportKeyword.trim() : '';
-    if (!email || (!formData.naicsCode.trim() && !sportKw)) return;
+    // Only fire when the NAICS field holds at least one PLAUSIBLE code (2-6 digits)
+    // or we have a Sport keyword. Guards against the mid-edit window: when a user
+    // clears+retypes a NAICS, the field transiently holds a partial fragment (e.g.
+    // "5", "99x") — firing on that gets invalid_naics back → a spurious "No matching
+    // agencies" flash. PSC-only or agency-only research still flows via handleGenerateAll.
+    const hasPlausibleNaics = splitCodeList(formData.naicsCode).some((c) => /^\d{2,6}$/.test(c));
+    if (!email || (!hasPlausibleNaics && !sportKw)) return;
+    // Debounce so a fast edit (clear → retype) doesn't fire one fetch per keystroke.
     let cancelled = false;
+    const debounce = setTimeout(() => {
     fetch('/api/app/target-market-research', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
@@ -1224,7 +1232,8 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         if (cancelled) return;
         console.warn('[MarketResearch parent] TMR fetch failed:', err);
       });
-    return () => { cancelled = true; };
+    }, 400);
+    return () => { cancelled = true; clearTimeout(debounce); };
   }, [
     email,
     formData.naicsCode,
@@ -3752,6 +3761,9 @@ function AgencyTable({
   const [rows, setRows] = useState<AgencyTableRow[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // Populated when find-agencies rejects the NAICS itself (invalid_naics).
+  // Lets the error block offer real replacement codes instead of a dead end.
+  const [naicsSuggestions, setNaicsSuggestions] = useState<Array<{ code: string; name: string }>>([]);
   const [activeLens, setActiveLens] = useState<SortLens>('top_total');
   // SBA Goaling small-business share per agency name. Populated by a
   // bulk fetch once rows arrive. Keyed by the agency name we PASSED
@@ -3830,6 +3842,7 @@ function AgencyTable({
     let cancelled = false;
     setLoading(true);
     setError(null);
+    setNaicsSuggestions([]);
 
     fetch('/api/app/target-market-research', {
       method: 'POST',
@@ -3848,7 +3861,14 @@ function AgencyTable({
       .then(data => {
         if (cancelled) return;
         if (!data?.success) {
-          setError(data?.error || 'Could not load research data');
+          // invalid_naics → show the friendly message + replacement codes the
+          // route now passes through, not the raw "invalid_naics" token.
+          if (data?.error === 'invalid_naics') {
+            setError(data.message || data.naicsValidationError || `The NAICS code "${naicsCode}" isn't valid. Update your profile with a real code.`);
+            setNaicsSuggestions(Array.isArray(data.suggestedNaicsCodes) ? data.suggestedNaicsCodes : []);
+          } else {
+            setError(data?.error || 'Could not load research data');
+          }
           setRows([]);
           onRowsChange?.([]);
           return;
@@ -4321,7 +4341,23 @@ function AgencyTable({
   if (error) {
     return (
       <section className="rounded-xl border border-red-500/30 bg-red-500/10 p-5 text-sm text-red-300">
-        {error}
+        <p>{error}</p>
+        {naicsSuggestions.length > 0 && (
+          <div className="mt-3">
+            <p className="text-xs text-red-200/80 mb-1.5">Try one of these codes (update them in your profile / the “Explore a Different Market” box):</p>
+            <div className="flex flex-wrap gap-1.5">
+              {naicsSuggestions.map((s) => (
+                <span
+                  key={s.code}
+                  className="rounded-md border border-red-400/30 bg-red-500/10 px-2 py-1 text-xs text-red-100"
+                  title={s.name}
+                >
+                  <span className="font-mono font-semibold">{s.code}</span> · {s.name}
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
       </section>
     );
   }

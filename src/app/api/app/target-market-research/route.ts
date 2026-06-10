@@ -188,6 +188,12 @@ interface FindAgenciesPayload {
   totalSpending?: number;
   satSummary?: unknown;
   error?: string;
+  // When find-agencies rejects the NAICS itself (validateNaicsCode failed),
+  // it returns error:'invalid_naics' plus a human message + replacement codes.
+  // Pass these through so the user gets a recovery path, not a dead end.
+  naicsValidationError?: string;
+  suggestedNaicsCodes?: Array<{ code: string; name: string }>;
+  message?: string;
 }
 
 export async function POST(request: NextRequest) {
@@ -345,9 +351,22 @@ export async function POST(request: NextRequest) {
     const findAgenciesMs = Date.now() - findAgenciesStart;
 
     if (!findData.success || !findData.agencies || findData.agencies.length === 0) {
+      // If find-agencies rejected the NAICS itself (invalid_naics), surface the
+      // real reason + suggested replacement codes instead of the generic
+      // "no matching agencies" dead end. This is what a profile with a stale /
+      // malformed NAICS hits (e.g. a code half-replaced in onboarding) — the
+      // user needs to know the code is bad, not that the market is empty.
+      const isInvalidNaics = findData.error === 'invalid_naics';
       return NextResponse.json({
         success: false,
-        error: findData.error || 'No matching agencies found for this NAICS.',
+        error: isInvalidNaics
+          ? 'invalid_naics'
+          : (findData.error || 'No matching agencies found for this NAICS.'),
+        message: isInvalidNaics
+          ? (findData.message || findData.naicsValidationError || `The NAICS code "${naics}" isn't valid. Pick a suggested code or update your profile.`)
+          : undefined,
+        naicsValidationError: findData.naicsValidationError,
+        suggestedNaicsCodes: findData.suggestedNaicsCodes,
         agencies: [],
         total_count: 0,
       });
