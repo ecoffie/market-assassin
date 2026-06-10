@@ -31,8 +31,9 @@ Both need the same thing: **embeddings over the SOW corpus + cosine search.**
   - `sow_doc_type TEXT` — `sow | pws | soo | combined | specs`
   - `sow_text TEXT` — the extracted scope text (6K–16K chars, null bytes stripped)
   - `sow_filename TEXT`, `sow_checked_at TIMESTAMPTZ`
-  - **~12,000 rows where `has_sow_doc = true`** at completion (active + expired/
-    recompete). ~6,900 done as of writing; the rest draining.
+  - **7,009 rows where `has_sow_doc = true`** (catalog COMPLETE as of June 2026):
+    4,711 active + 2,298 recompete/expired. **6,901 have `sow_text`** (embeddable).
+    By type: SOW 3,055 · PWS 1,573 · Specs 1,408 · Combined 869 · SOO 104.
 - **Detection lib:** `src/lib/sam/sow-detect.ts` (`scanAttachmentsForSow`,
   `classifyByFilename`). Reuse, don't touch.
 - **Profile engine:** `src/lib/market/profile-from-text.ts`
@@ -77,7 +78,7 @@ table is full-text/tsvector only — verified). Enabling it needs a dashboard to
   (scan all 12K per query) is added.
 
 **Cost:** OpenAI `text-embedding-3-small`, 1536-dim. Measured **$0.00000016 per
-SOW** → embedding the entire ~12K corpus costs **~$0.002 total.** Negligible.
+SOW** → embedding the entire 6,901-SOW corpus costs **~$0.0011 total.** Negligible.
 
 ---
 
