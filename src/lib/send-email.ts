@@ -39,6 +39,10 @@ interface SendEmailParams {
   html: string;
   text?: string;
   from?: string;
+  // Optional Reply-To. Lets a send from a SEND-ONLY domain (e.g. Resend's
+  // mail.getmindy.ai, which has no inbox) route replies to a real receiving
+  // address (e.g. the hello@getmindy.ai Google Group). Omit = no reply-to header.
+  replyTo?: string;
   emailType?: string;
   eventSource?: string;
   tags?: Record<string, string | number | boolean | null | undefined>;
@@ -158,6 +162,7 @@ export async function sendEmail({
   html,
   text,
   from,
+  replyTo,
   emailType,
   eventSource,
   tags,
@@ -184,6 +189,7 @@ export async function sendEmail({
       const { data, error } = await resend.emails.send({
         from: fromAddress,
         to: [to],
+        replyTo: replyTo || undefined,
         subject,
         html,
         text: text || html.replace(/<[^>]*>/g, ''),
@@ -224,6 +230,7 @@ export async function sendEmail({
     await transporter.sendMail({
       from: fromAddress,
       to,
+      replyTo: replyTo || undefined,
       subject,
       html,
       text: text || html.replace(/<[^>]*>/g, ''),

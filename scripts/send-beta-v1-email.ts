@@ -23,7 +23,7 @@ import { createClient } from '@supabase/supabase-js';
 // MODULE-LOAD time. A static `import` is hoisted ABOVE dotenv.config(), so the
 // key would be undefined → resend=null → it falls through to SMTP (no local
 // creds) and fails. Load it DYNAMICALLY inside main(), after dotenv has run.
-type SendEmailFn = (p: { to: string; subject: string; html: string; from?: string; emailType?: string; eventSource?: string }) => Promise<unknown>;
+type SendEmailFn = (p: { to: string; subject: string; html: string; from?: string; replyTo?: string; emailType?: string; eventSource?: string }) => Promise<unknown>;
 let sendEmail: SendEmailFn;
 
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, { auth: { persistSession: false } });
@@ -42,6 +42,10 @@ const PER_SEND_DELAY_MS = 250;
 // per-send override — it does NOT change the global EMAIL_FROM that the daily
 // alerts depend on (alerts@govcongiants.com via Office365). Scoped + safe.
 const BETA_FROM = 'Mindy <hello@mail.getmindy.ai>';
+// mail.getmindy.ai SENDS (Resend) but has no inbox. Replies route to the real
+// hello@getmindy.ai Google Group (shared inbox, Annelle monitors). So a recipient
+// who hits "reply" reaches a mailbox we actually read.
+const BETA_REPLY_TO = 'hello@getmindy.ai';
 
 // Subject per email # (matches docs/email-series-beta-v1-nurture.md, approved)
 const SUBJECTS: Record<number, string> = {
@@ -82,7 +86,7 @@ async function main() {
   // TEST: one send to yourself with sample tokens, then exit
   if (TEST_TO) {
     const body = tmpl(html, { first_name: 'there', email: encodeURIComponent(TEST_TO), opp_count: '634', top_office: 'NAVSUP Weapon Systems Support', expiring_count: '18' });
-    const r = await sendEmail({ to: TEST_TO, subject, html: body, from: BETA_FROM, emailType, eventSource: 'beta-v1-test' });
+    const r = await sendEmail({ to: TEST_TO, subject, html: body, from: BETA_FROM, replyTo: BETA_REPLY_TO, emailType, eventSource: 'beta-v1-test' });
     console.log('  test send:', JSON.stringify(r));
     return;
   }
@@ -114,7 +118,7 @@ async function main() {
       });
       if (!DO_SEND) { skipped++; return; }                // dry run
       try {
-        const r = await sendEmail({ to: email, subject, html: body, from: BETA_FROM, emailType, eventSource: 'beta-v1-nurture' });
+        const r = await sendEmail({ to: email, subject, html: body, from: BETA_FROM, replyTo: BETA_REPLY_TO, emailType, eventSource: 'beta-v1-nurture' });
         // sendEmail returns a result; treat suppression/cap as a non-failure skip
         if (r && (r as any).suppressed) skipped++; else sent++;
       } catch (e) { failed++; console.warn('  fail', email.slice(0, 18), (e as Error).message.slice(0, 60)); }
