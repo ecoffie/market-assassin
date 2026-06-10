@@ -560,3 +560,26 @@ investors/acquirers).
 *All features live on getmindy.ai as of June 2026. Tone: plain language, no jargon
 (say "Target Market Research" not "ABM/ICP"; "BD outreach" not "sales"). Federal
 acronyms (NAICS, PSC, OSBP, IDIQ) are fine — define them once per piece.*
+
+---
+
+## 19. Free → Trial → Pro: try the whole thing, then choose (coming)
+
+**What:** Mindy now has a clean access ladder under the hood — paying members keep
+full Mindy permanently, and everyone else can be given a **time-boxed full-access
+trial** that we open or close with a single switch. When a trial ends, you don't get
+locked out — you drop cleanly to **free Mindy** (daily alerts + a taste of research),
+never a broken screen.
+
+**Why:** The best way to understand what Mindy does for your BD is to *use* the whole
+thing — full market research, briefings, pipeline, proposal assist — not read a
+feature list. The trial lets a new contractor experience the full product, then
+decide. And the "drop to free, never broken" rule means leaving a trial is graceful,
+not punishing.
+
+**SEO/positioning:** "free federal contracting tool," "try GovCon market intelligence
+free," "BD software trial for government contractors."
+
+**Proof:** Real entitlement, grounded in real payment data — the paid set comes from
+Stripe + the access gate, not a guess. Access resolves in one place (`resolveAccess`):
+paid → trial → free, and it fails *open* to free so alerts always keep flowing.

@@ -85,6 +85,15 @@ ALTER TABLE user_profiles
 ```
 (KV stays the hot gate; this is the durable record + audit trail.)
 
+## ✅ Build status (June 10, 2026 — wired, dormant, awaiting seed)
+- [x] Schema: trial_ends_at + access_source on user_profiles (hand-run, VERIFIED queryable).
+- [x] resolveAccess() — src/lib/access/resolve-access.ts. Paid > trial(date AND switch) > free, fail-open.
+- [x] MINDY_TRIAL_OPEN switch (defaults open; off/false/0/no = closed).
+- [x] Admin split view — GET /api/admin/access-split (paid/trial-active/trial-expired/free).
+- [x] Wired into the 3 USER-FACING gates (briefings/latest, briefings/verify, lindy/intelligence). Admin analytics left RAW (count real payers). Regression-tested: real paid->pro, free->free.
+- [ ] **SEED TRIALS** — the remaining lever. Set trial_ends_at on a chosen cohort, then the switch opens the window. Eric: prove plumbing first (done) → seed deliberately.
+LIVE LANDSCAPE (June 10): 85 profiles · 26 paid · 0 trials · 59 free · 9,916 alert audience.
+
 ## 6. Build phases
 1. **Resolve the true paid list** — run `admin/backfill-stripe` + reconcile KV
    `briefings:` → the definitive full-paid set. Tag `access_source`.
