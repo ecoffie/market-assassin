@@ -227,3 +227,43 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
 Pick a P0 or P1, open its PRD, and go. The PRDs have phasing + risks + success
 criteria already worked out. P2 items are quick wins you can slot between
 bigger work. Delete items as you finish them.
+
+---
+
+## v2.0 — Email-in to Mindy (TripIt-for-opportunities)
+
+**Status:** v2.0, deferred (Eric, June 2026 — "save this for v2.0 not now").
+
+**The need:** Mindy only knows SAM.gov today. Users get opportunities from sources
+we don't scrape — NIH/DARPA/NSF labs, AF/Army open solicitations, agency portals,
+NECO, GSA eBuy. They want to **forward any opportunity email into Mindy and have it
+tracked + managed like a native pursuit** (the TripIt model: forward to
+plans@tripit.com → it appears in your account).
+
+**Decided shape (June 2026):**
+- A forwarded email → **a tracked Pursuit** (extract title/agency/deadline/link →
+  `user_pipeline` row). Then it gets the same change-alerts + Proposal Assist as a
+  SAM opp.
+- Ingest via a **per-user forwarding address** (e.g. `track+<userid>@getmindy.ai`
+  or `<id>@in.getmindy.ai`) so mail maps to the right account automatically.
+
+**Reuse (already in the codebase — don't rebuild):**
+- `user_pipeline` table already has `source`, `external_url`, `title`, `agency`,
+  `response_deadline`, `notes`, `notice_id` — a non-SAM `source='email-in'` slots
+  right in.
+- **Resend is already our email provider** → **Resend Inbound** is the natural
+  inbound choice (no new vendor). Alternatives: SendGrid Inbound Parse, Postmark,
+  Cloudflare Email Workers.
+- Doc extraction exists: `src/lib/sam/pdf-extract.ts` (`extractPdf/Docx/Txt`) for
+  forwarded attachments → Vault.
+- `buildProfileFromText` / LLM extraction for parsing the email body into
+  title/agency/deadline.
+
+**Net-new infra to design in the PRD:** MX record + inbound webhook route
+(`/api/webhooks/inbound-email`), per-user address mapping, **spoofing/security**
+(verify the forwarding sender owns the account; DKIM/SPF on inbound), dedup
+(forwarded twice), attachment size limits. Both-mode option: also save attachments
+to Vault linked to the pursuit.
+
+**Why deferred:** net-new inbound-email plumbing (provider + MX + webhook +
+security) — not a small wiring change. Write the PRD when v2.0 starts.
