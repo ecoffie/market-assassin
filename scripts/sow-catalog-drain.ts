@@ -33,15 +33,21 @@ async function processOne(row: Row): Promise<{ sow: boolean; text: boolean }> {
     return { sow: false, text: false };
   }
   try {
-    const scan = await scanAttachmentsForSow(urls, API_KEY);
+    // Race against a hard timeout — a few records have a hanging/huge attachment
+    // download that stalls a pool worker forever, so the loop re-fetches the same
+    // un-stamped rows endlessly ("stuck on the last 13"). 30s cap → stamp + move on.
+    const scan = await Promise.race([
+      scanAttachmentsForSow(urls, API_KEY),
+      new Promise<never>((_, rej) => setTimeout(() => rej(new Error('scan-timeout')), 30_000)),
+    ]);
     await sb.from('sam_opportunities').update({
       has_sow_doc: scan.hasSowDoc, sow_doc_type: scan.docType,
       sow_filename: scan.filename, sow_text: scan.text, sow_checked_at: checkedAt,
     }).eq('id', row.id);
     return { sow: scan.hasSowDoc, text: !!scan.text };
   } catch {
-    // Stamp checked even on failure so a poison record never blocks the queue.
-    await sb.from('sam_opportunities').update({ sow_checked_at: checkedAt }).eq('id', row.id);
+    // Stamp checked even on timeout/failure so a poison record never blocks the queue.
+    await sb.from('sam_opportunities').update({ has_sow_doc: false, sow_checked_at: checkedAt }).eq('id', row.id);
     return { sow: false, text: false };
   }
 }
