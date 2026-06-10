@@ -57,6 +57,12 @@ export async function GET(request: NextRequest) {
   // "No matching agencies". Surface them + flag invalid codes.
   const briefing = await safeSelect(supabase, 'user_briefing_profile', email);
   const miBeta = await safeSelect(supabase, 'mi_beta_user_settings', email);
+  // The Vault (user_identity_profile) holds the UEI-imported company identity —
+  // primary_naics from SAM. Market Research does NOT read it directly; it only
+  // feeds alerts/research after a Vault-identity SAVE seeds user_notification_settings.
+  // So a user can have a populated Vault but an empty research profile. Surface it
+  // here so "no profile" is never a false negative again.
+  const vault = await safeSelect(supabase, 'user_identity_profile', email);
 
   // Look up the Supabase Auth user so we can tell whether the account
   // exists, what providers it has (oauth vs email), and whether it has
@@ -132,6 +138,19 @@ export async function GET(request: NextRequest) {
     mi_beta_user_settings: miBeta
       ? { present: true, naics_codes: miBeta.naics_codes, invalid_naics: invalidNaics(miBeta.naics_codes) }
       : { present: false },
+    user_identity_profile: vault
+      ? {
+          present: true,
+          uei: vault.uei,
+          legal_name: vault.legal_name,
+          primary_naics: vault.primary_naics,
+          invalid_naics: invalidNaics(vault.primary_naics),
+          certifications: vault.certifications,
+          // Did the Vault NAICS make it into the research/alerts table? If false,
+          // the user has a profile they can't see in Market Research.
+          seeded_to_notification_settings: Array.isArray(notification.data?.naics_codes) && notification.data.naics_codes.length > 0,
+        }
+      : { present: false },
   });
 }
 
@@ -140,6 +159,7 @@ const NAICS_NCOL: Record<string, string> = {
   user_briefing_profile: 'naics_codes',
   mi_beta_user_settings: 'naics_codes',
   user_business_profiles: 'extracted_naics_codes',
+  user_identity_profile: 'primary_naics', // Vault — UEI-imported company NAICS
 };
 
 const VALID_SECTORS = ['11','21','22','23','31','32','33','42','44','45','48','49','51','52','53','54','55','56','61','62','71','72','81','92'];
