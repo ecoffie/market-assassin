@@ -90,6 +90,21 @@ the trial/paid access (`PRD-trial-vs-paid-access.md`) → THEN the public rename
 (Mindy / Solopreneur / Teams / Enterprise). Enterprise *capabilities* (user mgmt,
 RBAC, sharing, group alerts) are a separate v2.0+ build, not part of the rename.
 
+## 4b. Checkout / Stripe cleanup (found June 10 during migration QA)
+The Stripe payment links work and are host-independent (migration-safe), but the
+**public checkout copy needs the rename + a branding fix**:
+- The **public Pro price is $149/mo** (link `dRmfZi9UO3MS20RdpefnO0C`). The **$49/mo
+  link** (`00wfZigjc97ceND3OEfnO0z`) is **legacy/loyalty only — NOT promoted**
+  (correctly commented out in `market-intelligence/page.tsx`). Make sure no public
+  surface links the $49 loyalty checkout.
+- The $49 checkout page still shows **"GovconEDU, LLC"** and **"Mindy Ai"** as the
+  business/product name. Per the exit-strategy memory (no personal/legacy brand in
+  product), update the Stripe product display name to **"Mindy"** / the new tier
+  names ("Solopreneur" / "Mindy Pro") in the Stripe dashboard.
+- Apply the tier rename to `src/lib/products.ts` display names + `pricing/page.tsx` +
+  `market-intelligence/page.tsx` so checkout reflects Mindy / Solopreneur / Teams /
+  Enterprise.
+
 ## 5. Open decisions
 - **Spelling:** "Solopreneur" (confirmed — was a typo as "Soloprenuer").
 - **"Mindy Pro" vs "Solopreneur":** are these the SAME tier with two names (lead with
