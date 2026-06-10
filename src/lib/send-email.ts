@@ -473,7 +473,7 @@ export async function sendAccessCodeEmail({
     </div>
 
     <p style="text-align: center; color: #64748b;">
-      Questions? Reply to this email or contact us at hello@govcongiants.com
+      Questions? Reply to this email or contact us at hello@getmindy.ai
     </p>
 
     <div class="footer">
@@ -821,7 +821,7 @@ export async function sendLicenseKeyEmail({
 
     <p style="color: #6b7280; font-size: 12px; text-align: center;">
       <strong>Keep this email safe!</strong> Your license key is your proof of purchase.<br>
-      Questions? Reply to this email or contact support@govcongiants.com
+      Questions? Reply to this email or contact support@getmindy.ai
     </p>
 
     <p style="text-align: center; color: #9ca3af; font-size: 12px;">
@@ -855,7 +855,7 @@ How to Activate:
 ${accessLink ? `Direct Access Link: ${accessLink}` : ''}
 
 Keep this email safe! Your license key is your proof of purchase.
-Questions? Reply to this email or contact support@govcongiants.com
+Questions? Reply to this email or contact support@getmindy.ai
 
 - GovCon Giants Team`,
     });
@@ -1571,7 +1571,7 @@ export async function sendAlertProWelcomeEmail({
 
   <div style="background: #f1f5f9; padding: 18px; border-radius: 0 0 12px 12px; text-align: center;">
     <p style="color: #64748b; font-size: 12px; margin: 0;">
-      Questions? Reply to this email or contact <a href="mailto:hello@govcongiants.com" style="color: #059669;">hello@govcongiants.com</a>
+      Questions? Reply to this email or contact <a href="mailto:hello@getmindy.ai" style="color: #059669;">hello@getmindy.ai</a>
     </p>
     <p style="color: #94a3b8; font-size: 11px; margin: 8px 0 0 0;">
       © ${new Date().getFullYear()} GovCon Giants • getmindy.ai
@@ -1608,7 +1608,7 @@ ${maLink}
 Your email: ${to}
 Subscription: $19/month • Cancel anytime
 
-Questions? Reply to this email or contact hello@govcongiants.com
+Questions? Reply to this email or contact hello@getmindy.ai
 
 - GovCon Giants Team`,
     });
