@@ -133,6 +133,13 @@ These have full PRDs (phasing/risks/success criteria worked out) — "open the d
   for new columns to be queryable.
 - **Commit + push BEFORE `vercel --prod`** (Process Non-Negotiable).
 - **DoDAAC directory refresh is auto-cron'd** (dispatcher) — not a manual task anymore.
+- **Public tier rename — AFTER migration** (Eric, June 10): names describe WHO buys.
+  `free`→**"Mindy"** (never "Mindy Free" publicly — that's internal), `pro`→
+  **"Soloprenuer"/"Mindy Pro"** (solo operator), `team`→**"Teams"** (consultants/
+  agencies, multi-client), `enterprise`→**"Enterprise"** (national orgs: APEX/USHCC —
+  user mgmt, RBAC, cross-user sharing, group alerts, calendar invites; the org caps
+  are a separate v2.0+ build). Rename = public surfaces only (keep `MITier` keys +
+  internal IDs). Plan: `docs/PRD-public-tier-naming.md`.
 - **8,834 unconfigured users — DEFERRED until AFTER the migration** (Eric, June 10:
   "once we move everyone over to Mindy then we can deal with it"). These have
   accounts but only the default fallback NAICS (`541512/541611/541330/541990/561210`)
