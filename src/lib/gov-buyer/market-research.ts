@@ -17,7 +17,8 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { bqQuery, BQ_TABLES } from '@/lib/bigquery/client';
+import { BQ_TABLES } from '@/lib/bigquery/client';
+import { queryCached } from '@/lib/bigquery/cache';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -165,7 +166,11 @@ async function fetchActivity(ueis: string[], targetNaics: string): Promise<Map<s
   const map = new Map<string, Activity>();
   if (!ueis.length) return map;
 
-  const rows = await bqQuery<{
+  // Cached: key by the sorted UEI set + NAICS so identical research re-runs hit KV
+  // instead of re-scanning BQ (cost hygiene — see tasks/bigquery-cost-spike-2026-06.md).
+  const sortedUeis = [...ueis].sort();
+  const cacheKey = `gov-buyer:activity:${targetNaics}:${sortedUeis.join(',')}`;
+  const rows = await queryCached<{
     recipient_uei: string;
     total_obligated: number;
     award_count: number;
@@ -173,6 +178,7 @@ async function fetchActivity(ueis: string[], targetNaics: string): Promise<Map<s
     last_action_date: string;
     won_target_naics: boolean;
   }>({
+    cacheKey,
     query: `
       SELECT
         r.recipient_uei,
@@ -188,7 +194,7 @@ async function fetchActivity(ueis: string[], targetNaics: string): Promise<Map<s
       FROM ${BQ_TABLES.recipients} r
       WHERE r.recipient_uei IN UNNEST(@ueis)
     `,
-    params: { ueis, naics: targetNaics },
+    params: { ueis: sortedUeis, naics: targetNaics },
   });
 
   for (const row of rows) {

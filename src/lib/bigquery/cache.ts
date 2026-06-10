@@ -9,9 +9,11 @@
  * DATA_VERSION after a fresh USASpending ingest invalidates every
  * cached entry without manual deletion or scan-and-delete.
  *
- * TTL: 7 days default. USASpending publishes new data monthly,
- * so 7d keeps us within one update cycle while giving Googlebot
- * a stable URL to crawl.
+ * TTL: 90 days default. USASpending data changes slowly and we now
+ * refresh QUARTERLY (Eric, June 2026 — aligns with the curated-source
+ * quarterly cadence; monthly was 12 cache-wipe storms/yr, quarterly is 4).
+ * A 90d TTL keeps results warm across a full quarter so Googlebot crawls
+ * the long tail without forcing cold-miss BQ scans.
  *
  * Failure mode: if KV is down, fall back to direct BQ. Page is
  * slower but doesn't break. Errors are logged, not thrown.
@@ -19,9 +21,16 @@
 import { kv } from '@vercel/kv';
 import { bqQuery, type BqQueryParams } from './client';
 
-// Bump this string whenever the source data is refreshed (monthly
+// Bump this string whenever the source data is refreshed (QUARTERLY
 // ingest, schema change, derived-table rebuild). All cached keys
 // become unreachable immediately — no scan-and-delete needed.
+//
+// ⚠️ COST WARNING (June 2026 spike, $2,075 — tasks/bigquery-cost-spike-2026-06.md):
+// Bumping this WIPES 100% of the cache at once. The public SEO long-tail
+// (/awards/[id], /contractors/[slug], /top/*, /agencies/*) then re-crawls into a
+// COLD cache → thousands of cold-miss BQ scans → a cost storm. BEFORE you bump:
+// (1) do it in a low-traffic window, (2) PRE-WARM the heavy/long-tail keys, and
+// (3) watch BQ cost for 24h. A hard GCP daily query quota is the backstop.
 // Bumped 2026-05-31 to invalidate KV cache after Round 2 subaward
 // ingest brought subawards from 903K → 1,001,345 rows and added
 // 340 new primes + 8,765 new subawardees to the rollups.
@@ -31,14 +40,14 @@ import { bqQuery, type BqQueryParams } from './client';
 // from the new cheap lookups.
 const DATA_VERSION = 'v3-2026-06';
 
-// 30 days. Contractor/award data refreshes ~weekly, but a fresh ingest
-// bumps DATA_VERSION (see above) which invalidates every key instantly —
-// so TTL only governs how long a STALE-but-same-version result lives.
-// Longer TTL = far fewer cold-miss BQ scans (the agency breakdown alone
-// was 82% of daily scan and helped exhaust the 20 TiB/day quota → 5xx).
-// 30d means a given contractor page's heavy query runs ~4x less often
-// than at 7d, with no accuracy cost between ingests.
-const DEFAULT_TTL_SECONDS = 30 * 24 * 60 * 60; // 30 days
+// 90 days. We refresh QUARTERLY and bump DATA_VERSION on each refresh
+// (which invalidates every key instantly), so TTL only governs how long a
+// STALE-but-same-version result lives within a quarter. Longer TTL = far
+// fewer cold-miss BQ scans (the agency breakdown alone was 82% of daily
+// scan and helped exhaust the daily quota → 5xx + the June 2026 $2K spike).
+// 90d means a page's heavy query runs at most ~once/quarter, with no
+// accuracy cost between quarterly ingests.
+const DEFAULT_TTL_SECONDS = 90 * 24 * 60 * 60; // 90 days
 
 export interface QueryCacheOptions<T> extends BqQueryParams {
   cacheKey: string;
