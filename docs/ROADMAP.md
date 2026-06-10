@@ -133,6 +133,15 @@ These have full PRDs (phasing/risks/success criteria worked out) — "open the d
   for new columns to be queryable.
 - **Commit + push BEFORE `vercel --prod`** (Process Non-Negotiable).
 - **DoDAAC directory refresh is auto-cron'd** (dispatcher) — not a manual task anymore.
+- **8,834 unconfigured users — DEFERRED until AFTER the migration** (Eric, June 10:
+  "once we move everyone over to Mindy then we can deal with it"). These have
+  accounts but only the default fallback NAICS (`541512/541611/541330/541990/561210`)
+  or empty — ~89% of ~9,910 accounts, mostly the batch-seeded bootcamp enrollees.
+  They get generic/no alerts. The fix is an **activation campaign → the new
+  Auto-setup (#12, paste→profile in 30s)** — but do NOT run it mid-migration (auth/
+  domain surface shifting = broken links at the worst time). Sequence: **finish
+  mi→getmindy → THEN activation campaign on solid ground.** (Admin dashboard:
+  "General Unconfigured Users".)
 - **Google Drive KB ingest** (if redone): auth gcloud as the GovCon Drive account →
   export ~373 files → migration + deploy → ingest.
 
