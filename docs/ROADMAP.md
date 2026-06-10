@@ -51,6 +51,52 @@ is the most-requested net-new capability and the natural v2.0 lead.
 
 ---
 
+## 🟡 P2 — Quick wins (slot between bigger pieces)
+
+Small, incremental — grab one when you have a gap.
+
+| Item | Scope | PRD/note |
+|---|---|---|
+| **Civilian office decode** | Extend the DoDAAC office-roster decode to GSA/VA/HHS solicitation formats (office rosters are DoD/DLA/Navy-only today). | — |
+| **NAICS + state combo** | Contractor state filter is name-search only (BQ rollup has no per-NAICS location); needs a location-aware path. | — |
+| **5-role contacts** | Add KO + the other 4 BD roles (the `role_category` column groundwork exists). | `tasks/todo.md` P1 #5 |
+| **Deal-flow board** | Kanban-style pipeline board view. | `docs/PRD-deal-flow-board.md` |
+| **SaaS landing page** | A proper marketing landing for getmindy.ai (vs the app). | — |
+| **Cal-AI simplification sweep** | UI simplification pass (Cal-AI reference). | — |
+
+---
+
+## 📦 P0/P1 (bigger, PRD-ready — from `tasks/BACKLOG-later.md`)
+
+These have full PRDs (phasing/risks/success criteria worked out) — "open the doc and go."
+
+| Pri | Item | PRD |
+|---|---|---|
+| **P0** | **DoD Forecast Coverage — Option A** (component LRAF scrapers: Army/Navy/NAVFAC → AF/DLA → DHA/SOCOM into `agency_forecasts`, reusing the civilian pipeline; no schema/UI rebuild). Option B (early-signals) already SHIPPED as the interim. | `docs/PRD-dod-forecast-scrapers.md` |
+| **P0** | **Cron Dispatcher — Phase 2** (migrate the remaining ~24 crons off the band-aid; load-bearing send pipelines LAST, carefully) — unblocks scale to 50K users past the Vercel 100-cron cap. | `docs/PRD-cron-dispatcher.md` |
+| **P1** | Light/dark mode (also v1.1 #5) · Newcomer clarity (OG previews on last public pages) · Real gov-contact roles (needs a commercial-enrichment buy decision) | — |
+
+---
+
+## ⚙️ Infra / Ops notes (remember — NOT tasks)
+
+- **mi→getmindy final cutover is READY** — runbook `tasks/mi-to-getmindy-cutover-runbook.md`.
+  `NEXT_PUBLIC_APP_URL` is already flipped for the share loop. 139 refs / 61 files
+  bucketed: (A) env-var-driven → just set the var, (B) hardcoded URLs → code change,
+  (C) host-pinned auth redirects → flip carefully (auth-critical). **Golden rule: the
+  old domain becomes a permanent 301, NEVER a shutdown** — years of sent email links
+  must keep resolving. `auth.getmindy.ai` is already done (verify only, no data
+  migration). Say **"do the final migration"** to execute step-by-step.
+- **Hand-run DDL + NOTIFY pgrst quirk** — this DB has no in-app DDL; after a schema
+  change you may need to reload the PostgREST schema cache (`NOTIFY pgrst, 'reload schema'`)
+  for new columns to be queryable.
+- **Commit + push BEFORE `vercel --prod`** (Process Non-Negotiable).
+- **DoDAAC directory refresh is auto-cron'd** (dispatcher) — not a manual task anymore.
+- **Google Drive KB ingest** (if redone): auth gcloud as the GovCon Drive account →
+  export ~373 files → migration + deploy → ingest.
+
+---
+
 ## 📎 Cross-cutting (do alongside, any release)
 - **Cron Dispatcher Phase 2** — migrate remaining jobs off the band-aid (`docs/PRD-cron-dispatcher.md`).
 - **Marketing literature** — update on every feature push (standing rule).
