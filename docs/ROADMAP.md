@@ -143,7 +143,7 @@ These have full PRDs (phasing/risks/success criteria worked out) — "open the d
   mi→getmindy → THEN activation campaign on solid ground.** (Admin dashboard:
   "General Unconfigured Users".) **Full plan: `docs/PRD-migration-onboarding.md`** —
   segmented: ~83% are imported bootcamp leads (suppress generic alerts → nurture, NOT
-  onboard); the real base is the ~1,300 warm (claim-account → Auto-setup). Don't chase
+  onboard); the real base is ~1,076 custom-NAICS (11%) (claim-account → Auto-setup). Don't chase
   the 9,910 vanity number.
 - **Google Drive KB ingest** (if redone): auth gcloud as the GovCon Drive account →
   export ~373 files → migration + deploy → ingest.

@@ -12,18 +12,24 @@ we should do something else with."
 
 ## 1. The real numbers (measured June 10, 2026 — strip the vanity)
 
-| Segment | Count | Truth |
-|---|---|---|
-| `user_notification_settings` rows ("users") | **9,910** | a vanity number — mostly an imported list |
-| **`bootcamp-batch-enroll` source** | **~8,200 (~83%)** | imported bootcamp contacts; **never opted into Mindy** |
-| **Organic / non-bootcamp** | **~1,700 (~17%)** | actually signed up |
-| **Alerts enabled (active audience)** | **1,337** | matches the dashboard's "1,336 active alert audience" |
-| **Warm + configured** (alerts-on AND real non-default NAICS) | **~900–1,000** | the genuine product audience — **this is the business** |
-| **Profile incomplete** (per dashboard) | ~359 | warm but unfinished setup |
-| **Supabase auth accounts** (can actually log in / have a password) | **85** | the rest are email-token only, no login |
+**Exact figures from the Command Center "User Inventory Health" panel (June 10):**
 
-**The honest read:** the real user base is **~900–1,300**, not ~9,910. The other
-~8,200 are a **top-of-funnel marketing list**, not users.
+| Segment | Count | % of 9,910 | Truth |
+|---|---|---|---|
+| Total user records | **9,910** | 100% | a vanity number — mostly an imported list |
+| **Custom NAICS** (genuinely configured) | **1,076** | **11%** | told Mindy what they actually do — **the real base** |
+| **Default NAICS only** (never personalized) | **7,889** | **80%** | the bootcamp-batch-enroll pile; generic alerts |
+| **No NAICS** (empty) | **945** | **9%** | nothing set |
+| Business Type set | ~4% | — | almost nobody completed full setup |
+| **Alerts enabled (active audience)** | **1,337** | 13% | who we email |
+| **Eligible this cycle** | 1,330 | — | of which **1,018 Custom NAICS · 7 default · 313 no-NAICS** |
+| Paid briefings entitled | **500** | 5% | the paid core |
+| Briefings: profile incomplete | 359 | — | warm but unfinished |
+| Supabase auth accounts (can log in / have a password) | **85** | <1% | the rest are email-token only, no login |
+
+**The honest read:** the real configured base is **1,076 (11%)**; the active+configured
+audience is **~1,018** (eligible-this-cycle custom-NAICS). The other **~8,800 (89%) are
+default-only or empty** — a top-of-funnel marketing list, not users. Don't chase 9,910.
 
 ---
 
@@ -43,7 +49,7 @@ cutover. Do NOT conflate them.
 
 ## 3. The plan — segment, then treat each segment differently
 
-### 🟢 Segment A — Warm users (~1,300; the real base)
+### 🟢 Segment A — Warm + configured (~1,076 custom-NAICS; the real base)
 *Alerts-on, and/or organic signup, and/or a real configured profile.*
 - **During migration:** keep email-token auth WORKING through the cutover (don't
   break their alerts). Links now resolve at getmindy.ai (301).
