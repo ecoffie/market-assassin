@@ -1,78 +1,71 @@
-<!-- Email #1 — Beta → Mindy 1.0 launch. Subject: We upgraded. You kept your access (through July 30).
+<!-- Email #1 (value-first, Eric's voice). Subject: We upgraded. You kept your access (through July 30).
      Tokens: {{first_name}} (fallback "there"), {{email}}. Send via sendEmail() batched (#58 cap). -->
 <!DOCTYPE html>
 <html lang="en">
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Mindy 1.0 is here</title>
+  <title>You kept your access</title>
 </head>
 <body style="margin:0; padding:0; background:#f1f5f9; font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,Helvetica,Arial,sans-serif; color:#0f172a;">
-  <div style="display:none; max-height:0; overflow:hidden;">The beta is now the full product. Log in to pick up where you left off.</div>
+  <div style="display:none; max-height:0; overflow:hidden;">The beta you've been using is now the real thing.</div>
 
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f1f5f9; padding:24px 0;">
     <tr><td align="center">
       <table role="presentation" width="600" cellpadding="0" cellspacing="0" style="max-width:600px; background:#ffffff; border-radius:14px; overflow:hidden; box-shadow:0 2px 12px rgba(15,23,42,0.06);">
 
-        <!-- Header -->
-        <tr><td style="background:linear-gradient(135deg,#059669 0%,#10b981 100%); padding:34px 32px; text-align:center;">
-          <div style="font-size:13px; letter-spacing:0.16em; text-transform:uppercase; color:#d1fae5; font-weight:600;">GovCon Giants</div>
-          <div style="font-size:30px; font-weight:800; color:#ffffff; margin-top:6px;">Mindy&nbsp;1.0 is here</div>
-          <div style="font-size:15px; color:#ecfdf5; margin-top:6px;">and your access came with you</div>
+        <!-- Slim brand bar (not a feature header — keep it a letter) -->
+        <tr><td style="background:#ffffff; padding:26px 36px 6px;">
+          <div style="font-size:13px; letter-spacing:0.14em; text-transform:uppercase; color:#10b981; font-weight:700;">GovCon Giants</div>
         </td></tr>
 
-        <!-- Body -->
-        <tr><td style="padding:34px 36px 8px;">
-          <p style="font-size:16px; line-height:1.6; margin:0 0 16px;">Hi {{first_name}},</p>
+        <!-- Body = Eric's letter -->
+        <tr><td style="padding:8px 36px 10px;">
+          <p style="font-size:16px; line-height:1.65; margin:0 0 16px;">Hey {{first_name}},</p>
 
-          <p style="font-size:16px; line-height:1.6; margin:0 0 16px;">
-            For the last few months you've been using <strong>Mindy</strong> in beta — daily federal
-            opportunities, market research, the works. That beta was scheduled to end <strong>June&nbsp;30</strong>.
+          <p style="font-size:16px; line-height:1.65; margin:0 0 16px;">
+            For the last few months you've had <strong>Mindy</strong> working in the background —
+            federal opportunities in your inbox, market research a click away.
           </p>
 
-          <p style="font-size:16px; line-height:1.6; margin:0 0 16px;">
-            Here's the good news: <strong>we didn't shut it off. We shipped the real thing.</strong>
+          <p style="font-size:16px; line-height:1.65; margin:0 0 16px;">
+            That beta was set to end June 30. Instead of shutting it off, <strong>we shipped the real
+            thing</strong> — and gave you <strong>30 more days</strong> on it, free, through July 30.
+            Call it a thank-you for being early.
           </p>
 
-          <p style="font-size:16px; line-height:1.6; margin:0 0 20px;">
-            Mindy <strong>1.0</strong> is live — faster, sharper, and with the tools the beta only hinted at.
-            And because you helped us get here, your full access is <strong>extended 30 more days, through
-            July&nbsp;30</strong> — so you can try the real version, not the beta.
+          <p style="font-size:16px; line-height:1.65; margin:0 0 22px;">
+            Here's the one thing to do: the beta knew you by email. The real Mindy uses a real account.
+            <strong>Set a password once</strong> — and Mindy rebuilds your entire setup from a single
+            sentence about what you do. Two minutes, and you're further along than the beta ever got you.
           </p>
 
-          <!-- Highlight box -->
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
-            <tr><td style="background:#ecfdf5; border:2px solid #10b981; border-radius:12px; padding:20px 22px;">
-              <div style="font-size:15px; font-weight:700; color:#065f46; margin-bottom:6px;">One small step to get back in</div>
-              <div style="font-size:15px; line-height:1.55; color:#0f172a;">
-                The beta logged you in by email. Mindy 1.0 uses a real account — <strong>set your password
-                once</strong> and you're in. Mindy will even set up your profile from a one-line description
-                of what you do.
-              </div>
-            </td></tr>
-          </table>
-
-          <!-- CTA -->
-          <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="margin:0 0 26px;">
-            <tr><td align="center">
+          <!-- Soft CTA -->
+          <table role="presentation" cellpadding="0" cellspacing="0" style="margin:0 0 24px;">
+            <tr><td>
               <a href="https://getmindy.ai/setup-account?email={{email}}"
-                 style="display:inline-block; background:linear-gradient(135deg,#059669 0%,#10b981 100%); color:#ffffff; text-decoration:none; font-size:17px; font-weight:700; padding:16px 40px; border-radius:10px;">
-                Log in &amp; claim your 30 days →
+                 style="display:inline-block; background:linear-gradient(135deg,#059669 0%,#10b981 100%); color:#ffffff; text-decoration:none; font-size:16px; font-weight:700; padding:14px 32px; border-radius:10px;">
+                Log in &amp; pick up where you left off →
               </a>
-              <div style="font-size:13px; color:#64748b; margin-top:12px;">Pick up right where you left off.</div>
             </td></tr>
           </table>
 
-          <p style="font-size:16px; line-height:1.6; margin:0 0 4px;">— The GovCon Giants team</p>
+          <p style="font-size:16px; line-height:1.65; margin:0 0 18px;">
+            More this week — I'll show you a few things the beta couldn't do yet.
+          </p>
+
+          <p style="font-size:16px; line-height:1.65; margin:0 0 4px;">Eric</p>
+
+          <p style="font-size:15px; line-height:1.6; color:#475569; margin:18px 0 0; padding-top:16px; border-top:1px solid #f1f5f9;">
+            <em>P.S. Tomorrow: the $243M mistake almost every contractor makes with a single NAICS code.</em>
+          </p>
         </td></tr>
 
         <!-- Footer -->
-        <tr><td style="padding:20px 36px 30px; border-top:1px solid #e2e8f0;">
-          <p style="font-size:13px; line-height:1.55; color:#64748b; margin:0 0 10px;">
-            Your extended access runs through <strong>July&nbsp;30</strong>. Questions? Just reply to this email.
-          </p>
-          <p style="font-size:12px; color:#94a3b8; margin:0;">
-            GovCon Giants · <a href="mailto:hello@govcongiants.com" style="color:#10b981; text-decoration:none;">hello@govcongiants.com</a>
+        <tr><td style="padding:22px 36px 30px;">
+          <p style="font-size:12px; line-height:1.55; color:#94a3b8; margin:0;">
+            Your extended access runs through July 30. GovCon Giants ·
+            <a href="mailto:hello@govcongiants.com" style="color:#10b981; text-decoration:none;">hello@govcongiants.com</a>
             &nbsp;·&nbsp; <a href="https://getmindy.ai/alerts/preferences?email={{email}}" style="color:#94a3b8;">Manage preferences</a>
             &nbsp;·&nbsp; <a href="https://getmindy.ai/api/alerts/unsubscribe?email={{email}}" style="color:#94a3b8;">Unsubscribe</a>
           </p>

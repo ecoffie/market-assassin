@@ -1,72 +1,94 @@
-# Email Series — Beta → Mindy 1.0 Nurture (7 emails)
+# Email Series — Beta → Mindy 1.0 (VALUE-FIRST, Eric's voice)
 
-**Why a series:** Dashboard (June 10): **481 eligible, 359 (75%) profile-incomplete,
-16 expired, 270 enabled-but-blocked.** One email won't convert a 75%-incomplete base.
-Each email teaches ONE real feature AND gives a reason to log in + finish setup. The
-incomplete profile is the conversion bottleneck — the series chips at it.
+**Rewritten to the GovCon Giants email playbook** (`~/Bootcamp/EMAIL-SEQUENCE-10-DAY-NURTURE.md`):
+- **Value/insight first, product second.** Each email teaches a real GovCon win; Mindy
+  is the *quiet enabler* (usually in the P.S. / soft CTA), NEVER the headline.
+- **Eric's first-person voice:** "Hey {{first_name}}", contrarian insight, real numbers
+  as proof, *homework*, signed Eric, P.S. teasing the next email.
+- Subject lines = curiosity/value, never "feature X is live."
 
-**Audience:** the 725 `beta_preview_v1_extension` cohort (trial through 2026-07-30).
-**From:** GovCon Giants <hello@govcongiants.com> · **Send:** `sendEmail()` batched (#58 cap).
-**Link (every email):** `https://getmindy.ai/setup-account?email={{email}}` → set
-password → `/app/onboarding` → Auto-setup. (For already-set-up users it lands them in
-the app.) **Voice:** plain language, "Mindy/Mindy Pro", no jargon.
-
-**Cadence:** Day 0, 2, 5, 8, 12, 18, 26 (front-loaded, tapering) — all land before
-the July 30 expiry, leaving room for a final "your trial ends" note.
-
----
-
-## The 7 emails (feature per send)
-
-| # | Day | Subject (draft) | Feature taught | The "log in" hook |
-|---|-----|-----------------|----------------|-------------------|
-| **1** | 0 | **We upgraded. You kept your access (through July 30).** | The switch + Auto-setup (#12) | "Set your password once — Mindy configures your profile from one line." |
-| **2** | 2 | Stop guessing NAICS codes — just type what you sell | Keyword-first research (#11) | "Type 'drones' — Mindy finds the $243M market across 70+ codes you'd never list." Log in to try your own keyword. |
-| **3** | 5 | See who's *really* buying — past the agency, to the office | Office-level buyer intel (#2) + full rosters (#9) | "Mindy drills to the buying office + the real contacts. Finish your profile so it targets YOUR agencies." |
-| **4** | 8 | Who holds this contract now? (one click) | "Who holds this now?" incumbent intel (#8) + award drill-down (#4) | "On any open opportunity, see the incumbent, the ceiling, when it expires. Log in and try it on a live one." |
-| **5** | 12 | The contracts expiring in your market — 6-18 months early | Recompete intelligence (#5) | "Mindy shows expiring contracts you can recompete. Set your NAICS so it shows YOURS." |
-| **6** | 18 | Upload a solicitation — Mindy drafts the response | Proposal Assist (#6) | "Mindy reads the whole RFP, builds the compliance matrix, drafts sections. Log in and drop one in." |
-| **7** | 26 | Your 30 days end July 30 — here's what you'd keep | Recap + pipeline (#10) + convert CTA | "You've got [X] saved. Keep Mindy Pro past July 30 →" (Stripe). Honest "or drop to free, alerts stay on." |
-
-**Profile-completion thread:** emails 2, 3, 5 explicitly tie the feature to "finish
-your setup so it's about YOUR market" — directly targeting the 359 incomplete.
-
-**Guardrails:** suppression list honored every send; anyone who completes setup +
-converts drops out of the remaining sequence; `{{first_name}}` → "there" fallback.
+**Audience:** 725 beta cohort (`trial_ends_at=2026-07-30`). 75% have incomplete
+profiles → the "win" in several emails REQUIRES finishing setup (that's the nudge).
+**Link:** `https://getmindy.ai/setup-account?email={{email}}` (set password → onboarding
+→ Auto-setup). **Send:** `sendEmail()` batched (#58 cap), drop-on-convert/unsub.
+**Cadence:** Day 0, 2, 4, 7, 11, 16, 24 (ends before July 30).
 
 ---
 
-## Email #1 copy (subject B — APPROVED lead)
+## The arc — each email is a WIN, the feature is the payoff
+
+| # | Day | Subject (value/curiosity) | The GovCon win it teaches | Mindy in the P.S. |
+|---|-----|---------------------------|----------------------------|-------------------|
+| **1** | 0 | We upgraded. You kept your access (through July 30). | "The beta you used is now the real thing — and you didn't lose a day." (re-entry + goodwill) | "Log in once, set a password, and Mindy rebuilds your whole setup from one sentence." |
+| **2** | 2 | The $243M market hiding behind ONE wrong code | Most contractors search ONE NAICS and miss 72% of their market (drones = 70+ codes). Search by what you SELL, not a code. | "Mindy does this for you — type a word, it finds the whole market. Try yours →" |
+| **3** | 4 | Stop pitching the agency. Pitch the office that actually buys. | The "agency" doesn't buy — a specific office does. Find the office + the person, skip the gatekeeper. | "Mindy drills to the buying office + the real contacts. Finish your setup so it shows YOURS →" |
+| **4** | 7 | Who's holding the contract you want? (find out in 10 seconds) | Before you bid, know the incumbent — their ceiling, when it expires, whether they're beatable. That's where capture starts. | "On any opportunity, Mindy shows who holds it now. Try it on one in your pipeline →" |
+| **5** | 11 | The contracts in your backyard expiring in the next 18 months | Expiring contracts = the agency MUST rebuy. Get in 6-18 months early, before the RFP. Your unfair-advantage list. | "Mindy shows the expiring contracts in your NAICS. Set yours so it's about your market →" |
+| **6** | 16 | I read a 142-page solicitation in 4 minutes (here's how) | The proposal grind kills small teams. The win: a compliance matrix + first-draft sections, fast — so you can actually bid more. | "Drop a solicitation into Mindy — it reads it, builds the matrix, drafts the sections →" |
+| **7** | 24 | Your 30 days are almost up — here's what you'd walk away from | Recap the wins they've had access to; honest choice: keep it or drop to free (alerts stay). | "Keep Mindy Pro past July 30 →" (Stripe). "Or do nothing — your free alerts keep coming." |
+
+**Profile-completion thread:** #2, #3, #5 make the win *require* their real profile
+("so it shows YOURS") — that's how we convert the 359 incomplete without nagging.
+
+---
+
+## EMAIL 1 (Day 0) — APPROVED subject B · re-entry + goodwill
 **Subject:** We upgraded. You kept your access (through July 30).
-**Preview:** The beta is now the full product. Log in to pick up where you left off.
+**Preview:** The beta you've been using is now the real thing.
 
-> **The beta is now Mindy 1.0 — and your access came with you.**
+> Hey {{first_name}},
 >
-> Hi {{first_name}},
+> For the last few months you've had **Mindy** working in the background — federal
+> opportunities in your inbox, market research a click away.
 >
-> For the last few months you've been using **Mindy** in beta — daily federal
-> opportunities, market research, the works. That beta was scheduled to end June 30.
+> That beta was set to end June 30. Instead of shutting it off, **we shipped the real
+> thing** — and gave you **30 more days** on it, free, through July 30. Call it a
+> thank-you for being early.
 >
-> Here's the good news: **we didn't shut it off. We shipped the real thing.**
+> Here's the one thing to do: the beta knew you by email. The real Mindy uses a real
+> account. **Set a password once** — and Mindy rebuilds your entire setup from a single
+> sentence about what you do. Two minutes, and you're further along than the beta ever
+> got you.
 >
-> Mindy **1.0** is live — faster, sharper, and with the tools the beta only hinted
-> at. And because you helped us get here, **your full access is extended 30 more days,
-> through July 30** — so you can try the real version, not the beta.
+> **[Log in & pick up where you left off →](https://getmindy.ai/setup-account?email={{email}})**
 >
-> **One small step:** the beta logged you in by email. Mindy 1.0 uses a real account.
-> **Set your password once** and you're in — Mindy will even set up your profile from
-> a one-line description of what you do.
+> More this week — I'll show you a few things the beta couldn't do yet.
 >
-> → **[Log in & claim your 30 days →]**(https://getmindy.ai/setup-account?email={{email}})
+> Eric
 >
-> Pick up right where you left off. — The GovCon Giants team
+> *P.S. Tomorrow: the $243M mistake almost every contractor makes with a single NAICS code.*
+
+---
+
+## EMAIL 2 (Day 2) — the value lesson (Mindy in the P.S.)
+**Subject:** The $243M market hiding behind ONE wrong code
+
+> {{first_name}},
 >
-> *Your extended access runs through July 30. Questions? Just reply.*
+> Here's a mistake I see almost every contractor make:
+>
+> They pick **one NAICS code** and search it. Done.
+>
+> Problem: a real market doesn't live in one code. Take "drones" — federal buyers
+> spent **$243M** on them last year, spread across **70+ NAICS codes**. The single
+> obvious one (336411, Aircraft Mfg)? **28% of the money.** Search it alone and you
+> miss **72% of your own market.**
+>
+> The fix is simple: **search by what you SELL, not by a code.** A keyword catches the
+> work no matter how the contracting officer classified it.
+>
+> Your homework: think of the ONE phrase a buyer would use for what you do. That's
+> your real search — not a code.
+>
+> Eric
+>
+> *P.S. This is the first thing I rebuilt in Mindy 1.0 — type that phrase, and it maps
+> the whole market for you, every code, automatically. [Try yours →](https://getmindy.ai/setup-account?email={{email}})*
 
 ---
 
 ## Build order
-1. ✅ Email #1 copy (above). HTML: `docs/email-beta-v1-launch-1.html`.
-2. Emails #2–#7 copy + HTML — build after #1 is approved (reuse the template).
-3. A small `sendEmail()`-backed sequence runner OR schedule via the existing
-   email pipeline; gate each send on "still in cohort + not converted + not unsubbed".
+1. ✅ Series rewritten value-first (above). #1 + #2 copy done.
+2. Draft #3–#7 copy in the same voice, then HTML (template = `email-beta-v1-launch-1.html`,
+   restyled for body-text-forward, less "feature box").
+3. Wire send (gated: in-cohort, not converted, not unsubbed). Eric sends after review.
