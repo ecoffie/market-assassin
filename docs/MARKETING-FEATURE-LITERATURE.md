@@ -462,6 +462,60 @@ starts with the high-value IDV/IDIQ vehicles and soon-expiring contracts.
 
 ---
 
+## 18. Government market research, done (coming) — Mindy for the buyer side
+
+**What it does:** Every federal contracting officer is *required* to do market
+research before they buy (FAR Part 10). The hardest part — proving whether a
+set-aside is viable, and who's *actually performing* this work — is exactly what
+Mindy does. A CO (on the roadmap) uploads their draft requirement, and Mindy
+produces the **performer-weighted small-business market depth** that drops straight
+into their Market Research Report: who's winning this work, the real Rule-of-Two
+picture, set-aside feasibility — grounded in live award data.
+
+**Why it's different:** Today a CO has two options — do it manually, or pay a
+consultant. **Mindy is the third alternative:** faster than manual, cheaper than a
+consultant, and it answers the one question SAM's SBS structurally can't — not "how
+many vendors are *registered*" but "how many are *actually winning* this kind of
+work." It puts Mindy on **both sides of the table** — the market-intelligence layer
+for federal contracting, for buyers and sellers alike.
+
+**SEO angles:**
+- "How contracting officers can do market research faster (FAR Part 10)"
+- "Is a small-business set-aside viable? The Rule-of-Two, answered with real data"
+- "SAM's SBS shows registrations — here's how to see who actually performs the work"
+
+**Proof point:** Grounded in USASpending awards + SAM + the federal recipients
+universe; performer-weighted depth, not raw registration counts. Honest scope:
+Mindy automates the small-business market-depth slice of the MRR — never the legal
+determinations, signatures, or rationale a CO must author.
+
+---
+
+## 19. Email any opportunity into Mindy (coming) — track it from ANY source
+
+**What it does:** Mindy tracks SAM.gov today — but you find opportunities
+*everywhere*: NIH/DARPA/NSF labs, Air Force and Army open solicitations, NECO, GSA
+eBuy, agency portals. Like forwarding a trip to TripIt, you'll (on the roadmap)
+forward any opportunity email to your personal Mindy address, and it becomes a
+**tracked pursuit** — same deadline alerts, amendment watching, and Proposal Assist
+as a native SAM opportunity. Attachments and all.
+
+**Why it's different:** Every other tool boxes you into one source. Real BD doesn't
+work that way — the work comes from a dozen portals. Mindy becomes the **single
+place you manage every pursuit, no matter where it came from.** Forward it, and
+it's tracked.
+
+**SEO angles:**
+- "Track government opportunities from labs, AF, Army — not just SAM.gov"
+- "One place to manage every federal pursuit, wherever it came from"
+- "Forward an opportunity to Mindy and never lose track of it"
+
+**Proof point:** Each forwarded email becomes a real pursuit record (title, agency,
+deadline, link, attachments extracted); secured against spoofing (verified sender /
+pending-review); deduped. Any source → one managed pipeline.
+
+---
+
 ## The data-sources story (the trust / acquisition angle)
 
 Every Mindy feature is grounded in **real, documented, continuously-maintained
