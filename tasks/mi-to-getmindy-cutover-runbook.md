@@ -9,6 +9,11 @@ tomorrow"). On pickup, FIRST re-run the ref audit fresh (count may have grown si
 this was written), THEN proceed through the sequence. Trigger phrase still works:
 "do the final migration."
 **Owner:** Eric (+ Claude for the code/verification steps).
+
+> **PAIR WITH `docs/PRD-migration-onboarding.md`** — this runbook moves the DOMAIN;
+> that PRD handles the AUDIENCE. Key: the real base is ~1,300 warm users (claim-
+> account → Auto-setup); ~83% are imported bootcamp leads → suppress generic alerts +
+> nurture, do NOT onboard. Don't run a mass cold-send during the cutover.
 **Related:** `docs/strategy/DOMAIN-BRAND-CONSOLIDATION.md` (strategy),
 `tasks/oauth-branding-runbook.md` (the OAuth/Supabase side — already done for
 `auth.getmindy.ai`; do NOT re-do, just verify).
