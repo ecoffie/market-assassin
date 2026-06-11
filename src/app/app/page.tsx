@@ -101,6 +101,7 @@ function AppDashboard() {
   // the email-only beta cohort who need to SET UP a password, not sign in.
   const [betaEmail, setBetaEmail] = useState('');
   const [betaSent, setBetaSent] = useState(false);
+  const [betaNoAccess, setBetaNoAccess] = useState(false);
   const [betaLoading, setBetaLoading] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'google' | 'microsoft' | null>(null);
   const [isSignUpMode, setIsSignUpMode] = useState(false);
@@ -652,6 +653,19 @@ function AppDashboard() {
               <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
                 ✅ Check your inbox — we sent your setup link. Click it to set a password and get in.
               </div>
+            ) : betaNoAccess ? (
+              // Non-entitled email — don't fake a sent link. Point them to the free
+              // signup form right below this banner.
+              <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+                We couldn&apos;t find Mindy access for that email.{' '}
+                <button
+                  type="button"
+                  onClick={() => { setIsSignUpMode(true); setBetaNoAccess(false); }}
+                  className="font-semibold underline hover:text-white"
+                >
+                  Create a free account →
+                </button>
+              </div>
             ) : (
               <div className="flex flex-col sm:flex-row gap-2">
                 <input
@@ -667,12 +681,16 @@ function AppDashboard() {
                   onClick={async () => {
                     setBetaLoading(true);
                     try {
-                      await fetch('/api/auth/mindy-account-setup/request', {
+                      const res = await fetch('/api/auth/mindy-account-setup/request', {
                         method: 'POST', headers: { 'Content-Type': 'application/json' },
                         body: JSON.stringify({ email: betaEmail.trim().toLowerCase() }),
                       });
-                      setBetaSent(true);
-                    } catch { /* generic success message either way (no email enumeration) */ setBetaSent(true); }
+                      const data = await res.json().catch(() => null);
+                      // entitled:false → they have no access; route to signup instead
+                      // of a dead-end "check your inbox".
+                      if (data && data.entitled === false) setBetaNoAccess(true);
+                      else setBetaSent(true);
+                    } catch { setBetaSent(true); }
                     finally { setBetaLoading(false); }
                   }}
                   className="rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-3 text-sm font-semibold text-white hover:from-blue-500 hover:to-purple-500 disabled:opacity-50 whitespace-nowrap"

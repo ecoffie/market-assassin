@@ -19,6 +19,7 @@ import nodemailer from 'nodemailer';
 import { createSecureAccessUrl } from '@/lib/access-links';
 import agencySatData from '@/data/agency-sat-friendliness.json';
 import { persistSentAlert } from '@/lib/alerts/delivery-log';
+import { userNeedsMindySetup } from '@/lib/alerts/profile-setup';
 import { MINDY_APP_URL, MINDY_FROM_NAME, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 
 // SAT Badge helper
@@ -100,6 +101,7 @@ interface NotificationUser {
   naics_codes: string[];
   keywords: string[] | null;
   business_type: string | null;
+  business_description?: string | null;
   set_aside_preferences?: string[] | null;
   agencies: string[];
   location_state: string | null; // State code for place of performance filter (e.g., 'FL', 'VA')
@@ -199,9 +201,14 @@ async function getRecentlySentOpportunityIds(email: string): Promise<Set<string>
  */
 async function sendAlertEmail(
   email: string,
-  opportunities: (SAMOpportunity & { score: number })[]
+  opportunities: (SAMOpportunity & { score: number })[],
+  user: NotificationUser
 ): Promise<void> {
   const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
+  const mindySetupUrl = await createSecureAccessUrl(email, 'briefings');
+  const needsSetup = userNeedsMindySetup(user);
+  const primaryCtaUrl = needsSetup ? mindySetupUrl : MINDY_APP_URL;
+  const primaryCtaLabel = needsSetup ? 'Set Up Mindy — Free →' : 'Open Mindy Dashboard →';
   const unsubscribeUrl = `${MINDY_SITE_URL}/api/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
 
   const opportunitiesHtml = opportunities.slice(0, 15).map((opp, i) => {
@@ -236,7 +243,7 @@ async function sendAlertEmail(
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8fafc;">
   <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); padding: 8px 16px; text-align: center; border-radius: 8px 8px 0 0;">
-    <p style="color: white; margin: 0; font-size: 11px; font-weight: 600;">🎁 FREE PREVIEW • Daily Alerts free during beta</p>
+    <p style="color: white; margin: 0; font-size: 11px; font-weight: 600;">👋 Welcome to Mindy</p>
   </div>
 
   <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 24px; text-align: center;">

@@ -27,6 +27,8 @@ import { getInsightForNoticeType, bucketNoticeType, renderInsightHtml } from '@/
 import { userInRollout } from '@/lib/intelligence/feature-flag';
 import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
 import { generateEmailToken } from '@/lib/api-auth';
+import { createSecureAccessUrl } from '@/lib/access-links';
+import { DEFAULT_PROFILE_NAICS, userNeedsMindySetup } from '@/lib/alerts/profile-setup';
 import { MINDY_APP_URL, MINDY_FROM_NAME, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 
 export const maxDuration = 300;
@@ -532,12 +534,11 @@ async function runDailyAlertJob(options?: {
 
         // Get NAICS codes - use defaults if user has none configured
         // Note: smart_user_profiles table was removed, using default NAICS as fallback
-        const DEFAULT_NAICS = ['541512', '541611', '541330', '541990', '561210'];
         let userNaics = user.naics_codes || [];
 
         if (userNaics.length === 0) {
           // Use default NAICS codes for users without profile
-          userNaics = DEFAULT_NAICS;
+          userNaics = DEFAULT_PROFILE_NAICS;
           console.log(`[Daily Alerts] Using default NAICS for ${user.user_email}: ${userNaics.join(', ')}`);
         }
 
@@ -1151,6 +1152,10 @@ async function sendDailyAlertEmail(
   const unsubscribeUrl = `${MINDY_SITE_URL}/api/alerts/unsubscribe?email=${encodedEmail}`;
   const preferencesUrl = `${MINDY_SITE_URL}/alerts/preferences?email=${encodedEmail}&token=${encodeURIComponent(preferencesAuth.token)}&ts=${preferencesAuth.ts}`;
   const mindyDashboardUrl = MINDY_APP_URL;
+  const mindySetupUrl = await createSecureAccessUrl(email, 'briefings');
+  const needsSetup = userNeedsMindySetup(user);
+  const primaryCtaUrl = needsSetup ? mindySetupUrl : mindyDashboardUrl;
+  const primaryCtaLabel = needsSetup ? 'Set Up Mindy — Free →' : 'Open Mindy Dashboard →';
   const totalCount = opportunities.length + grants.length;
 
   const opportunitiesHtml = opportunities.slice(0, 20).map((opp, i) => {
@@ -1253,12 +1258,23 @@ async function sendDailyAlertEmail(
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; color: #1f2937; max-width: 620px; margin: 0 auto; padding: 20px; background: #f8fafc;">
 
-  <!-- FREE PREVIEW Banner -->
+  ${needsSetup ? `
+  <!-- Setup Banner -->
+  <a href="${trackedUrl(mindySetupUrl, 'mindy_setup', 'banner_setup')}" style="text-decoration: none; display: block;">
+    <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); padding: 10px 20px; text-align: center; border-radius: 12px 12px 0 0;">
+      <p style="color: white; margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.5px;">
+        🎁 FREE forever • <span style="text-decoration: underline;">Set up your keywords in Mindy →</span>
+      </p>
+    </div>
+  </a>
+  ` : `
+  <!-- Welcome Banner -->
   <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); padding: 10px 20px; text-align: center; border-radius: 12px 12px 0 0;">
     <p style="color: white; margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.5px;">
-      🎁 FREE PREVIEW • You're testing Mindy daily alerts — no charge during beta!
+      👋 Welcome to Mindy • FREE forever
     </p>
   </div>
+  `}
 
   <!-- Header -->
   <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 28px 24px; text-align: center;">
@@ -1270,14 +1286,31 @@ async function sendDailyAlertEmail(
       ${formatDate(new Date().toISOString())} • ${totalCount} matches found
     </p>
     <p style="color: #cbd5e1; margin: 10px auto 0 auto; font-size: 12px; line-height: 1.5; max-width: 440px;">
-      New matches from your saved filters. Mindy prioritizes the best opportunities and keeps your full market view in one dashboard.
+      ${needsSetup
+        ? 'These matches use default filters. Set up Mindy with your keywords so we find opportunities for <em>your</em> business — free, no credit card.'
+        : 'New matches from your saved filters. Mindy prioritizes the best opportunities and keeps your full market view in one dashboard.'}
     </p>
     <p style="margin: 16px 0 0 0;">
-      <a href="${trackedUrl(mindyDashboardUrl, 'open_mindy_dashboard', 'header_dashboard')}" style="background: #10b981; color: white; padding: 10px 18px; text-decoration: none; border-radius: 999px; font-weight: 700; font-size: 13px; display: inline-block;">
-        Open Mindy Dashboard →
+      <a href="${trackedUrl(primaryCtaUrl, needsSetup ? 'mindy_setup' : 'open_mindy_dashboard', 'header_dashboard')}" style="background: #10b981; color: white; padding: 10px 18px; text-decoration: none; border-radius: 999px; font-weight: 700; font-size: 13px; display: inline-block;">
+        ${primaryCtaLabel}
       </a>
     </p>
   </div>
+
+  ${needsSetup ? `
+  <!-- Setup nudge -->
+  <div style="background: #fffbeb; border: 1px solid #fcd34d; border-left: 4px solid #f59e0b; padding: 14px 18px;">
+    <p style="color: #92400e; margin: 0 0 8px 0; font-size: 14px; font-weight: 700;">
+      ⚡ Personalize your alerts in 2 minutes
+    </p>
+    <p style="color: #78350f; margin: 0 0 12px 0; font-size: 13px; line-height: 1.5;">
+      Most alert subscribers haven't set up Mindy yet. Add your <strong>keywords</strong>, NAICS codes, and set-asides — then every alert is matched to what you actually sell.
+    </p>
+    <a href="${trackedUrl(mindySetupUrl, 'mindy_setup', 'setup_nudge')}" style="background: #f59e0b; color: white; padding: 9px 16px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 13px; display: inline-block;">
+      Set Up Mindy →
+    </a>
+  </div>
+  ` : ''}
 
   <!-- Filter summary -->
   <div style="background: #1e293b; padding: 12px 20px; border-bottom: 1px solid #334155;">
@@ -1378,16 +1411,18 @@ async function sendDailyAlertEmail(
 
   <div style="background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 100%); border-radius: 10px; padding: 24px; margin-top: 20px; text-align: center;">
     <h3 style="color: white; margin: 0 0 8px 0; font-size: 17px; font-weight: 700;">
-      Want Mindy to rank these for you?
+      ${needsSetup ? 'Ready for better matches?' : 'Want Mindy to rank these for you?'}
     </h3>
     <p style="color: #ddd6fe; margin: 0 0 16px 0; font-size: 13px; line-height: 1.5;">
-      Alerts tell you what matched. <strong>Mindy Pro</strong> ranks your top priorities, explains why they matter, and links you to the full opportunity dashboard.
+      ${needsSetup
+        ? 'Mindy is <strong>free forever</strong>. Tell us what you sell — keywords, NAICS, set-asides — and we\'ll find the right contracts for you.'
+        : 'Alerts tell you what matched. <strong>Mindy Pro</strong> ranks your top priorities, explains why they matter, and links you to the full opportunity dashboard.'}
     </p>
-    <a href="${trackedUrl(mindyDashboardUrl, 'open_mindy_dashboard', 'ranked_dashboard')}" style="background: white; color: #5b21b6; padding: 11px 24px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 14px; display: inline-block;">
-      Open Mindy Dashboard →
+    <a href="${trackedUrl(needsSetup ? mindySetupUrl : mindyDashboardUrl, needsSetup ? 'mindy_setup' : 'open_mindy_dashboard', 'ranked_dashboard')}" style="background: white; color: #5b21b6; padding: 11px 24px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 14px; display: inline-block;">
+      ${needsSetup ? 'Set Up Mindy — Free →' : 'Open Mindy Dashboard →'}
     </a>
     <p style="color: #c4b5fd; font-size: 11px; margin: 10px 0 0 0;">
-      Top priorities in your inbox + browse all matching opportunities
+      ${needsSetup ? '2-minute setup • No credit card • Alerts stay free' : 'Top priorities in your inbox + browse all matching opportunities'}
     </p>
   </div>
 
