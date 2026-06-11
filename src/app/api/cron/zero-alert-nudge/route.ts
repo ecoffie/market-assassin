@@ -67,6 +67,22 @@ export async function GET(request: NextRequest) {
   const limit = Math.max(1, Math.min(200, Number(url.searchParams.get('limit') || 50)));
   const supabase = sb();
 
+  // QA: ?test=email&password=... sends ONE nudge to that address (verify the email
+  // before the real batch). Password-gated so it can't be abused.
+  const testEmail = url.searchParams.get('test');
+  if (testEmail) {
+    const pw = url.searchParams.get('password');
+    if (pw !== (process.env.ADMIN_PASSWORD || 'galata-assassin-2026')) {
+      return NextResponse.json({ error: 'test requires admin password' }, { status: 401 });
+    }
+    try {
+      const r = await sendZeroAlertNudge(testEmail.toLowerCase().trim());
+      return NextResponse.json({ success: true, mode: 'test', to: testEmail, linkType: r.linkType });
+    } catch (err) {
+      return NextResponse.json({ success: false, error: err instanceof Error ? err.message : 'send failed' }, { status: 500 });
+    }
+  }
+
   const sevenDaysAgo = new Date(Date.now() - 7 * 86400_000).toISOString().split('T')[0];
   const fourteenDaysAgoIso = new Date(Date.now() - 14 * 86400_000).toISOString();
 
