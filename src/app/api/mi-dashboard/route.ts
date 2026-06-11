@@ -138,6 +138,42 @@ function getUrgencyLevel(deadline: string | null): 'critical' | 'urgent' | 'norm
   return 'upcoming';
 }
 
+/**
+ * Build the PostgREST .or() clause for a search term across title/description/dept.
+ *
+ * WORD-BOUNDARY for code-like terms: "M7" should match the TOKEN "M7" (and "M-7",
+ * "M 7"), NOT "M776"/"M700". A bare ILIKE %m7% substring-matches those longer codes
+ * → noise. So for short, code-like tokens (digits present, no spaces, <=8 chars) we
+ * use a case-insensitive regex with word boundaries (Postgres \m … \M) that also
+ * tolerates an optional separator between the letter run and the digit run
+ * (M7 ≈ M-7 ≈ M 7). Normal phrases ("contractor shall", "solar") keep plain ILIKE —
+ * substring is the right behavior there and regex-escaping free text is risky.
+ */
+function buildSearchOr(search: string): string {
+  const term = search.trim();
+  const cols = ['title', 'description', 'department'];
+
+  // Code-like? e.g. M7, M-7, 1005, 53-1234, AN/PVS-7. Has a digit, no whitespace,
+  // short, and not a plain word.
+  const isCodeLike = /\d/.test(term) && !/\s/.test(term) && term.length <= 8;
+
+  if (isCodeLike) {
+    // Escape regex metachars, then allow an optional [-/ ._]? where the original had
+    // a separator OR at the letter→digit / digit→letter seam, so M7 matches M-7 etc.
+    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const flexible = escaped
+      .replace(/[-/_. ]+/g, '[-/_. ]?')                 // existing separators → optional
+      .replace(/([A-Za-z])(?=\d)/g, '$1[-/_. ]?')        // letter→digit seam
+      .replace(/(\d)(?=[A-Za-z])/g, '$1[-/_. ]?');       // digit→letter seam
+    // \m … \M = word boundaries. imatch = case-insensitive regex (PostgREST).
+    const pattern = `\\m${flexible}\\M`;
+    return cols.map((c) => `${c}.imatch.${pattern}`).join(',');
+  }
+
+  // Normal phrase → substring ILIKE.
+  return cols.map((c) => `${c}.ilike.%${term}%`).join(',');
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
 
@@ -184,7 +220,8 @@ export async function GET(request: NextRequest) {
 
     // Apply filters
     if (search) {
-      query = query.or(`title.ilike.%${search}%,description.ilike.%${search}%,department.ilike.%${search}%`);
+      // Word-boundary for code-like terms ("M7" ≠ "M776"); ILIKE for phrases.
+      query = query.or(buildSearchOr(search));
     }
     // "Has SOW/PWS" (#66) — only opps with a real scope document (the serious,
     // evaluable ones). Backfilled by /api/cron/sow-catalog.
