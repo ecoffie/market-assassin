@@ -1453,7 +1453,7 @@ export default function AdminDashboard() {
           <div className="bg-gray-800 rounded-lg p-6 mb-8">
             <div className="flex items-start justify-between gap-4 mb-5">
               <div>
-                <h2 className="text-xl font-semibold text-white">MI Growth & Engagement</h2>
+                <h2 className="text-xl font-semibold text-white">Mindy Growth & Engagement</h2>
                 <p className="text-sm text-gray-400">
                   Current user inventory is separated from 7-day movement, email clicks, and app time.
                 </p>
@@ -1746,8 +1746,8 @@ export default function AdminDashboard() {
         <div className="bg-gray-800 rounded-lg p-6 mb-8">
           <div className="flex items-start justify-between gap-4 mb-5">
             <div>
-              <h2 className="text-xl font-semibold text-white">Legacy Email Snapshot</h2>
-              <p className="text-sm text-gray-400">Email-only launch activity from the older briefing dashboard. Use MI Growth above for the primary engagement read.</p>
+              <h2 className="text-xl font-semibold text-white">Email Engagement Snapshot</h2>
+              <p className="text-sm text-gray-400">Email open/click activity. Use Mindy Growth above for the primary engagement read.</p>
             </div>
             <span className="text-xs text-gray-500 bg-gray-700 px-2 py-1 rounded">Last 7 days</span>
           </div>
@@ -1781,13 +1781,13 @@ export default function AdminDashboard() {
           <div className="bg-gray-800 rounded-lg p-6 mb-8">
             <div className="flex flex-col gap-2 mb-5 md:flex-row md:items-start md:justify-between">
               <div>
-                <h2 className="text-xl font-semibold text-white">MI Account Setup Snapshot</h2>
+                <h2 className="text-xl font-semibold text-white">Mindy Account Setup Snapshot</h2>
                 <p className="text-sm text-gray-400">
-                  Entitlement, login identity, profile readiness, and setup-email status for MI beta users.
+                  Entitlement, login identity, profile readiness, and setup-email status for Mindy users.
                 </p>
               </div>
               <a href="/admin/mi-accounts" className="rounded bg-slate-700 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-600">
-                Open MI Accounts
+                Open Accounts
               </a>
             </div>
             <div className="grid grid-cols-2 md:grid-cols-4 xl:grid-cols-6 gap-3">
