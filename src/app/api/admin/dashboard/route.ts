@@ -443,32 +443,11 @@ async function getEmailStats(today: string) {
   return stats;
 }
 
-// Default NAICS assigned during bootcamp batch enrollment
+// Default NAICS assigned during bootcamp batch enrollment. "Custom NAICS" on the
+// dashboard = a profile whose codes are NOT exactly this set (the original, looser
+// definition — display-only, kept for continuity per Eric). The tighter
+// sweep/healthcare-aware classification lives in /api/admin/zero-alert-diagnosis.
 const DEFAULT_NAICS_SET = new Set(['541512', '541611', '541330', '541990', '561210']);
-// The OTHER seed set (defaults.ts healthcare — prompts users to configure).
-const HEALTHCARE_DEFAULT_SET = new Set([
-  '621111', '621210', '621511', '621610', '622110', '622310', '623110', '623312', '624120',
-]);
-
-// Tightened "Custom NAICS" — a profile is only CUSTOM when the user genuinely
-// chose their codes. Pre-filled signals to EXCLUDE:
-//   1. Exactly a known default set (5-code pro-services OR 9-code healthcare).
-//   2. A batch SWEEP — the identical NAICS array shared by many users (onboarding
-//      "describe your business" expanded a whole sector), or an array so large it's
-//      clearly a sector expansion, not hand-picked. (Measured June 2026: 535 users
-//      shared one identical 51-code full-541 sweep — counted as "custom" before.)
-const SWEEP_SHARED_USER_THRESHOLD = 5;  // same exact array held by >= this many users
-const SWEEP_MAX_HANDPICKED_CODES = 20;  // arrays bigger than this read as a sweep
-
-function naicsShapeKey(codes: string[]): string {
-  return [...new Set(codes.map(String))].sort().join(',');
-}
-
-function isExactDefaultSet(codes: string[]): boolean {
-  if (!codes.length) return false;
-  const isAll = (set: Set<string>) => codes.every((c) => set.has(String(c)));
-  return isAll(DEFAULT_NAICS_SET) || isAll(HEALTHCARE_DEFAULT_SET);
-}
 
 async function getUserHealth() {
   const health = {
@@ -581,38 +560,24 @@ async function getUserHealth() {
     if (settingsData) {
       health.totalUsers = settingsData.length;
 
-      // PASS 1: count how many users share each exact NAICS array. A shape held by
-      // many users is a batch seed, not independent choices — used below to keep
-      // sweeps out of the "Custom NAICS" count.
-      const shapeUserCounts = new Map<string, number>();
-      for (const user of settingsData) {
-        const codes = user.naics_codes || [];
-        if (codes.length === 0) continue;
-        const key = naicsShapeKey(codes);
-        shapeUserCounts.set(key, (shapeUserCounts.get(key) || 0) + 1);
-      }
-
       for (const user of settingsData) {
         const naicsCodes = user.naics_codes || [];
         const hasNaics = naicsCodes.length > 0;
         const hasBusinessType = user.business_type && user.business_type.trim() !== '';
         const normalizedEmail = user.user_email.toLowerCase();
 
-        // CUSTOM = user genuinely chose their codes. Exclude default sets AND batch
-        // sweeps (shared identical array, or an over-large sector expansion).
-        const isDefault = isExactDefaultSet(naicsCodes);
-        const sharedByManyUsers = hasNaics &&
-          (shapeUserCounts.get(naicsShapeKey(naicsCodes)) || 0) >= SWEEP_SHARED_USER_THRESHOLD;
-        const isSweep = hasNaics &&
-          (sharedByManyUsers || naicsCodes.length > SWEEP_MAX_HANDPICKED_CODES);
-        const isPrefilled = isDefault || isSweep;
-        const hasCustomNaics = hasNaics && !isPrefilled;
+        // CUSTOM = NAICS array isn't exactly the 5-code default set. (Eric: keep the
+        // original looser count for continuity — display-only, no send impact. The
+        // tighter "exclude sweeps + healthcare default" definition is available via
+        // the shape diagnostic / zero-alert-diagnosis endpoint when we want the
+        // honest activation number.)
+        const hasOnlyDefaults = hasNaics &&
+          naicsCodes.every((code: string) => DEFAULT_NAICS_SET.has(code));
+        const hasCustomNaics = hasNaics && !hasOnlyDefaults;
 
         if (hasCustomNaics) {
           health.naicsConfigured++;
-        } else if (hasNaics) {
-          // Has codes but they're pre-filled (a default set OR a batch sweep) —
-          // the user still needs to set up their real profile.
+        } else if (hasOnlyDefaults) {
           health.defaultNaicsOnly++;
           health.unconfiguredEmails.push(user.user_email);
         } else {

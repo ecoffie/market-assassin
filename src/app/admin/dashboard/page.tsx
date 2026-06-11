@@ -2148,7 +2148,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
               <div className="flex justify-between items-center">
-                <span className="text-gray-400" title="Default seed sets + batch sector sweeps — pre-filled, not user-chosen">Default / Pre-filled NAICS</span>
+                <span className="text-gray-400">Default NAICS Only</span>
                 <div className="flex items-center gap-2">
                   <div className="w-20 h-2 bg-gray-700 rounded-full overflow-hidden">
                     <div
