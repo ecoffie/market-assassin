@@ -1,5 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchSamAttachmentFilename, parseSamAttachment } from '@/lib/sam/attachment-metadata';
+import {
+  fetchSamAttachmentFilename,
+  isGenericAttachmentName,
+  parseSamAttachment,
+} from '@/lib/sam/attachment-metadata';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -19,7 +23,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'invalid SAM attachment url' }, { status: 400 });
   }
 
-  if (ref.name && !/^document\s+\d+/i.test(ref.name)) {
+  if (ref.name && !isGenericAttachmentName(ref.name)) {
     return NextResponse.json(
       { filename: ref.name },
       { headers: { 'Cache-Control': 'public, max-age=86400' } },

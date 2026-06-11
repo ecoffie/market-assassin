@@ -693,6 +693,8 @@ it or read cached metadata from the backfill cron.
 **SEO:** "SAM.gov RFP attachments," "federal solicitation documents download."
 
 **Proof:** `src/lib/sam/attachment-metadata.ts`, `SamAttachmentLinks.tsx`,
+`GET /api/sam-attachment/metadata`. SAM returns 403 on HEAD; ranged GET
+(`bytes=0-0`) reads `Content-Disposition` for the real filename.
 `backfill-sam-attachments` cron. DB rows with stale "Document N" names can be refreshed
 with `?retry-names=1` on the backfill endpoint.
 

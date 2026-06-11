@@ -49,15 +49,22 @@ export function parseSamAttachment(entry: unknown): SamAttachmentRef | null {
   return null;
 }
 
-/** True when we should HEAD SAM for the real filename (missing or auto-numbered). */
+/** Auto-numbered placeholders from backfill when SAM filename lookup failed. */
+export function isGenericAttachmentName(name: string | undefined | null): boolean {
+  if (!name) return true;
+  const t = name.trim();
+  if (!t || t.toLowerCase() === 'download') return true;
+  return /^(document|attachment)\s+\d+(\.\w+)?$/i.test(t);
+}
+
+/** True when we should fetch SAM for the real filename (missing or auto-numbered). */
 export function attachmentNeedsFilenameResolution(ref: SamAttachmentRef): boolean {
-  if (!ref.name) return true;
-  return /^document\s+\d+/i.test(ref.name);
+  return isGenericAttachmentName(ref.name);
 }
 
 /**
  * Pull the real filename from SAM's file-download endpoint via Content-Disposition.
- * HEAD first; fall back to GET when SAM returns 405.
+ * SAM returns 403 on HEAD — use a ranged GET first (206 + disposition header).
  */
 export async function fetchSamAttachmentFilename(fileUrl: string, apiKey?: string): Promise<string | null> {
   const key = apiKey || getRotatedSAMKey();
@@ -75,19 +82,24 @@ export async function fetchSamAttachmentFilename(fileUrl: string, apiKey?: strin
     target.searchParams.set('api_key', key);
   }
 
-  let res: Response;
-  try {
-    res = await fetch(target.toString(), { method: 'HEAD' });
-    if (res.status === 405) {
-      res = await fetch(target.toString(), { method: 'GET', headers: { Range: 'bytes=0-0' } });
-    }
-  } catch {
-    return null;
-  }
-  if (!res.ok) return null;
+  const targetUrl = target.toString();
+  const attempts: RequestInit[] = [
+    { method: 'GET', headers: { Range: 'bytes=0-0' } },
+    { method: 'HEAD' },
+  ];
 
-  const name = filenameFromDisposition(res.headers.get('content-disposition'));
-  return name || null;
+  for (const init of attempts) {
+    try {
+      const res = await fetch(targetUrl, init);
+      if (!res.ok) continue;
+      const name = filenameFromDisposition(res.headers.get('content-disposition'));
+      if (name) return name;
+    } catch {
+      /* try next */
+    }
+  }
+
+  return null;
 }
 
 /** Human label for an attachment row — prefers resolved SAM filename. */
@@ -97,7 +109,7 @@ export function labelSamAttachment(
   resolvedFilename?: string | null,
 ): string {
   const candidate = (resolvedFilename || ref.name || '').trim();
-  if (candidate && !/^document\s+\d+/i.test(candidate)) {
+  if (candidate && !isGenericAttachmentName(candidate)) {
     return candidate;
   }
   return `Attachment ${index + 1}`;
