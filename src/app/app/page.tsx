@@ -620,14 +620,17 @@ function AppDashboard() {
   if (!email) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900">
-        <div className="max-w-4xl mx-auto px-6 py-16">
+        {/* py-8 (was py-16) + tighter header margin so the Beta-setup + sign-in
+            card sit ABOVE the fold on a laptop — the buttons used to require a
+            scroll. */}
+        <div className="max-w-4xl mx-auto px-6 py-8">
           {/* Header */}
-          <div className="text-center mb-12">
-            <MindyLogo size={64} className="mx-auto mb-6" />
-            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+          <div className="text-center mb-6">
+            <MindyLogo size={56} className="mx-auto mb-4" />
+            <h1 className="text-3xl md:text-4xl font-bold text-white mb-2">
               Meet Mindy
             </h1>
-            <p className="text-xl text-gray-400 max-w-2xl mx-auto">
+            <p className="text-base md:text-lg text-gray-400 max-w-2xl mx-auto">
               Your AI-powered federal market intelligence partner. Daily briefings, market research,
               forecasts, pipeline tracking, and more.
             </p>
