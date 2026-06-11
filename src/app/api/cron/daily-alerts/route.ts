@@ -1354,15 +1354,15 @@ async function sendDailyAlertEmail(
   ${grants.length > 0 ? `
   <!-- Grants Section -->
   <div style="margin-top: 24px;">
-    <div style="background: linear-gradient(135deg, #065f46 0%, #059669 100%); padding: 16px 20px; border-radius: 12px 12px 0 0;">
+    <div style="background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%); padding: 16px 20px; border-radius: 12px 12px 0 0;">
       <h2 style="color: white; margin: 0; font-size: 18px; font-weight: 700;">
         🎓 Grant Opportunities
       </h2>
-      <p style="color: #a7f3d0; margin: 4px 0 0 0; font-size: 13px;">
+      <p style="color: #e9e3ff; margin: 4px 0 0 0; font-size: 13px;">
         ${grants.length} federal grants matching your profile
       </p>
     </div>
-    <div style="background: #ffffff; border: 1px solid #d1fae5; border-top: none; border-radius: 0 0 12px 12px;">
+    <div style="background: #ffffff; border: 1px solid #ede9fe; border-top: none; border-radius: 0 0 12px 12px;">
       <table style="width: 100%; border-collapse: collapse;">
         ${grants.map((grant, i) => {
           const daysUntil = getDaysUntil(grant.closeDate);
@@ -1380,7 +1380,7 @@ async function sendDailyAlertEmail(
                   ${fundingText ? `<span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 4px;">${fundingText}</span>` : ''}
                   <span style="background: ${scoreColor}20; color: ${scoreColor}; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-left: 4px;">${grant.score}%</span>
                 </div>
-                <a href="${trackedUrl(grant.link, 'grants_gov_opportunity', `grant_${grant.oppNumber || i + 1}`)}" style="color: #065f46; font-weight: 600; text-decoration: none; font-size: 14px; line-height: 1.4;">
+                <a href="${trackedUrl(grant.link, 'grants_gov_opportunity', `grant_${grant.oppNumber || i + 1}`)}" style="color: #6d28d9; font-weight: 600; text-decoration: none; font-size: 14px; line-height: 1.4;">
                   ${i + 1}. ${grant.title.slice(0, 90)}${grant.title.length > 90 ? '...' : ''}
                 </a>
                 <div style="color: #6b7280; font-size: 12px; margin-top: 5px;">

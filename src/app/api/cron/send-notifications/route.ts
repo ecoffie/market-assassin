@@ -260,7 +260,7 @@ async function sendAlertEmail(
     <h1 style="color: white; margin: 0; font-size: 20px;">Mindy Alert: ${opportunities.length} New Opportunities</h1>
     <p style="color: #94a3b8; margin: 4px 0 0 0; font-size: 13px;">${formatDate(new Date().toISOString())}</p>
     ${showSetupNudges ? `<p style="color: #cbd5e1; margin: 10px auto 0 auto; font-size: 12px; line-height: 1.5; max-width: 400px;">Add your keywords in Mindy for matches tailored to your business — free, no credit card.</p>` : ''}
-    <p style="margin: 14px 0 0 0;"><a href="${primaryCtaUrl}" style="background: #10b981; color: white; padding: 9px 16px; text-decoration: none; border-radius: 999px; font-weight: 700; font-size: 12px; display: inline-block;">${primaryCtaLabel}</a></p>
+    <p style="margin: 14px 0 0 0;"><a href="${primaryCtaUrl}" style="background: #7c3aed; color: white; padding: 9px 16px; text-decoration: none; border-radius: 999px; font-weight: 700; font-size: 12px; display: inline-block;">${primaryCtaLabel}</a></p>
   </div>
 
   <div style="background: white; border: 1px solid #e2e8f0;">
