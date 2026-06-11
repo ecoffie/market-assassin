@@ -32,7 +32,9 @@ export async function GET(request: NextRequest) {
   const offset = Math.max(Number(sp.get('offset')) || 0, 0);
 
   try {
-    const { rows, total } = await searchRecipients({ search, naics, state, sortBy, limit, offset });
+    // liveBq: this is the in-app contractor search — hit live BigQuery, don't
+    // return [] on a cold cache (the bug that made the panel + lookup show nothing).
+    const { rows, total } = await searchRecipients({ search, naics, state, sortBy, limit, offset, liveBq: true });
 
     // Shape to the panel's contractor model (recipient_name → company, etc.).
     const contractors = rows.map((r) => ({

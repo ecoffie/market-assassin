@@ -821,7 +821,14 @@ export async function searchRecipients(opts: {
   sortBy?: 'total_obligated' | 'award_count' | 'recipient_name';
   limit?: number;
   offset?: number;
+  // Opt into LIVE BigQuery. queryCached defaults to cacheOnly (returns [] on a
+  // cache miss to protect public/unauthed traffic from cold BQ scans). The
+  // authenticated in-app contractor search MUST set this true, else every search
+  // returns 0 on a cold cache (the bug: panel + lookup showed no results despite
+  // 317K rows in the table).
+  liveBq?: boolean;
 }): Promise<{ rows: RecipientSearchRow[]; total: number }> {
+  const liveBq = opts.liveBq ?? false;
   const search = (opts.search || '').trim();
   const state = (opts.state || '').trim().toUpperCase();
   // Parse NAICS into a list of codes, PRESERVING separate codes (don't strip
@@ -859,6 +866,7 @@ export async function searchRecipients(opts: {
       recipient_uei: string; recipient_name: string; total_amount: number; award_count: number;
       distinct_agency_count: number; total_rows: number;
     }>({
+      cacheOnly: !liveBq,
       cacheKey: `recipient-search-naics:${naicsCodes.join('_')}:${search}:${sortBy}:${limit}:${offset}:v3`,
       query: `
         WITH matched AS (
@@ -910,6 +918,7 @@ export async function searchRecipients(opts: {
   const orderDir = sortBy === 'recipient_name' ? 'ASC' : 'DESC';
 
   const rows = await queryCached<RecipientSearchRow & { total_rows: number }>({
+    cacheOnly: !liveBq,
     cacheKey: `recipient-search:${search}:${state}:${sortBy}:${limit}:${offset}:v2`,
     query: `
       SELECT
