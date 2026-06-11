@@ -68,6 +68,7 @@ interface Opportunity {
   title: string;
   description: string | null;
   description_url: string | null;
+  synopsis_available?: boolean;
   attachments: SamAttachment[];
   points_of_contact: SamPointOfContact[];
   office_address: SamOfficeAddress | null;
@@ -1038,8 +1039,15 @@ function MarketIntelDashboard() {
                           notice_id: opp.notice_id,
                         });
                       }
-                      // Auto-fetch description only on demand — not on expand.
-                      // Keeps documents & contacts visible without a wall of SAM text.
+                      // Background-fetch synopsis on expand — renders collapsed below docs/POC.
+                      if (
+                        opening
+                        && !(opp.description || lazyDescriptions[opp.notice_id])
+                        && loadingDescriptionFor !== opp.notice_id
+                        && (opp.synopsis_available || opp.description_url || opp.notice_id)
+                      ) {
+                        void loadFullDescription(opp.notice_id);
+                      }
                       if (opening) {
                         void loadAnalyst(opp.notice_id);
                       }
@@ -1285,6 +1293,24 @@ function MarketIntelDashboard() {
                         </div>
                       )}
 
+                      {(opp.synopsis_available || opp.description || lazyDescriptions[opp.notice_id] || opp.description_url || opp.notice_id) && (
+                        <CollapsibleOpportunityDescription
+                          text={opp.description || lazyDescriptions[opp.notice_id]}
+                          loading={loadingDescriptionFor === opp.notice_id}
+                          pendingRemote={
+                            !(opp.description || lazyDescriptions[opp.notice_id])
+                            && loadingDescriptionFor !== opp.notice_id
+                          }
+                          onLoad={() => loadFullDescription(opp.notice_id)}
+                          error={
+                            descriptionErrorFor?.id === opp.notice_id
+                              ? descriptionErrorFor.error
+                              : null
+                          }
+                          onRetry={() => loadFullDescription(opp.notice_id)}
+                        />
+                      )}
+
                       <div className="grid md:grid-cols-3 gap-4 text-sm">
                         <div>
                           <span className="text-gray-500 text-xs">Solicitation #</span>
@@ -1406,23 +1432,6 @@ function MarketIntelDashboard() {
                             </a>
                           )}
                         </div>
-                      )}
-
-                      {(opp.description || lazyDescriptions[opp.notice_id] || opp.description_url) && (
-                        <CollapsibleOpportunityDescription
-                          text={opp.description || lazyDescriptions[opp.notice_id]}
-                          loading={loadingDescriptionFor === opp.notice_id}
-                          pendingRemote={
-                            !!(opp.description_url && !opp.description && !lazyDescriptions[opp.notice_id])
-                          }
-                          onLoad={() => loadFullDescription(opp.notice_id)}
-                          error={
-                            descriptionErrorFor?.id === opp.notice_id
-                              ? descriptionErrorFor.error
-                              : null
-                          }
-                          onRetry={() => loadFullDescription(opp.notice_id)}
-                        />
                       )}
 
                       {opp.ui_link && (

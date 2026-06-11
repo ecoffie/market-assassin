@@ -85,6 +85,7 @@ interface RawOpportunity {
   pop_state: string | null;
   pop_zip: string | null;
   ui_link: string | null;
+  raw_data?: Record<string, unknown> | null;
 }
 
 interface DashboardOpportunity {
@@ -97,6 +98,7 @@ interface DashboardOpportunity {
   // instead of inline text. UI can fetch the text on demand via
   // /api/sam-description?noticeId=... and cache it back.
   description_url: string | null;
+  synopsis_available?: boolean;
   department: string;
   attachments: SamAttachment[];
   points_of_contact: SamPointOfContact[];
@@ -565,7 +567,10 @@ export async function GET(request: NextRequest) {
       // through. description_url from the column (if separately
       // populated) is honored too.
       const rawDescription = typeof opp.description === 'string' ? opp.description.trim() : null;
+      const rawData = opp.raw_data;
+      const rawDataDesc = typeof rawData?.description === 'string' ? rawData.description.trim() : null;
       const descriptionIsUrl = !!rawDescription && /^https?:\/\//i.test(rawDescription);
+      const rawDataDescIsUrl = !!rawDataDesc && /^https?:\/\//i.test(rawDataDesc);
       // Some rows were cached before the HTML→text helper landed and
       // still hold raw SAM markup (<p>, <li>, &nbsp;, etc.). Clean
       // on read so the UI never sees raw tags, regardless of when
@@ -578,7 +583,10 @@ export async function GET(request: NextRequest) {
       const description = cleanedDescription;
       const description_url = descriptionIsUrl
         ? rawDescription
+        : rawDataDescIsUrl
+        ? rawDataDesc
         : (typeof opp.description_url === 'string' ? opp.description_url : null);
+      const synopsis_available = !!(description || description_url || opp.notice_id);
 
       return {
         id: opp.id,
@@ -587,6 +595,7 @@ export async function GET(request: NextRequest) {
         title: opp.title,
         description,
         description_url,
+        synopsis_available,
         department: opp.department || 'Unknown Agency',
         sub_tier: opp.sub_tier,
         office: opp.office,

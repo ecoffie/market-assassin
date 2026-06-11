@@ -409,7 +409,14 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
     }
   }, [email, analystByOpp]);
 
-  // Mindy Analyst on drawer open — description loads on demand only.
+  // Background-fetch synopsis when drawer opens.
+  useEffect(() => {
+    if (!selectedAlert) return;
+    if (selectedAlert.description || lazyDescriptions[selectedAlert.id]) return;
+    if (loadingDescription === selectedAlert.id) return;
+    void loadFullDescription(selectedAlert.id);
+  }, [selectedAlert, lazyDescriptions, loadingDescription, loadFullDescription]);
+
   useEffect(() => {
     if (!selectedAlert) return;
     void loadAnalyst(selectedAlert.id);
@@ -1208,6 +1215,22 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                 </div>
               )}
 
+              {(selectedAlert.description || lazyDescriptions[selectedAlert.id] || selectedAlert.descriptionUrl || selectedAlert.id) && (
+                <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+                  <CollapsibleOpportunityDescription
+                    text={selectedAlert.description || lazyDescriptions[selectedAlert.id]}
+                    loading={loadingDescription === selectedAlert.id}
+                    pendingRemote={
+                      !(selectedAlert.description || lazyDescriptions[selectedAlert.id])
+                      && loadingDescription !== selectedAlert.id
+                    }
+                    onLoad={() => loadFullDescription(selectedAlert.id)}
+                    error={descriptionError}
+                    onRetry={() => loadFullDescription(selectedAlert.id)}
+                  />
+                </div>
+              )}
+
               <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 space-y-3">
                 <div>
                   <div className="text-xs text-slate-500">Buyer</div>
@@ -1439,21 +1462,6 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                       {selectedAlert.additionalInfoLink}
                     </a>
                   )}
-                </div>
-              )}
-
-              {(selectedAlert.description || lazyDescriptions[selectedAlert.id] || selectedAlert.descriptionUrl) && (
-                <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-                  <CollapsibleOpportunityDescription
-                    text={selectedAlert.description || lazyDescriptions[selectedAlert.id]}
-                    loading={loadingDescription === selectedAlert.id}
-                    pendingRemote={
-                      !!(selectedAlert.descriptionUrl && !selectedAlert.description && !lazyDescriptions[selectedAlert.id])
-                    }
-                    onLoad={() => loadFullDescription(selectedAlert.id)}
-                    error={descriptionError}
-                    onRetry={() => loadFullDescription(selectedAlert.id)}
-                  />
                 </div>
               )}
 

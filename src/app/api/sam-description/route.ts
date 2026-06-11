@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getRotatedSAMKey } from '@/lib/sam/utils';
 import { samHtmlToText, looksLikeHtml } from '@/lib/sam/description-text';
+import { fetchNoticeDescription, isDescriptionLink } from '@/lib/sam/notice-description';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -92,12 +93,47 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // Need to resolve the URL.
+  // Need to resolve from SAM — use stored URL or build from notice_id.
   if (!cached || !isHttpUrl(cached)) {
-    return NextResponse.json({
-      success: false,
-      error: 'no description URL on file for this opportunity',
-    }, { status: 404 });
+    const apiKey = getRotatedSAMKey();
+    if (!apiKey) {
+      return NextResponse.json(
+        { success: false, error: 'SAM API key not configured' },
+        { status: 500 },
+      );
+    }
+
+    try {
+      const linkOrId = cached && isDescriptionLink(cached) ? cached : noticeId;
+      const cleaned = (await fetchNoticeDescription(linkOrId, apiKey)).slice(0, MAX_DESCRIPTION_LENGTH);
+      if (!cleaned) {
+        return NextResponse.json(
+          { success: false, error: 'SAM.gov returned no description text' },
+          { status: 502 },
+        );
+      }
+
+      void supabase
+        .from('sam_opportunities')
+        .update({ description: cleaned })
+        .eq('notice_id', noticeId)
+        .then((res) => {
+          if (res.error) console.warn('[sam-description] cache write failed:', res.error.message);
+        });
+
+      return NextResponse.json({
+        success: true,
+        noticeId,
+        description: cleaned,
+        source: 'sam.gov+noticeid',
+      });
+    } catch (err) {
+      console.error('[sam-description] noticedesc fetch failed:', err);
+      return NextResponse.json(
+        { success: false, error: 'no description URL on file for this opportunity' },
+        { status: 404 },
+      );
+    }
   }
 
   const apiKey = getRotatedSAMKey();

@@ -34,7 +34,7 @@ export default function CollapsibleOpportunityDescription({
       <div className={`rounded-lg border border-dashed border-gray-700 bg-gray-950/30 p-3 ${className}`}>
         <p className="text-xs text-gray-500 uppercase tracking-wide">SAM synopsis</p>
         <p className="mt-1 text-sm text-gray-400">
-          Long legal boilerplate is hidden by default — load only if you need the full text.
+          Scope narrative from SAM.gov — collapsed by default so documents stay on top.
         </p>
         {onLoad && (
           <button
@@ -42,7 +42,7 @@ export default function CollapsibleOpportunityDescription({
             onClick={onLoad}
             className="mt-2 text-xs font-medium text-purple-300 hover:text-purple-200"
           >
-            Load full description from SAM.gov
+            Load synopsis from SAM.gov
           </button>
         )}
       </div>
