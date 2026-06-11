@@ -719,3 +719,9 @@ SAM attachments). Match via OpenAI `text-embedding-3-small` + in-app cosine over
 agency/NAICS-sliced candidates (~50–300 rows). API: `GET /api/app/recompete-sow`.
 UI: `RecompeteSowMatch` in Expiring Contracts — labeled "likely SOW match by semantic
 similarity," never "the incumbent's SOW."
+
+**Tuning (June 2026):** Thresholds calibrated to real award-title vs SOW-body scores
+(~0.52 confident, ~0.42 possible). Interior/DOI agency filter fixed (comma-safe SAM
+`department` patterns). UI shows amber "possible match" cards for review when score is
+42–51%; below 42% nothing is shown to avoid wrong links. Corpus: 7,491 embedded SOWs in
+`sam_opportunities`.

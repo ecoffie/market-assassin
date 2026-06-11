@@ -10,8 +10,11 @@ import { createClient } from '@supabase/supabase-js';
 import {
   agencyDepartmentPatterns,
   agencyFilterToken,
+  buildRecompeteQueryText,
   embedText,
   evaluateRecompeteMatch,
+  isPossibleRecompeteMatch,
+  naics2Prefix,
   naicsPrefix,
   parseEmbedding,
   topMatches,
@@ -65,33 +68,51 @@ export async function GET(request: NextRequest) {
   };
 
   try {
-    const queryVec = await embedText(description);
+    const queryText = buildRecompeteQueryText(description, naics, agency);
+    const queryVec = await embedText(queryText);
 
     const sb = getSupabase();
-    let q = sb
-      .from('sam_opportunities')
-      .select(
-        'id, notice_id, solicitation_number, title, department, naics_code, sow_doc_type, sow_filename, sow_text, sow_embedding',
-      )
-      .eq('has_sow_doc', true)
-      .not('sow_embedding', 'is', null);
 
-    if (prefix) {
-      q = q.like('naics_code', `${prefix}%`);
-    }
-    if (deptPatterns.length) {
-      q = q.or(deptPatterns.map((p) => `department.ilike.%${p}%`).join(','));
-    } else if (agencyToken) {
-      q = q.ilike('department', `%${agencyToken}%`);
+    async function fetchRows(naicsLike: string | null) {
+      let q = sb
+        .from('sam_opportunities')
+        .select(
+          'id, notice_id, solicitation_number, title, department, naics_code, sow_doc_type, sow_filename, sow_text, sow_embedding',
+        )
+        .eq('has_sow_doc', true)
+        .not('sow_embedding', 'is', null);
+
+      if (naicsLike) {
+        q = q.like('naics_code', `${naicsLike}%`);
+      }
+      if (deptPatterns.length) {
+        q = q.or(deptPatterns.map((p) => `department.ilike.%${p}%`).join(','));
+      } else if (agencyToken) {
+        q = q.ilike('department', `%${agencyToken}%`);
+      }
+
+      return q.limit(500);
     }
 
-    const { data: rows, error } = await q.limit(500);
+    let { data: rows, error } = await fetchRows(prefix);
     if (error) {
       return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     }
 
+    const twoDigit = naics2Prefix(naics);
+    if ((rows?.length ?? 0) < 20 && twoDigit && twoDigit !== prefix?.slice(0, 2)) {
+      const wider = await fetchRows(twoDigit);
+      if (!wider.error && (wider.data?.length ?? 0) > (rows?.length ?? 0)) {
+        rows = wider.data;
+      }
+    }
+
+    const seenNotices = new Set<string>();
     const candidates = (rows || [])
       .map((row) => {
+        const noticeId = row.notice_id as string;
+        if (noticeId && seenNotices.has(noticeId)) return null;
+        if (noticeId) seenNotices.add(noticeId);
         const vec = parseEmbedding(row.sow_embedding);
         if (!vec) return null;
         return {
@@ -145,7 +166,7 @@ export async function GET(request: NextRequest) {
 
     console.log('[recompete-sow]', JSON.stringify(telemetry));
 
-    const formatMatch = (m: (typeof ranked)[0]) => ({
+    const formatMatch = (m: (typeof ranked)[0], tier: 'confident' | 'possible') => ({
       id: m.id,
       noticeId: m.noticeId,
       solicitationNumber: m.solicitationNumber,
@@ -158,17 +179,21 @@ export async function GET(request: NextRequest) {
       scorePct: Math.round(m.score * 100),
       snippet: snippet(m.sowText || ''),
       samUrl: m.noticeId ? samNoticeUrl(m.noticeId) : null,
-      label: 'Likely SOW match by semantic similarity',
+      label:
+        tier === 'confident'
+          ? 'Likely SOW match by semantic similarity'
+          : 'Possible match — review before relying on this link',
     });
 
     if (!verdict.confident) {
+      const showPossible = isPossibleRecompeteMatch(top.score);
       return NextResponse.json({
         success: true,
         verdict: 'no_confident_match',
         reason: top.score < verdict.threshold ? 'below_threshold' : 'gap_too_small',
         match: null,
-        possible: formatMatch(top),
-        top: ranked.map(formatMatch),
+        possible: showPossible ? formatMatch(top, 'possible') : null,
+        top: ranked.map((m) => formatMatch(m, 'possible')),
         telemetry,
       });
     }
@@ -176,8 +201,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       verdict: 'confident_match',
-      match: formatMatch(top),
-      top: ranked.map(formatMatch),
+      match: formatMatch(top, 'confident'),
+      top: ranked.map((m) => formatMatch(m, 'confident')),
       telemetry,
     });
   } catch (e) {

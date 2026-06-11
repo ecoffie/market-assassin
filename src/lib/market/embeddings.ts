@@ -7,8 +7,13 @@ const EMBED_MODEL = 'text-embedding-3-small';
 const EMBED_DIM = 1536;
 const MAX_INPUT_CHARS = 8000;
 
-export const RECOMPETE_SOW_THRESHOLD = parseFloat(process.env.RECOMPETE_SOW_THRESHOLD || '0.78');
-export const RECOMPETE_SOW_MIN_GAP = parseFloat(process.env.RECOMPETE_SOW_MIN_GAP || '0.05');
+/** Award title vs full SOW body rarely exceeds ~0.55–0.69; tune from telemetry. */
+export const RECOMPETE_SOW_THRESHOLD = parseFloat(process.env.RECOMPETE_SOW_THRESHOLD || '0.52');
+export const RECOMPETE_SOW_MIN_GAP = parseFloat(process.env.RECOMPETE_SOW_MIN_GAP || '0.01');
+/** Below this we hide the link entirely — too likely wrong. */
+export const RECOMPETE_SOW_POSSIBLE_THRESHOLD = parseFloat(
+  process.env.RECOMPETE_SOW_POSSIBLE_THRESHOLD || '0.42',
+);
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
@@ -103,6 +108,8 @@ export function agencyFilterToken(agency: string): string | null {
 /**
  * Map USASpending expiring-contract agency names → SAM `department` ilike patterns.
  * Army/Navy/AF all live under DEPT OF DEFENSE in SAM — not "Army" literally.
+ *
+ * Patterns must NOT contain commas — PostgREST `.or()` uses comma as a delimiter.
  */
 export function agencyDepartmentPatterns(agency: string): string[] {
   const a = (agency || '').toLowerCase();
@@ -112,9 +119,11 @@ export function agencyDepartmentPatterns(agency: string): string[] {
   if (/veterans|\bva\b/.test(a)) return ['VETERANS AFFAIRS'];
   if (/homeland|dhs|cbp|ice|fema|tsa/.test(a)) return ['HOMELAND SECURITY'];
   if (/health.*human|hhs|\bnih\b|\bcdc\b/.test(a)) return ['HEALTH AND HUMAN SERVICES'];
-  if (/energy|\bdoe\b/.test(a)) return ['ENERGY, DEPARTMENT OF'];
-  if (/justice|\bdoj\b|fbi/.test(a)) return ['JUSTICE, DEPARTMENT OF'];
-  if (/interior|\bdoi\b/.test(a)) return ['INTERIOR, DEPARTMENT'];
+  if (/energy|\bdoe\b/.test(a)) return ['ENERGY'];
+  if (/justice|\bdoj\b|fbi/.test(a)) return ['JUSTICE'];
+  if (/interior|\bdoi\b/.test(a)) return ['INTERIOR'];
+  if (/transportation|\bdot\b/.test(a)) return ['TRANSPORTATION'];
+  if (/commerce/.test(a)) return ['COMMERCE'];
   if (/nasa|aeronautics/.test(a)) return ['NATIONAL AERONAUTICS'];
   if (/gsa|general services/.test(a)) return ['GENERAL SERVICES'];
   const token = agencyFilterToken(agency);
@@ -124,6 +133,19 @@ export function agencyDepartmentPatterns(agency: string): string[] {
 export function naicsPrefix(naics: string): string | null {
   const digits = (naics || '').replace(/\D/g, '');
   return digits.length >= 3 ? digits.slice(0, 3) : null;
+}
+
+export function naics2Prefix(naics: string): string | null {
+  const digits = (naics || '').replace(/\D/g, '');
+  return digits.length >= 2 ? digits.slice(0, 2) : null;
+}
+
+/** Richer embedding input than award title alone. */
+export function buildRecompeteQueryText(description: string, naics?: string, agency?: string): string {
+  const parts = [(description || '').trim()];
+  if (naics) parts.push(`NAICS ${naics}`);
+  if (agency) parts.push(agency.trim());
+  return parts.filter(Boolean).join(' | ');
 }
 
 export interface RecompeteMatchVerdict {
@@ -142,12 +164,17 @@ export function evaluateRecompeteMatch(
   minGap = RECOMPETE_SOW_MIN_GAP,
 ): RecompeteMatchVerdict {
   const gap = topScore - runnerUpScore;
+  const weakRunnerUp = runnerUpScore < 0.4;
   return {
-    confident: topScore >= threshold && gap >= minGap,
+    confident: topScore >= threshold && (gap >= minGap || weakRunnerUp),
     topScore,
     runnerUpScore,
     gap,
     threshold,
     minGap,
   };
+}
+
+export function isPossibleRecompeteMatch(score: number): boolean {
+  return score >= RECOMPETE_SOW_POSSIBLE_THRESHOLD;
 }

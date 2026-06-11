@@ -1129,7 +1129,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                           <RecompeteSowMatch
                             piid={contract.piid}
                             naics={contract.naics}
-                            agency={contract.agency}
+                            agency={[contract.agency, contract.subAgency].filter(Boolean).join(' ')}
                             description={contract.title}
                             email={email}
                             className="mt-3"

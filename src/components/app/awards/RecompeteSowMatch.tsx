@@ -131,13 +131,23 @@ export default function RecompeteSowMatch({
             renderMatch(state.match, true)
           )}
           {typeof state === 'object' && state.verdict === 'no_confident_match' && (
-            <div className="text-[11px] text-slate-500">
-              No confident SOW match found for this recompete
-              {state.reason === 'no_candidates' ? ' (no recovered scope docs in this agency/NAICS slice yet).' : '.'}
-              {state.possible && state.reason !== 'no_candidates' && (
-                <span className="block mt-1 text-slate-600">Best candidate scored below our confidence bar — not shown to avoid a wrong link.</span>
+            <>
+              {state.possible ? (
+                <div className="space-y-2">
+                  <p className="text-[11px] text-amber-400/90">
+                    No confident match — showing best candidate for review (semantic similarity only).
+                  </p>
+                  {renderMatch(state.possible, false)}
+                </div>
+              ) : (
+                <div className="text-[11px] text-slate-500">
+                  No confident SOW match found for this recompete
+                  {state.reason === 'no_candidates'
+                    ? ' (no recovered scope docs in this agency/NAICS slice yet).'
+                    : '. Best candidate scored below our confidence bar — not shown to avoid a wrong link.'}
+                </div>
               )}
-            </div>
+            </>
           )}
         </div>
       )}
