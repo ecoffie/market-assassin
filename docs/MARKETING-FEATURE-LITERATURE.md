@@ -727,3 +727,75 @@ similarity," never "the incumbent's SOW."
 `department` patterns). UI shows amber "possible match" cards for review when score is
 42–51%; below 42% nothing is shown to avoid wrong links. Corpus: 7,491 embedded SOWs in
 `sam_opportunities`.
+
+## 24. Search the BODY of solicitations, not just the titles — across the whole archive
+
+**What:** Mindy's Market Dashboard search now reads the **full text of every notice** —
+the title, the SAM description body, AND the extracted SOW/PWS scope document — not just
+the title. So a term like **"M7"** buried in a Statement of Work surfaces even when the
+title says "Soldier Virtual Trainer" and the NAICS says "ordnance." Plus an
+**Active / Inactive / All** toggle to search the full archive (90,000+ closed
+solicitations), not just what's biddable today.
+
+**Why:** The #1 reason contractors miss work: the title lies. Federal solicitation titles
+rarely match what's actually being bought — the real requirement is in the body and the
+scope document. SAM.gov only searches titles + metadata; it can't see inside the notice
+body or the attachments. Mindy can. And an active search now **escapes your profile
+NAICS** — the whole point of keyword search is to find work *outside* the codes you'd
+expect.
+
+**SEO:** "search inside SAM solicitations," "find federal opportunities by keyword not
+title," "search SAM.gov full text," "federal contract archive search," "search expired
+solicitations recompete."
+
+**Proof:** 4-corpus search (title + SAM description + sow_text + department) over the
+local cache. Description bodies captured from SAM's per-notice text endpoint (the SAM
+list API returns only a link, never the body — Mindy resolves it). Word-boundary
+matching so "M7" matches the token, not "M776." 91,830-notice corpus (active + archive).
+Verified: searching scope-document language ("quality assurance surveillance plan")
+returns 625 notices whose titles never mention it.
+
+## 25. Look up any contract, company, or UEI from one search bar
+
+**What:** A global lookup bar in the Mindy header. Paste a **contract number** → the full
+award detail (ceiling vs obligated, the parent vehicle, period of performance, recipient,
+NAICS/PSC, funding account). Type a **company name** or a **UEI** → that contractor's
+full profile (5-year federal sales, top agencies, NAICS mix, recent awards). One bar,
+any identifier, instant answer.
+
+**Why:** When you already *have* an identifier — a contract number off a press release, a
+competitor's name, a UEI from a teaming partner — you shouldn't have to hunt for the
+"right section." Every serious intelligence platform (Bloomberg, GovWin) works this way:
+type the thing, land on its page. Mindy brings that to federal market data.
+
+**SEO:** "look up federal contract number," "research a government contract by PIID,"
+"federal contractor lookup by UEI," "search USASpending contract number," "who won
+contract number."
+
+**Proof:** Reuses the USASpending award-detail spine (`/api/app/award-detail`, resolves a
+raw PIID server-side) + the 317K-recipient BigQuery contractor profiles. Verified live:
+SAIC $2.09B, L3Harris $1.83B, Oracle Health $1.50B contracts resolve by number; Boeing
+resolves by both name and UEI. Misses fall back to a USASpending link, never a dead end.
+
+## 26. Mindy reads your past work and writes your keywords (coming)
+
+**What:** When you import your company by UEI, Mindy already pulls your NAICS, PSC, and
+identity from SAM. Now it also **reads your past-performance descriptions and writes the
+keywords buyers actually use for your work** — then teaches you why they matter: *"Your
+NAICS codes say who you are. Keywords say what you sell — and catch work your codes alone
+miss."*
+
+**Why:** NAICS codes are who you're *registered* as; they're a blunt instrument that
+misses most of your real opportunities (the title/keyword gap). Most contractors have no
+idea their alerts are NAICS-only and quietly under-matching. Deriving keywords from what
+they've *actually done* — by meaning, not guesswork — closes that gap automatically, the
+moment they import their UEI.
+
+**SEO:** "federal contractor keyword research," "find opportunities beyond my NAICS code,"
+"government contract keywords from past performance," "SAM UEI profile auto-setup."
+
+**Proof:** Keywords derived semantically (OpenAI `text-embedding-3-small` + cosine,
+ranked to the company-meaning vector) from the contractor's own past-performance scope
+descriptions + capabilities + NAICS titles. Seeded additively into alert matching (never
+clobbers tuned keywords). The keyword gap is the same root cause behind under-matched
+profiles documented across Mindy's alert quality work.
