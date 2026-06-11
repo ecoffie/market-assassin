@@ -2,14 +2,16 @@ import Link from 'next/link';
 import { MindySignupForm } from '@/components/mindy/MindySignupForm';
 import { DemoMedia } from '@/components/mindy/DemoMedia';
 
-// Product reels (vertical 9:16). Vimeo player-embed format. The hero uses the
-// first; the "See Mindy in action" row uses all three.
-const DEMO_REELS = [
-  'https://player.vimeo.com/video/1200497413',
-  'https://player.vimeo.com/video/1200497355',
-  'https://player.vimeo.com/video/1200497352',
-];
-const HERO_DEMO_EMBED = DEMO_REELS[0];
+// Product reels (vertical 9:16). Vimeo player-embed URLs WITH app_id — the exact
+// form Vimeo's own oembed serves (a bare player URL gets a 401 for these Business
+// Team-library videos). Matched to captions by their real Vimeo titles:
+//   1200497355 "How Do I Know Which Ones to Actually Bid On" → bid/search
+//   1200497352 "5 active solicitations"                      → morning briefing
+//   1200497413 "Weekly Deep Dive 10 Opportunities"           → market research
+const VIMEO_APP = 'app_id=122963';
+const reel = (id: string) => `https://player.vimeo.com/video/${id}?${VIMEO_APP}`;
+const DEMO_REELS = [reel('1200497355'), reel('1200497352'), reel('1200497413')];
+const HERO_DEMO_EMBED = reel('1200497413'); // the Weekly Deep Dive overview as the hero
 
 // Route paid CTAs through /checkout first so purchase attribution (UTM /
 // referrer captured pre-checkout) is joined to the Stripe purchase event.
