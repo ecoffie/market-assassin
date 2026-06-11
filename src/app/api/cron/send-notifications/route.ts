@@ -19,7 +19,7 @@ import nodemailer from 'nodemailer';
 import { createSecureAccessUrl } from '@/lib/access-links';
 import agencySatData from '@/data/agency-sat-friendliness.json';
 import { persistSentAlert } from '@/lib/alerts/delivery-log';
-import { userNeedsMindySetup } from '@/lib/alerts/profile-setup';
+import { shouldShowAlertSetupNudges } from '@/lib/alerts/profile-setup';
 import { MINDY_APP_URL, MINDY_FROM_NAME, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 
 // SAT Badge helper
@@ -111,6 +111,7 @@ interface NotificationUser {
   timezone?: string;
   last_alert_sent?: string;
   total_alerts_sent?: number;
+  created_at?: string | null;
 }
 
 interface FetchedData {
@@ -206,9 +207,9 @@ async function sendAlertEmail(
 ): Promise<void> {
   const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
   const mindySetupUrl = await createSecureAccessUrl(email, 'briefings');
-  const needsSetup = userNeedsMindySetup(user);
-  const primaryCtaUrl = needsSetup ? mindySetupUrl : MINDY_APP_URL;
-  const primaryCtaLabel = needsSetup ? 'Set Up Mindy — Free →' : 'Open Mindy Dashboard →';
+  const showSetupNudges = shouldShowAlertSetupNudges(user);
+  const primaryCtaUrl = showSetupNudges ? mindySetupUrl : MINDY_APP_URL;
+  const primaryCtaLabel = showSetupNudges ? 'Set Up Mindy — Free →' : 'Open Mindy Dashboard →';
   const unsubscribeUrl = `${MINDY_SITE_URL}/api/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
 
   const opportunitiesHtml = opportunities.slice(0, 15).map((opp, i) => {
@@ -242,15 +243,24 @@ async function sendAlertEmail(
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; background: #f8fafc;">
+  ${showSetupNudges ? `
+  <a href="${mindySetupUrl}" style="text-decoration: none; display: block;">
+    <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); padding: 8px 16px; text-align: center; border-radius: 8px 8px 0 0;">
+      <p style="color: white; margin: 0; font-size: 11px; font-weight: 600;">🎁 FREE forever • <span style="text-decoration: underline;">Set up your keywords in Mindy →</span></p>
+    </div>
+  </a>
+  ` : `
   <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); padding: 8px 16px; text-align: center; border-radius: 8px 8px 0 0;">
-    <p style="color: white; margin: 0; font-size: 11px; font-weight: 600;">👋 Welcome to Mindy</p>
+    <p style="color: white; margin: 0; font-size: 11px; font-weight: 600;">👋 Welcome to Mindy • FREE forever</p>
   </div>
+  `}
 
   <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 24px; text-align: center;">
     ${renderMindyEmailLogo(48)}
     <h1 style="color: white; margin: 0; font-size: 20px;">Mindy Alert: ${opportunities.length} New Opportunities</h1>
     <p style="color: #94a3b8; margin: 4px 0 0 0; font-size: 13px;">${formatDate(new Date().toISOString())}</p>
-    <p style="margin: 14px 0 0 0;"><a href="${MINDY_APP_URL}" style="background: #10b981; color: white; padding: 9px 16px; text-decoration: none; border-radius: 999px; font-weight: 700; font-size: 12px; display: inline-block;">Open Mindy Dashboard →</a></p>
+    ${showSetupNudges ? `<p style="color: #cbd5e1; margin: 10px auto 0 auto; font-size: 12px; line-height: 1.5; max-width: 400px;">Add your keywords in Mindy for matches tailored to your business — free, no credit card.</p>` : ''}
+    <p style="margin: 14px 0 0 0;"><a href="${primaryCtaUrl}" style="background: #10b981; color: white; padding: 9px 16px; text-decoration: none; border-radius: 999px; font-weight: 700; font-size: 12px; display: inline-block;">${primaryCtaLabel}</a></p>
   </div>
 
   <div style="background: white; border: 1px solid #e2e8f0;">
@@ -352,7 +362,7 @@ async function runNotificationJob(options?: {
 
         if (newOpps.length > 0) {
           try {
-            await sendAlertEmail(user.user_email, newOpps);
+            await sendAlertEmail(user.user_email, newOpps, user);
 
             await persistSentAlert({
               supabase: getSupabase(),

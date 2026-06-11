@@ -17,13 +17,25 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Email is required' }, { status: 400 });
     }
 
-    const access = await verifyMIAccess(email);
+    // Resolve entitlement. If the access lookup itself errors (KV/Supabase blip on
+    // an unknown email), treat as NO access rather than 500 — a new visitor should
+    // be routed to signup, never see a server error.
+    let tier: string = 'none';
+    let staffRole = 'none';
+    try {
+      const access = await verifyMIAccess(email);
+      tier = access.tier;
+      staffRole = access.staffRole || 'none';
+    } catch (accessErr) {
+      console.warn('[MI Account Setup] access lookup failed, treating as no-access:', accessErr);
+      tier = 'none';
+    }
+
     // No entitlement → DON'T fake "check your inbox" (that's a dead end — no email
-    // is sent). Tell THIS user (who typed their own email) that there's no Mindy
-    // access for it and to create a free account instead. `entitled:false` lets the
-    // UI redirect them to signup. Not meaningful enumeration: it's a self-service
-    // flow where the person already knows their own email's status.
-    if (access.tier === 'none') {
+    // is sent). Tell THIS user (who typed their own email) there's no Mindy access
+    // for it and to create a free account. `entitled:false` lets the UI redirect to
+    // signup. Not meaningful enumeration: self-service, the user's own email.
+    if (tier === 'none') {
       return NextResponse.json({
         success: true,
         entitled: false,
@@ -31,11 +43,21 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    await sendSetupInvite(email, { tier: access.tier, staffRole: access.staffRole || 'none' });
+    // Entitled → send the setup link. If the SEND fails, still don't 500 the user;
+    // report a soft failure they can retry.
+    try {
+      await sendSetupInvite(email, { tier, staffRole });
+    } catch (sendErr) {
+      console.error('[MI Account Setup] setup-link send failed:', sendErr);
+      return NextResponse.json(
+        { success: false, entitled: true, error: 'Could not send the setup link right now. Please try again.' },
+        { status: 502 },
+      );
+    }
 
     return NextResponse.json({ success: true, entitled: true, message: SETUP_SUCCESS_MESSAGE });
   } catch (error) {
-    console.error('[MI Account Setup] Failed to send setup link:', error);
+    console.error('[MI Account Setup] Unexpected failure:', error);
     return NextResponse.json({ success: false, error: 'Unable to send setup link' }, { status: 500 });
   }
 }
