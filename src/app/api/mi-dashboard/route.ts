@@ -151,7 +151,12 @@ function getUrgencyLevel(deadline: string | null): 'critical' | 'urgent' | 'norm
  */
 function buildSearchOr(search: string): string {
   const term = search.trim();
-  const cols = ['title', 'description', 'department'];
+  // Search corpus, richest last: title + SAM description body + the extracted
+  // SOW/PWS scope text (sow_text, a column on sam_opportunities) + department.
+  // sow_text is the deepest layer — the actual requirements doc — so a term like
+  // "M7" buried in a Statement of Work surfaces even when neither title nor the
+  // short SAM description mentions it. Same row, so it's a plain column add.
+  const cols = ['title', 'description', 'sow_text', 'department'];
 
   // Code-like? e.g. M7, M-7, 1005, 53-1234, AN/PVS-7. Has a digit, no whitespace,
   // short, and not a plain word.

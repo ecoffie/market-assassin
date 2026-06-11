@@ -42,6 +42,14 @@ export async function GET(request: NextRequest) {
       .eq('active', true),
   ]);
 
+  // SOW corpus: how many rows actually have non-empty sow_text (the 2nd search corpus).
+  const [sowFlagged, sowWithText] = await Promise.all([
+    supabase.from('sam_opportunities').select('notice_id', { count: 'exact', head: true })
+      .eq('has_sow_doc', true),
+    supabase.from('sam_opportunities').select('notice_id', { count: 'exact', head: true })
+      .not('sow_text', 'is', null).neq('sow_text', ''),
+  ]);
+
   // Live SAM rate-limit probe: grab one row's description link and fetch it,
   // reading the rate-limit headers off the raw response.
   let rateLimit: Record<string, string | null> = {};
@@ -93,6 +101,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     success: true,
     needsBackfill: { active: activeNeedCount, inactive: inactiveNeedCount },
+    sowCorpus: { hasSowDocFlag: sowFlagged.count || 0, withSowText: sowWithText.count || 0 },
     totalActive: totalActive.count || 0,
     samRateLimit: rateLimit,
     smokeTest: { ok: smokeOk, length: smokeText.length, preview: smokeText.slice(0, 160) },
