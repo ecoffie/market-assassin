@@ -970,12 +970,13 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         naics: (d.naicsSuggestions || []).map((s: { code: string; name: string }) => ({ code: s.code, name: s.name })),
         psc: (d.pscSuggestions || []).map((s: { code: string; name: string }) => ({ code: s.code, name: s.name })),
       });
-      // Apply the FULL coverage set (#59 — up to 8 codes covering ~90%, not the
-      // old top-3 that silently missed 72%). The keyword still flows to TMR so the
-      // coverage lesson banner renders.
-      const coverageNaics = (d.naicsSuggestions || []).slice(0, 8).map((s: { code: string }) => s.code).join(', ');
-      const coveragePsc = (d.pscSuggestions || []).slice(0, 4).map((s: { code: string }) => s.code).join(', ');
-      const nextFormData = { ...formData, naicsCode: coverageNaics, pscCode: coveragePsc, businessType: formData.businessType || 'Small Business' };
+      // DON'T pre-fill naicsCode from the narrow suggest-codes list — that made the
+      // backend SKIP its full-90%-coverage derivation (it only auto-derives when
+      // naicsCode is EMPTY). Send the keyword with EMPTY codes so target-market-
+      // research computes the real coverage set (~9 codes covering 91%, not 6).
+      // The suggestion chips above are display-only. (Bug: panel showed a fraction
+      // of the coverage the engine actually finds.)
+      const nextFormData = { ...formData, naicsCode: '', pscCode: '', businessType: formData.businessType || 'Small Business' };
       setFormData(nextFormData);
       handleGenerateAll({ nextFormData });
       // Persist the user's own words into their profile keywords (additive, never
@@ -2067,7 +2068,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         <div className="space-y-6">
           {/* Market coverage lesson (#59) — how many codes make up this market +
               the keyword-vs-one-code teaching. Only when researched by keyword. */}
-          <MarketCoverageBanner coverage={marketCoverage} />
+          <MarketCoverageBanner coverage={marketCoverage} email={email} />
           {/* Headline stats — same 4 numbers as the reports view's
               MetricCards but with stronger visual hierarchy here. */}
           <section className="grid grid-cols-1 gap-4 md:grid-cols-4">

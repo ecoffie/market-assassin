@@ -72,6 +72,37 @@ function normalizeAgencyKey(s: string): string {
     .trim();
 }
 
+// Derive SEARCH KEYWORDS from a keyword's market coverage — grounded in real data:
+// the keyword + the top PSC's product name ("what's bought") + signal words from
+// the top buying NAICS titles. These are the terms a contractor would actually
+// search by, catching opps where the title says something else.
+const KW_STOP = new Set([
+  'and', 'or', 'the', 'of', 'for', 'all', 'other', 'nec', 'services', 'service',
+  'manufacturing', 'except', 'related', 'activities', 'professional', 'scientific',
+  'technical', 'except', 'instruments', 'equipment', 'general', 'misc', 'miscellaneous',
+]);
+function deriveCoverageKeywords(coverage: NonNullable<Awaited<ReturnType<typeof keywordCoverage>>>): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const add = (s: string) => {
+    const t = s.toLowerCase().trim();
+    if (t.length >= 3 && !seen.has(t)) { seen.add(t); out.push(t); }
+  };
+  // 1. The keyword itself.
+  add(coverage.keyword);
+  // 2. The top PSC product name (e.g. "unmanned aircraft") — what's actually bought.
+  if (coverage.topPsc?.name) add(coverage.topPsc.name.toLowerCase());
+  // 3. Signal phrases from the top buying NAICS titles (most $ first).
+  for (const n of (coverage.allNaics || []).slice(0, 6)) {
+    const words = (n.name || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+      .filter((w) => w.length >= 4 && !KW_STOP.has(w));
+    // the single most distinctive word per title (longest)
+    const best = [...words].sort((a, b) => b.length - a.length)[0];
+    if (best) add(best);
+  }
+  return out.slice(0, 10);
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
 function getSupabase() {
@@ -737,6 +768,10 @@ export async function POST(request: NextRequest) {
         top_code_pct: Math.round(coverage.topCodePct * 100),
         psc_count: coverage.pscCount,
         top_psc: coverage.topPsc,           // "what was bought" — the teachable PSC lesson
+        // SEARCH KEYWORDS the user can add to alerts — grounded in real data: the
+        // keyword itself + the top PSC's product name + signal words from the top
+        // buying NAICS titles. These catch body-buried opps the codes alone miss.
+        keywords: deriveCoverageKeywords(coverage),
       } : null,
       cached: false,
       generation_ms: Date.now() - startedAt,

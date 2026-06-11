@@ -1,5 +1,7 @@
 'use client';
 
+import { useState } from 'react';
+
 /**
  * MarketCoverageBanner (#59) — teaches the user how big their market really is and
  * how many codes make it up. Eric: "let users know how many codes make up the
@@ -20,13 +22,31 @@ export interface MarketCoverage {
   top_code_pct: number;          // e.g. 28
   psc_count?: number;
   top_psc?: { code: string; name: string } | null;
+  keywords?: string[];           // search terms to add to alerts
 }
 
 const fmt$ = (n: number) => n >= 1e9 ? `$${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `$${(n / 1e6).toFixed(0)}M` : `$${Math.round(n).toLocaleString()}`;
 
-export default function MarketCoverageBanner({ coverage }: { coverage: MarketCoverage | null }) {
+export default function MarketCoverageBanner({ coverage, email }: { coverage: MarketCoverage | null; email?: string | null }) {
+  const [added, setAdded] = useState(false);
+  const [adding, setAdding] = useState(false);
   if (!coverage || !coverage.total_market) return null;
   const hiddenPct = 100 - coverage.top_code_pct;
+  const keywords = coverage.keywords || [];
+
+  async function addKeywords() {
+    if (!email || keywords.length === 0) return;
+    setAdding(true);
+    try {
+      await fetch('/api/app/keywords/add', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, keywords }),
+      });
+      setAdded(true);
+    } catch { /* non-fatal */ }
+    finally { setAdding(false); }
+  }
   return (
     <div className="rounded-xl border border-purple-500/30 bg-gradient-to-br from-blue-900/15 to-purple-600/10 p-4 mb-4">
       <div className="flex items-baseline justify-between mb-2.5">
@@ -56,6 +76,33 @@ export default function MarketCoverageBanner({ coverage }: { coverage: MarketCov
           </div>
         )}
       </div>
+
+      {/* SEARCH KEYWORDS — the terms to add to alerts so you catch body-buried opps. */}
+      {keywords.length > 0 && (
+        <div className="rounded-lg bg-slate-950/40 p-2.5 mt-3">
+          <div className="flex items-center justify-between gap-2 mb-1.5">
+            <div className="text-[10px] uppercase tracking-wider text-slate-500">🔑 Search keywords for this market</div>
+            {email && (
+              added ? (
+                <span className="text-[11px] font-medium text-emerald-400">✓ Added to your alerts</span>
+              ) : (
+                <button
+                  onClick={addKeywords}
+                  disabled={adding}
+                  className="text-[11px] font-medium text-purple-300 hover:text-purple-200 disabled:opacity-60"
+                >
+                  {adding ? 'Adding…' : '+ Add all to my alerts'}
+                </button>
+              )
+            )}
+          </div>
+          <div className="flex flex-wrap gap-1.5">
+            {keywords.map((kw) => (
+              <span key={kw} className="rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-[11px] text-slate-300">{kw}</span>
+            ))}
+          </div>
+        </div>
+      )}
 
       <div className="text-[11px] text-slate-500 mt-2.5">
         💬 <b className="text-slate-400">Lesson:</b> &ldquo;{coverage.keyword}&rdquo; is bought under <b className="text-slate-400">{coverage.naics_count} NAICS codes</b>
