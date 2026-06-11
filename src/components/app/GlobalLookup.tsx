@@ -14,26 +14,63 @@ import AwardDetailDrawer from './awards/AwardDetailDrawer';
 // A contract PIID is an alphanumeric token, typically 9-20 chars, often with the
 // agency code prefix (e.g. 140F0822D0024, W912HV26Z0015, FA865012C5168). We accept
 // any alphanumeric-ish token of reasonable length as a candidate.
+// A UEI is exactly 12 alphanumeric chars, no separators (e.g. NYCTPM8VVDM6).
+function looksLikeUei(q: string): boolean {
+  return /^[A-Za-z0-9]{12}$/.test(q.trim());
+}
+// A PIID is alphanumeric with digits, 7-25 chars (e.g. 140F0822D0024). Excludes
+// 12-char UEIs (checked first) so they don't collide.
 function looksLikePiid(q: string): boolean {
   const t = q.trim();
   return /^[A-Za-z0-9][A-Za-z0-9-]{6,24}$/.test(t) && /\d/.test(t);
+}
+// A company name: has a space or a corp suffix.
+function looksLikeCompany(q: string): boolean {
+  const t = q.trim();
+  return t.length > 2 && (/\s/.test(t) || /\b(inc|corp|llc|ltd|co|company|group|systems|technolog)\b/i.test(t));
 }
 
 export default function GlobalLookup({ email }: { email: string | null }) {
   const [value, setValue] = useState('');
   const [openPiid, setOpenPiid] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
+  const [resolving, setResolving] = useState(false);
+
+  // Company / UEI → resolve to a contractor slug via the (now-live) search, then
+  // navigate to the full /contractors/[slug] profile page.
+  async function resolveContractor(query: string) {
+    setResolving(true);
+    setHint(null);
+    try {
+      const res = await fetch(`/api/contractors/search-bq?search=${encodeURIComponent(query)}&limit=1`);
+      const data = await res.json();
+      const top = (data?.contractors || [])[0];
+      if (top?.slug) {
+        window.location.href = `/contractors/${top.slug}`;
+      } else {
+        setHint(`No contractor found for "${query}".`);
+      }
+    } catch {
+      setHint('Lookup failed — try again.');
+    } finally {
+      setResolving(false);
+    }
+  }
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
     const q = value.trim();
     if (!q) return;
-    if (looksLikePiid(q)) {
-      setHint(null);
+    setHint(null);
+    // Order matters: UEI (exact 12) before PIID (would also match 12-char tokens).
+    if (looksLikeUei(q)) {
+      resolveContractor(q.toUpperCase());
+    } else if (looksLikePiid(q)) {
       setOpenPiid(q.toUpperCase());
+    } else if (looksLikeCompany(q)) {
+      resolveContractor(q);
     } else {
-      // v1 only handles contract numbers; guide the user instead of failing silently.
-      setHint("That doesn't look like a contract number. Try a PIID like 140F0822D0024.");
+      setHint('Try a contract number (PIID), a UEI, or a company name.');
     }
   }
 
@@ -45,9 +82,10 @@ export default function GlobalLookup({ email }: { email: string | null }) {
           type="text"
           value={value}
           onChange={(e) => { setValue(e.target.value); setHint(null); }}
-          placeholder="Look up a contract number (PIID)…"
-          aria-label="Look up a contract number"
-          className="w-full rounded-lg border border-slate-700 bg-slate-900/80 pl-9 pr-3 py-2 text-sm text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500"
+          placeholder="Look up a contract #, company, or UEI…"
+          aria-label="Look up a contract number, company, or UEI"
+          className="w-full rounded-lg border border-slate-700 bg-slate-900/80 pl-9 pr-3 py-2 text-sm text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:opacity-60"
+          disabled={resolving}
         />
         {hint && (
           <div className="absolute left-0 right-0 top-full mt-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200 z-50">
