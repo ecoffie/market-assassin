@@ -35,6 +35,7 @@ export default function GlobalLookup({ email }: { email: string | null }) {
   const [openPiid, setOpenPiid] = useState<string | null>(null);
   const [hint, setHint] = useState<string | null>(null);
   const [resolving, setResolving] = useState(false);
+  const [focused, setFocused] = useState(false);
 
   // Company / UEI → resolve to a contractor slug via the (now-live) search, then
   // navigate to the full /contractors/[slug] profile page.
@@ -82,11 +83,37 @@ export default function GlobalLookup({ email }: { email: string | null }) {
           type="text"
           value={value}
           onChange={(e) => { setValue(e.target.value); setHint(null); }}
+          onFocus={() => setFocused(true)}
+          onBlur={() => setTimeout(() => setFocused(false), 150)}
           placeholder="Look up a contract #, company, or UEI…"
           aria-label="Look up a contract number, company, or UEI"
-          className="w-full rounded-lg border border-slate-700 bg-slate-900/80 pl-9 pr-3 py-2 text-sm text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:opacity-60"
+          className="w-full rounded-lg border border-slate-700 bg-slate-900/80 pl-9 pr-9 py-2 text-sm text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:opacity-60"
           disabled={resolving}
         />
+        {resolving && (
+          <span className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
+        )}
+        {/* Capability hint — appears on focus (when empty) so users discover what
+            they can look up, like Linear/Notion search. */}
+        {focused && !value && !hint && (
+          <div className="absolute left-0 right-0 top-full mt-1 rounded-lg border border-slate-700 bg-slate-900 p-2 shadow-2xl shadow-black/40 z-50">
+            <p className="px-2 pb-1 text-[10px] uppercase tracking-wider text-slate-500">Look up by</p>
+            <div className="space-y-0.5">
+              <div className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-xs">
+                <span className="text-slate-300">Contract number</span>
+                <span className="font-mono text-slate-500">140F0822D0024</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-xs">
+                <span className="text-slate-300">Company name</span>
+                <span className="font-mono text-slate-500">Lockheed Martin</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-xs">
+                <span className="text-slate-300">UEI</span>
+                <span className="font-mono text-slate-500">E466BXU4KJH8</span>
+              </div>
+            </div>
+          </div>
+        )}
         {hint && (
           <div className="absolute left-0 right-0 top-full mt-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200 z-50">
             {hint}
