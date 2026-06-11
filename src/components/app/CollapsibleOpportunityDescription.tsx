@@ -87,7 +87,7 @@ export default function CollapsibleOpportunityDescription({
         <span className="text-gray-500 text-xs uppercase tracking-wide">SAM synopsis</span>
         {isLong && (
           <span className="text-[10px] text-gray-600">
-            {showCollapsed ? 'Collapsed — documents & contacts are above' : `${content.length.toLocaleString()} chars`}
+            {showCollapsed ? 'Preview — expand for full text' : `${content.length.toLocaleString()} chars`}
           </span>
         )}
       </div>

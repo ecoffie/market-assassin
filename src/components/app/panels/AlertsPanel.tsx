@@ -1170,18 +1170,6 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                 contactsAnchorId={`alert-poc-${selectedAlert.id}`}
               />
 
-              {selectedAlert.attachments && selectedAlert.attachments.length > 0 && (
-                <div
-                  id={`alert-docs-${selectedAlert.id}`}
-                  className="bg-purple-500/[0.04] border border-purple-500/30 rounded-lg p-4 scroll-mt-4"
-                >
-                  <SamAttachmentLinks
-                    attachments={selectedAlert.attachments}
-                    onDownloadClick={() => trackAlertEvent('link_click', selectedAlert, 'download_attachment')}
-                  />
-                </div>
-              )}
-
               {selectedAlert.pointsOfContact && selectedAlert.pointsOfContact.length > 0 && (
                 <div id={`alert-poc-${selectedAlert.id}`} className="bg-slate-900 border border-slate-800 rounded-lg p-4 scroll-mt-4">
                   <div className="text-xs text-slate-500 uppercase tracking-wider mb-3">
@@ -1462,6 +1450,18 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                       {selectedAlert.additionalInfoLink}
                     </a>
                   )}
+                </div>
+              )}
+
+              {selectedAlert.attachments && selectedAlert.attachments.length > 0 && (
+                <div
+                  id={`alert-docs-${selectedAlert.id}`}
+                  className="bg-purple-500/[0.04] border border-purple-500/30 rounded-lg p-4 scroll-mt-4"
+                >
+                  <SamAttachmentLinks
+                    attachments={selectedAlert.attachments}
+                    onDownloadClick={() => trackAlertEvent('link_click', selectedAlert, 'download_attachment')}
+                  />
                 </div>
               )}
 

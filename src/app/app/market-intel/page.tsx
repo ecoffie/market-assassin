@@ -1244,22 +1244,6 @@ function MarketIntelDashboard() {
                         contactsAnchorId={`opp-poc-${opp.notice_id}`}
                       />
 
-                      {opp.attachments && opp.attachments.length > 0 && (
-                        <div
-                          id={`opp-docs-${opp.notice_id}`}
-                          className="rounded-lg border border-purple-500/30 bg-purple-500/[0.04] p-3 scroll-mt-4"
-                        >
-                          <SamAttachmentLinks
-                            attachments={opp.attachments}
-                            onDownloadClick={(idx) => track('link_click', 'market_intel_dashboard', {
-                              action: 'download_attachment',
-                              notice_id: opp.notice_id,
-                              attachment_index: idx,
-                            })}
-                          />
-                        </div>
-                      )}
-
                       {opp.points_of_contact && opp.points_of_contact.length > 0 && (
                         <div id={`opp-poc-${opp.notice_id}`} className="scroll-mt-4">
                           <span className="text-gray-500 text-xs uppercase tracking-wide">
@@ -1431,6 +1415,22 @@ function MarketIntelDashboard() {
                               {opp.additional_info_link}
                             </a>
                           )}
+                        </div>
+                      )}
+
+                      {opp.attachments && opp.attachments.length > 0 && (
+                        <div
+                          id={`opp-docs-${opp.notice_id}`}
+                          className="rounded-lg border border-purple-500/30 bg-purple-500/[0.04] p-3 scroll-mt-4"
+                        >
+                          <SamAttachmentLinks
+                            attachments={opp.attachments}
+                            onDownloadClick={(idx) => track('link_click', 'market_intel_dashboard', {
+                              action: 'download_attachment',
+                              notice_id: opp.notice_id,
+                              attachment_index: idx,
+                            })}
+                          />
                         </div>
                       )}
 
