@@ -165,7 +165,14 @@ function mapToDbRecord(opp: SamOpportunity) {
     notice_id: opp.noticeId,
     solicitation_number: opp.solicitationNumber || null,
     title: opp.title || 'Untitled',
-    description: opp.description?.substring(0, 10000) || null,
+    // NOTE: `description` is deliberately NOT set here. opp.description from the SAM
+    // /search list endpoint is a LINK (.../noticedesc?...), not the body text, so
+    // storing it made body search useless. Omitting it from the upsert means:
+    //  - new notices insert with description = NULL (column default), and
+    //  - re-syncs of existing notices DON'T clobber text the backfill already wrote
+    //    (upsert only sets the columns present in the record).
+    // The backfill-descriptions cron claims null/link rows and fills real text from
+    // raw_data.description (the link, still stored below) within minutes.
     naics_code: opp.naicsCode || null,
     psc_code: opp.classificationCode || null,
     department: opp.department?.name || opp.fullParentPathName?.split('.')[0] || null,
