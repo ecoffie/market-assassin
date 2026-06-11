@@ -2,9 +2,14 @@ import Link from 'next/link';
 import { MindySignupForm } from '@/components/mindy/MindySignupForm';
 import { DemoMedia } from '@/components/mindy/DemoMedia';
 
-// Drop a real product video here (Vimeo/YouTube embed URL) to replace the hero
-// placeholder. e.g. 'https://player.vimeo.com/video/XXXXXXXXX'
-const HERO_DEMO_EMBED = '';
+// Product reels (vertical 9:16). Vimeo player-embed format. The hero uses the
+// first; the "See Mindy in action" row uses all three.
+const DEMO_REELS = [
+  'https://player.vimeo.com/video/1200497413',
+  'https://player.vimeo.com/video/1200497355',
+  'https://player.vimeo.com/video/1200497352',
+];
+const HERO_DEMO_EMBED = DEMO_REELS[0];
 
 // Route paid CTAs through /checkout first so purchase attribution (UTM /
 // referrer captured pre-checkout) is joined to the Stripe purchase event.
@@ -200,12 +205,12 @@ export default function MindyLandingPage() {
         </p>
         <div className="grid md:grid-cols-3 gap-6">
           {[
-            { cap: 'Search the BODY of solicitations, not just titles', sub: 'Find "M7" buried in a Statement of Work that SAM.gov would never surface.' },
-            { cap: 'Your morning briefing, written for you', sub: 'The 5 opportunities that fit your business — with why they fit.' },
-            { cap: 'Market research in one click', sub: 'Who buys, who wins, what they pay — for any NAICS or keyword.' },
+            { cap: 'Search the BODY of solicitations, not just titles', sub: 'Find "M7" buried in a Statement of Work that SAM.gov would never surface.', embed: DEMO_REELS[0] },
+            { cap: 'Your morning briefing, written for you', sub: 'The 5 opportunities that fit your business — with why they fit.', embed: DEMO_REELS[1] },
+            { cap: 'Market research in one click', sub: 'Who buys, who wins, what they pay — for any NAICS or keyword.', embed: DEMO_REELS[2] },
           ].map((d) => (
             <div key={d.cap}>
-              <DemoMedia caption={d.cap} aspect="reel" />
+              <DemoMedia embed={d.embed} caption={d.cap} aspect="reel" />
               <h3 className="mt-4 text-base font-bold text-white text-center">{d.cap}</h3>
               <p className="mt-1 text-sm text-slate-400 text-center">{d.sub}</p>
             </div>
