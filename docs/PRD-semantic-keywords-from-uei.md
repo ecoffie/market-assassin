@@ -35,22 +35,6 @@ This is genuinely "semantic search" — keywords grounded in real work, by meani
 
 ---
 
-## UNBLOCKED ✅ (2026-06-11) — the embedding infra is LIVE in prod
-
-The original "blocked on pgvector" premise was WRONG. The Phase 2 SOW-embedding work
-(#67) landed on main + deployed, and it **does NOT use pgvector** — it stores embeddings
-as JSONB and does cosine **in JavaScript**. Verified live:
-`/api/app/recompete-sow` returns real semantic matches (score 0.613, real PWS doc).
-
-| Dependency | State |
-|---|---|
-| Embedding pipeline `embedText()` + `cosineSimilarity()` (`src/lib/market/embeddings.ts`) | ✅ live, proven |
-| OpenAI `text-embedding-3-small` + `OPENAI_API_KEY` | ✅ set in prod |
-| JSONB-embedding storage pattern (`sam_opportunities.sow_embedding`) | ✅ migration run, populated |
-| pgvector | ❌ NOT needed — JS cosine works at this scale |
-
-**This is now BUILDABLE.** No new infra. Reuse `embedText()` for the company blob, store
-the keyword/term embeddings the same JSONB way, cosine-match in app.
 
 ---
 
@@ -94,3 +78,6 @@ SAM/grants search. No cron change needed — populating keywords is the whole jo
 ## Related
 [[prefilled_naics_not_real_signal]] · [[sam_description_body_capture]] · [[naics_vs_psc_search]]
 · [[naics_sync_vault_alerts]] · keyword forward-capture (onboarding, already shipped).
+
+## ✅ BUILT + DEPLOYED 2026-06-11
+Shipped: semantic-keywords.ts (deriveSemanticKeywords), vault/prefill seeds keywords additively + returns keywords_derived, VaultPanel keywords teaching stage. Reuses live embedText+cosineSimilarity (no pgvector). Pending: verify against a live authenticated UEI prefill.
