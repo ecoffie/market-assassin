@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
+import MetricTrends from '@/components/admin/MetricTrends';
 
 interface DashboardData {
   timestamp: string;
@@ -1447,6 +1448,10 @@ export default function AdminDashboard() {
             ))}
           </div>
         </div>
+
+        {/* Trend charts — reads daily_metric_snapshots (history), so this shows
+            change over time instead of a single live snapshot. */}
+        <MetricTrends password={password} />
 
         {/* MI Growth & Engagement */}
         {data.miGrowth && (
