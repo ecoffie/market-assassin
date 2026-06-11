@@ -9,46 +9,10 @@ export function MindySignupForm() {
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [oauthLoading, setOauthLoading] = useState<'google' | 'microsoft' | null>(null);
-  const [password, setPassword] = useState('');
-  // Sign in vs. create account — a toggle right here so EXISTING users
-  // can get back in from the landing page WITHOUT being re-routed.
-  // Defaults to 'signup' (Create account). OAuth works for both modes.
+  // Sign in vs. create account toggle. Defaults to 'signup' (Create account).
+  // 'signin' routes to /app's single real sign-in surface (no inline password
+  // form here — that caused a redundant double sign-in). OAuth works for both.
   const [mode, setMode] = useState<'signup' | 'signin'>('signup');
-
-  // Inline email+password sign-in — no reroute. Logs in via mindy-login,
-  // stores the session token, then lands the user directly in /app
-  // (Today's Intel) already authenticated.
-  async function handleEmailSignin(e: React.FormEvent) {
-    e.preventDefault();
-    if (!email || !password || isSubmitting) return;
-    setIsSubmitting(true);
-    setError('');
-    try {
-      const res = await fetch('/api/auth/mindy-login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: email.toLowerCase().trim(), password }),
-      });
-      const data = await res.json().catch(() => null);
-      if (!data?.success) {
-        setError(data?.error || 'Invalid email or password.');
-        return;
-      }
-      if (typeof window !== 'undefined' && data.sessionToken) {
-        localStorage.setItem('mi_beta_auth_token', data.sessionToken);
-        if (data.authenticatedAt) localStorage.setItem('mi_beta_authenticated_at', data.authenticatedAt);
-        // Land authenticated on the app — no retyping.
-        window.location.href = `/app?email=${encodeURIComponent(email.toLowerCase().trim())}`;
-      } else {
-        // No token returned (e.g. 2FA required) — continue on /app.
-        window.location.href = `/app?email=${encodeURIComponent(email.toLowerCase().trim())}`;
-      }
-    } catch {
-      setError('Network error. Please try again.');
-    } finally {
-      setIsSubmitting(false);
-    }
-  }
 
   async function handleGoogleSignup() {
     setOauthLoading('google');
@@ -178,55 +142,48 @@ export function MindySignupForm() {
         </div>
       </div>
 
-      <form onSubmit={mode === 'signin' ? handleEmailSignin : handleFreeSignup} className="space-y-3">
-        <input
-          type="email"
-          value={email}
-          onChange={(e) => setEmail(e.target.value)}
-          placeholder="you@company.com"
-          required
-          aria-label="Email address"
-          autoComplete="email"
-          className="w-full px-4 py-3.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500/50 text-base"
-        />
-        {mode === 'signin' && (
-          <input
-            type="password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            placeholder="Password"
-            required
-            aria-label="Password"
-            autoComplete="current-password"
-            className="w-full px-4 py-3.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500/50 text-base"
-          />
-        )}
-        <button
-          type="submit"
-          disabled={isSubmitting || oauthLoading !== null}
-          className={`w-full px-5 py-3.5 text-white rounded-xl font-semibold text-base shadow-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed ${
-            mode === 'signin'
-              ? 'bg-emerald-600 hover:bg-emerald-500 shadow-emerald-500/20'
-              : 'bg-purple-600 hover:bg-purple-500 shadow-purple-500/20'
-          }`}
-        >
-          {mode === 'signin'
-            ? 'Sign in with email'
-            : isSubmitting ? 'Creating your briefing…' : 'Get Your First Briefing Free'}
-        </button>
-        {error && (
-          <p className="text-red-400 text-sm pt-1">{error}</p>
-        )}
-        {mode === 'signin' ? (
-          <p className="text-slate-500 text-xs text-center pt-2">
-            <a href="/app/forgot-password" className="text-emerald-400 hover:text-emerald-300">Forgot password?</a>
+      {mode === 'signin' ? (
+        /* ONE sign-in surface: route to /app's real sign-in (which has the
+           show-password toggle + proper session handling) instead of a second,
+           redundant inline password form that bounced users to /app anyway. */
+        <div className="space-y-3">
+          <a
+            href="/app"
+            className="block w-full text-center px-5 py-3.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-xl font-semibold text-base shadow-lg shadow-purple-500/20 transition-colors"
+          >
+            Sign in with email →
+          </a>
+          <p className="text-slate-500 text-xs text-center pt-1">
+            Use the email + password for your Mindy account.
           </p>
-        ) : (
+        </div>
+      ) : (
+        <form onSubmit={handleFreeSignup} className="space-y-3">
+          <input
+            type="email"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+            placeholder="you@company.com"
+            required
+            aria-label="Email address"
+            autoComplete="email"
+            className="w-full px-4 py-3.5 bg-white/5 border border-white/10 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-purple-500/50 text-base"
+          />
+          <button
+            type="submit"
+            disabled={isSubmitting || oauthLoading !== null}
+            className="w-full px-5 py-3.5 text-white rounded-xl font-semibold text-base shadow-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed bg-purple-600 hover:bg-purple-500 shadow-purple-500/20"
+          >
+            {isSubmitting ? 'Creating your briefing…' : 'Get Your First Briefing Free'}
+          </button>
+          {error && (
+            <p className="text-red-400 text-sm pt-1">{error}</p>
+          )}
           <p className="text-slate-500 text-xs text-center pt-2">
             Free forever · No credit card required
           </p>
-        )}
-      </form>
+        </form>
+      )}
     </div>
   );
 }
