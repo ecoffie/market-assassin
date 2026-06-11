@@ -19,6 +19,7 @@
  */
 import type { Metadata } from 'next';
 import MeetMindyStrip from '@/components/MeetMindyStrip';
+import MemberAwareCta from '@/components/MemberAwareCta';
 import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import {
@@ -537,16 +538,18 @@ export default async function ContractorPage({ params }: PageProps) {
       <section className="mx-auto max-w-6xl px-6 pb-16">
         <div className="rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-900/40 to-slate-900 p-8 text-center">
           <h2 className="text-2xl font-bold">Track {displayName} Recompetes Before They Post</h2>
-          <p className="mt-3 max-w-2xl mx-auto text-slate-300">
+          <p className="mt-3 mb-6 max-w-2xl mx-auto text-slate-300">
             Mindy monitors {displayName}&apos;s active contracts and alerts you 12 months before they expire — so you can
             position to compete on recompete.
           </p>
-          <Link
-            href="/signup"
-            className="mt-6 inline-flex rounded-xl bg-purple-600 px-6 py-3 font-semibold text-white hover:bg-purple-500 shadow-lg shadow-purple-500/20"
-          >
-            Get Free Recompete Alerts
-          </Link>
+          <MemberAwareCta memberHref="/app" memberLabel="Track in Mindy →">
+            <Link
+              href="/signup"
+              className="inline-flex rounded-xl bg-purple-600 px-6 py-3 font-semibold text-white hover:bg-purple-500 shadow-lg shadow-purple-500/20"
+            >
+              Get Free Recompete Alerts
+            </Link>
+          </MemberAwareCta>
         </div>
       </section>
     </main>

@@ -1,5 +1,5 @@
 'use client';
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 
 /**
@@ -7,11 +7,26 @@ import Link from 'next/link';
  * PRD). A student asked "what is Mindy?" — public pages must self-introduce the
  * product + offer a free signup. Dismissible (per-session via state).
  *
+ * Auth-aware: HIDDEN for logged-in Mindy users (they reach these public pages via
+ * the in-app global lookup; nagging an existing member to "Try free" is wrong).
+ *
  * Drop into any public page. Links to the getmindy.ai signup.
  */
 export default function MeetMindyStrip({ variant = 'banner' }: { variant?: 'banner' | 'card' }) {
   const [dismissed, setDismissed] = useState(false);
-  if (dismissed) return null;
+  // Suppress for signed-in Mindy users. Start hidden until we've checked, so a
+  // member never sees a flash of the "Try free" acquisition CTA.
+  const [hideForMember, setHideForMember] = useState(true);
+  useEffect(() => {
+    const loggedIn = typeof window !== 'undefined' && Boolean(
+      localStorage.getItem('mi_beta_auth_token') ||
+      localStorage.getItem('mi_beta_2fa_token') ||
+      localStorage.getItem('mi_beta_email'),
+    );
+    setHideForMember(loggedIn);
+  }, []);
+
+  if (dismissed || hideForMember) return null;
 
   if (variant === 'card') {
     return (
