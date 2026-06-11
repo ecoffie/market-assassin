@@ -27,6 +27,7 @@ import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { getEntityByUEI } from '@/lib/sam/entity-api';
 import { retrieveRagContext, formatChunksForPrompt } from '@/lib/rag/retrieve';
 import { getNaics } from '@/lib/codes/lookup';
+import { deriveSemanticKeywords } from '@/lib/market/semantic-keywords';
 import { humanize } from '@/lib/proposal/humanize';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
 
@@ -580,12 +581,59 @@ export async function POST(request: NextRequest) {
     }
   }
 
+  // ---- Semantic keywords from the imported identity (the keyword-gap fix) ----
+  // UEI autofill gives NAICS + PSC but ZERO keywords, so profiles match NAICS-only
+  // and miss body-buried opps. Derive keywords BY MEANING from the company's own
+  // words (past-perf scope + capabilities + NAICS titles + AI summary) and SEED
+  // alerts — additively, never clobbering tuned keywords. Returned so the Vault can
+  // show them + teach the gap. Non-fatal: a derivation failure never breaks prefill.
+  let keywordsDerived: string[] = [];
+  try {
+    const naicsArr = Array.isArray(identity?.primary_naics) ? (identity!.primary_naics as string[]) : [];
+    const derived = await deriveSemanticKeywords({
+      oneLiner: (identity?.one_liner as string) || null,
+      elevatorPitch: (identity?.elevator_pitch as string) || null,
+      capabilities: capabilities.map((c) =>
+        `${c.capability_name || ''} ${c.description || ''}`.trim(),
+      ).filter(Boolean),
+      naicsDescriptions: naicsArr.map((n) => getNaics(String(n))?.title || '').filter(Boolean),
+      scopeDescriptions: pastPerformance
+        .map((p) => (p.scope_description as string) || '')
+        .filter(Boolean),
+    }, 12);
+
+    if (derived.length > 0) {
+      keywordsDerived = derived;
+      // Additive merge into user_notification_settings.keywords (never clobber).
+      const { data: cur } = await supabase
+        .from('user_notification_settings')
+        .select('keywords')
+        .eq('user_email', userEmail)
+        .maybeSingle();
+      const existing = Array.isArray(cur?.keywords)
+        ? cur!.keywords.map((k: unknown) => String(k).toLowerCase().trim()).filter(Boolean)
+        : [];
+      const merged = Array.from(new Set([...existing, ...derived])).slice(0, 40);
+      if (merged.length > existing.length) {
+        await supabase
+          .from('user_notification_settings')
+          .upsert(
+            { user_email: userEmail, keywords: merged, updated_at: new Date().toISOString() },
+            { onConflict: 'user_email' },
+          );
+      }
+    }
+  } catch (kwErr) {
+    errors.push(`keywords (non-fatal): ${kwErr instanceof Error ? kwErr.message : 'derive failed'}`);
+  }
+
   return NextResponse.json({
     success: errors.length === 0,
     identity_written: identityWritten,
     past_performance_written: pastPerfWritten,
     capabilities_written: capabilitiesWritten,
     sample_pp_written: samplePpWritten,
+    keywords_derived: keywordsDerived,
     errors,
   });
 }

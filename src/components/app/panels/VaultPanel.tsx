@@ -1048,7 +1048,8 @@ interface PrefillResponse {
 }
 
 function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: () => void; onApplied: () => void }) {
-  const [stage, setStage] = useState<'input' | 'loading' | 'preview' | 'applying'>('input');
+  const [stage, setStage] = useState<'input' | 'loading' | 'preview' | 'applying' | 'keywords'>('input');
+  const [derivedKeywords, setDerivedKeywords] = useState<string[]>([]);
   const [uei, setUei] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [preview, setPreview] = useState<PrefillResponse | null>(null);
@@ -1110,6 +1111,14 @@ function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: 
       if (!res.ok || !data.success) {
         setError(data.error || `Apply failed (HTTP ${res.status})`);
         setStage('preview');
+        return;
+      }
+      // Teaching moment: if we derived keywords from their UEI, show them + the
+      // keyword-gap lesson before closing. Otherwise close straight away.
+      const kws = Array.isArray(data.keywords_derived) ? data.keywords_derived as string[] : [];
+      if (kws.length > 0) {
+        setDerivedKeywords(kws);
+        setStage('keywords');
         return;
       }
       onApplied();
@@ -1334,6 +1343,44 @@ function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: 
           <div className="p-12 text-center">
             <div className="inline-block w-10 h-10 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
             <p className="text-white font-medium">Saving to your Vault…</p>
+          </div>
+        )}
+
+        {/* KEYWORD-GAP TEACHING MOMENT — shown after autofill when we derived
+            keywords from the company's real work. Teaches WHY keywords matter. */}
+        {stage === 'keywords' && (
+          <div className="p-6">
+            <div className="rounded-xl border border-purple-500/40 bg-gradient-to-br from-blue-950/40 to-purple-950/40 p-5 mb-5">
+              <span className="text-xs font-bold uppercase tracking-wider text-purple-300">One more thing</span>
+              <h3 className="text-lg font-bold text-white mt-1 mb-2">We found the words buyers use for your work</h3>
+              <p className="text-sm text-slate-300">
+                Your NAICS codes say <strong>who you are</strong>. These keywords say
+                <strong> what you sell</strong> — and they catch opportunities your codes
+                alone would miss, because the title rarely matches the work.
+              </p>
+            </div>
+
+            <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">Added to your alerts</p>
+            <div className="flex flex-wrap gap-2 mb-5">
+              {derivedKeywords.map((kw) => (
+                <span key={kw} className="rounded-full border border-purple-400/30 bg-purple-500/10 px-3 py-1.5 text-sm text-purple-100">
+                  {kw}
+                </span>
+              ))}
+            </div>
+
+            <p className="text-sm text-slate-400 mb-5">
+              Mindy will now match opportunities on these words too — including ones buried
+              in the body of a solicitation that a keyword like your NAICS would never surface.
+              You can fine-tune them anytime in <strong className="text-slate-300">Settings → Keywords</strong>.
+            </p>
+
+            <button
+              onClick={onApplied}
+              className="w-full px-5 py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-semibold rounded-lg transition-colors"
+            >
+              Got it — start using Mindy →
+            </button>
           </div>
         )}
 
