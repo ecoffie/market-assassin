@@ -905,11 +905,22 @@ export async function searchRecipients(opts: {
     };
   }
 
-  // ── No-NAICS path: name/state search over recipients (cheap) ──
+  // ── No-NAICS path: name/UEI/state search over recipients (cheap) ──
   const where: string[] = ['r.recipient_name IS NOT NULL'];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const params: Record<string, any> = { limit, offset };
-  if (search) { where.push('LOWER(r.recipient_name) LIKE @search'); params.search = `%${search.toLowerCase()}%`; }
+  if (search) {
+    // Match the name (substring) OR an exact UEI — so pasting a 12-char UEI
+    // resolves the company, not just a name search.
+    const isUei = /^[A-Za-z0-9]{12}$/.test(search);
+    if (isUei) {
+      where.push('(LOWER(r.recipient_name) LIKE @search OR r.recipient_uei = @uei)');
+      params.uei = search.toUpperCase();
+    } else {
+      where.push('LOWER(r.recipient_name) LIKE @search');
+    }
+    params.search = `%${search.toLowerCase()}%`;
+  }
   if (state) { where.push('r.state = @state'); params.state = state; }
 
   const orderCol = sortBy === 'recipient_name' ? 'r.recipient_name'
