@@ -26,6 +26,7 @@ import {
   Lock,
   PanelLeftClose,
   PanelLeftOpen,
+  LogOut,
 } from 'lucide-react';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
@@ -310,6 +311,9 @@ interface UnifiedSidebarProps {
   // hidden below md breakpoint. Desktop ignores this flag.
   isMobileOpen?: boolean;
   onMobileClose?: () => void;
+  // Sign out — surfaced in the sidebar footer so it's reachable on MOBILE (the
+  // header sign-out is desktop-only / hidden md:, which stranded mobile users).
+  onSignOut?: () => void;
 }
 
 export default function UnifiedSidebar({
@@ -323,6 +327,7 @@ export default function UnifiedSidebar({
   onToggleCollapse,
   isMobileOpen = false,
   onMobileClose,
+  onSignOut,
 }: UnifiedSidebarProps) {
   const [hoveredItem, setHoveredItem] = useState<AppPanel | null>(null);
   // Collapsed-state tooltip rendered with position:fixed so the nav's
@@ -620,6 +625,18 @@ export default function UnifiedSidebar({
               ? <PanelLeftOpen className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
               : <PanelLeftClose className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />}
             {!isCollapsed && <span>Collapse</span>}
+          </button>
+        )}
+        {/* Sign out — reachable on mobile (the header button is desktop-only). */}
+        {onSignOut && (
+          <button
+            onClick={() => { onSignOut(); onMobileClose?.(); }}
+            className={`w-full flex items-center rounded-lg px-3 py-2 text-sm text-slate-400 hover:bg-red-500/10 hover:text-red-300 transition-colors ${isCollapsed ? 'justify-center' : 'gap-2'}`}
+            title="Sign out"
+            aria-label="Sign out"
+          >
+            <LogOut className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
+            {!isCollapsed && <span>Sign out</span>}
           </button>
         )}
       </div>

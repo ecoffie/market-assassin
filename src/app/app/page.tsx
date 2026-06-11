@@ -1064,6 +1064,7 @@ function AppDashboard() {
         onToggleCollapse={() => setIsSidebarCollapsed(!isSidebarCollapsed)}
         isMobileOpen={isMobileSidebarOpen}
         onMobileClose={() => setIsMobileSidebarOpen(false)}
+        onSignOut={handleSignOut}
       />
 
       {/* Settings Panel */}
