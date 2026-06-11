@@ -978,10 +978,20 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       const nextFormData = { ...formData, naicsCode: coverageNaics, pscCode: coveragePsc, businessType: formData.businessType || 'Small Business' };
       setFormData(nextFormData);
       handleGenerateAll({ nextFormData });
+      // Persist the user's own words into their profile keywords (additive, never
+      // clobbers). Their language is the strongest search signal — used to be
+      // discarded after a single Sport report, leaving keyword-empty profiles.
+      if (email) {
+        fetch('/api/app/keywords/add', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+          body: JSON.stringify({ email, keywords: [sportKeyword.trim()] }),
+        }).catch(() => { /* non-fatal */ });
+      }
     } catch {
       showToast({ message: 'Could not look up codes — try the Suggest codes button.', variant: 'error' });
     } finally { setSportSuggesting(false); }
-  }, [sportKeyword, formData, getAuthHeaders, handleGenerateAll, showToast]);
+  }, [sportKeyword, formData, getAuthHeaders, handleGenerateAll, showToast, email]);
 
   const applySavedProfile = useCallback((profile: SavedResearchProfile) => {
     setFormData((current) => ({

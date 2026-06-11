@@ -14,6 +14,7 @@ export async function POST(request: NextRequest) {
       email,
       businessDescription,
       naicsCodes,
+      keywords,
       setAsides,
       businessType,
       targetAgencies,
@@ -67,17 +68,32 @@ export async function POST(request: NextRequest) {
       updated_at: new Date().toISOString(),
     };
 
+    // The user's OWN words (from the describe-your-business step) are the best
+    // search signal — far better than back-deriving keywords from NAICS. Persist
+    // them directly so onboarding stops throwing them away (the keyword-empty
+    // profile bug). Dedup + lowercase + cap to keep the array sane.
+    const safeKeywords = Array.isArray(keywords)
+      ? Array.from(new Set(
+          keywords.map((k) => String(k).trim().toLowerCase()).filter(Boolean),
+        )).slice(0, 30)
+      : [];
+
     // Only update fields that were provided
     let deriveKw: string[] = [];
+    if (safeKeywords.length > 0) {
+      updateData.keywords = safeKeywords;
+    }
     if (expandedNaicsCodes.length > 0) {
       updateData.naics_codes = expandedNaicsCodes;
       // Auto-derive search keywords from the NAICS so search widens beyond NAICS
       // (Eric's "drone problem"). Applied AFTER the update below, only when the
-      // user has no keywords yet — never clobbers tuned keywords.
-      try {
-        const { deriveKeywordsFromNaics } = await import('@/lib/utils/derive-keywords');
-        deriveKw = deriveKeywordsFromNaics(expandedNaicsCodes);
-      } catch { /* non-fatal */ }
+      // user supplied NO keywords AND has none yet — never clobbers tuned keywords.
+      if (safeKeywords.length === 0) {
+        try {
+          const { deriveKeywordsFromNaics } = await import('@/lib/utils/derive-keywords');
+          deriveKw = deriveKeywordsFromNaics(expandedNaicsCodes);
+        } catch { /* non-fatal */ }
+      }
     }
 
     if (Array.isArray(setAsides)) {

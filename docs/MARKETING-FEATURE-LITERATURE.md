@@ -608,3 +608,28 @@ when hundreds of profileless users hit this path.
 single source of truth for whether a sector exists, and the suggested codes it returns are
 the ones surfaced to the user (not an LLM guess). An admin scrub (`POST
 /api/admin/debug-profile`) removes invalid codes from every profile table so the fix sticks.
+
+---
+
+## Keyword-first profiles: capture your words, end onboarding at the Vault
+
+**What:** Onboarding now KEEPS the keywords it extracts from how you describe your
+business (it used to show them on the confirm screen, then throw them away — leaving
+NAICS-only profiles). Research by keyword in Market Research Sport mode and those
+words are saved to your profile too. And onboarding now hands you off to the **Vault**
+at the end — enter your UEI and your company identity, NAICS, and certifications
+auto-fill from SAM.gov — so you finish with a COMPLETE profile, not a half-built one.
+
+**Why:** Keywords are the strongest search signal — they match the actual contract
+text, catching opportunities a NAICS code misses (the "drones live across 70+ codes"
+problem). A profile that's NAICS-only quietly under-matches. Ending at the Vault means
+new and beta users don't stop at codes and wonder why their alerts feel thin.
+
+**SEO:** "set up government contracting profile," "keyword alerts federal contracts,"
+"SAM UEI auto-fill profile," "find opportunities by keyword not just NAICS."
+
+**Proof:** Keywords are a real, live matching signal in the daily-alerts pipeline
+(`fetchSamOpportunitiesFromCache` searches them). The Vault auto-fill is grounded in
+the SAM.gov Entity API for the user's real UEI — not guessed. Existing keyword-empty
+profiles are backfilled from their NAICS (`/api/admin/backfill-keywords`), and new
+captures never clobber a user's tuned keywords (additive merge only).

@@ -454,6 +454,10 @@ export default function OnboardingPage() {
           email,
           businessDescription: autoText.trim() || null,
           naicsCodes: autoProfile.naics || [],
+          // Persist the extracted keywords — they were shown on the confirm screen
+          // but used to be dropped, leaving keyword-empty profiles. The user's own
+          // words are the strongest search signal.
+          keywords: autoProfile.keywords || [],
           businessType: autoProfile.setAsides?.[0] || 'Small Business',
           setAsides: autoProfile.setAsides || [],
           targetAgencies: (autoProfile.agencies || []).map((a: { name: string }) => a.name),
@@ -465,7 +469,10 @@ export default function OnboardingPage() {
       const d = await res.json();
       if (!res.ok || !d.success) { setError(d.error || 'Failed to save. Try again.'); return; }
       track('onboarding_step', 'onboarding', { step: 'completion', status: 'success', mode: 'auto' });
-      router.push(`/app?email=${encodeURIComponent(email)}`);
+      // Land in the Vault so the user finishes a COMPLETE profile — enter their UEI
+      // (auto-fills company identity + NAICS) and confirm keywords. Without this
+      // hand-off users stop at NAICS-only and have incomplete profiles.
+      router.push(`/app?email=${encodeURIComponent(email)}&panel=vault&onboarded=1`);
     } catch {
       setError('Failed to save your profile. Please try again.');
     } finally { setSaving(false); }
@@ -664,7 +671,9 @@ export default function OnboardingPage() {
         alert_frequency: frequency,
         has_business_description: !!businessDescription.trim(),
       });
-      router.push(`/app?email=${encodeURIComponent(email)}`);
+      // Hand off to the Vault to complete the profile (UEI → identity + NAICS,
+      // confirm keywords). See the auto-mode finish for the full rationale.
+      router.push(`/app?email=${encodeURIComponent(email)}&panel=vault&onboarded=1`);
     } catch {
       setError('Something went wrong saving your profile. Please try again.');
     } finally {

@@ -39,6 +39,14 @@ function DashboardLoading() {
   );
 }
 
+// Panels that may be deep-linked via ?panel=<id>. Keep in sync with AppPanel.
+const KNOWN_PANELS = new Set<AppPanel>([
+  'chat', 'dashboard', 'alerts', 'market-intel', 'research', 'forecasts',
+  'recompetes', 'contractors', 'decision-makers', 'pipeline', 'contacts',
+  'team', 'settings', 'vault', 'library', 'knowledge-base', 'coach',
+  'pricing', 'proposals', 'target-list', 'grants',
+]);
+
 // Wrap in Suspense for useSearchParams
 export default function AppPage() {
   return (
@@ -546,6 +554,18 @@ function AppDashboard() {
     return () => {
       window.fetch = originalFetch;
     };
+  }, []);
+
+  // Deep-link to a specific panel via ?panel=<id> (e.g. onboarding lands the user
+  // on the Vault: /app?panel=vault). Only honored for known panels; ignored
+  // otherwise so a bad param can't blank the app.
+  useEffect(() => {
+    const panelParam = searchParams.get('panel');
+    if (panelParam && KNOWN_PANELS.has(panelParam as AppPanel)) {
+      setActivePanel(panelParam as AppPanel);
+      activePanelRef.current = panelParam as AppPanel;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Load user profile on mount
