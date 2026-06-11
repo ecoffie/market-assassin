@@ -419,7 +419,7 @@ export default function UnifiedSidebar({
       <aside
         className={`
           bg-slate-900 border-r border-slate-800 flex flex-col
-          h-screen
+          h-screen h-dvh
           transition-transform duration-300 ease-in-out
           z-50
           fixed inset-y-0 left-0 w-64
@@ -608,8 +608,9 @@ export default function UnifiedSidebar({
         })}
       </nav>
 
-      {/* Footer */}
-      <div className="p-4 border-t border-slate-800 space-y-2">
+      {/* Footer — shrink-0 so it never gets squeezed out by the scrolling nav;
+          pb safe-area so the account menu clears the iOS home indicator. */}
+      <div className="shrink-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-slate-800 space-y-2">
         {!isCollapsed && userTier === 'free' && (
           <Link
             href="/market-intelligence"
