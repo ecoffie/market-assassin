@@ -219,9 +219,32 @@ export default function MindyLandingPage() {
       <section className="bg-slate-900/40 border-y border-slate-800">
         <div className="max-w-6xl mx-auto px-4 py-16">
           <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-3">Explore the data — free, no login</h2>
-          <p className="text-slate-400 text-center max-w-2xl mx-auto mb-10">
+          <p className="text-slate-400 text-center max-w-2xl mx-auto mb-6">
             Real federal market intelligence you can browse right now. No account needed.
           </p>
+
+          {/* Real, live top-50 boards — concrete proof, each links to an actual page. */}
+          <div className="flex flex-wrap justify-center gap-2 mb-10">
+            {[
+              { slug: '8a-contractors', label: 'Top 50 8(a) Contractors' },
+              { slug: 'army-contractors', label: 'Top 50 Army Contractors' },
+              { slug: 'air-force-contractors', label: 'Top 50 Air Force Contractors' },
+              { slug: 'navy-contractors', label: 'Top 50 Navy Contractors' },
+              { slug: 'va-contractors', label: 'Top 50 VA Contractors' },
+              { slug: 'sdvosb-contractors', label: 'Top 50 SDVOSB Contractors' },
+              { slug: 'hubzone-contractors', label: 'Top 50 HUBZone Contractors' },
+              { slug: 'wosb-contractors', label: 'Top 50 WOSB Contractors' },
+            ].map((b) => (
+              <Link
+                key={b.slug}
+                href={`/top/${b.slug}`}
+                className="rounded-full border border-slate-700 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-slate-300 hover:border-purple-500/60 hover:text-purple-300 transition-colors"
+              >
+                {b.label}
+              </Link>
+            ))}
+          </div>
+
           <div className="grid md:grid-cols-3 gap-6">
             <Link href="/top" className="group rounded-2xl border border-slate-700 bg-slate-800/40 p-6 hover:border-purple-500/60 transition-colors">
               <div className="text-2xl mb-3">🏆</div>
