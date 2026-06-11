@@ -1,0 +1,18 @@
+---
+description: Always commit and deploy after completing a fix or feature in market-assassin
+alwaysApply: true
+---
+
+# Ship After Fix (Eric preference)
+
+When you finish a bug fix or feature in **market-assassin**:
+
+1. **Commit + push** before claiming done — do not leave fixes local-only.
+2. **Deploy** with `vercel --prod` from `market-assassin/` after push succeeds.
+3. **Verify** prod (curl HTTP 200 or spot-check the UI) before telling Eric it's fixed.
+
+Do not ask "want me to commit/deploy?" — just do it unless the change is explicitly exploratory/draft.
+
+Commit messages end with: `Co-Authored-By: Claude Opus 4.8 (1M context) <noreply@anthropic.com>`
+
+Feature pushes: append proof to `docs/MARKETING-FEATURE-LITERATURE.md` in the same commit.

@@ -4,6 +4,12 @@ Rules and patterns to prevent repeated mistakes.
 
 ---
 
+## Ship After Fix (Jun 2026)
+
+**Always commit, push, and `vercel --prod` after completing a fix or feature.** Eric should never need to ask — local-only changes that "look done" aren't done. Verify prod before claiming fixed.
+
+---
+
 ## Vercel Cron Jobs
 
 **Lesson (Mar 17, 2026):** Vercel cron jobs call endpoints with GET requests, not POST.
