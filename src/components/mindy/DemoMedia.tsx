@@ -16,14 +16,19 @@ type DemoMediaProps = {
   image?: string;
   /** Alt / placeholder caption describing what this demo shows. */
   caption: string;
-  /** Aspect ratio box. */
-  aspect?: 'video' | 'wide' | 'tall';
+  /** Aspect ratio box. 'reel' = vertical 9:16 (Instagram/TikTok reels). */
+  aspect?: 'video' | 'wide' | 'tall' | 'reel';
   className?: string;
 };
 
 export function DemoMedia({ video, embed, image, caption, aspect = 'video', className = '' }: DemoMediaProps) {
   const aspectClass =
-    aspect === 'wide' ? 'aspect-[16/7]' : aspect === 'tall' ? 'aspect-[4/3]' : 'aspect-video';
+    aspect === 'wide' ? 'aspect-[16/7]'
+    : aspect === 'tall' ? 'aspect-[4/3]'
+    : aspect === 'reel' ? 'aspect-[9/16] max-w-[280px] mx-auto'  // vertical reel, width-capped so it doesn't tower
+    : 'aspect-video';
+  // Reels (vertical phone footage) must NOT be cropped — contain, with a dark fill.
+  const fit = aspect === 'reel' ? 'object-contain bg-black' : 'object-cover';
 
   return (
     <div
@@ -39,7 +44,7 @@ export function DemoMedia({ video, embed, image, caption, aspect = 'video', clas
         />
       ) : video ? (
         <video
-          className="absolute inset-0 h-full w-full object-cover"
+          className={`absolute inset-0 h-full w-full ${fit}`}
           src={video}
           autoPlay
           muted
@@ -49,7 +54,7 @@ export function DemoMedia({ video, embed, image, caption, aspect = 'video', clas
         />
       ) : image ? (
         // eslint-disable-next-line @next/next/no-img-element
-        <img src={image} alt={caption} className="absolute inset-0 h-full w-full object-cover" />
+        <img src={image} alt={caption} className={`absolute inset-0 h-full w-full ${fit}`} />
       ) : (
         // Placeholder until real media lands — clearly labeled, on-brand.
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-gradient-to-br from-slate-900 via-purple-950/40 to-slate-900 p-6 text-center">

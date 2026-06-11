@@ -121,8 +121,8 @@ export default function MindyLandingPage() {
           {/* SEE IT WORK — show the product in action above the fold (the #1 trust
               signal for a new brand: "in a world of vaporware, a demo proves the
               code is real"). Swap HERO_DEMO_EMBED for a real video to go live. */}
-          <div className="max-w-3xl mx-auto mb-8">
-            <DemoMedia embed={HERO_DEMO_EMBED || undefined} caption="Watch Mindy turn 88,000 opportunities into your morning briefing" />
+          <div className="mb-8">
+            <DemoMedia embed={HERO_DEMO_EMBED || undefined} aspect="reel" caption="Watch Mindy turn 88,000 opportunities into your morning briefing" />
           </div>
 
           {/* BETA-USER PATH — most arrivals right now are the email-only beta cohort
@@ -205,9 +205,9 @@ export default function MindyLandingPage() {
             { cap: 'Market research in one click', sub: 'Who buys, who wins, what they pay — for any NAICS or keyword.' },
           ].map((d) => (
             <div key={d.cap}>
-              <DemoMedia caption={d.cap} aspect="tall" />
-              <h3 className="mt-4 text-base font-bold text-white">{d.cap}</h3>
-              <p className="mt-1 text-sm text-slate-400">{d.sub}</p>
+              <DemoMedia caption={d.cap} aspect="reel" />
+              <h3 className="mt-4 text-base font-bold text-white text-center">{d.cap}</h3>
+              <p className="mt-1 text-sm text-slate-400 text-center">{d.sub}</p>
             </div>
           ))}
         </div>
