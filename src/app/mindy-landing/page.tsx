@@ -2,16 +2,15 @@ import Link from 'next/link';
 import { MindySignupForm } from '@/components/mindy/MindySignupForm';
 import { DemoMedia } from '@/components/mindy/DemoMedia';
 
-// Product reels (vertical 9:16). Vimeo player-embed URLs WITH app_id — the exact
-// form Vimeo's own oembed serves (a bare player URL gets a 401 for these Business
-// Team-library videos). Matched to captions by their real Vimeo titles:
+// Product reels (vertical 9:16) for the "See Mindy in action" row. Vimeo player-
+// embed URLs WITH app_id — the exact form Vimeo's own oembed serves (a bare player
+// URL 401s for these Business team-library videos). Matched to captions by title:
 //   1200497355 "How Do I Know Which Ones to Actually Bid On" → bid/search
 //   1200497352 "5 active solicitations"                      → morning briefing
-//   1200497413 "Weekly Deep Dive 10 Opportunities"           → market research
+//   1200503755 "2_Mindy_AI"                                  → market research
 const VIMEO_APP = 'app_id=122963';
 const reel = (id: string) => `https://player.vimeo.com/video/${id}?${VIMEO_APP}`;
-const DEMO_REELS = [reel('1200497355'), reel('1200497352'), reel('1200497413')];
-const HERO_DEMO_EMBED = reel('1200497413'); // the Weekly Deep Dive overview as the hero
+const DEMO_REELS = [reel('1200497355'), reel('1200497352'), reel('1200503755')];
 
 // Route paid CTAs through /checkout first so purchase attribution (UTM /
 // referrer captured pre-checkout) is joined to the Stripe purchase event.
@@ -124,13 +123,6 @@ export default function MindyLandingPage() {
             While you sleep, Mindy scans 88,000+ federal opportunities, tracks your competitors,
             and delivers a personalized briefing before your first coffee.
           </p>
-
-          {/* SEE IT WORK — show the product in action above the fold (the #1 trust
-              signal for a new brand: "in a world of vaporware, a demo proves the
-              code is real"). Swap HERO_DEMO_EMBED for a real video to go live. */}
-          <div className="mb-8">
-            <DemoMedia embed={HERO_DEMO_EMBED || undefined} aspect="reel" caption="Watch Mindy turn 88,000 opportunities into your morning briefing" />
-          </div>
 
           {/* BETA-USER PATH — most arrivals right now are the email-only beta cohort
               who get alerts but never set a password. OAuth won't help them; they need
