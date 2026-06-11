@@ -11,6 +11,7 @@ import { getNaics, getPsc } from '@/lib/codes/lookup';
 import { NaicsBadgeList } from '@/components/codes/NaicsBadge';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 import { useDodaacNames } from '@/components/app/useDodaacNames';
+import { userNeedsMindySetup } from '@/lib/alerts/profile-setup';
 
 interface AlertsPanelProps {
   email: string | null;
@@ -140,13 +141,32 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
   const [stateFilter, setStateFilter] = useState<string>('');
   const [searchCriteria, setSearchCriteria] = useState<{
     naicsCodes: string[];
+    keywords: string[];
+    businessDescription: string | null;
     businessType: string | null;
     setAsidePreferences: string[];
     locationStates: string[];
-  }>({ naicsCodes: [], businessType: null, setAsidePreferences: [], locationStates: [] });
+  }>({
+    naicsCodes: [],
+    keywords: [],
+    businessDescription: null,
+    businessType: null,
+    setAsidePreferences: [],
+    locationStates: [],
+  });
 
   const canUsePipeline = tier !== 'free';
   const isFreeTier = tier === 'free';
+  const needsProfileSetup = useMemo(
+    () => userNeedsMindySetup({
+      naics_codes: searchCriteria.naicsCodes,
+      keywords: searchCriteria.keywords,
+      business_description: searchCriteria.businessDescription,
+    }),
+    [searchCriteria],
+  );
+  const mindySetupHref = '/app/onboarding';
+  const mindyProHref = '/market-intelligence';
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
 
   const trackAlertEvent = useCallback((eventType: 'link_click' | 'tool_use', alert: Alert, action: string) => {
@@ -193,6 +213,8 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
         if (data.searchCriteria) {
           setSearchCriteria({
             naicsCodes: data.searchCriteria.naicsCodes || [],
+            keywords: data.searchCriteria.keywords || [],
+            businessDescription: data.searchCriteria.businessDescription ?? null,
             businessType: data.searchCriteria.businessType ?? null,
             setAsidePreferences: data.searchCriteria.setAsidePreferences || [],
             locationStates: data.searchCriteria.locationStates || [],
@@ -222,10 +244,14 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
     }
 
     if (!canUsePipeline) {
+      if (needsProfileSetup) {
+        window.location.href = mindySetupHref;
+        return;
+      }
       showToast({
         message: 'Pipeline tracking is included with Mindy Pro',
         variant: 'info',
-        action: { label: 'Upgrade', onClick: () => { window.location.href = '/market-intelligence'; } },
+        action: { label: 'Unlock Pipeline', onClick: () => { window.location.href = mindyProHref; } },
       });
       return;
     }
@@ -659,13 +685,13 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
               >
                 {isLoading ? 'Refreshing…' : '🔄 Refresh'}
               </button>
-              {isFreeTier && (
-                <a
-                  href="/market-intelligence"
-                  className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg transition-colors"
+              {isFreeTier && needsProfileSetup && (
+                <Link
+                  href={mindySetupHref}
+                  className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-sm font-semibold rounded-lg transition-colors"
                 >
-                  Upgrade to Mindy Pro
-                </a>
+                  Set up your keywords →
+                </Link>
               )}
             </div>
           </div>
@@ -1266,9 +1292,24 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                 }
 
                 if (err?.teaser) {
-                  // Free tier: upgrade hook. Mirrors the Source Feed
-                  // header's "Upgrade to Mindy Pro" treatment so the
-                  // CTA feels consistent across surfaces.
+                  if (needsProfileSetup) {
+                    return (
+                      <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4">
+                        <p className="text-xs text-amber-300 uppercase tracking-wider mb-1">Personalize first</p>
+                        <p className="text-sm text-slate-200 mb-3">
+                          Add your keywords and NAICS so Mindy can score this opportunity for{' '}
+                          <em>your</em> business. Setup is free — takes about 2 minutes.
+                        </p>
+                        <Link
+                          href={mindySetupHref}
+                          className="inline-block px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-sm font-semibold rounded-lg transition-colors"
+                        >
+                          Set up Mindy →
+                        </Link>
+                      </div>
+                    );
+                  }
+
                   return (
                     <div className="rounded-xl border border-purple-500/30 bg-purple-500/10 p-4">
                       <p className="text-xs text-purple-300 uppercase tracking-wider mb-1">Mindy Analyst</p>
@@ -1277,10 +1318,10 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                         concerns, likely competitors, and the next step. Included with Mindy Pro.
                       </p>
                       <a
-                        href="/market-intelligence"
+                        href={mindyProHref}
                         className="inline-block px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold rounded-lg transition-colors"
                       >
-                        Upgrade to Mindy Pro
+                        Get bid/no-bid analysis
                       </a>
                     </div>
                   );
@@ -1488,7 +1529,9 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                       ? 'Saving...'
                       : canUsePipeline
                         ? 'Save to Pipeline'
-                        : 'Upgrade to Save'}
+                        : needsProfileSetup
+                          ? 'Set up to save'
+                          : 'Unlock Pipeline'}
                 </button>
                 <a
                   href={selectedAlert.url}

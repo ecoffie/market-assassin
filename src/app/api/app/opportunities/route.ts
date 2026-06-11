@@ -61,6 +61,8 @@ interface SAMOpportunity {
 
 interface UserOpportunityProfile {
   naics_codes?: string[] | null;
+  keywords?: string[] | null;
+  business_description?: string | null;
   business_type?: string | null;
   set_aside_preferences?: string[] | null;
   location_states?: string[] | null;
@@ -323,7 +325,7 @@ export async function GET(request: NextRequest) {
   if (email) {
     const { data: profile } = await supabase
       .from('user_notification_settings')
-      .select('naics_codes,business_type,set_aside_preferences,location_states')
+      .select('naics_codes,keywords,business_description,business_type,set_aside_preferences,location_states')
       .eq('user_email', email)
       .single();
 
@@ -521,6 +523,8 @@ export async function GET(request: NextRequest) {
       // in-app Source Feed header can render the same "Filters:" line.
       searchCriteria: {
         naicsCodes,
+        keywords: userProfile?.keywords ?? [],
+        businessDescription: userProfile?.business_description ?? null,
         limit,
         noticeType,
         businessType: userProfile?.business_type ?? null,
