@@ -44,9 +44,14 @@ export function deriveKeywordsFromNaics(naicsCodes: string[]): string[] {
     if (!code) continue;
     let title = CODES[code]?.title;
     if (!title) {
-      // prefix fallback: find the most specific parent title
+      // Prefix fallback: find the most specific parent title — but ONLY within the
+      // SAME 2-digit sector. Object.keys().find() otherwise grabbed the first code
+      // sharing a short prefix, which could be a DIFFERENT industry (an IT code with
+      // no exact title pulled "Offices of Lawyers" → bogus 'lawyers'/'notaries'
+      // keywords). Requiring the sector to match keeps derived words on-industry.
+      const sector = code.slice(0, 2);
       for (let len = 5; len >= 3 && !title; len--) {
-        const k = Object.keys(CODES).find(c => c.startsWith(code.slice(0, len)));
+        const k = Object.keys(CODES).find(c => c.startsWith(code.slice(0, len)) && c.startsWith(sector));
         if (k) title = CODES[k]?.title;
       }
     }
