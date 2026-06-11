@@ -799,3 +799,26 @@ ranked to the company-meaning vector) from the contractor's own past-performance
 descriptions + capabilities + NAICS titles. Seeded additively into alert matching (never
 clobbers tuned keywords). The keyword gap is the same root cause behind under-matched
 profiles documented across Mindy's alert quality work.
+
+## 27. Works everywhere, signs in once — the reliability story
+
+**What:** Mindy works the same on your phone as on your desktop. One sign-in (no
+redundant second login screen), a clear account menu you can reach from any device —
+sign out, switch accounts, jump to settings — and your data right where you expect it.
+Sign in on the homepage and you go straight to your dashboard, not a second sign-in.
+
+**Why:** Federal BD doesn't happen only at a desk. You check a deadline from your phone
+between meetings, look up a competitor on the drive, forward an opportunity from the
+field. A tool that strands mobile users — no way to sign out, a login that bounces you to
+another login — quietly tells people it isn't built for how they actually work. Mindy is.
+Trust in a new product is won in these small, boring details as much as in the features.
+
+**SEO:** "federal contracting app mobile," "GovCon tools on phone," "market intelligence
+mobile app," "Mindy mobile."
+
+**Proof:** One sign-in surface (the redundant landing-page login was removed). A
+bottom-of-sidebar account menu (the Slack/Linear/Vercel convention) reachable on every
+device, including mobile drawers. Show-password on the real sign-in. Account actions —
+Settings, Switch account, Sign out — consolidated in one expected place that shows who's
+logged in. Polished against real mobile-viewport bugs (the menu was cut off behind the
+phone browser toolbar — fixed with dynamic-viewport sizing).
