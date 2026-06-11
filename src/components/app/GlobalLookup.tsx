@@ -71,7 +71,9 @@ export default function GlobalLookup({ email }: { email: string | null }) {
     } else if (looksLikeCompany(q)) {
       resolveContractor(q);
     } else {
-      setHint('Try a contract number (PIID), a UEI, or a company name.');
+      // Plain-English term (e.g. "drones") → research the whole market for it in
+      // Market Research (Sport mode): all the NAICS codes, coverage %, keywords.
+      window.location.href = `/app?panel=research&keyword=${encodeURIComponent(q)}`;
     }
   }
 
@@ -85,8 +87,8 @@ export default function GlobalLookup({ email }: { email: string | null }) {
           onChange={(e) => { setValue(e.target.value); setHint(null); }}
           onFocus={() => setFocused(true)}
           onBlur={() => setTimeout(() => setFocused(false), 150)}
-          placeholder="Look up a contract #, company, or UEI…"
-          aria-label="Look up a contract number, company, or UEI"
+          placeholder="Contract #, company, UEI, or a market like “drones”…"
+          aria-label="Look up a contract number, company, UEI, or research a market"
           className="w-full rounded-lg border border-slate-700 bg-slate-900/80 pl-9 pr-9 py-2 text-sm text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:opacity-60"
           disabled={resolving}
         />
@@ -110,6 +112,10 @@ export default function GlobalLookup({ email }: { email: string | null }) {
               <div className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-xs">
                 <span className="text-slate-300">UEI</span>
                 <span className="font-mono text-slate-500">E466BXU4KJH8</span>
+              </div>
+              <div className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-xs">
+                <span className="text-slate-300">A market / keyword</span>
+                <span className="text-slate-500">drones, medical supplies…</span>
               </div>
             </div>
           </div>

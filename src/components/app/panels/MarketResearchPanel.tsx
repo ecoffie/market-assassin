@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useCallback, useEffect, useRef, useMemo, Fragment } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   BarChart, Bar,
   PieChart, Pie, Cell,
@@ -603,6 +604,8 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   // research ANY industry (manual NAICS/PSC/set-aside) without touching your
   // saved settings — for exploring expansion lanes / a report for someone else.
   const [researchMode, setResearchMode] = useState<'auto' | 'sport'>('auto');
+  const searchParams = useSearchParams();
+  const deepLinkKeywordRef = useRef(false);
   // Sport-mode keyword→code lookup (Eric's "drone problem": don't make users
   // know the NAICS for "medical supplies" — type plain English, get codes).
   const [sportKeyword, setSportKeyword] = useState('');
@@ -993,6 +996,27 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       showToast({ message: 'Could not look up codes — try the Suggest codes button.', variant: 'error' });
     } finally { setSportSuggesting(false); }
   }, [sportKeyword, formData, getAuthHeaders, handleGenerateAll, showToast, email]);
+
+  // Deep-link: ?keyword=drones (from the global lookup bar) → open Sport mode,
+  // pre-fill the keyword, and auto-build the market map. Runs once.
+  useEffect(() => {
+    if (deepLinkKeywordRef.current) return;
+    const kw = searchParams.get('keyword');
+    if (!kw || !kw.trim()) return;
+    deepLinkKeywordRef.current = true;
+    setResearchMode('sport');
+    setSportKeyword(kw.trim());
+  }, [searchParams]);
+
+  // Once Sport mode + the deep-link keyword are set, build automatically.
+  useEffect(() => {
+    if (!deepLinkKeywordRef.current) return;
+    if (researchMode === 'sport' && sportKeyword && !sportReportRan) {
+      handleSportBuild();
+    }
+    // handleSportBuild intentionally omitted to avoid re-firing on its identity change
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [researchMode, sportKeyword, sportReportRan]);
 
   const applySavedProfile = useCallback((profile: SavedResearchProfile) => {
     setFormData((current) => ({
