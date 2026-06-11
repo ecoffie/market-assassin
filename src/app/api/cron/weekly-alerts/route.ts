@@ -606,7 +606,7 @@ async function sendAlertEmail(
             <span style="background: #dbeafe; color: #1e40af; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500;">
               ${opp.noticeType || 'Solicitation'}
             </span>
-            ${opp.setAside ? `<span style="background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; margin-left: 4px;">${opp.setAside}</span>` : ''}
+            ${opp.setAside ? `<span style="background: #ede9fe; color: #6d28d9; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; margin-left: 4px;">${opp.setAside}</span>` : ''}
             ${urgencyText ? `<span style="background: ${urgencyColor}20; color: ${urgencyColor}; padding: 2px 8px; border-radius: 4px; font-size: 12px; font-weight: 500; margin-left: 4px;">${urgencyText}</span>` : ''}
           </div>
           <a href="${trackedUrl(opp.uiLink, 'sam_gov_opportunity', `opportunity_${opp.noticeId || i + 1}`)}" style="color: #1e40af; font-weight: 600; text-decoration: none; font-size: 15px;">
@@ -685,8 +685,8 @@ async function sendAlertEmail(
     </div>
 
     <!-- Feedback Section -->
-    <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 10px; padding: 16px 20px; margin-top: 25px; text-align: center;">
-      <p style="color: #166534; margin: 0 0 12px 0; font-size: 14px; font-weight: 600;">
+    <div style="background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 10px; padding: 16px 20px; margin-top: 25px; text-align: center;">
+      <p style="color: #6d28d9; margin: 0 0 12px 0; font-size: 14px; font-weight: 600;">
         Was this weekly digest helpful?
       </p>
       <div>

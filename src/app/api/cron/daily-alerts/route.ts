@@ -1172,8 +1172,8 @@ async function sendDailyAlertEmail(
           : '';
 
     const noticeTypeColors: Record<string, { bg: string; text: string }> = {
-      'Solicitation': { bg: '#dcfce7', text: '#166534' },
-      'RFP': { bg: '#dcfce7', text: '#166534' },
+      'Solicitation': { bg: '#ede9fe', text: '#6d28d9' },
+      'RFP': { bg: '#ede9fe', text: '#6d28d9' },
       'RFQ': { bg: '#dbeafe', text: '#1e40af' },
       'Sources Sought': { bg: '#f3e8ff', text: '#7c3aed' },
       'Presolicitation': { bg: '#ffedd5', text: '#c2410c' },
@@ -1374,7 +1374,7 @@ async function sendDailyAlertEmail(
             <tr>
               <td style="padding: 14px 16px; border-bottom: 1px solid #e5e7eb;">
                 <div style="margin-bottom: 6px;">
-                  <span style="background: #dcfce7; color: #166534; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">
+                  <span style="background: #ede9fe; color: #6d28d9; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600;">
                     GRANT
                   </span>
                   ${fundingText ? `<span style="background: #fef3c7; color: #92400e; padding: 2px 8px; border-radius: 4px; font-size: 11px; font-weight: 600; margin-left: 4px;">${fundingText}</span>` : ''}
@@ -1397,8 +1397,8 @@ async function sendDailyAlertEmail(
   ` : ''}
 
   <!-- Feedback Section -->
-  <div style="background: #f0fdf4; border: 1px solid #86efac; border-radius: 10px; padding: 16px 20px; margin-top: 20px; text-align: center;">
-    <p style="color: #166534; margin: 0 0 12px 0; font-size: 14px; font-weight: 600;">
+  <div style="background: #f5f3ff; border: 1px solid #ddd6fe; border-radius: 10px; padding: 16px 20px; margin-top: 20px; text-align: center;">
+    <p style="color: #6d28d9; margin: 0 0 12px 0; font-size: 14px; font-weight: 600;">
       Was this alert helpful?
     </p>
     <div style="display: inline-block;">

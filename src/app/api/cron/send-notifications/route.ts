@@ -217,14 +217,14 @@ async function sendAlertEmail(
     const urgencyColor = daysUntil <= 7 ? '#dc2626' : daysUntil <= 14 ? '#d97706' : '#16a34a';
     const scoreColor = opp.score >= 75 ? '#16a34a' : opp.score >= 50 ? '#84cc16' : '#eab308';
     const satInfo = getSatBadgeForAgency(opp.department);
-    const satBadgeHtml = satInfo.badge ? `<span style="background: ${satInfo.level === 'high' ? '#dcfce7' : '#fef9c3'}; color: ${satInfo.level === 'high' ? '#166534' : '#854d0e'}; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; margin-left: 4px;">${satInfo.badge}</span>` : '';
+    const satBadgeHtml = satInfo.badge ? `<span style="background: ${satInfo.level === 'high' ? '#ede9fe' : '#fef9c3'}; color: ${satInfo.level === 'high' ? '#6d28d9' : '#854d0e'}; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; margin-left: 4px;">${satInfo.badge}</span>` : '';
 
     return `
       <tr>
         <td style="padding: 12px 16px; border-bottom: 1px solid #e5e7eb;">
           <div style="margin-bottom: 4px;">
             <span style="background: #dbeafe; color: #1e40af; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600;">${opp.noticeType || 'Solicitation'}</span>
-            ${opp.setAside ? `<span style="background: #dcfce7; color: #166534; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; margin-left: 4px;">${opp.setAside}</span>` : ''}${satBadgeHtml}
+            ${opp.setAside ? `<span style="background: #ede9fe; color: #6d28d9; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 600; margin-left: 4px;">${opp.setAside}</span>` : ''}${satBadgeHtml}
             <span style="background: ${scoreColor}20; color: ${scoreColor}; padding: 2px 6px; border-radius: 4px; font-size: 10px; font-weight: 700; margin-left: 4px;">${opp.score}%</span>
           </div>
           <a href="${opp.uiLink}" style="color: #1e40af; font-weight: 600; text-decoration: none; font-size: 13px;">
