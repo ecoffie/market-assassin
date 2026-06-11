@@ -50,10 +50,14 @@ export async function GET(request: NextRequest) {
   const execute = url.searchParams.get('mode') === 'execute';
   // Optional ?activeOnly=1 — restrict to active users (skip dormant bootcamp imports).
   const activeOnly = url.searchParams.get('activeOnly') === '1';
+  // ?shapes=1 — diagnostic: tally how many CANDIDATES share each distinct NAICS
+  // array (so we can see how much is one batch-seed sweep vs. real bespoke profiles).
+  const shapesMode = url.searchParams.get('shapes') === '1';
   const supabase = sb();
 
   let candidates = 0, written = 0, skippedHasKw = 0, skippedNoNaics = 0, skippedDefault = 0, scanned = 0;
   const samples: Array<{ email: string; keywords: string[] }> = [];
+  const shapeCounts = new Map<string, { count: number; size: number; sample: string }>();
 
   // Page through ALL users — a bare .select() caps at 1000, which silently skipped
   // ~9K profiles. Range-paginate until a short page.
@@ -79,6 +83,12 @@ export async function GET(request: NextRequest) {
       const derived = deriveKeywordsFromNaics(naics);
       if (derived.length === 0) { skippedNoNaics++; continue; }
       candidates++;
+      if (shapesMode) {
+        const key = `${naics.length}:${[...new Set(naics)].sort().join(',')}`;
+        const prev = shapeCounts.get(key);
+        if (prev) prev.count++;
+        else shapeCounts.set(key, { count: 1, size: naics.length, sample: u.user_email });
+      }
       if (samples.length < 8) samples.push({ email: u.user_email, keywords: derived });
       if (execute) {
         const { error: upErr } = await supabase
@@ -101,5 +111,14 @@ export async function GET(request: NextRequest) {
     written,
     skipped: { hasKeywords: skippedHasKw, noNaics: skippedNoNaics, defaultProfile: skippedDefault },
     samples,
+    // Top shared NAICS-array shapes among candidates (only when ?shapes=1). A high
+    // count on one shape = a batch seed masquerading as candidates, not real choices.
+    shapes: shapesMode
+      ? [...shapeCounts.values()]
+          .sort((a, b) => b.count - a.count)
+          .slice(0, 15)
+          .map((s) => ({ users: s.count, naicsCount: s.size, sample: s.sample }))
+      : undefined,
+    distinctShapes: shapesMode ? shapeCounts.size : undefined,
   });
 }
