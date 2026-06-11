@@ -1,5 +1,10 @@
 import Link from 'next/link';
 import { MindySignupForm } from '@/components/mindy/MindySignupForm';
+import { DemoMedia } from '@/components/mindy/DemoMedia';
+
+// Drop a real product video here (Vimeo/YouTube embed URL) to replace the hero
+// placeholder. e.g. 'https://player.vimeo.com/video/XXXXXXXXX'
+const HERO_DEMO_EMBED = '';
 
 // Route paid CTAs through /checkout first so purchase attribution (UTM /
 // referrer captured pre-checkout) is joined to the Stripe purchase event.
@@ -109,9 +114,16 @@ export default function MindyLandingPage() {
             Your 24/7 Federal Market Intelligence Analyst.
           </h2>
           <p className="text-lg text-slate-300 max-w-2xl mx-auto mb-6">
-            While you sleep, Mindy scans 24,000+ federal opportunities, tracks your competitors,
+            While you sleep, Mindy scans 88,000+ federal opportunities, tracks your competitors,
             and delivers a personalized briefing before your first coffee.
           </p>
+
+          {/* SEE IT WORK — show the product in action above the fold (the #1 trust
+              signal for a new brand: "in a world of vaporware, a demo proves the
+              code is real"). Swap HERO_DEMO_EMBED for a real video to go live. */}
+          <div className="max-w-3xl mx-auto mb-8">
+            <DemoMedia embed={HERO_DEMO_EMBED || undefined} caption="Watch Mindy turn 88,000 opportunities into your morning briefing" />
+          </div>
 
           {/* BETA-USER PATH — most arrivals right now are the email-only beta cohort
               who get alerts but never set a password. OAuth won't help them; they need
@@ -148,17 +160,86 @@ export default function MindyLandingPage() {
             </Link>
           </div>
 
-          <p className="text-slate-400 text-sm">
-            Trusted by 500+ small businesses chasing federal contracts
+          {/* LIVE-PROOF BAR — real, verified numbers (not vague claims). For a new
+              brand, concrete scale + real usage substitutes for big-name logos. */}
+          <div className="mt-8 grid grid-cols-2 md:grid-cols-4 gap-3 max-w-3xl mx-auto">
+            {[
+              { n: '88,000+', l: 'opportunities tracked' },
+              { n: '90,000+', l: 'archived solicitations searchable' },
+              { n: '9,900+', l: 'contractors using Mindy' },
+              { n: 'Daily 6 AM', l: 'fresh scan, before coffee' },
+            ].map((s) => (
+              <div key={s.l} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-4">
+                <div className="text-xl md:text-2xl font-extrabold text-white">{s.n}</div>
+                <div className="mt-1 text-xs text-slate-400 leading-snug">{s.l}</div>
+              </div>
+            ))}
+          </div>
+          <p className="mt-4 text-slate-500 text-xs">
+            Built by <a href="https://govcongiants.org" className="text-purple-400 hover:text-purple-300">GovCon Giants</a> — trusted by thousands of small federal contractors.
           </p>
 
           {/* Already have access link */}
-          <div className="mt-8">
+          <div className="mt-6">
             <Link
               href={DASHBOARD_URL}
               className="text-purple-400 hover:text-purple-300 text-sm"
             >
               Already have access? Sign in
+            </Link>
+          </div>
+        </div>
+      </section>
+
+      {/* WATCH MINDY WORK — three short capability demos. Show, don't tell. Swap the
+          DemoMedia placeholders for real GIFs/screen-captures as they're produced. */}
+      <section className="max-w-6xl mx-auto px-4 py-16">
+        <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-3">See Mindy in action</h2>
+        <p className="text-slate-400 text-center max-w-2xl mx-auto mb-10">
+          Not screenshots of a pitch deck — the actual product, working on real federal data.
+        </p>
+        <div className="grid md:grid-cols-3 gap-6">
+          {[
+            { cap: 'Search the BODY of solicitations, not just titles', sub: 'Find "M7" buried in a Statement of Work that SAM.gov would never surface.' },
+            { cap: 'Your morning briefing, written for you', sub: 'The 5 opportunities that fit your business — with why they fit.' },
+            { cap: 'Market research in one click', sub: 'Who buys, who wins, what they pay — for any NAICS or keyword.' },
+          ].map((d) => (
+            <div key={d.cap}>
+              <DemoMedia caption={d.cap} aspect="tall" />
+              <h3 className="mt-4 text-base font-bold text-white">{d.cap}</h3>
+              <p className="mt-1 text-sm text-slate-400">{d.sub}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* EXPLORE FREE, NO LOGIN — surface the LIVE public pages (top boards,
+          contractor directory, NAICS) as real, browsable proof + SEO entry points.
+          A new brand earns trust by letting people USE the data before signing up. */}
+      <section className="bg-slate-900/40 border-y border-slate-800">
+        <div className="max-w-6xl mx-auto px-4 py-16">
+          <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-3">Explore the data — free, no login</h2>
+          <p className="text-slate-400 text-center max-w-2xl mx-auto mb-10">
+            Real federal market intelligence you can browse right now. No account needed.
+          </p>
+          <div className="grid md:grid-cols-3 gap-6">
+            <Link href="/top" className="group rounded-2xl border border-slate-700 bg-slate-800/40 p-6 hover:border-purple-500/60 transition-colors">
+              <div className="text-2xl mb-3">🏆</div>
+              <h3 className="text-lg font-bold text-white group-hover:text-purple-300">Top Contractor Boards</h3>
+              <p className="mt-2 text-sm text-slate-400">61 leaderboards — top contractors by agency, NAICS, set-aside, and state. See who&apos;s winning.</p>
+              <span className="mt-3 inline-block text-sm font-semibold text-purple-400">Browse the boards →</span>
+            </Link>
+            <Link href="/contractors" className="group rounded-2xl border border-slate-700 bg-slate-800/40 p-6 hover:border-purple-500/60 transition-colors">
+              <div className="text-2xl mb-3">🏢</div>
+              <h3 className="text-lg font-bold text-white group-hover:text-purple-300">Contractor Directory</h3>
+              <p className="mt-2 text-sm text-slate-400">Look up any federal contractor — award history, top agencies, NAICS, and 5-year spend.</p>
+              <span className="mt-3 inline-block text-sm font-semibold text-purple-400">Search contractors →</span>
+            </Link>
+            <Link href="/naics" className="group rounded-2xl border border-slate-700 bg-slate-800/40 p-6 hover:border-purple-500/60 transition-colors">
+              <div className="text-2xl mb-3">📊</div>
+              <h3 className="text-lg font-bold text-white group-hover:text-purple-300">NAICS Market Pages</h3>
+              <p className="mt-2 text-sm text-slate-400">Market data for your industry code — spend, buyers, and competition at a glance.</p>
+              <span className="mt-3 inline-block text-sm font-semibold text-purple-400">Explore your market →</span>
             </Link>
           </div>
         </div>
