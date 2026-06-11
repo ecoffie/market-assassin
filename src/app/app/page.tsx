@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import UnifiedSidebar, { type AppPanel, type AppTier } from '@/components/app/UnifiedSidebar';
+import GlobalLookup from '@/components/app/GlobalLookup';
 import ProductTour from '@/components/app/ProductTour';
 import PanelContainer from '@/components/app/panels';
 import VoiceCaptureModal from '@/components/app/voice/VoiceCaptureModal';
@@ -1096,9 +1097,14 @@ function AppDashboard() {
               >
                 <Menu className="w-5 h-5" strokeWidth={1.75} />
               </button>
-              <span className="hidden md:inline text-sm text-slate-400 truncate">
+              <span className="hidden lg:inline text-sm text-slate-400 truncate">
                 Logged in as <span className="text-white">{email}</span>
               </span>
+            </div>
+            {/* Global lookup — type a contract number → award detail (enterprise
+                "search-an-identifier" convention). Members-only header tool. */}
+            <div className="flex-1 flex justify-center min-w-0 px-2">
+              <GlobalLookup email={email} />
             </div>
             <div className="flex items-center gap-2 md:gap-3 shrink-0">
               <span className={`
