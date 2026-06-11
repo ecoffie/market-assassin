@@ -7,6 +7,8 @@ import { useAppTracker } from '@/components/app/track';
 import { useToast, ToastHost } from '@/components/app/Toast';
 import { getMIApiHeaders } from '@/components/app/authHeaders';
 import SamAttachmentLinks from '@/components/app/SamAttachmentLinks';
+import CollapsibleOpportunityDescription from '@/components/app/CollapsibleOpportunityDescription';
+import OpportunityDetailStrip from '@/components/app/OpportunityDetailStrip';
 
 interface NoticeTypeInfo {
   code: string;
@@ -1036,21 +1038,8 @@ function MarketIntelDashboard() {
                           notice_id: opp.notice_id,
                         });
                       }
-                      // Auto-fetch the SAM description text on expand if we
-                      // don't have it inline and haven't already loaded it.
-                      // Cache hit (DB or in-memory) returns instantly; cache
-                      // miss shows a brief spinner inside the expanded area.
-                      if (
-                        opening
-                        && !opp.description
-                        && !lazyDescriptions[opp.notice_id]
-                        && loadingDescriptionFor !== opp.notice_id
-                      ) {
-                        void loadFullDescription(opp.notice_id);
-                      }
-                      // Also kick off Mindy Analyst on expand. Returns
-                      // a 402 teaser for free users (renders the
-                      // upgrade card); cached pro responses are instant.
+                      // Auto-fetch description only on demand — not on expand.
+                      // Keeps documents & contacts visible without a wall of SAM text.
                       if (opening) {
                         void loadAnalyst(opp.notice_id);
                       }
@@ -1230,33 +1219,69 @@ function MarketIntelDashboard() {
                         return null;
                       })()}
 
-                      {/* Description: inline text if SAM gave us one, else a
-                          Load button that lazy-fetches from SAM's noticedesc
-                          endpoint and caches the result. */}
-                      {(opp.description || lazyDescriptions[opp.notice_id] || opp.description_url) && (
-                        <div>
-                          <span className="text-gray-500 text-xs uppercase tracking-wide">Description</span>
-                          {(opp.description || lazyDescriptions[opp.notice_id]) ? (
-                            <p className="text-gray-300 text-sm mt-1 whitespace-pre-wrap leading-relaxed">
-                              {opp.description || lazyDescriptions[opp.notice_id]}
-                            </p>
-                          ) : loadingDescriptionFor === opp.notice_id ? (
-                            <p className="text-gray-500 text-sm mt-2 flex items-center gap-2">
-                              <span className="inline-block w-3 h-3 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
-                              Loading description from SAM.gov…
-                            </p>
-                          ) : descriptionErrorFor?.id === opp.notice_id ? (
-                            <div className="mt-2">
-                              <p className="text-xs text-red-400">{descriptionErrorFor.error}</p>
-                              <button
-                                type="button"
-                                onClick={() => loadFullDescription(opp.notice_id)}
-                                className="mt-1 text-xs text-purple-300 hover:text-purple-200 underline"
-                              >
-                                Retry
-                              </button>
-                            </div>
-                          ) : null}
+                      <OpportunityDetailStrip
+                        attachmentCount={opp.attachments?.length || 0}
+                        contactCount={
+                          opp.points_of_contact?.filter((poc) => {
+                            const fullName = (poc?.fullName || poc?.full_name || poc?.name) as string | undefined;
+                            const pocEmail = poc?.email as string | undefined;
+                            const phone = (poc?.phone || poc?.phoneNumber) as string | undefined;
+                            return !!(fullName || pocEmail || phone);
+                          }).length || 0
+                        }
+                        deadlineLabel={formatDate(opp.response_deadline)}
+                        deadlineUrgent={opp.urgency_level === 'critical' || opp.urgency_level === 'urgent'}
+                        placeLabel={[opp.pop_city, opp.pop_state].filter(Boolean).join(', ') || null}
+                        attachmentsAnchorId={`opp-docs-${opp.notice_id}`}
+                        contactsAnchorId={`opp-poc-${opp.notice_id}`}
+                      />
+
+                      {opp.attachments && opp.attachments.length > 0 && (
+                        <div
+                          id={`opp-docs-${opp.notice_id}`}
+                          className="rounded-lg border border-purple-500/30 bg-purple-500/[0.04] p-3 scroll-mt-4"
+                        >
+                          <SamAttachmentLinks
+                            attachments={opp.attachments}
+                            onDownloadClick={(idx) => track('link_click', 'market_intel_dashboard', {
+                              action: 'download_attachment',
+                              notice_id: opp.notice_id,
+                              attachment_index: idx,
+                            })}
+                          />
+                        </div>
+                      )}
+
+                      {opp.points_of_contact && opp.points_of_contact.length > 0 && (
+                        <div id={`opp-poc-${opp.notice_id}`} className="scroll-mt-4">
+                          <span className="text-gray-500 text-xs uppercase tracking-wide">
+                            Points of Contact
+                          </span>
+                          <div className="mt-2 grid md:grid-cols-2 gap-3">
+                            {opp.points_of_contact.map((poc, idx) => {
+                              const fullName = (poc?.fullName || poc?.full_name || poc?.name) as string | undefined;
+                              const title = (poc?.title || poc?.type) as string | undefined;
+                              const email = poc?.email as string | undefined;
+                              const phone = (poc?.phone || poc?.phoneNumber) as string | undefined;
+                              if (!fullName && !email && !phone) return null;
+                              return (
+                                <div key={idx} className="rounded-lg border border-gray-800 bg-gray-900/40 p-3 text-sm">
+                                  {fullName && <p className="text-gray-200 font-medium">{fullName}</p>}
+                                  {title && <p className="text-xs text-gray-500">{title}</p>}
+                                  {email && (
+                                    <a href={`mailto:${email}`} className="block mt-1 text-purple-300 hover:text-purple-200 text-xs break-all">
+                                      {email}
+                                    </a>
+                                  )}
+                                  {phone && (
+                                    <a href={`tel:${phone}`} className="block text-gray-400 hover:text-gray-200 text-xs">
+                                      {phone}
+                                    </a>
+                                  )}
+                                </div>
+                              );
+                            })}
+                          </div>
                         </div>
                       )}
 
@@ -1326,54 +1351,6 @@ function MarketIntelDashboard() {
                         </div>
                       </div>
 
-                      {opp.attachments && opp.attachments.length > 0 && (
-                        <SamAttachmentLinks
-                          attachments={opp.attachments}
-                          onDownloadClick={(idx) => track('link_click', 'market_intel_dashboard', {
-                            action: 'download_attachment',
-                            notice_id: opp.notice_id,
-                            attachment_index: idx,
-                          })}
-                        />
-                      )}
-
-                      {/* Points of Contact — usually contracting officer +
-                          specialist. SAM's pointOfContact entries vary
-                          slightly, so we read whichever name/email/phone
-                          fields are populated. */}
-                      {opp.points_of_contact && opp.points_of_contact.length > 0 && (
-                        <div>
-                          <span className="text-gray-500 text-xs uppercase tracking-wide">
-                            Points of Contact
-                          </span>
-                          <div className="mt-2 grid md:grid-cols-2 gap-3">
-                            {opp.points_of_contact.map((poc, idx) => {
-                              const fullName = (poc?.fullName || poc?.full_name || poc?.name) as string | undefined;
-                              const title = (poc?.title || poc?.type) as string | undefined;
-                              const email = poc?.email as string | undefined;
-                              const phone = (poc?.phone || poc?.phoneNumber) as string | undefined;
-                              if (!fullName && !email && !phone) return null;
-                              return (
-                                <div key={idx} className="rounded-lg border border-gray-800 bg-gray-900/40 p-3 text-sm">
-                                  {fullName && <p className="text-gray-200 font-medium">{fullName}</p>}
-                                  {title && <p className="text-xs text-gray-500">{title}</p>}
-                                  {email && (
-                                    <a href={`mailto:${email}`} className="block mt-1 text-purple-300 hover:text-purple-200 text-xs break-all">
-                                      {email}
-                                    </a>
-                                  )}
-                                  {phone && (
-                                    <a href={`tel:${phone}`} className="block text-gray-400 hover:text-gray-200 text-xs">
-                                      {phone}
-                                    </a>
-                                  )}
-                                </div>
-                              );
-                            })}
-                          </div>
-                        </div>
-                      )}
-
                       {/* Contracting office address */}
                       {opp.office_address && Object.values(opp.office_address).some(Boolean) && (
                         <div>
@@ -1429,6 +1406,23 @@ function MarketIntelDashboard() {
                             </a>
                           )}
                         </div>
+                      )}
+
+                      {(opp.description || lazyDescriptions[opp.notice_id] || opp.description_url) && (
+                        <CollapsibleOpportunityDescription
+                          text={opp.description || lazyDescriptions[opp.notice_id]}
+                          loading={loadingDescriptionFor === opp.notice_id}
+                          pendingRemote={
+                            !!(opp.description_url && !opp.description && !lazyDescriptions[opp.notice_id])
+                          }
+                          onLoad={() => loadFullDescription(opp.notice_id)}
+                          error={
+                            descriptionErrorFor?.id === opp.notice_id
+                              ? descriptionErrorFor.error
+                              : null
+                          }
+                          onRetry={() => loadFullDescription(opp.notice_id)}
+                        />
                       )}
 
                       {opp.ui_link && (

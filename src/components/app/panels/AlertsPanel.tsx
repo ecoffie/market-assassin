@@ -13,6 +13,8 @@ import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 import { useDodaacNames } from '@/components/app/useDodaacNames';
 import { userNeedsMindySetup } from '@/lib/alerts/profile-setup';
 import SamAttachmentLinks from '@/components/app/SamAttachmentLinks';
+import CollapsibleOpportunityDescription from '@/components/app/CollapsibleOpportunityDescription';
+import OpportunityDetailStrip from '@/components/app/OpportunityDetailStrip';
 
 interface AlertsPanelProps {
   email: string | null;
@@ -407,19 +409,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
     }
   }, [email, analystByOpp]);
 
-  // When the drawer opens (selectedAlert changes), auto-fetch the full
-  // description if we don't have inline text. Cache hit returns
-  // instantly; cache miss shows a spinner inside the drawer.
-  useEffect(() => {
-    if (!selectedAlert) return;
-    if (selectedAlert.description) return;
-    if (lazyDescriptions[selectedAlert.id]) return;
-    void loadFullDescription(selectedAlert.id);
-  }, [selectedAlert, lazyDescriptions, loadFullDescription]);
-
-  // Auto-fetch Mindy Analyst on drawer open. Pro tier gets the real
-  // analysis; free tier hits the 402 teaser path and renders the
-  // upgrade card. Either way, fire-and-forget on open.
+  // Mindy Analyst on drawer open — description loads on demand only.
   useEffect(() => {
     if (!selectedAlert) return;
     void loadAnalyst(selectedAlert.id);
@@ -1156,6 +1146,68 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                 </div>
               </div>
 
+              <OpportunityDetailStrip
+                attachmentCount={selectedAlert.attachments?.length || 0}
+                contactCount={
+                  selectedAlert.pointsOfContact?.filter((poc) => {
+                    const fullName = (poc?.fullName || poc?.full_name || poc?.name) as string | undefined;
+                    const pocEmail = poc?.email as string | undefined;
+                    const phone = (poc?.phone || poc?.phoneNumber) as string | undefined;
+                    return !!(fullName || pocEmail || phone);
+                  }).length || 0
+                }
+                deadlineLabel={formatDate(selectedAlert.responseDeadline)}
+                deadlineUrgent={selectedAlert.isUrgent || selectedAlert.isClosingSoon}
+                placeLabel={formatOpportunityLocation(selectedAlert) || null}
+                attachmentsAnchorId={`alert-docs-${selectedAlert.id}`}
+                contactsAnchorId={`alert-poc-${selectedAlert.id}`}
+              />
+
+              {selectedAlert.attachments && selectedAlert.attachments.length > 0 && (
+                <div
+                  id={`alert-docs-${selectedAlert.id}`}
+                  className="bg-purple-500/[0.04] border border-purple-500/30 rounded-lg p-4 scroll-mt-4"
+                >
+                  <SamAttachmentLinks
+                    attachments={selectedAlert.attachments}
+                    onDownloadClick={() => trackAlertEvent('link_click', selectedAlert, 'download_attachment')}
+                  />
+                </div>
+              )}
+
+              {selectedAlert.pointsOfContact && selectedAlert.pointsOfContact.length > 0 && (
+                <div id={`alert-poc-${selectedAlert.id}`} className="bg-slate-900 border border-slate-800 rounded-lg p-4 scroll-mt-4">
+                  <div className="text-xs text-slate-500 uppercase tracking-wider mb-3">
+                    Points of Contact
+                  </div>
+                  <div className="space-y-3">
+                    {selectedAlert.pointsOfContact.map((poc, idx) => {
+                      const fullName = (poc?.fullName || poc?.full_name || poc?.name) as string | undefined;
+                      const title = (poc?.title || poc?.type) as string | undefined;
+                      const pocEmail = poc?.email as string | undefined;
+                      const phone = (poc?.phone || poc?.phoneNumber) as string | undefined;
+                      if (!fullName && !pocEmail && !phone) return null;
+                      return (
+                        <div key={idx} className="border border-slate-800 rounded-lg p-3 text-sm">
+                          {fullName && <p className="text-slate-200 font-medium line-clamp-2">{fullName}</p>}
+                          {title && <p className="text-xs text-slate-500">{title}</p>}
+                          {pocEmail && (
+                            <a href={`mailto:${pocEmail}`} className="block mt-1 text-purple-300 hover:text-purple-200 text-xs break-all">
+                              {pocEmail}
+                            </a>
+                          )}
+                          {phone && (
+                            <a href={`tel:${phone}`} className="block text-slate-400 hover:text-slate-200 text-xs">
+                              {phone}
+                            </a>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+
               <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 space-y-3">
                 <div>
                   <div className="text-xs text-slate-500">Buyer</div>
@@ -1347,81 +1399,6 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                 return null;
               })()}
 
-              {/* Description — inline if SAM gave us text; lazy-fetched
-                  from /api/sam-description when only a URL is on file.
-                  Cleaned (HTML → text) at the API layer so no raw tags
-                  leak into the drawer. */}
-              {(selectedAlert.description || lazyDescriptions[selectedAlert.id] || selectedAlert.descriptionUrl) && (
-                <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-                  <div className="text-xs text-slate-500 uppercase tracking-wider mb-2">Description</div>
-                  {(selectedAlert.description || lazyDescriptions[selectedAlert.id]) ? (
-                    <p className="text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
-                      {selectedAlert.description || lazyDescriptions[selectedAlert.id]}
-                    </p>
-                  ) : loadingDescription === selectedAlert.id ? (
-                    <p className="text-sm text-slate-500 flex items-center gap-2">
-                      <span className="inline-block w-3 h-3 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
-                      Loading description from SAM.gov…
-                    </p>
-                  ) : descriptionError ? (
-                    <div>
-                      <p className="text-xs text-red-400">{descriptionError}</p>
-                      <button
-                        type="button"
-                        onClick={() => loadFullDescription(selectedAlert.id)}
-                        className="mt-1 text-xs text-purple-300 hover:text-purple-200 underline"
-                      >
-                        Retry
-                      </button>
-                    </div>
-                  ) : null}
-                </div>
-              )}
-
-              {selectedAlert.attachments && selectedAlert.attachments.length > 0 && (
-                <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-                  <SamAttachmentLinks
-                    attachments={selectedAlert.attachments}
-                    onDownloadClick={() => trackAlertEvent('link_click', selectedAlert, 'download_attachment')}
-                  />
-                </div>
-              )}
-
-              {/* Points of Contact — contracting officer + specialist.
-                  Mailto/tel links so users can act directly. */}
-              {selectedAlert.pointsOfContact && selectedAlert.pointsOfContact.length > 0 && (
-                <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-                  <div className="text-xs text-slate-500 uppercase tracking-wider mb-3">
-                    Points of Contact
-                  </div>
-                  <div className="space-y-3">
-                    {selectedAlert.pointsOfContact.map((poc, idx) => {
-                      const fullName = (poc?.fullName || poc?.full_name || poc?.name) as string | undefined;
-                      const title = (poc?.title || poc?.type) as string | undefined;
-                      const pocEmail = poc?.email as string | undefined;
-                      const phone = (poc?.phone || poc?.phoneNumber) as string | undefined;
-                      if (!fullName && !pocEmail && !phone) return null;
-                      return (
-                        <div key={idx} className="border border-slate-800 rounded-lg p-3 text-sm">
-                          {fullName && <p className="text-slate-200 font-medium line-clamp-2">{fullName}</p>}
-                          {title && <p className="text-xs text-slate-500">{title}</p>}
-                          {pocEmail && (
-                            <a href={`mailto:${pocEmail}`} className="block mt-1 text-purple-300 hover:text-purple-200 text-xs break-all">
-                              {pocEmail}
-                            </a>
-                          )}
-                          {phone && (
-                            <a href={`tel:${phone}`} className="block text-slate-400 hover:text-slate-200 text-xs">
-                              {phone}
-                            </a>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
-                </div>
-              )}
-
               {/* Contracting office address */}
               {selectedAlert.officeAddress && Object.values(selectedAlert.officeAddress).some(Boolean) && (
                 <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
@@ -1462,6 +1439,21 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                       {selectedAlert.additionalInfoLink}
                     </a>
                   )}
+                </div>
+              )}
+
+              {(selectedAlert.description || lazyDescriptions[selectedAlert.id] || selectedAlert.descriptionUrl) && (
+                <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+                  <CollapsibleOpportunityDescription
+                    text={selectedAlert.description || lazyDescriptions[selectedAlert.id]}
+                    loading={loadingDescription === selectedAlert.id}
+                    pendingRemote={
+                      !!(selectedAlert.descriptionUrl && !selectedAlert.description && !lazyDescriptions[selectedAlert.id])
+                    }
+                    onLoad={() => loadFullDescription(selectedAlert.id)}
+                    error={descriptionError}
+                    onRetry={() => loadFullDescription(selectedAlert.id)}
+                  />
                 </div>
               )}
 
