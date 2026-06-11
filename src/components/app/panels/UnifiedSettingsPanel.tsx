@@ -20,7 +20,6 @@ interface SettingsForm {
   target_agencies: string;
   email_frequency: string;
   onboarding_completed: boolean;
-  two_factor_required: boolean;
   // States the user wants opportunities scoped to. Empty = national.
   location_states: string[];
 }
@@ -34,7 +33,6 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
     target_agencies: '',
     email_frequency: 'daily',
     onboarding_completed: false,
-    two_factor_required: true,
     location_states: [],
   });
   const [workspaceName, setWorkspaceName] = useState('Workspace');
@@ -90,7 +88,6 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
         // over the legacy mi_beta_user_settings.email_frequency value.
         email_frequency: realAlertFrequency || settings.email_frequency || 'daily',
         onboarding_completed: Boolean(settings.onboarding_completed),
-        two_factor_required: settings.two_factor_required !== false,
         // Canonical store for states is user_notification_settings,
         // surfaced via the alerts preferences endpoint.
         location_states: realLocationStates.map((s) => String(s || '').toUpperCase()),
@@ -131,7 +128,6 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
             target_agencies: parseList(form.target_agencies),
             email_frequency: form.email_frequency,
             onboarding_completed: markComplete,
-            two_factor_required: form.two_factor_required,
           }),
         }),
         fetch('/api/alerts/preferences', {
@@ -261,22 +257,6 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
             />
           </section>
 
-          <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5">
-            <SectionTitle title="Security" />
-            <label className="flex items-center justify-between gap-4 rounded-lg border border-slate-800 bg-slate-800/40 p-4">
-              <div>
-                <div className="text-sm font-medium text-white">Require two-factor verification</div>
-                <div className="text-xs text-slate-500 mt-1">Adds an extra layer of security to your account.</div>
-              </div>
-              <input
-                type="checkbox"
-                checked={form.two_factor_required}
-                onChange={(e) => setForm({ ...form, two_factor_required: e.target.checked })}
-                className="h-5 w-5 rounded border-slate-600 bg-slate-900 text-emerald-600"
-              />
-            </label>
-          </section>
-
           <div className="flex justify-end gap-3">
             <button
               onClick={() => saveSettings(false)}
@@ -319,7 +299,6 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
               <ChecklistItem label="Profile saved" done={Boolean(form.display_name || form.company_name)} />
               <ChecklistItem label="NAICS selected" done={parseList(form.naics_codes).length > 0} />
               <ChecklistItem label="Agencies selected" done={parseList(form.target_agencies).length > 0} />
-              <ChecklistItem label="2FA enabled" done={form.two_factor_required} />
             </div>
           </div>
 
