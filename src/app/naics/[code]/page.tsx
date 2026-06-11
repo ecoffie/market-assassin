@@ -19,6 +19,7 @@
  */
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import MemberAwareCta from '@/components/MemberAwareCta';
 import { notFound } from 'next/navigation';
 import {
   NAICS_TOP_100,
@@ -719,15 +720,19 @@ export default async function NaicsCodePage({
             the matches every morning. So you read opportunities, not search
             results.
           </p>
-          <Link
-            href="/signup"
-            className="inline-block px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-purple-500/30 transition-all hover:scale-105"
-          >
-            Meet Mindy — Free Daily Briefing
-          </Link>
-          <p className="text-slate-500 text-sm mt-4">
-            No credit card. First briefing lands tomorrow morning.
-          </p>
+          <MemberAwareCta memberHref="/app" memberLabel="Open Mindy →">
+            <>
+              <Link
+                href="/signup"
+                className="inline-block px-8 py-4 bg-purple-600 hover:bg-purple-500 text-white rounded-xl font-bold text-lg shadow-xl shadow-purple-500/30 transition-all hover:scale-105"
+              >
+                Meet Mindy — Free Daily Briefing
+              </Link>
+              <p className="text-slate-500 text-sm mt-4">
+                No credit card. First briefing lands tomorrow morning.
+              </p>
+            </>
+          </MemberAwareCta>
         </div>
       </section>
     </main>

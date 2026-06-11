@@ -537,17 +537,17 @@ export default async function ContractorPage({ params }: PageProps) {
       {/* CTA */}
       <section className="mx-auto max-w-6xl px-6 pb-16">
         <div className="rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-900/40 to-slate-900 p-8 text-center">
-          <h2 className="text-2xl font-bold">Track {displayName} Recompetes Before They Post</h2>
+          <h2 className="text-2xl font-bold">Want to win work like {displayName}?</h2>
           <p className="mt-3 mb-6 max-w-2xl mx-auto text-slate-300">
-            Mindy monitors {displayName}&apos;s active contracts and alerts you 12 months before they expire — so you can
-            position to compete on recompete.
+            Their contracts will eventually end — and when they do, the government has to award that
+            work again. Mindy tells you up to a year early, so you can be ready to compete for it.
           </p>
-          <MemberAwareCta memberHref="/app" memberLabel="Track in Mindy →">
+          <MemberAwareCta memberHref="/app" memberLabel="Track this company in Mindy →">
             <Link
               href="/signup"
               className="inline-flex rounded-xl bg-purple-600 px-6 py-3 font-semibold text-white hover:bg-purple-500 shadow-lg shadow-purple-500/20"
             >
-              Get Free Recompete Alerts
+              Track this company free →
             </Link>
           </MemberAwareCta>
         </div>

@@ -17,6 +17,7 @@
  */
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import MemberAwareCta from '@/components/MemberAwareCta';
 import { notFound } from 'next/navigation';
 import { getListicleBySlug, LISTICLES } from '@/data/top-listicles';
 import {
@@ -240,17 +241,19 @@ export default async function ListiclePage({ params }: PageProps) {
       {/* CTA */}
       <section className="mx-auto max-w-6xl px-6 pb-16">
         <div className="rounded-2xl border border-purple-500/30 bg-gradient-to-br from-purple-900/40 to-slate-900 p-8 text-center">
-          <h2 className="text-2xl font-bold">Compete With the Top of This List</h2>
-          <p className="mt-3 max-w-2xl mx-auto text-slate-300">
-            Mindy watches every contract these primes are about to lose at recompete. Get alerts 12 months out so
-            you can position to win.
+          <h2 className="text-2xl font-bold">Want to compete with the companies on this list?</h2>
+          <p className="mt-3 mb-6 max-w-2xl mx-auto text-slate-300">
+            Their contracts won&apos;t last forever. When the government re-awards that work, Mindy
+            tells you up to a year early — so you have time to get ready and go after it.
           </p>
-          <Link
-            href="/signup"
-            className="mt-6 inline-flex rounded-xl bg-purple-600 px-6 py-3 font-semibold text-white hover:bg-purple-500 shadow-lg shadow-purple-500/20"
-          >
-            Start Free
-          </Link>
+          <MemberAwareCta memberHref="/app" memberLabel="Open Mindy →">
+            <Link
+              href="/signup"
+              className="inline-flex rounded-xl bg-purple-600 px-6 py-3 font-semibold text-white hover:bg-purple-500 shadow-lg shadow-purple-500/20"
+            >
+              Start free →
+            </Link>
+          </MemberAwareCta>
         </div>
       </section>
     </main>
