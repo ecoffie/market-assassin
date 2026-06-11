@@ -22,6 +22,25 @@ function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 }
 
+// Known SEED/DEFAULT NAICS sets. A profile whose codes ARE one of these was never
+// set up by the user — it was pre-filled. Deriving keywords from a default would
+// seed FAKE signal (healthcare/consulting keywords for someone who never chose
+// them). We only backfill profiles where the user picked their OWN codes.
+const DEFAULT_SETS: string[][] = [
+  // briefings FALLBACK_NAICS (professional services)
+  ['541512', '541611', '541330', '541990', '561210'],
+  // defaults.ts DEFAULT_NAICS_CODES (healthcare — prompts users to configure)
+  ['621111', '621210', '621511', '621610', '622110', '622310', '623110', '623312', '624120'],
+];
+const DEFAULT_SET_KEYS = new Set(DEFAULT_SETS.map((s) => [...s].sort().join(',')));
+
+/** True if the stored codes are EXACTLY a known default set (i.e. user never set up). */
+function isDefaultProfile(codes: string[]): boolean {
+  if (!codes.length) return false;
+  const key = [...new Set(codes.map(String))].sort().join(',');
+  return DEFAULT_SET_KEYS.has(key);
+}
+
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const pw = url.searchParams.get('password');
@@ -33,7 +52,7 @@ export async function GET(request: NextRequest) {
   const activeOnly = url.searchParams.get('activeOnly') === '1';
   const supabase = sb();
 
-  let candidates = 0, written = 0, skippedHasKw = 0, skippedNoNaics = 0, scanned = 0;
+  let candidates = 0, written = 0, skippedHasKw = 0, skippedNoNaics = 0, skippedDefault = 0, scanned = 0;
   const samples: Array<{ email: string; keywords: string[] }> = [];
 
   // Page through ALL users — a bare .select() caps at 1000, which silently skipped
@@ -52,8 +71,11 @@ export async function GET(request: NextRequest) {
 
     for (const u of users as Array<{ user_email: string; naics_codes: string[] | null; keywords: string[] | null }>) {
       if (Array.isArray(u.keywords) && u.keywords.length > 0) { skippedHasKw++; continue; }
-      const naics = u.naics_codes || [];
+      const naics = (u.naics_codes || []).map(String);
       if (naics.length === 0) { skippedNoNaics++; continue; }
+      // Skip pre-filled DEFAULT profiles — the user never chose these codes, so
+      // derived keywords would be fake signal (Eric: don't count pre-filled NAICS).
+      if (isDefaultProfile(naics)) { skippedDefault++; continue; }
       const derived = deriveKeywordsFromNaics(naics);
       if (derived.length === 0) { skippedNoNaics++; continue; }
       candidates++;
@@ -77,7 +99,7 @@ export async function GET(request: NextRequest) {
     scanned,
     candidates,
     written,
-    skipped: { hasKeywords: skippedHasKw, noNaics: skippedNoNaics },
+    skipped: { hasKeywords: skippedHasKw, noNaics: skippedNoNaics, defaultProfile: skippedDefault },
     samples,
   });
 }
