@@ -306,8 +306,14 @@ export async function POST(request: NextRequest) {
     // through to the live merge. Stale rows are overwritten by the
     // upsert at the bottom of the success path.
     const supabase = getSupabase();
+    // SKIP the cache for KEYWORD searches. The cached return path doesn't include
+    // keyword_coverage (the lesson banner + derived keywords), so a cache hit made
+    // them vanish — "drones" showed no coverage/keywords while a fresh keyword
+    // ("cybersecurity") worked. Keyword research is exploratory + teaching; always
+    // compute it live so the coverage + keyword output is present and current.
+    const skipCache = Boolean(keyword && keyword.trim());
     try {
-      const { data: cacheRow } = await supabase
+      const { data: cacheRow } = skipCache ? { data: null } : await supabase
         .from('agency_target_data_cache')
         .select('*')
         .eq('naics_code', cacheKey.naics_code)
