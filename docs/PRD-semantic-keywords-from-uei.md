@@ -35,15 +35,22 @@ This is genuinely "semantic search" — keywords grounded in real work, by meani
 
 ---
 
-## BLOCKER — what must land first
+## UNBLOCKED ✅ (2026-06-11) — the embedding infra is LIVE in prod
 
-| Dependency | State | Notes |
-|---|---|---|
-| **pgvector in Supabase** | ❌ not installed | Required for cosine at query scale. |
-| Embedding pipeline | ⚠️ partial | `src/lib/market/embeddings.ts` has `embedText()` (OpenAI text-embedding-3-small) + `cosineSimilarity()` — built for **SOW recompete match**. Reuse it. |
-| SOW embeddings (Phase 2 / #67) | ⚠️ Cursor agent, uncommitted | That work installs pgvector + the embedding drain. **This PRD rides on it** — do AFTER Phase 2 lands. See [[sam_description_body_capture]]. |
+The original "blocked on pgvector" premise was WRONG. The Phase 2 SOW-embedding work
+(#67) landed on main + deployed, and it **does NOT use pgvector** — it stores embeddings
+as JSONB and does cosine **in JavaScript**. Verified live:
+`/api/app/recompete-sow` returns real semantic matches (score 0.613, real PWS doc).
 
-**Do NOT build until pgvector + the Phase 2 embedding infra are merged + deployed.**
+| Dependency | State |
+|---|---|
+| Embedding pipeline `embedText()` + `cosineSimilarity()` (`src/lib/market/embeddings.ts`) | ✅ live, proven |
+| OpenAI `text-embedding-3-small` + `OPENAI_API_KEY` | ✅ set in prod |
+| JSONB-embedding storage pattern (`sam_opportunities.sow_embedding`) | ✅ migration run, populated |
+| pgvector | ❌ NOT needed — JS cosine works at this scale |
+
+**This is now BUILDABLE.** No new infra. Reuse `embedText()` for the company blob, store
+the keyword/term embeddings the same JSONB way, cosine-match in app.
 
 ---
 
