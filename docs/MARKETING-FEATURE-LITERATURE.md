@@ -695,3 +695,27 @@ it or read cached metadata from the backfill cron.
 **Proof:** `src/lib/sam/attachment-metadata.ts`, `SamAttachmentLinks.tsx`,
 `backfill-sam-attachments` cron. DB rows with stale "Document N" names can be refreshed
 with `?retry-names=1` on the backfill endpoint.
+
+---
+
+## 23. Recompete SOW match — find the incumbent's scope before it re-posts
+
+**What:** On an expiring contract in Expiring Contracts, click **Find incumbent SOW**.
+Mindy searches ~7,600 recovered SOW/PWS documents (from the catalog backfill) and
+returns a **likely scope match by semantic similarity** — pre-filtered to the same
+agency and NAICS sector, ranked by meaning not keywords.
+
+**Why:** PIIDs (award IDs) never join to solicitation numbers — measured 0% exact match.
+The only honest link is semantic: "this expiring IT services contract at Army MEDCOM
+probably matches this recovered PWS from a prior Army health IT sol." Confidence
+requires both a high score AND a clear gap to the runner-up — a wrong SOW is worse
+than none.
+
+**SEO:** "incumbent statement of work recompete," "find predecessor SOW federal contract,"
+"recompete capture intelligence."
+
+**Proof:** Corpus grounded in real recovered docs (`has_sow_doc=true`, `sow_text` from
+SAM attachments). Match via OpenAI `text-embedding-3-small` + in-app cosine over
+agency/NAICS-sliced candidates (~50–300 rows). API: `GET /api/app/recompete-sow`.
+UI: `RecompeteSowMatch` in Expiring Contracts — labeled "likely SOW match by semantic
+similarity," never "the incumbent's SOW."

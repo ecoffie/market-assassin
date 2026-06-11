@@ -7,6 +7,7 @@ import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButto
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
 import ContractorLink from '../contractors/ContractorLink';
 import AwardDetailDrawer from '../awards/AwardDetailDrawer';
+import RecompeteSowMatch from '../awards/RecompeteSowMatch';
 import SaveContactButton from '../contacts/SaveContactButton';
 import { classifyLocation, MATCH_META, type LocationMatch } from '@/lib/geo/location-match';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
@@ -1125,6 +1126,14 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                               className="mt-3"
                             />
                           )}
+                          <RecompeteSowMatch
+                            piid={contract.piid}
+                            naics={contract.naics}
+                            agency={contract.agency}
+                            description={contract.title}
+                            email={email}
+                            className="mt-3"
+                          />
                           <div className="mt-4 flex flex-wrap gap-2">
                             {contract.piid && (
                               <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">
