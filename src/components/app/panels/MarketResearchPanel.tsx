@@ -969,17 +969,25 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         showToast({ message: 'No federal codes found for that — try different words.', variant: 'error' });
         return;
       }
-      setSportSuggestions({
-        naics: (d.naicsSuggestions || []).map((s: { code: string; name: string }) => ({ code: s.code, name: s.name })),
-        psc: (d.pscSuggestions || []).map((s: { code: string; name: string }) => ({ code: s.code, name: s.name })),
-      });
-      // DON'T pre-fill naicsCode from the narrow suggest-codes list — that made the
-      // backend SKIP its full-90%-coverage derivation (it only auto-derives when
-      // naicsCode is EMPTY). Send the keyword with EMPTY codes so target-market-
-      // research computes the real coverage set (~9 codes covering 91%, not 6).
-      // The suggestion chips above are display-only. (Bug: panel showed a fraction
-      // of the coverage the engine actually finds.)
-      const nextFormData = { ...formData, naicsCode: '', pscCode: '', businessType: formData.businessType || 'Small Business' };
+      const naicsList = (d.naicsSuggestions || []).map((s: { code: string; name: string }) => ({ code: s.code, name: s.name }));
+      const pscList = (d.pscSuggestions || []).map((s: { code: string; name: string }) => ({ code: s.code, name: s.name }));
+      setSportSuggestions({ naics: naicsList, psc: pscList });
+      // Apply the derived codes to formData so the strategic-reports build
+      // (/api/reports/generate-all) has codes — it HARD-requires naicsCode|pscCode
+      // and threw "Either inputs.naicsCode or inputs.pscCode is required" when we
+      // left them empty. The coverage LESSON banner is still keyword-driven
+      // (target-market-research computes total market / 90%-coverage set from the
+      // keyword regardless of the codes), so filling them no longer narrows it.
+      // Replace any prefilled profile NAICS (e.g. 236,237,238) with the keyword's
+      // real codes so reports + agencies match what the user actually searched.
+      const derivedNaics = naicsList.map((n: { code: string }) => n.code).join(', ');
+      const derivedPsc = pscList.map((p: { code: string }) => p.code).join(', ');
+      const nextFormData = {
+        ...formData,
+        naicsCode: derivedNaics,
+        pscCode: derivedNaics ? '' : derivedPsc,
+        businessType: formData.businessType || 'Small Business',
+      };
       setFormData(nextFormData);
       handleGenerateAll({ nextFormData });
       // Persist the user's own words into their profile keywords (additive, never
