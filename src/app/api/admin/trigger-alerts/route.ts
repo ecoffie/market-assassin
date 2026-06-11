@@ -326,12 +326,12 @@ async function sendAlertEmail(
   }).join('');
 
   const upgradeSection = showUpgrade ? `
-    <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); border-radius: 10px; padding: 24px; margin-top: 25px; text-align: center;">
+    <div style="background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%); border-radius: 10px; padding: 24px; margin-top: 25px; text-align: center;">
       <h3 style="color: white; margin: 0 0 10px 0; font-size: 18px;">You're Missing ${totalAvailable - 5} More Opportunities!</h3>
-      <p style="color: #d1fae5; margin: 0 0 16px 0; font-size: 14px;">
+      <p style="color: #e9e3ff; margin: 0 0 16px 0; font-size: 14px;">
         Open Mindy Pro for <strong>15 opps/week</strong> and priority ranking.
       </p>
-      <a href="${mindyDashboardUrl}" style="background: white; color: #059669; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+      <a href="${mindyDashboardUrl}" style="background: white; color: #7c3aed; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
         Open Mindy Dashboard
       </a>
     </div>
@@ -346,7 +346,7 @@ async function sendAlertEmail(
     ${renderMindyEmailLogo(52)}
     <h1 style="color: white; margin: 0; font-size: 24px;">Mindy</h1>
     <p style="color: #c4b5fd; margin: 8px 0 0 0; font-size: 16px;">Weekly SAM.gov Opportunities</p>
-    <p style="margin: 16px 0 0 0;"><a href="${mindyDashboardUrl}" style="background: #10b981; color: white; padding: 10px 18px; text-decoration: none; border-radius: 999px; font-weight: 700; font-size: 13px; display: inline-block;">Open Mindy Dashboard →</a></p>
+    <p style="margin: 16px 0 0 0;"><a href="${mindyDashboardUrl}" style="background: #7c3aed; color: white; padding: 10px 18px; text-decoration: none; border-radius: 999px; font-weight: 700; font-size: 13px; display: inline-block;">Open Mindy Dashboard →</a></p>
   </div>
 
   <div style="background: #ffffff; padding: 25px; border: 1px solid #e5e7eb; border-top: none;">

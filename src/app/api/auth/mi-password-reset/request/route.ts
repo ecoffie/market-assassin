@@ -62,15 +62,15 @@ function buildResetEmailHtml(resetUrl: string): string {
             <td align="center" style="padding:24px 12px;">
               <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%; max-width:640px; background:#ffffff; border-collapse:separate; border-spacing:0; font-family:Arial,Helvetica,sans-serif; color:#0f172a;">
                 <tr>
-                  <td align="center" bgcolor="#0b7a5a" style="background:#0b7a5a; padding:26px 24px; color:#ffffff;">
+                  <td align="center" bgcolor="#1e3a8a" style="background:#1e3a8a; background:linear-gradient(135deg,#1e3a8a 0%,#7c3aed 100%); padding:26px 24px; color:#ffffff;">
                     ${renderMindyEmailLogo(48)}
                     <div style="font-size:30px; line-height:1.12; margin:0 0 8px; font-weight:800;">Mindy</div>
-                    <div style="font-size:15px; line-height:1.45; margin:0 auto; color:#d7ffef; max-width:430px;">Federal opportunity alerts, briefings, forecasts, and capture intelligence.</div>
+                    <div style="font-size:15px; line-height:1.45; margin:0 auto; color:#e9e3ff; max-width:430px;">Federal opportunity alerts, briefings, forecasts, and capture intelligence.</div>
                   </td>
                 </tr>
                 <tr>
                   <td bgcolor="#ffffff" style="background:#ffffff; padding:28px 24px 34px;">
-                    <div style="display:inline-block; background:#ecfdf5; color:#047857; border:1px solid #a7f3d0; border-radius:999px; padding:7px 12px; font-size:12px; font-weight:800; letter-spacing:0.04em; text-transform:uppercase;">
+                    <div style="display:inline-block; background:#f5f3ff; color:#6d28d9; border:1px solid #ddd6fe; border-radius:999px; padding:7px 12px; font-size:12px; font-weight:800; letter-spacing:0.04em; text-transform:uppercase;">
                       Password reset
                     </div>
                     <h1 style="font-size:24px; line-height:1.25; margin:18px 0 12px; color:#0f172a; font-weight:800;">Choose a new Mindy password</h1>
@@ -86,7 +86,7 @@ function buildResetEmailHtml(resetUrl: string): string {
                           </p>
                           <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;">
                             <tr>
-                              <td align="center" bgcolor="#059669" style="background:#059669; border-radius:10px;">
+                              <td align="center" bgcolor="#7c3aed" style="background:#7c3aed; background:linear-gradient(135deg,#3b82f6 0%,#7c3aed 100%); border-radius:10px;">
                                 <a href="${resetUrl}" style="display:block; text-align:center; color:#ffffff; padding:16px 22px; text-decoration:none; font-size:16px; font-weight:800;">
                                   Reset Mindy password
                                 </a>
@@ -107,7 +107,7 @@ function buildResetEmailHtml(resetUrl: string): string {
                           <p style="font-size:13px; line-height:1.6; color:#64748b; margin:0 0 8px;">
                             Button not working? Paste this secure link into your browser:
                           </p>
-                          <a href="${resetUrl}" style="color:#047857; font-size:13px; line-height:1.5; word-break:break-all;">${resetUrl}</a>
+                          <a href="${resetUrl}" style="color:#6d28d9; font-size:13px; line-height:1.5; word-break:break-all;">${resetUrl}</a>
                         </td>
                       </tr>
                     </table>

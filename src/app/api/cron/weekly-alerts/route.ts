@@ -660,13 +660,13 @@ async function sendAlertEmail(
 
     ${showUpgradeToMindyPro ? `
     <!-- Mindy Pro Upgrade CTA (for free tier with more opps available) -->
-    <div style="background: linear-gradient(135deg, #059669 0%, #10b981 100%); border-radius: 10px; padding: 24px; margin-top: 25px; text-align: center;">
+    <div style="background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%); border-radius: 10px; padding: 24px; margin-top: 25px; text-align: center;">
       <h3 style="color: white; margin: 0 0 10px 0; font-size: 18px;">You're Missing ${totalAvailable - 5} More Opportunities!</h3>
-      <p style="color: #d1fae5; margin: 0 0 16px 0; font-size: 14px;">
+      <p style="color: #e9e3ff; margin: 0 0 16px 0; font-size: 14px;">
         Free tier shows 5 opps/week. We found <strong>${totalAvailable}</strong> matches for your profile.<br>
         Mindy Pro gives you <strong>15 opps/week</strong>, priority ranking, and richer recommendations.
       </p>
-      <a href="${trackedUrl(mindyDashboardUrl, 'upgrade_mindy_pro')}" style="background: white; color: #059669; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+      <a href="${trackedUrl(mindyDashboardUrl, 'upgrade_mindy_pro')}" style="background: white; color: #7c3aed; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
         Upgrade to Mindy Pro
       </a>
     </div>

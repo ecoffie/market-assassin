@@ -1293,7 +1293,7 @@ async function sendDailyAlertEmail(
         : 'New matches from your saved filters. Mindy prioritizes the best opportunities and keeps your full market view in one dashboard.'}
     </p>
     <p style="margin: 16px 0 0 0;">
-      <a href="${trackedUrl(primaryCtaUrl, showSetupNudges ? 'mindy_setup' : 'open_mindy_dashboard', 'header_dashboard')}" style="background: #10b981; color: white; padding: 10px 18px; text-decoration: none; border-radius: 999px; font-weight: 700; font-size: 13px; display: inline-block;">
+      <a href="${trackedUrl(primaryCtaUrl, showSetupNudges ? 'mindy_setup' : 'open_mindy_dashboard', 'header_dashboard')}" style="background: #7c3aed; color: white; padding: 10px 18px; text-decoration: none; border-radius: 999px; font-weight: 700; font-size: 13px; display: inline-block;">
         ${primaryCtaLabel}
       </a>
     </p>
