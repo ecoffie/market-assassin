@@ -1471,4 +1471,68 @@ getmindy.ai purchases feed a **unified cross-site dashboard** hosted at `govcong
 
 ---
 
-*Last Updated: June 11, 2026 — Free alert email phased messaging (30-day setup nudges → Welcome/FREE forever; `profile-setup.ts`). Opportunity detail CTAs: profile setup before Pro upsell. SAM attachment real filenames (`SamAttachmentLinks`, metadata API; sync cron preserves attachment metadata). Prev Jun 8: Keyword-first market research (NAICS is the wrong primary key; "drones"=70+ codes, obvious code=28%/miss 72%; keyword auto-derives 90%-coverage NAICS; PSC=what's-bought lesson; Market Coverage banner; phrase-resilient; onboarding grounds day-1 codes so alerts aren't broken). Email send guard (#58 — global per-recipient daily cap + suppression, fixes 12-emails/day churn; emailType audit). Award Intelligence spine (award-detail + incumbent intel woven through task orders / Expiring Contracts / bid-no-bid / My Pursuits / Today's Intel), office contact rosters (#16, DoDAAC-decoded), Vault POC fields, SOW export tables, active-first pursuit picker, pipeline next-action + dedup, LLM cost discipline (gpt-4o-mini reasoning + $15 cap), quarterly data-refresh cron (honest stamp). See "Keyword-first market research" + "Award Intelligence + Office Rosters" sections. Prev Jun 3: Daily alerts free-daily permanent (DAILY_ALERT_BETA). Jun 2: purchase attribution → unified sales dashboard. May 20: OAuth custom domain (auth.getmindy.ai), Proposal Assist V2, mi-beta → app rename, session TTL 30d*
+## Full-text search + global lookup (June 11, 2026)
+
+The "biggest challenge" fix — **titles lie; the body has the truth.** Four-corpus search
++ a header lookup bar. (See memories `sam_description_body_capture`, `market_research_invalid_naics`.)
+
+### Body-text capture (descriptions were EMPTY cache-wide)
+SAM's `/search` list endpoint returns `description` as a LINK (`…/noticedesc?noticeid=`),
+not text. The sync stored the link → every `sam_opportunities.description` was empty →
+body search matched nothing.
+- `src/lib/sam/notice-description.ts` — resolves the link → plain text (HTML-stripped, NUL-safe).
+- `/api/cron/backfill-descriptions` — batched/resumable, dispatcher-fired (uses prod SAM key
+  server-side; LOCAL key 400s on noticedesc). 2 jobs: active + `?inactive=1`. Drains rows
+  where description is null/a-link.
+- `sync-sam-opportunities` OMITS `description` from the upsert (was storing the link + would
+  clobber backfilled text on re-sync). New notices insert NULL; backfill fills within minutes.
+
+### Search (mi-dashboard) — 4 corpora + archive + word-boundary
+`src/app/api/mi-dashboard/route.ts` `buildSearchOr()`:
+- Searches **title + description + sow_text + department** (sow_text = the extracted SOW/PWS).
+- **Word-boundary** for code-like terms ("M7" ≠ "M776") via Postgres `\m..\M` `imatch` regex;
+  ILIKE substring for phrases.
+- **`?status=active|inactive|all`** — search the archive (~59k inactive notices). Default active.
+- **Active search ESCAPES the profile-NAICS/states filter** (two `.or()` calls AND together in
+  PostgREST → keyword search was trapped inside the user's codes). Default view = profile-scoped;
+  explicit search = full corpus. Explicit `?naics=`/`?state=` still apply.
+
+### Global lookup bar (`src/components/app/GlobalLookup.tsx`)
+In the `/app` header (members-only). Resolves three identifier types:
+- **Contract number (PIID)** → `AwardDetailDrawer` (reuses `/api/app/award-detail?piid=`).
+- **Company name / UEI** → `/api/contractors/search-bq` → navigate to `/contractors/[slug]`.
+- UEI checked before PIID (12-char collision). Focus hint lists the three types.
+
+### Contractor search bug (was returning 0 for everything)
+`queryCached` (`src/lib/bigquery/cache.ts`) DEFAULTS to `cacheOnly: true` — returns `[]` on a
+cache miss to protect public/unauthed traffic from cold BQ scans. `searchRecipients` never set
+`cacheOnly: false`, so the in-app Contractors panel + lookup returned 0 despite 317K rows. Fix:
+`searchRecipients({ liveBq: true })` threads `cacheOnly: !liveBq`; the authed `search-bq` route
+passes `liveBq: true`. Also: name-search now matches exact UEI too. Diagnostic: `/api/admin/bq-health`.
+
+## Launch ops + onboarding (June 10-11, 2026)
+
+(See memory `mindy_launch_ops_jobs`.) Three dispatcher jobs + onboarding keyword capture:
+- **`setup-invite-batch`** (50/day) — drains the 723 entitled-but-no-login beta users. Shared
+  `src/lib/mindy/account-setup.ts` (`sendSetupInvite`). Email is Mindy navy→purple (NOT green).
+- **`zero-alert-nudge`** (50/day) — sharp re-onboarding to prefilled-profile users getting 0
+  alerts (88% of zero-alerts = placeholder NAICS, not a matching failure). Diagnosis:
+  `/api/admin/zero-alert-diagnosis`.
+- **`snapshot-metrics`** (daily) — `daily_metric_snapshots` table → dashboard trend charts
+  (`/api/admin/metric-trends` + `MetricTrends.tsx`, recharts).
+- **Onboarding** persists the user's REAL keywords (was dropping them) + ends at the Vault
+  (`?panel=vault`). Save route REPLACES naics_codes (overwrites prefilled sweeps).
+- **Semantic keywords from UEI** — `src/lib/market/semantic-keywords.ts` derives keywords by
+  MEANING from past-perf + capabilities + NAICS titles (reuses `embeddings.ts` embedText+cosine,
+  JSONB no-pgvector); seeds alerts additively + Vault teaching moment. (Memory `semantic_keywords_from_uei`.)
+- **Dashboard:** MI→Mindy label rename; "Custom NAICS" is DISPLAY-ONLY, never a send gate.
+  All emails rebranded green→navy/purple (kept urgency/score traffic-light colors).
+- **Account menu** at bottom of sidebar (Settings/Switch/Sign out) — fixes unreachable
+  sign-out on mobile (`h-dvh` + footer `shrink-0`). One sign-in surface (landing routes to /app).
+- **Homepage** (`/mindy-landing`, NOT `/app` — getmindy.ai/ host-rewrites there; memory
+  `getmindy_url_routing`): demo-driven rebuild — Vimeo reels (9:16), live-proof numbers, real
+  top-board chips. **2FA toggle REMOVED** (it enforced nothing — decorative).
+
+---
+
+*Last Updated: June 11, 2026 (PM) — Full-text search overhaul: bodies were EMPTY cache-wide (SAM returns description as a link; sync stored it) → notice-description lib + backfill-descriptions crons (active+inactive). 4-corpus search (title+description+sow_text+department), word-boundary ("M7"≠"M776"), Active/Inactive/All archive toggle, active-search escapes profile-NAICS filter. Global lookup bar (/app header): contract#→award detail, company/UEI→/contractors/[slug]. FIXED contractor search returning 0 (queryCached cacheOnly default → searchRecipients now liveBq:true; restored Contractors panel). Launch ops: setup-invite-batch + zero-alert-nudge + snapshot-metrics dispatcher jobs; onboarding persists real keywords + ends at Vault; semantic-keywords-from-UEI; emails green→navy/purple; sidebar account menu (mobile sign-out fix); demo-driven homepage (/mindy-landing, Vimeo reels); 2FA toggle removed (decorative). See "Full-text search + global lookup" + "Launch ops + onboarding" sections. Prev: Free alert email phased messaging (30-day setup nudges → Welcome/FREE forever; `profile-setup.ts`). Opportunity detail CTAs: profile setup before Pro upsell. SAM attachment real filenames (`SamAttachmentLinks`, metadata API; sync cron preserves attachment metadata). Prev Jun 8: Keyword-first market research (NAICS is the wrong primary key; "drones"=70+ codes, obvious code=28%/miss 72%; keyword auto-derives 90%-coverage NAICS; PSC=what's-bought lesson; Market Coverage banner; phrase-resilient; onboarding grounds day-1 codes so alerts aren't broken). Email send guard (#58 — global per-recipient daily cap + suppression, fixes 12-emails/day churn; emailType audit). Award Intelligence spine (award-detail + incumbent intel woven through task orders / Expiring Contracts / bid-no-bid / My Pursuits / Today's Intel), office contact rosters (#16, DoDAAC-decoded), Vault POC fields, SOW export tables, active-first pursuit picker, pipeline next-action + dedup, LLM cost discipline (gpt-4o-mini reasoning + $15 cap), quarterly data-refresh cron (honest stamp). See "Keyword-first market research" + "Award Intelligence + Office Rosters" sections. Prev Jun 3: Daily alerts free-daily permanent (DAILY_ALERT_BETA). Jun 2: purchase attribution → unified sales dashboard. May 20: OAuth custom domain (auth.getmindy.ai), Proposal Assist V2, mi-beta → app rename, session TTL 30d*
