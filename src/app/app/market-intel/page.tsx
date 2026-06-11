@@ -6,6 +6,7 @@ import Link from 'next/link';
 import { useAppTracker } from '@/components/app/track';
 import { useToast, ToastHost } from '@/components/app/Toast';
 import { getMIApiHeaders } from '@/components/app/authHeaders';
+import SamAttachmentLinks from '@/components/app/SamAttachmentLinks';
 
 interface NoticeTypeInfo {
   code: string;
@@ -1302,81 +1303,16 @@ function MarketIntelDashboard() {
                         </div>
                       </div>
 
-                      {/* Attachments — SAM's resourceLinks (populated by
-                          the per-opp detail fetch cron). Sentinel entries
-                          like { _no_attachments: true } are filtered out
-                          so empty results don't render as "Attachments (1)". */}
-                      {(() => {
-                        const realAttachments = (opp.attachments || []).filter(
-                          (a) => a && !(a as Record<string, unknown>)._no_attachments
-                        );
-                        if (realAttachments.length === 0) return null;
-                        return (
-                          <div>
-                            <span className="text-gray-500 text-xs uppercase tracking-wide">
-                              Attachments ({realAttachments.length})
-                            </span>
-                            <ul className="mt-2 space-y-1.5">
-                              {realAttachments.map((att, idx) => {
-                                const url = typeof att === 'string'
-                                  ? att
-                                  : (att?.url || att?.link || att?.resourceLink) as string | undefined;
-                                // Derive a meaningful label. SAM URLs end in
-                                // /download, so url.split('/').pop() yields
-                                // "download" for every file — useless. Prefer
-                                // any name SAM gave us, then the file-id
-                                // segment from the URL, then a numbered
-                                // fallback.
-                                const givenName = (att?.name || att?.fileName || att?.title) as string | undefined;
-                                let derivedName: string | undefined = givenName && givenName.toLowerCase() !== 'download'
-                                  ? givenName
-                                  : undefined;
-                                if (!derivedName && url) {
-                                  try {
-                                    const parts = new URL(url).pathname.split('/').filter(Boolean);
-                                    const last = parts[parts.length - 1];
-                                    const fileId = last && last.toLowerCase() !== 'download'
-                                      ? last
-                                      : (parts.length >= 2 ? parts[parts.length - 2] : undefined);
-                                    derivedName = fileId && fileId.length <= 24
-                                      ? `Document ${idx + 1} (${fileId})`
-                                      : `Document ${idx + 1}`;
-                                  } catch { /* fall through */ }
-                                }
-                                const name = derivedName || `Document ${idx + 1}`;
-                                if (!url) return null;
-                                // SAM file URLs require our SAM_API_KEY
-                                // to download. Route through the proxy so
-                                // the user sees a normal file download
-                                // instead of an UNAUTHORIZED JSON error.
-                                const downloadHref = /(^|\.)sam\.gov\//i.test(url)
-                                  ? `/api/sam-attachment?url=${encodeURIComponent(url)}`
-                                  : url;
-                                return (
-                                  <li key={idx}>
-                                    <a
-                                      href={downloadHref}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      onMouseDown={() => track('link_click', 'market_intel_dashboard', {
-                                        action: 'download_attachment',
-                                        notice_id: opp.notice_id,
-                                        attachment_index: idx,
-                                      })}
-                                      className="inline-flex items-center gap-2 text-sm text-purple-300 hover:text-purple-200 underline"
-                                    >
-                                      <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                                      </svg>
-                                      <span className="truncate">{name}</span>
-                                    </a>
-                                  </li>
-                                );
-                              })}
-                            </ul>
-                          </div>
-                        );
-                      })()}
+                      {opp.attachments && opp.attachments.length > 0 && (
+                        <SamAttachmentLinks
+                          attachments={opp.attachments}
+                          onDownloadClick={(idx) => track('link_click', 'market_intel_dashboard', {
+                            action: 'download_attachment',
+                            notice_id: opp.notice_id,
+                            attachment_index: idx,
+                          })}
+                        />
+                      )}
 
                       {/* Points of Contact — usually contracting officer +
                           specialist. SAM's pointOfContact entries vary

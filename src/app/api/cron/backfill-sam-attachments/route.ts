@@ -32,6 +32,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getRotatedSAMKey } from '@/lib/sam/utils';
+import {
+  extractSamFileId,
+  fetchSamAttachmentFilename,
+} from '@/lib/sam/attachment-metadata';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -61,54 +65,6 @@ function authorized(request: NextRequest): boolean {
 
 async function sleep(ms: number) {
   await new Promise((r) => setTimeout(r, ms));
-}
-
-/**
- * Pull the real filename from SAM's file-download endpoint by doing a
- * HEAD request and parsing Content-Disposition. SAM responds with a
- * header like:
- *   Content-Disposition: attachment; filename="RFP_Parking_Lifts.pdf"
- * Returns the filename or null on any failure.
- */
-async function fetchAttachmentFilename(fileUrl: string, apiKey: string): Promise<string | null> {
-  let target: URL;
-  try {
-    target = new URL(fileUrl);
-  } catch {
-    return null;
-  }
-  if (!target.searchParams.has('api_key')) {
-    target.searchParams.set('api_key', apiKey);
-  }
-
-  let res: Response;
-  try {
-    // HEAD avoids downloading the full file body just to read headers.
-    // Some SAM endpoints reject HEAD with 405; fall back to GET if so.
-    res = await fetch(target.toString(), { method: 'HEAD' });
-    if (res.status === 405) {
-      res = await fetch(target.toString(), { method: 'GET' });
-    }
-  } catch {
-    return null;
-  }
-  if (!res.ok) return null;
-
-  const cd = res.headers.get('content-disposition');
-  if (!cd) return null;
-
-  // Match RFC 5987 filename* first (UTF-8 encoded), then plain filename=.
-  const utf8Match = cd.match(/filename\*=UTF-8''([^;]+)/i);
-  if (utf8Match?.[1]) {
-    try {
-      return decodeURIComponent(utf8Match[1].trim().replace(/^"|"$/g, ''));
-    } catch { /* fall through */ }
-  }
-  const plainMatch = cd.match(/filename="([^"]+)"/i) || cd.match(/filename=([^;]+)/i);
-  if (plainMatch?.[1]) {
-    return plainMatch[1].trim();
-  }
-  return null;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -155,21 +111,9 @@ async function fetchAttachments(noticeId: string, apiKey: string): Promise<any[]
     // still rate-limits between opps so we don't burst SAM's quota.
     return await Promise.all(
       opp.resourceLinks.map(async (url: string, i: number) => {
-        let fileId: string | undefined;
-        try {
-          const parts = new URL(url).pathname.split('/').filter(Boolean);
-          const last = parts[parts.length - 1];
-          if (last && last.toLowerCase() !== 'download') {
-            fileId = last;
-          } else if (parts.length >= 2) {
-            fileId = parts[parts.length - 2];
-          }
-        } catch { /* leave fileId undefined if URL parse fails */ }
-
-        const realName = await fetchAttachmentFilename(url, apiKey);
-
-        const name = realName
-          || (fileId && fileId.length <= 24 ? `Document ${i + 1} (${fileId})` : `Document ${i + 1}`);
+        const fileId = extractSamFileId(url);
+        const realName = await fetchSamAttachmentFilename(url, apiKey);
+        const name = realName || `Attachment ${i + 1}`;
         return { url, name, fileId: fileId || null };
       })
     );
@@ -222,9 +166,10 @@ export async function GET(request: NextRequest) {
     .limit(limit);
 
   if (retryNames) {
-    // Match the first attachment's name starting with "Document " —
-    // the auto-numbered fallback shape. JSONB path: attachments->0->>name
-    queryBuilder = queryBuilder.like('attachments->0->>name', 'Document %');
+    // Match auto-numbered fallback names (Document/Attachment N).
+    queryBuilder = queryBuilder.or(
+      'attachments->0->>name.like.Document %,attachments->0->>name.like.Attachment %',
+    );
   } else {
     queryBuilder = queryBuilder.eq('attachments', '[]');
   }

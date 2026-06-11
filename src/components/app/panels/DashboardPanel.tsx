@@ -14,6 +14,7 @@ import ContractorLink from '../contractors/ContractorLink';
 import { MindyInsightCard } from '../MindyInsightCard';
 import { getNaics } from '@/lib/codes/lookup';
 import ShareButton from '@/components/briefings/ShareButton';
+import SamAttachmentLinks from '@/components/app/SamAttachmentLinks';
 
 interface DashboardPanelProps {
   email: string | null;
@@ -1485,48 +1486,8 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
                             the /api/sam-attachment proxy (raw SAM URLs need
                             our API key). Only shows when the item has them. */}
                         {itemAttachments.length > 0 && (
-                          <div className="mt-4 border-t border-slate-800 pt-4">
-                            <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">
-                              Attachments ({itemAttachments.length})
-                            </p>
-                            <ul className="space-y-1.5">
-                              {itemAttachments.map((raw, idx) => {
-                                const att = (typeof raw === 'object' && raw !== null ? raw : {}) as Record<string, unknown>;
-                                const url = typeof raw === 'string'
-                                  ? raw
-                                  : (att.url || att.link || att.resourceLink) as string | undefined;
-                                if (!url) return null;
-                                const givenName = (att.name || att.fileName || att.title) as string | undefined;
-                                let name = givenName && givenName.toLowerCase() !== 'download' ? givenName : undefined;
-                                if (!name) {
-                                  try {
-                                    const parts = new URL(url).pathname.split('/').filter(Boolean);
-                                    const last = parts[parts.length - 1];
-                                    const fileId = last && last.toLowerCase() !== 'download'
-                                      ? last
-                                      : (parts.length >= 2 ? parts[parts.length - 2] : undefined);
-                                    name = fileId && fileId.length <= 24 ? `Document ${idx + 1} (${fileId})` : `Document ${idx + 1}`;
-                                  } catch { name = `Document ${idx + 1}`; }
-                                }
-                                const downloadHref = /(^|\.)sam\.gov\//i.test(url)
-                                  ? `/api/sam-attachment?url=${encodeURIComponent(url)}`
-                                  : url;
-                                return (
-                                  <li key={idx}>
-                                    <a
-                                      href={downloadHref}
-                                      target="_blank"
-                                      rel="noopener noreferrer"
-                                      onClick={(event) => event.stopPropagation()}
-                                      className="inline-flex items-center gap-2 text-sm text-purple-300 hover:text-purple-200 underline"
-                                    >
-                                      <span className="shrink-0">📄</span>
-                                      <span className="truncate">{name}</span>
-                                    </a>
-                                  </li>
-                                );
-                              })}
-                            </ul>
+                          <div className="mt-4 border-t border-slate-800 pt-4" onClick={(e) => e.stopPropagation()}>
+                            <SamAttachmentLinks attachments={itemAttachments} />
                           </div>
                         )}
 

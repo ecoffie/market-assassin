@@ -161,7 +161,7 @@ async function fetchOpportunitiesPage(
 }
 
 function mapToDbRecord(opp: SamOpportunity) {
-  return {
+  const record: Record<string, unknown> = {
     notice_id: opp.noticeId,
     solicitation_number: opp.solicitationNumber || null,
     title: opp.title || 'Untitled',
@@ -185,10 +185,6 @@ function mapToDbRecord(opp: SamOpportunity) {
     pop_zip: opp.placeOfPerformance?.zip || null,
     pop_country: opp.placeOfPerformance?.country?.code || 'USA',
     ui_link: opp.uiLink || null,
-    // Extra fields surfaced so users see everything SAM gives without
-    // leaving Mindy. All stored as JSONB so we don't have to flatten
-    // each nested array/object into separate columns.
-    attachments: Array.isArray(opp.resourceLinks) ? opp.resourceLinks : [],
     points_of_contact: Array.isArray(opp.pointOfContact) ? opp.pointOfContact : [],
     office_address: opp.officeAddress ?? null,
     fair_opportunity: opp.fairOpportunity ?? null,
@@ -197,6 +193,14 @@ function mapToDbRecord(opp: SamOpportunity) {
     raw_data: opp,
     synced_at: new Date().toISOString(),
   };
+
+  // List endpoint often omits resourceLinks. Never wipe enriched attachment
+  // metadata (url+name from backfill) by writing [] on every sync pass.
+  if (Array.isArray(opp.resourceLinks) && opp.resourceLinks.length > 0) {
+    record.attachments = opp.resourceLinks;
+  }
+
+  return record;
 }
 
 // Find incomplete sync to resume

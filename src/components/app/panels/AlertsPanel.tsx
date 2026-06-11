@@ -12,6 +12,7 @@ import { NaicsBadgeList } from '@/components/codes/NaicsBadge';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 import { useDodaacNames } from '@/components/app/useDodaacNames';
 import { userNeedsMindySetup } from '@/lib/alerts/profile-setup';
+import SamAttachmentLinks from '@/components/app/SamAttachmentLinks';
 
 interface AlertsPanelProps {
   email: string | null;
@@ -1377,67 +1378,14 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                 </div>
               )}
 
-              {/* Attachments — file URLs from SAM resourceLinks. Sentinel
-                  entries with _no_attachments are filtered out. Labels
-                  fall back to "Document N (fileId)" if no real name. */}
-              {(() => {
-                const realAttachments = (selectedAlert.attachments || []).filter(
-                  (a) => a && !(a as Record<string, unknown>)._no_attachments,
-                );
-                if (realAttachments.length === 0) return null;
-                return (
-                  <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-                    <div className="text-xs text-slate-500 uppercase tracking-wider mb-2">
-                      Attachments ({realAttachments.length})
-                    </div>
-                    <ul className="space-y-1.5">
-                      {realAttachments.map((att, idx) => {
-                        const isObject = typeof att !== 'string' && att !== null;
-                        const obj = isObject ? (att as Record<string, unknown>) : null;
-                        const url = typeof att === 'string'
-                          ? att
-                          : (obj?.url || obj?.link || obj?.resourceLink) as string | undefined;
-                        const givenName = (obj?.name || obj?.fileName || obj?.title) as string | undefined;
-                        let name = givenName && givenName.toLowerCase() !== 'download' ? givenName : undefined;
-                        if (!name && url) {
-                          try {
-                            const parts = new URL(url).pathname.split('/').filter(Boolean);
-                            const last = parts[parts.length - 1];
-                            const fileId = last && last.toLowerCase() !== 'download'
-                              ? last
-                              : (parts.length >= 2 ? parts[parts.length - 2] : undefined);
-                            name = fileId && fileId.length <= 24
-                              ? `Document ${idx + 1} (${fileId})`
-                              : `Document ${idx + 1}`;
-                          } catch { /* fall through */ }
-                        }
-                        if (!url) return null;
-                        // SAM file URLs need our SAM_API_KEY; route
-                        // through the Mindy proxy so the user gets a
-                        // real file download instead of UNAUTHORIZED.
-                        const downloadHref = /(^|\.)sam\.gov\//i.test(url)
-                          ? `/api/sam-attachment?url=${encodeURIComponent(url)}`
-                          : url;
-                        return (
-                          <li key={idx}>
-                            <a
-                              href={downloadHref}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              className="inline-flex items-center gap-2 text-sm text-purple-300 hover:text-purple-200 underline"
-                            >
-                              <svg className="w-4 h-4 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                              </svg>
-                              <span className="truncate">{name || `Document ${idx + 1}`}</span>
-                            </a>
-                          </li>
-                        );
-                      })}
-                    </ul>
-                  </div>
-                );
-              })()}
+              {selectedAlert.attachments && selectedAlert.attachments.length > 0 && (
+                <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+                  <SamAttachmentLinks
+                    attachments={selectedAlert.attachments}
+                    onDownloadClick={() => trackAlertEvent('link_click', selectedAlert, 'download_attachment')}
+                  />
+                </div>
+              )}
 
               {/* Points of Contact — contracting officer + specialist.
                   Mailto/tel links so users can act directly. */}
