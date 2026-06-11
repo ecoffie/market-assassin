@@ -203,18 +203,26 @@ export async function GET(request: NextRequest) {
     if (naics) {
       query = query.or(`naics_code.eq.${naics},naics_code.like.${naics.substring(0, 3)}%`);
     }
-    // Apply user's profile NAICS codes if loaded from email
-    if (userNaicsCodes.length > 0) {
-      // Build OR filter for all user's NAICS codes
-      // Combines exact matches for full codes + prefix matches for short codes
+    // KEY FIX: when the user is actively SEARCHING (a keyword/term), DON'T trap them
+    // inside their profile NAICS. PostgREST ANDs multiple .or() calls, so the
+    // profile-NAICS .or() would AND with the search .or() → every cross-NAICS body
+    // match (the whole point of body search — "M7" in an ordnance notice when you're
+    // a services shop) got filtered out. A search is an intentional act to find
+    // something specific, often OUTSIDE your usual codes. So: profile NAICS + states
+    // scope the DEFAULT view; an explicit search escapes them and hits the full
+    // corpus. (An explicit ?naics= / ?state= URL filter still applies — that's a
+    // deliberate filter, not the passive profile.)
+    const isActiveSearch = Boolean(search && search.trim());
+
+    // Apply user's profile NAICS codes — ONLY when not actively searching.
+    if (userNaicsCodes.length > 0 && !isActiveSearch) {
+      // OR across the user's codes: prefix match for short codes, exact for full.
       const conditions: string[] = [];
       for (const code of userNaicsCodes) {
         const trimmed = String(code).trim();
         if (trimmed.length <= 4) {
-          // Short code - prefix match
           conditions.push(`naics_code.like.${trimmed}%`);
         } else {
-          // Full code - exact match
           conditions.push(`naics_code.eq.${trimmed}`);
         }
       }
@@ -223,10 +231,10 @@ export async function GET(request: NextRequest) {
       }
     }
     if (state) {
-      // Single state filter from URL takes precedence
+      // Explicit state filter from the URL always applies (deliberate).
       query = query.eq('pop_state', state.toUpperCase());
-    } else if (userStates.length > 0) {
-      // Apply user's profile states filter (OR across all states)
+    } else if (userStates.length > 0 && !isActiveSearch) {
+      // Profile-states scope the default view, but an active search escapes them too.
       const stateConditions = userStates.map(s => `pop_state.eq.${s.toUpperCase()}`);
       query = query.or(stateConditions.join(','));
     }
