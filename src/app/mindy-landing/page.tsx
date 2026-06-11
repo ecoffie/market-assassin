@@ -199,9 +199,9 @@ export default function MindyLandingPage() {
         </p>
         <div className="grid md:grid-cols-3 gap-6">
           {[
-            { cap: 'Search the BODY of solicitations, not just titles', sub: 'Find "M7" buried in a Statement of Work that SAM.gov would never surface.', embed: DEMO_REELS[0] },
-            { cap: 'Your morning briefing, written for you', sub: 'The 5 opportunities that fit your business — with why they fit.', embed: DEMO_REELS[1] },
-            { cap: 'Market research in one click', sub: 'Who buys, who wins, what they pay — for any NAICS or keyword.', embed: DEMO_REELS[2] },
+            { cap: 'Know which ones are worth bidding', sub: 'Mindy reads each opportunity and tells you the signals that matter — competition, timing, and fit — so you stop guessing.', embed: DEMO_REELS[0] },
+            { cap: 'Your daily briefing, before coffee', sub: 'The active solicitations that fit your business, delivered every morning — already filtered, ranked, and explained.', embed: DEMO_REELS[1] },
+            { cap: 'Ask Mindy anything', sub: 'Your 24/7 market intelligence analyst — ask about opportunities, agencies, or competitors and get a straight answer.', embed: DEMO_REELS[2] },
           ].map((d) => (
             <div key={d.cap}>
               <DemoMedia embed={d.embed} caption={d.cap} aspect="reel" />
