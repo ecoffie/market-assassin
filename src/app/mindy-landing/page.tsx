@@ -90,26 +90,45 @@ export default function MindyLandingPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      {/* Hero Section */}
-      <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-20 px-4">
+      {/* Hero Section — py-20→py-10 + tighter logo/heading margins so the signup
+          form (and the beta-setup banner below) sit above the fold. Beta users land
+          here; they shouldn't have to scroll to find how to get in. */}
+      <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-10 px-4">
         <div className="max-w-4xl mx-auto text-center">
           {/* Mindy Logo/Icon */}
-          <div className="inline-flex items-center gap-4 mb-8">
-            <div className="w-20 h-20 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-xl shadow-purple-500/30">
-              <span className="text-white font-bold text-4xl">M</span>
+          <div className="inline-flex items-center gap-4 mb-4">
+            <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-purple-500 to-purple-700 flex items-center justify-center shadow-xl shadow-purple-500/30">
+              <span className="text-white font-bold text-3xl">M</span>
             </div>
           </div>
 
-          <h1 className="text-5xl md:text-6xl font-bold text-white mb-4">
+          <h1 className="text-4xl md:text-5xl font-bold text-white mb-3">
             Meet Mindy.
           </h1>
-          <h2 className="text-2xl md:text-3xl text-purple-200 mb-6">
+          <h2 className="text-xl md:text-2xl text-purple-200 mb-4">
             Your 24/7 Federal Market Intelligence Analyst.
           </h2>
-          <p className="text-xl text-slate-300 max-w-2xl mx-auto mb-8">
+          <p className="text-lg text-slate-300 max-w-2xl mx-auto mb-6">
             While you sleep, Mindy scans 24,000+ federal opportunities, tracks your competitors,
             and delivers a personalized briefing before your first coffee.
           </p>
+
+          {/* BETA-USER PATH — most arrivals right now are the email-only beta cohort
+              who get alerts but never set a password. OAuth won't help them; they need
+              the password-setup link. Lead with it. */}
+          <div className="max-w-md mx-auto mb-6 rounded-2xl border-2 border-purple-500/50 bg-gradient-to-br from-blue-950/60 to-purple-950/60 p-5 text-left">
+            <span className="text-xs font-bold uppercase tracking-wider text-purple-300 bg-purple-500/20 px-2 py-1 rounded-full">Beta user?</span>
+            <h3 className="text-lg font-bold text-white mt-2 mb-1">Already getting Mindy alerts? Set up your account.</h3>
+            <p className="text-sm text-slate-300 mb-3">
+              If you&apos;ve been getting our daily emails, you just need to set a password once.
+            </p>
+            <Link
+              href={DASHBOARD_URL}
+              className="inline-block w-full text-center px-4 py-2.5 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white rounded-lg font-semibold text-sm transition-colors"
+            >
+              Set up my account →
+            </Link>
+          </div>
 
           <MindySignupForm />
 
