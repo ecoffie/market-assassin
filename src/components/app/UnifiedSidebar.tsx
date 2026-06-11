@@ -27,6 +27,9 @@ import {
   PanelLeftClose,
   PanelLeftOpen,
   LogOut,
+  CircleUser,
+  ChevronUp,
+  RefreshCw,
 } from 'lucide-react';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
@@ -311,9 +314,11 @@ interface UnifiedSidebarProps {
   // hidden below md breakpoint. Desktop ignores this flag.
   isMobileOpen?: boolean;
   onMobileClose?: () => void;
-  // Sign out — surfaced in the sidebar footer so it's reachable on MOBILE (the
-  // header sign-out is desktop-only / hidden md:, which stranded mobile users).
+  // Account actions — surfaced in a bottom-of-sidebar user menu (Slack/Linear/
+  // Vercel convention) so they're reachable on MOBILE too (the header sign-out
+  // was desktop-only / hidden md:, which stranded mobile users).
   onSignOut?: () => void;
+  onSwitchAccount?: () => void;
 }
 
 export default function UnifiedSidebar({
@@ -328,7 +333,10 @@ export default function UnifiedSidebar({
   isMobileOpen = false,
   onMobileClose,
   onSignOut,
+  onSwitchAccount,
 }: UnifiedSidebarProps) {
+  // Bottom-of-sidebar account menu open state.
+  const [accountMenuOpen, setAccountMenuOpen] = useState(false);
   const [hoveredItem, setHoveredItem] = useState<AppPanel | null>(null);
   // Collapsed-state tooltip rendered with position:fixed so the nav's
   // overflow-y-auto scroll clip can't eat it. Captured from the hovered
@@ -627,17 +635,56 @@ export default function UnifiedSidebar({
             {!isCollapsed && <span>Collapse</span>}
           </button>
         )}
-        {/* Sign out — reachable on mobile (the header button is desktop-only). */}
-        {onSignOut && (
-          <button
-            onClick={() => { onSignOut(); onMobileClose?.(); }}
-            className={`w-full flex items-center rounded-lg px-3 py-2 text-sm text-slate-400 hover:bg-red-500/10 hover:text-red-300 transition-colors ${isCollapsed ? 'justify-center' : 'gap-2'}`}
-            title="Sign out"
-            aria-label="Sign out"
-          >
-            <LogOut className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
-            {!isCollapsed && <span>Sign out</span>}
-          </button>
+        {/* ACCOUNT MENU — bottom-of-sidebar user block (Slack/Linear/Vercel
+            convention): avatar + email → up-menu with Settings, Switch Account,
+            Sign out. Reachable on mobile via the hamburger drawer. */}
+        {(onSignOut || onSwitchAccount) && (
+          <div className="relative">
+            {accountMenuOpen && (
+              <>
+                {/* click-away */}
+                <div className="fixed inset-0 z-40" onClick={() => setAccountMenuOpen(false)} />
+                <div className="absolute bottom-full left-0 right-0 z-50 mb-2 rounded-lg border border-slate-700 bg-slate-900 p-1 shadow-2xl shadow-black/40">
+                  <button
+                    onClick={() => { onPanelChange('settings'); setAccountMenuOpen(false); onMobileClose?.(); }}
+                    className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+                  >
+                    <Settings className="w-4 h-4 shrink-0" strokeWidth={1.75} /> Settings
+                  </button>
+                  {onSwitchAccount && (
+                    <button
+                      onClick={() => { onSwitchAccount(); setAccountMenuOpen(false); onMobileClose?.(); }}
+                      className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+                    >
+                      <RefreshCw className="w-4 h-4 shrink-0" strokeWidth={1.75} /> Switch account
+                    </button>
+                  )}
+                  {onSignOut && (
+                    <button
+                      onClick={() => { onSignOut(); setAccountMenuOpen(false); onMobileClose?.(); }}
+                      className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm text-red-400 hover:bg-red-500/10 hover:text-red-300 transition-colors"
+                    >
+                      <LogOut className="w-4 h-4 shrink-0" strokeWidth={1.75} /> Sign out
+                    </button>
+                  )}
+                </div>
+              </>
+            )}
+            <button
+              onClick={() => setAccountMenuOpen((v) => !v)}
+              className={`w-full flex items-center rounded-lg px-2 py-2 text-sm text-slate-300 hover:bg-slate-800 transition-colors ${isCollapsed ? 'justify-center' : 'gap-2'}`}
+              title={userEmail || 'Account'}
+              aria-label="Account menu"
+            >
+              <CircleUser className="w-[22px] h-[22px] shrink-0 text-slate-400" strokeWidth={1.5} />
+              {!isCollapsed && (
+                <>
+                  <span className="flex-1 truncate text-left text-xs text-slate-300">{userEmail || 'Account'}</span>
+                  <ChevronUp className={`w-4 h-4 shrink-0 text-slate-500 transition-transform ${accountMenuOpen ? '' : 'rotate-180'}`} strokeWidth={1.75} />
+                </>
+              )}
+            </button>
+          </div>
         )}
       </div>
 

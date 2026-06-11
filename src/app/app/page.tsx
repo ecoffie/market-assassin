@@ -1065,6 +1065,7 @@ function AppDashboard() {
         isMobileOpen={isMobileSidebarOpen}
         onMobileClose={() => setIsMobileSidebarOpen(false)}
         onSignOut={handleSignOut}
+        onSwitchAccount={handleSwitchAccount}
       />
 
       {/* Settings Panel */}
@@ -1117,20 +1118,8 @@ function AppDashboard() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
                 </svg>
               </button>
-              <button
-                onClick={handleSwitchAccount}
-                disabled={authLoading}
-                className="hidden lg:inline text-sm text-slate-500 hover:text-slate-300 transition-colors"
-              >
-                Switch Account
-              </button>
-              <button
-                onClick={handleSignOut}
-                disabled={authLoading}
-                className="hidden md:inline-block rounded-lg border border-slate-700 px-3 py-1.5 text-sm font-medium text-slate-300 transition-colors hover:border-red-400/60 hover:bg-red-500/10 hover:text-red-200 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Sign out
-              </button>
+              {/* Switch Account + Sign out moved to the bottom-of-sidebar account
+                  menu (Slack/Linear/Vercel convention) — reachable on mobile too. */}
             </div>
           </div>
         </header>
