@@ -43,7 +43,7 @@ Transform individual tools into a unified intelligence platform that tracks, mon
 
 ### Current State
 - OH is gated (requires purchase or Pro subscription)
-- Alerts/Briefings are free during beta (ends April 27)
+- Daily alerts are FREE for everyone (permanent); briefings on rollout cohort; Mindy Pro = paid tier
 
 ### Target State
 ```

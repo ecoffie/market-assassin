@@ -1,6 +1,32 @@
 # GovCon Giants - Tasks by Priority
 
-**Last Updated:** June 8, 2026
+**Last Updated:** June 11, 2026
+
+---
+
+## Session Handoff — 2026-06-11 (Alert messaging + attachment filenames — branch, not prod)
+
+### Free alert email phased messaging — DONE (code)
+- [x] Replace "FREE during beta" with `shouldShowAlertSetupNudges()` (`profile-setup.ts`)
+- [x] 30-day window + incomplete profile → setup CTAs; else → Welcome/FREE forever
+- [x] Wired in `daily-alerts/route.ts` + `send-notifications/route.ts`
+
+### Opportunity detail CTAs — DONE (code)
+- [x] Incomplete profile → `/app/onboarding` (not Pro upsell)
+- [x] Complete profile → Pro upsells in AlertsPanel + market-intel
+
+### SAM attachment real filenames — DONE (code)
+- [x] `SamAttachmentLinks` + `/api/sam-attachment/metadata`
+- [x] Sync cron preserves attachment metadata when API omits resourceLinks
+- [x] Commit `0d6ec3b` on `fix/market-research-invalid-naics`, PR #7
+
+### GovCon Funnels exit popup — SHIPPED
+- [x] Removed `ExitIntentPopup` — deployed `e3ff863` on govcongiants.org
+
+### Still open
+- [ ] **Deploy market-assassin** — `npm run build` + `vercel --prod` (interrupted twice)
+- [ ] Verify attachment names on getmindy.ai `/app/market-intel` after deploy
+- [ ] Optional: `backfill-sam-attachments?retry-names=1` for DB rows still showing "Document N"
 
 ---
 

@@ -35,7 +35,7 @@ The GovCon Giants opportunity alerts system is a single unified product with thr
 
 | Attribute | Value |
 |-----------|-------|
-| **Price** | $19/mo (FREE during beta through April 27, 2026) |
+| **Price** | $19/mo planned — **daily delivery is FREE for everyone** (permanent since June 2026) |
 | **Email Frequency** | Daily (weekday mornings) |
 | **NAICS Codes** | Unlimited |
 | **Filtering** | Full (NAICS, PSC, keywords, agencies, set-asides, geography) |
@@ -51,7 +51,7 @@ The GovCon Giants opportunity alerts system is a single unified product with thr
 
 | Attribute | Value |
 |-----------|-------|
-| **Price** | $49/mo (FREE during beta through April 27, 2026) |
+| **Price** | $49/mo planned — briefing cohort on rollout (`beta_all` / sticky cohort) |
 | **Email Frequency** | Daily + Weekly Deep Dive (Fri) + Pursuit Brief (Sat) |
 | **NAICS Codes** | Unlimited |
 | **Filtering** | Full |

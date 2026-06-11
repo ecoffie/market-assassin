@@ -279,7 +279,7 @@ const userNaics = userSettings?.naics_codes || [];
 - Simple SAM.gov opportunity notifications
 - User sets NAICS codes at `/alerts/preferences`
 - Cron: `/api/cron/daily-alerts`
-- FREE during beta - no access check
+- FREE for everyone permanently — phased setup nudges first 30 days (`profile-setup.ts`)
 
 **Market Intelligence:**
 - Premium system with 3 report types
@@ -1380,3 +1380,32 @@ bid" — every feature must actually use that.
   reads as trustworthy; a confident wrong answer does not.
 - Provider note: Groq's paid tier is CLOSED — never single-source an LLM. Use
   `callLLM` per-job chains. Claude runs out fast → never use it for bulk.
+
+---
+
+## 2026-06-11 — SAM sync must not wipe attachment metadata
+
+**Pattern:** Opportunity attachments in Market Dashboard showed "Document 1", "Document 2"
+even after backfill stored real names.
+
+**Root cause:** Nightly `sync-sam-opportunities` overwrote `attachments: []` when SAM's
+list API omitted `resourceLinks`. UI fell back to generic labels; bare `/download` URLs
+carry no filename in the path.
+
+**Rule:** Always X, not Y because Z → **Always preserve existing attachment metadata when
+an upstream sync returns an empty attachments array, and resolve display names via HEAD
+Content-Disposition (or cached backfill), not path parsing — because Z: SAM list responses
+are incomplete and download URLs are opaque; overwriting with `[]` destroys good data and
+the UI has nothing real to show.**
+
+---
+
+## 2026-06-11 — Alert email conversion: time-box the nag, not the access
+
+**Pattern:** "FREE during beta" banner aged poorly; most alert users never log in.
+
+**Rule:** Always X, not Y because Z → **Always use a phased conversion window (30 days +
+incomplete profile) for setup CTAs on free alert emails, then switch to "Welcome • FREE
+forever" with dashboard access — because Z: permanent beta banners train users to ignore
+you, and permanent nagging after a month punishes loyal email-only subscribers who still
+get value from alerts.**

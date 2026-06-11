@@ -50,3 +50,20 @@ retry, heal endpoint).
 - `src/lib/grants/fetch-grant-docs.ts` — `fetchPursuitDocsAuto`
 - call sites: `src/app/api/pipeline/route.ts`, `src/app/api/actions/add-to-pipeline/route.ts`,
   `src/app/api/app/proposal/pursuit-docs/route.ts`, `src/app/api/admin/heal-pursuit-attachments/route.ts`
+
+---
+
+## Follow-up (2026-06-11) — Display names in Market Dashboard / Alerts
+
+**Separate bug:** Even when attachments were fetched for pursuits, opportunity *detail*
+views in `/app/market-intel` and Daily Alerts showed "Document 1 / Document 2" because
+SAM download URLs are bare `/download` paths with no filename segment.
+
+**Fix:**
+- `src/lib/sam/attachment-metadata.ts` — shared parse + HEAD for Content-Disposition
+- `GET /api/sam-attachment/metadata?url=` — returns `{ filename }`
+- `src/components/app/SamAttachmentLinks.tsx` — lazy client-side resolve
+- `sync-sam-opportunities` — do not overwrite `attachments` when list API returns empty
+- `backfill-sam-attachments` — uses shared lib; `?retry-names=1` refreshes stale "Document N" rows
+
+**Files:** `AlertsPanel.tsx`, `market-intel/page.tsx`, `DashboardPanel.tsx`

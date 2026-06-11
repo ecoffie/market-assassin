@@ -633,3 +633,65 @@ new and beta users don't stop at codes and wonder why their alerts feel thin.
 the SAM.gov Entity API for the user's real UEI — not guessed. Existing keyword-empty
 profiles are backfilled from their NAICS (`/api/admin/backfill-keywords`), and new
 captures never clobber a user's tuned keywords (additive merge only).
+
+---
+
+## 20. Free alert emails: phased setup nudges, then "Welcome to Mindy • FREE forever"
+
+**What:** Daily alert emails no longer say "FREE during beta." New subscribers with
+incomplete profiles see a **30-day conversion window** with setup CTAs ("Set up your
+keywords in Mindy →"). After 30 days — or once the profile has real keywords,
+business description, and non-default NAICS — the banner switches to **"Welcome to
+Mindy • FREE forever"** with dashboard access and no more nagging.
+
+**Why:** Most alert users are email-only and never log in. A month of gentle setup
+prompts converts better than a permanent beta banner or a hard paywall. Established
+users who never completed onboarding still get value without feeling punished.
+
+**SEO/positioning:** "free federal contract alerts," "SAM.gov daily email alerts,"
+"free Mindy alerts forever."
+
+**Proof:** Logic lives in `src/lib/alerts/profile-setup.ts`
+(`shouldShowAlertSetupNudges`, `ALERT_CONVERSION_WINDOW_DAYS=30`). Wired in
+`daily-alerts/route.ts` and `send-notifications/route.ts`. Fallback when
+`created_at` is missing: stop nudging after `total_alerts_sent >= 25`.
+
+---
+
+## 21. Opportunity detail CTAs: profile setup before Pro upsell
+
+**What:** When a free user expands an opportunity in Daily Alerts or Market Dashboard
+(`/app/market-intel`), incomplete profiles see **"Set up your keywords"** (links to
+`/app/onboarding`) instead of a generic "Upgrade to Mindy Pro." Complete profiles
+see Pro upsells ("Get bid/no-bid analysis," "Unlock Pipeline").
+
+**Why:** Cold visitors and email-only users need a profile before Pro features matter.
+Showing a paywall to someone with no keywords is a dead end; onboarding is the right
+next step.
+
+**SEO:** "set up federal contracting alerts," "keyword-based SAM.gov matching."
+
+**Proof:** `AlertsPanel.tsx`, `market-intel/page.tsx`, `DashboardPanel.tsx`;
+`userNeedsMindySetup()` from `profile-setup.ts`. Cold visitors on setup-request get
+signup flow via `isKnownAccount()` — not a fake "check your inbox" message.
+
+---
+
+## 22. SAM attachment real filenames (RFP, amendment — not "Document 1")
+
+**What:** Opportunity attachment links in Market Dashboard, Daily Alerts, and the
+legacy dashboard now show **real filenames** (e.g. `RFP_Attachment_3.pdf`) instead of
+generic "Document 1 / Document 2." Names resolve lazily via
+`GET /api/sam-attachment/metadata?url=` (HEAD + Content-Disposition). Nightly
+`sync-sam-opportunities` no longer wipes stored attachment metadata when the list API
+omits `resourceLinks`.
+
+**Why:** Contractors need to know which file is the RFP vs. an amendment before they
+click. SAM's bare `/download` URLs carry no filename in the path — the UI must fetch
+it or read cached metadata from the backfill cron.
+
+**SEO:** "SAM.gov RFP attachments," "federal solicitation documents download."
+
+**Proof:** `src/lib/sam/attachment-metadata.ts`, `SamAttachmentLinks.tsx`,
+`backfill-sam-attachments` cron. DB rows with stale "Document N" names can be refreshed
+with `?retry-names=1` on the backfill endpoint.

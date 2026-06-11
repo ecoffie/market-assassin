@@ -115,6 +115,8 @@ All admin endpoints require `?password=galata-assassin-2026`
 | `/api/usaspending/find-hit-list` | POST | Find high-value targets |
 | `/api/sam/live-opportunities` | POST | Fetch live SAM.gov opportunities |
 | `/api/sam/historical-context` | POST | Get historical context |
+| `/api/sam-attachment` | GET | Proxy/download SAM.gov attachment by URL |
+| `/api/sam-attachment/metadata` | GET | Resolve real filename (`?url=`) via HEAD Content-Disposition |
 
 ### Other Tools
 | Endpoint | Method | Purpose |

@@ -396,7 +396,7 @@ Central registry at `src/lib/data-sources/registry.ts` tracks all data sources:
 1. ~~PSC-NAICS Crosswalk Integration (cross-tool)~~ **DONE** (Mar 23, 2026)
 2. AI Win Probability Score (both tools) — **DONE** for Briefings (Mar 20, 2026)
 3. Teaming Suggestions (both tools)
-4. ~~Custom Alerts system~~ **DONE** — Daily alerts FREE for everyone during beta (Mar 23, 2026)
+4. ~~Custom Alerts system~~ **DONE** — Daily alerts FREE for everyone permanently (Jun 2026); phased setup nudges on email (30-day window)
 5. Mobile responsiveness fixes
 
 ### Medium-Term (1-3 Months)

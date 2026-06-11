@@ -4,6 +4,41 @@ This file contains detailed session history for the Market Assassin project. For
 
 ---
 
+## Session 44 (June 11, 2026)
+
+### Free alert emails + opportunity CTAs + SAM attachment filenames
+
+**Goal:** Replace stale "FREE during beta" messaging, drive profile setup for email-only users, fix "Document 1" attachment labels in Market Dashboard.
+
+#### Free alert email header (phased conversion)
+
+- **Before:** "FREE during beta" strip on all daily alert emails.
+- **After:** `shouldShowAlertSetupNudges()` in `src/lib/alerts/profile-setup.ts`:
+  - First **30 days** + incomplete profile (no keywords, no description, default NAICS) → `🎁 FREE forever • Set up your keywords in Mindy →`
+  - Otherwise → `👋 Welcome to Mindy • FREE forever`
+  - Fallback when `created_at` missing: stop nudging after `total_alerts_sent >= 25`
+- Wired in `daily-alerts/route.ts` and `send-notifications/route.ts`.
+
+#### In-app opportunity CTAs
+
+- Incomplete profile → "Set up your keywords" → `/app/onboarding` (not "Upgrade to Mindy Pro")
+- Complete profile → Pro upsells (bid/no-bid, Pipeline)
+- Files: `AlertsPanel.tsx`, `market-intel/page.tsx`, `DashboardPanel.tsx`
+- `isKnownAccount()` on setup-request so cold visitors get signup, not fake inbox message
+
+#### SAM attachment real filenames
+
+- **Root cause:** SAM `/download` URLs have no filename in path; nightly sync wrote `attachments: []` when list API omits `resourceLinks`, wiping backfill metadata.
+- **Fix:** `src/lib/sam/attachment-metadata.ts`, `GET /api/sam-attachment/metadata?url=`, `SamAttachmentLinks.tsx` (lazy client resolve)
+- **Sync guard:** `sync-sam-opportunities` preserves existing attachment metadata when API returns empty
+- **Branch:** `fix/market-research-invalid-naics` — commit `0d6ec3b`, PR #7
+
+#### GovCon Funnels (separate repo)
+
+- Removed `ExitIntentPopup` from `govcon-funnels` layout — deployed `e3ff863`
+
+---
+
 ## Session 43 (May 15, 2026)
 
 ### /briefings Redirect for Unauthenticated Users

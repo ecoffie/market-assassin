@@ -570,7 +570,8 @@ Users with custom NAICS profiles (via preferences page) get briefings immediatel
 - **GREEN** (`#059669→#10b981`): Daily Market Intel — "bid now" SAM.gov opportunities
 - **NAVY→PURPLE** (`#1e3a8a→#7c3aed`): Weekly Deep Dive + Pursuit — strategic intelligence
 - **PURPLE BANNER**: Daily Alerts — simple opportunity list
-- **RED BANNER** (`#dc2626→#ef4444`): "🎯 Market Intelligence • FREE PREVIEW during beta" — on all $49/mo emails
+- **ALERT STRIP** (daily alerts, purple email): phased — first 30 days + incomplete profile → `🎁 FREE forever • Set up your keywords in Mindy →`; otherwise → `👋 Welcome to Mindy • FREE forever` (see `src/lib/alerts/profile-setup.ts`)
+- **RED BANNER** (`#dc2626→#ef4444`): "🎯 Market Intelligence • FREE PREVIEW during beta" — on $49/mo briefing emails only (not daily alerts)
 
 **SAM.gov Recompete Matching (April 16, 2026):**
 
@@ -650,7 +651,7 @@ The daily-alerts cron is nominally "PAID TIER ONLY," but the tier check is **OFF
 - Timezone-aware delivery (~6 AM local time)
 - Keywords search (catch mislabeled opportunities)
 - PSC crosswalk (auto-generate related PSC codes from NAICS)
-- FREE PREVIEW banners on emails
+- Phased alert email strip (setup nudges → Welcome/FREE forever); briefing emails still use FREE PREVIEW banner
 - **NOT included:** Win Probability, AI analysis (reserved for $49/mo Market Intelligence)
 
 **Key Files:**
@@ -1127,7 +1128,11 @@ node scripts/merge-agency-intelligence.js --merge    # Apply
 | `src/lib/send-email.ts` | All email templates |
 | `src/lib/briefings/` | Daily briefing system |
 | `src/lib/smart-profile/` | User profile learning system |
-| `src/app/api/cron/daily-alerts/route.ts` | Daily alerts cron (FREE during beta) |
+| `src/app/api/cron/daily-alerts/route.ts` | Daily alerts cron (FREE for everyone; phased setup nudges via `profile-setup.ts`) |
+| `src/lib/alerts/profile-setup.ts` | Alert conversion window + `userNeedsMindySetup()` |
+| `src/lib/sam/attachment-metadata.ts` | SAM attachment filename resolution (HEAD / Content-Disposition) |
+| `src/components/app/SamAttachmentLinks.tsx` | Lazy attachment labels in Alerts + Market Dashboard |
+| `src/app/api/sam-attachment/metadata/route.ts` | `GET ?url=` → `{ filename }` for SAM download links |
 | `src/app/api/cron/precompute-briefings/route.ts` | Pre-compute daily templates by NAICS |
 | `src/app/api/cron/send-briefings-fast/route.ts` | Send daily briefings (~100ms/user) |
 | `src/app/api/cron/precompute-weekly-briefings/route.ts` | Pre-compute weekly templates by NAICS |
@@ -1466,4 +1471,4 @@ getmindy.ai purchases feed a **unified cross-site dashboard** hosted at `govcong
 
 ---
 
-*Last Updated: June 8, 2026 (PM) — Keyword-first market research (NAICS is the wrong primary key; "drones"=70+ codes, obvious code=28%/miss 72%; keyword auto-derives 90%-coverage NAICS; PSC=what's-bought lesson; Market Coverage banner; phrase-resilient; onboarding grounds day-1 codes so alerts aren't broken). Email send guard (#58 — global per-recipient daily cap + suppression, fixes 12-emails/day churn; emailType audit). Award Intelligence spine (award-detail + incumbent intel woven through task orders / Expiring Contracts / bid-no-bid / My Pursuits / Today's Intel), office contact rosters (#16, DoDAAC-decoded), Vault POC fields, SOW export tables, active-first pursuit picker, pipeline next-action + dedup, LLM cost discipline (gpt-4o-mini reasoning + $15 cap), quarterly data-refresh cron (honest stamp). See "Keyword-first market research" + "Award Intelligence + Office Rosters" sections. Prev Jun 3: Daily alerts free-daily permanent (DAILY_ALERT_BETA). Jun 2: purchase attribution → unified sales dashboard. May 20: OAuth custom domain (auth.getmindy.ai), Proposal Assist V2, mi-beta → app rename, session TTL 30d*
+*Last Updated: June 11, 2026 — Free alert email phased messaging (30-day setup nudges → Welcome/FREE forever; `profile-setup.ts`). Opportunity detail CTAs: profile setup before Pro upsell. SAM attachment real filenames (`SamAttachmentLinks`, metadata API; sync cron preserves attachment metadata). Prev Jun 8: Keyword-first market research (NAICS is the wrong primary key; "drones"=70+ codes, obvious code=28%/miss 72%; keyword auto-derives 90%-coverage NAICS; PSC=what's-bought lesson; Market Coverage banner; phrase-resilient; onboarding grounds day-1 codes so alerts aren't broken). Email send guard (#58 — global per-recipient daily cap + suppression, fixes 12-emails/day churn; emailType audit). Award Intelligence spine (award-detail + incumbent intel woven through task orders / Expiring Contracts / bid-no-bid / My Pursuits / Today's Intel), office contact rosters (#16, DoDAAC-decoded), Vault POC fields, SOW export tables, active-first pursuit picker, pipeline next-action + dedup, LLM cost discipline (gpt-4o-mini reasoning + $15 cap), quarterly data-refresh cron (honest stamp). See "Keyword-first market research" + "Award Intelligence + Office Rosters" sections. Prev Jun 3: Daily alerts free-daily permanent (DAILY_ALERT_BETA). Jun 2: purchase attribution → unified sales dashboard. May 20: OAuth custom domain (auth.getmindy.ai), Proposal Assist V2, mi-beta → app rename, session TTL 30d*

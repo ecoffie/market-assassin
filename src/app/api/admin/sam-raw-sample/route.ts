@@ -60,6 +60,12 @@ export async function GET(request: NextRequest) {
       officeAddress: raw.officeAddress ?? null,
       fairOpportunity: raw.fairOpportunity ?? null,
       additionalInfoLink: raw.additionalInfoLink ?? null,
+      // The crux: is raw_data.description a LINK (needs a 2nd fetch) or inline TEXT?
+      description: {
+        value: typeof raw.description === 'string' ? raw.description.slice(0, 120) : raw.description ?? null,
+        isLink: typeof raw.description === 'string' && raw.description.startsWith('http'),
+        length: typeof raw.description === 'string' ? raw.description.length : null,
+      },
     };
   });
 

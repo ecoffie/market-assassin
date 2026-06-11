@@ -326,10 +326,15 @@ SMTP_PASSWORD=***
   GovCon Giants Daily Intel
 </div>
 
-<!-- FREE PREVIEW Banner (beta) -->
+<!-- FREE PREVIEW Banner (briefing emails only — $49/mo tier) -->
 <div style="background: #10b981;">
   🎁 FREE PREVIEW - Daily Intelligence Briefing
 </div>
+
+<!-- Daily ALERT emails use a different strip (not this banner):
+     first 30d + incomplete profile → "FREE forever • Set up keywords in Mindy"
+     otherwise → "Welcome to Mindy • FREE forever"
+     See src/lib/alerts/profile-setup.ts -->
 
 <!-- Summary stats -->
 <div>
