@@ -185,6 +185,11 @@ export async function GET(request: NextRequest) {
   const setAside = searchParams.get('setAside') || '';
   let naics = searchParams.get('naics') || '';
   const state = searchParams.get('state') || '';
+  // status: 'active' (default — biddable now), 'inactive' (the archive — expired/
+  // closed, for recompete intel + mining old SOW/PWS), or 'all'. Mirrors SAM.gov's
+  // active/inactive toggle. The 59k inactive notices are already cached; this just
+  // unlocks searching them.
+  const status = (searchParams.get('status') || 'active').toLowerCase();
   const page = parseInt(searchParams.get('page') || '1');
   const limit = parseInt(searchParams.get('limit') || '50');
   const mode = searchParams.get('mode') || 'list'; // list | stats | export
@@ -211,12 +216,22 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Build base query
+    // Build base query. Status gates active vs the archive:
+    //  - active   (default): biddable now — active flag + deadline in the future
+    //  - inactive: the archive — closed/expired (recompete intel, old SOW/PWS mining)
+    //  - all      : everything we have
     let query = supabase
       .from('sam_opportunities')
-      .select('*', { count: 'exact' })
-      .eq('active', true)
-      .gt('response_deadline', new Date().toISOString());
+      .select('*', { count: 'exact' });
+    if (status === 'inactive') {
+      // Closed: explicitly inactive OR the deadline has passed.
+      query = query.or(`active.eq.false,response_deadline.lt.${new Date().toISOString()}`);
+    } else if (status === 'all') {
+      // No active/deadline gate — full corpus.
+    } else {
+      // Default 'active' — biddable now.
+      query = query.eq('active', true).gt('response_deadline', new Date().toISOString());
+    }
 
     // Apply filters
     if (search) {

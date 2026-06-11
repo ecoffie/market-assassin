@@ -217,6 +217,9 @@ function MarketIntelDashboard() {
   const [stateFilter, setStateFilter] = useState('');
   const [agencyFilter, setAgencyFilter] = useState('');
   const [hasSow, setHasSow] = useState(false);   // #66 "Has SOW/PWS" filter
+  // Active (biddable now) | Inactive (the archive — recompete intel, old SOW/PWS) |
+  // All. Mirrors SAM.gov's status toggle; the inactive corpus (~59k) is already cached.
+  const [status, setStatus] = useState<'active' | 'inactive' | 'all'>('active');
   const [page, setPage] = useState(1);
   const [expandedId, setExpandedId] = useState<string | null>(null);
   // Lazy-loaded full descriptions keyed by notice_id. SAM.gov stores
@@ -464,6 +467,7 @@ function MarketIntelDashboard() {
       if (stateFilter) params.set('state', stateFilter);
       if (agencyFilter) params.set('agency', agencyFilter);
       if (hasSow) params.set('hasSow', 'true');
+      if (status !== 'active') params.set('status', status); // active(default)|inactive|all
 
       const res = await fetch(`/api/mi-dashboard?${params.toString()}`);
       const data = await res.json();
@@ -476,7 +480,7 @@ function MarketIntelDashboard() {
     } finally {
       setLoadingOpps(false);
     }
-  }, [page, search, noticeType, urgency, setAside, naicsFilter, stateFilter, agencyFilter, hasSow, email, isProfileFiltered]);
+  }, [page, search, noticeType, urgency, setAside, naicsFilter, stateFilter, agencyFilter, hasSow, status, email, isProfileFiltered]);
 
   useEffect(() => {
     // Don't fetch while we're still resolving the email for a profile-filtered
@@ -853,6 +857,25 @@ function MarketIntelDashboard() {
             >
               📄 Has SOW/PWS
             </button>
+            {/* Active / Inactive / All — search the archive too (recompete intel +
+                mining old SOW/PWS), like SAM.gov's status toggle. */}
+            <span className="mx-1 text-gray-700">|</span>
+            <div className="inline-flex rounded-full bg-gray-800 p-0.5" title="Active = biddable now. Inactive = the archive (closed/expired) — for recompete intel and digging up old solicitation documents. All = everything.">
+              {([
+                { v: 'active', label: 'Active' },
+                { v: 'inactive', label: '🗄 Inactive' },
+                { v: 'all', label: 'All' },
+              ] as const).map((s) => (
+                <button
+                  key={s.v}
+                  type="button"
+                  onClick={() => { setStatus(s.v); setPage(1); }}
+                  className={`rounded-full px-2.5 py-1 text-xs font-medium transition-colors ${status === s.v ? 'bg-purple-600 text-white' : 'text-gray-300 hover:text-white'}`}
+                >
+                  {s.label}
+                </button>
+              ))}
+            </div>
           </div>
           <form onSubmit={handleSearchSubmit} className="flex flex-wrap gap-3">
             <div className="flex-1 min-w-[200px]">
