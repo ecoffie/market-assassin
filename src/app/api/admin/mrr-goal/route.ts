@@ -42,23 +42,32 @@ export async function GET(request: NextRequest) {
 
     // Debug: dump status distribution + a sample row so we can see why active=0.
     if (request.nextUrl.searchParams.get('debug') === '1') {
-      const { data: all } = await supabase
+      const { data: all, error: dbgErr } = await supabase
         .from('stripe_subscriptions')
-        .select('status, plan_amount, plan_id, product_name')
+        .select('*')
         .range(0, 999);
-      const statusDist: Record<string, number> = {};
-      let withAmount = 0;
+      if (dbgErr) {
+        return NextResponse.json({ debug: true, selectError: dbgErr.message, hint: 'column name mismatch or RLS' });
+      }
+      if ((all || []).length === 0) {
+        return NextResponse.json({ debug: true, note: 'select * returned 0 rows despite count>0 — RLS on SELECT data' });
+      }
+      // Show the real column names + status values present.
+      const cols = Object.keys((all || [])[0] || {});
+      const statusKey = cols.find((c) => /status/i.test(c)) || 'status';
+      const amtKey = cols.find((c) => /amount/i.test(c)) || 'plan_amount';
+      const statusDistFull: Record<string, number> = {};
       for (const r of all || []) {
-        const st = (r as { status?: string }).status || 'NULL';
-        statusDist[st] = (statusDist[st] || 0) + 1;
-        if ((r as { plan_amount?: number }).plan_amount) withAmount++;
+        const st = String((r as Record<string, unknown>)[statusKey] ?? 'NULL');
+        statusDistFull[st] = (statusDistFull[st] || 0) + 1;
       }
       return NextResponse.json({
         debug: true,
-        totalRowsSampled: (all || []).length,
-        statusDistribution: statusDist,
-        rowsWithPlanAmount: withAmount,
-        sampleRow: (all || [])[0] || null,
+        columns: cols,
+        statusColumn: statusKey,
+        amountColumn: amtKey,
+        statusDistribution: statusDistFull,
+        sampleRow: (all || [])[0],
       });
     }
 
