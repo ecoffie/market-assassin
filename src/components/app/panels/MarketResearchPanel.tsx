@@ -611,6 +611,11 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   const [sportKeyword, setSportKeyword] = useState('');
   const [sportSuggesting, setSportSuggesting] = useState(false);
   const [sportSuggestions, setSportSuggestions] = useState<{ naics: Array<{ code: string; name: string }>; psc: Array<{ code: string; name: string }> } | null>(null);
+  // "Save to my profile" — persist the researched NAICS + keyword to the user's
+  // alert profile (replaces their current codes). The fix for "I researched my
+  // market but it never reached my alerts."
+  const [savingProfile, setSavingProfile] = useState(false);
+  const [profileSaved, setProfileSaved] = useState(false);
   // Has a report been explicitly run since entering Sport? Gates the whole
   // results area so the saved-profile report never shows in Sport (Eric).
   const [sportReportRan, setSportReportRan] = useState(false);
@@ -1004,6 +1009,42 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       showToast({ message: 'Could not look up codes — try the Suggest codes button.', variant: 'error' });
     } finally { setSportSuggesting(false); }
   }, [sportKeyword, formData, getAuthHeaders, handleGenerateAll, showToast, email]);
+
+  // Save the researched market to the user's alert profile — REPLACES their
+  // current NAICS with the coverage codes + adds the keyword. This is how "I
+  // researched demolition" actually starts matching their daily alerts.
+  const saveResearchToProfile = useCallback(async (
+    naics: Array<{ code: string }>,
+    keyword: string,
+  ) => {
+    if (!email) { showToast({ message: 'Sign in to save to your profile.', variant: 'error' }); return; }
+    setSavingProfile(true);
+    try {
+      const naicsCodes = naics.map((n) => n.code);
+      const keywords = keyword.trim() ? [keyword.trim()] : [];
+      // NOTE: PSC isn't saved — user_notification_settings has no psc_codes column
+      // in production yet. NAICS + keywords are what drive the user's alerts.
+      const res = await fetch('/api/app/profile', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({
+          email,
+          naicsCodes,        // REPLACES the profile's NAICS (the route sets, not appends)
+          keywords,
+          businessType: formData.businessType || 'Small Business',
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data && !data.error) {
+        setProfileSaved(true);
+        showToast({ message: '✅ Saved to your profile — your alerts now track this market.', variant: 'success' });
+      } else {
+        showToast({ message: data?.error || 'Could not save to your profile.', variant: 'error' });
+      }
+    } catch {
+      showToast({ message: 'Could not save to your profile — try again.', variant: 'error' });
+    } finally { setSavingProfile(false); }
+  }, [email, getAuthHeaders, formData.businessType, showToast]);
 
   // Deep-link: ?keyword=drones (from the global lookup bar) → open Sport mode,
   // pre-fill the keyword, and auto-build the market map. Runs once.
@@ -1838,6 +1879,25 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                       >
                         ✓ Use these codes (Small Business) — then Build Market Map
                       </button>
+
+                      {/* SAVE TO PROFILE — persist the full coverage set + keyword to
+                          the user's alert profile (replaces current codes). The fix
+                          for "I researched my market but my alerts never changed." */}
+                      {profileSaved ? (
+                        <div className="mt-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200 text-center">
+                          ✅ Saved — your daily alerts now track &ldquo;{sportKeyword || 'this market'}&rdquo;
+                        </div>
+                      ) : (
+                        <button
+                          type="button"
+                          disabled={savingProfile}
+                          onClick={() => saveResearchToProfile(sportSuggestions.naics, sportKeyword)}
+                          className="mt-2 w-full rounded-lg border border-purple-500/40 bg-purple-500/10 px-3 py-2 text-xs font-semibold text-purple-200 hover:bg-purple-500/20 disabled:opacity-60"
+                          title="Replaces your current NAICS with this market's codes and adds the keyword to your alerts"
+                        >
+                          {savingProfile ? 'Saving…' : '★ Save this market to my profile (updates my alerts)'}
+                        </button>
+                      )}
                     </div>
                   );
                 })()}
