@@ -33,10 +33,7 @@ import {
   renderAlertTopBannerHtml,
   renderBootcampPromoHtml,
   renderKeywordSetupNudgeHtml,
-  renderMarketCoverageTeaserHtml,
   renderMindyV10PromoHtml,
-  renderNarrowMarketNudgeHtml,
-  MINDY_MARKET_RESEARCH_URL,
 } from '@/lib/alerts/email-promo';
 import { MINDY_APP_URL, MINDY_FROM_NAME, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 
@@ -1347,10 +1344,7 @@ async function sendDailyAlertEmail(
     </p>
   </div>
 
-  ${renderMarketCoverageTeaserHtml(alertCta, preferencesUrl, trackedUrl)}
-
-  ${alertCta.stage === 'unconfigured' ? renderKeywordSetupNudgeHtml(preferencesUrl, trackedUrl) : ''}
-  ${alertCta.stage === 'narrow_market' ? renderNarrowMarketNudgeHtml(MINDY_MARKET_RESEARCH_URL, alertCta.naicsCount ?? 1, trackedUrl) : ''}
+  ${alertCta.needsKeywordSetup ? renderKeywordSetupNudgeHtml(preferencesUrl, trackedUrl) : ''}
 
   <!-- Filter summary -->
   <div style="background: #1e293b; padding: 12px 20px; border-bottom: 1px solid #334155;">

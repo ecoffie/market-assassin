@@ -12,11 +12,7 @@ import {
   renderAlertTopBannerHtml,
   renderBootcampPromoHtml,
   renderKeywordSetupNudgeHtml,
-  renderMarketCoverageTeaserHtml,
   renderMindyV10PromoHtml,
-  renderNarrowMarketNudgeHtml,
-  MINDY_MARKET_RESEARCH_URL,
-  ALERT_MARKETING,
 } from '@/lib/alerts/email-promo';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -659,10 +655,7 @@ async function sendAlertEmail(
     </p>
   </div>
 
-  ${renderMarketCoverageTeaserHtml(alertCta, preferencesUrl, trackedUrl)}
-
-  ${alertCta.stage === 'unconfigured' ? renderKeywordSetupNudgeHtml(preferencesUrl, trackedUrl) : ''}
-  ${alertCta.stage === 'narrow_market' ? renderNarrowMarketNudgeHtml(MINDY_MARKET_RESEARCH_URL, alertCta.naicsCount ?? 1, trackedUrl) : ''}
+  ${alertCta.needsKeywordSetup ? renderKeywordSetupNudgeHtml(preferencesUrl, trackedUrl) : ''}
 
   <div style="background: #ffffff; padding: 25px; border: 1px solid #e5e7eb; border-top: none;">
     <p style="margin: 0 0 20px 0; font-size: 16px;">
@@ -683,10 +676,10 @@ async function sendAlertEmail(
     ${showUpgradeToMindyPro ? `
     <!-- Mindy Pro Upgrade CTA (for free tier with more opps available) -->
     <div style="background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%); border-radius: 10px; padding: 24px; margin-top: 25px; text-align: center;">
-      <h3 style="color: white; margin: 0 0 10px 0; font-size: 18px;">You're Missing ${totalAvailable - 5} More Opportunities This Week</h3>
+      <h3 style="color: white; margin: 0 0 10px 0; font-size: 18px;">You're Missing ${totalAvailable - 5} More Opportunities!</h3>
       <p style="color: #e9e3ff; margin: 0 0 16px 0; font-size: 14px;">
-        Free tier shows 5 of <strong>${totalAvailable}</strong> matches — and one NAICS code usually hides ~${ALERT_MARKETING.missPct}% of your market.<br>
-        Mindy Pro: <strong>15 opps/week</strong>, full Sport-mode market coverage, and priority ranking.
+        Free tier shows 5 opps/week. We found <strong>${totalAvailable}</strong> matches for your profile.<br>
+        Mindy Pro gives you <strong>15 opps/week</strong>, priority ranking, and richer recommendations.
       </p>
       <a href="${trackedUrl(mindyDashboardUrl, 'upgrade_mindy_pro')}" style="background: white; color: #7c3aed; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
         Upgrade to Mindy Pro
