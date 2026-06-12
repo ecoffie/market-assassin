@@ -22,6 +22,38 @@ function pct(part: number, total: number): number {
   return Math.max(0, Math.min(100, Math.round((part / total) * 1000) / 10));
 }
 
+type MrrGoal = {
+  success: boolean;
+  goal: number;
+  proPrice: number;
+  activeSubs: number;
+  mrr: number;
+  arpu: number;
+  pctToGoal: number;
+  byPlan: Array<{ monthlyPrice: number; count: number }>;
+  subsNeededAt149: number;
+  subsRemainingAt149: number;
+  mrrGap: number;
+  oneTimeCash30d?: number;
+  oneTimeCount30d?: number;
+  lifetimeScenarios?: Array<{ name: string; price: number; salesToFundGoalMonth: number; mrrEquivPerSale: number }>;
+};
+
+// Lead targets to hit the remaining $149 subs at three close rates. Anchored to
+// real data: cold base converts ~0.7%, warm bootcamp leads realistically 3-8%.
+// (IG peak was ~2,000 signups/mo — the 5% medium case is ~6 months at that pace.)
+function leadScenarios(subsNeeded: number) {
+  const rates = [
+    { label: 'High', rate: 0.08, tone: 'emerald' as const },
+    { label: 'Medium', rate: 0.05, tone: 'amber' as const },
+    { label: 'Low', rate: 0.03, tone: 'blue' as const },
+  ];
+  return rates.map((r) => {
+    const leads = Math.ceil(subsNeeded / r.rate);
+    return { ...r, leads, perMonth6: Math.ceil(leads / 6) };
+  });
+}
+
 type RoleLane = {
   name: string;
   owners: string;
@@ -404,6 +436,8 @@ export default function LaunchCommandCenterPage() {
   const [betaConv, setBetaConv] = useState<BetaConversion | null>(null);
   const [betaConvLoading, setBetaConvLoading] = useState(false);
   const [betaConvError, setBetaConvError] = useState('');
+  const [mrrGoal, setMrrGoal] = useState<MrrGoal | null>(null);
+  const [mrrGoalError, setMrrGoalError] = useState('');
 
   const currentDate = useMemo(() => {
     return new Intl.DateTimeFormat('en-US', {
@@ -652,6 +686,29 @@ export default function LaunchCommandCenterPage() {
     return () => { cancelled = true; };
   }, [authenticated, password]);
 
+  useEffect(() => {
+    if (!authenticated || !password) return;
+    let cancelled = false;
+    async function loadMrrGoal() {
+      setMrrGoalError('');
+      try {
+        const response = await fetch(`/api/admin/mrr-goal?password=${encodeURIComponent(password)}`, { cache: 'no-store' });
+        const data = await response.json();
+        if (cancelled) return;
+        if (!response.ok || !data.success) {
+          setMrrGoalError(data.error || 'Could not load MRR goal');
+          setMrrGoal(null);
+          return;
+        }
+        setMrrGoal(data as MrrGoal);
+      } catch {
+        if (!cancelled) { setMrrGoalError('Could not load MRR goal'); setMrrGoal(null); }
+      }
+    }
+    loadMrrGoal();
+    return () => { cancelled = true; };
+  }, [authenticated, password]);
+
   if (checking) {
     return <LoadingState />;
   }
@@ -743,6 +800,90 @@ export default function LaunchCommandCenterPage() {
       </header>
 
       <div className="mx-auto max-w-7xl space-y-8 px-6 py-8">
+        {/* ★ NORTH STAR — $100K/mo goal + the lead targets to hit it. The whole
+            team sees this. Real MRR from Stripe; lead math from real close rates. */}
+        <section className="rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-900/25 via-slate-900 to-slate-900 p-6">
+          <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-[0.2em] text-emerald-300">★ The Goal — $100K / month</p>
+              <h2 className="mt-2 text-3xl font-bold md:text-4xl">Where we are, and what it takes to get there</h2>
+            </div>
+          </div>
+
+          {mrrGoalError && <p className="mt-6 text-sm text-red-300">{mrrGoalError}</p>}
+          {!mrrGoal && !mrrGoalError && <p className="mt-6 text-sm text-slate-400">Loading the goal…</p>}
+
+          {mrrGoal && (
+            <>
+              {/* Big MRR vs goal */}
+              <div className="mt-6 flex flex-wrap items-end gap-x-4 gap-y-1">
+                <span className="text-5xl font-black text-emerald-300">${mrrGoal.mrr.toLocaleString()}</span>
+                <span className="text-xl text-slate-400">/ ${mrrGoal.goal.toLocaleString()} MRR</span>
+                <span className="ml-auto rounded-full bg-emerald-500/15 px-3 py-1 text-sm font-semibold text-emerald-300">{mrrGoal.pctToGoal}% there</span>
+              </div>
+              <div className="mt-3 h-4 overflow-hidden rounded-full bg-slate-800">
+                <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-300" style={{ width: `${Math.max(1, mrrGoal.pctToGoal)}%` }} />
+              </div>
+              <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-400">
+                <span><b className="text-white">{mrrGoal.activeSubs}</b> active subs</span>
+                <span><b className="text-white">${mrrGoal.arpu}</b> blended ARPU</span>
+                <span><b className="text-white">{mrrGoal.subsRemainingAt149}</b> more $149 subs to goal</span>
+                {mrrGoal.oneTimeCash30d ? <span><b className="text-white">${mrrGoal.oneTimeCash30d.toLocaleString()}</b> one-time cash (30d)</span> : null}
+              </div>
+
+              {/* LEAD TARGETS — High / Medium / Low */}
+              <div className="mt-7">
+                <p className="text-sm font-semibold text-white">Leads we need to convert {mrrGoal.subsRemainingAt149} more subs</p>
+                <p className="text-xs text-slate-500">at three lead→paid close rates. IG peak was ~2,000 signups/mo — the Medium case is ~6 months at that pace.</p>
+                <div className="mt-3 grid gap-4 sm:grid-cols-3">
+                  {leadScenarios(mrrGoal.subsRemainingAt149).map((s) => {
+                    const ring = s.tone === 'emerald' ? 'border-emerald-500/40 bg-emerald-500/5' : s.tone === 'amber' ? 'border-amber-500/40 bg-amber-500/5' : 'border-blue-500/40 bg-blue-500/5';
+                    const text = s.tone === 'emerald' ? 'text-emerald-300' : s.tone === 'amber' ? 'text-amber-300' : 'text-blue-300';
+                    return (
+                      <div key={s.label} className={`rounded-xl border p-4 ${ring}`}>
+                        <div className="flex items-baseline justify-between">
+                          <span className={`text-sm font-bold uppercase tracking-wide ${text}`}>{s.label}</span>
+                          <span className="text-xs text-slate-500">{Math.round(s.rate * 100)}% close</span>
+                        </div>
+                        <div className="mt-2 text-3xl font-black text-white">{s.leads.toLocaleString()}</div>
+                        <div className="text-xs text-slate-400">total leads needed</div>
+                        <div className="mt-2 text-sm text-slate-300">≈ <b className={text}>{s.perMonth6.toLocaleString()}/mo</b> for 6 months</div>
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+
+              {/* LIFETIME / TIER LEVERS — fewer conversions needed */}
+              {mrrGoal.lifetimeScenarios && mrrGoal.lifetimeScenarios.length > 0 && (
+                <div className="mt-6 rounded-xl border border-purple-500/30 bg-purple-500/5 p-4">
+                  <p className="text-sm font-semibold text-purple-200">Lifetime / bundle levers — shrink the number</p>
+                  <div className="mt-2 grid gap-3 sm:grid-cols-2">
+                    {mrrGoal.lifetimeScenarios.map((l) => (
+                      <div key={l.name} className="text-sm text-slate-300">
+                        <b className="text-white">{l.name}</b> (${l.price.toLocaleString()}): <b className="text-purple-300">{l.salesToFundGoalMonth}</b> sales fund a $100K month · ${l.mrrEquivPerSale}/mo MRR-equiv each
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs text-slate-500">Plus Team ($499) & Enterprise tiers — every higher-tier sub counts as more than one $149.</p>
+                </div>
+              )}
+
+              {/* Current plan mix */}
+              <div className="mt-5">
+                <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">Current active plan mix ({mrrGoal.activeSubs} subs)</p>
+                <div className="flex flex-wrap gap-2">
+                  {mrrGoal.byPlan.filter((p) => p.monthlyPrice > 0).map((p) => (
+                    <span key={p.monthlyPrice} className="rounded-full border border-slate-700 bg-slate-900 px-2.5 py-0.5 text-xs text-slate-300">
+                      ${p.monthlyPrice} × <b className="text-white">{p.count}</b>
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </>
+          )}
+        </section>
+
         {/* BETA SETUP CONVERSION — how many entitled beta users have turned their
             access into a real login, and how the setup-invite queue is draining. */}
         <section className="rounded-lg border border-purple-500/30 bg-gradient-to-br from-purple-900/20 to-slate-900 p-6">
