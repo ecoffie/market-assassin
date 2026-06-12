@@ -889,3 +889,23 @@ Army/Air Force/VA each render their own real pain points (Soldier modernization,
 Aircraft sustainment, EHR modernization). Data exported from market-assassin's
 agency-pain-points.json (307 agencies), agency-budget-data.json (47), and the 2,768-row
 SBLO contractor file — regenerated via `scripts/export-agency-enrichment.js`.
+
+## 31. Forecasts page goes live — real upcoming procurements, BQ-free
+
+**What:** The public forecasts page (govcongiants.com/data/forecasts) used to show
+100% fake placeholder rows ("████ Cloud Migration ████"). It now pulls REAL data
+from a new public, Supabase-only preview API (zero BigQuery): 7,824 real forecasts
+across 15 agencies, with real sample procurements shown as proof — DOT "Recapitalize
+10 Roll-on/Roll-off Ships" ($5B), DOL "Medical Provider Network" ($5B). First two
+shown unblurred; the full searchable pipeline gated to Mindy Pro.
+
+**Why:** Fake placeholder rows erode trust the moment a visitor recognizes them. Real,
+named, dollar-quantified forecasts prove the database is real and worth the upgrade —
+and the data refreshes automatically (ISR daily) without a redeploy. Built BQ-free per
+the cost constraint: the preview endpoint reads only Supabase, never BigQuery.
+
+**SEO:** "federal contract forecasts", "upcoming government contracts", "acquisition
+forecast [agency]", "pre-solicitation opportunities", "DOD forecast".
+
+**Proof (live):** govcongiants.com/data/forecasts shows 7,824 / 15 agencies + real
+titles. Endpoint: getmindy.ai/api/forecasts-preview (public, Supabase-only, edge-cached).
