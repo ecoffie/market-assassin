@@ -933,3 +933,22 @@ moment it spikes, with a feature-specific pitch and a one-click $149 checkout
 
 **Proof:** Live in the /app sidebar. CTA routes to /checkout/mindy-pro-monthly (307 →
 Stripe, attribution captured). Feature-named pitches for all 12 Pro-locked panels.
+
+## 33. Partner referral links — tagged signups for channel partners (NCMBC)
+
+**What:** Dedicated partner landing page and referral code so every signup from a
+channel partner (starting with NCMBC) is tagged in `user_notification_settings`
+(`invitation_source` / `trial_source` = `partner_ncmbc`). Referred contractors get a
+30-day Mindy Pro trial. Share link: getmindy.ai/ncmbc or code NCMBC on any signup URL.
+
+**Why:** You can't manage, reward, or build a case study from referrals you can't
+attribute. Tagged cohorts become APEX Q3 proof — signup count, NAICS fill rate, trial
+activation. Clean partner offer: extended Pro trial for their base + free training
+webinar for NCMBC (no improvised rev-share on live calls).
+
+**SEO:** "NCMBC federal contracting", "minority business federal opportunities",
+partner-branded landing only — not a broad SEO page.
+
+**Proof:** Landing at getmindy.ai/ncmbc. Admin cohort:
+`/api/admin/partner-referrals?password=...&code=NCMBC`. Trial tagged via
+`trial_source=partner_ncmbc` on `user_notification_settings`.

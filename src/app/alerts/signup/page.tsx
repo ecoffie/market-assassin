@@ -4,6 +4,8 @@ import { useState, useEffect, Suspense } from 'react';
 import Link from 'next/link';
 import { useSearchParams } from 'next/navigation';
 import SampleOpportunitiesPicker from '@/components/briefings/SampleOpportunitiesPicker';
+import { capturePartnerRefFromSearchParams, getStoredPartnerRef } from '@/lib/mindy/partner-referral-client';
+import { getPartnerReferralByCode } from '@/lib/mindy/partner-referrals';
 
 // Industry presets with icons
 const INDUSTRY_PRESETS = [
@@ -123,11 +125,16 @@ function AlertSignupContent() {
   } | null>(null);
   const [verifyingInvite, setVerifyingInvite] = useState(false);
   const [inviteError, setInviteError] = useState('');
+  const [partnerRef, setPartnerRef] = useState<string | null>(null);
 
   const totalSteps = 5;
+  const partnerProgram = getPartnerReferralByCode(partnerRef);
 
   // Check for invite token on mount
   useEffect(() => {
+    const ref = capturePartnerRefFromSearchParams(searchParams) || getStoredPartnerRef();
+    setPartnerRef(ref);
+
     const token = searchParams.get('invite');
     if (token) {
       setInviteToken(token);
@@ -236,10 +243,11 @@ function AlertSignupContent() {
             locationStates: selectedStates,
             alertFrequency: frequency,
             source: inviteToken ? 'paid_existing' : 'free-signup',
+            referralCode: partnerRef || undefined,
             inviteToken: inviteToken || undefined,
             stripeCustomerId: inviteData?.customerId || undefined,
             alertsEnabled: true,
-            briefingsEnabled: !!inviteToken, // Only for paid subscribers
+            briefingsEnabled: !!inviteToken || !!partnerProgram,
             isActive: true,
           }),
         });

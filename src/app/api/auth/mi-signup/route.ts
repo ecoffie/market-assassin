@@ -3,6 +3,8 @@ import { createClient } from '@supabase/supabase-js';
 import { resolveMx } from 'dns/promises';
 import { renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 import { sendEmail } from '@/lib/send-email';
+import { applyPartnerReferralIfEligible } from '@/lib/mindy/apply-partner-referral';
+import { getPartnerReferralByCode } from '@/lib/mindy/partner-referrals';
 
 export const runtime = 'nodejs';
 
@@ -131,7 +133,15 @@ async function validateSignupEmail(email: string): Promise<string | null> {
   return null;
 }
 
-function buildWelcomeEmailHtml(setupUrl: string): string {
+function buildWelcomeEmailHtml(setupUrl: string, partnerTrialDays?: number): string {
+  const proTrialBlock = partnerTrialDays
+    ? `
+            <div style="background:#ecfdf5; border:1px solid #a7f3d0; border-radius:10px; padding:16px; margin:0 0 22px;">
+              <p style="font-size:14px; line-height:1.5; margin:0; color:#047857;">
+                <strong>Partner offer active:</strong> You have ${partnerTrialDays} days of Mindy Pro — AI briefings, forecasts, and capture intelligence.
+              </p>
+            </div>`
+    : '';
   return `
     <div style="margin:0; padding:0; background:#f4f7fb;">
       <div style="display:none; max-height:0; overflow:hidden; opacity:0;">
@@ -153,6 +163,7 @@ function buildWelcomeEmailHtml(setupUrl: string): string {
               Free Account
             </div>
             <h2 style="font-size:28px; line-height:1.2; margin:18px 0 12px; color:#0f172a; font-weight:800;">Set up your password</h2>
+            ${proTrialBlock}
             <p style="font-size:16px; line-height:1.65; margin:0 0 22px; color:#334155;">
               Click below to create your password and start using Mindy. Your free account includes:
             </p>
@@ -199,6 +210,7 @@ export async function POST(request: NextRequest) {
   try {
     const body = await request.json().catch(() => ({}));
     const email = normalizeEmail(body.email);
+    const referralCode = typeof body.referralCode === 'string' ? body.referralCode : '';
 
     if (!email) {
       return NextResponse.json({ success: false, error: 'Email is required' }, { status: 400 });
@@ -213,6 +225,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: emailError }, { status: 400 });
     }
 
+    const partner = getPartnerReferralByCode(referralCode);
+    if (referralCode && partner) {
+      try {
+        await applyPartnerReferralIfEligible(getSupabaseAdmin(), email, referralCode);
+      } catch (partnerError) {
+        console.warn('[Mindy Signup] Partner referral apply failed:', partnerError);
+      }
+    }
+
     // Generate setup link
     const setupUrl = getSupabaseAuthRedirectUrl('/app/setup-password');
     const link = await generateSetupLink(email, setupUrl);
@@ -221,7 +242,7 @@ export async function POST(request: NextRequest) {
     await sendEmail({
       to: email,
       subject: 'Welcome to Mindy — Set up your password',
-      html: buildWelcomeEmailHtml(link.url),
+      html: buildWelcomeEmailHtml(link.url, partner?.trialDays),
       text: `Welcome to Mindy! Set up your password: ${link.url}`,
       emailType: 'mindy_free_signup',
       eventSource: 'mindy_signup',

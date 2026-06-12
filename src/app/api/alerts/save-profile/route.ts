@@ -15,6 +15,7 @@ import {
   extractIpAddress,
   extractUserAgent,
 } from '@/lib/signup-events';
+import { applyPartnerReferralIfEligible, partnerReferralSourceLabel } from '@/lib/mindy/apply-partner-referral';
 
 // Lazy initialization to avoid build-time errors
 function getSupabase() {
@@ -36,6 +37,7 @@ interface AlertProfileRequest {
   locationZip?: string;
   alertFrequency?: 'daily' | 'weekly';
   source?: string;            // e.g., "opportunity-hunter-free", "free-signup", "paid_existing"
+  referralCode?: string;      // Partner code e.g. NCMBC
   inviteToken?: string;       // Magic link token for paid subscriber activation
   stripeCustomerId?: string;  // Stripe customer ID from invitation verification
   businessDescription?: string | null;
@@ -60,15 +62,19 @@ export async function POST(request: NextRequest) {
       locationZip,
       alertFrequency,
       source,
+      referralCode,
       inviteToken,
       stripeCustomerId,
       businessDescription,
     } = body;
 
     // Log signup started event (non-blocking)
+    const partnerSource = partnerReferralSourceLabel(referralCode);
+    const signupSource = partnerSource || source || 'unknown';
+
     logSignupEvent({
       eventType: SignupEventType.SIGNUP_STARTED,
-      source: source || 'unknown',
+      source: signupSource,
       userEmail: email,
       ipAddress: extractIpAddress(request),
       userAgent: extractUserAgent(request),
@@ -180,8 +186,31 @@ export async function POST(request: NextRequest) {
     // Production does not have user_notification_settings.business_description yet.
     // Store the description in user_business_profiles below until the migration is applied.
 
+    // Partner referral (e.g. NCMBC) — 30-day Pro trial, tagged cohort
+    let partnerReferralApplied = false;
+    if (referralCode) {
+      try {
+        const partnerResult = await applyPartnerReferralIfEligible(
+          getSupabase(),
+          verifiedEmail,
+          referralCode,
+        );
+        partnerReferralApplied = partnerResult.applied;
+        if (partnerResult.applied && partnerResult.partner) {
+          upsertPayload.briefings_enabled = true;
+          upsertPayload.treatment_type = 'briefings';
+          upsertPayload.invitation_source = partnerResult.partner.invitationSource;
+          upsertPayload.trial_source = partnerResult.partner.trialSource;
+          upsertPayload.trial_ends_at = partnerResult.trialEndsAt;
+          console.log(`[Alerts] Partner referral ${partnerResult.partner.code} applied: ${verifiedEmail}`);
+        }
+      } catch (partnerError) {
+        console.warn('[Alerts] Partner referral apply failed:', partnerError);
+      }
+    }
+
     // free_signup = MI Free tier signup (alerts only, no AI briefings)
-    if (source === 'free_signup') {
+    if (source === 'free_signup' && !partnerReferralApplied) {
       upsertPayload.briefings_enabled = false;
       upsertPayload.treatment_type = 'alerts';
       console.log(`[Alerts] MI Free signup: ${email} - Daily Alerts only, no briefings`);
@@ -235,7 +264,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Log successful signup completion
-    logSignupCompleted(source || 'unknown', verifiedEmail, {
+    logSignupCompleted(signupSource, verifiedEmail, {
       naicsCount: expandedNaics.length,
       agencyCount: targetAgencies?.length || 0,
       isPaidSource: source === 'paid_existing',

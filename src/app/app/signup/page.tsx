@@ -1,16 +1,40 @@
 'use client';
 
 import Link from 'next/link';
-import { useState } from 'react';
+import { Suspense, useEffect, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
+import { capturePartnerRefFromSearchParams, getStoredPartnerRef } from '@/lib/mindy/partner-referral-client';
+import { getPartnerReferralByCode } from '@/lib/mindy/partner-referrals';
 
 export default function MindySignupPage() {
+  return (
+    <Suspense fallback={
+      <main className="min-h-screen bg-slate-950 flex items-center justify-center">
+        <div className="text-slate-400">Loading...</div>
+      </main>
+    }>
+      <MindySignupContent />
+    </Suspense>
+  );
+}
+
+function MindySignupContent() {
+  const searchParams = useSearchParams();
+  const [partnerRef, setPartnerRef] = useState<string | null>(null);
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
   const [error, setError] = useState('');
   const [oauthLoading, setOauthLoading] = useState<'google' | 'microsoft' | null>(null);
+
+  useEffect(() => {
+    const ref = capturePartnerRefFromSearchParams(searchParams) || getStoredPartnerRef();
+    setPartnerRef(ref);
+  }, [searchParams]);
+
+  const partnerProgram = getPartnerReferralByCode(partnerRef);
 
   // Handle email signup (sends verification link)
   async function handleEmailSignup(e: React.FormEvent) {
@@ -24,7 +48,10 @@ export default function MindySignupPage() {
       const res = await fetch('/api/auth/mindy-signup', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({
+          email,
+          referralCode: partnerRef || undefined,
+        }),
       });
 
       const data = await res.json();
@@ -79,6 +106,11 @@ export default function MindySignupPage() {
           </Link>
           <h1 className="text-2xl font-bold text-white">Create your Mindy account</h1>
           <p className="text-slate-400 mt-2">Start getting federal market intelligence</p>
+          {partnerProgram && (
+            <p className="text-emerald-400 text-sm mt-3 font-medium">
+              {partnerProgram.name} partner offer: {partnerProgram.trialDays}-day Mindy Pro trial included
+            </p>
+          )}
         </div>
 
         {/* Card */}

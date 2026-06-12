@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserSession } from '@/lib/api-auth';
 import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
+import { applyPartnerReferralIfEligible } from '@/lib/mindy/apply-partner-referral';
 
 /**
  * MI Beta Profile API
@@ -23,6 +24,7 @@ export async function POST(request: NextRequest) {
       locationZip,
       alertFrequency,
       onboardingComplete,
+      referralCode,
     } = body;
 
     if (!email) {
@@ -138,9 +140,17 @@ export async function POST(request: NextRequest) {
 
     const { data: existingSettings } = await supabase
       .from('user_notification_settings')
-      .select('user_email')
+      .select('user_email, invitation_source, trial_source')
       .eq('user_email', normalizedEmail)
       .maybeSingle();
+
+    if (referralCode && !existingSettings?.invitation_source?.startsWith('partner_')) {
+      try {
+        await applyPartnerReferralIfEligible(supabase, normalizedEmail, referralCode);
+      } catch (partnerError) {
+        console.warn('[Mindy Profile] Partner referral apply failed:', partnerError);
+      }
+    }
 
     const settingsWrite = existingSettings
       ? supabase
