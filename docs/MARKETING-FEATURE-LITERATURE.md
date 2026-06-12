@@ -864,3 +864,28 @@ AI training", "Mindy launch".
 
 **Proof:** Registration page live (HTTP 200) — "Meet Mindy — The AI BD Analyst for
 Federal Small Business | Live Launch June 27 | GovCon Giants".
+
+## 30. Agency pages, now backed by the real databases (10 pain points, budget, contacts)
+
+**What:** The public agency intelligence pages (govcongiants.com/data/agencies/[slug])
+were rendering thin hand-written content — 5 pain points, 5 priorities, no contacts.
+They now pull from the real GovCon Giants databases: **10 pain points + 10 priorities
+per agency** (257 agencies covered, up from 35), **real FY2026 budget authority + YoY
+trend**, and a **count of subcontracting contacts** per agency (e.g. 599 primes with
+sub-plans serve the Navy). Two real pain points show unblurred as proof; the full set
++ the actual contact names/emails are gated to Mindy Pro.
+
+**Why:** The depth IS the product. A page that names a real pain point ("Shipyard
+modernization and maintenance backlogs") and quantifies the opportunity ("599
+subcontracting contacts") earns trust and a signup far better than 5 blurred bars.
+Contacts are surfaced as a count + teaser, never PII — the 125K live gov POCs stay a
+paid asset, which is exactly why the upgrade CTA converts.
+
+**SEO:** "[agency] pain points", "sell to [agency]", "[agency] subcontracting
+opportunities", "[agency] small business contacts", "how to win [agency] contracts".
+
+**Proof (live):** Navy → 10 pain points, 10 priorities, 599 subcontracting contacts.
+Army/Air Force/VA each render their own real pain points (Soldier modernization,
+Aircraft sustainment, EHR modernization). Data exported from market-assassin's
+agency-pain-points.json (307 agencies), agency-budget-data.json (47), and the 2,768-row
+SBLO contractor file — regenerated via `scripts/export-agency-enrichment.js`.
