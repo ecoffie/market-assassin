@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendZeroAlertNudge } from '@/lib/mindy/account-setup';
+import { isCampaignExcludedEmail } from '@/lib/mindy/campaign-exclusions';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,11 +35,6 @@ const HEALTHCARE_DEFAULT_SET = new Set([
 ]);
 const SWEEP_SHARED_USER_THRESHOLD = 5;
 const SWEEP_MAX_HANDPICKED_CODES = 20;
-
-const COMP_TESTIMONIAL = new Set([
-  'aj@cypherintel.com', 'pa.joof@pjaygroup.com', 'dare2dreaminc615@gmail.com',
-  'olga@olaexecutiveconsulting.com', 'tavinalford@gmail.com',
-]);
 
 function shapeKey(codes: string[]): string {
   return [...new Set(codes.map(String))].sort().join(',');
@@ -145,7 +141,7 @@ export async function GET(request: NextRequest) {
       (shapeCounts.get(shapeKey(codes)) || 0) >= SWEEP_SHARED_USER_THRESHOLD;
     if (!prefilled) continue;                              // real codes → not our target
     if (recentlyTouched.has(email)) continue;             // already in the funnel
-    if (COMP_TESTIMONIAL.has(email)) continue;
+    if (isCampaignExcludedEmail(email)) continue;
     queue.push(email);
   }
   queue.sort();

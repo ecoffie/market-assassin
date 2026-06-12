@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { sendSetupInvite } from '@/lib/mindy/account-setup';
+import { isCampaignExcludedEmail } from '@/lib/mindy/campaign-exclusions';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -32,11 +33,6 @@ function sb() {
 function norm(e: unknown): string {
   return typeof e === 'string' ? e.toLowerCase().trim() : '';
 }
-
-const COMP_TESTIMONIAL = new Set([
-  'aj@cypherintel.com', 'pa.joof@pjaygroup.com', 'dare2dreaminc615@gmail.com',
-  'olga@olaexecutiveconsulting.com', 'tavinalford@gmail.com',
-]);
 
 async function fetchAllRows<T>(supabase: SupabaseClient, table: string, select: string): Promise<T[]> {
   const rows: T[] = [];
@@ -137,7 +133,7 @@ export async function GET(request: NextRequest) {
   for (const e of entitled) {
     if (authEmails.has(e)) continue;       // already has login
     if (invited.has(e)) continue;          // already got a setup email
-    if (COMP_TESTIMONIAL.has(e)) continue; // testimonial accounts, never campaign
+    if (isCampaignExcludedEmail(e)) continue; // comp/testimonial + advocate accounts
     queue.push(e);
   }
   queue.sort(); // deterministic order so runs drain predictably

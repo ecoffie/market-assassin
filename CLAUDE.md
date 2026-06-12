@@ -1009,13 +1009,19 @@ node scripts/import-forecasts.js --source=DOE
 | Pro Giant ($997) | $1,388 value | Contractor DB, Recompete, MA Standard, Content Gen, 1 Year Briefings |
 | Ultimate ($1,497) | $1,788 value | Content Full Fix, Contractor DB, Recompete, MA Premium, Lifetime Briefings |
 
-### Comp/Testimonial Accounts (Exclude from Campaigns)
+### Mindy Account Types (non-customer)
 
-These accounts received free product access for testing and testimonial purposes. They are **not paying customers** and should be excluded from:
-- Paid customer counts
-- Revenue reporting
-- Upgrade campaigns
-- Billing queries
+| Type | Who | Pro access | Counts as paid? | Campaigns |
+|------|-----|------------|-------------------|-----------|
+| **Staff** | `@govcongiants.com`, `MI_STAFF_EMAILS`, `INTERNAL_TEAM_EMAILS` | Yes (`staffRole`) | No | Excluded |
+| **Advocate** | T4 power users / creators (`src/lib/mindy/advocate-accounts.ts`) | Yes (complimentary Pro) | No | Excluded |
+| **Comp/Testimonial** | Demo accounts for marketing videos | Varies | No | Excluded |
+| **Mindy Team** | Paid `$499/mo` product (`access_team`) | Team tier | Yes | Normal |
+| **Mindy Pro** | Paid subscriber or bundle buyer | Pro tier | Yes | Normal |
+
+Grant advocate: `npx tsx scripts/grant-mindy-pro-once.ts email@example.com --advocate`
+
+### Comp/Testimonial Accounts (Exclude from Campaigns)
 
 | Email | Purpose |
 |-------|---------|
@@ -1024,6 +1030,14 @@ These accounts received free product access for testing and testimonial purposes
 | `dare2dreaminc615@gmail.com` | Testimonial |
 | `olga@olaexecutiveconsulting.com` | Testimonial |
 | `tavinalford@gmail.com` | Testimonial |
+
+### Advocate Accounts (Exclude from Campaigns)
+
+Complimentary Pro for creators / power users with their own audience (Launch Strategy T4). Registry: `src/lib/mindy/advocate-accounts.ts`.
+
+| Email | Name |
+|-------|------|
+| `westover105@gmail.com` | Sue Kranes |
 
 ### Memberships
 | Membership | Price | Includes |

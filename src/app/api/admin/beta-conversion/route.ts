@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { isCampaignExcludedEmail } from '@/lib/mindy/campaign-exclusions';
 
 /**
  * GET /api/admin/beta-conversion?password=...
@@ -21,11 +22,6 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
-
-const COMP_TESTIMONIAL = new Set([
-  'aj@cypherintel.com', 'pa.joof@pjaygroup.com', 'dare2dreaminc615@gmail.com',
-  'olga@olaexecutiveconsulting.com', 'tavinalford@gmail.com',
-]);
 
 function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
@@ -147,13 +143,13 @@ export async function GET(request: NextRequest) {
     let invitedPending = 0; // invited, still no login
     let remaining = 0;      // entitled, no login, not invited
     for (const e of entitled) {
-      if (COMP_TESTIMONIAL.has(e)) continue;
+      if (isCampaignExcludedEmail(e)) continue;
       if (authEmails.has(e)) { converted++; continue; }
       if (sends.invited.has(e)) { invitedPending++; continue; }
       remaining++;
     }
 
-    const entitledTotal = [...entitled].filter((e) => !COMP_TESTIMONIAL.has(e)).length;
+    const entitledTotal = [...entitled].filter((e) => !isCampaignExcludedEmail(e)).length;
     const conversionRate = entitledTotal > 0 ? Math.round((converted / entitledTotal) * 1000) / 10 : 0;
     const PER_DAY = 150; // setup-invite send rate: 75 @ 14:00 + 75 @ 21:00 UTC
     const daysToDrain = Math.ceil(remaining / PER_DAY);
