@@ -7,6 +7,13 @@ import { sendEmail } from '@/lib/send-email';
 import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
 import { resolveBriefingAudience } from '@/lib/briefings/delivery/rollout';
 import { MINDY_APP_URL, MINDY_FROM_NAME, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
+import {
+  getAlertEmailCta,
+  renderAlertTopBannerHtml,
+  renderBootcampPromoHtml,
+  renderKeywordSetupNudgeHtml,
+  renderMindyV10PromoHtml,
+} from '@/lib/alerts/email-promo';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -109,6 +116,7 @@ async function getAlertLimit(email: string): Promise<{ limit: number; tier: 'fre
 interface AlertUser {
   user_email: string;
   naics_codes: string[];
+  keywords?: string[] | null;
   business_type: string | null;
   business_description?: string | null;
   set_aside_preferences?: string[] | null;
@@ -591,6 +599,7 @@ async function sendAlertEmail(
   const unsubscribeUrl = `${MINDY_SITE_URL}/api/alerts/unsubscribe?email=${encodeURIComponent(email)}`;
   const preferencesUrl = await createSecureAccessUrl(email, 'preferences');
   const mindyDashboardUrl = MINDY_APP_URL;
+  const alertCta = getAlertEmailCta(preferencesUrl, mindyDashboardUrl, user);
 
   const showUpgradeToMindyPro = tier === 'free' && totalAvailable > 5;
 
@@ -631,16 +640,22 @@ async function sendAlertEmail(
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
 </head>
 <body style="font-family: Arial, sans-serif; line-height: 1.6; color: #333; max-width: 650px; margin: 0 auto; padding: 20px; background: #f3f4f6;">
-  <div style="background: linear-gradient(135deg, #020617 0%, #4c1d95 100%); padding: 30px; text-align: center; border-radius: 10px 10px 0 0;">
+  ${renderAlertTopBannerHtml(alertCta, trackedUrl)}
+  <div style="background: linear-gradient(135deg, #020617 0%, #4c1d95 100%); padding: 30px; text-align: center; border-radius: 0;">
     ${renderMindyEmailLogo(52)}
     <h1 style="color: white; margin: 0; font-size: 24px;">Mindy</h1>
     <p style="color: #c4b5fd; margin: 8px 0 0 0; font-size: 16px;">Weekly SAM.gov Opportunity Alert</p>
+    <p style="color: #cbd5e1; margin: 10px auto 0 auto; font-size: 12px; line-height: 1.5; max-width: 440px;">
+      ${alertCta.headerSubtitle}
+    </p>
     <p style="margin: 16px 0 0 0;">
-      <a href="${trackedUrl(mindyDashboardUrl, 'open_mindy_dashboard', 'header_dashboard')}" style="background: rgba(255,255,255,0.14); color: white; padding: 10px 18px; text-decoration: none; border-radius: 999px; font-weight: 700; display: inline-block; font-size: 13px;">
-        Open Mindy Dashboard →
+      <a href="${trackedUrl(alertCta.url, alertCta.trackingLabel, 'header_dashboard')}" style="background: #7c3aed; color: white; padding: 10px 18px; text-decoration: none; border-radius: 999px; font-weight: 700; display: inline-block; font-size: 13px;">
+        ${alertCta.label}
       </a>
     </p>
   </div>
+
+  ${alertCta.needsKeywordSetup ? renderKeywordSetupNudgeHtml(preferencesUrl, trackedUrl) : ''}
 
   <div style="background: #ffffff; padding: 25px; border: 1px solid #e5e7eb; border-top: none;">
     <p style="margin: 0 0 20px 0; font-size: 16px;">
@@ -672,16 +687,19 @@ async function sendAlertEmail(
     </div>
     ` : ''}
 
-    <!-- Dashboard CTA -->
+    ${renderMindyV10PromoHtml(trackedUrl)}
+
+    ${renderBootcampPromoHtml(trackedUrl)}
+
     <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); border-radius: 10px; padding: 24px; margin-top: 25px; text-align: center;">
-      <h3 style="color: white; margin: 0 0 10px 0; font-size: 18px;">Want AI-Ranked Daily Intel?</h3>
+      <h3 style="color: white; margin: 0 0 10px 0; font-size: 18px;">${alertCta.footerHeadline}</h3>
       <p style="color: #e9d5ff; margin: 0 0 16px 0; font-size: 14px;">
-        Mindy ranks your best opportunities, explains why they matter,<br>
-        and keeps your dashboard, pipeline, and preferences in one place.
+        ${alertCta.footerBody}
       </p>
-      <a href="${trackedUrl(mindyDashboardUrl, 'open_mindy_dashboard')}" style="background: white; color: #7c3aed; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-        Open Mindy Dashboard →
+      <a href="${trackedUrl(alertCta.url, alertCta.trackingLabel, 'ranked_dashboard')}" style="background: white; color: #7c3aed; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+        ${alertCta.label}
       </a>
+      <p style="color: #ddd6fe; font-size: 11px; margin: 10px 0 0 0;">${alertCta.footerFinePrint}</p>
     </div>
 
     <!-- Feedback Section -->

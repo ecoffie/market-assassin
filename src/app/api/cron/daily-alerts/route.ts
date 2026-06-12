@@ -27,8 +27,14 @@ import { getInsightForNoticeType, bucketNoticeType, renderInsightHtml } from '@/
 import { userInRollout } from '@/lib/intelligence/feature-flag';
 import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
 import { generateEmailToken } from '@/lib/api-auth';
-import { createSecureAccessUrl } from '@/lib/access-links';
-import { DEFAULT_PROFILE_NAICS, shouldShowAlertSetupNudges } from '@/lib/alerts/profile-setup';
+import { DEFAULT_PROFILE_NAICS } from '@/lib/alerts/profile-setup';
+import {
+  getAlertEmailCta,
+  renderAlertTopBannerHtml,
+  renderBootcampPromoHtml,
+  renderKeywordSetupNudgeHtml,
+  renderMindyV10PromoHtml,
+} from '@/lib/alerts/email-promo';
 import { MINDY_APP_URL, MINDY_FROM_NAME, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 
 export const maxDuration = 300;
@@ -952,6 +958,11 @@ export async function GET(request: NextRequest) {
 
   // Admin override - allows manual triggering with timezone skip
   if (password === ADMIN_PASSWORD) {
+    if (request.nextUrl.searchParams.get('fixture') === 'true' && email) {
+      console.log('[Daily Alerts] Admin fixture template test →', email);
+      return sendFixtureDailyAlertTest(email);
+    }
+
     console.log('[Daily Alerts] Admin override triggered', { skipTimezone, limit: limit || 'all' });
     return runDailyAlertJob({
       skipTimezoneCheck: skipTimezone,
@@ -1128,6 +1139,60 @@ Return ONLY a JSON array of strings, each tip under 100 characters:
   return defaultTips;
 }
 
+/** Admin fixture send — renders the live template with sample opps (no cron batching). */
+async function sendFixtureDailyAlertTest(toEmail: string) {
+  const fixtureUser: AlertUser = {
+    user_email: toEmail,
+    naics_codes: [],
+    keywords: null,
+    business_type: null,
+    business_description: null,
+    set_aside_preferences: null,
+    agencies: [],
+    location_state: null,
+    location_states: null,
+    alert_frequency: 'daily',
+    alerts_enabled: true,
+    is_active: true,
+  };
+
+  const cached = await fetchSamOpportunitiesFromCache({ limit: 10 });
+  const opportunities = (cached.opportunities || []).slice(0, 3).map((opp, i) => ({
+    ...opp,
+    score: 72 - i * 8,
+  }));
+
+  if (opportunities.length === 0) {
+    return NextResponse.json(
+      { success: false, error: 'No cached SAM opportunities available for fixture email' },
+      { status: 503 },
+    );
+  }
+
+  const sent = await sendDailyAlertEmail(toEmail, opportunities, fixtureUser, [], [], [], undefined, {
+    transactional: true,
+  });
+  if (!sent) {
+    return NextResponse.json(
+      {
+        success: false,
+        fixture: true,
+        to: toEmail,
+        error: 'Email blocked by send guard (suppression or daily cap). Check /api/admin/email-guard.',
+      },
+      { status: 429 },
+    );
+  }
+  return NextResponse.json({
+    success: true,
+    fixture: true,
+    sent: true,
+    to: toEmail,
+    opportunities: opportunities.length,
+    keywordSetupCta: true,
+  });
+}
+
 // Send daily alert email - alert product format (distinct from Market Intelligence briefings)
 async function sendDailyAlertEmail(
   email: string,
@@ -1136,8 +1201,9 @@ async function sendDailyAlertEmail(
   grants: (GrantOpportunity & { score: number })[] = [],
   allActiveOpportunities: SAMOpportunity[] = [],
   actionTips: string[] = [],
-  noticeSummary?: SAMNoticeSummary
-) {
+  noticeSummary?: SAMNoticeSummary,
+  sendOptions?: { transactional?: boolean },
+): Promise<boolean> {
   const emailDate = new Date().toISOString().split('T')[0];
   const tokenResult = await createEmailTrackingToken(email, 'daily_alert', emailDate);
   const trackingToken = tokenResult?.token;
@@ -1154,10 +1220,7 @@ async function sendDailyAlertEmail(
   const unsubscribeUrl = `${MINDY_SITE_URL}/api/alerts/unsubscribe?email=${encodedEmail}`;
   const preferencesUrl = `${MINDY_SITE_URL}/alerts/preferences?email=${encodedEmail}&token=${encodeURIComponent(preferencesAuth.token)}&ts=${preferencesAuth.ts}`;
   const mindyDashboardUrl = MINDY_APP_URL;
-  const mindySetupUrl = await createSecureAccessUrl(email, 'briefings');
-  const showSetupNudges = shouldShowAlertSetupNudges(user);
-  const primaryCtaUrl = showSetupNudges ? mindySetupUrl : mindyDashboardUrl;
-  const primaryCtaLabel = showSetupNudges ? 'Set Up Mindy — Free →' : 'Open Mindy Dashboard →';
+  const alertCta = getAlertEmailCta(preferencesUrl, mindyDashboardUrl, user);
   const totalCount = opportunities.length + grants.length;
 
   const opportunitiesHtml = opportunities.slice(0, 20).map((opp, i) => {
@@ -1260,23 +1323,7 @@ async function sendDailyAlertEmail(
 </head>
 <body style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.5; color: #1f2937; max-width: 620px; margin: 0 auto; padding: 20px; background: #f8fafc;">
 
-  ${showSetupNudges ? `
-  <!-- Setup Banner (conversion window only) -->
-  <a href="${trackedUrl(mindySetupUrl, 'mindy_setup', 'banner_setup')}" style="text-decoration: none; display: block;">
-    <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); padding: 10px 20px; text-align: center; border-radius: 12px 12px 0 0;">
-      <p style="color: white; margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.5px;">
-        🎁 FREE forever • <span style="text-decoration: underline;">Set up your keywords in Mindy →</span>
-      </p>
-    </div>
-  </a>
-  ` : `
-  <!-- Welcome Banner -->
-  <div style="background: linear-gradient(135deg, #7c3aed 0%, #a855f7 100%); padding: 10px 20px; text-align: center; border-radius: 12px 12px 0 0;">
-    <p style="color: white; margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.5px;">
-      👋 Welcome to Mindy • FREE forever
-    </p>
-  </div>
-  `}
+  ${renderAlertTopBannerHtml(alertCta, trackedUrl)}
 
   <!-- Header -->
   <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 28px 24px; text-align: center;">
@@ -1288,31 +1335,16 @@ async function sendDailyAlertEmail(
       ${formatDate(new Date().toISOString())} • ${totalCount} matches found
     </p>
     <p style="color: #cbd5e1; margin: 10px auto 0 auto; font-size: 12px; line-height: 1.5; max-width: 440px;">
-      ${showSetupNudges
-        ? 'These matches use default filters. Set up Mindy with your keywords so we find opportunities for <em>your</em> business — free, no credit card.'
-        : 'New matches from your saved filters. Mindy prioritizes the best opportunities and keeps your full market view in one dashboard.'}
+      ${alertCta.headerSubtitle}
     </p>
     <p style="margin: 16px 0 0 0;">
-      <a href="${trackedUrl(primaryCtaUrl, showSetupNudges ? 'mindy_setup' : 'open_mindy_dashboard', 'header_dashboard')}" style="background: #7c3aed; color: white; padding: 10px 18px; text-decoration: none; border-radius: 999px; font-weight: 700; font-size: 13px; display: inline-block;">
-        ${primaryCtaLabel}
+      <a href="${trackedUrl(alertCta.url, alertCta.trackingLabel, 'header_dashboard')}" style="background: #7c3aed; color: white; padding: 10px 18px; text-decoration: none; border-radius: 999px; font-weight: 700; font-size: 13px; display: inline-block;">
+        ${alertCta.label}
       </a>
     </p>
   </div>
 
-  ${showSetupNudges ? `
-  <!-- Setup nudge (conversion window only) -->
-  <div style="background: #fffbeb; border: 1px solid #fcd34d; border-left: 4px solid #f59e0b; padding: 14px 18px;">
-    <p style="color: #92400e; margin: 0 0 8px 0; font-size: 14px; font-weight: 700;">
-      ⚡ Personalize your alerts in 2 minutes
-    </p>
-    <p style="color: #78350f; margin: 0 0 12px 0; font-size: 13px; line-height: 1.5;">
-      Most alert subscribers haven't set up Mindy yet. Add your <strong>keywords</strong>, NAICS codes, and set-asides — then every alert is matched to what you actually sell.
-    </p>
-    <a href="${trackedUrl(mindySetupUrl, 'mindy_setup', 'setup_nudge')}" style="background: #f59e0b; color: white; padding: 9px 16px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 13px; display: inline-block;">
-      Set Up Mindy →
-    </a>
-  </div>
-  ` : ''}
+  ${alertCta.needsKeywordSetup ? renderKeywordSetupNudgeHtml(preferencesUrl, trackedUrl) : ''}
 
   <!-- Filter summary -->
   <div style="background: #1e293b; padding: 12px 20px; border-bottom: 1px solid #334155;">
@@ -1411,20 +1443,22 @@ async function sendDailyAlertEmail(
     </div>
   </div>
 
+  ${renderMindyV10PromoHtml(trackedUrl)}
+
+  ${renderBootcampPromoHtml(trackedUrl)}
+
   <div style="background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 100%); border-radius: 10px; padding: 24px; margin-top: 20px; text-align: center;">
     <h3 style="color: white; margin: 0 0 8px 0; font-size: 17px; font-weight: 700;">
-      ${showSetupNudges ? 'Ready for better matches?' : 'Want Mindy to rank these for you?'}
+      ${alertCta.footerHeadline}
     </h3>
     <p style="color: #ddd6fe; margin: 0 0 16px 0; font-size: 13px; line-height: 1.5;">
-      ${showSetupNudges
-        ? 'Mindy is <strong>free forever</strong>. Tell us what you sell — keywords, NAICS, set-asides — and we\'ll find the right contracts for you.'
-        : 'Alerts tell you what matched. <strong>Mindy Pro</strong> ranks your top priorities, explains why they matter, and links you to the full opportunity dashboard.'}
+      ${alertCta.footerBody}
     </p>
-    <a href="${trackedUrl(showSetupNudges ? mindySetupUrl : mindyDashboardUrl, showSetupNudges ? 'mindy_setup' : 'open_mindy_dashboard', 'ranked_dashboard')}" style="background: white; color: #5b21b6; padding: 11px 24px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 14px; display: inline-block;">
-      ${showSetupNudges ? 'Set Up Mindy — Free →' : 'Open Mindy Dashboard →'}
+    <a href="${trackedUrl(alertCta.url, alertCta.trackingLabel, 'ranked_dashboard')}" style="background: white; color: #5b21b6; padding: 11px 24px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 14px; display: inline-block;">
+      ${alertCta.label}
     </a>
     <p style="color: #c4b5fd; font-size: 11px; margin: 10px 0 0 0;">
-      ${showSetupNudges ? '2-minute setup • No credit card • Alerts stay free' : 'Top priorities in your inbox + browse all matching opportunities'}
+      ${alertCta.footerFinePrint}
     </p>
   </div>
 
@@ -1446,13 +1480,14 @@ async function sendDailyAlertEmail(
 </html>
 `;
 
-  await sendEmail({
+  return sendEmail({
     from: `"${MINDY_FROM_NAME}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
     to: email,
     subject: `Mindy Alert: ${totalCount} New Opportunities${grants.length > 0 ? ' + Grants' : ''} - ${formatDate(new Date().toISOString())}`,
     html: htmlContent,
     emailType: 'daily_alert',
     eventSource: 'daily_alert',
+    transactional: sendOptions?.transactional,
     tags: {
       email_type: 'daily_alert',
       alert_type: 'daily',

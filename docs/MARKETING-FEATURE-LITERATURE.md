@@ -636,25 +636,29 @@ captures never clobber a user's tuned keywords (additive merge only).
 
 ---
 
-## 20. Free alert emails: phased setup nudges, then "Welcome to Mindy • FREE forever"
+## 20. Free alert emails: loss-framed keyword setup + Mindy v1.0 + bootcamp
 
-**What:** Daily alert emails no longer say "FREE during beta." New subscribers with
-incomplete profiles see a **30-day conversion window** with setup CTAs ("Set up your
-keywords in Mindy →"). After 30 days — or once the profile has real keywords,
-business description, and non-default NAICS — the banner switches to **"Welcome to
-Mindy • FREE forever"** with dashboard access and no more nagging.
+**What:** Daily/weekly alert emails push incomplete profiles to fix their **free
+alert filters** with **fear-of-loss framing** from the market-coverage story (§1, §11):
+"One NAICS code ≈ 28% of your market — you're missing the other **72%**." Copy cites
+real FY2025 USASpending proof (drones 70+ buying codes, cybersecurity/medical up to
+74% hidden). CTAs link to `/alerts/preferences` keyword setup, not a generic dashboard.
+Every email also promotes **Mindy v1.0 is now live** (positioning + platform CTA) and
+the **June 27 Mindy Bootcamp** (§29).
 
-**Why:** Most alert users are email-only and never log in. A month of gentle setup
-prompts converts better than a permanent beta banner or a hard paywall. Established
-users who never completed onboarding still get value without feeling punished.
+**Why:** Gain framing ("get better matches") converts weaker than loss framing
+("you're missing three-quarters of contracts that match your business"). Literature
+angle: *"the wrong setup quietly breaks every alert they'll ever get"* (§12). Users
+with incomplete profiles see the red miss banner until keywords + NAICS are set.
 
-**SEO/positioning:** "free federal contract alerts," "SAM.gov daily email alerts,"
-"free Mindy alerts forever."
+**SEO/positioning:** "free federal contract alerts," "why one NAICS code misses 72%
+of your market," "keyword alerts federal contracts," "Mindy v1.0 government contracting
+AI."
 
-**Proof:** Logic lives in `src/lib/alerts/profile-setup.ts`
-(`shouldShowAlertSetupNudges`, `ALERT_CONVERSION_WINDOW_DAYS=30`). Wired in
-`daily-alerts/route.ts` and `send-notifications/route.ts`. Fallback when
-`created_at` is missing: stop nudging after `total_alerts_sent >= 25`.
+**Proof:** Copy in `src/lib/alerts/email-promo.ts` (`ALERT_MARKETING`, `MINDY_V1`,
+`ALERT_BOOTCAMP`). Profile gate: `userNeedsMindySetup()` in `profile-setup.ts`. Wired
+in `daily-alerts/route.ts` and `weekly-alerts/route.ts`. Admin fixture test:
+`GET /api/cron/daily-alerts?password=...&email=...&fixture=true`.
 
 ---
 

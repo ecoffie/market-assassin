@@ -32,6 +32,7 @@ interface PreferencesResponse {
     email: string;
     businessDescription?: string | null;
     naicsCodes?: string[];
+    keywords?: string[];
     businessType?: string | null;
     targetAgencies?: string[];
     locationState?: string | null;
@@ -59,6 +60,7 @@ function AlertPreferencesContent() {
   const [businessDescription, setBusinessDescription] = useState('');
   const [showDescriptionPrompt, setShowDescriptionPrompt] = useState(false);
   const [naicsInput, setNaicsInput] = useState('');
+  const [keywordsInput, setKeywordsInput] = useState('');
   const [businessType, setBusinessType] = useState('');
   const [agenciesInput, setAgenciesInput] = useState('');
   const [locationState, setLocationState] = useState('');
@@ -101,6 +103,7 @@ function AlertPreferencesContent() {
         setBusinessDescription(description);
         setShowDescriptionPrompt(!description);
         setNaicsInput((data.data.naicsCodes || []).join(', '));
+        setKeywordsInput((data.data.keywords || []).join(', '));
         setBusinessType(data.data.businessType || '');
         setAgenciesInput((data.data.targetAgencies || []).join(', '));
         setLocationState(data.data.locationState || '');
@@ -161,6 +164,7 @@ function AlertPreferencesContent() {
           email,
           businessDescription: businessDescription.trim() || null,
           naicsCodes,
+          keywords: parseList(keywordsInput),
           businessType: businessType || null,
           targetAgencies: parseList(agenciesInput),
           locationState: locationState || null,
@@ -211,7 +215,7 @@ function AlertPreferencesContent() {
           </div>
           <h1 className="text-3xl font-bold">Manage Daily Alerts</h1>
           <p className="mt-2 max-w-2xl text-slate-400">
-            Update the NAICS, set-aside, agency, and delivery settings that power your opportunity alert emails.
+            Add keywords, NAICS, set-aside, agency, and delivery settings that power your free opportunity alert emails.
           </p>
         </div>
 
@@ -291,6 +295,22 @@ function AlertPreferencesContent() {
                     </p>
                   </div>
                 )}
+
+                <div>
+                  <label htmlFor="keywords" className="mb-2 block text-sm font-medium text-slate-300">
+                    Keywords
+                  </label>
+                  <input
+                    id="keywords"
+                    value={keywordsInput}
+                    onChange={event => setKeywordsInput(event.target.value)}
+                    placeholder="cybersecurity, HVAC, logistics, cloud migration"
+                    className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
+                  />
+                  <p className="mt-2 text-xs text-slate-500">
+                    What you sell or do — comma-separated. We match these against opportunity titles and descriptions.
+                  </p>
+                </div>
 
                 <div>
                   <label htmlFor="naics" className="mb-2 block text-sm font-medium text-slate-300">
