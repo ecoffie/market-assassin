@@ -11,9 +11,11 @@ import {
   getAlertEmailCta,
   renderAlertTopBannerHtml,
   renderBootcampPromoHtml,
+  renderKeywordSetupNudgeHtml,
   renderMarketCoverageTeaserHtml,
   renderMindyV10PromoHtml,
-  renderProfileActionStripHtml,
+  renderNarrowMarketNudgeHtml,
+  MINDY_MARKET_RESEARCH_URL,
   ALERT_MARKETING,
 } from '@/lib/alerts/email-promo';
 
@@ -647,7 +649,6 @@ async function sendAlertEmail(
     ${renderMindyEmailLogo(52)}
     <h1 style="color: white; margin: 0; font-size: 24px;">Mindy</h1>
     <p style="color: #c4b5fd; margin: 8px 0 0 0; font-size: 16px;">Weekly SAM.gov Opportunity Alert</p>
-    ${alertCta.showHeaderPromo ? `
     <p style="color: #cbd5e1; margin: 10px auto 0 auto; font-size: 12px; line-height: 1.5; max-width: 440px;">
       ${alertCta.headerSubtitle}
     </p>
@@ -656,12 +657,12 @@ async function sendAlertEmail(
         ${alertCta.label}
       </a>
     </p>
-    ` : ''}
   </div>
 
-  ${renderMarketCoverageTeaserHtml(alertCta)}
+  ${renderMarketCoverageTeaserHtml(alertCta, preferencesUrl, trackedUrl)}
 
-  ${renderProfileActionStripHtml(alertCta, trackedUrl)}
+  ${alertCta.stage === 'unconfigured' ? renderKeywordSetupNudgeHtml(preferencesUrl, trackedUrl) : ''}
+  ${alertCta.stage === 'narrow_market' ? renderNarrowMarketNudgeHtml(MINDY_MARKET_RESEARCH_URL, alertCta.naicsCount ?? 1, trackedUrl) : ''}
 
   <div style="background: #ffffff; padding: 25px; border: 1px solid #e5e7eb; border-top: none;">
     <p style="margin: 0 0 20px 0; font-size: 16px;">
@@ -684,8 +685,8 @@ async function sendAlertEmail(
     <div style="background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%); border-radius: 10px; padding: 24px; margin-top: 25px; text-align: center;">
       <h3 style="color: white; margin: 0 0 10px 0; font-size: 18px;">You're Missing ${totalAvailable - 5} More Opportunities This Week</h3>
       <p style="color: #e9e3ff; margin: 0 0 16px 0; font-size: 14px;">
-        Free tier shows 5 of <strong>${totalAvailable}</strong> matches this week.<br>
-        Mindy Pro: <strong>15 opps/week</strong>, priority ranking, and full platform access.
+        Free tier shows 5 of <strong>${totalAvailable}</strong> matches — and one NAICS code usually hides ~${ALERT_MARKETING.missPct}% of your market.<br>
+        Mindy Pro: <strong>15 opps/week</strong>, full Sport-mode market coverage, and priority ranking.
       </p>
       <a href="${trackedUrl(mindyDashboardUrl, 'upgrade_mindy_pro')}" style="background: white; color: #7c3aed; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
         Upgrade to Mindy Pro
@@ -702,8 +703,8 @@ async function sendAlertEmail(
       <p style="color: #e9d5ff; margin: 0 0 16px 0; font-size: 14px;">
         ${alertCta.footerBody}
       </p>
-      <a href="${trackedUrl(alertCta.footerCtaUrl, alertCta.trackingLabel, 'ranked_dashboard')}" style="background: white; color: #7c3aed; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
-        ${alertCta.footerCtaLabel}
+      <a href="${trackedUrl(alertCta.url, alertCta.trackingLabel, 'ranked_dashboard')}" style="background: white; color: #7c3aed; padding: 12px 28px; text-decoration: none; border-radius: 6px; font-weight: bold; display: inline-block;">
+        ${alertCta.label}
       </a>
       <p style="color: #ddd6fe; font-size: 11px; margin: 10px 0 0 0;">${alertCta.footerFinePrint}</p>
     </div>

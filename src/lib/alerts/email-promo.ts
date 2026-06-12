@@ -59,12 +59,7 @@ export interface AlertEmailCta {
   naicsCount?: number;
   url: string;
   label: string;
-  /** Footer CTA — defaults to label/url when omitted in templates */
-  footerCtaUrl: string;
-  footerCtaLabel: string;
   trackingLabel: string;
-  /** Header promo copy + CTA — only for healthy profiles (others get Did you know + action strip). */
-  showHeaderPromo: boolean;
   headerSubtitle: string;
   footerHeadline: string;
   footerBody: string;
@@ -87,16 +82,14 @@ export function getAlertEmailCta(
     return {
       stage,
       url: preferencesUrl,
-      label: 'Fix My Alert Filters →',
-      footerCtaUrl: v1.url,
-      footerCtaLabel: v1.ctaLabel,
+      label: `Stop Missing ${m.missPct}% — Fix My Alerts →`,
       trackingLabel: 'alert_keyword_setup',
-      showHeaderPromo: false,
-      headerSubtitle: '',
-      footerHeadline: `Ready for more than alerts?`,
+      headerSubtitle:
+        `<strong>${m.alertMissHeadline}.</strong> ${m.wrongSetupBreaksAlerts} Add <strong>keywords + NAICS</strong> on your free alert profile (2 min) — or open <strong>Mindy ${v1.version}</strong>, now live.`,
+      footerHeadline: `You're only seeing ~${m.obviousCodePct}% of your market`,
       footerBody:
-        `<strong>Mindy ${v1.version}</strong> is live — ${v1.positioning}`,
-      footerFinePrint: `2-minute free alert setup above • ${m.dataGrounded}`,
+        `${m.expensiveMistake} ${m.keywordFirstFlip} Fix your free alerts now — or jump into <strong>Mindy ${v1.version}</strong> for the full platform.`,
+      footerFinePrint: `2-minute setup • ${m.dataGrounded}`,
       needsKeywordSetup: true,
     };
   }
@@ -107,15 +100,13 @@ export function getAlertEmailCta(
       stage,
       naicsCount,
       url: sportUrl,
-      label: 'Open Sport Mode →',
-      footerCtaUrl: sportUrl,
-      footerCtaLabel: 'Open Sport Mode →',
+      label: `See Your Full Market (${m.missPct}% hidden) →`,
       trackingLabel: 'market_research_sport',
-      showHeaderPromo: false,
-      headerSubtitle: '',
-      footerHeadline: `Map every buying code for what you sell`,
+      headerSubtitle:
+        `<strong>${m.narrowMarketHeadline}.</strong> You have keywords set, but only <strong>${naicsCount} NAICS code${naicsCount === 1 ? '' : 's'}</strong> — the obvious one is usually ~${m.obviousCodePct}% of the market. Use <strong>Sport mode</strong> in Mindy ${v1.version} to map the other ~${m.missPct}%.`,
+      footerHeadline: `You're still missing ~${m.missPct}% of opportunities`,
       footerBody:
-        `Sport mode in <strong>Mindy ${v1.version}</strong> derives NAICS from real USASpending award data — no guessing.`,
+        `${m.expensiveMistake} Type what you sell in Sport mode — Mindy derives every buying NAICS from real award data so you don't have to guess codes.`,
       footerFinePrint: m.dataGrounded,
       needsKeywordSetup: false,
     };
@@ -125,10 +116,7 @@ export function getAlertEmailCta(
     stage,
     url: mindyDashboardUrl,
     label: v1.ctaLabel,
-    footerCtaUrl: mindyDashboardUrl,
-    footerCtaLabel: v1.ctaLabel,
     trackingLabel: 'open_mindy_dashboard',
-    showHeaderPromo: true,
     headerSubtitle:
       `Your filters cover a broader NAICS set. <strong>Mindy ${v1.version}</strong> is now live — ${v1.positioning}`,
     footerHeadline: v1.headline,
@@ -147,7 +135,14 @@ export function renderAlertTopBannerHtml(
   const m = ALERT_MARKETING;
 
   if (cta.stage === 'unconfigured') {
-    return '';
+    return `
+  <a href="${trackedUrl(cta.url, cta.trackingLabel, 'banner_keyword_setup')}" style="text-decoration: none; display: block;">
+    <div style="background: linear-gradient(135deg, #b91c1c 0%, #dc2626 100%); padding: 10px 20px; text-align: center; border-radius: 12px 12px 0 0;">
+      <p style="color: white; margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; line-height: 1.4;">
+        ⚠️ One NAICS code ≈ ${m.obviousCodePct}% of your market &nbsp;•&nbsp; <span style="text-decoration: underline;">You're missing the other ${m.missPct}% — fix your alert filters →</span>
+      </p>
+    </div>
+  </a>`;
   }
 
   if (cta.stage === 'narrow_market') {
@@ -155,7 +150,7 @@ export function renderAlertTopBannerHtml(
   <a href="${trackedUrl(cta.url, cta.trackingLabel, 'banner_narrow_market')}" style="text-decoration: none; display: block;">
     <div style="background: linear-gradient(135deg, #c2410c 0%, #ea580c 100%); padding: 10px 20px; text-align: center; border-radius: 12px 12px 0 0;">
       <p style="color: white; margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; line-height: 1.4;">
-        📊 ${cta.naicsCount ?? '1–2'} NAICS on your profile &nbsp;•&nbsp; <span style="text-decoration: underline;">Expand coverage in Sport mode →</span>
+        📊 Only ${cta.naicsCount ?? '1–2'} NAICS code${cta.naicsCount === 1 ? '' : 's'}? &nbsp;•&nbsp; <span style="text-decoration: underline;">~${m.missPct}% of your market is still hidden — see full coverage →</span>
       </p>
     </div>
   </a>`;
@@ -172,69 +167,71 @@ export function renderAlertTopBannerHtml(
   </a>`;
 }
 
-/** Shown on every alert — the ONE place we teach the 72% market-coverage insight. */
+/** Shown on every alert — teaches the 72% insight even when profile looks "complete". */
 export function renderMarketCoverageTeaserHtml(
-  _cta: AlertEmailCta,
+  cta: AlertEmailCta,
+  preferencesUrl: string,
+  trackedUrl: TrackedUrlFn,
 ): string {
   const m = ALERT_MARKETING;
+  const teaserUrl = cta.stage === 'unconfigured' ? preferencesUrl : MINDY_MARKET_RESEARCH_URL;
+  const teaserLabel = cta.stage === 'unconfigured' ? 'Fix your alert filters →' : 'See your market coverage →';
+  const teaserTrack = cta.stage === 'unconfigured' ? 'alert_keyword_setup' : 'market_research_sport';
 
   return `
   <div style="background: #f5f3ff; border: 1px solid #ddd6fe; border-left: 4px solid #7c3aed; padding: 12px 16px; margin: 0;">
     <p style="color: #5b21b6; margin: 0 0 6px 0; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.4px;">
       Did you know?
     </p>
-    <p style="color: #4c1d95; margin: 0; font-size: 13px; line-height: 1.5;">
+    <p style="color: #4c1d95; margin: 0 0 10px 0; font-size: 13px; line-height: 1.5;">
       ${m.didYouKnowTeaser} Example: "drones" spans <strong>70+ buying NAICS codes</strong>; cybersecurity and medical supplies miss up to <strong>${m.missPctCyberMed}%</strong>.
     </p>
-  </div>`;
-}
-
-/** One compact action strip — unconfigured only (narrow uses top banner + footer). */
-export function renderProfileActionStripHtml(
-  cta: AlertEmailCta,
-  trackedUrl: TrackedUrlFn,
-): string {
-  if (cta.stage !== 'unconfigured') return '';
-
-  const m = ALERT_MARKETING;
-  return `
-  <div style="background: #fef2f2; border: 1px solid #fecaca; border-left: 4px solid #dc2626; padding: 12px 16px;">
-    <p style="color: #7f1d1d; margin: 0 0 10px 0; font-size: 13px; line-height: 1.5;">
-      <strong>Your profile needs keywords.</strong> ${m.keywordMatchesBody} Takes about 2 minutes.
-    </p>
-    <a href="${trackedUrl(cta.url, cta.trackingLabel, 'setup_nudge')}" style="background: #dc2626; color: white; padding: 9px 16px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 13px; display: inline-block;">
-      ${cta.label}
+    <a href="${trackedUrl(teaserUrl, teaserTrack, 'coverage_teaser')}" style="color: #7c3aed; font-weight: 700; font-size: 12px; text-decoration: none;">
+      ${teaserLabel}
     </a>
   </div>`;
 }
 
-/** @deprecated Use renderProfileActionStripHtml */
 export function renderKeywordSetupNudgeHtml(
   preferencesUrl: string,
   trackedUrl: TrackedUrlFn,
 ): string {
-  return renderProfileActionStripHtml(
-    {
-      stage: 'unconfigured',
-      url: preferencesUrl,
-      label: 'Fix My Alert Filters →',
-      footerCtaUrl: MINDY_V1.url,
-      footerCtaLabel: MINDY_V1.ctaLabel,
-      trackingLabel: 'alert_keyword_setup',
-      showHeaderPromo: false,
-      headerSubtitle: '',
-      footerHeadline: '',
-      footerBody: '',
-      footerFinePrint: '',
-      needsKeywordSetup: true,
-    },
-    trackedUrl,
-  );
+  const m = ALERT_MARKETING;
+  return `
+  <div style="background: #fef2f2; border: 1px solid #fecaca; border-left: 4px solid #dc2626; padding: 14px 18px;">
+    <p style="color: #991b1b; margin: 0 0 8px 0; font-size: 14px; font-weight: 700;">
+      ⚠️ ${m.alertMissHeadline}
+    </p>
+    <p style="color: #7f1d1d; margin: 0 0 8px 0; font-size: 13px; line-height: 1.5;">
+      ${m.naicsOnlyThin} ${m.keywordMatchesBody}
+    </p>
+    <p style="color: #7f1d1d; margin: 0 0 12px 0; font-size: 12px; line-height: 1.5; font-style: italic;">
+      Real FY2025 data: "drones" alone spans <strong>70+ buying NAICS codes</strong> — the obvious code is only <strong>${m.obviousCodePct}%</strong> of the market.
+    </p>
+    <a href="${trackedUrl(preferencesUrl, 'alert_keyword_setup', 'setup_nudge')}" style="background: #dc2626; color: white; padding: 9px 16px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 13px; display: inline-block;">
+      Fix My Alert Filters →
+    </a>
+  </div>`;
 }
 
-/** @deprecated Narrow market uses top banner + footer CTA only */
-export function renderNarrowMarketNudgeHtml(): string {
-  return '';
+export function renderNarrowMarketNudgeHtml(
+  sportUrl: string,
+  naicsCount: number,
+  trackedUrl: TrackedUrlFn,
+): string {
+  const m = ALERT_MARKETING;
+  return `
+  <div style="background: #fff7ed; border: 1px solid #fed7aa; border-left: 4px solid #ea580c; padding: 14px 18px;">
+    <p style="color: #9a3412; margin: 0 0 8px 0; font-size: 14px; font-weight: 700;">
+      📊 ${m.narrowMarketHeadline}
+    </p>
+    <p style="color: #7c2d12; margin: 0 0 12px 0; font-size: 13px; line-height: 1.5;">
+      You have <strong>${naicsCount} NAICS code${naicsCount === 1 ? '' : 's'}</strong> on your profile — that's usually only ~${m.obviousCodePct}% of the federal market for what you sell. <strong>Sport mode</strong> in Mindy maps the other ~${m.missPct}% from real USASpending data.
+    </p>
+    <a href="${trackedUrl(sportUrl, 'market_research_sport', 'narrow_market_nudge')}" style="background: #ea580c; color: white; padding: 9px 16px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 13px; display: inline-block;">
+      See Your Full Market →
+    </a>
+  </div>`;
 }
 
 export function renderMindyV10PromoHtml(trackedUrl: TrackedUrlFn): string {
