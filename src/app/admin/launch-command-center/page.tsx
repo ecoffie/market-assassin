@@ -37,6 +37,10 @@ type MrrGoal = {
   oneTimeCash30d?: number;
   oneTimeCount30d?: number;
   lifetimeScenarios?: Array<{ name: string; price: number; salesToFundGoalMonth: number; mrrEquivPerSale: number }>;
+  upgradeModalShown?: number;
+  upgradeModalCtaClicks?: number;
+  upgradeModalCtr?: number;
+  topUpgradeFeatures?: Array<{ feature: string; count: number }>;
 };
 
 // Lead targets to hit the remaining $149 subs at three close rates. Anchored to
@@ -868,6 +872,32 @@ export default function LaunchCommandCenterPage() {
                   <p className="mt-2 text-xs text-slate-500">Plus Team ($499) & Enterprise tiers — every higher-tier sub counts as more than one $149.</p>
                 </div>
               )}
+
+              {/* UPGRADE-MODAL INTENT — the free→paid funnel's first step, measured. */}
+              <div className="mt-6 rounded-xl border border-blue-500/30 bg-blue-500/5 p-4">
+                <p className="text-sm font-semibold text-blue-200">Free→paid upgrade modal (last 30 days)</p>
+                {(mrrGoal.upgradeModalShown || 0) === 0 ? (
+                  <p className="mt-1 text-xs text-slate-500">No upgrade-modal opens yet — free users haven&apos;t clicked a locked feature in this window (or it just shipped).</p>
+                ) : (
+                  <>
+                    <div className="mt-2 flex flex-wrap gap-x-6 gap-y-1 text-sm text-slate-300">
+                      <span><b className="text-white">{mrrGoal.upgradeModalShown}</b> opens</span>
+                      <span><b className="text-white">{mrrGoal.upgradeModalCtaClicks}</b> Go-Pro clicks</span>
+                      <span><b className="text-blue-300">{mrrGoal.upgradeModalCtr}%</b> click-through</span>
+                    </div>
+                    {mrrGoal.topUpgradeFeatures && mrrGoal.topUpgradeFeatures.length > 0 && (
+                      <div className="mt-2 flex flex-wrap gap-2">
+                        {mrrGoal.topUpgradeFeatures.map((f) => (
+                          <span key={f.feature} className="rounded-full border border-slate-700 bg-slate-900 px-2.5 py-0.5 text-xs text-slate-300">
+                            {f.feature} × <b className="text-white">{f.count}</b>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                    <p className="mt-2 text-xs text-slate-500">Which locked features drive the most upgrade intent — fuel for what to build/price next.</p>
+                  </>
+                )}
+              </div>
 
               {/* Current plan mix */}
               <div className="mt-5">

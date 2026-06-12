@@ -40,7 +40,15 @@ const PRO_BENEFITS = [
   'Full contractor & decision-maker database',
 ];
 
-export function UpgradeModal({ featureId, onClose }: { featureId: string | null; onClose: () => void }) {
+export function UpgradeModal({
+  featureId,
+  onClose,
+  onCtaClick,
+}: {
+  featureId: string | null;
+  onClose: () => void;
+  onCtaClick?: (plan: 'monthly' | 'pricing') => void;
+}) {
   // Close on Escape.
   useEffect(() => {
     if (!featureId) return;
@@ -92,12 +100,14 @@ export function UpgradeModal({ featureId, onClose }: { featureId: string | null;
 
           <Link
             href="/checkout/mindy-pro-monthly"
+            onClick={() => onCtaClick?.('monthly')}
             className="mt-4 block w-full rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 py-3 text-center font-semibold text-white shadow-lg shadow-purple-500/20 transition-all hover:scale-[1.02] hover:from-purple-500 hover:to-blue-500"
           >
             Go Pro — unlock everything →
           </Link>
           <Link
             href="/market-intelligence"
+            onClick={() => onCtaClick?.('pricing')}
             className="mt-2 block w-full text-center text-sm text-slate-400 hover:text-slate-200"
           >
             See full pricing & annual plans

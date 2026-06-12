@@ -136,6 +136,47 @@ export async function GET(request: NextRequest) {
       }
     } catch { /* charges table optional */ }
 
+    // --- Upgrade-modal intent (last 30 days) from app_events ---
+    // Measures the free→paid funnel's first step: free users clicking a Pro-locked
+    // feature (modal shown) and then clicking the Go-Pro CTA. Tells us if the modal
+    // converts intent — without this the modal is unmeasured.
+    let upgradeModalShown = 0;
+    let upgradeModalCtaClicks = 0;
+    const upgradeByFeature: Record<string, number> = {};
+    try {
+      const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const events: Array<{ metadata?: Record<string, unknown> }> = [];
+      for (let from = 0; from < 60000; from += 1000) {
+        const { data, error } = await supabase
+          .from('app_events')
+          .select('metadata')
+          .eq('event_type', 'link_click')
+          .eq('event_source', 'sidebar')
+          .gte('created_at', since)
+          .range(from, from + 999);
+        if (error) break;
+        events.push(...(data || []));
+        if (!data || data.length < 1000) break;
+      }
+      for (const e of events) {
+        const action = (e.metadata || {}).action;
+        const feature = String((e.metadata || {}).feature || 'unknown');
+        if (action === 'upgrade_modal_shown') {
+          upgradeModalShown++;
+          upgradeByFeature[feature] = (upgradeByFeature[feature] || 0) + 1;
+        } else if (action === 'upgrade_modal_cta_click') {
+          upgradeModalCtaClicks++;
+        }
+      }
+    } catch { /* app_events optional */ }
+    const upgradeModalCtr = upgradeModalShown > 0
+      ? Math.round((upgradeModalCtaClicks / upgradeModalShown) * 1000) / 10
+      : 0;
+    const topUpgradeFeatures = Object.entries(upgradeByFeature)
+      .sort((a, b) => b[1] - a[1])
+      .slice(0, 5)
+      .map(([feature, count]) => ({ feature, count }));
+
     // Goal math (recurring)
     const subsNeededAt149 = Math.ceil(MONTHLY_GOAL / PRO_PRICE);   // 671
     const subsRemainingAt149 = Math.max(0, subsNeededAt149 - activeSubs);
@@ -174,6 +215,11 @@ export async function GET(request: NextRequest) {
       oneTimeCash30d: Math.round(oneTimeCash30d),
       oneTimeCount30d,
       lifetimeScenarios,
+      // Free→paid funnel — upgrade-modal intent (last 30 days)
+      upgradeModalShown,
+      upgradeModalCtaClicks,
+      upgradeModalCtr,        // % of modal opens that clicked Go Pro
+      topUpgradeFeatures,     // which locked features drive the most intent
     });
   } catch (err) {
     console.error('[mrr-goal] error', err);

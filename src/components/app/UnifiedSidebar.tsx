@@ -34,6 +34,7 @@ import {
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
 import { UpgradeModal } from './UpgradeModal';
+import { useAppTracker } from './track';
 
 // Panel types for the unified MI platform
 export type AppPanel =
@@ -341,6 +342,7 @@ export default function UnifiedSidebar({
   // Free user clicked a Pro-locked feature → open the upgrade modal (highest-
   // intent conversion moment). Holds the clicked item id so the modal can name it.
   const [upgradeFeature, setUpgradeFeature] = useState<string | null>(null);
+  const track = useAppTracker(userEmail);
   const [hoveredItem, setHoveredItem] = useState<AppPanel | null>(null);
   // Collapsed-state tooltip rendered with position:fixed so the nav's
   // overflow-y-auto scroll clip can't eat it. Captured from the hovered
@@ -597,8 +599,10 @@ export default function UnifiedSidebar({
                       } else {
                         // Locked Pro feature + a free user clicked it = the
                         // highest-intent upgrade signal. Open the upgrade modal
-                        // (named to the feature) instead of doing nothing.
+                        // (named to the feature) instead of doing nothing, and
+                        // log the intent so the command center can measure it.
                         setUpgradeFeature(item.id);
+                        track('link_click', 'sidebar', { action: 'upgrade_modal_shown', feature: item.id, tier: userTier });
                       }
                     }}
                     onMouseEnter={(e) => { setHoveredItem(item.id); showTooltip(e, display.label, item.badge, !canAccess); }}
@@ -714,7 +718,11 @@ export default function UnifiedSidebar({
       </aside>
 
       {/* Free→paid upgrade modal — opens when a free user clicks a locked feature. */}
-      <UpgradeModal featureId={upgradeFeature} onClose={() => setUpgradeFeature(null)} />
+      <UpgradeModal
+        featureId={upgradeFeature}
+        onClose={() => setUpgradeFeature(null)}
+        onCtaClick={(plan) => track('link_click', 'sidebar', { action: 'upgrade_modal_cta_click', feature: upgradeFeature, plan })}
+      />
     </>
   );
 }
