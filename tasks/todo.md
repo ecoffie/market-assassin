@@ -1,6 +1,27 @@
 # GovCon Giants - Tasks by Priority
 
-**Last Updated:** June 11, 2026
+**Last Updated:** June 12, 2026
+
+---
+
+## 🔲 OPEN — Build the $2,997 Mindy Lifetime product (before bootcamp special ends)
+
+**Why:** $2,997 is the STANDARD lifetime price AFTER the June 27 bootcamp ($1,497 Ultimate
+is the bootcamp special — see the bootcamp lifetime offer email which already anchors against
+$2,997). Right now $2,997 is a pricing DECISION, not a sellable product — nothing can charge it.
+Build it before the special closes so there's a real checkout at the standard price.
+
+**Steps:**
+1. Create the Stripe product + payment link for **$2,997 one-time "Mindy Lifetime"**.
+2. Add a `mindy-lifetime` entry to `CHECKOUT_PRODUCTS` in `src/lib/purchase-attribution.ts`
+   (amountCents 299700, the new Stripe link, type stripe_payment_link).
+3. Confirm `src/app/api/stripe-webhook/route.ts` grants `briefings_lifetime` for it
+   (it already handles that tier → `access_briefings=true`, no expiry). Map the new
+   product/price → `briefings_lifetime`.
+4. Surface a `/checkout/mindy-lifetime` path + wherever the standard lifetime is sold post-bootcamp.
+
+**Context:** memory `mindy_100k_goal_math` + `free_to_paid_funnel`. The bootcamp $1,497 blast is
+already built/tested (`/api/cron/bootcamp-lifetime-offer`) and uses the EXISTING shop link.
 
 ---
 
