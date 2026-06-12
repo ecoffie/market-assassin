@@ -636,29 +636,33 @@ captures never clobber a user's tuned keywords (additive merge only).
 
 ---
 
-## 20. Free alert emails: loss-framed keyword setup + Mindy v1.0 + bootcamp
+## 20. Alert emails: three-stage profile CTAs + universal 72% teaser + v1.0 + bootcamp
 
-**What:** Daily/weekly alert emails push incomplete profiles to fix their **free
-alert filters** with **fear-of-loss framing** from the market-coverage story (§1, §11):
-"One NAICS code ≈ 28% of your market — you're missing the other **72%**." Copy cites
-real FY2025 USASpending proof (drones 70+ buying codes, cybersecurity/medical up to
-74% hidden). CTAs link to `/alerts/preferences` keyword setup, not a generic dashboard.
-Every email also promotes **Mindy v1.0 is now live** (positioning + platform CTA) and
-the **June 27 Mindy Bootcamp** (§29).
+**What:** Daily/weekly alert emails use **three profile stages** (`getAlertProfileStage()`):
+(1) **unconfigured** — no keywords / default NAICS → red banner + `/alerts/preferences`
+keyword setup; (2) **narrow_market** — profile exists but **&lt;3 NAICS** → amber
+banner + Sport mode (`getmindy.ai/app?panel=research`); (3) **healthy** — **3+ NAICS**
+→ Mindy v1.0 dashboard CTA + bootcamp top banner. **Every** recipient also gets a
+purple **"Did you know?"** block teaching the 72% market-coverage insight (§1, §11)
+with FY2025 USASpending proof (drones 70+ buying codes; cyber/med up to 74% hidden).
+Footer promos: **Mindy v1.0 is now live** + **June 27 Mindy Bootcamp** (§29). Weekly
+Free upsell ties "5 of N matches" to the one-NAICS / 72% story.
 
-**Why:** Gain framing ("get better matches") converts weaker than loss framing
-("you're missing three-quarters of contracts that match your business"). Literature
-angle: *"the wrong setup quietly breaks every alert they'll ever get"* (§12). Users
-with incomplete profiles see the red miss banner until keywords + NAICS are set.
+**Why:** Free and Pro users alike often don't know one obvious NAICS ≈ 28% of the
+market. The universal teaser educates everyone; stage-specific CTAs route the right
+next action (fix filters vs expand coverage vs use the dashboard). Loss framing
+outperforms gain framing for incomplete profiles (§12).
 
 **SEO/positioning:** "free federal contract alerts," "why one NAICS code misses 72%
-of your market," "keyword alerts federal contracts," "Mindy v1.0 government contracting
-AI."
+of your market," "keyword alerts federal contracts," "Mindy Sport mode market research,"
+"Mindy v1.0 government contracting AI."
 
-**Proof:** Copy in `src/lib/alerts/email-promo.ts` (`ALERT_MARKETING`, `MINDY_V1`,
-`ALERT_BOOTCAMP`). Profile gate: `userNeedsMindySetup()` in `profile-setup.ts`. Wired
-in `daily-alerts/route.ts` and `weekly-alerts/route.ts`. Admin fixture test:
-`GET /api/cron/daily-alerts?password=...&email=...&fixture=true`.
+**Proof:** `src/lib/alerts/email-promo.ts` (`ALERT_MARKETING`, `getAlertEmailCta`,
+`renderMarketCoverageTeaserHtml`). Stages: `getAlertProfileStage()` /
+`MIN_NAICS_FOR_BROAD_COVERAGE = 3` in `profile-setup.ts`. Wired in
+`daily-alerts/route.ts` and `weekly-alerts/route.ts`. Admin fixture:
+`GET /api/cron/daily-alerts?password=...&email=...&fixture=true` (`transactional: true`
+bypasses daily cap).
 
 ---
 

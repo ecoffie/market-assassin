@@ -12,6 +12,28 @@ export interface AlertProfileFields {
   business_description?: string | null;
 }
 
+/** Users with fewer than this many NAICS are likely searching a narrow slice of the market. */
+export const MIN_NAICS_FOR_BROAD_COVERAGE = 3;
+
+export type AlertProfileStage = 'unconfigured' | 'narrow_market' | 'healthy';
+
+/**
+ * Alert email profile stage (literature §1 / §11):
+ * - unconfigured: no keywords / default NAICS — fix free alert filters
+ * - narrow_market: basic profile but ≤2 NAICS — teach the 72% / expand via Sport mode
+ * - healthy: 3+ NAICS — dashboard / v1.0 CTAs
+ */
+export function getAlertProfileStage(user: AlertProfileFields): AlertProfileStage {
+  if (userNeedsMindySetup(user)) return 'unconfigured';
+  const naics = (user.naics_codes || []).filter(code => Boolean(String(code).trim()));
+  if (naics.length < MIN_NAICS_FOR_BROAD_COVERAGE) return 'narrow_market';
+  return 'healthy';
+}
+
+export function userHasNarrowMarketCoverage(user: AlertProfileFields): boolean {
+  return getAlertProfileStage(user) === 'narrow_market';
+}
+
 export interface AlertEnrollmentFields {
   created_at?: string | null;
   total_alerts_sent?: number | null;
