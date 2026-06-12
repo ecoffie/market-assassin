@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
 
 /**
  * POST /api/admin/set-user-profile?password=...
@@ -39,8 +38,10 @@ export async function POST(request: NextRequest) {
   };
 
   if (Array.isArray(body.naicsCodes)) {
-    const raw = body.naicsCodes.map((c) => String(c).trim()).filter(Boolean);
-    update.naics_codes = raw.length ? expandNAICSCodes(raw) : [];
+    // Store the EXACT codes provided — do NOT prefix-expand. Expanding a precise
+    // market (demolition's 8 codes) to whole 3-digit families pulls in unrelated
+    // industries (332xxx metal mfg, 541xxx consulting) and dilutes the alerts.
+    update.naics_codes = body.naicsCodes.map((c) => String(c).trim()).filter(Boolean);
   }
   if (Array.isArray(body.keywords)) {
     update.keywords = Array.from(new Set(body.keywords.map((k) => String(k).trim().toLowerCase()).filter(Boolean))).slice(0, 30);
