@@ -40,13 +40,38 @@ export async function GET(request: NextRequest) {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Pull all active subscriptions (page past the 1000 cap).
+    // Debug: dump status distribution + a sample row so we can see why active=0.
+    if (request.nextUrl.searchParams.get('debug') === '1') {
+      const { data: all } = await supabase
+        .from('stripe_subscriptions')
+        .select('status, plan_amount, plan_id, product_name')
+        .range(0, 999);
+      const statusDist: Record<string, number> = {};
+      let withAmount = 0;
+      for (const r of all || []) {
+        const st = (r as { status?: string }).status || 'NULL';
+        statusDist[st] = (statusDist[st] || 0) + 1;
+        if ((r as { plan_amount?: number }).plan_amount) withAmount++;
+      }
+      return NextResponse.json({
+        debug: true,
+        totalRowsSampled: (all || []).length,
+        statusDistribution: statusDist,
+        rowsWithPlanAmount: withAmount,
+        sampleRow: (all || [])[0] || null,
+      });
+    }
+
+    // Pull all active subscriptions (page past the 1000 cap). Stripe's "paying"
+    // statuses are active + trialing; past_due is still billing. Be inclusive of
+    // the genuinely-paying states, exclude canceled/unpaid/incomplete.
+    const PAYING = ['active', 'trialing', 'past_due'];
     const subs: SubRow[] = [];
     for (let from = 0; from < 60000; from += 1000) {
       const { data, error } = await supabase
         .from('stripe_subscriptions')
         .select('customer_id, product_name, status, plan_amount, interval')
-        .eq('status', 'active')
+        .in('status', PAYING)
         .range(from, from + 999);
       if (error) break;
       subs.push(...((data || []) as SubRow[]));
