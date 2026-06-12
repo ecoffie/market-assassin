@@ -7,11 +7,11 @@ import { BootcampBar } from '@/components/mindy/BootcampBar';
 // embed URLs WITH app_id — the exact form Vimeo's own oembed serves (a bare player
 // URL 401s for these Business team-library videos). Matched to captions by title:
 //   1200736343 "5 Active Solicitations - Friday"            → "worth bidding"
-//   1200736776 "Mindy Alert: 15 New Opportunities"          → morning briefing
+//   1200736054 "1_Mindy_Reel_1"                             → morning briefing
 //   1200735215 "Mindy Chat (CTA)"                           → ask Mindy anything
 const VIMEO_APP = 'app_id=122963';
 const reel = (id: string) => `https://player.vimeo.com/video/${id}?${VIMEO_APP}`;
-const DEMO_REELS = [reel('1200736343'), reel('1200736776'), reel('1200735215')];
+const DEMO_REELS = [reel('1200736343'), reel('1200736054'), reel('1200735215')];
 
 // Route paid CTAs through /checkout first so purchase attribution (UTM /
 // referrer captured pre-checkout) is joined to the Stripe purchase event.
