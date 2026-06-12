@@ -4,6 +4,24 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 
 type StatusTone = 'green' | 'blue' | 'amber' | 'purple' | 'red' | 'slate';
 
+type BetaConversion = {
+  success: boolean;
+  entitledTotal: number;
+  converted: number;
+  conversionRate: number;
+  invitedPending: number;
+  remaining: number;
+  perDay: number;
+  daysToDrain: number;
+  sendTrend: Array<{ date: string; count: number }>;
+};
+
+/** Percent of total, clamped 0–100 (for the conversion progress bar widths). */
+function pct(part: number, total: number): number {
+  if (!total) return 0;
+  return Math.max(0, Math.min(100, Math.round((part / total) * 1000) / 10));
+}
+
 type RoleLane = {
   name: string;
   owners: string;
@@ -383,6 +401,9 @@ export default function LaunchCommandCenterPage() {
   const [qualBrief, setQualBrief] = useState<CustomerQualificationBrief | null>(null);
   const [qualLoading, setQualLoading] = useState(false);
   const [qualError, setQualError] = useState('');
+  const [betaConv, setBetaConv] = useState<BetaConversion | null>(null);
+  const [betaConvLoading, setBetaConvLoading] = useState(false);
+  const [betaConvError, setBetaConvError] = useState('');
 
   const currentDate = useMemo(() => {
     return new Intl.DateTimeFormat('en-US', {
@@ -598,6 +619,39 @@ export default function LaunchCommandCenterPage() {
     };
   }, [authenticated, password]);
 
+  useEffect(() => {
+    if (!authenticated || !password) return;
+    let cancelled = false;
+
+    async function loadBetaConversion() {
+      setBetaConvLoading(true);
+      setBetaConvError('');
+      try {
+        const response = await fetch(`/api/admin/beta-conversion?password=${encodeURIComponent(password)}`, {
+          cache: 'no-store',
+        });
+        const data = await response.json();
+        if (cancelled) return;
+        if (!response.ok || !data.success) {
+          setBetaConvError(data.error || 'Could not load beta conversion');
+          setBetaConv(null);
+          return;
+        }
+        setBetaConv(data as BetaConversion);
+      } catch {
+        if (!cancelled) {
+          setBetaConvError('Could not load beta conversion');
+          setBetaConv(null);
+        }
+      } finally {
+        if (!cancelled) setBetaConvLoading(false);
+      }
+    }
+
+    loadBetaConversion();
+    return () => { cancelled = true; };
+  }, [authenticated, password]);
+
   if (checking) {
     return <LoadingState />;
   }
@@ -689,6 +743,81 @@ export default function LaunchCommandCenterPage() {
       </header>
 
       <div className="mx-auto max-w-7xl space-y-8 px-6 py-8">
+        {/* BETA SETUP CONVERSION — how many entitled beta users have turned their
+            access into a real login, and how the setup-invite queue is draining. */}
+        <section className="rounded-lg border border-purple-500/30 bg-gradient-to-br from-purple-900/20 to-slate-900 p-6">
+          <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-[0.2em] text-purple-300">Beta Setup Conversion</p>
+              <h2 className="mt-2 text-3xl font-bold">Are entitled beta users setting up accounts?</h2>
+              <p className="mt-2 text-sm text-slate-400">
+                Entitled = has access and should create a login. Sent {betaConv?.perDay ?? 50}/day by the setup-invite cron.
+              </p>
+            </div>
+          </div>
+
+          {betaConvLoading && !betaConv && (
+            <p className="mt-6 text-sm text-slate-400">Loading conversion funnel…</p>
+          )}
+          {betaConvError && (
+            <p className="mt-6 text-sm text-red-300">{betaConvError}</p>
+          )}
+
+          {betaConv && (
+            <>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-4">
+                  <div className="text-3xl font-bold text-white">{betaConv.entitledTotal.toLocaleString()}</div>
+                  <div className="mt-1 text-sm text-slate-400">Entitled beta users</div>
+                </div>
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
+                  <div className="text-3xl font-bold text-emerald-300">
+                    {betaConv.converted.toLocaleString()}
+                    <span className="ml-2 text-base font-semibold text-emerald-400/80">{betaConv.conversionRate}%</span>
+                  </div>
+                  <div className="mt-1 text-sm text-slate-400">Converted (have a login)</div>
+                </div>
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+                  <div className="text-3xl font-bold text-amber-300">{betaConv.invitedPending.toLocaleString()}</div>
+                  <div className="mt-1 text-sm text-slate-400">Invited, not set up yet</div>
+                </div>
+                <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-4">
+                  <div className="text-3xl font-bold text-blue-300">{betaConv.remaining.toLocaleString()}</div>
+                  <div className="mt-1 text-sm text-slate-400">In send queue (~{betaConv.daysToDrain}d to drain)</div>
+                </div>
+              </div>
+
+              {/* Conversion progress bar: converted / invited-pending / remaining */}
+              <div className="mt-5">
+                <div className="flex h-3 overflow-hidden rounded-full bg-slate-800">
+                  <div className="bg-emerald-500" style={{ width: `${pct(betaConv.converted, betaConv.entitledTotal)}%` }} title={`Converted: ${betaConv.converted}`} />
+                  <div className="bg-amber-500" style={{ width: `${pct(betaConv.invitedPending, betaConv.entitledTotal)}%` }} title={`Invited pending: ${betaConv.invitedPending}`} />
+                  <div className="bg-blue-500/60" style={{ width: `${pct(betaConv.remaining, betaConv.entitledTotal)}%` }} title={`Queue: ${betaConv.remaining}`} />
+                </div>
+                <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-500">
+                  <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-500" />Converted</span>
+                  <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-amber-500" />Invited, pending</span>
+                  <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-blue-500/60" />Queue remaining</span>
+                </div>
+              </div>
+
+              {betaConv.sendTrend.length > 0 && (
+                <div className="mt-5">
+                  <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">Setup invites sent — last {betaConv.sendTrend.length} days</p>
+                  <div className="flex items-end gap-1 h-16">
+                    {betaConv.sendTrend.map((d) => {
+                      const max = Math.max(...betaConv.sendTrend.map((x) => x.count), 1);
+                      return (
+                        <div key={d.date} className="flex-1 bg-purple-500/50 rounded-t" style={{ height: `${Math.max(6, (d.count / max) * 100)}%` }} title={`${d.date}: ${d.count}`} />
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
+            </>
+          )}
+        </section>
+
         <section className="rounded-lg border border-slate-800 bg-slate-900 p-6">
           <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
             <div>
