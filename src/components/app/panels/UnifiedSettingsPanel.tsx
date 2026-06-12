@@ -17,6 +17,7 @@ interface SettingsForm {
   display_name: string;
   role_title: string;
   naics_codes: string;
+  keywords: string;
   target_agencies: string;
   email_frequency: string;
   onboarding_completed: boolean;
@@ -30,6 +31,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
     display_name: '',
     role_title: '',
     naics_codes: '',
+    keywords: '',
     target_agencies: '',
     email_frequency: 'daily',
     onboarding_completed: false,
@@ -83,6 +85,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
         display_name: settings.display_name || '',
         role_title: settings.role_title || '',
         naics_codes: (settings.naics_codes || []).join(', '),
+        keywords: (settings.keywords || []).join(', '),
         target_agencies: (settings.target_agencies || []).join(', '),
         // Prefer the canonical alert_frequency (drives actual emails)
         // over the legacy mi_beta_user_settings.email_frequency value.
@@ -137,6 +140,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
             email,
             frequency: form.email_frequency,
             locationStates: form.location_states,
+            keywords: parseList(form.keywords),
           }),
         }),
       ]);
@@ -248,6 +252,19 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                 onChange={(codes) => setForm({ ...form, naics_codes: codes.join(', ') })}
                 placeholder='Search by description (e.g. "consulting") or paste a code'
               />
+            </div>
+            <div>
+              <Field
+                label="Keywords"
+                value={form.keywords}
+                onChange={(value) => setForm({ ...form, keywords: value })}
+                placeholder="demolition, hazmat removal, asbestos abatement"
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                What Mindy searches for in the opportunity TEXT — catches the work your NAICS codes miss.
+                Comma-separated. Tip: run a <span className="text-purple-300">Market Research</span> and click
+                &ldquo;Save this market to my profile&rdquo; to fill these automatically.
+              </p>
             </div>
             <Field label="Target Agencies" value={form.target_agencies} onChange={(value) => setForm({ ...form, target_agencies: value })} placeholder="VA, DHS, Army, GSA" />
 
