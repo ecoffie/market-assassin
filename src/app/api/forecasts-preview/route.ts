@@ -49,33 +49,50 @@ export async function GET(request: NextRequest) {
     if (naics) countQuery = countQuery.ilike('naics_code', `${naics}%`);
     const { count: totalCount } = await countQuery;
 
-    // Distinct source-agency count, for the "X agencies" stat. Pull a slim
-    // column set and dedupe in-process (table is ~7.7k rows, trivial).
-    const { data: agencyRows } = await supabase
-      .from('agency_forecasts')
-      .select('source_agency')
-      .limit(10000);
-    const agencyCount = new Set((agencyRows || []).map((r) => r.source_agency).filter(Boolean)).size;
+    // Distinct source-agency count. Supabase caps a plain select at 1000 rows,
+    // which gave a non-representative slice → wrong count. Page through the
+    // single slim column to dedupe across the whole table (~7.8k rows, cheap).
+    const agencySet = new Set<string>();
+    for (let page = 0; page < 12; page++) {
+      const { data: rows } = await supabase
+        .from('agency_forecasts')
+        .select('source_agency')
+        .range(page * 1000, page * 1000 + 999);
+      if (!rows || rows.length === 0) break;
+      for (const r of rows) if (r.source_agency) agencySet.add(r.source_agency);
+      if (rows.length < 1000) break;
+    }
+    const agencyCount = agencySet.size;
 
-    // Sample teaser rows — prefer ones with a real title + value so the preview
-    // looks substantive. Order by estimated value desc when present.
+    // Sample teaser rows — over-fetch then DEDUPE by title (the by-value ordering
+    // surfaces identical high-value rows, e.g. repeated DOJ entries). Prefer rows
+    // with a real title + value so the preview looks substantive.
     let sampleQuery = supabase
       .from('agency_forecasts')
       .select('source_agency, title, estimated_value_range, estimated_value_max, fiscal_year, naics_code')
       .not('title', 'is', null)
       .order('estimated_value_max', { ascending: false, nullsFirst: false })
-      .limit(limit);
+      .limit(limit * 6);
     if (naics) sampleQuery = sampleQuery.ilike('naics_code', `${naics}%`);
     const { data: sampleRows } = await sampleQuery;
 
-    const sample: PreviewRow[] = (sampleRows || []).map((r) => ({
-      agency: r.source_agency || '—',
-      title: r.title || 'Upcoming procurement',
-      value: r.estimated_value_range
-        || (r.estimated_value_max ? fmt$(r.estimated_value_max) : 'TBD'),
-      fiscalYear: r.fiscal_year || '',
-      naics: r.naics_code || '',
-    }));
+    const seen = new Set<string>();
+    const sample: PreviewRow[] = [];
+    for (const r of sampleRows || []) {
+      const title = (r.title || '').trim();
+      const key = `${r.source_agency}|${title.toLowerCase()}`;
+      if (!title || seen.has(key)) continue;
+      seen.add(key);
+      sample.push({
+        agency: r.source_agency || '—',
+        title,
+        value: r.estimated_value_range
+          || (r.estimated_value_max ? fmt$(r.estimated_value_max) : 'TBD'),
+        fiscalYear: r.fiscal_year || '',
+        naics: r.naics_code || '',
+      });
+      if (sample.length >= limit) break;
+    }
 
     return NextResponse.json(
       {
