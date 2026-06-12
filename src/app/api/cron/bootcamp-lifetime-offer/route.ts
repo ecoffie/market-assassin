@@ -75,6 +75,7 @@ export async function GET(request: NextRequest) {
       subject: bootcampLifetimeSubject(),
       html: bootcampLifetimeHtml(deadline),
       emailType: BOOTCAMP_LIFETIME_EMAIL_TYPE + '_test',
+      transactional: true, // admin render-check — bypass the daily cap so it always delivers
     });
     return NextResponse.json({ success: true, mode: 'test', to: testEmail, sent: ok });
   }
