@@ -42,6 +42,17 @@ export const PARTNER_REFERRAL_PROGRAMS: PartnerReferralProgram[] = [
     affiliatePercent: DEFAULT_AFFILIATE_PERCENT,
     contactEmail: 'westover105@gmail.com',
   },
+  {
+    code: 'MDEAT',
+    slug: 'mdeat',
+    name: 'MDEAT',
+    description: 'Miami-Dade Economic Advocacy Trust — Miami-Dade County small business partner referrals',
+    trialDays: 30,
+    invitationSource: 'partner_mdeat',
+    trialSource: 'partner_mdeat',
+    compensationModel: 'affiliate_recurring',
+    affiliatePercent: DEFAULT_AFFILIATE_PERCENT,
+  },
 ];
 
 const BY_CODE = new Map(

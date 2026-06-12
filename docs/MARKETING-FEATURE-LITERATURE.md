@@ -970,6 +970,21 @@ gets the same 30% model as future Kash/Usama/Muneeba influencer codes.
 Per $149/mo Pro sub: affiliate $44.70, you keep $104.30. Command Center Partner
 & Affiliate Programs panel + `/api/admin/partner-referrals`.
 
+## 35. MDEAT partner affiliate — Miami-Dade Economic Advocacy Trust
+
+**What:** Second channel partner program alongside NCMBC: dedicated landing at
+`getmindy.ai/mdeat`, code `MDEAT`, 30-day Pro trial for referred Miami-Dade
+contractors, 30% recurring affiliate on attributed Pro revenue.
+
+**Why:** MDEAT supports Black-owned and minority enterprises in Miami-Dade County;
+tagged referrals let us measure cohort outcomes and compensate the trust on
+conversions from their contractor base.
+
+**SEO:** Partner-branded landing only — not a broad SEO page.
+
+**Proof:** Registry entry `partner_mdeat` in `partner-referrals.ts`. Landing:
+getmindy.ai/mdeat. Cohort: `/api/admin/partner-referrals?password=...&code=MDEAT`.
+
 ## 33. Free→paid email drip — teach a GovCon lesson, sell in the P.S.
 
 **What:** A 4-email nurture sequence for free Mindy users on days 1/3/7/14 after
