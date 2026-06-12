@@ -668,13 +668,16 @@ function AppDashboard() {
                 </button>
               </div>
             ) : (
-              <div className="flex flex-col sm:flex-row gap-2">
+              // Stacked (not side-by-side): the "Set up my account →" label is too
+              // long to sit next to the input inside this max-w-md card — side-by-side
+              // overflowed the box. Full-width button below the input fits every width.
+              <div className="flex flex-col gap-2">
                 <input
                   type="email"
                   value={betaEmail}
                   onChange={(e) => setBetaEmail(e.target.value)}
                   placeholder="you@company.com"
-                  className="flex-1 rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 text-white placeholder:text-gray-500 outline-none focus:border-purple-500"
+                  className="w-full rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 text-white placeholder:text-gray-500 outline-none focus:border-purple-500"
                 />
                 <button
                   type="button"
@@ -694,7 +697,7 @@ function AppDashboard() {
                     } catch { setBetaSent(true); }
                     finally { setBetaLoading(false); }
                   }}
-                  className="rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-3 text-sm font-semibold text-white hover:from-blue-500 hover:to-purple-500 disabled:opacity-50 whitespace-nowrap"
+                  className="w-full rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-3 text-sm font-semibold text-white hover:from-blue-500 hover:to-purple-500 disabled:opacity-50"
                 >
                   {betaLoading ? 'Sending…' : 'Set up my account →'}
                 </button>
