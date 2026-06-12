@@ -985,7 +985,24 @@ conversions from their contractor base.
 **Proof:** Registry entry `partner_mdeat` in `partner-referrals.ts`. Landing:
 getmindy.ai/mdeat. Cohort: `/api/admin/partner-referrals?password=...&code=MDEAT`.
 
-## 33. Free→paid email drip — teach a GovCon lesson, sell in the P.S.
+## 36. Magic-link sign-in — one-click access without password setup loops
+
+**What:** Primary sign-in on getmindy.ai/app is now Canva-style: enter email →
+receive a secure magic link → click to open Mindy. Password sign-in remains as a
+secondary option. Setup-account and forgot-password routes send the same magic link
+(not separate setup/reset flows).
+
+**Why:** Advocate onboarding (e.g. NCMBC) exposed a dead-end loop for less technical
+users — expired setup/reset links, three competing paths, and wrong-password errors
+routing to "set up account." One email → one link → in the app removes that friction.
+
+**SEO:** n/a (authenticated app surface).
+
+**Proof:** `POST /api/auth/mindy-magic-link/request` uses Supabase `generateLink`
+type `magiclink` with redirect to getmindy.ai/app. Shared lib:
+`src/lib/mindy/magic-link-signin.ts`. Sue Kranes cohort uses the same path as NCMBC
+referrals.
+
 
 **What:** A 4-email nurture sequence for free Mindy users on days 1/3/7/14 after
 signup. Each email teaches ONE real GovCon lesson — the 72%-hidden NAICS coverage

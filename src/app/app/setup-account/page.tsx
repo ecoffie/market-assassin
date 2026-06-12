@@ -8,11 +8,13 @@ export default function MISetupAccountRequestPage() {
   const [email, setEmail] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [noAccess, setNoAccess] = useState(false);
   const [error, setError] = useState('');
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
     setError('');
+    setNoAccess(false);
 
     const normalizedEmail = email.toLowerCase().trim();
     if (!normalizedEmail) {
@@ -22,7 +24,7 @@ export default function MISetupAccountRequestPage() {
 
     setIsLoading(true);
     try {
-      const response = await fetch('/api/auth/mindy-account-setup/request', {
+      const response = await fetch('/api/auth/mindy-magic-link/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: normalizedEmail }),
@@ -30,13 +32,18 @@ export default function MISetupAccountRequestPage() {
       const data = await response.json();
 
       if (!response.ok || !data.success) {
-        setError(data.error || 'Unable to send setup link');
+        setError(data.error || 'Unable to send sign-in link');
+        return;
+      }
+
+      if (data.entitled === false) {
+        setNoAccess(true);
         return;
       }
 
       setSent(true);
     } catch {
-      setError('Unable to send setup link');
+      setError('Unable to send sign-in link');
     } finally {
       setIsLoading(false);
     }
@@ -47,9 +54,9 @@ export default function MISetupAccountRequestPage() {
       <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/70 p-8 shadow-2xl">
         <div className="mb-8 text-center">
           <MindyLogo size={56} className="mx-auto mb-5" />
-          <h1 className="text-2xl font-bold text-white">Set up your Mindy account</h1>
+          <h1 className="text-2xl font-bold text-white">Sign in to Mindy</h1>
           <p className="mt-2 text-sm text-slate-400">
-            Use this if you have Mindy access but have not created a password yet.
+            Enter your email and we&apos;ll send a secure link — no password needed.
           </p>
         </div>
 
@@ -62,10 +69,19 @@ export default function MISetupAccountRequestPage() {
         {sent ? (
           <div className="text-center">
             <div className="mb-6 rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-200">
-              If that email has Mindy access, a setup link is on the way.
+              Check your inbox — click the link to open Mindy.
             </div>
             <Link href="/app" className="font-medium text-emerald-400 hover:text-emerald-300">
               Back to sign in
+            </Link>
+          </div>
+        ) : noAccess ? (
+          <div className="text-center space-y-4">
+            <div className="rounded-lg border border-amber-500/40 bg-amber-950/40 px-4 py-3 text-sm text-amber-100">
+              We couldn&apos;t find Mindy access for that email.
+            </div>
+            <Link href="/app" className="font-medium text-emerald-400 hover:text-emerald-300">
+              Create a free account
             </Link>
           </div>
         ) : (
@@ -84,12 +100,9 @@ export default function MISetupAccountRequestPage() {
               disabled={isLoading}
               className="w-full rounded-lg bg-emerald-600 px-4 py-3 font-medium text-white transition-colors hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-400"
             >
-              {isLoading ? 'Sending setup link...' : 'Send setup link'}
+              {isLoading ? 'Sending sign-in link...' : 'Email me a sign-in link'}
             </button>
-            <div className="flex items-center justify-between text-sm">
-              <Link href="/forgot-password" className="font-medium text-slate-400 hover:text-slate-200">
-                Forgot password?
-              </Link>
+            <div className="text-center text-sm">
               <Link href="/app" className="font-medium text-slate-400 hover:text-slate-200">
                 Back to sign in
               </Link>

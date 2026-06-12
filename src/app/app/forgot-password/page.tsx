@@ -22,16 +22,21 @@ export default function MIForgotPasswordPage() {
 
     setIsLoading(true);
     try {
-      await fetch('/api/auth/mindy-password-reset/request', {
+      const response = await fetch('/api/auth/mindy-magic-link/request', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email: normalizedEmail }),
       });
+      const data = await response.json();
 
-      // Always show success to avoid confirming whether an account exists.
+      if (!response.ok || !data.success) {
+        setError(data.error || 'Unable to send sign-in link');
+        return;
+      }
+
       setSent(true);
     } catch {
-      setSent(true);
+      setError('Unable to send sign-in link');
     } finally {
       setIsLoading(false);
     }
@@ -42,9 +47,9 @@ export default function MIForgotPasswordPage() {
       <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/70 p-8 shadow-2xl">
         <div className="mb-8 text-center">
           <MindyLogo size={56} className="mx-auto mb-5" />
-          <h1 className="text-2xl font-bold text-white">Reset your Mindy password</h1>
+          <h1 className="text-2xl font-bold text-white">Sign in to Mindy</h1>
           <p className="mt-2 text-sm text-slate-400">
-            Enter your email and we will send a secure reset link.
+            Enter your email and we&apos;ll send a fresh secure link.
           </p>
         </div>
 
@@ -57,7 +62,7 @@ export default function MIForgotPasswordPage() {
         {sent ? (
           <div className="text-center">
             <div className="mb-6 rounded-lg border border-emerald-500/40 bg-emerald-950/40 px-4 py-3 text-sm text-emerald-200">
-              If a Mindy account exists for that email, a reset link is on the way.
+              If that email has Mindy access, a sign-in link is on the way.
             </div>
             <Link href="/app" className="font-medium text-emerald-400 hover:text-emerald-300">
               Back to sign in
@@ -79,7 +84,7 @@ export default function MIForgotPasswordPage() {
               disabled={isLoading}
               className="w-full rounded-lg bg-emerald-600 px-4 py-3 font-medium text-white transition-colors hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-400"
             >
-              {isLoading ? 'Sending reset link...' : 'Send reset link'}
+              {isLoading ? 'Sending sign-in link...' : 'Email me a sign-in link'}
             </button>
             <div className="text-center">
               <Link href="/app" className="text-sm font-medium text-slate-400 hover:text-slate-200">

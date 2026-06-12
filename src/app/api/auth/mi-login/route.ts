@@ -15,6 +15,49 @@ function getAuthSupabase() {
   return _authSupabase;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+let _adminSupabase: any = null;
+function getAdminSupabase() {
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!serviceRoleKey) return null;
+  if (!_adminSupabase) {
+    _adminSupabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      serviceRoleKey,
+      { auth: { persistSession: false, autoRefreshToken: false } }
+    );
+  }
+  return _adminSupabase;
+}
+
+async function mindyAccountExists(email: string): Promise<boolean> {
+  const admin = getAdminSupabase();
+  if (!admin) return false;
+
+  try {
+    let page = 1;
+    for (;;) {
+      const { data: list } = await admin.auth.admin.listUsers({ page, perPage: 1000 });
+      const users = list?.users || [];
+      if (users.some((u: { email?: string | null }) => (u.email || '').toLowerCase() === email)) {
+        return true;
+      }
+      if (users.length < 1000) break;
+      page += 1;
+      if (page > 20) break;
+    }
+
+    const { data: notificationRow } = await admin
+      .from('user_notification_settings')
+      .select('user_email')
+      .eq('user_email', email)
+      .maybeSingle();
+    return Boolean(notificationRow);
+  } catch {
+    return false;
+  }
+}
+
 function normalizeEmail(email: string) {
   return email.toLowerCase().trim();
 }
@@ -48,13 +91,7 @@ export async function POST(request: NextRequest) {
       // right). Supabase's sign-in error is identical for both (security), so we look
       // up whether an auth user actually exists. This stops the dead-end where a
       // beta user clicks "forgot password" for an account that was never created.
-      let hasAccount = false;
-      try {
-        const admin = getAuthSupabase();
-        // admin listUsers is the reliable existence check (no public reveal).
-        const { data: list } = await admin.auth.admin.listUsers({ page: 1, perPage: 1000 });
-        hasAccount = (list?.users || []).some((u: { email?: string | null }) => (u.email || '').toLowerCase() === email);
-      } catch { /* fall through — default to setup guidance */ }
+      const hasAccount = await mindyAccountExists(email);
 
       return NextResponse.json(
         {

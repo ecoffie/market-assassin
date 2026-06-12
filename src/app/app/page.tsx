@@ -2,7 +2,6 @@
 
 import { useState, useEffect, useCallback, useRef, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
-import Link from 'next/link';
 import UnifiedSidebar, { type AppPanel, type AppTier } from '@/components/app/UnifiedSidebar';
 import GlobalLookup from '@/components/app/GlobalLookup';
 import ProductTour from '@/components/app/ProductTour';
@@ -98,12 +97,8 @@ function AppDashboard() {
   // When sign-in fails because the email has NO account yet (email-only beta user),
   // show a one-click "Set up my account" instead of a dead-end "forgot password".
   const [needsSetup, setNeedsSetup] = useState(false);
-  // Beta-user banner (the prominent path on the landing): most people arriving now are
-  // the email-only beta cohort who need to SET UP a password, not sign in.
-  const [betaEmail, setBetaEmail] = useState('');
-  const [betaSent, setBetaSent] = useState(false);
-  const [betaNoAccess, setBetaNoAccess] = useState(false);
-  const [betaLoading, setBetaLoading] = useState(false);
+  const [magicLinkSent, setMagicLinkSent] = useState(false);
+  const [usePasswordSignIn, setUsePasswordSignIn] = useState(false);
   const [oauthLoading, setOauthLoading] = useState<'google' | 'microsoft' | null>(null);
   const [isSignUpMode, setIsSignUpMode] = useState(false);
   const [signUpEmail, setSignUpEmail] = useState('');
@@ -453,6 +448,51 @@ function AppDashboard() {
     }
   }, [loadUserProfile]);
 
+  const requestMagicLinkSignIn = useCallback(async (userEmail: string) => {
+    const normalizedEmail = userEmail.toLowerCase().trim();
+    if (!normalizedEmail || !normalizedEmail.includes('@')) {
+      setAuthError('Enter your email address');
+      return;
+    }
+
+    setAuthLoading(true);
+    setAuthError(null);
+    setAuthMessage(null);
+    setMagicLinkSent(false);
+    setNeedsSetup(false);
+
+    try {
+      const res = await fetch('/api/auth/mindy-magic-link/request', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: normalizedEmail }),
+      });
+      const data = await res.json();
+
+      if (!res.ok || !data.success) {
+        setAuthError(data.error || 'Unable to send sign-in link');
+        return;
+      }
+
+      if (data.entitled === false) {
+        setAuthError(null);
+        setAuthMessage(data.message || "We couldn't find Mindy access for that email.");
+        setIsSignUpMode(true);
+        setPendingEmail(normalizedEmail);
+        return;
+      }
+
+      setPendingEmail(normalizedEmail);
+      setMagicLinkSent(true);
+      setAuthMessage(data.message || 'Check your inbox — click the link to open Mindy.');
+    } catch (error) {
+      console.error('Failed to send magic link:', error);
+      setAuthError('Unable to send sign-in link');
+    } finally {
+      setAuthLoading(false);
+    }
+  }, []);
+
   const requestTwoFactorCode = useCallback(async (userEmail: string, password: string) => {
     const normalizedEmail = userEmail.toLowerCase().trim();
     if (!normalizedEmail || !password) {
@@ -611,6 +651,27 @@ function AppDashboard() {
         setIsLoading(false);
       }
     });
+
+    const supabase = getSupabase();
+    const hasAuthHash = typeof window !== 'undefined' && window.location.hash.includes('access_token');
+    if (!supabase || !hasAuthHash) {
+      return;
+    }
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if ((event === 'SIGNED_IN' || event === 'INITIAL_SESSION') && session?.user?.email) {
+        const ok = await bootstrapFromSupabaseSession();
+        if (ok && typeof window !== 'undefined') {
+          window.history.replaceState(null, '', `${window.location.pathname}${window.location.search}`);
+        } else if (!ok) {
+          clearStoredAppAuth();
+          setIsLoading(false);
+        }
+        subscription.unsubscribe();
+      }
+    });
+
+    return () => subscription.unsubscribe();
   }, [searchParams, loadUserProfile, bootstrapFromSupabaseSession]);
 
   // Loading state
@@ -638,80 +699,13 @@ function AppDashboard() {
             </p>
           </div>
 
-          {/* BETA-USER BANNER — the prominent path. Most people arriving right now are the
-              email-only beta cohort who get alerts but never set a password. Lead with
-              setup; regular sign-in is the "everyone else" path below. */}
-          <div className="max-w-md mx-auto mb-6 rounded-2xl border-2 border-purple-500/50 bg-gradient-to-br from-blue-950/60 to-purple-950/60 p-6">
-            <div className="flex items-center gap-2 mb-2">
-              <span className="text-xs font-bold uppercase tracking-wider text-purple-300 bg-purple-500/20 px-2 py-1 rounded-full">Beta user?</span>
-            </div>
-            <h3 className="text-lg font-bold text-white mb-1">Already getting Mindy alerts? Set up your account.</h3>
-            <p className="text-sm text-gray-300 mb-4">
-              If you&apos;ve been getting our daily emails, you just need to set a password once.
-              Enter your email and we&apos;ll send your secure setup link.
-            </p>
-            {betaSent ? (
-              <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-200">
-                ✅ Check your inbox — we sent your setup link. Click it to set a password and get in.
-              </div>
-            ) : betaNoAccess ? (
-              // Non-entitled email — don't fake a sent link. Point them to the free
-              // signup form right below this banner.
-              <div className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
-                We couldn&apos;t find Mindy access for that email.{' '}
-                <button
-                  type="button"
-                  onClick={() => { setIsSignUpMode(true); setBetaNoAccess(false); }}
-                  className="font-semibold underline hover:text-white"
-                >
-                  Create a free account →
-                </button>
-              </div>
-            ) : (
-              // Stacked (not side-by-side): the "Set up my account →" label is too
-              // long to sit next to the input inside this max-w-md card — side-by-side
-              // overflowed the box. Full-width button below the input fits every width.
-              <div className="flex flex-col gap-2">
-                <input
-                  type="email"
-                  value={betaEmail}
-                  onChange={(e) => setBetaEmail(e.target.value)}
-                  placeholder="you@company.com"
-                  className="w-full rounded-lg border border-gray-700 bg-gray-900 px-4 py-3 text-white placeholder:text-gray-500 outline-none focus:border-purple-500"
-                />
-                <button
-                  type="button"
-                  disabled={betaLoading || !betaEmail.includes('@')}
-                  onClick={async () => {
-                    setBetaLoading(true);
-                    try {
-                      const res = await fetch('/api/auth/mindy-account-setup/request', {
-                        method: 'POST', headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email: betaEmail.trim().toLowerCase() }),
-                      });
-                      const data = await res.json().catch(() => null);
-                      // entitled:false → they have no access; route to signup instead
-                      // of a dead-end "check your inbox".
-                      if (data && data.entitled === false) setBetaNoAccess(true);
-                      else setBetaSent(true);
-                    } catch { setBetaSent(true); }
-                    finally { setBetaLoading(false); }
-                  }}
-                  className="w-full rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-5 py-3 text-sm font-semibold text-white hover:from-blue-500 hover:to-purple-500 disabled:opacity-50"
-                >
-                  {betaLoading ? 'Sending…' : 'Set up my account →'}
-                </button>
-              </div>
-            )}
-          </div>
-
-          {/* Email Entry — regular sign-in / create-account for everyone else */}
+          {/* Email Entry — magic-link-first sign-in / create-account */}
           <div className="bg-gray-900/50 rounded-2xl border border-gray-800 p-8 max-w-md mx-auto">
             {/* Sign-in / Sign-up toggle */}
             {!signUpSent && authStep === 'credentials' && (
               <div className="flex rounded-lg bg-gray-800 p-1 mb-6">
                 <button
-                  onClick={() => { setIsSignUpMode(false); setAuthError(null); setAuthMessage(null); }}
+                  onClick={() => { setIsSignUpMode(false); setAuthError(null); setAuthMessage(null); setMagicLinkSent(false); setUsePasswordSignIn(false); }}
                   className={`flex-1 py-2 px-4 rounded-md text-sm font-medium transition-colors ${
                     !isSignUpMode ? 'bg-emerald-600 text-white' : 'text-gray-400 hover:text-white'
                   }`}
@@ -730,7 +724,15 @@ function AppDashboard() {
             )}
 
             <h2 className="text-lg font-semibold text-white mb-4 text-center">
-              {signUpSent ? 'Check your email' : isSignUpMode ? 'Create your free account' : authStep === 'credentials' ? 'Sign in to Mindy' : 'Enter verification code'}
+              {signUpSent
+                ? 'Check your email'
+                : magicLinkSent && !isSignUpMode
+                  ? 'Check your email'
+                  : isSignUpMode
+                    ? 'Create your free account'
+                    : authStep === 'credentials'
+                      ? (usePasswordSignIn ? 'Sign in with password' : 'Sign in to Mindy')
+                      : 'Enter verification code'}
             </h2>
 
             {resetSuccess && authStep === 'credentials' && !isSignUpMode && (
@@ -884,6 +886,81 @@ function AppDashboard() {
                   Free includes: Daily alerts, market research (4 reports), opportunity search
                 </div>
               </form>
+            ) : authStep === 'credentials' && magicLinkSent && !isSignUpMode ? (
+              <div className="text-center space-y-4">
+                <div className="w-16 h-16 rounded-full bg-emerald-500/20 flex items-center justify-center mx-auto">
+                  <svg className="w-8 h-8 text-emerald-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+                  </svg>
+                </div>
+                <p className="text-gray-300">
+                  We sent a sign-in link to <span className="text-white font-medium">{pendingEmail}</span>
+                </p>
+                <p className="text-gray-500 text-sm">
+                  Click the link in your email to open Mindy. No password needed. If it expired, request a fresh one below.
+                </p>
+                <button
+                  type="button"
+                  onClick={() => requestMagicLinkSignIn(pendingEmail)}
+                  disabled={authLoading}
+                  className="text-emerald-400 hover:text-emerald-300 text-sm font-medium disabled:text-gray-600"
+                >
+                  {authLoading ? 'Sending…' : 'Send a fresh link'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setMagicLinkSent(false);
+                    setAuthMessage(null);
+                    setUsePasswordSignIn(true);
+                  }}
+                  className="block w-full text-sm text-gray-500 hover:text-gray-300"
+                >
+                  Sign in with password instead
+                </button>
+              </div>
+            ) : authStep === 'credentials' && !isSignUpMode && !usePasswordSignIn ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const formData = new FormData(e.currentTarget);
+                  const emailValue = formData.get('magic_email') as string;
+                  requestMagicLinkSignIn(emailValue);
+                }}
+                className="space-y-4"
+              >
+                <p className="text-center text-gray-400 text-sm">
+                  Enter your email — we&apos;ll send a secure link. Click it to open Mindy. No password to remember.
+                </p>
+                <input
+                  type="email"
+                  name="magic_email"
+                  value={pendingEmail}
+                  onChange={(e) => setPendingEmail(e.target.value)}
+                  placeholder="your@email.com"
+                  required
+                  autoComplete="email"
+                  className="w-full px-4 py-3 bg-gray-800 border border-gray-700 rounded-lg text-white placeholder-gray-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+                />
+                <button
+                  type="submit"
+                  disabled={authLoading || !pendingEmail.trim().includes('@')}
+                  className="w-full px-4 py-3 bg-emerald-600 hover:bg-emerald-500 disabled:bg-gray-700 disabled:text-gray-400 text-white font-medium rounded-lg transition-colors"
+                >
+                  {authLoading ? 'Sending link…' : 'Email me a sign-in link'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    setAuthError(null);
+                    setAuthMessage(null);
+                    setUsePasswordSignIn(true);
+                  }}
+                  className="w-full text-sm text-gray-500 hover:text-gray-300"
+                >
+                  Sign in with password instead
+                </button>
+              </form>
             ) : authStep === 'credentials' ? (
               <form
                 onSubmit={(e) => {
@@ -925,13 +1002,20 @@ function AppDashboard() {
                     {showSignInPassword ? 'Hide' : 'Show'}
                   </button>
                 </div>
-                <div className="flex items-center justify-between text-sm">
-                  <Link href="/setup-account" className="font-medium text-slate-400 hover:text-slate-200">
-                    Set up account
-                  </Link>
-                  <Link href="/forgot-password" className="text-sm font-medium text-emerald-400 hover:text-emerald-300">
-                    Forgot password?
-                  </Link>
+                <div className="flex items-center justify-end text-sm">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAuthError(null);
+                      setAuthMessage(null);
+                      setNeedsSetup(false);
+                      setUsePasswordSignIn(false);
+                      setMagicLinkSent(false);
+                    }}
+                    className="font-medium text-emerald-400 hover:text-emerald-300"
+                  >
+                    Email me a sign-in link instead
+                  </button>
                 </div>
                 <button
                   type="submit"
@@ -1007,23 +1091,11 @@ function AppDashboard() {
             {needsSetup && (
               <button
                 type="button"
-                onClick={async () => {
-                  setAuthError(null); setAuthMessage(null); setAuthLoading(true);
-                  try {
-                    await fetch('/api/auth/mindy-account-setup/request', {
-                      method: 'POST', headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ email: (email || '').trim().toLowerCase() }),
-                    });
-                    setNeedsSetup(false);
-                    setAuthMessage('Check your inbox — we sent a secure link to set your password and get you in.');
-                  } catch {
-                    setAuthError('Could not send the setup link. Try again in a moment.');
-                  } finally { setAuthLoading(false); }
-                }}
-                disabled={authLoading}
+                onClick={() => requestMagicLinkSignIn(pendingEmail)}
+                disabled={authLoading || !pendingEmail.includes('@')}
                 className="mt-3 w-full rounded-lg bg-gradient-to-r from-blue-600 to-purple-600 px-4 py-3 text-sm font-semibold text-white hover:from-blue-500 hover:to-purple-500 disabled:opacity-60"
               >
-                Set up my account →
+                Email me a sign-in link →
               </button>
             )}
           </div>

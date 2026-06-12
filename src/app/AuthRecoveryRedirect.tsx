@@ -21,6 +21,10 @@ function getRecoveryDestination(hash: string): string | null {
     return `${MINDY_ORIGIN}/app/setup-password${hash}`;
   }
 
+  if (type === 'magiclink') {
+    return `${MINDY_ORIGIN}/app${hash}`;
+  }
+
   return null;
 }
 
