@@ -32,11 +32,9 @@ import {
   getAlertEmailCta,
   renderAlertTopBannerHtml,
   renderBootcampPromoHtml,
-  renderKeywordSetupNudgeHtml,
   renderMarketCoverageTeaserHtml,
   renderMindyV10PromoHtml,
-  renderNarrowMarketNudgeHtml,
-  MINDY_MARKET_RESEARCH_URL,
+  renderProfileActionStripHtml,
 } from '@/lib/alerts/email-promo';
 import { MINDY_APP_URL, MINDY_FROM_NAME, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 
@@ -1337,6 +1335,7 @@ async function sendDailyAlertEmail(
     <p style="color: #94a3b8; margin: 6px 0 0 0; font-size: 14px;">
       ${formatDate(new Date().toISOString())} • ${totalCount} matches found
     </p>
+    ${alertCta.showHeaderPromo ? `
     <p style="color: #cbd5e1; margin: 10px auto 0 auto; font-size: 12px; line-height: 1.5; max-width: 440px;">
       ${alertCta.headerSubtitle}
     </p>
@@ -1345,12 +1344,12 @@ async function sendDailyAlertEmail(
         ${alertCta.label}
       </a>
     </p>
+    ` : ''}
   </div>
 
-  ${renderMarketCoverageTeaserHtml(alertCta, preferencesUrl, trackedUrl)}
+  ${renderMarketCoverageTeaserHtml(alertCta)}
 
-  ${alertCta.stage === 'unconfigured' ? renderKeywordSetupNudgeHtml(preferencesUrl, trackedUrl) : ''}
-  ${alertCta.stage === 'narrow_market' ? renderNarrowMarketNudgeHtml(MINDY_MARKET_RESEARCH_URL, alertCta.naicsCount ?? 1, trackedUrl) : ''}
+  ${renderProfileActionStripHtml(alertCta, trackedUrl)}
 
   <!-- Filter summary -->
   <div style="background: #1e293b; padding: 12px 20px; border-bottom: 1px solid #334155;">
@@ -1460,8 +1459,8 @@ async function sendDailyAlertEmail(
     <p style="color: #ddd6fe; margin: 0 0 16px 0; font-size: 13px; line-height: 1.5;">
       ${alertCta.footerBody}
     </p>
-    <a href="${trackedUrl(alertCta.url, alertCta.trackingLabel, 'ranked_dashboard')}" style="background: white; color: #5b21b6; padding: 11px 24px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 14px; display: inline-block;">
-      ${alertCta.label}
+    <a href="${trackedUrl(alertCta.footerCtaUrl, alertCta.trackingLabel, 'ranked_dashboard')}" style="background: white; color: #5b21b6; padding: 11px 24px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 14px; display: inline-block;">
+      ${alertCta.footerCtaLabel}
     </a>
     <p style="color: #c4b5fd; font-size: 11px; margin: 10px 0 0 0;">
       ${alertCta.footerFinePrint}
