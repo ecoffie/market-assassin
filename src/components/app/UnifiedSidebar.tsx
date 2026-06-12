@@ -33,6 +33,7 @@ import {
 } from 'lucide-react';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
+import { UpgradeModal } from './UpgradeModal';
 
 // Panel types for the unified MI platform
 export type AppPanel =
@@ -337,6 +338,9 @@ export default function UnifiedSidebar({
 }: UnifiedSidebarProps) {
   // Bottom-of-sidebar account menu open state.
   const [accountMenuOpen, setAccountMenuOpen] = useState(false);
+  // Free user clicked a Pro-locked feature → open the upgrade modal (highest-
+  // intent conversion moment). Holds the clicked item id so the modal can name it.
+  const [upgradeFeature, setUpgradeFeature] = useState<string | null>(null);
   const [hoveredItem, setHoveredItem] = useState<AppPanel | null>(null);
   // Collapsed-state tooltip rendered with position:fixed so the nav's
   // overflow-y-auto scroll clip can't eat it. Captured from the hovered
@@ -524,7 +528,7 @@ export default function UnifiedSidebar({
                     ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                     : canAccess
                       ? 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                      : 'text-slate-600 cursor-not-allowed opacity-50'
+                      : 'text-slate-500 hover:bg-purple-500/10 hover:text-purple-300 cursor-pointer'
                   }
                   ${isCollapsed ? 'justify-center' : ''}
                 `;
@@ -590,13 +594,16 @@ export default function UnifiedSidebar({
                         // a panel — they expect the chosen panel to
                         // take focus, not stare at the menu.
                         onMobileClose?.();
+                      } else {
+                        // Locked Pro feature + a free user clicked it = the
+                        // highest-intent upgrade signal. Open the upgrade modal
+                        // (named to the feature) instead of doing nothing.
+                        setUpgradeFeature(item.id);
                       }
                     }}
                     onMouseEnter={(e) => { setHoveredItem(item.id); showTooltip(e, display.label, item.badge, !canAccess); }}
                     onMouseLeave={() => { setHoveredItem(null); setTooltip(null); }}
-                    disabled={!canAccess}
                     className={sharedClassName}
-                    
                   >
                     {innerContent}
                   </button>
@@ -705,6 +712,9 @@ export default function UnifiedSidebar({
         </div>
       )}
       </aside>
+
+      {/* Free→paid upgrade modal — opens when a free user clicks a locked feature. */}
+      <UpgradeModal featureId={upgradeFeature} onClose={() => setUpgradeFeature(null)} />
     </>
   );
 }
