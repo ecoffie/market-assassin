@@ -89,12 +89,16 @@ async function fetchEntitledEmails(supabase: SupabaseClient): Promise<Set<string
     if (ACCESS_FLAGS.some((f) => r[f] === true)) out.add(e);
   }
 
-  const notif = await fetchAllRows<{ user_email?: string }>(
-    supabase, 'user_notification_settings', 'user_email',
+  // IMPORTANT: only briefings_enabled users count as entitled — this MUST match
+  // the setup-invite cron's filter. Counting every notification-settings row
+  // (the whole free daily-alert base, ~10k) inflated the denominator 13× and
+  // made conversion read 2.8% instead of the real rate.
+  const notif = await fetchAllRows<{ user_email?: string; briefings_enabled?: boolean }>(
+    supabase, 'user_notification_settings', 'user_email, briefings_enabled',
   );
   for (const r of notif) {
     const e = norm(r.user_email);
-    if (e) out.add(e);
+    if (e && r.briefings_enabled === true) out.add(e);
   }
 
   return out;
