@@ -13,6 +13,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
+import { getMIApiHeaders } from '../authHeaders';
 import { useToast } from '../Toast';
 import { useAppTracker } from '../track';
 import SaveContactButton from '../contacts/SaveContactButton';
@@ -1291,7 +1292,7 @@ function TargetContacts({ agency, email }: { agency: string; email: string }) {
     setLoading(true);
     // Pull a generous set we can search client-side (a card preview + filter).
     const p = new URLSearchParams({ email, agency, limit: '250' });
-    fetch(`/api/app/federal-contacts?${p.toString()}`)
+    fetch(`/api/app/federal-contacts?${p.toString()}`, { headers: getMIApiHeaders(email) })
       .then(r => r.json())
       .then(d => {
         const list: TargetContact[] = d?.contacts || d?.results || [];
