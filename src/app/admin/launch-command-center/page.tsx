@@ -217,7 +217,7 @@ const launchHealthClasses: Record<LaunchHealth, string> = {
 const roleLanes: RoleLane[] = [
   {
     name: 'Customer Validation',
-    owners: 'Annelle, Sikander',
+    owners: 'Shanoor, Sikander',
     mission: 'Talk to users first and learn what makes MI useful enough to open every week.',
     nextAction: 'Run A1/A2 customer calls, tag blockers, and surface upgrade or proof-story candidates.',
     signal: 'Replies, booked calls, profile blockers, upgrade intent',
@@ -267,7 +267,7 @@ const priorities: Priority[] = [
   },
   {
     priority: 'Customer-first outreach',
-    owner: 'Annelle / Sikander',
+    owner: 'Shanoor / Sikander',
     decision: 'Talk to users before advisory board outreach.',
     status: 'Ready to run',
     tone: 'blue',
@@ -298,7 +298,7 @@ const priorities: Priority[] = [
 const queueItems: QueueItem[] = [
   {
     queue: 'A1 Customer Outreach',
-    owner: 'Annelle',
+    owner: 'Shanoor',
     segment: 'Paid buyers, bundle buyers, active MI users',
     nextAction: 'Book validation calls and ask what would make MI weekly-useful.',
     status: 'Start this week',
@@ -1341,7 +1341,7 @@ export default function LaunchCommandCenterPage() {
           <div className="rounded-lg border border-blue-500/30 bg-blue-500/10 p-5">
             <p className="text-sm uppercase tracking-[0.18em] text-blue-200">Current Focus</p>
             <p className="mt-3 text-2xl font-bold">Talk to users first</p>
-            <p className="mt-3 text-sm text-blue-100/80">Annelle and Sikander validate customers before broader advisory outreach.</p>
+            <p className="mt-3 text-sm text-blue-100/80">Shanoor and Sikander validate customers before broader advisory outreach.</p>
           </div>
           <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-5">
             <p className="text-sm uppercase tracking-[0.18em] text-amber-200">Sales Lever</p>
@@ -1491,7 +1491,7 @@ export default function LaunchCommandCenterPage() {
                 Wire customer qualification, Stripe tier, MI profile state, email engagement, and app activity.
               </p>
               <p className="rounded-lg border border-slate-800 bg-slate-950/50 p-4">
-                Create owner-specific views for Annelle, Sikander, coaches, Branden, and social media owners.
+                Create owner-specific views for Shanoor, Sikander, coaches, Branden, and social media owners.
               </p>
               <p className="rounded-lg border border-slate-800 bg-slate-950/50 p-4">
                 Add Slack-ready summary generation so Eric can send one link and one brief.

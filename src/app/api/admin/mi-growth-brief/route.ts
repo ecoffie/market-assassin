@@ -478,7 +478,7 @@ export async function GET(request: NextRequest) {
     .map(user => queueItem(
       user,
       'Imported or alert-enabled user has no profile/account activity signal.',
-      'Annelle / Sikander',
+      'Shanoor / Sikander',
       'Send account setup invite and confirm they can log in.'
     ));
 
@@ -498,7 +498,7 @@ export async function GET(request: NextRequest) {
     .map(user => queueItem(
       user,
       'User clicked email but did not spend time in MI.',
-      'Annelle / Sikander',
+      'Shanoor / Sikander',
       'Send a direct deep link and ask what blocked them.'
     ));
 
@@ -543,7 +543,7 @@ export async function GET(request: NextRequest) {
     setupInvite.length > 0 ? {
       priority: 'high',
       lever: 'Account setup',
-      owner: 'Annelle / Sikander',
+      owner: 'Shanoor / Sikander',
       action: `Work the first ${Math.min(setupInvite.length, 25)} setup invite candidates.`,
       why: `${importedNoAccount} users appear imported or alert-enabled without a profile/account activity signal.`,
     } : null,
@@ -557,7 +557,7 @@ export async function GET(request: NextRequest) {
     activationRescue.length > 0 ? {
       priority: 'medium',
       lever: 'Email-to-app activation',
-      owner: 'Annelle / Sikander',
+      owner: 'Shanoor / Sikander',
       action: 'Follow up with clickers who never made it into MI.',
       why: 'Clicks without app time usually means a deep-link, loading, or first-screen problem.',
     } : null,

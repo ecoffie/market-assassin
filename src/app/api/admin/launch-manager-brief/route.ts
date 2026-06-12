@@ -43,7 +43,7 @@ const launches = [
     ],
     actions: [
       {
-        owner: 'Annelle/Sikander',
+        owner: 'Shanoor/Sikander',
         area: 'outreach',
         action: 'Work the setup and profile-nudge queue before broad selling.',
         dueDate: 'This week',

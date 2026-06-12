@@ -438,7 +438,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Decorate each list entry with live outreach state so Sikander
-    // and Annelle see who's already invited / called / booked / etc
+    // and Shanoor see who's already invited / called / booked / etc
     // instead of working from stale CSVs. One query, build a lookup
     // by lowercased email. Best-effort: if the join fails (table not
     // yet migrated, RLS hiccup), we still return the lists without
@@ -505,7 +505,7 @@ export async function GET(request: NextRequest) {
             action: c.recommendedAction,
           })),
 
-        // Top 25 for Annelle/Sikander outreach
+        // Top 25 for Shanoor/Sikander outreach
         salesOutreach: qualifiedCustomers
           .filter(c => ['10-10 Candidate', 'White-glove Candidate'].includes(c.segment))
           .slice(0, 25)
