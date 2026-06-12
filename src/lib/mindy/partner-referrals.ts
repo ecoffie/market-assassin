@@ -89,6 +89,22 @@ export function getPartnerByInvitationSource(
   ) ?? null;
 }
 
+/** Every partner-program contact email (lowercased). Partners ARE advocates and
+ *  vice-versa (Eric's model) — so a partner's own account is treated exactly like
+ *  an advocate: comp Pro, excluded from campaigns AND from active-user/revenue
+ *  metrics. Add a partner here → they're automatically handled, no double-entry. */
+const PARTNER_CONTACT_EMAILS = new Set(
+  PARTNER_REFERRAL_PROGRAMS
+    .map((p) => (p.contactEmail || '').toLowerCase().trim())
+    .filter(Boolean),
+);
+
+export function isPartnerContactEmail(email: string | null | undefined): boolean {
+  const normalized = (email || '').toLowerCase().trim();
+  if (!normalized) return false;
+  return PARTNER_CONTACT_EMAILS.has(normalized);
+}
+
 export function formatCentsUsd(cents: number): string {
   return new Intl.NumberFormat('en-US', {
     style: 'currency',

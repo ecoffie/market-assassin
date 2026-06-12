@@ -14,6 +14,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 
@@ -148,7 +149,7 @@ export async function GET(request: NextRequest) {
     const userEngagement: Record<string, { opens: number; clicks: number }> = {};
     for (const row of topEngagedUsers.data || []) {
       const email = row.user_email;
-      if (!email) continue;
+      if (!email || isExcludedFromMetrics(email)) continue; // skip comp/advocate/partner
       if (!userEngagement[email]) {
         userEngagement[email] = { opens: 0, clicks: 0 };
       }

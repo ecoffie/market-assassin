@@ -14,6 +14,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 
@@ -302,6 +303,9 @@ export async function GET(request: NextRequest) {
           email.includes('test@')) {
         continue;
       }
+      // Skip comp/advocate/partner accounts — they're not customers, so they must
+      // not pollute scoring, segments, or purchaser counts.
+      if (isExcludedFromMetrics(email)) continue;
 
       const purchase = purchasesByEmail.get(email);
       const briefingsCount = briefingsByEmail.get(email) || 0;

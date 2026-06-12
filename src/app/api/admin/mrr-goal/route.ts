@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
 
 /**
  * GET /api/admin/mrr-goal?password=...
@@ -86,11 +87,34 @@ export async function GET(request: NextRequest) {
       if (!data || data.length < 1000) break;
     }
 
+    // Exclude comp/advocate/partner subscriptions from MRR. Stripe subs only carry
+    // customer_id, so join customer_id → email via stripe_customers, then drop any
+    // sub whose email is a special account. (If a partner gets comp Pro via a real
+    // Stripe sub, it must not count toward the $100K.)
+    const excludedCustomerIds = new Set<string>();
+    try {
+      const customers: Array<{ id?: string; email?: string }> = [];
+      for (let from = 0; from < 60000; from += 1000) {
+        const { data, error } = await supabase
+          .from('stripe_customers')
+          .select('id, email')
+          .range(from, from + 999);
+        if (error) break;
+        customers.push(...(data || []));
+        if (!data || data.length < 1000) break;
+      }
+      for (const c of customers) {
+        if (c.id && isExcludedFromMetrics(c.email)) excludedCustomerIds.add(c.id);
+      }
+    } catch { /* customers cache optional — fall back to counting all */ }
+
+    const payingSubs = subs.filter((s) => !(s.customer_id && excludedCustomerIds.has(s.customer_id)));
+
     // plan_amount is in cents. Annual plans bill once a year → normalize to /12
     // for MRR. We infer annual from the interval field or a large amount.
     const planCounts = new Map<number, number>(); // monthly-dollar price → count
     let mrr = 0;
-    for (const s of subs) {
+    for (const s of payingSubs) {
       const cents = s.plan_amount || 0;
       if (cents <= 0) continue;
       const dollars = cents / 100;
@@ -101,7 +125,7 @@ export async function GET(request: NextRequest) {
       planCounts.set(bucket, (planCounts.get(bucket) || 0) + 1);
     }
 
-    const activeSubs = subs.length;
+    const activeSubs = payingSubs.length;
     const arpu = activeSubs > 0 ? mrr / activeSubs : 0;
 
     const byPlan = [...planCounts.entries()]

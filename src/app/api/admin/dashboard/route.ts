@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
+import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
 import fs from 'fs';
 import path from 'path';
 
@@ -558,9 +559,11 @@ async function getUserHealth() {
     );
 
     if (settingsData) {
-      health.totalUsers = settingsData.length;
+      // Exclude comp/advocate/partner accounts from every user-health count.
+      const realUsers = settingsData.filter((u: { user_email?: string }) => !isExcludedFromMetrics(u.user_email));
+      health.totalUsers = realUsers.length;
 
-      for (const user of settingsData) {
+      for (const user of realUsers) {
         const naicsCodes = user.naics_codes || [];
         const hasNaics = naicsCodes.length > 0;
         const hasBusinessType = user.business_type && user.business_type.trim() !== '';

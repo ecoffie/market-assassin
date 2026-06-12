@@ -20,6 +20,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -70,7 +71,7 @@ export async function GET(request: NextRequest) {
     const wau = new Set<string>();
     for (const r of engagement) {
       const e = (r.user_email || '').toLowerCase();
-      if (!e) continue;
+      if (!e || isExcludedFromMetrics(e)) continue; // skip comp/advocate/partner
       wau.add(e);
       if ((r.created_at || '') >= dayStart) dau.add(e);
     }
@@ -78,12 +79,14 @@ export async function GET(request: NextRequest) {
     metrics.wau = wau.size;
 
     // --- users: total, new today, profile-complete (custom NAICS) ---
-    const settings = await fetchAll<{ naics_codes: string[] | null; created_at: string | null }>((from, to) =>
+    // Exclude comp/advocate/partner accounts from every user count.
+    const settingsAll = await fetchAll<{ user_email: string | null; naics_codes: string[] | null; created_at: string | null }>((from, to) =>
       supabase
         .from('user_notification_settings')
-        .select('naics_codes, created_at')
+        .select('user_email, naics_codes, created_at')
         .range(from, to),
     );
+    const settings = settingsAll.filter((s) => !isExcludedFromMetrics(s.user_email));
     metrics.total_users = settings.length;
     metrics.new_signups = settings.filter((s) => (s.created_at || '') >= dayStart && (s.created_at || '') <= dayEnd).length;
     metrics.profile_complete = settings.filter((s) => {
@@ -104,6 +107,7 @@ export async function GET(request: NextRequest) {
     const oppByUser = new Map<string, number>();
     for (const r of alertLogs) {
       const e = (r.user_email || '').toLowerCase();
+      if (isExcludedFromMetrics(e)) continue;
       oppByUser.set(e, (oppByUser.get(e) || 0) + (r.opportunities_count || 0));
     }
     const activeNaics = await fetchAll<{ user_email: string; naics_codes: string[] | null }>((from, to) =>
@@ -115,7 +119,7 @@ export async function GET(request: NextRequest) {
         .range(from, to),
     );
     metrics.zero_alert_users_7d = activeNaics.filter(
-      (u) => (u.naics_codes || []).length > 0 && !(oppByUser.get((u.user_email || '').toLowerCase()) || 0),
+      (u) => !isExcludedFromMetrics(u.user_email) && (u.naics_codes || []).length > 0 && !(oppByUser.get((u.user_email || '').toLowerCase()) || 0),
     ).length;
 
     // --- setup/onboarding emails sent today ---
