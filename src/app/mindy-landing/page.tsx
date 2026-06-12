@@ -1,6 +1,7 @@
 import Link from 'next/link';
 import { MindySignupForm } from '@/components/mindy/MindySignupForm';
 import { DemoMedia } from '@/components/mindy/DemoMedia';
+import { BootcampBar } from '@/components/mindy/BootcampBar';
 
 // Product reels (vertical 9:16) for the "See Mindy in action" row. Vimeo player-
 // embed URLs WITH app_id — the exact form Vimeo's own oembed serves (a bare player
@@ -103,19 +104,8 @@ export default function MindyLandingPage() {
 
       {/* TOP ANNOUNCEMENT BAR — the live Mindy Bootcamp. Pinned above the hero so
           every arrival sees it; the standard placement for a time-sensitive launch.
-          Links to the GovCon Giants registration page. */}
-      <a
-        href="https://govcongiants.com/mindy-launch"
-        target="_blank"
-        rel="noopener noreferrer"
-        className="block bg-gradient-to-r from-purple-600 via-purple-500 to-blue-600 text-white text-center px-4 py-2.5 text-sm font-semibold hover:from-purple-500 hover:to-blue-500 transition-colors"
-      >
-        <span className="inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
-          <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold uppercase tracking-wide">Free Live · June 27</span>
-          <span>🚀 Mindy Bootcamp — see how to win federal contracts with AI, live</span>
-          <span className="underline underline-offset-2">Register free →</span>
-        </span>
-      </a>
+          Dismissible (× → localStorage); links to the GovCon Giants registration page. */}
+      <BootcampBar />
 
       {/* Hero Section — py-20→py-10 + tighter logo/heading margins so the signup
           form (and the beta-setup banner below) sit above the fold. Beta users land
