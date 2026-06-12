@@ -108,13 +108,55 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b[0] - a[0])
       .map(([price, count]) => ({ monthlyPrice: price, count }));
 
-    // Goal math
+    // --- One-time / lifetime cash (last 30 days) from stripe_charges ---
+    // Lifetime + bundle sales are CASH, not MRR — but they fund the business and
+    // convert leads who'd never subscribe monthly. Report them as a separate line
+    // so the goal story is honest (MRR is recurring; lifetime is cash-in).
+    let oneTimeCash30d = 0;
+    let oneTimeCount30d = 0;
+    try {
+      const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const charges: Array<{ amount?: number; status?: string; invoice?: string | null; created_at?: string }> = [];
+      for (let from = 0; from < 60000; from += 1000) {
+        const { data, error } = await supabase
+          .from('stripe_charges')
+          .select('amount, status, invoice, created_at')
+          .gte('created_at', since)
+          .range(from, from + 999);
+        if (error) break;
+        charges.push(...(data || []));
+        if (!data || data.length < 1000) break;
+      }
+      for (const c of charges) {
+        if (c.status !== 'succeeded') continue;
+        // No invoice → one-time charge (subscription renewals carry an invoice id).
+        if (c.invoice) continue;
+        oneTimeCash30d += (c.amount || 0) / 100;
+        oneTimeCount30d++;
+      }
+    } catch { /* charges table optional */ }
+
+    // Goal math (recurring)
     const subsNeededAt149 = Math.ceil(MONTHLY_GOAL / PRO_PRICE);   // 671
     const subsRemainingAt149 = Math.max(0, subsNeededAt149 - activeSubs);
     const mrrGap = Math.max(0, MONTHLY_GOAL - mrr);
-    // At the CURRENT blended ARPU, how many more subs to close the gap?
     const subsRemainingAtArpu = arpu > 0 ? Math.ceil(mrrGap / arpu) : null;
     const pctToGoal = Math.round((mrr / MONTHLY_GOAL) * 1000) / 10;
+
+    // Lifetime offers — how many lifetime sales equal the $100K/mo goal if we
+    // count lifetime cash amortized over 12 months (a common way to value LTV
+    // against an MRR target). Tunable price points the team is using.
+    const LIFETIME_OFFERS = [
+      { name: 'Ultimate Giant Bundle (lifetime)', price: 1497 },
+      { name: 'Mindy Lifetime', price: 2997 },
+    ];
+    const lifetimeScenarios = LIFETIME_OFFERS.map((o) => ({
+      ...o,
+      // Cash needed to fund one $100K month = the monthly gap; how many sales.
+      salesToFundGoalMonth: Math.ceil(MONTHLY_GOAL / o.price),
+      // If amortized over 12 months, MRR-equivalent per sale.
+      mrrEquivPerSale: Math.round(o.price / 12),
+    }));
 
     return NextResponse.json({
       success: true,
@@ -129,6 +171,9 @@ export async function GET(request: NextRequest) {
       subsRemainingAt149,
       subsRemainingAtArpu,
       mrrGap: Math.round(mrrGap),
+      oneTimeCash30d: Math.round(oneTimeCash30d),
+      oneTimeCount30d,
+      lifetimeScenarios,
     });
   } catch (err) {
     console.error('[mrr-goal] error', err);
