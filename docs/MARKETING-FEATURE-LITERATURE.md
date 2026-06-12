@@ -822,3 +822,45 @@ device, including mobile drawers. Show-password on the real sign-in. Account act
 Settings, Switch account, Sign out — consolidated in one expected place that shows who's
 logged in. Polished against real mobile-viewport bugs (the menu was cut off behind the
 phone browser toolbar — fixed with dynamic-viewport sizing).
+
+## 28. Type a market like "drones" — get the whole map, no NAICS knowledge needed
+
+**What:** The global lookup bar in the Mindy app now accepts plain-English market
+terms, not just contract numbers and companies. Type "drones" or "medical supplies"
+and Mindy drops you into Market Research in Sport mode and auto-builds the full
+market map: total market size, every buying NAICS code, the coverage %, the top PSC
+(what's actually bought), and the search keywords to add to your alerts. You never
+have to know a single NAICS code.
+
+**Why:** A product like "drones" sprawls across **42 buying NAICS codes** — the one
+"obvious" code (336411 Aircraft Mfg) is only **28%** of the market. Search that code
+alone and you miss **72% of the money**. NAICS is the wrong starting point for
+discovery; the plain-English term is. Mindy auto-derives the ~90%-coverage code set
+invisibly, so the user works in their own language and still catches the whole market.
+
+**SEO:** "how to find all NAICS codes for drones", "what NAICS code for medical
+supplies federal contracts", "federal market research by keyword", "find government
+buyers for a product".
+
+**Proof (live, USASpending FY2025):**
+- "drones" → **$242.7M** market, **42 NAICS** codes (Mindy tracks 91% across 9),
+  obvious code = 28%, top PSC **1550 Unmanned Aircraft**, 152 buying agencies.
+- "medical supplies" → **$25.2M**, **35 NAICS** codes (91% across 7), obvious code =
+  25%, top PSC **6515 Medical & Surgical Instruments/Equipment/Supplies**.
+
+## 29. Live Mindy Bootcamp — registration pinned to the top of the homepage
+
+**What:** A top announcement bar across the Mindy homepage promotes the free live
+Mindy Bootcamp (launch June 27) and links straight to the GovCon Giants registration
+page (govcongiants.com/mindy-launch). Pinned above the hero so every visitor sees it.
+
+**Why:** A live, hands-on session is the fastest way to convert a curious visitor into
+an activated user — they see Mindy win real contracts with AI before they sign up. The
+top-of-page placement is the standard for a time-sensitive launch and doesn't disrupt
+the existing free-signup and beta-setup paths below it.
+
+**SEO:** "federal contracting bootcamp", "win government contracts with AI", "GovCon
+AI training", "Mindy launch".
+
+**Proof:** Registration page live (HTTP 200) — "Meet Mindy — The AI BD Analyst for
+Federal Small Business | Live Launch June 27 | GovCon Giants".
