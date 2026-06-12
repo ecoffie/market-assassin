@@ -953,6 +953,23 @@ partner-branded landing only — not a broad SEO page.
 `/api/admin/partner-referrals?password=...&code=NCMBC`. Trial tagged via
 `trial_source=partner_ncmbc` on `user_notification_settings`.
 
+## 34. 30% recurring affiliate — partner compensation on Mindy Pro revenue
+
+**What:** Partners and influencers (starting with NCMBC at 30%) earn recurring
+commission on Mindy Pro checkout and subscription renewals. Attribution flows from
+`?ref=CODE` / `getmindy.ai/ncmbc` cookie through `/checkout` into Stripe payments;
+commissions ledger in KV; payout totals on Launch Command Center.
+
+**Why:** Launch Strategy T2–T4 calls for 20–30% recurring affiliate — you can't
+compensate creators long-term without tying payouts to attributed revenue. NCMBC
+gets the same 30% model as future Kash/Usama/Muneeba influencer codes.
+
+**SEO:** n/a (internal ops + partner-facing links).
+
+**Proof:** Default `DEFAULT_AFFILIATE_PERCENT = 30` in `partner-referrals.ts`.
+Per $149/mo Pro sub: affiliate $44.70, you keep $104.30. Command Center Partner
+& Affiliate Programs panel + `/api/admin/partner-referrals`.
+
 ## 33. Free→paid email drip — teach a GovCon lesson, sell in the P.S.
 
 **What:** A 4-email nurture sequence for free Mindy users on days 1/3/7/14 after

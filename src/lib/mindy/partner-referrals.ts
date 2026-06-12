@@ -3,6 +3,13 @@
  * Each partner gets a code (NCMBC) + slug URL (/ncmbc).
  */
 
+export const DEFAULT_AFFILIATE_PERCENT = 30;
+
+export type PartnerCompensationModel =
+  | 'affiliate_recurring'
+  | 'channel_partner'
+  | 'anchor_retainer';
+
 export interface PartnerReferralProgram {
   /** Uppercase code for ?ref=NCMBC */
   code: string;
@@ -16,6 +23,10 @@ export interface PartnerReferralProgram {
   invitationSource: string;
   /** Stored on user_notification_settings.trial_source */
   trialSource: string;
+  compensationModel: PartnerCompensationModel;
+  /** Recurring affiliate % on Mindy Pro / Team revenue (0 = no affiliate payout) */
+  affiliatePercent: number;
+  contactEmail?: string;
 }
 
 export const PARTNER_REFERRAL_PROGRAMS: PartnerReferralProgram[] = [
@@ -27,6 +38,9 @@ export const PARTNER_REFERRAL_PROGRAMS: PartnerReferralProgram[] = [
     trialDays: 30,
     invitationSource: 'partner_ncmbc',
     trialSource: 'partner_ncmbc',
+    compensationModel: 'affiliate_recurring',
+    affiliatePercent: DEFAULT_AFFILIATE_PERCENT,
+    contactEmail: 'westover105@gmail.com',
   },
 ];
 
@@ -52,6 +66,24 @@ export function getPartnerReferralBySlug(raw: string | null | undefined): Partne
   const slug = (raw || '').trim().toLowerCase();
   if (!slug) return null;
   return BY_SLUG.get(slug) ?? null;
+}
+
+export function getPartnerByInvitationSource(
+  raw: string | null | undefined,
+): PartnerReferralProgram | null {
+  const source = (raw || '').trim().toLowerCase();
+  if (!source) return null;
+  return PARTNER_REFERRAL_PROGRAMS.find(
+    (p) => p.invitationSource === source || p.trialSource === source,
+  ) ?? null;
+}
+
+export function formatCentsUsd(cents: number): string {
+  return new Intl.NumberFormat('en-US', {
+    style: 'currency',
+    currency: 'USD',
+    maximumFractionDigits: 0,
+  }).format(cents / 100);
 }
 
 /** Canonical product origin — getmindy.ai only (mi.govcongiants.com redirects here). */

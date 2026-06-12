@@ -5,7 +5,11 @@ import {
   buildStripeRedirectUrl,
   createCheckoutStart,
   parseAttributionCookie,
+  type AttributionState,
 } from "@/lib/purchase-attribution";
+import { getPartnerReferralByCode } from "@/lib/mindy/partner-referrals";
+
+const PARTNER_REF_COOKIE = "mindy_partner_ref";
 
 export const runtime = "nodejs";
 
@@ -54,6 +58,28 @@ function mergeAttributionFromQuery(request: NextRequest, cookieValue: string | u
   };
 }
 
+function mergePartnerReferral(
+  request: NextRequest,
+  attribution: AttributionState,
+): AttributionState {
+  const ref = (
+    request.nextUrl.searchParams.get("ref")
+    || request.nextUrl.searchParams.get("code")
+    || request.cookies.get(PARTNER_REF_COOKIE)?.value
+    || attribution.partner_code
+    || ""
+  ).trim();
+
+  const partner = getPartnerReferralByCode(ref);
+  if (!partner) return attribution;
+
+  return {
+    ...attribution,
+    partner_code: partner.code,
+    partner_slug: partner.slug,
+  };
+}
+
 export async function GET(request: NextRequest, { params }: Params) {
   const { product: productId } = await params;
   const product = CHECKOUT_PRODUCTS[productId];
@@ -62,9 +88,12 @@ export async function GET(request: NextRequest, { params }: Params) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
-  const attribution = mergeAttributionFromQuery(
+  const attribution = mergePartnerReferral(
     request,
-    request.cookies.get(ATTR_COOKIE)?.value,
+    mergeAttributionFromQuery(
+      request,
+      request.cookies.get(ATTR_COOKIE)?.value,
+    ),
   );
 
   const checkoutStart = await createCheckoutStart({

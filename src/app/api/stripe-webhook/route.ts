@@ -198,6 +198,37 @@ export async function POST(request: NextRequest) {
       console.error('[stripe-webhook] purchase attribution write failed (non-fatal):', attrErr);
     }
 
+    // Affiliate commission (30% recurring) — non-fatal
+    try {
+      const { recordAffiliateFromStripePayment } = await import('@/lib/mindy/affiliate-commissions');
+      const { getCheckoutStart } = await import('@/lib/purchase-attribution');
+      const attributionId =
+        session.client_reference_id || session.metadata?.attribution_id || null;
+      const checkoutStart = await getCheckoutStart(attributionId);
+      const grossCents = session.amount_total ?? checkoutStart?.amount_cents ?? 0;
+      if (grossCents > 0 && email) {
+        const commission = await recordAffiliateFromStripePayment({
+          supabase,
+          customerEmail: email,
+          grossCents,
+          stripeEventId: event.id,
+          eventType: 'checkout',
+          currency: session.currency ?? undefined,
+          productLabel: checkoutStart?.product_name || lineItemDescription,
+          partnerCode: checkoutStart?.attribution?.partner_code,
+        });
+        if (commission) {
+          console.log(
+            `[stripe-webhook] Affiliate ${commission.commissionPercent}% recorded: `
+            + `${commission.partnerCode} +$${(commission.commissionCents / 100).toFixed(2)} `
+            + `from ${email}`,
+          );
+        }
+      }
+    } catch (affiliateErr) {
+      console.error('[stripe-webhook] affiliate commission failed (non-fatal):', affiliateErr);
+    }
+
     // Auto-update access flags (always update, user_id is optional)
     const accessUpdates = await updateAccessFlags(email, tier, bundle);
 
@@ -391,6 +422,45 @@ export async function POST(request: NextRequest) {
       bundle,
       isFHCMembership,
     });
+  }
+
+  // Recurring affiliate commission on subscription renewals (not first checkout —
+  // checkout.session.completed already records the initial payment).
+  if (event.type === 'invoice.paid') {
+    const invoice = event.data.object as Stripe.Invoice;
+    if (invoice.billing_reason === 'subscription_create') {
+      return NextResponse.json({ received: true, action: 'invoice_skipped_initial' });
+    }
+
+    const grossCents = invoice.amount_paid ?? 0;
+    let email = invoice.customer_email || null;
+    if (!email && invoice.customer) {
+      const customerId = typeof invoice.customer === 'string'
+        ? invoice.customer
+        : invoice.customer.id;
+      const customer = await stripe.customers.retrieve(customerId);
+      if (!customer.deleted) email = customer.email;
+    }
+
+    if (grossCents > 0 && email) {
+      try {
+        const { recordAffiliateFromStripePayment } = await import('@/lib/mindy/affiliate-commissions');
+        const line = invoice.lines?.data?.[0];
+        await recordAffiliateFromStripePayment({
+          supabase,
+          customerEmail: email,
+          grossCents,
+          stripeEventId: event.id,
+          eventType: 'invoice',
+          currency: invoice.currency ?? undefined,
+          productLabel: line?.description || undefined,
+        });
+      } catch (affiliateErr) {
+        console.error('[stripe-webhook] invoice affiliate commission failed (non-fatal):', affiliateErr);
+      }
+    }
+
+    return NextResponse.json({ received: true, action: 'invoice_paid' });
   }
 
   // Handle subscription cancellation - revoke FHC access

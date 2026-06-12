@@ -68,6 +68,9 @@ export type AttributionState = {
   first_touch?: AttributionTouch;
   last_touch?: AttributionTouch;
   visit_count?: number;
+  /** Partner referral code e.g. NCMBC — flows to Stripe checkout attribution */
+  partner_code?: string;
+  partner_slug?: string;
 };
 
 export type CheckoutStart = {
