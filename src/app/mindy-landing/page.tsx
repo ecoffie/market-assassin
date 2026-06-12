@@ -6,12 +6,12 @@ import { BootcampBar } from '@/components/mindy/BootcampBar';
 // Product reels (vertical 9:16) for the "See Mindy in action" row. Vimeo player-
 // embed URLs WITH app_id — the exact form Vimeo's own oembed serves (a bare player
 // URL 401s for these Business team-library videos). Matched to captions by title:
-//   1200497355 "How Do I Know Which Ones to Actually Bid On" → bid/search
-//   1200497352 "5 active solicitations"                      → morning briefing
-//   1200503755 "2_Mindy_AI"                                  → market research
+//   1200736343 "5 Active Solicitations - Friday"            → "worth bidding"
+//   1200736776 "Mindy Alert: 15 New Opportunities"          → morning briefing
+//   1200735215 "Mindy Chat (CTA)"                           → ask Mindy anything
 const VIMEO_APP = 'app_id=122963';
 const reel = (id: string) => `https://player.vimeo.com/video/${id}?${VIMEO_APP}`;
-const DEMO_REELS = [reel('1200497355'), reel('1200497352'), reel('1200503755')];
+const DEMO_REELS = [reel('1200736343'), reel('1200736776'), reel('1200735215')];
 
 // Route paid CTAs through /checkout first so purchase attribution (UTM /
 // referrer captured pre-checkout) is joined to the Stripe purchase event.
