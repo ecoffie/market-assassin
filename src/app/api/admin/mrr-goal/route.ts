@@ -24,10 +24,9 @@ const PRO_PRICE = 149;
 
 interface SubRow {
   customer_id: string | null;
-  product_name: string | null;
   status: string | null;
   plan_amount: number | null; // cents (Stripe convention)
-  interval?: string | null;
+  plan_interval?: string | null;
 }
 
 export async function GET(request: NextRequest) {
@@ -79,7 +78,7 @@ export async function GET(request: NextRequest) {
     for (let from = 0; from < 60000; from += 1000) {
       const { data, error } = await supabase
         .from('stripe_subscriptions')
-        .select('customer_id, product_name, status, plan_amount, interval')
+        .select('customer_id, status, plan_amount, plan_interval')
         .in('status', PAYING)
         .range(from, from + 999);
       if (error) break;
@@ -95,7 +94,7 @@ export async function GET(request: NextRequest) {
       const cents = s.plan_amount || 0;
       if (cents <= 0) continue;
       const dollars = cents / 100;
-      const isAnnual = (s.interval === 'year') || dollars >= 1000; // $1,490/yr etc.
+      const isAnnual = (s.plan_interval === 'year') || dollars >= 1000; // $1,490/yr etc.
       const monthly = isAnnual ? dollars / 12 : dollars;
       mrr += monthly;
       const bucket = Math.round(monthly);
