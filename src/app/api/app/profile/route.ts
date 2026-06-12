@@ -15,6 +15,7 @@ export async function POST(request: NextRequest) {
       email,
       businessDescription,
       naicsCodes,
+      pscCodes,
       keywords,
       setAsides,
       businessType,
@@ -98,6 +99,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // PSC codes — what was actually BOUGHT (the most precise opportunity signal).
+    // Written into updateData; if the psc_codes column doesn't exist yet, the
+    // write below retries without it (see the column-guard around settingsWrite).
+    const safePscCodes = Array.isArray(pscCodes)
+      ? Array.from(new Set(pscCodes.map((c: unknown) => String(c).trim().toUpperCase()).filter(Boolean))).slice(0, 30)
+      : null;
+    if (safePscCodes) {
+      updateData.psc_codes = safePscCodes;
+    }
+
     if (Array.isArray(setAsides)) {
       updateData.set_aside_preferences = safeSetAsides;
     }
@@ -152,23 +163,27 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    const settingsWrite = existingSettings
-      ? supabase
-          .from('user_notification_settings')
-          .update(updateData)
-          .eq('user_email', normalizedEmail)
-      : supabase.from('user_notification_settings').insert({
-          user_email: normalizedEmail,
-          treatment_type: 'free',
-          alerts_enabled: true,
-          briefings_enabled: false,
-          alert_frequency: 'daily',
-          timezone: 'America/New_York',
-          created_at: new Date().toISOString(),
-          ...updateData,
-        });
+    const baseInsert = {
+      user_email: normalizedEmail,
+      treatment_type: 'free',
+      alerts_enabled: true,
+      briefings_enabled: false,
+      alert_frequency: 'daily',
+      timezone: 'America/New_York',
+      created_at: new Date().toISOString(),
+    };
+    const runWrite = (payload: Record<string, unknown>) => existingSettings
+      ? supabase.from('user_notification_settings').update(payload).eq('user_email', normalizedEmail)
+      : supabase.from('user_notification_settings').insert({ ...baseInsert, ...payload });
 
-    const { error: updateError } = await settingsWrite;
+    let { error: updateError } = await runWrite(updateData);
+    // Column-guard: if psc_codes doesn't exist yet, retry without it so the rest
+    // of the profile still saves (PSC starts working once the migration is run).
+    if (updateError && /psc_codes/.test(updateError.message)) {
+      const { psc_codes: _drop, ...withoutPsc } = updateData;
+      void _drop;
+      ({ error: updateError } = await runWrite(withoutPsc));
+    }
 
     // Fill auto-derived keywords ONLY if the user has none (never clobber tuned).
     if (!updateError && deriveKw.length > 0) {

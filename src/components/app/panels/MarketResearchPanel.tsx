@@ -1015,21 +1015,22 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   // researched demolition" actually starts matching their daily alerts.
   const saveResearchToProfile = useCallback(async (
     naics: Array<{ code: string }>,
+    psc: Array<{ code: string }>,
     keyword: string,
   ) => {
     if (!email) { showToast({ message: 'Sign in to save to your profile.', variant: 'error' }); return; }
     setSavingProfile(true);
     try {
       const naicsCodes = naics.map((n) => n.code);
+      const pscCodes = psc.map((p) => p.code);
       const keywords = keyword.trim() ? [keyword.trim()] : [];
-      // NOTE: PSC isn't saved — user_notification_settings has no psc_codes column
-      // in production yet. NAICS + keywords are what drive the user's alerts.
       const res = await fetch('/api/app/profile', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
         body: JSON.stringify({
           email,
           naicsCodes,        // REPLACES the profile's NAICS (the route sets, not appends)
+          pscCodes,          // PSC = what was bought (most precise signal); OR'd into alert matching
           keywords,
           businessType: formData.businessType || 'Small Business',
         }),
@@ -1891,7 +1892,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                         <button
                           type="button"
                           disabled={savingProfile}
-                          onClick={() => saveResearchToProfile(sportSuggestions.naics, sportKeyword)}
+                          onClick={() => saveResearchToProfile(sportSuggestions.naics, sportSuggestions.psc, sportKeyword)}
                           className="mt-2 w-full rounded-lg border border-purple-500/40 bg-purple-500/10 px-3 py-2 text-xs font-semibold text-purple-200 hover:bg-purple-500/20 disabled:opacity-60"
                           title="Replaces your current NAICS with this market's codes and adds the keyword to your alerts"
                         >

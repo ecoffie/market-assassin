@@ -94,6 +94,7 @@ const TIMEZONE_OFFSETS: Record<string, number> = {
 interface AlertUser {
   user_email: string;
   naics_codes: string[];
+  psc_codes?: string[] | null;
   keywords: string[] | null;
   business_type: string | null;
   business_description?: string | null;
@@ -594,8 +595,13 @@ async function runDailyAlertJob(options?: {
             states: userStates,
           });
 
+          // PSC = what was actually BOUGHT — the most precise opportunity signal.
+          // OR'd with NAICS/keywords in the cache fetcher (psc_code.like.X%).
+          const userPsc = (user.psc_codes || []).filter(Boolean);
+
           const cacheResult = await fetchSamOpportunitiesFromCache({
             naicsCodes: expandedNaics,
+            pscCodes: userPsc.length > 0 ? userPsc : undefined,
             keywords: userKeywords.length > 0 ? userKeywords : undefined,
             setAsides,
             states: userStates,
