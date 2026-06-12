@@ -913,3 +913,23 @@ forecast [agency]", "pre-solicitation opportunities", "DOD forecast".
 
 **Proof (live):** govcongiants.com/data/forecasts shows 7,824 / 15 agencies + real
 titles. Endpoint: getmindy.ai/api/forecasts-preview (public, Supabase-only, edge-cached).
+
+## 32. Upgrade modal — turn the "locked feature" click into a sale
+
+**What:** When a free Mindy user clicks a Pro-locked feature in the sidebar (Today's
+Intel, Forecasts, Pricing Intel, Proposal Assist, etc.), Mindy now opens a clean
+upgrade modal that NAMES the feature they reached for, shows what Pro unlocks, and
+sends them straight to checkout — instead of the old silent disabled button that did
+nothing. Locked items now look clickable (purple hover), not dead.
+
+**Why:** A free user clicking a paid feature is the single highest-intent upgrade
+signal there is — they're literally reaching for the thing they'd pay for. Wasting
+that click on an inert button left money on the table. This is the first piece of the
+free→paid conversion engine toward the $100K/mo goal: convert intent at the exact
+moment it spikes, with a feature-specific pitch and a one-click $149 checkout
+(attribution-tracked).
+
+**SEO:** n/a (in-app conversion surface, members only).
+
+**Proof:** Live in the /app sidebar. CTA routes to /checkout/mindy-pro-monthly (307 →
+Stripe, attribution captured). Feature-named pitches for all 12 Pro-locked panels.
