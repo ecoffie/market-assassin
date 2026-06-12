@@ -896,10 +896,18 @@ export async function fetchSamOpportunitiesFromCache(
   console.log(`[SAM Cache] Querying database for ${searchCriteria.join(' | ') || 'all opportunities'}`);
 
   try {
+    // Explicit columns (not select('*')) — avoids pulling the wide raw_data JSONB
+    // (~50KB/row) into memory on this hot per-user query. These are exactly the
+    // fields the mapper below reads.
     const query = applySamCacheFilters(
       supabase
         .from('sam_opportunities')
-        .select('*')
+        .select(
+          'notice_id, title, solicitation_number, naics_code, psc_code, description, ' +
+          'department, sub_tier, office, posted_date, response_deadline, archive_date, ' +
+          'set_aside_code, set_aside_description, notice_type, active, ' +
+          'pop_city, pop_state, pop_zip, pop_country, ui_link, last_modified'
+        )
         .order('response_deadline', { ascending: true })
         .limit(limit),
       params
