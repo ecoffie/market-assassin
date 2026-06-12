@@ -41,6 +41,7 @@ type MrrGoal = {
   upgradeModalCtaClicks?: number;
   upgradeModalCtr?: number;
   topUpgradeFeatures?: Array<{ feature: string; count: number }>;
+  dripSends30d?: number;
 };
 
 // Lead targets to hit the remaining $149 subs at three close rates. Anchored to
@@ -875,7 +876,12 @@ export default function LaunchCommandCenterPage() {
 
               {/* UPGRADE-MODAL INTENT — the free→paid funnel's first step, measured. */}
               <div className="mt-6 rounded-xl border border-blue-500/30 bg-blue-500/5 p-4">
-                <p className="text-sm font-semibold text-blue-200">Free→paid upgrade modal (last 30 days)</p>
+                <div className="flex items-baseline justify-between">
+                  <p className="text-sm font-semibold text-blue-200">Free→paid funnel (last 30 days)</p>
+                  {(mrrGoal.dripSends30d || 0) > 0 && (
+                    <span className="text-xs text-slate-400"><b className="text-white">{mrrGoal.dripSends30d}</b> nurture emails sent</span>
+                  )}
+                </div>
                 {(mrrGoal.upgradeModalShown || 0) === 0 ? (
                   <p className="mt-1 text-xs text-slate-500">No upgrade-modal opens yet — free users haven&apos;t clicked a locked feature in this window (or it just shipped).</p>
                 ) : (

@@ -952,3 +952,24 @@ partner-branded landing only — not a broad SEO page.
 **Proof:** Landing at getmindy.ai/ncmbc. Admin cohort:
 `/api/admin/partner-referrals?password=...&code=NCMBC`. Trial tagged via
 `trial_source=partner_ncmbc` on `user_notification_settings`.
+
+## 33. Free→paid email drip — teach a GovCon lesson, sell in the P.S.
+
+**What:** A 4-email nurture sequence for free Mindy users on days 1/3/7/14 after
+signup. Each email teaches ONE real GovCon lesson — the 72%-hidden NAICS coverage
+trap, the $430B of expiring contracts, why opportunity titles lie (body search), and
+the bid/no-bid discipline that separates winners — with homework. Mindy Pro shows up
+only as the quiet enabler in the P.S. ("doing this by hand takes hours; Mindy does it
+in seconds").
+
+**Why:** The in-app upgrade modal only catches free users who are already in the app.
+The drip reaches the thousands who aren't logging in daily — especially the bootcamp
+leads. Value-first (not feature-tour) is how GovCon Giants email converts: lead with a
+lesson, earn the click, let the product be the payoff. It's the volume engine for the
+free→paid funnel toward $100K.
+
+**SEO:** n/a (lifecycle email).
+
+**Proof:** Live cron (dispatcher `upgrade-drip`, daily 15:00 UTC). 9,164 free users in
+the pipeline; deduped per (email,emailType); respects the global daily cap. Drip-send
+count surfaces on the command center's $100K goal panel.

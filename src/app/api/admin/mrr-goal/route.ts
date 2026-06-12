@@ -177,6 +177,19 @@ export async function GET(request: NextRequest) {
       .slice(0, 5)
       .map(([feature, count]) => ({ feature, count }));
 
+    // --- Upgrade drip sends (last 30 days) from email_provider_sends ---
+    let dripSends30d = 0;
+    try {
+      const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+      const dripTypes = ['upgrade_drip_d1', 'upgrade_drip_d3', 'upgrade_drip_d7', 'upgrade_drip_d14'];
+      const { count } = await supabase
+        .from('email_provider_sends')
+        .select('id', { count: 'exact', head: true })
+        .in('email_type', dripTypes)
+        .gte('sent_at', since);
+      dripSends30d = count || 0;
+    } catch { /* optional */ }
+
     // Goal math (recurring)
     const subsNeededAt149 = Math.ceil(MONTHLY_GOAL / PRO_PRICE);   // 671
     const subsRemainingAt149 = Math.max(0, subsNeededAt149 - activeSubs);
@@ -220,6 +233,7 @@ export async function GET(request: NextRequest) {
       upgradeModalCtaClicks,
       upgradeModalCtr,        // % of modal opens that clicked Go Pro
       topUpgradeFeatures,     // which locked features drive the most intent
+      dripSends30d,           // free→paid nurture emails sent (last 30d)
     });
   } catch (err) {
     console.error('[mrr-goal] error', err);
