@@ -48,8 +48,6 @@ interface NotifRow {
   user_email?: string;
   briefings_enabled?: boolean;
   created_at?: string | null;
-  full_name?: string | null;
-  first_name?: string | null;
 }
 
 export async function GET(request: NextRequest) {
@@ -70,7 +68,7 @@ export async function GET(request: NextRequest) {
   for (let from = 0; from < 60000; from += 1000) {
     const { data, error } = await supabase
       .from('user_notification_settings')
-      .select('user_email, briefings_enabled, created_at, full_name, first_name')
+      .select('user_email, briefings_enabled, created_at')
       .range(from, from + 999);
     if (error) break;
     for (const r of (data || []) as NotifRow[]) {
@@ -108,7 +106,7 @@ export async function GET(request: NextRequest) {
     const drip = dripForDay(age);
     if (!drip) continue;
     if (sentKey.has(`${e}|${drip.emailType}`)) continue;
-    const first = (u.first_name || u.full_name || '').toString().trim().split(' ')[0] || '';
+    const first = ''; // no reliable name column on this table — emails handle empty ("there")
     queue.push({
       email: e,
       first,
