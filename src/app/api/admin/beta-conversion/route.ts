@@ -155,7 +155,7 @@ export async function GET(request: NextRequest) {
 
     const entitledTotal = [...entitled].filter((e) => !COMP_TESTIMONIAL.has(e)).length;
     const conversionRate = entitledTotal > 0 ? Math.round((converted / entitledTotal) * 1000) / 10 : 0;
-    const PER_DAY = 50; // setup-invite-batch limit
+    const PER_DAY = 150; // setup-invite send rate: 75 @ 14:00 + 75 @ 21:00 UTC
     const daysToDrain = Math.ceil(remaining / PER_DAY);
 
     return NextResponse.json({
