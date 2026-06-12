@@ -179,6 +179,7 @@ export async function GET(request: NextRequest) {
 
     // --- Upgrade drip sends (last 30 days) from email_provider_sends ---
     let dripSends30d = 0;
+    let bootcampOfferSends = 0;
     try {
       const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
       const dripTypes = ['upgrade_drip_d1', 'upgrade_drip_d3', 'upgrade_drip_d7', 'upgrade_drip_d14'];
@@ -188,6 +189,13 @@ export async function GET(request: NextRequest) {
         .in('email_type', dripTypes)
         .gte('sent_at', since);
       dripSends30d = count || 0;
+
+      // Bootcamp lifetime-offer blast (all-time — it's a one-time campaign).
+      const { count: bc } = await supabase
+        .from('email_provider_sends')
+        .select('id', { count: 'exact', head: true })
+        .eq('email_type', 'bootcamp_lifetime_offer');
+      bootcampOfferSends = bc || 0;
     } catch { /* optional */ }
 
     // Goal math (recurring)
@@ -234,6 +242,7 @@ export async function GET(request: NextRequest) {
       upgradeModalCtr,        // % of modal opens that clicked Go Pro
       topUpgradeFeatures,     // which locked features drive the most intent
       dripSends30d,           // free→paid nurture emails sent (last 30d)
+      bootcampOfferSends,     // bootcamp lifetime-offer blast (all-time)
     });
   } catch (err) {
     console.error('[mrr-goal] error', err);

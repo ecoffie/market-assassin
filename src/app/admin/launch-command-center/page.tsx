@@ -42,6 +42,33 @@ type MrrGoal = {
   upgradeModalCtr?: number;
   topUpgradeFeatures?: Array<{ feature: string; count: number }>;
   dripSends30d?: number;
+  bootcampOfferSends?: number;
+};
+
+type PartnerAffiliateSummary = {
+  partnerCode: string;
+  partnerName: string;
+  commissionPercent: number;
+  transactionCount: number;
+  payingCustomers: number;
+  grossFormatted: string;
+  commissionFormatted: string;
+  monthlyRunRateFormatted: string;
+  affiliatePer149SubFormatted?: string;
+  yourNetPer149SubFormatted?: string;
+};
+
+type PartnerProgramsBrief = {
+  defaultAffiliatePercent: number;
+  programs: Array<{
+    code: string;
+    slug: string;
+    name: string;
+    affiliatePercent: number;
+    compensationModel: string;
+    urls: { landing: string; alertsSignup: string; appSignup: string };
+    affiliate: PartnerAffiliateSummary;
+  }>;
 };
 
 // Lead targets to hit the remaining $149 subs at three close rates. Anchored to
@@ -443,6 +470,8 @@ export default function LaunchCommandCenterPage() {
   const [betaConvError, setBetaConvError] = useState('');
   const [mrrGoal, setMrrGoal] = useState<MrrGoal | null>(null);
   const [mrrGoalError, setMrrGoalError] = useState('');
+  const [partnerBrief, setPartnerBrief] = useState<PartnerProgramsBrief | null>(null);
+  const [partnerBriefError, setPartnerBriefError] = useState('');
 
   const currentDate = useMemo(() => {
     return new Intl.DateTimeFormat('en-US', {
@@ -714,6 +743,35 @@ export default function LaunchCommandCenterPage() {
     return () => { cancelled = true; };
   }, [authenticated, password]);
 
+  useEffect(() => {
+    if (!authenticated || !password) return;
+    let cancelled = false;
+    async function loadPartnerBrief() {
+      setPartnerBriefError('');
+      try {
+        const response = await fetch(
+          `/api/admin/partner-referrals?password=${encodeURIComponent(password)}`,
+          { cache: 'no-store' },
+        );
+        const data = await response.json();
+        if (cancelled) return;
+        if (!response.ok) {
+          setPartnerBriefError(data.error || 'Could not load partner programs');
+          setPartnerBrief(null);
+          return;
+        }
+        setPartnerBrief(data as PartnerProgramsBrief);
+      } catch {
+        if (!cancelled) {
+          setPartnerBriefError('Could not load partner programs');
+          setPartnerBrief(null);
+        }
+      }
+    }
+    loadPartnerBrief();
+    return () => { cancelled = true; };
+  }, [authenticated, password]);
+
   if (checking) {
     return <LoadingState />;
   }
@@ -878,9 +936,10 @@ export default function LaunchCommandCenterPage() {
               <div className="mt-6 rounded-xl border border-blue-500/30 bg-blue-500/5 p-4">
                 <div className="flex items-baseline justify-between">
                   <p className="text-sm font-semibold text-blue-200">Free→paid funnel (last 30 days)</p>
-                  {(mrrGoal.dripSends30d || 0) > 0 && (
-                    <span className="text-xs text-slate-400"><b className="text-white">{mrrGoal.dripSends30d}</b> nurture emails sent</span>
-                  )}
+                  <span className="text-xs text-slate-400">
+                    {(mrrGoal.dripSends30d || 0) > 0 && <><b className="text-white">{mrrGoal.dripSends30d}</b> nurture sent</>}
+                    {(mrrGoal.bootcampOfferSends || 0) > 0 && <> · <b className="text-white">{mrrGoal.bootcampOfferSends}</b> bootcamp offers</>}
+                  </span>
                 </div>
                 {(mrrGoal.upgradeModalShown || 0) === 0 ? (
                   <p className="mt-1 text-xs text-slate-500">No upgrade-modal opens yet — free users haven&apos;t clicked a locked feature in this window (or it just shipped).</p>
@@ -917,6 +976,77 @@ export default function LaunchCommandCenterPage() {
                 </div>
               </div>
             </>
+          )}
+        </section>
+
+        {/* PARTNER / AFFILIATE PROGRAMS — tagged signups + 30% recurring commissions */}
+        <section className="rounded-lg border border-violet-500/30 bg-gradient-to-br from-violet-900/20 to-slate-900 p-6">
+          <div>
+            <p className="text-sm uppercase tracking-[0.2em] text-violet-300">Partner &amp; Affiliate Programs</p>
+            <h2 className="mt-2 text-3xl font-bold">
+              {partnerBrief?.defaultAffiliatePercent ?? 30}% recurring affiliate — attribution + payouts owed
+            </h2>
+            <p className="mt-2 text-sm text-slate-400">
+              Signups tagged via <code className="text-violet-200">getmindy.ai/&#123;slug&#125;</code> or{' '}
+              <code className="text-violet-200">?ref=CODE</code>. Commissions accrue on Stripe checkout + renewals.
+            </p>
+          </div>
+
+          {partnerBriefError && <p className="mt-6 text-sm text-red-300">{partnerBriefError}</p>}
+          {!partnerBrief && !partnerBriefError && (
+            <p className="mt-6 text-sm text-slate-400">Loading partner programs…</p>
+          )}
+
+          {partnerBrief && partnerBrief.programs.length > 0 && (
+            <div className="mt-6 grid gap-4 lg:grid-cols-2">
+              {partnerBrief.programs.map((p) => (
+                <div key={p.code} className="rounded-xl border border-slate-800 bg-slate-950/50 p-5">
+                  <div className="flex items-start justify-between gap-3">
+                    <div>
+                      <h3 className="text-xl font-bold text-white">{p.name}</h3>
+                      <p className="text-xs text-slate-500 mt-1">
+                        Code <b className="text-violet-300">{p.code}</b> · {p.affiliatePercent}% affiliate · {p.compensationModel}
+                      </p>
+                    </div>
+                    <a
+                      href={p.urls.landing}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="shrink-0 rounded-lg border border-violet-500/40 px-3 py-1.5 text-xs text-violet-200 hover:border-violet-400"
+                    >
+                      Open link
+                    </a>
+                  </div>
+                  <div className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                    <div>
+                      <p className="text-xs text-slate-500">Commission owed (lifetime)</p>
+                      <p className="text-lg font-bold text-violet-300">{p.affiliate.commissionFormatted}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500">Paying customers</p>
+                      <p className="text-lg font-bold text-white">{p.affiliate.payingCustomers}</p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500">Per $149/mo sub (affiliate / you)</p>
+                      <p className="text-sm text-slate-300">
+                        <b className="text-violet-300">{p.affiliate.affiliatePer149SubFormatted || '—'}</b>
+                        {' / '}
+                        <b className="text-emerald-300">{p.affiliate.yourNetPer149SubFormatted || '—'}</b>
+                      </p>
+                    </div>
+                    <div>
+                      <p className="text-xs text-slate-500">Est. monthly run-rate owed</p>
+                      <p className="text-sm font-semibold text-slate-200">{p.affiliate.monthlyRunRateFormatted}</p>
+                    </div>
+                  </div>
+                  <p className="mt-3 text-xs text-slate-500 break-all">{p.urls.landing}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          {partnerBrief && partnerBrief.programs.length === 0 && (
+            <p className="mt-6 text-sm text-slate-400">No partner programs registered yet.</p>
           )}
         </section>
 

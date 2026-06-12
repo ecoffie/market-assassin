@@ -64,7 +64,20 @@ export async function GET(request: NextRequest) {
   const execute = url.searchParams.get('mode') === 'execute';
   const limit = Math.max(1, Math.min(500, Number(url.searchParams.get('limit') || 200)));
   const deadline = (url.searchParams.get('deadline') || 'this week').slice(0, 40);
+  const testEmail = url.searchParams.get('testEmail');
   const supabase = sb();
+
+  // Test render: send ONE email to the given address (bypasses audience/dedup),
+  // so we can verify it looks right before the real blast.
+  if (testEmail) {
+    const ok = await sendEmail({
+      to: testEmail,
+      subject: bootcampLifetimeSubject(),
+      html: bootcampLifetimeHtml(deadline),
+      emailType: BOOTCAMP_LIFETIME_EMAIL_TYPE + '_test',
+    });
+    return NextResponse.json({ success: true, mode: 'test', to: testEmail, sent: ok });
+  }
 
   // 1) Bootcamp leads (tagged invitation_source). Page past the 1000 cap.
   const leads = new Set<string>();
