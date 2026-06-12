@@ -33,37 +33,45 @@ export async function GET(request: NextRequest) {
     auth: { autoRefreshToken: false, persistSession: false },
   });
 
-  // exec returns the SELECT result as JSON (the RPC used by the apply-* routes).
   const sql = `select indexname, tablename from pg_indexes
     where indexname in (${EXPECTED.map((n) => `'${n}'`).join(', ')})
     order by indexname;`;
 
-  const { data, error } = await supabase.rpc('exec', { query: sql });
+  // The DB exposes a few SQL-exec RPCs with differing signatures across migrations
+  // (exec_sql{sql}, exec_sql{sql_query}, exec{query}). DDL routes only read .error,
+  // so we don't know which returns SELECT rows. Try each until one returns data.
+  const attempts: Array<{ fn: string; arg: Record<string, string> }> = [
+    { fn: 'exec_sql', arg: { sql } },
+    { fn: 'exec_sql', arg: { sql_query: sql } },
+    { fn: 'exec', arg: { query: sql } },
+    { fn: 'exec', arg: { sql } },
+  ];
 
-  if (error) {
-    return NextResponse.json({ success: false, error: error.message, hint: 'exec RPC may differ — check pg_indexes manually' }, { status: 500 });
+  let data: unknown = null;
+  let lastError = '';
+  let usedFn = '';
+  for (const a of attempts) {
+    const res = await supabase.rpc(a.fn, a.arg);
+    if (!res.error && res.data != null) { data = res.data; usedFn = `${a.fn}(${Object.keys(a.arg)[0]})`; break; }
+    if (res.error) lastError = res.error.message;
   }
 
-  // `data` shape depends on the exec function; normalize to a found-name set.
-  const rows: Array<{ indexname?: string; tablename?: string }> = Array.isArray(data) ? data : (data?.result || data?.rows || []);
+  // Normalize whatever shape came back into a list of index names.
+  const rows: Array<{ indexname?: string; tablename?: string }> = Array.isArray(data)
+    ? (data as Array<{ indexname?: string; tablename?: string }>)
+    : ((data as { result?: unknown[]; rows?: unknown[] })?.result as Array<{ indexname?: string }> || (data as { rows?: unknown[] })?.rows as Array<{ indexname?: string }> || []);
   const found = new Set(rows.map((r) => r.indexname).filter(Boolean));
   const missing = EXPECTED.filter((n) => !found.has(n));
 
-  // Also confirm the pg_trgm extension (the GIN indexes need it).
-  const { data: extData } = await supabase.rpc('exec', {
-    query: `select extname from pg_extension where extname = 'pg_trgm';`,
-  });
-  const extRows: Array<{ extname?: string }> = Array.isArray(extData) ? extData : (extData?.result || extData?.rows || []);
-  const pgTrgmInstalled = extRows.some((r) => r.extname === 'pg_trgm');
-
   return NextResponse.json({
-    success: true,
-    allPresent: missing.length === 0,
-    pgTrgmInstalled,
+    success: data != null,
+    execFnUsed: usedFn || 'NONE WORKED',
+    lastError: usedFn ? undefined : lastError,
+    allPresent: data != null && missing.length === 0,
     expected: EXPECTED.length,
     found: [...found],
     missing,
     rawRows: rows,
-    _rawExecData: data, // so we can see exec's actual return shape if normalization misses
+    _rawExecData: data,
   });
 }
