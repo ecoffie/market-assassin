@@ -27,6 +27,38 @@ const DOMAIN_MAP: Array<[RegExp, string]> = [
   [/cdc\.gov$/i, 'CDC'],
   [/fda\.hhs\.gov$/i, 'FDA'],
   [/cms\.hhs\.gov$/i, 'CMS'],
+  // --- Interior bureaus ---
+  [/(^|\.)nps\.gov$/i, 'National Park Service'],
+  [/(^|\.)blm\.gov$/i, 'Bureau of Land Management'],
+  [/(^|\.)fws\.gov$/i, 'Fish and Wildlife Service'],
+  [/(^|\.)usgs\.gov$/i, 'Geological Survey'],
+  [/(^|\.)usbr\.gov$/i, 'Bureau of Reclamation'],
+  [/(^|\.)bia\.gov$/i, 'Bureau of Indian Affairs'],
+  [/(^|\.)boem\.gov$/i, 'Bureau of Ocean Energy Management'],
+  // --- USDA agencies ---
+  [/(^|\.)fs\.usda\.gov$/i, 'Forest Service'],
+  [/(^|\.)fs\.fed\.us$/i, 'Forest Service'],
+  [/(^|\.)nrcs\.usda\.gov$/i, 'Natural Resources Conservation Service'],
+  [/(^|\.)aphis\.usda\.gov$/i, 'Animal and Plant Health Inspection Service'],
+  [/(^|\.)ars\.usda\.gov$/i, 'Agricultural Research Service'],
+  [/(^|\.)fsa\.usda\.gov$/i, 'Farm Service Agency'],
+  [/(^|\.)rd\.usda\.gov$/i, 'Rural Development'],
+  // --- Energy labs / offices ---
+  [/(^|\.)netl\.doe\.gov$/i, 'National Energy Technology Laboratory'],
+  [/(^|\.)inl\.gov$/i, 'Idaho National Laboratory'],
+  [/(^|\.)bnl\.gov$/i, 'Brookhaven National Laboratory'],
+  [/(^|\.)ornl\.gov$/i, 'Oak Ridge National Laboratory'],
+  [/(^|\.)lanl\.gov$/i, 'Los Alamos National Laboratory'],
+  [/(^|\.)nnsa\.doe\.gov$/i, 'National Nuclear Security Administration'],
+  // --- DOT ---
+  [/(^|\.)faa\.gov$/i, 'Federal Aviation Administration'],
+  [/(^|\.)fhwa\.dot\.gov$/i, 'Federal Highway Administration'],
+  [/(^|\.)fta\.dot\.gov$/i, 'Federal Transit Administration'],
+  // --- Treasury / Justice / others with own domains ---
+  [/(^|\.)irs\.gov$/i, 'Internal Revenue Service'],
+  [/(^|\.)bop\.gov$/i, 'Bureau of Prisons'],
+  [/(^|\.)usdoj\.gov$/i, 'Justice HQ'],
+  [/(^|\.)fbi\.gov$/i, 'FBI'],
 ];
 
 // Solicitation-number prefix → sub-agency. DoD-heavy (the prefixes are codified

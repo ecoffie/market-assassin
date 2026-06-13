@@ -430,10 +430,18 @@ export async function GET(request: NextRequest) {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   contacts = contacts.filter((c: any) => !FOREIGN_OFFICE_RE.test(c.derivedOffice || ''));
 
-  // Filter by derived sub-agency (JS, since it's not a column).
+  // Filter by derived sub-agency (JS, since it's not a column). Fuzzy + case-
+  // insensitive so a stored "National Park Service" matches the derived label
+  // even with minor wording differences. If the narrow yields contacts, use them;
+  // if it yields ZERO, keep the narrow (honest "no NPS contacts" beats showing the
+  // wrong bureau's people — the whole point of the fix).
   if (subAgency) {
+    const want = subAgency.toLowerCase();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    contacts = contacts.filter((c: any) => c.subAgency === subAgency).slice(0, limit);
+    contacts = contacts.filter((c: any) => {
+      const got = (c.subAgency || '').toLowerCase();
+      return got === want || (got && (got.includes(want) || want.includes(got)));
+    }).slice(0, limit);
   }
 
   // OSBP / Small-Business office (Eric: OSBP was a SEPARATE source — the
