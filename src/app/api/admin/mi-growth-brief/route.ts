@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
 import { verifyAdminPassword } from '@/lib/admin-auth';
 
 export const dynamic = 'force-dynamic';
@@ -174,6 +175,9 @@ function isInternalOrTestEmail(email: string): boolean {
   if (normalized.includes('+test') || normalized.includes('test@')) return true;
   if (normalized.endsWith('@example.com')) return true;
   if (normalized.includes('healthcheck')) return true;
+  // Comp/advocate/partner accounts are not customers — exclude from all growth
+  // metrics + queues (they flow through the .internal flag downstream).
+  if (isExcludedFromMetrics(normalized)) return true;
   return false;
 }
 

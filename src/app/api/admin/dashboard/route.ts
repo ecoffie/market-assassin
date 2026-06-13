@@ -2461,6 +2461,18 @@ async function getRevenueMetrics() {
     for (const charge of charges.data) {
       if (charge.status !== 'succeeded') continue;
 
+      // Exclude comp/advocate/partner accounts from revenue. The charge expands
+      // data.customer, so the email is on hand — drop the charge if it's a special
+      // account (e.g. a comp Pro that somehow billed) so it doesn't inflate revenue.
+      const chargeEmail =
+        (typeof charge.customer === 'object' && charge.customer && 'email' in charge.customer
+          ? (charge.customer as { email?: string | null }).email
+          : null)
+        || charge.billing_details?.email
+        || charge.receipt_email
+        || null;
+      if (isExcludedFromMetrics(chargeEmail)) continue;
+
       const amount = charge.amount / 100; // Convert cents to dollars
 
       metrics.thirtyDay.total += amount;
