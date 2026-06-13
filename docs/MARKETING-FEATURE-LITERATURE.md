@@ -1125,3 +1125,21 @@ generic services (R425 engineering support). PSC tightening also requires a
 literal keyword↔PSC name match so related categories (1550 Unmanned Aircraft
 for "drones") do not over-restrict rankings.
 
+---
+
+## Company vs Market Lookup Disambiguation (June 2026)
+
+**What:** Global search bar no longer auto-routes single words like "Excel" to
+Market Research. Ambiguous queries show a picker: product vendor (Microsoft for
+Excel), matching contractors from BigQuery (317K), or federal market keyword search.
+
+**Why:** "Excel" as a market keyword hits healthcare managed-care awards — users
+typing a company or product name got the wrong experience.
+
+**SEO:** federal contractor lookup, company search govcon, Excel Microsoft federal contracts
+
+**Proof:** `/api/contractors/search-bq?search=Excel` returns EXCELLA LLC ($275M),
+EXCEL GARMENT ($257M); `search=Microsoft` returns MICROSOFT CORPORATION ($4.7B).
+`PRODUCT_VENDOR_HINTS` maps excel→Microsoft for product-name queries.
+
+

@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { useSearchParams } from 'next/navigation';
 import type { AppTier } from '../UnifiedSidebar';
 import { NaicsAutocompleteInput } from '../../codes/NaicsAutocompleteInput';
 import ContractorSalesHistoryDrawer from '../contractors/ContractorSalesHistoryDrawer';
@@ -63,6 +64,8 @@ function extractNaicsCode(value?: string | null): string {
 
 export default function ContractorsPanel({ email, tier }: ContractorsPanelProps) {
   void tier;
+  const searchParams = useSearchParams();
+  const deepLinkSearch = searchParams.get('search')?.trim() || '';
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [stats, setStats] = useState<ContractorStats | null>(null);
   const [profileDefaults, setProfileDefaults] = useState<SavedContractorDefaults | null>(null);
@@ -154,6 +157,14 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
   }, []);
 
   useEffect(() => {
+    // Deep-link from global lookup: /app?panel=contractors&search=Excel
+    if (deepLinkSearch) {
+      setSearchQuery(deepLinkSearch);
+      setUsingProfileDefaults(false);
+      searchContractors(deepLinkSearch, '', '', 'all', 'contract_value', 0);
+      return;
+    }
+
     if (!email) {
       searchContractors('', '', '', 'all', 'contract_value', 0);
       return;
@@ -203,7 +214,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
     }
 
     loadProfileAndSearch();
-  }, [email, searchContractors]);
+  }, [email, searchContractors, deepLinkSearch]);
 
   const handleSearch = () => {
     setPage(0);

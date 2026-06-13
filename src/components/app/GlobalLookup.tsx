@@ -1,33 +1,32 @@
 'use client';
 
 /**
- * Global lookup bar (the enterprise "type an identifier → land on its detail"
- * pattern — Bloomberg/GovWin/Salesforce). v1 resolves a CONTRACT NUMBER (PIID) to
- * the full USASpending award detail, reusing the live /api/app/award-detail spine
- * + AwardDetailDrawer. Architected to grow: detect UEI / opportunity-id / agency
- * later and route to the right detail. Lives in the /app header (members only).
+ * Global lookup bar — contract #, company, UEI, or market keyword.
+ * Ambiguous single words (e.g. "Excel") disambiguate: contractor vs market.
  */
 import { useState } from 'react';
-import { Search, X } from 'lucide-react';
+import { Search, X, Building2, BarChart3, ChevronRight } from 'lucide-react';
 import AwardDetailDrawer from './awards/AwardDetailDrawer';
+import {
+  looksLikeUei,
+  looksLikePiid,
+  looksLikeCompany,
+  isAmbiguousLookup,
+  getProductVendorHint,
+  filterContractorMatches,
+  type ContractorHit,
+} from '@/lib/lookup-intent';
 
-// A contract PIID is an alphanumeric token, typically 9-20 chars, often with the
-// agency code prefix (e.g. 140F0822D0024, W912HV26Z0015, FA865012C5168). We accept
-// any alphanumeric-ish token of reasonable length as a candidate.
-// A UEI is exactly 12 alphanumeric chars, no separators (e.g. NYCTPM8VVDM6).
-function looksLikeUei(q: string): boolean {
-  return /^[A-Za-z0-9]{12}$/.test(q.trim());
+function fmt$(n: number) {
+  if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
+  if (n >= 1e6) return `$${(n / 1e6).toFixed(0)}M`;
+  return `$${Math.round(n).toLocaleString()}`;
 }
-// A PIID is alphanumeric with digits, 7-25 chars (e.g. 140F0822D0024). Excludes
-// 12-char UEIs (checked first) so they don't collide.
-function looksLikePiid(q: string): boolean {
-  const t = q.trim();
-  return /^[A-Za-z0-9][A-Za-z0-9-]{6,24}$/.test(t) && /\d/.test(t);
-}
-// A company name: has a space or a corp suffix.
-function looksLikeCompany(q: string): boolean {
-  const t = q.trim();
-  return t.length > 2 && (/\s/.test(t) || /\b(inc|corp|llc|ltd|co|company|group|systems|technolog)\b/i.test(t));
+
+interface Disambiguation {
+  query: string;
+  contractors: ContractorHit[];
+  vendorHint: ReturnType<typeof getProductVendorHint>;
 }
 
 export default function GlobalLookup({ email }: { email: string | null }) {
@@ -36,12 +35,12 @@ export default function GlobalLookup({ email }: { email: string | null }) {
   const [hint, setHint] = useState<string | null>(null);
   const [resolving, setResolving] = useState(false);
   const [focused, setFocused] = useState(false);
+  const [disambig, setDisambig] = useState<Disambiguation | null>(null);
 
-  // Company / UEI → resolve to a contractor slug via the (now-live) search, then
-  // navigate to the full /contractors/[slug] profile page.
   async function resolveContractor(query: string) {
     setResolving(true);
     setHint(null);
+    setDisambig(null);
     try {
       const res = await fetch(`/api/contractors/search-bq?search=${encodeURIComponent(query)}&limit=1`);
       const data = await res.json();
@@ -58,23 +57,68 @@ export default function GlobalLookup({ email }: { email: string | null }) {
     }
   }
 
-  function submit(e: React.FormEvent) {
+  function goMarketResearch(q: string) {
+    setDisambig(null);
+    window.location.href = `/app?panel=research&keyword=${encodeURIComponent(q)}`;
+  }
+
+  function goContractorsSearch(q: string) {
+    setDisambig(null);
+    window.location.href = `/app?panel=contractors&search=${encodeURIComponent(q)}`;
+  }
+
+  async function submit(e: React.FormEvent) {
     e.preventDefault();
     const q = value.trim();
     if (!q) return;
     setHint(null);
-    // Order matters: UEI (exact 12) before PIID (would also match 12-char tokens).
+    setDisambig(null);
+
     if (looksLikeUei(q)) {
       resolveContractor(q.toUpperCase());
-    } else if (looksLikePiid(q)) {
-      setOpenPiid(q.toUpperCase());
-    } else if (looksLikeCompany(q)) {
-      resolveContractor(q);
-    } else {
-      // Plain-English term (e.g. "drones") → research the whole market for it in
-      // Market Research (Sport mode): all the NAICS codes, coverage %, keywords.
-      window.location.href = `/app?panel=research&keyword=${encodeURIComponent(q)}`;
+      return;
     }
+    if (looksLikePiid(q)) {
+      setOpenPiid(q.toUpperCase());
+      return;
+    }
+    if (looksLikeCompany(q)) {
+      resolveContractor(q);
+      return;
+    }
+
+    // Ambiguous single word — check contractor DB + product→vendor hints before
+    // defaulting to market research ("Excel" ≠ healthcare keyword market).
+    if (isAmbiguousLookup(q)) {
+      setResolving(true);
+      try {
+        const vendorHint = getProductVendorHint(q);
+        const res = await fetch(`/api/contractors/search-bq?search=${encodeURIComponent(q)}&limit=8`);
+        const data = await res.json();
+        const raw: ContractorHit[] = (data?.contractors || []).map((c: {
+          uei: string; company: string; slug: string;
+          total_contract_value: number; state?: string;
+        }) => ({
+          uei: c.uei,
+          company: c.company,
+          slug: c.slug,
+          total_contract_value: c.total_contract_value,
+          state: c.state,
+        }));
+        const matches = filterContractorMatches(raw, q);
+
+        if (vendorHint || matches.length > 0) {
+          setDisambig({ query: q, contractors: matches, vendorHint });
+          return;
+        }
+      } catch {
+        // Fall through to market research on search failure
+      } finally {
+        setResolving(false);
+      }
+    }
+
+    goMarketResearch(q);
   }
 
   return (
@@ -84,9 +128,9 @@ export default function GlobalLookup({ email }: { email: string | null }) {
         <input
           type="text"
           value={value}
-          onChange={(e) => { setValue(e.target.value); setHint(null); }}
+          onChange={(e) => { setValue(e.target.value); setHint(null); setDisambig(null); }}
           onFocus={() => setFocused(true)}
-          onBlur={() => setTimeout(() => setFocused(false), 150)}
+          onBlur={() => setTimeout(() => { setFocused(false); }, 200)}
           placeholder="Contract #, company, UEI, or a market like “drones”…"
           aria-label="Look up a contract number, company, UEI, or research a market"
           className="w-full rounded-lg border border-slate-700 bg-slate-900/80 pl-9 pr-9 py-2 text-sm text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:opacity-60"
@@ -95,9 +139,8 @@ export default function GlobalLookup({ email }: { email: string | null }) {
         {resolving && (
           <span className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 border-2 border-purple-500 border-t-transparent rounded-full animate-spin" />
         )}
-        {/* Capability hint — appears on focus (when empty) so users discover what
-            they can look up, like Linear/Notion search. */}
-        {focused && !value && !hint && (
+
+        {focused && !value && !hint && !disambig && (
           <div className="absolute left-0 right-0 top-full mt-1 rounded-lg border border-slate-700 bg-slate-900 p-2 shadow-2xl shadow-black/40 z-50">
             <p className="px-2 pb-1 text-[10px] uppercase tracking-wider text-slate-500">Look up by</p>
             <div className="space-y-0.5">
@@ -115,11 +158,81 @@ export default function GlobalLookup({ email }: { email: string | null }) {
               </div>
               <div className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-xs">
                 <span className="text-slate-300">A market / keyword</span>
-                <span className="text-slate-500">drones, medical supplies…</span>
+                <span className="text-slate-500">drones, demolition…</span>
               </div>
+              <p className="px-2 pt-1 text-[10px] text-slate-600">Single words like &ldquo;Excel&rdquo; ask company vs market.</p>
             </div>
           </div>
         )}
+
+        {disambig && (
+          <div className="absolute left-0 right-0 top-full mt-1 rounded-lg border border-slate-600 bg-slate-900 shadow-2xl shadow-black/50 z-50 overflow-hidden">
+            <div className="px-3 py-2 border-b border-slate-800">
+              <p className="text-xs font-semibold text-white">&ldquo;{disambig.query}&rdquo; — what did you mean?</p>
+              <p className="text-[10px] text-slate-500 mt-0.5">Company lookup and market research are different searches.</p>
+            </div>
+
+            {disambig.vendorHint && (
+              <button
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => resolveContractor(disambig.vendorHint!.searchQuery)}
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-purple-500/10 border-b border-slate-800/80"
+              >
+                <Building2 className="w-4 h-4 text-purple-400 shrink-0" strokeWidth={1.75} />
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs font-medium text-purple-200">{disambig.vendorHint.label}</div>
+                  <div className="text-[10px] text-slate-500">Product name → federal vendor profile</div>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+              </button>
+            )}
+
+            {disambig.contractors.slice(0, 4).map((c) => (
+              <button
+                key={c.uei}
+                type="button"
+                onMouseDown={(e) => e.preventDefault()}
+                onClick={() => { window.location.href = `/contractors/${c.slug}`; }}
+                className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-emerald-500/10 border-b border-slate-800/60 last:border-0"
+              >
+                <Building2 className="w-4 h-4 text-emerald-400 shrink-0" strokeWidth={1.75} />
+                <div className="min-w-0 flex-1">
+                  <div className="text-xs text-white truncate">{c.company}</div>
+                  <div className="text-[10px] text-slate-500">
+                    {fmt$(c.total_contract_value)}{c.state ? ` · ${c.state}` : ''}
+                  </div>
+                </div>
+                <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+              </button>
+            ))}
+
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => goContractorsSearch(disambig.query)}
+              className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-slate-800 border-t border-slate-800 text-xs text-slate-400"
+            >
+              <Search className="w-3.5 h-3.5 shrink-0" strokeWidth={1.75} />
+              View all contractors matching &ldquo;{disambig.query}&rdquo;
+            </button>
+
+            <button
+              type="button"
+              onMouseDown={(e) => e.preventDefault()}
+              onClick={() => goMarketResearch(disambig.query)}
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-blue-500/10 border-t border-slate-700"
+            >
+              <BarChart3 className="w-4 h-4 text-blue-400 shrink-0" strokeWidth={1.75} />
+              <div className="min-w-0 flex-1">
+                <div className="text-xs font-medium text-blue-200">Research federal market for &ldquo;{disambig.query}&rdquo;</div>
+                <div className="text-[10px] text-slate-500">Which agencies buy this — award keyword search</div>
+              </div>
+              <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />
+            </button>
+          </div>
+        )}
+
         {hint && (
           <div className="absolute left-0 right-0 top-full mt-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200 z-50">
             {hint}
@@ -127,7 +240,6 @@ export default function GlobalLookup({ email }: { email: string | null }) {
         )}
       </form>
 
-      {/* Result modal — reuses the live AwardDetailDrawer (self-fetches by piid). */}
       {openPiid && (
         <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/70 backdrop-blur-sm p-4">
           <div className="relative my-12 w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl">

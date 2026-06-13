@@ -19,6 +19,7 @@ import StartTrackingModal, { type TriageAgencyCard } from './triage/StartTrackin
 import { EntryAccessibilityCard } from './EntryAccessibilityCard';
 import type { Agency, SimplifiedAcquisitionReport } from '@/types/federal-market-assassin';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
+import { getProductVendorHint } from '@/lib/lookup-intent';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 
 interface MarketResearchPanelProps {
@@ -1859,6 +1860,13 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                 {sportSuggesting ? 'Finding…' : 'Suggest codes'}
               </button>
             </div>
+            {sportKeyword.trim() && getProductVendorHint(sportKeyword) && (
+              <p className="mt-2 text-[11px] text-amber-200/90 rounded-md border border-amber-500/25 bg-amber-500/10 px-2.5 py-2">
+                <b className="text-amber-100">Company lookup?</b> &ldquo;{sportKeyword.trim()}&rdquo; is often a product name — use the{' '}
+                <b>search bar at the top</b> to find{' '}
+                {getProductVendorHint(sportKeyword)!.label}. This field researches the <em>federal market</em> for that word in award titles.
+              </p>
+            )}
             {sportSuggestions && (
               <div className="mt-2.5 space-y-2">
                 {sportSuggestions.naics.length > 0 && (
