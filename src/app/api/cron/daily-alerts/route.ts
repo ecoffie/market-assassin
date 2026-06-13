@@ -785,9 +785,11 @@ async function runDailyAlertJob(options?: {
         // the conservative threshold. Never throws into the send path.
         let hiddenMatches: HiddenMatch[] = [];
         try {
+          // .trim() the env — Vercel UI paste can leave a trailing newline that would
+          // silently make `=== 'true'` false and disable the whole feature.
           if (
-            process.env.ENABLE_HIDDEN_MATCH === 'true' &&
-            userInRollout(user.user_email, Number(process.env.HIDDEN_MATCH_ROLLOUT_PERCENT || '0'), 'hidden-match-v1')
+            (process.env.ENABLE_HIDDEN_MATCH || '').trim() === 'true' &&
+            userInRollout(user.user_email, Number((process.env.HIDDEN_MATCH_ROLLOUT_PERCENT || '0').trim()) || 0, 'hidden-match-v1')
           ) {
             const userVec = await getCapabilityVector(user.user_email);
             if (userVec) {
