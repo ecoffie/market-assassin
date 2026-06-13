@@ -1041,7 +1041,7 @@ function emptyForecastStats() {
 }
 
 function emptySowCatalog() {
-  return { hasSow: 0, checked: 0, remaining: 0, total: 0, pctComplete: 0, recompeteRemaining: 0, byType: {} as Record<string, number>, complete: false };
+  return { hasSow: 0, checked: 0, remaining: 0, total: 0, pctComplete: 0, recompeteRemaining: 0, byType: {} as Record<string, number>, embedded: 0, embedRemaining: 0, embedPct: 0, complete: false };
 }
 
 // SOW/PWS catalog backfill progress (#66). The cron does ACTIVE opps first
