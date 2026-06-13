@@ -17,16 +17,30 @@ export interface AlertEnrollmentFields {
   total_alerts_sent?: number | null;
 }
 
-/** True when the user is still on generic/default filters (no keywords, etc.). */
-export function userNeedsMindySetup(user: AlertProfileFields): boolean {
-  const hasKeywords = (user.keywords?.length ?? 0) > 0;
-  const hasDescription = Boolean(user.business_description?.trim());
-  const naics = user.naics_codes || [];
-  const hasOnlyDefaults =
+/** True when NAICS codes are still the generic onboarding defaults only. */
+export function hasOnlyDefaultNaics(naicsCodes: string[] | null | undefined): boolean {
+  const naics = naicsCodes || [];
+  return (
     naics.length === 0 ||
     (naics.length <= DEFAULT_PROFILE_NAICS.length &&
-      naics.every(code => DEFAULT_PROFILE_NAICS.includes(code)));
-  return !hasKeywords || !hasDescription || hasOnlyDefaults;
+      naics.every(code => DEFAULT_PROFILE_NAICS.includes(code)))
+  );
+}
+
+/**
+ * True when alert filters are still too thin for keyword-first matching.
+ * Keywords + real NAICS are required; business description is optional (ranking boost only).
+ */
+export function userNeedsMindySetup(user: AlertProfileFields): boolean {
+  const hasKeywords = (user.keywords?.length ?? 0) > 0;
+  return !hasKeywords || hasOnlyDefaultNaics(user.naics_codes);
+}
+
+/** Auto-fill description when user saves keywords but skips the textarea. */
+export function deriveBusinessDescriptionFromKeywords(keywords: string[]): string | null {
+  const clean = keywords.map(k => k.trim()).filter(Boolean).slice(0, 6);
+  if (clean.length === 0) return null;
+  return `Federal contractor: ${clean.join(', ')}.`;
 }
 
 /** First ~30 days after enrollment — show signup/profile CTAs on alert emails. */

@@ -106,7 +106,7 @@ Future sources:
 | 10-10 Candidate | 80+ and strong fit | Founder/customer success call |
 | White-glove Candidate | 70+ and clear business need | Sales call |
 | MI Pro Upgrade Candidate | 50+ and free/currently limited | Upgrade campaign |
-| Activation Candidate | Incomplete profile (default NAICS only), score 30+, has Mindy access | Profile setup nudge — NAICS, state, agencies |
+| Activation Candidate | Incomplete profile (default NAICS only), score 30+, has Mindy access | Profile setup nudge — keywords + NAICS (description optional) |
 | Rescue Candidate | Paid but inactive | Customer success outreach |
 | Audience Only | Low purchase and low engagement | Low-touch nurture |
 

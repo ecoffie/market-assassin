@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
+import { deriveBusinessDescriptionFromKeywords } from '@/lib/alerts/profile-setup';
 
 /**
  * Generate MD5 hash of NAICS profile for template matching
@@ -348,10 +349,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    if (businessDescription !== undefined) {
-      const cleanDescription = typeof businessDescription === 'string'
+    if (businessDescription !== undefined || keywords !== undefined) {
+      let cleanDescription = typeof businessDescription === 'string'
         ? businessDescription.trim()
         : '';
+      if (!cleanDescription && Array.isArray(keywords) && keywords.length > 0) {
+        cleanDescription = deriveBusinessDescriptionFromKeywords(keywords) || '';
+      }
 
       try {
         await getSupabase()

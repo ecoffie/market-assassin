@@ -1180,3 +1180,21 @@ briefings.
 (`profileComplete`, `hasEngagement`, `hasPurchase`). Activation count drops from ~148 to
 paid+incomplete-profile only (~4).
 
+---
+
+## 35. Alert CTA preferences quick-setup (June 2026)
+
+**What:** Email CTA landers (`/alerts/preferences` with token or `utm_campaign=daily_alert`)
+see a focused **Fix My Alert Filters** flow: red 72% banner, keywords first, one-click save.
+`userNeedsMindySetup()` no longer blocks on business description — keywords + non-default
+NAICS only. Server auto-derives description from keywords when the textarea is skipped.
+
+**Why:** 22 CTA clicks in 2 days, 0 profile saves — clickers had keywords/NAICS but bounced
+on hidden description field. Gate now matches email promise ("add keywords").
+
+**SEO:** N/A (conversion / alert onboarding)
+
+**Proof:** `user_engagement` Jun 12–13: 8 unique `alert_keyword_setup` clickers, 1 partial
+keyword save (`keytransportationsolutions@gmail.com`). Gate change clears users like
+`joanne.horowitz@xerox.com` (15 keywords, no description) from repeat red-banner CTAs.
+
