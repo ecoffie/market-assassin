@@ -951,7 +951,8 @@ partner-branded landing only — not a broad SEO page.
 
 **Proof:** Landing at getmindy.ai/ncmbc. Admin cohort:
 `/api/admin/partner-referrals?password=...&code=NCMBC`. Trial tagged via
-`trial_source=partner_ncmbc` on `user_notification_settings`.
+`trial_source=partner_ncmbc` on `user_notification_settings`. In-app Pro unlocks via
+`trial_ends_at` + `resolveAccess()` in `/api/access/check` (30 days, not permanent KV).
 
 ## 34. 30% recurring affiliate — partner compensation on Mindy Pro revenue
 
@@ -984,6 +985,8 @@ conversions from their contractor base.
 
 **Proof:** Registry entry `partner_mdeat` in `partner-referrals.ts`. Landing:
 getmindy.ai/mdeat. Cohort: `/api/admin/partner-referrals?password=...&code=MDEAT`.
+Partner trial Pro unlocks via `trial_ends_at` + `resolveAccess()` in `/api/access/check`
+(30 days, expires to free — not permanent KV).
 
 ## 36. Magic-link sign-in — one-click access without password setup loops
 

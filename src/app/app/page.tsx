@@ -12,6 +12,7 @@ import SettingsPanel from '@/components/briefings/SettingsPanel';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import { ToastHost } from '@/components/app/Toast';
 import { getSupabase } from '@/lib/supabase/client';
+import { getStoredPartnerRef } from '@/lib/mindy/partner-referral-client';
 import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
 
 const TWO_FACTOR_SESSION_MS = 12 * 60 * 60 * 1000;
@@ -845,7 +846,10 @@ function AppDashboard() {
                     const res = await fetch('/api/auth/mindy-signup', {
                       method: 'POST',
                       headers: { 'Content-Type': 'application/json' },
-                      body: JSON.stringify({ email: emailValue }),
+                      body: JSON.stringify({
+                        email: emailValue,
+                        referralCode: getStoredPartnerRef() || undefined,
+                      }),
                     });
                     const data = await res.json();
 

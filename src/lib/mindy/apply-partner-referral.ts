@@ -23,6 +23,9 @@ function trialEndFromDays(days: number): string {
 /**
  * Grant partner-tagged 30-day Pro trial. Idempotent — won't shorten an
  * existing longer trial or override paid/advocate access.
+ *
+ * Pro app access comes from trial_ends_at + resolveAccess() (temporary),
+ * not permanent KV briefings: — so the trial expires cleanly after 30 days.
  */
 export async function applyPartnerReferralIfEligible(
   supabase: SupabaseClient,

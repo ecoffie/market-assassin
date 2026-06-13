@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyMIAccess } from '@/lib/api-auth';
+import { resolveAccess } from '@/lib/access/resolve-access';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 
 export async function GET(request: NextRequest) {
@@ -16,24 +17,41 @@ export async function GET(request: NextRequest) {
     const authSession = requireMIAuthSession(request, email);
     if (!authSession.ok) return authSession.response;
 
-    const access = await verifyMIAccess(email);
+    const [access, resolved] = await Promise.all([
+      verifyMIAccess(email),
+      resolveAccess(email),
+    ]);
+
+    // Partner trials (and other per-user trial_ends_at) stamp Pro via
+    // resolveAccess — not permanent KV. Team/enterprise stay above trial.
+    let tier = access.tier;
+    if (
+      resolved.level === 'pro'
+      && tier !== 'team'
+      && tier !== 'enterprise'
+    ) {
+      tier = 'pro';
+    }
+
     const isPaidMI =
-      access.tier === 'pro'
-      || access.tier === 'team'
-      || access.tier === 'enterprise';
+      tier === 'pro'
+      || tier === 'team'
+      || tier === 'enterprise';
 
     return NextResponse.json({
       success: true,
       email,
-      tier: access.tier,
+      tier,
       isStaff: access.isStaff ?? false,
       staffRole: access.staffRole ?? 'none',
+      trialEndsAt: resolved.trialEndsAt,
+      accessSource: resolved.source,
       access: {
-        mi_free: access.tier !== 'none',
+        mi_free: tier !== 'none',
         mi_pro: isPaidMI,
         briefings: isPaidMI,
-        team: access.tier === 'team',
-        enterprise: access.tier === 'enterprise',
+        team: tier === 'team',
+        enterprise: tier === 'enterprise',
         staff: access.isStaff ?? false,
         admin: access.staffRole === 'admin',
         legacy_sources: access.sources ?? {},

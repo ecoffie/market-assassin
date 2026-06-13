@@ -166,6 +166,15 @@ const SS_RFI_PACKAGE_NOTES = [
   'Keep the response within the notice page limit and submit using the named email, portal, or deadline.',
 ];
 
+const COMPLIANCE_PROGRESS_MESSAGES = [
+  'Reading the solicitation text…',
+  'Scanning instructions to offerors (Section L)…',
+  'Extracting every shall / must / required clause…',
+  'Pulling evaluation factors (Section M)…',
+  'Checking submission deadlines and page limits…',
+  'Organizing requirements into your matrix…',
+] as const;
+
 function detectNoticeTypeFromText(sourceText: string): 'rfp' | 'sources_sought' | 'rfi' | 'rfq' | 'unknown' {
   const head = sourceText.slice(0, 3000).toLowerCase();
   if (
@@ -395,6 +404,10 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   const [complianceLoading, setComplianceLoading] = useState(false);
   const [complianceError, setComplianceError] = useState<string | null>(null);
   const [complianceMeta, setComplianceMeta] = useState<{ truncated?: boolean; originalChars?: number; inputChars?: number } | null>(null);
+  const [complianceProgressIdx, setComplianceProgressIdx] = useState(0);
+  const [complianceElapsedSec, setComplianceElapsedSec] = useState(0);
+  const complianceSectionRef = useRef<HTMLElement | null>(null);
+  const complianceStartedAtRef = useRef<number | null>(null);
   const [statusFilter, setStatusFilter] = useState<'all' | ComplianceStatus>('all');
   const [categoryFilter, setCategoryFilter] = useState<'all' | ComplianceCategory>('all');
   const [priorityFilter, setPriorityFilter] = useState<'all' | ReqPriority>('all');
@@ -404,6 +417,12 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     if (!email || !uploadedRfp) return;
     setComplianceLoading(true);
     setComplianceError(null);
+    setComplianceProgressIdx(0);
+    setComplianceElapsedSec(0);
+    complianceStartedAtRef.current = Date.now();
+    requestAnimationFrame(() => {
+      complianceSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
     try {
       const res = await fetch(`/api/app/proposal/compliance?email=${encodeURIComponent(email)}`, {
         method: 'POST',
@@ -436,8 +455,30 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       setComplianceError('Request failed. Try again.');
     } finally {
       setComplianceLoading(false);
+      complianceStartedAtRef.current = null;
     }
-  }, [email, uploadedRfp, getAuthHeaders]);
+  }, [email, uploadedRfp, getAuthHeaders, activePursuitId]);
+
+  useEffect(() => {
+    if (!complianceLoading) {
+      setComplianceElapsedSec(0);
+      return;
+    }
+    const tick = setInterval(() => {
+      if (complianceStartedAtRef.current) {
+        setComplianceElapsedSec(Math.floor((Date.now() - complianceStartedAtRef.current) / 1000));
+      }
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [complianceLoading]);
+
+  useEffect(() => {
+    if (!complianceLoading) return;
+    const interval = setInterval(() => {
+      setComplianceProgressIdx(i => (i + 1) % COMPLIANCE_PROGRESS_MESSAGES.length);
+    }, 4500);
+    return () => clearInterval(interval);
+  }, [complianceLoading]);
 
   // ── Sources Sought / RFI: extract LOI fields straight from the notice text ──
   // The notice text IS the input — no document upload needed for 90% of SS.
@@ -644,6 +685,14 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   const [draftError, setDraftError] = useState<string | null>(null);
   const [draftAllLoading, setDraftAllLoading] = useState(false);
   const [draftAllSummary, setDraftAllSummary] = useState<{ count: number; ms: number; errors: number } | null>(null);
+  const reviewSectionRef = useRef<HTMLElement | null>(null);
+
+  const scrollToReview = useCallback(() => {
+    setShowAdvancedOutputs(true);
+    requestAnimationFrame(() => {
+      reviewSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    });
+  }, []);
 
   const generateDraft = useCallback(async (sectionType: SectionType) => {
     if (!email || !uploadedRfp) return;
@@ -691,7 +740,13 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       const res = await fetch(`/api/app/proposal/draft-all?email=${encodeURIComponent(email)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({ text: uploadedRfp.text, fileName: uploadedRfp.fileName }),
+        body: JSON.stringify({
+          text: uploadedRfp.text,
+          fileName: uploadedRfp.fileName,
+          // Match the tabs the user sees (LOI vs RFP) — don't rely on text
+          // heuristics alone or drafts land under the wrong section keys.
+          sectionTypes: currentSectionTabs.map(tab => tab.id),
+        }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
@@ -722,13 +777,17 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       if (data.sections?.[0]?.section) {
         setActiveSection(data.sections[0].section);
       }
+      setShowAdvancedOutputs(true);
+      requestAnimationFrame(() => {
+        reviewSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
     } catch (err) {
       console.error('Draft-all failed:', err);
       setDraftError('Request failed. Try again.');
     } finally {
       setDraftAllLoading(false);
     }
-  }, [email, uploadedRfp, getAuthHeaders]);
+  }, [email, uploadedRfp, getAuthHeaders, currentSectionTabs]);
 
   const updateDraftText = useCallback((sectionType: SectionType, text: string) => {
     setDrafts(prev => {
@@ -1125,6 +1184,16 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           </button>
         </div>
       </div>
+
+      {complianceLoading && (
+        <ComplianceMatrixProgress
+          charCount={uploadedRfp?.charCount || uploadedRfp?.text?.length || 0}
+          elapsedSec={complianceElapsedSec}
+          messageIdx={complianceProgressIdx}
+          hasPursuit={!!activePursuitId}
+          compact
+        />
+      )}
 
       {activePursuit && (
         <section className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
@@ -1744,9 +1813,33 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           )}
 
           {draftAllSummary && !draftAllLoading && !isRfqMode && (
-            <p className="text-sm text-emerald-300 mt-3">
-              ✅ Drafted {draftAllSummary.count} section{draftAllSummary.count === 1 ? '' : 's'} — review and export below.
-            </p>
+            <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 space-y-3">
+              <p className="text-sm text-emerald-200">
+                ✅ Drafted {draftAllSummary.count} section{draftAllSummary.count === 1 ? '' : 's'}
+                {draftAllSummary.errors > 0 && ` (${draftAllSummary.errors} failed — retry those individually below)`}
+                . Review each section, edit if needed, then export.
+              </p>
+              <div className="flex flex-wrap gap-3">
+                <button
+                  type="button"
+                  onClick={scrollToReview}
+                  className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-purple-600 hover:bg-purple-500 text-white transition-colors"
+                >
+                  Review my draft
+                </button>
+                <button
+                  type="button"
+                  onClick={exportProposalPackage}
+                  disabled={exporting || !hasAnyDraft}
+                  className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-colors flex items-center gap-2"
+                >
+                  {exporting && (
+                    <span className="inline-block w-3.5 h-3.5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                  )}
+                  {exporting ? 'Assembling…' : isLoiResponseMode ? 'Export LOI (.docx)' : 'Export Word (.docx)'}
+                </button>
+              </div>
+            </div>
           )}
 
           {/* Secondary: collapsed "more options" (export blank template, edit
@@ -1886,7 +1979,11 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           only when "More options" is expanded. Full-proposal mode always shows
           the compliance-matrix variant. */}
       {responseOutputsReady && driveMode === 'auto' && (!isSimpleResponseMode || showAdvancedOutputs) && (
-        <section id={isSimpleResponseMode ? 'proposal-response-template' : undefined} className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+        <section
+          id={isSimpleResponseMode ? 'proposal-response-template' : 'proposal-compliance-section'}
+          ref={complianceSectionRef}
+          className="bg-slate-900 border border-slate-800 rounded-xl p-5"
+        >
           {isSimpleResponseMode ? (
             <>
               <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
@@ -1978,6 +2075,15 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 </div>
               </div>
 
+              {complianceLoading && (
+                <ComplianceMatrixProgress
+                  charCount={uploadedRfp?.charCount || uploadedRfp?.text?.length || 0}
+                  elapsedSec={complianceElapsedSec}
+                  messageIdx={complianceProgressIdx}
+                  hasPursuit={!!activePursuitId}
+                />
+              )}
+
               {complianceError && (
                 <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-3 text-sm text-red-300 mb-3">
                   {complianceError}
@@ -1991,7 +2097,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               )}
 
               {compliance.length > 0 && (
-                <>
+                <div className={complianceLoading ? 'opacity-40 pointer-events-none select-none' : ''}>
                   {/* Calming priority summary (Eric: 172 raw rows is intimidating;
                       lead with what MATTERS — critical first, page-counts last). */}
                   {(() => {
@@ -2149,7 +2255,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                   <p className="text-xs text-slate-500 mt-3">
                     Owner and status edits live in this session only. CSV export captures the full table.
                   </p>
-                </>
+                </div>
               )}
 
               {!complianceLoading && compliance.length === 0 && !complianceError && (
@@ -2166,7 +2272,11 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           drafted (to review/edit individual sections) or expanded More options.
           The hero "Draft my response" button above is the primary entry. */}
       {uploadedRfp && !isRfqMode && driveMode === 'auto' && (!isSimpleResponseMode || showAdvancedOutputs || !!draftAllSummary || hasAnyDraft) && (
-        <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+        <section
+          ref={reviewSectionRef}
+          id="proposal-review-section"
+          className="bg-slate-900 border border-slate-800 rounded-xl p-5"
+        >
           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
               <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">
@@ -2349,7 +2459,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       )}
 
       {/* Output · Review Checklist + Export */}
-      {uploadedRfp && !isRfqMode && driveMode === 'auto' && (
+      {responseOutputsReady && !isRfqMode && driveMode === 'auto' && (
         <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
@@ -2656,6 +2766,97 @@ function PrepSection({ title, items, tone }: { title: string; items: string[]; t
         ))}
       </ul>
     </section>
+  );
+}
+
+function ComplianceMatrixProgress({
+  charCount,
+  elapsedSec,
+  messageIdx,
+  hasPursuit,
+  compact = false,
+}: {
+  charCount: number;
+  elapsedSec: number;
+  messageIdx: number;
+  hasPursuit: boolean;
+  compact?: boolean;
+}) {
+  const message = COMPLIANCE_PROGRESS_MESSAGES[messageIdx % COMPLIANCE_PROGRESS_MESSAGES.length];
+  const estSections = Math.max(1, Math.ceil(charCount / 14000));
+  const timeHint = charCount > 120000
+    ? 'Large packages can take 1–3 minutes — Mindy reads each section separately.'
+    : charCount > 40000
+      ? 'Usually 30–90 seconds for documents this size.'
+      : 'Usually 15–45 seconds.';
+
+  if (compact) {
+    return (
+      <div className="overflow-hidden rounded-xl border border-purple-500/30 bg-purple-500/10 px-4 py-3">
+        <div className="flex items-center gap-3">
+          <span className="inline-block w-4 h-4 border-2 border-purple-300 border-t-transparent rounded-full animate-spin shrink-0" />
+          <div className="flex-1 min-w-0">
+            <p className="text-sm font-semibold text-purple-100">Building compliance matrix…</p>
+            <p key={messageIdx} className="text-xs text-purple-200/80 truncate animate-[complianceFadeIn_0.3s_ease-out]">
+              {message} ({elapsedSec}s — still working)
+            </p>
+          </div>
+        </div>
+        <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-800">
+          <div className="h-full w-1/3 animate-[complianceBar_1.8s_ease-in-out_infinite] rounded-full bg-gradient-to-r from-purple-500 via-indigo-400 to-purple-500" />
+        </div>
+        <style jsx>{`
+          @keyframes complianceBar {
+            0% { transform: translateX(-100%); }
+            100% { transform: translateX(400%); }
+          }
+          @keyframes complianceFadeIn {
+            from { opacity: 0; transform: translateY(2px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+        `}</style>
+      </div>
+    );
+  }
+
+  return (
+    <div className="overflow-hidden rounded-xl border border-purple-500/30 bg-gradient-to-r from-purple-500/10 via-indigo-500/10 to-purple-500/10 p-5 mb-4">
+      <div className="flex items-start gap-3">
+        <span className="relative inline-flex h-4 w-4 mt-0.5 shrink-0">
+          <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-purple-400 opacity-75" />
+          <span className="relative inline-flex h-4 w-4 rounded-full bg-purple-500" />
+        </span>
+        <div className="flex-1 min-w-0">
+          <p className="text-sm font-semibold text-purple-100">Mindy is building your compliance matrix</p>
+          <p key={messageIdx} className="mt-1 text-sm text-slate-200 animate-[complianceFadeIn_0.3s_ease-out]">
+            {message}
+          </p>
+          <p className="mt-2 text-xs text-slate-400">
+            {timeHint}
+            {hasPursuit && estSections > 1
+              ? ` Checking pursuit documents and amendments (${estSections}+ sections).`
+              : estSections > 1
+                ? ` Reading the document in ${estSections} sections.`
+                : ''}
+            {' '}
+            <span className="text-purple-300/90">Elapsed {elapsedSec}s — not stuck, still calculating.</span>
+          </p>
+        </div>
+      </div>
+      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-800">
+        <div className="h-full w-1/3 animate-[complianceBar_1.8s_ease-in-out_infinite] rounded-full bg-gradient-to-r from-purple-500 via-indigo-400 to-purple-500" />
+      </div>
+      <style jsx>{`
+        @keyframes complianceBar {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(400%); }
+        }
+        @keyframes complianceFadeIn {
+          from { opacity: 0; transform: translateY(2px); }
+          to { opacity: 1; transform: translateY(0); }
+        }
+      `}</style>
+    </div>
   );
 }
 
