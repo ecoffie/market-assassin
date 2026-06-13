@@ -71,20 +71,22 @@ export default function CoachPanel({
   useEffect(() => { load(); }, [load]);
   useEffect(() => { try { setActiveWs(localStorage.getItem(ACTIVE_KEY) || ''); } catch { /* */ } }, []);
 
+  const goApp = (panel?: AppPanel) => {
+    window.location.href = panel && panel !== 'dashboard' ? `/app?panel=${panel}` : '/app';
+  };
+
   const switchTo = (c: Client, thenPanel?: AppPanel) => {
     try { localStorage.setItem(ACTIVE_KEY, c.workspaceId); } catch { /* */ }
-    if (thenPanel && onPanelChange) {
-      onPanelChange(thenPanel);
-      window.location.reload();
+    if (thenPanel) {
+      goApp(thenPanel);
       return;
     }
-    window.location.reload();
+    goApp();
   };
 
   const clearActive = () => {
     try { localStorage.removeItem(ACTIVE_KEY); } catch { /* */ }
-    setActiveWs('');
-    window.location.reload();
+    goApp();
   };
 
   const addClient = async () => {
@@ -102,7 +104,7 @@ export default function CoachPanel({
         const wsId = d?.client?.workspaceId;
         if (wsId) {
           try { localStorage.setItem(ACTIVE_KEY, wsId); } catch { /* */ }
-          window.location.reload();
+          window.location.href = '/app';
         }
       }
     } catch { /* */ }

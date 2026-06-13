@@ -61,7 +61,7 @@ export default function ClientWorkspaceBanner({
 
   const exit = () => {
     try { localStorage.removeItem(ACTIVE_KEY); } catch { /* */ }
-    window.location.reload();
+    window.location.href = '/app';
   };
 
   const prof = client.profile;

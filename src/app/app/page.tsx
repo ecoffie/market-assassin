@@ -396,6 +396,18 @@ function AppDashboard() {
     if (typeof window !== 'undefined') localStorage.setItem('mindy_tour_completed', '1');
   }, []);
 
+  /** Keep the address bar aligned with the active panel so refresh doesn't resurrect stale ?panel= params. */
+  const syncAppUrl = useCallback((panel: AppPanel, context?: Record<string, unknown>) => {
+    if (typeof window === 'undefined') return;
+    const params = new URLSearchParams();
+    if (panel !== 'dashboard') params.set('panel', panel);
+    if (panel === 'research' && context?.keyword) {
+      params.set('keyword', String(context.keyword));
+    }
+    const qs = params.toString();
+    window.history.replaceState(null, '', qs ? `/app?${qs}` : '/app');
+  }, []);
+
   const handlePanelChange = useCallback((nextPanel: AppPanel, context?: Record<string, unknown>) => {
     if (nextPanel === activePanelRef.current && !context) return;
     flushPanelTime(activePanelRef.current, { keepalive: true });
@@ -406,8 +418,9 @@ function AppDashboard() {
     // Clearing to undefined when no context was passed prevents stale
     // context from a previous navigation from leaking into the next panel.
     setPanelContext(context);
+    syncAppUrl(nextPanel, context);
     trackEngagement('page_view', { panel: nextPanel, tier });
-  }, [flushPanelTime, tier, trackEngagement]);
+  }, [flushPanelTime, tier, trackEngagement, syncAppUrl]);
 
   const loginWithPassword = useCallback(async (userEmail: string, password: string) => {
     const normalizedEmail = userEmail.toLowerCase().trim();
@@ -601,9 +614,21 @@ function AppDashboard() {
   }, []);
 
   // Deep-link to a specific panel via ?panel=<id> (e.g. onboarding lands the user
-  // on the Vault: /app?panel=vault). Only honored for known panels; ignored
-  // otherwise so a bad param can't blank the app.
+  // on the Vault: /app?panel=vault). Hard refresh always returns to Today's Intel
+  // so stale ?panel=research from an old search doesn't stick around.
   useEffect(() => {
+    const nav = performance.getEntriesByType('navigation')[0] as PerformanceNavigationTiming | undefined;
+    const isReload = nav?.type === 'reload';
+
+    if (isReload) {
+      setActivePanel('dashboard');
+      activePanelRef.current = 'dashboard';
+      if (typeof window !== 'undefined') {
+        window.history.replaceState(null, '', '/app');
+      }
+      return;
+    }
+
     const panelParam = searchParams.get('panel');
     if (panelParam && KNOWN_PANELS.has(panelParam as AppPanel)) {
       setActivePanel(panelParam as AppPanel);
