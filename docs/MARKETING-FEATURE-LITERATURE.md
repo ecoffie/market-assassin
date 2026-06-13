@@ -1311,3 +1311,33 @@ contact block.
 offline scorer `scripts/proposal-eval/score.ts`). Live eval, 4 Sources Sought / RFI
 cases: every POC section addressed the real CO (Righthero Phillips / Mariah Gambino /
 Miranda V. Smith / Chris Ryssa Nix), **0 fabrications**, worst-case score 65→75.
+
+---
+
+## Proposal Assist: Evidence-Aware LOI / Why-Us Sections (June 13, 2026)
+
+**What:** The "Why Us" and "Letter of Intent Opening" sections of a Sources Sought /
+RFI response now (1) actually load the bidder's real past-performance contracts so
+they can cite them, and (2) recognize unfilled template rows ("[Contract Title]",
+"📝 Fill in...") as NOT real evidence — so Mindy never tries to pass a blank
+placeholder off as a credential. When the vault has no real proof for a claim, the
+draft honestly brackets it ("[relevant contract — title, agency, value]") for the
+user to complete instead of writing hollow "proven track record" prose.
+
+**Why:** Our offline eval flagged these two sections as the lowest-scoring — generic,
+unanchored. Two root causes: the Why-Us / LOI sections never even loaded the bidder's
+contracts (only capabilities), and a vault seeded with onboarding template stubs
+*looked* populated while being empty (the 94-char-stub trap). The result was confident
+but unbacked language. Now the sections cite real contracts when present and fail
+honestly when not — which is the whole point of an ASSIST tool.
+
+**SEO:** federal proposal past performance section, how to write a sources sought
+response, letter of intent capability statement, AI proposal no fabrication, what to
+put in a Why Us section government RFP.
+
+**Proof:** `src/lib/proposal/loaders.ts` — `needsPastPerf` now includes the
+differentiators (Why Us) + company_overview (LOI Opening) sections;
+`isStubValue`/`isStubRow`/`filterRealRows` strip placeholder rows;
+`formatEvidenceGapsForPrompt` emits a "bracket, don't bluff" instruction. Verified:
+the eval vault's 6 past-performance rows are all template stubs → correctly counted as
+0 real records, filtered from the prompt, and the bracket instruction fires.

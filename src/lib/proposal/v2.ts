@@ -18,7 +18,7 @@
 
 import { retrieveRagContext, formatChunksForPrompt } from '@/lib/rag/retrieve';
 import { callLLM } from '@/lib/llm/call-llm';
-import { loadBidderProfile, loadVaultContext, formatProfileForPrompt, formatVaultForPrompt } from './loaders';
+import { loadBidderProfile, loadVaultContext, formatProfileForPrompt, formatVaultForPrompt, formatEvidenceGapsForPrompt } from './loaders';
 import { buildAgencyContext, formatAgencyContextForPrompt } from './agency-context';
 import { pickLens } from './lenses';
 import { getSectionMeta } from './sections';
@@ -127,6 +127,11 @@ General rules:
 
   parts.push(`### Bidder profile (NAICS / agencies / set-asides)\n${profileBlock}`);
   if (vaultBlock) parts.push(vaultBlock);
+  // Evidence-gap signal: for evidence-dependent sections whose vault slice is
+  // empty (or only stubs), tell the model to BRACKET the missing proof instead
+  // of bluffing — an honest assist draft beats a confident unbacked one.
+  const gapBlock = formatEvidenceGapsForPrompt(vault, sectionType);
+  if (gapBlock) parts.push(gapBlock);
   if (agencyBlock) parts.push(agencyBlock);
   if (ragBlock) parts.push(`### Curated proposal corpus — STYLE references (do NOT copy verbatim)\n${ragBlock}`);
 

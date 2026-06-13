@@ -20,6 +20,50 @@ function getSupabase(): SupabaseClient {
   return _supabase;
 }
 
+// ---- Stub / placeholder detection ----------------------------------
+//
+// The vault onboarding seeds TEMPLATE rows so a user has something to edit:
+// "[Contract Title] — [Agency Name]", "[Briefly describe the scope...]", with a
+// "📝 Fill in..." nudge. If the user never fills them, the rows still COUNT as
+// present — the 94-char-stub trap. Feeding them to the model is worse than an
+// empty vault: it either cites "[Contract Title]" (a fabrication) or, seeing
+// junk, writes vague prose. So we detect stub text and treat it as absent.
+
+const STUB_MARKERS = [/\[[^\]]+\]/, /📝/, /\bfill in\b/i, /\byour\b.*\bhere\b/i];
+
+/** True if a string is empty or template-placeholder text (not real content). */
+export function isStubValue(v: unknown): boolean {
+  if (typeof v !== 'string') return true;
+  const t = v.trim();
+  if (!t) return true;
+  // Mostly-bracketed text ("[Contract Title] — [Agency Name]") or an explicit
+  // fill-in nudge → a stub. A real value may MENTION a bracket, so require the
+  // brackets/markers to dominate or an explicit nudge.
+  if (STUB_MARKERS.some(re => re.test(t))) {
+    const bracketed = (t.match(/\[[^\]]*\]/g) || []).join('');
+    // Explicit nudge, or brackets make up a large share of the text → stub.
+    if (/📝|\bfill in\b/i.test(t)) return true;
+    if (bracketed.length >= t.length * 0.4) return true;
+  }
+  return false;
+}
+
+/**
+ * True if a vault row carries no REAL content — its identifying fields are all
+ * stubs. Past-performance: title + agency. Capability: name + description.
+ */
+export function isStubRow(row: Record<string, unknown>): boolean {
+  const title = row.contract_title ?? row.project_name ?? row.engagement_name ?? row.capability_name;
+  const body = row.scope_description ?? row.outcomes ?? row.description;
+  // A row is real if EITHER its title or its body is non-stub. Both stub → drop.
+  return isStubValue(title) && isStubValue(body);
+}
+
+/** Drop stub rows from an array; returns only rows with real content. */
+export function filterRealRows<T extends Record<string, unknown>>(rows: T[] | null | undefined): T[] {
+  return (rows || []).filter(r => !isStubRow(r));
+}
+
 // ---- Bidder profile (NAICS / agencies / set-asides) ----------------
 
 export async function loadBidderProfile(email: string): Promise<BidderProfile> {
@@ -66,7 +110,13 @@ export async function loadVaultContext(email: string, sectionType: SectionType):
 
   // Same per-section narrowing as v1 — only load what THIS section uses.
   const needsIdentity = true;
-  const needsPastPerf = sectionType === 'past_performance' || sectionType === 'cap_past_performance' || sectionType === 'exec_summary';
+  // Why Us (differentiators) and LOI Opening (company_overview) are EVIDENCE
+  // sections — they argue "why this firm fits" and must cite real contracts,
+  // not just capabilities. They previously loaded only capabilities, so a vault
+  // WITH past performance still got vague "proven track record" prose because
+  // the contracts were never put in front of the model. (Eval: Why Us 68, LOI
+  // Opening 67 — the two lowest.)
+  const needsPastPerf = sectionType === 'past_performance' || sectionType === 'cap_past_performance' || sectionType === 'exec_summary' || sectionType === 'differentiators' || sectionType === 'company_overview';
   const needsCapabilities = sectionType === 'capabilities' || sectionType === 'technical' || sectionType === 'differentiators' || sectionType === 'company_overview';
   const needsTeam = sectionType === 'management' || sectionType === 'poc';
 
@@ -140,8 +190,9 @@ export function formatVaultForPrompt(ctx: VaultContext): string {
     if (lines.length) blocks.push(`### Bidder identity (FACTUAL — use verbatim)\n${lines.join('\n')}`);
   }
 
-  if (ctx.past_performance && ctx.past_performance.length) {
-    const lines = ctx.past_performance.map((p, i) => {
+  const realPastPerf = filterRealRows(ctx.past_performance);
+  if (realPastPerf.length) {
+    const lines = realPastPerf.map((p, i) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const pp = p as any;
       const parts: string[] = [];
@@ -161,8 +212,9 @@ export function formatVaultForPrompt(ctx: VaultContext): string {
     blocks.push(`### Bidder past performance (FACTUAL — cite these, not [placeholders])\n${lines}`);
   }
 
-  if (ctx.capabilities && ctx.capabilities.length) {
-    const lines = ctx.capabilities.map((c) => {
+  const realCaps = filterRealRows(ctx.capabilities);
+  if (realCaps.length) {
+    const lines = realCaps.map((c) => {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const cc = c as any;
       let line = `- **${cc.capability_name}**: ${cc.description}`;
@@ -190,4 +242,54 @@ export function formatVaultForPrompt(ctx: VaultContext): string {
   }
 
   return blocks.join('\n\n');
+}
+
+/**
+ * Evidence-gap signal — the fix for the lowest-scoring sections (LOI Opening 67,
+ * Why Us 68 in the eval). Those sections demand "concrete evidence", but when a
+ * thin vault has NO past performance / capabilities (e.g. a brand-new user with
+ * only an elevator pitch), the model gets SILENCE about the gap — so it bluffs,
+ * paraphrasing the elevator pitch into the notice's vocabulary as if it were
+ * proof. The judge correctly flags that as generic.
+ *
+ * This emits an EXPLICIT instruction to bracket the missing evidence instead of
+ * inventing it — turning a hollow-but-confident draft into an honest assist
+ * draft the user fills in. (ground_in_real_data / proposal_assist_v1: ASSIST,
+ * not WRITER. The judge rubric rewards "a short honest draft that brackets the
+ * unknowns".)
+ *
+ * Fires ONLY for evidence-dependent sections, and ONLY for the slices that are
+ * actually empty — a vault WITH past performance gets no gap nag for it.
+ */
+export function formatEvidenceGapsForPrompt(ctx: VaultContext, sectionType: SectionType): string {
+  // Sections whose quality depends on real proof points (vs. an "approach"
+  // section like Technical, which scores well without past evidence).
+  const EVIDENCE_SECTIONS: SectionType[] = [
+    'differentiators',      // Why Us
+    'company_overview',     // LOI Opening
+    'cap_past_performance', // Relevant Experience
+    'capabilities',         // Capability Fit
+    'past_performance',
+    'exec_summary',
+  ];
+  if (!EVIDENCE_SECTIONS.includes(sectionType)) return '';
+
+  const gaps: string[] = [];
+  const usesPastPerf = sectionType === 'past_performance' || sectionType === 'cap_past_performance' || sectionType === 'exec_summary' || sectionType === 'differentiators' || sectionType === 'company_overview';
+  const usesCaps = sectionType === 'capabilities' || sectionType === 'differentiators' || sectionType === 'company_overview';
+
+  // Count REAL rows only — a vault full of unfilled template stubs is, for
+  // drafting purposes, an empty vault (the 94-char-stub trap).
+  const hasRealPastPerf = filterRealRows(ctx.past_performance).length > 0;
+  const hasRealCaps = filterRealRows(ctx.capabilities).length > 0;
+
+  if (usesPastPerf && !hasRealPastPerf) {
+    gaps.push('- No past-performance records in the vault. Do NOT assert "proven track record", "successfully delivered", "we have streamlined operations for clients", or similar without a specific contract behind it. Where the section needs a proof point, write a bracketed placeholder like "[relevant contract — title, agency, value]" for the user to fill in.');
+  }
+  if (usesCaps && !hasRealCaps) {
+    gaps.push('- No confirmed capability records in the vault beyond the one-liner/elevator pitch. State the directly transferable strength plainly (tie it to THIS notice\'s scope), but do NOT manufacture specific expertise the vault can\'t back. Bracket the specifics the user must confirm, e.g. "[specific credentialing systems experience]".');
+  }
+  if (!gaps.length) return '';
+
+  return `### Evidence gaps — BRACKET, do not bluff\nThis bidder's vault is thin for this section. An honest, notice-anchored draft that brackets the missing proof scores BETTER than a confident draft full of unbacked claims. Specifically:\n${gaps.join('\n')}`;
 }
