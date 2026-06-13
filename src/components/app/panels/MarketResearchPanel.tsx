@@ -598,6 +598,26 @@ function buildSavedResearchProfile(data: WorkspaceData | null): SavedResearchPro
   };
 }
 
+function rollupChartBuyers(rows: AgencyTableRow[]): BuyerLike[] {
+  const byAgency = new Map<string, BuyerLike>();
+  for (const row of rows) {
+    const spend = row.metric_top_total || row.totalSpending || row.setAsideSpending || 0;
+    if (spend <= 0) continue;
+    const label = row.subAgency || row.parentAgency || row.name;
+    const prev = byAgency.get(label);
+    if (!prev || spend > (prev.spending || 0)) {
+      byAgency.set(label, {
+        contractingOffice: label,
+        parentAgency: row.parentAgency,
+        subAgency: row.subAgency,
+        spending: spend,
+        contractCount: row.contractCount,
+      });
+    }
+  }
+  return [...byAgency.values()];
+}
+
 export default function MarketResearchPanel({ email, tier, onNavigate }: MarketResearchPanelProps) {
   const [formData, setFormData] = useState<FormData>({
     businessType: '',
@@ -1659,18 +1679,11 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   // keyword searches must not show generate-all buyers — wrong market).
   const sportKeywordActive = researchMode === 'sport' && !!(sportReportRan || sportBuildActive) && !!sportKeyword.trim();
   const chartBuyers: BuyerLike[] = tmrRows.length > 0
-    ? tmrRows.map((row) => ({
-        contractingOffice: row.contractingOffice,
-        parentAgency: row.parentAgency,
-        subAgency: row.subAgency,
-        // Align with agency table "Top Total $" lens (metric_top_total).
-        spending: row.metric_top_total || row.totalSpending || row.setAsideSpending,
-        contractCount: row.contractCount,
-      }))
+    ? rollupChartBuyers(tmrRows)
     : sportKeywordActive ? [] : buyers;
 
-  const chartTotalSpending = tmrRows.length > 0
-    ? tmrRows.reduce((sum, row) => sum + (row.metric_top_total || row.totalSpending || row.setAsideSpending || 0), 0)
+  const chartTotalSpending = chartBuyers.length > 0
+    ? chartBuyers.reduce((sum, row) => sum + (row.spending || 0), 0)
     : sportKeywordActive ? 0 : (buyerSummary?.totalSpending || 0);
 
   // chartSatTotal — repurposed May 23, 2026 to represent SMALL

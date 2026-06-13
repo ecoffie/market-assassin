@@ -411,6 +411,7 @@ export async function POST(request: NextRequest) {
     // agency name and use it as the authoritative metric_top_total. Falls back
     // to the sampled total when an agency isn't in the category response.
     const categoryTotalByKey: Record<string, number> = {};
+    const keywordGrounded = Boolean(coverage?.keyword);
     try {
       const expanded = expandNAICSCodes(parseNAICSInput(naics));
       const catFilterBase: Record<string, unknown> = {
@@ -423,20 +424,23 @@ export async function POST(request: NextRequest) {
         catFilterBase.naics_codes = expanded;
       }
       if (coverage?.keyword || expanded.length > 0) {
-        const catRes = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_category', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            category: 'awarding_subagency',
-            filters: catFilterBase,
-            subawards: false, limit: 100, page: 1,
-          }),
-        });
-        if (catRes.ok) {
+        // Sub-agency + parent department totals (keyword or NAICS). Parent-level
+        // keys let DoD/HHS rank correctly; sub-agency keys surface USACE/Navy.
+        for (const category of ['awarding_subagency', 'awarding_agency'] as const) {
+          const catRes = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_category', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              category,
+              filters: catFilterBase,
+              subawards: false, limit: 100, page: 1,
+            }),
+          });
+          if (!catRes.ok) continue;
           const catJson = await catRes.json();
           for (const r of (catJson.results || []) as Array<{ name: string; amount: number }>) {
             const k = normalizeAgencyKey(r.name || '');
-            if (k) categoryTotalByKey[k] = (categoryTotalByKey[k] || 0) + (r.amount || 0);
+            if (k) categoryTotalByKey[k] = Math.max(categoryTotalByKey[k] || 0, r.amount || 0);
           }
         }
       }
@@ -658,9 +662,12 @@ export async function POST(request: NextRequest) {
       const totalSpending = isOfficeLevel
         ? officeOwnTotal
         : ((accurateTotal && accurateTotal > officeOwnTotal) ? accurateTotal : officeOwnTotal);
-      // Top Total $ sort uses sub-agency category aggregate (same source as FPDS
-      // leaderboards) so DoD/Navy/Army surface at the top — not per-office slices.
-      const metric_top_total = accurateTotal > 0 ? accurateTotal : totalSpending;
+      // Keyword searches: ONLY USAspending category totals for this keyword — never
+      // the NAICS-sample setAsideSpending (Eric: DOE $2B / NASA $6B on Set-Aside lens
+      // while real keyword "excel" has DoD ~$380M, DOE ~$20M per spending_by_category).
+      const metric_top_total = keywordGrounded
+        ? accurateTotal
+        : (accurateTotal > 0 ? accurateTotal : totalSpending);
 
       return {
         id: a.id,
@@ -678,7 +685,7 @@ export async function POST(request: NextRequest) {
         satContractCount: a.satContractCount || 0,
 
         // Pre-computed sort metrics. Higher is better for all of them.
-        metric_top_spending: a.setAsideSpending || 0,
+        metric_top_spending: keywordGrounded ? accurateTotal : (a.setAsideSpending || 0),
         metric_top_total,
         metric_contracts: a.contractCount || 0,
         // Easy Entry score combines SAT ratio (% of contracts under

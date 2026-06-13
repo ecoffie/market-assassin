@@ -1084,3 +1084,17 @@ keyword search — two different data pipelines. One market, one source of truth
 `tmrRows[].metric_top_total`; Sport mode blocks legacy `governmentBuyers` fallback.
 Verified: `excel` keyword TMR returns 141 agencies with DOE-scale totals via
 `/api/app/target-market-research`.
+
+## 40. Keyword spend rankings grounded in USAspending (no NAICS sample inflation)
+
+**What:** Sport keyword searches now rank agencies using **keyword-filtered**
+`spending_by_category` totals only — not inflated per-office NAICS sample dollars.
+Set-Aside $ lens uses the same grounded totals. Chart rolls up one bar per agency.
+
+**Why:** "excel" showed DOE $2B / NASA $6B on Set-Aside while real USAspending
+keyword data has HHS #1, DoD #2 (~$380M), DOE ~$20M. Broad 90%-NAICS sampling
+was bleeding into sort metrics.
+
+**Proof:** USASpending `spending_by_category` + `keywords:["excel"]` — Department
+level: HHS $520M, DoD $380M, DOE $20M (Jun 2026). TMR `keywordGrounded` flag
+blocks sample fallback on `metric_top_total` / `metric_top_spending`.
