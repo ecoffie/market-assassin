@@ -54,12 +54,36 @@ Source of truth: `src/lib/products.ts`
 
 ## Mindy Pro (getmindy.ai)
 
-| Product | Price | Checkout route | Stripe Payment Link |
-|---------|-------|----------------|----------------------|
-| Mindy Pro Monthly | $149/mo | `/checkout/mindy-pro-monthly` | `buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C` |
-| Mindy Pro Annual | $1,490/yr | `/checkout/mindy-pro-annual` | `buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D` |
+| Product | Price | Checkout route | Stripe Payment Link | Tier metadata |
+|---------|-------|----------------|---------------------|---------------|
+| Mindy Pro Monthly | $149/mo | `/checkout/mindy-pro-monthly` | `buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C` | (subscription) |
+| Mindy Pro Annual | $1,490/yr | `/checkout/mindy-pro-annual` | `buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D` | (subscription) |
+| **Bootcamp Lifetime** | **$1,497 one-time** | `/checkout/bootcamp-lifetime` | `buy.stripe.com/6oU3cwff897ceND84UfnO0t` (legacy Ultimate link — update metadata) | `tier=briefings_lifetime` |
+| **Founders Lifetime** | **$4,997 one-time** | `/checkout/founders-lifetime` | `buy.stripe.com/28E00k6IC5V0fRH5WMfnO0G` | `tier=briefings_lifetime` |
 
-**Partner attribution:** Share `getmindy.ai/ncmbc` or `getmindy.ai/checkout/mindy-pro-monthly?ref=NCMBC` — never raw `buy.stripe.com` links (skips affiliate tracking).
+**Sales page:** `https://getmindy.ai/lifetime`
+
+**1-1-1 model:** One product (Mindy Pro). Lifetime grants `briefings_lifetime` only — no separate legacy tool flags for new purchases. Ultimate Giant Bundle is retired as a offer; bootcamp uses $1,497 lifetime pricing.
+
+**Partner attribution:** Share `getmindy.ai/checkout/founders-lifetime?ref=NCMBC` — never raw `buy.stripe.com` links.
+
+### Stripe setup checklist (Eric)
+
+**Founders Lifetime ($4,997):**
+- [x] Create product "Mindy Founders Lifetime" — $4,997 USD one-time
+- [x] Payment Link metadata: `tier=briefings_lifetime`
+- [x] Payment link: `buy.stripe.com/28E00k6IC5V0fRH5WMfnO0G`
+- [ ] After-payment redirect: `https://getmindy.ai/purchase/success?product=founders-lifetime`
+- [x] Replace placeholder in `purchase-attribution.ts`
+
+**Bootcamp Lifetime ($1,497):**
+- [ ] Create new Payment Link OR update existing Ultimate link metadata to `tier=briefings_lifetime` only
+- [ ] Update `bootcamp-lifetime.checkoutUrl` if new link created
+- [ ] After-payment redirect: `https://getmindy.ai/purchase/success?product=bootcamp-lifetime`
+
+**Verify:** Test purchase → `user_profiles.access_briefings=true`, welcome email sent.
+
+**Deprecated:** $2,997 "standard lifetime" tier — removed. Founders = $4,997 capped at 100 seats.
 
 ---
 
@@ -154,4 +178,4 @@ stripe listen --forward-to localhost:3000/api/stripe-webhook
 
 ---
 
-*Last Updated: March 20, 2026*
+*Last Updated: June 13, 2026 — Founders Lifetime $4,997 + Bootcamp $1,497 (1-1-1 pricing)*

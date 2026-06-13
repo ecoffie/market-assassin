@@ -1440,3 +1440,27 @@ rendered to .docx with per-volume page breaks. Verified: a real 4-volume Word
 document packs with the real bonding value ($15,000,000) filled and every subfactor
 present. Completes the deterministic IDIQ/MACC build (corpus → structure → Volume I
 → full package).
+
+---
+
+## Mindy Founders Lifetime — $4,997 (June 13, 2026)
+
+**What:** Replaced the fragmented Ultimate Giant Bundle + $2,997 lifetime plan with a
+1-1-1-aligned lifetime ladder: **Bootcamp Lifetime $1,497** (time-boxed) and **Founders
+Lifetime $4,997** (100 seats). Same product — full Mindy Pro forever (`briefings_lifetime`).
+Sales page at `/lifetime`, checkout via `/checkout/founders-lifetime` and
+`/checkout/bootcamp-lifetime` with purchase attribution.
+
+**Why:** Ultimate Giant Bundle violated 1-1-1 (sold dead legacy tools as a bundle). Course
+lifetime historically sold at $4,997 — proven WTP. $2,997 undervalued Mindy vs ongoing AI
+costs and break-even (~20 months). Founders cap preserves scarcity and SaaS narrative.
+
+**SEO:** Mindy lifetime access, federal contracting software lifetime, GovCon AI lifetime
+deal, founders lifetime Mindy.
+
+**Proof:** `src/lib/mindy/lifetime-pricing.ts` (FOUNDERS_LIFETIME_PRICE=4997,
+BOOTCAMP_LIFETIME_PRICE=1497, cap=100). Stripe webhook grants `briefings_lifetime` on
+$1,497/$4,997 amounts + lifetime description match. Bootcamp email uses
+`getmindy.ai/checkout/bootcamp-lifetime` (not shop Ultimate URL). Pending: Eric creates
+$4,997 Stripe payment link (plink live Jun 13 — `buy.stripe.com/28E00k6IC5V0fRH5WMfnO0G`,
+metadata `tier=briefings_lifetime`).
