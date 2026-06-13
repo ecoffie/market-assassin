@@ -1053,12 +1053,15 @@ async function getSowCatalogStats() {
   const sb = getSupabase();
   const headCount = (q: ReturnType<typeof sb.from>) => q.then(({ count }: { count: number | null }) => count || 0);
 
-  const [hasSow, checkedWithAttach, remaining, totalWithAttach, recompeteRemaining] = await Promise.all([
+  const [hasSow, checkedWithAttach, remaining, totalWithAttach, recompeteRemaining, embedded, embedRemaining] = await Promise.all([
     headCount(sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('has_sow_doc', true)),
     headCount(sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('active', true).not('attachments', 'is', null).not('sow_checked_at', 'is', null)),
     headCount(sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('active', true).not('attachments', 'is', null).is('sow_checked_at', null)),
     headCount(sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('active', true).not('attachments', 'is', null)),
     headCount(sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('active', false).not('attachments', 'is', null).is('sow_checked_at', null)),
+    // Embedding progress: SOWs with a vector vs. SOWs still needing one.
+    headCount(sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('has_sow_doc', true).not('sow_embedding', 'is', null)),
+    headCount(sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('has_sow_doc', true).not('sow_text', 'is', null).is('sow_embedding', null)),
   ]);
 
   const byType: Record<string, number> = {};
@@ -1071,6 +1074,8 @@ async function getSowCatalogStats() {
   return {
     hasSow, checked: checkedWithAttach, remaining, total: totalWithAttach,
     pctComplete, recompeteRemaining, byType,
+    embedded, embedRemaining,
+    embedPct: hasSow ? Math.round((embedded / hasSow) * 100) : 0,
     complete: remaining === 0 && totalWithAttach > 0,
   };
 }
