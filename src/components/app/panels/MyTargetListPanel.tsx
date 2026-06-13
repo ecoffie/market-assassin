@@ -846,6 +846,8 @@ export default function MyTargetListPanel({
                   {contactsId === t.id && email && (
                     <TargetContacts
                       agency={t.agency_name}
+                      subAgency={t.sub_agency_name}
+                      office={t.office_name}
                       email={email}
                     />
                   )}
@@ -1279,8 +1281,17 @@ const isJunkPhone = (p?: string | null) => !p || /^0+$/.test(p.replace(/\D/g, ''
 const isJunkTitle = (t?: string | null) => !t || /^(primary|secondary)\s*(contact)?$/i.test(t.trim());
 
 const PREVIEW_COUNT = 8; // curated preview size; rest behind search (SaaS pattern)
-function TargetContacts({ agency, email }: { agency: string; email: string }) {
-  const cacheKey = `${email}:${agency}`;
+function TargetContacts({ agency, subAgency, office, email }: { agency: string; subAgency?: string | null; office?: string | null; email: string }) {
+  // Key + query by the MOST SPECIFIC identity the target has. Passing only the
+  // broad agency made every DoD/Interior card match the parent department and
+  // return the globally-newest contacts — i.e. the SAME wrong people on every
+  // card. sub_agency_name + office_name narrow to the actual office the user saved.
+  const subA = (subAgency || '').trim();
+  // Don't pass the office when it's just a copy of the agency name (targets are
+  // often saved with office_name = agency name) — that over-narrows to zero.
+  const off = (office || '').trim();
+  const officeParam = off && off.toLowerCase() !== agency.toLowerCase() && off.toLowerCase() !== subA.toLowerCase() ? off : '';
+  const cacheKey = `${email}:${agency}:${subA}:${officeParam}`;
   const [contacts, setContacts] = useState<TargetContact[]>(() => _contactsCache.get(cacheKey) || []);
   const [loading, setLoading] = useState(() => !_contactsCache.has(cacheKey));
   const [total, setTotal] = useState(0);
@@ -1292,6 +1303,8 @@ function TargetContacts({ agency, email }: { agency: string; email: string }) {
     setLoading(true);
     // Pull a generous set we can search client-side (a card preview + filter).
     const p = new URLSearchParams({ email, agency, limit: '250' });
+    if (subA) p.set('subAgency', subA);
+    if (officeParam) p.set('office', officeParam);
     fetch(`/api/app/federal-contacts?${p.toString()}`, { headers: getMIApiHeaders(email) })
       .then(r => r.json())
       .then(d => {
@@ -1302,7 +1315,7 @@ function TargetContacts({ agency, email }: { agency: string; email: string }) {
       .catch(() => {})
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [agency, email, cacheKey]);
+  }, [agency, subA, officeParam, email, cacheKey]);
 
   // Format the name "Last, First" → "First Last".
   const fmtName = (n: string) => /,/.test(n) ? n.split(',').reverse().map(s => s.trim()).join(' ') : n;
