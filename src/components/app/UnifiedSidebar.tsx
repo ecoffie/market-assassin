@@ -289,7 +289,8 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'My Clients',
         icon: BookOpen,
         description: 'Manage multiple businesses',
-        tier: ['free', 'pro', 'team', 'enterprise'],
+        tier: ['team', 'enterprise'],
+        badge: 'Teams',
       },
       {
         id: 'settings',
@@ -306,6 +307,8 @@ interface UnifiedSidebarProps {
   activePanel: AppPanel;
   onPanelChange: (panel: AppPanel) => void;
   userTier: AppTier;
+  /** Staff / grandfathered org members on Pro can use My Clients. */
+  coachModeAllowed?: boolean;
   userEmail?: string | null;
   currentWorkspaceId?: string | null;
   onWorkspaceChange?: (workspaceId: string) => void;
@@ -327,6 +330,7 @@ export default function UnifiedSidebar({
   activePanel,
   onPanelChange,
   userTier,
+  coachModeAllowed = false,
   userEmail,
   currentWorkspaceId,
   onWorkspaceChange,
@@ -358,6 +362,13 @@ export default function UnifiedSidebar({
 
   const hasAccess = (itemTier: AppTier[]) => {
     return itemTier.includes(userTier);
+  };
+
+  const canAccessItem = (item: NavItem) => {
+    if (item.id === 'coach') {
+      return hasAccess(item.tier) || coachModeAllowed;
+    }
+    return hasAccess(item.tier);
   };
 
   const getItemDisplay = (item: NavItem) => {
@@ -505,8 +516,8 @@ export default function UnifiedSidebar({
           // confusion that free users hit when Today's Intel sits above
           // Source Feed.
           const orderedItems = [...section.items].sort((a, b) => {
-            const aAccess = hasAccess(a.tier) ? 0 : 1;
-            const bAccess = hasAccess(b.tier) ? 0 : 1;
+            const aAccess = canAccessItem(a) ? 0 : 1;
+            const bAccess = canAccessItem(b) ? 0 : 1;
             return aAccess - bAccess;
           });
           return (
@@ -519,7 +530,7 @@ export default function UnifiedSidebar({
             <div className="space-y-1 px-2">
               {orderedItems.map((item) => {
                 const isActive = activePanel === item.id;
-                const canAccess = hasAccess(item.tier);
+                const canAccess = canAccessItem(item);
                 const isHovered = hoveredItem === item.id;
                 const display = getItemDisplay(item);
                 const sharedClassName = `
@@ -597,10 +608,8 @@ export default function UnifiedSidebar({
                         // take focus, not stare at the menu.
                         onMobileClose?.();
                       } else {
-                        // Locked Pro feature + a free user clicked it = the
-                        // highest-intent upgrade signal. Open the upgrade modal
-                        // (named to the feature) instead of doing nothing, and
-                        // log the intent so the command center can measure it.
+                        // Locked feature — open upgrade modal (Pro for most panels,
+                        // Teams for My Clients).
                         setUpgradeFeature(item.id);
                         track('link_click', 'sidebar', { action: 'upgrade_modal_shown', feature: item.id, tier: userTier });
                       }

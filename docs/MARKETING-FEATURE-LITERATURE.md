@@ -1262,3 +1262,22 @@ agencies, or pipeline — the switch was invisible.
 **Proof:** `ClientWorkspaceBanner.tsx` + enriched `/api/app/coach` client profile stats.
 `target-list` GET/POST uses `resolveActiveWorkspace` + `clientNotificationEmail`.
 
+---
+
+## 39. My Clients tier gating — Teams+ only (June 2026)
+
+**What:** **My Clients** (Coach mode) is gated to **Mindy Teams** ($499/mo) and **Enterprise**.
+Solopreneur ($149/mo) manages one business only. Sidebar shows lock + Teams upgrade modal;
+`/api/app/coach` blocks new org auto-provision on Pro. Staff and existing org members
+(e.g. solo consultants who already added clients) are grandfathered with a 10-client cap.
+
+**Why:** Public tier ladder (PRD-public-tier-naming): Teams = Solopreneur + multi-user +
+multi-client. Prevents Pro self-serve from undercutting the Teams SKU.
+
+**SEO:** Position on pricing page — "Consultants & agencies: Teams includes My Clients
+(up to 10 client workspaces per seat)."
+
+**Proof:** `src/lib/mindy/coach-access.ts` + `docs/PRD-my-clients-access-pricing.md`.
+`/api/access/check` returns `coachMode.allowed`. Teams tier from `MI-SAAS-PRICING-STRATEGY.md`
+($499/mo, 5 seats).
+

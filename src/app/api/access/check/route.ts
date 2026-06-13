@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyMIAccess } from '@/lib/api-auth';
 import { resolveAccess } from '@/lib/access/resolve-access';
+import { resolveCoachAccess } from '@/lib/mindy/coach-access';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 
 export async function GET(request: NextRequest) {
@@ -17,9 +18,10 @@ export async function GET(request: NextRequest) {
     const authSession = requireMIAuthSession(request, email);
     if (!authSession.ok) return authSession.response;
 
-    const [access, resolved] = await Promise.all([
+    const [access, resolved, coachMode] = await Promise.all([
       verifyMIAccess(email),
       resolveAccess(email),
+      resolveCoachAccess(email),
     ]);
 
     // Partner trials (and other per-user trial_ends_at) stamp Pro via
@@ -55,6 +57,13 @@ export async function GET(request: NextRequest) {
         staff: access.isStaff ?? false,
         admin: access.staffRole === 'admin',
         legacy_sources: access.sources ?? {},
+      },
+      coachMode: {
+        allowed: coachMode.allowed,
+        reason: coachMode.reason,
+        canAddClients: coachMode.canAddClients,
+        maxClients: coachMode.maxClients,
+        upgradeRequired: coachMode.upgradeRequired ?? null,
       },
     });
   } catch (error) {

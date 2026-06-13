@@ -14,17 +14,22 @@ type ActiveClient = {
 
 export default function ClientWorkspaceBanner({
   email,
+  coachModeAllowed = false,
   onPanelChange,
   activePanel,
 }: {
   email: string | null;
+  coachModeAllowed?: boolean;
   onPanelChange: (panel: AppPanel) => void;
   activePanel?: AppPanel;
 }) {
   const [client, setClient] = useState<ActiveClient | null>(null);
 
   useEffect(() => {
-    if (!email || typeof window === 'undefined') return;
+    if (!email || !coachModeAllowed || typeof window === 'undefined') {
+      setClient(null);
+      return;
+    }
     const ws = localStorage.getItem(ACTIVE_KEY);
     if (!ws) {
       setClient(null);
@@ -55,7 +60,7 @@ export default function ClientWorkspaceBanner({
     })();
 
     return () => { cancelled = true; };
-  }, [email]);
+  }, [email, coachModeAllowed]);
 
   if (!client || activePanel === 'coach') return null;
 

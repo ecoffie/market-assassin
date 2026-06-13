@@ -42,6 +42,11 @@ export default function CoachPanel({
 }) {
   const [loading, setLoading] = useState(true);
   const [isCoach, setIsCoach] = useState(false);
+  const [coachAccess, setCoachAccess] = useState<{
+    allowed: boolean;
+    reason?: string;
+    upgradeRequired?: string | null;
+  } | null>(null);
   const [org, setOrg] = useState<{ name: string; tabLabel: string } | null>(null);
   const [clients, setClients] = useState<Client[]>([]);
   const [orgTab, setOrgTab] = useState<OrgTab>({ deadlines: [], changes: [], news: [] });
@@ -58,6 +63,7 @@ export default function CoachPanel({
     try {
       const res = await fetch(`/api/app/coach?email=${encodeURIComponent(email)}`, { headers: headers() });
       const d = await res.json();
+      setCoachAccess(d.coachAccess || null);
       setIsCoach(!!d.isCoach);
       if (d.isCoach) {
         setOrg(d.org || null);
@@ -135,6 +141,29 @@ export default function CoachPanel({
   }
 
   if (!isCoach) {
+    if (coachAccess && !coachAccess.allowed) {
+      return (
+        <div className="mx-auto max-w-2xl p-6 md:p-8">
+          <h1 className="text-2xl font-bold text-white">My Clients</h1>
+          <p className="mt-2 text-slate-400 text-sm leading-relaxed">
+            Manage multiple client businesses — each with its own pipeline, target agencies, and market research.
+            This capability is included with <span className="text-blue-300 font-medium">Mindy Teams</span> ($499/mo).
+          </p>
+          <div className="mt-6 rounded-xl border border-blue-500/30 bg-blue-950/30 p-5">
+            <p className="text-sm text-slate-300">
+              Solopreneur covers one business. If you consult for multiple clients, upgrade to Teams for up to 10 client workspaces per seat.
+            </p>
+            <a
+              href="/market-intelligence#teams"
+              className="mt-4 inline-flex h-10 items-center rounded-lg bg-blue-600 px-5 text-sm font-medium text-white hover:bg-blue-500"
+            >
+              Upgrade to Teams →
+            </a>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="mx-auto max-w-2xl p-6 md:p-8">
         <h1 className="text-2xl font-bold text-white">Manage multiple clients</h1>

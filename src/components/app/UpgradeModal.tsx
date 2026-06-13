@@ -30,6 +30,10 @@ const FEATURE_PITCH: Record<string, { title: string; line: string }> = {
   proposals: { title: 'Proposal Assist', line: 'Turn an RFP into a compliance matrix and drafted sections in minutes.' },
   'target-list': { title: 'My Target List', line: 'Save and track the agencies and offices you’re going after.' },
   library: { title: 'My Library', line: 'Your saved opportunities, docs, and research in one place.' },
+  coach: {
+    title: 'My Clients',
+    line: 'Manage multiple client businesses — each gets its own pipeline, target agencies, and market research.',
+  },
 };
 
 const PRO_BENEFITS = [
@@ -40,6 +44,14 @@ const PRO_BENEFITS = [
   'Full contractor & decision-maker database',
 ];
 
+const TEAM_BENEFITS = [
+  'Everything in Solopreneur — for your whole team',
+  'My Clients — up to 10 client workspaces per seat',
+  '5 user seats (add more at $99/mo each)',
+  'Shared pipeline + team briefings',
+  'Monthly strategy call with a GovCon coach',
+];
+
 export function UpgradeModal({
   featureId,
   onClose,
@@ -47,7 +59,7 @@ export function UpgradeModal({
 }: {
   featureId: string | null;
   onClose: () => void;
-  onCtaClick?: (plan: 'monthly' | 'pricing') => void;
+  onCtaClick?: (plan: 'monthly' | 'pricing' | 'team') => void;
 }) {
   // Close on Escape.
   useEffect(() => {
@@ -59,6 +71,7 @@ export function UpgradeModal({
 
   if (!featureId) return null;
   const pitch = FEATURE_PITCH[featureId] || { title: 'Mindy Pro', line: 'Unlock the full Mindy workspace.' };
+  const isTeamUpsell = featureId === 'coach';
 
   return (
     <div
@@ -79,13 +92,13 @@ export function UpgradeModal({
 
         <div className="p-6">
           <div className="mb-1 inline-flex items-center gap-1.5 rounded-full bg-purple-500/15 px-2.5 py-1 text-xs font-semibold text-purple-300">
-            <Sparkles className="h-3.5 w-3.5" strokeWidth={2} /> Mindy Pro
+            <Sparkles className="h-3.5 w-3.5" strokeWidth={2} /> {isTeamUpsell ? 'Mindy Teams' : 'Mindy Pro'}
           </div>
           <h2 className="mt-2 text-2xl font-bold text-white">Unlock {pitch.title}</h2>
           <p className="mt-2 text-sm text-slate-300">{pitch.line}</p>
 
           <ul className="mt-5 space-y-2">
-            {PRO_BENEFITS.map((b) => (
+            {(isTeamUpsell ? TEAM_BENEFITS : PRO_BENEFITS).map((b) => (
               <li key={b} className="flex items-start gap-2 text-sm text-slate-300">
                 <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" strokeWidth={2.5} />
                 <span>{b}</span>
@@ -94,17 +107,27 @@ export function UpgradeModal({
           </ul>
 
           <div className="mt-6 flex items-baseline gap-2">
-            <span className="text-3xl font-black text-white">$149</span>
+            <span className="text-3xl font-black text-white">{isTeamUpsell ? '$499' : '$149'}</span>
             <span className="text-sm text-slate-400">/mo — cancel anytime</span>
           </div>
 
-          <Link
-            href="/checkout/mindy-pro-monthly"
-            onClick={() => onCtaClick?.('monthly')}
-            className="mt-4 block w-full rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 py-3 text-center font-semibold text-white shadow-lg shadow-purple-500/20 transition-all hover:scale-[1.02] hover:from-purple-500 hover:to-blue-500"
-          >
-            Go Pro — unlock everything →
-          </Link>
+          {isTeamUpsell ? (
+            <Link
+              href="/market-intelligence#teams"
+              onClick={() => onCtaClick?.('team')}
+              className="mt-4 block w-full rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 py-3 text-center font-semibold text-white shadow-lg shadow-blue-500/20 transition-all hover:scale-[1.02] hover:from-blue-500 hover:to-indigo-500"
+            >
+              Upgrade to Teams — manage clients →
+            </Link>
+          ) : (
+            <Link
+              href="/checkout/mindy-pro-monthly"
+              onClick={() => onCtaClick?.('monthly')}
+              className="mt-4 block w-full rounded-xl bg-gradient-to-r from-purple-600 to-blue-600 py-3 text-center font-semibold text-white shadow-lg shadow-purple-500/20 transition-all hover:scale-[1.02] hover:from-purple-500 hover:to-blue-500"
+            >
+              Go Pro — unlock everything →
+            </Link>
+          )}
           <Link
             href="/market-intelligence"
             onClick={() => onCtaClick?.('pricing')}

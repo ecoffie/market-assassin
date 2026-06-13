@@ -16,6 +16,11 @@ import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { buildProfileFromText } from '@/lib/market/profile-from-text';
 import { clientNotificationEmail } from '@/lib/app/workspace';
+import {
+  coachAtClientLimit,
+  requireCoachAccess,
+  resolveCoachAccess,
+} from '@/lib/mindy/coach-access';
 
 /**
  * Seed a new client workspace from pasted capability text. Uses the SHARED
@@ -82,6 +87,15 @@ export async function GET(request: NextRequest) {
   const auth = requireMIAuthSession(request, email);
   if (!auth.ok) return auth.response;
   const supabase = sb();
+  const coachAccess = await resolveCoachAccess(email!);
+
+  if (!coachAccess.allowed) {
+    return NextResponse.json({
+      success: true,
+      isCoach: false,
+      coachAccess,
+    });
+  }
 
   // Is this user a coach/admin in any org?
   const { data: membership } = await supabase
@@ -93,7 +107,7 @@ export async function GET(request: NextRequest) {
     .maybeSingle();
 
   if (!membership) {
-    return NextResponse.json({ success: true, isCoach: false });
+    return NextResponse.json({ success: true, isCoach: false, coachAccess });
   }
 
   const { data: org } = await supabase.from('organizations').select('*').eq('id', membership.org_id).maybeSingle();
@@ -184,6 +198,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     success: true,
     isCoach: true,
+    coachAccess,
     role: membership.role,
     org: org ? { id: org.id, name: org.name, tabLabel: org.tab_label, logoUrl: org.logo_url, brandColor: org.brand_color } : null,
     clients: clientList.map((c: Record<string, unknown>) => {
@@ -222,13 +237,25 @@ export async function POST(request: NextRequest) {
   if (!auth.ok) return auth.response;
   const supabase = sb();
 
+  const coachAccess = await requireCoachAccess(email);
+  if (!coachAccess) {
+    const denied = await resolveCoachAccess(email);
+    return NextResponse.json(
+      {
+        success: false,
+        error: 'My Clients requires Mindy Teams. Upgrade to manage client workspaces.',
+        coachAccess: denied,
+      },
+      { status: 403 },
+    );
+  }
+
   let { data: membership } = await supabase
     .from('org_members').select('org_id, role').eq('user_email', email).eq('status', 'active')
     .in('role', ['coach', 'org_admin']).maybeSingle();
 
-  // Solo-consultant self-serve (Eric's use case): a non-coach who adds a client
-  // gets a lightweight personal org auto-created, with them as admin + coach.
-  // No APEX-style org provisioning needed — same machinery, lighter entry.
+  // Teams-tier solo consultant: first add_client auto-creates a personal org.
+  // Pro users without grandfather org membership are blocked above.
   if (!membership && body.action === 'add_client') {
     const slug = `solo-${email.replace(/[^a-z0-9]/gi, '-').toLowerCase().slice(0, 40)}`;
     const { data: org } = await supabase.from('organizations').insert({
@@ -244,6 +271,22 @@ export async function POST(request: NextRequest) {
   if (body.action === 'add_client') {
     const businessName = String(body.business_name || '').trim();
     if (!businessName) return NextResponse.json({ success: false, error: 'business_name required' }, { status: 400 });
+
+    const { count: clientCount } = await supabase
+      .from('org_clients')
+      .select('id', { count: 'exact', head: true })
+      .eq('org_id', membership.org_id)
+      .eq('status', 'active');
+    if (coachAtClientLimit(coachAccess, clientCount ?? 0)) {
+      return NextResponse.json(
+        {
+          success: false,
+          error: `Client limit reached (${coachAccess.maxClients} active clients). Upgrade to Enterprise for more.`,
+          coachAccess,
+        },
+        { status: 403 },
+      );
+    }
     // Each client gets its own workspace_id (stable, derived from org+name).
     const workspaceId = `org-${membership.org_id.slice(0, 8)}-${businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}`;
     const { data, error } = await supabase.from('org_clients').insert({

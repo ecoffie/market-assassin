@@ -67,6 +67,7 @@ export default function AppPage() {
 function AppDashboard() {
   const [email, setEmail] = useState<string | null>(null);
   const [tier, setTier] = useState<AppTier>('free');
+  const [coachModeAllowed, setCoachModeAllowed] = useState(false);
   const [activePanel, setActivePanel] = useState<AppPanel>('dashboard');
   // Optional context the previous panel can pass to the next (e.g.
   // PipelinePanel sets { pursuit_id } when user clicks 'Draft Proposal'
@@ -233,6 +234,7 @@ function AppDashboard() {
 
       setEmail(userEmail);
       setTier(userTier);
+      setCoachModeAllowed(!!accessData?.coachMode?.allowed);
 
       // If the currently-active panel is gated for this tier, swap to the
       // first accessible one. Default panel is 'dashboard' (AI briefings) —
@@ -241,6 +243,15 @@ function AppDashboard() {
       if (userTier === 'free' && activePanelRef.current === 'dashboard') {
         activePanelRef.current = 'alerts';
         setActivePanel('alerts');
+      }
+      if (
+        activePanelRef.current === 'coach'
+        && !accessData?.coachMode?.allowed
+        && userTier !== 'team'
+        && userTier !== 'enterprise'
+      ) {
+        activePanelRef.current = 'dashboard';
+        setActivePanel(userTier === 'free' ? 'alerts' : 'dashboard');
       }
 
       // Store email in localStorage
@@ -1163,6 +1174,7 @@ function AppDashboard() {
         activePanel={activePanel}
         onPanelChange={handlePanelChange}
         userTier={tier}
+        coachModeAllowed={coachModeAllowed}
         userEmail={email}
         currentWorkspaceId={currentWorkspaceId}
         onWorkspaceChange={setCurrentWorkspaceId}
@@ -1235,7 +1247,12 @@ function AppDashboard() {
           </div>
         </header>
 
-        <ClientWorkspaceBanner email={email} onPanelChange={handlePanelChange} activePanel={activePanel} />
+        <ClientWorkspaceBanner
+          email={email}
+          coachModeAllowed={coachModeAllowed}
+          onPanelChange={handlePanelChange}
+          activePanel={activePanel}
+        />
 
         {/* Panel Content */}
         <PanelContainer
