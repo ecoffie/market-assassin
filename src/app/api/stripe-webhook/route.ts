@@ -121,14 +121,34 @@ export async function POST(request: NextRequest) {
 
     // Payment links for standalone Mindy AI may not inject session metadata.
     // Fall back to the product description so the purchase still grants
-    // the right access. Order matters: check Team first because "Mindy AI
-    // Team" descriptions also match "market intelligence" / "mindy" if
-    // we ever rename the line items.
+    // the right access. Order matters: Team first, then lifetime (before
+    // generic briefings/mindy match), then recurring briefings.
     if (!tier && !bundle) {
       if (normalizedDescription.includes('team monthly') || normalizedDescription.includes('team annual')) {
         tier = normalizedDescription.includes('annual') ? 'team_annual' : 'team_monthly';
-      } else if (normalizedDescription.includes('market intelligence') || normalizedDescription.includes('daily briefings') || normalizedDescription.includes('mindy ai')) {
+      } else if (
+        normalizedDescription.includes('lifetime') &&
+        (normalizedDescription.includes('mindy') ||
+          normalizedDescription.includes('briefings') ||
+          normalizedDescription.includes('market intelligence') ||
+          normalizedDescription.includes('founders'))
+      ) {
+        tier = 'briefings_lifetime';
+      } else if (
+        normalizedDescription.includes('market intelligence') ||
+        normalizedDescription.includes('daily briefings') ||
+        normalizedDescription.includes('mindy ai')
+      ) {
         tier = 'briefings';
+      }
+      // Bootcamp / legacy Ultimate one-time checkout at $1,497 — grant lifetime
+      // Mindy only (1-1-1). Grandfathered Ultimate buyers keep legacy flags via
+      // bundle metadata on older sessions; new links should set tier metadata.
+      if (!tier && session.amount_total === 149700) {
+        tier = 'briefings_lifetime';
+      }
+      if (!tier && session.amount_total === 499700) {
+        tier = 'briefings_lifetime';
       }
     }
 

@@ -11,9 +11,8 @@ import {
 /**
  * GET /api/cron/bootcamp-lifetime-offer
  *
- * Post-bootcamp lifetime-offer blast. Sends the $1,497 Ultimate Giant Bundle
- * offer to bootcamp leads (user_notification_settings.invitation_source =
- * 'bootcamp-batch-enroll') who are NOT already paying customers, ONCE each
+ * Post-bootcamp lifetime-offer blast. Sends the $1,497 Mindy Lifetime bootcamp
+ * special (not Ultimate Giant Bundle — 1-1-1 model) to bootcamp leads
  * (deduped on email_type). One-time campaign — run it after June 27.
  *
  * Skips anyone who already has briefings/Pro access (no point pitching lifetime

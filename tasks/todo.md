@@ -28,24 +28,21 @@ that opportunities API (bigger change than a render tweak).
 
 ---
 
-## 🔲 OPEN — Build the $2,997 Mindy Lifetime product (before bootcamp special ends)
+## 🔲 OPEN — Founders Lifetime $4,997 (Stripe link pending)
 
-**Why:** $2,997 is the STANDARD lifetime price AFTER the June 27 bootcamp ($1,497 Ultimate
-is the bootcamp special — see the bootcamp lifetime offer email which already anchors against
-$2,997). Right now $2,997 is a pricing DECISION, not a sellable product — nothing can charge it.
-Build it before the special closes so there's a real checkout at the standard price.
+**Why:** 1-1-1 pricing — one product (Mindy), lifetime at proven $4,997 course anchor.
+Bootcamp special stays $1,497 through Jun 27. No $2,997 tier.
 
-**Steps:**
-1. Create the Stripe product + payment link for **$2,997 one-time "Mindy Lifetime"**.
-2. Add a `mindy-lifetime` entry to `CHECKOUT_PRODUCTS` in `src/lib/purchase-attribution.ts`
-   (amountCents 299700, the new Stripe link, type stripe_payment_link).
-3. Confirm `src/app/api/stripe-webhook/route.ts` grants `briefings_lifetime` for it
-   (it already handles that tier → `access_briefings=true`, no expiry). Map the new
-   product/price → `briefings_lifetime`.
-4. Surface a `/checkout/mindy-lifetime` path + wherever the standard lifetime is sold post-bootcamp.
+**Code shipped (branch `feat/founders-lifetime-4997`):**
+- [x] `src/lib/mindy/lifetime-pricing.ts` — single source of truth
+- [x] `/lifetime` sales page + `/checkout/founders-lifetime` + `/checkout/bootcamp-lifetime`
+- [x] Bootcamp email rewritten (no Ultimate Giant Bundle)
+- [x] Webhook: `briefings_lifetime` for $1,497 / $4,997 + lifetime description fallback
 
-**Context:** memory `mindy_100k_goal_math` + `free_to_paid_funnel`. The bootcamp $1,497 blast is
-already built/tested (`/api/cron/bootcamp-lifetime-offer`) and uses the EXISTING shop link.
+**Eric — Stripe dashboard (blocks go-live):**
+- [x] Create Founders Lifetime $4,997 payment link → `buy.stripe.com/28E00k6IC5V0fRH5WMfnO0G`
+- [ ] Update bootcamp $1,497 link metadata to `tier=briefings_lifetime` (or create new link)
+- [ ] Merge branch + deploy
 
 ---
 
