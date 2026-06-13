@@ -47,6 +47,32 @@ export const CHECKOUT_PRODUCTS: Record<string, CheckoutProduct> = {
     checkoutUrl: 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D',
     type: 'stripe_payment_link',
   },
+  // Mindy Lifetime $2,997 — the STANDARD post-bootcamp price for lifetime
+  // Mindy access (Market Intelligence / briefings_lifetime tier). The
+  // $1,497 Ultimate Giant Bundle (shop.govcongiants.com/bundles/ultimate)
+  // is the time-boxed bootcamp special and bundles the full tool suite;
+  // this product is Mindy-lifetime ONLY and is what we sell at full
+  // price after the June 27 bootcamp closes.
+  //
+  // STRIPE DASHBOARD SETUP (must do before launching):
+  //   1. Create product "Mindy Lifetime" — $2,997 one-time, USD
+  //   2. Create a Payment Link for that price
+  //   3. On the Payment Link, add metadata: tier = briefings_lifetime
+  //      (the webhook reads this to grant access_briefings with no expiry —
+  //      see src/lib/supabase/user-profiles.ts, line ~346. As a defensive
+  //      backstop the webhook also infers briefings_lifetime from a 'lifetime'
+  //      description, but metadata is the canonical signal.)
+  //   4. Replace the checkoutUrl placeholder below with the real buy.stripe.com URL
+  'mindy-lifetime': {
+    id: 'mindy-lifetime',
+    name: 'Mindy Lifetime',
+    priceLabel: '$2,997 one-time',
+    amountCents: 299700,
+    // PLACEHOLDER — replace with the real payment link before launching.
+    // The /checkout/mindy-lifetime route will redirect users here.
+    checkoutUrl: 'https://buy.stripe.com/REPLACE_ME_MINDY_LIFETIME_2997',
+    type: 'stripe_payment_link',
+  },
 };
 
 export type AttributionTouch = {

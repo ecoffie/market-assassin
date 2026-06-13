@@ -54,12 +54,35 @@ Source of truth: `src/lib/products.ts`
 
 ## Mindy Pro (getmindy.ai)
 
-| Product | Price | Checkout route | Stripe Payment Link |
-|---------|-------|----------------|----------------------|
-| Mindy Pro Monthly | $149/mo | `/checkout/mindy-pro-monthly` | `buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C` |
-| Mindy Pro Annual | $1,490/yr | `/checkout/mindy-pro-annual` | `buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D` |
+| Product | Price | Checkout route | Stripe Payment Link | Tier metadata |
+|---------|-------|----------------|----------------------|---------------|
+| Mindy Pro Monthly | $149/mo | `/checkout/mindy-pro-monthly` | `buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C` | (subscription — auto-detected) |
+| Mindy Pro Annual | $1,490/yr | `/checkout/mindy-pro-annual` | `buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D` | (subscription — auto-detected) |
+| **Mindy Lifetime** | **$2,997 one-time** | `/checkout/mindy-lifetime` | **TODO — see Stripe Setup Checklist below** | `tier=briefings_lifetime` |
 
 **Partner attribution:** Share `getmindy.ai/ncmbc` or `getmindy.ai/checkout/mindy-pro-monthly?ref=NCMBC` — never raw `buy.stripe.com` links (skips affiliate tracking).
+
+### Mindy Lifetime — Stripe Dashboard Setup Checklist
+
+The **standard** post-bootcamp lifetime price ($2,997). The $1,497 Ultimate Giant Bundle on shop.govcongiants.com is the time-boxed bootcamp special — it bundles the full tool suite. The new $2,997 product is **Mindy lifetime ONLY** (briefings tier, no other tools).
+
+Setup steps (Eric, in Stripe dashboard — live mode):
+
+- [ ] **Create product:** `Mindy Lifetime` — $2,997.00 USD, **one-time** (not recurring)
+- [ ] **Create Payment Link** for that price
+  - Description on the line item should include the word **"Lifetime"** (the webhook has a defensive fallback that infers `briefings_lifetime` from "Mindy Lifetime" / "Lifetime Briefings" / "Lifetime Market Intelligence" descriptions if metadata is missing)
+- [ ] **Set Payment Link metadata:** `tier = briefings_lifetime` (canonical signal — webhook reads this from `session.metadata.tier`)
+- [ ] **Enable** "Collect customer name + email" on the link
+- [ ] **Set after-payment redirect** to `https://getmindy.ai/purchase/success?product=mindy-lifetime`
+- [ ] **Copy the resulting `buy.stripe.com/...` URL** and replace the placeholder in `src/lib/purchase-attribution.ts` (`mindy-lifetime` entry) — search for `REPLACE_ME_MINDY_LIFETIME_2997`
+- [ ] Deploy
+- [ ] Test with a $0 promotion code (or in test mode) and verify:
+  - [ ] `purchases` row created with `tier=briefings_lifetime`, `amount_paid=2997`
+  - [ ] `user_profiles.access_briefings = true` for the buyer
+  - [ ] Welcome email arrives (`sendMarketIntelligenceWelcomeEmail`)
+  - [ ] Buyer can load `/app` and access Mindy AI
+
+**Why a manual step:** Stripe products/prices are live-mode resources; we don't auto-create them from code. Once the link exists, everything downstream (checkout route, webhook, access grant, welcome email, purchase attribution, affiliate commission) is already wired.
 
 ---
 
@@ -154,4 +177,4 @@ stripe listen --forward-to localhost:3000/api/stripe-webhook
 
 ---
 
-*Last Updated: March 20, 2026*
+*Last Updated: June 13, 2026 — added Mindy Lifetime $2,997 (post-bootcamp standard price)*

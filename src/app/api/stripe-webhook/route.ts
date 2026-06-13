@@ -123,10 +123,22 @@ export async function POST(request: NextRequest) {
     // Fall back to the product description so the purchase still grants
     // the right access. Order matters: check Team first because "Mindy AI
     // Team" descriptions also match "market intelligence" / "mindy" if
-    // we ever rename the line items.
+    // we ever rename the line items. Lifetime is checked BEFORE the generic
+    // briefings/mindy match so "Mindy Lifetime" doesn't downgrade to a
+    // 1-year `briefings` tier when the payment-link metadata is missing.
     if (!tier && !bundle) {
       if (normalizedDescription.includes('team monthly') || normalizedDescription.includes('team annual')) {
         tier = normalizedDescription.includes('annual') ? 'team_annual' : 'team_monthly';
+      } else if (
+        normalizedDescription.includes('lifetime') &&
+        (normalizedDescription.includes('mindy') ||
+          normalizedDescription.includes('briefings') ||
+          normalizedDescription.includes('market intelligence'))
+      ) {
+        // "Mindy Lifetime" / "Lifetime Briefings" / "Lifetime Market
+        // Intelligence" → grant access_briefings with no expiry. Mirrors
+        // updateAccessFlags()'s briefings_lifetime branch.
+        tier = 'briefings_lifetime';
       } else if (normalizedDescription.includes('market intelligence') || normalizedDescription.includes('daily briefings') || normalizedDescription.includes('mindy ai')) {
         tier = 'briefings';
       }
