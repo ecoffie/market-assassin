@@ -41,10 +41,16 @@ export async function upsertCtaTagsForOpportunity(
   const rows = buildCtaTagRows(opp, taggedAt);
   const noticeId = opp.notice_id;
 
+  // Dedupe within batch (defensive) and upsert so concurrent cron workers
+  // don't collide on opportunity_cta_tags_pkey.
+  const deduped = [...new Map(rows.map((r) => [`${r.notice_id}:${r.cta_id}`, r])).values()];
+
   await supabase.from('opportunity_cta_tags').delete().eq('notice_id', noticeId);
 
-  if (rows.length > 0) {
-    const { error } = await supabase.from('opportunity_cta_tags').insert(rows);
+  if (deduped.length > 0) {
+    const { error } = await supabase
+      .from('opportunity_cta_tags')
+      .upsert(deduped, { onConflict: 'notice_id,cta_id' });
     if (error) throw new Error(error.message);
   }
 
@@ -53,7 +59,7 @@ export async function upsertCtaTagsForOpportunity(
     .update({ cta_tagged_at: taggedAt })
     .eq('notice_id', noticeId);
 
-  return { inserted: rows.length };
+  return { inserted: deduped.length };
 }
 
 export async function tagCtaBatch(
