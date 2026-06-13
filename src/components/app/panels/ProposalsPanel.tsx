@@ -880,9 +880,15 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     [drafts, currentSectionTabs]
   );
 
-  const exportProposalPackage = useCallback(async () => {
+  const exportProposalPackage = useCallback(async (opts?: { idiq?: boolean }) => {
     if (!email) return;
-    if (!uploadedRfp && !isSimpleResponseMode) return;
+    // The IDIQ package is built from the compliance matrix, so it needs that
+    // (not an uploaded RFP / simple-response mode). Other exports keep their guard.
+    if (opts?.idiq) {
+      if (compliance.length === 0) { setExportError('Generate the compliance matrix first — the IDIQ package structure is built from it.'); return; }
+    } else if (!uploadedRfp && !isSimpleResponseMode) {
+      return;
+    }
     setExporting(true);
     setExportError(null);
     try {
@@ -912,7 +918,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           drafts: draftsForExport,
           sectionOrder: currentSectionTabs.map(tab => tab.id),
           checklist: isSimpleResponseMode ? [] : checklist.map(c => ({ label: c.label, checked: c.checked })),
-          packageType: isLoiResponseMode ? 'sources_sought_loi' : isRfqMode ? 'rfq_response' : 'proposal',
+          packageType: opts?.idiq ? 'idiq_proposal' : isLoiResponseMode ? 'sources_sought_loi' : isRfqMode ? 'rfq_response' : 'proposal',
           // Pre-fill the LOI template from the notice text when we extracted fields.
           loiFields: isLoiResponseMode && loiFields ? loiFields : undefined,
         }),
@@ -1813,7 +1819,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             </button>
           ) : (
             <button
-              onClick={exportProposalPackage}
+              onClick={() => exportProposalPackage()}
               disabled={exporting}
               className="w-full sm:w-auto px-6 py-3 bg-gradient-to-br from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white text-base font-semibold rounded-xl shadow-lg disabled:opacity-50"
             >
@@ -1847,7 +1853,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 </button>
                 <button
                   type="button"
-                  onClick={exportProposalPackage}
+                  onClick={() => exportProposalPackage()}
                   disabled={exporting || !hasAnyDraft}
                   className="px-5 py-2.5 text-sm font-semibold rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white transition-colors flex items-center gap-2"
                 >
@@ -1942,7 +1948,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 status={exporting ? 'Working...' : 'Ready'}
                 buttonLabel={exporting ? 'Assembling...' : isRfqMode ? 'Export RFQ .docx' : 'Export LOI .docx'}
                 disabled={exporting}
-                onClick={exportProposalPackage}
+                onClick={() => exportProposalPackage()}
               />
             ) : (
               <OutputActionCard
@@ -1985,7 +1991,23 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 status={hasAnyDraft || compliance.length > 0 ? 'Ready' : 'Needs an output'}
                 buttonLabel={exporting ? 'Assembling...' : 'Export .docx'}
                 disabled={exporting || (!hasAnyDraft && compliance.length === 0)}
-                onClick={exportProposalPackage}
+                onClick={() => exportProposalPackage()}
+              />
+            )}
+
+            {/* Full 4-volume IDIQ/MACC proposal skeleton — the deterministic
+                Volume I–IV structure derived from the compliance matrix. The
+                format people can't build themselves; placeholders show what goes
+                where. Needs a compliance matrix (the structure is driven by it). */}
+            {!isSimpleResponseMode && (
+              <OutputActionCard
+                eyebrow="Export · IDIQ / MACC"
+                title="Export 4-volume proposal skeleton"
+                description="The full Volume I–IV structure (Technical · Past Performance · Pricing · Solicitation & Award) laid out from the solicitation's requirements, pre-filled from your vault, with labeled placeholders for the rest."
+                status={compliance.length > 0 ? 'Ready' : 'Generate the compliance matrix first'}
+                buttonLabel={exporting ? 'Assembling...' : 'Export IDIQ package (.docx)'}
+                disabled={exporting || compliance.length === 0}
+                onClick={() => exportProposalPackage({ idiq: true })}
               />
             )}
           </div>
@@ -2018,7 +2040,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 </div>
                 <button
                   type="button"
-                  onClick={exportProposalPackage}
+                  onClick={() => exportProposalPackage()}
                   disabled={exporting}
                   className="px-4 py-2 text-sm rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 text-white transition-colors flex items-center gap-2"
                 >
@@ -2608,7 +2630,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               </div>
               <button
                 type="button"
-                onClick={exportProposalPackage}
+                onClick={() => exportProposalPackage()}
                 disabled={exporting || (!hasAnyDraft && (!compliance.length || isLoiResponseMode))}
                 className="px-5 py-2.5 text-sm rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium flex items-center gap-2 transition-colors"
               >

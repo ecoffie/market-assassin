@@ -19,7 +19,7 @@ import { createClient } from '@supabase/supabase-js';
 import type { LoiFields } from '@/lib/proposal/loi-fields';
 import { assembleLoiTemplate } from '@/lib/proposal/loi-template';
 import { assembleProposalPackage } from '@/lib/proposal/proposal-package';
-import type { ComplianceReq } from '@/lib/proposal/section-alignment';
+import { normalizeCategory, type ComplianceReq } from '@/lib/proposal/section-alignment';
 import type { VaultContext } from '@/lib/proposal/types';
 
 export const runtime = 'nodejs';
@@ -748,10 +748,14 @@ export async function POST(request: NextRequest) {
   // compliance matrix the caller already extracted (body.compliance); pre-filled
   // from the vault; everything unknown is an instructive labeled [placeholder].
   if (isIdiqPackage) {
+    // The UI sends `category` as a HUMAN LABEL ("Technical", "Past Performance")
+    // via CATEGORY_LABELS — normalizeCategory maps it (and the requirement text)
+    // back to the enum the structure builder buckets on. Casting the label
+    // directly would mis-bucket every requirement.
     const reqs: ComplianceReq[] = compliance.map((c) => ({
       id: c.id,
       requirement: c.requirement,
-      category: (c.category as ComplianceReq['category']) || 'other',
+      category: normalizeCategory(c.category, c.requirement),
       section: c.section,
     }));
     const idiqVault = await loadVaultForLoi(email).catch(() => ({ has_any: false } as VaultContext));
