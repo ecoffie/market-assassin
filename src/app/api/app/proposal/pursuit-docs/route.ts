@@ -17,7 +17,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { fetchPursuitDocsAuto } from '@/lib/grants/fetch-grant-docs';
-import { ensureWorkspaceMember } from '@/lib/app/workspace';
+import { resolveActiveWorkspace } from '@/lib/app/workspace';
 import { isValidSamNoticeId } from '@/lib/sam/utils';
 import { fetchNoticeDescription, isDescriptionLink } from '@/lib/sam/notice-description';
 
@@ -43,12 +43,13 @@ function getSupabase() {
 // rows ("not your pursuit") even though the user could see them.
 async function ownsPursuit(
   row: { user_email?: string | null; workspace_id?: string | null },
-  email: string
+  email: string,
+  request: NextRequest,
 ): Promise<boolean> {
   if (row.user_email?.toLowerCase() === email.toLowerCase()) return true;
   if (row.workspace_id) {
     try {
-      const { workspaceId } = await ensureWorkspaceMember(email.toLowerCase());
+      const { workspaceId } = await resolveActiveWorkspace(email.toLowerCase(), request);
       if (workspaceId && row.workspace_id === workspaceId) return true;
     } catch {
       // Workspace lookup unavailable — deny.
@@ -87,7 +88,7 @@ export async function GET(request: NextRequest) {
       { status: 404 }
     );
   }
-  if (!(await ownsPursuit(pipelineRow, email))) {
+  if (!(await ownsPursuit(pipelineRow, email, request))) {
     return NextResponse.json(
       { success: false, error: 'not your pursuit' },
       { status: 403 }
@@ -300,7 +301,7 @@ export async function POST(request: NextRequest) {
   if (pipelineErr || !pipelineRow) {
     return NextResponse.json({ success: false, error: 'pursuit not found' }, { status: 404 });
   }
-  if (!(await ownsPursuit(pipelineRow, email))) {
+  if (!(await ownsPursuit(pipelineRow, email, request))) {
     return NextResponse.json({ success: false, error: 'not your pursuit' }, { status: 403 });
   }
   if (!pipelineRow.notice_id) {

@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { buildProfileFromText } from '@/lib/market/profile-from-text';
+import { clientNotificationEmail } from '@/lib/app/workspace';
 
 /**
  * Seed a new client workspace from pasted capability text. Uses the SHARED
@@ -145,14 +146,71 @@ export async function GET(request: NextRequest) {
     .order('created_at', { ascending: false })
     .limit(20);
 
+  // Per-client profile + counts so the My Clients panel shows what was seeded.
+  const profileByWs = new Map<string, Record<string, unknown>>();
+  const pipelineCount = new Map<string, number>();
+  const targetCount = new Map<string, number>();
+  if (workspaceIds.length) {
+    const clientEmails = workspaceIds.map((ws: string) => clientNotificationEmail(ws));
+    const { data: profiles } = await supabase
+      .from('user_notification_settings')
+      .select('user_email, naics_codes, keywords, location_states, primary_industry')
+      .in('user_email', clientEmails);
+    for (const p of profiles || []) {
+      const ws = clientEmails.find((e: string) => e === p.user_email);
+      const wsId = workspaceIds.find((id: string) => clientNotificationEmail(id) === p.user_email);
+      if (wsId) profileByWs.set(wsId, p);
+      void ws;
+    }
+    const { data: plRows } = await supabase
+      .from('user_pipeline')
+      .select('workspace_id')
+      .in('workspace_id', workspaceIds)
+      .neq('is_archived', true);
+    for (const r of plRows || []) {
+      const ws = r.workspace_id as string;
+      pipelineCount.set(ws, (pipelineCount.get(ws) || 0) + 1);
+    }
+    const { data: tlRows } = await supabase
+      .from('user_target_list')
+      .select('workspace_id')
+      .in('workspace_id', workspaceIds);
+    for (const r of tlRows || []) {
+      const ws = r.workspace_id as string;
+      targetCount.set(ws, (targetCount.get(ws) || 0) + 1);
+    }
+  }
+
   return NextResponse.json({
     success: true,
     isCoach: true,
     role: membership.role,
     org: org ? { id: org.id, name: org.name, tabLabel: org.tab_label, logoUrl: org.logo_url, brandColor: org.brand_color } : null,
-    clients: clientList.map((c: Record<string, unknown>) => ({
-      id: c.id, workspaceId: c.workspace_id, businessName: c.business_name, primaryEmail: c.primary_email,
-    })),
+    clients: clientList.map((c: Record<string, unknown>) => {
+      const ws = c.workspace_id as string;
+      const prof = profileByWs.get(ws);
+      const naics = (prof?.naics_codes as string[] | undefined) || [];
+      const keywords = (prof?.keywords as string[] | undefined) || [];
+      const states = (prof?.location_states as string[] | undefined) || [];
+      return {
+        id: c.id,
+        workspaceId: ws,
+        businessName: c.business_name,
+        primaryEmail: c.primary_email,
+        profile: prof ? {
+          naics,
+          keywords,
+          states,
+          naicsCount: naics.length,
+          keywordCount: keywords.length,
+          industry: prof.primary_industry || null,
+        } : null,
+        stats: {
+          pipeline: pipelineCount.get(ws) || 0,
+          targets: targetCount.get(ws) || 0,
+        },
+      };
+    }),
     orgTab: { deadlines, changes, news: news || [] },
   });
 }

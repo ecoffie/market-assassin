@@ -2,10 +2,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import {
   ensureAppWorkspaceSchema,
-  ensureWorkspaceMember,
   getAppSupabase,
   normalizeEmail,
   recordAppActivity,
+  resolveActiveWorkspace,
 } from '@/lib/app/workspace';
 
 export const dynamic = 'force-dynamic';
@@ -48,8 +48,8 @@ async function requireFocusContext(request: NextRequest, email: string) {
     };
   }
 
-  const { workspaceId, member } = await ensureWorkspaceMember(email);
-  return { workspaceId, member };
+  const { workspaceId } = await resolveActiveWorkspace(email, request);
+  return { workspaceId };
 }
 
 export async function GET(request: NextRequest) {

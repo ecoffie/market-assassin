@@ -377,3 +377,8 @@ export async function resolveActiveWorkspace(
   const { workspaceId } = await ensureWorkspaceMember(email);
   return { workspaceId, asClient: false };
 }
+
+/** Synthetic email for a client workspace's notification profile (Coach Mode). */
+export function clientNotificationEmail(workspaceId: string): string {
+  return `${workspaceId}@clients.getmindy.ai`;
+}

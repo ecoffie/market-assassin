@@ -100,6 +100,27 @@ type PartnerProgramsBrief = {
   }>;
 };
 
+type CoachActivityRow = {
+  id: string;
+  coach: string;
+  activity_type: string;
+  target_name?: string;
+  target_org?: string;
+  status: string;
+  customer_signal?: string;
+  next_action?: string;
+  updated_at: string;
+};
+
+type CoachActivityBrief = {
+  success: boolean;
+  count: number;
+  activities: CoachActivityRow[];
+  summary: { open: number; byCoach: Record<string, number> };
+  migrationNeeded?: boolean;
+  hint?: string;
+};
+
 // Lead targets to hit the remaining $149 subs at three close rates. Anchored to
 // real data: cold base converts ~0.7%, warm bootcamp leads realistically 3-8%.
 // (IG peak was ~2,000 signups/mo — the 5% medium case is ~6 months at that pace.)
@@ -292,8 +313,8 @@ const roleLanes: RoleLane[] = [
   {
     name: 'Coach Signal Loop',
     owners: 'Ryan, Zach, Randie, Tavin',
-    mission: 'Turn coach conversations into activation help, partner leads, proof stories, and white-glove referrals.',
-    nextAction: 'Log customer-success signals and partner/channel opportunities after each call or event.',
+    mission: 'Partner BD (APEX/SBDC/Chambers) + signal capture — NOT profile nudges (those are Annelle/Sikander).',
+    nextAction: 'Log partner leads, proof stories, and white-glove referrals in the Coach Signal queue.',
     signal: 'Setup needs, partner intros, proof stories, referrals',
     tone: 'blue',
   },
@@ -381,9 +402,9 @@ const queueItems: QueueItem[] = [
   {
     queue: 'Coach Signal Capture',
     owner: 'Ryan, Zach, Randie, Tavin',
-    segment: 'Calls, live events, partner conversations, customer success touchpoints',
-    nextAction: 'Log proof stories, partner leads, setup needs, and white-glove referrals.',
-    status: 'Needs intake form',
+    segment: 'Partner BD (APEX/SBDC/Chambers), livestream validation, proof stories, referrals',
+    nextAction: 'Log partner leads and customer-success signals — profile nudges stay with Annelle/Sikander.',
+    status: 'Live in Command Center',
     tone: 'blue',
   },
   {
@@ -511,6 +532,17 @@ export default function LaunchCommandCenterPage() {
   const [upgradeIntentError, setUpgradeIntentError] = useState('');
   const [partnerBrief, setPartnerBrief] = useState<PartnerProgramsBrief | null>(null);
   const [partnerBriefError, setPartnerBriefError] = useState('');
+  const [coachBrief, setCoachBrief] = useState<CoachActivityBrief | null>(null);
+  const [coachLoading, setCoachLoading] = useState(false);
+  const [coachError, setCoachError] = useState('');
+  const [coachLogStatus, setCoachLogStatus] = useState<string | null>(null);
+  const [coachForm, setCoachForm] = useState({
+    coach: 'Ryan',
+    activity_type: 'partner_bd',
+    target_org: '',
+    objective: '',
+    next_action: '',
+  });
 
   const currentDate = useMemo(() => {
     return new Intl.DateTimeFormat('en-US', {
@@ -883,6 +915,72 @@ export default function LaunchCommandCenterPage() {
     loadPartnerBrief();
     return () => { cancelled = true; };
   }, [authenticated, password]);
+
+  useEffect(() => {
+    if (!authenticated || !password) return;
+    let cancelled = false;
+    async function loadCoachBrief() {
+      setCoachLoading(true);
+      setCoachError('');
+      try {
+        const response = await fetch(
+          `/api/admin/coach-activity?password=${encodeURIComponent(password)}&limit=50`,
+          { cache: 'no-store' },
+        );
+        const data = await response.json();
+        if (cancelled) return;
+        if (!response.ok || !data.success) {
+          setCoachError(data.hint || data.error || 'Could not load coach activity');
+          setCoachBrief(data.migrationNeeded ? { success: false, count: 0, activities: [], summary: { open: 0, byCoach: {} }, migrationNeeded: true, hint: data.hint } : null);
+          return;
+        }
+        setCoachBrief(data as CoachActivityBrief);
+      } catch {
+        if (!cancelled) {
+          setCoachError('Could not load coach activity');
+          setCoachBrief(null);
+        }
+      } finally {
+        if (!cancelled) setCoachLoading(false);
+      }
+    }
+    loadCoachBrief();
+    return () => { cancelled = true; };
+  }, [authenticated, password]);
+
+  async function logCoachActivity() {
+    if (!password || !coachForm.target_org.trim()) return;
+    setCoachLogStatus(null);
+    try {
+      const response = await fetch(`/api/admin/coach-activity?password=${encodeURIComponent(password)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          coach: coachForm.coach,
+          activity_type: coachForm.activity_type,
+          target_org: coachForm.target_org.trim(),
+          objective: coachForm.objective.trim() || undefined,
+          next_action: coachForm.next_action.trim() || undefined,
+          channel: 'call',
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success) {
+        setCoachLogStatus(data.error || 'Failed to log activity');
+        return;
+      }
+      setCoachLogStatus('Logged — refresh shows in queue');
+      setCoachForm((f) => ({ ...f, target_org: '', objective: '', next_action: '' }));
+      const refresh = await fetch(
+        `/api/admin/coach-activity?password=${encodeURIComponent(password)}&limit=50`,
+        { cache: 'no-store' },
+      );
+      const refreshed = await refresh.json();
+      if (refreshed.success) setCoachBrief(refreshed as CoachActivityBrief);
+    } catch {
+      setCoachLogStatus('Failed to log activity');
+    }
+  }
 
   if (checking) {
     return <LoadingState />;
@@ -1739,6 +1837,111 @@ export default function LaunchCommandCenterPage() {
           ) : (
             <div className="mt-6 rounded-lg border border-slate-800 bg-slate-950/60 p-5 text-slate-400">
               Launch manager brief will load after admin authentication.
+            </div>
+          )}
+        </section>
+
+        {/* Coach Signal Loop — partner BD, NOT profile nudges */}
+        <section className="rounded-lg border border-blue-500/30 bg-gradient-to-br from-blue-900/20 to-slate-900 p-6">
+          <div className="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-[0.2em] text-blue-300">Coach Signal Loop</p>
+              <h2 className="mt-2 text-3xl font-bold">Partner BD + Referrals</h2>
+              <p className="mt-2 text-sm text-slate-400">
+                Ryan, Zach, Randie, Tavin own APEX/SBDC/Chamber partnerships and signal capture.
+                Profile nudges stay with Annelle/Sikander — coaches do not run the activation queue.
+              </p>
+            </div>
+            {coachBrief && (
+              <div className="text-right">
+                <p className="text-3xl font-bold text-blue-300">{coachBrief.summary?.open ?? 0}</p>
+                <p className="text-xs text-slate-500">open coach activities</p>
+              </div>
+            )}
+          </div>
+
+          {coachLoading ? (
+            <p className="mt-6 text-sm text-slate-400">Loading coach queue…</p>
+          ) : coachBrief?.migrationNeeded ? (
+            <div className="mt-6 rounded-lg border border-amber-500/40 bg-amber-500/10 p-4 text-sm text-amber-100">
+              Run migration in Supabase: <code className="text-amber-200">supabase/migrations/20260611_internal_coach_activity.sql</code>
+            </div>
+          ) : coachError && !coachBrief ? (
+            <p className="mt-6 text-sm text-red-300">{coachError}</p>
+          ) : (
+            <div className="mt-6 grid gap-5 lg:grid-cols-[1fr_1.1fr]">
+              <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-5">
+                <h3 className="text-lg font-bold">Log partner activity</h3>
+                <p className="mt-1 text-xs text-slate-500">Target: 20 outreach calls/week per coach (COACH-ENTERPRISE-BD-PLAN)</p>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2">
+                  <select
+                    value={coachForm.coach}
+                    onChange={(e) => setCoachForm((f) => ({ ...f, coach: e.target.value }))}
+                    className="h-10 rounded-lg border border-slate-700 bg-slate-800 px-3 text-sm text-white"
+                  >
+                    {['Ryan', 'Zach', 'Randie', 'Tavin'].map((c) => (
+                      <option key={c} value={c}>{c}</option>
+                    ))}
+                  </select>
+                  <select
+                    value={coachForm.activity_type}
+                    onChange={(e) => setCoachForm((f) => ({ ...f, activity_type: e.target.value }))}
+                    className="h-10 rounded-lg border border-slate-700 bg-slate-800 px-3 text-sm text-white"
+                  >
+                    <option value="partner_bd">Partner BD</option>
+                    <option value="livestream_validation">Livestream validation</option>
+                    <option value="customer_success_checkin">Customer success</option>
+                    <option value="enterprise_referral">Enterprise referral</option>
+                    <option value="proof_story">Proof story</option>
+                    <option value="white_glove_referral">White-glove referral</option>
+                  </select>
+                </div>
+                <input
+                  value={coachForm.target_org}
+                  onChange={(e) => setCoachForm((f) => ({ ...f, target_org: e.target.value }))}
+                  placeholder="Target org (e.g. Florida APEX Tampa)"
+                  className="mt-3 w-full h-10 rounded-lg border border-slate-700 bg-slate-800 px-3 text-sm text-white placeholder-slate-500"
+                />
+                <input
+                  value={coachForm.objective}
+                  onChange={(e) => setCoachForm((f) => ({ ...f, objective: e.target.value }))}
+                  placeholder="Objective (e.g. bulk alert signup email to client list)"
+                  className="mt-2 w-full h-10 rounded-lg border border-slate-700 bg-slate-800 px-3 text-sm text-white placeholder-slate-500"
+                />
+                <button
+                  type="button"
+                  onClick={logCoachActivity}
+                  disabled={!coachForm.target_org.trim()}
+                  className="mt-3 h-10 w-full rounded-lg bg-blue-600 px-4 text-sm font-medium text-white hover:bg-blue-500 disabled:bg-slate-700"
+                >
+                  Log activity
+                </button>
+                {coachLogStatus && (
+                  <p className={`mt-2 text-xs ${coachLogStatus.startsWith('Logged') ? 'text-emerald-300' : 'text-amber-300'}`}>
+                    {coachLogStatus}
+                  </p>
+                )}
+              </div>
+
+              <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-5">
+                <h3 className="text-lg font-bold">Recent coach queue</h3>
+                <div className="mt-4 max-h-72 overflow-y-auto space-y-2">
+                  {(coachBrief?.activities || []).length === 0 ? (
+                    <p className="text-sm text-slate-500">No activities logged yet. Coaches: log your first APEX/SBDC outreach call above.</p>
+                  ) : (
+                    coachBrief!.activities.slice(0, 12).map((row) => (
+                      <div key={row.id} className="rounded-lg border border-slate-800 bg-slate-900/70 p-3">
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-sm font-semibold text-blue-200">{row.coach}</span>
+                          <span className="text-[10px] uppercase tracking-wider text-slate-500">{row.status}</span>
+                        </div>
+                        <p className="mt-1 text-sm text-white">{row.target_org || row.target_name || '—'}</p>
+                        <p className="text-xs text-slate-500">{row.activity_type.replace(/_/g, ' ')}</p>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
             </div>
           )}
         </section>

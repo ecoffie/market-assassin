@@ -23,6 +23,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyMIAccess } from '@/lib/api-auth';
+import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { getAgencySatForNaics } from '@/lib/bigquery/agencies';
 import { internalBaseUrl } from '@/lib/utils/internal-base-url';
 
@@ -355,12 +357,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'email parameter required' }, { status: 400 });
   }
 
+  const auth = requireMIAuthSession(request, email);
+  if (!auth.ok) return auth.response;
+
+  const { workspaceId, asClient } = await resolveActiveWorkspace(email.toLowerCase(), request);
+  const profileEmail = asClient ? clientNotificationEmail(workspaceId) : email.toLowerCase();
+
   try {
-    const { data, error } = await getSupabase()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let q: any = getSupabase()
       .from('user_target_list')
       .select('*')
-      .eq('user_email', email.toLowerCase())
       .order('added_at', { ascending: false });
+    q = asClient ? q.eq('workspace_id', workspaceId) : q.eq('user_email', email.toLowerCase());
+
+    const { data, error } = await q;
 
     if (error) {
       console.error('[target-list] GET error:', error);
@@ -370,7 +381,7 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    const profile = await loadSatBackfillProfile(email);
+    const profile = await loadSatBackfillProfile(profileEmail);
     // Live SAT lookup (~40s) only on explicit ?live=1 — never on the default
     // page load, so the list renders fast.
     const allowLive = request.nextUrl.searchParams.get('live') === '1';
@@ -386,6 +397,8 @@ export async function GET(request: NextRequest) {
       targets,
       count: targets.length,
       sat_backfill_persisted: persisted,
+      asClient,
+      workspaceId: asClient ? workspaceId : undefined,
     });
   } catch (err) {
     const msg = err instanceof Error ? err.message : String(err);
@@ -413,6 +426,11 @@ export async function POST(request: NextRequest) {
   if (!email) {
     return NextResponse.json({ error: 'user_email required' }, { status: 400 });
   }
+
+  const auth = requireMIAuthSession(request, email);
+  if (!auth.ok) return auth.response;
+  const { workspaceId, asClient } = await resolveActiveWorkspace(email.toLowerCase(), request);
+  const rowEmail = asClient ? clientNotificationEmail(workspaceId) : email.toLowerCase();
   if (!body.agency_name || !body.office_name) {
     return NextResponse.json(
       { error: 'agency_name and office_name are required' },
@@ -466,8 +484,8 @@ export async function POST(request: NextRequest) {
   }
 
   const insertPayload: Record<string, unknown> = {
-    user_email: email.toLowerCase(),
-    workspace_id: body.workspace_id || null,
+    user_email: rowEmail,
+    workspace_id: asClient ? workspaceId : (body.workspace_id || null),
 
     agency_code: body.agency_code || null,
     agency_name: body.agency_name,
@@ -547,6 +565,10 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ error: 'id and user_email required' }, { status: 400 });
   }
 
+  const auth = requireMIAuthSession(request, email);
+  if (!auth.ok) return auth.response;
+  const { workspaceId, asClient } = await resolveActiveWorkspace(email.toLowerCase(), request);
+
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
   if (typeof body.status === 'string' && (VALID_STATUSES as readonly string[]).includes(body.status)) {
     updates.status = body.status;
@@ -559,13 +581,13 @@ export async function PATCH(request: NextRequest) {
   }
 
   try {
-    const { data, error } = await getSupabase()
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let q: any = getSupabase()
       .from('user_target_list')
       .update(updates)
-      .eq('id', id)
-      .eq('user_email', email.toLowerCase()) // ownership check
-      .select()
-      .single();
+      .eq('id', id);
+    q = asClient ? q.eq('workspace_id', workspaceId) : q.eq('user_email', email.toLowerCase());
+    const { data, error } = await q.select().single();
 
     if (error) {
       console.error('[target-list] PATCH error:', error);
@@ -601,14 +623,17 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ error: 'id and user_email required' }, { status: 400 });
   }
 
+  const auth = requireMIAuthSession(request, email);
+  if (!auth.ok) return auth.response;
+  const { workspaceId, asClient } = await resolveActiveWorkspace(email.toLowerCase(), request);
+
   try {
     // ON DELETE CASCADE on user_target_outreach.target_id handles the
     // child rows automatically — see the migration.
-    const { error } = await getSupabase()
-      .from('user_target_list')
-      .delete()
-      .eq('id', id)
-      .eq('user_email', email.toLowerCase());
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    let q: any = getSupabase().from('user_target_list').delete().eq('id', id);
+    q = asClient ? q.eq('workspace_id', workspaceId) : q.eq('user_email', email.toLowerCase());
+    const { error } = await q;
 
     if (error) {
       console.error('[target-list] DELETE error:', error);

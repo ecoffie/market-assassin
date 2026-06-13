@@ -84,7 +84,7 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
       case 'knowledge-base':
         return <KnowledgeBasePanel email={email} initialDocId={typeof panelContext?.doc === 'string' ? panelContext.doc : undefined} />;
       case 'coach':
-        return <CoachPanel email={email} />;
+        return <CoachPanel email={email} onPanelChange={onPanelChange} />;
       case 'grants':
         return <GrantsPanel email={email} tier={tier} />;
       case 'vault':

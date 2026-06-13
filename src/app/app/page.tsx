@@ -6,6 +6,7 @@ import UnifiedSidebar, { type AppPanel, type AppTier } from '@/components/app/Un
 import GlobalLookup from '@/components/app/GlobalLookup';
 import ProductTour from '@/components/app/ProductTour';
 import PanelContainer from '@/components/app/panels';
+import ClientWorkspaceBanner from '@/components/app/ClientWorkspaceBanner';
 import VoiceCaptureModal from '@/components/app/voice/VoiceCaptureModal';
 import { Mic, Menu } from 'lucide-react';
 import SettingsPanel from '@/components/briefings/SettingsPanel';
@@ -1208,6 +1209,8 @@ function AppDashboard() {
             </div>
           </div>
         </header>
+
+        <ClientWorkspaceBanner email={email} onPanelChange={handlePanelChange} />
 
         {/* Panel Content */}
         <PanelContainer

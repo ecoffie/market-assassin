@@ -14,6 +14,7 @@ import {
   getAppSupabase,
   normalizeEmail,
   recordAppActivity,
+  resolveActiveWorkspace,
 } from '@/lib/app/workspace';
 
 export async function GET(request: NextRequest) {
@@ -32,7 +33,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: schema.error }, { status: 500 });
   }
 
-  const { workspaceId } = await ensureWorkspaceMember(email);
+  const { workspaceId } = await resolveActiveWorkspace(email, request);
   const supabase = getAppSupabase();
 
   // Verify the user has access to this pipeline item (same workspace)
@@ -93,7 +94,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: schema.error }, { status: 500 });
   }
 
-  const { workspaceId } = await ensureWorkspaceMember(email);
+  const { workspaceId } = await resolveActiveWorkspace(email, request);
   const supabase = getAppSupabase();
 
   // Verify access to pipeline item

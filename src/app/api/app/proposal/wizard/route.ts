@@ -30,7 +30,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { archiveContent, type ArchiveContentType } from '@/lib/archive/persist';
-import { ensureWorkspaceMember } from '@/lib/app/workspace';
+import { resolveActiveWorkspace } from '@/lib/app/workspace';
 import { lookupSamOpportunityForPipeline } from '@/lib/pipeline/sam-opportunity-lookup';
 import { isSamDescriptionUrl, resolveSamDescriptionUrl } from '@/lib/sam/description-text';
 import { getRotatedSAMKey } from '@/lib/sam/utils';
@@ -166,7 +166,7 @@ interface DraftArtifact {
   generated_from_metadata_only: boolean;
 }
 
-async function loadPipeline(pipelineId: string, email: string): Promise<PipelineRow | null> {
+async function loadPipeline(pipelineId: string, email: string, request: NextRequest): Promise<PipelineRow | null> {
   const { data } = await getSupabase()
     .from('user_pipeline')
     .select('id, user_email, workspace_id, title, agency, notice_id, naics_code, set_aside, response_deadline, docs_status, docs_count')
@@ -187,7 +187,7 @@ async function loadPipeline(pipelineId: string, email: string): Promise<Pipeline
   }
   if (data.workspace_id) {
     try {
-      const { workspaceId } = await ensureWorkspaceMember(normalizedEmail);
+      const { workspaceId } = await resolveActiveWorkspace(normalizedEmail, request);
       if (workspaceId && data.workspace_id === workspaceId) {
         return data as PipelineRow;
       }
@@ -689,7 +689,7 @@ export async function GET(request: NextRequest) {
   const auth = requireMIAuthSession(request, email);
   if (!auth.ok) return auth.response;
 
-  const pipeline = await loadPipeline(pipelineId, email);
+  const pipeline = await loadPipeline(pipelineId, email, request);
   if (!pipeline) return jsonError('pursuit not found', 404);
 
   const cached = await loadCached(email, pipelineId, stage);
@@ -736,7 +736,7 @@ export async function POST(request: NextRequest) {
     // Empty body is fine — defaults below.
   }
 
-  const pipeline = await loadPipeline(pipelineId, email);
+  const pipeline = await loadPipeline(pipelineId, email, request);
   if (!pipeline) return jsonError('pursuit not found', 404);
 
   // Cache hit unless force regenerate

@@ -492,7 +492,7 @@ export async function GET(request: NextRequest) {
     .map(user => queueItem(
       user,
       'User needs custom NAICS/profile data before matching can feel personal.',
-      'Tavin',
+      'Annelle / Sikander',
       'Nudge profile completion and offer quick setup help.'
     ));
 
@@ -554,7 +554,7 @@ export async function GET(request: NextRequest) {
     profileNudge.length > 0 ? {
       priority: 'high',
       lever: 'Profile completion',
-      owner: 'Tavin',
+      owner: 'Annelle / Sikander',
       action: 'Help users add real NAICS/profile data.',
       why: `${accountCreatedNoProfile} users have account/profile rows but still need a useful profile.`,
     } : null,

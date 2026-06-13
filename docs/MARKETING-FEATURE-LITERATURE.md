@@ -1223,3 +1223,42 @@ synthesizes a document from `sam_opportunities` when no attachment has extractab
 text. Verified body text exists for live notices (e.g. notice `ba697ef3…`, 11,247
 chars). Client (`ProposalsPanel.tsx`) surfaces draft errors in the hero card and no
 longer returns silently on missing source.
+
+---
+
+## 37. Coach operating model realignment (June 2026)
+
+**What:** Coaches (Ryan, Zach, Randie, Tavin) now own **partner BD + signal capture**
+in the Command Center — APEX/SBDC/Chamber outreach, proof stories, enterprise referrals.
+Profile nudges and activation rescue stay with **Annelle / Sikander** (customer validation).
+New `internal_coach_activity` table + `/api/admin/coach-activity` + Coach Signal Loop UI
+on the launch command center.
+
+**Why:** The old model assigned Tavin to profile-completion nudges — same work as
+customer validation, at $22–34/hr effective rate on weekly FHC trainings. Per
+`COACH-ENTERPRISE-BD-PLAN`, coaches should drive org partnerships → bulk free-alert
+signups → paid conversion, not duplicate activation queues.
+
+**SEO:** N/A (internal ops)
+
+**Proof:** `mi-growth-brief` profileNudge owner corrected from Tavin → Annelle/Sikander.
+Coach queue types: `partner_bd`, `proof_story`, `white_glove_referral` per PRD §6.3.
+Weekly target: 20 outreach calls/coach (`COACH_WEEKLY_TARGETS` in `coach-operating-model.ts`).
+
+---
+
+## 38. My Clients workspace switcher UX (June 2026)
+
+**What:** Clicking a client in **My Clients** switches the whole app to their workspace.
+A green **Working as client** banner shows their seeded profile (NAICS/keywords) with
+one-click jumps to **Pipeline**, **Target agencies**, and **Market research**.
+New clients auto-switch after add. Target-list API scopes by `workspace_id` in coach mode.
+
+**Why:** Users added "Drone Monster" but had no visible path to the client's profile,
+agencies, or pipeline — the switch was invisible.
+
+**SEO:** N/A (in-app coach/consultant mode)
+
+**Proof:** `ClientWorkspaceBanner.tsx` + enriched `/api/app/coach` client profile stats.
+`target-list` GET/POST uses `resolveActiveWorkspace` + `clientNotificationEmail`.
+

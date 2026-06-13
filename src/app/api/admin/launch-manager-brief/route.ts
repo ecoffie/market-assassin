@@ -49,9 +49,9 @@ const launches = [
         dueDate: 'This week',
       },
       {
-        owner: 'Tavin',
+        owner: 'Ryan / Zach / Randie / Tavin',
         area: 'coach',
-        action: 'Turn profile completion into a customer-success save instead of a support ticket.',
+        action: 'Log partner BD calls (APEX/SBDC/Chambers) and coach signals in the Command Center — not profile nudges.',
         dueDate: 'This week',
       },
     ],

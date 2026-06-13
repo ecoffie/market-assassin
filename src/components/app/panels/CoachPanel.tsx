@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback } from 'react';
+import type { AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 
 /**
@@ -9,7 +10,22 @@ import { getMIApiHeaders } from '../authHeaders';
  * that client), and see the cross-client "Org Tab" — deadlines, amendment
  * alerts, and org news across all your clients.
  */
-interface Client { id: string; workspaceId: string; businessName: string; primaryEmail?: string }
+interface ClientProfile {
+  naics: string[];
+  keywords: string[];
+  states: string[];
+  naicsCount: number;
+  keywordCount: number;
+  industry?: string | null;
+}
+interface Client {
+  id: string;
+  workspaceId: string;
+  businessName: string;
+  primaryEmail?: string;
+  profile?: ClientProfile | null;
+  stats?: { pipeline: number; targets: number };
+}
 interface OrgTab {
   deadlines: Array<{ id: string; title: string; response_deadline: string; client: string; stage: string }>;
   changes: Array<{ pursuit_id: string; summary: string; change_type: string }>;
@@ -18,7 +34,19 @@ interface OrgTab {
 
 const ACTIVE_KEY = 'mindy_active_workspace';
 
-export default function CoachPanel({ email }: { email: string | null }) {
+const WORK_PANELS: Array<{ panel: AppPanel; label: string }> = [
+  { panel: 'pipeline', label: 'Pipeline' },
+  { panel: 'target-list', label: 'Target agencies' },
+  { panel: 'research', label: 'Market research' },
+];
+
+export default function CoachPanel({
+  email,
+  onPanelChange,
+}: {
+  email: string | null;
+  onPanelChange?: (panel: AppPanel) => void;
+}) {
   const [loading, setLoading] = useState(true);
   const [isCoach, setIsCoach] = useState(false);
   const [org, setOrg] = useState<{ name: string; tabLabel: string } | null>(null);
@@ -26,7 +54,7 @@ export default function CoachPanel({ email }: { email: string | null }) {
   const [orgTab, setOrgTab] = useState<OrgTab>({ deadlines: [], changes: [], news: [] });
   const [adding, setAdding] = useState(false);
   const [newName, setNewName] = useState('');
-  const [capabilityText, setCapabilityText] = useState('');   // paste capability/website → seed profile
+  const [capabilityText, setCapabilityText] = useState('');
   const [seededNote, setSeededNote] = useState<string | null>(null);
   const [activeWs, setActiveWs] = useState<string>('');
   const headers = useCallback(() => getMIApiHeaders(email), [email]);
@@ -53,13 +81,22 @@ export default function CoachPanel({ email }: { email: string | null }) {
   const switchTo = (c: Client) => {
     try { localStorage.setItem(ACTIVE_KEY, c.workspaceId); } catch { /* */ }
     setActiveWs(c.workspaceId);
-    // The app reads x-active-workspace from this on its next requests; a reload
-    // guarantees every panel picks up the active client.
     window.location.reload();
   };
+
   const clearActive = () => {
     try { localStorage.removeItem(ACTIVE_KEY); } catch { /* */ }
-    setActiveWs(''); window.location.reload();
+    setActiveWs('');
+    window.location.reload();
+  };
+
+  const goWork = (panel: AppPanel, c: Client) => {
+    try { localStorage.setItem(ACTIVE_KEY, c.workspaceId); } catch { /* */ }
+    if (onPanelChange) {
+      onPanelChange(panel);
+      return;
+    }
+    window.location.href = `/app?panel=${panel}`;
   };
 
   const addClient = async () => {
@@ -74,7 +111,6 @@ export default function CoachPanel({ email }: { email: string | null }) {
       });
       const d = await res.json().catch(() => null);
       if (res.ok) {
-        // Tell the user what Mindy extracted, so they trust the seeded profile.
         if (d?.seeded) {
           const s = d.seeded;
           const parts = [
@@ -83,47 +119,84 @@ export default function CoachPanel({ email }: { email: string | null }) {
             s.agencies ? `${s.agencies} target agencies` : '',
             s.states?.length ? s.states.join('/') : '',
           ].filter(Boolean);
-          setSeededNote(parts.length ? `✓ Seeded ${name} from the text — ${parts.join(' · ')}. Alerts + who-to-contact are ready.` : `Added ${name}.`);
+          setSeededNote(parts.length ? `✓ Seeded ${name} — ${parts.join(' · ')}. Click the client, then open Pipeline or Target agencies.` : `Added ${name}. Click them to start working as this client.`);
+        } else {
+          setSeededNote(`Added ${name}. Click them below, then open Pipeline or Target agencies to start tracking.`);
         }
-        setNewName(''); setCapabilityText('');
+        setNewName('');
+        setCapabilityText('');
         await load();
+        // Auto-switch to the new client so the banner + panels open in their workspace.
+        const wsId = d?.client?.workspaceId;
+        if (wsId) {
+          try { localStorage.setItem(ACTIVE_KEY, wsId); } catch { /* */ }
+          window.location.reload();
+        }
       }
     } catch { /* */ }
     setAdding(false);
   };
 
+  const profileSummary = (c: Client) => {
+    const p = c.profile;
+    if (!p || (p.naicsCount === 0 && p.keywordCount === 0)) {
+      return <span className="text-[11px] text-amber-400/90">No profile yet — re-add with capability text or work as them and set up in Market Research</span>;
+    }
+    return (
+      <span className="text-[11px] text-slate-400">
+        {p.naicsCount} NAICS · {p.keywordCount} keywords
+        {p.states?.length ? ` · ${p.states.join('/')}` : ''}
+        {' · '}{c.stats?.targets ?? 0} agencies · {c.stats?.pipeline ?? 0} pursuits
+      </span>
+    );
+  };
+
+  const addClientForm = (compact?: boolean) => (
+    <div className={compact ? '' : 'mt-5 rounded-xl border border-purple-500/30 bg-purple-950/20 p-5'}>
+      {!compact && (
+        <p className="text-sm text-slate-300 mb-3">Add your first client to get started:</p>
+      )}
+      <div className="flex gap-2">
+        <input
+          value={newName}
+          onChange={e => setNewName(e.target.value)}
+          placeholder="Client business name"
+          className={`flex-1 ${compact ? 'h-9 text-xs' : 'h-10 text-sm'} px-3 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-purple-500 focus:outline-none`}
+        />
+        <button
+          onClick={addClient}
+          disabled={adding || !newName.trim()}
+          className={`${compact ? 'h-9 px-3 text-xs' : 'h-10 px-5 text-sm'} bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 text-white font-medium rounded-lg`}
+        >
+          {adding ? 'Adding…' : compact ? '+ Add' : 'Add client'}
+        </button>
+      </div>
+      <textarea
+        value={capabilityText}
+        onChange={e => setCapabilityText(e.target.value)}
+        placeholder="Optional: paste their capability statement / website text — Mindy seeds the NAICS, keywords + location so their alerts start immediately."
+        rows={compact ? 2 : 3}
+        className={`w-full mt-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white ${compact ? 'text-xs' : 'text-sm'} placeholder-slate-500 focus:border-purple-500 focus:outline-none resize-y`}
+      />
+      {seededNote && <p className="text-[12px] text-emerald-300 mt-2">{seededNote}</p>}
+      {!compact && (
+        <p className="text-[11px] text-slate-500 mt-2">
+          <b className="text-slate-400">How it works:</b> click a client → the whole app switches to their pipeline, agencies, and research. Use the green banner at the top to jump to their workspace.
+        </p>
+      )}
+    </div>
+  );
+
   if (loading) return <div className="p-6 text-slate-400 text-sm">Loading…</div>;
 
   if (!isCoach) {
-    // Solo-consultant entry point: not yet a coach → offer to turn it on.
     return (
       <div className="p-6 max-w-2xl">
         <h1 className="text-2xl font-bold text-white">Manage Multiple Clients</h1>
         <p className="text-slate-400 mt-2">
-          Consultant or counselor managing several businesses? Turn on multi-client mode to set up a separate Mindy profile (pipeline, vault, proposals) for each entity you manage — and switch between them in one click.
+          Consultant or counselor managing several businesses? Each client gets their own Mindy profile — pipeline, target agencies, market research — and you switch between them in one click.
         </p>
-        <div className="mt-5 rounded-xl border border-purple-500/30 bg-purple-950/20 p-5">
-          <p className="text-sm text-slate-300 mb-3">Add your first client to get started:</p>
-          <div className="flex gap-2">
-            <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Client business name" className="flex-1 h-10 px-3 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:border-purple-500 focus:outline-none" />
-            <button onClick={addClient} disabled={adding || !newName.trim()} className="h-10 px-5 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 text-white text-sm font-medium rounded-lg">
-              {adding ? 'Adding…' : 'Add client'}
-            </button>
-          </div>
-          {/* Paste capability statement / website (Eric: "paste their info →
-              extract keywords + NAICS/PSC + location → so I track them + get
-              their alerts"). Optional — but seeds the profile so alerts flow
-              from day one instead of an empty workspace. */}
-          <textarea
-            value={capabilityText}
-            onChange={e => setCapabilityText(e.target.value)}
-            placeholder="Optional — paste their capability statement or website text. Mindy extracts the NAICS/PSC, keywords, and location so this client's alerts start immediately. (e.g. 'Professional staffing in or around Puerto Rico…')"
-            rows={3}
-            className="w-full mt-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-purple-500 focus:outline-none resize-y"
-          />
-          {seededNote && <p className="text-[12px] text-emerald-300 mt-2">{seededNote}</p>}
-          <p className="text-[11px] text-slate-500 mt-2">Each client gets its own isolated workspace. You can switch anytime.</p>
-        </div>
+        {addClientForm()}
       </div>
     );
   }
@@ -136,42 +209,61 @@ export default function CoachPanel({ email }: { email: string | null }) {
         <h1 className="text-2xl font-bold text-white">{org?.tabLabel || 'My Clients'}</h1>
         {org && <span className="text-sm text-slate-500">{org.name}</span>}
       </div>
-      <p className="text-slate-400 text-sm mb-5">
-        {activeClient ? <>Working as <b className="text-emerald-400">{activeClient.businessName}</b> · <button onClick={clearActive} className="text-purple-400 hover:text-purple-300 underline">exit to your own account</button></> : 'Pick a client to work as them, or review everything across your clients below.'}
-      </p>
 
-      <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5">
-        {/* Clients list + switcher */}
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">Your clients ({clients.length})</h3>
-          </div>
-          <div className="space-y-1.5 mb-3">
-            {clients.map(c => (
-              <button key={c.id} onClick={() => switchTo(c)} className={`w-full text-left rounded-lg border px-3 py-2.5 transition-colors ${activeWs === c.workspaceId ? 'border-emerald-500/60 bg-emerald-500/10' : 'border-slate-800 bg-slate-900 hover:border-slate-700'}`}>
-                <div className="text-sm font-medium text-white">{c.businessName}</div>
-                {activeWs === c.workspaceId && <div className="text-[11px] text-emerald-400 mt-0.5">● Active</div>}
+      {!activeClient ? (
+        <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 px-4 py-3 mb-5 text-sm text-amber-100">
+          <b>Step 1:</b> Click a client below to work as them. <b>Step 2:</b> Open <b>Pipeline</b> or <b>Target agencies</b> from the green banner — that is their profile in action.
+        </div>
+      ) : (
+        <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-4 py-3 mb-5">
+          <p className="text-sm text-emerald-100">
+            Working as <b className="text-emerald-300">{activeClient.businessName}</b>
+            {' · '}
+            <button type="button" onClick={clearActive} className="text-purple-400 hover:text-purple-300 underline">exit to your account</button>
+          </p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {WORK_PANELS.map(({ panel, label }) => (
+              <button
+                key={panel}
+                type="button"
+                onClick={() => goWork(panel, activeClient)}
+                className="h-8 px-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-xs font-medium text-emerald-200 hover:bg-emerald-500/20"
+              >
+                Open {label}
               </button>
             ))}
           </div>
-          <div className="flex gap-2">
-            <input value={newName} onChange={e => setNewName(e.target.value)} placeholder="Add a client…" className="flex-1 h-9 px-3 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs focus:border-purple-500 focus:outline-none" />
-            <button onClick={addClient} disabled={adding || !newName.trim()} className="h-9 px-3 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 text-white text-xs font-medium rounded-lg">+ Add</button>
+          <div className="mt-2">{profileSummary(activeClient)}</div>
+        </div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-[320px_1fr] gap-5">
+        <div>
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400 mb-2">
+            Your clients ({clients.length})
+          </h3>
+          <div className="space-y-1.5 mb-3">
+            {clients.map(c => (
+              <div
+                key={c.id}
+                className={`rounded-lg border px-3 py-2.5 transition-colors ${activeWs === c.workspaceId ? 'border-emerald-500/60 bg-emerald-500/10' : 'border-slate-800 bg-slate-900'}`}
+              >
+                <button type="button" onClick={() => switchTo(c)} className="w-full text-left">
+                  <div className="text-sm font-medium text-white">{c.businessName}</div>
+                  <div className="mt-0.5">{profileSummary(c)}</div>
+                  {activeWs === c.workspaceId ? (
+                    <div className="text-[11px] text-emerald-400 mt-1">● Active — use Pipeline / Target agencies in sidebar</div>
+                  ) : (
+                    <div className="text-[11px] text-purple-400 mt-1">Click to work as this client</div>
+                  )}
+                </button>
+              </div>
+            ))}
           </div>
-          {/* Paste capability text → seed the new client's NAICS/keywords/location (#63). */}
-          <textarea
-            value={capabilityText}
-            onChange={e => setCapabilityText(e.target.value)}
-            placeholder="Optional: paste their capability statement / website text — Mindy seeds the NAICS, keywords + location so their alerts start immediately."
-            rows={2}
-            className="w-full mt-2 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs placeholder-slate-500 focus:border-purple-500 focus:outline-none resize-y"
-          />
-          {seededNote && <p className="text-[11px] text-emerald-300 mt-1">{seededNote}</p>}
+          {addClientForm(true)}
         </div>
 
-        {/* Org Tab feed */}
         <div className="space-y-5">
-          {/* Deadlines */}
           <section className="rounded-xl border border-slate-800 bg-slate-900 p-4">
             <h3 className="text-sm font-semibold text-white mb-3">⏰ Upcoming deadlines — all clients</h3>
             {orgTab.deadlines.length === 0 ? <p className="text-xs text-slate-500">No deadlines in the next 30 days.</p> : (
@@ -189,7 +281,6 @@ export default function CoachPanel({ email }: { email: string | null }) {
             )}
           </section>
 
-          {/* Amendment alerts */}
           {orgTab.changes.length > 0 && (
             <section className="rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
               <h3 className="text-sm font-semibold text-amber-300 mb-3">⚠️ Recent changes on your clients&apos; pursuits</h3>
@@ -199,7 +290,6 @@ export default function CoachPanel({ email }: { email: string | null }) {
             </section>
           )}
 
-          {/* Org news */}
           <section className="rounded-xl border border-slate-800 bg-slate-900 p-4">
             <h3 className="text-sm font-semibold text-white mb-3">📣 {org?.name || 'Org'} news</h3>
             {orgTab.news.length === 0 ? <p className="text-xs text-slate-500">No announcements.</p> : (
