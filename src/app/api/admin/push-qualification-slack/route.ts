@@ -2,7 +2,7 @@
  * POST /api/admin/push-qualification-slack?password=xxx&segment=activation
  *
  * Posts a qualification queue digest to Slack (activation, founder, sales, rescue).
- * Uses SLACK_BOT_TOKEN + QUALIFICATION_SLACK_CHANNEL (default #sales-outreach).
+ * Uses SLACK_BOT_TOKEN + QUALIFICATION_SLACK_CHANNEL (default C08DMRLNCCF).
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { postSlackMessage } from '@/lib/slack/post-message';
@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Invalid segment. Use activation, founder, sales, or rescue.' }, { status: 400 });
   }
 
-  const channel = process.env.QUALIFICATION_SLACK_CHANNEL || process.env.OUTREACH_SLACK_CHANNEL || '#sales-outreach';
+  const channel = process.env.QUALIFICATION_SLACK_CHANNEL || process.env.OUTREACH_SLACK_CHANNEL || 'C08DMRLNCCF';
 
   try {
     const baseUrl = internalBaseUrl(request);
