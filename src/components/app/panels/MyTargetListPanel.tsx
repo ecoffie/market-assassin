@@ -98,8 +98,7 @@ export default function MyTargetListPanel({
   const [expandedId, setExpandedId] = useState<string | null>(null);
   // Which target's CONTACTS (Decision Makers) are expanded inline (Eric: fold
   // Relationships into Target List — target the people from the agency card).
-  const [contactsId, setContactsId] = useState<string | null>(null);
-  const [savedId, setSavedId] = useState<string | null>(null);   // My Contacts (#40)
+  const [contactsId, setContactsId] = useState<string | null>(null); // unified Contacts panel (Directory|Saved)
   // Slice 4 — Event Radar. Map of target_id → upcoming events. One
   // fetch covers every target (the endpoint loops server-side so the
   // client makes a single round trip regardless of list size).
@@ -709,24 +708,16 @@ export default function MyTargetListPanel({
                           );
                         })()}
 
-                        {/* Contacts (Decision Makers) for this agency — inline,
-                            so you target the people right from the agency card
-                            (Eric: fold Relationships into Target List). */}
+                        {/* Contacts — ONE button opens a unified Contacts panel
+                            with a Directory | Saved toggle inside (merged from the
+                            old "Find gov contacts" + "Saved contacts" buttons,
+                            which read as overlapping). */}
                         <button
                           type="button"
                           onClick={() => setContactsId(contactsId === t.id ? null : t.id)}
                           className="text-xs text-purple-400 hover:text-purple-300 transition-colors"
                         >
-                          {contactsId === t.id ? '▼ Hide contacts' : '▸ Who to contact'}
-                        </button>
-                        {/* My Contacts (#40) — the people you've SAVED for this
-                            agency, from anywhere in Mindy. */}
-                        <button
-                          type="button"
-                          onClick={() => setSavedId(savedId === t.id ? null : t.id)}
-                          className="text-xs text-amber-400 hover:text-amber-300 transition-colors"
-                        >
-                          {savedId === t.id ? '▼ Hide my contacts' : '⭐ My contacts'}
+                          {contactsId === t.id ? '▼ Hide contacts' : '▸ Contacts'}
                         </button>
                         {/* Slice 3D — toggle for the outreach log. Click
                             to expand the activity timeline + log-new
@@ -842,7 +833,7 @@ export default function MyTargetListPanel({
                       revealed when the row is expanded. Lazy: the
                       OutreachLog component only fetches when mounted,
                       so collapsed rows don't trigger API calls. */}
-                  {/* Inline contacts (Decision Makers) for this agency. */}
+                  {/* Unified contacts panel (Directory + Saved in one, toggled). */}
                   {contactsId === t.id && email && (
                     <TargetContacts
                       agency={t.agency_name}
@@ -850,10 +841,6 @@ export default function MyTargetListPanel({
                       office={t.office_name}
                       email={email}
                     />
-                  )}
-                  {/* My saved contacts for this agency (#40). */}
-                  {savedId === t.id && email && (
-                    <SavedContacts agency={t.agency_name} email={email} />
                   )}
                   {expandedId === t.id && email && (
                     <OutreachLog
@@ -1299,8 +1286,12 @@ function TargetContacts({ agency, subAgency, office, email }: { agency: string; 
   // True when we asked for a sub-agency but SAM only had parent-department POCs,
   // so the card shows the parent dept (labeled, not silently wrong).
   const [parentFallback, setParentFallback] = useState(false);
+  // Merged Directory | Saved view (was two separate buttons). 'directory' = SAM
+  // gov POCs to find; 'saved' = the people you've pinned for this agency.
+  const [tab, setTab] = useState<'directory' | 'saved'>('directory');
 
   useEffect(() => {
+    if (tab !== 'directory') return; // directory data only loads on the directory tab
     if (_contactsCache.has(cacheKey)) { setContacts(_contactsCache.get(cacheKey)!); setLoading(false); return; }
     let active = true;
     setLoading(true);
@@ -1318,18 +1309,62 @@ function TargetContacts({ agency, subAgency, office, email }: { agency: string; 
       .catch(() => {})
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [agency, subA, officeParam, email, cacheKey]);
+  }, [tab, agency, subA, officeParam, email, cacheKey]);
 
   // Format the name "Last, First" → "First Last".
   const fmtName = (n: string) => /,/.test(n) ? n.split(',').reverse().map(s => s.trim()).join(' ') : n;
 
-  if (loading) return <div className="mt-3 text-xs text-slate-500">Loading contacts…</div>;
-  if (contacts.length === 0) return <div className="mt-3 text-xs text-slate-500">No SAM contacts found for this agency yet.</div>;
+  // Directory | Saved tab header — shared across both views.
+  const tabHeader = (
+    <div className="flex items-center gap-1 mb-2.5 border-b border-slate-700/50 pb-2">
+      <button
+        type="button"
+        onClick={() => setTab('directory')}
+        className={`text-xs font-semibold px-2 py-1 rounded transition-colors ${tab === 'directory' ? 'bg-purple-500/20 text-purple-200' : 'text-slate-400 hover:text-slate-200'}`}
+      >
+        Directory
+      </button>
+      <button
+        type="button"
+        onClick={() => setTab('saved')}
+        className={`text-xs font-semibold px-2 py-1 rounded transition-colors ${tab === 'saved' ? 'bg-amber-500/20 text-amber-200' : 'text-slate-400 hover:text-slate-200'}`}
+      >
+        ⭐ Saved
+      </button>
+      <span className="ml-auto text-[10px] text-slate-500">
+        {tab === 'directory' ? 'gov POCs from SAM' : 'contacts you’ve pinned'}
+      </span>
+    </div>
+  );
+
+  // SAVED tab → the user's pinned contacts for this agency.
+  if (tab === 'saved') {
+    return (
+      <div className="mt-3 rounded-lg border border-purple-500/20 bg-purple-500/[0.04] p-3">
+        {tabHeader}
+        <SavedContacts agency={agency} email={email} />
+      </div>
+    );
+  }
+
+  if (loading) return (
+    <div className="mt-3 rounded-lg border border-purple-500/20 bg-purple-500/[0.04] p-3">
+      {tabHeader}
+      <div className="text-xs text-slate-500">Loading contacts…</div>
+    </div>
+  );
+  if (contacts.length === 0) return (
+    <div className="mt-3 rounded-lg border border-purple-500/20 bg-purple-500/[0.04] p-3">
+      {tabHeader}
+      <div className="text-xs text-slate-500">No SAM contacts found for this agency yet.</div>
+    </div>
+  );
 
   return (
     <div className="mt-3 rounded-lg border border-purple-500/20 bg-purple-500/[0.04] p-3">
+      {tabHeader}
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-semibold text-purple-300">Who to contact at {subA || agency}</span>
+        <span className="text-xs font-semibold text-purple-300">Gov contacts at {subA || agency}</span>
         <span className="text-[10px] text-slate-500">{contacts.length} contacts · from SAM notices</span>
       </div>
       {parentFallback && subA && (
@@ -1456,15 +1491,15 @@ function SavedContacts({ agency, email }: { agency: string; email: string }) {
   useEffect(() => { load(); }, [load]);
 
   return (
-    <div className="mt-2 rounded-lg border border-amber-500/15 bg-amber-500/[0.04] p-3">
+    <div>
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-semibold text-amber-300">⭐ My contacts at {agency}</span>
+        <span className="text-xs font-semibold text-amber-300">⭐ Saved contacts at {agency}</span>
         <span className="text-[10px] text-slate-500">{rows.length} saved</span>
       </div>
       {loading ? (
         <div className="text-[11px] text-slate-500">Loading…</div>
       ) : rows.length === 0 ? (
-        <p className="text-[11px] text-slate-500">No saved contacts yet. Use <span className="text-purple-300">▸ Who to contact</span> (or Decision Makers / task orders) and hit <span className="text-purple-300">+ Save contact</span> to pin people here.</p>
+        <p className="text-[11px] text-slate-500">No saved contacts yet. On the <span className="text-purple-300">Directory</span> tab (or Decision Makers / task orders), hit <span className="text-purple-300">+ Save contact</span> to pin people here.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
           {rows.map(c => (
