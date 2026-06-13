@@ -15,9 +15,11 @@ type ActiveClient = {
 export default function ClientWorkspaceBanner({
   email,
   onPanelChange,
+  activePanel,
 }: {
   email: string | null;
   onPanelChange: (panel: AppPanel) => void;
+  activePanel?: AppPanel;
 }) {
   const [client, setClient] = useState<ActiveClient | null>(null);
 
@@ -55,7 +57,7 @@ export default function ClientWorkspaceBanner({
     return () => { cancelled = true; };
   }, [email]);
 
-  if (!client) return null;
+  if (!client || activePanel === 'coach') return null;
 
   const exit = () => {
     try { localStorage.removeItem(ACTIVE_KEY); } catch { /* */ }

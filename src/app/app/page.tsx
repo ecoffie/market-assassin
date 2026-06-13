@@ -1210,7 +1210,7 @@ function AppDashboard() {
           </div>
         </header>
 
-        <ClientWorkspaceBanner email={email} onPanelChange={handlePanelChange} />
+        <ClientWorkspaceBanner email={email} onPanelChange={handlePanelChange} activePanel={activePanel} />
 
         {/* Panel Content */}
         <PanelContainer
