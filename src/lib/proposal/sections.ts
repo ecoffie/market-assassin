@@ -207,10 +207,13 @@ export const SECTION_META: Record<SectionType, SectionMeta> = {
     basePrompt:
       'Draft a Point of Contact block. Single block at the bottom. Format:\n\n[Full Name], ' +
       '[Title]\n[Company Name]\n[Phone] · [Email]\n[Website]\n\nUEI: [UEI]\nCAGE: [CAGE]\n' +
-      'NAICS: [primary NAICS]\n\nUse vault identity if present. Target ~80 words.',
+      'NAICS: [primary NAICS]\n\nUse the vault identity values verbatim. For ANY field not in ' +
+      'the vault — name, title, phone, email, website — leave the literal [bracketed] ' +
+      'placeholder. NEVER invent a name, phone number, or email address. Target ~80 words.',
     antiPatterns: [
       'turning the POC block into a paragraph',
       'omitting UEI / CAGE / NAICS',
+      'INVENTING a contact name, phone, or email not in the vault (e.g. "John Doe", "555-…", made-up @addresses) — bracket it instead',
     ],
   },
 };

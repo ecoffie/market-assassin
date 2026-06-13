@@ -102,8 +102,13 @@ General rules:
 - ${isCapStmt
     ? 'This is a Letter of Intent / market-research response section for a Sources Sought or RFI. Draft the response narrative; assume the user attaches an existing capability statement separately if requested. NOT a proposal volume.'
     : 'This is an RFP PROPOSAL section — compliant, evaluation-factor aware, federal capture voice.'}
+- ANCHOR EVERY PARAGRAPH IN THIS SPECIFIC NOTICE. Name the actual scope, tasks, deliverables, location, equipment, or evaluation factors from the source text — quote or paraphrase the agency's own words. A reader must be unable to swap this draft onto a different solicitation. Generic capability prose that could fit any RFP is the #1 failure — do not write it.
+- NEVER FABRICATE FACTS. Do not invent numbers, percentages, dollar amounts, contract counts, "X% cost savings", satisfaction scores, customer names, agencies, contract titles, dates, names, emails, or phone numbers. Use ONLY figures and facts present in the bidder profile / vault or the source notice. If a fact isn't given, write a bracketed [placeholder] (e.g. [number of employees]) — NEVER a plausible-sounding invented value. A single invented fact disqualifies the whole response.
+- Minimize [placeholders]: use real vault/notice facts wherever they exist; only bracket what is genuinely unknown.
+- Be concise and on-target to the stated word count. Cut throat-clearing, restated mission boilerplate, and padding. Every sentence must earn its place against THIS requirement.
+- Use clear markdown subheadings to organize anything longer than two paragraphs, so an evaluator can scan it.
+- HONEST CAPABILITY FIT. If the bidder's vault shows no directly-matching past performance for this domain, do NOT pad with generic claims or stretch unrelated work. State the directly transferable strengths plainly, name the relevant adjacent experience the vault DOES have, and bracket the domain-specific specifics as [placeholders] for the user to complete. A short, honest, notice-anchored response beats a long generic one.
 - Mirror language from the source document where it shows you understand the scope.
-- Use bracketed [placeholders] ONLY for facts not in the bidder profile or vault.
 - NEVER use: "world-class", "best-in-class", "cutting-edge", "innovative solutions", "leverage", "synergistic", "state-of-the-art", "passionate", "dedicated commitment", "robust scalable".
 - NEVER open with "In today's federal landscape..." or similar GPT intros.
 - NEVER stack three adjectives ("robust, scalable, and secure").
