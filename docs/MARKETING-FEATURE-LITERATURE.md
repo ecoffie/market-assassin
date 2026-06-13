@@ -1025,3 +1025,23 @@ free→paid funnel toward $100K.
 **Proof:** Live cron (dispatcher `upgrade-drip`, daily 15:00 UTC). 9,164 free users in
 the pipeline; deduped per (email,emailType); respects the global daily cap. Drip-send
 count surfaces on the command center's $100K goal panel.
+
+## 37. Sport keyword search — full market coverage, not the same 96 agencies
+
+**What:** In Market Research Sport mode, typing a keyword (e.g. "tires", "drones")
+now drives agency results from the **full ~90% coverage NAICS set** derived from
+real USASpending award data — not just the top 8 suggest-code chips. Agency rows
+rank by sub-agency total spend (matching FPDS leaderboards), and DoD parent filters
+include all service branches.
+
+**Why:** Pinning suggest chips into the form made every keyword return the same
+~96 agencies — the market lesson was right but the buyer list wasn't keyword-specific.
+Contractors need the agencies that actually buy *their* product, ranked by real spend.
+
+**SEO:** *federal market research by keyword, NAICS coverage government contracting,
+who buys [product] federal*
+
+**Proof:** `/api/app/target-market-research` — `keywordCoverage()` from USASpending
+`spending_by_category`; Sport mode passes `keyword` from `MarketResearchPanel` →
+`AgencyTable`. Example: "drones" = 70+ buying NAICS codes, top obvious code = 28%
+of $245M FY2025 market (see Sport Mode proof point §1).

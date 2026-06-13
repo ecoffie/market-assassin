@@ -44,7 +44,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyMIAccess } from '@/lib/api-auth';
-import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
+import { expandNAICSCodes, parseNAICSInput } from '@/lib/utils/naics-expansion';
 import {
   getPainPointsForAgency,
   getPainPointsByNaics,
@@ -70,6 +70,19 @@ function normalizeAgencyKey(s: string): string {
     .replace(/\b(DEPARTMENT|DEPT|OF|THE|U S|US|ADMINISTRATION|AGENCY|NATIONAL)\b/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+/** Best sub-agency category total from spending_by_category for ranking. */
+function categoryTotalForAgency(
+  categoryTotalByKey: Record<string, number>,
+  subAgency?: string,
+  parentAgency?: string,
+  name?: string,
+): number {
+  const keys = [subAgency, parentAgency, name]
+    .map((s) => normalizeAgencyKey(s || ''))
+    .filter(Boolean);
+  return keys.reduce((best, k) => Math.max(best, categoryTotalByKey[k] || 0), 0);
 }
 
 // Derive SEARCH KEYWORDS from a keyword's market coverage — grounded in real data:
@@ -269,10 +282,12 @@ export async function POST(request: NextRequest) {
     let coverage: Awaited<ReturnType<typeof keywordCoverage>> | null = null;
     if (keyword && keyword.trim()) {
       // Always compute coverage when a keyword is present — it powers the LESSON
-      // banner (total market, code count, hidden %). When no explicit NAICS was
-      // given, ALSO use the derived coverage set as the search codes.
+      // banner (total market, code count, hidden %). Sport mode also pins
+      // suggest-codes chips into formData for report generation — but the agency
+      // search MUST use the full 90%-coverage set from the keyword, not those
+      // top-8 chips (Eric: every keyword returned the same ~96 agencies).
       coverage = await keywordCoverage(keyword.trim());
-      if (coverage && coverage.coverageCodes.length && !(rawNaicsCode && rawNaicsCode.trim())) {
+      if (coverage && coverage.coverageCodes.length) {
         naicsCode = coverage.coverageCodes.join(', ');
       }
     }
@@ -419,7 +434,7 @@ export async function POST(request: NextRequest) {
     // to the sampled total when an agency isn't in the category response.
     const categoryTotalByKey: Record<string, number> = {};
     try {
-      const expanded = expandNAICSCodes(naics ? [naics] : []);
+      const expanded = expandNAICSCodes(parseNAICSInput(naics));
       if (expanded.length > 0) {
         const catRes = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_category', {
           method: 'POST',
@@ -649,13 +664,20 @@ export async function POST(request: NextRequest) {
       // lookupOfficeKey falls back to subAgencyCode when officeId is empty, so it
       // returns the whole sub-agency total (the $22.5B-on-every-Army-office bug).
       const officeOwnTotal = a.setAsideSpending || totalSpendingByOffice[a.officeId || ''] || 0;
-      const catKey = normalizeAgencyKey(a.subAgency || a.parentAgency || a.name || '');
-      const accurateTotal = categoryTotalByKey[catKey];
+      const accurateTotal = categoryTotalForAgency(
+        categoryTotalByKey,
+        a.subAgency,
+        a.parentAgency,
+        a.name,
+      );
       // Office row → its own spend. Agency/sub-agency rollup row → the accurate
       // category total (so the real giants still rank correctly).
       const totalSpending = isOfficeLevel
         ? officeOwnTotal
         : ((accurateTotal && accurateTotal > officeOwnTotal) ? accurateTotal : officeOwnTotal);
+      // Top Total $ sort uses sub-agency category aggregate (same source as FPDS
+      // leaderboards) so DoD/Navy/Army surface at the top — not per-office slices.
+      const metric_top_total = accurateTotal > 0 ? accurateTotal : totalSpending;
 
       return {
         id: a.id,
@@ -674,7 +696,7 @@ export async function POST(request: NextRequest) {
 
         // Pre-computed sort metrics. Higher is better for all of them.
         metric_top_spending: a.setAsideSpending || 0,
-        metric_top_total: totalSpending,
+        metric_top_total,
         metric_contracts: a.contractCount || 0,
         // Easy Entry score combines SAT ratio (% of contracts under
         // $250K) with raw SAT count, so agencies with 80% SAT but only
@@ -724,8 +746,8 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    // Default sort: top spending. UI applies its own sort on top.
-    rows.sort((x, y) => y.metric_top_spending - x.metric_top_spending);
+    // Default sort: top total $ (matches UI default lens + FPDS leaderboards).
+    rows.sort((x, y) => y.metric_top_total - x.metric_top_total);
 
     // Persist to cache. Idempotent upsert. Failures are non-fatal — we
     // still return the live data to the user.

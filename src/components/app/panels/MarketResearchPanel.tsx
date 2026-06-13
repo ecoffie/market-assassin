@@ -2250,6 +2250,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               veteranStatus={formData.veteranStatus}
               zipCode={formData.zipCode}
               excludeDOD={formData.excludeDOD}
+              keyword={researchMode === 'sport' && sportReportRan ? sportKeyword.trim() : undefined}
               onRowsChange={setTmrRows}
               onSelectedAgenciesChange={setStarredAgencies}
               parentAgencyFilter={parentAgencyFilter}
@@ -3845,6 +3846,7 @@ function AgencyTable({
   veteranStatus,
   zipCode,
   excludeDOD,
+  keyword,
   onRowsChange,
   onSelectedAgenciesChange,
   parentAgencyFilter,
@@ -3857,6 +3859,8 @@ function AgencyTable({
   veteranStatus: string;
   zipCode: string;
   excludeDOD: boolean;
+  /** Sport-mode keyword — drives keyword-first NAICS coverage on the server. */
+  keyword?: string;
   // Optional escape hatch — parent can subscribe to the full row
   // set so the upstream charts (Spending by Agency, Set-Aside Mix)
   // can render from the same 96-row data this table uses, not the
@@ -3951,7 +3955,8 @@ function AgencyTable({
   // Fetch happens once per (naics, psc, businessType, veteran) combo.
   // The endpoint itself does the 24h cache layer — we just call it.
   useEffect(() => {
-    if (!email || !naicsCode.trim()) return;
+    const sportKw = (keyword || '').trim();
+    if (!email || (!naicsCode.trim() && !sportKw)) return;
 
     let cancelled = false;
     setLoading(true);
@@ -3963,6 +3968,7 @@ function AgencyTable({
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email,
+        keyword: sportKw || undefined,
         naicsCode,
         pscCode,
         businessType,
@@ -4037,7 +4043,7 @@ function AgencyTable({
       });
 
     return () => { cancelled = true; };
-  }, [email, naicsCode, pscCode, businessType, veteranStatus, zipCode, excludeDOD]);
+  }, [email, naicsCode, pscCode, businessType, veteranStatus, zipCode, excludeDOD, keyword, onRowsChange]);
 
   // Slice 3B — fetch my saved target list once per email change. We
   // store (office_name → target_id) so the row ★ indicator and the
@@ -4434,11 +4440,11 @@ function AgencyTable({
     };
   }, [rows, quickPick]);
 
-  if (!naicsCode.trim()) {
+  if (!naicsCode.trim() && !keyword?.trim()) {
     return (
       <section className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
         <p className="text-sm text-slate-400">
-          Enter a NAICS or PSC code in your profile to load Target Market Research.
+          Enter a keyword or NAICS/PSC code, then click Build Market Map to load agencies.
         </p>
       </section>
     );
@@ -4491,6 +4497,9 @@ function AgencyTable({
   const filteredRows = parentAgencyFilter
     ? sortedRows.filter((r) => {
         const needle = parentAgencyFilter.toLowerCase();
+        // FPDS "Department of Defense" → match all service branches (Army/Navy/Air
+        // Force rows use those as parent/sub, not the top-level DoD label).
+        if (needle.includes('defense') && isDodAgency(r)) return true;
         return (
           (r.parentAgency || '').toLowerCase().includes(needle) ||
           (r.subAgency || '').toLowerCase().includes(needle) ||
