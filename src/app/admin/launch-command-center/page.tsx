@@ -240,6 +240,10 @@ const toneClasses: Record<StatusTone, string> = {
   slate: 'border-slate-500/40 bg-slate-500/10 text-slate-200',
 };
 
+function statusBadgeClass(tone: StatusTone): string {
+  return `inline-flex shrink-0 items-center whitespace-nowrap rounded-full border px-3 py-1 text-xs font-semibold leading-none ${toneClasses[tone]}`;
+}
+
 const launchHealthClasses: Record<LaunchHealth, string> = {
   green: 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200',
   yellow: 'border-amber-500/40 bg-amber-500/10 text-amber-200',
@@ -1570,7 +1574,7 @@ export default function LaunchCommandCenterPage() {
                     <th className="px-4 py-3">Priority</th>
                     <th className="px-4 py-3">Owner</th>
                     <th className="px-4 py-3">Decision</th>
-                    <th className="px-4 py-3">Status</th>
+                    <th className="w-[1%] whitespace-nowrap px-4 py-3">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-800">
@@ -1579,8 +1583,8 @@ export default function LaunchCommandCenterPage() {
                       <td className="px-4 py-4 font-semibold text-white">{item.priority}</td>
                       <td className="px-4 py-4 text-slate-300">{item.owner}</td>
                       <td className="px-4 py-4 text-slate-300">{item.decision}</td>
-                      <td className="px-4 py-4">
-                        <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${toneClasses[item.tone]}`}>
+                      <td className="w-[1%] whitespace-nowrap px-4 py-4">
+                        <span className={statusBadgeClass(item.tone)}>
                           {item.status}
                         </span>
                       </td>
@@ -1623,7 +1627,7 @@ export default function LaunchCommandCenterPage() {
                     <h3 className="text-xl font-bold text-white">{item.queue}</h3>
                     <p className="mt-1 text-sm text-slate-400">{item.owner}</p>
                   </div>
-                  <span className={`rounded-full border px-3 py-1 text-xs font-semibold ${toneClasses[item.tone]}`}>
+                  <span className={statusBadgeClass(item.tone)}>
                     {item.status}
                   </span>
                 </div>
