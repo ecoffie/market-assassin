@@ -74,6 +74,32 @@ function subAgencyToParent(name: string): string | null {
   return null;
 }
 
+// When a target agency collapses to a broad parent (e.g. all of DEFENSE), but the
+// name actually names a SPECIFIC branch, return the sub-agency label that
+// deriveSubAgency() emits — so we can narrow the DoD/DHS/HHS firehose to just the
+// branch the user targeted (the "Navy card showing Army contacts" bug). Maps to
+// the exact labels in derive-subagency.ts.
+const AGENCY_TO_SUBAGENCY: Array<{ re: RegExp; label: string }> = [
+  { re: /\bnavy\b|\bnaval\b|navfac|navsup|navsea|navair|navwar|\bnswc\b|\bnuwc\b|marine corps mat|\bspawar\b/i, label: 'Navy' },
+  { re: /marine corps/i, label: 'Marine Corps' },
+  { re: /air force|\busaf\b|\bafmc\b/i, label: 'Air Force' },
+  { re: /corps of engineers|\busace\b/i, label: 'Army Corps of Engineers' },
+  { re: /\barmy\b/i, label: 'Army' },
+  { re: /defense logistics|\bdla\b/i, label: 'Defense Logistics Agency' },
+  { re: /defense health|\bdha\b/i, label: 'Defense Health Agency' },
+  { re: /coast guard|\buscg\b/i, label: 'Coast Guard' },
+  { re: /\bfema\b/i, label: 'FEMA' },
+  { re: /customs (and|&) border|\bcbp\b/i, label: 'Customs & Border Protection' },
+  { re: /\bnih\b|national institutes/i, label: 'NIH' },
+  { re: /\bfda\b|food (and|&) drug/i, label: 'FDA' },
+  { re: /\bcdc\b/i, label: 'CDC' },
+  { re: /\bcms\b|medicare/i, label: 'CMS' },
+];
+function agencyToExpectedSubAgency(name: string): string | null {
+  for (const m of AGENCY_TO_SUBAGENCY) if (m.re.test(name)) return m.label;
+  return null;
+}
+
 // OVERSEAS markers (Eric: "why are offices in Japan/Europe in my list?"). A US
 // small business won't bid on these — drop the contact entirely.
 const FOREIGN_OFFICE_RE = /\b(yokosuka|okinawa|guam|sasebo|atsugi|japan|korea|seoul|osan|kunsan|europe|german|ramstein|kaiserslautern|italy|aviano|naples|sigonella|spain|rota|uk\b|united kingdom|england|raf\b|bahrain|qatar|kuwait|djibouti|far east|pacific command|africa command|european command|central command|overseas|apo\b|fpo\b)\b/i;
@@ -293,7 +319,15 @@ export async function GET(request: NextRequest) {
   const limit = Math.min(Number(sp.get('limit')) || 50, 200);
   const offset = Math.max(Number(sp.get('offset')) || 0, 0);
 
-  const subAgency = (sp.get('subAgency') || '').trim();
+  let subAgency = (sp.get('subAgency') || '').trim();
+  // If the target agency NAMES a specific branch (e.g. "Naval Facilities
+  // Engineering Command") it collapses to the DEFENSE parent in the SQL filter,
+  // which pulls the whole DoD (Army, Air Force, …). Auto-narrow to the branch the
+  // user actually targeted so the Navy card shows Navy contacts, not all of DoD.
+  if (!subAgency && agency) {
+    const expected = agencyToExpectedSubAgency(agency);
+    if (expected) subAgency = expected;
+  }
 
   let q = sb
     .from('federal_contacts')
