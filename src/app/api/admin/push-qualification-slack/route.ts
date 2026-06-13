@@ -71,37 +71,51 @@ export async function POST(request: NextRequest) {
       : list.length;
 
     const top = list.slice(0, limit);
-    const lines = top.map((c, i) => {
-      const score = c.score != null ? ` *${c.score}*` : '';
-      const why = c.why ? ` — ${c.why}` : '';
-      return `${i + 1}. \`${c.email}\`${score}${why}`;
-    });
+    const lineFor = (c: (typeof top)[0], i: number) => {
+      const why = (c.why || c.action || '').slice(0, 120);
+      return `*${i + 1}.* \`${c.email}\`${c.score != null ? ` · score ${c.score}` : ''}${why ? `\n${why}` : ''}`;
+    };
 
-    const text = `${cfg.emoji} *${cfg.title}* — ${totalInSegment} total, showing top ${top.length}\n${lines.join('\n')}\n<https://getmindy.ai/command-center|Open Command Center>`;
+    const text = `${cfg.emoji} *${cfg.title}* — ${totalInSegment} total, showing top ${top.length}\n\n${top.map(lineFor).join('\n\n')}\n\n<https://getmindy.ai/command-center|Open Command Center>`;
 
-    const blocks = [
+    // Slack section blocks cap at 3000 chars — chunk candidates (~8 per block).
+    const blocks: Array<Record<string, unknown>> = [
       {
         type: 'header',
         text: { type: 'plain_text', text: `${cfg.title} (${totalInSegment})`, emoji: true },
       },
-      {
-        type: 'section',
-        text: {
-          type: 'mrkdwn',
-          text: top.length
-            ? top.map((c, i) => `*${i + 1}.* \`${c.email}\`${c.score != null ? ` · score ${c.score}` : ''}\n${c.why || c.action || ''}`).join('\n\n')
-            : '_No candidates in this queue._',
-        },
-      },
-      {
-        type: 'context',
-        elements: [
-          { type: 'mrkdwn', text: `<https://getmindy.ai/command-center|Command Center> · Generated ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC` },
-        ],
-      },
     ];
+    if (top.length === 0) {
+      blocks.push({
+        type: 'section',
+        text: { type: 'mrkdwn', text: '_No candidates in this queue._' },
+      });
+    } else {
+      const CHUNK = 8;
+      for (let i = 0; i < top.length; i += CHUNK) {
+        const chunk = top.slice(i, i + CHUNK);
+        blocks.push({
+          type: 'section',
+          text: {
+            type: 'mrkdwn',
+            text: chunk.map((c, j) => lineFor(c, i + j)).join('\n\n').slice(0, 2900),
+          },
+        });
+      }
+    }
+    blocks.push({
+      type: 'context',
+      elements: [
+        { type: 'mrkdwn', text: `<https://getmindy.ai/command-center|Command Center> · ${new Date().toISOString().slice(0, 16).replace('T', ' ')} UTC` },
+      ],
+    });
 
-    const slack = await postSlackMessage({ channel, text, blocks });
+    let slack = await postSlackMessage({ channel, text, blocks });
+
+    // Fallback: plain text if block layout rejected
+    if (!slack.ok && slack.error === 'invalid_blocks') {
+      slack = await postSlackMessage({ channel, text });
+    }
 
     if (!slack.ok) {
       return NextResponse.json({ error: slack.error || 'Slack post failed', channel }, { status: 500 });
