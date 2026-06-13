@@ -195,6 +195,7 @@ type CustomerQualificationBrief = {
   lists: {
     founderCalls: QualificationCandidate[];
     salesOutreach: QualificationCandidate[];
+    activationCandidates: QualificationCandidate[];
     upgradeTargets: QualificationCandidate[];
     rescueCandidates: QualificationCandidate[];
   };
@@ -469,6 +470,8 @@ export default function LaunchCommandCenterPage() {
   const [qualBrief, setQualBrief] = useState<CustomerQualificationBrief | null>(null);
   const [qualLoading, setQualLoading] = useState(false);
   const [qualError, setQualError] = useState('');
+  const [qualSlackStatus, setQualSlackStatus] = useState<string | null>(null);
+  const [qualSlackLoading, setQualSlackLoading] = useState(false);
   const [betaConv, setBetaConv] = useState<BetaConversion | null>(null);
   const [betaConvLoading, setBetaConvLoading] = useState(false);
   const [betaConvError, setBetaConvError] = useState('');
@@ -690,6 +693,28 @@ export default function LaunchCommandCenterPage() {
       cancelled = true;
     };
   }, [authenticated, password]);
+
+  async function pushQualSegmentToSlack(segment: 'activation' | 'founder' | 'sales' | 'rescue') {
+    if (!password) return;
+    setQualSlackLoading(true);
+    setQualSlackStatus(null);
+    try {
+      const res = await fetch(
+        `/api/admin/push-qualification-slack?password=${encodeURIComponent(password)}&segment=${segment}&limit=25`,
+        { method: 'POST' },
+      );
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setQualSlackStatus(data.error || 'Slack push failed');
+        return;
+      }
+      setQualSlackStatus(`Posted ${data.posted} ${segment} candidates to ${data.channel}`);
+    } catch {
+      setQualSlackStatus('Slack push failed — check SLACK_BOT_TOKEN');
+    } finally {
+      setQualSlackLoading(false);
+    }
+  }
 
   useEffect(() => {
     if (!authenticated || !password) return;
@@ -1255,10 +1280,33 @@ export default function LaunchCommandCenterPage() {
               <p className="text-sm uppercase tracking-[0.2em] text-amber-300">Customer Qualification Agent</p>
               <h2 className="mt-2 text-3xl font-bold">High-Value Customer Outreach</h2>
               <p className="mt-2 text-sm text-slate-400">
-                Purchase-based scoring identifies your best customers for founder calls, sales outreach, and rescue campaigns.
+                Purchase-based scoring identifies your best customers for founder calls, activation nudges, sales outreach, and rescue campaigns.
               </p>
             </div>
+            {qualBrief && password ? (
+              <div className="flex flex-wrap gap-2">
+                <a
+                  href={`/api/admin/qualify-customers?password=${encodeURIComponent(password)}&segment=activation&format=csv&limit=200`}
+                  className="rounded-lg border border-emerald-600/40 bg-emerald-600/10 px-3 py-2 text-sm font-medium text-emerald-200 hover:bg-emerald-600/20"
+                >
+                  Export Activation CSV
+                </a>
+                <button
+                  type="button"
+                  disabled={qualSlackLoading}
+                  onClick={() => pushQualSegmentToSlack('activation')}
+                  className="rounded-lg border border-purple-500/40 bg-purple-500/10 px-3 py-2 text-sm font-medium text-purple-200 hover:bg-purple-500/20 disabled:opacity-50"
+                >
+                  {qualSlackLoading ? 'Posting…' : 'Send Activation → Slack'}
+                </button>
+              </div>
+            ) : null}
           </div>
+          {qualSlackStatus ? (
+            <p className={`mt-3 text-sm ${qualSlackStatus.includes('Posted') ? 'text-emerald-300' : 'text-amber-300'}`}>
+              {qualSlackStatus}
+            </p>
+          ) : null}
 
           {qualLoading ? (
             <div className="mt-6 rounded-lg border border-slate-800 bg-slate-950/60 p-5">
@@ -1283,7 +1331,7 @@ export default function LaunchCommandCenterPage() {
                 <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4">
                   <p className="text-sm text-emerald-200">Activation Candidates</p>
                   <p className="mt-2 text-4xl font-bold text-emerald-300">{qualBrief.summary.bySegment['Activation Candidate']}</p>
-                  <p className="mt-1 text-xs text-slate-400">Score 30-84 • Sales outreach</p>
+                  <p className="mt-1 text-xs text-slate-400">Score 30+ • Setup / profile nudges</p>
                 </div>
                 <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
                   <p className="text-sm text-red-200">Rescue Candidates</p>
@@ -1343,6 +1391,40 @@ export default function LaunchCommandCenterPage() {
                       </div>
                     ))}
                   </div>
+                </div>
+              </div>
+
+              {/* Activation Queue — the 148 (or N) counted in the stat card but previously hidden */}
+              <div className="rounded-lg border border-emerald-500/20 bg-slate-950/50 p-5">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <h3 className="text-xl font-bold text-emerald-200">⚡ Activation Queue</h3>
+                    <p className="mt-1 text-sm text-slate-400">
+                      Has Mindy access but incomplete onboarding — Annelle / Sikander setup nudges
+                    </p>
+                  </div>
+                  <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-sm font-semibold text-emerald-300">
+                    Showing {qualBrief.lists.activationCandidates?.length || 0} of {qualBrief.summary.bySegment['Activation Candidate']}
+                  </span>
+                </div>
+                <div className="mt-4 max-h-96 space-y-2 overflow-y-auto">
+                  {(qualBrief.lists.activationCandidates || []).map((candidate) => (
+                    <div key={candidate.email} className="rounded-lg border border-slate-700 bg-slate-900/70 p-3">
+                      <div className="flex items-start justify-between gap-2">
+                        <p className="font-mono text-sm text-white break-all">{candidate.email}</p>
+                        <span className="shrink-0 rounded-full bg-emerald-500/20 px-2 py-0.5 text-xs font-bold text-emerald-300">
+                          {candidate.score}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-slate-400">{candidate.why}</p>
+                      {candidate.action ? (
+                        <p className="mt-1 text-xs text-emerald-400/80">{candidate.action}</p>
+                      ) : null}
+                    </div>
+                  ))}
+                  {(qualBrief.lists.activationCandidates?.length || 0) === 0 ? (
+                    <p className="text-sm text-slate-500">No activation candidates in the top-50 list.</p>
+                  ) : null}
                 </div>
               </div>
 

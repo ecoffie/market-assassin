@@ -509,6 +509,17 @@ export async function GET(request: NextRequest) {
             action: c.recommendedAction,
           })),
 
+        // Activation — has access, incomplete onboarding (Annelle/Sikander nudges)
+        activationCandidates: qualifiedCustomers
+          .filter(c => c.segment === 'Activation Candidate')
+          .slice(0, 50)
+          .map(c => decorateOutreach({
+            email: c.email,
+            score: c.score,
+            why: c.signals.slice(0, 3).join(', '),
+            action: c.recommendedAction,
+          })),
+
         // Top 25 for Shanoor/Sikander outreach
         salesOutreach: qualifiedCustomers
           .filter(c => ['10-10 Candidate', 'White-glove Candidate'].includes(c.segment))
