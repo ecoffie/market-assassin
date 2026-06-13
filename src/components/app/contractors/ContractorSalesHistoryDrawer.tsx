@@ -318,7 +318,11 @@ export default function ContractorSalesHistoryDrawer({
                       <div key={agency.agency} className="flex items-center justify-between gap-4">
                         <div className="min-w-0">
                           <div className="truncate text-sm font-medium text-slate-200">{agency.agency}</div>
-                          <div className="text-xs text-slate-500">{agency.count} awards</div>
+                          <div className="text-xs text-slate-500">
+                            {typeof agency.share === 'number' && agency.share > 0
+                              ? `${(agency.share * 100).toFixed(1)}% of total obligations`
+                              : `${agency.count} ${agency.count === 1 ? 'award' : 'awards'}`}
+                          </div>
                         </div>
                         <div className="text-sm font-semibold text-emerald-400">{formatCurrency(agency.amount)}</div>
                       </div>

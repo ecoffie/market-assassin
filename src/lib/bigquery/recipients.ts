@@ -1066,7 +1066,16 @@ export async function getBqContractorHistory(opts: { uei?: string; slug?: string
       averageAwardSize: awardCount > 0 ? totalObligations / awardCount : 0,
     },
     series,
-    topAgencies: agencies.map(a => ({ agency: a.awarding_agency, amount: Number(a.total_amount || 0), count: 0 })),
+    // count: 0 here is a sentinel — the BQ top-agencies query intentionally
+    // doesn't return per-agency award_count (cost). We surface `share`
+    // (pct_of_total, 0-1) instead; renderers fall back to count only when
+    // share is undefined (i.e. the static-contractor path).
+    topAgencies: agencies.map(a => ({
+      agency: a.awarding_agency,
+      amount: Number(a.total_amount || 0),
+      count: 0,
+      share: Number(a.pct_of_total || 0),
+    })),
     topNaics: naics.map(n => ({ naics: n.naics_code, description: n.naics_description || null, amount: Number(n.total_amount || 0), count: Number(n.award_count || 0) })),
     recentAwards: recent.map(r => ({
       id: r.award_id,

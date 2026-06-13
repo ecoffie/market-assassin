@@ -72,7 +72,13 @@ export interface ContractorSalesHistory {
     awardCount: number;
     agencyBreakdown: Array<{ agency: string; amount: number; count: number }>;
   }>;
-  topAgencies: Array<{ agency: string; amount: number; count: number }>;
+  // share is the agency's % of total obligations (0-1). The BQ path
+  // (getBqContractorHistory) sets this and skips count because the cheap
+  // top-agencies query deliberately doesn't return per-agency award counts
+  // (COUNT(DISTINCT award_id) doubled the BQ scan). The static path
+  // populates count from real per-row tallies. Renderers prefer share when
+  // present and fall back to count for the static-contractor path.
+  topAgencies: Array<{ agency: string; amount: number; count: number; share?: number }>;
   topNaics: Array<{ naics: string; description: string | null; amount: number; count: number }>;
   recentAwards: Array<{
     id: string;
