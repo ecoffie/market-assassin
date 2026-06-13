@@ -18,6 +18,13 @@ import { isSearchableKeyword } from '@/lib/market/keyword-sanitize';
 import { naicsSubsectorPrefixes } from '@/lib/utils/naics-expansion';
 import { getMindyFeedbackSignals, scoreOpportunityWithMindyFeedback } from '@/lib/mindy/feedback-scoring';
 import { getBuyerAgencyParts } from '@/lib/mindy/agency-display';
+import {
+  getNoticeIdsForCtaFilter,
+  loadCtaTagsForNotices,
+  opportunityMatchesCtaFilter,
+  tagOpportunityInMemory,
+  type OpportunityCtaTagPayload,
+} from '@/lib/cta/opportunity-tags';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -28,6 +35,7 @@ interface SAMOpportunity {
   title: string;
   solicitation_number?: string;
   naics_code?: string;
+  naics_codes?: string[];
   classification_code?: string;
   department?: string;
   sub_tier?: string;
@@ -314,6 +322,10 @@ export async function GET(request: NextRequest) {
   // When true, the keyword REPLACES the NAICS filter (browse-all-SAM mode). When
   // false (default), keyword is OR'd with NAICS so the feed widens, not narrows.
   const keywordOnly = searchParams.get('keywordOnly') === 'true';
+  const ctaParam = (searchParams.get('cta') || '').trim();
+  const selectedCtaIds = ctaParam
+    ? ctaParam.split(',').map((s) => s.trim()).filter(Boolean)
+    : [];
 
   const authSession = requireMIAuthSession(request, email);
   if (!authSession.ok) return authSession.response;
@@ -412,6 +424,39 @@ export async function GET(request: NextRequest) {
       query = query.eq('has_sow_doc', true);
     }
 
+    let ctaDbFilter = false;
+    let ctaTablesMissing = false;
+    if (selectedCtaIds.length > 0) {
+      const { noticeIds, error: ctaFilterError } = await getNoticeIdsForCtaFilter(
+        supabase,
+        selectedCtaIds,
+      );
+      if (ctaFilterError === 'cta_tables_missing') {
+        ctaTablesMissing = true;
+      } else if (noticeIds && noticeIds.length > 0) {
+        ctaDbFilter = true;
+        query = query.in('notice_id', noticeIds.slice(0, 1000));
+      } else if (noticeIds && noticeIds.length === 0 && !ctaTablesMissing) {
+        return NextResponse.json({
+          success: true,
+          count: 0,
+          opportunities: [],
+          ctaFilter: { selected: selectedCtaIds, needsBackfill: true },
+          searchCriteria: {
+            naicsCodes,
+            keywords: userProfile?.keywords ?? [],
+            businessDescription: userProfile?.business_description ?? null,
+            limit,
+            noticeType,
+            businessType: userProfile?.business_type ?? null,
+            setAsidePreferences: userProfile?.set_aside_preferences ?? [],
+            locationStates: locationStates,
+            ctaIds: selectedCtaIds,
+          },
+        });
+      }
+    }
+
     const { data: opportunities, error } = await query;
 
     if (error) {
@@ -423,9 +468,15 @@ export async function GET(request: NextRequest) {
     }
 
     const feedbackSignals = email ? await getMindyFeedbackSignals(email) : undefined;
+    const rawOpps: SAMOpportunity[] = opportunities || [];
+    const tagsByNotice = await loadCtaTagsForNotices(
+      supabase,
+      rawOpps.map((o) => o.notice_id),
+    );
+    const useInMemoryCta = ctaTablesMissing || (tagsByNotice.size === 0 && rawOpps.length > 0);
 
     // Transform to consistent format
-    const alerts = (opportunities || []).map((opp: SAMOpportunity) => {
+    let alerts = rawOpps.map((opp: SAMOpportunity) => {
       // Calculate days until deadline
       const deadline = opp.response_deadline ? new Date(opp.response_deadline) : null;
       const now = new Date();
@@ -447,6 +498,11 @@ export async function GET(request: NextRequest) {
       });
       if (setAsideFit.reason && setAsideFit.adjustment > 0) feedbackReasons.push(setAsideFit.reason);
       if (agencyFit.reason) feedbackReasons.push(agencyFit.reason);
+
+      let ctaTags: OpportunityCtaTagPayload[] = tagsByNotice.get(opp.notice_id) || [];
+      if (useInMemoryCta || ctaTags.length === 0) {
+        ctaTags = tagOpportunityInMemory(opp);
+      }
 
       return {
         id: opp.notice_id,
@@ -493,8 +549,17 @@ export async function GET(request: NextRequest) {
         feedbackScoreAdjustment: feedbackScore.adjustment,
         recommendationScore,
         feedbackReasons: Array.from(new Set(feedbackReasons)).slice(0, 3),
+        ctaTags,
       };
-    }).sort((a, b) => {
+    });
+
+    if (selectedCtaIds.length > 0 && (ctaTablesMissing || !ctaDbFilter)) {
+      alerts = alerts.filter((alert) =>
+        opportunityMatchesCtaFilter(alert.ctaTags || [], selectedCtaIds),
+      );
+    }
+
+    alerts = alerts.sort((a, b) => {
       if (b.recommendationScore !== a.recommendationScore) {
         return b.recommendationScore - a.recommendationScore;
       }
@@ -519,6 +584,13 @@ export async function GET(request: NextRequest) {
       success: true,
       count: dedupedAlerts.length,
       opportunities: dedupedAlerts,
+      ctaFilter: selectedCtaIds.length
+        ? {
+            selected: selectedCtaIds,
+            mode: ctaDbFilter ? 'database' : useInMemoryCta ? 'in_memory' : 'database',
+            needsBackfill: !ctaDbFilter && !useInMemoryCta && dedupedAlerts.length === 0,
+          }
+        : undefined,
       // Mirrors the data shown on the daily-alert email banner so the
       // in-app Source Feed header can render the same "Filters:" line.
       searchCriteria: {
@@ -530,6 +602,7 @@ export async function GET(request: NextRequest) {
         businessType: userProfile?.business_type ?? null,
         setAsidePreferences: userProfile?.set_aside_preferences ?? [],
         locationStates: locationStates,
+        ctaIds: selectedCtaIds,
       },
     });
 

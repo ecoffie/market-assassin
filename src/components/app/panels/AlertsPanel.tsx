@@ -51,6 +51,13 @@ interface Alert {
   recommendationScore?: number;
   feedbackReasons?: string[];
   descriptionUrl?: string | null;
+  ctaTags?: Array<{
+    ctaId: string;
+    name: string;
+    shortName: string;
+    confidence: 'high' | 'medium' | 'low';
+    matchSource: string;
+  }>;
   // Extra SAM record fields populated by the static + per-opp
   // backfill jobs. Used by the Details drawer to render the full
   // opportunity in-app instead of bouncing to sam.gov.
@@ -60,6 +67,20 @@ interface Alert {
   fairOpportunity?: Record<string, unknown> | null;
   additionalInfoLink?: string | null;
   additionalInfoText?: string | null;
+}
+
+interface CtaCodeOption {
+  cta_id: string;
+  name: string;
+  short_name: string;
+  description: string;
+  priority_order: number;
+}
+
+function ctaConfidenceClass(confidence: 'high' | 'medium' | 'low'): string {
+  if (confidence === 'high') return 'bg-violet-600/30 text-violet-100 border border-violet-500/50';
+  if (confidence === 'medium') return 'bg-violet-500/15 text-violet-200 border border-violet-500/25';
+  return 'bg-transparent text-violet-300 border border-violet-500/30 border-dashed';
 }
 
 type AlertFilter = 'all' | 'solicitation' | 'sources' | 'setaside' | 'urgent';
@@ -141,6 +162,10 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
   const [savingFeedbackIds, setSavingFeedbackIds] = useState<Set<string>>(new Set());
   const [dismissedAlertIds, setDismissedAlertIds] = useState<Set<string>>(new Set());
   const [totalCount, setTotalCount] = useState(0);
+  const [ctaOptions, setCtaOptions] = useState<CtaCodeOption[]>([]);
+  const [selectedCtaIds, setSelectedCtaIds] = useState<string[]>([]);
+  const [ctaSectionOpen, setCtaSectionOpen] = useState(false);
+  const [ctaNeedsBackfill, setCtaNeedsBackfill] = useState(false);
   const [stateFilter, setStateFilter] = useState<string>('');
   const [searchCriteria, setSearchCriteria] = useState<{
     naicsCodes: string[];
@@ -204,6 +229,9 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
       // feed contradicts that. The API itself protects against runaway
       // queries via its internal fetchLimit (2000).
       params.set('limit', '1000');
+      if (selectedCtaIds.length > 0) {
+        params.set('cta', selectedCtaIds.join(','));
+      }
 
       const res = await fetch(`/api/app/opportunities?${params.toString()}`, {
         headers: getAuthHeaders(),
@@ -213,6 +241,7 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
       if (data.success) {
         setAlerts(data.opportunities || []);
         setTotalCount(data.count || 0);
+        setCtaNeedsBackfill(Boolean(data.ctaFilter?.needsBackfill));
         if (data.searchCriteria) {
           setSearchCriteria({
             naicsCodes: data.searchCriteria.naicsCodes || [],
@@ -234,7 +263,24 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
     } finally {
       setIsLoading(false);
     }
-  }, [email, getAuthHeaders]);
+  }, [email, getAuthHeaders, selectedCtaIds]);
+
+  useEffect(() => {
+    fetch('/api/cta/codes')
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.success && Array.isArray(data.ctas)) {
+          setCtaOptions(data.ctas);
+        }
+      })
+      .catch(() => {});
+  }, []);
+
+  const toggleCtaFilter = (ctaId: string) => {
+    setSelectedCtaIds((prev) =>
+      prev.includes(ctaId) ? prev.filter((id) => id !== ctaId) : [...prev, ctaId],
+    );
+  };
 
   useEffect(() => {
     loadAlerts();
@@ -740,6 +786,66 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
         </div>
       )}
 
+      {/* DoD Critical Tech Area filter — collapsed by default (NAPEX / APEX counselors) */}
+      {ctaOptions.length > 0 && (
+        <div className="rounded-xl border border-violet-500/25 bg-gradient-to-br from-violet-950/40 to-slate-950/60 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setCtaSectionOpen((open) => !open)}
+            className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-violet-500/5 transition-colors"
+          >
+            <div>
+              <p className="text-sm font-semibold text-violet-100">Critical Tech Areas (DoD 14 CTAs)</p>
+              <p className="text-xs text-violet-200/70 mt-0.5">
+                Filter to opportunities aligned with the 35% APEX reporting mandate
+                {selectedCtaIds.length > 0 && (
+                  <span className="text-violet-300"> · {selectedCtaIds.length} selected</span>
+                )}
+              </p>
+            </div>
+            <span className="text-violet-300 text-sm shrink-0">{ctaSectionOpen ? '▾' : '▸'}</span>
+          </button>
+          {ctaSectionOpen && (
+            <div className="px-4 pb-4 border-t border-violet-500/15">
+              <div className="flex flex-wrap gap-2 pt-3">
+                {ctaOptions.map((cta) => {
+                  const active = selectedCtaIds.includes(cta.cta_id);
+                  return (
+                    <button
+                      key={cta.cta_id}
+                      type="button"
+                      title={cta.description}
+                      onClick={() => toggleCtaFilter(cta.cta_id)}
+                      className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
+                        active
+                          ? 'bg-gradient-to-r from-blue-900 to-violet-700 text-white border-violet-400/50'
+                          : 'bg-slate-900/80 text-violet-200/90 border-slate-700 hover:border-violet-500/40'
+                      }`}
+                    >
+                      {cta.short_name}
+                    </button>
+                  );
+                })}
+              </div>
+              {selectedCtaIds.length > 0 && (
+                <button
+                  type="button"
+                  onClick={() => setSelectedCtaIds([])}
+                  className="mt-3 text-xs text-violet-300 hover:text-violet-100"
+                >
+                  Clear CTA filters
+                </button>
+              )}
+              {ctaNeedsBackfill && selectedCtaIds.length > 0 && (
+                <p className="mt-2 text-xs text-amber-300/90">
+                  CTA tags are still indexing — results may be sparse until the nightly tag job completes.
+                </p>
+              )}
+            </div>
+          )}
+        </div>
+      )}
+
       {/* Filters */}
       <div className="flex flex-wrap items-center gap-2">
         {filterOptions.map(({ key, label }) => (
@@ -787,12 +893,13 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
           <option value="posted">Sort by newest posted</option>
           <option value="agency">Sort by agency</option>
         </select>
-        {(filter !== 'all' || searchQuery || stateFilter) && (
+        {(filter !== 'all' || searchQuery || stateFilter || selectedCtaIds.length > 0) && (
           <button
             onClick={() => {
               setFilter('all');
               setSearchQuery('');
               setStateFilter('');
+              setSelectedCtaIds([]);
             }}
             className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm rounded-lg transition-colors"
           >
@@ -899,6 +1006,26 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                     {alert.isClosingSoon && !alert.isUrgent && (
                       <span className="px-2 py-0.5 text-xs bg-amber-500/20 text-amber-400 rounded">
                         ⚡ {alert.daysLeft} days left
+                      </span>
+                    )}
+                    {(alert.ctaTags || []).slice(0, 2).map((tag) => (
+                      <button
+                        key={`${alert.id}-${tag.ctaId}`}
+                        type="button"
+                        title={`${tag.name} (${tag.confidence} confidence)`}
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          toggleCtaFilter(tag.ctaId);
+                          setCtaSectionOpen(true);
+                        }}
+                        className={`px-2 py-0.5 text-xs rounded ${ctaConfidenceClass(tag.confidence)}`}
+                      >
+                        {tag.shortName}
+                      </button>
+                    ))}
+                    {(alert.ctaTags?.length || 0) > 2 && (
+                      <span className="px-2 py-0.5 text-xs text-violet-300/80">
+                        +{(alert.ctaTags?.length || 0) - 2} CTA
                       </span>
                     )}
                     {/* Match-strength chip: surfaces the server-side
@@ -1066,7 +1193,9 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
           <div className="text-4xl mb-4">📋</div>
           <h3 className="text-lg font-medium text-white mb-2">No Opportunities Found</h3>
           <p className="text-slate-400 text-sm">
-            {filter !== 'all'
+            {selectedCtaIds.length > 0
+              ? 'No opportunities match the selected Critical Tech Areas. Try fewer CTAs or expand your NAICS profile.'
+              : filter !== 'all'
               ? 'Try a different filter, clear your search, or check back later.'
               : 'Configure your NAICS codes to see matching opportunities.'}
           </p>
