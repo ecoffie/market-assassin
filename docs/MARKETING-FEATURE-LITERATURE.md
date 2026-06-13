@@ -1341,3 +1341,40 @@ differentiators (Why Us) + company_overview (LOI Opening) sections;
 `formatEvidenceGapsForPrompt` emits a "bracket, don't bluff" instruction. Verified:
 the eval vault's 6 past-performance rows are all template stubs → correctly counted as
 0 real records, filtered from the prompt, and the bracket instruction fires.
+
+---
+
+## Proposal Assist: Copy-Paste-Ready LOI Template (June 13, 2026)
+
+**What:** The Letter of Intent / Sources Sought response now renders as a DETERMINISTIC
+copy-paste replica of the proven GovCon Giants LOI format — letterhead, the
+"(a)(b)(c)(d)" intent block, Responsible Office / Contact Person, and a RELEVANT
+EXPERIENCE appendix with each reference project in the exact labeled layout
+(Role / Scope of Work / Contract Value / Point of Contact / General Contractor /
+Telephone / Timeliness). Real bidder + notice data fills automatically (CO name from
+the SAM notice, company identity + real past performance from the vault); everything
+unknown becomes a clearly-labeled [placeholder] the user pastes over and submits.
+
+**Why:** Formatting — not prose — is what contractors can't do. Before AI, the GovCon
+Giants playbook was: copy the proven LOI template, swap your name / past performance /
+reference projects against the solicitation, submit. We measured this directly: an
+LLM-judged "persuasion" score held flat at 78/100 whether or not the prose improved,
+because persuasion was never the gap. The gap is the FORMAT and knowing what goes
+where. A deterministic template (no LLM in the render) guarantees exact format fidelity
+and puts the fill-in slots in the right places — driven toward compliance, not clever
+wording.
+
+**SEO:** federal letter of intent template, sources sought response format, how to
+write an LOI for a government solicitation, 8(a) capability response template, proposal
+formatting copy paste.
+
+**Proof:** `src/lib/proposal/loi-template.ts` (`assembleLoiTemplate`) renders the format
+transcribed from a real winning LOI (Tavares LLC, USCG New London #70Z0G118SPFA02700).
+Verified against a real client vault: fills real CO (Joyce M. Overton), solicitation #,
+8(a) cert, $15M bonding, and reference projects ($5.3M South Street Landing abatement
+with its real POC) — bracketing only what the vault genuinely lacks. Supporting fixes
+in the same change: vault loader now selects office / reference contacts (were invisible
+to every consumer); currency renders as "$15,000,000" not raw integers; the fact-guard
+accepts abbreviated currency ("$15 million") so real values stop being neutralized; and
+the drafting prompt now handles an out-of-scope bid as an HONEST STRETCH (lead with real
+transferable past performance, bracket the gap) instead of inventing a credential.

@@ -151,6 +151,17 @@ export function assembleLoiTemplate({ fields, vault }: LoiTemplateInput): string
     : (Array.isArray(id.certifications) ? (id.certifications as string[]) : [])
   ).filter(Boolean);
   const certPhrase = certs.length ? certs.join(', ') + ' certified' : ph('your set-aside certification') + ' certified';
+  // "an 8(a)", "an SDVOSB", "a HUBZone", "a WOSB" — pick the article by how the
+  // term is READ aloud. 8(a) reads "eight-A" (vowel). An all-caps initialism
+  // whose first letter is spelled out (S→"ess", F→"eff") takes "an" when that
+  // letter-name starts with a vowel sound (F,H,L,M,N,R,S,X). But an acronym
+  // pronounced as a WORD (HUBZone="hubzone", WOSB="woz-b") follows its first
+  // actual letter. Heuristic: treat as a spelled-out initialism only when it's
+  // ALL caps with no lowercase (SDVOSB) — mixed case (HUBZone) reads as a word.
+  const cp = certPhrase.trim();
+  const isSpelledInitialism = /^[A-Z0-9()]+(?:\s|$)/.test(cp) && !/[a-z]/.test(cp.split(/\s/)[0]);
+  const startsVowelSound = /^[8aeiou]/i.test(cp) || (isSpelledInitialism && /^[FHLMNRSX]/.test(cp));
+  const certArticle = startsVowelSound ? 'an' : 'a';
   const location = [s(id.hq_city), s(id.hq_state)].filter(Boolean).join(', ') || ph('your city, state');
   const bondSingle = fmtMoney(id.bonding_single) || ph('$single');
   const bondAgg = fmtMoney(id.bonding_aggregate) || ph('$aggregate');
@@ -191,7 +202,7 @@ Thank you for allowing us this opportunity to present our firm, ${company}, as a
 
 (b) Attached to this document you will find a copy of our bonding letter. Single/Aggregate Limits ${bondSingle} / ${bondAgg}.
 
-(c) ${company} is a ${certPhrase} company based out of ${location}.
+(c) ${company} is ${certArticle} ${certPhrase} company based out of ${location}.
 
 (d) Please see attached past performance and relevant experience. ${differentiator}
 
