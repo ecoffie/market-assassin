@@ -7,6 +7,7 @@ import dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 import { isDescriptionLink, fetchNoticeDescription } from '../../src/lib/sam/notice-description';
+import { extractNoticePoc, noticePocGroundingText, type NoticePocSet } from '../../src/lib/proposal/notice-poc';
 
 // Lazy singleton — ESM hoists imports above a caller's dotenv.config(), so
 // reading env at module-init time can race. Defer until first use.
@@ -19,13 +20,15 @@ export function db(): SupabaseClient {
 }
 const SAM_API_KEY = () => process.env.SAM_API_KEY || '';
 
-export async function loadNoticeBody(noticeId: string): Promise<{ title: string; body: string }> {
+export async function loadNoticeBody(noticeId: string): Promise<{ title: string; body: string; poc: NoticePocSet }> {
+  const emptyPoc: NoticePocSet = { primary: null, secondary: null, all: [] };
   const { data: row } = await db()
     .from('sam_opportunities')
     .select('notice_id, title, description, sow_text, raw_data')
     .eq('notice_id', noticeId)
     .maybeSingle();
-  if (!row) return { title: '', body: '' };
+  if (!row) return { title: '', body: '', poc: emptyPoc };
+  const poc = extractNoticePoc(row.raw_data);
   const sow = (row.sow_text || '').trim();
   let desc = (row.description || '').trim();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -39,7 +42,7 @@ export async function loadNoticeBody(noticeId: string): Promise<{ title: string;
   if (!desc && link && SAM_API_KEY()) desc = (await fetchNoticeDescription(link, SAM_API_KEY()).catch(() => '')) || '';
   if (!sow && !desc && SAM_API_KEY()) desc = (await fetchNoticeDescription(row.notice_id, SAM_API_KEY()).catch(() => '')) || '';
   const body = [row.title, sow, desc].filter(Boolean).join('\n\n').trim();
-  return { title: row.title || '', body };
+  return { title: row.title || '', body, poc };
 }
 
 /**

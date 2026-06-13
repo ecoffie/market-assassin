@@ -137,5 +137,9 @@ export interface DraftResult {
     painPointsUsed: number;
     lensId: string | null;
     humanized: boolean;
+    /** Fact-guard: count of ungrounded facts caught + neutralized to [placeholders]. */
+    factGuardFlags?: number;
+    /** Fact-guard: the actual ungrounded values that were removed (capped). */
+    factGuardRemoved?: string[];
   };
 }

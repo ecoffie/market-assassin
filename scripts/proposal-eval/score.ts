@@ -26,61 +26,34 @@ import { readFileSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { callLLM } from '../../src/lib/llm/call-llm';
 import { loadKnownFacts } from './lib';
+import { guardFacts } from '../../src/lib/proposal/fact-guard';
 
 // ---- A) Fact extraction + grounding check ---------------------------
-
-// Normalize for substring matching: lowercase, strip non-alphanumerics so
-// "$1,200,000" and "1200000" and "1.2M" can be compared loosely.
-function norm(s: string): string {
-  return s.toLowerCase().replace(/[^a-z0-9]/g, '');
-}
-
-// Pull candidate facts worth checking. We deliberately IGNORE the bidder's own
-// known identity tokens (added to the haystack) so true facts pass.
-function extractFacts(draft: string): string[] {
-  const facts = new Set<string>();
-  // Percentages and explicit metric claims: "15%", "95% satisfaction"
-  for (const m of draft.matchAll(/\b\d{1,3}(?:\.\d+)?\s*%/g)) facts.add(m[0].trim());
-  // Dollar amounts: "$1.2M", "$450,000"
-  for (const m of draft.matchAll(/\$\s?\d[\d,]*(?:\.\d+)?\s?(?:[KMB]|million|billion)?/gi)) facts.add(m[0].trim());
-  // "N engagements/contracts/clients/projects/years" quantified claims
-  for (const m of draft.matchAll(/\b\d{1,4}\s+(?:engagements?|contracts?|clients?|projects?|organizations?|agencies|awards?)\b/gi)) facts.add(m[0].trim());
-  // Emails + phones (catch hallucinated POCs like john.doe@ / 555-123-4567)
-  for (const m of draft.matchAll(/[\w.+-]+@[\w.-]+\.\w+/g)) facts.add(m[0].trim());
-  for (const m of draft.matchAll(/\(?\d{3}\)?[\s.-]\d{3}[\s.-]\d{4}/g)) facts.add(m[0].trim());
-  // Solicitation/contract-number-ish tokens (mix of letters+digits, 6+)
-  for (const m of draft.matchAll(/\b[A-Z0-9]{2,}-?[A-Z0-9]{2,}(?:-[A-Z0-9]+)+\b/g)) facts.add(m[0].trim());
-  return [...facts];
-}
+//
+// The extraction + grounding logic is the SAME code the LIVE draft pipeline
+// uses (src/lib/proposal/fact-guard.ts). Importing it — rather than keeping a
+// parallel copy here — is the whole point of the harness: the offline scorer
+// and the in-app guard must agree on what counts as a fact, or the eval would
+// pass a draft the live guard flags (or vice versa). (Memory: ground_in_real_data.)
 
 interface Fabrication { fact: string; }
 
 function checkGrounding(draft: string, haystack: string): Fabrication[] {
-  const hay = norm(haystack);
-  const out: Fabrication[] = [];
-  for (const f of extractFacts(draft)) {
-    const nf = norm(f);
-    if (!nf) continue;
-    // A fact is grounded if its normalized form appears in the haystack
-    // (vault + notice body + the rest of the draft's own template tokens).
-    if (!hay.includes(nf)) {
-      // Loosen for $/M phrasing: try the bare digits too.
-      const digits = f.replace(/[^0-9]/g, '');
-      if (digits.length >= 3 && hay.includes(digits)) continue;
-      out.push({ fact: f });
-    }
-  }
-  return out;
+  // sanitize:false → flag only; we just want the list of ungrounded facts.
+  const { unverified } = guardFacts(draft, haystack, { sanitize: false });
+  return unverified.map(f => ({ fact: f.value }));
 }
 
 // ---- B) LLM judge ---------------------------------------------------
 
-const JUDGE_SYSTEM = `You are a strict federal proposal evaluator scoring ONE drafted response section. Score 0-100 on:
-- Responsiveness: directly answers what the notice asks for (40)
-- Structure & format: correct for the section type, no leftover [placeholders] (20)
+const JUDGE_SYSTEM = `You are a strict federal proposal evaluator scoring ONE drafted section of an ASSIST tool (it produces a first draft the user finalizes). Score 0-100 on:
+- Responsiveness: directly anchored in THIS notice's actual scope/tasks/deliverables, not generic (40)
+- Structure & format: correct for the section type, scannable (20)
 - Federal voice: concrete, evidence-oriented, no fluff/GPT-tells ("in today's landscape", triple adjectives, "world-class") (20)
 - Concision & relevance: on-target length, nothing padded (20)
-Respond with JSON only: { "score": <0-100>, "issues": ["short issue", ...] }. Be harsh — 90+ means submission-ready.`;
+
+IMPORTANT — brackets are CORRECT, not defects. This is an assist draft: a [bracketed placeholder] for a fact the bidder must supply (a phone number, a contract title, an employee count not in their profile) is the RIGHT behavior — do NOT penalize it. Penalize only INVENTED facts, generic/unanchored prose, fluff, and padding. A short honest draft that names the real scope and brackets the unknowns should score well.
+Respond with JSON only: { "score": <0-100>, "issues": ["short issue", ...] }. 90+ means a strong first draft ready for the user to fill in and submit.`;
 
 async function judge(label: string, draft: string, noticeBody: string): Promise<{ score: number; issues: string[] }> {
   const user = `SECTION: ${label}\n\nNOTICE (excerpt):\n${noticeBody.slice(0, 4000)}\n\nDRAFT:\n${draft}\n\nScore it. JSON only.`;
@@ -98,7 +71,7 @@ async function judge(label: string, draft: string, noticeBody: string): Promise<
 async function main() {
   const { vaultEmail, results } = JSON.parse(
     readFileSync(join(__dirname, 'out', 'drafts.json'), 'utf8'),
-  ) as { vaultEmail: string; results: Array<{ label: string; notice_type: string; body: string; sections: Array<{ section: string; label: string; draft: string }>; errors: unknown[] }> };
+  ) as { vaultEmail: string; results: Array<{ label: string; notice_type: string; body: string; pocText?: string; sections: Array<{ section: string; label: string; draft: string }>; errors: unknown[] }> };
 
   const knownFacts = await loadKnownFacts(vaultEmail);
   console.log(`Known-facts haystack: ${knownFacts.length} chars. Scoring...`);
@@ -106,9 +79,12 @@ async function main() {
   const rows: Array<{ case: string; section: string; quality: number; fabrications: string[]; final: number; issues: string[] }> = [];
 
   for (const r of results) {
-    // Haystack = vault facts + this notice's body + the bidder's own draft
-    // template tokens (so "GOVCON GIANTS INC" etc. never reads as invented).
-    const haystack = `${knownFacts}\n${r.body}`;
+    // Haystack = vault facts + this notice's body + the government POC (name/
+    // email/phone from raw_data, which is often NOT in the body) + the bidder's
+    // own draft template tokens (so "GOVCON GIANTS INC" never reads as invented).
+    // Without pocText, a correctly-grounded gov POC email would score as a
+    // fabrication and zero out the POC section — the bug this whole change fixes.
+    const haystack = `${knownFacts}\n${r.body}\n${r.pocText || ''}`;
     for (const s of (r.sections || [])) {
       const fabrications = checkGrounding(s.draft, haystack).map(f => f.fact);
       const q = await judge(s.label, s.draft, r.body);

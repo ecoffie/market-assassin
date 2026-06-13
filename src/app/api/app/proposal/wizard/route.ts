@@ -32,6 +32,7 @@ import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { archiveContent, type ArchiveContentType } from '@/lib/archive/persist';
 import { resolveActiveWorkspace } from '@/lib/app/workspace';
 import { lookupSamOpportunityForPipeline } from '@/lib/pipeline/sam-opportunity-lookup';
+import type { NoticePocSet } from '@/lib/proposal/notice-poc';
 import { isSamDescriptionUrl, resolveSamDescriptionUrl } from '@/lib/sam/description-text';
 import { getRotatedSAMKey } from '@/lib/sam/utils';
 import { logToolError, ToolNames, AIProviders, classifyError } from '@/lib/tool-errors';
@@ -625,11 +626,27 @@ async function generateDraft(
     return empty;
   }
 
+  // Government POC (CO name/email/phone) from the matched SAM notice, so the
+  // POC / cover-letter section addresses the real contracting officer instead
+  // of generic boilerplate (the lowest-scoring eval section). Best-effort — a
+  // pursuit with no SAM match just drafts without it.
+  let noticePoc: NoticePocSet | undefined;
+  try {
+    const samMatch = await lookupSamOpportunityForPipeline(
+      getSupabase() as unknown as Parameters<typeof lookupSamOpportunityForPipeline>[0],
+      { noticeId: pipeline.notice_id, title: pipeline.title, agency: pipeline.agency },
+    );
+    noticePoc = samMatch?.poc;
+  } catch (err) {
+    console.warn('[wizard] notice POC lookup failed:', err);
+  }
+
   const result = await generateAllSections({
     email,
     sourceText,
     fileName,
     rfpAgency: pipeline.agency,
+    noticePoc,
     // sectionTypes omitted → draft-all defaults to the 5 RFP sections.
   });
 

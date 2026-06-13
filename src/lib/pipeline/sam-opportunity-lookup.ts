@@ -11,6 +11,8 @@ type SupabaseLike = {
   };
 };
 
+import { extractNoticePoc, type NoticePocSet } from '@/lib/proposal/notice-poc';
+
 export interface SamOpportunityRow {
   notice_id: string | null;
   solicitation_number: string | null;
@@ -22,6 +24,7 @@ export interface SamOpportunityRow {
   office: string | null;
   description: string | null;
   attachments: unknown;
+  raw_data: unknown;
 }
 
 export interface SamOpportunityLookup {
@@ -33,9 +36,13 @@ export interface SamOpportunityLookup {
   // Attachment download URLs synced nightly from SAM (resourceLinks). When
   // present we can fetch docs straight from these without a live SAM call.
   attachments: string[];
+  // Government POC (CO name/email/phone) from raw_data.pointOfContact. Lets
+  // Proposal Assist address an LOI/response to the real contracting officer
+  // instead of generic boilerplate (the lowest-scoring eval section).
+  poc: NoticePocSet;
 }
 
-const SAM_SELECT = 'notice_id, solicitation_number, notice_type, response_deadline, title, department, sub_tier, office, description, attachments';
+const SAM_SELECT = 'notice_id, solicitation_number, notice_type, response_deadline, title, department, sub_tier, office, description, attachments, raw_data';
 
 function normalize(value?: string | null): string {
   return String(value || '')
@@ -80,6 +87,7 @@ function toLookup(row: SamOpportunityRow | null): SamOpportunityLookup | null {
     responseDeadline: row.response_deadline || null,
     description: row.description || null,
     attachments,
+    poc: extractNoticePoc(row.raw_data),
   };
 }
 

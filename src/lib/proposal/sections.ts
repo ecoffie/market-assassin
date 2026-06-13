@@ -205,11 +205,16 @@ export const SECTION_META: Record<SectionType, SectionMeta> = {
     voice:
       'You are formatting a POC block. Mechanical, structured, no prose.',
     basePrompt:
-      'Draft a Point of Contact block. Single block at the bottom. Format:\n\n[Full Name], ' +
-      '[Title]\n[Company Name]\n[Phone] · [Email]\n[Website]\n\nUEI: [UEI]\nCAGE: [CAGE]\n' +
-      'NAICS: [primary NAICS]\n\nUse the vault identity values verbatim. For ANY field not in ' +
-      'the vault — name, title, phone, email, website — leave the literal [bracketed] ' +
-      'placeholder. NEVER invent a name, phone number, or email address. Target ~80 words.',
+      'Draft a Point of Contact block. Two parts:\n\n' +
+      '1) ONE short line addressing the response to the government POC IF the ' +
+      '"Government point of contact" block is present above — e.g. "Submitted to ' +
+      '[Gov POC name], [Gov POC email]." Use those exact values verbatim. If no ' +
+      'government POC was provided, omit this line entirely (do NOT invent one).\n\n' +
+      '2) The bidder\'s own contact block:\n\n[Full Name], [Title]\n[Company Name]\n' +
+      '[Phone] · [Email]\n[Website]\n\nUEI: [UEI]\nCAGE: [CAGE]\nNAICS: [primary NAICS]\n\n' +
+      'Use the vault identity values verbatim. For ANY bidder field not in the vault — ' +
+      'name, title, phone, email, website — leave the literal [bracketed] placeholder. ' +
+      'NEVER invent a name, phone number, or email address. Target ~80 words.',
     antiPatterns: [
       'turning the POC block into a paragraph',
       'omitting UEI / CAGE / NAICS',

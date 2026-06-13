@@ -22,6 +22,7 @@
  */
 
 import { generateV2Draft } from './v2';
+import type { NoticePocSet } from './notice-poc';
 import { getSectionMeta } from './sections';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
 import { isCapStatementSection, type SectionType, type DraftResult } from './types';
@@ -38,6 +39,8 @@ export interface DraftAllOpts {
   rfpAgency?: string | null;
   /** Which sections to draft. Defaults to all 5 RFP sections. */
   sectionTypes?: SectionType[];
+  /** Government POC from the SAM notice (raw_data.pointOfContact). */
+  noticePoc?: NoticePocSet | null;
 }
 
 export interface DraftAllResult {
@@ -183,6 +186,7 @@ async function renderSectionsInBatches(
           sourceText: augmentedSource,
           fileName: opts.fileName,
           rfpAgency: opts.rfpAgency,
+          noticePoc: opts.noticePoc,
         });
       })
     );

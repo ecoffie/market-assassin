@@ -23,6 +23,8 @@ import { buildAgencyContext, formatAgencyContextForPrompt } from './agency-conte
 import { pickLens } from './lenses';
 import { getSectionMeta } from './sections';
 import { humanizeProposalDraft } from './humanize';
+import { guardFacts } from './fact-guard';
+import { formatNoticePocForPrompt, noticePocGroundingText, type NoticePocSet } from './notice-poc';
 import { isCapStatementSection, type SectionType, type BuiltPrompt, type DraftResult } from './types';
 import { buildTemplateCorpusQuery, getTemplateCorpusDocTypes } from './template-corpus';
 
@@ -40,8 +42,9 @@ export async function buildV2Prompt(opts: {
   sourceText: string;
   rfpAgency?: string | null;
   lensSeed?: number;  // for deterministic A/B testing
+  noticePoc?: NoticePocSet | null;  // government POC from the SAM notice
 }): Promise<BuiltPrompt> {
-  const { email, sectionType, sourceText, rfpAgency, lensSeed } = opts;
+  const { email, sectionType, sourceText, rfpAgency, lensSeed, noticePoc } = opts;
   const sectionMeta = getSectionMeta(sectionType);
   const isCapStmt = isCapStatementSection(sectionType);
 
@@ -131,6 +134,12 @@ General rules:
     parts.push(`### Lens for THIS draft\n${lens.framing}\n\n(Use this framing. A different lens may be used on a future run to produce a different framing — this is intentional.)`);
   }
 
+  // Government POC from the SAM notice (the contracting officer the response
+  // is submitted to). Lets POC / cover-letter sections address a REAL name
+  // instead of generic boilerplate — the lowest-scoring section in the eval.
+  const noticePocBlock = noticePoc ? formatNoticePocForPrompt(noticePoc) : '';
+  if (noticePocBlock) parts.push(noticePocBlock);
+
   parts.push(`### Section to draft: ${sectionMeta.label}\n${sectionMeta.basePrompt}`);
 
   parts.push(`### Source solicitation${opts ? '' : ''}\n--- SOURCE TEXT (${inputText.length.toLocaleString()} chars${wasTruncated ? ', truncated' : ''}) ---\n${inputText}`);
@@ -161,6 +170,7 @@ export async function generateV2Draft(opts: {
   fileName?: string;
   rfpAgency?: string | null;
   lensSeed?: number;
+  noticePoc?: NoticePocSet | null;  // government POC from the SAM notice
 }): Promise<DraftResult> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error('GROQ_API_KEY not configured');
@@ -184,12 +194,30 @@ export async function generateV2Draft(opts: {
 
   // ---- Humanization pass ----
   const { text: humanizedDraft } = humanizeProposalDraft(rawDraft);
-  const wordCount = humanizedDraft.split(/\s+/).filter(Boolean).length;
+
+  // ---- Fact-guard (deterministic anti-fabrication backstop) ----
+  // Prompt rules reduce invented facts but don't guarantee zero. Verify every
+  // number/$/%/count/email/phone/ref against the vault + the source notice;
+  // neutralize ungrounded ones to [placeholders] so a hallucinated "95%
+  // satisfaction" / "$1.2B" / fake POC can't reach the user as if it were real.
+  // (Memory: proposal_offline_eval_harness, ground_in_real_data.)
+  const grounding = [
+    formatProfileForPrompt(built.context.profile),
+    formatVaultForPrompt(built.context.vault),
+    opts.sourceText,
+    // The government POC (name/email/phone from the SAM notice) is REAL — add
+    // it to the haystack so the guard treats it as verified, not a fabricated
+    // contact to strip. raw_data POC names often aren't in the body text.
+    opts.noticePoc ? noticePocGroundingText(opts.noticePoc) : '',
+  ].filter(Boolean).join('\n');
+  const guard = guardFacts(humanizedDraft, grounding, { sanitize: true });
+  const finalDraft = guard.text;
+  const wordCount = finalDraft.split(/\s+/).filter(Boolean).length;
 
   return {
     section: opts.sectionType,
     label: sectionMeta.label,
-    draft: humanizedDraft,
+    draft: finalDraft,
     wordCount,
     targetWords: sectionMeta.targetWords,
     meta: {
@@ -211,6 +239,11 @@ export async function generateV2Draft(opts: {
       painPointsUsed: built.context.agency.painPoints.length,
       lensId: built.context.lens?.id || null,
       humanized: true,
+      // Fact-guard: how many ungrounded facts were caught + neutralized. >0
+      // means the model tried to invent something the guard replaced with a
+      // [placeholder]; the UI can surface "N unverified facts removed".
+      factGuardFlags: guard.unverified.length,
+      factGuardRemoved: guard.unverified.map(f => f.value).slice(0, 10),
     },
   };
 }

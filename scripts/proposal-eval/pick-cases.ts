@@ -22,8 +22,15 @@ import { isDescriptionLink, fetchNoticeDescription } from '../../src/lib/sam/not
 
 const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 const SAM_API_KEY = process.env.SAM_API_KEY || '';
-const TARGET = parseInt(process.env.N || '15', 10);
+const TARGET = parseInt(process.env.N || '18', 10);
 const MIN_BODY = 400;
+
+// Match the test set to the bidder's REAL capabilities (GOVCON GIANTS = 541611
+// consulting/training). Tuning against domains the vault can't do (knee
+// instruments, fuel storage) penalizes the model for a bad test fit, not the
+// prompt. Set NAICS_MATCH=0 to go back to a blind spread.
+const VAULT_NAICS = (process.env.VAULT_NAICS || '541611,541612,541613,541618,541690,611430,813410,813910').split(',');
+const NAICS_MATCH = process.env.NAICS_MATCH !== '0';
 
 // How a notice type maps to the section set Proposal Assist would draft.
 // LOI/response set for market-research notices; full RFP set for solicitations.
@@ -85,12 +92,13 @@ async function main() {
 
   for (const nt of wantedTypes) {
     if (cases.length >= TARGET) break;
-    const { data, error } = await sb
+    let q = sb
       .from('sam_opportunities')
       .select('notice_id, notice_type, naics_code, title, description, sow_text, raw_data')
       .eq('notice_type', nt)
-      .not('description', 'is', null)
-      .limit(150);
+      .not('description', 'is', null);
+    if (NAICS_MATCH) q = q.in('naics_code', VAULT_NAICS);
+    const { data, error } = await q.limit(150);
     if (error) {
       console.warn(`[pick] ${nt}: ${error.message}`);
       continue;
@@ -99,9 +107,10 @@ async function main() {
     for (const row of data || []) {
       if (cases.length >= TARGET || addedForType >= perType) break;
       if (!row.notice_id || !row.title) continue;
-      // Prefer NAICS diversity — skip a 2nd of the same code unless we're short.
+      // Prefer NAICS diversity — but only in blind-spread mode. In NAICS_MATCH
+      // mode we WANT multiple notices per the vault's codes (few codes match).
       const naics = row.naics_code || null;
-      if (naics && seenNaics.has(naics) && cases.length < TARGET - 3) continue;
+      if (!NAICS_MATCH && naics && seenNaics.has(naics) && cases.length < TARGET - 3) continue;
 
       const body = await resolveBody(row);
       if (body.length < MIN_BODY) continue;

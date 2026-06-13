@@ -18,6 +18,7 @@ import { join } from 'path';
 import { generateAllSections } from '../../src/lib/proposal/draft-all';
 import type { SectionType } from '../../src/lib/proposal/types';
 import { loadNoticeBody, LOI_SECTIONS, RFP_SECTIONS } from './lib';
+import { noticePocGroundingText } from '../../src/lib/proposal/notice-poc';
 
 const CONCURRENCY = parseInt(process.env.CONCURRENCY || '2', 10);
 
@@ -51,10 +52,11 @@ async function main() {
   console.log(`Drafting ${cases.length} cases for vault ${vaultEmail} (concurrency ${CONCURRENCY})...`);
 
   const results = await pool(cases, CONCURRENCY, async (c, i) => {
-    const { title, body } = await loadNoticeBody(c.notice_id);
+    const { title, body, poc } = await loadNoticeBody(c.notice_id);
+    const pocText = noticePocGroundingText(poc);
     if (body.length < 200) {
       console.log(`  [${i + 1}/${cases.length}] ${c.label} — SKIP (no body)`);
-      return { ...c, title, body, sections: [], errors: [{ sectionType: 'n/a', error: 'no body text' }], ms: 0 };
+      return { ...c, title, body, pocText, sections: [], errors: [{ sectionType: 'n/a', error: 'no body text' }], ms: 0 };
     }
     const sectionTypes = (c.sectionSet === 'loi' ? LOI_SECTIONS : RFP_SECTIONS) as unknown as SectionType[];
     const t0 = Date.now();
@@ -64,19 +66,21 @@ async function main() {
         sourceText: body,
         fileName: `${title} — notice text`,
         sectionTypes,
+        noticePoc: poc,
       });
-      console.log(`  [${i + 1}/${cases.length}] ${c.label} — ${res.sections.length} sections, ${res.errors.length} errors, ${Date.now() - t0}ms`);
+      console.log(`  [${i + 1}/${cases.length}] ${c.label} — ${res.sections.length} sections, ${res.errors.length} errors, ${poc.all.length} POC, ${Date.now() - t0}ms`);
       return {
         ...c,
         title,
         body,
+        pocText,
         sections: res.sections.map(s => ({ section: s.section, label: s.label, draft: s.draft, wordCount: s.wordCount, provider: s.meta?.model })),
         errors: res.errors,
         ms: Date.now() - t0,
       };
     } catch (e) {
       console.log(`  [${i + 1}/${cases.length}] ${c.label} — FAILED: ${e instanceof Error ? e.message : String(e)}`);
-      return { ...c, title, body, sections: [], errors: [{ sectionType: 'all', error: String(e) }], ms: Date.now() - t0 };
+      return { ...c, title, body, pocText, sections: [], errors: [{ sectionType: 'all', error: String(e) }], ms: Date.now() - t0 };
     }
   });
 

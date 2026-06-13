@@ -1,0 +1,149 @@
+{
+  "vaultEmail": "eric@govcongiants.com",
+  "cases": [
+    {
+      "notice_id": "8cab440ca4824560b8a290994a6ce15a",
+      "label": "Sources Sought Notice For Acquisition & Systems Engineering Support",
+      "notice_type": "Sources Sought",
+      "naics": "541611",
+      "sectionSet": "loi",
+      "bodyChars": 16572
+    },
+    {
+      "notice_id": "31c0141b0083427b99cf23c8354b62fa",
+      "label": "Credentialing Verification Sources Sought",
+      "notice_type": "Sources Sought",
+      "naics": "541611",
+      "sectionSet": "loi",
+      "bodyChars": 40042
+    },
+    {
+      "notice_id": "5db977c5a6814af488cd560d3d0ca461",
+      "label": "Request for Information (RFI) for Program Management Support Services ",
+      "notice_type": "Sources Sought",
+      "naics": "541611",
+      "sectionSet": "loi",
+      "bodyChars": 22787
+    },
+    {
+      "notice_id": "81a69e70dc5f49e09106b784738b0f2e",
+      "label": "GME Institutional Coordinator",
+      "notice_type": "Sources Sought",
+      "naics": "541611",
+      "sectionSet": "loi",
+      "bodyChars": 10136
+    },
+    {
+      "notice_id": "32f6162f2989452fbc6aa66f1a5dc488",
+      "label": "Operation Support Services",
+      "notice_type": "Sources Sought",
+      "naics": "541611",
+      "sectionSet": "loi",
+      "bodyChars": 24460
+    },
+    {
+      "notice_id": "87af072821ab4b8ba6b73844e5aea1b0",
+      "label": "Business Operations Specialist Support",
+      "notice_type": "Sources Sought",
+      "naics": "541611",
+      "sectionSet": "loi",
+      "bodyChars": 12590
+    },
+    {
+      "notice_id": "289ce624e9b540819e6333e0abddac3c",
+      "label": "INL Haiti: Tactical Operations in Urban Terrain Training",
+      "notice_type": "Combined Synopsis/Solicitation",
+      "naics": "541611",
+      "sectionSet": "rfp",
+      "bodyChars": 40058
+    },
+    {
+      "notice_id": "99a32eb52a934483b627ff21e7021f2d",
+      "label": "2: 2026 POWER Forum - Cohort Two",
+      "notice_type": "Combined Synopsis/Solicitation",
+      "naics": "541611",
+      "sectionSet": "rfp",
+      "bodyChars": 1096
+    },
+    {
+      "notice_id": "4a5ca01e00ad4bfc8d70c3320af799ff",
+      "label": "Defense Travel System (DTS) Administration and Technical Support",
+      "notice_type": "Combined Synopsis/Solicitation",
+      "naics": "541611",
+      "sectionSet": "rfp",
+      "bodyChars": 40066
+    },
+    {
+      "notice_id": "2a5590a171bd443e8c240cb1918a9850",
+      "label": "DLA Transportation Process Support",
+      "notice_type": "Combined Synopsis/Solicitation",
+      "naics": "541611",
+      "sectionSet": "rfp",
+      "bodyChars": 40036
+    },
+    {
+      "notice_id": "548713b75e9a4f2c94545856b564060e",
+      "label": "INL Haiti: Tactical Operations in Urban Terrain Training",
+      "notice_type": "Combined Synopsis/Solicitation",
+      "naics": "541611",
+      "sectionSet": "rfp",
+      "bodyChars": 40058
+    },
+    {
+      "notice_id": "647fb1eda5e54e44aac7987b5618c25c",
+      "label": "Technical Advisory Support Services: Transition of Food for Peace  to ",
+      "notice_type": "Combined Synopsis/Solicitation",
+      "naics": "541611",
+      "sectionSet": "rfp",
+      "bodyChars": 19920
+    },
+    {
+      "notice_id": "d733c8e5f895480daae5cebcee548609",
+      "label": "Records Administration and Management Services",
+      "notice_type": "Solicitation",
+      "naics": "541611",
+      "sectionSet": "rfp",
+      "bodyChars": 1703
+    },
+    {
+      "notice_id": "84a0f510cb52403c8708a8290e56fac2",
+      "label": "DC3 SETA Follow on Systems Engineering and Technical Assistance (SETA)",
+      "notice_type": "Solicitation",
+      "naics": "541611",
+      "sectionSet": "rfp",
+      "bodyChars": 1703
+    },
+    {
+      "notice_id": "c4bd900eec7843888ef823b58b89243b",
+      "label": "DC3 SETA Follow on Systems Engineering and Technical Assistance (SETA)",
+      "notice_type": "Solicitation",
+      "naics": "541611",
+      "sectionSet": "rfp",
+      "bodyChars": 2317
+    },
+    {
+      "notice_id": "9f49f2450422411f9e11626c8fa25e8c",
+      "label": "HRO Manpower/Advanced Data Analytics Integrator Jun 03,",
+      "notice_type": "Solicitation",
+      "naics": "541611",
+      "sectionSet": "rfp",
+      "bodyChars": 15949
+    },
+    {
+      "notice_id": "d3b8fabc529f4385b8748987c5eacc14",
+      "label": "Endor on-site film digitization, information technology (IT) support, ",
+      "notice_type": "Solicitation",
+      "naics": "541611",
+      "sectionSet": "rfp",
+      "bodyChars": 38644
+    },
+    {
+      "notice_id": "7bb03354008f421e9d8bd63fd95de853",
+      "label": "Endor on-site film digitization, information technology (IT) support, ",
+      "notice_type": "Solicitation",
+      "naics": "541611",
+      "sectionSet": "rfp",
+      "bodyChars": 38222
+    }
+  ]
+}

@@ -1281,3 +1281,33 @@ multi-client. Prevents Pro self-serve from undercutting the Teams SKU.
 `/api/access/check` returns `coachMode.allowed`. Teams tier from `MI-SAAS-PRICING-STRATEGY.md`
 ($499/mo, 5 seats).
 
+
+---
+
+## Proposal Assist: Real Contracting-Officer POC + Deterministic Anti-Fabrication Guard (June 13, 2026)
+
+**What:** When Proposal Assist drafts a Sources Sought / RFI / LOI response, the
+Point of Contact section now addresses the **real government contracting officer
+by name** — "Submitted to Righthero Phillips, righthero.phillips@ssp.navy.mil" —
+pulled straight from the SAM notice, not invented. Backing it: a deterministic
+**fact-guard** that scans every generated draft for numbers, dollars, percentages,
+emails, phones, and contract references, and neutralizes any that don't trace back
+to the bidder's vault or the source notice — so a hallucinated "95% satisfaction"
+or fake POC can never reach the user as if it were real.
+
+**Why:** Our offline eval (drafting against real SAM notices + a real vault) showed
+the Point of Contact section scoring worst — generic and unanchored — because the
+draft never saw the government's actual POC. SAM stores it structured
+(`raw_data.pointOfContact`), but it rarely appears in the notice body text the model
+read. Surfacing it lifts the section and, more importantly, lets a response be
+correctly addressed to the person who will read it.
+
+**SEO:** federal proposal point of contact, who to address a sources sought response
+to, contracting officer SAM.gov, AI proposal writing no hallucination, RFI response
+contact block.
+
+**Proof:** `src/lib/proposal/notice-poc.ts` (POC extraction) +
+`src/lib/proposal/fact-guard.ts` (deterministic grounding check, shared with the
+offline scorer `scripts/proposal-eval/score.ts`). Live eval, 4 Sources Sought / RFI
+cases: every POC section addressed the real CO (Righthero Phillips / Mariah Gambino /
+Miranda V. Smith / Chris Ryssa Nix), **0 fabrications**, worst-case score 65→75.
