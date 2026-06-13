@@ -732,7 +732,16 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   // Content Reaper pattern #2 — outline + parallel write. Takes
   // ~30-60s total instead of 5+ minutes of sequential clicks.
   const generateAllDrafts = useCallback(async () => {
-    if (!email || !uploadedRfp) return;
+    if (!email) return;
+    // Be HONEST when there's no source text instead of dead-clicking
+    // (Eric QC 2026-06-13: "click, nothing happens"). The notice-body
+    // fallback in /api/app/proposal/pursuit-docs should populate uploadedRfp
+    // for Sources Sought notices with no attachments, but if it's still
+    // empty, tell the user what to do rather than silently returning.
+    if (!uploadedRfp || !uploadedRfp.text?.trim()) {
+      setDraftError('No notice text loaded yet. Paste the SAM notice text or upload the solicitation below, then draft.');
+      return;
+    }
     setDraftAllLoading(true);
     setDraftError(null);
     setDraftAllSummary(null);
@@ -1810,6 +1819,15 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             >
               {exporting ? 'Assembling…' : '✨ Build my RFQ response'}
             </button>
+          )}
+
+          {/* Surface draft errors HERE in the hero card — the other draftError
+              render is below the fold behind "More options", so a hero-button
+              failure was invisible (Eric QC 2026-06-13: "click, nothing happens"). */}
+          {draftError && !draftAllLoading && (
+            <p className="mt-4 text-sm text-rose-300 bg-rose-500/10 border border-rose-500/30 rounded-lg px-4 py-3">
+              {draftError}
+            </p>
           )}
 
           {draftAllSummary && !draftAllLoading && !isRfqMode && (

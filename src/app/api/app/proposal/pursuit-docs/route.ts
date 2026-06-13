@@ -19,6 +19,7 @@ import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { fetchPursuitDocsAuto } from '@/lib/grants/fetch-grant-docs';
 import { ensureWorkspaceMember } from '@/lib/app/workspace';
 import { isValidSamNoticeId } from '@/lib/sam/utils';
+import { fetchNoticeDescription, isDescriptionLink } from '@/lib/sam/notice-description';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -159,6 +160,92 @@ export async function GET(request: NextRequest) {
       { success: false, error: docsErr.message },
       { status: 500 }
     );
+  }
+
+  // NOTICE-BODY FALLBACK (2026-06-13). Sources Sought / RFI notices usually
+  // have NO downloadable attachments — the requirement lives in the notice
+  // BODY (sam_opportunities.description / sow_text), not a PDF. Without this,
+  // such a pursuit reaches Proposal Assist with zero source text: the
+  // "Draft my response" card still shows (template-without-source mode), but
+  // generateAllDrafts bails on the missing uploadedRfp and the click does
+  // NOTHING (Eric QC 2026-06-13: "click, nothing happens"). When no attachment
+  // has extractable text, synthesize one document from the cached notice body
+  // so drafting always has source text. (Memory: sources_sought_loi_prefill.)
+  const docList = (docs || []) as Array<{ extracted_text?: string | null }>;
+  const hasExtractableDoc = docList.some(d => (d.extracted_text || '').trim().length >= 80);
+
+  if (!hasExtractableDoc && isValidSamNoticeId(pipelineRow.notice_id)) {
+    try {
+      const { data: samRow } = await supabase
+        .from('sam_opportunities')
+        .select('title, description, sow_text, description_url, raw_data')
+        .eq('notice_id', pipelineRow.notice_id)
+        .maybeSingle();
+
+      const sow = typeof samRow?.sow_text === 'string' ? samRow.sow_text.trim() : '';
+      let desc = typeof samRow?.description === 'string' ? samRow.description.trim() : '';
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rawData = (samRow?.raw_data || {}) as any;
+      const rawDesc = typeof rawData.description === 'string' ? rawData.description.trim() : '';
+
+      // description may still be a noticedesc LINK on older rows — resolve it.
+      const link = (desc && isDescriptionLink(desc) && desc)
+        || (rawDesc && isDescriptionLink(rawDesc) && rawDesc)
+        || (typeof samRow?.description_url === 'string' ? samRow.description_url : '');
+      if (desc && isDescriptionLink(desc)) desc = '';
+      if (!desc && rawDesc && !isDescriptionLink(rawDesc)) desc = rawDesc;
+      // Resolve a noticedesc LINK → text. Needs the SAM API key server-side
+      // (the local key 400s on noticedesc — see backfill-descriptions cron).
+      const samApiKey = process.env.SAM_API_KEY || '';
+      if (!desc && link && samApiKey) {
+        desc = (await fetchNoticeDescription(link, samApiKey).catch(() => '')) || '';
+      }
+
+      const body = [samRow?.title || pipelineRow.title, sow, desc]
+        .filter((p): p is string => Boolean(p && p.trim()))
+        .join('\n\n')
+        .trim();
+
+      if (body.length >= 80) {
+        const synthetic = {
+          id: `notice-body-${pipelineRow.notice_id}`,
+          sam_file_id: null,
+          sam_url: link || null,
+          filename: `${(samRow?.title || pipelineRow.title || 'SAM notice').slice(0, 80)} — notice text`,
+          mime_type: 'text/plain',
+          size_bytes: Buffer.byteLength(body, 'utf8'),
+          page_count: null,
+          char_count: body.length,
+          extracted_text: body,
+          doc_kind: 'notice_body',
+          doc_kind_confidence: 1,
+          storage_path: null,
+          downloaded_at: pipelineRow.docs_fetched_at || pipelineRow.updated_at || null,
+          extraction_error: null,
+        };
+        return NextResponse.json({
+          success: true,
+          pursuit: {
+            id: pipelineRow.id,
+            title: pipelineRow.title,
+            agency: pipelineRow.agency,
+            notice_id: pipelineRow.notice_id,
+            naics_code: pipelineRow.naics_code,
+            set_aside: pipelineRow.set_aside,
+            response_deadline: pipelineRow.response_deadline,
+            // We DO have usable source text now → stop showing "no attachments".
+            docs_status: 'loaded',
+            docs_count: (docs || []).length + 1,
+            docs_fetched_at: pipelineRow.docs_fetched_at,
+            source: 'notice_body',
+          },
+          documents: [...(docs || []), synthetic],
+        });
+      }
+    } catch (err) {
+      console.warn('[pursuit-docs] notice-body fallback failed:', err);
+      // Non-fatal — fall through to the normal (possibly empty) response.
+    }
   }
 
   return NextResponse.json({

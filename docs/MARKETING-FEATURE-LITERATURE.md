@@ -1198,3 +1198,28 @@ on hidden description field. Gate now matches email promise ("add keywords").
 keyword save (`keytransportationsolutions@gmail.com`). Gate change clears users like
 `joanne.horowitz@xerox.com` (15 keywords, no description) from repeat red-banner CTAs.
 
+
+---
+
+## 36. Proposal Assist drafts from the notice body (Sources Sought fix, June 2026)
+
+**What:** "Draft my response" in Proposal Assist now works for Sources Sought / RFI
+pursuits that have **no downloadable attachments**. When a SAM notice ships its
+requirement in the notice BODY (not a PDF), Mindy now loads that body text
+(`sam_opportunities.sow_text` / `description`, resolving the noticedesc link when
+needed) as the source so the one-click draft always has something to work from.
+
+**Why:** A Sources Sought notice usually has no attached files — the requirement is
+the notice text itself. Previously the "Draft my response" card appeared (template
+mode) but the button did **nothing** on click, because the draft handler required an
+uploaded/attached document. Now the body text auto-loads, and if it genuinely can't,
+the button gives an honest message ("paste or upload the notice") instead of dead-
+clicking.
+
+**SEO:** N/A (in-app drafting reliability)
+
+**Proof:** `src/app/api/app/proposal/pursuit-docs/route.ts` — notice-body fallback
+synthesizes a document from `sam_opportunities` when no attachment has extractable
+text. Verified body text exists for live notices (e.g. notice `ba697ef3…`, 11,247
+chars). Client (`ProposalsPanel.tsx`) surfaces draft errors in the hero card and no
+longer returns silently on missing source.
