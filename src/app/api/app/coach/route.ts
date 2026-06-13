@@ -58,7 +58,7 @@ async function seedClientProfile(
       user_email: clientEmail,
       agency_name: a.name,
       set_aside_spending: a.amount,
-      status: 'researching',
+      status: 'targeting',
       added_from: 'capability_text_seed',
       source_naics: naics.join(','),
     }));

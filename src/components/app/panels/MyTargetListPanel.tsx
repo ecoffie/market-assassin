@@ -134,7 +134,9 @@ export default function MyTargetListPanel({
       return;
     }
     try {
-      const res = await fetch(`/api/app/target-list?email=${encodeURIComponent(email)}`);
+      const res = await fetch(`/api/app/target-list?email=${encodeURIComponent(email)}`, {
+        headers: getMIApiHeaders(email),
+      });
       const data = await res.json();
       if (!data?.success) {
         setError(data?.error || 'Failed to load your target list');
@@ -188,7 +190,7 @@ export default function MyTargetListPanel({
     try {
       const res = await fetch('/api/app/target-list', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
         body: JSON.stringify({
           user_email: email,
           agency_name: parent || name,
@@ -248,7 +250,7 @@ export default function MyTargetListPanel({
     try {
       const res = await fetch('/api/app/discover-events', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
         body: JSON.stringify({ email, target_id: target.id }),
       });
       const data = await res.json().catch(() => null);
@@ -310,7 +312,7 @@ export default function MyTargetListPanel({
     try {
       const res = await fetch('/api/app/target-list', {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
         body: JSON.stringify({ id, user_email: email, ...changes }),
       });
       const data = await res.json();
@@ -381,7 +383,7 @@ export default function MyTargetListPanel({
     try {
       const res = await fetch('/api/app/target-list', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
         body: JSON.stringify({ id, user_email: email }),
       });
       if (!res.ok) {
@@ -410,7 +412,7 @@ export default function MyTargetListPanel({
               void _omitId; void _omitEmail;
               const restore = await fetch('/api/app/target-list', {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
+                headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
                 body: JSON.stringify({ ...rest, user_email: email }),
               });
               const r = await restore.json();
@@ -1571,7 +1573,7 @@ function OutreachLog({
     try {
       const res = await fetch('/api/app/target-outreach', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
         body: JSON.stringify({
           target_id: targetId,
           user_email: email,
@@ -1616,7 +1618,7 @@ function OutreachLog({
     try {
       const res = await fetch('/api/app/target-outreach', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
         body: JSON.stringify({ id, user_email: email }),
       });
       if (!res.ok) {
