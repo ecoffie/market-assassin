@@ -202,6 +202,17 @@ export async function GET(request: NextRequest) {
         desc = (await fetchNoticeDescription(link, samApiKey).catch(() => '')) || '';
       }
 
+      // LIVE SAM fetch — final tier. The notice may not be in our cache at all
+      // (older than the sync window, or an agency/type we don't ingest — e.g. a
+      // DoD construction Sources Sought). The pursuit still carries the
+      // notice_id (the "Verify on SAM.gov" link proves it), so pull the
+      // description straight from SAM by ID. fetchNoticeDescription builds the
+      // noticedesc URL from a bare notice_id. (Eric QC 2026-06-13: Cape Cod
+      // SFS well Sources Sought wasn't cached → fallback was empty → dead end.)
+      if (!sow && !desc && samApiKey) {
+        desc = (await fetchNoticeDescription(pipelineRow.notice_id, samApiKey).catch(() => '')) || '';
+      }
+
       const body = [samRow?.title || pipelineRow.title, sow, desc]
         .filter((p): p is string => Boolean(p && p.trim()))
         .join('\n\n')
