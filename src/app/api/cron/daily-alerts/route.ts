@@ -13,6 +13,8 @@ import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
 import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
 import nodemailer from 'nodemailer';
 import Anthropic from '@anthropic-ai/sdk';
+import { getCapabilityVector } from '@/lib/alerts/capability-vector';
+import { fetchHiddenMatchPool, findHiddenMatches, type HiddenMatch } from '@/lib/alerts/hidden-match';
 import {
   IntelligenceMetrics,
   logIntelligenceDelivery,
@@ -777,6 +779,33 @@ async function runDailyAlertJob(options?: {
           user.business_type || undefined
         );
 
+        // 💡 HIDDEN MATCH (Phase 3 semantic alerts) — opps whose SOW matches the
+        // user's CAPABILITIES but that NAICS/keyword search missed. Gated + off by
+        // default; skips cleanly if not eligible / no cached vector / nothing clears
+        // the conservative threshold. Never throws into the send path.
+        let hiddenMatches: HiddenMatch[] = [];
+        try {
+          if (
+            process.env.ENABLE_HIDDEN_MATCH === 'true' &&
+            userInRollout(user.user_email, Number(process.env.HIDDEN_MATCH_ROLLOUT_PERCENT || '0'), 'hidden-match-v1')
+          ) {
+            const userVec = await getCapabilityVector(user.user_email);
+            if (userVec) {
+              const pool = await fetchHiddenMatchPool();
+              // Exclude everything they already got: recent sends + this email's results.
+              const excluded = new Set<string>(recentlySentIds);
+              for (const o of scoredOpps) if (o.noticeId) excluded.add(o.noticeId);
+              for (const o of allActiveOpportunities) if (o.noticeId) excluded.add(o.noticeId);
+              hiddenMatches = findHiddenMatches(userVec, excluded, pool);
+              if (hiddenMatches.length) {
+                console.log(`[hidden-match] ${user.user_email}: ${hiddenMatches.length} shown, top=${hiddenMatches[0].score}`);
+              }
+            }
+          }
+        } catch (hmErr) {
+          console.warn('[hidden-match] non-fatal', user.user_email, hmErr instanceof Error ? hmErr.message : hmErr);
+        }
+
         // Send email - now includes all active opportunities for deadline tracking and action tips
         try {
           metrics.recordEmailAttempted();
@@ -787,7 +816,8 @@ async function runDailyAlertJob(options?: {
             scoredGrants,
             allActiveOpportunities,
             actionTips,
-            noticeSummary
+            noticeSummary,
+            hiddenMatches
           );
 
           // Track successful send
@@ -809,15 +839,27 @@ async function runDailyAlertJob(options?: {
             email: user.user_email,
             alertType: 'daily',
             opportunitiesCount: scoredOpps.length,
-            opportunitiesData: scoredOpps.slice(0, 20).map(o => ({
-              noticeId: o.noticeId,
-              title: o.title,
-              agency: o.department,
-              naics: o.naicsCode,
-              deadline: o.responseDeadline,
-              score: o.score,
-              repeatFallback: usedRepeatFallback || undefined,
-            })),
+            opportunitiesData: [
+              ...scoredOpps.slice(0, 20).map(o => ({
+                noticeId: o.noticeId,
+                title: o.title,
+                agency: o.department,
+                naics: o.naicsCode,
+                deadline: o.responseDeadline,
+                score: o.score,
+                repeatFallback: usedRepeatFallback || undefined,
+              })),
+              // 💡 Hidden matches appended with a flag so the Source Feed can badge them.
+              ...hiddenMatches.map(m => ({
+                noticeId: m.noticeId,
+                title: m.title,
+                agency: m.agency,
+                naics: m.naics,
+                deadline: m.deadline,
+                score: m.score,
+                hiddenMatch: true,
+              })),
+            ],
             currentTotalAlertsSent: (user as any).total_alerts_sent,
           });
 
@@ -1175,7 +1217,7 @@ async function sendFixtureDailyAlertTest(toEmail: string) {
     );
   }
 
-  const sent = await sendDailyAlertEmail(toEmail, opportunities, fixtureUser, [], [], [], undefined, {
+  const sent = await sendDailyAlertEmail(toEmail, opportunities, fixtureUser, [], [], [], undefined, [], {
     transactional: true,
   });
   if (!sent) {
@@ -1208,6 +1250,7 @@ async function sendDailyAlertEmail(
   allActiveOpportunities: SAMOpportunity[] = [],
   actionTips: string[] = [],
   noticeSummary?: SAMNoticeSummary,
+  hiddenMatches: HiddenMatch[] = [],
   sendOptions?: { transactional?: boolean },
 ): Promise<boolean> {
   const emailDate = new Date().toISOString().split('T')[0];
@@ -1320,6 +1363,41 @@ async function sendDailyAlertEmail(
     : null;
   const mindyInsightHtml = renderInsightHtml(mindyInsight);
 
+  // 💡 Hidden match section — opps matched to capabilities, NOT NAICS codes. Honest
+  // label. Each link carries a distinct `hidden_match_<id>` content tag for CTR
+  // measurement. Omitted entirely when there are none (no noise).
+  const escHtml = (s: string) => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  const hiddenMatchHtml = hiddenMatches.length > 0 ? `
+  <div style="margin-top: 24px;">
+    <div style="background: linear-gradient(135deg, #7c3aed 0%, #2563eb 100%); padding: 16px 20px; border-radius: 12px 12px 0 0;">
+      <h2 style="color: white; margin: 0; font-size: 18px; font-weight: 700;">💡 Hidden match — your kind of work</h2>
+      <p style="color: #e9e3ff; margin: 4px 0 0 0; font-size: 13px;">Matched to your capabilities &amp; past performance — <b>not</b> your NAICS codes. Worth a look.</p>
+    </div>
+    <div style="background: #ffffff; border: 1px solid #ddd6fe; border-top: none; border-radius: 0 0 12px 12px;">
+      <table style="width: 100%; border-collapse: collapse;">
+        ${hiddenMatches.map((m) => {
+          const daysUntil = getDaysUntil(m.deadline || '');
+          const urgencyColor = daysUntil <= 7 ? '#dc2626' : daysUntil <= 14 ? '#d97706' : '#16a34a';
+          const link = trackedUrl(m.url, 'hidden_match_opportunity', `hidden_match_${m.noticeId}`);
+          return `
+            <tr>
+              <td style="padding: 14px 16px; border-bottom: 1px solid #ede9fe;">
+                <a href="${link}" style="color: #6d28d9; font-weight: 600; font-size: 14px; text-decoration: none;">${escHtml(m.title)}</a>
+                <div style="color: #64748b; font-size: 12px; margin-top: 4px;">
+                  ${escHtml(m.agency || 'Federal agency')}${m.naics ? ` · NAICS ${m.naics}` : ''}
+                  ${m.deadline ? ` · <span style="color: ${urgencyColor}; font-weight: 600;">${daysUntil <= 0 ? 'Due now' : `${daysUntil} days left`}</span>` : ''}
+                </div>
+              </td>
+            </tr>`;
+        }).join('')}
+      </table>
+      <div style="padding: 10px 16px; background: #faf5ff; text-align: center; border-top: 1px solid #ede9fe;">
+        <span style="color: #7c3aed; font-size: 12px;">Found by matching your capabilities to the actual scope of work — opportunities your codes would miss.</span>
+      </div>
+    </div>
+  </div>
+  ` : '';
+
   const htmlContent = `
 <!DOCTYPE html>
 <html>
@@ -1388,6 +1466,8 @@ async function sendDailyAlertEmail(
     </div>
   </div>
   `}
+
+  ${hiddenMatchHtml}
 
   ${grants.length > 0 ? `
   <!-- Grants Section -->

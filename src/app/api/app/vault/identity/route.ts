@@ -50,6 +50,9 @@ export async function PUT(request: NextRequest) {
   for (const k of WRITABLE_FIELDS) {
     if (k in profile) row[k] = profile[k];
   }
+  // Invalidate the cached capability vector — the meaning text may have changed;
+  // the embed-user-capabilities cron will re-embed. (No-op if the column is absent.)
+  row.capability_embedded_at = null;
 
   const { data, error } = await getSupabase()
     .from('user_identity_profile')

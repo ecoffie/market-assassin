@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
+import { invalidateCapabilityVector } from '@/lib/alerts/capability-vector';
 
 export const dynamic = 'force-dynamic';
 
@@ -43,6 +44,7 @@ export async function POST(request: NextRequest) {
   const row = { ...pick(entry), user_email: auth.email! };
   const { data, error } = await getSupabase().from('user_capabilities_library').insert(row).select().maybeSingle();
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  void invalidateCapabilityVector(auth.email!); // capability text changed → re-embed
   return NextResponse.json({ success: true, entry: data });
 }
 
@@ -55,5 +57,6 @@ export async function DELETE(request: NextRequest) {
   const { error } = await getSupabase().from('user_capabilities_library')
     .update({ archived_at: new Date().toISOString() }).eq('id', id).eq('user_email', auth.email!);
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  void invalidateCapabilityVector(auth.email!); // capability removed → re-embed
   return NextResponse.json({ success: true });
 }
