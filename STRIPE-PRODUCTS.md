@@ -52,21 +52,40 @@ Source of truth: `src/lib/products.ts`
 
 ---
 
+## Mindy Pro (getmindy.ai)
+
+| Product | Price | Checkout route | Stripe Payment Link |
+|---------|-------|----------------|----------------------|
+| Mindy Pro Monthly | $149/mo | `/checkout/mindy-pro-monthly` | `buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C` |
+| Mindy Pro Annual | $1,490/yr | `/checkout/mindy-pro-annual` | `buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D` |
+
+**Partner attribution:** Share `getmindy.ai/ncmbc` or `getmindy.ai/checkout/mindy-pro-monthly?ref=NCMBC` — never raw `buy.stripe.com` links (skips affiliate tracking).
+
+---
+
 ## Webhook Configuration
 
-**Endpoint:** `/api/stripe-webhook`
+**Endpoint (live):** `https://getmindy.ai/api/stripe-webhook`  
+**Stripe endpoint ID:** `we_1SlciyK5zyiZ50PBzCmDeI2K`
 
 ### Webhook Secrets
-- `STRIPE_WEBHOOK_SECRET` - Live webhook secret
+- `STRIPE_WEBHOOK_SECRET` - Live webhook secret (must match endpoint above in Vercel)
 - `STRIPE_TEST_WEBHOOK_SECRET` - Test webhook secret
 
 ### Events Handled
 
 | Event | Action |
 |-------|--------|
-| `checkout.session.completed` | Triple-write (Supabase + KV + email) |
+| `checkout.session.completed` | Triple-write (Supabase + KV + email) + **30% affiliate commission** (initial payment) |
+| `invoice.paid` | **30% affiliate commission** on subscription renewals (skips `subscription_create` — checkout already counted) |
 | `customer.subscription.deleted` | Revoke FHC/Alert Pro access |
 | `customer.subscription.updated` | Check for cancellation/past_due |
+
+### Affiliate payout tracking
+- Ledger: Vercel KV (`mindy:affiliate:*`)
+- Dashboard: Launch Command Center → Partner & Affiliate Programs
+- API: `GET /api/admin/partner-referrals?password=...&code=NCMBC`
+- Payouts: **manual** (no Stripe Connect / Rewardful yet)
 
 ### Triple-Write Flow
 
