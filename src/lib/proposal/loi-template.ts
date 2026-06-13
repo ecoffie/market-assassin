@@ -58,8 +58,9 @@ interface ReferenceProject {
   timeliness: string;
 }
 
-/** Build the labeled RELEVANT EXPERIENCE block from vault past performance. */
-function relevantExperienceBlock(vault: VaultContext | null | undefined): string {
+/** Build the labeled RELEVANT EXPERIENCE block from vault past performance.
+ *  Exported so Volume II (Past Performance) reuses the exact same format. */
+export function relevantExperienceBlock(vault: VaultContext | null | undefined): string {
   const rows = (vault?.past_performance || []).filter((p) => {
     const t = s((p as Record<string, unknown>).contract_title);
     // skip obvious empty/stub rows

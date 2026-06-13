@@ -1407,3 +1407,36 @@ Miami Wiipica Safety Plan, Poff VBA Accident Prevention Plan, CMPv2/v3; 100
 `contract_forms` chunks). `template-corpus.ts` now lists `proposal_subdoc` in the
 doc types retrieved for Technical/Management sections. First step of the deterministic
 IDIQ/MACC proposal-template build.
+
+---
+
+## Proposal Assist: Full 4-Volume IDIQ/MACC Proposal Skeleton (June 13, 2026)
+
+**What:** Mindy now generates the complete structure of a federal IDIQ / MACC
+construction proposal as a downloadable Word document — Volume I (Technical, broken
+into the Bonding / Safety / QCP / CMP subfactors with their full numbered
+sub-structure), Volume II (Past Performance), Volume III (Pricing), and Volume IV
+(Solicitation, Offer & Award / SF1442 / reps & certs). The skeleton is driven by
+the solicitation's own compliance matrix, pre-filled from the user's vault where we
+have real facts, and everywhere else carries an instructive labeled placeholder
+telling the user exactly what to write there.
+
+**Why:** Formatting a full multi-volume proposal — knowing it splits into volumes,
+that Volume I follows the RFP's evaluation subfactors, what a QCP or Accident
+Prevention Plan contains — is the single hardest thing for a small contractor, and
+exactly what the GovCon Giants database always provided: the proven format to copy,
+swap your specifics into, and submit. This brings that to a one-click export, with
+the structure derived from THIS solicitation rather than a generic template.
+
+**SEO:** IDIQ proposal template, MACC proposal format, 4-volume government proposal,
+how to structure a federal construction proposal, technical volume subfactors
+template, SF1442 reps and certs.
+
+**Proof:** `src/lib/proposal/proposal-package.ts` (`assembleProposalPackage`)
+assembles the four volumes from the compliance matrix + vault, reusing the Volume I
+technical template (`volume1-technical.ts`) and the LOI reference-project block for
+Volume II. Wired into `/api/app/proposal/export` as packageType `idiq_proposal`,
+rendered to .docx with per-volume page breaks. Verified: a real 4-volume Word
+document packs with the real bonding value ($15,000,000) filled and every subfactor
+present. Completes the deterministic IDIQ/MACC build (corpus → structure → Volume I
+→ full package).

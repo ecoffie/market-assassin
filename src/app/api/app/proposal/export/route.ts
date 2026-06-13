@@ -18,6 +18,8 @@ import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { createClient } from '@supabase/supabase-js';
 import type { LoiFields } from '@/lib/proposal/loi-fields';
 import { assembleLoiTemplate } from '@/lib/proposal/loi-template';
+import { assembleProposalPackage } from '@/lib/proposal/proposal-package';
+import type { ComplianceReq } from '@/lib/proposal/section-alignment';
 import type { VaultContext } from '@/lib/proposal/types';
 
 export const runtime = 'nodejs';
@@ -159,6 +161,33 @@ function renderLoiTemplateParagraphs(letter: string): Paragraph[] {
   return out;
 }
 
+// Render the deterministic 4-volume IDIQ package. Volumes are separated by a
+// form-feed (\f) marker → a page break. A line's leading numbering (1.0, 1.2,
+// 1.2.1) drives its heading weight so the numbered skeleton reads as a real
+// proposal; bracketed [placeholders] stay inline for the user to fill.
+function renderProposalPackageParagraphs(packageText: string): (Paragraph)[] {
+  const out: Paragraph[] = [];
+  const blocks = packageText.split('\f');
+  blocks.forEach((block, bi) => {
+    if (bi > 0) out.push(new Paragraph({ children: [new PageBreak()] }));
+    for (const raw of block.split('\n')) {
+      const line = raw.replace(/\s+$/, '');
+      const t = line.trim();
+      // Volume header (N.0) → big bold; section (N.M) → bold; sub (N.M.K) → bold-ish.
+      if (/^\d\.0\s/.test(t)) {
+        out.push(new Paragraph({ heading: HeadingLevel.HEADING_1, spacing: { before: 240, after: 120 }, children: [new TextRun({ text: t, bold: true })] }));
+      } else if (/^\d\.\d+\s/.test(t)) {
+        out.push(new Paragraph({ heading: HeadingLevel.HEADING_2, spacing: { before: 160, after: 60 }, children: [new TextRun({ text: t, bold: true })] }));
+      } else if (/^\d\.\d+\.\d+\s/.test(t)) {
+        out.push(new Paragraph({ spacing: { before: 80 }, children: [new TextRun({ text: line, bold: true })] }));
+      } else {
+        out.push(new Paragraph({ children: [new TextRun({ text: line })] }));
+      }
+    }
+  });
+  return out;
+}
+
 interface ComplianceRow {
   id: string;
   requirement: string;
@@ -186,7 +215,7 @@ interface ExportBody {
   drafts?: Record<string, DraftSection>;
   checklist?: ChecklistItem[];
   sectionOrder?: string[];
-  packageType?: 'proposal' | 'sources_sought_loi' | 'rfq_response';
+  packageType?: 'proposal' | 'sources_sought_loi' | 'rfq_response' | 'idiq_proposal';
   rfpFileName?: string;
   // Structured fields extracted from the SAM.gov notice text (Sources Sought /
   // RFI). When present, the LOI template pre-fills agency/address/solicitation/
@@ -629,6 +658,7 @@ export async function POST(request: NextRequest) {
   const sectionOrder = body.sectionOrder || ['exec_summary', 'technical', 'management', 'past_performance', 'pricing'];
   const isLoiPackage = body.packageType === 'sources_sought_loi';
   const isRfqPackage = body.packageType === 'rfq_response';
+  const isIdiqPackage = body.packageType === 'idiq_proposal';
   const isSimpleResponsePackage = isLoiPackage || isRfqPackage;
   // Reference line for the LOI. Prefer the parsed solicitation number; else the
   // source name with the synthetic "— notice text" suffix stripped (the
@@ -708,6 +738,54 @@ export async function POST(request: NextRequest) {
       headers: {
         'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
         'Content-Disposition': `attachment; filename="${loiFileName}"`,
+        'Cache-Control': 'no-store',
+      },
+    });
+  }
+
+  // IDIQ / MACC 4-volume proposal package (#7): the deterministic Volume I–IV
+  // skeleton — the format people can't structure themselves. Driven by the
+  // compliance matrix the caller already extracted (body.compliance); pre-filled
+  // from the vault; everything unknown is an instructive labeled [placeholder].
+  if (isIdiqPackage) {
+    const reqs: ComplianceReq[] = compliance.map((c) => ({
+      id: c.id,
+      requirement: c.requirement,
+      category: (c.category as ComplianceReq['category']) || 'other',
+      section: c.section,
+    }));
+    const idiqVault = await loadVaultForLoi(email).catch(() => ({ has_any: false } as VaultContext));
+    const pkg = assembleProposalPackage({ requirements: reqs, vault: idiqVault });
+
+    const idiqChildren: (Paragraph | Table)[] = [
+      new Paragraph({ heading: HeadingLevel.TITLE, alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'Proposal Package (IDIQ / MACC)', bold: true, size: 52 })] }),
+      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: rfpName, size: 28 })] }),
+      new Paragraph({ alignment: AlignmentType.CENTER, children: [new TextRun({ text: `Generated ${today} via Mindy`, italics: true, color: '666666' })] }),
+    ];
+    // Critical requirements up front (deadlines, mandatory plans/certs).
+    if (pkg.critical.length) {
+      idiqChildren.push(new Paragraph({ children: [new PageBreak()] }));
+      idiqChildren.push(heading('Critical Requirements — handle first'));
+      for (const r of pkg.critical) {
+        idiqChildren.push(new Paragraph({ children: [new TextRun({ text: `• ${r.section ? r.section + ' — ' : ''}${r.requirement}` })] }));
+      }
+    }
+    idiqChildren.push(new Paragraph({ children: [new PageBreak()] }));
+    idiqChildren.push(...renderProposalPackageParagraphs(pkg.text));
+
+    const idiqDoc = new Document({
+      creator: 'Mindy',
+      title: `Proposal Package — ${rfpName}`,
+      description: '4-volume IDIQ/MACC proposal skeleton generated by Mindy from the solicitation compliance matrix + your profile.',
+      sections: [{ children: idiqChildren }],
+    });
+    const idiqBuffer = await Packer.toBuffer(idiqDoc);
+    const idiqFileName = `${fileNameBase}-${new Date().toISOString().split('T')[0]}.docx`;
+    return new NextResponse(new Uint8Array(idiqBuffer), {
+      status: 200,
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+        'Content-Disposition': `attachment; filename="${idiqFileName}"`,
         'Cache-Control': 'no-store',
       },
     });
