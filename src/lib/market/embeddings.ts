@@ -16,15 +16,15 @@ export const RECOMPETE_SOW_POSSIBLE_THRESHOLD = parseFloat(
 );
 
 /**
- * "Hidden match" (Phase 3 semantic alerts) — a rich capability blob vs a full SOW
- * body. Both texts are long + on-topic, so scores run higher AND noisier than the
- * recompete title→SOW case; a wrong "matches your capabilities" claim in a daily
- * email erodes trust in the honest label, so this floor is CONSERVATIVE (> the
- * recompete-confident 0.52). Tune DOWN from telemetry only if precision holds.
+ * "Hidden match" (Phase 3 semantic alerts) — capability blob vs SOW body. MEASURED
+ * June 2026 against real profiles: similarity tops out ~0.50-0.51, p90 ~0.41,
+ * median ~0.37 — so 0.50 is the genuine STRONG TAIL of each user's distribution
+ * (0.55 made the feature never fire). Cap 2 so only the best 1-2 show. The honest
+ * "worth a look" label matches the actual quality (adjacent professional services).
  */
-export const HIDDEN_MATCH_THRESHOLD = parseFloat(process.env.HIDDEN_MATCH_THRESHOLD || '0.55');
+export const HIDDEN_MATCH_THRESHOLD = parseFloat(process.env.HIDDEN_MATCH_THRESHOLD || '0.50');
 /** Max hidden matches surfaced per alert (don't dilute the headline opps). */
-export const HIDDEN_MATCH_MAX = parseInt(process.env.HIDDEN_MATCH_MAX || '3', 10);
+export const HIDDEN_MATCH_MAX = parseInt(process.env.HIDDEN_MATCH_MAX || '2', 10);
 
 function sleep(ms: number) {
   return new Promise((r) => setTimeout(r, ms));
