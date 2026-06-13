@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionEnd": [
+      {
+        "command": ".cursor/hooks/auto-stash.sh",
+        "timeout": 15
+      }
+    ]
+  }
+}
