@@ -92,10 +92,12 @@ export function getTemplateCorpusDocTypes(sectionType: SectionType, sourceText: 
     return ['past_performance', 'technical_volume', 'cap_statement', 'proposal_template'];
   }
   if (sectionType === 'technical') {
-    return ['technical_volume', 'past_performance', 'cap_statement', 'proposal_template'];
+    // proposal_subdoc = the real QCP / Safety / Accident Prevention / CMP
+    // examples — the Volume I components a technical draft must mirror.
+    return ['technical_volume', 'proposal_subdoc', 'past_performance', 'cap_statement', 'proposal_template'];
   }
   if (sectionType === 'management') {
-    return ['management_volume', 'technical_volume', 'past_performance', 'proposal_template'];
+    return ['management_volume', 'proposal_subdoc', 'technical_volume', 'past_performance', 'proposal_template'];
   }
   if (sectionType === 'pricing') {
     return ['pricing_volume', 'rfq_response', 'technical_volume', 'proposal_template'];

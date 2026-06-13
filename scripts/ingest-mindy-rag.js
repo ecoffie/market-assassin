@@ -171,12 +171,26 @@ function classifyDocType(filePath, filename) {
     n.includes('quote proposal') ||
     (hasResponseIntent(n) && (n.includes('rfq') || n.includes('request for quotation')))
   ) return 'rfq_response';
-  if (n.includes('technical volume') || n.includes('technical approach')) return 'technical_volume';
+  // Proposal SUB-DOCUMENTS — the Volume I components people can't format
+  // themselves (Quality Control Plan, Safety/Accident Prevention Plan, Contract
+  // Management Plan). These were landing in 'misc' and were therefore invisible
+  // to the proposal RAG retrieval. A dedicated type makes them findable for the
+  // Technical-volume sections. (IDIQ/MACC template work, 2026-06-13.)
+  if (
+    n.includes('quality plan') || n.includes('quality control plan') || /\bqcp\b/.test(n) ||
+    n.includes('safety plan') || n.includes('accident prevention') ||
+    n.includes('contract management plan') || /\bcmpv?\d?\b/.test(n)
+  ) return 'proposal_subdoc';
+  if (n.includes('technical volume') || n.includes('technical approach') || /vol(ume)?\s*\bi\b.*tech|tech.*vol(ume)?\s*\bi\b/.test(n)) return 'technical_volume';
   if (n.includes('management volume') || n.includes('management approach') || n.includes('staffing plan')) return 'management_volume';
-  if (n.includes('pricing volume') || n.includes('price volume') || n.includes('cost volume')) return 'pricing_volume';
+  // NON-price / non-cost proposal is the TECHNICAL volume — exclude before price.
+  if (/non[-\s]?price|non[-\s]?cost/.test(n)) return 'technical_volume';
+  if (n.includes('pricing volume') || n.includes('price volume') || n.includes('cost volume') || /price proposal|vol(ume)?\s*iii.*pric|pric.*vol(ume)?\s*iii/.test(n)) return 'pricing_volume';
   if (n.includes('cap statement') || n.includes('cap-statement') || n.includes('capability statement')) return 'cap_statement';
-  if (n.includes('past performance') || n.includes('past-performance')) return 'past_performance';
-  if (n.includes('proposal') || n.includes('rfp ')) return 'proposal_template';
+  if (n.includes('past performance') || n.includes('past-performance') || /vol(ume)?\s*ii\b(?!i)/.test(n)) return 'past_performance';
+  // Volume IV / contract forms / reps & certs / solicitation & award.
+  if (n.includes('contract forms') || n.includes('solicitation & award') || n.includes('solicitation and award') || /vol(ume)?\s*iv\b/.test(n)) return 'contract_forms';
+  if (n.includes('proposal') || n.includes('rfp ') || n.includes('macc') || n.includes('non-price proposal')) return 'proposal_template';
   if (p.includes('/the vault/')) return 'teaching_handout';
   if (p.includes('/courses/')) return 'course_material';
   if (p.includes('/slides/') || n.endsWith('.pptx')) return 'slide_deck';

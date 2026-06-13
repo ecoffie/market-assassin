@@ -1378,3 +1378,32 @@ to every consumer); currency renders as "$15,000,000" not raw integers; the fact
 accepts abbreviated currency ("$15 million") so real values stop being neutralized; and
 the drafting prompt now handles an out-of-scope bid as an HONEST STRETCH (lead with real
 transferable past performance, bracket the gap) instead of inventing a credential.
+
+---
+
+## Proposal Corpus: Surfacing the Real QCP / Safety / CMP Examples (June 13, 2026)
+
+**What:** Mindy's proposal corpus now correctly classifies the format-critical
+sub-documents of a federal technical proposal — Quality Control Plan (QCP), Site
+Safety / Accident Prevention Plan (APP), and Contract Management Plan (CMP) — as a
+dedicated `proposal_subdoc` type, plus the Volume IV solicitation/contract forms as
+`contract_forms`. These real winning examples were previously buried as "misc" and
+were invisible to the AI when drafting a Technical volume; they are now retrieved
+as style references so a generated section mirrors the proven format.
+
+**Why:** Formatting a full IDIQ/MACC technical volume — knowing it splits into
+Bonding / Safety / QCP / CMP per the solicitation's evaluation subfactors, and what
+each of those documents looks like — is exactly what small contractors can't do.
+The proven examples already lived in the GovCon Giants vault; they just weren't
+findable. Fixing the classification turns a dormant corpus into a usable one.
+
+**SEO:** federal quality control plan template, construction QCP example, accident
+prevention plan government contract, MACC technical volume format, IDIQ proposal
+structure.
+
+**Proof:** `scripts/ingest-mindy-rag.js` (classifyDocType) + `scripts/reclassify-
+proposal-docs.ts` reclassified 14 docs (306 `proposal_subdoc` chunks: real QCP,
+Miami Wiipica Safety Plan, Poff VBA Accident Prevention Plan, CMPv2/v3; 100
+`contract_forms` chunks). `template-corpus.ts` now lists `proposal_subdoc` in the
+doc types retrieved for Technical/Management sections. First step of the deterministic
+IDIQ/MACC proposal-template build.
