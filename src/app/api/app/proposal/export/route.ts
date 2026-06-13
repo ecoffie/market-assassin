@@ -603,18 +603,11 @@ function bodyPara(text: string): Paragraph {
 }
 
 // Build the whole LOI / Statement of Capability body matching the template.
-function buildLoiChildren(profile: CompanyProfile, rfpName: string): (Paragraph | Table)[] {
-  const company = profile.legalName || '____________________';
-  const cityState = [profile.hqCity, profile.hqState].filter(Boolean).join(', ');
-  const cityStateLabel = cityState || '____________';
-  const designation = (profile.certifications && profile.certifications.length)
-    ? profile.certifications.join(', ')
-    : 'Small Business';
-  const services = profile.oneLiner || '____________________________';
+// Letter header: date, attention, reference. The notice text / drafted opening
+// follows this, so it reads as a real letter top-to-bottom.
+function buildLoiHeader(rfpName: string): (Paragraph | Table)[] {
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
-
   const out: (Paragraph | Table)[] = [];
-
   out.push(bodyPara(today));
   out.push(new Paragraph({ spacing: { after: 80 }, children: [new TextRun({ text: 'Attention:', bold: true })] }));
   out.push(bodyPara('______________________________  (Agency / Contracting Office)'));
@@ -627,10 +620,31 @@ function buildLoiChildren(profile: CompanyProfile, rfpName: string): (Paragraph 
     ],
   }));
   out.push(bodyPara('To whom it may concern,'));
+  return out;
+}
 
-  // Intro prose — the cover letter.
-  out.push(bodyPara(`${company}, a ${cityStateLabel}-based ${designation} firm, is pleased to submit this Statement of Capability to demonstrate its intention and ability to provide professional services for the above-referenced requirement.`));
-  out.push(bodyPara(`${company} has successfully completed work of similar scope and size for federal and commercial customers. We specialize in ${services}. Our team is prepared to provide the personnel, management, and technical capability required for this effort. Following is a Summary of Qualifications along with the requested submittal information.`));
+// One short cover paragraph. The drafted "LOI Opening" follows and carries the
+// real substance, so this stays brief and factual (no invented claims).
+function buildLoiIntro(profile: CompanyProfile): (Paragraph | Table)[] {
+  const company = profile.legalName || '____________________';
+  const cityState = [profile.hqCity, profile.hqState].filter(Boolean).join(', ');
+  const cityStateLabel = cityState || '____________';
+  const designation = (profile.certifications && profile.certifications.length)
+    ? profile.certifications.join(', ')
+    : 'Small Business';
+  return [
+    bodyPara(`${company}, a ${cityStateLabel}-based ${designation} firm, is pleased to submit this Statement of Capability for the above-referenced requirement.`),
+  ];
+}
+
+// The structured Submittal Requirements form — pre-filled from the vault.
+// Comes AFTER the drafted narrative so the letter leads and the data follows.
+function buildLoiForm(profile: CompanyProfile): (Paragraph | Table)[] {
+  const company = profile.legalName || '____________________';
+  const cityState = [profile.hqCity, profile.hqState].filter(Boolean).join(', ');
+  const services = profile.oneLiner || '____________________________';
+
+  const out: (Paragraph | Table)[] = [];
 
   // SUBMITTAL REQUIREMENTS
   out.push(sectionHeader('SUBMITTAL REQUIREMENTS:'));
@@ -720,7 +734,15 @@ export async function POST(request: NextRequest) {
   const isLoiPackage = body.packageType === 'sources_sought_loi';
   const isRfqPackage = body.packageType === 'rfq_response';
   const isSimpleResponsePackage = isLoiPackage || isRfqPackage;
-  const rfpName = body.rfpFileName || 'RFP';
+  // Reference line for the LOI. Prefer the parsed solicitation number; else the
+  // source name with the synthetic "— notice text" suffix stripped (the
+  // notice-body fallback labels its virtual doc that way for the docs list, and
+  // it was leaking into the Reference field — Eric QC 2026-06-13).
+  const cleanedRfpName = (body.rfpFileName || '')
+    .replace(/\s*[—-]\s*notice text\s*$/i, '')
+    .trim();
+  const solNumber = (body.loiFields?.solicitationNumber || '').trim();
+  const rfpName = solNumber || cleanedRfpName || 'RFP';
 
   const today = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
@@ -748,14 +770,32 @@ export async function POST(request: NextRequest) {
   // single "Export LOI .docx" button always produces the complete document.
   const useLoiTemplate = isLoiPackage;
   if (useLoiTemplate) {
-    children.push(...buildLoiChildren(companyProfile, rfpName));
-    // Append drafted narrative sections, if any.
-    for (const id of orderedSections) {
+    // ORDER (Eric QC 2026-06-13: drafted prose was dumped AFTER the blank form
+    // — backwards). A real LOI reads: letter header → drafted opening + body
+    // narrative (the letter itself) → the structured Submittal Requirements
+    // form (the data an agency wants, pre-filled from the vault) → attachment
+    // reminder. The drafted "Point of Contact" prose is intentionally dropped:
+    // the structured "Responsible Office / Contact Person" table already carries
+    // the real vault contact, so the prose POC was redundant AND was the source
+    // of hallucinated "John Doe / 555-…" placeholders.
+    children.push(...buildLoiHeader(rfpName));
+    children.push(...buildLoiIntro(companyProfile));
+
+    // Drafted narrative — opening leads, then experience / capability / why-us.
+    // Skip the POC prose (covered by the structured contact table below).
+    const NARRATIVE_ORDER = ['company_overview', 'cap_past_performance', 'capabilities', 'differentiators'];
+    const narrativeIds = NARRATIVE_ORDER.filter(id => orderedSections.includes(id) && drafts[id]?.draft);
+    // Any other drafted sections the user generated (except poc) still get in.
+    const extraIds = orderedSections.filter(id => id !== 'poc' && !narrativeIds.includes(id) && drafts[id]?.draft);
+    for (const id of [...narrativeIds, ...extraIds]) {
       const s = drafts[id];
       if (!s || !s.draft) continue;
       children.push(sectionHeader(`${s.label}:`));
       children.push(...paragraphsFromMarkdown(s.draft));
     }
+
+    // Structured Submittal Requirements form — pre-filled from the vault.
+    children.push(...buildLoiForm(companyProfile));
     const loiDoc = new Document({
       creator: 'Mindy',
       title: `Statement of Capability — ${rfpName}`,

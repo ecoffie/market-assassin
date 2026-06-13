@@ -160,6 +160,8 @@ export const SECTION_META: Record<SectionType, SectionMeta> = {
       'turning the citations into prose paragraphs',
       'listing 8+ contracts (5 max — over that and it\'s clutter)',
       'including irrelevant past work because it sounded impressive',
+      'INVENTING contracts, customers, or agencies not in the vault (use [placeholders] instead — never fabricate)',
+      'fabricating quantified metrics (percentages, counts, dollar amounts, satisfaction scores) — only cite numbers present in the vault',
     ],
   },
   capabilities: {
@@ -177,6 +179,7 @@ export const SECTION_META: Record<SectionType, SectionMeta> = {
       'long paragraph-style capabilities instead of bullets',
       'using "world-class", "best-in-class", "cutting-edge", "innovative"',
       'listing capabilities the bidder hasn\'t confirmed in their vault',
+      'fabricating quantified metrics or project examples not in the vault — use [placeholders], never invent',
     ],
   },
   differentiators: {
@@ -193,6 +196,7 @@ export const SECTION_META: Record<SectionType, SectionMeta> = {
       'using "passionate", "dedicated", "committed" as differentiators (everyone says that)',
       'differentiators that any small business could claim',
       'more than 5 bullets (loses the "differentiator" framing)',
+      'FABRICATING numbers — "X% cost savings", "Y% satisfaction", "Z engagements", "$N saved" — unless the figure is in the vault. Make the point without the invented stat, or use a [placeholder].',
     ],
   },
   poc: {
