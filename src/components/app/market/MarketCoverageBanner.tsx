@@ -62,7 +62,9 @@ export default function MarketCoverageBanner({ coverage, email }: { coverage: Ma
         <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-300" style={{ width: `${coverage.coverage_pct}%` }} />
       </div>
 
-      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 text-xs">
+      {/* NAICS + PSC + keywords — one recommendation row (Eric: keywords belong
+          with the code guidance, not as a divider below the filters). */}
+      <div className={`grid grid-cols-1 gap-3 text-xs ${keywords.length > 0 ? 'sm:grid-cols-2 lg:grid-cols-3' : 'sm:grid-cols-2'}`}>
         <div className="rounded-lg bg-slate-950/40 p-2.5">
           <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">⚠️ The single &ldquo;obvious&rdquo; NAICS</div>
           <div className="text-slate-200">= only <b className="text-amber-400">{coverage.top_code_pct}%</b> of the market</div>
@@ -75,34 +77,32 @@ export default function MarketCoverageBanner({ coverage, email }: { coverage: Ma
             <div className="text-slate-600 mt-0.5">PSC = the product itself, not the vendor&rsquo;s industry</div>
           </div>
         )}
+        {keywords.length > 0 && (
+          <div className={`rounded-lg bg-slate-950/40 p-2.5 ${!coverage.top_psc ? 'sm:col-span-2 lg:col-span-1' : ''}`}>
+            <div className="flex items-center justify-between gap-2 mb-1.5">
+              <div className="text-[10px] uppercase tracking-wider text-slate-500">🔑 Search keywords for this market</div>
+              {email && (
+                added ? (
+                  <span className="text-[11px] font-medium text-emerald-400">✓ Added</span>
+                ) : (
+                  <button
+                    onClick={addKeywords}
+                    disabled={adding}
+                    className="text-[11px] font-medium text-purple-300 hover:text-purple-200 disabled:opacity-60 shrink-0"
+                  >
+                    {adding ? 'Adding…' : '+ Add all'}
+                  </button>
+                )
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {keywords.map((kw) => (
+                <span key={kw} className="rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-[11px] text-slate-300">{kw}</span>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
-
-      {/* SEARCH KEYWORDS — the terms to add to alerts so you catch body-buried opps. */}
-      {keywords.length > 0 && (
-        <div className="rounded-lg bg-slate-950/40 p-2.5 mt-3">
-          <div className="flex items-center justify-between gap-2 mb-1.5">
-            <div className="text-[10px] uppercase tracking-wider text-slate-500">🔑 Search keywords for this market</div>
-            {email && (
-              added ? (
-                <span className="text-[11px] font-medium text-emerald-400">✓ Added to your alerts</span>
-              ) : (
-                <button
-                  onClick={addKeywords}
-                  disabled={adding}
-                  className="text-[11px] font-medium text-purple-300 hover:text-purple-200 disabled:opacity-60"
-                >
-                  {adding ? 'Adding…' : '+ Add all to my alerts'}
-                </button>
-              )
-            )}
-          </div>
-          <div className="flex flex-wrap gap-1.5">
-            {keywords.map((kw) => (
-              <span key={kw} className="rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-[11px] text-slate-300">{kw}</span>
-            ))}
-          </div>
-        </div>
-      )}
 
       <div className="text-[11px] text-slate-500 mt-2.5">
         💬 <b className="text-slate-400">Lesson:</b> &ldquo;{coverage.keyword}&rdquo; is bought under <b className="text-slate-400">{coverage.naics_count} NAICS codes</b>

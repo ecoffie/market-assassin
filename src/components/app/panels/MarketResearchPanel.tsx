@@ -1906,6 +1906,14 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
             )}
           </div>
 
+          {/* Coverage lesson lives with code suggestions in Sport — not below the
+              manual filter row where keywords felt like a divider (Eric). */}
+          {marketCoverage?.total_market ? (
+            <div className="mb-3">
+              <MarketCoverageBanner coverage={marketCoverage} email={email} />
+            </div>
+          ) : null}
+
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
             <label className="text-xs text-slate-400">
               NAICS code(s)
@@ -2159,9 +2167,11 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           real charts, AI narrative, and export. */}
       {showResults && viewMode === 'map' && reportData && (
         <div className="space-y-6">
-          {/* Market coverage lesson (#59) — how many codes make up this market +
-              the keyword-vs-one-code teaching. Only when researched by keyword. */}
-          <MarketCoverageBanner coverage={marketCoverage} email={email} />
+          {/* Market coverage lesson (#59) — Auto mode only; Sport renders this
+              inside the research box above the manual filter row. */}
+          {researchMode !== 'sport' && (
+            <MarketCoverageBanner coverage={marketCoverage} email={email} />
+          )}
           {/* Headline stats — same 4 numbers as the reports view's
               MetricCards but with stronger visual hierarchy here. */}
           <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
