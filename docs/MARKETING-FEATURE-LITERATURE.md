@@ -1045,3 +1045,25 @@ who buys [product] federal*
 `spending_by_category`; Sport mode passes `keyword` from `MarketResearchPanel` →
 `AgencyTable`. Example: "drones" = 70+ buying NAICS codes, top obvious code = 28%
 of $245M FY2025 market (see Sport Mode proof point §1).
+
+## 38. Keyword-first agency discovery — union keyword awards + 90% NAICS coverage
+
+**What:** Market Research now discovers agencies in two passes merged together:
+(1) **keyword-filtered** USAspending award samples using the user's term plus
+data-derived signals (top PSC product name, NAICS title keywords), and (2) the
+existing **90% NAICS coverage** set for set-aside/eligibility. Auto mode also
+feeds saved profile keywords into the union. Top Total $ rankings use keyword-
+filtered sub-agency totals when a Sport keyword is present.
+
+**Why:** NAICS alone misses how agencies actually title contracts; keywords alone
+miss set-aside eligibility. Unioning both gives keyword-specific buyer lists
+("cybersecurity" ≠ "demolition") while keeping the 90% market definition honest.
+
+**SEO:** *find federal buyers by keyword, government contracting agency research,
+who buys cybersecurity federal*
+
+**Proof:** `/api/usaspending/find-agencies` accepts `searchKeywords[]` and unions
+keyword `spending_by_award` passes with NAICS sampling; `/api/app/target-market-research`
+builds terms via `buildSearchKeywords()` from `keywordCoverage()` + profile keywords.
+USASpending `spending_by_category` keyword filter for `metric_top_total` when Sport
+keyword present.

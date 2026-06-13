@@ -27,6 +27,8 @@ export interface CoreInputs {
   pscCode?: string;  // Product/Service Code (4-character) for precise filtering
   companyName?: string;
   excludeDOD?: boolean;  // Exclude Department of Defense agencies (civilian agencies only)
+  /** USAspending exact-phrase terms — unioned with NAICS award sample (#59). */
+  searchKeywords?: string[];
 }
 
 // Agency Data from USAspending.gov

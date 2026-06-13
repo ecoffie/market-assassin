@@ -55,6 +55,55 @@ function keywordCandidates(input: string): string[] {
   return out.slice(0, 4);
 }
 
+const DERIVE_KW_STOP = new Set([
+  'and', 'or', 'the', 'of', 'for', 'all', 'other', 'nec', 'services', 'service',
+  'manufacturing', 'except', 'related', 'activities', 'professional', 'scientific',
+  'technical', 'instruments', 'equipment', 'general', 'misc', 'miscellaneous',
+]);
+
+/**
+ * Search terms grounded in real award data — user keyword + top PSC product name +
+ * signal words from top buying NAICS titles. Powers alerts AND agency discovery.
+ */
+export function deriveCoverageKeywords(coverage: KeywordCoverage): string[] {
+  const out: string[] = [];
+  const seen = new Set<string>();
+  const add = (s: string) => {
+    const t = s.toLowerCase().trim();
+    if (t.length >= 3 && !seen.has(t)) { seen.add(t); out.push(t); }
+  };
+  add(coverage.keyword);
+  if (coverage.topPsc?.name) add(coverage.topPsc.name.toLowerCase());
+  for (const n of (coverage.allNaics || []).slice(0, 6)) {
+    const words = (n.name || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+      .filter((w) => w.length >= 4 && !DERIVE_KW_STOP.has(w));
+    const best = [...words].sort((a, b) => b.length - a.length)[0];
+    if (best) add(best);
+  }
+  return out.slice(0, 10);
+}
+
+/** Union of coverage-derived + profile keywords for find-agencies keyword passes. */
+export function buildSearchKeywords(opts: {
+  keyword?: string;
+  coverage?: KeywordCoverage | null;
+  profileKeywords?: string[];
+}): string[] {
+  const seen = new Set<string>();
+  const out: string[] = [];
+  const add = (s: string) => {
+    const t = s.trim().toLowerCase();
+    if (t.length >= 3 && !seen.has(t)) { seen.add(t); out.push(t); }
+  };
+  if (opts.coverage) {
+    for (const k of deriveCoverageKeywords(opts.coverage)) add(k);
+  } else if (opts.keyword?.trim()) {
+    add(opts.keyword);
+  }
+  for (const k of opts.profileKeywords || []) add(k);
+  return out.slice(0, 6);
+}
+
 export async function keywordCoverage(keyword: string, coverageTarget = 0.9): Promise<KeywordCoverage | null> {
   const raw = (keyword || '').trim();
   if (raw.length < 2) return null;

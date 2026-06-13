@@ -91,6 +91,7 @@ interface SavedResearchProfile {
   naicsCodes: string[];
   pscCodes: string[];
   agencies: string[];
+  keywords: string[];
   setAsides: string[];
   locationStates: string[];
   zipCode: string;
@@ -551,6 +552,13 @@ function buildSavedResearchProfile(data: WorkspaceData | null): SavedResearchPro
     briefingAggregated.set_aside_preferences,
     briefingAggregated.certifications
   );
+  const keywords = firstArray(
+    settings.keywords,
+    notification.keywords,
+    notificationAggregated.keywords,
+    briefing.keywords,
+    briefingAggregated.keywords
+  );
   const businessType = normalizeBusinessType(
     notification.business_type || notificationAggregated.business_type || briefingAggregated.business_type,
     certifications
@@ -581,6 +589,7 @@ function buildSavedResearchProfile(data: WorkspaceData | null): SavedResearchPro
     naicsCodes,
     pscCodes,
     agencies,
+    keywords,
     setAsides: certifications,
     locationStates,
     zipCode: briefing.zip_code || zipCodes[0] || '',
@@ -1218,6 +1227,9 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           ...(prefsData.locationStates || []),
           ...(prefsData.locationState ? [prefsData.locationState] : []),
         ]);
+        const keywords = uniqueStrings([
+          ...(workspaceProfile?.keywords || []),
+        ]);
 
         const profile: SavedResearchProfile | null = (
           workspaceProfile || naicsCodes.length > 0 || pscCodes.length > 0 || agencies.length > 0 || prefsData.businessType || prefsData.companyName
@@ -1226,6 +1238,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           naicsCodes,
           pscCodes,
           agencies,
+          keywords,
           setAsides,
           locationStates,
           zipCode: workspaceProfile?.zipCode || '',
@@ -1297,6 +1310,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         // coverage LESSON (total market, NAICS/PSC count, top code %) from the
         // keyword so the banner renders. Codes take precedence for the search.
         keyword: sportKw || undefined,
+        profileKeywords: savedProfile?.keywords?.length ? savedProfile.keywords : undefined,
         naicsCode: formData.naicsCode,
         pscCode: formData.pscCode,
         businessType: formData.businessType,
@@ -1330,6 +1344,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     researchMode,
     sportKeyword,
     sportReportRan,
+    savedProfile?.keywords,
   ]);
 
   // SBA Goaling bulk fetch — fires after tmrRows arrives. Looks up
@@ -2251,6 +2266,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               zipCode={formData.zipCode}
               excludeDOD={formData.excludeDOD}
               keyword={researchMode === 'sport' && sportReportRan ? sportKeyword.trim() : undefined}
+              profileKeywords={savedProfile?.keywords}
               onRowsChange={setTmrRows}
               onSelectedAgenciesChange={setStarredAgencies}
               parentAgencyFilter={parentAgencyFilter}
@@ -3847,6 +3863,7 @@ function AgencyTable({
   zipCode,
   excludeDOD,
   keyword,
+  profileKeywords,
   onRowsChange,
   onSelectedAgenciesChange,
   parentAgencyFilter,
@@ -3861,6 +3878,8 @@ function AgencyTable({
   excludeDOD: boolean;
   /** Sport-mode keyword — drives keyword-first NAICS coverage on the server. */
   keyword?: string;
+  /** Saved profile keywords — unioned into agency discovery in Auto mode. */
+  profileKeywords?: string[];
   // Optional escape hatch — parent can subscribe to the full row
   // set so the upstream charts (Spending by Agency, Set-Aside Mix)
   // can render from the same 96-row data this table uses, not the
@@ -3969,6 +3988,7 @@ function AgencyTable({
       body: JSON.stringify({
         email,
         keyword: sportKw || undefined,
+        profileKeywords: profileKeywords?.length ? profileKeywords : undefined,
         naicsCode,
         pscCode,
         businessType,
@@ -4043,7 +4063,7 @@ function AgencyTable({
       });
 
     return () => { cancelled = true; };
-  }, [email, naicsCode, pscCode, businessType, veteranStatus, zipCode, excludeDOD, keyword, onRowsChange]);
+  }, [email, naicsCode, pscCode, businessType, veteranStatus, zipCode, excludeDOD, keyword, profileKeywords?.join('|'), onRowsChange]);
 
   // Slice 3B — fetch my saved target list once per email change. We
   // store (office_name → target_id) so the row ★ indicator and the

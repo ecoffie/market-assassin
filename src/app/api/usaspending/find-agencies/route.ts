@@ -33,7 +33,8 @@ export async function POST(request: NextRequest) {
       zipCode,
       veteranStatus,
       pscCode,
-      excludeDOD
+      excludeDOD,
+      searchKeywords: rawSearchKeywords,
     } = body;
 
     console.log('🔍 Government contract search request:', body);
@@ -491,6 +492,28 @@ export async function POST(request: NextRequest) {
     console.log(
       `✅ Smart sampling complete: ${allAwards.length} unique contracts (${amountOnlyCount} by $, +${uniqueFromDate} recent, +${uniqueFromSat} SAT-eligible)`,
     );
+
+    // KEYWORD UNION (#59): merge award samples matched by exact-phrase keywords
+    // (user term + PSC/NAICS-derived signals) ON TOP of the NAICS pass.
+    const searchKeywords = Array.isArray(rawSearchKeywords)
+      ? rawSearchKeywords.map((k) => String(k).trim()).filter((k) => k.length >= 3).slice(0, 6)
+      : [];
+    if (searchKeywords.length > 0) {
+      const beforeKw = allAwards.length;
+      const kwPages = Math.min(maxPagesPerSort, 15);
+      for (const kw of searchKeywords) {
+        const kwFilters = { ...filters };
+        delete kwFilters.naics_codes;
+        delete kwFilters.psc_codes;
+        kwFilters.keywords = [kw.slice(0, 80)];
+        console.log(`   Keyword pass: "${kw}"...`);
+        const kwByAmount = await fetchBatch('Award Amount', 'desc', kwPages, kwFilters);
+        const kwByDate = await fetchBatch('Award Date', 'desc', Math.min(kwPages, 10), kwFilters);
+        mergeAwards(kwByAmount);
+        mergeAwards(kwByDate);
+      }
+      console.log(`✅ Keyword union: +${allAwards.length - beforeKw} contracts from ${searchKeywords.length} terms`);
+    }
 
     // Track if we applied a fallback to show users what changed
     let wasAutoAdjusted = false;

@@ -51,7 +51,7 @@ import {
 } from '@/lib/agency-hierarchy/pain-points-linker';
 import { getPrimesByAgency } from '@/lib/utils/prime-contractors';
 import { getEnhancedAgencyInfo, getAllCommands } from '@/lib/utils/command-info';
-import { keywordCoverage } from '@/lib/market/keyword-coverage';
+import { keywordCoverage, deriveCoverageKeywords, buildSearchKeywords } from '@/lib/market/keyword-coverage';
 import { internalBaseUrl } from '@/lib/utils/internal-base-url';
 
 const FREE_TIER_ROW_LIMIT = 10;
@@ -85,36 +85,7 @@ function categoryTotalForAgency(
   return keys.reduce((best, k) => Math.max(best, categoryTotalByKey[k] || 0), 0);
 }
 
-// Derive SEARCH KEYWORDS from a keyword's market coverage — grounded in real data:
-// the keyword + the top PSC's product name ("what's bought") + signal words from
-// the top buying NAICS titles. These are the terms a contractor would actually
-// search by, catching opps where the title says something else.
-const KW_STOP = new Set([
-  'and', 'or', 'the', 'of', 'for', 'all', 'other', 'nec', 'services', 'service',
-  'manufacturing', 'except', 'related', 'activities', 'professional', 'scientific',
-  'technical', 'except', 'instruments', 'equipment', 'general', 'misc', 'miscellaneous',
-]);
-function deriveCoverageKeywords(coverage: NonNullable<Awaited<ReturnType<typeof keywordCoverage>>>): string[] {
-  const out: string[] = [];
-  const seen = new Set<string>();
-  const add = (s: string) => {
-    const t = s.toLowerCase().trim();
-    if (t.length >= 3 && !seen.has(t)) { seen.add(t); out.push(t); }
-  };
-  // 1. The keyword itself.
-  add(coverage.keyword);
-  // 2. The top PSC product name (e.g. "unmanned aircraft") — what's actually bought.
-  if (coverage.topPsc?.name) add(coverage.topPsc.name.toLowerCase());
-  // 3. Signal phrases from the top buying NAICS titles (most $ first).
-  for (const n of (coverage.allNaics || []).slice(0, 6)) {
-    const words = (n.name || '').toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
-      .filter((w) => w.length >= 4 && !KW_STOP.has(w));
-    // the single most distinctive word per title (longest)
-    const best = [...words].sort((a, b) => b.length - a.length)[0];
-    if (best) add(best);
-  }
-  return out.slice(0, 10);
-}
+// Derive SEARCH KEYWORDS moved to @/lib/market/keyword-coverage (deriveCoverageKeywords).
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -252,6 +223,7 @@ export async function POST(request: NextRequest) {
     const {
       naicsCode: rawNaicsCode,
       keyword,
+      profileKeywords: rawProfileKeywords,
       businessType = '',
       veteranStatus = '',
       zipCode = '',
@@ -261,6 +233,7 @@ export async function POST(request: NextRequest) {
     } = body as {
       naicsCode?: string;
       keyword?: string;        // KEYWORD-FIRST (#59): "drones" → Mindy auto-derives the NAICS set
+      profileKeywords?: string[]; // Auto mode: saved profile keywords unioned into agency discovery
       businessType?: string;
       veteranStatus?: string;
       zipCode?: string;
@@ -306,6 +279,11 @@ export async function POST(request: NextRequest) {
     const naics = (naicsCode || '').trim();
     const psc = (pscCode || '').trim();
 
+    const profileKeywords = Array.isArray(rawProfileKeywords)
+      ? rawProfileKeywords.map((k) => String(k).trim()).filter((k) => k.length >= 3).slice(0, 5)
+      : [];
+    const searchKeywords = buildSearchKeywords({ keyword, coverage, profileKeywords });
+
     // Tier check. Free users still see data, just fewer rows.
     const access = await verifyMIAccess(email);
     const isFree = access.tier === 'free' && !access.isStaff;
@@ -326,7 +304,7 @@ export async function POST(request: NextRequest) {
     // them vanish — "drones" showed no coverage/keywords while a fresh keyword
     // ("cybersecurity") worked. Keyword research is exploratory + teaching; always
     // compute it live so the coverage + keyword output is present and current.
-    const skipCache = Boolean(keyword && keyword.trim());
+    const skipCache = Boolean(keyword && keyword.trim()) || searchKeywords.length > 0;
     try {
       const { data: cacheRow } = skipCache ? { data: null } : await supabase
         .from('agency_target_data_cache')
@@ -391,11 +369,11 @@ export async function POST(request: NextRequest) {
     const [findRes, totalRes] = await Promise.all([
       fetch(`${baseUrl}/api/usaspending/find-agencies`, {
         ...findAgenciesInit,
-        body: JSON.stringify({ naicsCode: naics, businessType, veteranStatus, zipCode, pscCode: psc, excludeDOD }),
+        body: JSON.stringify({ naicsCode: naics, businessType, veteranStatus, zipCode, pscCode: psc, excludeDOD, searchKeywords }),
       }),
       fetch(`${baseUrl}/api/usaspending/find-agencies`, {
         ...findAgenciesInit,
-        body: JSON.stringify({ naicsCode: naics, businessType: '', veteranStatus: '', zipCode, pscCode: psc, excludeDOD }),
+        body: JSON.stringify({ naicsCode: naics, businessType: '', veteranStatus: '', zipCode, pscCode: psc, excludeDOD, searchKeywords }),
       }),
     ]);
     const findData = (await findRes.json()) as FindAgenciesPayload;
@@ -435,17 +413,22 @@ export async function POST(request: NextRequest) {
     const categoryTotalByKey: Record<string, number> = {};
     try {
       const expanded = expandNAICSCodes(parseNAICSInput(naics));
-      if (expanded.length > 0) {
+      const catFilterBase: Record<string, unknown> = {
+        time_period: [{ start_date: '2023-10-01', end_date: new Date().toISOString().slice(0, 10) }],
+        award_type_codes: ['A', 'B', 'C', 'D'],
+      };
+      if (coverage?.keyword) {
+        catFilterBase.keywords = [coverage.keyword];
+      } else if (expanded.length > 0) {
+        catFilterBase.naics_codes = expanded;
+      }
+      if (coverage?.keyword || expanded.length > 0) {
         const catRes = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_category', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             category: 'awarding_subagency',
-            filters: {
-              naics_codes: expanded,
-              time_period: [{ start_date: '2023-10-01', end_date: new Date().toISOString().slice(0, 10) }],
-              award_type_codes: ['A', 'B', 'C', 'D'],
-            },
+            filters: catFilterBase,
             subawards: false, limit: 100, page: 1,
           }),
         });
