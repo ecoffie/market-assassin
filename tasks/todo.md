@@ -1,6 +1,30 @@
 # GovCon Giants - Tasks by Priority
 
-**Last Updated:** June 12, 2026
+**Last Updated:** June 13, 2026
+
+---
+
+## 🔲 OPEN — Hidden-match CTR readout (after a few days of sends)
+
+**Why:** Phase 3 semantic "💡 Hidden match" alerts are LIVE at 25% rollout (memory
+`hidden_match_semantic_alerts`). Before ramping to 50%/100%, we want a data signal:
+do hidden matches get clicked as much as regular opps? Success = hidden-match CTR ≥
+regular-opp CTR. Needs a few days of real morning sends to accumulate clicks first.
+
+**Build:** extend an admin engagement route (e.g. `/api/admin/engagement-metrics`) to
+split click-through by the email link's `content` tag — `hidden_match_<id>` vs
+`opportunity_<id>` (both already flow through `/api/track` → `user_engagement`
+link_click records, captured as linkText/utm_content). Compute:
+`hidden_match clicks / hidden_match impressions` (impressions = count of alert_log rows
+with `hiddenMatch:true`) vs the same for regular opps. Surface on the command center.
+
+**Then:** if CTR holds, bump `HIDDEN_MATCH_ROLLOUT_PERCENT` 25→50→100 (Vercel env +
+redeploy). If it craters, raise `HIDDEN_MATCH_THRESHOLD` or kill via
+`ENABLE_HIDDEN_MATCH=false`. (No deploy needed to read; ramp needs redeploy.)
+
+**Also deferred (same feature):** Source Feed in-app 💡 badge — AlertsPanel reads
+`/api/app/opportunities` (live), NOT `alert_log`, so it needs the matcher wired into
+that opportunities API (bigger change than a render tweak).
 
 ---
 
