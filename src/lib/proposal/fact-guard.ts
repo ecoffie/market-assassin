@@ -46,6 +46,24 @@ export function extractFacts(draft: string): ExtractedFact[] {
   return facts;
 }
 
+// Expand an abbreviated money amount to its full digit string so "$15 million"
+// / "$15M" / "$1.2B" can match a grounding that stores "$15,000,000". Without
+// this the guard false-flags a correctly-cited value written in shorthand and
+// neutralizes it to a [placeholder] (leaving garbage like "[amount]illion").
+function expandMoneyDigits(fact: string): string | null {
+  const m = fact.match(/(\d[\d,]*(?:\.\d+)?)\s*([KMB]|million|billion|thousand)?/i);
+  if (!m) return null;
+  const base = parseFloat(m[1].replace(/,/g, ''));
+  if (!Number.isFinite(base)) return null;
+  const unit = (m[2] || '').toLowerCase();
+  const mult =
+    unit === 'k' || unit === 'thousand' ? 1e3 :
+    unit === 'm' || unit === 'million' ? 1e6 :
+    unit === 'b' || unit === 'billion' ? 1e9 : 1;
+  if (mult === 1) return null; // no abbreviation → nothing to expand
+  return String(Math.round(base * mult));
+}
+
 function isGrounded(fact: string, haystackNorm: string): boolean {
   const nf = norm(fact);
   if (!nf) return true;
@@ -53,6 +71,9 @@ function isGrounded(fact: string, haystackNorm: string): boolean {
   // Loosen for $/M phrasing — try the bare digits too.
   const digits = fact.replace(/[^0-9]/g, '');
   if (digits.length >= 3 && haystackNorm.includes(digits)) return true;
+  // Abbreviated currency ("$15 million") → expand and match the full number.
+  const expanded = expandMoneyDigits(fact);
+  if (expanded && expanded.length >= 3 && haystackNorm.includes(expanded)) return true;
   return false;
 }
 

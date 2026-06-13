@@ -127,7 +127,7 @@ export async function loadVaultContext(email: string, sectionType: SectionType):
   }
   if (needsPastPerf) {
     queries.push(supabase.from('user_past_performance')
-      .select('contract_title, agency, sub_agency, contract_number, period_start, period_end, contract_value, role, scope_description, outcomes, cpars_rating, relevance_keywords, naics_codes')
+      .select('contract_title, agency, sub_agency, office, contract_number, period_start, period_end, contract_value, role, scope_description, outcomes, cpars_rating, reference_name, reference_phone, relevance_keywords, naics_codes')
       .eq('user_email', email).is('archived_at', null).limit(10));
   }
   if (needsCapabilities) {
@@ -156,6 +156,16 @@ export async function loadVaultContext(email: string, sectionType: SectionType):
   return ctx;
 }
 
+// Format a stored money value (often a bare integer string like "15000000")
+// as clean, citable currency: "$15,000,000". Without this the model sees a raw
+// number, can't phrase it, and emits garbage like "$[amount]illion".
+function fmtMoney(v: unknown): string | null {
+  if (v == null || v === '') return null;
+  const n = Number(String(v).replace(/[^0-9.]/g, ''));
+  if (!Number.isFinite(n) || n <= 0) return typeof v === 'string' ? v : null;
+  return `$${n.toLocaleString('en-US')}`;
+}
+
 export function formatVaultForPrompt(ctx: VaultContext): string {
   if (!ctx.has_any) return '';
   const blocks: string[] = [];
@@ -179,8 +189,9 @@ export function formatVaultForPrompt(ctx: VaultContext): string {
     if (id.office_address) lines.push(`Office address: ${id.office_address}`);
     if (Array.isArray(id.service_states) && id.service_states.length) lines.push(`Service states: ${id.service_states.join(', ')}`);
     if (Array.isArray(id.contract_vehicles) && id.contract_vehicles.length) lines.push(`Contract vehicles: ${id.contract_vehicles.join(', ')}`);
-    if (id.bonding_single) lines.push(`Single bonding capacity: ${id.bonding_single}`);
-    if (id.bonding_aggregate) lines.push(`Aggregate bonding capacity: ${id.bonding_aggregate}`);
+    if (fmtMoney(id.bonding_single)) lines.push(`Single bonding capacity: ${fmtMoney(id.bonding_single)}`);
+    if (fmtMoney(id.bonding_aggregate)) lines.push(`Aggregate bonding capacity: ${fmtMoney(id.bonding_aggregate)}`);
+    if (fmtMoney(id.annual_revenue)) lines.push(`Annual revenue: ${fmtMoney(id.annual_revenue)}`);
     // Point of contact (#41) — fills cert-package "Responsible Office / Contact
     // Person" + Point-of-Contact sections instead of [placeholders].
     if (id.contact_name) lines.push(`Contact person: ${id.contact_name}${id.contact_title ? `, ${id.contact_title}` : ''}`);

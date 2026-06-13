@@ -90,6 +90,17 @@ export async function buildV2Prompt(opts: {
   // proposal writer' prompt for all sections).
   const banList = sectionMeta.antiPatterns.map(p => `- DO NOT: ${p}`).join('\n');
 
+  // The capability-fit rule. Honest-stretch is the live behavior; the old
+  // "don't stretch unrelated work" text is kept behind an env flag ONLY for the
+  // offline A/B eval (PROPOSAL_OLD_HONEST_RULE=1) — never set in production.
+  const OLD_HONEST_RULE = '- HONEST CAPABILITY FIT. If the bidder\'s vault shows no directly-matching past performance for this domain, do NOT pad with generic claims or stretch unrelated work. State the directly transferable strengths plainly, name the relevant adjacent experience the vault DOES have, and bracket the domain-specific specifics as [placeholders] for the user to complete. A short, honest, notice-anchored response beats a long generic one.';
+  const NEW_HONEST_RULE = `- HONEST STRETCH — this is how to handle a notice OUTSIDE the bidder's direct experience (a normal, legitimate thing contractors do; never refuse or apologize for it). When the vault has no directly-matching past performance for this requirement:
+  1. LEAD with the bidder's REAL, most-transferable past performance — cite the actual contract(s) from the vault by name/value, and explain plainly HOW that work transfers to this requirement (e.g. "our $5.3M demolition and abatement scope on South Street Landing demonstrates the hazardous-material handling this notice requires").
+  2. NAME the adjacency honestly. It is fine to say the bidder is expanding into / well-positioned for this work based on transferable strengths. It is NOT fine to claim the bidder has already done the specific thing when the vault doesn't show it.
+  3. BRACKET the gap — the domain-specific specifics the bidder must supply go in [placeholders] (e.g. "[firing-range maintenance approach]"), NOT invented.
+  THE LINE: framing a stretch from real, named experience = GOOD. Manufacturing a credential to fake the fit — inventing a project, task, or capability the vault doesn't contain (e.g. claiming "quarterly bullet-trap maintenance" with no such record) = a FABRICATION and disqualifies the response. A short, honest, notice-anchored response that names real transferable work and brackets the rest beats a long one full of invented fit.`;
+  const honestRule = process.env.PROPOSAL_OLD_HONEST_RULE === '1' ? OLD_HONEST_RULE : NEW_HONEST_RULE;
+
   const systemPrompt = `${sectionMeta.voice}
 
 You will receive several context blocks. Use them like this:
@@ -110,7 +121,7 @@ General rules:
 - Minimize [placeholders]: use real vault/notice facts wherever they exist; only bracket what is genuinely unknown.
 - Be concise and on-target to the stated word count. Cut throat-clearing, restated mission boilerplate, and padding. Every sentence must earn its place against THIS requirement.
 - Use clear markdown subheadings to organize anything longer than two paragraphs, so an evaluator can scan it.
-- HONEST CAPABILITY FIT. If the bidder's vault shows no directly-matching past performance for this domain, do NOT pad with generic claims or stretch unrelated work. State the directly transferable strengths plainly, name the relevant adjacent experience the vault DOES have, and bracket the domain-specific specifics as [placeholders] for the user to complete. A short, honest, notice-anchored response beats a long generic one.
+${honestRule}
 - Mirror language from the source document where it shows you understand the scope.
 - NEVER use: "world-class", "best-in-class", "cutting-edge", "innovative solutions", "leverage", "synergistic", "state-of-the-art", "passionate", "dedicated commitment", "robust scalable".
 - NEVER open with "In today's federal landscape..." or similar GPT intros.

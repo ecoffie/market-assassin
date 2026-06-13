@@ -36,6 +36,7 @@ const identity = {
   hq_state: 'RI',
   hq_city: 'Providence',
   service_states: ['RI', 'MA'],
+  office_address: '124 Webster Avenue, Providence, RI 02909',
   contact_name: 'Fernando Tavares',
   contact_title: 'Sole Owner',
   contact_phone: '(401) 451-2584',
@@ -66,6 +67,8 @@ const pastPerf = [
     role: 'sub',
     scope_description:
       'Paint removal on existing steel, miscellaneous metals, and brick/CMU; lead paint abatement; general demolition of concrete, wood, CMU, structural and non-structural steel, and steel decking from two houses, turbine hall, and dynamo hall; asbestos caulking removal from east/south/west elevations.',
+    reference_name: 'Anthony Iaccarrino',
+    reference_phone: '401.456.5800',
     relevance_keywords: ['demolition', 'asbestos abatement', 'lead paint removal', 'environmental remediation'],
     naics_codes: ['238910', '562910'],
   },
