@@ -46,7 +46,18 @@ export default function GlobalLookup({ email }: { email: string | null }) {
       const data = await res.json();
       const top = (data?.contractors || [])[0];
       if (top?.slug) {
-        window.location.href = `/contractors/${top.slug}`;
+        // Stay in-app: open the Contractors panel and auto-fire the
+        // full in-app profile view (not the public SEO page, not the
+        // drawer). The Contractors panel switches to ?view=profile when
+        // these params are set. Pre-fix this jumped to /contractors/[slug]
+        // and dumped the user out of the app shell with no path back.
+        const params = new URLSearchParams({
+          panel: 'contractors',
+          view: 'profile',
+          slug: top.slug,
+          company: top.company || query,
+        });
+        window.location.href = `/app?${params.toString()}`;
       } else {
         setHint(`No contractor found for "${query}".`);
       }
@@ -193,7 +204,15 @@ export default function GlobalLookup({ email }: { email: string | null }) {
                 key={c.uei}
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
-                onClick={() => { window.location.href = `/contractors/${c.slug}`; }}
+                onClick={() => {
+                  const params = new URLSearchParams({
+                    panel: 'contractors',
+                    view: 'profile',
+                    slug: c.slug,
+                    company: c.company,
+                  });
+                  window.location.href = `/app?${params.toString()}`;
+                }}
                 className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-emerald-500/10 border-b border-slate-800/60 last:border-0"
               >
                 <Building2 className="w-4 h-4 text-emerald-400 shrink-0" strokeWidth={1.75} />

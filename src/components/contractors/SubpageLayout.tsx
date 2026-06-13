@@ -7,8 +7,13 @@
  * fetching the recipient summary on the page itself.
  *
  * Server component — no client JS needed. Tabs are plain Link nav.
+ *
+ * BackToAppHeader is a client component; it hydrates and only renders for
+ * authenticated visitors (anonymous SEO traffic sees nothing). Deep-links
+ * back to the same contractor in the in-app drawer.
  */
 import Link from 'next/link';
+import BackToAppHeader from '@/components/BackToAppHeader';
 
 interface SubpageTab {
   href: string;
@@ -46,6 +51,7 @@ export function SubpageLayout({
 
   return (
     <main className="min-h-screen bg-slate-950 text-white">
+      <BackToAppHeader slug={slug} company={displayName} />
       {/* Breadcrumb */}
       <div className="mx-auto max-w-6xl px-6 pt-6 text-sm text-slate-400">
         <Link href="/" className="hover:text-purple-400">Home</Link>

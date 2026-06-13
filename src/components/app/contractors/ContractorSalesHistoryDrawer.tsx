@@ -195,19 +195,36 @@ export default function ContractorSalesHistoryDrawer({
               </div>
 
               <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
-                <div className="mb-5 flex items-center justify-between">
+                <div className="mb-5 flex items-center justify-between gap-2">
                   <div>
                     <h3 className="text-lg font-semibold text-white">Sales by Fiscal Year</h3>
                     <p className="text-sm text-slate-500">Federal obligations grouped by year.</p>
                   </div>
-                  <a
-                    href={`/contractors/${history.contractor.slug}`}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-medium text-slate-300 hover:bg-slate-700"
-                  >
-                    Public page
-                  </a>
+                  {/* Two escape hatches from the drawer:
+                      - "Open full profile" (primary, emerald) → in-app
+                        ContractorProfileView at panel-page width with
+                        the wider layout, more rows, and room to grow
+                        workspace actions.
+                      - "Public page" (secondary, slate) → external SEO
+                        page with UEI/CAGE/address/treemap (data we don't
+                        yet surface in-app). Opens in new tab so the
+                        drawer stays put when the user comes back. */}
+                  <div className="flex shrink-0 items-center gap-2">
+                    <a
+                      href={`/app?panel=contractors&view=profile&slug=${encodeURIComponent(history.contractor.slug)}&company=${encodeURIComponent(contractor.company)}`}
+                      className="rounded-lg bg-emerald-500/15 px-3 py-2 text-xs font-medium text-emerald-300 hover:bg-emerald-500/25"
+                    >
+                      Open full profile →
+                    </a>
+                    <a
+                      href={`/contractors/${history.contractor.slug}`}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-medium text-slate-300 hover:bg-slate-700"
+                    >
+                      Public page ↗
+                    </a>
+                  </div>
                 </div>
 
                 {displaySeries.length > 0 ? (

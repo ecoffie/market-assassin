@@ -20,6 +20,7 @@
 import type { Metadata } from 'next';
 import MeetMindyStrip from '@/components/MeetMindyStrip';
 import MemberAwareCta from '@/components/MemberAwareCta';
+import BackToAppHeader from '@/components/BackToAppHeader';
 import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import {
@@ -215,6 +216,7 @@ export default async function ContractorPage({ params }: PageProps) {
 
   return (
     <main className="min-h-screen bg-slate-950 text-white">
+      <BackToAppHeader slug={recipient.canonical_slug} company={displayName} />
       <MeetMindyStrip variant="banner" />
       <script
         type="application/ld+json"

@@ -1,10 +1,10 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { useSearchParams } from 'next/navigation';
+import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import type { AppTier } from '../UnifiedSidebar';
 import { NaicsAutocompleteInput } from '../../codes/NaicsAutocompleteInput';
-import ContractorSalesHistoryDrawer from '../contractors/ContractorSalesHistoryDrawer';
+import ContractorProfileView from '../contractors/ContractorProfileView';
 import { getMIApiHeaders } from '../authHeaders';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
 
@@ -65,7 +65,18 @@ function extractNaicsCode(value?: string | null): string {
 export default function ContractorsPanel({ email, tier }: ContractorsPanelProps) {
   void tier;
   const searchParams = useSearchParams();
+  const router = useRouter();
+  const pathname = usePathname();
   const deepLinkSearch = searchParams.get('search')?.trim() || '';
+  // Profile view sub-state. When the URL carries
+  //   /app?panel=contractors&view=profile&slug=<x>&company=<y>
+  // we hand off to <ContractorProfileView /> instead of the list. Same
+  // panel mount, just a different render branch — keeps everything
+  // inside the dashboard shell (sidebar/auth/global-lookup) without
+  // needing a separate /app/contractors/[slug] route.
+  const profileView = searchParams.get('view') === 'profile';
+  const profileSlug = searchParams.get('slug')?.trim() || '';
+  const profileCompany = searchParams.get('company')?.trim() || '';
   const [contractors, setContractors] = useState<Contractor[]>([]);
   const [stats, setStats] = useState<ContractorStats | null>(null);
   const [profileDefaults, setProfileDefaults] = useState<SavedContractorDefaults | null>(null);
@@ -75,7 +86,28 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
   const [error, setError] = useState<string | null>(null);
   const [totalCount, setTotalCount] = useState(0);
   const [filteredCount, setFilteredCount] = useState(0);
-  const [selectedContractor, setSelectedContractor] = useState<Contractor | null>(null);
+
+  // Push profile-view URL state. Using router.push (not window.location)
+  // so the list's scroll position, search query, and pagination survive
+  // the round-trip back. Preserves any other panel-level params
+  // (search/naics/state) the user had set.
+  const openProfile = useCallback((contractor: Contractor) => {
+    if (!contractor.slug) return; // legacy static rows have no slug
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('panel', 'contractors');
+    params.set('view', 'profile');
+    params.set('slug', contractor.slug);
+    params.set('company', contractor.company);
+    router.push(`${pathname}?${params.toString()}`);
+  }, [router, pathname, searchParams]);
+
+  const closeProfile = useCallback(() => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.delete('view');
+    params.delete('slug');
+    params.delete('company');
+    router.push(`${pathname}?${params.toString()}`);
+  }, [router, pathname, searchParams]);
 
   // Search filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -148,7 +180,6 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
       setSearching(false);
       setLoading(false);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [stateFilter]);
 
   // Load stats on mount
@@ -240,6 +271,21 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
   };
 
   const totalPages = Math.ceil(filteredCount / limit);
+
+  // Profile sub-view — full-page contractor profile inside the panel
+  // shell. Branches BEFORE the loading skeleton because the profile
+  // view has its own data fetch and skeleton; we don't want the list
+  // skeleton to flash while we navigate into a profile.
+  if (profileView && profileSlug && profileCompany) {
+    return (
+      <ContractorProfileView
+        slug={profileSlug}
+        company={profileCompany}
+        email={email}
+        onBack={closeProfile}
+      />
+    );
+  }
 
   if (loading) {
     return (
@@ -414,11 +460,11 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
               key={`${contractor.company}-${idx}`}
               role="button"
               tabIndex={0}
-              onClick={() => setSelectedContractor(contractor)}
+              onClick={() => openProfile(contractor)}
               onKeyDown={(event) => {
                 if (event.key === 'Enter' || event.key === ' ') {
                   event.preventDefault();
-                  setSelectedContractor(contractor);
+                  openProfile(contractor);
                 }
               }}
               className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-emerald-500/50 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500/40 cursor-pointer"
@@ -450,20 +496,24 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
                     )}
                   </div>
 
-                  {/* Company Name — links to the public profile page (BQ rows) */}
-                  {contractor.slug ? (
-                    <a
-                      href={`/contractors/${contractor.slug}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="text-white hover:text-emerald-400 font-semibold text-lg mb-1 inline-flex items-center gap-1 transition-colors"
-                    >
-                      {contractor.company}
-                      <span className="text-slate-500 text-sm">↗</span>
-                    </a>
-                  ) : (
-                    <h3 className="text-white font-semibold text-lg mb-1">{contractor.company}</h3>
-                  )}
+                  {/* Company name — opens the in-app full profile view
+                      (`?view=profile&slug=…&company=…`). Stays inside the
+                      app shell. Previously this was an `<a>` to
+                      /contractors/[slug] which dumped the user out to the
+                      public SEO page. The drawer that briefly replaced it
+                      is kept alive for inline contexts (Source Feed,
+                      Today's Intel) but row-click in the panel now goes
+                      to the proper full profile. */}
+                  <button
+                    type="button"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      openProfile(contractor);
+                    }}
+                    className="text-white hover:text-emerald-400 font-semibold text-lg mb-1 text-left transition-colors"
+                  >
+                    {contractor.company}
+                  </button>
 
                   {/* HQ location — disambiguates same-named firms (which Excell?) */}
                   {(contractor.city || contractor.state) && (
@@ -664,13 +714,6 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
         ))}
       </div>
 
-      {selectedContractor && (
-        <ContractorSalesHistoryDrawer
-          contractor={selectedContractor}
-          email={email}
-          onClose={() => setSelectedContractor(null)}
-        />
-      )}
     </div>
   );
 }
