@@ -11,8 +11,13 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 
 type SegmentKey = 'activation' | 'founder' | 'sales' | 'rescue';
 
-const SEGMENT_CONFIG: Record<SegmentKey, { listKey: string; title: string; emoji: string }> = {
-  activation: { listKey: 'activationCandidates', title: 'Activation Candidates', emoji: '🟢' },
+const SEGMENT_CONFIG: Record<SegmentKey, { listKey: string; title: string; emoji: string; definition?: string }> = {
+  activation: {
+    listKey: 'activationCandidates',
+    title: 'Activation Candidates',
+    emoji: '🟢',
+    definition: 'Mindy access + incomplete profile (default NAICS only). Score 30+. Setup nudges — not sales or rescue.',
+  },
   founder: { listKey: 'founderCalls', title: 'Founder Call Queue', emoji: '🎯' },
   sales: { listKey: 'salesOutreach', title: 'Sales Outreach Queue', emoji: '💼' },
   rescue: { listKey: 'rescueCandidates', title: 'Rescue Queue', emoji: '🚨' },
@@ -76,7 +81,7 @@ export async function POST(request: NextRequest) {
       return `*${i + 1}.* \`${c.email}\`${c.score != null ? ` · score ${c.score}` : ''}${why ? `\n${why}` : ''}`;
     };
 
-    const text = `${cfg.emoji} *${cfg.title}* — ${totalInSegment} total, showing top ${top.length}\n\n${top.map(lineFor).join('\n\n')}\n\n<https://getmindy.ai/command-center|Open Command Center>`;
+    const text = `${cfg.emoji} *${cfg.title}* — ${totalInSegment} total, showing top ${top.length}${cfg.definition ? `\n_${cfg.definition}_` : ''}\n\n${top.map(lineFor).join('\n\n')}\n\n<https://getmindy.ai/command-center|Open Command Center>`;
 
     // Slack section blocks cap at 3000 chars — chunk candidates (~8 per block).
     const blocks: Array<Record<string, unknown>> = [
@@ -85,6 +90,12 @@ export async function POST(request: NextRequest) {
         text: { type: 'plain_text', text: `${cfg.title} (${totalInSegment})`, emoji: true },
       },
     ];
+    if (cfg.definition) {
+      blocks.push({
+        type: 'context',
+        elements: [{ type: 'mrkdwn', text: cfg.definition }],
+      });
+    }
     if (top.length === 0) {
       blocks.push({
         type: 'section',

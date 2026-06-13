@@ -4,7 +4,7 @@
  * Every panel and major action funnels through trackAppEvent() so we
  * get consistent eventType / eventSource / metadata shapes across the
  * codebase. Backed by /api/mindy/engagement (which thin-aliases
- * /api/app/engagement → logEngagement() → app_events table).
+ * /api/app/engagement → logEngagement() → user_engagement table).
  *
  * Mirrors the EventTypes catalog in src/lib/engagement.ts. Keeping
  * the string literals in sync is intentional — the catalog is the

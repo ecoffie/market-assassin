@@ -1243,10 +1243,12 @@ node scripts/merge-agency-intelligence.js --merge    # Apply
 - App events (5+): +5
 
 **Segments:**
-- **10-10 Candidate**: Score 85+ → Founder calls
-- **Activation Candidate**: Score 30-84 → Sales outreach
-- **Rescue Candidate**: Paid but inactive → Re-engagement
-- **Audience Only**: Score <30 → Nurture sequence
+- **10-10 Candidate**: Score 80+ and Ultimate/high-ticket → Founder calls
+- **White-glove Candidate**: Score 70+ with paid purchase → Sales calls
+- **MI Pro Upgrade**: Score 50+, free, profile complete, engaged → Upgrade campaign
+- **Activation Candidate**: Incomplete profile (default NAICS), score 30+ → Setup nudges (Annelle/Sikander)
+- **Rescue Candidate**: Paid but zero engagement → Re-engagement
+- **Audience Only**: Profile complete, low score → Nurture sequence
 
 ### Key Files
 

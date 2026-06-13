@@ -15,6 +15,13 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
+import {
+  SEGMENT_DEFINITIONS,
+  buildSegmentContext,
+  describeWhyQualified,
+  determineSegment,
+  getRecommendedAction,
+} from '@/lib/mindy/customer-segments';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
 
@@ -68,6 +75,7 @@ interface QualifiedCustomer {
   score: number;
   signals: string[];
   recommendedAction: string;
+  whyQualified: string;
   // Raw data for debugging
   totalSpent: number;
   purchaseCount: number;
@@ -110,40 +118,6 @@ function isProfileComplete(user: {
     user.naics_codes.length > 0 &&
     hasCustomNaics(user.naics_codes)
   );
-}
-
-function determineSegment(score: number, signals: string[]): string {
-  const hasHighTicket = signals.some(s => s.includes('High-ticket') || s.includes('Ultimate'));
-  const hasPaid = signals.some(s => s.includes('purchase') || s.includes('subscription'));
-  const hasEngagement = signals.some(s => s.includes('briefing') || s.includes('pipeline') || s.includes('active'));
-
-  if (score >= 80 && hasHighTicket) return '10-10 Candidate';
-  if (score >= 70 && hasPaid) return 'White-glove Candidate';
-  if (score >= 50 && !hasPaid && hasEngagement) return 'MI Pro Upgrade';
-  if (score >= 40 && hasPaid && !hasEngagement) return 'Rescue Candidate';
-  if (score >= 30 && !hasEngagement) return 'Activation Candidate';
-  return 'Audience Only';
-}
-
-function getRecommendedAction(segment: string, signals: string[]): string {
-  const hasProfile = signals.some(s => s.includes('Profile complete'));
-
-  switch (segment) {
-    case '10-10 Candidate':
-      return 'Schedule founder call — high-value customer worth deep investment';
-    case 'White-glove Candidate':
-      return 'Sales call — discuss done-for-you services and enterprise needs';
-    case 'MI Pro Upgrade':
-      return 'Send upgrade campaign — active free user ready for paid';
-    case 'Rescue Candidate':
-      return hasProfile
-        ? 'Customer success check-in — paid but inactive, understand blockers'
-        : 'Send profile setup help — paid but hasn\'t configured';
-    case 'Activation Candidate':
-      return 'Send setup nudge — has access but incomplete onboarding';
-    default:
-      return 'Low-touch nurture — add to email sequence only';
-  }
 }
 
 export async function GET(request: NextRequest) {
@@ -316,17 +290,21 @@ export async function GET(request: NextRequest) {
 
       let score = 0;
       const signals: string[] = [];
+      let hasUltimateBundle = false;
+      let hasHighTicketProduct = false;
 
       // Purchase signals
       if (purchase) {
         const products = purchase.products.map(p => p?.toLowerCase() || '');
 
         if (products.some(p => p.includes('ultimate'))) {
+          hasUltimateBundle = true;
           score += SCORE_WEIGHTS.ULTIMATE_BUNDLE;
           signals.push('Ultimate Bundle buyer (+30)');
         }
 
         if (products.some(p => HIGH_TICKET_PRODUCTS.some(ht => p.includes(ht)))) {
+          hasHighTicketProduct = true;
           score += SCORE_WEIGHTS.HIGH_TICKET;
           signals.push('High-ticket purchase (+15)');
         }
@@ -374,9 +352,20 @@ export async function GET(request: NextRequest) {
         signals.push('No profile, no engagement (-20)');
       }
 
-      // Determine segment
-      const customerSegment = determineSegment(score, signals);
-      const recommendedAction = getRecommendedAction(customerSegment, signals);
+      // Determine segment from real flags (not signal-string parsing)
+      const segmentCtx = buildSegmentContext({
+        score,
+        profileComplete,
+        purchase,
+        briefingsCount,
+        hasPipeline,
+        hasPositiveFeedback,
+        hasUltimateBundle,
+        hasHighTicketProduct,
+      });
+      const customerSegment = determineSegment(segmentCtx);
+      const recommendedAction = getRecommendedAction(customerSegment, segmentCtx);
+      const whyQualified = describeWhyQualified(customerSegment, segmentCtx);
 
       qualifiedCustomers.push({
         email,
@@ -385,6 +374,7 @@ export async function GET(request: NextRequest) {
         score,
         signals,
         recommendedAction,
+        whyQualified,
         totalSpent: purchase?.totalSpent || 0,
         purchaseCount: purchase?.count || 0,
         productsOwned: purchase?.products || [],
@@ -419,12 +409,13 @@ export async function GET(request: NextRequest) {
 
     // CSV export
     if (format === 'csv') {
-      const headers = ['Rank', 'Email', 'Segment', 'Score', 'Signals', 'Recommended Action', 'Total Spent', 'Products'];
+      const headers = ['Rank', 'Email', 'Segment', 'Score', 'Why Qualified', 'Signals', 'Recommended Action', 'Total Spent', 'Products'];
       const rows = filtered.map((c, i) => [
         i + 1,
         c.email,
         c.segment,
         c.score,
+        c.whyQualified,
         c.signals.join('; '),
         c.recommendedAction,
         `$${c.totalSpent.toFixed(2)}`,
@@ -488,6 +479,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       generatedAt: new Date().toISOString(),
+      segmentDefinitions: SEGMENT_DEFINITIONS,
       summary: {
         totalScored: qualifiedCustomers.length,
         totalUsers: allUsers.length,
@@ -509,14 +501,14 @@ export async function GET(request: NextRequest) {
             action: c.recommendedAction,
           })),
 
-        // Activation — has access, incomplete onboarding (Annelle/Sikander nudges)
+        // Activation — incomplete profile, setup nudges (Annelle/Sikander)
         activationCandidates: qualifiedCustomers
           .filter(c => c.segment === 'Activation Candidate')
           .slice(0, 50)
           .map(c => decorateOutreach({
             email: c.email,
             score: c.score,
-            why: c.signals.slice(0, 3).join(', '),
+            why: c.whyQualified,
             action: c.recommendedAction,
           })),
 

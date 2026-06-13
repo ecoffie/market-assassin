@@ -1142,4 +1142,41 @@ typing a company or product name got the wrong experience.
 EXCEL GARMENT ($257M); `search=Microsoft` returns MICROSOFT CORPORATION ($4.7B).
 `PRODUCT_VENDOR_HINTS` maps excel→Microsoft for product-name queries.
 
+---
+
+## 33. Upgrade clickers call list + Slack push (June 2026)
+
+**What:** Command Center now surfaces free users who clicked **Go Pro** in the in-app
+upgrade modal (hot) or opened the modal only (warm). Each row shows email, feature
+they tried to unlock, click count, profile status, and a recommended call script.
+One-click CSV export and Slack push to `#sales-mindy` for same-day sales follow-up.
+
+**Why:** A Go Pro click is the highest-intent free→paid signal in the product — hotter
+than email opens or profile nudges. Sales was flying blind because events lived in
+`user_engagement` while the dashboard queried a non-existent `app_events` table.
+
+**SEO:** N/A (internal ops / conversion tooling)
+
+**Proof:** Events from `user_engagement` where `event_type=link_click`,
+`event_source=sidebar`, `metadata.action` = `upgrade_modal_cta_click` or
+`upgrade_modal_shown`. API: `/api/admin/upgrade-intent`. Slack:
+`/api/admin/push-upgrade-intent-slack` → channel `C08DMRLNCCF`.
+
+---
+
+## 34. Activation Candidate segment definition (June 2026)
+
+**What:** Tightened Activation Candidate to **incomplete profile only** (still on default
+NAICS). Users with custom NAICS + briefings now route to Audience Only or MI Pro Upgrade
+instead of a 148-person false-positive activation list.
+
+**Why:** Case-sensitive signal-string matching misclassified 121 briefing recipients
+as "activation." Annelle/Sikander need a precise setup-nudge list, not everyone with
+briefings.
+
+**SEO:** N/A (internal segmentation)
+
+**Proof:** `src/lib/mindy/customer-segments.ts` — `determineSegment()` uses real flags
+(`profileComplete`, `hasEngagement`, `hasPurchase`). Activation count drops from ~148 to
+paid+incomplete-profile only (~4).
 

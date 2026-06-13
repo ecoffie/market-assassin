@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
+import { fetchUpgradeEngagementRows } from '@/lib/mindy/upgrade-intent';
 
 /**
  * GET /api/admin/mrr-goal?password=...
@@ -160,31 +161,16 @@ export async function GET(request: NextRequest) {
       }
     } catch { /* charges table optional */ }
 
-    // --- Upgrade-modal intent (last 30 days) from app_events ---
-    // Measures the free→paid funnel's first step: free users clicking a Pro-locked
-    // feature (modal shown) and then clicking the Go-Pro CTA. Tells us if the modal
-    // converts intent — without this the modal is unmeasured.
+    // --- Upgrade-modal intent (last 30 days) from user_engagement ---
     let upgradeModalShown = 0;
     let upgradeModalCtaClicks = 0;
     const upgradeByFeature: Record<string, number> = {};
     try {
       const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
-      const events: Array<{ metadata?: Record<string, unknown> }> = [];
-      for (let from = 0; from < 60000; from += 1000) {
-        const { data, error } = await supabase
-          .from('app_events')
-          .select('metadata')
-          .eq('event_type', 'link_click')
-          .eq('event_source', 'sidebar')
-          .gte('created_at', since)
-          .range(from, from + 999);
-        if (error) break;
-        events.push(...(data || []));
-        if (!data || data.length < 1000) break;
-      }
-      for (const e of events) {
-        const action = (e.metadata || {}).action;
-        const feature = String((e.metadata || {}).feature || 'unknown');
+      const rows = await fetchUpgradeEngagementRows(supabase, since);
+      for (const row of rows) {
+        const action = row.metadata?.action;
+        const feature = String(row.metadata?.feature || 'unknown');
         if (action === 'upgrade_modal_shown') {
           upgradeModalShown++;
           upgradeByFeature[feature] = (upgradeByFeature[feature] || 0) + 1;
@@ -192,7 +178,7 @@ export async function GET(request: NextRequest) {
           upgradeModalCtaClicks++;
         }
       }
-    } catch { /* app_events optional */ }
+    } catch { /* user_engagement optional */ }
     const upgradeModalCtr = upgradeModalShown > 0
       ? Math.round((upgradeModalCtaClicks / upgradeModalShown) * 1000) / 10
       : 0;

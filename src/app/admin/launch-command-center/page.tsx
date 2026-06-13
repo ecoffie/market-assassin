@@ -45,6 +45,35 @@ type MrrGoal = {
   bootcampOfferSends?: number;
 };
 
+type UpgradeIntentCandidate = {
+  email: string;
+  level: 'hot' | 'warm';
+  ctaClicks: number;
+  modalOpens: number;
+  lastCtaAt: string | null;
+  topFeature: string;
+  profileComplete: boolean;
+  totalSpent: number;
+  isProSubscriber: boolean;
+  recommendedAction: string;
+};
+
+type UpgradeIntentBrief = {
+  success: boolean;
+  windowDays: number;
+  definition: { hot: string; warm: string; source: string };
+  summary: {
+    totalWithIntent: number;
+    hot: number;
+    warm: number;
+    callableNow: number;
+    alreadyPro: number;
+    ctaClicks: number;
+    modalOpens: number;
+  };
+  candidates: UpgradeIntentCandidate[];
+};
+
 type PartnerAffiliateSummary = {
   partnerCode: string;
   partnerName: string;
@@ -472,11 +501,14 @@ export default function LaunchCommandCenterPage() {
   const [qualError, setQualError] = useState('');
   const [qualSlackStatus, setQualSlackStatus] = useState<string | null>(null);
   const [qualSlackLoading, setQualSlackLoading] = useState(false);
+  const [upgradeSlackLoading, setUpgradeSlackLoading] = useState(false);
   const [betaConv, setBetaConv] = useState<BetaConversion | null>(null);
   const [betaConvLoading, setBetaConvLoading] = useState(false);
   const [betaConvError, setBetaConvError] = useState('');
   const [mrrGoal, setMrrGoal] = useState<MrrGoal | null>(null);
   const [mrrGoalError, setMrrGoalError] = useState('');
+  const [upgradeIntent, setUpgradeIntent] = useState<UpgradeIntentBrief | null>(null);
+  const [upgradeIntentError, setUpgradeIntentError] = useState('');
   const [partnerBrief, setPartnerBrief] = useState<PartnerProgramsBrief | null>(null);
   const [partnerBriefError, setPartnerBriefError] = useState('');
 
@@ -716,6 +748,28 @@ export default function LaunchCommandCenterPage() {
     }
   }
 
+  async function pushUpgradeClickersToSlack() {
+    if (!password) return;
+    setUpgradeSlackLoading(true);
+    setQualSlackStatus(null);
+    try {
+      const res = await fetch(
+        `/api/admin/push-upgrade-intent-slack?password=${encodeURIComponent(password)}&level=hot&limit=25`,
+        { method: 'POST' },
+      );
+      const data = await res.json();
+      if (!res.ok || !data.success) {
+        setQualSlackStatus(data.error || 'Upgrade Slack push failed');
+        return;
+      }
+      setQualSlackStatus(`Posted ${data.posted} upgrade clickers to ${data.channel}`);
+    } catch {
+      setQualSlackStatus('Upgrade Slack push failed — check SLACK_BOT_TOKEN');
+    } finally {
+      setUpgradeSlackLoading(false);
+    }
+  }
+
   useEffect(() => {
     if (!authenticated || !password) return;
     let cancelled = false;
@@ -769,6 +823,35 @@ export default function LaunchCommandCenterPage() {
       }
     }
     loadMrrGoal();
+    return () => { cancelled = true; };
+  }, [authenticated, password]);
+
+  useEffect(() => {
+    if (!authenticated || !password) return;
+    let cancelled = false;
+    async function loadUpgradeIntent() {
+      setUpgradeIntentError('');
+      try {
+        const response = await fetch(
+          `/api/admin/upgrade-intent?password=${encodeURIComponent(password)}&days=30&limit=50&level=hot`,
+          { cache: 'no-store' },
+        );
+        const data = await response.json();
+        if (cancelled) return;
+        if (!response.ok || !data.success) {
+          setUpgradeIntentError(data.error || 'Could not load upgrade intent');
+          setUpgradeIntent(null);
+          return;
+        }
+        setUpgradeIntent(data as UpgradeIntentBrief);
+      } catch {
+        if (!cancelled) {
+          setUpgradeIntentError('Could not load upgrade intent');
+          setUpgradeIntent(null);
+        }
+      }
+    }
+    loadUpgradeIntent();
     return () => { cancelled = true; };
   }, [authenticated, password]);
 
@@ -989,6 +1072,79 @@ export default function LaunchCommandCenterPage() {
                       </div>
                     )}
                     <p className="mt-2 text-xs text-slate-500">Which locked features drive the most upgrade intent — fuel for what to build/price next.</p>
+                  </>
+                )}
+              </div>
+
+              {/* UPGRADE CLICKERS — who to call for conversion right now */}
+              <div className="mt-6 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div>
+                    <p className="text-sm font-semibold text-amber-200">Upgrade clickers — call list</p>
+                    <p className="mt-1 text-xs text-slate-400">
+                      Free users who clicked <span className="text-amber-300/90">Go Pro</span> in the upgrade modal (highest purchase intent in-app)
+                    </p>
+                  </div>
+                  {password ? (
+                    <div className="flex flex-wrap gap-2">
+                      <a
+                        href={`/api/admin/upgrade-intent?password=${encodeURIComponent(password)}&format=csv&days=30&limit=200&level=hot`}
+                        className="rounded-lg border border-amber-600/40 bg-amber-600/10 px-3 py-1.5 text-xs font-medium text-amber-200 hover:bg-amber-600/20"
+                      >
+                        Export CSV
+                      </a>
+                      <button
+                        type="button"
+                        disabled={upgradeSlackLoading}
+                        onClick={pushUpgradeClickersToSlack}
+                        className="rounded-lg border border-purple-500/40 bg-purple-500/10 px-3 py-1.5 text-xs font-medium text-purple-200 hover:bg-purple-500/20 disabled:opacity-50"
+                      >
+                        {upgradeSlackLoading ? 'Posting…' : 'Send to Slack'}
+                      </button>
+                    </div>
+                  ) : null}
+                </div>
+                {upgradeIntentError ? (
+                  <p className="mt-2 text-xs text-red-300">{upgradeIntentError}</p>
+                ) : !upgradeIntent ? (
+                  <p className="mt-2 text-xs text-slate-500">Loading upgrade clickers…</p>
+                ) : upgradeIntent.summary.callableNow === 0 ? (
+                  <p className="mt-2 text-xs text-slate-500">
+                    No Go-Pro clicks in the last {upgradeIntent.windowDays} days yet.
+                    {upgradeIntent.summary.modalOpens > 0
+                      ? ` ${upgradeIntent.summary.modalOpens} modal opens (warm leads) — switch export to include warm.`
+                      : ' Tracking starts when free users click a Pro-locked sidebar feature.'}
+                  </p>
+                ) : (
+                  <>
+                    <div className="mt-2 flex flex-wrap gap-x-5 gap-y-1 text-sm text-slate-300">
+                      <span><b className="text-amber-300">{upgradeIntent.summary.callableNow}</b> to call now</span>
+                      <span><b className="text-white">{upgradeIntent.summary.ctaClicks}</b> Go-Pro clicks</span>
+                      <span><b className="text-white">{upgradeIntent.summary.modalOpens}</b> modal opens</span>
+                      {upgradeIntent.summary.alreadyPro > 0 ? (
+                        <span><b className="text-slate-400">{upgradeIntent.summary.alreadyPro}</b> already Pro</span>
+                      ) : null}
+                    </div>
+                    <div className="mt-3 max-h-72 space-y-2 overflow-y-auto">
+                      {upgradeIntent.candidates
+                        .filter((c) => !c.isProSubscriber)
+                        .map((candidate) => (
+                          <div key={candidate.email} className="rounded-lg border border-amber-500/20 bg-slate-900/60 p-3">
+                            <div className="flex items-start justify-between gap-2">
+                              <p className="font-mono text-sm text-white break-all">{candidate.email}</p>
+                              <span className="shrink-0 rounded-full bg-amber-500/20 px-2 py-0.5 text-xs font-bold text-amber-300">
+                                {candidate.ctaClicks}× click
+                              </span>
+                            </div>
+                            <p className="mt-1 text-xs text-slate-400">
+                              Unlocked <b className="text-amber-200/90">{candidate.topFeature}</b>
+                              {candidate.lastCtaAt ? ` · ${candidate.lastCtaAt.slice(0, 10)}` : ''}
+                              {candidate.profileComplete ? ' · profile done' : ' · needs NAICS setup'}
+                            </p>
+                            <p className="mt-1 text-xs text-amber-400/80">{candidate.recommendedAction}</p>
+                          </div>
+                        ))}
+                    </div>
                   </>
                 )}
               </div>
@@ -1331,7 +1487,7 @@ export default function LaunchCommandCenterPage() {
                 <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4">
                   <p className="text-sm text-emerald-200">Activation Candidates</p>
                   <p className="mt-2 text-4xl font-bold text-emerald-300">{qualBrief.summary.bySegment['Activation Candidate']}</p>
-                  <p className="mt-1 text-xs text-slate-400">Score 30+ • Setup / profile nudges</p>
+                  <p className="mt-1 text-xs text-slate-400">Incomplete profile (default NAICS) · score 30+ · setup nudges</p>
                 </div>
                 <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4">
                   <p className="text-sm text-red-200">Rescue Candidates</p>
@@ -1394,13 +1550,16 @@ export default function LaunchCommandCenterPage() {
                 </div>
               </div>
 
-              {/* Activation Queue — the 148 (or N) counted in the stat card but previously hidden */}
+              {/* Activation Queue — incomplete profile, not sales/rescue/upgrade */}
               <div className="rounded-lg border border-emerald-500/20 bg-slate-950/50 p-5">
                 <div className="flex flex-wrap items-center justify-between gap-3">
                   <div>
                     <h3 className="text-xl font-bold text-emerald-200">⚡ Activation Queue</h3>
                     <p className="mt-1 text-sm text-slate-400">
-                      Has Mindy access but incomplete onboarding — Annelle / Sikander setup nudges
+                      Mindy users still on <span className="text-emerald-300/90">default NAICS</span> — help them finish profile setup (Annelle / Sikander)
+                    </p>
+                    <p className="mt-2 text-xs text-slate-500">
+                      Includes free signups and paid buyers who never picked custom NAICS. Excludes 10-10, white-glove, rescue, and MI Pro upgrade queues.
                     </p>
                   </div>
                   <span className="rounded-full bg-emerald-500/20 px-3 py-1 text-sm font-semibold text-emerald-300">
