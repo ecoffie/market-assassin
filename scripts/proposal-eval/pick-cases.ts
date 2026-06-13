@@ -129,8 +129,11 @@ async function main() {
     console.log(`[pick] ${nt}: added ${addedForType}`);
   }
 
+  // VAULT_EMAIL lets the eval target a different test vault (e.g. a real
+  // client's seeded past performance) without hand-editing cases.json.
+  const vaultEmail = process.env.VAULT_EMAIL || 'eric@govcongiants.com';
   const outPath = join(__dirname, 'cases.json');
-  writeFileSync(outPath, JSON.stringify({ vaultEmail: 'eric@govcongiants.com', cases }, null, 2));
+  writeFileSync(outPath, JSON.stringify({ vaultEmail, cases }, null, 2));
   console.log(`\nWrote ${cases.length} cases → ${outPath}`);
   console.log('Breakdown:', cases.reduce((acc: Record<string, number>, c) => {
     acc[c.sectionSet] = (acc[c.sectionSet] || 0) + 1;
