@@ -55,3 +55,6 @@ market-assasin-*.json
 tasks/cache/calls/
 tasks/cache/fireflies-titles.txt
 backups/
+
+# Supabase CLI scratch — auto-rewritten on every `supabase` invocation
+supabase/.temp/
