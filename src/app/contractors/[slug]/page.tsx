@@ -25,6 +25,7 @@ import Link from 'next/link';
 import { notFound, permanentRedirect } from 'next/navigation';
 import {
   getRollupBySlug,
+  getRollupOrSingleBySlug,
   resolveCanonicalSlug,
   getYearlyTotalsForRecipient,
   getYearlyByAgencyForRecipient,
@@ -79,7 +80,10 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps): Promise<Metadata> {
   const { slug } = await params;
-  const recipient = await getRollupBySlug(slug);
+  // Cache-first; on miss, try live BQ + recipients fallback so small/orphan
+  // contractors still get proper meta tags (must mirror the page resolver).
+  const recipient =
+    (await getRollupBySlug(slug)) ?? (await getRollupOrSingleBySlug(slug, true));
   if (!recipient) {
     return { title: 'Contractor Not Found | Mindy' };
   }
@@ -110,14 +114,28 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
 
 export default async function ContractorPage({ params }: PageProps) {
   const { slug } = await params;
-  const recipient = await getRollupBySlug(slug);
+  // Fast path: cache-only rollup lookup. Hits for the warmed top-N
+  // contractors and pays zero BQ cost.
+  let recipient = await getRollupBySlug(slug);
+  // Falling back means we paid for a live BQ rollup lookup — also pass
+  // liveBq=true to the downstream sub-section queries below, otherwise the
+  // page renders an empty header for any contractor not in the warmed cache
+  // (the bug Eric hit on /contractors/excell-construction-corp).
+  let needsLiveBq = false;
   if (!recipient) {
     // Slug doesn't match any rollup NAME. Before 404ing, check whether it's a
     // subsidiary slug (a child UEI's own name) that should consolidate onto its
-    // parent — if so, 308 there. Only genuinely unknown slugs fall through.
+    // parent — if so, 308 there.
     const canonical = await resolveCanonicalSlug(slug);
     if (canonical) permanentRedirect(`/contractors/${canonical}`);
-    notFound();
+
+    // Last-ditch fallback: live BQ rollup + base-recipients table (catches
+    // small contractors and orphan UEIs that the warmed cache + rollup table
+    // both missed). ISR caches the resulting page for 7 days, so each unique
+    // cold slug pays at most a handful of live BQ queries once per window.
+    recipient = await getRollupOrSingleBySlug(slug, true);
+    if (!recipient) notFound();
+    needsLiveBq = true;
   }
 
   // Same-name orphan that resolved to a higher-spend rollup with a different
@@ -146,12 +164,12 @@ export default async function ContractorPage({ params }: PageProps) {
     subPaidOutSummary,
     subReceivedSummary,
   ] = await Promise.all([
-    getYearlyTotalsForRecipient(ueis, rollupUei),
-    getYearlyByAgencyForRecipient(ueis, rollupUei),
-    getTopAgenciesForRecipient(ueis, rollupUei, 10),
-    getTopNaicsForRecipient(ueis, rollupUei, 25), // wider NAICS set for treemap (more visual diversity than agencies)
-    getTopNaicsForRecipient(ueis, rollupUei, 10),
-    getRecentAwardsForRecipient(ueis, rollupUei, 25),
+    getYearlyTotalsForRecipient(ueis, rollupUei, needsLiveBq),
+    getYearlyByAgencyForRecipient(ueis, rollupUei, needsLiveBq),
+    getTopAgenciesForRecipient(ueis, rollupUei, 10, needsLiveBq),
+    getTopNaicsForRecipient(ueis, rollupUei, 25, needsLiveBq), // wider NAICS set for treemap (more visual diversity than agencies)
+    getTopNaicsForRecipient(ueis, rollupUei, 10, needsLiveBq),
+    getRecentAwardsForRecipient(ueis, rollupUei, 25, needsLiveBq),
     getExecutivesForRecipient(ueis, rollupUei),
     getSubawardsPaidOutSummary(rollupUei),
     getSubawardsReceivedSummary(rollupUei),

@@ -193,6 +193,47 @@ export async function getRollupBySlug(slug: string, liveBq = false): Promise<Rol
 }
 
 /**
+ * Rollup resolver with single-UEI fallback. Tries the rollup table first;
+ * if the slug isn't a rollup name (small contractor or orphan UEI that the
+ * recipients_rollup build excluded), falls back to the base `recipients`
+ * table and synthesizes a one-UEI rollup so the contractor page can still
+ * render. Pass liveBq=true to allow a cold BQ scan when the cache misses
+ * (the public page does this as its last fallback before 404).
+ *
+ * Cost: ≤2 BQ queries (rollup + recipients) per cold slug. ISR caches the
+ * resulting page for 7 days, so each unique slug pays this once per window.
+ */
+export async function getRollupOrSingleBySlug(
+  slug: string,
+  liveBq = false,
+): Promise<RollupProfile | null> {
+  const rollup = await getRollupBySlug(slug, liveBq);
+  if (rollup) return rollup;
+  const recipient = await getRecipientBySlug(slug, liveBq);
+  if (!recipient) return null;
+  return {
+    rollup_uei: recipient.recipient_uei,
+    rollup_name: recipient.recipient_name,
+    canonical_slug: recipientSlug(recipient.recipient_name),
+    child_ueis: [recipient.recipient_uei],
+    child_count: 1,
+    cage_code: recipient.cage_code,
+    address: recipient.address,
+    city: recipient.city,
+    state: recipient.state,
+    zip: recipient.zip,
+    country: recipient.country,
+    total_obligated: Number(recipient.total_obligated || 0),
+    award_count: Number(recipient.award_count || 0),
+    transaction_count: Number(recipient.transaction_count || 0),
+    first_action_date: recipient.first_action_date,
+    last_action_date: recipient.last_action_date,
+    distinct_agency_count: Number(recipient.distinct_agency_count || 0),
+    distinct_naics_count: Number(recipient.distinct_naics_count || 0),
+  };
+}
+
+/**
  * Sibling-redirect resolver. Given the slug actually requested, return the
  * canonical rollup slug it should 301/308 to — or null if the requested
  * slug IS already canonical (so the page renders without redirecting).
