@@ -17,6 +17,7 @@ import {
 import { fetchFPDSByNaics, mapFPDSToAgencies } from '@/lib/utils/fpds-api';
 import { expandGenericDoDAgency } from '@/lib/utils/command-info';
 import { expandNAICSCodes, parseNAICSInput } from '@/lib/utils/naics-expansion';
+import { marketFilterToUsaspending } from '@/lib/market/keyword-coverage';
 import {
   MICRO_PURCHASE_THRESHOLD,
   SIMPLIFIED_ACQUISITION_THRESHOLD,
@@ -35,9 +36,19 @@ export async function POST(request: NextRequest) {
       pscCode,
       excludeDOD,
       searchKeywords: rawSearchKeywords,
+      marketFilter: rawMarketFilter,
     } = body;
 
+    const marketFilter = rawMarketFilter
+      && (rawMarketFilter.keywords?.length || rawMarketFilter.psc_codes?.length)
+      ? rawMarketFilter
+      : null;
+    const keywordPrimary = Boolean(marketFilter);
+
     console.log('🔍 Government contract search request:', body);
+    if (keywordPrimary) {
+      console.log(`🎯 Keyword/PSC-primary discovery: ${marketFilter!.rankingLabel}`);
+    }
     if (excludeDOD) {
       console.log('🚫 DOD exclusion enabled - will filter out Department of Defense agencies');
     }
@@ -71,9 +82,10 @@ export async function POST(request: NextRequest) {
     // Track if this is a multi-NAICS search (for expanded fetch limits)
     let isMultiNaicsSearch = false;
 
-    // Add NAICS filter if provided
-    // Supports comma-separated input: "236, 238, 541511"
-    if (naicsCode && naicsCode.trim()) {
+    // Add NAICS filter if provided — SKIPPED when keyword/PSC-primary (#59).
+    // NAICS = vendor industry (who sold), not what was bought. Keyword-primary
+    // mode uses marketFilter for discovery; NAICS stays eligibility-only in TMR.
+    if (naicsCode && naicsCode.trim() && !keywordPrimary) {
       // Check if user entered multiple NAICS codes (comma-separated)
       const inputCodes = parseNAICSInput(naicsCode);
 
@@ -290,11 +302,10 @@ export async function POST(request: NextRequest) {
       filters.set_aside_type_codes = setAsideTypeCodes;
     }
 
-    // Add PSC (Product/Service Code) filter
-    // If NAICS provided, PSC supplements via crosswalk. If only PSC, convert to NAICS codes.
-    const hasNaicsFilter = naicsCode && naicsCode.trim();
+    // Add PSC filter — keyword-primary already carries PSC in marketFilter.
+    const hasNaicsFilter = naicsCode && naicsCode.trim() && !keywordPrimary;
 
-    if (!hasNaicsFilter && pscCode && pscCode.trim()) {
+    if (!keywordPrimary && !hasNaicsFilter && pscCode && pscCode.trim()) {
       const trimmedPsc = pscCode.trim().toUpperCase();
       // Use crosswalk to convert PSC → related NAICS codes for better results
       const { getNAICSForPSC } = await import('@/lib/utils/psc-crosswalk');
@@ -441,33 +452,7 @@ export async function POST(request: NextRequest) {
     }
 
     const satPages = Math.min(maxPagesPerSort, 15);
-    console.log(
-      `📊 Smart sampling: up to ${maxPagesPerSort * limit} by $ + ${maxPagesPerSort * limit} by date + ${satPages * limit} SAT-eligible (≤$${SIMPLIFIED_ACQUISITION_THRESHOLD / 1000}K)...`,
-    );
 
-    // PASS 1: Fetch by Award Amount (biggest contracts first)
-    console.log('   Pass 1: Fetching by Award Amount (largest contracts)...');
-    const byAmount = await fetchBatch('Award Amount', 'desc', maxPagesPerSort);
-    console.log(`   ✓ Retrieved ${byAmount.length} contracts by amount`);
-
-    // PASS 2: Fetch by Award Date (most recent contracts)
-    console.log('   Pass 2: Fetching by Award Date (most recent)...');
-    const byDate = await fetchBatch('Award Date', 'desc', maxPagesPerSort);
-    console.log(`   ✓ Retrieved ${byDate.length} contracts by date`);
-
-    // PASS 3: SAT-eligible awards only. Pass 1 sorts amount DESC so
-    // high-volume NAICS fill the sample with mega-contracts and SAT%
-    // was always 0 (tasks/todo.md 2026-05-25). This pass guarantees
-    // sub-$350K awards enter the merge for honest office-level SAT%.
-    const satFilters = {
-      ...filters,
-      award_amounts: [{ lower_bound: 1, upper_bound: SIMPLIFIED_ACQUISITION_THRESHOLD }],
-    };
-    console.log(`   Pass 3: Fetching SAT-eligible awards (≤$${SIMPLIFIED_ACQUISITION_THRESHOLD / 1000}K)...`);
-    const bySat = await fetchBatch('Award Amount', 'desc', satPages, satFilters);
-    console.log(`   ✓ Retrieved ${bySat.length} SAT-eligible contracts`);
-
-    // Deduplicate by Award ID
     const seenAwardIds = new Set<string>();
     const allAwards: any[] = [];
 
@@ -481,39 +466,115 @@ export async function POST(request: NextRequest) {
       }
     };
 
-    mergeAwards(byAmount);
-    const amountOnlyCount = allAwards.length;
-    mergeAwards(byDate);
-    const uniqueFromDate = allAwards.length - amountOnlyCount;
-    const beforeSat = allAwards.length;
-    mergeAwards(bySat);
-    const uniqueFromSat = allAwards.length - beforeSat;
+    let amountOnlyCount = 0;
+    let uniqueFromDate = 0;
+    let uniqueFromSat = 0;
+
+    if (keywordPrimary && marketFilter) {
+      // KEYWORD/PSC-PRIMARY (#59): sample awards by what was BOUGHT, not vendor NAICS.
+      const discoveryBase: Record<string, unknown> = { ...filters };
+      delete discoveryBase.naics_codes;
+      delete discoveryBase.psc_codes;
+      delete discoveryBase.keywords;
+      const primaryFilter = marketFilterToUsaspending(marketFilter, discoveryBase);
+      const kwPages = Math.min(maxPagesPerSort, 20);
+
+      console.log(`📊 Keyword/PSC-primary sampling: ${marketFilter.rankingLabel}`);
+      console.log('   Pass 1: Fetching by Award Amount (largest contracts)...');
+      const byAmount = await fetchBatch('Award Amount', 'desc', kwPages, primaryFilter);
+      console.log(`   ✓ Retrieved ${byAmount.length} contracts by amount`);
+      console.log('   Pass 2: Fetching by Award Date (most recent)...');
+      const byDate = await fetchBatch('Award Date', 'desc', kwPages, primaryFilter);
+      console.log(`   ✓ Retrieved ${byDate.length} contracts by date`);
+      const satFilters = {
+        ...primaryFilter,
+        award_amounts: [{ lower_bound: 1, upper_bound: SIMPLIFIED_ACQUISITION_THRESHOLD }],
+      };
+      console.log(`   Pass 3: Fetching SAT-eligible awards (≤$${SIMPLIFIED_ACQUISITION_THRESHOLD / 1000}K)...`);
+      const bySat = await fetchBatch('Award Amount', 'desc', satPages, satFilters);
+      console.log(`   ✓ Retrieved ${bySat.length} SAT-eligible contracts`);
+
+      mergeAwards(byAmount);
+      amountOnlyCount = allAwards.length;
+      mergeAwards(byDate);
+      uniqueFromDate = allAwards.length - amountOnlyCount;
+      const beforeSat = allAwards.length;
+      mergeAwards(bySat);
+      uniqueFromSat = allAwards.length - beforeSat;
+
+      // Union derived search terms (PSC name, NAICS title signals) — skip primary keyword dup.
+      const searchKeywords = Array.isArray(rawSearchKeywords)
+        ? rawSearchKeywords.map((k) => String(k).trim()).filter((k) => k.length >= 3).slice(0, 6)
+        : [];
+      const primaryKw = (marketFilter.keywords?.[0] || '').toLowerCase();
+      if (searchKeywords.length > 0) {
+        const beforeKw = allAwards.length;
+        const extraPages = Math.min(kwPages, 12);
+        for (const kw of searchKeywords) {
+          if (kw.toLowerCase() === primaryKw) continue;
+          const kwFilters = { ...discoveryBase, keywords: [kw.slice(0, 80)] };
+          console.log(`   Derived keyword pass: "${kw}"...`);
+          mergeAwards(await fetchBatch('Award Amount', 'desc', extraPages, kwFilters));
+          mergeAwards(await fetchBatch('Award Date', 'desc', Math.min(extraPages, 8), kwFilters));
+        }
+        console.log(`✅ Derived keyword union: +${allAwards.length - beforeKw} contracts`);
+      }
+    } else {
+      console.log(
+        `📊 Smart sampling: up to ${maxPagesPerSort * limit} by $ + ${maxPagesPerSort * limit} by date + ${satPages * limit} SAT-eligible (≤$${SIMPLIFIED_ACQUISITION_THRESHOLD / 1000}K)...`,
+      );
+
+      // PASS 1: Fetch by Award Amount (biggest contracts first)
+      console.log('   Pass 1: Fetching by Award Amount (largest contracts)...');
+      const byAmount = await fetchBatch('Award Amount', 'desc', maxPagesPerSort);
+      console.log(`   ✓ Retrieved ${byAmount.length} contracts by amount`);
+
+      // PASS 2: Fetch by Award Date (most recent contracts)
+      console.log('   Pass 2: Fetching by Award Date (most recent)...');
+      const byDate = await fetchBatch('Award Date', 'desc', maxPagesPerSort);
+      console.log(`   ✓ Retrieved ${byDate.length} contracts by date`);
+
+      const satFilters = {
+        ...filters,
+        award_amounts: [{ lower_bound: 1, upper_bound: SIMPLIFIED_ACQUISITION_THRESHOLD }],
+      };
+      console.log(`   Pass 3: Fetching SAT-eligible awards (≤$${SIMPLIFIED_ACQUISITION_THRESHOLD / 1000}K)...`);
+      const bySat = await fetchBatch('Award Amount', 'desc', satPages, satFilters);
+      console.log(`   ✓ Retrieved ${bySat.length} SAT-eligible contracts`);
+
+      mergeAwards(byAmount);
+      amountOnlyCount = allAwards.length;
+      mergeAwards(byDate);
+      uniqueFromDate = allAwards.length - amountOnlyCount;
+      const beforeSat = allAwards.length;
+      mergeAwards(bySat);
+      uniqueFromSat = allAwards.length - beforeSat;
+
+      // KEYWORD UNION (#59): merge award samples on top of NAICS pass (legacy NAICS mode).
+      const searchKeywords = Array.isArray(rawSearchKeywords)
+        ? rawSearchKeywords.map((k) => String(k).trim()).filter((k) => k.length >= 3).slice(0, 6)
+        : [];
+      if (searchKeywords.length > 0) {
+        const beforeKw = allAwards.length;
+        const kwPages = Math.min(maxPagesPerSort, 15);
+        for (const kw of searchKeywords) {
+          const kwFilters = { ...filters };
+          delete kwFilters.naics_codes;
+          delete kwFilters.psc_codes;
+          kwFilters.keywords = [kw.slice(0, 80)];
+          console.log(`   Keyword pass: "${kw}"...`);
+          const kwByAmount = await fetchBatch('Award Amount', 'desc', kwPages, kwFilters);
+          const kwByDate = await fetchBatch('Award Date', 'desc', Math.min(kwPages, 10), kwFilters);
+          mergeAwards(kwByAmount);
+          mergeAwards(kwByDate);
+        }
+        console.log(`✅ Keyword union: +${allAwards.length - beforeKw} contracts from ${searchKeywords.length} terms`);
+      }
+    }
 
     console.log(
-      `✅ Smart sampling complete: ${allAwards.length} unique contracts (${amountOnlyCount} by $, +${uniqueFromDate} recent, +${uniqueFromSat} SAT-eligible)`,
+      `✅ Sampling complete: ${allAwards.length} unique contracts (${amountOnlyCount} by $, +${uniqueFromDate} recent, +${uniqueFromSat} SAT-eligible)`,
     );
-
-    // KEYWORD UNION (#59): merge award samples matched by exact-phrase keywords
-    // (user term + PSC/NAICS-derived signals) ON TOP of the NAICS pass.
-    const searchKeywords = Array.isArray(rawSearchKeywords)
-      ? rawSearchKeywords.map((k) => String(k).trim()).filter((k) => k.length >= 3).slice(0, 6)
-      : [];
-    if (searchKeywords.length > 0) {
-      const beforeKw = allAwards.length;
-      const kwPages = Math.min(maxPagesPerSort, 15);
-      for (const kw of searchKeywords) {
-        const kwFilters = { ...filters };
-        delete kwFilters.naics_codes;
-        delete kwFilters.psc_codes;
-        kwFilters.keywords = [kw.slice(0, 80)];
-        console.log(`   Keyword pass: "${kw}"...`);
-        const kwByAmount = await fetchBatch('Award Amount', 'desc', kwPages, kwFilters);
-        const kwByDate = await fetchBatch('Award Date', 'desc', Math.min(kwPages, 10), kwFilters);
-        mergeAwards(kwByAmount);
-        mergeAwards(kwByDate);
-      }
-      console.log(`✅ Keyword union: +${allAwards.length - beforeKw} contracts from ${searchKeywords.length} terms`);
-    }
 
     // Track if we applied a fallback to show users what changed
     let wasAutoAdjusted = false;

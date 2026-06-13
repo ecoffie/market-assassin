@@ -15,6 +15,104 @@ import { fiscalYearTimePeriod } from '@/lib/utils/fiscal-year';
 
 const BASE = 'https://api.usaspending.gov/api/v2/search/spending_by_category';
 
+/** How agency rankings + discovery filter USAspending — keyword/PSC, never NAICS. */
+export type MarketFilterMode = 'keyword' | 'keyword_psc' | 'psc' | 'naics';
+
+export interface MarketFilter {
+  keywords?: string[];
+  psc_codes?: string[];
+  mode: MarketFilterMode;
+  /** Human label for UI — e.g. 'keyword "demolition" + PSC P500' */
+  rankingLabel: string;
+}
+
+/** PSC names that are too generic to tighten rankings (engineering support, etc.). */
+const GENERIC_PSC_PATTERNS = [
+  /support-\s*professional/i,
+  /engineering\/tech/i,
+  /managed health/i,
+  /professional:\s*engineering/i,
+  /services?\s*-\s*general/i,
+  /miscellaneous/i,
+  /other\s*services/i,
+  /research\s+and\s+development/i,
+];
+
+export function isGenericPsc(name: string | undefined | null): boolean {
+  if (!name) return true;
+  return GENERIC_PSC_PATTERNS.some((p) => p.test(name));
+}
+
+/** PSC must literally describe the user's product — not just a related category. */
+export function pscLiteralProduct(keyword: string, pscName: string): boolean {
+  const kw = keyword.toLowerCase().trim();
+  const psc = pscName.toLowerCase();
+  if (!kw || !psc) return false;
+  if (psc.includes(kw)) return true;
+  // Significant keyword token appears in PSC title (≥4 chars)
+  const tokens = kw.replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter((w) => w.length >= 4);
+  if (tokens.some((t) => psc.includes(t))) return true;
+  return false;
+}
+
+/**
+ * Single source of truth for ranking + agency discovery filters.
+ * Keyword = default; add top PSC when the market concentrates on one product code.
+ * NAICS is never returned here — it is eligibility-only (set-aside / pain points).
+ */
+export function buildMarketFilter(opts: {
+  coverage?: KeywordCoverage | null;
+  pscCode?: string;
+  keyword?: string;
+}): MarketFilter | null {
+  const { coverage, pscCode } = opts;
+
+  if (coverage?.keyword) {
+    const kw = coverage.keyword;
+    const pscIsSpecific = Boolean(
+      coverage.topPsc?.code
+      && coverage.topPscPct >= 0.40
+      && !isGenericPsc(coverage.topPsc.name)
+      && pscLiteralProduct(kw, coverage.topPsc.name),
+    );
+    if (pscIsSpecific && coverage.topPsc) {
+      return {
+        keywords: [kw],
+        psc_codes: [coverage.topPsc.code],
+        mode: 'keyword_psc',
+        rankingLabel: `keyword "${kw}" + PSC ${coverage.topPsc.code} (${coverage.topPsc.name})`,
+      };
+    }
+    return {
+      keywords: [kw],
+      mode: 'keyword',
+      rankingLabel: `keyword "${kw}"`,
+    };
+  }
+
+  const psc = (pscCode || '').trim().toUpperCase();
+  if (psc) {
+    return {
+      psc_codes: [psc],
+      mode: 'psc',
+      rankingLabel: `PSC ${psc}`,
+    };
+  }
+
+  return null;
+}
+
+/** Merge a MarketFilter into USAspending filter fields (no NAICS). */
+export function marketFilterToUsaspending(
+  marketFilter: MarketFilter,
+  base: Record<string, unknown> = {},
+): Record<string, unknown> {
+  const out = { ...base };
+  if (marketFilter.keywords?.length) out.keywords = marketFilter.keywords;
+  if (marketFilter.psc_codes?.length) out.psc_codes = marketFilter.psc_codes;
+  return out;
+}
+
 export interface KeywordCoverage {
   keyword: string;
   totalMarket: number;            // $ total across all codes that bought this

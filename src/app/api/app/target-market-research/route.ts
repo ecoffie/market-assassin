@@ -51,7 +51,7 @@ import {
 } from '@/lib/agency-hierarchy/pain-points-linker';
 import { getPrimesByAgency } from '@/lib/utils/prime-contractors';
 import { getEnhancedAgencyInfo, getAllCommands } from '@/lib/utils/command-info';
-import { keywordCoverage, deriveCoverageKeywords, buildSearchKeywords } from '@/lib/market/keyword-coverage';
+import { keywordCoverage, deriveCoverageKeywords, buildSearchKeywords, buildMarketFilter, marketFilterToUsaspending } from '@/lib/market/keyword-coverage';
 import { internalBaseUrl } from '@/lib/utils/internal-base-url';
 
 const FREE_TIER_ROW_LIMIT = 10;
@@ -283,6 +283,7 @@ export async function POST(request: NextRequest) {
       ? rawProfileKeywords.map((k) => String(k).trim()).filter((k) => k.length >= 3).slice(0, 5)
       : [];
     const searchKeywords = buildSearchKeywords({ keyword, coverage, profileKeywords });
+    const marketFilter = buildMarketFilter({ coverage, pscCode: psc, keyword });
 
     // Tier check. Free users still see data, just fewer rows.
     const access = await verifyMIAccess(email);
@@ -366,14 +367,24 @@ export async function POST(request: NextRequest) {
       headers: { 'Content-Type': 'application/json' },
       redirect: 'follow' as const, // belt + suspenders if a redirect ever sneaks in
     };
+    const findAgenciesBody = (withSetAside: boolean) => JSON.stringify({
+      naicsCode: marketFilter ? '' : naics,
+      businessType: withSetAside ? businessType : '',
+      veteranStatus: withSetAside ? veteranStatus : '',
+      zipCode,
+      pscCode: marketFilter ? '' : psc,
+      excludeDOD,
+      searchKeywords,
+      marketFilter: marketFilter || undefined,
+    });
     const [findRes, totalRes] = await Promise.all([
       fetch(`${baseUrl}/api/usaspending/find-agencies`, {
         ...findAgenciesInit,
-        body: JSON.stringify({ naicsCode: naics, businessType, veteranStatus, zipCode, pscCode: psc, excludeDOD, searchKeywords }),
+        body: findAgenciesBody(true),
       }),
       fetch(`${baseUrl}/api/usaspending/find-agencies`, {
         ...findAgenciesInit,
-        body: JSON.stringify({ naicsCode: naics, businessType: '', veteranStatus: '', zipCode, pscCode: psc, excludeDOD, searchKeywords }),
+        body: findAgenciesBody(false),
       }),
     ]);
     const findData = (await findRes.json()) as FindAgenciesPayload;
@@ -411,19 +422,19 @@ export async function POST(request: NextRequest) {
     // agency name and use it as the authoritative metric_top_total. Falls back
     // to the sampled total when an agency isn't in the category response.
     const categoryTotalByKey: Record<string, number> = {};
-    const keywordGrounded = Boolean(coverage?.keyword);
+    const keywordGrounded = Boolean(marketFilter);
     try {
       const expanded = expandNAICSCodes(parseNAICSInput(naics));
       const catFilterBase: Record<string, unknown> = {
         time_period: [{ start_date: '2023-10-01', end_date: new Date().toISOString().slice(0, 10) }],
         award_type_codes: ['A', 'B', 'C', 'D'],
       };
-      if (coverage?.keyword) {
-        catFilterBase.keywords = [coverage.keyword];
+      if (marketFilter) {
+        Object.assign(catFilterBase, marketFilterToUsaspending(marketFilter));
       } else if (expanded.length > 0) {
         catFilterBase.naics_codes = expanded;
       }
-      if (coverage?.keyword || expanded.length > 0) {
+      if (marketFilter || expanded.length > 0) {
         // Sub-agency + parent department totals (keyword or NAICS). Parent-level
         // keys let DoD/HHS rank correctly; sub-agency keys surface USACE/Navy.
         for (const category of ['awarding_subagency', 'awarding_agency'] as const) {
@@ -785,10 +796,11 @@ export async function POST(request: NextRequest) {
         coverage_pct: Math.round(coverage.coveragePct * 100),
         top_code_pct: Math.round(coverage.topCodePct * 100),
         psc_count: coverage.pscCount,
-        top_psc: coverage.topPsc,           // "what was bought" — the teachable PSC lesson
-        // SEARCH KEYWORDS the user can add to alerts — grounded in real data: the
-        // keyword itself + the top PSC's product name + signal words from the top
-        // buying NAICS titles. These catch body-buried opps the codes alone miss.
+        top_psc: coverage.topPsc,
+        top_psc_pct: Math.round(coverage.topPscPct * 100),
+        ranking_mode: marketFilter?.mode || 'keyword',
+        ranking_label: marketFilter?.rankingLabel || `keyword "${coverage.keyword}"`,
+        uses_psc_ranking: marketFilter?.mode === 'keyword_psc',
         keywords: deriveCoverageKeywords(coverage),
       } : null,
       cached: false,

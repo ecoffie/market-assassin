@@ -2268,7 +2268,10 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               the same view a BD person used to get from the FPDS-NG
               search sidebar before FPDS retired in Feb 2026. */}
           <FpdsLeaderboards
-            naicsCode={formData.naicsCode}
+            naicsCode={marketCoverage ? '' : formData.naicsCode}
+            keyword={marketCoverage?.keyword}
+            pscCode={marketCoverage?.uses_psc_ranking ? marketCoverage?.top_psc?.code : undefined}
+            rankingLabel={marketCoverage?.ranking_label}
             excludeDOD={formData.excludeDOD}
             email={email}
             onAgencyClick={(agencyName) => {
@@ -3396,11 +3399,17 @@ interface FpdsResponse {
 
 function FpdsLeaderboards({
   naicsCode,
+  keyword,
+  pscCode,
+  rankingLabel,
   excludeDOD,
   email,
   onAgencyClick,
 }: {
   naicsCode: string;
+  keyword?: string;
+  pscCode?: string;
+  rankingLabel?: string;
   excludeDOD: boolean;
   email: string | null;
   /**
@@ -3416,13 +3425,12 @@ function FpdsLeaderboards({
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Use the first NAICS code from comma-separated input. The FPDS
-  // endpoint takes a single NAICS at a time (USAspending category
-  // queries don't accept OR'd NAICS lists). Future: fan out N calls.
+  // Keyword-first: use market filter. Legacy NAICS mode uses first code.
   const primaryNaics = (naicsCode || '').split(',')[0]?.trim() || '';
+  const useKeyword = Boolean(keyword?.trim());
 
   useEffect(() => {
-    if (!primaryNaics) {
+    if (!useKeyword && !primaryNaics) {
       setData(null);
       return;
     }
@@ -3431,7 +3439,13 @@ function FpdsLeaderboards({
     setLoading(true);
     setError(null);
 
-    const params = new URLSearchParams({ naics: primaryNaics });
+    const params = new URLSearchParams();
+    if (useKeyword && keyword) {
+      params.set('keyword', keyword.trim());
+      if (pscCode) params.set('psc', pscCode);
+    } else {
+      params.set('naics', primaryNaics);
+    }
     if (excludeDOD) params.set('excludeDOD', 'true');
 
     fetch(`/api/usaspending/fpds-top-n?${params.toString()}`)
@@ -3454,9 +3468,13 @@ function FpdsLeaderboards({
       });
 
     return () => { cancelled = true; };
-  }, [primaryNaics, excludeDOD]);
+  }, [primaryNaics, keyword, pscCode, excludeDOD, useKeyword]);
 
-  if (!primaryNaics) return null;
+  if (!useKeyword && !primaryNaics) return null;
+
+  const subtitle = useKeyword
+    ? (rankingLabel || `keyword "${keyword}"`)
+    : `NAICS ${primaryNaics}`;
 
   return (
     <section className="space-y-3">
@@ -3464,7 +3482,7 @@ function FpdsLeaderboards({
         <div>
           <h3 className="text-base font-bold text-white">FPDS Leaderboards</h3>
           <p className="text-xs text-slate-500">
-            Top 10 by award $ in NAICS {primaryNaics}
+            Top 10 by award $ · {subtitle}
             {data?.fiscal_year ? ` · FY${data.fiscal_year}` : ''}
             {data?.cached ? ' · cached' : ''}
           </p>

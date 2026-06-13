@@ -1098,3 +1098,30 @@ was bleeding into sort metrics.
 **Proof:** USASpending `spending_by_category` + `keywords:["excel"]` — Department
 level: HHS $520M, DoD $380M, DOE $20M (Jun 2026). TMR `keywordGrounded` flag
 blocks sample fallback on `metric_top_total` / `metric_top_spending`.
+
+---
+
+## PSC/Keyword-First Agency Rankings (June 2026)
+
+**What:** Market Research Sport mode now ranks agencies by **what was bought**
+(keyword + optional top PSC), not vendor NAICS. `buildMarketFilter()` is the
+single source of truth for discovery, `metric_top_total`, FPDS leaderboards, and
+the coverage banner teaching moment.
+
+**Why:** NAICS classifies who the **seller** is — too broad and incomplete for
+"who buys drones." PSC classifies the **product**; keywords match award titles.
+Ranking by NAICS put DOE/NASA at the top for "excel"; keyword ranking correctly
+surfaces HHS #1, DoD #2.
+
+**SEO:** federal procurement PSC codes, keyword agency rankings, NAICS vs PSC
+government contracting, who buys [keyword] federal contracts
+
+**Proof:** USASpending `spending_by_category` FY24–today: `excel` keyword → HHS
+$516M, DoD $377M; `demolition` → keyword+PSC P500 → DoD $1.7B, DOE $1.1B;
+`drones` → keyword mode (PSC 1550 too generic at 40% threshold) → DoD $267M;
+`cybersecurity` → keyword → DoD $2.6B. `buildMarketFilter()` adds PSC only when
+`topPscPct >= 40%` and PSC name is product-specific (demolition P500), not
+generic services (R425 engineering support). PSC tightening also requires a
+literal keyword↔PSC name match so related categories (1550 Unmanned Aircraft
+for "drones") do not over-restrict rankings.
+

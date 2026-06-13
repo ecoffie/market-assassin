@@ -27,6 +27,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
+import {
+  buildMarketFilter,
+  keywordCoverage,
+  marketFilterToUsaspending,
+  type MarketFilter,
+} from '@/lib/market/keyword-coverage';
 
 const USASPENDING_URL = 'https://api.usaspending.gov/api/v2/search/spending_by_category';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
@@ -68,37 +74,32 @@ interface CategoryResult {
 
 /**
  * Build the USASpending filter shared by all 4 category calls.
- * Mirrors the FPDS-NG filter set: NAICS, optional state, optional
- * agency exclusion, fiscal year date range.
- *
- * IMPORTANT — naics_codes here is the FULL expanded list of 6-digit
- * codes (e.g. ["236115", "236116", ...]) not a single prefix. See
- * expandNaicsForFpds() at module bottom. Passing a short prefix
- * like "236" returns zero rows from USAspending.
+ * Keyword/PSC mode ranks by what was bought; NAICS mode is legacy profile search.
  */
-function buildFilters(opts: {
-  naicsCodes: string[];
+function buildSpendingFilters(opts: {
+  naicsCodes?: string[];
+  marketFilter?: MarketFilter | null;
   state?: string;
   fiscalYear: number;
-  excludeDOD: boolean;
 }) {
-  const startDate = `${opts.fiscalYear - 1}-10-01`; // FY starts Oct 1 prior year
+  const startDate = `${opts.fiscalYear - 1}-10-01`;
   const endDate = `${opts.fiscalYear}-09-30`;
 
   const filters: Record<string, unknown> = {
-    naics_codes: opts.naicsCodes,
     award_type_codes: CONTRACT_AWARD_TYPE_CODES,
     time_period: [{ start_date: startDate, end_date: endDate }],
   };
+
+  if (opts.marketFilter) {
+    marketFilterToUsaspending(opts.marketFilter, filters);
+  } else if (opts.naicsCodes?.length) {
+    filters.naics_codes = opts.naicsCodes;
+  }
 
   if (opts.state) {
     filters.place_of_performance_locations = [{ country: 'USA', state: opts.state }];
   }
 
-  // excludeDOD removes Department of Defense from the awarding-
-  // agency scope. USAspending doesn't expose a direct "exclude"
-  // filter so we post-filter the results client-side below. Flag
-  // is plumbed through so the cache key reflects the choice.
   return filters;
 }
 
@@ -160,31 +161,41 @@ async function fetchCategory(
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const naics = url.searchParams.get('naics')?.trim() || '';
+  const keyword = url.searchParams.get('keyword')?.trim() || '';
+  const pscParam = url.searchParams.get('psc')?.trim().toUpperCase() || '';
   const state = (url.searchParams.get('state') || '').trim().toUpperCase();
   const excludeDOD = url.searchParams.get('excludeDOD') === 'true';
   const fyParam = url.searchParams.get('fy');
   const fiscalYear = fyParam ? Number(fyParam) : currentFiscalYear();
 
-  if (!naics) {
-    return NextResponse.json({ error: 'naics is required' }, { status: 400 });
+  if (!naics && !keyword && !pscParam) {
+    return NextResponse.json({ error: 'naics, keyword, or psc is required' }, { status: 400 });
   }
   if (Number.isNaN(fiscalYear) || fiscalYear < 2020 || fiscalYear > 2030) {
     return NextResponse.json({ error: 'fy out of range' }, { status: 400 });
   }
 
-  // Expand short prefixes to all matching 6-digit NAICS codes.
-  // USAspending's spending_by_category endpoint REQUIRES 6-digit
-  // codes; sending "236" returns zero rows. Sending all 6 expansions
-  // (236115, 236116, 236117, 236118, 236210, 236220) returns the
-  // construction-of-buildings market the user actually wants.
-  //
-  // The cache key uses the user's input (`naics`) so different
-  // prefixes ("236" vs "236220") cache separately — they ARE
-  // different views of the market. Keeps the cache predictable.
-  const expandedNaics = expandNAICSCodes([naics]);
+  let marketFilter: MarketFilter | null = null;
+  let expandedNaics: string[] = [];
+  let filterKey: string;
+
+  if (keyword) {
+    const coverage = await keywordCoverage(keyword);
+    marketFilter = buildMarketFilter({ coverage, keyword, pscCode: pscParam || undefined });
+    if (!marketFilter) {
+      return NextResponse.json({ error: `No federal market found for keyword "${keyword}"` }, { status: 404 });
+    }
+    filterKey = `kw:${keyword}${marketFilter.psc_codes?.length ? `:psc:${marketFilter.psc_codes[0]}` : ''}`;
+  } else if (pscParam) {
+    marketFilter = buildMarketFilter({ pscCode: pscParam });
+    filterKey = `psc:${pscParam}`;
+  } else {
+    expandedNaics = expandNAICSCodes([naics]);
+    filterKey = naics;
+  }
 
   const cacheKey = {
-    naics_code: naics,
+    naics_code: filterKey,
     state_code: state,
     fiscal_year: fiscalYear,
     exclude_dod: excludeDOD,
@@ -241,7 +252,12 @@ export async function GET(request: NextRequest) {
   }
 
   // 2) Cache miss — 4 parallel USAspending calls
-  const filters = buildFilters({ naicsCodes: expandedNaics, state: state || undefined, fiscalYear, excludeDOD });
+  const filters = buildSpendingFilters({
+    naicsCodes: expandedNaics.length ? expandedNaics : undefined,
+    marketFilter,
+    state: state || undefined,
+    fiscalYear,
+  });
 
   const [departments, contracting, vendors, funding] = await Promise.all([
     fetchCategory('awarding_agency', filters, DEFAULT_LIMIT * 2), // pull 20 so post-DOD-exclusion still has 10
@@ -290,9 +306,11 @@ export async function GET(request: NextRequest) {
     success: true,
     cached: false,
     fiscal_year: fiscalYear,
-    naics_requested: naics,
-    naics_expanded: expandedNaics,
-    naics_expansion_count: expandedNaics.length,
+    naics_requested: naics || null,
+    keyword: keyword || null,
+    ranking_label: marketFilter?.rankingLabel || null,
+    naics_expanded: expandedNaics.length ? expandedNaics : null,
+    naics_expansion_count: expandedNaics.length || null,
     top_departments: finalDepartments,
     top_contracting: finalContracting,
     top_vendors: vendors,

@@ -27,8 +27,15 @@ export interface CoreInputs {
   pscCode?: string;  // Product/Service Code (4-character) for precise filtering
   companyName?: string;
   excludeDOD?: boolean;  // Exclude Department of Defense agencies (civilian agencies only)
-  /** USAspending exact-phrase terms — unioned with NAICS award sample (#59). */
+  /** USAspending exact-phrase terms — unioned with primary award sample (#59). */
   searchKeywords?: string[];
+  /** Keyword/PSC-first discovery filter — when set, NAICS is not used for sampling. */
+  marketFilter?: {
+    keywords?: string[];
+    psc_codes?: string[];
+    mode: 'keyword' | 'keyword_psc' | 'psc' | 'naics';
+    rankingLabel: string;
+  };
 }
 
 // Agency Data from USAspending.gov
