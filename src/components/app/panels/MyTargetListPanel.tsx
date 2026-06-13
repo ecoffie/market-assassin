@@ -1296,6 +1296,9 @@ function TargetContacts({ agency, subAgency, office, email }: { agency: string; 
   const [loading, setLoading] = useState(() => !_contactsCache.has(cacheKey));
   const [total, setTotal] = useState(0);
   const [search, setSearch] = useState('');
+  // True when we asked for a sub-agency but SAM only had parent-department POCs,
+  // so the card shows the parent dept (labeled, not silently wrong).
+  const [parentFallback, setParentFallback] = useState(false);
 
   useEffect(() => {
     if (_contactsCache.has(cacheKey)) { setContacts(_contactsCache.get(cacheKey)!); setLoading(false); return; }
@@ -1310,7 +1313,7 @@ function TargetContacts({ agency, subAgency, office, email }: { agency: string; 
       .then(d => {
         const list: TargetContact[] = d?.contacts || d?.results || [];
         _contactsCache.set(cacheKey, list);
-        if (active) { setContacts(list); setTotal(d?.total || list.length); }
+        if (active) { setContacts(list); setTotal(d?.total || list.length); setParentFallback(Boolean(d?.narrowedToParent)); }
       })
       .catch(() => {})
       .finally(() => { if (active) setLoading(false); });
@@ -1326,9 +1329,14 @@ function TargetContacts({ agency, subAgency, office, email }: { agency: string; 
   return (
     <div className="mt-3 rounded-lg border border-purple-500/20 bg-purple-500/[0.04] p-3">
       <div className="flex items-center justify-between mb-2">
-        <span className="text-xs font-semibold text-purple-300">Who to contact at {agency}</span>
+        <span className="text-xs font-semibold text-purple-300">Who to contact at {subA || agency}</span>
         <span className="text-[10px] text-slate-500">{contacts.length} contacts · from SAM notices</span>
       </div>
+      {parentFallback && subA && (
+        <div className="mb-2 rounded-md bg-amber-500/10 border border-amber-500/20 px-2 py-1 text-[11px] text-amber-200">
+          Showing <b>{agency}</b> contacts — SAM doesn’t have {subA}-specific POCs yet (their emails use the department-wide domain).
+        </div>
+      )}
 
       {/* Mindy insight: WHO to seek out (Eric — the roles to ask for even when
           they're not named in SAM data: KO, OSBP, program, end user, engineer).

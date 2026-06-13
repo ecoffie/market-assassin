@@ -431,17 +431,27 @@ export async function GET(request: NextRequest) {
   contacts = contacts.filter((c: any) => !FOREIGN_OFFICE_RE.test(c.derivedOffice || ''));
 
   // Filter by derived sub-agency (JS, since it's not a column). Fuzzy + case-
-  // insensitive so a stored "National Park Service" matches the derived label
-  // even with minor wording differences. If the narrow yields contacts, use them;
-  // if it yields ZERO, keep the narrow (honest "no NPS contacts" beats showing the
-  // wrong bureau's people — the whole point of the fix).
+  // insensitive so a stored "National Park Service" matches the derived label.
+  // FALLBACK: many civilian POCs use generic department emails (usda.gov, not
+  // fs.usda.gov), so the bureau can't be derived → narrowing would return zero.
+  // Rather than an empty card, fall back to the PARENT-department contacts and
+  // flag narrowedToParent so the UI can say "showing Dept of Agriculture — no
+  // Forest-Service-specific POCs in SAM yet." (TODO: bureau-level enrichment from
+  // office/sub_tier text is a separate data project.)
+  let narrowedToParent = false;
   if (subAgency) {
     const want = subAgency.toLowerCase();
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    contacts = contacts.filter((c: any) => {
+    const narrowed = contacts.filter((c: any) => {
       const got = (c.subAgency || '').toLowerCase();
       return got === want || (got && (got.includes(want) || want.includes(got)));
-    }).slice(0, limit);
+    });
+    if (narrowed.length > 0) {
+      contacts = narrowed.slice(0, limit);
+    } else {
+      narrowedToParent = true; // no bureau-specific POCs → show parent dept
+      contacts = contacts.slice(0, limit);
+    }
   }
 
   // OSBP / Small-Business office (Eric: OSBP was a SEPARATE source — the
@@ -473,5 +483,9 @@ export async function GET(request: NextRequest) {
     offset,
     limit,
     contacts,
+    // When the user targeted a sub-agency we couldn't narrow to (generic civilian
+    // emails), we fell back to the parent department — tell the UI so it can label it.
+    subAgency: subAgency || null,
+    narrowedToParent,
   });
 }
