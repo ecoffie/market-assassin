@@ -17,6 +17,8 @@ import {
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { createClient } from '@supabase/supabase-js';
 import type { LoiFields } from '@/lib/proposal/loi-fields';
+import { assembleLoiTemplate } from '@/lib/proposal/loi-template';
+import type { VaultContext } from '@/lib/proposal/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -115,6 +117,46 @@ async function loadCompanyProfile(email: string): Promise<CompanyProfile> {
       scope: str(p.scope_description) || str(p.scope) || str(p.outcomes),
     })),
   };
+}
+
+// Load the raw vault rows (identity + past performance) shaped as a VaultContext
+// so the deterministic LOI assembler (assembleLoiTemplate) can render the proven
+// "(a)(b)(c)(d) + RELEVANT EXPERIENCE" letter. We load the RAW rows (not the
+// reshaped CompanyProfile) because the assembler needs office / reference_name /
+// reference_phone / sub_agency to fill the labeled reference-project blocks.
+async function loadVaultForLoi(email: string): Promise<VaultContext> {
+  const sb = getSupabase();
+  const userEmail = email.toLowerCase().trim();
+  const [idRes, ppRes] = await Promise.all([
+    sb.from('user_identity_profile').select('*').eq('user_email', userEmail).maybeSingle().then((r: { data: unknown }) => r, () => ({ data: null })),
+    sb.from('user_past_performance').select('*').eq('user_email', userEmail).is('archived_at', null).order('updated_at', { ascending: false }).limit(10).then((r: { data: unknown }) => r, () => ({ data: [] })),
+  ]);
+  const identity = (idRes.data || null) as Record<string, unknown> | null;
+  const past_performance = (Array.isArray(ppRes.data) ? ppRes.data : []) as Array<Record<string, unknown>>;
+  return { has_any: Boolean(identity) || past_performance.length > 0, identity, past_performance };
+}
+
+// Render the deterministic LOI letter (a formatted plain-text string) as docx
+// paragraphs. The RELEVANT EXPERIENCE block uses space-aligned labels, so it is
+// rendered in a monospace font to preserve the column alignment; the rest reads
+// as a normal letter.
+function renderLoiTemplateParagraphs(letter: string): Paragraph[] {
+  const [body, ...expParts] = letter.split('RELEVANT EXPERIENCE');
+  const out: Paragraph[] = [];
+
+  for (const line of body.split('\n')) {
+    out.push(new Paragraph({ children: [new TextRun({ text: line })] }));
+  }
+
+  if (expParts.length) {
+    out.push(new Paragraph({ children: [new TextRun({ text: 'RELEVANT EXPERIENCE', bold: true })] }));
+    const exp = expParts.join('RELEVANT EXPERIENCE');
+    for (const line of exp.split('\n')) {
+      // Monospace so "Role:  …  / Contract Value:  …" labels stay aligned.
+      out.push(new Paragraph({ children: [new TextRun({ text: line, font: 'Courier New', size: 20 })] }));
+    }
+  }
+  return out;
 }
 
 interface ComplianceRow {
@@ -770,32 +812,35 @@ export async function POST(request: NextRequest) {
   // single "Export LOI .docx" button always produces the complete document.
   const useLoiTemplate = isLoiPackage;
   if (useLoiTemplate) {
-    // ORDER (Eric QC 2026-06-13: drafted prose was dumped AFTER the blank form
-    // — backwards). A real LOI reads: letter header → drafted opening + body
-    // narrative (the letter itself) → the structured Submittal Requirements
-    // form (the data an agency wants, pre-filled from the vault) → attachment
-    // reminder. The drafted "Point of Contact" prose is intentionally dropped:
-    // the structured "Responsible Office / Contact Person" table already carries
-    // the real vault contact, so the prose POC was redundant AND was the source
-    // of hallucinated "John Doe / 555-…" placeholders.
-    children.push(...buildLoiHeader(rfpName));
-    children.push(...buildLoiIntro(companyProfile));
+    // DETERMINISTIC LOI (2026-06-13): render the proven GovCon Giants letter
+    // format — letterhead → "(a)(b)(c)(d)" intent block → Responsible Office /
+    // Contact Person → RELEVANT EXPERIENCE (labeled per reference project) — via
+    // assembleLoiTemplate. The output IS the template: real CO/notice + vault
+    // data fills automatically; everything unknown is a labeled [placeholder]
+    // the user pastes over. No LLM in the letter itself = exact format fidelity.
+    // (memory: sources_sought_loi_prefill; this replaces the old key/value form.)
+    const loiVault = await loadVaultForLoi(email).catch(() => ({ has_any: false } as VaultContext));
+    const letter = assembleLoiTemplate({ fields: body.loiFields || null, vault: loiVault });
+    children.push(...renderLoiTemplateParagraphs(letter));
 
-    // Drafted narrative — opening leads, then experience / capability / why-us.
-    // Skip the POC prose (covered by the structured contact table below).
-    const NARRATIVE_ORDER = ['company_overview', 'cap_past_performance', 'capabilities', 'differentiators'];
+    // Any AI-drafted narrative the user generated (Capability Fit, Why Us, etc.)
+    // is appended AFTER the template letter as optional supporting narrative, so
+    // their drafted content isn't lost. POC prose is skipped (the letter already
+    // carries the structured Responsible Office / Contact Person block).
+    const NARRATIVE_ORDER = ['cap_past_performance', 'capabilities', 'differentiators'];
     const narrativeIds = NARRATIVE_ORDER.filter(id => orderedSections.includes(id) && drafts[id]?.draft);
-    // Any other drafted sections the user generated (except poc) still get in.
-    const extraIds = orderedSections.filter(id => id !== 'poc' && !narrativeIds.includes(id) && drafts[id]?.draft);
-    for (const id of [...narrativeIds, ...extraIds]) {
-      const s = drafts[id];
-      if (!s || !s.draft) continue;
-      children.push(sectionHeader(`${s.label}:`));
-      children.push(...paragraphsFromMarkdown(s.draft));
+    const extraIds = orderedSections.filter(id => id !== 'poc' && id !== 'company_overview' && !narrativeIds.includes(id) && drafts[id]?.draft);
+    const supporting = [...narrativeIds, ...extraIds];
+    if (supporting.length) {
+      children.push(new Paragraph({ children: [new PageBreak()] }));
+      children.push(sectionHeader('Supporting Narrative (optional):'));
+      for (const id of supporting) {
+        const s = drafts[id];
+        if (!s || !s.draft) continue;
+        children.push(sectionHeader(`${s.label}:`));
+        children.push(...paragraphsFromMarkdown(s.draft));
+      }
     }
-
-    // Structured Submittal Requirements form — pre-filled from the vault.
-    children.push(...buildLoiForm(companyProfile));
     const loiDoc = new Document({
       creator: 'Mindy',
       title: `Statement of Capability — ${rfpName}`,
