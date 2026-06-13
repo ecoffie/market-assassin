@@ -1067,3 +1067,20 @@ keyword `spending_by_award` passes with NAICS sampling; `/api/app/target-market-
 builds terms via `buildSearchKeywords()` from `keywordCoverage()` + profile keywords.
 USASpending `spending_by_category` keyword filter for `metric_top_total` when Sport
 keyword present.
+
+## 39. Market Map chart ↔ agency table alignment (Sport keyword)
+
+**What:** Spending-by-Agency chart and the agency table now share the same TMR row
+set and `metric_top_total` spend field. Sport keyword builds start TMR in parallel
+with generate-all (no more stale 7-row profile buyers in the chart while DOE loads
+in the table).
+
+**Why:** Users saw Army commands in the chart and DOE in the table for the same
+keyword search — two different data pipelines. One market, one source of truth.
+
+**SEO:** n/a (UX/data accuracy).
+
+**Proof:** `MarketResearchPanel` — `sportBuildActive` parallel TMR fetch; chart uses
+`tmrRows[].metric_top_total`; Sport mode blocks legacy `governmentBuyers` fallback.
+Verified: `excel` keyword TMR returns 141 agencies with DOE-scale totals via
+`/api/app/target-market-research`.

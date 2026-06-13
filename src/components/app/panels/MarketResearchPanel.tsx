@@ -628,6 +628,8 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   // Has a report been explicitly run since entering Sport? Gates the whole
   // results area so the saved-profile report never shows in Sport (Eric).
   const [sportReportRan, setSportReportRan] = useState(false);
+  /** True from Sport Build/deep-link until complete — starts TMR in parallel with generate-all. */
+  const [sportBuildActive, setSportBuildActive] = useState(false);
   // True when results should render: always in Auto; in Sport only after a run.
   const showResults = researchMode === 'auto' || sportReportRan;
   const [isGenerating, setIsGenerating] = useState(false);
@@ -975,6 +977,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   // required"). If there's a keyword but no codes yet, resolve the keyword to
   // real USASpending codes and build with them — no dead-end error.
   const handleSportBuild = useCallback(async (options?: { notifySuccess?: boolean }) => {
+    setSportBuildActive(true);
     const hasCodes = formData.naicsCode.trim() || formData.pscCode.trim();
     // If the user pinned codes, build with those. Otherwise build from the
     // KEYWORD — we leave naicsCode EMPTY so the target-market-research effect
@@ -991,6 +994,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       const d = await res.json();
       if (!(d.naicsSuggestions || []).length && !(d.pscSuggestions || []).length) {
         showToast({ message: 'No federal codes found for that — try different words.', variant: 'error' });
+        setSportBuildActive(false);
         return;
       }
       const naicsList = (d.naicsSuggestions || []).map((s: { code: string; name: string }) => ({ code: s.code, name: s.name }));
@@ -1026,6 +1030,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       }
     } catch {
       showToast({ message: 'Could not look up codes — try the Suggest codes button.', variant: 'error' });
+      setSportBuildActive(false);
     } finally { setSportSuggesting(false); }
   }, [sportKeyword, formData, getAuthHeaders, handleGenerateAll, showToast, email]);
 
@@ -1299,9 +1304,11 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     // Fire when we have EITHER explicit codes OR a Sport keyword (#59 — keyword
     // lets the backend auto-derive the full 90%-coverage NAICS set instead of the
     // top-3, so the user doesn't silently miss 72% of their market). Only use the
-    // keyword once a report has actually been requested (sportReportRan) so we
-    // don't fetch on every keystroke.
-    const sportKw = (researchMode === 'sport' && sportReportRan) ? sportKeyword.trim() : '';
+    // keyword once a Sport build has started (parallel with generate-all) — not
+    // only after sportReportRan (that waited ~60s and left charts on stale data).
+    const sportKw = (researchMode === 'sport' && (sportReportRan || sportBuildActive))
+      ? sportKeyword.trim()
+      : '';
     // Only fire when the NAICS field holds at least one PLAUSIBLE code (2-6 digits)
     // or we have a Sport keyword. Guards against the mid-edit window: when a user
     // clears+retypes a NAICS, the field transiently holds a partial fragment (e.g.
@@ -1356,6 +1363,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     researchMode,
     sportKeyword,
     sportReportRan,
+    sportBuildActive,
     savedProfile?.keywords,
   ]);
 
@@ -1644,32 +1652,26 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   }, [email, getAuthHeaders, loadRecommendedOpportunities]);
 
   const buyers = reportData?.governmentBuyers?.agencies || [];
+  const buyerSummary = reportData?.governmentBuyers?.summary;
 
   // chartBuyers — prefer the full TMR row set when it's loaded; fall
-  // back to the legacy 7-row governmentBuyers data so the charts
-  // never empty out mid-render. AgencyTableRow uses
-  // `setAsideSpending` whereas BuyerLike expects `spending`, so we
-  // map the field name. setAsideSpending IS the correct number to
-  // show — it's the total tracked spend per office in this NAICS
-  // window, not just SAT-eligible spend. Confusing field name from
-  // the upstream USASpending wrapper; documented in
-  // src/types/federal-market-assassin.ts.
+  // back to the legacy 7-row governmentBuyers ONLY in Auto mode (Sport
+  // keyword searches must not show generate-all buyers — wrong market).
+  const sportKeywordActive = researchMode === 'sport' && !!(sportReportRan || sportBuildActive) && !!sportKeyword.trim();
   const chartBuyers: BuyerLike[] = tmrRows.length > 0
     ? tmrRows.map((row) => ({
         contractingOffice: row.contractingOffice,
         parentAgency: row.parentAgency,
         subAgency: row.subAgency,
-        spending: row.setAsideSpending,
+        // Align with agency table "Top Total $" lens (metric_top_total).
+        spending: row.metric_top_total || row.totalSpending || row.setAsideSpending,
         contractCount: row.contractCount,
       }))
-    : buyers;
+    : sportKeywordActive ? [] : buyers;
 
-  // Total spend across the full TMR row set, used by the Set-Aside
-  // Mix chart denominator and Mindy Says narrative. Falls back to
-  // the legacy buyerSummary value when TMR hasn't loaded.
   const chartTotalSpending = tmrRows.length > 0
-    ? tmrRows.reduce((sum, row) => sum + (row.setAsideSpending || 0), 0)
-    : 0;
+    ? tmrRows.reduce((sum, row) => sum + (row.metric_top_total || row.totalSpending || row.setAsideSpending || 0), 0)
+    : sportKeywordActive ? 0 : (buyerSummary?.totalSpending || 0);
 
   // chartSatTotal — repurposed May 23, 2026 to represent SMALL
   // BUSINESS spend (not SAT-threshold spend). The donut's "satTotal"
@@ -1696,7 +1698,6 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     : tmrRows.length > 0
       ? tmrRows.reduce((sum, row) => sum + (row.satSpending || 0), 0)
       : 0;
-  const buyerSummary = reportData?.governmentBuyers?.summary;
   const painSummary = reportData?.agencyPainPoints?.summary;
   const primeSummary = reportData?.primeContractor?.summary;
   const vehicleSummary = reportData?.idvContracts?.summary;
@@ -1716,6 +1717,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               type="button"
               onClick={() => {
                 setResearchMode('auto');
+                setSportBuildActive(false);
                 // Restore the saved profile into the inputs.
                 if (savedProfile) applySavedProfile(savedProfile);
               }}
@@ -1738,6 +1740,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                 setActiveReportId(null);
                 setSportReportRan(false);
                 sportAutoBuildRef.current = false;
+                setSportBuildActive(false);
                 setSportKeyword('');
                 setSportSuggestions(null);
               }}
@@ -2214,7 +2217,10 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               adds Trend line + Top 5 Primes. The slots are here
               so the layout is visible/scannable from Slice 1. */}
           <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <SpendingByAgencyChart buyers={chartBuyers} />
+            <SpendingByAgencyChart
+              buyers={chartBuyers}
+              loading={sportKeywordActive && tmrRows.length === 0}
+            />
             {/* Small Business Mix is about YOUR profile's SBA goaling — not a
                 one-off industry exploration. Remove it in Sport (Eric: "serves a
                 different function"). */}
@@ -2278,7 +2284,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               veteranStatus={formData.veteranStatus}
               zipCode={formData.zipCode}
               excludeDOD={formData.excludeDOD}
-              keyword={researchMode === 'sport' && sportReportRan ? sportKeyword.trim() : undefined}
+              keyword={researchMode === 'sport' && (sportReportRan || sportBuildActive) ? sportKeyword.trim() : undefined}
               profileKeywords={savedProfile?.keywords}
               onRowsChange={setTmrRows}
               onSelectedAgenciesChange={setStarredAgencies}
@@ -2881,7 +2887,7 @@ interface BuyerLike {
   spending?: number;
   contractCount?: number;
 }
-function SpendingByAgencyChart({ buyers }: { buyers: BuyerLike[] }) {
+function SpendingByAgencyChart({ buyers, loading }: { buyers: BuyerLike[]; loading?: boolean }) {
   // Map to chart-friendly shape, sort, slice. Truncate the office
   // name for the Y axis so the chart bars don't get squeezed.
   //
@@ -2904,6 +2910,16 @@ function SpendingByAgencyChart({ buyers }: { buyers: BuyerLike[] }) {
       .reverse();
   }, [buyers]);
 
+  if (loading) {
+    return (
+      <ChartShell title="Spending by Agency" subtitle="Top 10 by total spend (loading…)">
+        <div className="flex items-center justify-center h-full text-xs text-slate-500">
+          Loading agency spend…
+        </div>
+      </ChartShell>
+    );
+  }
+
   if (data.length === 0) {
     return (
       <ChartShell title="Spending by Agency" subtitle="Top 10 by tracked spend">
@@ -2925,7 +2941,7 @@ function SpendingByAgencyChart({ buyers }: { buyers: BuyerLike[] }) {
   return (
     <ChartShell
       title="Spending by Agency"
-      subtitle={`Top ${data.length} by tracked spend in your NAICS`}
+      subtitle={`Top ${data.length} by total spend in your market`}
       footer={footer ? <p className="text-[11px] text-amber-300/80">{footer}</p> : undefined}
     >
       <ResponsiveContainer width="100%" height={Math.max(200, data.length * 22)}>
