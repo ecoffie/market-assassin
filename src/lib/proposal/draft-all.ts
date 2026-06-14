@@ -23,6 +23,7 @@
 
 import { generateV2Draft } from './v2';
 import type { NoticePocSet } from './notice-poc';
+import type { ComplianceReq } from './section-alignment';
 import { getSectionMeta } from './sections';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
 import { isCapStatementSection, type SectionType, type DraftResult } from './types';
@@ -41,6 +42,8 @@ export interface DraftAllOpts {
   sectionTypes?: SectionType[];
   /** Government POC from the SAM notice (raw_data.pointOfContact). */
   noticePoc?: NoticePocSet | null;
+  /** Compliance matrix — each section is told which requirements it must cover. */
+  requirements?: ComplianceReq[];
 }
 
 export interface DraftAllResult {
@@ -187,6 +190,7 @@ async function renderSectionsInBatches(
           fileName: opts.fileName,
           rfpAgency: opts.rfpAgency,
           noticePoc: opts.noticePoc,
+          requirements: opts.requirements,
         });
       })
     );

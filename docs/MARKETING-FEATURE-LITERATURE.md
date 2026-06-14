@@ -1555,3 +1555,30 @@ session token that no longer exists — so returning users saw an empty form.
 `user_profiles` by email after KV access check. `loadCompanyProfile()` calls
 `loadUserProfile()` on boot. Library saves use `POST /api/content-generator/library`
 when no session. Verified against `user_profiles` rows keyed by purchaser email.
+
+---
+
+## Proposal Assist: Drafts Now Write to the Compliance Matrix (June 14, 2026)
+
+**What:** When Mindy drafts a proposal section, it now knows exactly which
+solicitation requirements that section has to satisfy. The compliance matrix feeds
+each section its own "shalls" — the Technical section gets the technical
+requirements, Past Performance gets the past-performance asks, and cross-cutting
+rules (deadlines, evaluation factors) reach the sections that need them. The draft
+is instructed to make each requirement traceable, critical ones first.
+
+**Why:** Previously the draft and the compliance matrix were two islands — Mindy
+wrote sections without knowing what the RFP actually demanded, so the burden of
+checking coverage fell entirely on the user (or the post-draft scanner). Wiring the
+matrix INTO the drafting means the response is built to cover the requirements from
+the start, not patched afterward.
+
+**SEO:** compliance-driven proposal drafting, RFP requirement coverage, government
+proposal shall statements, requirements traceability proposal, write to Section M.
+
+**Proof:** `src/lib/proposal/v2.ts` (`formatSectionRequirements` + `alignMatrix`
+per-section bucketing, category labels normalized) threaded through
+`generateV2Draft` / `generateAllSections` and the `/draft` + `/draft-all` routes;
+the panel sends the matrix with every draft request. Verified: the Technical section
+receives the technical + cross-cutting requirements, Past Performance receives the PP
+requirements. Closes Gap D in docs/PROPOSAL-UX-MAP.md.

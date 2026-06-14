@@ -27,6 +27,7 @@ import { generateV2Draft } from '@/lib/proposal/v2';
 import { SECTION_META } from '@/lib/proposal/sections';
 import type { SectionType } from '@/lib/proposal/types';
 import { archiveContent } from '@/lib/archive/persist';
+import type { ComplianceReq } from '@/lib/proposal/section-alignment';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -41,6 +42,7 @@ interface RequestBody {
    *  a pursuit row with a saved agency field). v2 will still try to
    *  detect from text if not provided. */
   rfpAgency?: string | null;
+  requirements?: Array<{ id?: string; requirement?: string; category?: string; section?: string }>;
 }
 
 export async function POST(request: NextRequest) {
@@ -87,6 +89,10 @@ export async function POST(request: NextRequest) {
       sourceText,
       fileName: body.fileName,
       rfpAgency: body.rfpAgency,
+      // #5: compliance matrix → this section drafts to its own requirements.
+      requirements: Array.isArray(body.requirements)
+        ? body.requirements.filter(r => r?.requirement).map(r => ({ id: r.id, requirement: r.requirement!, category: (r.category as ComplianceReq['category']) || 'other', section: r.section }))
+        : undefined,
     });
 
     // Auto-library: fire-and-forget archive of this draft so the user

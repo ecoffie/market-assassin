@@ -18,6 +18,7 @@ import { logToolError, ToolNames, AIProviders, classifyError } from '@/lib/tool-
 import { generateAllSections } from '@/lib/proposal/draft-all';
 import { archiveContent } from '@/lib/archive/persist';
 import type { SectionType } from '@/lib/proposal/types';
+import type { ComplianceReq } from '@/lib/proposal/section-alignment';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -30,6 +31,7 @@ interface RequestBody {
   fileName?: string;
   rfpAgency?: string | null;
   sectionTypes?: SectionType[];
+  requirements?: Array<{ id?: string; requirement?: string; category?: string; section?: string }>;
 }
 
 export async function POST(request: NextRequest) {
@@ -62,6 +64,11 @@ export async function POST(request: NextRequest) {
       fileName: body.fileName,
       rfpAgency: body.rfpAgency,
       sectionTypes: body.sectionTypes,
+      // #5: the compliance matrix → each section is told which requirements it
+      // must cover. Sent by the panel when a matrix exists.
+      requirements: Array.isArray(body.requirements)
+        ? body.requirements.filter(r => r?.requirement).map(r => ({ id: r.id, requirement: r.requirement!, category: (r.category as ComplianceReq['category']) || 'other', section: r.section }))
+        : undefined,
     });
 
     // Auto-library archive of each section (fire-and-forget batch)

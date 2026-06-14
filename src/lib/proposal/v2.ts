@@ -26,6 +26,7 @@ import { humanizeProposalDraft } from './humanize';
 import { guardFacts } from './fact-guard';
 import { formatNoticePocForPrompt, noticePocGroundingText, type NoticePocSet } from './notice-poc';
 import { isCapStatementSection, type SectionType, type BuiltPrompt, type DraftResult } from './types';
+import { alignMatrix, priorityOf, normalizeCategory, type ComplianceReq } from './section-alignment';
 import { buildTemplateCorpusQuery, getTemplateCorpusDocTypes } from './template-corpus';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -36,6 +37,47 @@ const MAX_INPUT_CHARS = 40000;
 
 // ---- Prompt builder -------------------------------------------------
 
+// Which aligned-matrix buckets feed a given draft section. alignMatrix routes
+// requirements to: technical / management / past_performance / pricing / 'all'
+// (cross-cutting: submission/eval/admin). A section gets its own bucket + 'all'.
+function bucketsForSection(sectionType: SectionType): string[] {
+  switch (sectionType) {
+    case 'technical': return ['technical', 'all'];
+    case 'management': return ['management', 'all'];
+    case 'past_performance':
+    case 'cap_past_performance': return ['past_performance', 'all'];
+    case 'pricing': return ['pricing', 'all'];
+    // exec summary + LOI/cap-statement sections speak to the whole response →
+    // give them the cross-cutting requirements (deadlines, eval factors, format).
+    default: return ['all'];
+  }
+}
+
+/** Build the "requirements this section must satisfy" prompt block. */
+function formatSectionRequirements(requirements: ComplianceReq[] | undefined, sectionType: SectionType): string {
+  if (!requirements || requirements.length === 0) return '';
+  // The client sends category as a human LABEL ("Technical") — normalize to the
+  // enum so alignMatrix buckets correctly (else everything falls to 'all').
+  const normalized = requirements.map((r) => ({ ...r, category: normalizeCategory(r.category, r.requirement) }));
+  const aligned = alignMatrix(normalized);
+  const buckets = bucketsForSection(sectionType);
+  const seen = new Set<string>();
+  const mine: ComplianceReq[] = [];
+  for (const b of buckets) {
+    for (const r of aligned.bySection[b] || []) {
+      const k = r.id || r.requirement;
+      if (k && !seen.has(k)) { seen.add(k); mine.push(r); }
+    }
+  }
+  if (mine.length === 0) return '';
+  // Critical first; cap so the prompt doesn't explode on a 200-req RFP.
+  const order = { critical: 0, standard: 1, final: 2 } as const;
+  mine.sort((a, b) => order[priorityOf(a)] - order[priorityOf(b)]);
+  const lines = mine.slice(0, 15).map((r) => `- ${r.section ? r.section + ' — ' : ''}${(r.requirement || '').slice(0, 160)}`);
+  const more = mine.length > 15 ? `\n(+${mine.length - 15} more — covered by other sections / the compliance matrix)` : '';
+  return `### Requirements THIS section MUST address (from the compliance matrix)\nWrite the section so an evaluator can trace each of these to your response. Do not skip a stated requirement; if you can't fully answer one, name it and bracket the specifics.\n${lines.join('\n')}${more}`;
+}
+
 export async function buildV2Prompt(opts: {
   email: string;
   sectionType: SectionType;
@@ -43,8 +85,9 @@ export async function buildV2Prompt(opts: {
   rfpAgency?: string | null;
   lensSeed?: number;  // for deterministic A/B testing
   noticePoc?: NoticePocSet | null;  // government POC from the SAM notice
+  requirements?: ComplianceReq[];  // the compliance matrix — section gets ITS shalls
 }): Promise<BuiltPrompt> {
-  const { email, sectionType, sourceText, rfpAgency, lensSeed, noticePoc } = opts;
+  const { email, sectionType, sourceText, rfpAgency, lensSeed, noticePoc, requirements } = opts;
   const sectionMeta = getSectionMeta(sectionType);
   const isCapStmt = isCapStatementSection(sectionType);
 
@@ -156,6 +199,14 @@ ${honestRule}
   const noticePocBlock = noticePoc ? formatNoticePocForPrompt(noticePoc) : '';
   if (noticePocBlock) parts.push(noticePocBlock);
 
+  // Compliance requirements THIS section must satisfy (#5: draft reads the
+  // matrix). alignMatrix buckets every extracted requirement to a target section;
+  // we feed THIS section its own shalls + the cross-cutting ('all') ones, sorted
+  // critical-first, so the draft actually covers what the RFP demands instead of
+  // being disconnected from the compliance matrix.
+  const reqBlock = formatSectionRequirements(requirements, sectionType);
+  if (reqBlock) parts.push(reqBlock);
+
   parts.push(`### Section to draft: ${sectionMeta.label}\n${sectionMeta.basePrompt}`);
 
   parts.push(`### Source solicitation${opts ? '' : ''}\n--- SOURCE TEXT (${inputText.length.toLocaleString()} chars${wasTruncated ? ', truncated' : ''}) ---\n${inputText}`);
@@ -187,6 +238,7 @@ export async function generateV2Draft(opts: {
   rfpAgency?: string | null;
   lensSeed?: number;
   noticePoc?: NoticePocSet | null;  // government POC from the SAM notice
+  requirements?: ComplianceReq[];   // compliance matrix → section gets its shalls
 }): Promise<DraftResult> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error('GROQ_API_KEY not configured');

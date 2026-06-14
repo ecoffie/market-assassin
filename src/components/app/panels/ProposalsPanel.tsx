@@ -755,7 +755,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       const res = await fetch(`/api/app/proposal/draft?email=${encodeURIComponent(email)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
-        body: JSON.stringify({ text: uploadedRfp.text, fileName: uploadedRfp.fileName, sectionType }),
+        body: JSON.stringify({ text: uploadedRfp.text, fileName: uploadedRfp.fileName, sectionType, requirements: compliance.map(c => ({ id: c.id, requirement: c.requirement, category: CATEGORY_LABELS[c.category]?.label || c.category, section: c.section })) }),
       });
       const data = await res.json();
       if (!res.ok || !data.success) {
@@ -779,7 +779,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     } finally {
       setDraftLoading(null);
     }
-  }, [email, uploadedRfp, getAuthHeaders]);
+  }, [email, uploadedRfp, getAuthHeaders, compliance]);
 
   // Draft ALL sections at once via the two-pass /draft-all endpoint.
   // Content Reaper pattern #2 — outline + parallel write. Takes
@@ -808,6 +808,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           // Match the tabs the user sees (LOI vs RFP) — don't rely on text
           // heuristics alone or drafts land under the wrong section keys.
           sectionTypes: currentSectionTabs.map(tab => tab.id),
+          // #5: send the compliance matrix so each drafted section is told which
+          // requirements it must cover. Empty when no matrix yet — drafting still works.
+          requirements: compliance.map(c => ({ id: c.id, requirement: c.requirement, category: CATEGORY_LABELS[c.category]?.label || c.category, section: c.section })),
         }),
       });
       const data = await res.json();
@@ -849,7 +852,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     } finally {
       setDraftAllLoading(false);
     }
-  }, [email, uploadedRfp, getAuthHeaders, currentSectionTabs]);
+  }, [email, uploadedRfp, getAuthHeaders, currentSectionTabs, compliance]);
 
   const updateDraftText = useCallback((sectionType: SectionType, text: string) => {
     setDrafts(prev => {
