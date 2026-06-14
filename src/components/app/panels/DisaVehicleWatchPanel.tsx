@@ -104,6 +104,24 @@ export default function DisaVehicleWatchPanel({ email }: Props) {
     await load();
   }, [email, load]);
 
+  // Download a single incumbent notice as .docx (the leave-behind). The route is
+  // auth-gated, so fetch with headers + trigger the download from the blob.
+  const downloadNotice = useCallback(async (vehicleId: string, piid: string) => {
+    try {
+      const res = await fetch(`/api/app/disa/notice-docx?email=${encodeURIComponent(email)}&id=${vehicleId}`, { headers: getMIApiHeaders(email) });
+      if (!res.ok) throw new Error('Could not generate notice');
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `expiry-notice-${piid.replace(/[^a-z0-9-_.]/gi, '_')}.docx`;
+      document.body.appendChild(a); a.click(); a.remove();
+      URL.revokeObjectURL(url);
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Notice download failed');
+    }
+  }, [email]);
+
   const fmtDays = (d: number | null) => d === null ? '—' : d < 0 ? `expired ${-d}d ago` : `${d} days`;
   const fmtVal = (v?: number | null) => v ? `$${(v / 1_000_000).toFixed(1)}M` : '—';
 
@@ -179,6 +197,12 @@ export default function DisaVehicleWatchPanel({ email }: Props) {
               </div>
               <p className="text-xs text-slate-400 mb-1"><span className="text-slate-500">Subject:</span> {n.subject}</p>
               <pre className="text-xs text-slate-300 whitespace-pre-wrap font-sans bg-slate-900/60 rounded p-3 mt-1">{n.body}</pre>
+              <button
+                onClick={() => downloadNotice(n.vehicle_id, n.vehicle_piid)}
+                className="mt-2 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+              >
+                ⬇ Download notice (.docx)
+              </button>
             </div>
           ))}
         </div>
@@ -214,7 +238,10 @@ export default function DisaVehicleWatchPanel({ email }: Props) {
                 <div className="text-sm text-white">{v.expiration_date || '—'}</div>
                 <div className={`text-xs ${v.daysUntilExpiration !== null && v.daysUntilExpiration <= 90 ? 'text-amber-400' : 'text-slate-500'}`}>{fmtDays(v.daysUntilExpiration)}</div>
                 <div className="text-xs text-slate-500">{fmtVal(v.ceiling_value)}</div>
-                <button onClick={() => removeVehicle(v.id)} className="text-[11px] text-slate-600 hover:text-red-400 mt-1">remove</button>
+                <div className="flex items-center gap-3 justify-end mt-1">
+                  <button onClick={() => downloadNotice(v.id, v.vehicle_piid)} className="text-[11px] text-slate-500 hover:text-amber-300">notice .docx</button>
+                  <button onClick={() => removeVehicle(v.id)} className="text-[11px] text-slate-600 hover:text-red-400">remove</button>
+                </div>
               </div>
             </div>
           ))}
