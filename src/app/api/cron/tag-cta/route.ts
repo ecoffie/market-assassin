@@ -28,8 +28,8 @@ export async function GET(request: NextRequest) {
   }
 
   const limit = Math.min(
-    parseInt(request.nextUrl.searchParams.get('limit') || '500', 10),
-    2000,
+    parseInt(request.nextUrl.searchParams.get('limit') || '100', 10),
+    500,
   );
   const activeOnly = request.nextUrl.searchParams.get('activeOnly') !== 'false';
 

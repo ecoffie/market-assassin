@@ -70,7 +70,7 @@ export async function tagCtaBatch(
   tagsWritten: number;
   remaining: number | null;
 }> {
-  const limit = Math.min(options.limit ?? 500, 2000);
+  const limit = Math.min(options.limit ?? 100, 200);
   const activeOnly = options.activeOnly !== false;
 
   let query = supabase
