@@ -5,6 +5,7 @@ import { useState } from 'react';
 // Panel types for the unified MI dashboard
 // All navigation happens within /briefings - no separate routes
 export type MIPanel =
+  | 'start'          // Getting Started — guided journeys for new users
   | 'dashboard'      // Daily briefings & intel
   | 'research'       // Market Research (Federal Market Assassin)
   | 'forecasts'      // 7,700+ upcoming procurements
@@ -49,6 +50,19 @@ interface NavSection {
 // - MI Team ($499/mo): 5 seats, shared pipeline
 // - MI Enterprise (Contact Sales): 15+ seats, API, white-label
 const navigation: NavSection[] = [
+  {
+    title: 'Start Here',
+    tier: 'free',
+    items: [
+      {
+        name: 'Getting Started',
+        panel: 'start',
+        icon: '🚀',
+        description: 'Set up, find buyers, win your first bid',
+        tier: 'free',
+      },
+    ],
+  },
   {
     title: 'Intelligence',
     tier: 'pro',

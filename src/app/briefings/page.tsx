@@ -13,6 +13,8 @@ import SbirPanel from '@/components/briefings/SbirPanel';
 import GrantsPanel from '@/components/briefings/GrantsPanel';
 import ShareButton from '@/components/briefings/ShareButton';
 import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
+import GettingStartedPanel from '@/components/app/panels/GettingStartedPanel';
+import { getMIApiHeaders } from '@/components/app/authHeaders';
 import PipelineBoard from '@/components/bd-assist/PipelineBoard';
 import ContactsPanel from '@/components/bd-assist/ContactsPanel';
 import { persistAccessEmail, reconcileAccessEmail, clearAccessEmail } from '@/lib/access-cookie';
@@ -639,6 +641,19 @@ function BriefingsDashboardContent() {
   const [activePanel, setActivePanel] = useState<MIPanel>('dashboard');
   const panelStartedAtRef = useRef<number>(Date.now());
   const lastTrackedPanelRef = useRef<MIPanel>('dashboard');
+  // Land new users on Getting Started for the first 14 days OR until all 3
+  // journeys are done. Fires once, only if the user hasn't already navigated.
+  const journeyLandingCheckedRef = useRef(false);
+  useEffect(() => {
+    if (!email || journeyLandingCheckedRef.current) return;
+    journeyLandingCheckedRef.current = true;
+    import('@/lib/journeys/definitions').then(({ shouldForceJourneyLanding }) => {
+      fetch(`/api/app/journeys?email=${encodeURIComponent(email)}`, { headers: getMIApiHeaders(email) })
+        .then((r) => (r.ok ? r.json() : null))
+        .then((d) => { if (d?.success && shouldForceJourneyLanding(d.progress)) setActivePanel('start'); })
+        .catch(() => {});
+    });
+  }, [email]);
 
   // Track if user is on free tier (alerts only, no briefings access)
   const [isFreeUser, setIsFreeUser] = useState(false);
@@ -1558,6 +1573,13 @@ function BriefingsDashboardContent() {
         />
 
         {/* Panel Content - Rendered based on activePanel */}
+
+        {/* Getting Started — guided journeys for new users */}
+        {activePanel === 'start' && (
+          <div className="p-6">
+            <GettingStartedPanel email={email} onPanelChange={(p) => setActivePanel(p as MIPanel)} />
+          </div>
+        )}
 
         {/* Pipeline Panel */}
         {activePanel === 'pipeline' && (

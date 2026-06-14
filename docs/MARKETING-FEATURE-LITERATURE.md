@@ -1705,3 +1705,31 @@ Kept the `proposal_wizard_*` archive type defs + LibraryPanel badges so historic
 archived items still display. The live flow is `ProposalsPanel` end-to-end, verified
 by a full bid→matrix→draft→scan→export walkthrough on real data. Closes the
 "two paths" issue noted in docs/PROPOSAL-UX-MAP.md.
+
+---
+
+## Mindy: Guided "Getting Started" Journeys for New Users (June 14, 2026)
+
+**What:** New free users now land on a Getting Started home instead of a blank form.
+It walks them through three task-based journeys — Set up your Market Profile, Find
+your customers, Create your first bid — each with a short walkthrough video, the
+steps, and a "Do it now" button that drops them into the real tool. Progress saves;
+a completion bar shows how far they are. It's the default landing for the first 14
+days (or until all three are done), then stays available in the sidebar.
+
+**Why:** The biggest gap in the free experience was "I signed up, then what?" — users
+handed over their NAICS and got a silent setup form with no payoff. These journeys
+turn signup into momentum: each one ends with something real (a complete profile,
+a target list, a submission-ready bid), and naturally reveals where Mindy Pro removes
+the ceiling (AI briefings, unlimited research, full pipeline). Free teaches; paid does
+it at scale.
+
+**SEO:** how to use Mindy, government contracting getting started, win your first
+federal contract, GovCon onboarding, set up a market profile.
+
+**Proof:** `src/lib/journeys/definitions.ts` (3 journeys as data) +
+`/api/app/journeys` (progress persistence) + `GettingStartedPanel` (the UI, sidebar
+item + value-first completion) + landing logic in `briefings/page.tsx`
+(shouldForceJourneyLanding: 14 days or all-3-done). Phase 1 of the guided-journeys
+plan (docs/PLAN-mindy-guided-journeys.md). Walkthrough videos: record in Loom →
+upload to Vimeo → paste the URL.
