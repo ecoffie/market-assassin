@@ -123,16 +123,22 @@ Several of these are the **surviving operators** of now-dead MBDA centers (§2) 
 
 ## 4. State minority business divisions (MBDA backfill path)
 
-When federal MBDA coop terminates, state operators often remain:
+When federal MBDA coop terminates, **state-funded** operators remain (never MBDA-funded → durable). **Important:** these certify firms for **STATE** procurement, not federal. The honest Mindy angle = *"graduate your certified SB/MBE firms from state contracting to FEDERAL — opportunity intel + teaming the state program doesn't provide."* Verified Jun 14, 2026.
 
-| State | Operator | Status | Contact | Notes |
-|-------|----------|--------|---------|-------|
-| NC | NC HUB Office | **Open** | ncmbda@doa.nc.gov | Absorbed MBDA center messaging |
-| GA | TBD | Research | | GA MBDA center closed Apr 2025 |
-| MD | MBE Office / MDOT MBE | Research | | PGCEDC runs parallel county programs |
-| TX | TX Comptroller — HUB program | Research | | State cert, not federal MBDA |
-| FL | FL Office of Supplier Diversity | Research | | |
-| CA | CPUC / DGS small business | Research | | |
+| State | Office (parent) | What it does | GovCon programming | Contact (verify before use) | Source |
+|---|---|---|---|---|---|
+| **NC** | NC HUB Office (Dept. of Admin.) | State HUB cert; absorbed NC MBDA messaging | State procurement outreach | ncmbda@doa.nc.gov | [NC DOA HUB](https://www.doa.nc.gov/divisions/historically-underutilized-businesses-hub/ncmbda) |
+| **MD** ⭐ | **GOSBA** (Gov's Office of Small, Minority & Women Biz Affairs) + **MDOT OMBE** (the certifier) | GOSBA = policy + **active training/webinars**; MDOT = statewide MBE/DBE cert engine | **Yes (GOSBA strong)** — T.I.P.S. series, "Ready Set GROW!" workshops | GOSBA: 410-697-9600 · info.gomdsmallbiz@maryland.gov (Sp. Sec. Y. Maria Martinez). MDOT OMBE: 410-865-1269 | [gomdsmallbiz.maryland.gov](https://gomdsmallbiz.maryland.gov/) |
+| **TX** ⭐ | **Statewide HUB Program** (Comptroller — Statewide Procurement Div.) | M/W/SDV HUB cert; CMBL/ESBD; Mentor-Protégé | **Yes (strongest)** — Spot Bid Fairs (on-the-spot awards), Economic Opportunity Forums, HUB Expos | 512-463-5872 / 888-863-5881 · cpa.hub@cpa.state.tx.us *(verify)* · Dir. Bobby Pounds (SPD) | [comptroller.texas.gov HUB](https://comptroller.texas.gov/purchasing/vendor/hub/) |
+| **FL** | **Office of Supplier Diversity/Development (OSD)** (DMS — State Purchasing) | M/W/V/SDV cert for state procurement; matchmaking | **Yes (moderate)** — Supplier Diversity Exchange, Business Exchange; SBDC partnership | 850-487-0915 *(verify)* · **Director name UNVERIFIED** (3 conflicting) → contact page | [dms.myflorida.com OSD](https://www.dms.myflorida.com/business_operations/state_purchasing/office_of_supplier_development_osd) |
+| **CA** ⭐ | **DGS OSDS** (Office of Small Biz & DVBE Services) — primary; **CalOSBA** (GO-Biz) — amplifier | OSDS = SB/DVBE cert + 25%/3% spend goals; CalOSBA = SB support network (no cert) | **Yes** — OSDS SB/DVBE Training Unit webinar series | OSDS: 916-375-4940 · OSDShelp@dgs.ca.gov · training: SBDVBETraining@dgs.ca.gov. CalOSBA Dir. Tara Lynn Gray | [dgs.ca.gov OSDS](https://www.dgs.ca.gov/PD) |
+| **GA** ⚠️ | DOAS Small Biz & Supplier Diversity (lightweight) | **NO strong state MBE program** — light cert + state-procurement workshops. Marquee "Mentor-Protégé" is **nonprofit/GMSDC-run, not state** | State-procurement workshops only | supplier.diversity@doas.ga.gov · 404-656-5514 | [doas.ga.gov](https://doas.ga.gov/state-purchasing/small-business-and-supplier-diversity/small-business-and-supplier) |
+
+**Routing notes:**
+- ⭐ **Best state-division targets: TX HUB, MD GOSBA, CA DGS-OSDS** — all run real procurement-readiness programming with a distribution channel Mindy can plug a "now go federal" session into.
+- ⚠️ **GA:** route through **GMSDC** (§3, Stacey Key), not the state — GA has no strong state MBE division.
+- **CPUC GO 156 (CA)** = utility supplier diversity, NOT government contracting — wrong target for a federal SaaS. Skipped.
+- **Caveat:** FL OSD director unverified (3 conflicting names); MD small-biz functions may be reorganizing into a new Dept. of Social & Economic Mobility — confirm org chart before formal outreach.
 
 ---
 
@@ -170,4 +176,30 @@ Target: **3 discovery calls at $50K EDC price point** before standardizing.
 
 ---
 
-*Last updated: June 14, 2026 — §1 EDC top-10 + §2 MBDA matrix + §3 NMSDC priority-council leadership all COMPLETE (verified CEOs/contacts for CRMSDC, GMSDC, FSMSDC, DFW, HMSDC, CVMSDC, SCMSDC). Corrected 2 §2 facts via §3 research: (a) VA MBDA center was CRMSDC not CVMSDC; (b) Federal Procurement Center TRANSITIONED to KDM & Associates ~May 2025, did not cease. Best NMSDC lead = CRMSDC (Sharon Pinder) — runs a 12-wk GovCon Incubator. Angle for ex-MBDA councils (CRMSDC/FSMSDC/DFW): their MBEs lost federal-contracting support → Mindy coach dashboard fills it. Open research now: §4 state minority-business divisions, §6 EDA/state RFP calendar.*
+## 8. Events & booth calendar (be in the room where they all gather)
+
+**Strategy (Eric, Jun 14):** instead of cold-emailing each org one-by-one, **get a booth at the national conferences where these buyers gather** — APEX directors, SBDC leaders, NMSDC councils, EDC pros. One booth = dozens of warm conversations. Catalog the ones bookable **before year-end 2026** and lock booths now (booths sell out; several have no published deadline = first-come). Verified Jun 14, 2026.
+
+| Event (host) | 2026 dates / venue | Audience (scale) | Booth cost | Deadline | Book? |
+|---|---|---|---|---|---|
+| **★ NAPEX National Conference** (Nat'l APEX Accelerator Alliance) | **Aug 16–20** · Orlando, Omni ChampionsGate | APEX directors + counselors (400+) | **$1,500 govt exhibitor** / $3,500 general (incl. 1 reg) | Not published — **first-come, apply NOW** | **YES — P1.** Cheapest + most on-target room. Email headquarters@napex.us |
+| **★ America's SBDC Annual Training** (ASBDC) | **Sept 29 – Oct 1** · Atlanta Marriott Marquis | SBDC network leaders/directors (~1,000) | Exhibitor price in prospectus; sponsorships from **$10K** | In prospectus — request now | **YES — P2.** Pull prospectus from nationaltraining.americassbdc.org |
+| **NMSDC Conference & Exchange** | **Oct 25–28** · Los Angeles Convention Center | Corp. supplier-diversity + certified MBEs + councils (~3,400) | TBA (opens ~May); ⚠️ **exhibitor ELIGIBILITY gated** — must be NMSDC-certified MBE / corp member / gov agency | TBA | **VERIFY ELIGIBILITY FIRST** (events@nmsdc.org) — may not qualify to exhibit |
+| **IEDC Annual Conference** | **Oct 25–28** · Hyatt Regency New Orleans | Economic-development pros (1,500+) | Via prospectus (not public) | Via prospectus | Maybe — ⚠️ **exact date collision with NMSDC** (one crew can't do both) |
+| **NADO — EDA Atlanta Region Econ. Dev. Conf.** | **Jul 21–23** · Atlanta | EDA-region grantees/practitioners | Verify w/ NADO | Verify | Maybe — closest thing to an "EDA convening" |
+| **~~MBDA MED Week~~** | **NO 2026 EVENT** | — | — | — | **DROP** — MBDA gutted; last MED Week was Oct 2024. Don't budget. |
+| **America's SBDC Leadership Summit** (watch) | **Mar 6–10, 2027** · Washington DC | State/Regional SBDC **directors** (the buyers) | TBA (reg opens Jan 2027) | Jan 2027 | **Watch** — higher-leverage director room; set Jan reminder |
+
+**Decisions:**
+- **Book NAPEX (Aug, Orlando) now** — $1,500, exactly the APEX-director audience, before year-end, first-come. Single highest-ROI action in this whole doc.
+- **Request the ASBDC prospectus** (Sept, Atlanta) — second room, SBDC leaders.
+- **NMSDC: confirm we can even exhibit** before budgeting (eligibility gate, not cost).
+- **Oct 25–28 conflict:** NMSDC (LA) vs IEDC (New Orleans) are the same days — pick one or split crews.
+- **EDA:** no single national HQ grantee expo with open booths found; NADO Atlanta (Jul) is the closest. Check eda.gov/events directly.
+- **MED Week is dead** — remove from any plan.
+
+**Open:** NAPEX exhibitor deadline (email HQ); ASBDC + IEDC + NMSDC exact booth $ (in prospectuses); whether our buyer qualifies for NMSDC exhibit eligibility.
+
+---
+
+*Last updated: June 14, 2026 — §1 EDC top-10 + §2 MBDA matrix + §3 NMSDC priority-council leadership + §4 state divisions + §8 events/booth calendar all COMPLETE (verified CEOs/contacts for CRMSDC, GMSDC, FSMSDC, DFW, HMSDC, CVMSDC, SCMSDC). Corrected 2 §2 facts via §3 research: (a) VA MBDA center was CRMSDC not CVMSDC; (b) Federal Procurement Center TRANSITIONED to KDM & Associates ~May 2025, did not cease. Best NMSDC lead = CRMSDC (Sharon Pinder) — runs a 12-wk GovCon Incubator. Angle for ex-MBDA councils (CRMSDC/FSMSDC/DFW): their MBEs lost federal-contracting support → Mindy coach dashboard fills it. §4 state divisions: best = TX HUB / MD GOSBA / CA DGS-OSDS (GA has no strong state MBE → route via GMSDC). §8 events: BOOK NAPEX (Aug 16–20 Orlando, $1,500 govt booth — top action) + ASBDC (Sept 29–Oct 1 Atlanta); NMSDC eligibility-gated; MED Week dead. Open research now: §6 EDA/state RFP calendar + grant-nofo-tracker seeding.*

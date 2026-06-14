@@ -17,6 +17,11 @@
 | 4 | **Complete EDC top-10 rows** in `landscape-research-phase2.md` (GA, TX, FL, VA, CA) | 2 hr | [x] — 10 verified rows, all priority states; APEX-overlap flagged |
 | 5 | **Draft PGC EDC one-pager proposal** (adapt USHCC HTML → EDC cohort angle) | 2 hr | [ ] |
 | 6 | **Grant NOFO tracker** — seed 5 rows in `grant-nofo-tracker.md` | 1 hr | [ ] |
+| 7 | **★ Book NAPEX booth** (Aug 16–20, Orlando — $1,500 govt exhibitor, first-come) — email headquarters@napex.us for deadline + apply | 30 min | [ ] |
+| 8 | **Request ASBDC prospectus** (Sept 29–Oct 1, Atlanta) — booth $ + deadline (nationaltraining.americassbdc.org) | 15 min | [ ] |
+| 9 | **Confirm NMSDC exhibit eligibility** (Oct 25–28, LA) — email events@nmsdc.org BEFORE budgeting (gated to certified MBE/member/gov) | 15 min | [ ] |
+
+**Events note:** Booths put you in the room with every buyer at once (§8 of research doc). NAPEX = cheapest + most on-target (APEX directors) + before year-end → highest-ROI action in the whole plan. MED Week is DEAD (don't budget). Oct 25–28 = NMSDC (LA) vs IEDC (New Orleans) date collision — pick one.
 
 **Do not wait for FT hire** to start PGC outreach or advisor posts. Hire closes; Eric opens.
 
@@ -119,7 +124,7 @@ Walk this order — 15 minutes max:
 - [ ] PGC EDC eval call booked
 - [ ] FT hire JD posted + 5+ applicants
 - [ ] 1 advisor role filled or strong pipeline
-- [x] Phase 2 research doc: **§1 EDCs + §2 MBDA matrix + §3 NMSDC councils done** (verified CEOs/contacts). ⛔ MBDA centers = not a viable channel (legal limbo, agreements end Aug 31 2026) → route to surviving operators + state divisions + NMSDC. Best NMSDC lead: CRMSDC (Sharon Pinder, 12-wk GovCon Incubator)
+- [x] Phase 2 research doc: **§1 EDCs + §2 MBDA matrix + §3 NMSDC + §4 state divisions + §8 events calendar done** (verified). ⛔ MBDA centers = not viable (agreements end Aug 31 2026) → route to surviving operators + state divisions (TX HUB/MD GOSBA/CA DGS) + NMSDC (best: CRMSDC). ★ Book NAPEX booth Aug 16–20 Orlando ($1,500) — top action.
 - [ ] Grant tracker: 5 NOFOs with deadlines logged
 
 ---
