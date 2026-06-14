@@ -933,12 +933,12 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     [drafts, currentSectionTabs]
   );
 
-  const exportProposalPackage = useCallback(async (opts?: { idiq?: boolean }) => {
+  const exportProposalPackage = useCallback(async (opts?: { idiq?: boolean; rfp?: boolean }) => {
     if (!email) return;
     // The IDIQ package is built from the compliance matrix, so it needs that
     // (not an uploaded RFP / simple-response mode). Other exports keep their guard.
-    if (opts?.idiq) {
-      if (compliance.length === 0) { setExportError('Generate the compliance matrix first — the IDIQ package structure is built from it.'); return; }
+    if (opts?.idiq || opts?.rfp) {
+      if (compliance.length === 0) { setExportError('Generate the compliance matrix first — the response structure is built from it.'); return; }
     } else if (!uploadedRfp && !isSimpleResponseMode) {
       return;
     }
@@ -971,7 +971,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           drafts: draftsForExport,
           sectionOrder: currentSectionTabs.map(tab => tab.id),
           checklist: isSimpleResponseMode ? [] : checklist.map(c => ({ label: c.label, checked: c.checked })),
-          packageType: opts?.idiq ? 'idiq_proposal' : isLoiResponseMode ? 'sources_sought_loi' : isRfqMode ? 'rfq_response' : 'proposal',
+          packageType: opts?.idiq ? 'idiq_proposal' : opts?.rfp ? 'rfp_response' : isLoiResponseMode ? 'sources_sought_loi' : isRfqMode ? 'rfq_response' : 'proposal',
           // Pre-fill the LOI template from the notice text when we extracted fields.
           loiFields: isLoiResponseMode && loiFields ? loiFields : undefined,
         }),
@@ -2052,6 +2052,18 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 Volume I–IV structure derived from the compliance matrix. The
                 format people can't build themselves; placeholders show what goes
                 where. Needs a compliance matrix (the structure is driven by it). */}
+            {!isSimpleResponseMode && (
+              <OutputActionCard
+                eyebrow="Export · RFP Response"
+                title="Export RFP response skeleton"
+                description="A single-award RFP response sized to THIS solicitation — a focused commercial response by default, or the full Section L/M volume structure when the RFP calls for it. Pre-filled from your vault, with placeholders for the rest."
+                status={compliance.length > 0 ? 'Ready' : 'Generate the compliance matrix first'}
+                buttonLabel={exporting ? 'Assembling...' : 'Export RFP response (.docx)'}
+                disabled={exporting || compliance.length === 0}
+                onClick={() => exportProposalPackage({ rfp: true })}
+              />
+            )}
+
             {!isSimpleResponseMode && (
               <OutputActionCard
                 eyebrow="Export · IDIQ / MACC"

@@ -1509,3 +1509,30 @@ competitor at NAPEX 2026 ships a CTA-aligned SAM filter — booth demo hook.
 **Proof:** 14 rows in `cta_codes` (`supabase/migrations/20260613_cta_filters.sql`).
 Tagger: `src/lib/cta/tagger.ts` + `/api/cron/tag-cta`. QA:
 `/api/admin/cta-tagging?password=...`. UI: `AlertsPanel.tsx` collapsed CTA chip section.
+
+---
+
+## Proposal Assist: Spectrum-Aware RFP Response Template (June 13, 2026)
+
+**What:** A one-click RFP response skeleton sized to THIS solicitation. Mindy
+detects the RFP's weight: a focused single-document commercial response by default
+(cover/offer → technical approach to the SOW → past performance if asked → price/
+quote → compliance confirmations), or the full Section L/M volume structure when the
+RFP actually carries it. Pre-filled from your vault; instructive placeholders for the
+rest; tells you which shape it chose and why.
+
+**Why:** We analyzed 488 real solicitations and found only ~1% are full UCF (Section
+L AND M) — the vast majority are commercial / simplified buys that should NOT be
+answered with a heavy multi-volume proposal. So the template doesn't over-build: it
+matches the response to what the solicitation actually is. This is the "in-between"
+between the LOI (simplest) and the IDIQ/MACC 4-volume package (hardest).
+
+**SEO:** RFP response template, commercial proposal format, FAR 12 quote response,
+single-award proposal structure, how to respond to a government RFP.
+
+**Proof:** `src/lib/proposal/rfp-response.ts` (`assembleRfpResponse`, spectrum
+detection + light/UCF rendering, reusing buildProposalStructure for the heavy case
+and the LOI reference block for past performance). Wired into `/api/app/proposal/
+export` as packageType `rfp_response`. Grounded in `docs/RFP-FORMAT-ANALYSIS.md`.
+Verified: a commercial buy renders the light 4-section response with real past
+performance; an L/M RFP escalates to the volume structure.
