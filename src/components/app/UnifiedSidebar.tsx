@@ -58,7 +58,8 @@ export type AppPanel =
   | 'pricing'        // Pricing Intel — labor rates, GSA/SCA wages (Estimating section)
   | 'proposals'      // AI Proposal Assist (Estimating section)
   | 'target-list'    // My Target List — saved BD targets (Pipeline section, Slice 3 of TMR roadmap)
-  | 'grants';        // Federal grants
+  | 'grants'         // Federal grants
+  | 'disa-watch';    // Vehicle Expiry Watch — DISA prototype (IDIQ/IDV expiry auto-notify)
 
 // Tier definitions
 export type AppTier = 'free' | 'pro' | 'team' | 'enterprise';
@@ -218,6 +219,16 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'Expiring Contracts',
         icon: Clock,
         description: 'Recompete targets',
+        tier: ['pro', 'team', 'enterprise'],
+      },
+      {
+        // DISA prototype (Jun 2026): automate IDIQ/IDV expiry tracking +
+        // incumbent notification (replaces their manual spreadsheet). Pro-tier
+        // like its neighbors; it's a focused demo surface for the DISA meeting.
+        id: 'disa-watch',
+        label: 'Vehicle Expiry Watch',
+        icon: Bell,
+        description: 'Auto-notify on expiry',
         tier: ['pro', 'team', 'enterprise'],
       },
       {

@@ -24,6 +24,7 @@ const VaultPanel = lazy(() => import('./VaultPanel'));
 const KnowledgeBasePanel = lazy(() => import('./KnowledgeBasePanel'));
 const CoachPanel = lazy(() => import('./CoachPanel'));
 const LibraryPanel = lazy(() => import('./LibraryPanel'));
+const DisaVehicleWatchPanel = lazy(() => import('./DisaVehicleWatchPanel'));
 
 interface PanelContainerProps {
   activePanel: AppPanel;
@@ -87,6 +88,8 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
         return <CoachPanel email={email} onPanelChange={onPanelChange} />;
       case 'grants':
         return <GrantsPanel email={email} tier={tier} />;
+      case 'disa-watch':
+        return <DisaVehicleWatchPanel email={email || ''} />;
       case 'vault':
         return <VaultPanel email={email} tier={tier} />;
       case 'library':
