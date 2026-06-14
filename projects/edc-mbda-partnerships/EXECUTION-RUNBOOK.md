@@ -119,7 +119,7 @@ Walk this order — 15 minutes max:
 - [ ] PGC EDC eval call booked
 - [ ] FT hire JD posted + 5+ applicants
 - [ ] 1 advisor role filled or strong pipeline
-- [x] Phase 2 research doc: **10 EDCs done** (verified contacts + sources); MBDA-adjacent rows next
+- [x] Phase 2 research doc: **10 EDCs + MBDA matrix done** (~16 centers, status + sources). ⛔ MBDA centers = not a viable channel (legal limbo, agreements end Aug 31 2026) → route to surviving operators + state divisions + NMSDC
 - [ ] Grant tracker: 5 NOFOs with deadlines logged
 
 ---

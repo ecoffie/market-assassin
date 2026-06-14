@@ -40,20 +40,46 @@ Priority states: **MD, GA, TX, FL, VA, CA** (per PRD).
 
 ## 2. MBDA center status matrix
 
-**Baseline:** GAO-26-107718 — **39 active business centers in 2024**. Federal cooperative agreements disrupted April 2025 onward.
+**⛔ STRATEGIC CALL (Jun 14, 2026): MBDA Business Centers are NOT a reliable buyer channel right now.** The whole network is in legal limbo, no funding is confirmable, and every FY2021 agreement expires Aug 31, 2026. **Pursue the SURVIVING OPERATORS under their own names** (the universities / councils / chambers that held the agreements) + **state minority-business divisions** (§4) + **NMSDC councils** (§3) instead. Do not pitch a multi-year license to anything badged "MBDA center."
 
-| Center / operator | State | MBDA coop status (verified) | Alternative operator | Contact | Mindy angle |
-|-------------------|-------|------------------------------|----------------------|---------|-------------|
-| **Georgia MBDA Business Center** | GA | **Terminated Apr 17, 2025** — cease operations per Commerce notice | None named; clients directed to federal MBDA staff | gambdacenter@innovate.gatech.edu (archival) | Pitch **GA state minority business division** instead |
-| **NC MBDA Business Center** | NC | **Terminated Apr 17, 2025** | **NC HUB Office remains open** (state program) | ncmbda@doa.nc.gov | State HUB + Mindy coach rollup |
-| *Remaining 37 centers* | Various | **Research required** — assume verify-before-outreach | State commerce / NMSDC regional | | See GAO-26-107718 appendix |
+### National status (verified — applies to every center)
 
-**Rule:** Do not pitch multi-year licenses to centers that posted termination notices without confirming a live operator.
+- **Mar 14, 2025** — EO 14238 ("Continuing the Reduction of the Federal Bureaucracy") gutted MBDA; nearly all staff placed on leave. ([EO text](https://www.executiveactions.org/actions/continuing-the-reduction-of-the-federal-bureaucracy))
+- **Apr 17, 2025** — Commerce began terminating Business Center cooperative agreements (cease-operations orders). At least **9** formally cut by Aug 29, 2025; journalism describes "dozens."
+- **Litigation — *Rhode Island v. Trump*, 1:25-cv-00128 (D.R.I.)**, 21-state suit (**CA, MD, VA are plaintiff states**; GA, TX, FL are NOT). Prelim. injunction May 2025 → **permanent injunction Nov 21, 2025** (reinstate funding/staff) → **defendants APPEALED Jan 2026**; compliance disputed. ([Clearinghouse 46344](https://clearinghouse.net/case/46344/))
+- **GAO-26-107718** (pub. Mar 27, 2026): confirms **39 active centers in 2024**; agreements terminated post-EO; some rescinded by injunction. No public roster appendix.
+- **All FY2021 cooperative agreements run through Aug 31, 2026** — end-of-term regardless of litigation.
+- **Verification blocker:** `mbda.gov/business-center/*` returns HTTP 403 to automated fetch; most operators have removed their MBDA pages. **No priority-state center could be confirmed as currently federally funded + operating.** "OPERATING" below = the host org shows life, NOT confirmed federal funding.
 
-**Sources:**
-- [Georgia MBDA center program update](https://georgiambdabusinesscenter.org/)
-- [NC DOA — NC MBDA / HUB](https://www.doa.nc.gov/divisions/historically-underutilized-businesses-hub/ncmbda)
-- [GAO-26-107718](https://www.gao.gov/products/gao-26-107718)
+### Priority-state center roster (status as of Jun 14, 2026)
+
+Status legend: **TERMINATED** (documented) · **UNVERIFIED** (no live federal confirmation — verify by phone) · ⚠️ plaintiff-state = stronger funding protection.
+
+| Center (operator) | State | Status (verified) | Surviving operator to pitch instead | Contact (verify before use) | Source |
+|---|---|---|---|---|---|
+| Georgia Statewide MBED (Georgia Tech EI²) | GA | UNVERIFIED → likely terminated | **GT EI² / GT APEX** (row 9) under own name | via gtapexaccelerator.org | [archival site](https://georgiambdabusinesscenter.org/) |
+| NC MBDA Center | NC | **TERMINATED Apr 17, 2025** | **NC HUB Office** (state, open) | ncmbda@doa.nc.gov | [NC DOA HUB](https://www.doa.nc.gov/divisions/historically-underutilized-businesses-hub/ncmbda) |
+| San Antonio MBDA (UTSA Inst. for Econ. Dev.) | TX | **TERMINATED** — domain disabled | **UTSA IED / SBDC network** | iedtexas.org | [iedtexas.org](https://iedtexas.org/) |
+| El Paso MBDA (El Paso Hispanic Chamber) | TX | **TERMINATED** (grant ended Jul 2024) | EPHCC self-funded "Growth Solutions" | ephcc.org | [El Paso Matters](https://elpasomatters.org/2025/05/07/el-paso-hispanic-chamber-minority-business-development-trump-cuts/) |
+| DFW MBDA (DFW MSDC) | TX | UNVERIFIED → likely terminated | **DFW MSDC** (NMSDC, own name) | andrew@dfwmsdc.com | [dfwmsdc.com](https://dfwmsdc.com/) |
+| Houston MBDA (Houston Comm. College) | TX | UNVERIFIED → likely terminated | HCC / City of Houston OBO / Houston MSDC | — | [hccs.edu/mbda](https://www.hccs.edu/mbda) |
+| Orlando MBDA (3D Strategic Mgmt) | FL | UNVERIFIED — **strongest live signals** (active site/IG) | 3D Strategic Mgmt under own name | 407-251-7021; info@orlandombdacenter.com *(verify)* | [orlandombdacenter.com](https://orlandombdacenter.com/) |
+| Miami MBDA (FSMSDC) | FL | UNVERIFIED — **CEO transition Dec 2025** | **FSMSDC** (NMSDC) under own name | via fsmsdc.org/contact-us | [fsmsdc.org](https://fsmsdc.org/) |
+| Virginia MBDA (CRMSDC) ⚠️ | VA | UNVERIFIED — domain redirects, socials "(ARCHIVED)" | **CRMSDC** (NMSDC) + **VA SBSD** (state) | via crmsdc.org | [LinkedIn (archived)](https://www.linkedin.com/company/mbdavirginia) |
+| MBDA Business Center – LA (USC) ⚠️ | CA | UNVERIFIED, **leaning OPERATING** (live USC dir.) | USC center; SCMSDC (row 8) | Dir. Sergio Gascon, 213-743-2164 | [USC dir.](https://departmentsdirectory.usc.edu/mbdc/) |
+| Sacramento MBDA (CalAsian Chamber) ⚠️ | CA | **TERMINATED — closed Jun 30, 2025** (operator notice) | CalAsian Chamber; CalOSBA | (916) 446-7883 | [sacramentombda.com](https://www.sacramentombda.com/) |
+| SF Bay Area MBDA (ASIAN, Inc.) ⚠️ | CA | UNVERIFIED → likely terminated (pages 404) | WRMSDC; CalOSBA | — | [asianinc.org](https://www.asianinc.org/) |
+| Baltimore MBDA (L.S. Caldwell & Assoc.) ⚠️ | MD | UNVERIFIED (host site live, 2025–26) | L.S. Caldwell under own name; MD GOSBA | Dir. Gary Moore, via site | [marylandmbdacenter.com](https://marylandmbdacenter.com/about/) |
+| Baltimore MBDA AMC (Baltimore City SMBA&D) ⚠️ | MD | UNVERIFIED (city office active) | Baltimore City SMBA&D | N. Scott Phillips, 443-401-0242 | [baltimorembda.com](https://baltimorembda.com/page/about-us) |
+| MBDA Federal Procurement Center (CRMSDC) ⚠️ | MD/DC | **TERMINATED — ceased Jun 2025** | CRMSDC under own name | site down | [Kolumn, Nov 2025](https://www.kolumnmagazine.com/2025/11/19/inside-the-quiet-dismantling-of-americas-only-minority-business-agency-and-the-entrepreneurs-left-stranded/) |
+
+*~16 of 39 centers accounted for (priority states + GA/NC). Full national roster sits behind the 403-blocked mbda.gov locator + GAO PDF — not pulled.*
+
+**The one qualifying question** (settles any center by phone): *"Is your MBDA cooperative agreement currently funded, and is it being renewed past Aug 31, 2026?"* If no → pitch the operator under its own name, not as an MBDA center.
+
+**Best surviving-operator leads from this matrix:** Orlando (3D Strategic — most alive), USC LA center (plaintiff state + live directory), FSMSDC & DFW MSDC & CRMSDC (already NMSDC councils → fold into §3), Baltimore AMC (city office, stable funding). **Avoid:** anything confirmed terminated (San Antonio, El Paso, Sacramento, CRMSDC Fed Procurement, NC).
+
+**Rule:** Do not pitch multi-year licenses to centers that posted termination notices or can't confirm funding past Aug 31, 2026. Plaintiff-state centers (CA/MD/VA ⚠️) have stronger near-term funding protection than GA/TX/FL.
 
 ---
 
@@ -127,4 +153,4 @@ Target: **3 discovery calls at $50K EDC price point** before standardizing.
 
 ---
 
-*Last updated: June 14, 2026 — EDC top-10 COMPLETE: 10 verified rows (all priority states MD/GA/TX/FL/VA/CA covered), each with a real contact + source URL. Key finding: strongest regional GovCon orgs are often the APEX Accelerators (parallel track); best non-APEX EDC buyers = county vendor academies + minority supplier councils. Runner-ups + disqualifications logged. Open research now shifts to §2 MBDA matrix, §3 NMSDC contacts, §4 state divisions.*
+*Last updated: June 14, 2026 — §1 EDC top-10 COMPLETE (10 verified rows, all priority states) + §2 MBDA matrix COMPLETE (~16 centers, national status, litigation timeline, surviving-operator routing). ⛔ Strategic call: MBDA centers are NOT a viable buyer channel (legal limbo, agreements expire Aug 31 2026, no funding confirmable) → pitch surviving operators under own names + state divisions (§4) + NMSDC (§3). Open research now: §3 NMSDC council contacts (Carolinas-Virginia + Georgia presidents), §4 state minority-business divisions, §6 EDA/state RFP calendar.*
