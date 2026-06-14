@@ -6,17 +6,19 @@
 
 ---
 
-## Active watch list
+## Active watch list (seeded w/ verified IDs + dates — Jun 14, 2026)
 
-| Source | Program / topic | Fit for Mindy | Deadline | Status | URL / ID | Notes |
+| Source | Program / topic | Fit for Mindy | Deadline (verified) | Status | URL / ID | Notes |
 |--------|-----------------|---------------|----------|--------|----------|-------|
-| **DoD SBIR/STTR** | OSBP / small business readiness / AI matching | CTA engine, UEI attribution API | Topic release — check [dsbs.sbir.gov](https://www.dsb.sbir.gov) | **Watch** | | Scan weekly for OSBP-aligned topics |
-| **SBA** | Growth Accelerator Fund Competition | Underserved firm cohort tooling | Annual — check sba.gov | **Watch** | | |
-| **SBA** | PRIME grant | Minority/rural technical assistance | Annual | **Watch** | | |
-| **EDA** | Economic Adjustment / Revolving Loan Fund / University Centers | EDC partnership + defense industrial base placement | FY26 NOFOs — check [eda.gov](https://www.eda.gov) | **Research** | | Keyword scan: "minority business," "defense," "entrepreneurship" |
-| **State — GA** | GA Dept of Economic Development innovation grants | Single-state EDC pilot | TBD Q3 2026 | **Open** | | Assign in Phase 2 research |
-| **State — TX** | Texas workforce / procurement training RFPs | San Antonio Vendor Academy adjacency | TBD | **Open** | | |
-| **DoD OSBP** | BAA / pilot (non-SBIR) | National CTA pipeline dashboard | Relationship-driven | **Open** | | Needs contact map (Phase 2) |
+| **DoD SBIR/STTR** | Release **26.3** (monthly BAA cadence, reauthorized Apr 13 2026) | CTA-tagged topic match + UEI win attribution | **Opens 24-Jun-2026 · closes 22-Jul-2026** | **★ ACT — next cycle** | `DOD_SBIR_2026_P3_*` (verify exact code on DSIP) · [dodsbirsttr.mil](https://www.dodsbirsttr.mil/) · [BAA schedule](https://business.defense.gov/Programs/SBIR-STTR/BAA-Schedule/) | Then R4 (Jul 22–Aug 19), R5 (Aug 26–Sep 23), R6 (Sep 23–Oct 21). Pick a topic per release. |
+| **MBDA** | **Rural Business Center Program** (still funding centers despite turmoil) | Partner/host angle for a center operator | **Closes 29-Jun-2026** | **★ ACT — closes soon** | `MBDA-OBC-2026-00003` · [grants.gov/362605](https://www.grants.gov/search-results-detail/362605) | Live NOW. A surviving-operator could bid + bundle Mindy. |
+| **EDA** | Public Works & Economic Adjustment Assistance (general NOFO) | EDC partnership; regional ecosystem | **Rolling — no close date** | **Open** | `PWEAA2023` · [grants.gov/346815](https://www.grants.gov/search-results-detail/346815) | EDA's competitive programs (Build-to-Scale, Univ Centers) are PAUSED/between-cycles in 2026 — only rolling NOFOs open. |
+| **NIST MEP** | Center State Competition FY26 | Supplier-development incumbents | **CLOSED 4-Feb-2026** | **Closed** | `2026-NIST-MEP-01` | Pilot (FR `2026-10105`, May 2026) = current MEP awardees ONLY. Low fit. |
+| **SBA** | Growth Accelerator Fund Competition (GAFC) | Entrepreneur-support orgs (our audience) | **FY26 NOT posted** (FY25 closed 31-Jan-2025) | **Watch — re-poll** | [sbir.gov/community/gafc](https://www.sbir.gov/community/gafc) | Do NOT publish a 2026 date — none confirmed. Re-check monthly. |
+| **SBA** | PRIME (microenterprise TA) | Nonprofit/SBDC-adjacent TA providers | **FY26 NOT posted** (FY25 closed 27-May-2025) | **Watch — re-poll** | [sba.gov grants](https://www.sba.gov/funding-programs/grants/grants-community-organizations) | Usually posts Apr–May; not up as of Jun 2026. |
+| **DoD OSBP** | BAA / pilot (non-SBIR) | National CTA pipeline dashboard | Relationship-driven | **Open** | e.g. NRL Long-Range BAA `N00173-24-S-BA01` (thru 30-Sep-2026) | Needs OSBP contact map (Phase 2). |
+
+**⚠️ Rule reminder:** GAFC + PRIME have NO confirmed 2026 NOFO — left as "re-poll," not guessed. Re-verify the DoD 26.3 BAA code on DSIP before submission.
 
 ---
 
@@ -48,4 +50,4 @@
 
 ---
 
-*Started: June 14, 2026 — populate deadlines as research confirms*
+*Started: June 14, 2026. Seeded w/ 7 verified rows. NEAR-TERM ACTIONS: DoD SBIR 26.3 (opens Jun 24, closes Jul 22) + MBDA Rural Business Center (closes Jun 29). GAFC/PRIME = no confirmed FY26 NOFO (re-poll, don't guess). EDA competitive programs paused; only rolling PWEAA open.*

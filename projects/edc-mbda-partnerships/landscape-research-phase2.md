@@ -121,9 +121,17 @@ Several of these are the **surviving operators** of now-dead MBDA centers (§2) 
 
 ---
 
-## 4. State minority business divisions (MBDA backfill path)
+## 4. State minority business divisions (a LEAD channel, not just MBDA backfill)
 
-When federal MBDA coop terminates, **state-funded** operators remain (never MBDA-funded → durable). **Important:** these certify firms for **STATE** procurement, not federal. The honest Mindy angle = *"graduate your certified SB/MBE firms from state contracting to FEDERAL — opportunity intel + teaming the state program doesn't provide."* Verified Jun 14, 2026.
+When federal MBDA coop terminates, **state-funded** operators remain (never MBDA-funded → durable). They certify firms for **STATE** procurement, not federal.
+
+**💡 Strategic upgrade (Eric, Jun 14): treat state-cert programs as a LEAD channel, not a consolation backfill.** The reasoning — this is where we make a splash *away* from the crowd:
+1. **Less competition.** Every GovCon SaaS vendor crowds the federal door (SAM/APEX/SBIR). State SB/MBE/HUB programs are largely **un-served by opportunity-intelligence tooling** → we're early, not 50th.
+2. **Captive pre-qualified cohorts + a built-in channel.** TX HUB, MD GOSBA, CA DGS-OSDS already run recurring **vendor forums + training series** with rosters of certified firms — exactly what Mindy's coach dashboard plugs into.
+3. **The upsell ladder is natural:** firm gets state-certified → wins state work → *"now how do I go federal?"* — Mindy is the bridge, and we reach them BEFORE they shop federal tools. The state program looks like a hero.
+4. **Durable buyers** (state-funded, MBDA-independent).
+
+The honest Mindy angle = *"graduate your certified SB/MBE firms from state contracting to FEDERAL — opportunity intel + teaming the state program doesn't provide."* Verified Jun 14, 2026.
 
 | State | Office (parent) | What it does | GovCon programming | Contact (verify before use) | Source |
 |---|---|---|---|---|---|
@@ -156,13 +164,23 @@ When federal MBDA coop terminates, **state-funded** operators remain (never MBDA
 
 ---
 
-## 6. EDA + state RFP calendar
+## 6. EDA + funding NOFO calendar
 
-See `grant-nofo-tracker.md` for deadline-driven rows. Phase 2 open items:
+Full deadline-driven rows now seeded in **`grant-nofo-tracker.md`** (7 verified rows). Scan summary (Jun 14, 2026):
 
-- [ ] EDA FY26 NOFO scan — "defense industrial base," "minority business," "entrepreneurship"
-- [ ] GA/TX/FL/CA commerce dept innovation RFPs — Q3 2026
-- [ ] DoD OSBP contact map for complementary CTA dashboard pitch
+**Two near-term ACTIONS:**
+- **DoD SBIR/STTR Release 26.3** — opens **Jun 24**, closes **Jul 22, 2026** (then monthly R4–R6 through Oct). Reauthorized Apr 13, 2026; monthly BAA cadence. Mindy = CTA-tagged topic match + UEI win attribution. [dodsbirsttr.mil](https://www.dodsbirsttr.mil/)
+- **MBDA Rural Business Center Program** `MBDA-OBC-2026-00003` — closes **Jun 29, 2026** (live now; a surviving-operator partner could bid + bundle Mindy). [grants.gov/362605](https://www.grants.gov/search-results-detail/362605)
+
+**Honest status of the rest:**
+- **EDA:** competitive programs (Build-to-Scale, University Centers, Tech Hubs) are **paused / between-cycles** in 2026 — only the rolling **Public Works & EAA** NOFO (`PWEAA2023`) is open. Thin pipeline.
+- **SBA GAFC + PRIME:** **no confirmed FY2026 NOFO** as of Jun 2026 (FY25 cycles closed). Re-poll monthly — do not assume a date.
+- **NIST MEP:** main FY26 competition **closed Feb 4, 2026**; the new Pilot is current-awardees-only. Low fit.
+
+**Still open (Phase 2):**
+- [ ] State commerce/innovation RFPs (TX/MD/CA/FL) — tie to §4 state-cert programs as the LEAD channel (see §4 strategic upgrade). Most are state-procurement vendor solicitations, not grants — check each state's eVA/ESBD/Cal eProcure portal.
+- [ ] DoD OSBP contact map for the complementary CTA-dashboard pitch (relationship-driven, not a NOFO).
+- [ ] Confirm DoD SBIR 26.3 exact BAA code on DSIP before any submission.
 
 ---
 
@@ -202,4 +220,4 @@ Target: **3 discovery calls at $50K EDC price point** before standardizing.
 
 ---
 
-*Last updated: June 14, 2026 — §1 EDC top-10 + §2 MBDA matrix + §3 NMSDC priority-council leadership + §4 state divisions + §8 events/booth calendar all COMPLETE (verified CEOs/contacts for CRMSDC, GMSDC, FSMSDC, DFW, HMSDC, CVMSDC, SCMSDC). Corrected 2 §2 facts via §3 research: (a) VA MBDA center was CRMSDC not CVMSDC; (b) Federal Procurement Center TRANSITIONED to KDM & Associates ~May 2025, did not cease. Best NMSDC lead = CRMSDC (Sharon Pinder) — runs a 12-wk GovCon Incubator. Angle for ex-MBDA councils (CRMSDC/FSMSDC/DFW): their MBEs lost federal-contracting support → Mindy coach dashboard fills it. §4 state divisions: best = TX HUB / MD GOSBA / CA DGS-OSDS (GA has no strong state MBE → route via GMSDC). §8 events: BOOK NAPEX (Aug 16–20 Orlando, $1,500 govt booth — top action) + ASBDC (Sept 29–Oct 1 Atlanta); NMSDC eligibility-gated; MED Week dead. Open research now: §6 EDA/state RFP calendar + grant-nofo-tracker seeding.*
+*Last updated: June 14, 2026 — §1 EDC top-10 + §2 MBDA matrix + §3 NMSDC priority-council leadership + §4 state divisions + §8 events/booth calendar all COMPLETE (verified CEOs/contacts for CRMSDC, GMSDC, FSMSDC, DFW, HMSDC, CVMSDC, SCMSDC). Corrected 2 §2 facts via §3 research: (a) VA MBDA center was CRMSDC not CVMSDC; (b) Federal Procurement Center TRANSITIONED to KDM & Associates ~May 2025, did not cease. Best NMSDC lead = CRMSDC (Sharon Pinder) — runs a 12-wk GovCon Incubator. Angle for ex-MBDA councils (CRMSDC/FSMSDC/DFW): their MBEs lost federal-contracting support → Mindy coach dashboard fills it. §4 state divisions: best = TX HUB / MD GOSBA / CA DGS-OSDS (GA has no strong state MBE → route via GMSDC). §8 events: BOOK NAPEX (Aug 16–20 Orlando, $1,500 govt booth — top action) + ASBDC (Sept 29–Oct 1 Atlanta); NMSDC eligibility-gated; MED Week dead. §4 UPGRADED to a LEAD channel (state-cert = uncrowded beachhead, captive cohorts, state→federal upsell — Eric's call). §6 + grant-nofo-tracker seeded (7 verified rows): near-term = DoD SBIR 26.3 (Jun 24–Jul 22) + MBDA Rural Business Center (closes Jun 29); EDA competitive programs paused; GAFC/PRIME no FY26 NOFO (re-poll). **Phase 2 COMPLETE.** Next: execute outreach + book NAPEX.*
