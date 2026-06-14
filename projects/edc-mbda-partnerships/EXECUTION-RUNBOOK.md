@@ -116,7 +116,8 @@ Walk this order — 15 minutes max:
 | `landscape-research-phase2.md` | Target inventory (living) |
 | `outreach-templates.md` | Copy-paste emails |
 | `advisor-recruitment-brief.md` | 3 advisor role posts |
-| `grant-nofo-tracker.md` | SBIR / EDA / state calendar |
+| `grant-nofo-tracker.md` | SBIR / EDA / state calendar (live deadlines) |
+| `FUNDING-STRATEGY.md` | **Which funding Mindy can actually win + apply/skip calls** (DoD SBIR, civilian, state; nonprofit + prior TX/FL contract assets) |
 | `../../scripts/provision-edc-pilot-org.sql` | Supabase org setup for EDC eval |
 
 ---
