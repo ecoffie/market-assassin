@@ -31,7 +31,7 @@ that opportunities API (bigger change than a render tweak).
 ## 🔲 OPEN — Founders Lifetime $4,997 (Stripe link pending)
 
 **Why:** 1-1-1 pricing — one product (Mindy), lifetime at proven $4,997 course anchor.
-Bootcamp special stays $1,497 through Jun 27. No $2,997 tier.
+Public anchor: Founders $4,997 on getmindy.ai/lifetime + govcongiants.com homepage. Bootcamp alumni $2,997 is email-only, never site hero.
 
 **Code shipped (branch `feat/founders-lifetime-4997`):**
 - [x] `src/lib/mindy/lifetime-pricing.ts` — single source of truth

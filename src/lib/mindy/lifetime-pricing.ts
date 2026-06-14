@@ -1,26 +1,25 @@
 /**
  * Mindy lifetime pricing — single source of truth (1-1-1 model).
  *
- * One product (Mindy Pro), two lifetime checkout paths:
- *   - Bootcamp special ($1,497) — time-boxed event offer
- *   - Founders Lifetime ($4,997) — capped founding cohort (100 seats)
+ * PERCEPTION RULE: Public surfaces anchor on Founders Lifetime ($4,997) — the
+ * same price lifetime course buyers already paid. Never lead with bootcamp rate;
+ * that trains the market to treat Mindy as a ~$3K product.
  *
- * No $2,997 tier. Historical course lifetime was $4,997; founders matches
- * proven WTP. After the cap closes, sell Pro monthly/annual only unless we
- * reopen lifetime at a higher price.
+ *   - Founders Lifetime ($4,997) — public anchor, capped at 100 seats
+ *   - Bootcamp alumni ($2,997) — private post-bootcamp email only, not homepage
  */
 
 export const PRO_MONTHLY = 149;
 export const PRO_ANNUAL = 1490;
 
-/** Founders Lifetime — standard post-bootcamp lifetime (capped). */
+/** Public lifetime anchor — Founders Lifetime (100 seats). */
 export const FOUNDERS_LIFETIME_PRICE = 4997;
 export const FOUNDERS_LIFETIME_CENTS = 499700;
 export const FOUNDERS_LIFETIME_CAP = 100;
 
-/** Bootcamp-only lifetime special (Jun 27, 2026 bootcamp cohort). */
-export const BOOTCAMP_LIFETIME_PRICE = 1497;
-export const BOOTCAMP_LIFETIME_CENTS = 149700;
+/** Bootcamp alumni rate — email-only; do not hero on /lifetime or funnels. */
+export const BOOTCAMP_LIFETIME_PRICE = 2997;
+export const BOOTCAMP_LIFETIME_CENTS = 299700;
 export const BOOTCAMP_LIFETIME_DEADLINE_ISO = '2026-06-27';
 
 export function bootcampDeadlineLabel(): string {
@@ -36,4 +35,12 @@ export function bootcampDeadlineLabel(): string {
 
 export function foundersBreakEvenMonths(): number {
   return Math.ceil(FOUNDERS_LIFETIME_PRICE / PRO_MONTHLY);
+}
+
+export function bootcampBreakEvenMonths(): number {
+  return Math.ceil(BOOTCAMP_LIFETIME_PRICE / PRO_MONTHLY);
+}
+
+export function bootcampLifetimeSavings(): number {
+  return FOUNDERS_LIFETIME_PRICE - BOOTCAMP_LIFETIME_PRICE;
 }

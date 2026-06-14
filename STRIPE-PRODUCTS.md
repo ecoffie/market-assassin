@@ -58,12 +58,14 @@ Source of truth: `src/lib/products.ts`
 |---------|-------|----------------|---------------------|---------------|
 | Mindy Pro Monthly | $149/mo | `/checkout/mindy-pro-monthly` | `buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C` | (subscription) |
 | Mindy Pro Annual | $1,490/yr | `/checkout/mindy-pro-annual` | `buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D` | (subscription) |
-| **Bootcamp Lifetime** | **$1,497 one-time** | `/checkout/bootcamp-lifetime` | `buy.stripe.com/6oU3cwff897ceND84UfnO0t` (legacy Ultimate link — update metadata) | `tier=briefings_lifetime` |
+| **Bootcamp Lifetime** | **$2,997 one-time** | `/checkout/bootcamp-lifetime` | `buy.stripe.com/REPLACE_ME_BOOTCAMP_LIFETIME_2997` (create + set metadata) | `tier=briefings_lifetime` |
 | **Founders Lifetime** | **$4,997 one-time** | `/checkout/founders-lifetime` | `buy.stripe.com/28E00k6IC5V0fRH5WMfnO0G` | `tier=briefings_lifetime` |
 
 **Sales page:** `https://getmindy.ai/lifetime`
 
-**1-1-1 model:** One product (Mindy Pro). Lifetime grants `briefings_lifetime` only — no separate legacy tool flags for new purchases. Ultimate Giant Bundle is retired as a offer; bootcamp uses $1,497 lifetime pricing.
+**1-1-1 model:** One product (Mindy Pro). Lifetime grants `briefings_lifetime` only. Ultimate Giant Bundle ($1,497) retired.
+
+**Perception rule:** Public anchor is **Founders $4,997** on getmindy.ai/lifetime and govcongiants.com. Bootcamp alumni **$2,997** is email-only — never the homepage hero.
 
 **Partner attribution:** Share `getmindy.ai/checkout/founders-lifetime?ref=NCMBC` — never raw `buy.stripe.com` links.
 
@@ -76,14 +78,13 @@ Source of truth: `src/lib/products.ts`
 - [ ] After-payment redirect: `https://getmindy.ai/purchase/success?product=founders-lifetime`
 - [x] Replace placeholder in `purchase-attribution.ts`
 
-**Bootcamp Lifetime ($1,497):**
-- [ ] Create new Payment Link OR update existing Ultimate link metadata to `tier=briefings_lifetime` only
-- [ ] Update `bootcamp-lifetime.checkoutUrl` if new link created
+**Bootcamp Lifetime ($2,997):**
+- [ ] Create product "Mindy Lifetime — Bootcamp Special" — $2,997 USD one-time
+- [ ] Payment Link metadata: `tier=briefings_lifetime`
+- [ ] Replace `REPLACE_ME_BOOTCAMP_LIFETIME_2997` in `purchase-attribution.ts`
 - [ ] After-payment redirect: `https://getmindy.ai/purchase/success?product=bootcamp-lifetime`
 
-**Verify:** Test purchase → `user_profiles.access_briefings=true`, welcome email sent.
-
-**Deprecated:** $2,997 "standard lifetime" tier — removed. Founders = $4,997 capped at 100 seats.
+**Founders Lifetime ($4,997):**
 
 ---
 

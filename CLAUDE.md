@@ -439,7 +439,7 @@ curl "https://tools.govcongiants.org/api/admin/test-sam-subaward?password=galata
 |---------|----------|------------|---------|
 | **Market Assassin** | This project | `tools.govcongiants.org` | Dev/staging tools |
 | **GovCon Shop** | `/Users/ericcoffie/govcon-shop` | `shop.govcongiants.org` | Live shop (production) |
-| **GovCon Funnels** | `/Users/ericcoffie/govcon-funnels` | `govcongiants.org` | Marketing site |
+| **GovCon Funnels** | `/Users/ericcoffie/govcon-funnels` | `govcongiants.com` | Marketing site |
 | **LinkedIn Deal Magnet** | `/Users/ericcoffie/Linkedin App` | `linkedin-deal-magnet.vercel.app` | Profile optimizer (separate product) |
 
 ---
@@ -1462,7 +1462,7 @@ done
 ### Companion Guide (Complete)
 - **Intel Pack PDF:** `presentations/JTED-2026-Intel-Pack.pdf`
 - **Slides PDF:** `presentations/JTED-2026-Slides.pdf`
-- **Landing page:** `govcongiants.org/jted-2026` (deployed)
+- **Landing page:** `govcongiants.com/jted-2026` (deployed)
 - **GHL tag:** `jted-2026-landing`
 
 ### Key Files

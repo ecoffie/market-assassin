@@ -39,7 +39,7 @@ export default function MindyLandingPage() {
         logo: 'https://getmindy.ai/icon.png',
         description: 'AI-powered federal market intelligence for small business contractors.',
         email: 'hello@getmindy.ai',
-        sameAs: ['https://govcongiants.org'],
+        sameAs: ['https://govcongiants.com'],
       },
       {
         '@type': 'SoftwareApplication',
@@ -181,7 +181,7 @@ export default function MindyLandingPage() {
             ))}
           </div>
           <p className="mt-4 text-slate-500 text-xs">
-            Built by <a href="https://govcongiants.org" className="text-purple-400 hover:text-purple-300">GovCon Giants</a> — trusted by thousands of small federal contractors.
+            Built by <a href="https://govcongiants.com" className="text-purple-400 hover:text-purple-300">GovCon Giants</a> — trusted by thousands of small federal contractors.
           </p>
 
           {/* Already have access link */}

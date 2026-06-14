@@ -20,7 +20,7 @@ function SuccessContent() {
     briefings_annual: 'Market Intelligence Annual',
     'founders-lifetime': 'Mindy Founders Lifetime',
     'bootcamp-lifetime': 'Mindy Lifetime — Bootcamp Special',
-    'mindy-lifetime': 'Mindy Founders Lifetime',
+    'mindy-lifetime': 'Mindy Lifetime — Bootcamp Special',
     fhc_membership: 'Federal Help Center Membership',
     'opportunity-hunter-pro': 'Opportunity Hunter Pro',
     'market-assassin-standard': 'Market Assassin Standard',

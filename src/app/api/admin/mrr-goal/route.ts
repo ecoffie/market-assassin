@@ -219,7 +219,7 @@ export async function GET(request: NextRequest) {
     // count lifetime cash amortized over 12 months (a common way to value LTV
     // against an MRR target). Tunable price points the team is using.
     const LIFETIME_OFFERS = [
-      { name: 'Bootcamp Lifetime ($1,497)', price: 1497 },
+      { name: 'Bootcamp Lifetime ($2,997)', price: 2997 },
       { name: 'Founders Lifetime ($4,997)', price: 4997 },
     ];
     const lifetimeScenarios = LIFETIME_OFFERS.map((o) => ({

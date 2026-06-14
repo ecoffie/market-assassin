@@ -1558,6 +1558,8 @@ when no session. Verified against `user_profiles` rows keyed by purchaser email.
 
 ---
 
+---
+
 ## Proposal Assist: Drafts Now Write to the Compliance Matrix (June 14, 2026)
 
 **What:** When Mindy drafts a proposal section, it now knows exactly which
@@ -1660,3 +1662,20 @@ decision, skip → stage=no_bid, workspace-authorized) + `BidDecisionGate` recor
 proceed/No-Bid. Pagination in `ProposalsPanel` (50/page, pager, page-reset on filter).
 Verified: decision persists + No-Bid sets the stage; build clean. Closes the last two
 gaps in docs/PROPOSAL-UX-MAP.md.
+
+---
+
+## Bootcamp alumni pricing — anchor discipline (June 13, 2026)
+
+**What:** Public lifetime anchor restored to **Founders $4,997** on `/lifetime` and govcongiants.com.
+Bootcamp alumni **$2,997** stays in the post-bootcamp email only — framed as an earned rate
+against the public $4,997 price, not "Mindy costs $2,997."
+
+**Why:** Leading with $2,997 on public pages trains the market to treat Mindy as a low-tier
+~$3K product. MI pricing strategy: serious Deltek alternative, not a cheap knockoff.
+
+**SEO:** Mindy Founders Lifetime, federal contracting AI platform lifetime access.
+
+**Proof:** `FOUNDERS_LIFETIME_PRICE=4997` heroes `/lifetime`; `BOOTCAMP_LIFETIME_PRICE=2997`
+only in `bootcamp-lifetime-offer.ts` email copy. Live Stripe Founders link:
+`buy.stripe.com/28E00k6IC5V0fRH5WMfnO0G`.

@@ -58,24 +58,24 @@ export const CHECKOUT_PRODUCTS: Record<string, CheckoutProduct> = {
     checkoutUrl: 'https://buy.stripe.com/28E00k6IC5V0fRH5WMfnO0G',
     type: 'stripe_payment_link',
   },
-  // Alias — older links/docs used mindy-lifetime before founders naming.
-  'mindy-lifetime': {
-    id: 'founders-lifetime',
-    name: 'Mindy Founders Lifetime',
-    priceLabel: '$4,997 one-time',
-    amountCents: 499700,
-    checkoutUrl: 'https://buy.stripe.com/28E00k6IC5V0fRH5WMfnO0G',
-    type: 'stripe_payment_link',
-  },
-  // Bootcamp special $1,497 — time-boxed (Jun 27 bootcamp). Uses existing
-  // Ultimate checkout link until Eric creates a Mindy-only link with
-  // metadata tier=briefings_lifetime (see STRIPE-PRODUCTS.md).
+  // Bootcamp special $2,997 — time-boxed (Jun 27 bootcamp). Mindy lifetime only
+  // (Ultimate Giant Bundle retired). Create Stripe Payment Link with
+  // metadata tier=briefings_lifetime — see STRIPE-PRODUCTS.md.
   'bootcamp-lifetime': {
     id: 'bootcamp-lifetime',
     name: 'Mindy Lifetime — Bootcamp Special',
-    priceLabel: '$1,497 one-time',
-    amountCents: 149700,
-    checkoutUrl: 'https://buy.stripe.com/6oU3cwff897ceND84UfnO0t',
+    priceLabel: '$2,997 one-time',
+    amountCents: 299700,
+    checkoutUrl: 'https://buy.stripe.com/REPLACE_ME_BOOTCAMP_LIFETIME_2997',
+    type: 'stripe_payment_link',
+  },
+  // Alias — older /lifetime page links and docs.
+  'mindy-lifetime': {
+    id: 'bootcamp-lifetime',
+    name: 'Mindy Lifetime — Bootcamp Special',
+    priceLabel: '$2,997 one-time',
+    amountCents: 299700,
+    checkoutUrl: 'https://buy.stripe.com/REPLACE_ME_BOOTCAMP_LIFETIME_2997',
     type: 'stripe_payment_link',
   },
 };

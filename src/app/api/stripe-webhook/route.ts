@@ -141,10 +141,11 @@ export async function POST(request: NextRequest) {
       ) {
         tier = 'briefings';
       }
-      // Bootcamp / legacy Ultimate one-time checkout at $1,497 — grant lifetime
-      // Mindy only (1-1-1). Grandfathered Ultimate buyers keep legacy flags via
-      // bundle metadata on older sessions; new links should set tier metadata.
+      // Legacy Ultimate ($1,497) + bootcamp Mindy Lifetime ($2,997) + Founders ($4,997)
       if (!tier && session.amount_total === 149700) {
+        tier = 'briefings_lifetime';
+      }
+      if (!tier && session.amount_total === 299700) {
         tier = 'briefings_lifetime';
       }
       if (!tier && session.amount_total === 499700) {

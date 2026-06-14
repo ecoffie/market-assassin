@@ -1,28 +1,24 @@
 /**
  * /lifetime — Mindy Founders Lifetime ($4,997) sales page.
  *
- * 1-1-1 model: one product (Mindy Pro), lifetime = briefings_lifetime tier.
- * Bootcamp attendees get $1,497 through Jun 27 via /checkout/bootcamp-lifetime.
- * Founders Lifetime is capped at 100 seats — no $2,997 tier.
+ * Public anchor: $4,997 (100 seats) — same WTP as legacy course lifetime.
+ * Bootcamp alumni $2,997 exists only in post-bootcamp email, not here.
+ * Ultimate Giant Bundle ($1,497) is retired.
  */
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import {
-  BOOTCAMP_LIFETIME_PRICE,
   FOUNDERS_LIFETIME_CAP,
   FOUNDERS_LIFETIME_PRICE,
   PRO_ANNUAL,
   PRO_MONTHLY,
-  bootcampDeadlineLabel,
   foundersBreakEvenMonths,
 } from '@/lib/mindy/lifetime-pricing';
 
 const FOUNDERS_CHECKOUT = '/checkout/founders-lifetime';
-const BOOTCAMP_CHECKOUT = '/checkout/bootcamp-lifetime';
 const MONTHLY_CHECKOUT = 'https://buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C';
 const ANNUAL_CHECKOUT = 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D';
 
-const bootcampDeadline = bootcampDeadlineLabel();
 const breakEvenMonths = foundersBreakEvenMonths();
 
 export const metadata: Metadata = {
@@ -64,10 +60,6 @@ const faqs: Array<{ q: string; a: string }> = [
   {
     q: 'Why $4,997?',
     a: `That's what lifetime course access cost before Mindy existed — and Mindy delivers far more (daily AI briefings, live federal data, full Pro platform). At $${PRO_MONTHLY}/mo you'd break even in about ${breakEvenMonths} months; most serious contractors stay longer.`,
-  },
-  {
-    q: 'What about the bootcamp $1,497 offer?',
-    a: `Bootcamp attendees get $${BOOTCAMP_LIFETIME_PRICE.toLocaleString()} through ${bootcampDeadline} only. After that, Founders Lifetime is $${FOUNDERS_LIFETIME_PRICE.toLocaleString()} until 100 seats fill.`,
   },
   {
     q: 'Is this really lifetime?',
@@ -128,7 +120,6 @@ function fmt(n: number): string {
 }
 
 export default function LifetimePage() {
-  const bootcampSavings = FOUNDERS_LIFETIME_PRICE - BOOTCAMP_LIFETIME_PRICE;
   const fiveYearMonthly = PRO_MONTHLY * 12 * 5;
   const fiveYearAnnual = PRO_ANNUAL * 5;
 
@@ -139,21 +130,6 @@ export default function LifetimePage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      {/* Bootcamp banner */}
-      <div className="bg-gradient-to-r from-purple-900 to-indigo-900 border-b border-purple-500/30 px-4 py-3 text-center text-sm">
-        <span className="text-purple-200">
-          Bootcamp attendee?{' '}
-          <span className="text-white font-semibold">
-            ${fmt(BOOTCAMP_LIFETIME_PRICE)} lifetime through {bootcampDeadline}
-          </span>{' '}
-          —{' '}
-          <Link href={BOOTCAMP_CHECKOUT} className="text-emerald-300 hover:text-emerald-200 font-semibold underline">
-            claim bootcamp pricing →
-          </Link>
-        </span>
-      </div>
-
-      {/* Hero */}
       <section className="bg-gradient-to-br from-purple-900 via-slate-900 to-slate-950 py-20 px-4">
         <div className="max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/40 rounded-full mb-6">
@@ -172,7 +148,7 @@ export default function LifetimePage() {
             Full Pro access for life — the same lifetime price our course buyers already trusted.
           </p>
           <p className="text-slate-400 text-sm mb-10">
-            No $2,997 tier. When 100 founders fill, this closes.
+            Serious federal intelligence. Not a discount tool — a founding seat in the platform.
           </p>
 
           <Link
@@ -185,7 +161,6 @@ export default function LifetimePage() {
         </div>
       </section>
 
-      {/* The math */}
       <section className="px-4 py-20">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-12">
@@ -228,7 +203,6 @@ export default function LifetimePage() {
         </div>
       </section>
 
-      {/* Features + founder perks */}
       <section className="bg-slate-900/40 px-4 py-20">
         <div className="max-w-4xl mx-auto grid md:grid-cols-2 gap-12">
           <div>
@@ -252,21 +226,10 @@ export default function LifetimePage() {
                 </div>
               ))}
             </div>
-            <div className="mt-8 rounded-xl border border-amber-500/30 bg-amber-500/5 p-4">
-              <p className="text-amber-100 text-sm">
-                <span className="font-semibold">Bootcamp special:</span> attended the June bootcamp?
-                Pay <span className="text-white font-bold">${fmt(BOOTCAMP_LIFETIME_PRICE)}</span> instead
-                (save ${fmt(bootcampSavings)}) through {bootcampDeadline}.{' '}
-                <Link href={BOOTCAMP_CHECKOUT} className="text-emerald-300 underline">
-                  Bootcamp checkout →
-                </Link>
-              </p>
-            </div>
           </div>
         </div>
       </section>
 
-      {/* Eric voice */}
       <section className="px-4 py-16">
         <div className="max-w-3xl mx-auto space-y-6 text-slate-300 text-lg leading-relaxed">
           <h2 className="text-3xl font-bold text-white text-center mb-8">Why $4,997</h2>
@@ -283,7 +246,6 @@ export default function LifetimePage() {
         </div>
       </section>
 
-      {/* FAQ */}
       <section className="bg-slate-900/40 px-4 py-16">
         <div className="max-w-3xl mx-auto">
           <h2 className="text-3xl font-bold text-white text-center mb-10">Questions</h2>
@@ -304,7 +266,6 @@ export default function LifetimePage() {
         </div>
       </section>
 
-      {/* Final CTA */}
       <section className="px-4 py-20">
         <div className="max-w-3xl mx-auto text-center rounded-3xl border border-purple-500/30 bg-gradient-to-br from-purple-900/40 to-slate-900 p-10">
           <h2 className="text-3xl font-bold text-white mb-4">
