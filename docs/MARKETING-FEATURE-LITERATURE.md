@@ -1493,3 +1493,19 @@ RFPs). Reuses the compliance-extraction engine's structured requirements (deadli
 page limits, required plans) rather than guessing. Verified: a weak draft missing a
 required Safety Plan and bidding a set-aside it doesn't hold is correctly flagged as
 "at risk" with the specific DQ reasons.
+
+## 36. DoD Critical Tech Area filters — NAPEX wedge (June 2026)
+
+**What:** Multi-select filter for all 14 DoD Critical Technology Areas on Source Feed
+(`/app` → Source Feed). Rules-based tagging (NAICS anchors + keyword phrases) on cached
+`sam_opportunities`; filter via `?cta=trusted_ai,microelectronics` on `/api/app/opportunities`.
+Per-card CTA badges with confidence styling (high/medium/low).
+
+**Why:** DoD's 35% CTA mandate is the #1 reporting pain for APEX center directors. No
+competitor at NAPEX 2026 ships a CTA-aligned SAM filter — booth demo hook.
+
+**SEO:** n/a (counselor/enterprise feature, not public SEO page).
+
+**Proof:** 14 rows in `cta_codes` (`supabase/migrations/20260613_cta_filters.sql`).
+Tagger: `src/lib/cta/tagger.ts` + `/api/cron/tag-cta`. QA:
+`/api/admin/cta-tagging?password=...`. UI: `AlertsPanel.tsx` collapsed CTA chip section.
