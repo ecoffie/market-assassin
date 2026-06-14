@@ -1197,8 +1197,16 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
               ? 'No opportunities match the selected Critical Tech Areas. Try fewer CTAs or expand your NAICS profile.'
               : filter !== 'all'
               ? 'Try a different filter, clear your search, or check back later.'
-              : 'Configure your NAICS codes to see matching opportunities.'}
+              : 'Configure your NAICS codes and keywords so Mindy can match opportunities for you.'}
           </p>
+          {selectedCtaIds.length === 0 && filter === 'all' && needsProfileSetup && (
+            <Link
+              href={mindySetupHref}
+              className="inline-block mt-4 px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-sm font-semibold rounded-lg transition-colors"
+            >
+              Set up your profile →
+            </Link>
+          )}
         </div>
       )}
 

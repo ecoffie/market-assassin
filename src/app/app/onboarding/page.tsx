@@ -763,6 +763,17 @@ export default function OnboardingPage() {
               <button onClick={runAutoExtract} disabled={autoLoading || autoText.trim().length < 4} className="mt-3 h-10 px-5 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 text-white text-sm font-medium rounded-lg">
                 {autoLoading ? 'Reading…' : 'Set me up →'}
               </button>
+              {/* Escape hatch — if auto-extract fails (niche description, no NAICS
+                  match), don't trap the user in a retry loop. One click to the
+                  step-by-step manual setup. */}
+              {error && (
+                <button
+                  onClick={() => { setError(''); setMode('manual'); setStep(1); }}
+                  className="mt-3 ml-3 h-10 px-4 text-sm font-medium text-slate-300 hover:text-white underline underline-offset-2"
+                >
+                  Set it up manually instead →
+                </button>
+              )}
             </div>
           )}
 
