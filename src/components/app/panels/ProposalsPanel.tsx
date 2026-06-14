@@ -1200,9 +1200,14 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   const [autoLoadMessage, setAutoLoadMessage] = useState<string | null>(null);
   // detectedNoticeType moved up near currentSectionTabs declaration
   // so we can derive the simple-response workflow before consumers need it.
-  useEffect(() => {
+  //
+  // Extracted into a callback (not an inline effect) so the "Retry" button on a
+  // stuck/failed auto-load can re-run it without a full panel reload — e.g. when
+  // SAM attachments are still downloading (docs_status='fetching'). Returns a
+  // cleanup fn that cancels the in-flight request.
+  const loadPursuitDocs = useCallback((): (() => void) => {
     const pursuitId = activePursuitId;
-    if (!pursuitId || !email) return;
+    if (!pursuitId || !email) return () => {};
 
     let cancelled = false;
     setAutoLoadStatus('loading');
@@ -1302,6 +1307,12 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
 
     return () => { cancelled = true; };
   }, [activePursuitId, email, getAuthHeaders, opportunities]);
+
+  // Auto-load when the active pursuit changes; cleanup cancels any in-flight call.
+  useEffect(() => {
+    const cleanup = loadPursuitDocs();
+    return cleanup;
+  }, [loadPursuitDocs]);
 
   if (tier === 'free') {
     return (
@@ -1717,6 +1728,14 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               {autoLoadStatus === 'error' && '✕ '}
             </span>
             {autoLoadStatus === 'loading' ? 'Loading pursuit documents…' : autoLoadMessage}
+            {(autoLoadStatus === 'no-docs' || autoLoadStatus === 'error') && (
+              <button
+                onClick={() => loadPursuitDocs()}
+                className="ml-2 underline underline-offset-2 font-semibold hover:opacity-80"
+              >
+                Retry
+              </button>
+            )}
           </div>
         )}
 
