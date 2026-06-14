@@ -457,6 +457,16 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       }));
       setCompliance(rows);
       setComplianceMeta(data.meta || null);
+      // Persist the matrix to the pursuit so it survives reload + is team-shared.
+      // The route preserves any owner/status already set on unchanged rows, so a
+      // re-extraction is non-destructive. Best-effort.
+      if (activePursuitId && rows.length) {
+        fetch(`/api/app/proposal/compliance-state?email=${encodeURIComponent(email)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+          body: JSON.stringify({ pipeline_id: activePursuitId, requirements: rows.map(r => ({ req_key: r.id, requirement: r.requirement, category: r.category, section: r.section, source_quote: r.source_quote, source_doc: r.source_doc, revised: r.revised })) }),
+        }).catch(() => {});
+      }
     } catch (err) {
       console.error('Compliance generation failed:', err);
       setComplianceError('Request failed. Try again.');
@@ -465,6 +475,36 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       complianceStartedAtRef.current = null;
     }
   }, [email, uploadedRfp, getAuthHeaders, activePursuitId]);
+
+  // Load the SAVED compliance matrix when a pursuit opens — fixes "it re-runs and
+  // resets every time" and surfaces teammates' owner/status. Only loads when the
+  // matrix isn't already populated (don't clobber an in-progress generation).
+  useEffect(() => {
+    if (!email || !activePursuitId) return;
+    let cancelled = false;
+    fetch(`/api/app/proposal/compliance-state?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(activePursuitId)}`, { headers: getAuthHeaders() })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (cancelled || !data?.success || !data.saved) return;
+        const rows: ComplianceRequirementRow[] = (data.requirements || []).map((r: Record<string, unknown>) => ({
+          id: String(r.req_key || ''),
+          requirement: String(r.requirement || ''),
+          category: (r.category as ComplianceCategory) || 'other',
+          section: (r.section as string) || undefined,
+          source_quote: (r.source_quote as string) || undefined,
+          source_doc: (r.source_doc as string) || undefined,
+          revised: Boolean(r.revised),
+          owner: String(r.owner || ''),
+          status: (r.status as ComplianceStatus) || 'open',
+        }));
+        // Only hydrate if we don't already have a (freshly generated) matrix.
+        setCompliance(prev => (prev.length > 0 ? prev : rows));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+    // activePursuitId is the trigger; intentionally not depending on `compliance`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email, activePursuitId, getAuthHeaders]);
 
   useEffect(() => {
     if (!complianceLoading) {
@@ -547,7 +587,17 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
 
   const updateRequirement = useCallback((id: string, patch: Partial<ComplianceRequirementRow>) => {
     setCompliance(prev => prev.map(r => (r.id === id ? { ...r, ...patch } : r)));
-  }, []);
+    // Persist owner/status changes (the team check-off) so they survive reload
+    // and are visible to teammates. Best-effort — a save failure doesn't block
+    // the optimistic UI update. Only when working a saved pursuit.
+    if (email && activePursuitId && ('owner' in patch || 'status' in patch)) {
+      fetch(`/api/app/proposal/compliance-state?email=${encodeURIComponent(email)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({ pipeline_id: activePursuitId, req_key: id, owner: patch.owner, status: patch.status }),
+      }).catch(() => {});
+    }
+  }, [email, activePursuitId, getAuthHeaders]);
 
   // Extract the SOW/PWS to a standalone .docx (send subs for pricing/bids).
   const [sowBusy, setSowBusy] = useState(false);
