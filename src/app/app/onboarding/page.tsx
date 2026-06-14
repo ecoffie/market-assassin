@@ -389,6 +389,32 @@ export default function OnboardingPage() {
     checkAuth();
   }, [router]);
 
+  // Mint + store the MI auth token before leaving onboarding. OAuth users arrive
+  // here with a Supabase session but NO MI token; without this they land in the
+  // app "logged in" yet every 2FA-gated route fails ("Invalid two-factor
+  // session") until they re-login another way. Calling mindy-session here (the
+  // same endpoint /app's bootstrap uses) guarantees the token is set on the way
+  // out instead of relying on a bootstrap that can silently fail. Best-effort —
+  // the /app bootstrap is still the backstop, but this closes the OAuth gap.
+  const ensureMIToken = async () => {
+    try {
+      const supabase = getSupabase();
+      const { data: { session } } = supabase ? await supabase.auth.getSession() : { data: { session: null } };
+      const bearer = session?.access_token || accessToken;
+      if (!bearer) return;
+      const res = await fetch('/api/auth/mindy-session', {
+        method: 'POST',
+        headers: { Authorization: `Bearer ${bearer}` },
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.success && data.sessionToken) {
+        localStorage.setItem('mi_beta_auth_token', data.sessionToken);
+        localStorage.setItem('mi_beta_authenticated_at', data.authenticatedAt || new Date().toISOString());
+        if (email) localStorage.setItem('mi_beta_email', email);
+      }
+    } catch { /* backstop: /app bootstrap retries */ }
+  };
+
   const allNaicsCodes = useMemo(() => {
     const presetCodes = selectedIndustries.flatMap(industry => {
       const preset = INDUSTRY_PRESETS.find(item => item.label === industry);
@@ -473,6 +499,7 @@ export default function OnboardingPage() {
       // Land in the Vault so the user finishes a COMPLETE profile — enter their UEI
       // (auto-fills company identity + NAICS) and confirm keywords. Without this
       // hand-off users stop at NAICS-only and have incomplete profiles.
+      await ensureMIToken();
       router.push(`/app?email=${encodeURIComponent(email)}&panel=vault&onboarded=1`);
     } catch {
       setError('Failed to save your profile. Please try again.');
@@ -674,6 +701,7 @@ export default function OnboardingPage() {
       });
       // Hand off to the Vault to complete the profile (UEI → identity + NAICS,
       // confirm keywords). See the auto-mode finish for the full rationale.
+      await ensureMIToken();
       router.push(`/app?email=${encodeURIComponent(email)}&panel=vault&onboarded=1`);
     } catch {
       setError('Something went wrong saving your profile. Please try again.');
