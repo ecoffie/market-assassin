@@ -62,7 +62,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
 
   useEffect(() => {
     if (!email) return;
-    fetch(`/api/app/target-list?email=${encodeURIComponent(email)}`)
+    fetch(`/api/app/target-list?email=${encodeURIComponent(email)}`, { headers: getMIApiHeaders(email) })
       .then(r => r.json())
       .then(d => {
         const ags = Array.from(new Set(((d?.targets || d?.targetList || []) as Array<{ agency_name?: string }>)
@@ -81,7 +81,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
     try {
       const res = await fetch('/api/app/target-list', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           user_email: email,
           agency_name: c.department_ind_agency || 'Department of Defense',

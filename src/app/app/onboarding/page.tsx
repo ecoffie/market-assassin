@@ -6,6 +6,7 @@ import SampleOpportunitiesPicker from '@/components/briefings/SampleOpportunitie
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import { getSupabase } from '@/lib/supabase/client';
 import { useAppTracker } from '@/components/app/track';
+import { getMIApiHeaders } from '@/components/app/authHeaders';
 
 const INDUSTRY_PRESETS = [
   { label: 'Construction', codes: ['236', '237', '238'], description: 'Building, heavy civil, specialty trades' },
@@ -429,7 +430,7 @@ export default function OnboardingPage() {
     try {
       const res = await fetch('/api/app/profile-from-text', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` }),
         body: JSON.stringify({ email, text }),
       });
       const d = await res.json();
@@ -449,7 +450,7 @@ export default function OnboardingPage() {
     try {
       const res = await fetch('/api/mindy/profile', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` }),
         body: JSON.stringify({
           email,
           businessDescription: autoText.trim() || null,
@@ -516,7 +517,7 @@ export default function OnboardingPage() {
     try {
       const res = await fetch('/api/app/profile-from-text', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
+        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` }),
         body: JSON.stringify({ email, text: phrase }),
       });
       const d = await res.json();

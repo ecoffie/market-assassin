@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { getMIApiHeaders } from '../app/authHeaders';
 
 interface Comment {
   id: string;
@@ -52,7 +53,7 @@ export default function CommentsSection({ pipelineId, email }: CommentsSectionPr
     try {
       const res = await fetch('/api/app/comments', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           email,
           pipeline_id: pipelineId,
@@ -80,7 +81,7 @@ export default function CommentsSection({ pipelineId, email }: CommentsSectionPr
     try {
       const res = await fetch('/api/app/comments', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({ email, comment_id: commentId }),
       });
       const data = await res.json();

@@ -905,7 +905,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         // when it does verifyMIAccess() server-side. Without this,
         // the request silently 401s and the Refresh button looks
         // like it "doesn't work" with no visible error.
-        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           inputs: {
             naicsCode: activeFormData.naicsCode,
@@ -1170,7 +1170,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     try {
       const res = await fetch('/api/app/market-focus', {
         method: 'POST',
-        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           email,
           name,
@@ -1202,7 +1202,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     try {
       const res = await fetch('/api/app/market-focus', {
         method: 'DELETE',
-        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({ email, id: focusId }),
       });
       const data = await res.json();
@@ -1520,7 +1520,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     try {
       const res = await fetch('/api/app/relationships', {
         method: 'POST',
-        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           user_email: email,
           contact_type: 'government_buyer',
@@ -1563,7 +1563,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     try {
       const res = await fetch('/api/app/relationships', {
         method: 'POST',
-        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           user_email: email,
           contact_type: 'prime',
@@ -1603,7 +1603,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     try {
       const res = await fetch('/api/pipeline', {
         method: 'POST',
-        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           user_email: email,
           title: forecast.description?.slice(0, 100) || `${forecast.agency} Forecast`,
@@ -1645,7 +1645,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     try {
       const res = await fetch('/api/mindy/opportunity-feedback', {
         method: 'POST',
-        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           email,
           opportunityId: opportunity.id,
@@ -3185,7 +3185,7 @@ function TopPrimesChart({ primes, tier2 = [], tribal = [], email }: TopPrimesCha
       return;
     }
     let cancelled = false;
-    fetch(`/api/app/target-list?email=${encodeURIComponent(email)}`)
+    fetch(`/api/app/target-list?email=${encodeURIComponent(email)}`, { headers: getMIApiHeaders(email) })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (cancelled) return;
@@ -4142,7 +4142,7 @@ function AgencyTable({
   useEffect(() => {
     if (!email) return;
     let cancelled = false;
-    fetch(`/api/app/target-list?email=${encodeURIComponent(email)}`)
+    fetch(`/api/app/target-list?email=${encodeURIComponent(email)}`, { headers: getMIApiHeaders(email) })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (cancelled || !data?.success) return;
@@ -4194,7 +4194,7 @@ function AgencyTable({
     try {
       const res = await fetch('/api/app/target-list', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({
           user_email: email,
           agency_name: row.parentAgency || row.subAgency || row.name,
@@ -4296,7 +4296,7 @@ function AgencyTable({
     try {
       const res = await fetch('/api/app/target-list', {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json' },
+        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
         body: JSON.stringify({ id: targetId, user_email: email }),
       });
       if (!res.ok) {
