@@ -118,6 +118,7 @@ Walk this order — 15 minutes max:
 | `advisor-recruitment-brief.md` | 3 advisor role posts |
 | `grant-nofo-tracker.md` | SBIR / EDA / state calendar (live deadlines) |
 | `FUNDING-STRATEGY.md` | **Which funding Mindy can actually win + apply/skip calls** (DoD SBIR, civilian, state; nonprofit + prior TX/FL contract assets) |
+| `AFWERX-ENDUSER-OUTREACH.md` | **Ready-to-send emails** to secure a DAF SBIR end-user (the top federal funding task) — connector + end-user + NAPEX follow-up |
 | `../../scripts/provision-edc-pilot-org.sql` | Supabase org setup for EDC eval |
 
 ---
