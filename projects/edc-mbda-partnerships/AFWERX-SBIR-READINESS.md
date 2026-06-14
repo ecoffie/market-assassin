@@ -22,23 +22,34 @@ defer the rest.
 
 ## TIER 1 — wins Phase I (do these first)
 
-### 1.1 Secure a DAF end-user  ← **80% of the win, and it's not code**
-- Send Email 1 (connectors: OSBP / APEX directors we already know) — `AFWERX-ENDUSER-OUTREACH.md`
-- Use **NAPEX (Aug 16–20)** as the end-user discovery room — every connector is there
-- Target: **1–2 candidate end-users** who confirm a real need ("we can't see small-biz
-  participation in [their CTA]")
-- Output: a named end-user relationship to cite as the Phase I transition path
-- **This gates everything else. Start now.**
+### 1.1 Convert a warm government end-user  ← **80% of the win — and we may already have it**
+**We already have 3 warm contacts with stated needs** (see `AFWERX-ENDUSER-OUTREACH.md` → Live
+prospects): **Army MICC KO** (acquisition market research), **DISA** (expiring-contracts research),
+**Navy OSBP** (SMB market research). Finding an engaged end-user is normally the whole battle —
+we're past it. So Tier 1.1 is **convert**, not discover:
+- **Capture each contact's name/email/exact need** → 20-min discovery call each (Email 2/3).
+- **Per contact, pick the SBIR route:** AFWERX (needs a DAF use case + DAF TPOC — these are
+  Army/Navy/Joint, so AFWERX requires a DAF angle) **vs.** the contact's **own component SBIR**
+  (Army SBIR / Navy SBIR / DISA topics) where they're the direct customer. The own-component route
+  may be cleaner for MICC/DISA/Navy than forcing an AFWERX-DAF frame.
+- **NAPEX (Aug 16–20)** is now a *backup* discovery room + a place to find a DAF TPOC if we go AFWERX.
+- Output: a named end-user + the right SBIR vehicle. **This still gates everything else.**
 
-### 1.2 Make the end-user's 1–2 CTAs survive scrutiny  ← **the only CTA work that matters for Phase I**
-Once we know which CTA(s) the end-user cares about (likely AI/autonomy, cyber, microelectronics,
-or space — the DAF-heavy ones), harden **just those**:
-- **Validate the NAICS anchors** for those CTAs against real DoD award history (USASpending — we
-  already have the 317K dataset; pull what NAICS actually won in that CTA's programs)
-- **Expand keywords** for those CTAs from ~5 → 30+ (synonyms + abbreviations: "AI", "ML", "drone",
-  "UAS", etc. — the audit found bare "AI" is missing today)
-- **Spot-check:** pull 10 real solicitations the end-user would recognize as their CTA → confirm
-  Mindy tags them. Fix misses. This is the demo-survival test.
+### 1.2 Harden the CAPABILITY the winning end-user actually needs  ← **scoped to their need, not all of CTA**
+Each contact needs a *different* Mindy capability — harden whichever one advances first. **Don't
+assume it's CTA tagging.** Map:
+- **DISA → expiring-contracts / recompete.** This is the **award-detail + incumbent engine**
+  (`src/lib/usaspending/award-detail.ts`, `find-predecessor.ts`) — **already our strongest, most-built
+  feature.** Demo-survival here = make sure recompete results are accurate + complete for DISA-relevant
+  agencies. Likely the *easiest* of the three to make bulletproof.
+- **MICC KO → acquisition market research.** Contractor search + (if their requirement is CTA-adjacent)
+  CTA tagging. If CTA matters: validate the NAICS anchors for *their* CTA against real DoD award
+  history (USASpending, 317K dataset), expand its keywords ~5→30+ (bare "AI"/"drone"/"UAS" missing
+  today), spot-check 10 real solicitations they'd recognize.
+- **Navy OSBP → SMB market research.** Contractor DB by set-aside + NAICS — verify socioeconomic
+  filters return clean, complete results.
+- **Spot-check is the demo-survival test for all three:** pull 10 real cases the end-user would
+  recognize → confirm Mindy nails them → fix misses before any live demo.
 
 ### 1.3 Write the Phase I narrative around the DIB-visibility mission
 - Frame: *"give a DAF office visibility into small-business participation across [CTA], and
@@ -99,14 +110,20 @@ The rest of the audit's red flags (full-14 NAICS validation, dispute mechanism, 
    money is for.
 
 ## Open items
-- [ ] Send Email 1 to known OSBP/APEX connectors
-- [ ] Resume + complete CTA backfill (currently ~30%)
-- [ ] Confirm next AFWERX Open Topic submission window on DSIP
-- [ ] Once end-user known: USASpending-validate their CTA's NAICS + expand its keywords
-- [ ] Spot-check 10 real solicitations in the end-user's CTA → fix misses
+- [ ] **Capture name/email/exact need for the 3 warm contacts** (Army MICC KO, DISA, Navy OSBP)
+- [ ] 20-min discovery call each → confirm the need + which is most ready to be a Phase I end-user
+- [ ] **Per contact, decide SBIR vehicle:** AFWERX (DAF angle + DAF TPOC) vs. their own component
+      SBIR (Army / Navy / DISA) — pick the cleaner path
+- [ ] Harden the capability the lead contact needs (DISA→recompete engine / MICC→market research /
+      Navy→SMB DB) — spot-check 10 real cases
+- [ ] Resume + complete CTA backfill (~30%) — only critical if a CTA-search contact leads
+- [ ] Confirm next AFWERX Open Topic window on DSIP (+ Army/Navy SBIR cycles if going component route)
 - [ ] Fix in-memory/DB tag inconsistency before any live demo
 
 ---
 
-*Created June 14, 2026. Priority locked: END-USER FIRST, CTA SECOND. We harden only the CTA(s) the
-end-user touches for Phase I; full-14 validation is deferred to Phase II (which the SBIR funds).*
+*Created June 14, 2026. Priority locked: END-USER FIRST, CTA SECOND. UPDATE: we already have 3 warm
+govt contacts with stated needs (Army MICC KO, DISA expiring-contracts, Navy OSBP SMB research) —
+the hard part may be in hand. Tier 1.1 is now CONVERT, not discover; per contact, choose AFWERX
+(DAF angle) vs. their own component SBIR. Harden the capability the lead contact needs (DISA's
+recompete engine is already our strongest) — not necessarily CTA. Full-14 CTA validation stays Phase II.*
