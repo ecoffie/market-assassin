@@ -119,6 +119,7 @@ Walk this order — 15 minutes max:
 | `grant-nofo-tracker.md` | SBIR / EDA / state calendar (live deadlines) |
 | `FUNDING-STRATEGY.md` | **Which funding Mindy can actually win + apply/skip calls** (DoD SBIR, civilian, state; nonprofit + prior TX/FL contract assets) |
 | `AFWERX-ENDUSER-OUTREACH.md` | **Ready-to-send emails** to secure a DAF SBIR end-user (the top federal funding task) — connector + end-user + NAPEX follow-up |
+| `AFWERX-SBIR-READINESS.md` | **Prioritized AFWERX plan** — end-user first, harden only the end-user's 1-2 CTAs for Phase I (full-14 CTA work deferred to Phase II) |
 | `../../scripts/provision-edc-pilot-org.sql` | Supabase org setup for EDC eval |
 
 ---
