@@ -72,7 +72,9 @@
         // Supabase configuration - Content Reaper project
         const SUPABASE_URL = 'https://krpyelfrbicmvsmwovti.supabase.co';
         const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtycHllbGZyYmljbXZzbXdvdnRpIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjgwNzU1MDAsImV4cCI6MjA4MzY1MTUwMH0.xI3qosl35ieKa5ObeExh0BiSwDdoZy74lZQWg1Fzn6M';
-        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+        const supabaseClient = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+            auth: { persistSession: false, autoRefreshToken: false },
+        });
 
         // Base path
         function getBasePath() {
@@ -126,69 +128,20 @@
             hideMessage();
 
             try {
-                // Step 1: Call our auth API which verifies access and creates/gets user
-                const response = await fetch(`${API_BASE}/api/content-generator-auth`, {
+                // KV purchase check only — no Supabase magic link (avoids redirect loops)
+                const verifyResp = await fetch(`${API_BASE}/api/verify-content-generator`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email })
+                    body: JSON.stringify({ email }),
                 });
-
-                let data;
-                try {
-                    data = await response.json();
-                } catch {
-                    showMessage('Unexpected server response. Please try again.', true);
+                const verifyData = await verifyResp.json().catch(() => ({}));
+                if (verifyResp.ok && verifyData.hasAccess) {
+                    kvFallbackLogin(email, verifyData.tier, verifyData.customerName);
                     return;
                 }
-
-                if (!response.ok || !data.success) {
-                    // Supabase magic link failed — fall back to KV-verified session
-                    const verifyResp = await fetch(`${API_BASE}/api/verify-content-generator`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email }),
-                    });
-                    const verifyData = await verifyResp.json().catch(() => ({}));
-                    if (verifyResp.ok && verifyData.hasAccess) {
-                        kvFallbackLogin(email, verifyData.tier, verifyData.customerName);
-                        return;
-                    }
-                    showMessage(data.error || 'No access found for this email.', true);
-                    return;
-                }
-
-                // Step 2: We have a magic link - redirect to it
-                const tierDisplay = data.tier === 'full-fix' ? 'Full Fix' : 'Content Engine';
-                showMessage(`Welcome! (${tierDisplay} access) Signing you in...`);
-                btnText.textContent = 'Redirecting...';
-
-                // Store tier info temporarily (will be replaced by Supabase profile)
-                sessionStorage.setItem('gcg_pending_tier', data.tier);
-                sessionStorage.setItem('gcg_pending_name', data.customerName || '');
-
-                // Redirect to the magic link
-                setTimeout(() => {
-                    window.location.href = data.magicLink;
-                }, 500);
-
+                showMessage('No access found for this email.', true);
             } catch (error) {
                 console.error('Sign in error:', error);
-                try {
-                    const verifyResp = await fetch(`${API_BASE}/api/verify-content-generator`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({ email: document.getElementById('signin-email').value.trim().toLowerCase() }),
-                    });
-                    const verifyData = await verifyResp.json();
-                    if (verifyResp.ok && verifyData.hasAccess) {
-                        kvFallbackLogin(
-                            document.getElementById('signin-email').value.trim().toLowerCase(),
-                            verifyData.tier,
-                            verifyData.customerName,
-                        );
-                        return;
-                    }
-                } catch { /* ignore */ }
                 showMessage('Error signing in. Please try again.', true);
             } finally {
                 spinner.classList.add('hidden');
@@ -197,66 +150,46 @@
             }
         }
 
-        // Break auth ↔ index flash loop: only redirect when KV confirms purchase access
-        async function checkExistingSession() {
+        // Clear any legacy Supabase session on load — never auto-redirect (prevents flash loop)
+        async function clearLegacySupabaseSession() {
             try {
-                const { data: { session } } = await supabaseClient.auth.getSession();
-                if (!session?.user?.email) return;
-
-                const email = session.user.email.trim().toLowerCase();
-                const resp = await fetch(`${API_BASE}/api/verify-content-generator`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email }),
-                });
-                const data = await resp.json().catch(() => ({}));
-
-                if (resp.ok && data.hasAccess) {
-                    localStorage.setItem('gcg_access_email', email);
-                    localStorage.setItem('gcg_tier', data.tier || 'content-engine');
-                    console.log('[Auth] Valid session + purchase access, opening app');
-                    window.location.href = getBasePath() + '/';
-                    return;
-                }
-
-                // Stale/wrong Supabase session — clear so this page stops bouncing
-                console.warn('[Auth] Clearing stale Supabase session (no KV access for', email, ')');
-                await supabaseClient.auth.signOut();
-            } catch (error) {
-                console.error('[Auth] Error checking session:', error);
-            }
+                await supabaseClient.auth.signOut({ scope: 'local' });
+            } catch { /* ignore */ }
         }
 
-        // Handle auth callback (magic link redirect)
+        // Magic-link callbacks: convert to KV session, do not open app with Supabase auth
         async function handleAuthCallback() {
             const hash = window.location.hash;
-            if (hash && hash.includes('access_token')) {
-                console.log('[Auth] Processing auth callback...');
-                showMessage('Completing sign in...');
+            if (!hash || !hash.includes('access_token')) return;
 
-                // Supabase will automatically handle the hash and set the session
-                const { data: { session }, error } = await supabaseClient.auth.getSession();
-
-                if (session) {
-                    console.log('[Auth] Session established:', session.user.id);
-
-                    // Clear any pending tier info (profile is created by the auth API)
-                    sessionStorage.removeItem('gcg_pending_tier');
-                    sessionStorage.removeItem('gcg_pending_name');
-
-                    // Clean up URL and redirect
-                    window.history.replaceState({}, document.title, getBasePath() + '/auth.html');
-                    window.location.href = getBasePath() + '/';
-                } else if (error) {
-                    console.error('[Auth] Callback error:', error);
-                    showMessage('Error completing sign in. Please try again.', true);
-                }
+            showMessage('Completing sign in...');
+            await supabaseClient.auth.getSession();
+            const { data: { session } } = await supabaseClient.auth.getSession();
+            const email = session?.user?.email?.trim().toLowerCase();
+            if (!email) {
+                showMessage('Error completing sign in. Please try again.', true);
+                return;
             }
+
+            const resp = await fetch(`${API_BASE}/api/verify-content-generator`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ email }),
+            });
+            const data = await resp.json().catch(() => ({}));
+            await supabaseClient.auth.signOut({ scope: 'local' }).catch(() => {});
+
+            if (resp.ok && data.hasAccess) {
+                window.history.replaceState({}, document.title, getBasePath() + '/auth.html');
+                kvFallbackLogin(email, data.tier, data.customerName);
+                return;
+            }
+            showMessage('No access found for this email.', true);
         }
 
-        // Initialize
+        // Initialize — stay on sign-in page until user submits email
+        clearLegacySupabaseSession();
         handleAuthCallback();
-        checkExistingSession();
     </script>
 </body>
 </html>
