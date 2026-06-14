@@ -93,11 +93,13 @@ funnel and the product become one (marketing's standing goal). Sequencing:
 
 ---
 
-## Open questions for Eric
+## Resolved spec (decided with Eric, June 2026)
 
-- **Where does the journey live** — a new sidebar item ("Getting Started"), a
-  dismissible home card on the dashboard, or both?
-- **Gate or not for new users** — show the journey panel as the default landing for
-  the first N days, or always-available-but-not-forced?
-- **Loom vs Vimeo** — you already use Vimeo for reels; reuse that, or Loom for the
-  screen-share tutorials?
+- **Where:** BOTH — a permanent sidebar "Getting Started" item AND a dismissible
+  home-card on the dashboard.
+- **Landing window:** new users land on Getting Started for **14 days OR until all 3
+  journeys are done**, whichever first; after that it's available-but-not-forced.
+- **Dismiss/reopen:** home-card dismissible anytime; sidebar item permanent so users
+  can return to any journey/Loom later. Always reopenable.
+- **Video:** **Vimeo embeds** (record in Loom → upload to Vimeo → paste URL). Reuse
+  the homepage-reel embed pattern; the app only sees Vimeo URLs.
