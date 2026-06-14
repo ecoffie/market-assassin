@@ -108,6 +108,7 @@ Walk this order — 15 minutes max:
 
 | File | Purpose |
 |------|---------|
+| `ONE-PAGER.md` | **Glance version** — the whole plan on one page (quick Slack/email drop) |
 | `TEAM-BRIEF.md` | **Share-with-team onboarding** — mission, who to hire, targets, plan (start new folks here) |
 | `PRD-edc-mbda-partnerships.md` | Strategy + pricing + KPIs |
 | `JD-head-public-sector-partnerships-funding.md` | FT hire posting |
