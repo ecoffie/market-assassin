@@ -128,6 +128,10 @@ function AppDashboard() {
     }
   }, []);
   const activePanelRef = useRef<AppPanel>('dashboard');
+  // Single-flight guards so a burst of concurrent 401s triggers ONE recovery,
+  // and so the proactive refresh only runs once per app load.
+  const sessionRecoveryRef = useRef(false);
+  const refreshAttemptedRef = useRef(false);
   const panelStartedAtRef = useRef<number>(Date.now());
   const sessionIdRef = useRef<string>(
     typeof crypto !== 'undefined' && 'randomUUID' in crypto
@@ -304,6 +308,77 @@ function AppDashboard() {
     await loadUserProfile(sessionEmail);
     return true;
   }, [loadUserProfile]);
+
+  // Proactively renew the MI token so an active user never hits the 30-day
+  // expiry cliff. Runs once per app load: if the stored token is older than ~23
+  // days (i.e. within a week of its 30-day TTL), exchange it for a fresh one.
+  // Cheap no-op for fresh tokens; silent on failure (recovery handles real death).
+  const maybeRefreshMIToken = useCallback(async () => {
+    if (refreshAttemptedRef.current) return;
+    refreshAttemptedRef.current = true;
+    if (typeof window === 'undefined') return;
+
+    const token = localStorage.getItem(MI_AUTH_TOKEN_KEY);
+    const authedAt = localStorage.getItem('mi_beta_authenticated_at');
+    if (!token || !authedAt) return;
+
+    const ageMs = Date.now() - new Date(authedAt).getTime();
+    const REFRESH_AFTER_MS = 23 * 24 * 60 * 60 * 1000; // 7 days before the 30-day TTL
+    if (!Number.isFinite(ageMs) || ageMs < REFRESH_AFTER_MS) return;
+
+    try {
+      const res = await fetch('/api/auth/refresh-mi-session', {
+        method: 'POST',
+        headers: { 'x-mi-auth-token': token },
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.success && data.sessionToken) {
+        localStorage.setItem(MI_AUTH_TOKEN_KEY, data.sessionToken);
+        localStorage.setItem('mi_beta_authenticated_at', data.authenticatedAt || new Date().toISOString());
+      }
+    } catch {
+      /* non-fatal: token still valid until TTL; recovery covers real expiry */
+    }
+  }, []);
+
+  // Global recovery when an /api/app/* call returns 401 (token expired, missing,
+  // or no longer verifies). Try ONE silent refresh from the stored token; if it
+  // can't be renewed, clear auth and show a clear "sign in again" prompt instead
+  // of leaving the user on a blank, broken-looking panel. Single-flight guarded.
+  const handleAppSessionExpired = useCallback(async () => {
+    if (sessionRecoveryRef.current) return;
+    sessionRecoveryRef.current = true;
+    try {
+      const token = typeof window !== 'undefined' ? localStorage.getItem(MI_AUTH_TOKEN_KEY) : null;
+      if (token) {
+        try {
+          const res = await fetch('/api/auth/refresh-mi-session', {
+            method: 'POST',
+            headers: { 'x-mi-auth-token': token },
+          });
+          const data = await res.json().catch(() => null);
+          if (res.ok && data?.success && data.sessionToken) {
+            localStorage.setItem(MI_AUTH_TOKEN_KEY, data.sessionToken);
+            localStorage.setItem('mi_beta_authenticated_at', data.authenticatedAt || new Date().toISOString());
+            // Recovered — allow future 401s to retry recovery again.
+            sessionRecoveryRef.current = false;
+            return;
+          }
+        } catch {
+          /* fall through to hard sign-out */
+        }
+      }
+      // Could not refresh → genuinely signed out. Surface it clearly.
+      clearStoredAppAuth();
+      setEmail(null);
+      setAuthError('Your session expired. Sign in again to restore access.');
+      setAuthStep('credentials');
+    } finally {
+      // Leave the guard set on a hard sign-out so we don't loop; it resets on
+      // next successful auth (component re-mounts / new token stored).
+      window.setTimeout(() => { sessionRecoveryRef.current = false; }, 5000);
+    }
+  }, []);
 
   const handleSignOut = useCallback(async () => {
     setAuthLoading(true);
@@ -598,7 +673,7 @@ function AppDashboard() {
   useEffect(() => {
     const originalFetch = window.fetch.bind(window);
 
-    window.fetch = (input, init = {}) => {
+    window.fetch = async (input, init = {}) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       const isApiRequest = url.startsWith('/api/') || url.startsWith(window.location.origin + '/api/');
       const authToken = localStorage.getItem(MI_AUTH_TOKEN_KEY);
@@ -616,12 +691,25 @@ function AppDashboard() {
         headers.set('x-mi-2fa-token', twoFactorToken);
       }
 
-      return originalFetch(input, { ...init, headers });
+      const res = await originalFetch(input, { ...init, headers });
+
+      // Global session-recovery: a 401 from a Mindy app route means the MI token
+      // expired / is missing / no longer verifies. Without this, the panel just
+      // renders blank ("the feature is broken"). Instead, try ONE silent refresh
+      // from the still-stored token; if that fails, clear auth and surface a
+      // clear "sign in again" prompt rather than a dead screen. Guarded so a burst
+      // of concurrent 401s triggers a single recovery, not a storm.
+      if (res.status === 401 && url.includes('/api/app/')) {
+        handleAppSessionExpired();
+      }
+
+      return res;
     };
 
     return () => {
       window.fetch = originalFetch;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Deep-link to a specific panel via ?panel=<id> (e.g. onboarding lands the user
@@ -674,6 +762,9 @@ function AppDashboard() {
 
     if (storedEmail && verifiedRecently && hasStoredToken) {
       loadUserProfile(storedEmail);
+      // Renew the MI token in the background if it's nearing its 30-day TTL so
+      // active users never get silently logged out mid-session.
+      maybeRefreshMIToken();
       return;
     }
 

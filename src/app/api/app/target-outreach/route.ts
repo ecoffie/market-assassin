@@ -22,6 +22,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyMIAccess } from '@/lib/api-auth';
+import { requireMIAuthSession } from '@/lib/two-factor-session';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -49,6 +50,8 @@ export async function GET(request: NextRequest) {
   if (!targetId || !email) {
     return NextResponse.json({ error: 'target_id and email required' }, { status: 400 });
   }
+  const gate = requireMIAuthSession(request, email);
+  if (!gate.ok) return gate.response;
 
   try {
     const { data, error } = await getSupabase()
@@ -92,6 +95,11 @@ export async function POST(request: NextRequest) {
       { status: 400 }
     );
   }
+
+  // Identity gate — caller must own this email (verifyMIAccess below only
+  // checks tier, not who is asking).
+  const gate = requireMIAuthSession(request, email);
+  if (!gate.ok) return gate.response;
 
   // Tier gate. Same as the target-list endpoint.
   const access = await verifyMIAccess(email);
@@ -170,6 +178,8 @@ export async function DELETE(request: NextRequest) {
   if (!id || !email) {
     return NextResponse.json({ error: 'id and user_email required' }, { status: 400 });
   }
+  const gate = requireMIAuthSession(request, email);
+  if (!gate.ok) return gate.response;
 
   try {
     const { error } = await getSupabase()

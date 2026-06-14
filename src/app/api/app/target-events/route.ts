@@ -29,6 +29,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyMIAccess } from '@/lib/api-auth';
+import { requireMIAuthSession } from '@/lib/two-factor-session';
 import eventsStaticData from '@/data/federal-events-sources.json';
 import agencyAliasesData from '@/data/agency-aliases.json';
 
@@ -156,6 +157,9 @@ export async function GET(request: NextRequest) {
   if (!email) {
     return NextResponse.json({ error: 'email parameter required' }, { status: 400 });
   }
+  // Identity gate — reads the caller's target list.
+  const gate = requireMIAuthSession(request, email);
+  if (!gate.ok) return gate.response;
 
   // Pro gate. Belt + suspenders since target-list itself is Pro.
   const access = await verifyMIAccess(email);

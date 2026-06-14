@@ -23,6 +23,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyMIAccess } from '@/lib/api-auth';
+import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { logToolError, classifyError, ToolNames, AIProviders } from '@/lib/tool-errors';
 import { searchEventsViaAI, type DiscoveredEvent } from '@/lib/events/ai-event-discovery';
 
@@ -73,6 +74,9 @@ export async function POST(request: NextRequest) {
   if (!email) {
     return NextResponse.json({ error: 'email required' }, { status: 400 });
   }
+  // Identity gate — reads/writes the caller's target list.
+  const gate = requireMIAuthSession(request, email);
+  if (!gate.ok) return gate.response;
 
   // Pro gate.
   const access = await verifyMIAccess(email);
