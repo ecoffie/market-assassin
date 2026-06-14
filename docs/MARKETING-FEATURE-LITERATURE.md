@@ -1555,3 +1555,29 @@ session token that no longer exists — so returning users saw an empty form.
 `user_profiles` by email after KV access check. `loadCompanyProfile()` calls
 `loadUserProfile()` on boot. Library saves use `POST /api/content-generator/library`
 when no session. Verified against `user_profiles` rows keyed by purchaser email.
+
+---
+
+## Proposal Assist: Team Check-Off on the Compliance Matrix (June 14, 2026)
+
+**What:** The compliance matrix is now a real shared worklist. Assign each
+requirement to a teammate (the assignee field suggests your actual workspace
+members), mark progress (open / in progress / done / N/A), filter to "My items" to
+see just your assignments, and watch a live progress roll-up — % complete, a
+completion bar, and a nudge when requirements are still unassigned so nothing falls
+through the cracks.
+
+**Why:** A proposal is a team sport — the compliance matrix is where the work gets
+divided and tracked. Building on the persistence we just shipped (owner/status now
+save and are workspace-shared), this turns the matrix from a static list into the
+team's coordination surface: who owns what, what's done, what's still open.
+
+**SEO:** proposal team collaboration software, compliance matrix assignments,
+RFP requirement owner tracking, government proposal task management, who is
+responsible for each requirement.
+
+**Proof:** `src/components/app/panels/ProposalsPanel.tsx` — assignee datalist from
+`GET /api/app/workspace` members, "My items" filter, and a progress roll-up
+(done/in-progress/open, % complete, unassigned count). Persists via the
+compliance-state route shipped with the persistent matrix. Build + roll-up math
+verified. Second of the proposal-UX fixes in docs/PROPOSAL-UX-MAP.md.
