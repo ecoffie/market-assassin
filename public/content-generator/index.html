@@ -227,7 +227,7 @@
                 requireAuth: () => false,
                 getUserTier: () => 'content-engine',
                 hasTierAccess: () => false,
-                signOut: async () => { window.location.href = getAppUrl('auth.html'); },
+                signOut: async () => { localStorage.removeItem('gcg_access_email'); showPaywall?.(); },
                 getAuthHeaders: () => ({}),
                 get user() { return null; },
                 get session() { return null; },
@@ -236,16 +236,15 @@
         } else {
             const supabaseClient = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
                 auth: {
-                    persistSession: true,
-                    storageKey: 'gcg-auth',
-                    storage: window.localStorage,
-                    autoRefreshToken: true,
-                    detectSessionInUrl: true
+                    persistSession: false,
+                    autoRefreshToken: false,
+                    detectSessionInUrl: false,
                 }
             });
             let currentUser = null;
             let currentSession = null;
             let userProfile = null;
+            window.gcgAuthInitComplete = false;
 
             async function initAuth() {
                 try {
@@ -375,9 +374,10 @@
                 }
             }
 
-            function requireAuth(redirectTo = '/auth') {
-                if (!currentSession) { window.location.href = redirectTo; return false; }
-                return true;
+            function requireAuth() {
+                if (localStorage.getItem('gcg_access_email') && hasContentGeneratorAccess) return true;
+                showPaywall();
+                return false;
             }
 
             function getUserTier() { return userProfile?.tier || 'content-engine'; }
@@ -389,10 +389,9 @@
 
             async function signOut() {
                 try {
-                    await supabaseClient.auth.signOut();
-                    currentUser = null; currentSession = null; userProfile = null;
-                    window.location.href = getAppUrl('auth.html');
-                } catch (error) { console.error('Sign out error:', error); }
+                    await supabaseClient.auth.signOut({ scope: 'local' });
+                } catch { /* ignore */ }
+                currentUser = null; currentSession = null; userProfile = null;
             }
 
             function getAuthHeaders() {
@@ -500,10 +499,9 @@
                         await loadUserProfile();
                     }
                 } else if (event === 'SIGNED_OUT') {
-                    // Only redirect on explicit sign out, not on initial page load
                     currentUser = null; currentSession = null; userProfile = null;
                     window.currentUserId = null;
-                    window.location.href = getAppUrl('auth.html');
+                    // Never redirect to auth.html — paywall + KV email gate access
                 } else if (!session) {
                     // No session on initial load - just update state, don't redirect
                     currentUser = null; currentSession = null; userProfile = null;
@@ -1601,90 +1599,57 @@
             }
         }
 
-        // Initialize on page load with Supabase Auth
+        function purgeLegacySupabaseStorage() {
+            try {
+                Object.keys(localStorage).forEach((key) => {
+                    if (key.startsWith('sb-') || key === 'gcg-auth') localStorage.removeItem(key);
+                });
+            } catch { /* ignore */ }
+        }
+
+        // Initialize — KV purchase email is the only access gate (no Supabase session loop)
         window.addEventListener('DOMContentLoaded', async function() {
-            // Check if SupabaseAuth is available (should be since it's inlined)
             if (typeof SupabaseAuth === 'undefined') {
                 console.error('SupabaseAuth not available - Supabase SDK may have failed to load');
                 alert('Authentication service failed to load. Please refresh the page.');
                 return;
             }
 
-            // Check if we just came from auth (might need to wait for session)
-            const urlParams = new URLSearchParams(window.location.search);
-            const justSignedIn = urlParams.get('auth') === 'success' || sessionStorage.getItem('gcg_just_signed_in');
+            purgeLegacySupabaseStorage();
+            await SupabaseAuth.client.auth.signOut({ scope: 'local' }).catch(() => {});
 
-            // Initialize Supabase Auth with retry for fresh logins
-            let session = await SupabaseAuth.initAuth();
-
-            // If no session but we just signed in, retry a few times
-            if (!session && justSignedIn) {
-                console.log('Just signed in, waiting for session...');
-                for (let i = 0; i < 5; i++) {
-                    await new Promise(resolve => setTimeout(resolve, 500));
-                    session = await SupabaseAuth.initAuth();
-                    if (session) {
-                        console.log('Session established after retry');
-                        break;
-                    }
+            const savedEmail = localStorage.getItem('gcg_access_email');
+            if (savedEmail) {
+                const tier = await verifyContentGeneratorAccess(savedEmail, { silent: true });
+                if (tier) {
+                    console.log('[App] KV-verified access for', savedEmail);
+                    updateEmailBasedUI(savedEmail);
+                    initializeUsageTracking();
+                    await loadCompanyProfile();
+                    await loadTemplates();
+                    backfillHistoryFromLibrary();
+                    window.gcgAuthInitComplete = true;
+                    return;
                 }
-                // Clear the flag
-                sessionStorage.removeItem('gcg_just_signed_in');
-                // Clean up URL
-                if (urlParams.get('auth')) {
-                    window.history.replaceState({}, '', window.location.pathname);
-                }
+                localStorage.removeItem('gcg_access_email');
+                localStorage.removeItem('gcg_tier');
+                localStorage.removeItem('gcg_customer_name');
             }
 
-            // Supabase session OR KV-verified purchase email (legacy tool buyers)
-            if (!session) {
-                const savedEmail = localStorage.getItem('gcg_access_email');
-                if (savedEmail) {
-                    const tier = await verifyContentGeneratorAccess(savedEmail);
-                    if (tier) {
-                        console.log('[App] KV-verified access for', savedEmail);
-                        updateEmailBasedUI(savedEmail);
-                        initializeUsageTracking();
-                        await loadCompanyProfile();
-                        await loadTemplates();
-                        backfillHistoryFromLibrary();
-                        return;
-                    }
-                }
-                console.log('[App] No session - showing paywall for new visitors');
-                showPaywall();
-                return;
-            }
-
-            // Initialize tier from profile (includes paywall check)
-            await initializeTier();
-
-            // If no access, don't continue loading
-            if (!hasContentGeneratorAccess) {
-                console.log('[App] No access - stopping initialization');
-                return;
-            }
-
-            // Update UI with user info
-            updateUserUI();
-
-            // Load data
-            await loadCompanyProfile();
-            await loadTemplates();
-
-            // Backfill generation history from library for users who had posts before memory system
-            backfillHistoryFromLibrary();
+            console.log('[App] No KV access — showing paywall');
+            showPaywall();
+            window.gcgAuthInitComplete = true;
         });
 
         // ========== PAYWALL / ACCESS VERIFICATION ==========
         let hasContentGeneratorAccess = false;
 
         // Verify access via market-assassin API
-        async function verifyContentGeneratorAccess(explicitEmail) {
-            const email = (explicitEmail || SupabaseAuth.user?.email || '').trim().toLowerCase();
+        async function verifyContentGeneratorAccess(explicitEmail, options = {}) {
+            const silent = options.silent === true;
+            const email = (explicitEmail || localStorage.getItem('gcg_access_email') || SupabaseAuth.user?.email || '').trim().toLowerCase();
             if (!email) {
-                console.log('[Access] No user email, showing paywall');
-                showPaywall();
+                if (!silent) showPaywall();
                 return false;
             }
 
@@ -1709,20 +1674,19 @@
                     return result.tier || 'content-engine';
                 } else {
                     hasContentGeneratorAccess = false;
-                    showPaywall();
+                    if (!silent) showPaywall();
                     return false;
                 }
             } catch (error) {
                 console.error('[Access] Error verifying access:', error);
-                // On error, check localStorage for cached access
                 const cachedTier = localStorage.getItem('gcg_tier');
-                if (cachedTier) {
+                if (cachedTier && localStorage.getItem('gcg_access_email')) {
                     console.log('[Access] Using cached tier:', cachedTier);
                     hasContentGeneratorAccess = true;
-                    hidePaywall();
+                    if (!silent) hidePaywall();
                     return cachedTier;
                 }
-                showPaywall();
+                if (!silent) showPaywall();
                 return false;
             }
         }
@@ -2076,14 +2040,15 @@
 
         // Logout function
         function logout() {
-            // Clear any legacy localStorage (can be removed later)
             localStorage.removeItem('gcg_access');
             localStorage.removeItem('gcg_email');
             localStorage.removeItem('gcg_access_email');
             localStorage.removeItem('gcg_tier');
             localStorage.removeItem('gcg_tier_name');
-            // Sign out of Supabase
-            SupabaseAuth.signOut();
+            localStorage.removeItem('gcg_customer_name');
+            hasContentGeneratorAccess = false;
+            purgeLegacySupabaseStorage();
+            SupabaseAuth.signOut().finally(() => showPaywall());
         }
 
         // Load company profile from Supabase
