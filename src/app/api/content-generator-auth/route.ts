@@ -25,20 +25,42 @@ const supabaseAdmin = supabaseUrl && supabaseServiceKey
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type SupabaseAdmin = any;
 
-/** Find or create auth user — listUsers() page 1 misses most Mindy accounts. */
+async function findAuthUserId(supabaseAdmin: SupabaseAdmin, email: string): Promise<string | null> {
+  try {
+    const { data: byEmail } = await supabaseAdmin.auth.admin.getUserByEmail(email);
+    if (byEmail?.user?.id) return byEmail.user.id;
+  } catch {
+    // getUserByEmail unavailable on some runtimes — fall through to pagination
+  }
+
+  let page = 1;
+  for (;;) {
+    const { data: list, error } = await supabaseAdmin.auth.admin.listUsers({ page, perPage: 1000 });
+    if (error) {
+      console.error('[CG Auth] listUsers error:', error.message);
+      break;
+    }
+    const users = list?.users || [];
+    const match = users.find((u: { email?: string | null }) => (u.email || '').toLowerCase() === email);
+    if (match?.id) return match.id;
+    if (users.length < 1000) break;
+    page += 1;
+    if (page > 30) break;
+  }
+  return null;
+}
+
+/** Find or create auth user — page-1 listUsers missed most Mindy accounts. */
 async function resolveContentGeneratorUserId(
   supabaseAdmin: SupabaseAdmin,
   email: string,
   tier: string,
   customerName: string,
 ): Promise<string | null> {
-  const { data: byEmail, error: lookupError } = await supabaseAdmin.auth.admin.getUserByEmail(email);
-  if (byEmail?.user?.id) {
-    console.log('[CG Auth] Found existing user:', byEmail.user.id);
-    return byEmail.user.id;
-  }
-  if (lookupError) {
-    console.warn('[CG Auth] getUserByEmail:', lookupError.message);
+  const existingId = await findAuthUserId(supabaseAdmin, email);
+  if (existingId) {
+    console.log('[CG Auth] Found existing user:', existingId);
+    return existingId;
   }
 
   const randomPassword = crypto.randomUUID() + crypto.randomUUID();
@@ -54,12 +76,12 @@ async function resolveContentGeneratorUserId(
   });
 
   if (createError) {
-    const { data: retry } = await supabaseAdmin.auth.admin.getUserByEmail(email);
-    if (retry?.user?.id) {
-      console.log('[CG Auth] User already existed after create race:', retry.user.id);
-      return retry.user.id;
+    const retryId = await findAuthUserId(supabaseAdmin, email);
+    if (retryId) {
+      console.log('[CG Auth] User existed after create conflict:', retryId);
+      return retryId;
     }
-    console.error('[CG Auth] Error creating user:', createError);
+    console.error('[CG Auth] Error creating user:', createError.message, createError);
     return null;
   }
 
@@ -83,6 +105,31 @@ async function resolveContentGeneratorUserId(
   return userId;
 }
 
+async function generateMagicLink(
+  supabaseAdmin: SupabaseAdmin,
+  email: string,
+  redirectUrl: string,
+): Promise<{ magicLink: string; userId?: string } | null> {
+  const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
+    type: 'magiclink',
+    email,
+    options: { redirectTo: redirectUrl },
+  });
+
+  if (linkError) {
+    console.warn('[CG Auth] generateLink:', linkError.message);
+    return null;
+  }
+
+  const magicLink = linkData.properties?.action_link;
+  if (!magicLink) return null;
+
+  return {
+    magicLink,
+    userId: linkData.user?.id,
+  };
+}
+
 // Handle OPTIONS preflight request
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders });
@@ -91,14 +138,12 @@ export async function OPTIONS() {
 /**
  * Content Reaper Auth Endpoint
  *
- * This endpoint:
- * 1. Verifies the email has Content Reaper access
- * 2. Creates a Supabase user if they don't exist
- * 3. Generates a magic link for passwordless login
+ * 1. Verifies KV purchase access
+ * 2. Generates Supabase magic link (creates auth user if needed)
  */
 export async function POST(request: NextRequest) {
   try {
-    const { email, action } = await request.json();
+    const { email } = await request.json();
 
     if (!email) {
       return NextResponse.json(
@@ -109,9 +154,7 @@ export async function POST(request: NextRequest) {
 
     const normalizedEmail = email.trim().toLowerCase();
 
-    // Step 1: Verify email has Content Reaper access
     const hasAccess = await hasContentGeneratorAccess(normalizedEmail);
-
     if (!hasAccess) {
       return NextResponse.json({
         success: false,
@@ -119,7 +162,6 @@ export async function POST(request: NextRequest) {
       }, { status: 403, headers: corsHeaders });
     }
 
-    // Get access details for tier info
     const accessDetails = await getContentGeneratorAccess(normalizedEmail);
     const tier = accessDetails?.tier || 'content-engine';
     const tierInfo = CONTENT_GENERATOR_TIER_FEATURES[tier];
@@ -132,48 +174,32 @@ export async function POST(request: NextRequest) {
       }, { status: 500, headers: corsHeaders });
     }
 
-    const userId = await resolveContentGeneratorUserId(
-      supabaseAdmin,
-      normalizedEmail,
-      tier,
-      accessDetails?.customerName || '',
-    );
-
-    if (!userId) {
-      return NextResponse.json({
-        success: false,
-        error: 'Failed to create user account',
-      }, { status: 500, headers: corsHeaders });
-    }
-
-    // Generate magic link for passwordless login
     const requestOrigin = request.headers.get('origin')
       || request.headers.get('referer')?.replace(/\/content-generator.*$/i, '')
       || 'https://getmindy.ai';
     const redirectUrl = `${requestOrigin.replace(/\/$/, '')}/content-generator/`;
 
-    const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
-      type: 'magiclink',
-      email: normalizedEmail,
-      options: {
-        redirectTo: redirectUrl,
-      }
-    });
+    // Fast path — works when auth user already exists
+    let link = await generateMagicLink(supabaseAdmin, normalizedEmail, redirectUrl);
+    let userId = link?.userId || (await findAuthUserId(supabaseAdmin, normalizedEmail));
 
-    if (linkError) {
-      console.error('[CG Auth] Error generating magic link:', linkError);
-      return NextResponse.json({
-        success: false,
-        error: 'Failed to generate login link',
-      }, { status: 500, headers: corsHeaders });
+    if (!link) {
+      userId = await resolveContentGeneratorUserId(
+        supabaseAdmin,
+        normalizedEmail,
+        tier,
+        accessDetails?.customerName || '',
+      );
+      if (!userId) {
+        return NextResponse.json({
+          success: false,
+          error: 'Failed to create user account',
+        }, { status: 500, headers: corsHeaders });
+      }
+      link = await generateMagicLink(supabaseAdmin, normalizedEmail, redirectUrl);
     }
 
-    // The magic link contains the token - we need to extract it
-    // Format: https://xxx.supabase.co/auth/v1/verify?token=...&type=magiclink&redirect_to=...
-    const magicLink = linkData.properties?.action_link;
-
-    if (!magicLink) {
-      console.error('[CG Auth] No magic link in response');
+    if (!link?.magicLink) {
       return NextResponse.json({
         success: false,
         error: 'Failed to generate login link',
@@ -184,13 +210,13 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      userId: userId,
+      userId: userId || link.userId,
       email: normalizedEmail,
-      tier: tier,
+      tier,
       tierName: tierInfo?.name || 'Content Engine',
       customerName: accessDetails?.customerName || '',
-      magicLink: magicLink,
-      redirectUrl: redirectUrl,
+      magicLink: link.magicLink,
+      redirectUrl,
     }, { headers: corsHeaders });
 
   } catch (error) {
