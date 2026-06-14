@@ -83,8 +83,8 @@
             window.location.href = getBasePath() + '/';
         }
 
-        // API base for auth endpoint
-        const API_BASE = 'https://tools.govcongiants.org';
+        // Same-origin API (getmindy.ai or tools.govcongiants.org)
+        const API_BASE = '';
 
         // Show message
         function showMessage(text, isError = false) {
@@ -124,9 +124,15 @@
                     body: JSON.stringify({ email })
                 });
 
-                const data = await response.json();
+                let data;
+                try {
+                    data = await response.json();
+                } catch {
+                    showMessage('Unexpected server response. Please try again.', true);
+                    return;
+                }
 
-                if (!data.success) {
+                if (!response.ok || !data.success) {
                     showMessage(data.error || 'No access found for this email.', true);
                     return;
                 }

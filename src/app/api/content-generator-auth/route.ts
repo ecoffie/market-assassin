@@ -22,6 +22,67 @@ const supabaseAdmin = supabaseUrl && supabaseServiceKey
     })
   : null;
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type SupabaseAdmin = any;
+
+/** Find or create auth user — listUsers() page 1 misses most Mindy accounts. */
+async function resolveContentGeneratorUserId(
+  supabaseAdmin: SupabaseAdmin,
+  email: string,
+  tier: string,
+  customerName: string,
+): Promise<string | null> {
+  const { data: byEmail, error: lookupError } = await supabaseAdmin.auth.admin.getUserByEmail(email);
+  if (byEmail?.user?.id) {
+    console.log('[CG Auth] Found existing user:', byEmail.user.id);
+    return byEmail.user.id;
+  }
+  if (lookupError) {
+    console.warn('[CG Auth] getUserByEmail:', lookupError.message);
+  }
+
+  const randomPassword = crypto.randomUUID() + crypto.randomUUID();
+  const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
+    email,
+    password: randomPassword,
+    email_confirm: true,
+    user_metadata: {
+      tier,
+      source: 'content-generator',
+      customerName,
+    },
+  });
+
+  if (createError) {
+    const { data: retry } = await supabaseAdmin.auth.admin.getUserByEmail(email);
+    if (retry?.user?.id) {
+      console.log('[CG Auth] User already existed after create race:', retry.user.id);
+      return retry.user.id;
+    }
+    console.error('[CG Auth] Error creating user:', createError);
+    return null;
+  }
+
+  const userId = newUser.user.id;
+  console.log('[CG Auth] Created new user:', userId);
+
+  const { error: profileError } = await supabaseAdmin
+    .from('user_profiles')
+    .upsert({
+      user_id: userId,
+      email,
+      tier,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString(),
+    }, { onConflict: 'user_id' });
+
+  if (profileError) {
+    console.error('[CG Auth] Error creating profile:', profileError);
+  }
+
+  return userId;
+}
+
 // Handle OPTIONS preflight request
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders });
@@ -71,60 +132,25 @@ export async function POST(request: NextRequest) {
       }, { status: 500, headers: corsHeaders });
     }
 
-    // Step 2: Check if user exists in Supabase
-    const { data: existingUsers } = await supabaseAdmin.auth.admin.listUsers();
-    const existingUser = existingUsers?.users?.find(u => u.email === normalizedEmail);
+    const userId = await resolveContentGeneratorUserId(
+      supabaseAdmin,
+      normalizedEmail,
+      tier,
+      accessDetails?.customerName || '',
+    );
 
-    let userId: string;
-
-    if (existingUser) {
-      userId = existingUser.id;
-      console.log('[CG Auth] Found existing user:', userId);
-    } else {
-      // Step 3: Create new user with a random password (they'll use magic link)
-      const randomPassword = crypto.randomUUID() + crypto.randomUUID();
-
-      const { data: newUser, error: createError } = await supabaseAdmin.auth.admin.createUser({
-        email: normalizedEmail,
-        password: randomPassword,
-        email_confirm: true, // Auto-confirm since we verified access
-        user_metadata: {
-          tier: tier,
-          source: 'content-generator',
-          customerName: accessDetails?.customerName || '',
-        }
-      });
-
-      if (createError) {
-        console.error('[CG Auth] Error creating user:', createError);
-        return NextResponse.json({
-          success: false,
-          error: 'Failed to create user account',
-        }, { status: 500, headers: corsHeaders });
-      }
-
-      userId = newUser.user.id;
-      console.log('[CG Auth] Created new user:', userId);
-
-      // Create user_profiles entry
-      const { error: profileError } = await supabaseAdmin
-        .from('user_profiles')
-        .upsert({
-          user_id: userId,
-          email: normalizedEmail,
-          tier: tier,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString(),
-        }, { onConflict: 'user_id' });
-
-      if (profileError) {
-        console.error('[CG Auth] Error creating profile:', profileError);
-        // Continue anyway - profile can be created later
-      }
+    if (!userId) {
+      return NextResponse.json({
+        success: false,
+        error: 'Failed to create user account',
+      }, { status: 500, headers: corsHeaders });
     }
 
-    // Step 4: Generate magic link for passwordless login
-    const redirectUrl = `${request.headers.get('origin') || 'https://getmindy.ai'}/content-generator/`;
+    // Generate magic link for passwordless login
+    const requestOrigin = request.headers.get('origin')
+      || request.headers.get('referer')?.replace(/\/content-generator.*$/i, '')
+      || 'https://getmindy.ai';
+    const redirectUrl = `${requestOrigin.replace(/\/$/, '')}/content-generator/`;
 
     const { data: linkData, error: linkError } = await supabaseAdmin.auth.admin.generateLink({
       type: 'magiclink',
