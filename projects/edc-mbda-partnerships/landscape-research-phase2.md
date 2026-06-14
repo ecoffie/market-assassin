@@ -18,18 +18,23 @@ Priority states: **MD, GA, TX, FL, VA, CA** (per PRD).
 | 3 | **Miami-Dade Strategic Procurement** | FL | Vendor Academy — workshops, forums, SBE program | SPD vendor outreach (see county page) | FL APEX | [miamidade.gov Vendor Academy](https://www.miamidade.gov/global/strategic-procurement/vendor-academy.page) | Research |
 | 4 | **Indiana Economic Development Corp (IEDC)** | IN | INPACT — procurement assistance, 30CAP, Get Certified | IEDC entrepreneurship contact form | IN APEX | [iedc.in.gov INPACT](https://iedc.in.gov/entrepreneurship/Indiana-Procurement-Assistance-Certification-Training-Initiative) | Research (IN = pilot adjacency) |
 | 5 | **Maryland eMMA / MDPA** | MD | Maryland Procurement Academy — state vendor training | procurement.maryland.gov | MD APEX | [procurement.maryland.gov/training](https://procurement.maryland.gov/training/) | Research — state-level complement to PGC |
-| 6 | *TBD — Atlanta regional EDC* | GA | | | | | Open |
-| 7 | *TBD — Houston / DFW EDC* | TX | | | | | Open |
-| 8 | *TBD — Northern VA EDC* | VA | | | | | Open |
-| 9 | *TBD — Los Angeles County / CA EDC* | CA | | | | | Open |
-| 10 | *TBD — Orange County / FL regional* | FL | | | | | Open |
+| 6 | **Hillsborough County — Small Business Encouragement Div.** | FL | Small Contractor Development Program — 5-week **cohort**, twice/yr, free to SBE firms (county-contract focus today; federal = our upsell) | Theresa Kempa — KempaT@hcfl.gov, 813-276-2729 (div: SBE@HCFL.gov) | FL APEX not referenced | [hcfl.gov SCDP](https://hcfl.gov/businesses/doing-business-with-hillsborough/small-business-encouragement-program/hillsborough-county-small-contractor-development-program) | Research — verified contact + real cohort (Tampa, non-Miami) |
+| 7 | **Loudoun County Economic Development** | VA | Federal Government Contracting named target industry; LoudounBizMatch (up to 10 hr subsidized TA) + GovConnect convening (events + 1:1, not a cohort) | Jennifer Goldman, BD Mgr Small Biz — jennifer.goldman@loudoun.gov, 571-507-3736 | APEX not referenced (NoVA GovCon training runs through VA APEX) | [loudounpossible.com — federal GovCon](https://www.loudounpossible.com/business-sector/federal-government-contracting) | Research — NoVA federal density; EDO can host/sponsor a cohort |
+| 8 | **Southern CA Minority Supplier Dev. Council (SCMSDC)** | CA | RISE Cohort (4-wk) + Supplier Readiness Series + Prime-Ready Playbook — runs **cohorts** (corporate supplier-diversity today; federal "prime-ready" = our gap) | Jade Cebedo, Dir. of Programs — jcebedo@scmsdc.org, 213-689-3086 | No APEX link (independent MBE council) | [scmsdc.org/rise](https://www.scmsdc.org/rise) | Research — cohort muscle + 1,700 MBEs; minority-business advisor lane |
+| 9 | **GT APEX Accelerator (Georgia Tech / EI²)** ⚠️ | GA | Georgia's APEX (ex-PTAC) — cohorts + workshops + BidMatch + 1:1 counseling, DoD-funded | Nancy Cleveland, Atlanta Region PM — nancy.cleveland@innovate.gatech.edu, 404-894-2000 | **IS** the GA APEX | [gtapexaccelerator.org](https://gtapexaccelerator.org/) | Research — ⚠️ overlaps APEX track (coordinate, don't double-pitch) |
+| 10 | **UH APEX Accelerator (Univ. of Houston)** ⚠️ | TX | Houston's APEX (ex-PTAC) — advising + workshops + webinars, 28 SE-TX counties, DoD-funded | Tim Healy, Program Director — uhapex@central.uh.edu, 832-842-8477 | **IS** the TX APEX (Houston) | [uhapex.uh.edu Services](https://www.uhapex.uh.edu/APEX/Services.asp) | Research — ⚠️ overlaps APEX track |
+
+**⚠️ Key finding (Jun 14):** In every priority metro, the **strongest** GovCon program is frequently the **APEX Accelerator itself** (GT APEX, UH APEX, FL APEX@USF, VA APEX@GMU, LA County APEX). Those belong to the **parallel APEX track** (`projects/apex-sbdc-funding-strategy/`) — coordinate via that channel, don't double-pitch them as EDCs. The best *non-APEX* EDC buyers are **county vendor academies** (Hillsborough, Loudoun) and **minority supplier councils** (SCMSDC) — they run cohorts but lean county/corporate, so federal opportunity intel is the **expansion angle**, not a 1:1 overlap.
+
+**Runner-ups logged (verified, parked):** ACE WOSB Cohort (GA, ext. facilitator) · DFW MSDC / Dallas MBDA Center (TX) · Houston OBO — Brandon Jones (TX, municipal focus) · FSMSDC (FL, strong federal fit but CEO transition Dec 2025, site 403) · Arlington BizLaunch (VA) · VSEDC (CA, SBA PRIME 7-wk, grant-dependent) · Get in the Game LA coalition (CA, World Cup/Olympics procurement, JPMorgan-backed).
+
+**Disqualified:** Community Business Partnership (Springfield VA) — site states operations concluded. Do not pursue.
 
 **Next research actions:**
-- [ ] GA: Investigate Invest Atlanta, Metro Atlanta Chamber GovCon programs
-- [ ] TX: Houston METRO small business + Dallas ODIE procurement outreach
-- [ ] VA: Fairfax County EDA / Virginia SBDC GovCon crossover
-- [ ] CA: LA County PTAC referral partners + local EDC academies
-- [ ] For each: note budget cycle (county FY) and whether they run cohorts vs. events only
+- [ ] Confirm whether Hillsborough / Loudoun cohorts will accept a *federal* track add-on (call the named contacts)
+- [ ] FSMSDC — re-approach once new CEO seated (better federal fit than Hillsborough)
+- [ ] Decide APEX-vs-EDC routing for GT APEX & UH APEX with the APEX advisor (avoid channel conflict)
+- [ ] For each verified row: confirm budget cycle (county FY vs. corporate-member-funded) on a discovery call
 
 ---
 
@@ -122,4 +127,4 @@ Target: **3 discovery calls at $50K EDC price point** before standardizing.
 
 ---
 
-*Last updated: June 14, 2026 — 5 verified EDC/MBDA rows; 15+ open research slots*
+*Last updated: June 14, 2026 — EDC top-10 COMPLETE: 10 verified rows (all priority states MD/GA/TX/FL/VA/CA covered), each with a real contact + source URL. Key finding: strongest regional GovCon orgs are often the APEX Accelerators (parallel track); best non-APEX EDC buyers = county vendor academies + minority supplier councils. Runner-ups + disqualifications logged. Open research now shifts to §2 MBDA matrix, §3 NMSDC contacts, §4 state divisions.*

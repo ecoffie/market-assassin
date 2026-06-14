@@ -14,7 +14,7 @@
 | 1 | **Send PGC EDC outreach** — Kimberlee Andrews (`kbandrews@co.pg.md.us`) | 30 min | [ ] |
 | 2 | **Post FT hire JD** — LinkedIn + GovCon Slack groups | 30 min | [ ] |
 | 3 | **Post 3 advisor role briefs** — `advisor-recruitment-brief.md` | 45 min | [ ] |
-| 4 | **Complete EDC top-10 rows** in `landscape-research-phase2.md` (GA, TX, FL, VA, CA) | 2 hr | [ ] |
+| 4 | **Complete EDC top-10 rows** in `landscape-research-phase2.md` (GA, TX, FL, VA, CA) | 2 hr | [x] — 10 verified rows, all priority states; APEX-overlap flagged |
 | 5 | **Draft PGC EDC one-pager proposal** (adapt USHCC HTML → EDC cohort angle) | 2 hr | [ ] |
 | 6 | **Grant NOFO tracker** — seed 5 rows in `grant-nofo-tracker.md` | 1 hr | [ ] |
 
@@ -119,7 +119,7 @@ Walk this order — 15 minutes max:
 - [ ] PGC EDC eval call booked
 - [ ] FT hire JD posted + 5+ applicants
 - [ ] 1 advisor role filled or strong pipeline
-- [ ] Phase 2 research doc: 10 EDCs + 10 MBDA-adjacent rows with verified contacts
+- [x] Phase 2 research doc: **10 EDCs done** (verified contacts + sources); MBDA-adjacent rows next
 - [ ] Grant tracker: 5 NOFOs with deadlines logged
 
 ---
