@@ -88,6 +88,15 @@ export async function GET(request: NextRequest, { params }: Params) {
     return NextResponse.redirect(new URL("/", request.url));
   }
 
+  // Don't send a buyer to an unconfigured payment link (placeholder URLs like
+  // buy.stripe.com/REPLACE_ME_* return a Stripe 403 — a silent dead sale). If a
+  // product's checkout URL was never wired up, fail safe to home rather than to
+  // a broken Stripe page. Guards the not-yet-launched lifetime tiers.
+  if (!product.checkoutUrl || product.checkoutUrl.includes("REPLACE_ME")) {
+    console.error(`Checkout requested for unconfigured product "${productId}" — checkoutUrl not set.`);
+    return NextResponse.redirect(new URL("/?checkout=unavailable", request.url));
+  }
+
   const attribution = mergePartnerReferral(
     request,
     mergeAttributionFromQuery(
