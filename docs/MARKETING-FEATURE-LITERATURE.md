@@ -1581,3 +1581,28 @@ responsible for each requirement.
 (done/in-progress/open, % complete, unassigned count). Persists via the
 compliance-state route shipped with the persistent matrix. Build + roll-up math
 verified. Second of the proposal-UX fixes in docs/PROPOSAL-UX-MAP.md.
+
+## Proposal Assist: Persistent, Team-Shared Compliance Matrix (June 14, 2026)
+
+**What:** The compliance matrix now SAVES. It used to live only in the browser —
+re-running and resetting on every reload, with per-requirement owner/status edits
+saved nowhere. Now the matrix persists to the pursuit: it loads automatically when
+you reopen, your assignments and progress (who owns each requirement, open / in
+progress / done) survive reload, and teammates on the same workspace pursuit see the
+same shared state. Re-extracting the matrix is non-destructive — it preserves the
+ownership and check-off the team already did.
+
+**Why:** The compliance matrix is the collaborative heart of a proposal — the list
+of every "shall / must" the team has to cover and divide up. Having it evaporate on
+reload (and be invisible to teammates) was the biggest gap in the proposal workflow.
+This makes it a real shared worklist.
+
+**SEO:** proposal compliance matrix software, shared compliance matrix, government
+proposal team collaboration, RFP requirement tracking, who owns which requirement.
+
+**Proof:** `supabase/migrations/20260614_pursuit_compliance.sql` (one row per
+requirement, pursuit-scoped, workspace-shared) + `/api/app/proposal/compliance-state`
+(GET load / POST save-preserving-owner-status / PATCH check-off). Verified
+end-to-end: a check-off (owner + status) persists across reload and survives a
+re-extraction of the matrix. First of the proposal-UX fixes mapped in
+docs/PROPOSAL-UX-MAP.md.
