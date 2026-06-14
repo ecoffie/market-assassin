@@ -1,6 +1,23 @@
 # GovCon Giants - Tasks by Priority
 
-**Last Updated:** June 13, 2026
+**Last Updated:** June 14, 2026
+
+---
+
+## 🔲 ACTIVE — EDC / MBDA partnerships (started Jun 14)
+
+**Runbook:** `projects/edc-mbda-partnerships/EXECUTION-RUNBOOK.md`
+
+**This week (Eric):**
+- [ ] Send PGC EDC outreach → Kimberlee Andrews `kbandrews@co.pg.md.us` (`outreach-templates.md` §1)
+- [ ] Post FT hire JD (`JD-head-public-sector-partnerships-funding.md`)
+- [ ] Post 3 advisor role briefs (`advisor-recruitment-brief.md`)
+- [ ] Fill EDC top-10 rows in `landscape-research-phase2.md` (GA, TX, FL, VA, CA)
+- [ ] Seed grant NOFO tracker (5 rows)
+
+**P1 target:** Prince George's County EDC — Procurement 360 → 60-day eval → $50K cohort license
+
+**Parallel (don't drop):** NAPEX prep, USHCC Atlanta close, APEX Illinois re-warm
 
 ---
 

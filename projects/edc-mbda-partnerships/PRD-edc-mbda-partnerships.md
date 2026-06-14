@@ -1,6 +1,6 @@
 # PRD: EDC, MBDA-Adjacent & State/Local Partnerships
 
-**Status:** DRAFT — research + GTM expansion (post-NAPEX execution)
+**Status:** ACTIVE — execution started June 14, 2026 (see `EXECUTION-RUNBOOK.md`)
 **Date:** June 13, 2026
 **Owner:** Eric (Strategy) / Head of Public Sector Partnerships & Funding (hire)
 **Related docs:**
@@ -9,6 +9,8 @@
 - `projects/apex-sbdc-funding-strategy/NAPEX-2026-readiness-plan.md` (Aug 16–21 forcing function)
 - `market-assassin/tasks/COACH-ENTERPRISE-BD-PLAN.md` (legacy coach BD plan — advisor assignments retired June 2026; recruit replacements)
 - `projects/edc-mbda-partnerships/JD-head-public-sector-partnerships-funding.md` (FT role)
+- `projects/edc-mbda-partnerships/EXECUTION-RUNBOOK.md` (weekly actions — **start here**)
+- `projects/edc-mbda-partnerships/landscape-research-phase2.md` (target inventory)
 
 ---
 
@@ -306,4 +308,4 @@ Dedicated owner required. SBIR funds **build**; org licenses fund **revenue**.
 
 ---
 
-*Last updated: June 13, 2026*
+*Last updated: June 14, 2026*
