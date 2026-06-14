@@ -197,14 +197,31 @@
             }
         }
 
-        // Check if already authenticated with Supabase
+        // Break auth ↔ index flash loop: only redirect when KV confirms purchase access
         async function checkExistingSession() {
             try {
                 const { data: { session } } = await supabaseClient.auth.getSession();
-                if (session) {
-                    console.log('[Auth] Existing session found, redirecting...');
+                if (!session?.user?.email) return;
+
+                const email = session.user.email.trim().toLowerCase();
+                const resp = await fetch(`${API_BASE}/api/verify-content-generator`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email }),
+                });
+                const data = await resp.json().catch(() => ({}));
+
+                if (resp.ok && data.hasAccess) {
+                    localStorage.setItem('gcg_access_email', email);
+                    localStorage.setItem('gcg_tier', data.tier || 'content-engine');
+                    console.log('[Auth] Valid session + purchase access, opening app');
                     window.location.href = getBasePath() + '/';
+                    return;
                 }
+
+                // Stale/wrong Supabase session — clear so this page stops bouncing
+                console.warn('[Auth] Clearing stale Supabase session (no KV access for', email, ')');
+                await supabaseClient.auth.signOut();
             } catch (error) {
                 console.error('[Auth] Error checking session:', error);
             }

@@ -246,6 +246,7 @@
             let currentUser = null;
             let currentSession = null;
             let userProfile = null;
+            window.gcgAuthInitComplete = false;
 
             async function initAuth() {
                 try {
@@ -500,9 +501,13 @@
                         await loadUserProfile();
                     }
                 } else if (event === 'SIGNED_OUT') {
-                    // Only redirect on explicit sign out, not on initial page load
                     currentUser = null; currentSession = null; userProfile = null;
                     window.currentUserId = null;
+                    // Don't bounce during init or when KV access / paywall is active (prevents flash loop)
+                    if (!window.gcgAuthInitComplete) return;
+                    if (localStorage.getItem('gcg_access_email')) return;
+                    const paywall = document.getElementById('paywall-modal');
+                    if (paywall && paywall.classList.contains('flex')) return;
                     window.location.href = getAppUrl('auth.html');
                 } else if (!session) {
                     // No session on initial load - just update state, don't redirect
@@ -1610,14 +1615,29 @@
                 return;
             }
 
-            // Check if we just came from auth (might need to wait for session)
             const urlParams = new URLSearchParams(window.location.search);
             const justSignedIn = urlParams.get('auth') === 'success' || sessionStorage.getItem('gcg_just_signed_in');
 
-            // Initialize Supabase Auth with retry for fresh logins
+            // Priority 1: KV-verified purchase email (legacy buyers — avoids stale Supabase loop)
+            const savedEmail = localStorage.getItem('gcg_access_email');
+            if (savedEmail) {
+                const tier = await verifyContentGeneratorAccess(savedEmail);
+                if (tier) {
+                    console.log('[App] KV-verified access for', savedEmail);
+                    await SupabaseAuth.client.auth.signOut({ scope: 'local' }).catch(() => {});
+                    updateEmailBasedUI(savedEmail);
+                    initializeUsageTracking();
+                    await loadCompanyProfile();
+                    await loadTemplates();
+                    backfillHistoryFromLibrary();
+                    window.gcgAuthInitComplete = true;
+                    return;
+                }
+            }
+
+            // Initialize Supabase Auth with retry for fresh magic-link logins
             let session = await SupabaseAuth.initAuth();
 
-            // If no session but we just signed in, retry a few times
             if (!session && justSignedIn) {
                 console.log('Just signed in, waiting for session...');
                 for (let i = 0; i < 5; i++) {
@@ -1628,52 +1648,34 @@
                         break;
                     }
                 }
-                // Clear the flag
                 sessionStorage.removeItem('gcg_just_signed_in');
-                // Clean up URL
                 if (urlParams.get('auth')) {
                     window.history.replaceState({}, '', window.location.pathname);
                 }
             }
 
-            // Supabase session OR KV-verified purchase email (legacy tool buyers)
             if (!session) {
-                const savedEmail = localStorage.getItem('gcg_access_email');
-                if (savedEmail) {
-                    const tier = await verifyContentGeneratorAccess(savedEmail);
-                    if (tier) {
-                        console.log('[App] KV-verified access for', savedEmail);
-                        updateEmailBasedUI(savedEmail);
-                        initializeUsageTracking();
-                        await loadCompanyProfile();
-                        await loadTemplates();
-                        backfillHistoryFromLibrary();
-                        return;
-                    }
-                }
                 console.log('[App] No session - showing paywall for new visitors');
                 showPaywall();
+                window.gcgAuthInitComplete = true;
                 return;
             }
 
-            // Initialize tier from profile (includes paywall check)
             await initializeTier();
 
-            // If no access, don't continue loading
             if (!hasContentGeneratorAccess) {
-                console.log('[App] No access - stopping initialization');
+                console.log('[App] Supabase session but no KV access — clearing stale session');
+                await SupabaseAuth.client.auth.signOut({ scope: 'local' }).catch(() => {});
+                showPaywall();
+                window.gcgAuthInitComplete = true;
                 return;
             }
 
-            // Update UI with user info
             updateUserUI();
-
-            // Load data
             await loadCompanyProfile();
             await loadTemplates();
-
-            // Backfill generation history from library for users who had posts before memory system
             backfillHistoryFromLibrary();
+            window.gcgAuthInitComplete = true;
         });
 
         // ========== PAYWALL / ACCESS VERIFICATION ==========
