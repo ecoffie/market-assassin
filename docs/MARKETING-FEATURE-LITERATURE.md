@@ -1679,3 +1679,29 @@ against the public $4,997 price, not "Mindy costs $2,997."
 **Proof:** `FOUNDERS_LIFETIME_PRICE=4997` heroes `/lifetime`; `BOOTCAMP_LIFETIME_PRICE=2997`
 only in `bootcamp-lifetime-offer.ts` email copy. Live Stripe Founders link:
 `buy.stripe.com/28E00k6IC5V0fRH5WMfnO0G`.
+
+---
+
+## Proposal Assist: One Unified Proposal Flow (June 14, 2026)
+
+**What:** Proposal Assist is now a single, coherent path from bid decision →
+compliance matrix → drafting → scan → export. We removed an orphaned older "wizard"
+flow (1,636 lines of unreachable code) that ran in parallel to the main workbench
+but was never wired into the app — so there is exactly one place the work happens,
+and one place the state lives.
+
+**Why:** The duplicate path wasn't just clutter — it was the root cause of the
+compliance matrix "resetting every time" (state was split across two systems). With
+it gone, the matrix that persists, the team check-off that's shared, the bid decision
+that's recorded, and the drafting that reads the requirements all live on one path
+with no seams. Fewer moving parts, no contradictory state, nothing dead to trip over.
+
+**SEO:** federal proposal software workflow, compliance matrix that saves,
+end-to-end proposal assistant, government RFP response tool.
+
+**Proof:** Removed `/api/app/proposal/wizard` + the unrendered
+`components/app/proposal-wizard/*` (confirmed zero callers via codebase trace).
+Kept the `proposal_wizard_*` archive type defs + LibraryPanel badges so historical
+archived items still display. The live flow is `ProposalsPanel` end-to-end, verified
+by a full bid→matrix→draft→scan→export walkthrough on real data. Closes the
+"two paths" issue noted in docs/PROPOSAL-UX-MAP.md.
