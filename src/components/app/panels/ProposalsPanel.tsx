@@ -306,6 +306,25 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       .catch(() => { /* silent — nudge just doesn't show */ });
   }, [email]);
 
+  // Load workspace teammates so requirements can be assigned to real people
+  // (the assignee field suggests them). Falls back to free-text for solo users.
+  useEffect(() => {
+    if (!email) return;
+    fetch(`/api/app/workspace?email=${encodeURIComponent(email)}`, { headers: getMIApiHeaders(email) })
+      .then((r) => r.ok ? r.json() : null)
+      .then((d) => {
+        if (!d?.success || !Array.isArray(d.members)) return;
+        // mi_beta_team_members rows carry user_email (the joined member) and/or
+        // invited_email (the invite). Collect both so every teammate shows up.
+        const emails = d.members
+          .flatMap((m: Record<string, unknown>) => [String(m.user_email || ''), String(m.invited_email || '')])
+          .filter(Boolean);
+        // include self so you can assign to yourself
+        setTeamMembers(Array.from(new Set([email, ...emails])));
+      })
+      .catch(() => {});
+  }, [email]);
+
   const handleRfpFile = useCallback(async (file: File) => {
     if (!email) {
       setUploadError('Sign in required.');
@@ -408,6 +427,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   const [complianceElapsedSec, setComplianceElapsedSec] = useState(0);
   const complianceSectionRef = useRef<HTMLElement | null>(null);
   const complianceStartedAtRef = useRef<number | null>(null);
+  // Workspace teammates (for the assignee dropdown) + a "my items" filter.
+  const [teamMembers, setTeamMembers] = useState<string[]>([]);
+  const [myItemsOnly, setMyItemsOnly] = useState(false);
   const [statusFilter, setStatusFilter] = useState<'all' | ComplianceStatus>('all');
   const [categoryFilter, setCategoryFilter] = useState<'all' | ComplianceCategory>('all');
   const [priorityFilter, setPriorityFilter] = useState<'all' | ReqPriority>('all');
@@ -457,6 +479,16 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       }));
       setCompliance(rows);
       setComplianceMeta(data.meta || null);
+      // Persist the matrix to the pursuit so it survives reload + is team-shared.
+      // The route preserves any owner/status already set on unchanged rows, so a
+      // re-extraction is non-destructive. Best-effort.
+      if (activePursuitId && rows.length) {
+        fetch(`/api/app/proposal/compliance-state?email=${encodeURIComponent(email)}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+          body: JSON.stringify({ pipeline_id: activePursuitId, requirements: rows.map(r => ({ req_key: r.id, requirement: r.requirement, category: r.category, section: r.section, source_quote: r.source_quote, source_doc: r.source_doc, revised: r.revised })) }),
+        }).catch(() => {});
+      }
     } catch (err) {
       console.error('Compliance generation failed:', err);
       setComplianceError('Request failed. Try again.');
@@ -465,6 +497,36 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       complianceStartedAtRef.current = null;
     }
   }, [email, uploadedRfp, getAuthHeaders, activePursuitId]);
+
+  // Load the SAVED compliance matrix when a pursuit opens — fixes "it re-runs and
+  // resets every time" and surfaces teammates' owner/status. Only loads when the
+  // matrix isn't already populated (don't clobber an in-progress generation).
+  useEffect(() => {
+    if (!email || !activePursuitId) return;
+    let cancelled = false;
+    fetch(`/api/app/proposal/compliance-state?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(activePursuitId)}`, { headers: getAuthHeaders() })
+      .then(r => r.ok ? r.json() : null)
+      .then(data => {
+        if (cancelled || !data?.success || !data.saved) return;
+        const rows: ComplianceRequirementRow[] = (data.requirements || []).map((r: Record<string, unknown>) => ({
+          id: String(r.req_key || ''),
+          requirement: String(r.requirement || ''),
+          category: (r.category as ComplianceCategory) || 'other',
+          section: (r.section as string) || undefined,
+          source_quote: (r.source_quote as string) || undefined,
+          source_doc: (r.source_doc as string) || undefined,
+          revised: Boolean(r.revised),
+          owner: String(r.owner || ''),
+          status: (r.status as ComplianceStatus) || 'open',
+        }));
+        // Only hydrate if we don't already have a (freshly generated) matrix.
+        setCompliance(prev => (prev.length > 0 ? prev : rows));
+      })
+      .catch(() => {});
+    return () => { cancelled = true; };
+    // activePursuitId is the trigger; intentionally not depending on `compliance`.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email, activePursuitId, getAuthHeaders]);
 
   useEffect(() => {
     if (!complianceLoading) {
@@ -547,7 +609,17 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
 
   const updateRequirement = useCallback((id: string, patch: Partial<ComplianceRequirementRow>) => {
     setCompliance(prev => prev.map(r => (r.id === id ? { ...r, ...patch } : r)));
-  }, []);
+    // Persist owner/status changes (the team check-off) so they survive reload
+    // and are visible to teammates. Best-effort — a save failure doesn't block
+    // the optimistic UI update. Only when working a saved pursuit.
+    if (email && activePursuitId && ('owner' in patch || 'status' in patch)) {
+      fetch(`/api/app/proposal/compliance-state?email=${encodeURIComponent(email)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({ pipeline_id: activePursuitId, req_key: id, owner: patch.owner, status: patch.status }),
+      }).catch(() => {});
+    }
+  }, [email, activePursuitId, getAuthHeaders]);
 
   // Extract the SOW/PWS to a standalone .docx (send subs for pricing/bids).
   const [sowBusy, setSowBusy] = useState(false);
@@ -584,7 +656,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   }, [email, uploadedRfp?.text, uploadedRfp?.fileName, getAuthHeaders]);
 
   const filteredCompliance = useMemo(() => {
+    const me = (email || '').toLowerCase();
     const rows = compliance.filter(r => {
+      if (myItemsOnly && (r.owner || '').toLowerCase() !== me) return false;
       if (statusFilter !== 'all' && r.status !== statusFilter) return false;
       if (categoryFilter !== 'all' && r.category !== categoryFilter) return false;
       if (priorityFilter !== 'all' && priorityOf({ requirement: r.requirement, category: r.category, section: r.section }) !== priorityFilter) return false;
@@ -604,7 +678,20 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       if (pa !== pb) return pa - pb;
       return sortKey(a.section).localeCompare(sortKey(b.section), undefined, { numeric: true });
     });
-  }, [compliance, statusFilter, categoryFilter, priorityFilter]);
+  }, [compliance, statusFilter, categoryFilter, priorityFilter, myItemsOnly, email]);
+
+  // Team progress roll-up across the WHOLE matrix (not just the filtered view).
+  const complianceProgress = useMemo(() => {
+    const total = compliance.length;
+    const done = compliance.filter(r => r.status === 'done').length;
+    const inProgress = compliance.filter(r => r.status === 'in_progress').length;
+    const na = compliance.filter(r => r.status === 'n_a').length;
+    const open = total - done - inProgress - na;
+    const assignable = total - na;
+    const pct = assignable > 0 ? Math.round((done / assignable) * 100) : 0;
+    const unassigned = compliance.filter(r => !r.owner?.trim() && r.status !== 'n_a').length;
+    return { total, done, inProgress, na, open, pct, unassigned };
+  }, [compliance]);
 
   // Section drafts. Holds slots for BOTH RFP + LOI/response
   // sections; only the active tab set is shown at any time based on
@@ -2292,6 +2379,27 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                       </div>
                     );
                   })()}
+                  {/* Team progress roll-up — done / in-progress / open across the
+                      whole matrix, with a completion bar and an unassigned nudge. */}
+                  {compliance.length > 0 && (
+                    <div className="mb-3 rounded-lg border border-slate-800 bg-slate-950/50 p-3">
+                      <div className="flex items-center justify-between text-xs mb-1.5">
+                        <span className="text-slate-300 font-medium">{complianceProgress.pct}% complete</span>
+                        <span className="text-slate-500">
+                          {complianceProgress.done} done · {complianceProgress.inProgress} in progress · {complianceProgress.open} open
+                          {complianceProgress.na ? ` · ${complianceProgress.na} N/A` : ''}
+                        </span>
+                      </div>
+                      <div className="h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
+                        <div className="h-full bg-emerald-500 transition-all" style={{ width: `${complianceProgress.pct}%` }} />
+                      </div>
+                      {complianceProgress.unassigned > 0 && (
+                        <p className="text-[11px] text-amber-300/80 mt-1.5">
+                          {complianceProgress.unassigned} requirement{complianceProgress.unassigned === 1 ? '' : 's'} unassigned — assign an owner so nothing falls through.
+                        </p>
+                      )}
+                    </div>
+                  )}
                   <div className="flex flex-wrap items-center gap-2 mb-3 text-xs">
                     <span className="text-slate-500">{compliance.length} requirement{compliance.length === 1 ? '' : 's'}</span>
                 <span className="text-slate-700">·</span>
@@ -2315,11 +2423,25 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                     <option key={s} value={s}>{STATUS_LABELS[s]}</option>
                   ))}
                 </select>
+                <button
+                  type="button"
+                  onClick={() => setMyItemsOnly(v => !v)}
+                  className={`rounded px-2 py-1 border transition-colors ${myItemsOnly ? 'border-purple-500 bg-purple-500/15 text-purple-200' : 'border-slate-700 bg-slate-800 text-slate-300 hover:text-white'}`}
+                  title="Show only requirements assigned to you"
+                >
+                  My items
+                </button>
                 <span className="text-slate-500 ml-auto">
                   Showing {filteredCompliance.length} of {compliance.length}
                 </span>
               </div>
 
+              {/* Teammate suggestions for the per-requirement assignee inputs. */}
+              {teamMembers.length > 0 && (
+                <datalist id="proposal-team-members">
+                  {teamMembers.map(m => <option key={m} value={m} />)}
+                </datalist>
+              )}
               <div className="overflow-x-auto border border-slate-800 rounded-lg">
                 <table className="w-full text-sm min-w-[820px]">
                   <thead className="bg-slate-950/60 text-slate-400 text-xs uppercase tracking-wider">
@@ -2390,6 +2512,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                           <td className="px-3 py-2">
                             <input
                               type="text"
+                              list="proposal-team-members"
                               value={r.owner}
                               onChange={e => updateRequirement(r.id, { owner: e.target.value })}
                               placeholder="Assign…"
@@ -2416,7 +2539,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               </div>
 
                   <p className="text-xs text-slate-500 mt-3">
-                    Owner and status edits live in this session only. CSV export captures the full table.
+                    {activePursuitId
+                      ? 'Owner and status are saved to this pursuit and shared with your workspace. CSV export captures the full table.'
+                      : 'Open this from a saved pursuit to share owner/status with your team. CSV export captures the full table.'}
                   </p>
                 </div>
               )}
