@@ -1464,3 +1464,32 @@ $1,497/$4,997 amounts + lifetime description match. Bootcamp email uses
 `getmindy.ai/checkout/bootcamp-lifetime` (not shop Ultimate URL). Pending: Eric creates
 $4,997 Stripe payment link (plink live Jun 13 — `buy.stripe.com/28E00k6IC5V0fRH5WMfnO0G`,
 metadata `tier=briefings_lifetime`).
+
+---
+
+## Proposal Assist: Pre-Submission Compliance Scanner — "Will This Get Thrown Out?" (June 13, 2026)
+
+**What:** A one-click check that scans your drafted proposal against the
+solicitation and flags the mistakes that get a proposal DISQUALIFIED before you
+submit — a missing required plan (QCP / safety) the RFP demanded, a page-limit
+overrun, an evaluation factor your response never addresses, and reminders on the
+real killers: submission deadline, submission method/portal, set-aside eligibility,
+and active SAM registration. Findings are ranked DQ → warning → note.
+
+**Why:** Most proposals don't lose on writing quality — they lose on a compliance
+mistake. We analyzed hundreds of real solicitations in our database to rank what
+actually disqualifies offers (deadline 44%, wrong submission method 36%, set-aside
+eligibility 26%, missing reps/certs/SAM 20%) and built the scanner to catch exactly
+those, BEFORE submission. It works on any response — one Mindy drafted or one you
+wrote yourself.
+
+**SEO:** federal proposal compliance check, why proposals get rejected, RFP
+disqualification reasons, pre-submission proposal review, government proposal
+compliance matrix checker.
+
+**Proof:** `src/lib/proposal/compliance-scanner.ts` (deterministic checks) +
+`POST /api/app/proposal/scan`. Grounded in `docs/RFP-FORMAT-ANALYSIS.md` (488 real
+RFPs). Reuses the compliance-extraction engine's structured requirements (deadlines,
+page limits, required plans) rather than guessing. Verified: a weak draft missing a
+required Safety Plan and bidding a set-aside it doesn't hold is correctly flagged as
+"at risk" with the specific DQ reasons.

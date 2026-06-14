@@ -413,6 +413,13 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   const [priorityFilter, setPriorityFilter] = useState<'all' | ReqPriority>('all');
   const [bidProceeded, setBidProceeded] = useState(false); // Step-1 bid decision made
 
+  // Pre-submission compliance scan — "will this proposal get thrown out?".
+  // Checks the current drafts against the compliance matrix for DQ mistakes.
+  type ScanFinding = { rule: string; severity: 'dq' | 'warning' | 'info'; title: string; detail: string; requirement?: string; section?: string };
+  const [scanResult, setScanResult] = useState<{ findings: ScanFinding[]; counts: { dq: number; warning: number; info: number }; atRisk: boolean } | null>(null);
+  const [scanning, setScanning] = useState(false);
+  const [scanError, setScanError] = useState<string | null>(null);
+
   const generateCompliance = useCallback(async () => {
     if (!email || !uploadedRfp) return;
     setComplianceLoading(true);
@@ -655,6 +662,52 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     () => (isLoiResponseMode ? LOI_RESPONSE_SECTION_TABS : RFP_SECTION_TABS),
     [isLoiResponseMode]
   );
+
+  // Pre-submission scan: check the current drafts against the compliance matrix
+  // for DQ mistakes (missing required plan, over page limit, unaddressed eval
+  // factor, deadline/portal/eligibility reminders). Deterministic + fast.
+  const runComplianceScan = useCallback(async () => {
+    if (!email || compliance.length === 0) {
+      setScanError('Generate the compliance matrix first — the scan checks your draft against it.');
+      return;
+    }
+    setScanning(true);
+    setScanError(null);
+    try {
+      const sections = currentSectionTabs
+        .map(tab => ({ label: tab.label, text: drafts[tab.id]?.draft || '' }))
+        .filter(s => s.text.trim());
+      const draftText = sections.map(s => s.text).join('\n\n');
+      if (!draftText.trim()) {
+        setScanError('No drafted sections to scan yet. Draft your response, then run the check.');
+        setScanning(false);
+        return;
+      }
+      const res = await fetch(`/api/app/proposal/scan?email=${encodeURIComponent(email)}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({
+          requirements: compliance.map(c => ({ id: c.id, requirement: c.requirement, category: CATEGORY_LABELS[c.category]?.label || c.category, section: c.section })),
+          draftText,
+          sections,
+          // Bidder set-asides aren't loaded in this panel; omit so the scanner
+          // surfaces set-aside as a "confirm it's active" reminder rather than
+          // risking a false DQ. (The vault knows the certs; a later pass can pass them.)
+          bidderSetAsides: [],
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.success) {
+        setScanError(data?.error || 'Scan failed. Try again.');
+        return;
+      }
+      setScanResult({ findings: data.findings || [], counts: data.counts || { dq: 0, warning: 0, info: 0 }, atRisk: !!data.atRisk });
+    } catch {
+      setScanError('Request failed. Try again.');
+    } finally {
+      setScanning(false);
+    }
+  }, [email, compliance, currentSectionTabs, drafts, getAuthHeaders]);
 
   // When the detected mode flips (e.g., user loads a different doc),
   // make sure activeSection isn't pointing to a tab that no longer
@@ -2010,7 +2063,62 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 onClick={() => exportProposalPackage({ idiq: true })}
               />
             )}
+
+            {/* Pre-submission compliance check — "will this get thrown out?".
+                Checks the current drafts against the compliance matrix for the
+                DQ mistakes that lose proposals (missing required plan, over page
+                limit, unaddressed eval factor, deadline/portal/eligibility). */}
+            <OutputActionCard
+              eyebrow="Pre-submission check"
+              title="Will this get thrown out?"
+              description="Scan your drafted response against the solicitation for the mistakes that disqualify a proposal — missing required plans, page-limit overruns, unaddressed evaluation factors, deadline / portal / eligibility gaps."
+              status={compliance.length > 0 ? 'Ready' : 'Generate the compliance matrix first'}
+              buttonLabel={scanning ? 'Scanning...' : 'Run compliance check'}
+              disabled={scanning || compliance.length === 0}
+              onClick={() => runComplianceScan()}
+            />
           </div>
+
+          {/* Scan findings */}
+          {scanError && (
+            <p className="mt-3 text-sm text-amber-300">{scanError}</p>
+          )}
+          {scanResult && (
+            <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+              <div className="flex items-center gap-3 mb-3">
+                <span className={`text-sm font-semibold ${scanResult.atRisk ? 'text-red-400' : 'text-emerald-400'}`}>
+                  {scanResult.atRisk
+                    ? `⚠️ ${scanResult.counts.dq} disqualifying issue${scanResult.counts.dq === 1 ? '' : 's'} found`
+                    : '✓ No disqualifying issues found'}
+                </span>
+                <span className="text-xs text-slate-400">
+                  {scanResult.counts.warning} warning{scanResult.counts.warning === 1 ? '' : 's'} · {scanResult.counts.info} note{scanResult.counts.info === 1 ? '' : 's'}
+                </span>
+              </div>
+              {scanResult.findings.length === 0 ? (
+                <p className="text-sm text-slate-400">Nothing flagged. Still verify the submission deadline and method before you send.</p>
+              ) : (
+                <ul className="space-y-2">
+                  {scanResult.findings.map((f, i) => (
+                    <li key={i} className="flex gap-2 text-sm">
+                      <span className={
+                        f.severity === 'dq' ? 'text-red-400 font-semibold shrink-0'
+                        : f.severity === 'warning' ? 'text-amber-300 shrink-0'
+                        : 'text-slate-400 shrink-0'
+                      }>
+                        {f.severity === 'dq' ? 'DQ' : f.severity === 'warning' ? '!' : 'i'}
+                      </span>
+                      <span>
+                        <span className="text-white font-medium">{f.title}</span>
+                        {f.section ? <span className="text-slate-500"> ({f.section})</span> : null}
+                        <span className="block text-slate-400">{f.detail}</span>
+                      </span>
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
+          )}
         </section>
       )}
 
