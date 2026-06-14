@@ -1,10 +1,7 @@
 import { NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-01-27.acacia' as Stripe.LatestApiVersion,
-});
+import { getStripe } from '@/lib/stripe';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -159,7 +156,7 @@ async function countStripeCustomers(): Promise<number> {
     const params: Stripe.CustomerListParams = { limit: 100 };
     if (startingAfter) params.starting_after = startingAfter;
 
-    const customers = await stripe.customers.list(params);
+    const customers = await getStripe().customers.list(params);
     count += customers.data.filter(c => c.livemode !== false).length;
     hasMore = customers.has_more;
     if (customers.data.length > 0) {
@@ -179,7 +176,7 @@ async function countStripeCharges(): Promise<number> {
     const params: Stripe.ChargeListParams = { limit: 100 };
     if (startingAfter) params.starting_after = startingAfter;
 
-    const charges = await stripe.charges.list(params);
+    const charges = await getStripe().charges.list(params);
     count += charges.data.filter(c => c.livemode !== false && c.status === 'succeeded').length;
     hasMore = charges.has_more;
     if (charges.data.length > 0) {
@@ -199,7 +196,7 @@ async function countStripeSubscriptions(): Promise<number> {
     const params: Stripe.SubscriptionListParams = { limit: 100, status: 'all' };
     if (startingAfter) params.starting_after = startingAfter;
 
-    const subscriptions = await stripe.subscriptions.list(params);
+    const subscriptions = await getStripe().subscriptions.list(params);
     count += subscriptions.data.filter(s => s.livemode !== false).length;
     hasMore = subscriptions.has_more;
     if (subscriptions.data.length > 0) {
@@ -218,7 +215,7 @@ async function backfillCustomers(supabase: any, stats: any, errors: string[]) {
     const params: Stripe.CustomerListParams = { limit: BATCH_SIZE };
     if (startingAfter) params.starting_after = startingAfter;
 
-    const customers = await stripe.customers.list(params);
+    const customers = await getStripe().customers.list(params);
 
     for (const customer of customers.data) {
       // Skip test mode customers
@@ -263,7 +260,7 @@ async function backfillCharges(supabase: any, stats: any, errors: string[]) {
     const params: Stripe.ChargeListParams = { limit: BATCH_SIZE };
     if (startingAfter) params.starting_after = startingAfter;
 
-    const charges = await stripe.charges.list(params);
+    const charges = await getStripe().charges.list(params);
 
     for (const charge of charges.data) {
       // Skip test mode and failed charges
@@ -321,7 +318,7 @@ async function enrichChargeMetadata(charge: Stripe.Charge): Promise<Record<strin
   if (!invoiceId) return metadata;
 
   try {
-    const invoice: any = await stripe.invoices.retrieve(invoiceId, {
+    const invoice: any = await getStripe().invoices.retrieve(invoiceId, {
       expand: ['lines.data.price.product'],
     });
     const line = invoice.lines?.data?.find((item: any) => item.price?.product) || invoice.lines?.data?.[0];
@@ -355,7 +352,7 @@ async function backfillSubscriptions(supabase: any, stats: any, errors: string[]
     const params: Stripe.SubscriptionListParams = { limit: BATCH_SIZE, status: 'all' };
     if (startingAfter) params.starting_after = startingAfter;
 
-    const subscriptions = await stripe.subscriptions.list(params);
+    const subscriptions = await getStripe().subscriptions.list(params);
 
     for (const subscription of subscriptions.data) {
       // Skip test mode

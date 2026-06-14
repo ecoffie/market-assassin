@@ -5,10 +5,9 @@ import { kv } from '@vercel/kv';
 import { verifyAdminPassword } from '@/lib/admin-auth';
 import { sendMarketIntelligenceWelcomeEmail } from '@/lib/send-email';
 import { grantBriefingsAccess } from '@/lib/briefings/access';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY || '', {
-  apiVersion: '2025-01-27.acacia' as Stripe.LatestApiVersion,
-});
+import { getStripe } from '@/lib/stripe';
+// `Stripe` is still imported for its TYPES (Stripe.Charge etc.); the CLIENT is
+// created lazily via getStripe() so this route doesn't instantiate at build time.
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
@@ -48,6 +47,7 @@ function isMarketIntelligencePurchase(productName: string, metadata: Record<stri
 }
 
 async function findCheckoutSession(charge: Stripe.Charge) {
+  const stripe = getStripe();
   const paymentIntentId = typeof charge.payment_intent === 'string'
     ? charge.payment_intent
     : charge.payment_intent?.id;
@@ -86,6 +86,7 @@ function getChargeEmail(charge: Stripe.Charge, session: Stripe.Checkout.Session 
 }
 
 async function getRecentPurchaserTargets(days: number) {
+  const stripe = getStripe();
   const createdGte = Math.floor((Date.now() - days * 24 * 60 * 60 * 1000) / 1000);
   const targets = new Map<string, { email: string; name?: string; source: string; productName: string; purchasedAt: string }>();
   let startingAfter: string | undefined;

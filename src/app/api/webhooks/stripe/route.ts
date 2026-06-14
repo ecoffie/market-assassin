@@ -5,10 +5,9 @@ import { createClient } from '@supabase/supabase-js';
 import { grantBriefingsAccess } from '@/lib/briefings/access';
 import { sendBundleEmail, sendMarketIntelligenceWelcomeEmail } from '@/lib/send-email';
 import { updateAccessFlags } from '@/lib/supabase/user-profiles';
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY!, {
-  apiVersion: '2025-01-27.acacia' as Stripe.LatestApiVersion,
-});
+import { getStripe } from '@/lib/stripe';
+// `Stripe` imported for TYPES; the client is created lazily via getStripe() so
+// this route never instantiates Stripe at build time (missing build-env key).
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -24,7 +23,7 @@ export async function POST(request: Request) {
   // Verify webhook signature
   if (webhookSecret && sig) {
     try {
-      event = stripe.webhooks.constructEvent(body, sig, webhookSecret);
+      event = getStripe().webhooks.constructEvent(body, sig, webhookSecret);
     } catch (err) {
       console.error('Webhook signature verification failed:', err);
       return NextResponse.json(
@@ -157,7 +156,7 @@ async function handleCustomerDeleted(supabase: any, customer: Stripe.Customer) {
 async function handleChargeSucceeded(supabase: any, charge: Stripe.Charge) {
   // First, ensure customer exists
   if (charge.customer && typeof charge.customer === 'string') {
-    const customer = await stripe.customers.retrieve(charge.customer);
+    const customer = await getStripe().customers.retrieve(charge.customer);
     if (!('deleted' in customer)) {
       await handleCustomer(supabase, customer);
     }
@@ -202,7 +201,7 @@ async function findCheckoutSessionForCharge(charge: Stripe.Charge) {
   if (!paymentIntentId) return null;
 
   try {
-    const sessions = await stripe.checkout.sessions.list({
+    const sessions = await getStripe().checkout.sessions.list({
       payment_intent: paymentIntentId,
       limit: 1,
       expand: ['data.line_items.data.price.product'],
@@ -349,7 +348,7 @@ async function enrichChargeMetadata(charge: Stripe.Charge): Promise<Record<strin
   if (!invoiceId) return metadata;
 
   try {
-    const invoice: any = await stripe.invoices.retrieve(invoiceId, {
+    const invoice: any = await getStripe().invoices.retrieve(invoiceId, {
       expand: ['lines.data.price.product'],
     });
     const line = invoice.lines?.data?.find((item: any) => item.price?.product) || invoice.lines?.data?.[0];
