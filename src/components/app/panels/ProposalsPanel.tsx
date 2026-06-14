@@ -430,6 +430,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   // Workspace teammates (for the assignee dropdown) + a "my items" filter.
   const [teamMembers, setTeamMembers] = useState<string[]>([]);
   const [myItemsOnly, setMyItemsOnly] = useState(false);
+  // Pagination for large matrices (200+ requirement RFPs).
+  const COMPLIANCE_PAGE_SIZE = 50;
+  const [compliancePage, setCompliancePage] = useState(0);
   const [statusFilter, setStatusFilter] = useState<'all' | ComplianceStatus>('all');
   const [categoryFilter, setCategoryFilter] = useState<'all' | ComplianceCategory>('all');
   const [priorityFilter, setPriorityFilter] = useState<'all' | ReqPriority>('all');
@@ -679,6 +682,16 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       return sortKey(a.section).localeCompare(sortKey(b.section), undefined, { numeric: true });
     });
   }, [compliance, statusFilter, categoryFilter, priorityFilter, myItemsOnly, email]);
+
+  // Pagination: a 200-requirement RFP shouldn't render as one giant scroll.
+  const complianceTotalPages = Math.max(1, Math.ceil(filteredCompliance.length / COMPLIANCE_PAGE_SIZE));
+  const safePage = Math.min(compliancePage, complianceTotalPages - 1);
+  const pagedCompliance = useMemo(
+    () => filteredCompliance.slice(safePage * COMPLIANCE_PAGE_SIZE, safePage * COMPLIANCE_PAGE_SIZE + COMPLIANCE_PAGE_SIZE),
+    [filteredCompliance, safePage],
+  );
+  // Reset to page 0 whenever the filtered set changes (filter/regenerate).
+  useEffect(() => { setCompliancePage(0); }, [statusFilter, categoryFilter, priorityFilter, myItemsOnly, compliance.length]);
 
   // Team progress roll-up across the WHOLE matrix (not just the filtered view).
   const complianceProgress = useMemo(() => {
@@ -2456,12 +2469,12 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredCompliance.map((r, i) => {
+                    {pagedCompliance.map((r, i) => {
                       const cat = CATEGORY_LABELS[r.category] || CATEGORY_LABELS.other;
                       // Section group header when the top-level section changes.
                       const sectionGroup = (s?: string) => (s ? `Section ${(s.match(/^[A-Za-z]/)?.[0] || '?').toUpperCase()}` : 'Unsectioned');
                       const grp = sectionGroup(r.section);
-                      const showGroup = i === 0 || sectionGroup(filteredCompliance[i - 1].section) !== grp;
+                      const showGroup = i === 0 || sectionGroup(pagedCompliance[i - 1].section) !== grp;
                       return (
                         <Fragment key={r.id}>
                         {showGroup && (
@@ -2537,6 +2550,30 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                   </tbody>
                 </table>
               </div>
+
+              {/* Pager — only when the filtered matrix exceeds one page. */}
+              {complianceTotalPages > 1 && (
+                <div className="flex items-center justify-between gap-2 mt-3 text-xs">
+                  <span className="text-slate-500">
+                    Rows {safePage * COMPLIANCE_PAGE_SIZE + 1}–{Math.min((safePage + 1) * COMPLIANCE_PAGE_SIZE, filteredCompliance.length)} of {filteredCompliance.length}
+                  </span>
+                  <div className="flex items-center gap-1">
+                    <button
+                      type="button"
+                      onClick={() => setCompliancePage(p => Math.max(0, p - 1))}
+                      disabled={safePage === 0}
+                      className="rounded px-2 py-1 border border-slate-700 bg-slate-800 text-slate-300 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                    >← Prev</button>
+                    <span className="text-slate-400 px-2">Page {safePage + 1} of {complianceTotalPages}</span>
+                    <button
+                      type="button"
+                      onClick={() => setCompliancePage(p => Math.min(complianceTotalPages - 1, p + 1))}
+                      disabled={safePage >= complianceTotalPages - 1}
+                      className="rounded px-2 py-1 border border-slate-700 bg-slate-800 text-slate-300 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                    >Next →</button>
+                  </div>
+                </div>
+              )}
 
                   <p className="text-xs text-slate-500 mt-3">
                     {activePursuitId

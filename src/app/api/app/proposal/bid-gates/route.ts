@@ -145,3 +145,51 @@ export async function GET(request: NextRequest) {
 
   return NextResponse.json({ success: true, gates, pursuit: { title: pursuit?.title, set_aside: pursuit?.set_aside } });
 }
+
+// Persist the bid / no-bid decision on the pursuit so it survives + is
+// workspace-visible (the decision used to vanish — the gate just opened the next
+// step). A 'skip' also flips the pursuit to the no_bid stage.
+export async function POST(request: NextRequest) {
+  const email = request.nextUrl.searchParams.get('email');
+  const auth = requireMIAuthSession(request, email);
+  if (!auth.ok) return auth.response;
+
+  let body: { pipeline_id?: string; decision?: string; score?: number };
+  try { body = await request.json(); } catch { return NextResponse.json({ success: false, error: 'Invalid JSON' }, { status: 400 }); }
+  const pipelineId = body.pipeline_id;
+  const decision = body.decision;
+  if (!pipelineId) return NextResponse.json({ success: false, error: 'pipeline_id required' }, { status: 400 });
+  if (!decision || !['pursue', 'watch', 'skip'].includes(decision)) {
+    return NextResponse.json({ success: false, error: "decision must be pursue | watch | skip" }, { status: 400 });
+  }
+
+  const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  // Authorize: the pursuit must belong to the caller or their workspace.
+  const { data: pursuit } = await sb.from('user_pipeline').select('id, user_email, workspace_id').eq('id', pipelineId).maybeSingle();
+  if (!pursuit) return NextResponse.json({ success: false, error: 'Pursuit not found' }, { status: 404 });
+  const owns = pursuit.user_email?.toLowerCase() === email!.toLowerCase();
+  if (!owns) {
+    // workspace fallback
+    try {
+      const { resolveActiveWorkspace } = await import('@/lib/app/workspace');
+      const { workspaceId } = await resolveActiveWorkspace(email!.toLowerCase(), request);
+      if (!workspaceId || pursuit.workspace_id !== workspaceId) return NextResponse.json({ success: false, error: 'Not your pursuit' }, { status: 403 });
+    } catch {
+      return NextResponse.json({ success: false, error: 'Not your pursuit' }, { status: 403 });
+    }
+  }
+
+  const update: Record<string, unknown> = {
+    bid_decision: decision,
+    bid_score: typeof body.score === 'number' ? Math.round(body.score) : null,
+    bid_decided_at: new Date().toISOString(),
+    bid_decided_by: email,
+    updated_at: new Date().toISOString(),
+  };
+  // A 'skip' = no-bid → reflect it in the pipeline stage too.
+  if (decision === 'skip') update.stage = 'no_bid';
+
+  const { error } = await sb.from('user_pipeline').update(update).eq('id', pipelineId);
+  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  return NextResponse.json({ success: true });
+}

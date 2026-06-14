@@ -1631,3 +1631,32 @@ requirement, pursuit-scoped, workspace-shared) + `/api/app/proposal/compliance-s
 end-to-end: a check-off (owner + status) persists across reload and survives a
 re-extraction of the matrix. First of the proposal-UX fixes mapped in
 docs/PROPOSAL-UX-MAP.md.
+
+---
+
+## Proposal Assist: Recorded Bid/No-Bid Decision + Matrix Pagination (June 14, 2026)
+
+**What (bid decision):** The bid/no-bid call now sticks. After the fit scorecard you
+can "Record No-Bid" or proceed to build the matrix — either way the decision (pursue /
+watch / skip + the fit score, who, when) is saved to the pursuit and visible to your
+workspace. A No-Bid also moves the pursuit to the No-Bid stage so it stops cluttering
+the active pipeline. Previously the decision evaporated the moment you clicked
+through.
+
+**What (pagination):** The compliance matrix now paginates (50 per page) so a big
+200+ requirement RFP is fast and scannable instead of one endless scroll, with a
+clean prev/next pager and row range. Filters and "My items" reset to page one.
+
+**Why:** Two finishing touches on the proposal workflow — a recorded decision gives
+the team a trail of what was chosen and why (and keeps the pipeline clean), and
+pagination makes large solicitations usable.
+
+**SEO:** bid no-bid decision tracking, government proposal go/no-go, RFP pipeline
+stage, large compliance matrix, proposal requirements pagination.
+
+**Proof:** `supabase/migrations/20260614_bid_decision.sql` (bid_decision / bid_score
+/ bid_decided_at/by on user_pipeline) + `POST /api/app/proposal/bid-gates` (saves the
+decision, skip → stage=no_bid, workspace-authorized) + `BidDecisionGate` records on
+proceed/No-Bid. Pagination in `ProposalsPanel` (50/page, pager, page-reset on filter).
+Verified: decision persists + No-Bid sets the stage; build clean. Closes the last two
+gaps in docs/PROPOSAL-UX-MAP.md.

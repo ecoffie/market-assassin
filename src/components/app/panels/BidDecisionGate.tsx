@@ -23,6 +23,19 @@ export default function BidDecisionGate({ onProceed, email, pipelineId }: { onPr
   // generic eliminators if we can't derive any.
   const [derivedGates, setDerivedGates] = useState<DerivedGate[] | null>(null);
   const [loadingGates, setLoadingGates] = useState(false);
+  const [savedDecision, setSavedDecision] = useState<string | null>(null);
+
+  // Persist the bid/no-bid decision on the pursuit (best-effort — doesn't block
+  // the flow). The decision used to vanish; now it's recorded + workspace-visible.
+  const saveDecision = (decision: 'pursue' | 'watch' | 'skip', score?: number) => {
+    setSavedDecision(decision);
+    if (!email || !pipelineId) return;
+    fetch(`/api/app/proposal/bid-gates?email=${encodeURIComponent(email)}`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
+      body: JSON.stringify({ pipeline_id: pipelineId, decision, score }),
+    }).catch(() => {});
+  };
 
   useEffect(() => {
     if (!email || !pipelineId) return;
@@ -125,10 +138,25 @@ export default function BidDecisionGate({ onProceed, email, pipelineId }: { onPr
                     </div>
                     <div className="text-xs text-slate-400 mt-0.5">{result.rated} of {BID_FACTORS.length} factors rated</div>
                   </div>
-                  <button onClick={onProceed} className="rounded-lg bg-purple-600 hover:bg-purple-500 px-4 py-2 text-sm font-semibold text-white shrink-0">
-                    Build the matrix →
-                  </button>
+                  <div className="flex items-center gap-2 shrink-0">
+                    <button
+                      onClick={() => saveDecision('skip', result.score)}
+                      className={`rounded-lg px-3 py-2 text-sm font-medium ${savedDecision === 'skip' ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                      title="Record a No-Bid on this pursuit"
+                    >
+                      {savedDecision === 'skip' ? '✓ No-Bid recorded' : 'Record No-Bid'}
+                    </button>
+                    <button
+                      onClick={() => { saveDecision(result.recommendation === 'no-bid' ? 'watch' : result.recommendation, result.score); onProceed(); }}
+                      className="rounded-lg bg-purple-600 hover:bg-purple-500 px-4 py-2 text-sm font-semibold text-white"
+                    >
+                      Build the matrix →
+                    </button>
+                  </div>
                 </div>
+                {savedDecision && savedDecision !== 'skip' && (
+                  <p className="text-[11px] text-slate-400 mt-2">Decision recorded on this pursuit ({savedDecision}, {result.score}% fit).</p>
+                )}
               </div>
             </div>
           )}
