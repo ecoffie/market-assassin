@@ -71,13 +71,13 @@ Status legend: **TERMINATED** (documented) · **UNVERIFIED** (no live federal co
 | SF Bay Area MBDA (ASIAN, Inc.) ⚠️ | CA | UNVERIFIED → likely terminated (pages 404) | WRMSDC; CalOSBA | — | [asianinc.org](https://www.asianinc.org/) |
 | Baltimore MBDA (L.S. Caldwell & Assoc.) ⚠️ | MD | UNVERIFIED (host site live, 2025–26) | L.S. Caldwell under own name; MD GOSBA | Dir. Gary Moore, via site | [marylandmbdacenter.com](https://marylandmbdacenter.com/about/) |
 | Baltimore MBDA AMC (Baltimore City SMBA&D) ⚠️ | MD | UNVERIFIED (city office active) | Baltimore City SMBA&D | N. Scott Phillips, 443-401-0242 | [baltimorembda.com](https://baltimorembda.com/page/about-us) |
-| MBDA Federal Procurement Center (CRMSDC) ⚠️ | MD/DC | **TERMINATED — ceased Jun 2025** | CRMSDC under own name | site down | [Kolumn, Nov 2025](https://www.kolumnmagazine.com/2025/11/19/inside-the-quiet-dismantling-of-americas-only-minority-business-agency-and-the-entrepreneurs-left-stranded/) |
+| MBDA Federal Procurement Center (was CRMSDC) ⚠️ | MD/DC | **TRANSITIONED ~May 1, 2025 to KDM & Associates** (NOT ceased — corrected Jun 14; the "ceased Jun 2025" in Kolumn = a *Utah* center). Still operating under KDM. | **KDM & Associates** (Keith Moore) — now its own asset; CRMSDC runs the 12-wk GovCon Incubator separately (see §3) | mbdafpcenter.com → kdm-assoc.com | [FPC→KDM transition](https://www.linkedin.com/pulse/mbda-federal-procurement-centers-transition-kdm-associates-wehqc) |
 
 *~16 of 39 centers accounted for (priority states + GA/NC). Full national roster sits behind the 403-blocked mbda.gov locator + GAO PDF — not pulled.*
 
 **The one qualifying question** (settles any center by phone): *"Is your MBDA cooperative agreement currently funded, and is it being renewed past Aug 31, 2026?"* If no → pitch the operator under its own name, not as an MBDA center.
 
-**Best surviving-operator leads from this matrix:** Orlando (3D Strategic — most alive), USC LA center (plaintiff state + live directory), FSMSDC & DFW MSDC & CRMSDC (already NMSDC councils → fold into §3), Baltimore AMC (city office, stable funding). **Avoid:** anything confirmed terminated (San Antonio, El Paso, Sacramento, CRMSDC Fed Procurement, NC).
+**Best surviving-operator leads from this matrix:** Orlando (3D Strategic — most alive), USC LA center (plaintiff state + live directory), FSMSDC & DFW MSDC & CRMSDC (already NMSDC councils → see §3), Baltimore AMC (city office, stable funding), KDM & Associates (took over the Federal Procurement Center). **Avoid (confirmed terminated):** San Antonio, El Paso, Sacramento, NC.
 
 **Rule:** Do not pitch multi-year licenses to centers that posted termination notices or can't confirm funding past Aug 31, 2026. Plaintiff-state centers (CA/MD/VA ⚠️) have stronger near-term funding protection than GA/TX/FL.
 
@@ -98,9 +98,26 @@ Certify **17,000+ MBEs**; connect to **1,700+ corporate buyers** (nmsdc.org, 202
 
 **Full affiliate list:** [nmsdc.org/about/regional-affiliates](https://nmsdc.org/about/regional-affiliates/)
 
-**Open research:**
-- [ ] Identify which councils already offer GovCon workshops or member alert partners
-- [ ] Pull president/CEO contact for Carolinas-Virginia MSDC and Georgia MSDC
+### Priority-state council leadership (verified Jun 14, 2026)
+
+Several of these are the **surviving operators** of now-dead MBDA centers (§2) — their MBEs just *lost* a federal-contracting support pipeline, which is the clean opening for a Mindy partnership.
+
+| Council | States | President/CEO | Contact (verify before use) | GovCon programming | MBDA-center tie | Priority |
+|---|---|---|---|---|---|---|
+| **CRMSDC** (Capital Region) | DC, MD, N.VA | **Sharon R. Pinder**, Pres & CEO | 301-593-5860 · crmsdc@crmsdc.org | **★ Strongest: 12-week Government Contracting Incubator (cohort) + Capital Readiness Program** (NMSDC + KDM) | Ran the VA MBDA center; the Federal Procurement Center transitioned to KDM (§2) | **P1 — cohort fit, MD/VA core** |
+| **GMSDC** → rebranding "Georgia Business Council" | GA | **Stacey J. Key**, Pres & CEO | 404-589-4929 · info@georgiacouncil.org | Gov+corporate **matchmaking events** (Business Opportunity Exchange; DOE OSDBU-attended expo) — not a GovCon cohort | — | **P1 — GA advisor lane** |
+| **FSMSDC** | FL | **IN TRANSITION** (Louissaint out Dec 12 2025; successor unconfirmed — *verify by phone*) | via fsmsdc.org/contact-us · old line (305) 762-6151 (stale) | Ran the **Miami MBDA Center** (procurement readiness — bid/proposal prep, award-history research) now defunct | **Ran Miami MBDA Center** (§2) | **P2 — strong fit, wait for new CEO** |
+| **DFW MSDC** | N. Texas | **Margo J. Posey**, Pres & CEO (since 1992) | 214-630-0747 · andrew@dfwmsdc.com | Ran the **Dallas MBDA Center** ($1.8B awards over grant); HUB advocacy, ACCESS expo | **Ran Dallas MBDA Center** (§2) | **P2 — TX advisor lane** |
+| **HMSDC** (Houston) | TX Gulf Coast | **Ingrid M. Robinson**, Pres & CEO | 713-271-7805 · info@hmsdc.org | MBE cert + corporate matchmaking + "MBE Pathway to Success" — **no federal cohort found** | None found | P3 — weaker GovCon fit |
+| **CVMSDC** (Carolinas-Virginia) | NC, SC, VA | **Dominique Milton**, Pres & Chief Engagement Officer | 704-549-1000 · info@cvmsdc.org | ProForum (corporate procurement) — **no GovCon cohort found** | **None** (corrects earlier mix-up — VA MBDA center was CRMSDC, not CVMSDC) | P3 — VA overlap w/ CRMSDC |
+| **SCMSDC** (S. California) | SoCal | Virginia Gomez, Pres & CEO | 213-689-6965 · programs: Jade Cebedo jcebedo@scmsdc.org | RISE cohort + Prime-Ready Playbook (see §1 row 8) | — | P2 — already a §1 lead |
+
+**Angle for ex-MBDA-center councils (CRMSDC, FSMSDC, DFW):** *"Your MBEs lost their MBDA federal-contracting support in 2025. Mindy gives the council a coach dashboard to keep delivering opportunity intel + teaming search to those members — at a fraction of a center's cost."*
+
+**Open research (remaining):**
+- [ ] Confirm FSMSDC's current CEO by phone before any outreach (transition unresolved)
+- [ ] Confirm CRMSDC 12-wk Incubator's current run status (was MBDA-CRP-funded — verify it survived 2025)
+- [ ] Pull president/CEO + GovCon programming for remaining Region 2/3/4 councils when expanding beyond priority states
 
 ---
 
@@ -153,4 +170,4 @@ Target: **3 discovery calls at $50K EDC price point** before standardizing.
 
 ---
 
-*Last updated: June 14, 2026 — §1 EDC top-10 COMPLETE (10 verified rows, all priority states) + §2 MBDA matrix COMPLETE (~16 centers, national status, litigation timeline, surviving-operator routing). ⛔ Strategic call: MBDA centers are NOT a viable buyer channel (legal limbo, agreements expire Aug 31 2026, no funding confirmable) → pitch surviving operators under own names + state divisions (§4) + NMSDC (§3). Open research now: §3 NMSDC council contacts (Carolinas-Virginia + Georgia presidents), §4 state minority-business divisions, §6 EDA/state RFP calendar.*
+*Last updated: June 14, 2026 — §1 EDC top-10 + §2 MBDA matrix + §3 NMSDC priority-council leadership all COMPLETE (verified CEOs/contacts for CRMSDC, GMSDC, FSMSDC, DFW, HMSDC, CVMSDC, SCMSDC). Corrected 2 §2 facts via §3 research: (a) VA MBDA center was CRMSDC not CVMSDC; (b) Federal Procurement Center TRANSITIONED to KDM & Associates ~May 2025, did not cease. Best NMSDC lead = CRMSDC (Sharon Pinder) — runs a 12-wk GovCon Incubator. Angle for ex-MBDA councils (CRMSDC/FSMSDC/DFW): their MBEs lost federal-contracting support → Mindy coach dashboard fills it. Open research now: §4 state minority-business divisions, §6 EDA/state RFP calendar.*

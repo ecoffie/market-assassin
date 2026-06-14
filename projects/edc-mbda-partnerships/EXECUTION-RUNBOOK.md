@@ -29,7 +29,7 @@
 | **Outreach** | PGC EDC (MD) | Kimberlee Andrews — kbandrews@co.pg.md.us, 301-583-4609 | Send email (`outreach-templates.md` §1) | Eval by Jul 15 |
 | **Research** | GA MBDA center (closed) → **GA Dept of Economic Development** | TBD — Phase 2 research | State operator path | Q3 |
 | **Research** | NC HUB Office (MBDA coop terminated; HUB open) | ncmbda@doa.nc.gov | State minority division pitch | Q3 |
-| **Research** | NMSDC Georgia MSDC | TBD — recruit minority-business advisor | Enterprise + member alerts | Post-NAPEX |
+| **Research** | NMSDC — **CRMSDC** (Sharon Pinder, 301-593-5860) runs a 12-wk GovCon Incubator; **GMSDC** (Stacey Key, 404-589-4929) | Minority-business advisor warm intro | Enterprise + member alerts; ex-MBDA councils (CRMSDC/FSMSDC/DFW) = MBEs lost fed support | Post-NAPEX |
 | **Parallel** | APEX Illinois | See `projects/apex-sbdc-funding-strategy/` | CTA demo + re-warm | Pre-NAPEX |
 | **Parallel** | USHCC Atlanta | See `tasks/USHCC-Atlanta-pilot-runbook.md` | Close chamber pilot | Jul |
 
@@ -119,7 +119,7 @@ Walk this order — 15 minutes max:
 - [ ] PGC EDC eval call booked
 - [ ] FT hire JD posted + 5+ applicants
 - [ ] 1 advisor role filled or strong pipeline
-- [x] Phase 2 research doc: **10 EDCs + MBDA matrix done** (~16 centers, status + sources). ⛔ MBDA centers = not a viable channel (legal limbo, agreements end Aug 31 2026) → route to surviving operators + state divisions + NMSDC
+- [x] Phase 2 research doc: **§1 EDCs + §2 MBDA matrix + §3 NMSDC councils done** (verified CEOs/contacts). ⛔ MBDA centers = not a viable channel (legal limbo, agreements end Aug 31 2026) → route to surviving operators + state divisions + NMSDC. Best NMSDC lead: CRMSDC (Sharon Pinder, 12-wk GovCon Incubator)
 - [ ] Grant tracker: 5 NOFOs with deadlines logged
 
 ---
