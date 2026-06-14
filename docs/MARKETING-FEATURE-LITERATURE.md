@@ -1536,3 +1536,22 @@ and the LOI reference block for past performance). Wired into `/api/app/proposal
 export` as packageType `rfp_response`. Grounded in `docs/RFP-FORMAT-ANALYSIS.md`.
 Verified: a commercial buy renders the light 4-section response with real past
 performance; an L/M RFP escalates to the volume structure.
+
+---
+
+## Content Reaper: KV Login Profile Restore (June 13, 2026)
+
+**What:** Content Reaper (LinkedIn post generator) now restores your saved company
+profile, NAICS, and content library after KV email login — even without a Supabase
+browser session (the fix that stopped the auth redirect loop).
+
+**Why:** The flash-loop fix switched to KV-only auth (`gcg_access_email`), which
+cleared Supabase sessions. Profile load still read `SupabaseAuth.profile` from a
+session token that no longer exists — so returning users saw an empty form.
+
+**SEO:** Content Reaper login, GovCon LinkedIn content generator, restore saved profile.
+
+**Proof:** `GET/POST /api/content-generator/profile?email=` loads and saves
+`user_profiles` by email after KV access check. `loadCompanyProfile()` calls
+`loadUserProfile()` on boot. Library saves use `POST /api/content-generator/library`
+when no session. Verified against `user_profiles` rows keyed by purchaser email.

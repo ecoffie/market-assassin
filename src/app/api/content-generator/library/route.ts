@@ -5,6 +5,10 @@
  *   Returns saved posts for a user (most recent first)
  *   Optional: &limit=50&offset=0&agency=X&template=Y
  *
+ * POST /api/content-generator/library
+ *   Body: { email, title, content, ... }
+ *   Saves a post (KV-only users without Supabase session)
+ *
  * DELETE /api/content-generator/library
  *   Body: { email, postId }
  *   Deletes a specific post from the library
@@ -12,10 +16,11 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { hasContentGeneratorAccess } from '@/lib/access-codes';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Methods': 'GET, DELETE, OPTIONS',
+  'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
@@ -97,6 +102,66 @@ export async function GET(request: NextRequest) {
     limit,
     offset,
   }, { headers: corsHeaders });
+}
+
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const email = (body.email as string | undefined)?.trim().toLowerCase();
+    if (!email) {
+      return NextResponse.json({ error: 'Email required' }, { status: 400, headers: corsHeaders });
+    }
+
+    if (!(await hasContentGeneratorAccess(email))) {
+      return NextResponse.json({ error: 'No access' }, { status: 403, headers: corsHeaders });
+    }
+
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
+    const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+    if (!supabaseUrl || !supabaseKey) {
+      return NextResponse.json({ error: 'Server config error' }, { status: 500, headers: corsHeaders });
+    }
+
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    let userId: string | null = null;
+    const { data: profileRow } = await supabase
+      .from('user_profiles')
+      .select('user_id')
+      .eq('email', email)
+      .maybeSingle();
+    userId = profileRow?.user_id || null;
+
+    const insertRow: Record<string, unknown> = {
+      user_email: email,
+      title: body.title || 'Untitled',
+      content: body.content || '',
+      tags: body.tags || [],
+      post_type: body.post_type || 'linkedin',
+      goal: body.goal || null,
+      template_key: body.template_key || null,
+      angle: body.angle || null,
+      pain_point: body.pain_point || null,
+      target_agencies: body.target_agencies || null,
+      created_at: new Date().toISOString(),
+    };
+    if (userId) insertRow.user_id = userId;
+
+    const { data, error } = await supabase
+      .from('content_library')
+      .insert(insertRow)
+      .select('id')
+      .single();
+
+    if (error) {
+      console.error('[Library] Insert error:', error.message);
+      return NextResponse.json({ error: 'Failed to save post' }, { status: 500, headers: corsHeaders });
+    }
+
+    return NextResponse.json({ success: true, id: data?.id }, { headers: corsHeaders });
+  } catch {
+    return NextResponse.json({ error: 'Invalid request' }, { status: 400, headers: corsHeaders });
+  }
 }
 
 export async function DELETE(request: NextRequest) {
