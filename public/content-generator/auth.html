@@ -83,8 +83,8 @@
             window.location.href = getBasePath() + '/';
         }
 
-        // API base for auth endpoint
-        const API_BASE = 'https://tools.govcongiants.org';
+        // Same-origin API (getmindy.ai or tools.govcongiants.org)
+        const API_BASE = '';
 
         // Show message
         function showMessage(text, isError = false) {
@@ -98,7 +98,16 @@
             document.getElementById('message').classList.add('hidden');
         }
 
-        // Sign In - Verifies access and creates Supabase session
+        function kvFallbackLogin(email, tier, customerName) {
+            localStorage.setItem('gcg_access_email', email);
+            localStorage.setItem('gcg_tier', tier || 'content-engine');
+            if (customerName) localStorage.setItem('gcg_customer_name', customerName);
+            sessionStorage.setItem('gcg_just_signed_in', '1');
+            showMessage('Access verified — opening Content Reaper...');
+            window.location.href = getBasePath() + '/?auth=success';
+        }
+
+        // Sign In - Verifies KV access, then Supabase magic link (with KV fallback)
         async function handleSignIn(e) {
             e.preventDefault();
             const btn = document.getElementById('signin-btn');
@@ -124,9 +133,26 @@
                     body: JSON.stringify({ email })
                 });
 
-                const data = await response.json();
+                let data;
+                try {
+                    data = await response.json();
+                } catch {
+                    showMessage('Unexpected server response. Please try again.', true);
+                    return;
+                }
 
-                if (!data.success) {
+                if (!response.ok || !data.success) {
+                    // Supabase magic link failed — fall back to KV-verified session
+                    const verifyResp = await fetch(`${API_BASE}/api/verify-content-generator`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email }),
+                    });
+                    const verifyData = await verifyResp.json().catch(() => ({}));
+                    if (verifyResp.ok && verifyData.hasAccess) {
+                        kvFallbackLogin(email, verifyData.tier, verifyData.customerName);
+                        return;
+                    }
                     showMessage(data.error || 'No access found for this email.', true);
                     return;
                 }
@@ -147,6 +173,22 @@
 
             } catch (error) {
                 console.error('Sign in error:', error);
+                try {
+                    const verifyResp = await fetch(`${API_BASE}/api/verify-content-generator`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ email: document.getElementById('signin-email').value.trim().toLowerCase() }),
+                    });
+                    const verifyData = await verifyResp.json();
+                    if (verifyResp.ok && verifyData.hasAccess) {
+                        kvFallbackLogin(
+                            document.getElementById('signin-email').value.trim().toLowerCase(),
+                            verifyData.tier,
+                            verifyData.customerName,
+                        );
+                        return;
+                    }
+                } catch { /* ignore */ }
                 showMessage('Error signing in. Please try again.', true);
             } finally {
                 spinner.classList.add('hidden');

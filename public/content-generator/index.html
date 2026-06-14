@@ -1636,10 +1636,21 @@
                 }
             }
 
-            // All users now authenticate via Supabase magic links
-            // No more localStorage workarounds needed
+            // Supabase session OR KV-verified purchase email (legacy tool buyers)
             if (!session) {
-                // Not logged in - show paywall first (don't redirect to auth)
+                const savedEmail = localStorage.getItem('gcg_access_email');
+                if (savedEmail) {
+                    const tier = await verifyContentGeneratorAccess(savedEmail);
+                    if (tier) {
+                        console.log('[App] KV-verified access for', savedEmail);
+                        updateEmailBasedUI(savedEmail);
+                        initializeUsageTracking();
+                        await loadCompanyProfile();
+                        await loadTemplates();
+                        backfillHistoryFromLibrary();
+                        return;
+                    }
+                }
                 console.log('[App] No session - showing paywall for new visitors');
                 showPaywall();
                 return;
@@ -1669,20 +1680,20 @@
         let hasContentGeneratorAccess = false;
 
         // Verify access via market-assassin API
-        async function verifyContentGeneratorAccess() {
-            const user = SupabaseAuth.user;
-            if (!user?.email) {
+        async function verifyContentGeneratorAccess(explicitEmail) {
+            const email = (explicitEmail || SupabaseAuth.user?.email || '').trim().toLowerCase();
+            if (!email) {
                 console.log('[Access] No user email, showing paywall');
                 showPaywall();
                 return false;
             }
 
             try {
-                console.log('[Access] Checking access for:', user.email);
-                const response = await fetch('https://tools.govcongiants.org/api/verify-content-generator', {
+                console.log('[Access] Checking access for:', email);
+                const response = await fetch('/api/verify-content-generator', {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ email: user.email })
+                    body: JSON.stringify({ email })
                 });
 
                 const result = await response.json();
@@ -1690,10 +1701,10 @@
 
                 if (result.hasAccess) {
                     hasContentGeneratorAccess = true;
-                    // Store the tier from the access check
                     if (result.tier) {
                         localStorage.setItem('gcg_tier', result.tier);
                     }
+                    localStorage.setItem('gcg_access_email', email);
                     hidePaywall();
                     return result.tier || 'content-engine';
                 } else {
@@ -2068,6 +2079,7 @@
             // Clear any legacy localStorage (can be removed later)
             localStorage.removeItem('gcg_access');
             localStorage.removeItem('gcg_email');
+            localStorage.removeItem('gcg_access_email');
             localStorage.removeItem('gcg_tier');
             localStorage.removeItem('gcg_tier_name');
             // Sign out of Supabase
@@ -2877,7 +2889,7 @@
                         contentStyle: contentStyle,
                         geoBoost: geoBoost,
                         useFineTuned: fineTuned,
-                        userEmail: SupabaseAuth.user?.email || '',
+                        userEmail: SupabaseAuth.user?.email || localStorage.getItem('gcg_access_email') || '',
                         previousAngles: previousAngles
                     })
                 });
