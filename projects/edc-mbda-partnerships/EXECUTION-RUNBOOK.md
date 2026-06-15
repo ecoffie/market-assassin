@@ -123,6 +123,7 @@ Walk this order — 15 minutes max:
 | `GOVT-GTM-STRATEGY.md` | **★ The govt go-to-market thesis** — SELL DIRECT to the 3 warm end-users (commercial-item pilots = revenue now) + ONE AFWERX SBIR for the Phase III key (the Anduril playbook). Read this for the SBIR-vs-direct-buy decision. |
 | `DISA-VEHICLE-WATCH-SPEC.md` | **DISA prototype build spec** — automate expiry-watch + incumbent notification (replaces their manual IDIQ/IDV spreadsheet tracking). BUILT + DEPLOYED. |
 | `DISA-DEMO-PITCH-RUNBOOK.md` | **★ Step-by-step demo script** for the DISA KO pitch — pre-flight, click-by-click, what to say, Q&A, the close. Read before the meeting. |
+| (built) Navy OSBP prototype | **SMB Market Research** panel — find certified small biz (8a/HUBZone hard-filter; SDVOSB/WOSB self-cert post-filter) by NAICS+state, CSV export. Live at /app → "SMB Market Research". Same demo account. |
 | `../../scripts/provision-edc-pilot-org.sql` | Supabase org setup for EDC eval |
 
 ---
