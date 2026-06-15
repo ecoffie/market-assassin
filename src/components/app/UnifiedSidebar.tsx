@@ -30,6 +30,7 @@ import {
   CircleUser,
   ChevronUp,
   RefreshCw,
+  Search,
 } from 'lucide-react';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import WorkspaceSwitcher from './WorkspaceSwitcher';
@@ -59,7 +60,8 @@ export type AppPanel =
   | 'proposals'      // AI Proposal Assist (Estimating section)
   | 'target-list'    // My Target List — saved BD targets (Pipeline section, Slice 3 of TMR roadmap)
   | 'grants'         // Federal grants
-  | 'disa-watch';    // Vehicle Expiry Watch — DISA prototype (IDIQ/IDV expiry auto-notify)
+  | 'disa-watch'     // Vehicle Expiry Watch — DISA prototype (IDIQ/IDV expiry auto-notify)
+  | 'osbp-smb';      // SMB Market Research — Navy OSBP prototype (certified small-biz sourcing)
 
 // Tier definitions
 export type AppTier = 'free' | 'pro' | 'team' | 'enterprise';
@@ -229,6 +231,15 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'Vehicle Expiry Watch',
         icon: Bell,
         description: 'Auto-notify on expiry',
+        tier: ['pro', 'team', 'enterprise'],
+      },
+      {
+        // Navy OSBP prototype (Jun 2026): find certified small/minority
+        // businesses by NAICS + cert + state from SAM, exportable. Demo surface.
+        id: 'osbp-smb',
+        label: 'SMB Market Research',
+        icon: Search,
+        description: 'Certified small-biz sourcing',
         tier: ['pro', 'team', 'enterprise'],
       },
       {

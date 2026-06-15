@@ -298,7 +298,10 @@ export async function searchEntities(
   }
 
   if (params.stateCode) {
-    queryParams.stateCode = params.stateCode;
+    // SAM v3 rejects `stateCode` (HTTP 400 "do not exist"). The real param is
+    // physicalAddressProvinceOrStateCode (verified vs. the SAM Functional Data
+    // Dictionary 2026-06-14).
+    queryParams.physicalAddressProvinceOrStateCode = params.stateCode;
   }
 
   if (params.registrationStatus) {
@@ -314,7 +317,9 @@ export async function searchEntities(
   }
 
   if (params.sbaBusinessTypes) {
-    queryParams.sbaBusinessTypes = params.sbaBusinessTypes;
+    // SAM v3 rejects `sbaBusinessTypes` (HTTP 400). Correct param is the
+    // SINGULAR `sbaBusinessTypeCode` (SAM Functional Data Dictionary 2026-06-14).
+    queryParams.sbaBusinessTypeCode = params.sbaBusinessTypes;
   }
 
   const result = await makeSAMRequest<{
@@ -437,9 +442,9 @@ export async function searchByCertification(
   options: { naicsCode?: string; stateCode?: string; limit?: number } = {}
 ): Promise<SAMEntity[]> {
   const certMap: Record<string, string> = {
-    '8a': '2X',
-    'SDVOSB': 'XY',
-    'WOSB': '23',
+    '8a': 'A6',
+    'SDVOSB': 'QF',
+    'WOSB': '8W',
     'HUBZone': 'XX'
   };
 
@@ -448,7 +453,7 @@ export async function searchByCertification(
     naicsCode: options.naicsCode,
     stateCode: options.stateCode,
     registrationStatus: 'Active',
-    size: options.limit || 50
+    size: Math.min(options.limit || 10, 10)
   });
 
   return result.entities;
@@ -482,20 +487,20 @@ export async function findTeamingPartners(
   naicsCode: string,
   certType?: '8a' | 'SDVOSB' | 'WOSB' | 'HUBZone',
   stateCode?: string,
-  limit: number = 20
+  limit: number = 10
 ): Promise<SAMEntity[]> {
   const params: EntitySearchParams = {
     naicsCode,
     stateCode,
     registrationStatus: 'Active',
-    size: limit
+    size: Math.min(limit, 10)
   };
 
   if (certType) {
     const certMap: Record<string, string> = {
-      '8a': '2X',
-      'SDVOSB': 'XY',
-      'WOSB': '23',
+      '8a': 'A6',
+      'SDVOSB': 'QF',
+      'WOSB': '8W',
       'HUBZone': 'XX'
     };
     params.sbaBusinessTypes = certMap[certType];

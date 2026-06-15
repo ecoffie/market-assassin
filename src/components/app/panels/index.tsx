@@ -25,6 +25,7 @@ const KnowledgeBasePanel = lazy(() => import('./KnowledgeBasePanel'));
 const CoachPanel = lazy(() => import('./CoachPanel'));
 const LibraryPanel = lazy(() => import('./LibraryPanel'));
 const DisaVehicleWatchPanel = lazy(() => import('./DisaVehicleWatchPanel'));
+const OsbpSmbResearchPanel = lazy(() => import('./OsbpSmbResearchPanel'));
 
 interface PanelContainerProps {
   activePanel: AppPanel;
@@ -90,6 +91,8 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
         return <GrantsPanel email={email} tier={tier} />;
       case 'disa-watch':
         return <DisaVehicleWatchPanel email={email || ''} />;
+      case 'osbp-smb':
+        return <OsbpSmbResearchPanel email={email || ''} />;
       case 'vault':
         return <VaultPanel email={email} tier={tier} />;
       case 'library':
