@@ -659,8 +659,8 @@ function generateDailyEmailHtmlFromSam(briefing: SamDailyBriefing, userEmail?: s
 
   const renderMetaRow = (label: string, value: string): string => `
     <tr>
-      <td style="width:120px;padding:4px 10px 4px 0;color:#6b7280;font-size:12px;line-height:18px;text-transform:uppercase;vertical-align:top;">${label}</td>
-      <td style="padding:4px 0;color:#111827;font-size:14px;line-height:20px;font-weight:700;vertical-align:top;">${escapeHtml(value)}</td>
+      <td class="meta-cell-label" style="width:120px;padding:4px 10px 4px 0;color:#6b7280;font-size:12px;line-height:18px;text-transform:uppercase;vertical-align:top;">${label}</td>
+      <td class="meta-cell-value" style="padding:4px 0;color:#111827;font-size:14px;line-height:20px;font-weight:700;vertical-align:top;">${escapeHtml(value)}</td>
     </tr>
   `;
 
@@ -762,8 +762,21 @@ function generateDailyEmailHtmlFromSam(briefing: SamDailyBriefing, userEmail?: s
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Light-only: stop mobile clients auto-inverting (which buried BUYER/POSTED
+       labels + values on dark backgrounds). Mirrors the sam-green template fix. -->
+  <meta name="color-scheme" content="light only">
+  <meta name="supported-color-schemes" content="light only">
   <title>Daily Brief - Active Solicitations</title>
   <style>
+    :root { color-scheme: light only; supported-color-schemes: light only; }
+    @media (prefers-color-scheme: dark) {
+      .container { background: #ffffff !important; }
+      .meta-cell-label { color: #6b7280 !important; }
+      .meta-cell-value { color: #111827 !important; }
+      .opp-title, .opp-meta-value { color: #111827 !important; }
+    }
+    [data-ogsc] .meta-cell-value, [data-ogsb] .meta-cell-value { color: #111827 !important; }
+    [data-ogsc] .meta-cell-label, [data-ogsb] .meta-cell-label { color: #6b7280 !important; }
     body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f3f4f6; }
     .container { max-width: 680px; margin: 0 auto; background: #ffffff; }
     .header { background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: white; padding: 32px 24px; text-align: center; }
