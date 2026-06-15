@@ -250,11 +250,18 @@ export function expandNAICSCode(code: string, expandFullCodes = true): string[] 
 /**
  * Expand multiple NAICS codes/prefixes
  */
-export function expandNAICSCodes(codes: string[]): string[] {
+// expandFullCodes=false keeps a fully-specified 6-digit code EXACTLY (no blow-out
+// to its whole 3-digit family) while still expanding short prefixes ("238" → the
+// family). The keyword-first model derives a precise ~6-code coverage SET that
+// covers ~90% of the market; expanding each of those to its family (562910 → all
+// 562x, 238910 → all 238x) re-buries the user under 70+ codes they never saw and
+// pollutes alert matching (Eric QC: demolition saved 74 codes, 68 unseen). Callers
+// that persist a derived/coverage set should pass false.
+export function expandNAICSCodes(codes: string[], expandFullCodes = true): string[] {
   const expanded = new Set<string>();
 
   for (const code of codes) {
-    const expansions = expandNAICSCode(code);
+    const expansions = expandNAICSCode(code, expandFullCodes);
     for (const exp of expansions) {
       expanded.add(exp);
     }

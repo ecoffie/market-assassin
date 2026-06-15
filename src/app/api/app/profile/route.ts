@@ -54,7 +54,11 @@ export async function POST(request: NextRequest) {
     const rawNaicsCodes = Array.isArray(naicsCodes)
       ? naicsCodes.map(code => String(code).trim()).filter(Boolean)
       : [];
-    const expandedNaicsCodes = rawNaicsCodes.length > 0 ? expandNAICSCodes(rawNaicsCodes) : [];
+    // expandFullCodes=false: persist precise 6-digit codes EXACTLY (the keyword-
+    // first coverage set the onboarding banner showed — e.g. demolition's 6 codes),
+    // never blown out to whole families (562910 → all 562x). Short prefixes a user
+    // types ("238") still expand. Keyword search does the broadening now, not NAICS.
+    const expandedNaicsCodes = rawNaicsCodes.length > 0 ? expandNAICSCodes(rawNaicsCodes, false) : [];
     const safeSetAsides = Array.isArray(setAsides)
       ? setAsides.map(value => String(value).trim()).filter(Boolean)
       : [];

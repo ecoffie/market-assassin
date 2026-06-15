@@ -12,6 +12,7 @@ import IncumbentIntel from '../awards/IncumbentIntel';
 import { useToast } from '../Toast';
 import ContractorLink from '../contractors/ContractorLink';
 import { MindyInsightCard } from '../MindyInsightCard';
+import TargetingCard from './TargetingCard';
 import { getNaics } from '@/lib/codes/lookup';
 import ShareButton from '@/components/briefings/ShareButton';
 import SamAttachmentLinks from '@/components/app/SamAttachmentLinks';
@@ -616,7 +617,7 @@ function getBriefingSummary(entry: BriefingEntry | null) {
   };
 }
 
-export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
+export default function DashboardPanel({ email, tier, onPanelChange }: DashboardPanelProps) {
   const router = useRouter();
   const marketIntelHref = email
     ? `/app/market-intel?email=${encodeURIComponent(email)}`
@@ -1128,6 +1129,10 @@ export default function DashboardPanel({ email, tier }: DashboardPanelProps) {
       {/* Mindy Insight hero card — daily quote, theme rotates by day */}
       <div className="px-3 md:px-6 pt-4 md:pt-5">
         <MindyInsightCard email={email} />
+        {/* Your targeting — current NAICS + keywords with one-click Edit. Makes
+            the codes/keywords editor discoverable from the home surface (Eric QC:
+            users couldn't find how to see/reset them). */}
+        <TargetingCard email={email} onEdit={onPanelChange} />
       </div>
 
       {isLoading ? (

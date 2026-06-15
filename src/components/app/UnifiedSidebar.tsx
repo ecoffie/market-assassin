@@ -671,6 +671,21 @@ export default function UnifiedSidebar({
             Upgrade to Pro
           </Link>
         )}
+        {/* Settings — persistent footer affordance (Linear/Notion convention) so
+            the codes/keywords + profile editor is ALWAYS one obvious click, not
+            buried in the nav scroll or behind the click-to-open account menu
+            (Eric QC 2026-06-15: users couldn't find how to reset their codes). */}
+        <button
+          onClick={() => { onPanelChange('settings'); onMobileClose?.(); }}
+          className={`w-full flex items-center rounded-lg px-3 py-2 text-sm transition-colors ${
+            activePanel === 'settings' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+          } ${isCollapsed ? 'justify-center' : 'gap-2'}`}
+          title="Settings — codes, keywords, profile"
+          aria-label="Settings"
+        >
+          <Settings className="w-[18px] h-[18px] shrink-0" strokeWidth={1.75} />
+          {!isCollapsed && <span>Settings</span>}
+        </button>
         {/* Collapse / expand control — pinned at the bottom of the sidebar
             (SaaS standard: Firecrawl, Gamma, Linear). The header arrow was
             easy to miss when collapsed, so surface an obvious, labeled toggle

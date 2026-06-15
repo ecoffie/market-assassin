@@ -1802,3 +1802,37 @@ figure, keyword as fallback) + `src/app/api/app/micc/mrr/route.ts` (.docx §5 li
 Demo verified end-to-end: §9 procurement history (BAE Systems $4.0B, FFP) and §11
 suppliers (4,681 capable, real UEIs) render in a valid .docx with the CO's judgment
 sections honestly bracketed.
+
+---
+
+## Mindy: Find & Reset Your Codes/Keywords + Honest NAICS Save (June 15, 2026)
+
+**What:** Two fixes to the post-signup experience. (1) Your targeting — NAICS codes
+and keywords — is now shown on the dashboard the moment you log in, as a "Your
+targeting" card with a one-click "Edit codes & keywords" button, plus a persistent
+Settings button pinned in the sidebar footer. Previously the editor lived only in a
+Settings panel buried below a long nav scroll / behind a click-to-open account menu,
+and new users couldn't find how to see or change them. (2) When onboarding saves your
+NAICS, it now persists the exact ~6-code coverage set it showed you, instead of
+silently blowing each code out to its entire NAICS family (a demolition profile was
+saving 30+ codes the user never saw — including unrelated metal-manufacturing and
+homebuilding codes — which polluted alert matching).
+
+**Why:** Two of the most common new-user frustrations: "I set this up, where did my
+keywords go?" and "why am I getting irrelevant alerts?" The targeting card makes the
+profile legible and editable from the home surface (vertical-SaaS convention: your
+working context is visible, not hidden in account admin), and loudly flags an empty
+keywords state — the #1 sign of a half-finished profile. The NAICS-save fix keeps the
+profile as precise as what the onboarding promised, so alerts match the work you
+actually do. Keyword search still does the broadening, which is its job now.
+
+**SEO:** edit NAICS codes, reset keywords government contracting, set up federal
+opportunity alerts, manage GovCon profile, why am I getting irrelevant contract
+alerts.
+
+**Proof:** `src/components/app/panels/TargetingCard.tsx` (dashboard card, reads
+/api/app/workspace, flags empty keywords) + `DashboardPanel` wiring +
+`UnifiedSidebar` footer Settings button + `expandNAICSCodes(codes, expandFullCodes=false)`
+in `src/lib/utils/naics-expansion.ts` so `/api/app/profile` persists precise 6-digit
+codes exactly (verified: demolition saved 6 codes, not 74). Diagnosed against the real
+stored profile via /api/admin/debug-profile.
