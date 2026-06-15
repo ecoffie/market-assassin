@@ -72,6 +72,13 @@
 > "Nothing here has been sent. The big DRY RUN badge means this is preview-only. When you're ready,
 > *you* decide the wording and approve the list before a single email goes out."
 
+**The leave-behind (do this — it's tangible):** click **"Download notice (.docx)"** on one card.
+> "And each notice generates as a clean Word document — here. This is something your team can drop
+> into your existing process today, even before any automation. I'll send you a couple of these from
+> your real vehicles after this call."
+
+A KO walking away with an actual editable .docx in DISA format is worth more than any slide.
+
 **Why it lands:** they SEE the manual work eliminated, AND you've shown the tool is honest about its
 own gaps — which is what earns a contracting officer's trust.
 
