@@ -226,14 +226,32 @@ export async function keywordCoverage(keyword: string, coverageTarget = 0.9): Pr
     } catch { return []; }
   };
   try {
-    // Try candidates most→least specific until one yields real data (phrase
-    // resilience — onboarding sends sentences, not single words).
+    // Resolve the keyword to the market a user would SEE if they fact-checked on
+    // USASpending. USASpending keyword search is EXACT-PHRASE, so "Demolition
+    // Services" returns only the 6 NAICS / $8M where that literal bigram appears,
+    // while the core term "demolition" returns the real 68-NAICS / $1.4B market.
+    // The old loop stopped at the first candidate with ANY data → it locked onto
+    // the narrow phrase and under-reported the market by ~170× (Eric QC, demolition).
+    //
+    // Fix: try candidates most→least specific, but PREFER the candidate that
+    // surfaces the larger market when a broader term materially beats the phrase.
+    // "Materially" = ≥3× the running-best total (a core term that captures the
+    // whole industry, not just a sibling phrase). This keeps genuine distinct
+    // products (where the phrase IS the market) while unburying the real number.
     let rows: { code: string; name?: string; amount: number }[] = [];
     let pscRows: { code: string; name?: string; amount: number }[] = [];
     let kw = raw;
+    let bestTotal = 0;
+    const sumAmt = (rs: { amount: number }[]) => rs.reduce((s, r) => s + (r.amount || 0), 0);
     for (const cand of keywordCandidates(raw)) {
       const [n, p] = await Promise.all([fetchCat(cand, 'naics'), fetchCat(cand, 'psc')]);
-      if (n.length > 0) { rows = n; pscRows = p; kw = cand; break; }
+      if (n.length === 0) continue;
+      const candTotal = sumAmt(n);
+      // First non-empty candidate seeds the result; a later (broader) candidate
+      // only wins if it captures ≥3× the market the current best does.
+      if (rows.length === 0 || candTotal >= bestTotal * 3) {
+        rows = n; pscRows = p; kw = cand; bestTotal = candTotal;
+      }
     }
     if (rows.length === 0) return null;
 

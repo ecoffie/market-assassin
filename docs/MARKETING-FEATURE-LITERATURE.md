@@ -1733,3 +1733,35 @@ item + value-first completion) + landing logic in `briefings/page.tsx`
 (shouldForceJourneyLanding: 14 days or all-3-done). Phase 1 of the guided-journeys
 plan (docs/PLAN-mindy-guided-journeys.md). Walkthrough videos: record in Loom →
 upload to Vimeo → paste the URL.
+
+---
+
+## Mindy: Honest, Fact-Checkable Market Numbers in Onboarding (June 15, 2026)
+
+**What:** The onboarding "wow" banner that shows new users their full NAICS coverage
+now reports the REAL market size. Previously it searched the LLM's exact industry
+phrase (e.g. "Demolition Services") against USASpending — which is exact-phrase — and
+matched only the handful of contracts where that literal bigram appears, reporting a
+$8M market across 6 codes. It now resolves to the core capability term ("demolition")
+when that surfaces a materially larger market, reporting the true **$1.4B across 61
+NAICS** with the correct top product code (PSC P500). The headline number is the
+~6-code set that covers 90% of the market (what Mindy actually tracks for you); the
+lesson cites the full market and total code count.
+
+**Why:** A new contractor's first impression of Mindy is this number — and federal
+buyers/sellers fact-check. If they search "demolition" on USASpending.gov and see
+$1.4B but Mindy said $8M, trust is gone. Grounding every figure so it reconciles
+against the public source the user can check themselves is the whole point: the LLM
+labels and frames, the dollars come from real award data. The fix also makes the
+"single-code crowd misses 90% of the money" lesson land with a billion-dollar number
+instead of a misleadingly tiny one.
+
+**SEO:** federal market size by NAICS, how big is the demolition contract market,
+USASpending market research, government contracting total addressable market, NAICS
+coverage.
+
+**Proof:** `src/lib/market/keyword-coverage.ts` (candidate loop prefers the broader
+term when it captures ≥3× the market — verified live: "Demolition Services" $8M →
+"demolition" $1.4B/61 NAICS/PSC P500) + `src/app/app/onboarding/page.tsx` (banner
+headline = 90%-coverage subset, lesson = full market with billions-aware formatting).
+Every number reconciles with a USASpending keyword search on the core term.

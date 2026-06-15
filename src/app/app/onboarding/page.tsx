@@ -795,20 +795,33 @@ export default function OnboardingPage() {
           {mode === 'auto' && autoProfile && (
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/10 p-5">
               <div className="text-sm text-slate-400 mb-3">Here&rsquo;s what Mindy found — look right? Anything off, just fix it.</div>
-              {/* Coverage hero — the wow moment. Most contractors search ONE obvious
-                  NAICS code; Mindy maps the full set. Honest, real numbers (6 for
-                  demolition, 70+ for a broad domain) — never a fabricated count. */}
-              {autoProfile.naicsCount > 1 && (
+              {/* Coverage hero — the wow moment. The HEADLINE number is the coverage
+                  SET Mindy actually applies to your profile (the chips below — 6 for
+                  demolition). The lesson cites the FULL market ($ + total codes that
+                  bought it) so the user sees what the single-code crowd misses. All
+                  numbers fact-check on USASpending by searching the core keyword
+                  (Eric QC, demolition: "Demolition Services" exact-phrase was
+                  under-reporting $1.4B as $8M — fixed in keyword-coverage). */}
+              {(autoProfile.naics?.length || 0) > 1 && (
                 <div className="mb-4 rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/40 to-slate-900 p-4">
                   <div className="flex items-baseline gap-2">
-                    <span className="text-3xl font-black text-emerald-400">{autoProfile.naicsCount}</span>
-                    <span className="text-sm font-semibold text-white">NAICS codes mapped to your work</span>
+                    <span className="text-3xl font-black text-emerald-400">{autoProfile.naics.length}</span>
+                    <span className="text-sm font-semibold text-white">NAICS codes cover ~90% of your market</span>
                   </div>
                   <p className="mt-1 text-xs text-slate-400">
-                    Most contractors track just the one obvious code. Mindy found{' '}
-                    <span className="text-emerald-300 font-semibold">{autoProfile.naicsCount}</span>
-                    {autoProfile.topPsc ? <> + PSC <span className="text-emerald-300 font-semibold">{autoProfile.topPsc.code}</span></> : null}
-                    {autoProfile.totalMarket ? <> across <span className="text-emerald-300 font-semibold">${Math.round(autoProfile.totalMarket / 1e6)}M</span> in federal spend</> : null}
+                    Most contractors track just the one obvious code.
+                    {autoProfile.totalMarket ? (
+                      <> Mindy mapped a{' '}
+                        <span className="text-emerald-300 font-semibold">
+                          {autoProfile.totalMarket >= 1e9
+                            ? `$${(autoProfile.totalMarket / 1e9).toFixed(1)}B`
+                            : `$${Math.round(autoProfile.totalMarket / 1e6)}M`}
+                        </span>{' '}
+                        market across{' '}
+                        <span className="text-emerald-300 font-semibold">{autoProfile.naicsCount}</span> codes
+                        {autoProfile.topPsc ? <> (top buy: PSC <span className="text-emerald-300 font-semibold">{autoProfile.topPsc.code}</span>)</> : null}
+                      </>
+                    ) : null}
                     {' '}— so your alerts catch opportunities the single-code crowd misses.
                   </p>
                 </div>
