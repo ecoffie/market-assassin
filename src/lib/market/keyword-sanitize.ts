@@ -29,6 +29,11 @@ const STOPWORDS = new Set([
   'we', 'provide', 'offer', 'and', 'or', 'the', 'a', 'an', 'for', 'of', 'to', 'in',
   'on', 'our', 'with', 'services', 'service', 'support', 'solutions', 'company',
   'federal', 'government', 'agencies', 'inc', 'llc', 'corp', 'all', 'any', 'new',
+  // Business-entity / generic nouns that describe the ORG, not the capability —
+  // "demolition firm" was leaking "firm" as a keyword.
+  'firm', 'business', 'corporation', 'group', 'enterprise', 'enterprises',
+  'contractor', 'contractors', 'provider', 'providers', 'specialist',
+  'specialists', 'professional', 'professionals',
 ]);
 
 // A "word" with no vowels or absurd consonant runs is keyboard mash (zxcvbnm,
