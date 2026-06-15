@@ -1407,7 +1407,7 @@ recordToolSuccess(ToolNames.CONTENT_REAPER).catch(() => {});
 - **Footer branding:** "GovCon Giants AI"
 - **From address:** `hello@govcongiants.com`
 - **Support email:** `service@govcongiants.com`
-- **Phone:** 786-477-0477
+- **Phone:** 508-290-6692
 - **Include:** activation link, "Manage preferences", "Unsubscribe"
 
 ---
