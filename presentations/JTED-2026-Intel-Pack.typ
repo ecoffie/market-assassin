@@ -927,7 +927,7 @@ I'm attending an industry day for [AGENCY] focused on [TOPIC]. Help me prepare:
     #v(0.2in)
 
     #text(fill: white.darken(20%), size: 10pt)[
-      Questions? Email hello\@govconedu.com or call 786-477-0477
+      Questions? Email hello\@govconedu.com or call 508-290-6692
     ]
   ]
 ]
