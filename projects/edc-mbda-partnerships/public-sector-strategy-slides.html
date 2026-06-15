@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Public Sector Strategy — The Anduril Model → Our Plan</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap');
+*{margin:0;padding:0;box-sizing:border-box}
+:root{--primary:#1e3a8a;--secondary:#7c3aed;--accent:#10b981;--accent-dark:#059669;--dark:#1a1a2e;--light:#f8fafc;--red:#dc2626}
+@page{size:landscape;margin:0}
+body{font-family:'Inter',-apple-system,BlinkMacSystemFont,sans-serif;background:#e5e7eb;line-height:1.4;color:var(--dark)}
+.slide{width:1280px;height:720px;background:white;margin:20px auto;box-shadow:0 10px 40px rgba(0,0,0,.2);position:relative;overflow:hidden;page-break-after:always;page-break-inside:avoid}
+@media print{body{background:white}.slide{margin:0;box-shadow:none}}
+
+/* Title */
+.slide-title{background:linear-gradient(135deg,var(--primary)0%,var(--secondary)100%);color:#fff;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:60px}
+.slide-title .badge{background:rgba(255,255,255,.2);padding:10px 30px;border-radius:30px;font-size:1rem;font-weight:600;text-transform:uppercase;letter-spacing:2px;margin-bottom:30px}
+.slide-title h1{font-size:4rem;font-weight:900;margin-bottom:20px;line-height:1.1}
+.slide-title .subtitle{font-size:1.7rem;opacity:.95;margin-bottom:40px;max-width:1000px}
+.slide-title .meta{display:flex;gap:70px;margin-top:20px}
+.slide-title .meta-value{font-size:2.5rem;font-weight:800}
+.slide-title .meta-label{font-size:.9rem;opacity:.8;text-transform:uppercase}
+
+/* Section (green) */
+.slide-section{background:linear-gradient(135deg,var(--accent-dark)0%,var(--accent)100%);color:#fff;display:flex;flex-direction:column;justify-content:center;padding:80px}
+.slide-section .session-num{font-size:1.2rem;font-weight:700;text-transform:uppercase;letter-spacing:3px;opacity:.8;margin-bottom:20px}
+.slide-section h2{font-size:3.5rem;font-weight:900;margin-bottom:24px;line-height:1.2}
+.slide-section .time-badge{display:inline-block;background:rgba(255,255,255,.2);padding:12px 30px;border-radius:30px;font-size:1.2rem;font-weight:600;align-self:flex-start}
+
+/* Content */
+.slide-content{padding:55px 75px}
+.slide-content .header{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:36px;padding-bottom:18px;border-bottom:3px solid var(--accent)}
+.slide-content h2{font-size:2.3rem;font-weight:800;color:var(--primary);max-width:80%}
+.slide-content .session-tag{background:var(--secondary);color:#fff;padding:8px 20px;border-radius:20px;font-size:.85rem;font-weight:700;text-transform:uppercase;white-space:nowrap}
+
+/* Key point (dark) */
+.slide-key-point{background:var(--dark);color:#fff;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center;padding:80px}
+.slide-key-point .icon{font-size:4.5rem;margin-bottom:24px}
+.slide-key-point h2{font-size:2.8rem;font-weight:800;max-width:980px;line-height:1.3}
+.slide-key-point p{font-size:1.4rem;opacity:.85;margin-top:28px;max-width:880px}
+.slide-key-point .src{font-size:.95rem;opacity:.5;margin-top:36px}
+
+/* Icon / card grids */
+.grid-2{display:grid;grid-template-columns:1fr 1fr;gap:28px;margin-top:10px}
+.grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:24px;margin-top:10px}
+.grid-4{display:grid;grid-template-columns:repeat(4,1fr);gap:22px;margin-top:10px}
+.card{background:var(--light);border-radius:18px;padding:30px 26px;border-left:6px solid var(--accent)}
+.card .ico{font-size:2.6rem;margin-bottom:14px}
+.card h3{font-size:1.35rem;color:var(--primary);margin-bottom:10px}
+.card p{font-size:1.05rem;color:#444}
+.card.purple{border-left-color:var(--secondary)}
+.card.navy{border-left-color:var(--primary)}
+.card.red{border-left-color:var(--red)}
+
+/* Stats */
+.stats-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:26px;margin-top:24px}
+.stat-card{background:linear-gradient(135deg,var(--primary)0%,var(--secondary)100%);color:#fff;border-radius:20px;padding:34px 22px;text-align:center}
+.stat-card.green{background:linear-gradient(135deg,var(--accent-dark)0%,var(--accent)100%)}
+.stat-card .value{font-size:2.7rem;font-weight:900;margin-bottom:8px}
+.stat-card .label{font-size:.95rem;opacity:.92}
+
+/* Flow (build→sell→scale) */
+.flow{display:flex;align-items:stretch;gap:18px;margin-top:34px}
+.flow .step{flex:1;background:var(--light);border-radius:16px;padding:30px 22px;text-align:center;border-top:6px solid var(--accent)}
+.flow .step .n{width:46px;height:46px;background:var(--accent);color:#fff;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:1.3rem;font-weight:800;margin:0 auto 16px}
+.flow .step h3{font-size:1.25rem;color:var(--primary);margin-bottom:8px}
+.flow .step p{font-size:1rem;color:#444}
+.flow .arrow{display:flex;align-items:center;font-size:2rem;color:var(--accent);font-weight:800}
+
+/* Table */
+.data-table{width:100%;border-collapse:collapse;font-size:1.05rem;margin-top:10px}
+.data-table th{background:var(--primary);color:#fff;padding:15px 18px;text-align:left;font-weight:700}
+.data-table td{padding:14px 18px;border-bottom:1px solid #e5e7eb;color:#333}
+.data-table tr:nth-child(even){background:#f5f7fb}
+.data-table .hi{color:var(--accent-dark);font-weight:700}
+
+/* Footer */
+.slide-footer{position:absolute;bottom:22px;left:75px;right:75px;display:flex;justify-content:space-between;align-items:center;font-size:.8rem;color:#9ca3af}
+.slide-footer .logo{font-weight:800;color:var(--primary)}
+
+.lede{font-size:1.3rem;color:#444;margin-bottom:8px}
+.tag-green{background:var(--accent)}
+</style>
+</head>
+<body>
+
+<!-- 1. TITLE -->
+<div class="slide slide-title">
+  <div class="badge">GovCon Giants · Internal Strategy</div>
+  <h1>Winning the Public Sector</h1>
+  <div class="subtitle">Introducing government funding for our company — the smart model (Anduril), the awardees who look like us, and our plan to sell Mindy to government</div>
+  <div class="meta">
+    <div class="meta-item"><div class="meta-value">3</div><div class="meta-label">Warm gov contacts</div></div>
+    <div class="meta-item"><div class="meta-value">3</div><div class="meta-label">Live prototypes</div></div>
+    <div class="meta-item"><div class="meta-value">2</div><div class="meta-label">Revenue tracks</div></div>
+  </div>
+</div>
+
+<!-- 2. SECTION: NEW FUNDING -->
+<div class="slide slide-section">
+  <div class="session-num">Part 1</div>
+  <h2>A new avenue for us: government funding</h2>
+  <div class="time-badge">Something we've never tapped</div>
+</div>
+
+<!-- 3. New idea + the smart way to do it -->
+<div class="slide slide-content">
+  <div class="header"><h2>We've never pursued funding — here's how to do it right</h2><span class="session-tag">New for us</span></div>
+  <p class="lede">SBIR, OTAs, and direct sales are open to us. The question isn't <i>whether</i> — it's <b>how</b>, so funding fuels us without owning us. Anduril answered this.</p>
+  <div class="grid-2">
+    <div class="card"><div class="ico">🚀</div><h3>The smart way (Anduril)</h3><p>Build the product, sell it fixed-price to an end-user with a budget, use SBIR/OTA only to <b>scale</b> what already works. Funding = fuel.</p></div>
+    <div class="card red"><div class="ico">🪤</div><h3>The way to avoid</h3><p>Becoming <b>grant-dependent</b> — getting paid to do R&D on spec. Slow, cost-plus incentives, years before revenue. We skip this entirely.</p></div>
+  </div>
+  <div class="slide-footer"><span class="logo">GovCon Giants</span><span>Public Sector Strategy · June 2026</span></div>
+</div>
+
+<!-- 4. The Anduril flow -->
+<div class="slide slide-content">
+  <div class="header"><h2>Build first → sell fixed-price → scale with SBIR Phase III</h2><span class="session-tag">Anduril</span></div>
+  <div class="flow">
+    <div class="step"><div class="n">1</div><h3>Build</h3><p>Real product, own capital. Not paid to develop on spec.</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="n">2</div><h3>Sell</h3><p>Fixed-price commercial item to an end-user with a budget &amp; real pain.</p></div>
+    <div class="arrow">→</div>
+    <div class="step"><div class="n">3</div><h3>Scale</h3><p>SBIR Phase III = uncapped, no-recompete sole-source across every agency.</p></div>
+  </div>
+  <p class="lede" style="margin-top:36px">Anduril's border business runs on an <b>SBIR Phase III IDIQ</b> (~$2B ceiling). They used the lever — they just didn't <i>depend</i> on the grant.</p>
+  <div class="slide-footer"><span class="logo">GovCon Giants</span><span>FPDS 70B02C20D00000019 · 15 U.S.C. §638(r)(4)</span></div>
+</div>
+
+<!-- 5. SECTION: AWARDEES -->
+<div class="slide slide-section">
+  <div class="session-num">Part 2</div>
+  <h2>The Air Force already funds companies like us</h2>
+  <div class="time-badge">The precedent</div>
+</div>
+
+<!-- 6. Awardee proof table -->
+<div class="slide slide-content">
+  <div class="header"><h2>AFWERX/AF awardees doing what we do</h2><span class="session-tag">Real awards</span></div>
+  <table class="data-table">
+    <tr><th>Company</th><th>Award</th><th>What they do (≈ Mindy)</th></tr>
+    <tr><td><b>Eudia</b></td><td class="hi">$1.25M AFWERX D2P2</td><td>AI for DAF <b>procurement / contract review</b></td></tr>
+    <tr><td><b>Oliver Wyman</b></td><td class="hi">SSC SBIR Phase III</td><td><b>Business-intelligence tool</b> for Space Systems Command</td></tr>
+    <tr><td><b>Outside Analytics — "DAVE"</b></td><td class="hi">$215M AF SBIR Phase III</td><td><b>Analytics &amp; visualization</b> ecosystem (the scale proof)</td></tr>
+    <tr><td><b>Certus Core</b></td><td class="hi">AFWERX Open Topic</td><td>Pure-software <b>knowledge-graph</b> data platform</td></tr>
+  </table>
+  <p class="lede" style="margin-top:30px">AFWERX funds AI / analytics / contractor-data software. <b>We sit squarely in that lane.</b></p>
+  <div class="slide-footer"><span class="logo">GovCon Giants</span><span>Sources: PRNewswire, OrangeSlices, FederalCompass</span></div>
+</div>
+
+<!-- 7. Why it maps to us (key point) -->
+<div class="slide slide-key-point">
+  <div class="icon">🧭</div>
+  <h2>Mindy is built. We have 3 government end-users with real needs. That's the whole battle.</h2>
+  <p>The hard part of the playbook — a finished product + an end-user with budget — we already have.</p>
+  <div class="src">Anduril spent $1B to get there. We're a SaaS — same motion, our scale.</div>
+</div>
+
+<!-- 8. SECTION: OUR STRATEGY -->
+<div class="slide slide-section">
+  <div class="session-num">Part 3</div>
+  <h2>Our public-sector strategy</h2>
+  <div class="time-badge">Two tracks</div>
+</div>
+
+<!-- 9. Two tracks -->
+<div class="slide slide-content">
+  <div class="header"><h2>Sell direct now · one SBIR for the key</h2><span class="session-tag">The plan</span></div>
+  <div class="grid-2">
+    <div class="card navy"><div class="ico">💵</div><h3>Track 1 — Sell direct</h3><p><b>Revenue now.</b> The 3 contacts are buyers, not grant sponsors. Commercial-item pilots: micro-purchase ($15K) → simplified acquisition ($350K).</p></div>
+    <div class="card purple"><div class="ico">🔑</div><h3>Track 2 — One AFWERX SBIR</h3><p><b>The strategic key.</b> Land one SBIR → unlock Phase III sole-source across every agency. Target an AF office. Parallel, not the income.</p></div>
+  </div>
+  <p class="lede" style="margin-top:34px"><b>The close, every time:</b> don't ask for a contract — ask for a no-cost pilot on their data.</p>
+  <div class="slide-footer"><span class="logo">GovCon Giants</span><span>The Anduril move, our scale</span></div>
+</div>
+
+<!-- 10. 3 prototypes -->
+<div class="slide slide-content">
+  <div class="header"><h2>3 warm contacts → 3 live prototypes</h2><span class="session-tag">Already built</span></div>
+  <div class="grid-3">
+    <div class="card"><div class="ico">⏰</div><h3>DISA</h3><p>Vehicle Expiry Watch — auto-notify the incumbent before IDIQ/IDV expiry. Replaces manual spreadsheets.</p></div>
+    <div class="card"><div class="ico">🔎</div><h3>Navy OSBP</h3><p>SMB Sourcing — thousands of capable small businesses, ranked by who's won the work. Exportable.</p></div>
+    <div class="card"><div class="ico">📄</div><h3>Army MICC</h3><p>MRR Generator — auto-drafts the official Army Market Research Report .docx from real award data.</p></div>
+  </div>
+  <p class="lede" style="margin-top:34px"><b>One engine, three jobs</b> — the same PSC-scored search powers Navy sourcing and the Army MRR.</p>
+  <div class="slide-footer"><span class="logo">GovCon Giants</span><span>All live · getmindy.ai demo account</span></div>
+</div>
+
+<!-- 11. Honesty = trust (key point) -->
+<div class="slide slide-key-point">
+  <div class="icon">🤝</div>
+  <h2>Each prototype is honest about what it doesn't do — that's why a CO trusts it.</h2>
+  <p>DISA sends nothing live until approved · OSBP shows "won set-aside work," not a faked cert · MICC brackets the IGE &amp; signatures.</p>
+  <div class="src">Never overclaim an authorization we don't have.</div>
+</div>
+
+<!-- 12. Who does what -->
+<div class="slide slide-content">
+  <div class="header"><h2>Who does what next</h2><span class="session-tag">This week</span></div>
+  <table class="data-table">
+    <tr><th>Owner</th><th>Action</th></tr>
+    <tr><td><b>Eric</b></td><td>Run the 3 gov demos (DISA verifying first) · approve advisor comp</td></tr>
+    <tr><td><b>FT hire</b> (to recruit)</td><td>Own gov pilots → commercial buys · partnerships funnel · grant calendar</td></tr>
+    <tr><td><b>Ops</b></td><td class="hi">Book the NAPEX booth NOW — $1,500, Aug 16–20, first-come</td></tr>
+    <tr><td><b>Product</b></td><td>Seed Ashley's real sourcing codes · keep prototypes warm</td></tr>
+  </table>
+  <p class="lede" style="margin-top:28px">Deadlines: NAPEX booth · DISA verification · DoD SBIR 26.3 (Jun 24) · MBDA Rural BC (Jun 29)</p>
+  <div class="slide-footer"><span class="logo">GovCon Giants</span><span>Hire the lead · recruit 3 advisors</span></div>
+</div>
+
+<!-- 13. Scoreboard -->
+<div class="slide slide-content">
+  <div class="header"><h2>The 6-month scoreboard</h2><span class="session-tag">Goals</span></div>
+  <div class="stats-grid">
+    <div class="stat-card green"><div class="value">3</div><div class="label">Signed pilots / evals</div></div>
+    <div class="stat-card"><div class="value">1</div><div class="label">Paid license</div></div>
+    <div class="stat-card green"><div class="value">10+</div><div class="label">NAPEX director meetings</div></div>
+    <div class="stat-card"><div class="value">2</div><div class="label">Grant applications</div></div>
+  </div>
+  <div class="stats-grid" style="grid-template-columns:repeat(3,1fr);margin-top:26px">
+    <div class="stat-card"><div class="value">3→💰</div><div class="label">Prototypes → paid pilots</div></div>
+    <div class="stat-card green"><div class="value">2</div><div class="label">Post-NAPEX pilots</div></div>
+    <div class="stat-card"><div class="value">1</div><div class="label">AFWERX end-user secured</div></div>
+  </div>
+  <div class="slide-footer"><span class="logo">GovCon Giants</span><span>Public Sector Strategy · June 2026</span></div>
+</div>
+
+<!-- 14. Close -->
+<div class="slide slide-key-point">
+  <div class="icon">🎯</div>
+  <h2>Build first. Sell direct. Use one SBIR for the key. Be honest. Land pilots, then expand.</h2>
+  <p>The proven defense-tech playbook — at our scale, starting now.</p>
+  <div class="src">getmindy.ai · GovCon Giants</div>
+</div>
+
+</body>
+</html>
