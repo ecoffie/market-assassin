@@ -289,3 +289,59 @@ export async function keywordCoverage(keyword: string, coverageTarget = 0.9): Pr
     return null;
   }
 }
+
+/**
+ * Market size for an EXACT PSC and/or NAICS — no keyword broadening.
+ *
+ * Use this when the caller already knows the precise code(s) they're researching
+ * (e.g. an MRR where the CO supplies PSC + NAICS). `keywordCoverage()` is built
+ * for vague DISCOVERY ("ship repair" → broadens to the whole naval market on
+ * purpose); that broadening is wrong when the requirement is pinned to a code.
+ * For "Non-Nuclear Ship Repair" (PSC J998) the keyword path returns $84B "Combat
+ * Ships"; this returns the actual J998 repair-services market.
+ *
+ * PSC is the more precise axis ("what was bought") — prefer it when both given.
+ * Returns null on any failure → caller falls back to the keyword figure or omits.
+ */
+export async function codeMarketSize(opts: {
+  psc?: string;
+  naics?: string;
+}): Promise<{ totalMarket: number; topPsc: { code: string; name: string } | null; basis: 'psc' | 'naics' } | null> {
+  const psc = (opts.psc || '').trim();
+  const naics = (opts.naics || '').trim();
+  if (!psc && !naics) return null;
+
+  // Prefer PSC (literal product bought); fall back to NAICS (vendor industry).
+  const basis: 'psc' | 'naics' = psc ? 'psc' : 'naics';
+  const filters: Record<string, unknown> = {
+    time_period: [fiscalYearTimePeriod()],
+    award_type_codes: ['A', 'B', 'C', 'D'],
+  };
+  if (basis === 'psc') filters.psc_codes = [psc];
+  else filters.naics_codes = [naics];
+
+  const fetchCat = async (cat: 'psc' | 'naics') => {
+    try {
+      const res = await fetch(`${BASE}/${cat}/`, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ filters, category: cat, limit: 100 }),
+      });
+      if (!res.ok) return [];
+      const j = await res.json();
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return (j.results || []).filter((r: any) => r.code && (r.amount || 0) > 0)
+        .sort((a: { amount: number }, b: { amount: number }) => b.amount - a.amount);
+    } catch { return []; }
+  };
+
+  try {
+    const [naicsRows, pscRows] = await Promise.all([fetchCat('naics'), fetchCat('psc')]);
+    const rows = basis === 'psc' && pscRows.length ? pscRows : naicsRows;
+    if (rows.length === 0) return null;
+    const total = rows.reduce((s: number, r: { amount: number }) => s + (r.amount || 0), 0);
+    const topPsc = pscRows[0] ? { code: pscRows[0].code, name: pscRows[0].name || pscRows[0].code } : null;
+    return { totalMarket: total, topPsc, basis };
+  } catch {
+    return null;
+  }
+}

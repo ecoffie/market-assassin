@@ -1765,3 +1765,40 @@ term when it captures ≥3× the market — verified live: "Demolition Services"
 "demolition" $1.4B/61 NAICS/PSC P500) + `src/app/app/onboarding/page.tsx` (banner
 headline = 90%-coverage subset, lesson = full market with billions-aware formatting).
 Every number reconciles with a USASpending keyword search on the core term.
+
+---
+
+## Market Research Report (MRR) generator — code-anchored §5 market size (June 15, 2026)
+
+**What:** The Army Market Research Report generator (matches the official MAY-2026
+template) now computes the §5 "Federal market size" figure from the **exact PSC/NAICS
+the contracting officer enters**, not from a broadening keyword search. New
+`codeMarketSize({psc, naics})` queries USASpending filtered on the literal code and
+reports the precise market for that requirement, with PSC preferred (what was bought)
+over NAICS (the vendor industry). The on-screen panel now shows the §5 figure too, so
+the live preview and the exported .docx report the same number. Also corrected the §12
+set-aside rationale to say "at least N of the top suppliers shown" instead of implying
+the displayed-page count was the market-wide total.
+
+**Why:** An MRR goes in the contract file and a KO fact-checks it. The keyword path is
+built for vague discovery and deliberately over-broadens — for "Non-Nuclear Ship
+Repair" it returned **$84.2B "Combat Ships and Landing Vessels"** (the entire naval
+*shipbuilding* market) instead of the ship-*repair* market. A KO researching ship
+repair would instantly distrust the tool. Anchored to PSC J998 it now reports the
+correct **$2.03B for the ship-repair market** with the right top product code. The CO
+already supplies the exact code in an MRR, so the precise number is always available —
+the LLM frames, the dollars come from real award data that reconciles against
+USASpending.
+
+**SEO:** Army market research report template, MRR generator, FAR Part 19 rule of two,
+PSC market size, federal market research by product service code, set-aside
+determination market research, USASpending procurement history.
+
+**Proof:** `src/lib/market/keyword-coverage.ts` (`codeMarketSize` — exact-code
+USASpending query, verified live: PSC J998 → $2.03B ship-repair market vs. the keyword
+path's $84.2B "Combat Ships") + `src/lib/micc/mrr.ts` (§5 prefers the code-anchored
+figure, keyword as fallback) + `src/app/api/app/micc/mrr/route.ts` (.docx §5 line) +
+`src/components/app/panels/MiccMrrPanel.tsx` (on-screen §5 banner matches the doc).
+Demo verified end-to-end: §9 procurement history (BAE Systems $4.0B, FFP) and §11
+suppliers (4,681 capable, real UEIs) render in a valid .docx with the CO's judgment
+sections honestly bracketed.

@@ -81,7 +81,7 @@ export default function MiccMrrPanel({ email }: Props) {
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-blue-500 focus:outline-none" />
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Keyword <span className="text-slate-600">(optional — market size)</span></label>
+            <label className="block text-xs text-slate-500 mb-1">Keyword <span className="text-slate-600">(optional — context)</span></label>
             <input value={keyword} onChange={e => setKeyword(e.target.value)} placeholder="ship repair"
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-blue-500 focus:outline-none" />
           </div>
@@ -121,6 +121,18 @@ export default function MiccMrrPanel({ email }: Props) {
             <Stat n={mrr.marketIntel.setAsideWinners.toLocaleString()} label="Set-aside winners" sub="proven small-biz" />
             <Stat n={mrr.procurementHistory.length.toLocaleString()} label="Prior contracts" sub="procurement history" />
           </div>
+
+          {/* §5 market size — anchored to the PSC/NAICS (precise to the requirement) */}
+          {mrr.taxonomy.marketTotal != null && (
+            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+              <p className="text-xs uppercase tracking-wider text-emerald-300 mb-1">§5 Federal market size</p>
+              <p className="text-lg font-semibold text-white">
+                {$(mrr.taxonomy.marketTotal)}
+                {mrr.taxonomy.psc ? <span className="text-slate-400 text-sm font-normal"> · PSC {mrr.taxonomy.psc}</span> : null}
+              </p>
+              {mrr.taxonomy.topPsc && <p className="text-xs text-slate-500 mt-1">Most-purchased: {mrr.taxonomy.topPsc} · source: USASpending</p>}
+            </div>
+          )}
 
           {/* §12 recommendation */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">

@@ -4,6 +4,26 @@
 
 ---
 
+## 🔲 ACTIVE — AFWERX SBIR application (GovCon Edu, started Jun 15)
+
+**Checklist:** `projects/edc-mbda-partnerships/AFWERX-QUALIFICATION-CHECKLIST.md`
+
+**DECIDED:** Applicant = **GovCon Edu** (for-profit, "developer of Mindy"). NOT the nonprofit, NOT a new entity.
+**✅ SAM confirmed active** (renewed) → the 4–6 wk gate is cleared; **R3 (closes Jul 22) is reachable.**
+**Constraint is now proposal-readiness, not registration.**
+
+**This week (Eric):**
+- [ ] Create **SBC ID** on sbir.gov (minutes — needs active SAM, ✅ have it)
+- [ ] Set up **DSIP account** → dodsbirsttr.mil/submissions/login
+- [ ] Download the **mandatory proposal template** (afwerx.com/divisions/ventures/open-topic/) — off-template = auto-reject
+- [ ] **Decision:** standard Phase I vs. D2P2 (we have 3 warm govt contacts → D2P2 possible)
+
+**Then:** harden the ONE end-user capability (per `AFWERX-SBIR-READINESS.md` Tier 1.2) → write Phase I narrative + work plan + Cost Volume on the template.
+**Target window:** R3 (Jul 22) if proposal ready; R4 (Aug 19) deliberate quality fallback (straddles NAPEX).
+**Infra:** SAM Entity API throwing 401 (`mcp__samgov__search_entities`) — also breaks Mindy's live entity search; fix separately.
+
+---
+
 ## 🔲 ACTIVE — EDC / MBDA partnerships (started Jun 14)
 
 **Runbook:** `projects/edc-mbda-partnerships/EXECUTION-RUNBOOK.md`

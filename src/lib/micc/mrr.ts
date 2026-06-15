@@ -10,7 +10,7 @@
  *  bracketed for the CO — we never invent an IGE or a determination.)
  */
 import { procurementHistoryByCode, findCapableSmallBusinesses, type ProcurementHistoryRow, type CapableSmbRow } from '@/lib/bigquery/recipients';
-import { keywordCoverage } from '@/lib/market/keyword-coverage';
+import { keywordCoverage, codeMarketSize } from '@/lib/market/keyword-coverage';
 
 export interface MrrInput {
   psc?: string;
@@ -48,14 +48,23 @@ export interface MrrResult {
 export async function buildMrr(input: MrrInput): Promise<MrrResult> {
   const { psc, naics, keyword } = input;
 
-  const [history, smbAll, smbSmall, coverage] = await Promise.all([
+  // §5 market size: anchor to the EXACT PSC/NAICS the CO supplied (precise to the
+  // requirement), NOT the broadening keyword search. The keyword path is built for
+  // vague discovery and deliberately over-broadens — e.g. "ship repair" → $84B
+  // "Combat Ships" (the whole naval-shipbuilding market) instead of the J998
+  // ship-REPAIR market. In an MRR the CO always gives the code, so use it.
+  const [history, smbAll, smbSmall, codeMarket, coverage] = await Promise.all([
     procurementHistoryByCode({ psc, naics, limit: 15, liveBq: true }).catch(() => [] as ProcurementHistoryRow[]),
     findCapableSmallBusinesses({ psc, naics, maxObligated: 100_000_000, limit: 50, liveBq: true }).catch(() => ({ rows: [] as CapableSmbRow[], total: 0 })),
     findCapableSmallBusinesses({ psc, naics, maxObligated: 25_000_000, limit: 1, liveBq: true }).catch(() => ({ rows: [] as CapableSmbRow[], total: 0 })),
+    (psc || naics) ? codeMarketSize({ psc, naics }).catch(() => null) : Promise.resolve(null),
     keyword ? keywordCoverage(keyword).catch(() => null) : Promise.resolve(null),
   ]);
 
   const suppliers = smbAll.rows;
+  // NOTE: this counts set-aside winners only within the displayed top-N suppliers
+  // (smbAll.rows is capped at limit), NOT the full market — so it's a floor, not a
+  // total. Phrase it as "at least N of the top suppliers" to stay honest with a CO.
   const setAsideWinners = suppliers.filter(s => s.won_set_aside).length;
   const supplierCount = smbAll.total;
   const smallBusinessCount = smbSmall.total;
@@ -71,7 +80,7 @@ export async function buildMrr(input: MrrInput): Promise<MrrResult> {
   if (smallEnough >= 2) {
     const saWinners = setAsideWinners;
     recommendedSetAside = 'Small business set-aside';
-    rationale = `${smallEnough} small businesses with relevant award history were identified (FAR 19 "rule of two" supported); ${saWinners} have won small-business set-aside work in this space. A small-business set-aside is recommended; review §11 for specific socioeconomic categories (8(a)/HUBZone/SDVOSB/WOSB).`;
+    rationale = `${smallEnough} small businesses with relevant award history were identified (FAR 19 "rule of two" supported); at least ${saWinners} of the top suppliers shown in §11 have won small-business set-aside work in this space. A small-business set-aside is recommended; review §11 for specific socioeconomic categories (8(a)/HUBZone/SDVOSB/WOSB).`;
   }
 
   return {
@@ -80,9 +89,14 @@ export async function buildMrr(input: MrrInput): Promise<MrrResult> {
     taxonomy: {
       psc: psc || null,
       naics: naics || null,
-      marketTotal: coverage?.totalMarket ?? null,
-      topPsc: coverage?.topPsc ? `${coverage.topPsc.code} ${coverage.topPsc.name}` : null,
-      naicsCount: coverage?.naicsCount ?? null,
+      // Prefer the code-anchored market (precise to the requirement); fall back to
+      // the keyword figure only if the code lookup returned nothing.
+      marketTotal: codeMarket?.totalMarket ?? coverage?.totalMarket ?? null,
+      topPsc: (codeMarket?.topPsc ?? coverage?.topPsc)
+        ? `${(codeMarket?.topPsc ?? coverage!.topPsc)!.code} ${(codeMarket?.topPsc ?? coverage!.topPsc)!.name}`
+        : null,
+      // naicsCount only meaningful for the keyword spread; null when code-anchored.
+      naicsCount: codeMarket ? null : (coverage?.naicsCount ?? null),
     },
     procurementHistory: history,
     suppliers,

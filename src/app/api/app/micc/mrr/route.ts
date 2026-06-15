@@ -86,7 +86,12 @@ async function renderDocx(m: MrrResult): Promise<Buffer> {
   H('§5 Taxonomy (auto-filled)');
   P(`Product Service Code (PSC): ${m.taxonomy.psc || '[CO to add]'}`);
   P(`NAICS Code: ${m.taxonomy.naics || '[CO to add]'}`);
-  if (m.taxonomy.marketTotal != null) P(`Federal market size (this space): ${$(m.taxonomy.marketTotal)} across ${m.taxonomy.naicsCount ?? '?'} NAICS codes (source: USASpending).`);
+  if (m.taxonomy.marketTotal != null) {
+    const span = m.taxonomy.naicsCount != null
+      ? ` across ${m.taxonomy.naicsCount} NAICS codes`
+      : (m.taxonomy.psc ? ` for PSC ${m.taxonomy.psc}` : '');
+    P(`Federal market size (this space): ${$(m.taxonomy.marketTotal)}${span} (source: USASpending, FY).`);
+  }
   if (m.taxonomy.topPsc) P(`Most-purchased product/service (PSC): ${m.taxonomy.topPsc}.`);
   BRACKET('Small Business Size Standard: [CO to confirm from SBA size-standards table for the selected NAICS]');
 
