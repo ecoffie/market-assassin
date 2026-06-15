@@ -87,6 +87,8 @@ function generateHtmlBody(data: BidTargetEmailData, date: string): string {
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="color-scheme" content="light only">
+  <meta name="supported-color-schemes" content="light only">
   <title>Your Bid Target</title>
   <!--[if mso]>
   <noscript>

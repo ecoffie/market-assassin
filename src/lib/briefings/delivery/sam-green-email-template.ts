@@ -823,8 +823,8 @@ export function generateSamGreenEmailHtml(briefing: SamDailyBriefing, userEmail?
 
   const renderMetaRow = (label: string, value: string): string => `
     <tr>
-      <td style="width:120px;padding:4px 10px 4px 0;color:#6b7280;font-size:12px;line-height:18px;text-transform:uppercase;vertical-align:top;">${label}</td>
-      <td style="padding:4px 0;color:#111827;font-size:14px;line-height:20px;font-weight:700;vertical-align:top;">${escapeHtml(value)}</td>
+      <td class="meta-cell-label" style="width:120px;padding:4px 10px 4px 0;color:#6b7280;font-size:12px;line-height:18px;text-transform:uppercase;vertical-align:top;">${label}</td>
+      <td class="meta-cell-value" style="padding:4px 0;color:#111827;font-size:14px;line-height:20px;font-weight:700;vertical-align:top;">${escapeHtml(value)}</td>
     </tr>
   `;
 
@@ -930,8 +930,26 @@ export function generateSamGreenEmailHtml(briefing: SamDailyBriefing, userEmail?
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <!-- Declare a light-only design. Without this, mobile clients (esp. Apple Mail)
+       auto-invert the email: the white card goes near-black but the dark value
+       text (#111827) and gray labels (#6b7280) DON'T invert cleanly → "BUYER /
+       POSTED" labels and values vanished on dark backgrounds (Eric, mobile QA). -->
+  <meta name="color-scheme" content="light only">
+  <meta name="supported-color-schemes" content="light only">
   <title>Daily Brief - Active Solicitations</title>
   <style>
+    :root { color-scheme: light only; supported-color-schemes: light only; }
+    /* Belt-and-suspenders: if a client still forces dark, pin the text colors so
+       the meta labels/values keep contrast instead of disappearing. */
+    @media (prefers-color-scheme: dark) {
+      .container { background: #ffffff !important; }
+      .meta-cell-label { color: #6b7280 !important; }
+      .meta-cell-value { color: #111827 !important; }
+      .opp-title, .opp-meta-value { color: #111827 !important; }
+    }
+    /* Outlook.com / Gmail dark-mode wrap these attrs around inverted nodes. */
+    [data-ogsc] .meta-cell-value, [data-ogsb] .meta-cell-value { color: #111827 !important; }
+    [data-ogsc] .meta-cell-label, [data-ogsb] .meta-cell-label { color: #6b7280 !important; }
     body { margin: 0; padding: 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; background: #f3f4f6; }
     .container { max-width: 680px; margin: 0 auto; background: #ffffff; }
     .header { background: linear-gradient(135deg, #059669 0%, #10b981 100%); color: white; padding: 32px 24px; text-align: center; }
