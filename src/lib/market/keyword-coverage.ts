@@ -134,7 +134,10 @@ export interface KeywordCoverage {
  * the derived code set should capture (default 0.9 = 90%).
  */
 // Stopwords stripped when reducing a phrase/sentence to its core term.
-const STOP = new Set(['we', 'provide', 'offer', 'and', 'or', 'the', 'a', 'an', 'for', 'of', 'to', 'in', 'our', 'with', 'services', 'service', 'support', 'solutions', 'consulting', 'company', 'federal', 'government', 'agencies']);
+const STOP = new Set(['we', 'provide', 'offer', 'and', 'or', 'the', 'a', 'an', 'for', 'of', 'to', 'in', 'our', 'with', 'services', 'service', 'support', 'solutions', 'consulting', 'company', 'federal', 'government', 'agencies',
+  // Business-entity / generic nouns that aren't capabilities — "demolition firm"
+  // was leaking "firm" as a keyword. These describe the org, not what it does.
+  'firm', 'llc', 'inc', 'corp', 'corporation', 'business', 'group', 'enterprise', 'enterprises', 'contractor', 'contractors', 'provider', 'providers', 'specialist', 'specialists', 'professional', 'professionals']);
 
 /**
  * USASpending keyword search is EXACT-PHRASE (QA: "cybersecurity consulting"

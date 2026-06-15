@@ -533,6 +533,20 @@ export default function OnboardingPage() {
     setAutoProfile((p: { naics?: string[] } | null) => p ? { ...p, naics: (p.naics || []).filter((c: string) => c !== code) } : p);
   }
 
+  // Keyword tuning on the confirm screen — extraction grabs generic words
+  // ("demolition firm" → "firm"); let the user drop junk + add the capability
+  // words that catch mislabeled titles. Keywords drive alert matching.
+  const [keywordDraft, setKeywordDraft] = useState('');
+  function removeAutoKeyword(kw: string) {
+    setAutoProfile((p: { keywords?: string[] } | null) => p ? { ...p, keywords: (p.keywords || []).filter((k: string) => k !== kw) } : p);
+  }
+  function addAutoKeyword() {
+    const kw = keywordDraft.trim().toLowerCase();
+    if (!kw) return;
+    setAutoProfile((p: { keywords?: string[] } | null) => p ? { ...p, keywords: [...new Set([...(p.keywords || []), kw])] } : p);
+    setKeywordDraft('');
+  }
+
   // Inline edit — the user fixes the industry phrase ("nurse staffing" not
   // "professional services") → re-ground codes/agencies from the corrected phrase.
   const [editingIndustry, setEditingIndustry] = useState(false);
@@ -781,6 +795,24 @@ export default function OnboardingPage() {
           {mode === 'auto' && autoProfile && (
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/10 p-5">
               <div className="text-sm text-slate-400 mb-3">Here&rsquo;s what Mindy found — look right? Anything off, just fix it.</div>
+              {/* Coverage hero — the wow moment. Most contractors search ONE obvious
+                  NAICS code; Mindy maps the full set. Honest, real numbers (6 for
+                  demolition, 70+ for a broad domain) — never a fabricated count. */}
+              {autoProfile.naicsCount > 1 && (
+                <div className="mb-4 rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/40 to-slate-900 p-4">
+                  <div className="flex items-baseline gap-2">
+                    <span className="text-3xl font-black text-emerald-400">{autoProfile.naicsCount}</span>
+                    <span className="text-sm font-semibold text-white">NAICS codes mapped to your work</span>
+                  </div>
+                  <p className="mt-1 text-xs text-slate-400">
+                    Most contractors track just the one obvious code. Mindy found{' '}
+                    <span className="text-emerald-300 font-semibold">{autoProfile.naicsCount}</span>
+                    {autoProfile.topPsc ? <> + PSC <span className="text-emerald-300 font-semibold">{autoProfile.topPsc.code}</span></> : null}
+                    {autoProfile.totalMarket ? <> across <span className="text-emerald-300 font-semibold">${Math.round(autoProfile.totalMarket / 1e6)}M</span> in federal spend</> : null}
+                    {' '}— so your alerts catch opportunities the single-code crowd misses.
+                  </p>
+                </div>
+              )}
               <div className="space-y-3 text-sm">
                 {/* Industry — editable. Wrong guess? Retype it → Mindy re-grounds. */}
                 <div>
@@ -798,7 +830,6 @@ export default function OnboardingPage() {
                     <>
                       <span className="text-white font-medium capitalize">{autoProfile.industryPhrase}</span>
                       <button onClick={() => { setIndustryDraft(autoProfile.industryPhrase); setEditingIndustry(true); }} className="ml-2 text-xs text-purple-400 hover:text-purple-300">edit</button>
-                      {autoProfile.totalMarket ? <span className="text-slate-500"> · ${Math.round(autoProfile.totalMarket / 1e6)}M market across {autoProfile.naicsCount} codes</span> : null}
                     </>
                   )}
                 </div>
@@ -811,6 +842,25 @@ export default function OnboardingPage() {
                     </span>
                   ))}
                   {autoProfile.topPsc && <span className="inline-block rounded bg-purple-500/20 px-2 py-0.5 text-xs text-purple-300 mr-1">PSC {autoProfile.topPsc.code}</span>}
+                </div>
+                {/* Keywords — tune the words that catch mislabeled opportunity titles.
+                    Extraction can grab generics; drop junk + add real capability words. */}
+                <div>
+                  <span className="text-slate-500">Keywords (catch titles your codes miss): </span>
+                  <div className="mt-1.5 flex flex-wrap items-center gap-1">
+                    {(autoProfile.keywords || []).map((kw: string) => (
+                      <span key={kw} className="inline-flex items-center gap-1 rounded bg-slate-800 px-2 py-0.5 text-xs text-slate-200">
+                        {kw}<button onClick={() => removeAutoKeyword(kw)} className="text-slate-500 hover:text-red-400">✕</button>
+                      </span>
+                    ))}
+                    <input
+                      value={keywordDraft}
+                      onChange={e => setKeywordDraft(e.target.value)}
+                      onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAutoKeyword(); } }}
+                      placeholder="+ add a keyword"
+                      className="w-32 bg-transparent border-b border-slate-700 text-xs text-white placeholder-slate-600 focus:border-purple-500 focus:outline-none px-1 py-0.5"
+                    />
+                  </div>
                 </div>
                 {autoProfile.setAsides?.length > 0 && (
                   <div><span className="text-slate-500">Set-asides detected: </span>{autoProfile.setAsides.map((s: string) => <span key={s} className="inline-block rounded bg-amber-500/20 px-2 py-0.5 text-xs text-amber-300 mr-1">{s}</span>)}</div>
