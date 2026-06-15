@@ -16,7 +16,7 @@ with a documented need is normally the whole challenge.
 
 | Contact | Org | Stated need | Maps to Mindy | AFWERX role | Priority |
 |---|---|---|---|---|---|
-| **KO** *(name TBD)* | **Army MICC** (Mission & Installation Contracting Command) | Market research for an acquisition (KO side) | Contractor search + CTA/market research | ✅ **Best fit** — a KO can speak to acquisition needs → valid Customer/End-User | **P1** |
+| **KO** *(name TBD)* | **U.S. Army Contracting Command – Orlando** | Market research for an acquisition (KO side) | Contractor search + CTA/market research | ✅ **Best fit** — a KO can speak to acquisition needs → valid Customer/End-User | **P1** |
 | *(name TBD)* | **DISA** | **Researching expiring contracts** (recompete intel) | ★ Award-detail + incumbent engine — *already strong in product* | Customer/End-User OK (Joint — needs a DAF use case for AFWERX; can't be TPOC) | **P1** |
 | *(name TBD)* | **Navy OSBP** | **SMB market research** | Contractor DB by socioeconomic + NAICS | Likely a CONNECTOR (OSBP = advisory) → route to a Navy operational office | P2 |
 
@@ -29,7 +29,7 @@ find a DAF TPOC, OR consider **other SBIR routes** where Army/Navy/DISA are the 
 per contact: AFWERX-with-DAF-angle vs. their own component's SBIR.**
 
 **Each need is a different Mindy capability** → harden the one that matches whoever advances first:
-- MICC KO → acquisition market research (contractor/CTA search)
+- ACC-Orlando KO → acquisition market research (contractor/CTA search)
 - DISA → expiring-contracts/recompete (the award-detail + incumbent spine — our strongest, most-built feature here)
 - Navy OSBP → SMB market research (contractor DB by set-aside + NAICS)
 

@@ -45,7 +45,7 @@ prototype for each, **all on one demo account** (getmindy.ai/app → disa-demo@g
 |---|---|---|
 | **DISA** | Stop tracking IDIQ/IDV vehicles by hand; notify the incumbent before expiry | **Vehicle Expiry Watch** — upload the spreadsheet, auto-watch every expiry, auto-draft the incumbent notice (dry-run until they approve). DISA can get us in front of the KOs once verified. |
 | **Navy OSBP** — Ashley Hodge, Deputy of Small Business Programs, Puget Sound Naval Shipyard | "Scaleable access to small businesses for contracting" | **SMB Sourcing** — search thousands of capable small businesses by PSC+NAICS, ranked by who's won the work, filter to small + set-aside, export. (She made the warm intro.) |
-| **Army MICC** (contracting officer) | Acquisition market research — sent us the official Army MRR template | **MRR Generator** — auto-drafts the data sections of the official Army MAY-2026 Market Research Report from real award data, exports the .docx; brackets the CO's judgment sections. |
+| **U.S. Army Contracting Command – Orlando** (contracting officer) | Acquisition market research — sent us the official Army MRR template | **MRR Generator** — auto-drafts the data sections of the official Army MAY-2026 Market Research Report from real award data, exports the .docx; brackets the CO's judgment sections. |
 
 **The product story (repeat it):** *one engine, real federal award data, three jobs.* The same
 PSC-scored search powers Navy sourcing AND the supplier/set-aside sections of the Army MRR; the
@@ -53,7 +53,7 @@ award/recompete spine powers DISA's watch.
 
 **The honesty rule (why gov buyers trust it):** every prototype does the heavy data work and is
 explicit about what it does NOT do — DISA sends nothing live until approved; OSBP shows "won
-set-aside work," not a faked cert; MICC brackets the IGE, commerciality determination, and
+set-aside work," not a faked cert; ACC-Orlando brackets the IGE, commerciality determination, and
 signatures. **Never overclaim an authorization (ATO) we don't have.**
 
 ---
@@ -68,7 +68,7 @@ That maps onto us. So:
 
 **TRACK 1 — SELL DIRECT (revenue now).** The 3 warm contacts are BUYERS, not grant sponsors. They
 buy Mindy as a commercial-item subscription:
-- Army MICC → micro-purchase (≤$15K) pilot → simplified acquisition (≤$350K). The KO can buy it.
+- U.S. Army Contracting Command – Orlando → micro-purchase (≤$15K) pilot → simplified acquisition (≤$350K). The KO can buy it.
 - DISA → DITCO or the Tradewind marketplace.
 - Navy OSBP → micro-purchase + NavalX Tech Bridge.
 - **Pilot shape:** small ($15K), 60–90 days, one team → land → expand to adjacent offices.

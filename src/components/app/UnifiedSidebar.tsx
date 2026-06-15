@@ -62,7 +62,7 @@ export type AppPanel =
   | 'grants'         // Federal grants
   | 'disa-watch'     // Vehicle Expiry Watch — DISA prototype (IDIQ/IDV expiry auto-notify)
   | 'osbp-smb'       // SMB Market Research — Navy OSBP prototype (certified small-biz sourcing)
-  | 'micc-mrr';      // Market Research Report — Army MICC prototype (auto-draft the MRR .docx)
+  | 'micc-mrr';      // Market Research Report — ACC-Orlando prototype (auto-draft the MRR .docx)
 
 // Tier definitions
 export type AppTier = 'free' | 'pro' | 'team' | 'enterprise';
@@ -244,7 +244,7 @@ const NAV_SECTIONS: NavSection[] = [
         tier: ['pro', 'team', 'enterprise'],
       },
       {
-        // Army MICC prototype (Jun 2026): auto-draft the official Army MRR
+        // ACC-Orlando prototype (Jun 2026): auto-draft the official Army MRR
         // (MAY 2026 template) data sections from real award data → .docx.
         id: 'micc-mrr',
         label: 'Market Research Report',

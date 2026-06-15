@@ -100,6 +100,6 @@ Programs, Puget Sound Naval Shipyard & IMF — PSNS&IMF, Bremerton WA) and her n
 - Best demo query: PSC **J998** + NAICS **336611** (ship repair — Ashley's domain)
 - Contact: Ashley Hodge, ashley.n.hodge6.civ@us.navy.mil, (360) 979-3423 · intro via Keidra Norwood
 - Honest gaps (say if asked): live cert filter + region filter + SBA size standard = next adds
-- Shared engine: this powers §11/§12 of the Army MRR too (`MICC-DEMO-PITCH-RUNBOOK.md`)
+- Shared engine: this powers §11/§12 of the Army MRR too (`ACC-Orlando-DEMO-PITCH-RUNBOOK.md`)
 
 *Created June 14, 2026.*

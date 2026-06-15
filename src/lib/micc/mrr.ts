@@ -6,7 +6,7 @@
  * opportunities, §15 market intelligence — from existing engines, and returns a
  * structured MRR + the list of sections the CO must complete (IGE, commerciality,
  * signatures). Matches the official Army MAY-2026 template.
- * (MICC-MRR-SPEC.md · honesty: auto-filled fields cite USASpending; the rest is
+ * (ACC-ORLANDO-MRR-SPEC.md · honesty: auto-filled fields cite USASpending; the rest is
  *  bracketed for the CO — we never invent an IGE or a determination.)
  */
 import { procurementHistoryByCode, findCapableSmallBusinesses, type ProcurementHistoryRow, type CapableSmbRow } from '@/lib/bigquery/recipients';

@@ -1,13 +1,13 @@
 'use client';
 
 /**
- * Army MICC — Market Research Report generator.
+ * U.S. Army Contracting Command – Orlando — Market Research Report generator.
  *
  * Enter PSC + NAICS + requirement title → Mindy fills the DATA sections of the
  * official Army MAY-2026 MRR (procurement history, capable suppliers, market
  * intelligence, set-aside recommendation) from real USASpending data, brackets
  * the CO's judgment sections, and exports the .docx. Turns days of manual
- * research into a first draft. (MICC-MRR-SPEC.md)
+ * research into a first draft. (ACC-ORLANDO-MRR-SPEC.md)
  */
 import { useState, useCallback } from 'react';
 import { getMIApiHeaders } from '../authHeaders';

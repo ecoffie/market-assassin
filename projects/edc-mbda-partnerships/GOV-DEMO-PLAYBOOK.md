@@ -13,7 +13,7 @@ prototype live on the demo account. This is the index — open the specific runb
 |---|---|---|---|---|
 | **DISA** | Research expiring contracts — stop tracking IDIQ/IDV by hand | **Vehicle Expiry Watch** — auto-notify the incumbent at 6mo/90d/30d | "Vehicle Expiry Watch" | `DISA-DEMO-PITCH-RUNBOOK.md` |
 | **Navy OSBP** — Ashley Hodge (PSNS&IMF) | Scaleable access to small businesses for contracting | **SMB Sourcing** — PSC-scored capable small businesses, exportable | "SMB Market Research" | `OSBP-DEMO-PITCH-RUNBOOK.md` |
-| **Army MICC** (KO) | Acquisition market research (sent the official MRR template) | **MRR generator** — auto-drafts the Army MAY-2026 MRR .docx | "Market Research Report" | `MICC-DEMO-PITCH-RUNBOOK.md` |
+| **U.S. Army Contracting Command – Orlando** (KO) | Acquisition market research (sent the official MRR template) | **MRR generator** — auto-drafts the Army MAY-2026 MRR .docx | "Market Research Report" | `ACC-Orlando-DEMO-PITCH-RUNBOOK.md` |
 
 ---
 
@@ -31,7 +31,7 @@ businesses, documenting a market research report, or tracking expiring vehicles.
 Each prototype does the data-heavy work and is **explicit about what it doesn't do**:
 - DISA: dry-run — nothing emails a vendor until they approve the voice + list.
 - OSBP: "won set-aside work" signal, not a live cert pull (yet); national ranking, region next.
-- MICC: fills research/data sections; brackets the IGE, commerciality determination, signatures.
+- ACC-Orlando: fills research/data sections; brackets the IGE, commerciality determination, signatures.
 
 A government buyer trusts the tool *because* it's honest about its edges. Never overclaim an ATO.
 
@@ -43,7 +43,7 @@ small, then grow.)
 ## Strategy context
 - `GOVT-GTM-STRATEGY.md` — these are Track 1 (sell direct via commercial-item pilots = revenue now);
   one AFWERX SBIR later for the Phase III key.
-- Direct-buy paths (per contact): MICC → micro-purchase $15K → SAT $350K; DISA → DITCO/Tradewind;
+- Direct-buy paths (per contact): ACC-Orlando → micro-purchase $15K → SAT $350K; DISA → DITCO/Tradewind;
   Navy OSBP → micro/SAT + NavalX Tech Bridge.
 
 *Created June 14, 2026.*

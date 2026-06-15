@@ -1,6 +1,6 @@
-# Army MICC Demo — Step-by-Step Pitch Runbook
+# Army Contracting Command – Orlando Demo — Step-by-Step Pitch Runbook
 
-**For:** Eric, demoing the Market Research Report (MRR) generator to the **Army MICC** contracting
+**For:** Eric, demoing the Market Research Report (MRR) generator to the **U.S. Army Contracting Command – Orlando** contracting
 officer (the contact who sent the official MRR template).
 **His stated need:** acquisition market research — and he handed you the exact form (the Army
 **MAY-2026 MRR template**, post-FAR-Overhaul). We match it.
@@ -71,7 +71,7 @@ officer (the contact who sent the official MRR template).
 > "So this turns days of market research into a draft you finish in an hour. Two things to make it
 > real for your shop:
 > 1. Give me a live requirement — a PSC/NAICS you're working now — and I'll generate its MRR.
-> 2. Is the May 2026 template the current one MICC uses, or do you have local addenda? I'll match it.
+> 2. Is the May 2026 template the current one ACC-Orlando uses, or do you have local addenda? I'll match it.
 >
 > Then we run it on a real action as a pilot — no cost."
 
@@ -85,7 +85,7 @@ officer (the contact who sent the official MRR template).
 |---|---|
 | "Where's the data from?" | "USASpending federal award data — every figure is real obligations, dated. The supplier and history tables cite the source." |
 | "Does it write the whole determination?" | "No — and that's deliberate. It fills the research/data sections; you write the IGE, commerciality determination, and sign. It never fabricates a determination." |
-| "Is this authorized / can it go in my contract file?" | "It produces a draft you review, complete, and certify — same as any tool-assisted research. What goes in the file is your finished, signed document. Standing it up for MICC use, with any IT review, is what a pilot scopes." |
+| "Is this authorized / can it go in my contract file?" | "It produces a draft you review, complete, and certify — same as any tool-assisted research. What goes in the file is your finished, signed document. Standing it up for ACC-Orlando use, with any IT review, is what a pilot scopes." |
 | "It used the wrong NAICS / set-aside." | "You control the inputs — change the PSC/NAICS and regenerate. The recommendation follows the real data; if you disagree, your judgment overrides, and the doc is yours to edit." |
 | "Does it handle the IGE?" | "No — the IGE is your cost estimate; it's bracketed for you to insert. It's not something a market tool should invent." |
 | "What about the RFA / non-commercial determination?" | "Bracketed for you — that's a legal/policy call. Mindy gives you the market research that *supports* it." |

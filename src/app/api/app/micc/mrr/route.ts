@@ -4,7 +4,7 @@
  * Army Market Research Report generator. Default → structured JSON (on-screen
  * preview). format=docx → the official Army MAY-2026 MRR template as .docx with
  * the data sections (§5/§9/§11/§12/§15) auto-filled and the CO's judgment
- * sections bracketed. (MICC-MRR-SPEC.md)
+ * sections bracketed. (ACC-ORLANDO-MRR-SPEC.md)
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';

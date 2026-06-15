@@ -125,7 +125,7 @@ Walk this order — 15 minutes max:
 | `GOV-DEMO-PLAYBOOK.md` | **★ INDEX of all 3 gov demos** — 3 warm contacts, 3 live prototypes, the product story + honesty rule + universal close. Start here. |
 | `DISA-DEMO-PITCH-RUNBOOK.md` | Step-by-step demo script — DISA Vehicle Expiry Watch |
 | `OSBP-DEMO-PITCH-RUNBOOK.md` | Step-by-step demo script — Navy OSBP (Ashley) SMB Sourcing |
-| `MICC-DEMO-PITCH-RUNBOOK.md` | Step-by-step demo script — Army MICC MRR generator |
+| `ACC-Orlando-DEMO-PITCH-RUNBOOK.md` | Step-by-step demo script — U.S. Army Contracting Command – Orlando MRR generator |
 | (built) 3 gov prototypes | DISA Vehicle Expiry Watch · Navy SMB Sourcing (PSC-scored) · Army MRR generator — all LIVE on the demo account (disa-demo@getmindy.ai) |
 | `../../scripts/provision-edc-pilot-org.sql` | Supabase org setup for EDC eval |
 

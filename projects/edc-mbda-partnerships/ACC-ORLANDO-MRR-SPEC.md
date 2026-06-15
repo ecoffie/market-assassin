@@ -1,6 +1,6 @@
-# Army MICC — Market Research Report (MRR) Generator Spec
+# U.S. Army Contracting Command – Orlando — Market Research Report (MRR) Generator Spec
 
-**For:** Army MICC contracting officer (warm contact #3); also feeds Navy OSBP (shared engine)
+**For:** U.S. Army Contracting Command – Orlando contracting officer (warm contact #3); also feeds Navy OSBP (shared engine)
 **Source of truth:** `docs/Market Research Report Template (MAY 2026).pdf` — the OFFICIAL Army MRR
 template (post-FAR-Overhaul, RFO/DFARS class deviations eff. 01 Feb 2026). The KO sent this as the
 example. We match it exactly.
@@ -74,7 +74,7 @@ Bracketed = the CO's input. We never invent an IGE, a commerciality determinatio
 ## Open items
 - [ ] Build the 5 data sections + bracketed skeleton + .docx export
 - [ ] SBA size-standard lookup for §5 (table by NAICS) — or bracket if not readily available
-- [ ] Confirm with the MICC KO: is the MAY 2026 template the current one they use? any local MICC addenda?
+- [ ] Confirm with the ACC-Orlando KO: is the MAY 2026 template the current one they use? any local ACC-Orlando addenda?
 - [ ] Demo: seed a sample PSC+NAICS (e.g. R425 / 541330) so the preview is populated
 
 *Created June 14, 2026. The MRR generator = assemble existing engines (findCapableSmallBusinesses +

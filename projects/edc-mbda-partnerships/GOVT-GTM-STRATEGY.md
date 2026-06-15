@@ -12,7 +12,7 @@
 We started thinking "win an SBIR to fund Mindy." The research says that's the **wrong instrument for our 3 warm contacts** — and the Anduril story shows why.
 
 **SBIR funds R&D you haven't done yet. Mindy already exists and works.** Our three contacts
-(Army MICC KO, DISA, Navy OSBP) are **acquisition / small-business people who can simply BUY a
+(U.S. Army Contracting Command – Orlando KO, DISA, Navy OSBP) are **acquisition / small-business people who can simply BUY a
 commercial tool** — none of them is an SBIR topic sponsor. Trying to route them through SBIR is
 solving a problem we don't have.
 
@@ -37,7 +37,7 @@ can execute it themselves.
 
 | Contact | Need | Buy path (post-Oct-2025 thresholds) |
 |---|---|---|
-| **Army MICC (KO)** | acquisition market research | **Micro-purchase ≤$15K** pilot (purchase card, no competition) → **Simplified Acquisition ≤$350K** to scale. The KO executes this directly. |
+| **U.S. Army Contracting Command – Orlando (KO)** | acquisition market research | **Micro-purchase ≤$15K** pilot (purchase card, no competition) → **Simplified Acquisition ≤$350K** to scale. The KO executes this directly. |
 | **DISA** | research expiring contracts | **DITCO** commercial buy (FAR Part 12) or the **Tradewind AI marketplace** (CDAO, DoD-wide). DISA issues no SBIR topics — this was always a direct buy. |
 | **Navy OSBP** | SMB market research | **Micro-purchase / SAT** commercial buy + **NavalX Tech Bridge** as the warm channel. |
 
@@ -98,7 +98,7 @@ demand for **industrial-base visibility** and faster market research. Anchor sen
 
 | Who | Vehicle | Why |
 |---|---|---|
-| Army MICC KO | **Direct buy** (micro → SAT) | KO is a buyer, not an SBIR sponsor; Army open topic narrowing |
+| U.S. Army Contracting Command – Orlando KO | **Direct buy** (micro → SAT) | KO is a buyer, not an SBIR sponsor; Army open topic narrowing |
 | DISA | **Direct buy** (DITCO / Tradewind) | DISA issues no SBIR topics; "research expiring contracts" = internal-tool buy |
 | Navy OSBP | **Direct buy** + NavalX Tech Bridge | OSBP is a buyer/advocate, not a topic sponsor |
 | AFICC / AFLCMC (new AF target) | **AFWERX SBIR** → Phase III key | The one SBIR worth doing — for the Phase III sole-source unlock |
