@@ -43,6 +43,19 @@ function SuccessContent() {
     'briefings_lifetime',
     'fhc_membership',
   ].includes(product) : false;
+  // Mindy products land the buyer in the canonical app (getmindy.ai/app), NOT
+  // the legacy /briefings dashboard. Matters most for the $2,997 bootcamp
+  // lifetime buyer's first impression.
+  const isMindyProduct = product ? [
+    'founders-lifetime',
+    'bootcamp-lifetime',
+    'mindy-lifetime',
+    'briefings',
+    'briefings_monthly',
+    'briefings_annual',
+    'briefings_lifetime',
+  ].includes(product) : false;
+  const appHref = isMindyProduct ? '/app' : '/briefings';
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 to-blue-50">
@@ -95,17 +108,17 @@ function SuccessContent() {
 
           <div className="space-y-4">
             <Link
-              href="/"
+              href={isMindyProduct ? '/app' : '/'}
               className="block w-full px-6 py-3 bg-amber-500 hover:bg-amber-400 text-slate-900 font-bold rounded-lg transition-colors text-center"
             >
-              Access Your Tools
+              {isMindyProduct ? 'Open Mindy →' : 'Access Your Tools'}
             </Link>
             {includesBriefings && (
               <Link
-                href="/briefings"
+                href={appHref}
                 className="block w-full px-6 py-3 border border-blue-200 text-blue-700 font-semibold rounded-lg transition-colors text-center hover:bg-blue-50"
               >
-                Open Your Briefings
+                {isMindyProduct ? 'Go to your dashboard' : 'Open Your Briefings'}
               </Link>
             )}
             <p className="text-sm text-gray-500">
@@ -123,10 +136,10 @@ function SuccessContent() {
           <div className="grid grid-cols-2 gap-3">
             {includesBriefings && (
               <Link
-                href="/briefings"
+                href={appHref}
                 className="px-4 py-3 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg text-center text-sm transition-colors"
               >
-                Daily Briefings
+                {isMindyProduct ? 'Open Mindy' : 'Daily Briefings'}
               </Link>
             )}
             <Link
