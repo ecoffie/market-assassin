@@ -2474,17 +2474,22 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                   {teamMembers.map(m => <option key={m} value={m} />)}
                 </datalist>
               )}
+              {/* On a phone the full 7-col grid is 820px wide → horizontal swipe.
+                  Hide the three least-actionable columns (ID / Category / Section)
+                  below sm so the columns that matter — Requirement, Owner, Status
+                  — fit the viewport. Min-width only kicks in at sm+. CSS only,
+                  no change to the data or the owner/status edit logic. */}
               <div className="overflow-x-auto border border-slate-800 rounded-lg">
-                <table className="w-full text-sm min-w-[820px]">
+                <table className="w-full text-sm sm:min-w-[820px]">
                   <thead className="bg-slate-950/60 text-slate-400 text-xs uppercase tracking-wider">
                     <tr>
-                      <th className="text-left px-3 py-2 font-medium w-20">ID</th>
-                      <th className="text-left px-3 py-2 font-medium min-w-[280px]">Requirement</th>
-                      <th className="text-left px-3 py-2 font-medium w-28">Category</th>
-                      <th className="text-left px-3 py-2 font-medium w-24">Section</th>
-                      <th className="text-left px-3 py-2 font-medium w-36">Drafted in</th>
-                      <th className="text-left px-3 py-2 font-medium w-40">Owner</th>
-                      <th className="text-left px-3 py-2 font-medium w-32">Status</th>
+                      <th className="hidden sm:table-cell text-left px-3 py-2 font-medium w-20">ID</th>
+                      <th className="text-left px-3 py-2 font-medium min-w-[160px] sm:min-w-[280px]">Requirement</th>
+                      <th className="hidden sm:table-cell text-left px-3 py-2 font-medium w-28">Category</th>
+                      <th className="hidden sm:table-cell text-left px-3 py-2 font-medium w-24">Section</th>
+                      <th className="hidden sm:table-cell text-left px-3 py-2 font-medium w-36">Drafted in</th>
+                      <th className="text-left px-3 py-2 font-medium w-28 sm:w-40">Owner</th>
+                      <th className="text-left px-3 py-2 font-medium w-24 sm:w-32">Status</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -2502,7 +2507,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                           </tr>
                         )}
                         <tr className="border-t border-slate-800 hover:bg-slate-800/30 align-top">
-                          <td className="px-3 py-2 font-mono text-xs text-slate-500">{r.id}</td>
+                          <td className="hidden sm:table-cell px-3 py-2 font-mono text-xs text-slate-500">{r.id}</td>
                           <td className="px-3 py-2 text-slate-200">
                             {r.requirement}
                             {r.revised && (
@@ -2520,13 +2525,13 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                               </details>
                             )}
                           </td>
-                          <td className="px-3 py-2">
+                          <td className="hidden sm:table-cell px-3 py-2">
                             <span className={`inline-block px-2 py-0.5 text-[10px] font-medium rounded border ${cat.color}`}>
                               {cat.label}
                             </span>
                           </td>
-                          <td className="px-3 py-2 text-xs text-slate-400 font-mono">{r.section || '—'}</td>
-                          <td className="px-3 py-2 text-xs">
+                          <td className="hidden sm:table-cell px-3 py-2 text-xs text-slate-400 font-mono">{r.section || '—'}</td>
+                          <td className="hidden sm:table-cell px-3 py-2 text-xs">
                             {(() => {
                               // Section alignment: which draft section answers
                               // this requirement, and is it drafted yet?
