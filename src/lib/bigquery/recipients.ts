@@ -527,6 +527,118 @@ export async function getYearlyTotalsForRecipient(
   });
 }
 
+// ── Capable small-business sourcing (Navy OSBP) ────────────────────────
+// SCORE, DON'T FILTER (Eric: "if we do backwards we miss real matches").
+// A firm that does the WORK (won the PSC) but is registered under an adjacent
+// NAICS is a REAL match — a hard PSC∩NAICS filter would drop it (false
+// negative, the #1 accuracy sin). So we UNION all winners and RANK by relevance:
+//   PSC exact = strongest ("won the literal thing being bought")
+//   PSC family (first 2 chars, e.g. J0/19) = strong
+//   NAICS match = solid (right industry)
+//   + set-aside wins (small-biz signal), + proven winner (real awards)
+// PSC drives the SORT; NAICS widens the net. (Memory: naics_vs_psc_search.)
+export interface CapableSmbRow {
+  recipient_uei: string;
+  recipient_name: string;
+  total_obligated: number;
+  award_count: number;
+  agency_count: number;
+  set_asides: string;
+  won_set_aside: boolean;
+  psc_exact: boolean;     // won the exact PSC
+  psc_family: boolean;    // won a PSC in the same 2-char family
+  naics_match: boolean;   // won under the target NAICS
+  match_score: number;    // composite relevance (higher = better)
+  match_reason: string;   // human label for why it ranked
+}
+
+export async function findCapableSmallBusinesses(opts: {
+  psc?: string;            // the specific product/service being bought (best signal)
+  naics?: string;          // the industry (widens the net)
+  maxObligated?: number;   // $ ceiling to bias toward smaller firms (default $25M)
+  setAsideOnly?: boolean;
+  limit?: number;
+  offset?: number;
+  liveBq?: boolean;
+}): Promise<{ rows: CapableSmbRow[]; total: number }> {
+  const psc = (opts.psc || '').trim().toUpperCase();
+  const naics = (opts.naics || '').trim();
+  if (!psc && !naics) return { rows: [], total: 0 };
+  const limit = Math.min(opts.limit || 50, 200);
+  const offset = Math.max(opts.offset || 0, 0);
+  const maxObligated = opts.maxObligated ?? 25_000_000;
+
+  // Match predicates. We UNION (OR) so nothing real is filtered out; the score
+  // (below) is what ranks PSC-exact above NAICS-only.
+  const naicsMatch = naics ? (naics.length >= 6 ? 'naics_code = @naics' : 'STARTS_WITH(naics_code, @naics)') : 'FALSE';
+  const pscExact = psc ? 'psc_code = @psc' : 'FALSE';
+  const pscFamily = psc ? 'STARTS_WITH(psc_code, @pscFam)' : 'FALSE';
+  const setAsideExpr =`LOGICAL_OR(set_aside IS NOT NULL AND set_aside != '' AND UPPER(set_aside) NOT LIKE '%NO SET%')`;
+
+  // Per-row flags computed in an inner aggregate, then scored in the outer.
+  const inner = `
+    SELECT
+      recipient_uei,
+      ANY_VALUE(recipient_name) AS recipient_name,
+      SUM(obligation_amount) AS total_obligated,
+      COUNT(DISTINCT award_id) AS award_count,
+      COUNT(DISTINCT awarding_agency) AS agency_count,
+      STRING_AGG(DISTINCT NULLIF(set_aside, ''), ', ') AS set_asides,
+      ${setAsideExpr} AS won_set_aside,
+      LOGICAL_OR(${pscExact}) AS psc_match_exact,
+      LOGICAL_OR(${pscFamily}) AS psc_match_family,
+      LOGICAL_OR(${naicsMatch}) AS naics_hit
+    FROM ${BQ_TABLES.awards}
+    WHERE obligation_amount > 0 AND (${pscExact} OR ${pscFamily} OR ${naicsMatch})
+    GROUP BY recipient_uei
+    HAVING SUM(obligation_amount) <= @maxObligated
+      ${opts.setAsideOnly ? `AND ${setAsideExpr}` : ''}
+  `;
+
+  // Composite score: PSC-exact 100, PSC-family 60, NAICS 40, +20 set-aside, +up
+  // to 20 for proven winning (award_count, capped). Sorts the union meaningfully.
+  const scored = `
+    SELECT
+      recipient_uei, recipient_name, total_obligated, award_count, agency_count,
+      set_asides, won_set_aside,
+      psc_match_exact AS psc_exact,
+      psc_match_family AS psc_family,
+      naics_hit AS naics_match,
+      (CASE WHEN psc_match_exact THEN 100 WHEN psc_match_family THEN 60 ELSE 0 END
+       + CASE WHEN naics_hit THEN 40 ELSE 0 END
+       + CASE WHEN won_set_aside THEN 20 ELSE 0 END
+       + LEAST(award_count, 20)) AS match_score,
+      (CASE WHEN psc_match_exact THEN 'Won this exact product/service'
+            WHEN psc_match_family THEN 'Won related product/service'
+            ELSE 'Active in this industry (NAICS)' END
+       || CASE WHEN won_set_aside THEN ' · set-aside winner' ELSE '' END) AS match_reason
+    FROM (${inner})
+  `;
+
+  const params: Record<string, unknown> = { maxObligated, limit, offset };
+  if (psc) { params.psc = psc; params.pscFam = psc.slice(0, 2); }
+  if (naics) params.naics = naics;
+
+  const key = `smb-capable:${psc}:${naics}:${maxObligated}:${opts.setAsideOnly ? 'sa' : 'all'}:${limit}:${offset}:v1`;
+  const rows = await queryCached<CapableSmbRow>({
+    cacheOnly: !opts.liveBq,
+    cacheKey: key,
+    query: `${scored} ORDER BY match_score DESC, total_obligated DESC LIMIT @limit OFFSET @offset`,
+    params,
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
+  });
+
+  const totalRows = await queryCached<{ n: number }>({
+    cacheOnly: !opts.liveBq,
+    cacheKey: `smb-capable-count:${psc}:${naics}:${maxObligated}:${opts.setAsideOnly ? 'sa' : 'all'}:v1`,
+    query: `SELECT COUNT(*) AS n FROM (${inner})`,
+    params: { maxObligated, ...(psc ? { psc, pscFam: psc.slice(0, 2) } : {}), ...(naics ? { naics } : {}) },
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
+  });
+
+  return { rows, total: Number(totalRows[0]?.n || rows.length) };
+}
+
 export interface YearlyByAgencyRow {
   fiscal_year: number;
   awarding_agency: string;
