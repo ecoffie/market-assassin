@@ -26,6 +26,7 @@ const CoachPanel = lazy(() => import('./CoachPanel'));
 const LibraryPanel = lazy(() => import('./LibraryPanel'));
 const DisaVehicleWatchPanel = lazy(() => import('./DisaVehicleWatchPanel'));
 const OsbpSmbResearchPanel = lazy(() => import('./OsbpSmbResearchPanel'));
+const MiccMrrPanel = lazy(() => import('./MiccMrrPanel'));
 
 interface PanelContainerProps {
   activePanel: AppPanel;
@@ -93,6 +94,8 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
         return <DisaVehicleWatchPanel email={email || ''} />;
       case 'osbp-smb':
         return <OsbpSmbResearchPanel email={email || ''} />;
+      case 'micc-mrr':
+        return <MiccMrrPanel email={email || ''} />;
       case 'vault':
         return <VaultPanel email={email} tier={tier} />;
       case 'library':

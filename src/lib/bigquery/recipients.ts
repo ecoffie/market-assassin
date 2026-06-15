@@ -639,6 +639,60 @@ export async function findCapableSmallBusinesses(opts: {
   return { rows, total: Number(totalRows[0]?.n || rows.length) };
 }
 
+// ── Procurement history (Army MRR §9) ──────────────────────────────────
+// Prior contracts for a PSC/NAICS, grouped to recipient — what the CO needs for
+// the "Procurement History" table: who won, how much, what method/set-aside,
+// over what period. Real award data (USASpending). (MICC-MRR-SPEC.md)
+export interface ProcurementHistoryRow {
+  recipient_name: string;
+  recipient_uei: string;
+  contract_type: string;     // most-common contract pricing type
+  set_aside: string;         // most-common set-aside / method
+  total_obligated: number;
+  award_count: number;
+  first_action: string;      // earliest award date (POP proxy start)
+  last_action: string;       // latest award date (POP proxy end)
+}
+
+export async function procurementHistoryByCode(opts: {
+  psc?: string;
+  naics?: string;
+  limit?: number;
+  liveBq?: boolean;
+}): Promise<ProcurementHistoryRow[]> {
+  const psc = (opts.psc || '').trim().toUpperCase();
+  const naics = (opts.naics || '').trim();
+  if (!psc && !naics) return [];
+  const limit = Math.min(opts.limit || 15, 50);
+  const conds: string[] = ['obligation_amount > 0'];
+  const params: Record<string, unknown> = { limit };
+  if (psc) { conds.push('psc_code = @psc'); params.psc = psc; }
+  if (naics) { conds.push(naics.length >= 6 ? 'naics_code = @naics' : 'STARTS_WITH(naics_code, @naics)'); params.naics = naics; }
+
+  return queryCached<ProcurementHistoryRow>({
+    cacheOnly: !opts.liveBq,
+    cacheKey: `mrr-proc-hist:${psc}:${naics}:${limit}:v1`,
+    query: `
+      SELECT
+        ANY_VALUE(recipient_name) AS recipient_name,
+        recipient_uei,
+        APPROX_TOP_COUNT(contract_pricing_type, 1)[OFFSET(0)].value AS contract_type,
+        APPROX_TOP_COUNT(NULLIF(set_aside, ''), 1)[OFFSET(0)].value AS set_aside,
+        SUM(obligation_amount) AS total_obligated,
+        COUNT(DISTINCT award_id) AS award_count,
+        CAST(MIN(action_date) AS STRING) AS first_action,
+        CAST(MAX(action_date) AS STRING) AS last_action
+      FROM ${BQ_TABLES.awards}
+      WHERE ${conds.join(' AND ')}
+      GROUP BY recipient_uei
+      ORDER BY total_obligated DESC
+      LIMIT @limit
+    `,
+    params,
+    maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
+  });
+}
+
 export interface YearlyByAgencyRow {
   fiscal_year: number;
   awarding_agency: string;

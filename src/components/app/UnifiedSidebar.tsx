@@ -61,7 +61,8 @@ export type AppPanel =
   | 'target-list'    // My Target List — saved BD targets (Pipeline section, Slice 3 of TMR roadmap)
   | 'grants'         // Federal grants
   | 'disa-watch'     // Vehicle Expiry Watch — DISA prototype (IDIQ/IDV expiry auto-notify)
-  | 'osbp-smb';      // SMB Market Research — Navy OSBP prototype (certified small-biz sourcing)
+  | 'osbp-smb'       // SMB Market Research — Navy OSBP prototype (certified small-biz sourcing)
+  | 'micc-mrr';      // Market Research Report — Army MICC prototype (auto-draft the MRR .docx)
 
 // Tier definitions
 export type AppTier = 'free' | 'pro' | 'team' | 'enterprise';
@@ -240,6 +241,15 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'SMB Market Research',
         icon: Search,
         description: 'Certified small-biz sourcing',
+        tier: ['pro', 'team', 'enterprise'],
+      },
+      {
+        // Army MICC prototype (Jun 2026): auto-draft the official Army MRR
+        // (MAY 2026 template) data sections from real award data → .docx.
+        id: 'micc-mrr',
+        label: 'Market Research Report',
+        icon: FileText,
+        description: 'Auto-draft the Army MRR',
         tier: ['pro', 'team', 'enterprise'],
       },
       {
