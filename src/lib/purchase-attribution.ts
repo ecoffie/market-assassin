@@ -66,7 +66,7 @@ export const CHECKOUT_PRODUCTS: Record<string, CheckoutProduct> = {
     name: 'Mindy Lifetime — Bootcamp Special',
     priceLabel: '$2,997 one-time',
     amountCents: 299700,
-    checkoutUrl: 'https://buy.stripe.com/REPLACE_ME_BOOTCAMP_LIFETIME_2997',
+    checkoutUrl: 'https://buy.stripe.com/8x29AU4Au0AG34VfxmfnO0H',
     type: 'stripe_payment_link',
   },
   // Alias — older /lifetime page links and docs.
@@ -75,7 +75,7 @@ export const CHECKOUT_PRODUCTS: Record<string, CheckoutProduct> = {
     name: 'Mindy Lifetime — Bootcamp Special',
     priceLabel: '$2,997 one-time',
     amountCents: 299700,
-    checkoutUrl: 'https://buy.stripe.com/REPLACE_ME_BOOTCAMP_LIFETIME_2997',
+    checkoutUrl: 'https://buy.stripe.com/8x29AU4Au0AG34VfxmfnO0H',
     type: 'stripe_payment_link',
   },
 };
