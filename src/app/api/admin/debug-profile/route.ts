@@ -47,7 +47,7 @@ export async function GET(request: NextRequest) {
   try {
     const r = await supabase
       .from('user_notification_settings')
-      .select('user_email, naics_codes, agencies, keywords, business_type, company_name, aggregated_profile, zip_codes')
+      .select('user_email, naics_codes, agencies, keywords, business_type, aggregated_profile')
       .eq('user_email', email)
       .maybeSingle();
     workspaceNotificationQuery = { data: r.data, error: r.error?.message || null };
