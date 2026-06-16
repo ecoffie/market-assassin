@@ -2045,3 +2045,30 @@ result into the existing confirm screen, and confirmAuto writes the UEI + identi
 past performance into the Vault so the capability-vector engine grounds hidden matches
 on real award history. Optional/skippable; falls through to describe-your-business.
 Marketing literature updated (rule #8).
+
+---
+
+## Mindy: Edit Your PSC Codes — the Precise "What's Bought" Targeting Axis (June 16, 2026)
+
+**What:** Settings now has an editable PSC Codes field alongside NAICS and keywords. PSC
+(Product/Service Codes) describe what the government actually buys — more precise than
+NAICS, which describes the vendor's industry. Your targeting card already shows the top
+PSC codes in your market ("what's actually bought"); now you can add those codes to your
+profile so your alerts hone in on them. The Keywords field also got a clearer placeholder
+so a saved value is obviously yours, not a sample.
+
+**Why:** PSC is the GovCon-pro's sharper instrument — "P500 Demolition of Structures" vs
+the broad NAICS "Remediation Services." Mindy's daily alerts already matched on PSC codes
+under the hood, but there was no way for a user to set them — a half-finished feature.
+Closing that loop lets contractors target the exact product/service the government issues
+contracts for, cutting noise from NAICS-only matching. Pairs with the card's PSC insight:
+see what's bought, then tell Mindy to watch those codes.
+
+**SEO:** edit PSC codes, product service codes federal contracting, PSC vs NAICS targeting,
+what does the government buy, precise opportunity matching.
+
+**Proof:** psc_codes column (20260612 migration) now surfaced in /api/app/workspace
+profile.notification; /api/alerts/preferences accepts + writes pscCodes (uppercased,
+deduped); UnifiedSettingsPanel has a PSC Codes field that loads + saves them; daily-alerts
+already consumed user.psc_codes for matching (the consuming half existed; this adds the
+editing half). Marketing literature updated (rule #8).

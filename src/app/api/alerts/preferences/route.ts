@@ -155,6 +155,7 @@ export async function POST(request: NextRequest) {
       phoneNumber,
       // Search criteria
       naicsCodes,
+      pscCodes,
       keywords,
       businessDescription,
       businessType,
@@ -278,6 +279,15 @@ export async function POST(request: NextRequest) {
 
     if (keywords !== undefined) {
       record.keywords = Array.isArray(keywords) ? keywords : [];
+    }
+
+    // PSC codes — "what was bought" (the precise product axis). Column exists
+    // (20260612 migration). Uppercased + deduped; PSCs are alphanumeric (e.g.
+    // R425, 1550, P500). Settings now edits these alongside NAICS.
+    if (pscCodes !== undefined) {
+      record.psc_codes = Array.isArray(pscCodes)
+        ? Array.from(new Set(pscCodes.map((c: unknown) => String(c).trim().toUpperCase()).filter(Boolean))).slice(0, 30)
+        : [];
     }
 
     // Production does not have user_notification_settings.business_description yet.

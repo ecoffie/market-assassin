@@ -18,6 +18,7 @@ interface SettingsForm {
   display_name: string;
   role_title: string;
   naics_codes: string;
+  psc_codes: string;
   keywords: string;
   target_agencies: string;
   email_frequency: string;
@@ -32,6 +33,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
     display_name: '',
     role_title: '',
     naics_codes: '',
+    psc_codes: '',
     keywords: '',
     target_agencies: '',
     email_frequency: 'daily',
@@ -96,6 +98,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
         display_name: settings.display_name || '',
         role_title: settings.role_title || '',
         naics_codes: (notif.naics_codes || settings.naics_codes || []).join(', '),
+        psc_codes: (notif.psc_codes || []).join(', '),
         keywords: (notif.keywords || settings.keywords || []).join(', '),
         target_agencies: (notif.agencies || settings.target_agencies || []).join(', '),
         // Prefer the canonical alert_frequency (drives actual emails)
@@ -161,6 +164,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
             keywords: parseList(form.keywords),
             // Authoritative targeting write → user_notification_settings.
             naicsCodes: parseList(form.naics_codes),
+            pscCodes: parseList(form.psc_codes),
             targetAgencies: parseList(form.target_agencies),
           }),
         }),
@@ -290,10 +294,22 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
             </div>
             <div>
               <Field
+                label="PSC Codes"
+                value={form.psc_codes}
+                onChange={(value) => setForm({ ...form, psc_codes: value })}
+                placeholder="e.g. R425, 1550, P500"
+              />
+              <p className="mt-1 text-xs text-slate-500">
+                Product/Service codes — <b>what the government actually buys</b> (more precise than NAICS).
+                Comma-separated. See &ldquo;what&rsquo;s bought&rdquo; on your targeting card above for the top codes in your market.
+              </p>
+            </div>
+            <div>
+              <Field
                 label="Keywords"
                 value={form.keywords}
                 onChange={(value) => setForm({ ...form, keywords: value })}
-                placeholder="demolition, hazmat removal, asbestos abatement"
+                placeholder="e.g. drone repair, cybersecurity, base operations"
               />
               <p className="mt-1 text-xs text-slate-500">
                 What Mindy searches for in the opportunity TEXT — catches the work your NAICS codes miss.

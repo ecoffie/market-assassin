@@ -42,7 +42,8 @@ export async function GET(request: NextRequest) {
       // WHOLE query → profile.notification came back null → the Settings card/form
       // showed "No codes / No keywords" despite the data being present (Eric QC
       // 2026-06-16). Never add a column here without confirming it exists.
-      .select('user_email, naics_codes, agencies, keywords, business_type, aggregated_profile')
+      // psc_codes DOES exist (20260612 migration) — included so Settings can edit it.
+      .select('user_email, naics_codes, psc_codes, agencies, keywords, business_type, aggregated_profile')
       .eq('user_email', normalizedEmail)
       .maybeSingle(),
     supabase
