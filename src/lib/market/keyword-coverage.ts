@@ -127,6 +127,11 @@ export interface KeywordCoverage {
   pscCount: number;
   topPsc: { code: string; name: string } | null;
   topPscPct: number;
+  // Top PSCs with dollars — "what was actually BOUGHT", ranked. Lets the UI show
+  // the real sub-markets a single keyword spans (e.g. "demolition" = Demolition of
+  // Structures $491M vs Ammunition Facilities $66M — building work vs ordnance work,
+  // which NAICS lumps together but PSC separates cleanly).
+  topPscList: { code: string; name: string; amount: number; pct: number }[];
 }
 
 /**
@@ -272,6 +277,12 @@ export async function keywordCoverage(keyword: string, coverageTarget = 0.9): Pr
     // literal product (e.g. 1550 Unmanned Aircraft) vs NAICS's vendor catch-all.
     const pscTotal = pscRows.reduce((s: number, r: { amount: number }) => s + r.amount, 0);
     const topPsc = pscRows[0] ? { code: pscRows[0].code, name: pscRows[0].name || pscRows[0].code } : null;
+    const topPscList = pscRows.slice(0, 5).map((r) => ({
+      code: r.code,
+      name: r.name || r.code,
+      amount: r.amount,
+      pct: pscTotal > 0 ? r.amount / pscTotal : 0,
+    }));
 
     return {
       keyword: kw,
@@ -284,6 +295,7 @@ export async function keywordCoverage(keyword: string, coverageTarget = 0.9): Pr
       pscCount: pscRows.length,
       topPsc,
       topPscPct: pscTotal > 0 && pscRows[0] ? pscRows[0].amount / pscTotal : 0,
+      topPscList,
     };
   } catch {
     return null;

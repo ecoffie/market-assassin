@@ -1868,3 +1868,35 @@ keyword corroboration for high/medium; specific anchors keep high) +
 100% processed; advanced_materials 5,444 suppressed vs 55 shown; all 14 CTAs populated
 (directed_energy 164, microelectronics 129, network_systems 124, …). Audit:
 `projects/edc-mbda-partnerships/CTA-TAGGER-AUDIT.md`.
+
+---
+
+## Mindy: Market Coverage + "What's Actually Bought" on the Targeting Card (June 15, 2026)
+
+**What:** The dashboard "Your targeting" card now shows the market context behind your
+codes, derived live from your primary keyword: "Your 6 codes cover 91% of a $1.4B
+market across 61 codes" — plus a "What's actually bought" list of the top product
+(PSC) codes with real dollars. For a demolition contractor that reads: Demolition of
+Structures $491M, Demolition Materials $184M, Environmental $174M, Demolition of
+Buildings $161M, Construction of Ammunition Facilities $66M. Every number reconciles
+with a USASpending keyword search on the same term — the card says so ("Verify: search
+'demolition' on USASpending").
+
+**Why:** Two things users asked for. (1) "Does it tell me the coverage area?" — now yes,
+on the home surface, not just once in onboarding. (2) The deeper insight: a single
+keyword spans DIFFERENT businesses that NAICS lumps together but PSC separates cleanly.
+"Demolition" covers building-demolition work (PSC P400/P500, ~$650M) AND ordnance-
+facility work (PSC Y1EA Ammunition Facilities, $66M → the 325920/332993 NAICS). Showing
+"what was actually bought" lets a contractor see which sub-market is theirs and prune
+the codes that aren't ("Not all of these are your work? Edit your codes →"). This is the
+PSC-over-NAICS lesson made concrete: PSC = the literal product bought; NAICS = the vendor
+industry. The product teaches the distinction with the user's own real numbers.
+
+**SEO:** federal market size by keyword, what product service codes does the government
+buy, PSC vs NAICS, demolition contract spending, distinguish building vs ordnance
+contracts, USASpending market research.
+
+**Proof:** `GET /api/app/keyword-coverage?keyword=` (lightweight coverage + top-5 PSC
+buckets, public USASpending aggregates) + `keywordCoverage().topPscList` (new field,
+top PSCs with dollars/pct) + `TargetingCard` coverage block. Verified live: demolition =
+$1.4B / 6 codes / 91% / PSC P500 top, Y1EA ordnance sliver visible at $66M.

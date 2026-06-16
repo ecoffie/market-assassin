@@ -32,8 +32,25 @@ interface Targeting {
   keywords: string[];
 }
 
+interface Coverage {
+  keyword: string;
+  totalMarket: number;
+  naicsCount: number;
+  coverageCount: number;
+  coveragePct: number;
+  topPsc: { code: string; name: string; amount: number; pct: number }[];
+}
+
+function fmtMoney(n: number): string {
+  if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
+  if (n >= 1e6) return `$${Math.round(n / 1e6)}M`;
+  if (n >= 1e3) return `$${Math.round(n / 1e3)}K`;
+  return `$${Math.round(n)}`;
+}
+
 export default function TargetingCard({ email, onEdit }: TargetingCardProps) {
   const [data, setData] = useState<Targeting | null>(null);
+  const [coverage, setCoverage] = useState<Coverage | null>(null);
   const [loading, setLoading] = useState(true);
 
   const load = useCallback(async () => {
@@ -45,10 +62,30 @@ export default function TargetingCard({ email, onEdit }: TargetingCardProps) {
       if (!res.ok) { setLoading(false); return; }
       const j = await res.json();
       const s = j.settings || {};
+      const keywords = Array.isArray(s.keywords) ? s.keywords.map(String) : [];
       setData({
         naics: Array.isArray(s.naics_codes) ? s.naics_codes.map(String) : [],
-        keywords: Array.isArray(s.keywords) ? s.keywords.map(String) : [],
+        keywords,
       });
+
+      // Coverage context for the user's PRIMARY keyword — the market size + the PSC
+      // breakdown (what was actually bought) so they see the building-vs-ordnance
+      // style split a single keyword spans. Every number matches a USASpending
+      // search on this term. Non-blocking; the card renders without it.
+      const primary = keywords[0];
+      if (primary) {
+        try {
+          const cr = await fetch(`/api/app/keyword-coverage?keyword=${encodeURIComponent(primary)}`, {
+            headers: getMIApiHeaders(email),
+          });
+          if (cr.ok) {
+            const cj = await cr.json();
+            setCoverage(cj.coverage || null);
+          }
+        } catch { /* coverage is optional */ }
+      } else {
+        setCoverage(null);
+      }
     } catch {
       /* non-fatal — card just doesn't render */
     } finally {
@@ -133,6 +170,46 @@ export default function TargetingCard({ email, onEdit }: TargetingCardProps) {
           )}
         </div>
       </div>
+
+      {/* Market coverage + what-was-bought — derived live from the primary keyword,
+          every number matches a USASpending search on that term. The PSC list shows
+          the real sub-markets a single keyword spans (e.g. "demolition" = Demolition
+          of Structures vs Ammunition Facilities — building vs ordnance work). */}
+      {coverage && coverage.totalMarket > 0 && (
+        <div className="mt-3 border-t border-slate-800 pt-3">
+          <div className="text-xs text-slate-400">
+            Your {coverage.coverageCount} codes cover{' '}
+            <span className="text-emerald-300 font-semibold">{Math.round(coverage.coveragePct * 100)}%</span>{' '}
+            of a{' '}
+            <span className="text-emerald-300 font-semibold">{fmtMoney(coverage.totalMarket)}</span>{' '}
+            market across {coverage.naicsCount} codes.{' '}
+            <span className="text-slate-500">
+              Verify: search &ldquo;{coverage.keyword}&rdquo; on USASpending.
+            </span>
+          </div>
+
+          {coverage.topPsc.length > 0 && (
+            <div className="mt-2">
+              <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">
+                What&rsquo;s actually bought (top product codes)
+              </div>
+              <div className="space-y-1">
+                {coverage.topPsc.map((p) => (
+                  <div key={p.code} className="flex items-center justify-between gap-2 text-xs">
+                    <span className="min-w-0 truncate text-slate-300">
+                      <span className="text-slate-500">{p.code}</span> {p.name}
+                    </span>
+                    <span className="shrink-0 text-slate-400">{fmtMoney(p.amount)}</span>
+                  </div>
+                ))}
+              </div>
+              <button onClick={edit} className="mt-2 text-xs text-purple-400 hover:text-purple-300">
+                Not all of these are your work? Edit your codes →
+              </button>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }
