@@ -309,7 +309,13 @@ export async function GET(request: NextRequest) {
   }
 
   const { searchParams } = request.nextUrl;
-  const email = searchParams.get('email');
+  // Normalize to the canonical (lowercase, trimmed) form the row is keyed by —
+  // user_notification_settings.user_email is stored lowercase. Using the raw
+  // param made the profile lookup miss on any casing/whitespace diff, silently
+  // falling back to the IT/consulting DEFAULT NAICS (541512/541611/...) — so a
+  // demolition user saw consulting alerts (Eric QC 2026-06-16). Matches the
+  // workspace route convention.
+  const email = searchParams.get('email')?.toLowerCase().trim() || null;
   const naicsParam = searchParams.get('naics');
   const limit = parseInt(searchParams.get('limit') || '25', 10);
   const noticeType = searchParams.get('noticeType');
@@ -337,7 +343,7 @@ export async function GET(request: NextRequest) {
       .from('user_notification_settings')
       .select('naics_codes,keywords,business_description,business_type,set_aside_preferences,location_states')
       .eq('user_email', email)
-      .single();
+      .maybeSingle();
 
     userProfile = profile || null;
 
