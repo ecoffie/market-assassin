@@ -319,10 +319,15 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Auto vs Manual setup (#64). 'choose' = the two-door picker; 'auto' = paste →
-  // confirm; 'manual' = the existing step wizard.
-  const [mode, setMode] = useState<'choose' | 'auto' | 'manual'>('choose');
+  // Setup mode. 'choose' = the door picker; 'uei' = paste UEI → SAM/USASpending
+  // pull → confirm; 'auto' = describe → confirm; 'manual' = the step wizard.
+  // UEI is the highest-quality path (identity + NAICS + certs + REAL award history
+  // → grounds the hidden-match capability vector), so it's the first/recommended
+  // door — but always skippable (Eric, Jun 2026; only 5 users had a UEI when it
+  // was a post-setup Vault afterthought).
+  const [mode, setMode] = useState<'choose' | 'uei' | 'auto' | 'manual'>('choose');
   const [autoText, setAutoText] = useState('');
+  const [ueiInput, setUeiInput] = useState('');
   const [autoLoading, setAutoLoading] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [autoProfile, setAutoProfile] = useState<any | null>(null);   // the confirm-screen extraction
@@ -468,12 +473,72 @@ export default function OnboardingPage() {
     } finally { setAutoLoading(false); }
   }
 
+  // UEI path — the highest-quality setup. Pull SAM registration + USASpending
+  // award history, then map into the SAME autoProfile shape the confirm screen
+  // already renders (so we reuse all that UI). Also persists the UEI to the Vault
+  // identity row so the capability-vector engine grounds hidden matches on the
+  // user's real award history (memory: hidden_match_coverage_reality).
+  async function runUeiExtract() {
+    const uei = ueiInput.trim().toUpperCase();
+    if (!/^[A-Z0-9]{12}$/.test(uei)) { setError('A UEI is 12 letters/numbers (from your SAM.gov registration).'); return; }
+    setAutoLoading(true); setError('');
+    try {
+      // Preview pull (identity + past performance + AI-drafted capabilities).
+      const res = await fetch(`/api/app/vault/prefill?uei=${encodeURIComponent(uei)}&email=${encodeURIComponent(email)}`, {
+        headers: getMIApiHeaders(email, { Authorization: `Bearer ${accessToken}` }),
+      });
+      const d = await res.json();
+      if (!res.ok || !d.success) {
+        setError(d.error || `No SAM.gov registration found for ${uei}. Check it, or describe your business instead.`);
+        return;
+      }
+      const identity = d.identity || {};
+      const naics: string[] = Array.isArray(identity.primary_naics)
+        ? identity.primary_naics.filter((c: unknown) => typeof c === 'string' && /^\d{2,6}$/.test(c))
+        : [];
+      // Map prefill → the confirm screen's autoProfile shape. industryPhrase from
+      // the AI one-liner (or legal name); agencies from real award history.
+      const agencyNames = Array.from(new Set(
+        (d.past_performance || []).map((p: { agency?: string }) => p.agency).filter(Boolean),
+      )).slice(0, 6).map((name) => ({ name }));
+      setAutoProfile({
+        industryPhrase: (d.ai_coach?.one_liner || identity.legal_name || 'Your business').slice(0, 80),
+        naics,
+        naicsCount: naics.length,
+        keywords: [],
+        topPsc: null,
+        agencies: agencyNames,
+        states: identity.hq_state ? [identity.hq_state] : [],
+        setAsides: Array.isArray(identity.certifications) ? identity.certifications : [],
+        totalMarket: 0,
+        uei,                       // carried through confirmAuto → Vault write
+        legalName: identity.legal_name || null,
+        pastPerfCount: (d.past_performance || []).length,
+      });
+      track('onboarding_step', 'onboarding', { step: 'uei_extract', uei, pastPerf: (d.past_performance || []).length });
+    } catch {
+      setError('Couldn’t reach SAM.gov just now. Try again or describe your business instead.');
+    } finally { setAutoLoading(false); }
+  }
+
   // Confirm the Auto profile → push the extracted values into the normal state
   // vars + save (reuses /api/mindy/profile, same as Manual).
   async function confirmAuto() {
     if (!autoProfile) return;
     setSaving(true); setError('');
     try {
+      // UEI path: write SAM identity + USASpending past performance into the Vault
+      // FIRST (non-blocking) — this is what grounds the hidden-match capability
+      // vector on real award history. Failure here doesn't block the profile save.
+      if (autoProfile.uei) {
+        try {
+          await fetch('/api/app/vault/prefill', {
+            method: 'POST',
+            headers: getMIApiHeaders(email, { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` }),
+            body: JSON.stringify({ email, uei: autoProfile.uei, accept: { identity: true, past_performance: true } }),
+          });
+        } catch { /* non-fatal — alerts profile below still saves */ }
+      }
       const res = await fetch('/api/mindy/profile', {
         method: 'POST',
         headers: getMIApiHeaders(email, { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` }),
@@ -743,21 +808,59 @@ export default function OnboardingPage() {
             <p className="mt-2 text-slate-400">Mindy finds the right federal opportunities for you</p>
           </header>
 
-          {/* The two-door choice */}
+          {/* The door choice — UEI first (highest-quality: pulls real identity +
+              NAICS + certs + award history → grounds hidden matches). All optional. */}
           {mode === 'choose' && (
-            <div className="grid sm:grid-cols-2 gap-4">
-              <button onClick={() => setMode('auto')} className="text-left rounded-xl border border-purple-500/40 bg-purple-950/20 p-5 hover:border-purple-400 transition-colors">
-                <div className="text-2xl mb-2">⚡</div>
-                <div className="text-lg font-semibold text-white">Auto setup</div>
-                <p className="text-sm text-slate-400 mt-1">Paste your capability statement or describe your business in a sentence. Mindy figures out your codes, market, and who buys — then you confirm.</p>
-                <div className="text-xs text-purple-300 mt-3 font-medium">Recommended — ~30 seconds →</div>
+            <div className="grid gap-4">
+              <button onClick={() => setMode('uei')} className="text-left rounded-xl border border-emerald-500/50 bg-emerald-950/20 p-5 hover:border-emerald-400 transition-colors">
+                <div className="flex items-center gap-2 mb-1">
+                  <span className="text-2xl">🏛️</span>
+                  <span className="text-lg font-semibold text-white">Set up from my SAM.gov UEI</span>
+                  <span className="ml-auto text-[10px] uppercase tracking-wide bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full">Best</span>
+                </div>
+                <p className="text-sm text-slate-400">Paste your 12-character UEI. Mindy pulls your legal name, NAICS, certifications, and your real federal award history — the most accurate setup, and it powers capability-matched opportunities.</p>
+                <div className="text-xs text-emerald-300 mt-3 font-medium">~10 seconds, most accurate →</div>
               </button>
-              <button onClick={() => { setMode('manual'); setStep(1); }} className="text-left rounded-xl border border-slate-700 bg-slate-900 p-5 hover:border-slate-500 transition-colors">
-                <div className="text-2xl mb-2">✏️</div>
-                <div className="text-lg font-semibold text-white">Manual setup</div>
-                <p className="text-sm text-slate-400 mt-1">Go step by step — pick your NAICS codes, target agencies, and geography yourself, or browse real opportunities that fit.</p>
-                <div className="text-xs text-slate-500 mt-3 font-medium">For power users →</div>
-              </button>
+              <div className="grid sm:grid-cols-2 gap-4">
+                <button onClick={() => setMode('auto')} className="text-left rounded-xl border border-purple-500/40 bg-purple-950/20 p-5 hover:border-purple-400 transition-colors">
+                  <div className="text-2xl mb-2">⚡</div>
+                  <div className="text-lg font-semibold text-white">Describe my business</div>
+                  <p className="text-sm text-slate-400 mt-1">No UEI? Paste your capability statement or describe what you do in a sentence. Mindy figures out your codes, market, and who buys.</p>
+                  <div className="text-xs text-purple-300 mt-3 font-medium">~30 seconds →</div>
+                </button>
+                <button onClick={() => { setMode('manual'); setStep(1); }} className="text-left rounded-xl border border-slate-700 bg-slate-900 p-5 hover:border-slate-500 transition-colors">
+                  <div className="text-2xl mb-2">✏️</div>
+                  <div className="text-lg font-semibold text-white">Manual setup</div>
+                  <p className="text-sm text-slate-400 mt-1">Go step by step — pick your NAICS codes, target agencies, and geography yourself.</p>
+                  <div className="text-xs text-slate-500 mt-3 font-medium">For power users →</div>
+                </button>
+              </div>
+            </div>
+          )}
+
+          {/* UEI input — paste → pull → the shared confirm screen. */}
+          {mode === 'uei' && !autoProfile && (
+            <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/10 p-5">
+              <button onClick={() => { setMode('choose'); setError(''); }} className="text-xs text-slate-400 hover:text-white mb-3">← Back</button>
+              <label className="block text-sm font-medium text-white mb-2">Your SAM.gov UEI</label>
+              <input
+                value={ueiInput}
+                onChange={e => setUeiInput(e.target.value.toUpperCase())}
+                onKeyDown={e => { if (e.key === 'Enter') runUeiExtract(); }}
+                maxLength={12}
+                placeholder="e.g. ABC123DEF456"
+                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm tracking-widest placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
+              />
+              <p className="text-xs text-slate-500 mt-2">The 12-character ID from your SAM.gov registration. Find it at sam.gov → Entity Management.</p>
+              {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
+              <div className="mt-3 flex items-center gap-3">
+                <button onClick={runUeiExtract} disabled={autoLoading || ueiInput.trim().length !== 12} className="h-10 px-5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white text-sm font-medium rounded-lg">
+                  {autoLoading ? 'Pulling from SAM.gov…' : 'Pull my profile →'}
+                </button>
+                <button onClick={() => { setError(''); setMode('auto'); }} className="text-sm text-slate-400 hover:text-white underline underline-offset-2">
+                  No UEI? Describe my business instead
+                </button>
+              </div>
             </div>
           )}
 
@@ -792,9 +895,13 @@ export default function OnboardingPage() {
           )}
 
           {/* AUTO confirm — the wow + safety net (editable states) */}
-          {mode === 'auto' && autoProfile && (
+          {(mode === 'auto' || mode === 'uei') && autoProfile && (
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/10 p-5">
-              <div className="text-sm text-slate-400 mb-3">Here&rsquo;s what Mindy found — look right? Anything off, just fix it.</div>
+              <div className="text-sm text-slate-400 mb-3">
+                {autoProfile.uei
+                  ? <>Pulled from SAM.gov{autoProfile.legalName ? ` — ${autoProfile.legalName}` : ''}{autoProfile.pastPerfCount ? ` · ${autoProfile.pastPerfCount} past awards found` : ''}. Look right? Fix anything below.</>
+                  : <>Here&rsquo;s what Mindy found — look right? Anything off, just fix it.</>}
+              </div>
               {/* Coverage hero — the wow moment. The HEADLINE number is the coverage
                   SET Mindy actually applies to your profile (the chips below — 6 for
                   demolition). The lesson cites the FULL market ($ + total codes that

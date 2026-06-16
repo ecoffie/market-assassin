@@ -2017,3 +2017,31 @@ UEI award scopes when saved Vault content is thin (only fetches when needed); ad
 reembed-uei-capabilities re-queues already-stamped UEI users so the cron re-embeds them
 from award history. Pool side already fixed (SOW corpus 100% embedded). Marketing
 literature updated (rule #8).
+
+---
+
+## Mindy: UEI-First Onboarding — Best Setup Made the Default Invitation (June 16, 2026)
+
+**What:** New users now see "Set up from my SAM.gov UEI" as the first, recommended
+option when they sign up — paste your 12-character UEI and Mindy instantly pulls your
+legal name, NAICS codes, certifications, and your real federal award history from
+SAM.gov + USASpending, then you confirm. "Describe my business" and "Manual setup"
+remain for anyone without a UEI. It's always skippable — never blocks signup.
+
+**Why:** The UEI is the single highest-value thing a contractor can give us: 12
+characters unlocks verified identity, real codes, certs, AND the award history that
+powers capability-matched ("hidden match") opportunities. But it used to be an
+afterthought — a post-signup Vault step almost nobody completed (only 5 users had
+entered one). Moving it to the front of onboarding, framed as the most accurate path,
+turns the best data source from an afterthought into the default first impression — and
+every UEI user automatically gets grounded capability matching with zero extra effort.
+
+**SEO:** SAM.gov UEI setup, federal contractor onboarding, set up from UEI, import SAM
+registration, government contracting profile from UEI.
+
+**Proof:** onboarding/page.tsx adds a 'uei' mode + UEI input screen as the first door;
+runUeiExtract calls /api/app/vault/prefill (SAM entity + USASpending awards), maps the
+result into the existing confirm screen, and confirmAuto writes the UEI + identity +
+past performance into the Vault so the capability-vector engine grounds hidden matches
+on real award history. Optional/skippable; falls through to describe-your-business.
+Marketing literature updated (rule #8).
