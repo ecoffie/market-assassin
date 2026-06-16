@@ -15,6 +15,7 @@ import { createHash } from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import { embedText, parseEmbedding } from '@/lib/market/embeddings';
 import { getNaics } from '@/lib/codes/lookup';
+import { fetchUSASpendingAwardsByUei } from '@/lib/usaspending/awards-by-uei';
 
 function admin() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
@@ -53,7 +54,7 @@ export async function buildCapabilityProfile(email: string): Promise<CapabilityP
 
   const [identityRes, capsRes, ppRes] = await Promise.all([
     supabase.from('user_identity_profile')
-      .select('one_liner, elevator_pitch, primary_naics')
+      .select('one_liner, elevator_pitch, primary_naics, uei')
       .eq('user_email', e).maybeSingle(),
     supabase.from('user_capabilities_library')
       .select('capability_name, description')
@@ -63,7 +64,7 @@ export async function buildCapabilityProfile(email: string): Promise<CapabilityP
       .eq('user_email', e).is('archived_at', null),
   ]);
 
-  const identity = (identityRes.data || {}) as { one_liner?: string | null; elevator_pitch?: string | null; primary_naics?: string[] | null };
+  const identity = (identityRes.data || {}) as { one_liner?: string | null; elevator_pitch?: string | null; primary_naics?: string[] | null; uei?: string | null };
   const caps = (capsRes.data || []) as Array<{ capability_name?: string; description?: string }>;
   const pp = (ppRes.data || []) as Array<{ scope_description?: string }>;
 
@@ -75,7 +76,25 @@ export async function buildCapabilityProfile(email: string): Promise<CapabilityP
   // Count REAL (non-placeholder) signals for eligibility.
   const realCaps = capStrings.filter((s) => !isPlaceholder(s)).length;
   const realScopes = scopeStrings.filter((s) => !isPlaceholder(s) && s.length > 30).length;
-  const realSignals = realCaps + realScopes;
+  let realSignals = realCaps + realScopes;
+
+  // UEI fallback (Eric, Jun 2026): a user who entered a UEI but never SAVED a Vault
+  // (didn't click "accept" on prefill) has no capabilities/past-perf rows → 0
+  // realSignals → no vector → no hidden matches. But their UEI gives us their REAL
+  // award history from USASpending. Pull those scope descriptions and use them as
+  // capability signal — so any UEI user gets a real, grounded vector automatically,
+  // not just those who completed the Vault. Only fetch when saved content is thin
+  // (don't waste the API call when the Vault already qualifies).
+  if (realSignals < MIN_REAL_SIGNALS && identity.uei) {
+    const awards = await fetchUSASpendingAwardsByUei(identity.uei, 15).catch(() => []);
+    for (const a of awards) {
+      const scope = (a.scope_description || '').trim();
+      if (scope && !isPlaceholder(scope) && scope.length > 30) {
+        scopeStrings.push(scope);
+        realSignals++;
+      }
+    }
+  }
 
   const naicsArr: string[] = Array.isArray(identity.primary_naics) ? identity.primary_naics as string[] : [];
   const naicsTitles = naicsArr.map((n) => getNaics(String(n))?.title || '').filter(Boolean);

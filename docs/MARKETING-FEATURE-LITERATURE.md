@@ -1989,3 +1989,31 @@ link_text click tags; backfill-descriptions detects SAM 429, halts the run, and 
 rate-limited rows null for retry after the midnight-UTC quota reset (no longer burns
 them with ''). Measured live: SOW corpus 91%→draining to 100%; active descriptions
 already 100%.
+
+---
+
+## Mindy: Hidden Matches for Every UEI User — Capability Vector from Award History (June 16, 2026)
+
+**What:** "Hidden match" alerts (opportunities matched to your capabilities, not your
+NAICS codes) now work for any user who's entered their UEI — not just the few who
+hand-filled a full Vault. Mindy builds your capability fingerprint from your REAL
+USASpending award history (the contracts you've actually won), pulled live by UEI, so
+the semantic match has something real to compare against automatically.
+
+**Why:** Hidden-match needs a "capability vector" on the user's side — previously only
+built from hand-written Vault capabilities/past-performance, which most users never
+fill in. So the feature was effectively dark for everyone but power users. But the UEI
+a user already gave us unlocks their entire federal award history for free. Using those
+real contract scopes as the capability signal means a Pro member (or anyone with a UEI)
+gets grounded hidden matches the moment they're set up — low effort for them, real data
+for the match. Non-UEI users still rely on the Vault for now.
+
+**SEO:** find federal opportunities by past performance, capability-based contract
+matching, UEI award history, hidden government contracts, opportunities like my past work.
+
+**Proof:** fetchUSASpendingAwardsByUei extracted to @/lib/usaspending/awards-by-uei
+(shared by vault/prefill + the vector builder); buildCapabilityProfile now falls back to
+UEI award scopes when saved Vault content is thin (only fetches when needed); admin
+reembed-uei-capabilities re-queues already-stamped UEI users so the cron re-embeds them
+from award history. Pool side already fixed (SOW corpus 100% embedded). Marketing
+literature updated (rule #8).

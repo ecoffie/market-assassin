@@ -30,6 +30,7 @@ import { getNaics } from '@/lib/codes/lookup';
 import { deriveSemanticKeywords } from '@/lib/market/semantic-keywords';
 import { humanize } from '@/lib/proposal/humanize';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
+import { fetchUSASpendingAwardsByUei } from '@/lib/usaspending/awards-by-uei';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = process.env.PROPOSAL_GROQ_MODEL || 'llama-3.3-70b-versatile';
@@ -53,89 +54,8 @@ function getSupabase() {
 // Live REST call (not the cached usaspending_awards table) because we
 // want immediate results on signup, not waiting for our nightly sync.
 // Live API is unrate-limited per their docs.
-
-interface AwardRow {
-  award_id: string;
-  contract_title: string;
-  agency: string | null;
-  sub_agency: string | null;
-  contract_number: string | null;
-  period_start: string | null;
-  period_end: string | null;
-  contract_value: number | null;
-  scope_description: string | null;
-  naics: string | null;
-  naics_description: string | null;
-  psc: string | null;
-}
-
-async function fetchUSASpendingAwardsByUei(uei: string, limit = 25): Promise<AwardRow[]> {
-  // POST to spending_by_award with recipient_uei filter
-  try {
-    const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_award/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        filters: {
-          recipient_search_text: [uei],
-          // Contract awards only (no IDVs at this stage — they're
-          // umbrellas, not individual past perf citations)
-          award_type_codes: ['A', 'B', 'C', 'D'],
-          time_period: [{ start_date: '2018-10-01', end_date: '2026-09-30' }],
-        },
-        fields: [
-          'Award ID',
-          'Recipient Name',
-          'Recipient UEI',
-          'Award Amount',
-          'Description',
-          'Start Date',
-          'End Date',
-          'Awarding Agency',
-          'Awarding Sub Agency',
-          'NAICS Code',
-          'NAICS',
-          'PSC Code',
-          'Last Modified Date',
-        ],
-        page: 1,
-        limit,
-        sort: 'Award Amount',
-        order: 'desc',
-      }),
-    });
-
-    if (!res.ok) {
-      console.warn(`[vault/prefill] USASpending ${res.status}`);
-      return [];
-    }
-    const data = await res.json();
-    const results = (data?.results || []) as Record<string, unknown>[];
-
-    // Filter to ONLY rows where the recipient UEI matches exactly.
-    // recipient_search_text is a fuzzy search — different recipients
-    // can share name fragments, so we hard-filter post-fetch.
-    return results
-      .filter((r) => String(r['Recipient UEI'] || '').toUpperCase() === uei.toUpperCase())
-      .map((r) => ({
-        award_id: String(r['Award ID'] || ''),
-        contract_title: String(r['Description'] || r['Award ID'] || '').slice(0, 200),
-        agency: (r['Awarding Agency'] as string) || null,
-        sub_agency: (r['Awarding Sub Agency'] as string) || null,
-        contract_number: (r['Award ID'] as string) || null,
-        period_start: (r['Start Date'] as string) || null,
-        period_end: (r['End Date'] as string) || null,
-        contract_value: Number(r['Award Amount']) || null,
-        scope_description: r['Description'] ? String(r['Description']).slice(0, 1000) : null,
-        naics: (r['NAICS Code'] as string) || (r['NAICS'] as string) || null,
-        naics_description: null,
-        psc: (r['PSC Code'] as string) || null,
-      }));
-  } catch (err) {
-    console.error('[vault/prefill] USASpending fetch failed:', err);
-    return [];
-  }
-}
+// fetchUSASpendingAwardsByUei now lives in @/lib/usaspending/awards-by-uei
+// (shared with the capability-vector builder — CLAUDE.md rule #7).
 
 // ---- AI capability draft (RAG-grounded) ----------------------------
 //
