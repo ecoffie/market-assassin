@@ -50,6 +50,22 @@ export async function GET(request: NextRequest) {
       .not('sow_text', 'is', null).neq('sow_text', ''),
   ]);
 
+  // HIDDEN-MATCH POOL eligibility — the EXACT filter fetchHiddenMatchPool uses.
+  // If this is ~0, hidden-match can't fire no matter the flags (diagnoses "enabled
+  // 3 days ago but 0 matches"). Pool = active + has_sow + embedded + posted in the
+  // last 60d + still-open deadline.
+  const poolSince = new Date(Date.now() - 60 * 24 * 60 * 60 * 1000).toISOString();
+  const poolNow = new Date().toISOString();
+  const [embeddedTotal, embeddedActive, poolEligible] = await Promise.all([
+    supabase.from('sam_opportunities').select('notice_id', { count: 'exact', head: true })
+      .not('sow_embedding', 'is', null),
+    supabase.from('sam_opportunities').select('notice_id', { count: 'exact', head: true })
+      .eq('active', true).not('sow_embedding', 'is', null),
+    supabase.from('sam_opportunities').select('notice_id', { count: 'exact', head: true })
+      .eq('has_sow_doc', true).not('sow_embedding', 'is', null)
+      .gte('posted_date', poolSince).gt('response_deadline', poolNow),
+  ]);
+
   // Live SAM rate-limit probe: grab one row's description link and fetch it,
   // reading the rate-limit headers off the raw response.
   let rateLimit: Record<string, string | null> = {};
@@ -102,6 +118,11 @@ export async function GET(request: NextRequest) {
     success: true,
     needsBackfill: { active: activeNeedCount, inactive: inactiveNeedCount },
     sowCorpus: { hasSowDocFlag: sowFlagged.count || 0, withSowText: sowWithText.count || 0 },
+    hiddenMatchPool: {
+      embeddedTotal: embeddedTotal.count || 0,
+      embeddedActive: embeddedActive.count || 0,
+      poolEligible: poolEligible.count || 0,  // active+embedded+posted<60d+open — what hidden-match actually matches against
+    },
     totalActive: totalActive.count || 0,
     samRateLimit: rateLimit,
     smokeTest: { ok: smokeOk, length: smokeText.length, preview: smokeText.slice(0, 160) },
