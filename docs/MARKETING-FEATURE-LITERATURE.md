@@ -1900,3 +1900,31 @@ contracts, USASpending market research.
 buckets, public USASpending aggregates) + `keywordCoverage().topPscList` (new field,
 top PSCs with dollars/pct) + `TargetingCard` coverage block. Verified live: demolition =
 $1.4B / 6 codes / 91% / PSC P500 top, Y1EA ordnance sliver visible at $66M.
+
+---
+
+## Mindy: "Do I Have Full Coverage?" — Gap Detection vs USASpending (June 16, 2026)
+
+**What:** The "Your targeting" card now answers the question directly: it compares your
+saved NAICS codes against the full ~90%-coverage set USASpending shows for your keyword
+and tells you the truth — "✓ Full coverage" or "⚠ Missing 1 code with real spend:
+562211 Hazardous Waste ($172M) — add it in Settings." It shows the % of the market your
+CURRENT codes actually capture (not just the theoretical max), plus the PSC breakdown.
+The card now lives on the Market Dashboard and in Settings (next to where you edit
+codes), not just Today's Intel — so it's where you actually manage your targeting.
+
+**Why:** A contractor's #1 fear is missing money they qualify for. "I track demolition —
+am I seeing ALL of it?" Before, you'd have to manually cross-check USASpending. Now Mindy
+does the comparison and flags the exact codes you're missing, with real dollars, so you
+can confirm full coverage in one glance and close the gap in one click. Every number
+reconciles with a USASpending keyword search — the card says so. This is the keyword-
+first coverage model turned into a self-service audit.
+
+**SEO:** am I missing federal contracts, full NAICS coverage, what codes should I track,
+demolition contract coverage, verify market coverage USASpending, find contracts I qualify for.
+
+**Proof:** `/api/app/keyword-coverage?keyword=&have=` now returns heldPct (what the user's
+codes capture), coverageCodes (the ~90% set, each marked have/missing + $), and missing
+(ranked by spend). `TargetingCard` renders the full/gap status + missing-code list.
+Placed on `/app/market-intel` + `UnifiedSettingsPanel`. Verified live: demolition with
+the 6 saved codes = 91% / full coverage; drop 562211 → 79% / flags $172M gap.

@@ -6,6 +6,7 @@ import { getMIApiHeaders } from '../authHeaders';
 import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
 import { NaicsPicker } from '@/components/codes/NaicsPicker';
+import TargetingCard from './TargetingCard';
 
 interface UnifiedSettingsPanelProps {
   email: string | null;
@@ -211,6 +212,12 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
 
       {message && <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-300">{message}</div>}
       {error && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-300">{error}</div>}
+
+      {/* Coverage readout — shows how the codes/keywords below stack up against the
+          real USASpending market + flags missing high-value codes. `key` ties to the
+          last-saved message so it re-fetches after a save. onEdit is a no-op here
+          (you're already on the editor). */}
+      <TargetingCard key={message || 'targeting'} email={email} onEdit={() => {}} />
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         <div className="space-y-5">

@@ -32,12 +32,23 @@ interface Targeting {
   keywords: string[];
 }
 
+interface CoverageCode {
+  code: string;
+  name: string;
+  amount: number;
+  pct: number;
+  have: boolean;
+}
+
 interface Coverage {
   keyword: string;
   totalMarket: number;
   naicsCount: number;
   coverageCount: number;
   coveragePct: number;
+  heldPct: number;
+  coverageCodes: CoverageCode[];
+  missing: CoverageCode[];
   topPsc: { code: string; name: string; amount: number; pct: number }[];
 }
 
@@ -73,9 +84,11 @@ export default function TargetingCard({ email, onEdit }: TargetingCardProps) {
       // style split a single keyword spans. Every number matches a USASpending
       // search on this term. Non-blocking; the card renders without it.
       const primary = keywords[0];
+      const naics = Array.isArray(s.naics_codes) ? s.naics_codes.map(String) : [];
       if (primary) {
         try {
-          const cr = await fetch(`/api/app/keyword-coverage?keyword=${encodeURIComponent(primary)}`, {
+          const haveParam = naics.length ? `&have=${encodeURIComponent(naics.join(','))}` : '';
+          const cr = await fetch(`/api/app/keyword-coverage?keyword=${encodeURIComponent(primary)}${haveParam}`, {
             headers: getMIApiHeaders(email),
           });
           if (cr.ok) {
@@ -177,16 +190,43 @@ export default function TargetingCard({ email, onEdit }: TargetingCardProps) {
           of Structures vs Ammunition Facilities — building vs ordnance work). */}
       {coverage && coverage.totalMarket > 0 && (
         <div className="mt-3 border-t border-slate-800 pt-3">
+          {/* Held coverage — what the user's CURRENT codes capture, vs the full
+              ~90% set. Green when they have it all; amber when there are gaps. */}
           <div className="text-xs text-slate-400">
-            Your {coverage.coverageCount} codes cover{' '}
-            <span className="text-emerald-300 font-semibold">{Math.round(coverage.coveragePct * 100)}%</span>{' '}
+            Your codes cover{' '}
+            <span className={`font-semibold ${coverage.missing.length === 0 ? 'text-emerald-300' : 'text-amber-300'}`}>
+              {Math.round(coverage.heldPct * 100)}%
+            </span>{' '}
             of a{' '}
             <span className="text-emerald-300 font-semibold">{fmtMoney(coverage.totalMarket)}</span>{' '}
-            market across {coverage.naicsCount} codes.{' '}
-            <span className="text-slate-500">
-              Verify: search &ldquo;{coverage.keyword}&rdquo; on USASpending.
-            </span>
+            &ldquo;{coverage.keyword}&rdquo; market ({coverage.naicsCount} codes bought it).{' '}
+            <span className="text-slate-500">Verify: search &ldquo;{coverage.keyword}&rdquo; on USASpending.</span>
           </div>
+
+          {/* Gap — coverage codes with real spend the user is NOT tracking. This is
+              the "do I have FULL coverage?" answer. */}
+          {coverage.missing.length > 0 ? (
+            <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5">
+              <div className="text-xs font-medium text-amber-300 mb-1">
+                ⚠ Missing {coverage.missing.length} code{coverage.missing.length > 1 ? 's' : ''} with real spend — you&rsquo;re not seeing all of this market:
+              </div>
+              <div className="space-y-1">
+                {coverage.missing.slice(0, 6).map((m) => (
+                  <div key={m.code} className="flex items-center justify-between gap-2 text-xs">
+                    <span className="min-w-0 truncate text-slate-300">
+                      <span className="text-amber-400">{m.code}</span> {m.name}
+                    </span>
+                    <span className="shrink-0 text-slate-400">{fmtMoney(m.amount)}</span>
+                  </div>
+                ))}
+              </div>
+              <button onClick={edit} className="mt-2 text-xs font-medium text-amber-300 hover:text-amber-200">
+                Add these in Settings → full coverage
+              </button>
+            </div>
+          ) : (
+            <div className="mt-1.5 text-xs text-emerald-400">✓ Full coverage — you&rsquo;re tracking every high-value code for this market.</div>
+          )}
 
           {coverage.topPsc.length > 0 && (
             <div className="mt-2">

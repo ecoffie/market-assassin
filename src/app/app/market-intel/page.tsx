@@ -9,6 +9,7 @@ import { getMIApiHeaders } from '@/components/app/authHeaders';
 import SamAttachmentLinks from '@/components/app/SamAttachmentLinks';
 import CollapsibleOpportunityDescription from '@/components/app/CollapsibleOpportunityDescription';
 import OpportunityDetailStrip from '@/components/app/OpportunityDetailStrip';
+import TargetingCard from '@/components/app/panels/TargetingCard';
 
 interface NoticeTypeInfo {
   code: string;
@@ -685,6 +686,14 @@ function MarketIntelDashboard() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 py-6">
+        {/* Your targeting — coverage vs USASpending + gap detection. Editing
+            routes to the Settings panel (this is a standalone route, not a panel). */}
+        {email && (
+          <TargetingCard
+            email={email}
+            onEdit={() => { window.location.href = `/app?email=${encodeURIComponent(email)}&panel=settings`; }}
+          />
+        )}
         {/* Stats Overview */}
         {stats && (
           <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
