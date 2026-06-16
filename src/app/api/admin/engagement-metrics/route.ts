@@ -52,6 +52,7 @@ export async function GET(request: NextRequest) {
       topLinks,
       dailyTrends,
       topEngagedUsers,
+      hiddenMatchImpressions,
     ] = await Promise.all([
       // Total briefings sent
       supabase
@@ -101,6 +102,16 @@ export async function GET(request: NextRequest) {
         .select('user_email, event_type')
         .gte('created_at', startDateStr)
         .not('user_email', 'is', null),
+
+      // Hidden-match CTR (#Phase-3): impressions come from alert_log
+      // opportunities_data entries flagged hiddenMatch:true, vs regular opps.
+      // Paired with the click counts (by link_text label) to compute CTR for each
+      // and answer "do hidden matches get clicked as much as regular opps?".
+      supabase
+        .from('alert_log')
+        .select('opportunities_data')
+        .eq('status', 'sent')
+        .gte('alert_date', startDateStr.split('T')[0]),
     ]);
 
     // Calculate metrics
@@ -127,6 +138,35 @@ export async function GET(request: NextRequest) {
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10)
       .map(([label, count]) => ({ label, count }));
+
+    // Hidden-match CTR vs regular-opp CTR — the readout that gates the
+    // hidden-match rollout ramp (25→50→100%). Clicks come from the link_text
+    // label (hidden_match_opportunity vs sam_gov_opportunity); impressions from
+    // alert_log opportunities_data entries (hiddenMatch:true vs the rest).
+    // Success = hidden-match CTR ≥ regular-opp CTR.
+    let hiddenImpr = 0;
+    let regularImpr = 0;
+    for (const row of hiddenMatchImpressions.data || []) {
+      const opps = Array.isArray(row.opportunities_data) ? row.opportunities_data : [];
+      for (const o of opps) {
+        if (o && typeof o === 'object' && (o as Record<string, unknown>).hiddenMatch === true) hiddenImpr++;
+        else regularImpr++;
+      }
+    }
+    const hiddenClicks = linkCounts['hidden_match_opportunity'] || 0;
+    const regularClicks = linkCounts['sam_gov_opportunity'] || 0;
+    const pct = (n: number, d: number) => (d > 0 ? Number(((n / d) * 100).toFixed(2)) : null);
+    const hiddenMatchCtr = {
+      hidden: { impressions: hiddenImpr, clicks: hiddenClicks, ctr: pct(hiddenClicks, hiddenImpr) },
+      regular: { impressions: regularImpr, clicks: regularClicks, ctr: pct(regularClicks, regularImpr) },
+      // Null until hidden-match is enabled and has accumulated sends (gated OFF
+      // by default — no data is expected yet). verdict compares the two CTRs.
+      verdict: hiddenImpr === 0
+        ? 'no hidden-match data yet (feature gated off or no sends in window)'
+        : (pct(hiddenClicks, hiddenImpr) ?? 0) >= (pct(regularClicks, regularImpr) ?? 0)
+          ? 'hidden ≥ regular — safe to ramp rollout'
+          : 'hidden < regular — hold / raise threshold before ramping',
+    };
 
     // Aggregate daily trends
     const dailyData: Record<string, { opens: number; clicks: number }> = {};
@@ -186,6 +226,7 @@ export async function GET(request: NextRequest) {
         clickToSendRate: `${clickToSendRate}%`,
       },
       topLinks: sortedLinks,
+      hiddenMatchCtr,
       dailyTrends: trends,
       topEngagedUsers: topUsers,
     });

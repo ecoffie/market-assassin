@@ -35,6 +35,10 @@ const LINK_FILTER = 'description.like.http%,description.is.null';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Row = { id: any; notice_id: string; raw_data: any };
 
+// Sentinel: SAM daily quota hit (429). The caller stops the whole run — we must
+// NOT burn the row with '' (that would falsely mark it done and lose it forever).
+class RateLimitedError extends Error {}
+
 async function processOne(supabase: ReturnType<typeof sb>, row: Row, apiKey: string): Promise<'text' | 'empty' | 'fail'> {
   const rawDesc = row.raw_data?.description;
   const link = isDescriptionLink(rawDesc) ? String(rawDesc) : row.notice_id;
@@ -45,8 +49,14 @@ async function processOne(supabase: ReturnType<typeof sb>, row: Row, apiKey: str
     ]);
     await supabase.from('sam_opportunities').update({ description: text || '' }).eq('id', row.id);
     return text ? 'text' : 'empty';
-  } catch {
-    // Store '' so a hanging/404 notice stops matching the link-filter (never re-claimed).
+  } catch (e) {
+    // 429 = SAM daily quota exhausted. Do NOT write '' — leave the row null so it's
+    // re-claimed after the quota resets. Signal the caller to stop the run cleanly.
+    if (e instanceof Error && /\b429\b/.test(e.message)) {
+      throw new RateLimitedError('SAM 429');
+    }
+    // Genuine failure (404/timeout/hang) → store '' so the link-filter stops
+    // re-claiming this poison row.
     await supabase.from('sam_opportunities').update({ description: '' }).eq('id', row.id);
     return 'fail';
   }
@@ -87,11 +97,20 @@ export async function GET(request: NextRequest) {
   // Concurrency pool with a soft time budget so we return before the platform kills us.
   const deadline = Date.now() + 240_000; // 4 min soft budget (maxDuration 300)
   let i = 0, text = 0, empty = 0, fail = 0, processed = 0;
+  // When SAM's daily quota (1000/day) is hit, ALL workers stop immediately — no
+  // point hammering a 429 for the rest of the run, and we must not burn rows.
+  let rateLimited = false;
   async function worker() {
-    while (i < rows.length && Date.now() < deadline) {
-      const r = await processOne(supabase, rows[i++], apiKey);
-      processed++;
-      if (r === 'text') text++; else if (r === 'empty') empty++; else fail++;
+    while (i < rows.length && Date.now() < deadline && !rateLimited) {
+      const row = rows[i++];
+      try {
+        const r = await processOne(supabase, row, apiKey);
+        processed++;
+        if (r === 'text') text++; else if (r === 'empty') empty++; else fail++;
+      } catch (e) {
+        if (e instanceof RateLimitedError) { rateLimited = true; break; }
+        throw e;
+      }
     }
   }
   await Promise.all(Array.from({ length: concurrency }, worker));
@@ -105,6 +124,9 @@ export async function GET(request: NextRequest) {
     withText: text,
     empty,
     failed: fail,
+    // True when the run stopped early on SAM's daily quota — the unprocessed rows
+    // stay null (not burned) and are re-claimed after the midnight-UTC reset.
+    rateLimited,
     remainingAfter: Math.max(0, (remaining || 0) - processed),
   });
 }

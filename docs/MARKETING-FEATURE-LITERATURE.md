@@ -1958,3 +1958,34 @@ user_notification_settings with a no-clobber guard; TargetingCard reads the same
 source. Audited via three parallel readers mapping every read/write of profile data.
 Scope this pass: repoint reads + mirror wizard (kept tables; dead-table cleanup +
 sync-route removal deferred).
+
+---
+
+## Mindy: Complete the Semantic Search Corpus + Hidden-Match Readiness (June 16, 2026)
+
+**What:** Three fixes to the semantic-search pipeline that powers "find work like
+mine" / hidden matches. (1) A new cron embeds the extracted SOW/PWS scope text into
+vectors — previously the text was extracted but never embedded, so the corpus stalled
+at 91% and semantic matching ran on an incomplete library. (2) The CTR readout that
+compares hidden-match clicks vs regular-opp clicks is live on the engagement dashboard,
+so we can prove hidden matches earn their place before turning them on broadly. (3) The
+SAM description backfill now stops cleanly when SAM's daily quota is hit instead of
+falsely marking those notices "done" with empty text.
+
+**Why:** Semantic search only works if the whole library of real statements of work is
+embedded — a 91% corpus quietly misses the other 9% of opportunities. And before we
+surface "hidden match" opportunities (work matched to your capabilities, not your NAICS
+codes) to everyone, we want data that they get clicked as much as normal matches —
+honest measurement before a confident rollout. The 429 fix protects data integrity:
+rate-limited notices stay queued for retry instead of being burned with blank text.
+
+**SEO:** semantic contract search, find federal opportunities by capability, statement
+of work matching, hidden government contract opportunities, NAICS-free opportunity matching.
+
+**Proof:** /api/cron/embed-sow-corpus (drains sam_opportunities where sow_text present +
+sow_embedding null, batched/resumable, text-embedding-3-small); engagement-metrics now
+returns hiddenMatchCtr {hidden, regular, verdict} computed from alert_log impressions +
+link_text click tags; backfill-descriptions detects SAM 429, halts the run, and leaves
+rate-limited rows null for retry after the midnight-UTC quota reset (no longer burns
+them with ''). Measured live: SOW corpus 91%→draining to 100%; active descriptions
+already 100%.
