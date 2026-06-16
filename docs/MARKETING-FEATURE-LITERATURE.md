@@ -1928,3 +1928,33 @@ codes capture), coverageCodes (the ~90% set, each marked have/missing + $), and 
 (ranked by spend). `TargetingCard` renders the full/gap status + missing-code list.
 Placed on `/app/market-intel` + `UnifiedSettingsPanel`. Verified live: demolition with
 the 6 saved codes = 91% / full coverage; drop 562211 → 79% / flags $172M gap.
+
+---
+
+## Mindy: One Source of Truth for Your Targeting (June 16, 2026)
+
+**What:** Consolidated where your NAICS codes + keywords live so the whole app reads
+and writes the same place. Your targeting now always reflects what you set: the
+Settings form shows your real codes/keywords (it was reading an empty secondary
+table), saving them lands where alerts actually look, and the Sample-Opportunities
+calibration wizard now seeds your alert profile directly (it used to store
+selections in an analytics table that never drove alerts).
+
+**Why:** A profile audit found the same logical data — your NAICS, keywords,
+agencies — scattered across five tables with no single source of truth. Different
+screens read different tables, so you could set up your profile and still see "No
+codes" in Settings, get alerts for the wrong industry, or calibrate via the wizard
+and receive nothing. user_notification_settings is the one table alerts, briefings,
+and the Source Feed read; everything that shows or edits targeting now points there.
+Fewer surprises, no more "I set this but it didn't take."
+
+**SEO:** my settings show no codes, alerts not matching my profile, set up federal
+opportunity alerts, why am I getting irrelevant alerts, manage NAICS keywords.
+
+**Proof:** UnifiedSettingsPanel reads profile.notification (user_notification_settings)
+for naics/keywords and writes them via /api/alerts/preferences (the table alerts
+read); sample-opportunities extract action mirrors NAICS+keywords into
+user_notification_settings with a no-clobber guard; TargetingCard reads the same
+source. Audited via three parallel readers mapping every read/write of profile data.
+Scope this pass: repoint reads + mirror wizard (kept tables; dead-table cleanup +
+sync-route removal deferred).

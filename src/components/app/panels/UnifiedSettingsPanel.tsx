@@ -80,14 +80,22 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
         : [];
 
       const settings = data.settings || {};
+      // TARGETING (naics/keywords/agencies) lives in user_notification_settings —
+      // the single source of truth alerts/feed/briefings read (memory:
+      // profile_table_source_of_truth). data.settings is mi_beta_user_settings, a
+      // separate per-user row that's EMPTY for alerts-path users → the form showed
+      // blank NAICS/keywords despite a real profile (Eric QC 2026-06-16). Read
+      // targeting from profile.notification; keep display_name/role/company (which
+      // legitimately live on mi_beta_user_settings) from settings.
+      const notif = data.profile?.notification || {};
       setWorkspaceName(data.workspace?.name || 'Workspace');
       setForm({
-        company_name: settings.company_name || '',
+        company_name: settings.company_name || notif.company_name || '',
         display_name: settings.display_name || '',
         role_title: settings.role_title || '',
-        naics_codes: (settings.naics_codes || []).join(', '),
-        keywords: (settings.keywords || []).join(', '),
-        target_agencies: (settings.target_agencies || []).join(', '),
+        naics_codes: (notif.naics_codes || settings.naics_codes || []).join(', '),
+        keywords: (notif.keywords || settings.keywords || []).join(', '),
+        target_agencies: (notif.agencies || settings.target_agencies || []).join(', '),
         // Prefer the canonical alert_frequency (drives actual emails)
         // over the legacy mi_beta_user_settings.email_frequency value.
         email_frequency: realAlertFrequency || settings.email_frequency || 'daily',
@@ -115,10 +123,14 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
     setMessage(null);
 
     try {
-      // Profile fields → mi_beta_user_settings via workspace endpoint
-      // Email frequency → user_notification_settings.alert_frequency via
-      //   alerts preferences endpoint (this is what the daily-alerts cron
-      //   actually reads, so it has to land there to take effect).
+      // TARGETING (naics/keywords/agencies/states/frequency) MUST land in
+      // user_notification_settings — the single source of truth alerts/feed read
+      // (memory: profile_table_source_of_truth). So it goes through the alerts
+      // preferences endpoint, which writes that table. The workspace PATCH keeps
+      // only the display fields (name/role/company) that live on
+      // mi_beta_user_settings. Previously NAICS+agencies went ONLY to the
+      // workspace endpoint → saved to mi_beta_user_settings → alerts never saw
+      // them (Eric QC 2026-06-16).
       const [workspaceRes, prefsRes] = await Promise.all([
         fetch('/api/app/workspace', {
           method: 'PATCH',
@@ -128,6 +140,9 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
             company_name: form.company_name,
             display_name: form.display_name,
             role_title: form.role_title,
+            // Mirror NAICS/agencies to the workspace row too (keeps the team
+            // workspace view consistent), but the AUTHORITATIVE write is the
+            // preferences call below.
             naics_codes: parseList(form.naics_codes),
             target_agencies: parseList(form.target_agencies),
             email_frequency: form.email_frequency,
@@ -142,6 +157,9 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
             frequency: form.email_frequency,
             locationStates: form.location_states,
             keywords: parseList(form.keywords),
+            // Authoritative targeting write → user_notification_settings.
+            naicsCodes: parseList(form.naics_codes),
+            targetAgencies: parseList(form.target_agencies),
           }),
         }),
       ]);

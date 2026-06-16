@@ -722,13 +722,45 @@ async function handleExtraction(selectedIds: string[], email: string): Promise<N
       agencies,
     };
 
-    // Store the extracted profile for business intelligence
+    // Store the extracted profile for business intelligence (analytics record —
+    // user_business_profiles is NOT the targeting source of truth).
     if (email) {
       await storeBusinessIntelligence(supabase, email, {
         extractedProfile: profile,
         opportunitiesSelected: selectedIds.length,
         selectedOpportunityIds: selectedIds,
       });
+
+      // MIRROR into the source of truth (user_notification_settings) so the
+      // extraction actually drives alerts — but ONLY if the user has no codes
+      // yet (never clobber a tuned profile; same guard as the keyword-derive
+      // path). The client apply-flow normally writes this table via the form
+      // save; this is the safety net for the "calibrated but got no alerts" gap
+      // (memory: profile_table_source_of_truth). Non-fatal on error.
+      try {
+        const normalizedEmail = email.toLowerCase().trim();
+        const { data: existing } = await supabase
+          .from('user_notification_settings')
+          .select('naics_codes, keywords')
+          .eq('user_email', normalizedEmail)
+          .maybeSingle();
+        const hasNaics = Array.isArray(existing?.naics_codes) && existing!.naics_codes.length > 0;
+        const hasKeywords = Array.isArray(existing?.keywords) && existing!.keywords.length > 0;
+        const seedNaics = naicsCodes.map((n) => n.code).filter((c) => /^\d+$/.test(c)).slice(0, 30);
+        const seedKeywords = keywords.slice(0, 30);
+        const patch: Record<string, unknown> = {};
+        if (!hasNaics && seedNaics.length > 0) patch.naics_codes = seedNaics;
+        if (!hasKeywords && seedKeywords.length > 0) patch.keywords = seedKeywords;
+        if (Object.keys(patch).length > 0) {
+          patch.alerts_enabled = true;
+          patch.updated_at = new Date().toISOString();
+          if (existing) {
+            await supabase.from('user_notification_settings').update(patch).eq('user_email', normalizedEmail);
+          } else {
+            await supabase.from('user_notification_settings').insert({ user_email: normalizedEmail, ...patch });
+          }
+        }
+      } catch { /* non-fatal — analytics write already succeeded */ }
     }
 
     return NextResponse.json({
