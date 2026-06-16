@@ -190,6 +190,32 @@ function naicsMatchesAnchor(naics: string, anchor: string): boolean {
   return false;
 }
 
+// "Catch-all" 6-digit codes — real industries, but vendor-INDUSTRY buckets that
+// cut across many capabilities, not capability proof. They tagged sprinklers as
+// "Directed Energy" (334516/541330) and forestry as "AI" (541511/541715). Even
+// though they're ≥5 digits, a match on these ALONE is NOT high-confidence — it
+// needs a keyword to corroborate, same as a broad 3-digit anchor. Identified
+// empirically (audit June 15: high active-opp volume and/or reused across ≥2 CTAs).
+const WEAK_ANCHORS = new Set([
+  '541330', // Engineering Services        (4 CTAs)
+  '334290', // Other Communications Equip  (4 CTAs)
+  '541512', // Computer Systems Design      (3 CTAs)
+  '541713', // R&D Physical/Eng Sci         (3 CTAs)
+  '541511', // Custom Computer Programming  (2 CTAs)
+  '541715', // R&D Phys/Eng/Life Sci        (2 CTAs)
+  '541519', // Other Computer Services      (IT catch-all)
+  '336414', // Guided Missile/Space Vehicle (2 CTAs, dual-use)
+  '334516', // Analytical Lab Instruments   (428 opps — lab/medical bucket)
+  '334419', // Other Electronic Components  (595 opps — cables/connectors bucket)
+]);
+
+/** A specific (≥5-digit) anchor earns 'high' on NAICS alone — UNLESS it's a known
+ *  catch-all bucket, which needs keyword corroboration like a broad anchor. */
+function isStrongAnchor(anchor: string): boolean {
+  const a = normalizeNaics(anchor);
+  return a.length >= 5 && !WEAK_ANCHORS.has(a);
+}
+
 function haystackIncludesPhrase(haystack: string, phrase: string): boolean {
   const h = haystack.toLowerCase();
   const p = phrase.toLowerCase().trim();
@@ -233,10 +259,12 @@ export function tagOpportunityForCta(
   for (const cta of definitions) {
     for (const anchor of cta.naics_anchors) {
       if (naicsValues.some((n) => naicsMatchesAnchor(n, anchor))) {
-        const specific = normalizeNaics(anchor).length >= 5;
+        // Strong anchor (specific, non-catch-all) → 'high' on NAICS alone.
+        // Broad (≤4-digit) OR catch-all 6-digit → provisional 'low'; needs a
+        // keyword below to reach high/medium.
         results.set(cta.cta_id, {
           cta_id: cta.cta_id,
-          confidence: specific ? 'high' : 'low',
+          confidence: isStrongAnchor(anchor) ? 'high' : 'low',
           match_source: 'naics',
         });
         break;

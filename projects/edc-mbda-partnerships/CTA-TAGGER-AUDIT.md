@@ -61,7 +61,28 @@ advanced_materials 5,445→~13 and tightens the 541330/IT catch-all cluster WITH
 - [ ] Deploy the tagger + feed-filter code (DB tags already correct; feed needs the filter live)
 - [ ] Spot-check demo-relevant opps in the live feed after deploy
 
-## Result (June 15, 2026 — drain complete)
+## Round 2 — catch-all 6-digit anchors (June 16, 2026)
+
+Post-deploy spot-check found a SECOND tier of false positives: the round-1 fix trusted any
+≥5-digit anchor on NAICS alone, but several 6-digit codes are vendor-INDUSTRY catch-alls, not
+capability proof — they tagged a fire sprinkler as "Directed Energy" (334516/541330) and a
+forestry BPA as "AI" (541511/541715). Added `WEAK_ANCHORS` (definitions.ts) — empirically
+chosen catch-all codes (high active volume and/or reused across ≥2 CTAs): 541330, 334290,
+541512, 541713, 541511, 541715, 541519, 336414, 334516, 334419. A match on these needs keyword
+corroboration like a broad anchor; only genuinely specific anchors (334413 Semiconductors,
+333611 Turbines, …) keep `high` on NAICS alone.
+
+**Re-drained all active. Verified June 16:** sprinkler/boiler/forestry/eDNA-samplers/coagulation/
+cable-assembly/biological-containment/rifle → all NONE (suppressed). What's SHOWN is now real:
+directed_energy = turbine blades + "Directed Energy Deposition"; trusted_ai = "Artificial
+Intelligence", "MRI Computer Vision"; microelectronics = "Semiconductor Device", "Microcircuit".
+
+## Result (June 16, 2026 — round-2 drain complete)
+- ACTIVE **32,470 · 100% processed**. Tags: **1,135 SHOWN (high+med)** · 10,268 suppressed.
+  968 distinct opps shown. All 14 CTAs populated; shown tags defensible (specific NAICS or
+  keyword-corroborated). The tighter rule suppresses far more (correctly) than round 1.
+
+## Result (June 15, 2026 — round-1 drain, superseded by round 2)
 - ACTIVE opps **31,281 · 100% processed** (was 5.3%). Tag rows 10,861 → **5,290 SHOWN
   (high+medium)** · 5,571 suppressed (`low`). 596 distinct active opps show a CTA tag.
 - **advanced_materials: 5,444 `low` (suppressed) vs 55 shown** — the rifle/metal/ordnance
