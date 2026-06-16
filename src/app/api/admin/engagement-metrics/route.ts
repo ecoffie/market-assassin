@@ -110,7 +110,7 @@ export async function GET(request: NextRequest) {
       supabase
         .from('alert_log')
         .select('opportunities_data')
-        .eq('status', 'sent')
+        .eq('delivery_status', 'sent')
         .gte('alert_date', startDateStr.split('T')[0]),
     ]);
 
