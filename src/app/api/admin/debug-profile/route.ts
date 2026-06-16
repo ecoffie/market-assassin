@@ -39,6 +39,22 @@ export async function GET(request: NextRequest) {
     .eq('user_email', email)
     .maybeSingle();
 
+  // DIAGNOSTIC: reproduce the EXACT query /api/app/workspace runs for profile.notification
+  // (same client, same select, same normalized email) to prove whether the server
+  // produces the data the Settings card/form read. Isolates "server returns empty"
+  // from "client ignores it". (Eric QC 2026-06-16: keywords feature shows empty.)
+  let workspaceNotificationQuery: { data: unknown; error: string | null } = { data: null, error: null };
+  try {
+    const r = await supabase
+      .from('user_notification_settings')
+      .select('user_email, naics_codes, agencies, keywords, business_type, company_name, aggregated_profile, zip_codes')
+      .eq('user_email', email)
+      .maybeSingle();
+    workspaceNotificationQuery = { data: r.data, error: r.error?.message || null };
+  } catch (err) {
+    workspaceNotificationQuery = { data: null, error: err instanceof Error ? err.message : 'query threw' };
+  }
+
   let business: { data: Record<string, unknown> | null; error: string | null } = { data: null, error: null };
   try {
     const result = await supabase
@@ -102,6 +118,8 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     email,
     supabaseAuth,
+    // What the Settings card/form's profile.notification would contain (server side).
+    workspaceNotificationQuery,
     user_notification_settings: notification.data
       ? {
           present: true,
