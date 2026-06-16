@@ -25,10 +25,14 @@ export async function getNoticeIdsForCtaFilter(
 ): Promise<{ noticeIds: string[] | null; error?: string }> {
   if (!ctaIds.length) return { noticeIds: null };
 
+  // Only high/medium tags drive the filter. 'low' = a broad-NAICS-only match with
+  // no keyword corroboration (e.g. a rifle under "Advanced Materials" via the 332
+  // anchor) — kept in the table for transparency but never surfaced as a CTA match.
   const { data, error } = await supabase
     .from('opportunity_cta_tags')
     .select('notice_id')
-    .in('cta_id', ctaIds);
+    .in('cta_id', ctaIds)
+    .in('confidence', ['high', 'medium']);
 
   if (error) {
     if (String(error.message || '').includes('does not exist')) {

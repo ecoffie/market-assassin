@@ -223,12 +223,20 @@ export function tagOpportunityForCta(
   const description = String(opp.description || '');
   const results = new Map<string, CtaTagResult>();
 
+  // NAICS-anchor pass. A match on a SPECIFIC anchor (≥5 digits — a real 6-digit
+  // industry like 334413 Semiconductors) earns 'high' on NAICS alone. A match on
+  // a BROAD anchor (≤4 digits, e.g. 332 = all fabricated metal, 5413 consulting)
+  // is too coarse to confidently mean the CTA — it tagged rifles (332994) as
+  // "Advanced Materials." So a broad-anchor-only match is provisional 'low'; it's
+  // promoted to 'high' below ONLY if a keyword also corroborates. (Audit: this
+  // collapses advanced_materials from 5,445 false tags → ~the 13 real ones.)
   for (const cta of definitions) {
     for (const anchor of cta.naics_anchors) {
       if (naicsValues.some((n) => naicsMatchesAnchor(n, anchor))) {
+        const specific = normalizeNaics(anchor).length >= 5;
         results.set(cta.cta_id, {
           cta_id: cta.cta_id,
-          confidence: 'high',
+          confidence: specific ? 'high' : 'low',
           match_source: 'naics',
         });
         break;
@@ -237,29 +245,36 @@ export function tagOpportunityForCta(
   }
 
   for (const cta of definitions) {
-    if (results.get(cta.cta_id)?.confidence === 'high') continue;
+    const existing = results.get(cta.cta_id);
+    if (existing?.confidence === 'high') continue;
     for (const kw of cta.keywords) {
       if (haystackIncludesPhrase(title, kw)) {
-        const existing = results.get(cta.cta_id);
-        if (!existing || existing.confidence === 'low') {
-          results.set(cta.cta_id, {
-            cta_id: cta.cta_id,
-            confidence: 'medium',
-            match_source: 'keyword_title',
-          });
-        }
+        // Keyword in title + a (broad) NAICS anchor already hit → strong signal:
+        // promote to 'high'. Keyword alone → 'medium'. (match_source stays
+        // 'keyword_title' — the DB CHECK constraint allows only the 3 base values;
+        // `confidence` carries the corroboration level.)
+        const naicsCorroborated = existing?.match_source === 'naics';
+        results.set(cta.cta_id, {
+          cta_id: cta.cta_id,
+          confidence: naicsCorroborated ? 'high' : 'medium',
+          match_source: 'keyword_title',
+        });
         break;
       }
     }
   }
 
   for (const cta of definitions) {
-    if (results.has(cta.cta_id)) continue;
+    const existing = results.get(cta.cta_id);
+    // Skip if already strong; a 'low' naics-only entry may still be corroborated
+    // by a description keyword → promote it to 'medium'.
+    if (existing && existing.confidence !== 'low') continue;
     for (const kw of cta.keywords) {
       if (haystackIncludesPhrase(description, kw)) {
+        const naicsCorroborated = existing?.match_source === 'naics';
         results.set(cta.cta_id, {
           cta_id: cta.cta_id,
-          confidence: 'low',
+          confidence: naicsCorroborated ? 'medium' : 'low',
           match_source: 'keyword_description',
         });
         break;

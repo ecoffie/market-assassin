@@ -1836,3 +1836,35 @@ alerts.
 in `src/lib/utils/naics-expansion.ts` so `/api/app/profile` persists precise 6-digit
 codes exactly (verified: demolition saved 6 codes, not 74). Diagnosed against the real
 stored profile via /api/admin/debug-profile.
+
+---
+
+## 14 Critical Technology Areas filter — honest CTA tagging at 100% coverage (June 15, 2026)
+
+**What:** Every active SAM opportunity (31,281) is now tagged to the DoD's 14 Critical
+Technology Areas, up from ~5% coverage. The rules-based tagger was rebuilt to stop false
+positives: a match on a broad 3-4 digit NAICS prefix alone (e.g. 332 = all fabricated
+metal) no longer confidently labels an opportunity — it must be corroborated by a real
+capability keyword, or anchor on a specific 5-6 digit industry code. Uncorroborated
+broad-NAICS matches are kept as low-confidence (for "why matched" transparency) but never
+surface in the CTA filter.
+
+**Why:** The old tagger labeled a "5.56 Rifle and Accessories" contract (NAICS 332994,
+Small Arms Ammunition) as "Advanced Materials" with high confidence — because 332994 starts
+with the 332 anchor. An audit found 5,445 active opportunities falsely tagged "Advanced
+Materials" while only ~13 actually involved composites or nanomaterials (~99.8% false). For
+a buyer or a DoD evaluator scanning a Critical Tech Area, a rifle under "Advanced Materials"
+destroys trust instantly. The fix makes every shown tag defensible: it's either a specific
+industry-code match or backed by the actual capability language in the opportunity.
+
+**SEO:** DoD 14 critical technology areas, critical tech area contract opportunities, find
+SBIR opportunities by technology area, hypersonics directed energy microelectronics
+contracts, defense industrial base technology areas, federal opportunities by capability.
+
+**Proof:** `src/lib/cta/definitions.ts` (`tagOpportunityForCta` — broad anchors require
+keyword corroboration for high/medium; specific anchors keep high) +
+`src/lib/cta/opportunity-tags.ts` (`getNoticeIdsForCtaFilter` surfaces only high/medium) +
+`scripts/drain-cta-tags.ts` (bulk local drain, rule #7). Verified live: 31,281 active opps
+100% processed; advanced_materials 5,444 suppressed vs 55 shown; all 14 CTAs populated
+(directed_energy 164, microelectronics 129, network_systems 124, …). Audit:
+`projects/edc-mbda-partnerships/CTA-TAGGER-AUDIT.md`.
