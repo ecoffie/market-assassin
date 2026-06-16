@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
-import type { AppTier } from '../UnifiedSidebar';
+import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import { useToast } from '../Toast';
 import { formatOpportunityLocation } from '@/lib/mindy/opportunity-location';
@@ -19,6 +19,7 @@ import OpportunityDetailStrip from '@/components/app/OpportunityDetailStrip';
 interface AlertsPanelProps {
   email: string | null;
   tier: AppTier;
+  onPanelChange?: (panel: AppPanel) => void;
 }
 
 interface Alert {
@@ -120,7 +121,7 @@ function getAlertBuyer(alert: Alert) {
   });
 }
 
-export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
+export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelProps) {
   const dodaacNames = useDodaacNames();
   const [alerts, setAlerts] = useState<Alert[]>([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -730,12 +731,26 @@ export default function AlertsPanel({ email, tier }: AlertsPanelProps) {
                 {isLoading ? 'Refreshing…' : '🔄 Refresh'}
               </button>
               {isFreeTier && needsProfileSetup && (
-                <Link
-                  href={mindySetupHref}
-                  className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-sm font-semibold rounded-lg transition-colors"
-                >
-                  Set up your keywords →
-                </Link>
+                // Open the Settings panel (where keywords are editable) rather than
+                // /app/onboarding — onboarding bounces any returning user who already
+                // has NAICS codes straight back to /app, so the button looked dead
+                // (Eric QC 2026-06-16). Fall back to the link only when no panel
+                // switcher is wired (e.g. a standalone render).
+                onPanelChange ? (
+                  <button
+                    onClick={() => onPanelChange('settings')}
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-sm font-semibold rounded-lg transition-colors"
+                  >
+                    Set up your keywords →
+                  </button>
+                ) : (
+                  <Link
+                    href={mindySetupHref}
+                    className="px-4 py-2 bg-amber-500 hover:bg-amber-400 text-slate-950 text-sm font-semibold rounded-lg transition-colors"
+                  >
+                    Set up your keywords →
+                  </Link>
+                )
               )}
             </div>
           </div>
