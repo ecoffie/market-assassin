@@ -177,22 +177,27 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
         return;
       }
 
-      // Frequency-save failures aren't fatal — workspace succeeded — but
-      // surface them so the user knows the email frequency may not have
-      // updated.
+      // The preferences call carries the TARGETING (naics/psc/keywords/agencies/
+      // states/frequency) → user_notification_settings, the table alerts read. A
+      // failure here means the user's codes/keywords DID NOT SAVE — treat it as a
+      // HARD error, not a soft "saved" (Eric QC 2026-06-16: a failed targeting save
+      // was disguised as an "email frequency" info toast → users thought it saved
+      // when it didn't). Surface the real error.
       if (!prefsRes.ok) {
         const prefsErr = await prefsRes.json().catch(() => null);
-        console.warn('Email frequency save failed:', prefsErr);
+        console.error('Targeting save failed:', prefsErr);
         showToast({
-          message: 'Saved, but email frequency may not have updated',
-          variant: 'info',
+          message: prefsErr?.error
+            ? `Codes/keywords did NOT save: ${prefsErr.error}`
+            : 'Your codes/keywords did NOT save — please try again.',
+          variant: 'error',
         });
-      } else {
-        showToast({
-          message: markComplete ? 'Onboarding marked complete' : 'Settings saved',
-          variant: 'success',
-        });
+        return;
       }
+      showToast({
+        message: markComplete ? 'Onboarding marked complete' : 'Settings saved',
+        variant: 'success',
+      });
 
       setForm(prev => ({ ...prev, onboarding_completed: markComplete }));
       setTargetingRefreshKey(prev => prev + 1);
