@@ -125,6 +125,8 @@ export async function GET(request: NextRequest) {
           present: true,
           naics_codes: notification.data.naics_codes,
           naics_codes_length: Array.isArray(notification.data.naics_codes) ? notification.data.naics_codes.length : null,
+          psc_codes: notification.data.psc_codes,
+          keywords: notification.data.keywords,
           set_aside_preferences: notification.data.set_aside_preferences,
           business_type: notification.data.business_type,
           agencies: notification.data.agencies,
