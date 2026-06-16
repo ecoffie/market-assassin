@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import { useAppTracker } from '../track';
@@ -43,9 +43,11 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [targetingRefreshKey, setTargetingRefreshKey] = useState(0);
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
   const track = useAppTracker(email);
   const { showToast } = useToast();
+  const matchingSectionRef = useRef<HTMLElement | null>(null);
 
   const loadSettings = useCallback(async () => {
     if (!email) return;
@@ -189,6 +191,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
       }
 
       setForm(prev => ({ ...prev, onboarding_completed: markComplete }));
+      setTargetingRefreshKey(prev => prev + 1);
       // profile_update is an activation signal — users tweaking their
       // profile are engaged. Capture which fields are non-empty so the
       // Launch Command Center can see what's being tuned.
@@ -209,6 +212,14 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
       setSaving(false);
     }
   };
+
+  const focusOpportunityMatching = useCallback(() => {
+    matchingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    window.setTimeout(() => {
+      const firstField = matchingSectionRef.current?.querySelector<HTMLElement>('input, textarea, button, select');
+      firstField?.focus();
+    }, 250);
+  }, []);
 
   if (loading) {
     return (
@@ -232,14 +243,13 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
       {error && <div className="rounded-lg border border-red-500/30 bg-red-500/10 p-4 text-red-300">{error}</div>}
 
       {/* Coverage readout — shows how the codes/keywords below stack up against the
-          real USASpending market + flags missing high-value codes. `key` ties to the
-          last-saved message so it re-fetches after a save. onEdit is a no-op here
-          (you're already on the editor). */}
-      <TargetingCard key={message || 'targeting'} email={email} onEdit={() => {}} />
+          real USASpending market + flags missing high-value codes. `key` bumps after
+          save so the card re-fetches the canonical targeting settings. */}
+      <TargetingCard key={`targeting-${targetingRefreshKey}`} email={email} onEdit={focusOpportunityMatching} />
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         <div className="space-y-5">
-          <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5">
+          <section ref={matchingSectionRef} className="scroll-mt-24 bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5">
             <SectionTitle title="Profile" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Field label="Display Name" value={form.display_name} onChange={(value) => setForm({ ...form, display_name: value })} placeholder="John Doe" />
