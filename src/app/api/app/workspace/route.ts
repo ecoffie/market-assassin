@@ -37,7 +37,12 @@ export async function GET(request: NextRequest) {
       .then((r: { data: unknown }) => r, () => ({ data: null })),
     supabase
       .from('user_notification_settings')
-      .select('user_email, naics_codes, agencies, keywords, business_type, company_name, aggregated_profile, zip_codes')
+      // NOTE: select ONLY columns that exist. company_name + zip_codes do NOT exist
+      // on user_notification_settings — including them made PostgREST reject the
+      // WHOLE query → profile.notification came back null → the Settings card/form
+      // showed "No codes / No keywords" despite the data being present (Eric QC
+      // 2026-06-16). Never add a column here without confirming it exists.
+      .select('user_email, naics_codes, agencies, keywords, business_type, aggregated_profile')
       .eq('user_email', normalizedEmail)
       .maybeSingle(),
     supabase
