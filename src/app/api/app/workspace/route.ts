@@ -43,7 +43,9 @@ export async function GET(request: NextRequest) {
       // showed "No codes / No keywords" despite the data being present (Eric QC
       // 2026-06-16). Never add a column here without confirming it exists.
       // psc_codes DOES exist (20260612 migration) — included so Settings can edit it.
-      .select('user_email, naics_codes, psc_codes, agencies, keywords, business_type, aggregated_profile')
+      // location_states exists too — surfaced so the targeting card shows coverage area.
+      // (Verified columns exist before adding — a missing column nulls the WHOLE query.)
+      .select('user_email, naics_codes, psc_codes, agencies, keywords, business_type, location_states, aggregated_profile')
       .eq('user_email', normalizedEmail)
       .maybeSingle(),
     supabase

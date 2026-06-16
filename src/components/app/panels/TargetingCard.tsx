@@ -30,6 +30,8 @@ interface TargetingCardProps {
 interface Targeting {
   naics: string[];
   keywords: string[];
+  psc: string[];
+  states: string[];
 }
 
 interface CoverageCode {
@@ -63,6 +65,7 @@ export default function TargetingCard({ email, onEdit }: TargetingCardProps) {
   const [data, setData] = useState<Targeting | null>(null);
   const [coverage, setCoverage] = useState<Coverage | null>(null);
   const [loading, setLoading] = useState(true);
+  const [collapsed, setCollapsed] = useState(false);
 
   const load = useCallback(async () => {
     if (!email) { setLoading(false); return; }
@@ -82,6 +85,8 @@ export default function TargetingCard({ email, onEdit }: TargetingCardProps) {
       setData({
         naics: Array.isArray(s.naics_codes) ? s.naics_codes.map(String) : [],
         keywords,
+        psc: Array.isArray(s.psc_codes) ? s.psc_codes.map(String) : [],
+        states: Array.isArray(s.location_states) ? s.location_states.map(String) : [],
       });
 
       // Coverage context for the user's PRIMARY keyword — the market size + the PSC
@@ -123,21 +128,34 @@ export default function TargetingCard({ email, onEdit }: TargetingCardProps) {
 
   if (loading || !data) return null;
 
-  const { naics, keywords } = data;
+  const { naics, keywords, psc, states } = data;
   const noKeywords = keywords.length === 0;
   // Only expose Edit affordances when a navigation handler is wired. On the Settings
   // panel itself there's no target to send the user to (they're already editing), so
   // onEdit is omitted and the buttons hide — no dead clicks.
   const canEdit = typeof onEdit === 'function';
   const edit = () => onEdit?.('settings');
+  // One-line summary shown when collapsed (glanceable verify without the full card).
+  const statesLabel = states.length > 0 ? states.join(', ') : 'Nationwide';
 
   return (
     <div className="mb-4 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
       <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="text-sm font-semibold text-white">Your targeting</div>
-          <div className="text-xs text-slate-500">What Mindy matches your alerts against</div>
-        </div>
+        <button
+          onClick={() => setCollapsed((v) => !v)}
+          className="flex min-w-0 items-center gap-2 text-left"
+          aria-expanded={!collapsed}
+        >
+          <span className={`text-slate-500 transition-transform ${collapsed ? '-rotate-90' : ''}`}>▾</span>
+          <span className="min-w-0">
+            <span className="block text-sm font-semibold text-white">Your targeting</span>
+            <span className="block text-xs text-slate-500">
+              {collapsed
+                ? `${naics.length} NAICS · ${keywords.length} keywords · ${psc.length} PSC · ${statesLabel}`
+                : 'What Mindy matches your alerts against'}
+            </span>
+          </span>
+        </button>
         {canEdit && (
           <button
             onClick={edit}
@@ -148,6 +166,8 @@ export default function TargetingCard({ email, onEdit }: TargetingCardProps) {
         )}
       </div>
 
+      {!collapsed && (
+      <>
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {/* NAICS */}
         <div>
@@ -192,6 +212,42 @@ export default function TargetingCard({ email, onEdit }: TargetingCardProps) {
               )}
             </div>
           )}
+        </div>
+
+        {/* PSC codes — what's BOUGHT (the precise axis). Display-only here; edit in Settings. */}
+        <div>
+          <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">
+            PSC codes ({psc.length})
+          </div>
+          {psc.length > 0 ? (
+            <div className="flex flex-wrap gap-1">
+              {psc.slice(0, 10).map((c) => (
+                <span key={c} className="rounded bg-purple-500/15 px-2 py-0.5 text-xs text-purple-300">{c}</span>
+              ))}
+            </div>
+          ) : canEdit ? (
+            <button onClick={edit} className="text-xs text-purple-400 hover:text-purple-300">
+              Add PSC codes (what the gov buys) →
+            </button>
+          ) : (
+            <span className="text-xs text-slate-500">None set — add in the PSC field below</span>
+          )}
+        </div>
+
+        {/* Coverage area — the states alerts are scoped to. "Nationwide" when empty. */}
+        <div>
+          <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">
+            Coverage area
+          </div>
+          <div className="flex flex-wrap gap-1">
+            {states.length > 0 ? (
+              states.map((st) => (
+                <span key={st} className="rounded bg-blue-500/15 px-2 py-0.5 text-xs text-blue-300">{st}</span>
+              ))
+            ) : (
+              <span className="rounded bg-slate-800 px-2 py-0.5 text-xs text-slate-300">🌎 Nationwide</span>
+            )}
+          </div>
         </div>
       </div>
 
@@ -260,6 +316,8 @@ export default function TargetingCard({ email, onEdit }: TargetingCardProps) {
             </div>
           )}
         </div>
+      )}
+      </>
       )}
     </div>
   );
