@@ -72,7 +72,12 @@ export default function TargetingCard({ email, onEdit }: TargetingCardProps) {
       });
       if (!res.ok) { setLoading(false); return; }
       const j = await res.json();
-      const s = j.settings || {};
+      // Read the AUTHORITATIVE source: profile.notification = user_notification_settings,
+      // the SAME table that drives alerts/feed. NOT j.settings (that's mi_beta_user_settings,
+      // a separate per-user row that's empty for users set up via the alerts path — the card
+      // showed "No codes" despite a correct profile; Eric QC 2026-06-16). Fall back to
+      // j.settings only if notification is absent.
+      const s = j.profile?.notification || j.settings || {};
       const keywords = Array.isArray(s.keywords) ? s.keywords.map(String) : [];
       setData({
         naics: Array.isArray(s.naics_codes) ? s.naics_codes.map(String) : [],
@@ -120,6 +125,10 @@ export default function TargetingCard({ email, onEdit }: TargetingCardProps) {
 
   const { naics, keywords } = data;
   const noKeywords = keywords.length === 0;
+  // Only expose Edit affordances when a navigation handler is wired. On the Settings
+  // panel itself there's no target to send the user to (they're already editing), so
+  // onEdit is omitted and the buttons hide — no dead clicks.
+  const canEdit = typeof onEdit === 'function';
   const edit = () => onEdit?.('settings');
 
   return (
@@ -129,12 +138,14 @@ export default function TargetingCard({ email, onEdit }: TargetingCardProps) {
           <div className="text-sm font-semibold text-white">Your targeting</div>
           <div className="text-xs text-slate-500">What Mindy matches your alerts against</div>
         </div>
-        <button
-          onClick={edit}
-          className="shrink-0 rounded-lg bg-purple-600 hover:bg-purple-500 px-3 py-1.5 text-xs font-medium text-white"
-        >
-          Edit codes &amp; keywords →
-        </button>
+        {canEdit && (
+          <button
+            onClick={edit}
+            className="shrink-0 rounded-lg bg-purple-600 hover:bg-purple-500 px-3 py-1.5 text-xs font-medium text-white"
+          >
+            Edit codes &amp; keywords →
+          </button>
+        )}
       </div>
 
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
