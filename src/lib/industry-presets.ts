@@ -61,6 +61,34 @@ export const INDUSTRY_PRESETS: IndustryPreset[] = [
     codes: ['611430', '611420', '611710'],
     description: 'Professional training, educational services'
   },
+  // PRODUCT / RESELLER verticals (added Jun 2026 — the picker was all SERVICES;
+  // sellers of goods, esp. medical-supply students, had nowhere to land. NAICS
+  // grounded in real USASpending "medical supplies" spend: 423450 wholesale,
+  // 339112/339113 instruments+appliances, 325412 pharma.)
+  {
+    label: 'Medical Supplies & Equipment',
+    name: 'Medical Supplies & Equipment',
+    codes: ['423450', '339112', '339113', '325412', '339115'],
+    description: 'Sell medical/dental/hospital supplies, devices, instruments'
+  },
+  {
+    label: 'Products & Wholesale',
+    name: 'Products & Wholesale',
+    codes: ['423', '424'],
+    description: 'Resell/distribute goods to the government (any product line)'
+  },
+  {
+    label: 'Manufacturing',
+    name: 'Manufacturing',
+    codes: ['332', '333', '334', '335'],
+    description: 'Make products — metal, machinery, electronics, equipment'
+  },
+  {
+    label: 'Office & Industrial Supplies',
+    name: 'Office & Industrial Supplies',
+    codes: ['453210', '424120', '423840', '423610'],
+    description: 'Office products, janitorial, industrial & MRO supplies'
+  },
 ];
 
 /**

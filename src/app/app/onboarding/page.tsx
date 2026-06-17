@@ -17,6 +17,13 @@ const INDUSTRY_PRESETS = [
   { label: 'Logistics & Supply', codes: ['493', '484', '488'], description: 'Warehousing, trucking, transportation' },
   { label: 'Facilities & Maintenance', codes: ['561210', '561720', '561730'], description: 'Janitorial, landscaping, building services' },
   { label: 'Training & Education', codes: ['611430', '611420', '611710'], description: 'Professional training, educational services' },
+  // PRODUCT / RESELLER verticals — the picker was all services; sellers of goods
+  // (esp. medical-supply students) had nowhere to land. NAICS grounded in real
+  // USASpending "medical supplies" spend (423450/339112/339113/325412).
+  { label: 'Medical Supplies & Equipment', codes: ['423450', '339112', '339113', '325412', '339115'], description: 'Sell medical/dental/hospital supplies, devices, instruments' },
+  { label: 'Products & Wholesale', codes: ['423', '424'], description: 'Resell/distribute goods to the government' },
+  { label: 'Manufacturing', codes: ['332', '333', '334', '335'], description: 'Make products — metal, machinery, electronics' },
+  { label: 'Office & Industrial Supplies', codes: ['453210', '424120', '423840', '423610'], description: 'Office, janitorial, industrial & MRO supplies' },
 ];
 
 const QUICK_AGENCIES = ['DHS', 'VA', 'GSA', 'DoD', 'Army Corps', 'HHS', 'DOE', 'NASA', 'DOJ', 'DOT'];
