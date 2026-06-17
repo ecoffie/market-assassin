@@ -46,6 +46,11 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [targetingRefreshKey, setTargetingRefreshKey] = useState(0);
+  // Count of saved BD targets (user_target_list) — used so "Agencies selected" in
+  // setup progress reflects the My Target List, not just the alert-agencies field
+  // (Eric QC 2026-06-17: had 23 targets but the checkmark was blank — they live in
+  // a DIFFERENT table than user_notification_settings.agencies).
+  const [targetListCount, setTargetListCount] = useState(0);
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
   const track = useAppTracker(email);
   const { showToast } = useToast();
@@ -62,14 +67,22 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
       // user_notification_settings.alert_frequency, surfaced via the alerts
       // preferences endpoint — read it there too so the dropdown reflects
       // the value that actually controls the daily-alerts cron.
-      const [workspaceRes, prefsRes] = await Promise.all([
+      const [workspaceRes, prefsRes, targetsRes] = await Promise.all([
         fetch(`/api/app/workspace?email=${encodeURIComponent(email)}`, {
           headers: getAuthHeaders(),
         }),
         fetch(`/api/alerts/preferences?email=${encodeURIComponent(email)}`, {
           headers: getAuthHeaders(),
         }),
+        // Saved BD targets (My Target List) — counts toward "Agencies selected".
+        fetch(`/api/app/target-list?email=${encodeURIComponent(email)}`, {
+          headers: getAuthHeaders(),
+        }).catch(() => null),
       ]);
+      try {
+        const tj = targetsRes && targetsRes.ok ? await targetsRes.json() : null;
+        setTargetListCount(Number(tj?.count) || (Array.isArray(tj?.targets) ? tj.targets.length : 0));
+      } catch { /* non-fatal */ }
 
       const data = await workspaceRes.json();
       if (!data.success) {
@@ -399,7 +412,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
               <p className="text-[11px] uppercase tracking-wider text-slate-500">Setup progress</p>
               <ChecklistItem label="Profile saved" done={Boolean(form.display_name || form.company_name)} />
               <ChecklistItem label="NAICS selected" done={parseList(form.naics_codes).length > 0} />
-              <ChecklistItem label="Agencies selected" done={parseList(form.target_agencies).length > 0} />
+              <ChecklistItem label="Agencies selected" done={parseList(form.target_agencies).length > 0 || targetListCount > 0} />
             </div>
           </div>
 
