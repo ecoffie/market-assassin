@@ -56,6 +56,20 @@ export async function POST(request: NextRequest) {
     update.business_type = body.businessType.trim();
   }
 
+  // Optional Vault identity write (user_identity_profile) — for restoring a profile
+  // from UEI when the auth'd prefill path can't be used (admin restore). Pass
+  // { vault: { legal_name, uei, primary_naics, ... } }.
+  if (body.vault && typeof body.vault === 'object') {
+    const v = body.vault as Record<string, unknown>;
+    const vaultRow: Record<string, unknown> = { user_email: email, updated_at: new Date().toISOString() };
+    for (const k of ['uei', 'cage_code', 'legal_name', 'dba', 'one_liner', 'elevator_pitch']) {
+      if (typeof v[k] === 'string' && v[k]) vaultRow[k] = v[k];
+    }
+    if (Array.isArray(v.primary_naics)) vaultRow.primary_naics = (v.primary_naics as unknown[]).map(String);
+    if (Array.isArray(v.certifications)) vaultRow.certifications = (v.certifications as unknown[]).map(String);
+    await supabase.from('user_identity_profile').upsert(vaultRow, { onConflict: 'user_email' });
+  }
+
   async function writeProfile(withPsc: boolean) {
     const payload = withPsc && pscCodes ? { ...update, psc_codes: pscCodes } : update;
     // Upsert by user_email; if the row exists, update it.
