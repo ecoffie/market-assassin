@@ -75,12 +75,13 @@ export default function TargetingCard({ email, onEdit }: TargetingCardProps) {
       });
       if (!res.ok) { setLoading(false); return; }
       const j = await res.json();
-      // Read the AUTHORITATIVE source: profile.notification = user_notification_settings,
-      // the SAME table that drives alerts/feed. NOT j.settings (that's mi_beta_user_settings,
-      // a separate per-user row that's empty for users set up via the alerts path — the card
-      // showed "No codes" despite a correct profile; Eric QC 2026-06-16). Fall back to
-      // j.settings only if notification is absent.
-      const s = j.profile?.notification || j.settings || {};
+      // Read ONLY the authoritative source: profile.notification =
+      // user_notification_settings, the SAME table that drives alerts/feed. We do
+      // NOT fall back to j.settings (mi_beta_user_settings) — that's a separate row
+      // that can DISAGREE with what alerts actually use, so falling back to it would
+      // show a profile different from what drives matching (Eric QC 2026-06-16). If
+      // notification is absent, show the empty/setup state — never stale mi_beta data.
+      const s = j.profile?.notification || {};
       const keywords = Array.isArray(s.keywords) ? s.keywords.map(String) : [];
       setData({
         naics: Array.isArray(s.naics_codes) ? s.naics_codes.map(String) : [],
