@@ -97,10 +97,14 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
         company_name: settings.company_name || notif.company_name || '',
         display_name: settings.display_name || '',
         role_title: settings.role_title || '',
-        naics_codes: (notif.naics_codes || settings.naics_codes || []).join(', '),
+        // Targeting comes ONLY from notification (user_notification_settings = the
+        // source of truth alerts read). No fallback to settings (mi_beta) — that
+        // could show a stale profile different from what drives alerts (launch
+        // consistency pass, Eric QC 2026-06-16).
+        naics_codes: (notif.naics_codes || []).join(', '),
         psc_codes: (notif.psc_codes || []).join(', '),
-        keywords: (notif.keywords || settings.keywords || []).join(', '),
-        target_agencies: (notif.agencies || settings.target_agencies || []).join(', '),
+        keywords: (notif.keywords || []).join(', '),
+        target_agencies: (notif.agencies || []).join(', '),
         // Prefer the canonical alert_frequency (drives actual emails)
         // over the legacy mi_beta_user_settings.email_frequency value.
         email_frequency: realAlertFrequency || settings.email_frequency || 'daily',
@@ -142,14 +146,13 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
           headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             email,
+            // DISPLAY FIELDS ONLY — targeting goes through the preferences call below
+            // (user_notification_settings, the source of truth). We no longer mirror
+            // NAICS/agencies here: the second copy could go stale and disagree with
+            // alerts (launch consistency pass, Eric QC 2026-06-16).
             company_name: form.company_name,
             display_name: form.display_name,
             role_title: form.role_title,
-            // Mirror NAICS/agencies to the workspace row too (keeps the team
-            // workspace view consistent), but the AUTHORITATIVE write is the
-            // preferences call below.
-            naics_codes: parseList(form.naics_codes),
-            target_agencies: parseList(form.target_agencies),
             email_frequency: form.email_frequency,
             onboarding_completed: markComplete,
           }),

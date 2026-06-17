@@ -342,14 +342,19 @@ export async function PATCH(request: NextRequest) {
   }
 
   const workspaceId = getWorkspaceId(email);
+  // DISPLAY FIELDS ONLY. Targeting (naics_codes, target_agencies, psc, keywords,
+  // states) is OWNED by user_notification_settings — the table alerts/feed/briefings
+  // read. We deliberately do NOT write targeting here anymore: writing it to BOTH
+  // tables created a stale second copy that could disagree with what alerts use, and
+  // showed users a different profile than their alerts (Eric QC 2026-06-16, launch
+  // consistency pass). mi_beta_user_settings now carries name/role/company + the
+  // workspace-display flags only.
   const updates = {
     workspace_id: workspaceId,
     user_email: email,
     company_name: body.company_name || null,
     display_name: body.display_name || null,
     role_title: body.role_title || null,
-    naics_codes: Array.isArray(body.naics_codes) ? body.naics_codes : [],
-    target_agencies: Array.isArray(body.target_agencies) ? body.target_agencies : [],
     email_frequency: body.email_frequency || 'daily',
     onboarding_completed: Boolean(body.onboarding_completed),
     two_factor_required: body.two_factor_required !== false,
@@ -402,6 +407,45 @@ async function saveWorkspaceDefaults(
     .single();
 
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+
+  // SEED each member's REAL targeting (user_notification_settings) with the workspace
+  // defaults — so the defaults actually affect alerts, not just the display (Eric, launch
+  // pass). NO-CLOBBER: only seed members who have NO naics_codes of their own; never
+  // overwrite a member who's tuned their own profile. Non-fatal on error.
+  if (defaults.naics_codes.length > 0 || defaults.target_agencies.length > 0) {
+    try {
+      const sb = getAppSupabase();
+      const { data: members } = await sb
+        .from('mi_beta_team_members')
+        .select('user_email')
+        .eq('workspace_id', workspaceId)
+        .eq('status', 'active');
+      for (const m of (members || []) as Array<{ user_email: string }>) {
+        const memberEmail = String(m.user_email || '').toLowerCase().trim();
+        if (!memberEmail) continue;
+        const { data: cur } = await sb
+          .from('user_notification_settings')
+          .select('user_email, naics_codes')
+          .eq('user_email', memberEmail)
+          .maybeSingle();
+        const hasOwn = Array.isArray(cur?.naics_codes) && cur!.naics_codes.length > 0;
+        if (hasOwn) continue; // never clobber a tuned profile
+        const patch = {
+          naics_codes: defaults.naics_codes,
+          agencies: defaults.target_agencies,
+          alerts_enabled: true,
+          updated_at: new Date().toISOString(),
+        };
+        if (cur) {
+          await sb.from('user_notification_settings').update(patch).eq('user_email', memberEmail);
+        } else {
+          await sb.from('user_notification_settings').insert({ user_email: memberEmail, ...patch });
+        }
+      }
+    } catch (e) {
+      console.warn('[workspace_defaults] member seed failed (non-fatal):', e instanceof Error ? e.message : e);
+    }
+  }
 
   await recordAppActivity({
     workspaceId,
