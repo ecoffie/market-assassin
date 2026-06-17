@@ -78,7 +78,13 @@ export async function POST(request: NextRequest) {
   }, { onConflict: 'user_email' });
   did.push(jErr ? `journey_progress: ${jErr.message}` : 'journey_progress reset');
 
-  // 3. Optional: wipe My Target List for a truly blank slate.
+  // 3. Wipe the Vault identity (user_identity_profile) — legal name, UEI, primary
+  //    NAICS. The first reset MISSED this, so "Govcon Giants" persisted when Eric
+  //    re-walked onboarding (QC 2026-06-17). A true new user has an empty Vault.
+  const { error: vErr } = await supabase.from('user_identity_profile').delete().eq('user_email', email);
+  did.push(vErr ? `vault identity: ${vErr.message}` : 'vault identity wiped');
+
+  // 4. Optional: wipe My Target List for a truly blank slate.
   if (p.get('wipeTargets') === '1') {
     const { error: tErr } = await supabase.from('user_target_list').delete().eq('user_email', email);
     did.push(tErr ? `target_list: ${tErr.message}` : 'target_list wiped');

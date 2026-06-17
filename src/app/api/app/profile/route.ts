@@ -26,6 +26,12 @@ export async function POST(request: NextRequest) {
       alertFrequency,
       onboardingComplete,
       referralCode,
+      // precise=true → save the codes EXACTLY as given, no prefix expansion at all.
+      // Onboarding's keyword-derived path already returns the tight ~8-code coverage
+      // set; expanding even prefixes there bloats it to 31 (Eric QC 2026-06-17:
+      // "construction" saved 31 codes + NAICS-title keywords). Tight by default;
+      // breadth is an explicit opt-in elsewhere, not an accident here.
+      precise,
     } = body;
 
     if (!email) {
@@ -58,7 +64,13 @@ export async function POST(request: NextRequest) {
     // first coverage set the onboarding banner showed — e.g. demolition's 6 codes),
     // never blown out to whole families (562910 → all 562x). Short prefixes a user
     // types ("238") still expand. Keyword search does the broadening now, not NAICS.
-    const expandedNaicsCodes = rawNaicsCodes.length > 0 ? expandNAICSCodes(rawNaicsCodes, false) : [];
+    // precise=true: keep codes exactly (no expansion, even prefixes). Otherwise
+    // expandFullCodes=false (6-digit stay exact; short prefixes expand to family).
+    const expandedNaicsCodes = rawNaicsCodes.length === 0
+      ? []
+      : precise
+        ? Array.from(new Set(rawNaicsCodes))
+        : expandNAICSCodes(rawNaicsCodes, false);
     const safeSetAsides = Array.isArray(setAsides)
       ? setAsides.map(value => String(value).trim()).filter(Boolean)
       : [];

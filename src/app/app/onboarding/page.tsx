@@ -546,6 +546,12 @@ export default function OnboardingPage() {
           email,
           businessDescription: autoText.trim() || null,
           naicsCodes: autoProfile.naics || [],
+          // precise: save the tight ~8-code coverage set EXACTLY as shown on the
+          // confirm screen — no prefix expansion (that bloated profiles to 31 codes).
+          // What the user sees IS what's saved. Breadth is an explicit opt-in, not
+          // an accident (Eric: tight-and-precise default; coverage % shows they're
+          // not missing the money).
+          precise: true,
           // Persist the extracted keywords — they were shown on the confirm screen
           // but used to be dropped, leaving keyword-empty profiles. The user's own
           // words are the strongest search signal.

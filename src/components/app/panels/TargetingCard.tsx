@@ -52,8 +52,8 @@ interface Coverage {
   totalMarket: number;
   sectorMarket: number;   // $ in the user's own line of work (same-sector)
   naicsCount: number;
-  coverageCount: number;
-  coveragePct: number;
+  coverageCount: number;  // # of codes in the tight ~90% set
+  coveragePct: number;    // what that tight set captures of the market (~0.9)
   heldPct: number;        // % of the user's LINE OF WORK they cover (sector-scoped)
   coverageCodes: CoverageCode[];
   missing: CoverageCode[];
@@ -264,16 +264,18 @@ export default function TargetingCard({ email, onEdit, variant = 'compact' }: Ta
       {coverage && coverage.totalMarket > 0 && variant === 'compact' && (
         <div className="mt-3 border-t border-slate-800 pt-3 text-xs">
           {coverage.missing.length === 0 ? (
-            <span className="text-emerald-400">
-              ✓ Tracking your full line of work — the{' '}
-              <span className="font-semibold">{fmtMoney(coverage.sectorMarket || coverage.totalMarket)}</span> &ldquo;{coverage.keyword}&rdquo; market.
+            <span className="text-slate-300">
+              Your <span className="text-emerald-300 font-semibold">{naics.length} code{naics.length !== 1 ? 's' : ''}</span> cover{' '}
+              <span className="text-emerald-300 font-semibold">{Math.round((coverage.coveragePct || 0) * 100)}%</span>{' '}
+              of your <span className="font-semibold">{fmtMoney(coverage.sectorMarket || coverage.totalMarket)}</span> &ldquo;{coverage.keyword}&rdquo; market.
+              <span className="text-slate-500"> You&rsquo;re not missing the money — keywords catch the rest.</span>
             </span>
           ) : (
             <span className="text-slate-400">
               Tracking{' '}
               <span className="text-amber-300 font-semibold">{Math.round(coverage.heldPct * 100)}%</span>{' '}
-              of your &ldquo;{coverage.keyword}&rdquo; line of work.
-              <span className="text-slate-500"> {coverage.missing.length} code{coverage.missing.length > 1 ? 's' : ''} missing — see Settings.</span>
+              of your &ldquo;{coverage.keyword}&rdquo; market.
+              <span className="text-slate-500"> {coverage.missing.length} high-value code{coverage.missing.length > 1 ? 's' : ''} missing — see Settings.</span>
             </span>
           )}
         </div>
@@ -311,9 +313,13 @@ export default function TargetingCard({ email, onEdit, variant = 'compact' }: Ta
               </div>
             </>
           ) : (
-            <div className="text-xs text-emerald-400">
-              ✓ Full coverage — you&rsquo;re tracking every code in your line of work (the{' '}
-              <span className="font-semibold">{fmtMoney(coverage.sectorMarket || coverage.totalMarket)}</span> &ldquo;{coverage.keyword}&rdquo; market).
+            <div className="text-xs">
+              <div className="text-emerald-400 font-medium">
+                ✓ Full coverage — your {naics.length} code{naics.length !== 1 ? 's' : ''} cover {Math.round((coverage.coveragePct || 0) * 100)}% of your {fmtMoney(coverage.sectorMarket || coverage.totalMarket)} &ldquo;{coverage.keyword}&rdquo; market.
+              </div>
+              <div className="text-slate-500 mt-1">
+                Fewer, precise codes mean less noise — not less opportunity. These capture the real spend, and your keywords catch anything mislabeled. (More codes just flood your alerts with work you don&rsquo;t do.)
+              </div>
             </div>
           )}
         </div>
