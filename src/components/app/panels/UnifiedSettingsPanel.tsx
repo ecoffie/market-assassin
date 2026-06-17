@@ -286,7 +286,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         <div className="space-y-5">
-          <section ref={matchingSectionRef} className="scroll-mt-24 bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5">
+          <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5">
             <SectionTitle title="Profile" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Field label="Display Name" value={form.display_name} onChange={(value) => setForm({ ...form, display_name: value })} placeholder="John Doe" />
@@ -309,7 +309,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
             </div>
           </section>
 
-          <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5">
+          <section ref={matchingSectionRef} className="scroll-mt-24 bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5">
             <div>
               <SectionTitle title="Opportunity Matching" />
               <p className="mt-2 text-sm text-slate-400">

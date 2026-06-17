@@ -39,6 +39,24 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ coverage: null });
   }
 
+  // PREFIX-AWARE "held" check — a coverage code (e.g. 236220) is HELD if the user
+  // has it exactly OR has a PREFIX of it (236, 23). That's how alerts actually
+  // match (naics_code.like.236% catches 236220/236210/...), so a 3-digit prefix
+  // genuinely covers the family. Exact-only matching wrongly told a user with
+  // [236,237,238] they were "missing 8 codes / 0% coverage" (Eric QC 2026-06-16) —
+  // they cover those codes. A coverage code is also held if the user has a MORE
+  // specific code under it (unlikely here, but symmetric).
+  const heldExact = have;
+  const isHeld = (code: string): boolean => {
+    if (heldExact.has(code)) return true;
+    for (const h of heldExact) {
+      if (!h) continue;
+      // user's prefix covers this code, OR user's code sits under this prefix
+      if (code.startsWith(h) || h.startsWith(code)) return true;
+    }
+    return false;
+  };
+
   // GAP analysis against the ~90%-coverage set ("full coverage" = these codes).
   // For each, mark have/missing and carry the $ + market share so the UI can rank.
   const byCode = new Map(cov.allNaics.map((n) => [n.code, n]));
@@ -49,7 +67,7 @@ export async function GET(request: NextRequest) {
       name: n?.name || code,
       amount: n?.amount || 0,
       pct: n?.pct || 0,        // share of the FULL market this one code is
-      have: have.size > 0 ? have.has(code) : true, // if no `have`, treat all as held
+      have: have.size > 0 ? isHeld(code) : true, // prefix-aware; if no `have`, treat all as held
     };
   });
   const missing = coverageDetail.filter((c) => !c.have);
