@@ -18,15 +18,19 @@ export function getSupabase(): SupabaseClient | null {
   }
 
   if (!supabaseInstance) {
+    // Single auth storage key per browser context. A second createClient() here
+    // (the old `supabase` export below) spawned a 2nd GoTrueClient on the SAME
+    // localStorage key → "Multiple GoTrueClient instances detected" → the two
+    // clients fought over the session token, so a save could send a stale/invalid
+    // token and 401 even right after sign-in (Eric QC 2026-06-16: profile wouldn't
+    // save). One instance only.
     supabaseInstance = createClient(supabaseUrl, supabaseAnonKey);
   }
 
   return supabaseInstance;
 }
 
-// For backward compatibility - returns null if not configured
-export const supabase = supabaseUrl && supabaseAnonKey
-  ? createClient(supabaseUrl, supabaseAnonKey)
-  : null;
+// For backward compatibility — REUSES the single instance (no 2nd GoTrueClient).
+export const supabase = getSupabase();
 
 
