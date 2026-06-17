@@ -321,6 +321,11 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
       setForm((f) => ({ ...f, naics_codes: '', psc_codes: '', keywords: '', target_agencies: '', location_states: [] }));
       setTargetingRefreshKey((k) => k + 1);
       showToast({ message: 'Profile cleared — add your codes & keywords below.', variant: 'success' });
+      // Drop the user straight into the editor to rebuild (Eric: clear → editor).
+      matchingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      window.setTimeout(() => {
+        matchingSectionRef.current?.querySelector<HTMLElement>('input, textarea')?.focus();
+      }, 300);
     } catch {
       showToast({ message: 'Network error — reset not saved', variant: 'error' });
     } finally {
@@ -360,7 +365,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
       {/* Coverage readout — shows how the codes/keywords below stack up against the
           real USASpending market + flags missing high-value codes. `key` bumps after
           save so the card re-fetches the canonical targeting settings. */}
-      <TargetingCard key={`targeting-${targetingRefreshKey}`} email={email} variant="full" onEdit={focusOpportunityMatching} />
+      <TargetingCard key={`targeting-${targetingRefreshKey}`} email={email} variant="full" onEdit={focusOpportunityMatching} onReset={resetProfile} />
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         <div className="space-y-5">
@@ -453,17 +458,8 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
               value={form.location_states}
               onChange={(states) => setForm({ ...form, location_states: states })}
             />
-
-            {/* Start over — clear all targeting so the user can rebuild cleanly. */}
-            <div className="pt-3 border-t border-slate-800">
-              <button
-                onClick={resetProfile}
-                disabled={saving}
-                className="text-xs text-slate-500 hover:text-red-400 transition-colors disabled:opacity-50"
-              >
-                ↺ Reset profile — clear codes, keywords &amp; agencies to start over
-              </button>
-            </div>
+            {/* "Start over" moved to the top "Your targeting" card header (next to
+                Edit) where it's discoverable — Eric QC 2026-06-17. */}
           </section>
 
           <div className="flex justify-end gap-3">

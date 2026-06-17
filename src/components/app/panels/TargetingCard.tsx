@@ -25,6 +25,11 @@ import { getMIApiHeaders } from '../authHeaders';
 interface TargetingCardProps {
   email: string | null;
   onEdit?: (panel: AppPanel) => void;
+  // When provided (Settings only), shows a "Start over" action in the header that
+  // clears the profile so the user can rebuild from scratch — right next to Edit,
+  // where it's discoverable (Eric QC 2026-06-17: the bottom-of-Settings reset was
+  // unfindable from the dashboard).
+  onReset?: () => void;
   // 'compact' (dashboards) = top piece only: codes/keywords/PSC/states + one
   // coverage line. 'full' (Settings) = adds the have-vs-missing gap list so the
   // user can act on it. Eric QC 2026-06-17: dashboards should be glanceable (what
@@ -67,7 +72,7 @@ function fmtMoney(n: number): string {
   return `$${Math.round(n)}`;
 }
 
-export default function TargetingCard({ email, onEdit, variant = 'compact' }: TargetingCardProps) {
+export default function TargetingCard({ email, onEdit, onReset, variant = 'compact' }: TargetingCardProps) {
   const [data, setData] = useState<Targeting | null>(null);
   const [coverage, setCoverage] = useState<Coverage | null>(null);
   const [loading, setLoading] = useState(true);
@@ -163,14 +168,25 @@ export default function TargetingCard({ email, onEdit, variant = 'compact' }: Ta
             </span>
           </span>
         </button>
-        {canEdit && (
-          <button
-            onClick={edit}
-            className="shrink-0 rounded-lg bg-purple-600 hover:bg-purple-500 px-3 py-1.5 text-xs font-medium text-white"
-          >
-            Edit codes &amp; keywords →
-          </button>
-        )}
+        <div className="shrink-0 flex items-center gap-2">
+          {typeof onReset === 'function' && (
+            <button
+              onClick={onReset}
+              className="text-xs text-slate-400 hover:text-red-400 transition-colors"
+              title="Clear your profile and start over"
+            >
+              ↺ Start over
+            </button>
+          )}
+          {canEdit && (
+            <button
+              onClick={edit}
+              className="rounded-lg bg-purple-600 hover:bg-purple-500 px-3 py-1.5 text-xs font-medium text-white"
+            >
+              Edit codes &amp; keywords →
+            </button>
+          )}
+        </div>
       </div>
 
       {!collapsed && (
