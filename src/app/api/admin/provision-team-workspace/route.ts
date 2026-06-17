@@ -40,10 +40,36 @@ export async function GET(request: NextRequest) {
   }
   const owner = norm(request.nextUrl.searchParams.get('owner') || '');
   if (!owner) return NextResponse.json({ success: false, error: 'owner required' }, { status: 400 });
+  const workspaceId = getWorkspaceId(owner);
+  const supabase = sb();
+  // AUDIT: show the actual provisioned state — every member in this workspace,
+  // their role/status, their settings.workspace_id, and access_team. Proves they're
+  // really one team (not just that writes returned ok).
+  const { data: teamRows } = await supabase
+    .from('mi_beta_team_members')
+    .select('user_email, role, status')
+    .eq('workspace_id', workspaceId)
+    .order('role', { ascending: true });
+  const audit: Record<string, unknown> = {};
+  for (const r of (teamRows || []) as Array<{ user_email: string; role: string; status: string }>) {
+    const [{ data: settings }, { data: prof }] = await Promise.all([
+      supabase.from('mi_beta_user_settings').select('workspace_id').eq('user_email', r.user_email).maybeSingle(),
+      supabase.from('user_profiles').select('access_team').eq('email', r.user_email).maybeSingle(),
+    ]);
+    audit[r.user_email] = {
+      role: r.role,
+      status: r.status,
+      settings_workspace_id: settings?.workspace_id ?? null,
+      in_owner_workspace: settings?.workspace_id === workspaceId,
+      access_team: !!prof?.access_team,
+    };
+  }
   return NextResponse.json({
     success: true,
-    workspaceId: getWorkspaceId(owner),
-    note: 'POST { owner, members:[...], invite:true } to provision. workspaceId is the owner email for personal-domain owners; members on other domains still join it.',
+    workspaceId,
+    memberCount: (teamRows || []).length,
+    audit,
+    note: 'POST { owner, members:[...], invite:true } to provision. Each member should show in_owner_workspace:true + access_team:true.',
   });
 }
 
