@@ -159,10 +159,13 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
     return () => { cancelled = true; };
   }, [form.keywords, email, getAuthHeaders]);
 
-  function addPscSuggestion(code: string) {
+  // TOGGLE: clicking an added PSC chip REMOVES it; an un-added one adds it. So the
+  // suggestion chips work as on/off, not add-only (Eric QC 2026-06-17: "doesn't help
+  // me unclick").
+  function togglePscSuggestion(code: string) {
     const cur = parseList(form.psc_codes);
-    if (cur.includes(code)) return;
-    setForm((f) => ({ ...f, psc_codes: [...cur, code].join(', ') }));
+    const next = cur.includes(code) ? cur.filter((c) => c !== code) : [...cur, code];
+    setForm((f) => ({ ...f, psc_codes: next.join(', ') }));
   }
 
   const saveSettings = async (markComplete = form.onboarding_completed) => {
@@ -290,6 +293,41 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
     }
   };
 
+  // Reset profile — wipe targeting (NAICS/PSC/keywords/agencies/states) so the user
+  // can rebuild from scratch (Eric QC 2026-06-17: no in-product "start over"; you
+  // could only delete codes one by one). Clears the form, persists the empty state
+  // to user_notification_settings (the source of truth), refreshes the card.
+  const resetProfile = async () => {
+    if (!email) return;
+    if (typeof window !== 'undefined' &&
+        !window.confirm('Clear your NAICS codes, PSC codes, keywords, and target agencies? This starts your profile fresh — you can rebuild it right after.')) {
+      return;
+    }
+    setSaving(true); setError(null); setMessage(null);
+    try {
+      const res = await fetch('/api/alerts/preferences', {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          email,
+          naicsCodes: [], pscCodes: [], keywords: [], targetAgencies: [], locationStates: [],
+        }),
+      });
+      if (!res.ok) {
+        const e = await res.json().catch(() => null);
+        showToast({ message: e?.error ? `Couldn't reset: ${e.error}` : 'Reset failed — try again', variant: 'error' });
+        return;
+      }
+      setForm((f) => ({ ...f, naics_codes: '', psc_codes: '', keywords: '', target_agencies: '', location_states: [] }));
+      setTargetingRefreshKey((k) => k + 1);
+      showToast({ message: 'Profile cleared — add your codes & keywords below.', variant: 'success' });
+    } catch {
+      showToast({ message: 'Network error — reset not saved', variant: 'error' });
+    } finally {
+      setSaving(false);
+    }
+  };
+
   const focusOpportunityMatching = useCallback(() => {
     matchingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     window.setTimeout(() => {
@@ -377,19 +415,18 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
               </p>
               {pscSuggestions.length > 0 && (
                 <div className="mt-2">
-                  <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Top codes for your market — tap to add:</div>
+                  <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Top codes for your market — tap to add or remove:</div>
                   <div className="flex flex-wrap gap-1.5">
                     {pscSuggestions.map((p) => {
                       const added = parseList(form.psc_codes).includes(p.code);
                       return (
                         <button
                           key={p.code}
-                          onClick={() => addPscSuggestion(p.code)}
-                          disabled={added}
-                          title={p.name}
-                          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${added ? 'border-slate-700 bg-slate-800 text-slate-500' : 'border-purple-500/40 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20'}`}
+                          onClick={() => togglePscSuggestion(p.code)}
+                          title={added ? `Click to remove ${p.code}` : p.name}
+                          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors ${added ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25' : 'border-purple-500/40 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20'}`}
                         >
-                          {added ? '✓' : '+'} {p.code} <span className="max-w-[150px] truncate text-purple-300/70">{p.name}</span>
+                          {added ? '✓' : '+'} {p.code} <span className="max-w-[150px] truncate opacity-70">{p.name}</span>
                         </button>
                       );
                     })}
@@ -416,6 +453,17 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
               value={form.location_states}
               onChange={(states) => setForm({ ...form, location_states: states })}
             />
+
+            {/* Start over — clear all targeting so the user can rebuild cleanly. */}
+            <div className="pt-3 border-t border-slate-800">
+              <button
+                onClick={resetProfile}
+                disabled={saving}
+                className="text-xs text-slate-500 hover:text-red-400 transition-colors disabled:opacity-50"
+              >
+                ↺ Reset profile — clear codes, keywords &amp; agencies to start over
+              </button>
+            </div>
           </section>
 
           <div className="flex justify-end gap-3">
