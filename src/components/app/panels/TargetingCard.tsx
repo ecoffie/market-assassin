@@ -290,7 +290,7 @@ export default function TargetingCard({ email, onEdit, variant = 'compact' }: Ta
           {coverage.missing.length > 0 ? (
             <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5">
               <div className="text-xs font-medium text-amber-300 mb-1.5">
-                Missing {coverage.missing.length} high-value code{coverage.missing.length > 1 ? 's' : ''}:
+                Missing {coverage.missing.length} code{coverage.missing.length > 1 ? 's' : ''} in your line of work:
               </div>
               <div className="space-y-1">
                 {coverage.missing.slice(0, 8).map((m) => (
@@ -307,7 +307,9 @@ export default function TargetingCard({ email, onEdit, variant = 'compact' }: Ta
               </button>
             </div>
           ) : (
-            <div className="text-xs text-emerald-400">✓ Full coverage — you&rsquo;re tracking every high-value code for this market.</div>
+            <div className="text-xs text-emerald-400">
+              ✓ You&rsquo;re tracking every code in your line of work. (The rest of the &ldquo;{coverage.keyword}&rdquo; market is adjacent industries — not your business.)
+            </div>
           )}
         </div>
       )}

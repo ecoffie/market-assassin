@@ -70,7 +70,18 @@ export async function GET(request: NextRequest) {
       have: have.size > 0 ? isHeld(code) : true, // prefix-aware; if no `have`, treat all as held
     };
   });
-  const missing = coverageDetail.filter((c) => !c.have);
+  // SAME-SECTOR gate for "missing": a keyword (e.g. "construction") co-occurs in
+  // ADJACENT industries that are NOT the user's work — "construction" matches
+  // 336611 Ship Building and 333120 Construction Machinery MFG, but a building
+  // contractor (23x) is neither. Flagging those as "missing codes you should add"
+  // is wrong and confusing (Eric QC 2026-06-17: "why are these missing, that was
+  // your job at setup"). So "missing" = only codes in a SECTOR the user already
+  // targets (same 3-digit family). Cross-sector keyword matches are noise, dropped.
+  const heldSectors = new Set(
+    Array.from(have).map((h) => String(h).slice(0, 3)).filter((p) => p.length === 3),
+  );
+  const sameSector = (code: string) => heldSectors.size === 0 || heldSectors.has(code.slice(0, 3));
+  const missing = coverageDetail.filter((c) => !c.have && sameSector(c.code));
   // What % of the full market the user's CURRENT codes actually capture.
   const heldPct = have.size > 0
     ? coverageDetail.filter((c) => c.have).reduce((s, c) => s + c.pct, 0)
