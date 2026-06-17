@@ -282,7 +282,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
       {/* Coverage readout — shows how the codes/keywords below stack up against the
           real USASpending market + flags missing high-value codes. `key` bumps after
           save so the card re-fetches the canonical targeting settings. */}
-      <TargetingCard key={`targeting-${targetingRefreshKey}`} email={email} onEdit={focusOpportunityMatching} />
+      <TargetingCard key={`targeting-${targetingRefreshKey}`} email={email} variant="full" onEdit={focusOpportunityMatching} />
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         <div className="space-y-5">

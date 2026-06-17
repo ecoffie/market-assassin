@@ -1132,7 +1132,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
         {/* Your targeting — current NAICS + keywords with one-click Edit. Makes
             the codes/keywords editor discoverable from the home surface (Eric QC:
             users couldn't find how to see/reset them). */}
-        <TargetingCard email={email} onEdit={onPanelChange} />
+        <TargetingCard email={email} variant="compact" onEdit={onPanelChange} />
       </div>
 
       {isLoading ? (

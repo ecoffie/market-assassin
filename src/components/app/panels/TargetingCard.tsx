@@ -25,6 +25,11 @@ import { getMIApiHeaders } from '../authHeaders';
 interface TargetingCardProps {
   email: string | null;
   onEdit?: (panel: AppPanel) => void;
+  // 'compact' (dashboards) = top piece only: codes/keywords/PSC/states + one
+  // coverage line. 'full' (Settings) = adds the have-vs-missing gap list so the
+  // user can act on it. Eric QC 2026-06-17: dashboards should be glanceable (what
+  // I'm targeting), Settings is where you audit/fix gaps. Default compact.
+  variant?: 'compact' | 'full';
 }
 
 interface Targeting {
@@ -61,7 +66,7 @@ function fmtMoney(n: number): string {
   return `$${Math.round(n)}`;
 }
 
-export default function TargetingCard({ email, onEdit }: TargetingCardProps) {
+export default function TargetingCard({ email, onEdit, variant = 'compact' }: TargetingCardProps) {
   const [data, setData] = useState<Targeting | null>(null);
   const [coverage, setCoverage] = useState<Coverage | null>(null);
   const [loading, setLoading] = useState(true);
@@ -252,34 +257,43 @@ export default function TargetingCard({ email, onEdit }: TargetingCardProps) {
         </div>
       </div>
 
-      {/* Market coverage + what-was-bought — derived live from the primary keyword,
-          every number matches a USASpending search on that term. The PSC list shows
-          the real sub-markets a single keyword spans (e.g. "demolition" = Demolition
-          of Structures vs Ammunition Facilities — building vs ordnance work). */}
-      {coverage && coverage.totalMarket > 0 && (
+      {/* COMPACT (dashboards): one glanceable coverage line. No gap list, no
+          "what's bought" — that's audit detail, it lives in Settings (Eric QC
+          2026-06-17: dashboards = what I'm targeting, not noise). */}
+      {coverage && coverage.totalMarket > 0 && variant === 'compact' && (
+        <div className="mt-3 border-t border-slate-800 pt-3 text-xs text-slate-400">
+          Your codes cover{' '}
+          <span className={`font-semibold ${coverage.missing.length === 0 ? 'text-emerald-300' : 'text-amber-300'}`}>
+            {Math.round(coverage.heldPct * 100)}%
+          </span>{' '}
+          of the{' '}
+          <span className="text-emerald-300 font-semibold">{fmtMoney(coverage.totalMarket)}</span>{' '}
+          &ldquo;{coverage.keyword}&rdquo; market.
+          {coverage.missing.length > 0 && (
+            <span className="text-slate-500"> {coverage.missing.length} code{coverage.missing.length > 1 ? 's' : ''} missing — see Settings.</span>
+          )}
+        </div>
+      )}
+
+      {/* FULL (Settings): just HAVE vs MISSING — the audit. No "what's bought"
+          breakdown, no "not all these are your work" (that read like you had WRONG
+          codes; Eric QC 2026-06-17). Only: what you have, what you're missing. */}
+      {coverage && coverage.totalMarket > 0 && variant === 'full' && (
         <div className="mt-3 border-t border-slate-800 pt-3">
-          {/* Held coverage — what the user's CURRENT codes capture, vs the full
-              ~90% set. Green when they have it all; amber when there are gaps. */}
-          <div className="text-xs text-slate-400">
+          <div className="text-xs text-slate-400 mb-2">
             Your codes cover{' '}
             <span className={`font-semibold ${coverage.missing.length === 0 ? 'text-emerald-300' : 'text-amber-300'}`}>
               {Math.round(coverage.heldPct * 100)}%
             </span>{' '}
-            of a{' '}
-            <span className="text-emerald-300 font-semibold">{fmtMoney(coverage.totalMarket)}</span>{' '}
-            &ldquo;{coverage.keyword}&rdquo; market ({coverage.naicsCount} codes bought it).{' '}
-            <span className="text-slate-500">Verify: search &ldquo;{coverage.keyword}&rdquo; on USASpending.</span>
+            of the <span className="text-emerald-300 font-semibold">{fmtMoney(coverage.totalMarket)}</span> &ldquo;{coverage.keyword}&rdquo; market.
           </div>
-
-          {/* Gap — coverage codes with real spend the user is NOT tracking. This is
-              the "do I have FULL coverage?" answer. */}
           {coverage.missing.length > 0 ? (
-            <div className="mt-2 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5">
-              <div className="text-xs font-medium text-amber-300 mb-1">
-                ⚠ Missing {coverage.missing.length} code{coverage.missing.length > 1 ? 's' : ''} with real spend — you&rsquo;re not seeing all of this market:
+            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5">
+              <div className="text-xs font-medium text-amber-300 mb-1.5">
+                Missing {coverage.missing.length} high-value code{coverage.missing.length > 1 ? 's' : ''}:
               </div>
               <div className="space-y-1">
-                {coverage.missing.slice(0, 6).map((m) => (
+                {coverage.missing.slice(0, 8).map((m) => (
                   <div key={m.code} className="flex items-center justify-between gap-2 text-xs">
                     <span className="min-w-0 truncate text-slate-300">
                       <span className="text-amber-400">{m.code}</span> {m.name}
@@ -289,32 +303,11 @@ export default function TargetingCard({ email, onEdit }: TargetingCardProps) {
                 ))}
               </div>
               <button onClick={edit} className="mt-2 text-xs font-medium text-amber-300 hover:text-amber-200">
-                Add these in Settings → full coverage
+                Add the missing codes ↓
               </button>
             </div>
           ) : (
-            <div className="mt-1.5 text-xs text-emerald-400">✓ Full coverage — you&rsquo;re tracking every high-value code for this market.</div>
-          )}
-
-          {coverage.topPsc.length > 0 && (
-            <div className="mt-2">
-              <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">
-                What&rsquo;s actually bought (top product codes)
-              </div>
-              <div className="space-y-1">
-                {coverage.topPsc.map((p) => (
-                  <div key={p.code} className="flex items-center justify-between gap-2 text-xs">
-                    <span className="min-w-0 truncate text-slate-300">
-                      <span className="text-slate-500">{p.code}</span> {p.name}
-                    </span>
-                    <span className="shrink-0 text-slate-400">{fmtMoney(p.amount)}</span>
-                  </div>
-                ))}
-              </div>
-              <button onClick={edit} className="mt-2 text-xs text-purple-400 hover:text-purple-300">
-                Not all of these are your work? Edit your codes →
-              </button>
-            </div>
+            <div className="text-xs text-emerald-400">✓ Full coverage — you&rsquo;re tracking every high-value code for this market.</div>
           )}
         </div>
       )}
