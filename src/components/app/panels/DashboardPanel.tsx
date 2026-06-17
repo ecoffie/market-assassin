@@ -13,6 +13,7 @@ import { useToast } from '../Toast';
 import ContractorLink from '../contractors/ContractorLink';
 import { MindyInsightCard } from '../MindyInsightCard';
 import TargetingCard from './TargetingCard';
+import StartHereCard from './StartHereCard';
 import { getNaics } from '@/lib/codes/lookup';
 import ShareButton from '@/components/briefings/ShareButton';
 import SamAttachmentLinks from '@/components/app/SamAttachmentLinks';
@@ -1128,6 +1129,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
 
       {/* Mindy Insight hero card — daily quote, theme rotates by day */}
       <div className="px-3 md:px-6 pt-4 md:pt-5">
+        <StartHereCard email={email} onGo={onPanelChange} />
         <MindyInsightCard email={email} />
         {/* Your targeting — current NAICS + keywords with one-click Edit. Makes
             the codes/keywords editor discoverable from the home surface (Eric QC:

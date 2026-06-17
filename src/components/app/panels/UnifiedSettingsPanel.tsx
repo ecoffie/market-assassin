@@ -51,6 +51,9 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
   // (Eric QC 2026-06-17: had 23 targets but the checkmark was blank — they live in
   // a DIFFERENT table than user_notification_settings.agencies).
   const [targetListCount, setTargetListCount] = useState(0);
+  // Top PSC codes for the user's market — one-tap "add" so they don't have to guess
+  // the correct PSC (Eric QC 2026-06-17: "how do I know I have the right PSC?").
+  const [pscSuggestions, setPscSuggestions] = useState<Array<{ code: string; name: string }>>([]);
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
   const track = useAppTracker(email);
   const { showToast } = useToast();
@@ -137,6 +140,30 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
   useEffect(() => {
     loadSettings();
   }, [loadSettings]);
+
+  // Fetch top PSC codes for the user's primary keyword so they can pick the right
+  // one instead of guessing a free-text code. Re-runs when keywords change.
+  useEffect(() => {
+    const primary = parseList(form.keywords)[0];
+    if (!primary || !email) { setPscSuggestions([]); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(`/api/app/keyword-coverage?keyword=${encodeURIComponent(primary)}`, { headers: getAuthHeaders() });
+        if (!res.ok) return;
+        const j = await res.json();
+        const psc = (j?.coverage?.topPsc || []) as Array<{ code: string; name: string }>;
+        if (!cancelled) setPscSuggestions(psc.slice(0, 5));
+      } catch { /* optional */ }
+    })();
+    return () => { cancelled = true; };
+  }, [form.keywords, email, getAuthHeaders]);
+
+  function addPscSuggestion(code: string) {
+    const cur = parseList(form.psc_codes);
+    if (cur.includes(code)) return;
+    setForm((f) => ({ ...f, psc_codes: [...cur, code].join(', ') }));
+  }
 
   const saveSettings = async (markComplete = form.onboarding_completed) => {
     if (!email) return;
@@ -346,9 +373,29 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                 placeholder="e.g. R425, 1550, P500"
               />
               <p className="mt-1 text-xs text-slate-500">
-                Product/Service codes — <b>what the government actually buys</b> (more precise than NAICS).
-                Comma-separated. See &ldquo;what&rsquo;s bought&rdquo; on your targeting card above for the top codes in your market.
+                Product/Service codes — <b>what the government actually buys</b> (more precise than NAICS). Comma-separated.
               </p>
+              {pscSuggestions.length > 0 && (
+                <div className="mt-2">
+                  <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Top codes for your market — tap to add:</div>
+                  <div className="flex flex-wrap gap-1.5">
+                    {pscSuggestions.map((p) => {
+                      const added = parseList(form.psc_codes).includes(p.code);
+                      return (
+                        <button
+                          key={p.code}
+                          onClick={() => addPscSuggestion(p.code)}
+                          disabled={added}
+                          title={p.name}
+                          className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${added ? 'border-slate-700 bg-slate-800 text-slate-500' : 'border-purple-500/40 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20'}`}
+                        >
+                          {added ? '✓' : '+'} {p.code} <span className="max-w-[150px] truncate text-purple-300/70">{p.name}</span>
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
             </div>
             <div>
               <Field

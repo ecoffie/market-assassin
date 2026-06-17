@@ -2098,3 +2098,30 @@ contracting setup, codes I qualify for, full market coverage onboarding.
 codes; renders `missing` (same-sector-gated) as one-tap add chips (addSuggestedNaics);
 re-evaluates as the user edits. Reuses the card's coverage engine — one source of logic.
 Marketing literature updated (rule #8).
+
+---
+
+## Mindy: "Start Here" New-User Checklist + PSC Suggestions (June 17, 2026)
+
+**What:** (1) A "🏅 First time? Start here" medallion card at the top of Today's Intel
+walks brand-new users through 5 concrete steps — set up profile, add PSC codes, build
+your target list, save your first pursuit, draft your first response. Each step
+auto-checks from real data (no manual marking), links straight to the action, shows a
+progress bar, is dismissible, and auto-hides once all 5 are done. (2) The Settings PSC
+field now suggests the top product codes for your market as one-tap "add" chips, so you
+never have to guess the right PSC.
+
+**Why:** People new to software don't know where to start — a blank powerful app is
+intimidating. The walkthrough videos help, but a plain "do these 5 things first"
+checklist is what a first-timer actually needs to get to value today. And "how do I know
+I have the right PSC code?" was unanswered — PSC was a free-text box; now Mindy surfaces
+the real top codes for your keyword so picking is a tap, not a research project.
+
+**SEO:** government contracting getting started, what to do first GovCon software,
+onboarding checklist, how to find my PSC code, federal product service codes for my business.
+
+**Proof:** StartHereCard (5 steps auto-checked from /api/app/workspace, target-list,
+pipeline, library; dismissible; auto-hides at 5/5) on DashboardPanel above the fold;
+PSC suggestion chips in UnifiedSettingsPanel fed by /api/app/keyword-coverage topPsc
+(tap to add, ✓ when added). Also fixed: "Agencies selected" setup-progress now counts
+My Target List (was checking the wrong table). Marketing literature updated (rule #8).
