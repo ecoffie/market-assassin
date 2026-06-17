@@ -79,6 +79,12 @@ interface NavItem {
   description: string;
   tier: AppTier[];
   badge?: string;
+  // staffOnly: hide this item entirely unless the user is INTERNAL STAFF. Used for
+  // demo / case-study prototypes (Vehicle Expiry Watch, SMB Market Research,
+  // Market Research Report) that confused normal Pro/Team users (Eric QC
+  // 2026-06-17). NOT gated on coach-mode — paid Team customers have coach-mode too
+  // and must not see these; only the internal team does.
+  staffOnly?: boolean;
   // When set, clicking this item navigates to a route instead of
   // switching the active panel. Used for full-bleed pages like
   // /app/market-intel that aren't part of the panel container.
@@ -233,6 +239,7 @@ const NAV_SECTIONS: NavSection[] = [
         icon: Bell,
         description: 'Auto-notify on expiry',
         tier: ['pro', 'team', 'enterprise'],
+        staffOnly: true,   // demo/case-study — internal staff only (not paid Pro/Team)
       },
       {
         // Navy OSBP prototype (Jun 2026): find certified small/minority
@@ -242,6 +249,7 @@ const NAV_SECTIONS: NavSection[] = [
         icon: Search,
         description: 'Certified small-biz sourcing',
         tier: ['pro', 'team', 'enterprise'],
+        staffOnly: true,   // demo/case-study — internal staff only (not paid Pro/Team)
       },
       {
         // ACC-Orlando prototype (Jun 2026): auto-draft the official Army MRR
@@ -251,6 +259,7 @@ const NAV_SECTIONS: NavSection[] = [
         icon: FileText,
         description: 'Auto-draft the Army MRR',
         tier: ['pro', 'team', 'enterprise'],
+        staffOnly: true,   // demo/case-study — internal staff only (not paid Pro/Team)
       },
       {
         // Moved from its own "Opportunities" section (May 21, 2026).
@@ -341,6 +350,9 @@ interface UnifiedSidebarProps {
   userTier: AppTier;
   /** Staff / grandfathered org members on Pro can use My Clients. */
   coachModeAllowed?: boolean;
+  /** Internal team (govcongiants). Gates demo/case-study tabs so paid
+   *  Pro/Team customers never see them — only staff do. */
+  isStaff?: boolean;
   userEmail?: string | null;
   currentWorkspaceId?: string | null;
   onWorkspaceChange?: (workspaceId: string) => void;
@@ -363,6 +375,7 @@ export default function UnifiedSidebar({
   onPanelChange,
   userTier,
   coachModeAllowed = false,
+  isStaff = false,
   userEmail,
   currentWorkspaceId,
   onWorkspaceChange,
@@ -400,8 +413,15 @@ export default function UnifiedSidebar({
     if (item.id === 'coach') {
       return hasAccess(item.tier) || coachModeAllowed;
     }
+    // staffOnly demo surfaces: access gated on INTERNAL STAFF, not tier and not
+    // coach-mode (paid Team customers have coach-mode too, and must NOT see these).
+    if (item.staffOnly) return isStaff;
     return hasAccess(item.tier);
   };
+
+  // staffOnly items are HIDDEN (not just locked) from everyone but internal staff,
+  // so paid Pro/Team customers never see the demo/case-study prototypes.
+  const isItemVisible = (item: NavItem) => !item.staffOnly || isStaff;
 
   const getItemDisplay = (item: NavItem) => {
     if (userTier !== 'free') {
@@ -547,11 +567,13 @@ export default function UnifiedSidebar({
           // Prevents the "I land on Mindy and my #1 nav item is locked"
           // confusion that free users hit when Today's Intel sits above
           // Source Feed.
-          const orderedItems = [...section.items].sort((a, b) => {
-            const aAccess = canAccessItem(a) ? 0 : 1;
-            const bAccess = canAccessItem(b) ? 0 : 1;
-            return aAccess - bAccess;
-          });
+          const orderedItems = [...section.items]
+            .filter(isItemVisible)   // hide staffOnly demo tabs from non-staff
+            .sort((a, b) => {
+              const aAccess = canAccessItem(a) ? 0 : 1;
+              const bAccess = canAccessItem(b) ? 0 : 1;
+              return aAccess - bAccess;
+            });
           return (
           <div key={section.title} className="mb-6">
             {!isCollapsed && (

@@ -68,6 +68,10 @@ function AppDashboard() {
   const [email, setEmail] = useState<string | null>(null);
   const [tier, setTier] = useState<AppTier>('free');
   const [coachModeAllowed, setCoachModeAllowed] = useState(false);
+  // Internal staff (govcongiants team). Gates the demo/case-study tabs (Vehicle
+  // Expiry Watch, SMB Market Research, Market Research Report) so paid Pro/Team
+  // customers never see them — only the internal team does (Eric QC 2026-06-17).
+  const [isStaff, setIsStaff] = useState(false);
   const [activePanel, setActivePanel] = useState<AppPanel>('dashboard');
   // Optional context the previous panel can pass to the next (e.g.
   // PipelinePanel sets { pursuit_id } when user clicks 'Draft Proposal'
@@ -239,6 +243,7 @@ function AppDashboard() {
       setEmail(userEmail);
       setTier(userTier);
       setCoachModeAllowed(!!accessData?.coachMode?.allowed);
+      setIsStaff(!!accessData?.isStaff);
 
       // If the currently-active panel is gated for this tier, swap to the
       // first accessible one. Default panel is 'dashboard' (AI briefings) —
@@ -454,19 +459,10 @@ function AppDashboard() {
     };
   }, [email, activePanel, tier, trackEngagement, flushPanelTime]);
 
-  // Tour: auto-start once for a new user; allow replay from Settings. We bump a
-  // `tourRunId` each start so ProductTour remounts fresh every time (a boolean
-  // wouldn't re-fire reliably after dismiss → replay).
-  useEffect(() => {
-    if (!email || isLoading) return;
-    if (typeof window === 'undefined') return;
-    if (!localStorage.getItem('mindy_tour_completed')) {
-      // Small delay so the dashboard has mounted before the tour drives it.
-      const t = setTimeout(() => setRunTour(true), 1200);
-      return () => clearTimeout(t);
-    }
-  }, [email, isLoading]);
-
+  // Tour: opt-in from Settings. It used to auto-start once for new users, but a
+  // hidden driver.js overlay can swallow clicks if the tour layer initializes
+  // poorly after a deploy/session restore. Keep the guided tour replayable while
+  // never blocking the app on page load.
   useEffect(() => {
     const replay = () => {
       localStorage.removeItem('mindy_tour_completed');
@@ -1266,6 +1262,7 @@ function AppDashboard() {
         onPanelChange={handlePanelChange}
         userTier={tier}
         coachModeAllowed={coachModeAllowed}
+        isStaff={isStaff}
         userEmail={email}
         currentWorkspaceId={currentWorkspaceId}
         onWorkspaceChange={setCurrentWorkspaceId}
