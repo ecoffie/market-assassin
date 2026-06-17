@@ -2072,3 +2072,29 @@ profile.notification; /api/alerts/preferences accepts + writes pscCodes (upperca
 deduped); UnifiedSettingsPanel has a PSC Codes field that loads + saves them; daily-alerts
 already consumed user.psc_codes for matching (the consuming half existed; this adds the
 editing half). Marketing literature updated (rule #8).
+
+---
+
+## Mindy: Proactive Code Suggestions at Setup (June 17, 2026)
+
+**What:** During onboarding, after Mindy derives your NAICS codes from your business,
+it now proactively suggests high-value codes IN YOUR LINE OF WORK that you don't have
+yet — shown as one-tap "+ add" chips on the confirm screen. It only suggests codes in
+your own sector (a building contractor never gets "ship building" suggested), so the
+profile is complete from day one instead of leaving money on the table.
+
+**Why:** Eric's principle — "catch everything for me." A contractor shouldn't have to
+know every NAICS code under their trade; Mindy should surface the ones they qualify for.
+The suggestions reuse the same same-sector coverage logic as the targeting card, so
+they're grounded in real USASpending spend and never recommend adjacent industries that
+aren't the user's work. Prefix-based profiles (e.g. 236/237/238) already cover their
+whole sector and correctly get no suggestions; specific-code profiles get their sibling
+codes surfaced.
+
+**SEO:** complete NAICS profile, suggest NAICS codes for my business, federal
+contracting setup, codes I qualify for, full market coverage onboarding.
+
+**Proof:** onboarding confirm screen fetches /api/app/keyword-coverage with the derived
+codes; renders `missing` (same-sector-gated) as one-tap add chips (addSuggestedNaics);
+re-evaluates as the user edits. Reuses the card's coverage engine — one source of logic.
+Marketing literature updated (rule #8).

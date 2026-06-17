@@ -598,6 +598,39 @@ export default function OnboardingPage() {
     setAutoProfile((p: { naics?: string[] } | null) => p ? { ...p, naics: (p.naics || []).filter((c: string) => c !== code) } : p);
   }
 
+  // SAME-SECTOR setup suggestions (Eric, "catch everything for me" — Jun 2026):
+  // after we derive the user's codes, proactively surface high-value codes in
+  // THEIR sector that they don't have, so the profile is complete on day one.
+  // Reuses /api/app/keyword-coverage's `missing` (already same-sector-gated, so it
+  // never suggests adjacent industries like ship building for a builder).
+  type CodeSuggestion = { code: string; name: string; amount: number };
+  const [codeSuggestions, setCodeSuggestions] = useState<CodeSuggestion[]>([]);
+  useEffect(() => {
+    const phrase = autoProfile?.industryPhrase;
+    const have: string[] = autoProfile?.naics || [];
+    if (!phrase || have.length === 0) { setCodeSuggestions([]); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch(
+          `/api/app/keyword-coverage?keyword=${encodeURIComponent(phrase)}&have=${encodeURIComponent(have.join(','))}`,
+          { headers: getMIApiHeaders(email, { Authorization: `Bearer ${accessToken}` }) },
+        );
+        if (!res.ok) return;
+        const j = await res.json();
+        const miss = (j?.coverage?.missing || []) as CodeSuggestion[];
+        if (!cancelled) setCodeSuggestions(miss.slice(0, 6));
+      } catch { /* suggestions are optional — never block the confirm screen */ }
+    })();
+    return () => { cancelled = true; };
+    // Re-run when the derived codes change (user removes one → re-evaluate gaps).
+  }, [autoProfile?.industryPhrase, (autoProfile?.naics || []).join(','), email, accessToken]);
+
+  function addSuggestedNaics(code: string) {
+    setAutoProfile((p: { naics?: string[] } | null) => p ? { ...p, naics: [...new Set([...(p.naics || []), code])] } : p);
+    setCodeSuggestions((s) => s.filter((x) => x.code !== code));
+  }
+
   // Keyword tuning on the confirm screen — extraction grabs generic words
   // ("demolition firm" → "firm"); let the user drop junk + add the capability
   // words that catch mislabeled titles. Keywords drive alert matching.
@@ -963,6 +996,28 @@ export default function OnboardingPage() {
                   ))}
                   {autoProfile.topPsc && <span className="inline-block rounded bg-purple-500/20 px-2 py-0.5 text-xs text-purple-300 mr-1">PSC {autoProfile.topPsc.code}</span>}
                 </div>
+                {/* Same-sector suggestions — high-value codes in the user's own
+                    line of work they don't have yet. One tap to add. Never suggests
+                    adjacent industries (the API gates to the user's sector). */}
+                {codeSuggestions.length > 0 && (
+                  <div className="rounded-lg border border-emerald-500/30 bg-emerald-950/20 p-2.5">
+                    <div className="text-xs font-medium text-emerald-300 mb-1.5">
+                      💡 Also in your line of work — tap to add:
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                      {codeSuggestions.map((s) => (
+                        <button
+                          key={s.code}
+                          onClick={() => addSuggestedNaics(s.code)}
+                          className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2.5 py-1 text-xs text-emerald-200 hover:bg-emerald-500/20"
+                          title={`${s.name} — $${Math.round((s.amount || 0) / 1e6)}M`}
+                        >
+                          + {s.code} <span className="text-emerald-400/80 max-w-[180px] truncate">{s.name}</span>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
                 {/* Keywords — tune the words that catch mislabeled opportunity titles.
                     Extraction can grab generics; drop junk + add real capability words. */}
                 <div>
