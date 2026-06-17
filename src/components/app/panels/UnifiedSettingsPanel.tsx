@@ -140,10 +140,34 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
       // mi_beta_user_settings. Previously NAICS+agencies went ONLY to the
       // workspace endpoint → saved to mi_beta_user_settings → alerts never saw
       // them (Eric QC 2026-06-16).
+      // Auth-resilient fetch: on a 401 (the MI session token expired — 30-day TTL),
+      // refresh the token and retry ONCE. Without this, an active user who hits the
+      // token cliff silently can't save anything — the save just 401s forever (the
+      // root cause of "I save but it never persists"; eric@govcongiants.com's profile
+      // was stuck 10 days). Eric QC / launch hardening 2026-06-16.
+      const authedFetch = async (url: string, init: RequestInit): Promise<Response> => {
+        let res = await fetch(url, { ...init, headers: getAuthHeaders((init.headers as HeadersInit) || { 'Content-Type': 'application/json' }) });
+        if (res.status === 401) {
+          try {
+            const refresh = await fetch('/api/auth/refresh-mi-session', {
+              method: 'POST',
+              headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+            });
+            if (refresh.ok) {
+              const j = await refresh.json().catch(() => null);
+              if (j?.sessionToken && typeof window !== 'undefined') {
+                window.localStorage.setItem('mi_beta_auth_token', j.sessionToken);
+              }
+              res = await fetch(url, { ...init, headers: getAuthHeaders((init.headers as HeadersInit) || { 'Content-Type': 'application/json' }) });
+            }
+          } catch { /* fall through with the original 401 */ }
+        }
+        return res;
+      };
+
       const [workspaceRes, prefsRes] = await Promise.all([
-        fetch('/api/app/workspace', {
+        authedFetch('/api/app/workspace', {
           method: 'PATCH',
-          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             email,
             // DISPLAY FIELDS ONLY — targeting goes through the preferences call below
@@ -157,9 +181,8 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
             onboarding_completed: markComplete,
           }),
         }),
-        fetch('/api/alerts/preferences', {
+        authedFetch('/api/alerts/preferences', {
           method: 'POST',
-          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
           body: JSON.stringify({
             email,
             frequency: form.email_frequency,
@@ -188,11 +211,13 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
       // when it didn't). Surface the real error.
       if (!prefsRes.ok) {
         const prefsErr = await prefsRes.json().catch(() => null);
-        console.error('Targeting save failed:', prefsErr);
+        console.error('Targeting save failed:', prefsRes.status, prefsErr);
         showToast({
-          message: prefsErr?.error
-            ? `Codes/keywords did NOT save: ${prefsErr.error}`
-            : 'Your codes/keywords did NOT save — please try again.',
+          message: prefsRes.status === 401
+            ? 'Your session expired — please sign out and back in, then save again.'
+            : prefsErr?.error
+              ? `Codes/keywords did NOT save: ${prefsErr.error}`
+              : 'Your codes/keywords did NOT save — please try again.',
           variant: 'error',
         });
         return;
