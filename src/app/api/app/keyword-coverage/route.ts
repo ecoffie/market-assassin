@@ -82,19 +82,35 @@ export async function GET(request: NextRequest) {
   );
   const sameSector = (code: string) => heldSectors.size === 0 || heldSectors.has(code.slice(0, 3));
   const missing = coverageDetail.filter((c) => !c.have && sameSector(c.code));
-  // What % of the full market the user's CURRENT codes actually capture.
-  const heldPct = have.size > 0
-    ? coverageDetail.filter((c) => c.have).reduce((s, c) => s + c.pct, 0)
-    : cov.coveragePct;
+
+  // heldPct measured WITHIN the user's own line of work (same-sector codes only),
+  // NOT the whole keyword market. The keyword "construction" includes ship building
+  // + machinery mfg — industries that AREN'T the user — so a builder who covers
+  // every construction code was shown "62%" (the rest being other people's
+  // industries), which read like a 38% gap (Eric QC 2026-06-17: "62% still feels
+  // like it's not 100%"). Sector-scoped: held same-sector $ / all same-sector $ →
+  // a builder covering their whole sector reads ~100%, with no false gap.
+  const sectorCodes = coverageDetail.filter((c) => sameSector(c.code));
+  const sectorTotal = sectorCodes.reduce((s, c) => s + c.pct, 0);
+  const sectorHeld = sectorCodes.filter((c) => c.have).reduce((s, c) => s + c.pct, 0);
+  const heldPct = have.size === 0
+    ? cov.coveragePct
+    : sectorTotal > 0
+      ? sectorHeld / sectorTotal   // % of YOUR line of work you cover
+      : 1;                         // no same-sector market data → treat as covered
+  // $ of the user's own line of work (so the card can say "of your $X line of work"
+  // instead of the whole keyword market, which includes unrelated industries).
+  const sectorMarket = sectorCodes.reduce((s, c) => s + (c.amount || 0), 0);
 
   return NextResponse.json({
     coverage: {
       keyword: cov.keyword,            // the term actually searched (may broaden, e.g. "demolition services" -> "demolition")
-      totalMarket: cov.totalMarket,    // $ across the whole market for this keyword
+      totalMarket: cov.totalMarket,    // $ across the whole keyword market (incl. adjacent industries)
+      sectorMarket,                    // $ in the USER'S line of work (same-sector codes only)
       naicsCount: cov.naicsCount,      // distinct NAICS that bought it
       coverageCount: cov.coverageCodes.length, // codes that together cover ~90%
       coveragePct: cov.coveragePct,    // what the FULL coverage set captures (~0.9)
-      heldPct,                         // what the USER'S current codes capture
+      heldPct,                         // % of the USER'S LINE OF WORK they cover (sector-scoped)
       coverageCodes: coverageDetail,   // the ~90% set, each marked have/missing + $
       missing,                         // coverage codes the user is NOT tracking, ranked $
       // "What was bought" — the sub-markets a single keyword spans (building demo

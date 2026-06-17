@@ -50,10 +50,11 @@ interface CoverageCode {
 interface Coverage {
   keyword: string;
   totalMarket: number;
+  sectorMarket: number;   // $ in the user's own line of work (same-sector)
   naicsCount: number;
   coverageCount: number;
   coveragePct: number;
-  heldPct: number;
+  heldPct: number;        // % of the user's LINE OF WORK they cover (sector-scoped)
   coverageCodes: CoverageCode[];
   missing: CoverageCode[];
   topPsc: { code: string; name: string; amount: number; pct: number }[];
@@ -261,16 +262,19 @@ export default function TargetingCard({ email, onEdit, variant = 'compact' }: Ta
           "what's bought" — that's audit detail, it lives in Settings (Eric QC
           2026-06-17: dashboards = what I'm targeting, not noise). */}
       {coverage && coverage.totalMarket > 0 && variant === 'compact' && (
-        <div className="mt-3 border-t border-slate-800 pt-3 text-xs text-slate-400">
-          Your codes cover{' '}
-          <span className={`font-semibold ${coverage.missing.length === 0 ? 'text-emerald-300' : 'text-amber-300'}`}>
-            {Math.round(coverage.heldPct * 100)}%
-          </span>{' '}
-          of the{' '}
-          <span className="text-emerald-300 font-semibold">{fmtMoney(coverage.totalMarket)}</span>{' '}
-          &ldquo;{coverage.keyword}&rdquo; market.
-          {coverage.missing.length > 0 && (
-            <span className="text-slate-500"> {coverage.missing.length} code{coverage.missing.length > 1 ? 's' : ''} missing — see Settings.</span>
+        <div className="mt-3 border-t border-slate-800 pt-3 text-xs">
+          {coverage.missing.length === 0 ? (
+            <span className="text-emerald-400">
+              ✓ Tracking your full line of work — the{' '}
+              <span className="font-semibold">{fmtMoney(coverage.sectorMarket || coverage.totalMarket)}</span> &ldquo;{coverage.keyword}&rdquo; market.
+            </span>
+          ) : (
+            <span className="text-slate-400">
+              Tracking{' '}
+              <span className="text-amber-300 font-semibold">{Math.round(coverage.heldPct * 100)}%</span>{' '}
+              of your &ldquo;{coverage.keyword}&rdquo; line of work.
+              <span className="text-slate-500"> {coverage.missing.length} code{coverage.missing.length > 1 ? 's' : ''} missing — see Settings.</span>
+            </span>
           )}
         </div>
       )}
@@ -280,35 +284,36 @@ export default function TargetingCard({ email, onEdit, variant = 'compact' }: Ta
           codes; Eric QC 2026-06-17). Only: what you have, what you're missing. */}
       {coverage && coverage.totalMarket > 0 && variant === 'full' && (
         <div className="mt-3 border-t border-slate-800 pt-3">
-          <div className="text-xs text-slate-400 mb-2">
-            Your codes cover{' '}
-            <span className={`font-semibold ${coverage.missing.length === 0 ? 'text-emerald-300' : 'text-amber-300'}`}>
-              {Math.round(coverage.heldPct * 100)}%
-            </span>{' '}
-            of the <span className="text-emerald-300 font-semibold">{fmtMoney(coverage.totalMarket)}</span> &ldquo;{coverage.keyword}&rdquo; market.
-          </div>
           {coverage.missing.length > 0 ? (
-            <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5">
-              <div className="text-xs font-medium text-amber-300 mb-1.5">
-                Missing {coverage.missing.length} code{coverage.missing.length > 1 ? 's' : ''} in your line of work:
+            <>
+              <div className="text-xs text-slate-400 mb-2">
+                You&rsquo;re tracking{' '}
+                <span className="text-amber-300 font-semibold">{Math.round(coverage.heldPct * 100)}%</span>{' '}
+                of your &ldquo;{coverage.keyword}&rdquo; line of work — add the codes below for full coverage.
               </div>
-              <div className="space-y-1">
-                {coverage.missing.slice(0, 8).map((m) => (
-                  <div key={m.code} className="flex items-center justify-between gap-2 text-xs">
-                    <span className="min-w-0 truncate text-slate-300">
-                      <span className="text-amber-400">{m.code}</span> {m.name}
-                    </span>
-                    <span className="shrink-0 text-slate-400">{fmtMoney(m.amount)}</span>
-                  </div>
-                ))}
+              <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5">
+                <div className="text-xs font-medium text-amber-300 mb-1.5">
+                  Missing {coverage.missing.length} code{coverage.missing.length > 1 ? 's' : ''} in your line of work:
+                </div>
+                <div className="space-y-1">
+                  {coverage.missing.slice(0, 8).map((m) => (
+                    <div key={m.code} className="flex items-center justify-between gap-2 text-xs">
+                      <span className="min-w-0 truncate text-slate-300">
+                        <span className="text-amber-400">{m.code}</span> {m.name}
+                      </span>
+                      <span className="shrink-0 text-slate-400">{fmtMoney(m.amount)}</span>
+                    </div>
+                  ))}
+                </div>
+                <button onClick={edit} className="mt-2 text-xs font-medium text-amber-300 hover:text-amber-200">
+                  Add the missing codes ↓
+                </button>
               </div>
-              <button onClick={edit} className="mt-2 text-xs font-medium text-amber-300 hover:text-amber-200">
-                Add the missing codes ↓
-              </button>
-            </div>
+            </>
           ) : (
             <div className="text-xs text-emerald-400">
-              ✓ You&rsquo;re tracking every code in your line of work. (The rest of the &ldquo;{coverage.keyword}&rdquo; market is adjacent industries — not your business.)
+              ✓ Full coverage — you&rsquo;re tracking every code in your line of work (the{' '}
+              <span className="font-semibold">{fmtMoney(coverage.sectorMarket || coverage.totalMarket)}</span> &ldquo;{coverage.keyword}&rdquo; market).
             </div>
           )}
         </div>
