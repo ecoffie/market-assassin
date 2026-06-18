@@ -169,11 +169,12 @@ export async function GET(request: NextRequest) {
   if (!naics && !keyword && !pscParam) {
     return NextResponse.json({ error: 'naics, keyword, or psc is required' }, { status: 400 });
   }
-  // The spend window is now FIXED (MARKET_SPEND_WINDOW, 3 FYs) so the dashboard
-  // dollars reconcile. The `fy` param no longer changes the window; we pin the
-  // cache's fiscal_year to a sentinel (0 = fixed-window) so one cache entry serves
-  // all callers AND stale single-FY entries (keyed 2024/2025/2026) aren't reused.
-  const fiscalYear = 0;
+  // The spend window is FIXED (MARKET_SPEND_WINDOW, 3 FYs) so the dashboard dollars
+  // reconcile. The `fy` param no longer changes the window; we pin the cache's
+  // fiscal_year to a VERSION sentinel so one entry serves all callers AND stale
+  // entries from prior logic aren't reused. v1 = 6-digit-exact NAICS (no subsector
+  // sweep) — bumped from 0 to bust the over-expanded rows written before that fix.
+  const fiscalYear = 1;
 
   let marketFilter: MarketFilter | null = null;
   let expandedNaics: string[] = [];
@@ -190,7 +191,11 @@ export async function GET(request: NextRequest) {
     marketFilter = buildMarketFilter({ pscCode: pscParam });
     filterKey = `psc:${pscParam}`;
   } else {
-    expandedNaics = expandNAICSCodes([naics]);
+    // expandFullCodes=false: a 6-digit code stays EXACT (don't sweep its whole
+    // 3-digit subsector — that inflated "Relevant spending" 7× by pulling in all
+    // of 541xxx for a 541512 search). Prefixes the user typed (2-4 digit) still
+    // expand. Mirrors find-agencies' 6-digit-exact behavior so widgets reconcile.
+    expandedNaics = expandNAICSCodes([naics], false);
     filterKey = naics;
   }
 

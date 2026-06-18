@@ -90,10 +90,12 @@ export async function POST(request: NextRequest) {
       const inputCodes = parseNAICSInput(naicsCode);
 
       if (inputCodes.length > 1) {
-        // MULTI-NAICS MODE: Expand all codes and merge
+        // MULTI-NAICS MODE: Expand all codes and merge.
+        // expandFullCodes=false: 6-digit codes stay exact (no subsector sweep) so
+        // multi-code spend totals aren't inflated; typed prefixes still expand.
         isMultiNaicsSearch = true;
         console.log(`📋 Multi-NAICS input detected: ${inputCodes.join(', ')}`);
-        const expandedCodes = expandNAICSCodes(inputCodes);
+        const expandedCodes = expandNAICSCodes(inputCodes, false);
         filters.naics_codes = expandedCodes;
         console.log(`   Expanded ${inputCodes.length} inputs to ${expandedCodes.length} NAICS codes`);
         naicsCorrectionMessage = `Searching ${inputCodes.length} NAICS codes/sectors: ${inputCodes.join(', ')} (${expandedCodes.length} total codes)`;

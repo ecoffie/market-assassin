@@ -433,7 +433,11 @@ export async function POST(request: NextRequest) {
     let authoritativeMarketTotal = 0;
     const keywordGrounded = Boolean(marketFilter);
     try {
-      const expanded = expandNAICSCodes(parseNAICSInput(naics));
+      // expandFullCodes=false: 6-digit codes stay EXACT so the authoritative
+      // "Relevant spending" total reflects the SEARCHED market, not the whole
+      // 3-digit subsector (was inflating 541512 → all of 541xxx, 7×). Prefixes
+      // still expand. Matches find-agencies + fpds-top-n.
+      const expanded = expandNAICSCodes(parseNAICSInput(naics), false);
       const catFilterBase: Record<string, unknown> = {
         // Canonical 3-FY window shared with find-agencies + fpds-top-n so the
         // accurate-total figures reconcile with the rest of the dashboard.
