@@ -39,6 +39,16 @@ export async function POST(request: NextRequest) {
       searchKeywords: rawSearchKeywords,
       marketFilter: rawMarketFilter,
     } = body;
+    // The dashboard's States filter (an array) — not on CoreInputs, read from raw
+    // body. When set, it scopes the spend query to those states (place of
+    // performance). Previously only zipCode→single-state was wired, so the States
+    // filter the user picked never reached the query (results stayed national).
+    const rawBody = body as unknown as Record<string, unknown>;
+    const locationStates: string[] = Array.isArray(rawBody.locationStates)
+      ? (rawBody.locationStates as unknown[])
+          .map((s) => String(s).trim().toUpperCase())
+          .filter((s) => /^[A-Z]{2}$/.test(s))
+      : [];
 
     const marketFilter = rawMarketFilter
       && (rawMarketFilter.keywords?.length || rawMarketFilter.psc_codes?.length)
@@ -345,10 +355,18 @@ export async function POST(request: NextRequest) {
       console.log(`ℹ️ PSC code ${pscCode} noted — NAICS ${naicsCode} is primary filter`);
     }
 
-    // Add location filter based on zip code - start with just the user's state (Tier 1)
+    // Add location filter. The explicit States filter (array) wins; otherwise fall
+    // back to deriving a single state from the zip code.
     let userState: string | null = null;
     let currentLocationTier = 1;
-    if (zipCode && zipCode.trim()) {
+    if (locationStates.length > 0) {
+      filters.place_of_performance_locations = locationStates.map((state) => ({
+        country: 'USA',
+        state,
+      }));
+      userState = locationStates[0];
+      console.log('📍 Initial search: States filter -', locationStates.join(', '));
+    } else if (zipCode && zipCode.trim()) {
       userState = getStateFromZip(zipCode);
       if (userState) {
         // Start with just the user's state (Tier 1)

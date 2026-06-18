@@ -36,6 +36,7 @@ interface FormData {
   naicsCode: string;
   pscCode: string;
   zipCode: string;
+  locationStates: string[];   // States filter — scopes Market Research spend by place of performance
   veteranStatus: VeteranStatus;
   companyName: string;
   excludeDOD: boolean;
@@ -147,6 +148,7 @@ interface MarketFocus {
     pscCodes?: string[];
     agencies?: string[];
     zipCode?: string;
+    locationStates?: string[];
     companyName?: string;
     excludeDOD?: boolean;
   };
@@ -625,6 +627,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     naicsCode: '',
     pscCode: '',
     zipCode: '',
+    locationStates: [],
     veteranStatus: 'Not Applicable',
     companyName: '',
     excludeDOD: false,
@@ -1126,6 +1129,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       naicsCode: profile.naicsCodes.length > 0 ? profile.naicsCodes.slice(0, 8).join(', ') : current.naicsCode,
       pscCode: profile.pscCodes[0] || current.pscCode,
       zipCode: profile.zipCode || current.zipCode,
+      locationStates: profile.locationStates?.length ? profile.locationStates : current.locationStates,
       companyName: profile.companyName || current.companyName,
     }));
 
@@ -1145,6 +1149,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       naicsCode: (filters.naicsCodes || []).join(', '),
       pscCode: (filters.pscCodes || []).join(', '),
       zipCode: filters.zipCode || '',
+      locationStates: Array.isArray(filters.locationStates) ? filters.locationStates : [],
       veteranStatus: 'Not Applicable',
       companyName: filters.companyName || '',
       excludeDOD: Boolean(filters.excludeDOD),
@@ -1360,6 +1365,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         businessType: formData.businessType,
         veteranStatus: formData.veteranStatus,
         zipCode: formData.zipCode,
+        locationStates: formData.locationStates || [],   // States filter → scopes spend
         excludeDOD: formData.excludeDOD,
       }),
     })
@@ -1386,6 +1392,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     formData.businessType,
     formData.veteranStatus,
     formData.zipCode,
+    formData.locationStates.join(','),
     formData.excludeDOD,
     researchMode,
     sportKeyword,
@@ -1761,7 +1768,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                 // profile report so nothing shows until the user runs their own.
                 // Default set-aside to Small Business (Eric) — most users are SBs
                 // exploring lanes; they can change it.
-                setFormData({ businessType: 'Small Business', naicsCode: '', pscCode: '', zipCode: '', veteranStatus: 'Not Applicable', companyName: '', excludeDOD: false });
+                setFormData({ businessType: 'Small Business', naicsCode: '', pscCode: '', zipCode: '', locationStates: [], veteranStatus: 'Not Applicable', companyName: '', excludeDOD: false });
                 setSelectedAgency('');
                 setReportData(null);
                 setActiveReportId(null);

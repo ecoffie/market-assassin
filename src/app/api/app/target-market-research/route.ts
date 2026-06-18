@@ -230,6 +230,7 @@ export async function POST(request: NextRequest) {
       zipCode = '',
       pscCode = '',
       excludeDOD = false,
+      locationStates = [],
       email,
     } = body as {
       naicsCode?: string;
@@ -240,6 +241,7 @@ export async function POST(request: NextRequest) {
       zipCode?: string;
       pscCode?: string;
       excludeDOD?: boolean;
+      locationStates?: string[]; // States filter — scopes spend to these states (place of perf)
       email?: string;
     };
 
@@ -290,8 +292,15 @@ export async function POST(request: NextRequest) {
     const access = await verifyMIAccess(email);
     const isFree = access.tier === 'free' && !access.isStaff;
 
+    // Normalize the states filter so it participates in the cache key (different
+    // state selections = different markets = different cache rows). No states column
+    // exists on the cache table, so fold it into naics_code (avoids a migration).
+    const normStates = (Array.isArray(locationStates) ? locationStates : [])
+      .map((s) => String(s).trim().toUpperCase()).filter((s) => /^[A-Z]{2}$/.test(s)).sort();
+    const stateSuffix = normStates.length ? `|st:${normStates.join(',')}` : '';
+
     const cacheKey = {
-      naics_code: naics,
+      naics_code: `${naics}${stateSuffix}`,
       psc_code: psc,
       business_type: businessType || '',
       veteran_status: veteranStatus || '',
@@ -376,6 +385,7 @@ export async function POST(request: NextRequest) {
       businessType: withSetAside ? businessType : '',
       veteranStatus: withSetAside ? veteranStatus : '',
       zipCode,
+      locationStates,   // States filter → scopes spend to these states (was dropped)
       pscCode: marketFilter ? '' : psc,
       excludeDOD,
       searchKeywords,
