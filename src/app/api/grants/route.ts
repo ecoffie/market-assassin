@@ -147,12 +147,20 @@ export async function GET(request: NextRequest) {
 
   try {
     // Build Grants.gov search payload
+    // NOTE: Grants.gov's `agency`/`agencies` filter params are unreliable for
+    // top-level codes — the facet exposes "DOD"/"HHS" but filtering by them returns
+    // 0 (it wants sub-codes like DOD-AMRAA). So we do NOT send agency upstream;
+    // instead we fetch broadly and filter results by agencyCode PREFIX below (every
+    // result carries agencyCode like "DOD-AMRAA"/"HHS-NIH11", prefixed with the
+    // top-level code). Fetch extra rows when an agency filter is active so the
+    // post-filter still fills the page.
+    const agencyFilter = (agency || '').trim().toUpperCase();
+    const fetchRows = agencyFilter ? Math.min(limit * 4, 100) : Math.min(limit, 100);
     const searchPayload = {
       keyword: keyword || undefined,
       oppStatuses: status === 'posted' ? 'posted' : status,
-      agency: agency || undefined,
       fundingCategories: category || undefined,
-      rows: Math.min(limit, 100),
+      rows: fetchRows,
       startRecordNum: offset || undefined, // Grants.gov paging cursor
       sortBy: 'openDate|desc',
     };
@@ -204,6 +212,15 @@ export async function GET(request: NextRequest) {
       score: undefined as number | undefined,
     }));
 
+    // Agency filter (client-side prefix match — see payload note). A result's
+    // agencyCode is like "DOD-AMRAA" / "HHS-NIH11", so a top-level pick ("DOD")
+    // matches by prefix. This is what makes the agency dropdown actually filter.
+    let agencyFiltered = false;
+    if (agencyFilter) {
+      grants = grants.filter((g) => (g.agencyCode || '').toUpperCase().startsWith(agencyFilter));
+      agencyFiltered = true;
+    }
+
     // Profile-relevance sort: when an email is provided and the user has a
     // profile, score each grant (same scoreGrant as the alert emails) and
     // sort best-match first, newest breaking ties. Without a profile we keep
@@ -230,16 +247,22 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // When agency-filtered, the upstream hitCount is the UNfiltered total — report
+    // the post-filter count instead (honest), and trim to the requested page size.
+    const pageGrants = agencyFiltered ? grants.slice(0, limit) : grants;
+    const reportedTotal = agencyFiltered ? grants.length : totalAvailable;
+
     return NextResponse.json({
       success: true,
-      total: totalAvailable,       // TRUE total matching grants (e.g. 1209)
-      count: grants.length,        // grants in THIS page
+      total: reportedTotal,        // TRUE total matching grants (post agency filter)
+      count: pageGrants.length,    // grants in THIS page
       offset,
       limit,
-      hasMore: offset + grants.length < totalAvailable,
+      hasMore: agencyFiltered ? false : offset + grants.length < totalAvailable,
       hasProfile,                  // whether a "For me" sort is even possible
       sortedByRelevance,
-      grants,
+      agencyFiltered,
+      grants: pageGrants,
       searchCriteria: { keyword, agency, category, status, limit, sort },
     });
 

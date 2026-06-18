@@ -86,8 +86,12 @@ export async function searchGrants(params: GrantSearchParams): Promise<GrantSear
       searchBody.keyword = keyword;
     }
 
-    if (agency) {
-      searchBody.agency = agency;
+    // Grants.gov's agency param doesn't filter by top-level codes (DOD/HHS → 0
+    // results despite the facet listing them). Fetch broadly, filter by agencyCode
+    // PREFIX after parsing (results carry "DOD-AMRAA" etc.). Mirrors /api/grants.
+    const agencyPrefix = (agency || '').trim().toUpperCase();
+    if (agencyPrefix) {
+      searchBody.rows = Math.min((searchBody.rows as number) * 4, 100);
     }
 
     if (category) {
@@ -138,11 +142,16 @@ export async function searchGrants(params: GrantSearchParams): Promise<GrantSear
       lastUpdated: opp.lastUpdatedDate || opp.openDate || '',
     }));
 
-    console.log(`[Grants.gov] Found ${grants.length} grants`);
+    // Apply the agency filter by agencyCode prefix (see note above).
+    const filtered = agencyPrefix
+      ? grants.filter((g) => (g.agencyCode || '').toUpperCase().startsWith(agencyPrefix))
+      : grants;
+
+    console.log(`[Grants.gov] Found ${filtered.length} grants${agencyPrefix ? ` (agency ${agencyPrefix})` : ''}`);
 
     return {
-      grants,
-      totalRecords: data.totalOppHits || grants.length,
+      grants: filtered,
+      totalRecords: agencyPrefix ? filtered.length : (data.totalOppHits || grants.length),
       fetchedAt: new Date().toISOString(),
     };
   } catch (error) {
