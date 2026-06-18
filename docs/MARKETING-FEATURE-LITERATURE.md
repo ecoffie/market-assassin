@@ -2125,3 +2125,34 @@ pipeline, library; dismissible; auto-hides at 5/5) on DashboardPanel above the f
 PSC suggestion chips in UnifiedSettingsPanel fed by /api/app/keyword-coverage topPsc
 (tap to add, ✓ when added). Also fixed: "Agencies selected" setup-progress now counts
 My Target List (was checking the wrong table). Marketing literature updated (rule #8).
+
+---
+
+## Mindy: Hidden-Match Alerts — opportunities your NAICS codes miss (June 18, 2026)
+
+**What:** Mindy now surfaces opportunities that match what your company can actually
+DO — even when they're filed under a NAICS code you don't track. Most tools only show
+you opportunities tagged with your exact codes, so anything an agency mis-coded, or
+filed under a neighboring code, is invisible to you. Hidden-Match reads the actual scope
+of work (the SOW/PWS text) of live opportunities and compares it to your real
+capabilities, then flags the ones a code-only search would never have shown you —
+marked with a 💡 so you know why it surfaced.
+
+**Why:** Federal opportunities are notoriously mis-coded — a job that's really "IT help
+desk" gets filed under a facilities code; a SOW that's clearly your wheelhouse sits
+under a NAICS you've never bid. Searching by code alone means you only ever see the
+opportunities the government happened to label correctly. The money you're missing isn't
+in the opportunities you can see — it's in the ones the code filter hides. Mindy matches
+on MEANING, not labels, so the contractor who can do the work finds the work.
+
+**SEO:** find federal contracts not in my NAICS code, mis-coded government opportunities,
+capability-based opportunity matching, opportunities I'm missing, SOW matching federal
+contracts, contracts that match what my company does.
+
+**Proof:** Live opportunity scopes of work are embedded (OpenAI text-embedding-3-small,
+real SOW/PWS text — 8,500+ active opportunities embedded) and cosine-matched against
+each user's capability vector derived from their real profile and past performance.
+Conservative similarity threshold so only genuine matches surface; everything the user
+already saw via normal search is excluded, so a Hidden-Match is always something new.
+Grounded in real federal scope text — never an AI guess about what the opportunity is.
+Marketing literature updated (rule #8).
