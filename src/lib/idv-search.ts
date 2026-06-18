@@ -97,6 +97,11 @@ export async function searchIDVContracts(options: IDVSearchOptions = {}): Promis
       "Contract Award Type",
       "Recipient State Code",
       "Place of Performance State Code",
+      // generated_internal_id is the id the award API + /award/ deep link need
+      // (generated_unique_award_id is null for contracts/IDVs). Request BOTH so
+      // the field we read (generatedId) is the field we ask for — not silently
+      // dependent on USASpending auto-including it.
+      "generated_internal_id",
       "generated_unique_award_id"
     ],
     page,

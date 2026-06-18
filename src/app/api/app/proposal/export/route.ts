@@ -221,6 +221,10 @@ interface ExportBody {
   sectionOrder?: string[];
   packageType?: 'proposal' | 'sources_sought_loi' | 'rfq_response' | 'idiq_proposal' | 'rfp_response';
   rfpFileName?: string;
+  // The real solicitation body text. Used by the RFP export to detect Section
+  // L/M / volume structure (detectWeight). Must be the document text, NOT the
+  // filename — a filename never carries those signals (Eric QC 2026-06).
+  rfpSourceText?: string;
   // Structured fields extracted from the SAM.gov notice text (Sources Sought /
   // RFI). When present, the LOI template pre-fills agency/address/solicitation/
   // submission-requirement blanks instead of leaving them empty.
@@ -811,7 +815,10 @@ export async function POST(request: NextRequest) {
       section: c.section,
     }));
     const rfpVault = await loadVaultForLoi(email).catch(() => ({ has_any: false } as VaultContext));
-    const rfp = assembleRfpResponse({ requirements: reqs, vault: rfpVault, sourceText: body.rfpFileName || '' });
+    // Feed the REAL solicitation text so detectWeight can see Section L/M /
+    // volume signals. The old code passed rfpFileName (the filename), which
+    // never contains those signals → every RFP misdetected as light_commercial.
+    const rfp = assembleRfpResponse({ requirements: reqs, vault: rfpVault, sourceText: body.rfpSourceText || '' });
 
     const rfpChildren: (Paragraph | Table)[] = [
       new Paragraph({ heading: HeadingLevel.TITLE, alignment: AlignmentType.CENTER, children: [new TextRun({ text: 'RFP Response', bold: true, size: 52 })] }),

@@ -287,7 +287,11 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
     if (!key || drillDetail[key]) return;
     setDrillDetail(d => ({ ...d, [key]: 'loading' }));
     try {
-      const res = await fetch(`/api/app/award-detail?id=${encodeURIComponent(key)}`, { headers: getMIApiHeaders(email) });
+      // If we have the real generated_internal_id, hit ?id= directly. If we only
+      // have a PIID (generatedId empty), use ?piid= so the route runs
+      // resolvePiidToId — otherwise the PIID is sent as id and 404s.
+      const param = row.generatedId ? 'id' : 'piid';
+      const res = await fetch(`/api/app/award-detail?${param}=${encodeURIComponent(key)}`, { headers: getMIApiHeaders(email) });
       const data = await res.json();
       setDrillDetail(d => ({ ...d, [key]: data?.success ? (data.detail as AwardDetail) : 'error' }));
     } catch {

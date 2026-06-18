@@ -1062,6 +1062,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         body: JSON.stringify({
           fileName: (exportContextName.replace(/\.(pdf|docx|txt)$/i, '') || 'proposal') + '-package',
           rfpFileName: exportContextName,
+          // Real solicitation body — lets the RFP export detect Section L/M /
+          // volume structure (filename alone never carries those signals).
+          rfpSourceText: uploadedRfp?.text || undefined,
           compliance: compliance.map(c => ({
             id: c.id,
             requirement: c.requirement,
