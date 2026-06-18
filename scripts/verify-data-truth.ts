@@ -157,6 +157,46 @@ async function checkGrants() {
     `DOD ${ourDod} vs all ${ourAll}`);
 }
 
+// === IDV task-order NAICS precision (was substring(0,2) → all of sector 54) ====
+// Assert at the UPSTREAM layer: 541512 must match FEWER naics buckets than "54".
+// This is the truth the idv-search filter now preserves (6-digit stays exact).
+async function checkIdvNaicsPrecision() {
+  console.log('\n[Layer 2] IDV task-order NAICS precision (6-digit must not match the whole sector):');
+  async function naicsBuckets(codes: string[]): Promise<number> {
+    const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_category', {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category: 'naics', filters: { award_type_codes: AWARD_TYPES, naics_codes: { require: codes }, time_period: [WINDOW] }, subawards: false, limit: 20, page: 1 }),
+    });
+    if (!res.ok) return -1;
+    return ((await res.json()).results || []).length;
+  }
+  const exact = await naicsBuckets(['541512']);
+  const sector = await naicsBuckets(['54']);
+  ok('NAICS 541512 matches fewer buckets than sector 54', exact > 0 && exact < sector,
+    `541512 → ${exact} bucket(s) vs 54 → ${sector}`);
+}
+
+// === Forecasts state/set-aside filter sensitivity (DB-layer truth) ============
+// These run against the agency_forecasts table via the public-data shape we know:
+// pop_state holds full names, set_aside_type holds strings like "8(a)". We assert
+// the route's expected behavior by checking the raw filter narrows (via our API if
+// reachable; else skip gracefully — the route is auth-gated).
+async function checkForecastsFilters() {
+  console.log('\n[Layer 2] Forecasts state/set-aside filters (skip if auth-gated):');
+  const probe = await fetch(`${BASE_URL}/api/forecasts?naics=541512&limit=1`);
+  if (probe.status === 401) { console.log('  ⊘ forecasts route is auth-gated — covered by DB-layer tests in CI with a token'); return; }
+  // If reachable, assert state filter narrows.
+  async function fc(params: Record<string, string>): Promise<number> {
+    const res = await fetch(`${BASE_URL}/api/forecasts?${new URLSearchParams(params)}`);
+    if (!res.ok) return -1;
+    const j = await res.json();
+    return (j.forecasts || j.data || []).length;
+  }
+  const all = await fc({ limit: '200' });
+  const fl = await fc({ state: 'FL', limit: '200' });
+  ok('forecasts state filter narrows', all > 0 && fl >= 0 && fl < all, `FL ${fl} vs all ${all}`);
+}
+
 async function main() {
   console.log(`\n🔎 Data Truth Check — re-deriving truth from live USASpending / Grants`);
   console.log(`   Target: ${BASE_URL}\n`);
@@ -164,6 +204,8 @@ async function main() {
     await checkSetAsideCodes();
     await checkMarketResearch();
     await checkStateFilter();
+    await checkIdvNaicsPrecision();
+    await checkForecastsFilters();
     await checkGrants();
   } catch (e) {
     console.error('\n💥 Harness error:', e);

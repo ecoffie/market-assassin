@@ -169,7 +169,24 @@ export async function GET(request: NextRequest) {
     }
 
     if (state) {
-      query = query.ilike('pop_state', `%${state}%`);
+      // pop_state holds FULL names ("FLORIDA"), but the UI may send a 2-letter code.
+      // Map 2-letter → full name so the ilike matches; pass through full names as-is.
+      const STATE_NAMES: Record<string, string> = {
+        AL: 'ALABAMA', AK: 'ALASKA', AZ: 'ARIZONA', AR: 'ARKANSAS', CA: 'CALIFORNIA',
+        CO: 'COLORADO', CT: 'CONNECTICUT', DE: 'DELAWARE', FL: 'FLORIDA', GA: 'GEORGIA',
+        HI: 'HAWAII', ID: 'IDAHO', IL: 'ILLINOIS', IN: 'INDIANA', IA: 'IOWA', KS: 'KANSAS',
+        KY: 'KENTUCKY', LA: 'LOUISIANA', ME: 'MAINE', MD: 'MARYLAND', MA: 'MASSACHUSETTS',
+        MI: 'MICHIGAN', MN: 'MINNESOTA', MS: 'MISSISSIPPI', MO: 'MISSOURI', MT: 'MONTANA',
+        NE: 'NEBRASKA', NV: 'NEVADA', NH: 'NEW HAMPSHIRE', NJ: 'NEW JERSEY', NM: 'NEW MEXICO',
+        NY: 'NEW YORK', NC: 'NORTH CAROLINA', ND: 'NORTH DAKOTA', OH: 'OHIO', OK: 'OKLAHOMA',
+        OR: 'OREGON', PA: 'PENNSYLVANIA', RI: 'RHODE ISLAND', SC: 'SOUTH CAROLINA',
+        SD: 'SOUTH DAKOTA', TN: 'TENNESSEE', TX: 'TEXAS', UT: 'UTAH', VT: 'VERMONT',
+        VA: 'VIRGINIA', WA: 'WASHINGTON', WV: 'WEST VIRGINIA', WI: 'WISCONSIN', WY: 'WYOMING',
+        DC: 'DISTRICT OF COLUMBIA',
+      };
+      const s = state.trim().toUpperCase();
+      const term = s.length === 2 && STATE_NAMES[s] ? STATE_NAMES[s] : s;
+      query = query.ilike('pop_state', `%${term}%`);
     }
 
     if (setAside) {

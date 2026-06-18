@@ -651,22 +651,20 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
             <div className="text-2xl font-bold text-white">{summary.totalContracts}</div>
             <div className="text-xs text-slate-500">{usingProfileDefaults ? 'Profile Matches' : 'Expiring Awards Shown'}</div>
-            {(profileDefaults?.states?.length || profileDefaults?.hqState) ? (
-              <div className="text-[11px] text-blue-400 mt-1">
-                📍 {summary.inAreaContracts} in or near your service area
-              </div>
-            ) : (
-              <div className="text-[11px] text-slate-600 mt-1">{allContracts.length.toLocaleString()} total in database</div>
-            )}
+            {/* The static recompete dataset has no place-of-performance state, so the
+                "in your service area" count was always 0. Show the honest DB total. */}
+            <div className="text-[11px] text-slate-600 mt-1">{allContracts.length.toLocaleString()} total in database</div>
           </div>
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
             <div className="text-2xl font-bold text-emerald-400">{formatCurrency(summary.totalValue)}</div>
             <div className="text-xs text-slate-500">Potential Rebid Value</div>
           </div>
+          {/* Was "Sole Source" — always 0 (static data has no competition_type).
+              Replaced with average rebid value, which the dataset DOES carry. */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <div className="text-2xl font-bold text-green-400">{summary.soleSourceContracts}</div>
-            <div className="text-xs text-slate-500">Sole Source</div>
-            <div className="text-[11px] text-slate-600 mt-1">Likely fewer competitors if rebid</div>
+            <div className="text-2xl font-bold text-green-400">{formatCurrency(summary.totalContracts ? summary.totalValue / summary.totalContracts : 0)}</div>
+            <div className="text-xs text-slate-500">Avg Rebid Value</div>
+            <div className="text-[11px] text-slate-600 mt-1">Per expiring award</div>
           </div>
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
             <div className="text-2xl font-bold text-red-400">{summary.urgentContracts}</div>
@@ -767,18 +765,10 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
               <option value="24">24 Months</option>
             </select>
           </div>
-          <div>
-            <label className="block text-xs text-slate-500 mb-1">Competition</label>
-            <select
-              value={competitionFilter}
-              onChange={(e) => setCompetitionFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:border-amber-500 focus:outline-none"
-            >
-              <option value="">All</option>
-              <option value="low">Low Competition</option>
-              <option value="sole_source">Sole Source</option>
-            </select>
-          </div>
+          {/* Competition filter hidden: the static recompete dataset carries no
+              number-of-offers / competition_type, so this would always return 0
+              (it hardcoded competitionLevel:'full'). Re-enable when the view is
+              sourced from /api/recompete, which has the real competition data. */}
           <div className="flex items-end">
             <button
               onClick={handleSearch}

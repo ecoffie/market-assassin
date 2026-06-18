@@ -233,6 +233,19 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
       if (selectedCtaIds.length > 0) {
         params.set('cta', selectedCtaIds.join(','));
       }
+      // Search the FULL SAM corpus server-side, not the 1000-row client window.
+      // keywordOnly=true makes the term browse ALL SAM (replaces the NAICS filter)
+      // so a user searching a term outside their profile codes still finds it —
+      // previously the box only substring-matched the loaded page.
+      const q = searchQuery.trim();
+      if (q) {
+        params.set('q', q);
+        params.set('keywordOnly', 'true');
+      }
+      // Notice-type tabs → server filter (the API supports noticeType). Maps the
+      // panel's filter values to the API's recognized types.
+      if (filter === 'solicitation') params.set('noticeType', 'solicitation');
+      else if (filter === 'sources') params.set('noticeType', 'sources_sought');
 
       const res = await fetch(`/api/app/opportunities?${params.toString()}`, {
         headers: getAuthHeaders(),
@@ -264,7 +277,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
     } finally {
       setIsLoading(false);
     }
-  }, [email, getAuthHeaders, selectedCtaIds]);
+  }, [email, getAuthHeaders, selectedCtaIds, searchQuery, filter]);
 
   useEffect(() => {
     fetch('/api/cta/codes')
@@ -284,7 +297,9 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
   };
 
   useEffect(() => {
-    loadAlerts();
+    // Debounce so typing in the search box doesn't fire a query per keystroke.
+    const t = setTimeout(() => { loadAlerts(); }, 350);
+    return () => clearTimeout(t);
   }, [loadAlerts]);
 
   const saveToPipeline = async (alert: Alert) => {

@@ -126,6 +126,8 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
   const [naicsFilter, setNaicsFilter] = useState('');
   const [agencyFilter, setAgencyFilter] = useState('');
   const [searchQuery, setSearchQuery] = useState('');
+  const [stateFilter, setStateFilter] = useState('');
+  const [setAsideFilter, setSetAsideFilter] = useState('');
 
   // Forecast request state
   const [showRequestModal, setShowRequestModal] = useState(false);
@@ -168,7 +170,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
     fetchSummary();
   }, [getForecastHeaders]);
 
-  const handleSearchWithParams = useCallback(async (naics: string, agency: string, query: string) => {
+  const handleSearchWithParams = useCallback(async (naics: string, agency: string, query: string, state = '', setAside = '') => {
     if (!naics && !agency && !query) {
       setForecasts([]);
       return;
@@ -182,6 +184,8 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
       if (naics) params.append('naics', naics);
       if (agency) params.append('agency', agency);
       if (query) params.append('search', query);
+      if (state) params.append('state', state);          // route supports pop_state filter
+      if (setAside) params.append('setAside', setAside);  // route supports set_aside_type filter
       params.append('limit', '200');
 
       const response = await fetch(`/api/forecasts?${params.toString()}`, {
@@ -262,7 +266,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
 
   const handleSearch = () => {
     setUsingProfileDefaults(false);
-    handleSearchWithParams(naicsFilter, agencyFilter, searchQuery);
+    handleSearchWithParams(naicsFilter, agencyFilter, searchQuery, stateFilter, setAsideFilter);
     track('tool_use', 'forecasts', {
       action: 'search',
       // Length signals (vs values) so we capture intent without
@@ -458,7 +462,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
       {/* Search Form */}
       <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
         <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Explore Upcoming Buys</h3>
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
+        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div>
             <label className="block text-xs text-slate-500 mb-1">NAICS Code(s)</label>
             <NaicsAutocompleteInput
@@ -494,10 +498,37 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-amber-500 focus:outline-none"
             />
           </div>
+          <div>
+            <label className="block text-xs text-slate-500 mb-1">State</label>
+            <input
+              type="text"
+              value={stateFilter}
+              onChange={(e) => setStateFilter(e.target.value.toUpperCase().slice(0, 2))}
+              onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
+              placeholder="FL"
+              maxLength={2}
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-amber-500 focus:outline-none uppercase"
+            />
+          </div>
+          <div>
+            <label className="block text-xs text-slate-500 mb-1">Set-Aside</label>
+            <select
+              value={setAsideFilter}
+              onChange={(e) => setSetAsideFilter(e.target.value)}
+              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:border-amber-500 focus:outline-none"
+            >
+              {/* Values match real set_aside_type strings in agency_forecasts. */}
+              <option value="">Any Set-Aside</option>
+              <option value="Small Business">Small Business</option>
+              <option value="8(a)">8(a)</option>
+              <option value="HUBZone">HUBZone</option>
+              <option value="SDVOSB">SDVOSB</option>
+            </select>
+          </div>
           <div className="flex items-end gap-2">
             <button
               onClick={handleSearch}
-              disabled={searching || (!naicsFilter && !agencyFilter && !searchQuery)}
+              disabled={searching || (!naicsFilter && !agencyFilter && !searchQuery && !stateFilter && !setAsideFilter)}
               className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
             >
               {searching ? 'Searching...' : 'Search'}

@@ -123,20 +123,19 @@ export async function searchIDVContracts(options: IDVSearchOptions = {}): Promis
     }];
   }
 
-  // Add NAICS filter - handle comma-separated codes
+  // Add NAICS filter - handle comma-separated codes.
+  // USASpending accepts full 6-digit codes in naics_codes.require. The old code
+  // did `substring(0,2)`, collapsing 541512 (IT systems design) → 54 (ALL
+  // professional services) — a 7x over-match (same class as the Market Research
+  // over-expansion). Keep the user's code AS ENTERED: a 6-digit code stays exact;
+  // a typed prefix (2-5 digit) stays a prefix. USASpending prefix-matches require.
   if (naicsCode) {
-    // Split comma-separated codes and clean each one
-    const codes = naicsCode.split(/[,\s]+/).filter(c => c.trim());
-    const cleanedCodes = codes.map(code => {
-      let cleanNaics = code.trim().replace(/0+$/, '') || code.trim();
-      // Normalize to 2-digit prefix for broader matching
-      if (cleanNaics.length >= 3) cleanNaics = cleanNaics.substring(0, 2);
-      else if (cleanNaics.length === 1) cleanNaics = cleanNaics + '0';
-      return cleanNaics;
-    });
-    // Dedupe the prefixes (e.g., 236, 237, 238 all become 23)
+    const codes = naicsCode.split(/[,\s]+/).map(c => c.trim()).filter(Boolean);
+    const cleanedCodes = codes
+      .map(code => code.replace(/\D/g, ''))   // digits only
+      .filter(code => code.length >= 2 && code.length <= 6);
     const uniqueCodes = [...new Set(cleanedCodes)];
-    filters.naics_codes = { require: uniqueCodes };
+    if (uniqueCodes.length) filters.naics_codes = { require: uniqueCodes };
   }
 
   // Add PSC code filter
