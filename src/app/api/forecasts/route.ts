@@ -336,12 +336,19 @@ export async function GET(request: NextRequest) {
     // we already ingest in sam_opportunities. Surface those in the forecast
     // feed when DoD is in scope, clearly labeled as "early signal" (not a
     // formal LRAF). Honest interim until component scrapers land (Option A).
-    const dodInScope = !agency
+    // DoD early signals come from sam_opportunities, which lacks clean pop_state /
+    // set_aside_type fields — so we CANNOT honor a state or set-aside filter on them.
+    // When the user has set either filter, skip the injection entirely rather than
+    // pollute the results with unfiltered DoD signals (the bug the harness caught:
+    // state=ZZ returned 60 unfiltered DoD signals, making a no-match look like 60 hits).
+    const dodInScope = !state && !setAside && (
+      !agency
       || agency.toLowerCase().includes('def')
       || agency.toLowerCase().includes('dod')
       || agency.toLowerCase().includes('army')
       || agency.toLowerCase().includes('navy')
-      || agency.toLowerCase().includes('air force');
+      || agency.toLowerCase().includes('air force')
+    );
     // Lookback window for DoD early signals (how far back the Sources Sought
     // can have been POSTED). Default 180d; ?lookbackDays= overrides. We also
     // include items with no/expired deadline when within the window so a useful

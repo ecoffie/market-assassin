@@ -21,10 +21,28 @@
  * Exits non-zero on any failure → blocks the predeploy gate.
  */
 
+import { config } from 'dotenv';
+config({ path: '.env.local' });
+import { createMIAuthSessionToken } from '../src/lib/two-factor-session';
+
 const BASE_URL = (process.env.BASE_URL || 'https://getmindy.ai').replace(/\/$/, '');
 const USASPENDING = 'https://api.usaspending.gov/api/v2/search/spending_by_category';
 const WINDOW = { start_date: '2022-10-01', end_date: '2025-09-30' }; // MARKET_SPEND_WINDOW
 const AWARD_TYPES = ['A', 'B', 'C', 'D'];
+
+// Auth for the gated routes (Forecasts, Source Feed/opportunities). Forecasts takes
+// the admin password; opportunities needs a signed MI session token — we mint one
+// locally with the SAME TWO_FACTOR_SECRET the server verifies with. Requires
+// .env.local to carry ADMIN_PASSWORD + TWO_FACTOR_SECRET (matching prod). When the
+// secret is absent, the auth-gated checks SKIP loudly rather than fail.
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || '';
+const HAS_SIGNING_SECRET = !!(process.env.TWO_FACTOR_SECRET || process.env.ADMIN_PASSWORD);
+const TEST_EMAIL = process.env.MI_TEST_EMAIL || 'verify-harness@govcongiants.com';
+function miAuthHeaders(): Record<string, string> {
+  if (!HAS_SIGNING_SECRET) return {};
+  try { return { 'x-mi-auth-token': createMIAuthSessionToken(TEST_EMAIL) }; }
+  catch { return {}; }
+}
 
 let pass = 0;
 let fail = 0;
@@ -182,19 +200,50 @@ async function checkIdvNaicsPrecision() {
 // the route's expected behavior by checking the raw filter narrows (via our API if
 // reachable; else skip gracefully — the route is auth-gated).
 async function checkForecastsFilters() {
-  console.log('\n[Layer 2] Forecasts state/set-aside filters (skip if auth-gated):');
-  const probe = await fetch(`${BASE_URL}/api/forecasts?naics=541512&limit=1`);
-  if (probe.status === 401) { console.log('  ⊘ forecasts route is auth-gated — covered by DB-layer tests in CI with a token'); return; }
-  // If reachable, assert state filter narrows.
+  console.log('\n[Layer 2] Forecasts state/set-aside filters (auth: admin password):');
+  if (!ADMIN_PASSWORD) { console.log('  ⊘ no ADMIN_PASSWORD in env — skipping (set it in .env.local)'); return; }
+  // Forecasts accepts ?password=ADMIN_PASSWORD (hasAdminAccess).
   async function fc(params: Record<string, string>): Promise<number> {
-    const res = await fetch(`${BASE_URL}/api/forecasts?${new URLSearchParams(params)}`);
+    const res = await fetch(`${BASE_URL}/api/forecasts?${new URLSearchParams({ ...params, password: ADMIN_PASSWORD })}`);
     if (!res.ok) return -1;
     const j = await res.json();
     return (j.forecasts || j.data || []).length;
   }
-  const all = await fc({ limit: '200' });
-  const fl = await fc({ state: 'FL', limit: '200' });
-  ok('forecasts state filter narrows', all > 0 && fl >= 0 && fl < all, `FL ${fl} vs all ${all}`);
+  // Note: a no-filter fetch returns a profile-defaulted subset, so it's NOT a valid
+  // "all" baseline. Assert each filter on its own terms: returns REAL data, and a
+  // nonsense value returns 0 (proves the filter actually constrains, isn't ignored).
+  const fl = await fc({ state: 'FL', limit: '500' });
+  const flBogus = await fc({ state: 'ZZ', limit: '500' });        // not a real state
+  const sa = await fc({ setAside: '8(a)', limit: '500' });
+  const saBogus = await fc({ setAside: 'NONEXISTENT-SETASIDE', limit: '500' });
+  ok('forecasts route reachable (auth works)', fl >= 0, `FL ${fl}`);
+  // State filter returns real data AND a bogus state returns 0 (2-letter→full-name maps + filters).
+  ok('forecasts STATE filter works (real data, bogus→0)', fl > 0 && flBogus === 0, `FL ${fl}, ZZ ${flBogus}`);
+  // Set-aside returns real data AND a bogus value returns 0 (values match the column).
+  ok('forecasts SET-ASIDE filter works (real data, bogus→0)', sa > 0 && saBogus === 0, `8(a) ${sa}, bogus ${saBogus}`);
+}
+
+// === Source Feed / opportunities (auth: minted MI token) =====================
+// The Source Feed search must query the FULL SAM corpus (q + keywordOnly), not a
+// client window. Assert: a keyword search returns results AND a rare term returns
+// FEWER than a broad/no-keyword fetch (the filter actually applies server-side).
+async function checkSourceFeed() {
+  console.log('\n[Layer 2] Source Feed search hits SAM corpus (auth: minted MI token):');
+  if (!HAS_SIGNING_SECRET) { console.log('  ⊘ no TWO_FACTOR_SECRET/ADMIN_PASSWORD — cannot mint token, skipping'); return; }
+  const headers = miAuthHeaders();
+  async function opps(params: Record<string, string>): Promise<{ count: number; status: number }> {
+    const res = await fetch(`${BASE_URL}/api/app/opportunities?${new URLSearchParams(params)}`, { headers });
+    if (!res.ok) return { count: -1, status: res.status };
+    const j = await res.json();
+    return { count: (j.opportunities || []).length, status: res.status };
+  }
+  // keywordOnly=true → browse ALL SAM by term (this is the path the search box now uses).
+  const broad = await opps({ q: 'services', keywordOnly: 'true', limit: '200' });
+  if (broad.status === 401) { ok('Source Feed auth (minted token accepted)', false, 'got 401 — TWO_FACTOR_SECRET mismatch with prod?'); return; }
+  ok('Source Feed auth (minted token accepted)', broad.status === 200, `status ${broad.status}`);
+  const rare = await opps({ q: 'hypersonic', keywordOnly: 'true', limit: '200' });
+  ok('Source Feed keyword search queries SAM (not a client window)', broad.count > 0, `"services" → ${broad.count} results`);
+  ok('Source Feed keyword filter is selective (rare < broad)', rare.count >= 0 && rare.count < broad.count, `"hypersonic" ${rare.count} vs "services" ${broad.count}`);
 }
 
 async function main() {
@@ -206,6 +255,7 @@ async function main() {
     await checkStateFilter();
     await checkIdvNaicsPrecision();
     await checkForecastsFilters();
+    await checkSourceFeed();
     await checkGrants();
   } catch (e) {
     console.error('\n💥 Harness error:', e);
