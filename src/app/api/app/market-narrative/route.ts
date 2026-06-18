@@ -68,6 +68,90 @@ interface NarrativeResponse {
   actions: Array<{ label: string; link?: string }>;
 }
 
+// --- Fact guardrail ----------------------------------------------
+//
+// The #1 rule: dollar/agency/name FACTS must come from real data, never an
+// LLM guess. This card sits next to the ground-truth table, so a hallucinated
+// figure or agency is a visible contradiction. We validate every $ figure the
+// model emits against the real input numbers; if any figure can't be matched,
+// we throw the LLM output away and serve a deterministic summary built only
+// from real stats. (Names are not hard-blocked — the deterministic fallback is
+// the safety net for both, and a mismatched $ is the strongest fabrication tell.)
+
+const formatMoney = (n: number): string => {
+  if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(1)}B`;
+  if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
+  if (n >= 1_000) return `$${Math.round(n / 1_000)}K`;
+  return `$${Math.round(n)}`;
+};
+
+// Parse a "$1.8B" / "$491.5M" / "$250K" token back to a number.
+function parseMoneyToken(tok: string): number | null {
+  const m = tok.match(/\$\s*([\d,]+(?:\.\d+)?)\s*([BMK])?/i);
+  if (!m) return null;
+  const base = parseFloat(m[1].replace(/,/g, ''));
+  if (Number.isNaN(base)) return null;
+  const unit = (m[2] || '').toUpperCase();
+  if (unit === 'B') return base * 1_000_000_000;
+  if (unit === 'M') return base * 1_000_000;
+  if (unit === 'K') return base * 1_000;
+  return base;
+}
+
+// The set of real dollar figures the narrative is allowed to cite.
+function realFigures(req: NarrativeRequest): number[] {
+  const figs: number[] = [];
+  if (req.totalSpending) figs.push(req.totalSpending);
+  if (req.satTotal) figs.push(req.satTotal);
+  for (const a of req.topAgencies || []) if (a.spending) figs.push(a.spending);
+  return figs.filter((n) => n > 0);
+}
+
+// True if `cited` is within 5% of any real figure (covers $1.8B-style rounding).
+function figureMatchesReal(cited: number, real: number[]): boolean {
+  return real.some((r) => r > 0 && Math.abs(cited - r) / r <= 0.05);
+}
+
+// Does the LLM text only cite dollar figures that exist in the real data?
+function narrativeFiguresAreReal(narr: NarrativeResponse, req: NarrativeRequest): boolean {
+  const real = realFigures(req);
+  const text = [narr.summary, ...(narr.actions || []).map((a) => a.label)].join(' ');
+  const tokens = text.match(/\$\s*[\d,]+(?:\.\d+)?\s*[BMK]?/gi) || [];
+  for (const tok of tokens) {
+    const val = parseMoneyToken(tok);
+    if (val === null) continue;
+    if (!figureMatchesReal(val, real)) return false; // a $ figure not in the data → reject
+  }
+  return true;
+}
+
+// Deterministic, real-data-only summary — the safe fallback when the LLM
+// strays. Uses ONLY agency names + figures from the structured payload.
+function deterministicNarrative(req: NarrativeRequest): NarrativeResponse {
+  const naics = req.naics || req.naicsCode || 'this market';
+  const top = (req.topAgencies || []).filter((a) => (a.spending || 0) > 0).slice(0, 3);
+  const total = req.totalSpending || top.reduce((s, a) => s + (a.spending || 0), 0);
+  const satPct = req.totalSpending && req.satTotal
+    ? Math.round((req.satTotal / req.totalSpending) * 100)
+    : null;
+
+  const lead = top.length
+    ? `${formatMoney(total)} in tracked spend for NAICS ${naics}, led by ${top
+        .map((a) => `${a.contractingOffice || a.parentAgency || 'an agency'} (${formatMoney(a.spending || 0)})`)
+        .join(', ')}.`
+    : `${formatMoney(total)} in tracked spend for NAICS ${naics}.`;
+  const sat = satPct !== null
+    ? ` Small-business set-aside addressable share is about ${satPct}% of total.`
+    : '';
+
+  const actions: Array<{ label: string }> = [];
+  if (top[0]) actions.push({ label: `Target ${top[0].contractingOffice || top[0].parentAgency} — top buyer at ${formatMoney(top[0].spending || 0)}` });
+  if (top[1]) actions.push({ label: `Add ${top[1].contractingOffice || top[1].parentAgency} (${formatMoney(top[1].spending || 0)}) to your agency watchlist` });
+  actions.push({ label: 'Set up daily alerts on this NAICS to catch new solicitations' });
+
+  return { summary: (lead + sat).slice(0, 600), actions: actions.slice(0, 3) };
+}
+
 // --- Prompt builder ----------------------------------------------
 //
 // The contract: we give Groq the stats + ask for JSON only. Tone
@@ -79,12 +163,7 @@ function buildPrompt(req: NarrativeRequest): string {
   const top10 = (req.topAgencies || []).slice(0, 10);
   const top5Primes = (req.topPrimes || []).slice(0, 5);
 
-  const formatM = (n: number) => {
-    if (n >= 1_000_000_000) return `$${(n / 1_000_000_000).toFixed(1)}B`;
-    if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
-    if (n >= 1_000) return `$${Math.round(n / 1_000)}K`;
-    return `$${Math.round(n)}`;
-  };
+  const formatM = formatMoney;
 
   const satPct = (req.totalSpending && req.satTotal)
     ? ((req.satTotal / req.totalSpending) * 100).toFixed(1)
@@ -119,6 +198,7 @@ function buildPrompt(req: NarrativeRequest): string {
     `- Summary: 2-4 sentences, max 350 chars. No bullet lists, no markdown.`,
     `- Actions: exactly 3. Each label under 100 chars. Concrete, not generic.`,
     `- Use real agency / prime names from the data above — do not invent.`,
+    `- CRITICAL: every dollar figure you write MUST be copied verbatim from the stats above. Never compute, estimate, sum, or round to a new number. If you can't cite an exact figure from the data, omit the figure.`,
     `- Tone: confident, specific, no hedging. Talk like a senior BD analyst.`,
     `- No markdown headers or formatting in the values.`,
     `- Return ONLY the JSON object. No code fences, no prose.`,
@@ -198,6 +278,19 @@ export async function POST(request: NextRequest) {
 
   const prompt = buildPrompt(body);
 
+  // When the AI is unreachable / errors / returns garbage, don't show an error
+  // card mid-demo — serve the real-data deterministic summary. Returns a 200 so
+  // the UI renders a valid (if plainer) narrative.
+  const serveFallback = (reason: string) =>
+    NextResponse.json({
+      success: true,
+      narrative: deterministicNarrative(body),
+      cached: false,
+      fact_safe: true,
+      model_used: 'deterministic-fallback',
+      fallback_reason: reason,
+    });
+
   let response: Response;
   try {
     response = await fetch(GROQ_API_URL, {
@@ -229,7 +322,7 @@ export async function POST(request: NextRequest) {
       aiProvider: AIProviders.GROQ,
       aiModel: GROQ_MODEL,
     }).catch(() => {});
-    return NextResponse.json({ error: 'Could not reach AI service' }, { status: 502 });
+    return serveFallback('ai_unreachable');
   }
 
   if (!response.ok) {
@@ -242,7 +335,7 @@ export async function POST(request: NextRequest) {
       aiProvider: AIProviders.GROQ,
       aiModel: GROQ_MODEL,
     }).catch(() => {});
-    return NextResponse.json({ error: `AI service returned ${response.status}` }, { status: 502 });
+    return serveFallback(`ai_status_${response.status}`);
   }
 
   const payload = await response.json().catch(() => null);
@@ -252,7 +345,7 @@ export async function POST(request: NextRequest) {
   const usage = (payload as any)?.usage as { prompt_tokens?: number; completion_tokens?: number } | undefined;
 
   if (!content) {
-    return NextResponse.json({ error: 'AI returned empty response' }, { status: 502 });
+    return serveFallback('ai_empty');
   }
 
   // safeParseJSON handles code fences, wrapper prose, and 2-pass cleanup
@@ -261,13 +354,13 @@ export async function POST(request: NextRequest) {
     source: 'market-narrative',
   });
   if (!narrative) {
-    return NextResponse.json({ error: 'AI returned malformed JSON' }, { status: 502 });
+    return serveFallback('ai_malformed_json');
   }
 
   // Sanity-validate shape. Drop bogus actions, clamp summary length
   // so a misbehaving model can't blow up the UI card.
   if (!narrative.summary || typeof narrative.summary !== 'string') {
-    return NextResponse.json({ error: 'AI response missing summary' }, { status: 502 });
+    return serveFallback('ai_missing_summary');
   }
   narrative.summary = narrative.summary.slice(0, 600);
   narrative.actions = Array.isArray(narrative.actions)
@@ -277,6 +370,21 @@ export async function POST(request: NextRequest) {
         .map(a => ({ label: a.label.slice(0, 150), link: typeof a.link === 'string' ? a.link.slice(0, 300) : undefined }))
     : [];
 
+  // FACT GUARDRAIL: if the model cited any dollar figure that isn't in the real
+  // input data, it's fabricating — discard the LLM output and serve a
+  // deterministic real-data-only summary. This card sits beside the ground-truth
+  // table, so a stray figure would be a visible contradiction (the #1 rule).
+  let factSafe = true;
+  if (!narrativeFiguresAreReal(narrative, body)) {
+    factSafe = false;
+    const safe = deterministicNarrative(body);
+    narrative.summary = safe.summary;
+    narrative.actions = safe.actions;
+    console.warn('[market-narrative] LLM cited a non-real $ figure — served deterministic fallback', { naics, email: email.toLowerCase() });
+  }
+
+  const modelUsed = factSafe ? GROQ_MODEL : `${GROQ_MODEL}+deterministic-fallback`;
+
   // Write to cache. Failures are non-fatal — the user still gets
   // the live narrative; only repeat-visit performance is degraded.
   try {
@@ -285,7 +393,7 @@ export async function POST(request: NextRequest) {
       .upsert({
         ...cacheKey,
         narrative,
-        model_used: GROQ_MODEL,
+        model_used: modelUsed,
         prompt_tokens: usage?.prompt_tokens || null,
         completion_tokens: usage?.completion_tokens || null,
         generated_at: new Date().toISOString(),
@@ -298,6 +406,7 @@ export async function POST(request: NextRequest) {
     success: true,
     narrative,
     cached: false,
-    model_used: GROQ_MODEL,
+    fact_safe: factSafe,
+    model_used: modelUsed,
   });
 }
