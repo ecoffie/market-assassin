@@ -300,7 +300,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
   const resetProfile = async () => {
     if (!email) return;
     if (typeof window !== 'undefined' &&
-        !window.confirm('Clear your NAICS codes, PSC codes, keywords, and target agencies? This starts your profile fresh — you can rebuild it right after.')) {
+        !window.confirm('Start over? This clears your codes, keywords, and agencies, then walks you back through guided setup to rebuild your profile.')) {
       return;
     }
     setSaving(true); setError(null); setMessage(null);
@@ -318,17 +318,15 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
         showToast({ message: e?.error ? `Couldn't reset: ${e.error}` : 'Reset failed — try again', variant: 'error' });
         return;
       }
-      setForm((f) => ({ ...f, naics_codes: '', psc_codes: '', keywords: '', target_agencies: '', location_states: [] }));
-      setTargetingRefreshKey((k) => k + 1);
-      showToast({ message: 'Profile cleared — add your codes & keywords below.', variant: 'success' });
-      // Drop the user straight into the editor to rebuild (Eric: clear → editor).
-      matchingSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-      window.setTimeout(() => {
-        matchingSectionRef.current?.querySelector<HTMLElement>('input, textarea')?.focus();
-      }, 300);
+      // Send the user back through the GUIDED onboarding sequence to rebuild — it's
+      // the smart tool (describe "demolition" → real codes via keyword-coverage),
+      // vs the Settings NAICS picker which only title-searches and misses colloquial
+      // terms like "demolition" (Eric, Jun 2026). Codes are now cleared, so
+      // onboarding shows the wizard (it only skips for users who already have codes).
+      showToast({ message: 'Profile cleared — taking you to guided setup…', variant: 'success' });
+      window.location.href = `/app/onboarding?email=${encodeURIComponent(email)}`;
     } catch {
       showToast({ message: 'Network error — reset not saved', variant: 'error' });
-    } finally {
       setSaving(false);
     }
   };
