@@ -38,10 +38,15 @@ function fmtMoney(v: unknown): string {
   return `$${n.toLocaleString('en-US')}`;
 }
 
-/** Mr./Ms. + last name from a full name, or a neutral fallback. */
-function salutationName(fullName?: string): string {
-  const name = s(fullName);
-  if (!name) return ph('Contracting Officer name');
+/**
+ * Last name for the "Dear Mr./Ms. ___" greeting, or a clean fallback.
+ * Takes the RESOLVED coName so it never re-placeholders. If the name is unknown
+ * (a [bracketed] placeholder), return a neutral "Sir or Madam" — splitting a
+ * placeholder produced the broken "Dear Mr./Ms. name]," greeting.
+ */
+function salutationLastName(resolvedName?: string): string {
+  const name = s(resolvedName);
+  if (!name || /^\[.*\]$/.test(name)) return 'Sir or Madam';
   const last = name.split(/\s+/).pop();
   return last || name;
 }
@@ -195,7 +200,7 @@ Subject:    Solicitation No. ${solNo}
             ${projectLoc}
             ${projectTitle}
 
-Dear Mr./Ms. ${salutationName(coName)},
+${(() => { const ln = salutationLastName(coName); return ln === 'Sir or Madam' ? 'Dear Sir or Madam,' : `Dear Mr./Ms. ${ln},`; })()}
 
 Thank you for allowing us this opportunity to present our firm, ${company}, as a potential suitor for the ${projectTitle} and any upcoming projects for ${agency}.
 
