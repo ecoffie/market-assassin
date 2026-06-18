@@ -16,16 +16,26 @@ export const MARKET_SPEND_WINDOW_LABEL = 'FY2023–2025 (3 fiscal years)';
 
 // Map business types to USAspending set-aside codes
 export const setAsideMap: Record<string, string[]> = {
+  // All codes VERIFIED against live USASpending set_aside_type_codes (2026-06-18).
+  // Dead codes removed — they silently contributed $0 to the OR (e.g. HUBZone's old
+  // HZBZ/HUBZ returned $0 = filter did nothing; the verbose "8A COMPETED" / "SMALL
+  // BUSINESS SET-ASIDE" strings are not the real codes). Keep ONLY working codes.
   'Women Owned': ['WOSB', 'EDWOSB'],
-  'HUBZone': ['HZBZ', 'HUBZ'],
-  '8(a) Certified': ['8A', '8AN', '8A COMPETED', '8A SOLE SOURCE'],
-  'Small Business': ['SBA', 'SBP', 'SMALL BUSINESS SET-ASIDE', 'TOTAL SMALL BUSINESS SET-ASIDE (FAR 19.5)'],
-  'Native American/Tribal': ['IND']
+  'HUBZone': ['HZC', 'HZS'],                          // was HZBZ/HUBZ → both dead ($0)
+  '8(a) Certified': ['8A', '8AN'],                    // dropped dead "8A COMPETED"/"8A SOLE SOURCE"
+  'Small Business': ['SBA', 'SBP'],                   // dropped dead verbose strings
+  'Native American/Tribal': ['IEE', 'ISBEE', 'BI']    // was IND → dead; these are the real Indian/tribal codes
 };
 
 export const veteranMap: Record<string, string[]> = {
-  'Veteran Owned': ['VOSB', 'VO'],
-  'Service Disabled Veteran': ['SDVOSB', 'SDVOSBC']
+  // Panel BusinessType keys are 'SDVOSB' / 'VOSB' (UnifiedSidebar BUSINESS_TYPES),
+  // plus the longer label forms — map all so the filter actually applies. There is
+  // no working plain veteran-owned (VOSB) set-aside code in USASpending federal-wide
+  // (VOSB set-asides are SDVOSB outside the VA), so VOSB maps to the SDVOSB codes.
+  'SDVOSB': ['SDVOSBC', 'SDVOSBS'],
+  'VOSB': ['SDVOSBC', 'SDVOSBS'],
+  'Veteran Owned': ['SDVOSBC', 'SDVOSBS'],
+  'Service Disabled Veteran': ['SDVOSBC', 'SDVOSBS'],  // was SDVOSB (dead) + SDVOSBC; added sole-source SDVOSBS
 };
 
 // NAICS expansion mapping for all sectors and common subsectors

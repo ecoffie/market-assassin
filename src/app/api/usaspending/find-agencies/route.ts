@@ -54,14 +54,24 @@ export async function POST(request: NextRequest) {
       console.log('🚫 DOD exclusion enabled - will filter out Department of Defense agencies');
     }
 
-    // Build set-aside type codes array for USAspending API
+    // Build set-aside type codes array for USAspending API.
+    // The panel sends the chosen set-aside in `businessType` (its BUSINESS_TYPES
+    // includes SDVOSB/VOSB), so look businessType up in BOTH maps — otherwise a
+    // veteran type selected as businessType silently applied no filter.
     const setAsideTypeCodes: string[] = [];
     if (businessType && setAsideMap[businessType]) {
       setAsideTypeCodes.push(...setAsideMap[businessType]);
     }
+    if (businessType && veteranMap[businessType]) {
+      setAsideTypeCodes.push(...veteranMap[businessType]);
+    }
     if (veteranStatus && veteranMap[veteranStatus]) {
       setAsideTypeCodes.push(...veteranMap[veteranStatus]);
     }
+    // De-dupe in case both maps contributed the same code.
+    const dedupedSetAside = Array.from(new Set(setAsideTypeCodes));
+    setAsideTypeCodes.length = 0;
+    setAsideTypeCodes.push(...dedupedSetAside);
 
     console.log('🎯 Target set-aside codes:', setAsideTypeCodes);
 
