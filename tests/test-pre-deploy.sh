@@ -27,14 +27,15 @@ FAIL=0
 WARN=0
 
 # Config
-# Production lives at mi.govcongiants.com. tools.govcongiants.org is a
-# legacy hostname that 308-redirects to mi — testing it without -L makes
-# every endpoint look like it's "failing" when it's healthy after the
-# redirect. Use the live host directly.
+# Production lives at getmindy.ai (the canonical domain since the consolidation).
+# mi.govcongiants.com + tools.govcongiants.org now 308-redirect here — testing a
+# legacy host without -L makes every endpoint look like it's "failing" when it's
+# healthy after the redirect. Target getmindy.ai directly AND use -L on endpoint
+# curls so any redirect is followed.
 if [ "$1" == "--local" ]; then
   BASE_URL="http://localhost:3000"
 else
-  BASE_URL="${PREDEPLOY_BASE_URL:-https://mi.govcongiants.com}"
+  BASE_URL="${PREDEPLOY_BASE_URL:-https://getmindy.ai}"
 fi
 
 ADMIN_PASSWORD="galata-assassin-2026"
@@ -119,7 +120,7 @@ echo ""
 echo -e "${BLUE}── Critical API Endpoints ──${NC}"
 
 # Health check endpoint
-HEALTH=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/cron/health-check?password=$ADMIN_PASSWORD" 2>/dev/null)
+HEALTH=$(curl -sL -o /dev/null -w "%{http_code}" "$BASE_URL/api/cron/health-check?password=$ADMIN_PASSWORD" 2>/dev/null)
 if [ "$HEALTH" == "200" ]; then
   test_result "Health check endpoint" "pass"
 else
@@ -127,7 +128,7 @@ else
 fi
 
 # Daily alerts endpoint (GET returns info)
-ALERTS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/cron/daily-alerts" 2>/dev/null)
+ALERTS=$(curl -sL -o /dev/null -w "%{http_code}" "$BASE_URL/api/cron/daily-alerts" 2>/dev/null)
 if [ "$ALERTS" == "200" ]; then
   test_result "Daily alerts endpoint" "pass"
 else
@@ -137,7 +138,7 @@ fi
 # Alert preferences endpoint — 401 is a healthy response for an unauthenticated request
 # (endpoint is up, just correctly refusing to leak data). 200 is also fine if the route
 # allows public reads. Anything else (404/500/etc.) means the route is broken.
-PREFS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/alerts/preferences?email=test@test.com" 2>/dev/null)
+PREFS=$(curl -sL -o /dev/null -w "%{http_code}" "$BASE_URL/api/alerts/preferences?email=test@test.com" 2>/dev/null)
 if [ "$PREFS" == "200" ] || [ "$PREFS" == "401" ]; then
   test_result "Alert preferences endpoint" "pass"
 else
@@ -151,7 +152,7 @@ echo ""
 echo -e "${BLUE}── Daily Alerts Pipeline ──${NC}"
 
 # Test alert with known user
-ALERT_TEST=$(curl -s "$BASE_URL/api/cron/daily-alerts?email=eric@govcongiants.com&test=true" 2>/dev/null)
+ALERT_TEST=$(curl -sL "$BASE_URL/api/cron/daily-alerts?email=eric@govcongiants.com&test=true" 2>/dev/null)
 ALERT_SUCCESS=$(echo "$ALERT_TEST" | jq -r '.success' 2>/dev/null)
 
 if [ "$ALERT_SUCCESS" == "true" ]; then
@@ -177,7 +178,7 @@ echo ""
 echo -e "${BLUE}── SAM.gov API Connection ──${NC}"
 
 # Test SAM.gov API health via MCP or direct
-SAM_TEST=$(curl -s "$BASE_URL/api/admin/test-sam-awards?password=$ADMIN_PASSWORD&naics=541512" 2>/dev/null)
+SAM_TEST=$(curl -sL "$BASE_URL/api/admin/test-sam-awards?password=$ADMIN_PASSWORD&naics=541512" 2>/dev/null)
 SAM_SUCCESS=$(echo "$SAM_TEST" | jq -r '.success // .totalRecords' 2>/dev/null)
 
 if [ "$SAM_SUCCESS" == "true" ] || [ "$SAM_SUCCESS" -ge 0 ] 2>/dev/null; then
@@ -198,7 +199,7 @@ echo ""
 echo -e "${BLUE}── Market Intelligence Pipeline ──${NC}"
 
 # Check that briefings endpoint exists
-BRIEFINGS=$(curl -s -o /dev/null -w "%{http_code}" "$BASE_URL/api/cron/send-briefings" 2>/dev/null)
+BRIEFINGS=$(curl -sL -o /dev/null -w "%{http_code}" "$BASE_URL/api/cron/send-briefings" 2>/dev/null)
 if [ "$BRIEFINGS" == "200" ]; then
   test_result "Briefings endpoint accessible" "pass"
 else
