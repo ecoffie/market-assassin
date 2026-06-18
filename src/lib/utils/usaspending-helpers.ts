@@ -1,6 +1,19 @@
 // USAspending API Helper Functions
 import type { AlternativeSearchOption } from '@/types/federal-market-assassin';
 
+/**
+ * CANONICAL market-spend window for the Market Research dashboard.
+ *
+ * Every spend figure on the dashboard (top "Relevant spending" card, Spending-by-
+ * Agency chart, FPDS leaderboards, All-Agencies table) MUST use this same window so
+ * the dollars reconcile. Previously find-agencies used FY23-25, TMR used FY24-today,
+ * and fpds-top-n used a single current FY — producing "$97.2B" next to "$1.5B" with
+ * no explanation. 3 complete fiscal years (FY2023-2025).
+ */
+export const MARKET_SPEND_WINDOW = { start_date: '2022-10-01', end_date: '2025-09-30' } as const;
+/** Human label for that window, shown next to spend figures so users know the scope. */
+export const MARKET_SPEND_WINDOW_LABEL = 'FY2023–2025 (3 fiscal years)';
+
 // Map business types to USAspending set-aside codes
 export const setAsideMap: Record<string, string[]> = {
   'Women Owned': ['WOSB', 'EDWOSB'],

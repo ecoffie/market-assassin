@@ -53,6 +53,7 @@ import { getPrimesByAgency } from '@/lib/utils/prime-contractors';
 import { getEnhancedAgencyInfo, getAllCommands } from '@/lib/utils/command-info';
 import { keywordCoverage, deriveCoverageKeywords, buildSearchKeywords, buildMarketFilter, marketFilterToUsaspending } from '@/lib/market/keyword-coverage';
 import { internalBaseUrl } from '@/lib/utils/internal-base-url';
+import { MARKET_SPEND_WINDOW, MARKET_SPEND_WINDOW_LABEL } from '@/lib/utils/usaspending-helpers';
 
 const FREE_TIER_ROW_LIMIT = 10;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -338,6 +339,9 @@ export async function POST(request: NextRequest) {
             agencies: sliced,
             total_count: rows.length,
             total_spending: cacheRow.total_spending,
+            // Reconciled figure stashed in source_versions; fall back to total_spending.
+            relevant_spending: cacheRow.source_versions?.relevant_spending || cacheRow.total_spending || 0,
+            spend_window_label: MARKET_SPEND_WINDOW_LABEL,
             sat_summary: cacheRow.sat_summary,
             cached: true,
             cache_age_ms: age,
@@ -422,11 +426,18 @@ export async function POST(request: NextRequest) {
     // agency name and use it as the authoritative metric_top_total. Falls back
     // to the sampled total when an agency isn't in the category response.
     const categoryTotalByKey: Record<string, number> = {};
+    // Authoritative market total from spending_by_category at the DEPARTMENT level
+    // (awarding_agency). Departments don't overlap, so summing them gives the true
+    // market size WITHOUT the double-count you'd get summing sampled award rows.
+    // This is what the top "Relevant spending" card should show (#2 reconciliation).
+    let authoritativeMarketTotal = 0;
     const keywordGrounded = Boolean(marketFilter);
     try {
       const expanded = expandNAICSCodes(parseNAICSInput(naics));
       const catFilterBase: Record<string, unknown> = {
-        time_period: [{ start_date: '2023-10-01', end_date: new Date().toISOString().slice(0, 10) }],
+        // Canonical 3-FY window shared with find-agencies + fpds-top-n so the
+        // accurate-total figures reconcile with the rest of the dashboard.
+        time_period: [{ start_date: MARKET_SPEND_WINDOW.start_date, end_date: MARKET_SPEND_WINDOW.end_date }],
         award_type_codes: ['A', 'B', 'C', 'D'],
       };
       if (marketFilter) {
@@ -449,9 +460,14 @@ export async function POST(request: NextRequest) {
           });
           if (!catRes.ok) continue;
           const catJson = await catRes.json();
-          for (const r of (catJson.results || []) as Array<{ name: string; amount: number }>) {
+          const catResults = (catJson.results || []) as Array<{ name: string; amount: number }>;
+          for (const r of catResults) {
             const k = normalizeAgencyKey(r.name || '');
             if (k) categoryTotalByKey[k] = Math.max(categoryTotalByKey[k] || 0, r.amount || 0);
+          }
+          // Department-level pass = the authoritative non-overlapping market total.
+          if (category === 'awarding_agency') {
+            authoritativeMarketTotal = catResults.reduce((s, r) => s + (r.amount || 0), 0);
           }
         }
       }
@@ -771,6 +787,9 @@ export async function POST(request: NextRequest) {
             opps_ms: oppsMs,
             events_ms: eventsMs,
             pain_ms: painMs,
+            // Authoritative category total stashed here (no schema change needed) so
+            // cache hits also serve the reconciled "Relevant spending" figure.
+            relevant_spending: authoritativeMarketTotal || findData.totalSpending || 0,
           },
         }, { onConflict: 'naics_code,psc_code,business_type,veteran_status' });
     } catch (cacheWriteErr) {
@@ -784,6 +803,11 @@ export async function POST(request: NextRequest) {
       agencies: sliced,
       total_count: rows.length,
       total_spending: findData.totalSpending || 0,
+      // Authoritative market total from spending_by_category (department level) —
+      // the figure the "Relevant spending" card should show. Falls back to the
+      // find-agencies total, then 0, if the category pass failed (#2 reconciliation).
+      relevant_spending: authoritativeMarketTotal || findData.totalSpending || 0,
+      spend_window_label: MARKET_SPEND_WINDOW_LABEL,
       sat_summary: findData.satSummary,
       // KEYWORD-FIRST coverage (#59) — when researched by keyword, tell the UI the
       // full market: "drones = $245M across 70+ codes; we covered 90%". Lets the

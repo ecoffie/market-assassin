@@ -33,6 +33,7 @@ import {
   marketFilterToUsaspending,
   type MarketFilter,
 } from '@/lib/market/keyword-coverage';
+import { MARKET_SPEND_WINDOW, MARKET_SPEND_WINDOW_LABEL } from '@/lib/utils/usaspending-helpers';
 
 const USASPENDING_URL = 'https://api.usaspending.gov/api/v2/search/spending_by_category';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
@@ -80,14 +81,14 @@ function buildSpendingFilters(opts: {
   naicsCodes?: string[];
   marketFilter?: MarketFilter | null;
   state?: string;
-  fiscalYear: number;
 }) {
-  const startDate = `${opts.fiscalYear - 1}-10-01`;
-  const endDate = `${opts.fiscalYear}-09-30`;
-
+  // Use the SAME canonical 3-FY window as the rest of the Market Research
+  // dashboard (find-agencies, TMR) so the FPDS leaderboard totals reconcile with
+  // the headline "Relevant spending" figure. Previously this used a single fiscal
+  // year, which is why "Tracked total $1.5B" looked tiny next to "$97.2B".
   const filters: Record<string, unknown> = {
     award_type_codes: CONTRACT_AWARD_TYPE_CODES,
-    time_period: [{ start_date: startDate, end_date: endDate }],
+    time_period: [{ start_date: MARKET_SPEND_WINDOW.start_date, end_date: MARKET_SPEND_WINDOW.end_date }],
   };
 
   if (opts.marketFilter) {
@@ -165,15 +166,14 @@ export async function GET(request: NextRequest) {
   const pscParam = url.searchParams.get('psc')?.trim().toUpperCase() || '';
   const state = (url.searchParams.get('state') || '').trim().toUpperCase();
   const excludeDOD = url.searchParams.get('excludeDOD') === 'true';
-  const fyParam = url.searchParams.get('fy');
-  const fiscalYear = fyParam ? Number(fyParam) : currentFiscalYear();
-
   if (!naics && !keyword && !pscParam) {
     return NextResponse.json({ error: 'naics, keyword, or psc is required' }, { status: 400 });
   }
-  if (Number.isNaN(fiscalYear) || fiscalYear < 2020 || fiscalYear > 2030) {
-    return NextResponse.json({ error: 'fy out of range' }, { status: 400 });
-  }
+  // The spend window is now FIXED (MARKET_SPEND_WINDOW, 3 FYs) so the dashboard
+  // dollars reconcile. The `fy` param no longer changes the window; we pin the
+  // cache's fiscal_year to a sentinel (0 = fixed-window) so one cache entry serves
+  // all callers AND stale single-FY entries (keyed 2024/2025/2026) aren't reused.
+  const fiscalYear = 0;
 
   let marketFilter: MarketFilter | null = null;
   let expandedNaics: string[] = [];
@@ -236,7 +236,7 @@ export async function GET(request: NextRequest) {
           success: true,
           cached: true,
           cache_age_ms: age,
-          fiscal_year: fiscalYear,
+          spend_window_label: MARKET_SPEND_WINDOW_LABEL,
           top_departments: cachedDepartments,
           top_contracting: cachedContracting,
           top_vendors: cachedVendors,
@@ -256,7 +256,6 @@ export async function GET(request: NextRequest) {
     naicsCodes: expandedNaics.length ? expandedNaics : undefined,
     marketFilter,
     state: state || undefined,
-    fiscalYear,
   });
 
   const [departments, contracting, vendors, funding] = await Promise.all([
@@ -305,7 +304,7 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     success: true,
     cached: false,
-    fiscal_year: fiscalYear,
+    spend_window_label: MARKET_SPEND_WINDOW_LABEL,
     naics_requested: naics || null,
     keyword: keyword || null,
     ranking_label: marketFilter?.rankingLabel || null,
@@ -318,13 +317,4 @@ export async function GET(request: NextRequest) {
     total_obligation: totalObligation,
     generated_at: new Date().toISOString(),
   });
-}
-
-/**
- * Current federal fiscal year. FY runs Oct 1 prior year → Sep 30.
- * Example: Today is May 22, 2026 → FY 2026.
- */
-function currentFiscalYear(): number {
-  const now = new Date();
-  return now.getMonth() >= 9 ? now.getFullYear() + 1 : now.getFullYear();
 }

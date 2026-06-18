@@ -12,7 +12,8 @@ import {
   getStatesByTier,
   generateAlternativeSearchOptions,
   estimateAlternativeSearchResults,
-  validateNaicsCode
+  validateNaicsCode,
+  MARKET_SPEND_WINDOW
 } from '@/lib/utils/usaspending-helpers';
 import { fetchFPDSByNaics, mapFPDSToAgencies } from '@/lib/utils/fpds-api';
 import { expandGenericDoDAgency } from '@/lib/utils/command-info';
@@ -67,11 +68,10 @@ export async function POST(request: NextRequest) {
     // Build USAspending API request
     const filters: any = {
       award_type_codes: ['A', 'B', 'C', 'D'], // Contracts only
+      // Canonical 3-FY window shared with fpds-top-n + TMR so all dashboard
+      // dollars reconcile (see MARKET_SPEND_WINDOW).
       time_period: [
-        {
-          start_date: '2022-10-01', // Last 3 fiscal years
-          end_date: '2025-09-30'
-        }
+        { start_date: MARKET_SPEND_WINDOW.start_date, end_date: MARKET_SPEND_WINDOW.end_date }
       ]
     };
 

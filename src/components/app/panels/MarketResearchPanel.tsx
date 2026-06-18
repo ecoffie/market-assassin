@@ -690,6 +690,10 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   // so firing it eagerly costs nothing.
   const [tmrRows, setTmrRows] = useState<AgencyTableRow[]>([]);
   const [marketCoverage, setMarketCoverage] = useState<MarketCoverage | null>(null);  // #59
+  // Authoritative "Relevant spending" from spending_by_category (department total)
+  // + the window label, so the headline figure reconciles with the table/leaderboards.
+  const [tmrRelevantSpending, setTmrRelevantSpending] = useState<number | null>(null);
+  const [spendWindowLabel, setSpendWindowLabel] = useState<string | null>(null);
   // Agencies the user STARRED in the agency table. When non-empty, the
   // reports (pain points / OSBP / buyers / needs) generate for THESE
   // instead of the typed/recommended set — so report content matches
@@ -1365,6 +1369,8 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         if (data?.success) {
           setTmrRows((data.agencies || []) as AgencyTableRow[]);
           setMarketCoverage(data.keyword_coverage || null);   // #59 — the coverage lesson
+          setTmrRelevantSpending(typeof data.relevant_spending === 'number' ? data.relevant_spending : null);
+          setSpendWindowLabel(data.spend_window_label || null);
         }
       })
       .catch((err) => {
@@ -1683,9 +1689,16 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     ? rollupChartBuyers(tmrRows)
     : sportKeywordActive ? [] : buyers;
 
-  const chartTotalSpending = chartBuyers.length > 0
-    ? chartBuyers.reduce((sum, row) => sum + (row.spending || 0), 0)
-    : sportKeywordActive ? 0 : (buyerSummary?.totalSpending || 0);
+  // Prefer the AUTHORITATIVE market total from spending_by_category (department
+  // level) — it reconciles with the table + FPDS leaderboards. Summing the sampled
+  // award rows (the old behavior) double-counts and overshoots, which is why the
+  // "$97.2B" card didn't match "$1.5B" elsewhere. Fall back to the row sum only
+  // when the authoritative figure isn't available (e.g. Sport keyword pre-TMR).
+  const chartTotalSpending = (tmrRelevantSpending && tmrRelevantSpending > 0)
+    ? tmrRelevantSpending
+    : chartBuyers.length > 0
+      ? chartBuyers.reduce((sum, row) => sum + (row.spending || 0), 0)
+      : sportKeywordActive ? 0 : (buyerSummary?.totalSpending || 0);
 
   // chartSatTotal — repurposed May 23, 2026 to represent SMALL
   // BUSINESS spend (not SAT-threshold spend). The donut's "satTotal"
@@ -2228,7 +2241,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               MetricCards but with stronger visual hierarchy here. */}
           <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <MetricCard label="Agencies to review" value={(chartBuyers.length || buyerSummary?.totalAgencies || buyers.length).toLocaleString()} />
-            <MetricCard label="Relevant spending" value={formatCurrency(chartTotalSpending || buyerSummary?.totalSpending)} tone="green" />
+            <MetricCard label="Relevant spending" value={formatCurrency(chartTotalSpending || buyerSummary?.totalSpending)} tone="green" hint={spendWindowLabel ? `Total federal contract obligations in this market, ${spendWindowLabel}` : undefined} />
             <MetricCard label="Competitors in your space" value={(primeSummary?.totalPrimes || vehicleSummary?.totalContracts || 0).toLocaleString()} hint="Incumbent primes already winning this work — who you'd compete against or could team with" />
             <MetricCard label="Upcoming opportunities" value={(forecastSummary?.totalForecasts || painSummary?.highOpportunityMatches || 0).toLocaleString()} tone="amber" hint="Forecasted procurements + agency needs coming 6–18 months out" />
           </section>
@@ -2342,7 +2355,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         <>
           <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <MetricCard label="Agencies to review" value={(chartBuyers.length || buyerSummary?.totalAgencies || buyers.length).toLocaleString()} />
-            <MetricCard label="Relevant spending" value={formatCurrency(chartTotalSpending || buyerSummary?.totalSpending)} tone="green" />
+            <MetricCard label="Relevant spending" value={formatCurrency(chartTotalSpending || buyerSummary?.totalSpending)} tone="green" hint={spendWindowLabel ? `Total federal contract obligations in this market, ${spendWindowLabel}` : undefined} />
             <MetricCard label="Competitors in your space" value={(primeSummary?.totalPrimes || vehicleSummary?.totalContracts || 0).toLocaleString()} hint="Incumbent primes already winning this work — who you'd compete against or could team with" />
             <MetricCard label="Upcoming opportunities" value={(forecastSummary?.totalForecasts || painSummary?.highOpportunityMatches || 0).toLocaleString()} tone="amber" hint="Forecasted procurements + agency needs coming 6–18 months out" />
           </section>
@@ -3397,7 +3410,7 @@ interface FpdsRow {
 interface FpdsResponse {
   success: boolean;
   cached?: boolean;
-  fiscal_year?: number;
+  spend_window_label?: string;
   top_departments?: FpdsRow[];
   top_contracting?: FpdsRow[];
   top_vendors?: FpdsRow[];
@@ -3491,7 +3504,7 @@ function FpdsLeaderboards({
           <h3 className="text-base font-bold text-white">FPDS Leaderboards</h3>
           <p className="text-xs text-slate-500">
             Top 10 by award $ · {subtitle}
-            {data?.fiscal_year ? ` · FY${data.fiscal_year}` : ''}
+            {data?.spend_window_label ? ` · ${data.spend_window_label}` : ''}
             {data?.cached ? ' · cached' : ''}
           </p>
         </div>
