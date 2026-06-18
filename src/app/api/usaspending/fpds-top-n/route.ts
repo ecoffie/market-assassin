@@ -86,13 +86,17 @@ function buildSpendingFilters(opts: {
   // dashboard (find-agencies, TMR) so the FPDS leaderboard totals reconcile with
   // the headline "Relevant spending" figure. Previously this used a single fiscal
   // year, which is why "Tracked total $1.5B" looked tiny next to "$97.2B".
-  const filters: Record<string, unknown> = {
+  let filters: Record<string, unknown> = {
     award_type_codes: CONTRACT_AWARD_TYPE_CODES,
     time_period: [{ start_date: MARKET_SPEND_WINDOW.start_date, end_date: MARKET_SPEND_WINDOW.end_date }],
   };
 
   if (opts.marketFilter) {
-    marketFilterToUsaspending(opts.marketFilter, filters);
+    // marketFilterToUsaspending RETURNS a merged object; it does NOT mutate in
+    // place. The old code ignored the return value, so keyword/PSC constraints
+    // were silently dropped → every keyword search queried ALL federal spend
+    // (drones showed $2.1T = the whole budget). Capture the return value.
+    filters = marketFilterToUsaspending(opts.marketFilter, filters);
   } else if (opts.naicsCodes?.length) {
     filters.naics_codes = opts.naicsCodes;
   }
@@ -172,9 +176,11 @@ export async function GET(request: NextRequest) {
   // The spend window is FIXED (MARKET_SPEND_WINDOW, 3 FYs) so the dashboard dollars
   // reconcile. The `fy` param no longer changes the window; we pin the cache's
   // fiscal_year to a VERSION sentinel so one entry serves all callers AND stale
-  // entries from prior logic aren't reused. v1 = 6-digit-exact NAICS (no subsector
-  // sweep) — bumped from 0 to bust the over-expanded rows written before that fix.
-  const fiscalYear = 1;
+  // entries from prior logic aren't reused. v2 = 6-digit-exact NAICS + keyword/PSC
+  // filter actually applied (the marketFilterToUsaspending return value was dropped,
+  // so keyword searches queried ALL federal spend — drones showed $2.1T). Bumped to
+  // bust rows written before either fix.
+  const fiscalYear = 2;
 
   let marketFilter: MarketFilter | null = null;
   let expandedNaics: string[] = [];
