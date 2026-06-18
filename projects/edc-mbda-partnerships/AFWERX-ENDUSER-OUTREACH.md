@@ -78,6 +78,51 @@ That's a *government end-user* story — the vendor-tool framing is not.
 
 ---
 
+## ⭐ LIVE — AFDW Small Business Professional (warm lead via mutual friend)
+
+**Who:** Small Business Professional at **Air Force District of Washington (AFDW)** — warm intro
+through a mutual friend. Role: small-business market research, set-aside validation, promoting SMB
+capabilities to mission partners, reviewing AFDW acquisition plans.
+**His SBIR role = CONNECTOR, not end-user/TPOC.** An SBP is advisory (can't be the Customer/End-User
+or TPOC) — but is the *ideal* person to introduce us to a DAF operational/program office (the real
+Phase I end-user). Bonus: market research / SMB capability discovery IS literally Mindy — so the demo
+serves *his own job*, not just our ask.
+**Why this framing:** warm referral → drop the cold self-intro, open with the mutual friend, ask for
+the call + the pointer directly. Send: **email**. Includes the SBIR ask in message 1.
+
+**Subject:** [Mutual friend] connected us — quick ask
+
+Hi [Name],
+
+[Mutual friend] connected us — glad he did. He figured your AFDW small-business work and what I'm
+building would line up.
+
+Quick version: I run Mindy — a platform that maps which small and disadvantaged businesses are actually
+winning federal work (317K firms by NAICS, set-aside, agency, capability + real award history).
+Basically the small-business market research and set-aside validation that's central to your job.
+
+We're already in early conversations with acquisition folks who have this exact pain — a contracting
+officer at Army Contracting Command–Orlando on market research, someone at DISA on tracking expiring
+contracts, and Navy OSBP on small-business research.
+
+Two quick things:
+1. **20 min to show you** — and hear if it'd speed up your market-research work.
+2. We're exploring an **AFWERX SBIR Open Topic** and need the right DAF program office as the end-user.
+   **Who at AFDW should I be talking to?**
+
+Early next week work for a call?
+
+Thanks again — and thanks to [mutual friend].
+
+[Eric] · [phone] · [email]
+
+**Don't:** ask him to be the customer or sign anything (not his lane — he'll say no). **Do:** let him
+be the door to a DAF program office, and give him a tool that helps his own market-research work.
+**Credibility note:** the 3 named orgs are real conversations with STATED needs (not endorsements, not
+DAF) — frame as DoD demand signal, never as AFWERX validation.
+
+---
+
 ## EMAIL 1 — to a CONNECTOR (OSBP / APEX director / base small-business office)
 
 *Use when: you want a warm intro to the right operational end-user. This person opens the door; they don't sign.*

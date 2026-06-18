@@ -5,7 +5,40 @@
 **Status:** Verified June 15, 2026 — grounded in live AFWERX/SBIR/SBA sources (see Sources)
 **Companions:** `GOVT-GTM-STRATEGY.md` (why one SBIR — the Phase III key), `AFWERX-SBIR-READINESS.md` (product hardening), `AFWERX-ENDUSER-OUTREACH.md` (end-user emails)
 
-> **One-line answer:** We almost certainly *already* qualify as a business (US-owned, <500 employees, for-profit). The real work is **(1) the registration stack** — SAM + CAGE/UEI + the SBC ID on SBIR.gov + a DSIP account — which has **multi-week lead times**, and **(2) submitting on the mandatory proposal template** during an open window. There is **no customer/end-user requirement at Phase I.**
+> ## ⚠️ FINDING (June 16, 2026 — checked live on DSIP): NO Open Topic this cycle
+> Logged into DSIP and reviewed the **DoW SBIR 2026 BAA (65 topics, Releases 2 & 3, pre-release/open,
+> close 06/24 & 07/22/2026)**. **Every topic is a SPECIFIC topic** (defined problem: hydraulic heating,
+> hyperspectral imagers, Rydberg sensors, lithium batteries, etc.). **The tech-agnostic AFWERX Open
+> Topic is NOT in the FY2026 DoW SBIR** — searching "open" returns only "Open *Architecture*" sensor
+> topics, not the Open Topic program. Consistent with the 2026 SBIR/STTR reauthorization disruption.
+> **→ There is no current AFWERX topic that fits Mindy (a market-intelligence SaaS).** Do NOT force a
+> submission into a specific topic we don't match (readiness-doc rule). **Pivot near-term to the
+> DIRECT COMMERCIAL BUY track (`GOVT-GTM-STRATEGY.md`) with the 3 warm contacts; monitor DSIP for the
+> next Open Topic release.** Registration prep (SBC ID + DSIP — already done logging in) still stands
+> so we can move the day an Open Topic opens.
+>
+> ## ⭐ STRONG LEAD — `DLA26BZ03-NV012` (read the full topic; it's a REAL fit, June 16)
+> "AI-Powered Tool for Automated Evaluation of **Vendor Economic Dependency**" — DLA, **closes
+> 07/22/2026**, **Phase I $100K/12mo → Phase II $1M/24mo**. TPOCs named: Shea McCullough, Corey Cook,
+> Matthew Borsinger. **This may be a BETTER path than the Open Topic ever was** — customer (DLA) already
+> attached (no end-user hunt), more money, longer runway.
+> - **Core ask = Mindy's engine:** identify a vendor universe from contract data, pull public financials
+>   (SEC EDGAR 10-Ks, **SAM.gov** — our source), compute **economic dependency % = vendor's federal $ /
+>   total revenue**, flag related-party/concentration risk by contract type. Verified: the numerator
+>   (federal $/vendor by UEI) is NATIVE to Mindy (e.g. McKesson $84B, Pfizer $28B fed obligated); the
+>   denominator = 10-K revenue. The dependency join is what we're built for.
+> - **Gaps to close (real):** (1) **US-person team** — topic is **ITAR**-restricted (must disclose any
+>   foreign nationals + their SOW tasks); (2) **CMMC Level 2 (Self)** self-attestation; (3) **SFFAS-47 /
+>   federal-accounting SME** — the topic is anchored in federal financial-accounting standards + audit
+>   readiness, which is NOT Mindy's domain → need an accounting/audit teammate or advisor for
+>   credibility; (4) reframe the pitch as "vendor economic-dependency analysis," not "Mindy as-is."
+> - **Bonus:** gives the AFDW SBP outreach a CONCRETE topic to reference, and our warm DISA contact +
+>   DoD partnerships motion are DLA-adjacent.
+> - **Action:** decide go/no-go before 07/22; if go → secure the SFFAS-47 SME + confirm US-person team +
+>   CMMC L2 self-attest, then write Phase I on the mandatory template (proof-of-concept: DLA vendor
+>   universe → EDGAR pull → dependency criterion → golden dataset).
+>
+> **One-line answer (registration mechanics, still valid for when an Open Topic opens):** We almost certainly *already* qualify as a business (US-owned, <500 employees, for-profit). The real work is **(1) the registration stack** — SAM + CAGE/UEI + the SBC ID on SBIR.gov + a DSIP account — which has **multi-week lead times**, and **(2) submitting on the mandatory proposal template** during an open window. There is **no customer/end-user requirement at Phase I.**
 
 ---
 
