@@ -689,7 +689,12 @@ export async function POST(request: NextRequest) {
     // Check if user is already searching for Small Business (no need to broaden)
     const isAlreadySmallBusiness = businessType === 'Small Business';
 
-    if (currentAgencyCount < MIN_AGENCIES_TARGET && userState) {
+    // Progressive geographic expansion broadens a single (zip-derived) state out to
+    // neighbors → region → national when results are thin. But when the user
+    // EXPLICITLY picked states, that would override their choice (FL → national), so
+    // skip expansion entirely and honor exactly the states they selected.
+    const userPickedStates = locationStates.length > 0;
+    if (currentAgencyCount < MIN_AGENCIES_TARGET && userState && !userPickedStates) {
       console.log(`⚠️ Only ${currentAgencyCount} agencies found (target: ${MIN_AGENCIES_TARGET}). Attempting progressive expansion...`);
       console.log('   NAICS:', naicsCode || 'none');
       console.log('   Business Type:', businessType || 'none');
