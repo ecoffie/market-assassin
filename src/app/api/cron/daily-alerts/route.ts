@@ -787,10 +787,17 @@ async function runDailyAlertJob(options?: {
         try {
           // .trim() the env — Vercel UI paste can leave a trailing newline that would
           // silently make `=== 'true'` false and disable the whole feature.
-          if (
-            (process.env.ENABLE_HIDDEN_MATCH || '').trim() === 'true' &&
+          // HIDDEN_MATCH_WHITELIST (comma-separated emails) bypasses the rollout %
+          // so specific accounts (e.g. demo/staff) get the feature without enabling
+          // it for the % bucket — lets us demo the beta without a broad rollout.
+          const hmWhitelist = (process.env.HIDDEN_MATCH_WHITELIST || '')
+            .split(',').map((e) => e.trim().toLowerCase()).filter(Boolean);
+          const hmEnabled = (process.env.ENABLE_HIDDEN_MATCH || '').trim() === 'true';
+          const hmEligible = hmEnabled && (
+            hmWhitelist.includes(user.user_email.toLowerCase()) ||
             userInRollout(user.user_email, Number((process.env.HIDDEN_MATCH_ROLLOUT_PERCENT || '0').trim()) || 0, 'hidden-match-v1')
-          ) {
+          );
+          if (hmEligible) {
             const userVec = await getCapabilityVector(user.user_email);
             if (userVec) {
               const pool = await fetchHiddenMatchPool();
