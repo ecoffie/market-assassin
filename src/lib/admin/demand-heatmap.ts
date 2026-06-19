@@ -22,8 +22,11 @@
 import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 /** Minimum trackers before an opp is "hot" enough to show/trigger. Below this,
- *  the social-proof signal is weak (airline showing "1 person looking" kills FOMO). */
-export const COLLAB_THRESHOLD = 3;
+ *  the social-proof signal is weak (airline showing "1 person looking" kills FOMO).
+ *  Set to 2 during early adoption so the feature DEMONSTRABLY fires on real data
+ *  (proves the mechanic works → drives usage). Raise to 3+ as the user base grows
+ *  so the signal stays meaningful. Env-overridable: COLLAB_THRESHOLD. */
+export const COLLAB_THRESHOLD = Number(process.env.COLLAB_THRESHOLD) || 2;
 
 export interface HeatmapOpp {
   noticeId: string;
