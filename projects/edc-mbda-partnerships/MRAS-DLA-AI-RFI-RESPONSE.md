@@ -105,11 +105,15 @@ their cleared staff execute correctly. Flag on the call: source of cleared AI/ML
 - **What:** Mindy — production AI platform delivering **grounded LLM/RAG over authoritative federal
   data** (317K contractor records, 88K+ live solicitations, USASpending/SAM), with **citation-backed
   answers, hallucination controls, and bounded agentic workflows** (market research, incumbent
-  analysis, response drafting). Live at getmindy.ai, paying users.
-- **Value / PoP / CPARS:** [Eric to fill — commercial revenue figure or "commercial SaaS, [N] users,
-  live since [date]"; no CPARS — commercial]. Capability URL: **getmindy.ai**.
+  analysis, response drafting). Live at getmindy.ai — ~9,700 active users, 80+ paying customers.
+- **Scale / PoP (real, verified June 19 2026):** commercial SaaS, **live in production since early
+  2026** (Market Assassin → Mindy product lineage; first paid customers Feb 2026), **~9,700 active
+  users** and **80+ paying customers** across the federal small-business market. No CPARS (commercial
+  item). Capability URL: **getmindy.ai**.
 - *Honest framing:* commercial item, not a prior federal contract — that's a STRENGTH for FAR 12
-  commercial determination, which the RFI explicitly explores.
+  commercial determination, which the RFI explicitly explores. (Numbers grounded in the live DB:
+  user_notification_settings active=9,703; purchases=80; git history launch Dec 2025 → prod early 2026.
+  Do NOT inflate to a pre-2026 "live since" — the operating history the data supports is early 2026.)
 
 ---
 
