@@ -1,5 +1,10 @@
 # DLA26BZ03-NV012 — SFFAS-47 SME Partner Candidates (work your network)
 
+> **STATUS (Jun 19):** ⏳ **Kay is reaching out to the accounting firms** for the SFFAS-47 SME (the
+> make-or-break gating item for NV012). Owner = Kay. Targets = the Tier-1 list below (Kearney,
+> Sikich/Cotton, IFAS, Haynes, CLA, etc.) — agency-side SFFAS/FIAR, NOT contractor-side DCAA. A named
+> advisor is enough for Phase I. Closes 22 Jul. Awaiting Kay's responses.
+
 **Need:** a **federal-AGENCY-side audit-readiness / SFFAS-47** partner (NOT a contractor-side
 DCAA/FAR firm like Diener). For Phase I a **named advisor** is enough; a small-firm sub is stronger.
 **Grounded:** firms below are ranked from real DoD financial-services award history (USASpending

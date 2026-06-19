@@ -57,8 +57,9 @@ enterprise sales — that IS Mindy's thesis. Study + adapt EVERYTHING:
 (landers, ad creative, the challenge, the value ladder offers, the affiliate spec).
 
 ### Other NEXT STEPS (after/alongside ClickFunnels)
-2. **NV012 SBIR** — send the SME outreach (network broadcast + Diener referral + one-pager PDF);
-   gating item = land an agency-side SFFAS-47 SME before 22 Jul.
+2. **NV012 SBIR** — ⏳ **Kay is reaching out to the accounting firms** for the SFFAS-47 SME (the gating
+   item). Owner = Kay; targets = Tier-1 agency-side firms (`DLA-NV012-SME-CANDIDATES.md`). Awaiting
+   responses. Closes 22 Jul. (Also live: the MRAS RFI = 2nd DLA door, sent to JP/Servexo.)
 3. **Tradewind Marketplace** revenue listing (free, 120+ DoD buyers — `MINDY-CSO-OTA-REVENUE-MAP.md`).
 4. **SEO Phase 3b** (optional): contractor vs/relationship pages on the 317K base.
 
