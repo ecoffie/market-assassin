@@ -198,6 +198,9 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
   const mindyProHref = '/market-intelligence';
   const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
 
+  // Collaboration signal — how many OTHER users are tracking each shown opp (anonymous).
+  const [interestCounts, setInterestCounts] = useState<Record<string, number>>({});
+
   const trackAlertEvent = useCallback((eventType: 'link_click' | 'tool_use', alert: Alert, action: string) => {
     if (!email) return;
 
@@ -301,6 +304,27 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
     const t = setTimeout(() => { loadAlerts(); }, 350);
     return () => clearTimeout(t);
   }, [loadAlerts]);
+
+  // Collaboration signal: how many OTHER users track each shown opp (anonymous,
+  // server gates to >=2). Powers the "X others are tracking this" FOMO badge.
+  useEffect(() => {
+    if (!email || alerts.length === 0) return;
+    let cancelled = false;
+    const noticeIds = alerts.map(a => a.id).filter(Boolean).slice(0, 200);
+    (async () => {
+      try {
+        const res = await fetch('/api/app/opportunity-interest', {
+          method: 'POST',
+          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          body: JSON.stringify({ email, noticeIds }),
+        });
+        if (!res.ok || cancelled) return;
+        const data = await res.json();
+        if (!cancelled) setInterestCounts(data.counts || {});
+      } catch { /* badge is best-effort — never block the panel */ }
+    })();
+    return () => { cancelled = true; };
+  }, [email, alerts, getAuthHeaders]);
 
   const saveToPipeline = async (alert: Alert) => {
     if (!email) {
@@ -1086,6 +1110,15 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
 
                   {/* Title */}
                   <h3 className="font-medium text-white mb-1 line-clamp-2">{alert.title}</h3>
+
+                  {/* Collaboration signal — "X others are tracking this" (anonymous FOMO) */}
+                  {interestCounts[alert.id] >= 2 && (
+                    <p className="text-xs font-medium text-cyan-300 mb-1.5 flex items-center gap-1">
+                      <span aria-hidden>👥</span>
+                      {interestCounts[alert.id]} other{interestCounts[alert.id] === 1 ? '' : 's'} {alert.noticeType?.toLowerCase().includes('sources') ? 'researching this Sources Sought' : 'tracking this'}
+                      {alert.noticeType?.toLowerCase().includes('sources') && <span className="text-cyan-400/70"> — respond together</span>}
+                    </p>
+                  )}
 
                   {/* Buyer */}
                   <p className="text-sm text-slate-400">

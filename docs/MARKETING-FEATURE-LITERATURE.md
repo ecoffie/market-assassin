@@ -2415,3 +2415,27 @@ emails and ~6.3K phone numbers embedded in the corpus — all redacted before re
 model, verified to preserve real GovCon identifiers (contract numbers, NAICS, PSC, UEI,
 dollar values) while removing only contact PII. Grounded in real documents, never an AI
 guess. Marketing literature updated (rule #8).
+
+---
+
+## Collaboration signal — in-app "X others are tracking this" badge (Phase 2a, June 19 2026)
+
+**What:** Inside the Mindy app, every opportunity in the Alerts panel now shows a live, anonymous
+collaboration badge when 2+ other users are tracking it — e.g. "👥 4 others researching this Sources
+Sought — respond together." It's the airline/hotel social-proof moment ("you're not the only one
+looking"), surfaced passively when a user views their opportunities. Counts are anonymous (no names),
+exclude the viewer ("X OTHERS"), and only appear at 2+ so a lone "1" never undercuts the effect.
+
+**Why:** This turns solo opportunity research into collective momentum and is a free-tier viral driver.
+A contractor who sees "5 others are researching this Sources Sought" feels urgency AND opportunity —
+respond before it closes, or team up to respond together. It's a network-effect moat no competitor can
+copy: it's powered entirely by Mindy's own aggregated user-tracking data, which only exists because of
+the user base. Phase 2a is the passive badge (no sending, lowest risk, proves the UX); active
+"respond together" alerts and socioeconomic segmentation follow once adoption proves the signal.
+
+**Growth:** collaboration/FOMO is a retention + word-of-mouth + free-tier growth mechanic.
+
+**Proof:** `src/app/api/app/opportunity-interest/route.ts` (user-authed, anonymous counts per notice_id
+from user_pipeline, excludes the requester, gated to >=2 via COLLAB_BADGE_MIN) + the badge in
+`src/components/app/panels/AlertsPanel.tsx` (best-effort fetch, never blocks the panel). Pairs with the
+admin Demand Heatmap (the same signal, monitored). Built on real user-tracking data; privacy-safe.
