@@ -86,8 +86,9 @@ enterprise sales — that IS Mindy's thesis. Study + adapt EVERYTHING:
 HigherGov/Procurement Sciences. Add ONLY when they serve the small-biz user (master strategy):
 - [ ] **GSA Advantage / labor-rate pricing** — "what price wins" intel, most accessible → **feasibility
       probe SOON** (next data sprint); build if clean.
-- [ ] **DIBBS** (~3.3M DLA small-buy RFQs) — FEASIBLE via residential-proxy scrape (check EULA) → build
-      when supplier/manufacturer users ask OR the DLA NV012 SBIR makes it strategic.
+- [x] **DIBBS** (~3.3M DLA small-buy RFQs) — ✅ **PILOT BUILT** (Apify ingest, commit `8be2075b`). To
+      turn on: (1) run migration `20260619_dibbs_rfqs.sql`, (2) set `APIFY_TOKEN` + confirm EULA,
+      (3) `npx tsx scripts/test-dibbs-pilot.ts`, (4) add `sync-dibbs` cron row. ~$0 until activated.
 - [ ] **SLED** (state/local) — HARD/costly → **Phase 3 only** (Eric).
 
 ---
