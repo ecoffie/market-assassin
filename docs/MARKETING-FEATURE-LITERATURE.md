@@ -2380,3 +2380,38 @@ aggregate counts only — never identities), `src/app/api/admin/demand-heatmap/r
 panel in `src/app/admin/launch-command-center/page.tsx`. Verified live: 140 tracked opportunities
 ranked, Sources Sought correctly flagged, threshold gate suppresses weak signals (won't fire below 3
 trackers). Built on real user-tracking data, privacy-safe (no names).
+
+---
+
+## Mindy Chat — ask the 8-year GovCon knowledge base, privacy-safe (Pro, June 19 2026)
+
+**What:** Ask Mindy anything about federal contracting — set-asides, certifications, SAM.gov,
+capability statements, teaming, proposals — and get a straight, cited answer drawn from an
+8-year teaching corpus and 743 podcast interviews. Every answer surfaces the documents it
+drew from as clickable source chips, so you can read the original. Mindy Chat is a Pro
+feature; free users see what it does and a one-click path to upgrade.
+
+**Why:** Most "AI chat" bolt-ons hallucinate federal programs, agency names, and contract
+values — exactly the things you can't afford to get wrong on a bid. Mindy Chat is different
+in two ways that matter. First, it's *grounded*: every answer is built from real teaching
+material and cited, not invented, so you can verify it instead of trusting it blindly.
+Second, it's *privacy-safe*: the knowledge base is built from years of real coaching calls
+and interviews, which means real contact details live in those documents — so before any of
+that text reaches the model, Mindy strips out emails, phone numbers, and other personal
+contact info. The chat answers your contracting questions; it will never leak a real
+person's email or phone from the corpus. If you need a buying-office contact, that lives in
+Decision Makers (sourced from SAM), not chat.
+
+**SEO:** ask AI about federal contracting, GovCon AI assistant, how to respond to sources
+sought, 8(a) vs HUBZone, capability statement help, federal contracting chatbot, government
+contracting Q&A, cited AI answers for contractors.
+
+**Proof:** Retrieval-augmented over the real corpus (`mindy_rag_chunks`, 12,534 indexed
+chunks of teaching material + 743 podcast interviews); answers cite the actual source
+documents and decline ("I don't have that in my knowledge base") rather than invent. Pro
+access is enforced server-side, not just hidden in the UI. The PII guard is a data-layer
+scrub (`src/lib/rag/scrub-pii.ts`, wired into RAG retrieval): a live audit found ~2.4K
+emails and ~6.3K phone numbers embedded in the corpus — all redacted before reaching the
+model, verified to preserve real GovCon identifiers (contract numbers, NAICS, PSC, UEI,
+dollar values) while removing only contact PII. Grounded in real documents, never an AI
+guess. Marketing literature updated (rule #8).
