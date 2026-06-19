@@ -4,6 +4,61 @@
 
 ---
 
+## 📋 SESSION HANDOFF — June 19, 2026 (big SEO + strategy day)
+
+### Completed + SHIPPED LIVE (getmindy.ai)
+- [x] **Full programmatic SEO machine — all 5 phases** (HigherGov-style "own the index"):
+  - P1 `/opportunity/[slug]` (~34K pages) · P2 facets `/naics/[code]/[state]`, `/psc/[code]`,
+    `/set-aside/[type]/[naics]` (~906) · P3 `/compare/[competitor]` (GovWin, SAM.gov, HigherGov,
+    GovTribe, Bloomberg Gov, Procurement Sciences) + `/compare` hub · P4 AI enrichment
+    (`seo_summary`, grounded, cheap models, cron + local drain) · P5 sitemap-index + IndexNow.
+  - Commits: `3522b93e` P1 · `8b69f740` P2 · `534c4a00`+`02ca0782` P3 · `fe873db9` P4 · `20abb98c` P5.
+  - Verified live: opp pages 200, facet pages 200, compare pages 200, sitemap-index/children 200,
+    IndexNow key 200, robots→index.
+- [x] **MRR demo fix, CTA tagger fix + 100% coverage, Mindy bootcamp dashboard** (earlier today).
+- [x] **Strategy locked** (docs in `projects/edc-mbda-partnerships/`): master thesis, HigherGov
+  teardown, CSO/OTA revenue map, SBIR vehicle sweep, DLA-NV012 partner kit, ClickFunnels playbook.
+
+### IN PROGRESS (self-completing, no action needed)
+- [ ] **SEO enrichment backlog drain** — 3,132/34,440 done at handoff, RESUMABLE
+  (`npx tsx scripts/drain-seo-enrich.ts`), and the hourly `enrich-opportunity-seo` cron backstops
+  the remainder. 100% summary rate. Just let it finish.
+
+### Crons added this session (dispatcher rows, hourly `0 * * * *`)
+- `tag-cta` (CTA tagging) · `enrich-opportunity-seo` (SEO summaries) · `indexnow-submit` (ping IndexNow)
+- Reminder (memory `dispatcher_is_hourly`): dispatcher ticks HOURLY — sub-hour cron_expr only fires at :00.
+
+### Migration RUN this session (confirmed "Success")
+- `20260619_seo_opportunity_enrichment.sql` — added `seo_summary` + `seo_enriched_at` + partial index.
+
+### NEXT STEPS (Eric's picks, when ready)
+1. **Study ClickFunnels — the WHOLE machine** (not just social): pull their FB/IG ad-library
+   creatives + lead pages; map Mindy's value ladder, the recurring webinar funnel, the 5-day
+   challenge, affiliate program. (`CLICKFUNNELS-PLAYBOOK-FOR-MINDY.md` has the framework.)
+2. **NV012 SBIR** — send the SME outreach (network broadcast + Diener referral + one-pager PDF);
+   gating item = land an agency-side SFFAS-47 SME before 22 Jul.
+3. **Tradewind Marketplace** revenue listing (free, 120+ DoD buyers — `MINDY-CSO-OTA-REVENUE-MAP.md`).
+4. **SEO Phase 3b** (optional): contractor vs/relationship pages on the 317K base.
+
+### Decisions made
+- **Elon mode = company policy:** condense 10yr→6mo; ship skeleton, measure, enrich winners (the
+  SEO build proved it). MOAT = mass adoption via freemium → market research at scale → DoW pitch.
+  Growth lane = ClickFunnels/social/content/brand, NOT enterprise sales.
+- **SLED:** hold until Phase 3. **DIBBS:** feasible (scraped via residential proxy) — research sourcing
+  before building. **Pricing:** keep $149/mo. **Competitors = future acquirers** (PSC×HigherGov = exit comp).
+- **SEO thin-page reframe:** Phase 1 gated thin pages; Phase 4 AI-enrichment flips that to "enrich,
+  don't hide" (the big-tech stance).
+
+### State
+- Branch: `main` · all SEO/strategy work committed + pushed + deployed.
+- ⚠️ **Uncommitted files NOT from this session** (a parallel "Mindy Day Jun 27" thread): `api/recompete/route.ts`,
+  `docs/strategy/MINDY-DAY-*.md`, `MINDY-STAGE-STRATEGY.md`, `DATA-QUALITY-AUDIT.md`,
+  `20260619_recompete_quality_flag.sql`, `scripts/data-quality-audit.ts`, `scripts/_tmp-power.ts`.
+  **Left untouched — not mine to commit.** That session should handle them.
+- Background: SEO enrichment drain still running (resumable; safe to let run or stop).
+
+---
+
 ## 📜 MASTER STRATEGY (governs all decisions) — `MINDY-MASTER-STRATEGY.md`
 
 **Operating policy:** condense the 10-yr plan to 6 months (Elon) — ask it of EVERY todo.
