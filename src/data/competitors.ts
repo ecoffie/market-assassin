@@ -51,7 +51,7 @@ export const COMPETITORS: Competitor[] = [
       ['Setup', 'Data platform to learn', '3-minute signup, first alert next morning'],
     ],
     whenToChoose:
-      'Choose HigherGov if you need deep state & local (SLED) coverage, GSA catalog/labor-rate pricing data, or you’re an investor/large prime wanting the broadest raw dataset and a team to mine it. Mindy is federal-focused and answer-first.',
+      'Choose HigherGov (now part of Procurement Sciences AI) if you need deep state & local (SLED) coverage, GSA catalog/labor-rate pricing data, or you’re an investor/large prime wanting the broadest raw dataset and a team to mine it. Mindy is federal-focused, answer-first, and built for small businesses — with a free tier.',
     faqs: [
       { q: 'Is Mindy a HigherGov alternative?', a: 'Yes — for federal small businesses. HigherGov is a broad data platform you interpret yourself; Mindy is an AI analyst that finds the opportunity, analyzes the incumbent on real award data, and drafts your response. There’s a permanent free tier (HigherGov starts at $500/yr).' },
       { q: 'Does Mindy have SLED (state & local) data like HigherGov?', a: 'Not yet — Mindy is federal-focused today. If state & local is your core market, HigherGov has deeper SLED coverage. For federal opportunities, recompetes, and contractor intel, Mindy delivers more analysis per dollar.' },
@@ -62,7 +62,7 @@ export const COMPETITORS: Competitor[] = [
   {
     slug: 'govtribe',
     name: 'GovTribe',
-    tagline: 'a federal contracting data + tracking platform (acquired, 2026)',
+    tagline: 'a federal contracting data + tracking platform (owned by GovExec)',
     pricing: 'subscription (per-seat)',
     metaTitle: 'GovTribe Alternative [2026] — AI Federal Opportunity Intelligence for Small Business | Mindy',
     metaDescription:
@@ -83,6 +83,34 @@ export const COMPETITORS: Competitor[] = [
       { q: 'Is Mindy a GovTribe alternative?', a: 'Yes. GovTribe is strong at tracking opportunities, agencies, and people. Mindy adds the AI-analyst layer — incumbent analysis, market research, and proposal drafting grounded in real award data — and offers a permanent free tier.' },
       { q: 'Does Mindy cost less than GovTribe?', a: 'Mindy starts free (daily alerts) and Pro is $149/mo, month-to-month. It’s built to be accessible to solo and small federal contractors, not just teams.' },
       { q: 'Is there a free version of Mindy?', a: 'Yes — a permanent free daily opportunity digest, no credit card required.' },
+    ],
+  },
+  {
+    slug: 'procurement-sciences',
+    name: 'Procurement Sciences AI',
+    tagline: 'an enterprise AI capture/proposal platform (now owns HigherGov); ~$40K/yr',
+    pricing: '~$40,000/yr (enterprise, FedRAMP)',
+    metaTitle: 'Procurement Sciences AI Alternative [2026] — Affordable AI for Small GovCon | Mindy',
+    metaDescription:
+      'Mindy is the small-business alternative to Procurement Sciences AI (Awarded AI / HigherGov): free daily alerts and AI opportunity intel vs ~$40K/yr enterprise. No sales call.',
+    keywords: ['procurement sciences ai alternative', 'awarded ai alternative', 'procurement sciences competitor', 'cheaper than procurement sciences', 'small business govcon ai', 'highergov procurement sciences alternative'],
+    wedge:
+      'Procurement Sciences AI is a ~$40K/yr enterprise capture suite built for the Top 100 primes. Mindy gives a solo or small federal contractor the opportunity + competitor intelligence that actually matters — free to start, $149/mo Pro, no sales call.',
+    rows: [
+      ['Starting price', '~$40,000/yr (enterprise)', 'Free (daily alerts) → $149/mo Pro'],
+      ['Built for', 'Top-100 primes + capture teams', 'Solo + small federal contractors'],
+      ['Owns', 'HigherGov (acquired 2026) + Awarded AI', 'Mindy (focused, not a roll-up)'],
+      ['Setup', 'Enterprise sales + onboarding', '3-minute signup, no sales call'],
+      ['Free tier', 'No', 'Yes — permanent'],
+      ['Fit for a 1–10 person shop', 'Overkill (and over-priced)', 'Exactly the target'],
+    ],
+    whenToChoose:
+      'Choose Procurement Sciences AI if you’re a large prime or a 50+ person BD/capture organization that needs a full FedRAMP enterprise suite (capture workflow, proposal automation, compliance) and the budget for it. Mindy is for the small businesses that tier prices out — daily opportunity flow, incumbent intel, and drafting at 1% of the cost.',
+    faqs: [
+      { q: 'Is Mindy a Procurement Sciences AI alternative?', a: 'For small federal contractors, yes. Procurement Sciences (which now owns HigherGov and runs Awarded AI) is a ~$40K/yr enterprise platform built for large primes and capture teams. Mindy delivers the opportunity discovery, incumbent intelligence, and response drafting a small business actually uses — free to start, $149/mo Pro.' },
+      { q: 'How much cheaper is Mindy than Procurement Sciences?', a: 'Procurement Sciences AI runs around $40,000/yr on enterprise contracts. Mindy is free to start and $149/mo for Pro, month-to-month — roughly 1% of the cost for the intelligence a small contractor needs day to day.' },
+      { q: 'Procurement Sciences bought HigherGov — does that change things?', a: 'It confirms the market is consolidating up-market toward large primes. That leaves small businesses underserved — which is exactly who Mindy is built for. Same grounded, AI-drafted intelligence, at a price a small shop can actually afford, with no enterprise sales call.' },
+      { q: 'Is there a free version?', a: 'Yes — Mindy Free gives you a daily opportunity digest with no credit card. Upgrade to Pro when you want full briefings, incumbent tracking, recompete alerts, and response drafting.' },
     ],
   },
   {

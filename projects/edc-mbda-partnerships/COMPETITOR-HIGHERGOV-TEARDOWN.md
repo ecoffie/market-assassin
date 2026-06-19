@@ -149,6 +149,37 @@ positioning, content, and the SEO play (branded authority pages, not just data p
 to maximize sale value. Resolution: GovCon Giants brand = the DISTRIBUTION/marketing engine; Mindy =
 the clean, sellable product it feeds. Brand drives acquisition; product is the asset.)*
 
+## Market consolidation signal (June 19 — Eric: "great news") ⭐
+**CORRECTION (June 19):** GovTribe was acquired by **GovExec in 2021** (old news, PE-backed by Growth
+Catalyst) — NOT 2026. The FRESH 2026 signal is **HigherGov → Procurement Sciences AI** (+ their $30M
+Series B, $40K/yr enterprise platform "Awarded AI", 3,000 contractors, ~half the Top 100). So it's not
+"two independents just got rolled up" — it's "the last big independent (HigherGov) got rolled up by an
+enterprise consolidator going UP-MARKET to the primes." The strategic point STANDS (consolidation
+vacates the small-biz lane), the timing was wrong. **The real new competitors = the ACQUIRERS:
+Procurement Sciences AI ($40K/yr, primes) + GovExec/GovTribe.** Both are enterprise-tier — Mindy's
+free/$149 small-biz lane is the opposite end they're abandoning.
+
+**Original note (timing corrected above):** HigherGov got ACQUIRED. The consolidators are
+being rolled up by the big boys. Why this is GOOD for Mindy:
+- **Validates the exit market** — buyers ARE paying for GovCon data/intel SaaS now (2 fresh comps for
+  Mindy's own exit, `exit_strategy_brand_separation`).
+- **Thins independent competition** — the nimble independents are absorbed into slower,
+  integration-distracted big platforms.
+- **VACATES the small-biz lane** — acquired tools get enterprise-ified (pricier, capture-team-focused).
+  The solo/small-contractor + brand-led lane Mindy owns is being abandoned by the consolidators going
+  up-market. Mindy = the nimble brand left serving the masses.
+- **Makes Mindy the next obvious target** — show traction → you're the independent the next acquirer
+  wants. Consolidation = tailwind, not threat.
+
+## SLED + GSA gaps — status (June 19)
+- **SLED:** "nearly impossible before" via scraping is RIGHT — but HigherGov proves it's now DOABLE
+  (5.2M+ gov data points, 10K+ SLED agencies) via **public-records requests + state-portal scraping +
+  residential proxies** (same playbook as DIBBS). Not impossible, just COSTLY/maintenance-heavy →
+  correctly a **Phase 3** investment, not a "can't."
+- **GSA Advantage / labor-rate pricing:** real gap, and the HIGHEST-VALUE one ("what price wins"
+  catalog prices + labor rates). MORE accessible than DIBBS/SLED (GSA publishes a lot) → worth its own
+  feasibility check sooner than SLED.
+
 ## Open items
 - [ ] ⭐ **Build Mindy's programmatic-SEO layer** (per-opp / per-NAICS / per-agency / per-contractor
       indexable + cross-linked pages) — the mass top-of-funnel engine. Biggest takeaway.
