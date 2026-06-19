@@ -2439,3 +2439,27 @@ the user base. Phase 2a is the passive badge (no sending, lowest risk, proves th
 from user_pipeline, excludes the requester, gated to >=2 via COLLAB_BADGE_MIN) + the badge in
 `src/components/app/panels/AlertsPanel.tsx` (best-effort fetch, never blocks the panel). Pairs with the
 admin Demand Heatmap (the same signal, monitored). Built on real user-tracking data; privacy-safe.
+
+---
+
+## Collaboration signal — "🔥 Hot right now" dashboard hero (Phase 2b, June 19 2026)
+
+**What:** The dashboard home now shows a "🔥 Hot right now" spotlight card above the Mindy Insight
+card — surfacing the SINGLE most-tracked, collab-ready opportunity across Mindy ("8 contractors are
+researching this Sources Sought — respond together") with a one-click "Respond together →" CTA that
+drops the user into their Alerts to act. It's the big-SaaS spotlight pattern (LinkedIn "12 connections
+work here", Booking "3 others looking right now"), paired with the ambient per-opp badge already in the
+Alerts list — ambient FOMO everywhere + one focal moment at the top.
+
+**Why:** The inline badge builds passive awareness; the hero creates the "whoa, people are mobilizing on
+THIS" moment that drives action and word-of-mouth. Two surfaces, two jobs — exactly how mature SaaS
+deploys social proof (never a popup, which trains users to dismiss). Both are powered by the same
+aggregated user-intent data — the uncopyable network-effect moat. Dismissible per session, renders only
+when an opp clears the collaboration threshold, never blocks the dashboard.
+
+**Growth:** spotlight social proof = the demo-able aha moment + a free-tier viral/retention driver.
+
+**Proof:** `src/components/app/CollabHotCard.tsx` (real interactive card, clickable CTA, navy→purple
+Mindy palette) + `GET /api/app/hot-opportunity` (user-authed, reuses the Demand Heatmap engine, picks
+the hottest collab-ready opp preferring Sources Sought, anonymous count, gated on COLLAB_THRESHOLD).
+Mounted above MindyInsightCard in DashboardPanel. Built on real user-tracking data; anonymous + safe.
