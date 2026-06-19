@@ -3,7 +3,7 @@
 ## Critical Rules
 
 1. **No Framer.** Do not use any Framer MCP tools. This is a pure Next.js/React codebase.
-2. **This is the DEVELOPMENT project.** Deploys to `tools.govcongiants.org`. For live `shop.govcongiants.org` changes, use `/Users/ericcoffie/govcon-shop`.
+2. **This is the DEVELOPMENT project.** Deploys to `getmindy.ai`. For live `shop.govcongiants.org` changes, use `/Users/ericcoffie/govcon-shop`.
 3. **Content Reaper `API_BASE` must be `''`** (empty string) in all `public/content-generator/*.html` files. Never set to an external URL.
 4. **Different Supabase databases.** market-assassin and govcon-shop have SEPARATE Supabase instances. They do NOT share tables.
 5. **KV store connected to BOTH projects** via Vercel Storage integration. KV backfills can run from either project.
@@ -358,19 +358,19 @@ Unified federal agency intelligence combining SAM.gov, pain points, contractors,
 
 ```bash
 # Search by abbreviation
-curl "https://tools.govcongiants.org/api/agency-hierarchy?search=VA"
+curl "https://getmindy.ai/api/agency-hierarchy?search=VA"
 
 # CGAC code lookup
-curl "https://tools.govcongiants.org/api/agency-hierarchy?cgac=069"
+curl "https://getmindy.ai/api/agency-hierarchy?cgac=069"
 
 # Get spending data
-curl "https://tools.govcongiants.org/api/agency-hierarchy?mode=spending&agency=DOD"
+curl "https://getmindy.ai/api/agency-hierarchy?mode=spending&agency=DOD"
 
 # Find buying offices for NAICS
-curl "https://tools.govcongiants.org/api/agency-hierarchy?naics=541512&mode=buying"
+curl "https://getmindy.ai/api/agency-hierarchy?naics=541512&mode=buying"
 
 # Service stats
-curl "https://tools.govcongiants.org/api/agency-hierarchy?mode=stats"
+curl "https://getmindy.ai/api/agency-hierarchy?mode=stats"
 ```
 
 ### Data Sources
@@ -406,19 +406,19 @@ curl "https://tools.govcongiants.org/api/agency-hierarchy?mode=stats"
 
 ```bash
 # Test Contract Awards (uses USASpending)
-curl "https://tools.govcongiants.org/api/admin/test-sam-awards?password=galata-assassin-2026&naics=541512"
+curl "https://getmindy.ai/api/admin/test-sam-awards?password=$ADMIN_PASSWORD&naics=541512"
 
 # Test USASpending directly
-curl "https://tools.govcongiants.org/api/admin/test-usaspending?password=galata-assassin-2026&naics=541512"
+curl "https://getmindy.ai/api/admin/test-usaspending?password=$ADMIN_PASSWORD&naics=541512"
 
 # Test Entity Lookup
-curl "https://tools.govcongiants.org/api/admin/test-sam-entity?password=galata-assassin-2026&name=Booz"
+curl "https://getmindy.ai/api/admin/test-sam-entity?password=$ADMIN_PASSWORD&name=Booz"
 
 # Test Hierarchy
-curl "https://tools.govcongiants.org/api/admin/test-sam-hierarchy?password=galata-assassin-2026&agency=VA"
+curl "https://getmindy.ai/api/admin/test-sam-hierarchy?password=$ADMIN_PASSWORD&agency=VA"
 
 # Test Subaward (blocked until System Account)
-curl "https://tools.govcongiants.org/api/admin/test-sam-subaward?password=galata-assassin-2026&prime_uei=XXX"
+curl "https://getmindy.ai/api/admin/test-sam-subaward?password=$ADMIN_PASSWORD&prime_uei=XXX"
 ```
 
 ---
@@ -437,7 +437,7 @@ curl "https://tools.govcongiants.org/api/admin/test-sam-subaward?password=galata
 
 | Project | Location | Deploys To | Purpose |
 |---------|----------|------------|---------|
-| **Market Assassin** | This project | `tools.govcongiants.org` | Dev/staging tools |
+| **Market Assassin** | This project | `getmindy.ai` | Dev/staging tools |
 | **GovCon Shop** | `/Users/ericcoffie/govcon-shop` | `shop.govcongiants.org` | Live shop (production) |
 | **GovCon Funnels** | `/Users/ericcoffie/govcon-funnels` | `govcongiants.com` | Marketing site |
 | **LinkedIn Deal Magnet** | `/Users/ericcoffie/Linkedin App` | `linkedin-deal-magnet.vercel.app` | Profile optimizer (separate product) |
@@ -530,7 +530,7 @@ Test mode (`?test=true&email=...`) bypasses day guards for manual testing.
 **Monitor Briefing Health:**
 ```bash
 # Check what was sent today
-curl "https://tools.govcongiants.org/api/admin/briefing-status?password=galata-assassin-2026"
+curl "https://getmindy.ai/api/admin/briefing-status?password=$ADMIN_PASSWORD"
 ```
 
 **Prefix Fallback for Custom Profiles:**
@@ -868,7 +868,7 @@ Enterprise-grade failsafe for 9,000+ users:
 
 **Admin Endpoint:**
 ```
-GET /api/admin/briefing-dead-letter?password=galata-assassin-2026
+GET /api/admin/briefing-dead-letter?password=$ADMIN_PASSWORD
 POST { action: "retry", id: "xxx" } — Force retry specific entry
 POST { action: "clear", status: "exhausted" } — Clear by status
 POST { action: "stats" } — Get summary statistics
@@ -878,7 +878,7 @@ POST { action: "stats" } — Get summary statistics
 **Location:** `/src/app/forecasts/`, `/src/lib/forecasts/`
 **Purpose:** Aggregate procurement forecasts from 13 federal agencies (6-18 months before solicitation)
 **Status:** Phase 1-2 complete (April 6, 2026) — **7,764 forecasts**
-**Live URL:** https://tools.govcongiants.org/forecasts
+**Live URL:** https://getmindy.ai/forecasts
 
 **Database Tables:**
 - `agency_forecasts` — Main forecast data (unified schema)
@@ -970,7 +970,7 @@ node scripts/import-forecasts.js --source=DOE
 | `src/app/api/market-scanner/route.ts` | Scanner API (870 lines) |
 | `supabase/migrations/20260410_bd_assist_pipeline.sql` | Database schema |
 
-**Live URL:** https://tools.govcongiants.org/bd-assist
+**Live URL:** https://getmindy.ai/bd-assist
 
 ---
 
@@ -1065,7 +1065,7 @@ Complimentary Pro for creators / power users with their own audience (Launch Str
 | Blocked | 500+ | API returns 403, logged to console |
 
 ### Admin Endpoint
-`/api/admin/abuse-report?password=galata-assassin-2026`
+`/api/admin/abuse-report?password=$ADMIN_PASSWORD`
 - GET: View all flagged users
 - GET `?email=X`: Check specific user
 - POST `{ action: "clear", email: "X" }`: Clear flag
@@ -1164,7 +1164,7 @@ node scripts/merge-agency-intelligence.js --merge    # Apply
 
 ## Admin Endpoint Standard
 
-- **Auth:** `?password=galata-assassin-2026` (or `ADMIN_PASSWORD` env var)
+- **Auth:** `?password=$ADMIN_PASSWORD` (or `ADMIN_PASSWORD` env var)
 - **GET** = read/preview (safe)
 - **POST** = execute (writes data)
 - **Preview mode:** `?mode=preview` (default)
@@ -1269,21 +1269,21 @@ node scripts/merge-agency-intelligence.js --merge    # Apply
 
 ```bash
 # Get dashboard data (last 7 days)
-curl "https://tools.govcongiants.org/api/admin/tool-health?password=galata-assassin-2026"
+curl "https://getmindy.ai/api/admin/tool-health?password=$ADMIN_PASSWORD"
 
 # Get specific tool data
-curl "https://tools.govcongiants.org/api/admin/tool-health?password=galata-assassin-2026&tool=content_reaper"
+curl "https://getmindy.ai/api/admin/tool-health?password=$ADMIN_PASSWORD&tool=content_reaper"
 
 # Include resolved errors
-curl "https://tools.govcongiants.org/api/admin/tool-health?password=galata-assassin-2026&unresolvedOnly=false"
+curl "https://getmindy.ai/api/admin/tool-health?password=$ADMIN_PASSWORD&unresolvedOnly=false"
 
 # Resolve an error
-curl -X POST "https://tools.govcongiants.org/api/admin/tool-health?password=galata-assassin-2026" \
+curl -X POST "https://getmindy.ai/api/admin/tool-health?password=$ADMIN_PASSWORD" \
   -H "Content-Type: application/json" \
   -d '{"action": "resolve", "errorId": "uuid", "notes": "Fixed by..."}'
 
 # Check all provider health
-curl -X POST "https://tools.govcongiants.org/api/admin/tool-health?password=galata-assassin-2026" \
+curl -X POST "https://getmindy.ai/api/admin/tool-health?password=$ADMIN_PASSWORD" \
   -H "Content-Type: application/json" \
   -d '{"action": "check_providers"}'
 ```
@@ -1439,7 +1439,7 @@ GROQ_API_KEY=gsk_...
 ```bash
 # Run this after verifying alerts are working
 cat data/bootcamp-attendees-to-enroll.txt | while read email; do
-  curl -s -X POST "https://tools.govcongiants.org/api/alerts/save-profile" \
+  curl -s -X POST "https://getmindy.ai/api/alerts/save-profile" \
     -H "Content-Type: application/json" \
     -d "{\"email\": \"$email\", \"naicsCodes\": [\"541512\", \"541611\", \"541330\"], \"businessType\": \"\", \"source\": \"free-signup\"}"
 done
