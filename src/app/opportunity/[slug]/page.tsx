@@ -170,6 +170,15 @@ export default async function OpportunityPage({
             ))}
         </div>
 
+        {/* AI analysis — unique, data-grounded content (Phase 4 enrichment) */}
+        {opp.seoSummary && (
+          <section className="mt-8">
+            <h2 className="text-lg font-semibold text-slate-900 mb-2">What this opportunity is</h2>
+            <p className="text-slate-700 leading-relaxed">{opp.seoSummary}</p>
+            <p className="text-xs text-gray-400 mt-2">Analysis by Mindy, grounded in the SAM.gov notice.</p>
+          </section>
+        )}
+
         {/* Body / description */}
         <section className="mt-8">
           <h2 className="text-lg font-semibold text-slate-900 mb-2">Description</h2>

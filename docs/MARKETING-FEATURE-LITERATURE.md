@@ -2284,3 +2284,34 @@ software, mindy vs.
 (hub), sitemap wired in `src/app/sitemap.ts`. Verified: production build prerenders
 /compare/highergov, /compare/govtribe, /compare/bloomberg-government as SSG; the bespoke
 /compare/govwin + /compare/sam-gov routes are NOT shadowed by the dynamic segment.
+
+---
+
+## Programmatic SEO Phase 4 — AI-enriched opportunity pages (June 19, 2026)
+
+**What:** Every public opportunity page now carries a unique, AI-written "What this
+opportunity is" analysis paragraph — what the government is buying, who it suits, and a
+practical note (e.g. "Sources Sought means review and give feedback, not bid yet").
+Generated in bulk by a cheap-model pipeline, cached to the database, and rendered
+statically — never an LLM call at request time. This is what makes ~34,000 otherwise-
+similar pages genuinely useful and unique to Google, and it lets pages with thin source
+descriptions still earn a place in the index.
+
+**Why:** The 2026 AI-SEO play, and the one Mindy is uniquely built for — we have both the
+real government data and the LLM to ground analysis in it. Doorway pages (mass pages with
+no unique value) get penalized; pages that genuinely answer the query rank. A contractor
+who searches a specific solicitation lands on a Mindy page that actually explains it —
+grounded in the SAM.gov notice, with the practical "track vs bid" guidance a small
+business needs — not a stub. Every summary is generated from the opportunity's real
+fields only; the prompt forbids inventing agencies, dollars, dates, or codes.
+
+**SEO:** what is [solicitation], [opportunity title] explained, is [opportunity] a bid or
+sources sought, who buys [naics], government contract [title] analysis.
+
+**Proof:** `src/lib/seo/enrich.ts` (grounded generation, job:'extraction' cheap models,
+NUL-safe), `src/app/api/cron/enrich-opportunity-seo/route.ts` (steady-state cron, cron_jobs
+row), `scripts/drain-seo-enrich.ts` (one-time backlog drain, concurrency pool, rule #7),
+`supabase/migrations/20260619_seo_opportunity_enrichment.sql` (seo_summary + seo_enriched_at
++ partial index). Page renders the cached summary in `src/app/opportunity/[slug]/page.tsx`.
+Verified live on 3 real opportunities (CBP/DHS LMR, FDA HPLC maintenance, DoD steam trap):
+accurate, grounded, correctly interprets notice types — zero hallucination.

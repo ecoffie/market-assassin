@@ -34,6 +34,7 @@ export interface SeoOpportunity {
   popCity: string | null;
   uiLink: string | null;
   active: boolean;
+  seoSummary: string | null;
 }
 
 export interface SimilarOpportunity {
@@ -94,7 +95,7 @@ export async function getOpportunityBySlug(slug: string): Promise<SeoOpportunity
   const { data, error } = await client
     .from('sam_opportunities')
     .select(
-      'notice_id, solicitation_number, title, description, sow_text, naics_code, psc_code, department, sub_tier, office, notice_type, set_aside_description, posted_date, response_deadline, pop_state, pop_city, ui_link, active',
+      'notice_id, solicitation_number, title, description, sow_text, naics_code, psc_code, department, sub_tier, office, notice_type, set_aside_description, posted_date, response_deadline, pop_state, pop_city, ui_link, active, seo_summary',
     )
     .ilike('notice_id', `%${tail}`)
     .limit(5);
@@ -124,6 +125,7 @@ export async function getOpportunityBySlug(slug: string): Promise<SeoOpportunity
     popCity: row.pop_city || null,
     uiLink: row.ui_link || null,
     active: !!row.active,
+    seoSummary: row.seo_summary || null,
   };
 }
 
