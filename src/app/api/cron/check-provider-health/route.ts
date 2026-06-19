@@ -33,6 +33,10 @@ async function ping(name: string, key: string | undefined, run: () => Promise<Re
     const latency = Date.now() - start;
     if (res.ok) return { provider: name, status: 'healthy', latency };
     if (res.status === 429) return { provider: name, status: 'degraded', latency, error: 'HTTP 429 (rate limited)' };
+    // 400 = the endpoint is REACHABLE + the key worked; the request payload was
+    // rejected (a probe quirk, not an outage). Real problems are auth (401/403) or
+    // server errors (5xx). Treat 400 as healthy so a payload drift can't false-flag.
+    if (res.status === 400) return { provider: name, status: 'healthy', latency, error: 'HTTP 400 (reachable; probe payload rejected)' };
     return { provider: name, status: 'down', latency, error: `HTTP ${res.status}` };
   } catch (e) {
     return { provider: name, status: 'down', error: e instanceof Error ? e.message.slice(0, 120) : 'fetch failed' };
@@ -54,12 +58,13 @@ export async function GET(request: NextRequest) {
     ping('openai', process.env.OPENAI_API_KEY, () =>
       fetch('https://api.openai.com/v1/models', { headers: { Authorization: `Bearer ${process.env.OPENAI_API_KEY}` } })),
     ping('anthropic', process.env.ANTHROPIC_API_KEY, () =>
-      // Cheapest liveness ping: a 1-token message. 200/400 both mean "reachable+keyed";
-      // only 401/403/5xx are real problems → treat non-OK-non-400 as down.
-      fetch('https://api.anthropic.com/v1/messages', {
-        method: 'POST',
-        headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-        body: JSON.stringify({ model: 'claude-haiku-4-5-20251001', max_tokens: 1, messages: [{ role: 'user', content: 'hi' }] }),
+      // Liveness via GET /v1/models — same pattern as groq/openai. A POST to
+      // /v1/messages false-flagged "down" (HTTP 400) whenever the probe's model
+      // name drifted from a current model ID; /v1/models has no model name or body
+      // to get wrong, so it returns 200 when reachable+keyed and only 401/403 when
+      // the key is bad (a real problem).
+      fetch('https://api.anthropic.com/v1/models', {
+        headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01' },
       })),
     ping('sam_gov', samKey, () =>
       fetch(`https://api.sam.gov/opportunities/v2/search?api_key=${samKey}&limit=1&postedFrom=01/01/2026&postedTo=01/02/2026`)),
