@@ -81,6 +81,17 @@ enterprise sales — that IS Mindy's thesis. Study + adapt EVERYTHING:
 
 ---
 
+## 🗄️ DATA-EXPANSION BACKLOG (standing — review at every data-feature sprint)
+**Tracker:** `projects/edc-mbda-partnerships/DATA-EXPANSION-BACKLOG.md` · sources Mindy is MISSING vs
+HigherGov/Procurement Sciences. Add ONLY when they serve the small-biz user (master strategy):
+- [ ] **GSA Advantage / labor-rate pricing** — "what price wins" intel, most accessible → **feasibility
+      probe SOON** (next data sprint); build if clean.
+- [ ] **DIBBS** (~3.3M DLA small-buy RFQs) — FEASIBLE via residential-proxy scrape (check EULA) → build
+      when supplier/manufacturer users ask OR the DLA NV012 SBIR makes it strategic.
+- [ ] **SLED** (state/local) — HARD/costly → **Phase 3 only** (Eric).
+
+---
+
 ## 📜 MASTER STRATEGY (governs all decisions) — `MINDY-MASTER-STRATEGY.md`
 
 **Operating policy:** condense the 10-yr plan to 6 months (Elon) — ask it of EVERY todo.
