@@ -31,10 +31,21 @@
 ### Migration RUN this session (confirmed "Success")
 - `20260619_seo_opportunity_enrichment.sql` — added `seo_summary` + `seo_enriched_at` + partial index.
 
-### NEXT STEPS (Eric's picks, when ready)
-1. **Study ClickFunnels — the WHOLE machine** (not just social): pull their FB/IG ad-library
-   creatives + lead pages; map Mindy's value ladder, the recurring webinar funnel, the 5-day
-   challenge, affiliate program. (`CLICKFUNNELS-PLAYBOOK-FOR-MINDY.md` has the framework.)
+### ⭐⭐ START HERE NEXT SESSION — STUDY CLICKFUNNELS, EVERYTHING (Eric's explicit #1)
+**The whole machine, not just social.** Russell Brunson grew ClickFunnels to $170M ARR with ZERO
+enterprise sales — that IS Mindy's thesis. Study + adapt EVERYTHING:
+- FB/IG ad-library creatives + lead pages (literal hooks, lead magnets, page structure to copy)
+- The value ladder (lead magnet → free alerts → Pro → backend), funnel scripts, order bumps/upsells
+- The webinar funnel (= make the Jun 27 Mindy launch RECURRING + evergreen)
+- The 5-Day Challenge mechanic (gamified onboarding) + community (Skool/FB)
+- Affiliate army (turn the GovCon Giants audience into a sales force)
+- Messaging: Attractive Character, Soap Opera Sequence, Seinfeld emails, Hook-Story-Offer
+- The books-as-funnels move (DotCom/Expert/Traffic Secrets) → a Mindy/GovCon lead-magnet book
+**Framework already drafted:** `projects/edc-mbda-partnerships/CLICKFUNNELS-PLAYBOOK-FOR-MINDY.md`
+→ Next session = go DEEP: pull real ClickFunnels assets, then turn the playbook into a build plan
+(landers, ad creative, the challenge, the value ladder offers, the affiliate spec).
+
+### Other NEXT STEPS (after/alongside ClickFunnels)
 2. **NV012 SBIR** — send the SME outreach (network broadcast + Diener referral + one-pager PDF);
    gating item = land an agency-side SFFAS-47 SME before 22 Jul.
 3. **Tradewind Marketplace** revenue listing (free, 120+ DoD buyers — `MINDY-CSO-OTA-REVENUE-MAP.md`).
