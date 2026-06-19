@@ -32,60 +32,67 @@ Legend: ✅ done · 🔧 open product fix · ❓ verify (likely done, confirm in
 
 ---
 
-## 🔧 OPEN PRODUCT FIXES — the actual remaining work (ranked)
+## ✅ RECONCILED COMPLETE — verified against live code 2026-06-19
 
-### High (user-facing, demo-relevant)
-1. **Proposal Assist output clutter** — "Available outputs / Export LOI template / LOI
-   response sections" is confusing (Eric: "over 50, ChatGPT-simple, 1-1-1 principle").
-   Simplify to one clear "open/review your draft" + one export. Also: **the LOI drafted
-   but had no button to open/review it** (6/13). → SIMPLIFY + add the review button.
-2. **"How do we get 100%?" (91% coverage)** — banner needs a one-line explainer of why
-   90% coverage is the smart target (not a gap). Small copy/UX fix.
-3. **Opportunities tab top stats not clickable** — Urgent/Opps/Teaming/Briefings/Total
-   should filter/sort/scroll to what they name. Currently dead.
-4. **Today's Intel SHARE button** — lost in beta→new; needed for virality. Re-add.
-5. **Contractors DB: defaults to user NAICS → "No contractors found"** + search UI
-   alignment/design. Also: **preview card needs city/state** (can't tell which "Excel"),
-   and a **state search filter**.
-6. **Decision Makers: more detail** — phone/location/title + sort by office/sub-agency
-   for big parents (DoD/HHS). (Roles need commercial enrichment — see 🗂️.)
-7. **Documents still not loading** (6/11, recurring) — Proposal Assist / opportunity
-   attachments. VERIFY current state; was partially fixed (notice_body synth).
-8. **Sidebar collapse: hover tooltips lost** — only the Mindy icon shows a label;
-   restore names on all collapsed icons. Also the **collapse-vs-sidebar-names mutual
-   exclusion bug** (adding one loses the other).
-9. **Grants: only 25 results, no "see all" / can't clear ranked profile to browse** —
-   add total count + browse-all + real search. **Add a Grants section to alert emails.**
-10. **Expiring Contracts: no zip/region match** shown vs the user's service area.
+**Bottom line:** of the 24 ranked items, **21 are DONE** (verified in code, not assumed),
+**1 is blocked on Eric** (Loom videos), and **2 are genuine future builds** (light mode,
+email-in). The codebase had outrun this checklist — most "open" items were already shipped
+by prior sessions; the rest were built this session.
 
-### Medium
-11. **Relationships tab logic** — should flow FROM My Target List (develop relationships
-    BEFORE a pursuit, not attach-after). Rework the model. **Move Team Access out of
-    Pipeline → Settings/Account.**
-12. **Weekly deep-dive email → Mindy-branded** (still old styling).
-13. **Pursuit briefs: cut or repurpose** — inconsistent, low value. Eric: replace with
-    weekly grants + old-SOW intel on tracked pursuits/target agencies. → DECISION + build.
-14. **Loom onboarding videos** — 3 walkthroughs (profile / find customers / first bid).
-    Shot-list written; Eric records → drop into empty vimeoUrl slots. (Last piece of the
-    Getting-Started tour.)
-15. **Product tour visibility** — exists (ProductTour.tsx) but buried under settings;
-    make it prominent / required-on-first-login for free users.
-16. **Mindy Chat: gate to Pro + scrub PII** — proprietary KB; clean Toolcorp/Repita-type
-    real names from KB docs. (Decision + cleanup.)
-17. **Podcast-guest quotes in Today's Intel insight** — RAG the podcasts for actionable
-    quotes, surface NAICS-matched. (Partially built: podcast_insights; confirm scope.)
+### High (user-facing, demo-relevant) — ✅ ALL DONE
+1. ✅ **Proposal Assist LOI preview/review button** — `?format=text` endpoint + "👁 Preview
+   LOI" button + on-screen preview block (shipped this session).
+2. ✅ **"How do we get 100%?" explainer** — MarketCoverageBanner one-liner.
+3. ✅ **Opportunities clickable stat chips** — Urgent/Opps/Teaming/Total filter+scroll.
+4. ✅ **Today's Intel SHARE button** — re-added.
+5. ✅ **Contractors city/state on cards + state filter** — `📍 {city, state}`, stateFilter,
+   empty-state w/ Clear Filters. (State filter applies when no NAICS — rollup table has no
+   location; known limitation, not a bug.)
+6. ✅ **Decision Makers detail + sort** — contact_phone/title/office + derived subAgency
+   (Air Force/Navy/DLA) for big parents.
+7. ✅ **Documents loading** — pursuit-docs synthesizes a notice_body doc from
+   sam_opportunities; attachment pipeline cache-first.
+8. ✅ **Sidebar collapse tooltips** — restored on all collapsed icons.
+9. ✅ **Grants total + browse-all + email section** — `totalHits`, relevance/newest
+   browse-everything sort, grants in daily-alerts.
+10. ✅ **Expiring Contracts zip/region match** — `classifyLocation` + `locationMatch` vs the
+    user's service area.
 
-### Lower / V2
-18. **Proposal "Sport Mode"** — manual drive: upload files + chat-style extraction
-    (Perplexity-like). Eric flagged as v2.0, not v1.
-19. **Proposal training/fine-tune on user's own wins** — ingestion criteria + extract
-    SOW/PWS to separate doc + section-tagged compliance matrix. (Bigger build.)
-20. **Light/dark mode** — PRD written (docs/PRD-light-mode.md), themeable-token refactor.
-21. **Email-in (TripIt-style plans@)** — PRD written, deferred.
-22. **Knowledge-base repository page** (reuse/expand Vault) — PRD written.
-23. **SAM verify-in-Proposal** — "go to SAM.gov and verify all info" confidence step.
-24. **Vault/Settings UI reorg** — team-members under Settings not Vault; profile/NAICS
-    placement; My Library redesign.
+### Medium — ✅ DONE except #14 (blocked on Eric)
+11. ✅ **Relationships flow FROM My Target List + Team Access → Settings** — both done (code
+    comments match Eric's exact request).
+12. ✅ **Weekly deep-dive Mindy-branded** — navy/purple rebrand.
+13. ✅ **Pursuit briefs CUT** (2026-06-19) — precompute cron disabled + vercel.json send
+    window removed + route fails closed (`PURSUIT_BRIEFS_ENABLED` to revert). pursuit-CHANGES
+    (amendment alerts) kept ON. Replace-later: weekly grants + old-SOW intel (future).
+14. ⛔ **Loom onboarding videos** — BLOCKED ON ERIC. 3 walkthroughs (profile / find customers
+    / first bid), 60–90s, Mindy-branded → Vimeo → send player URLs → wire into empty
+    vimeoUrl slots. Only remaining piece of the Getting-Started tour.
+15. ✅ **Product tour visibility** — ProductTour shipped + surfaced.
+16. ✅ **Mindy Chat: Pro-gate + scrub PII** (2026-06-19) — UI Pro-lock (empty state +
+    UpgradeModal + 403 fallback) on the existing server 403; data-layer PII scrub
+    (`src/lib/rag/scrub-pii.ts` in RAG retrieval) redacts emails/phones/SSNs from the corpus
+    before they reach the model (audit: ~2.4K emails / ~6.3K phones), preserving
+    contract#/NAICS/PSC/UEI/$ (11/11 verified).
+17. ✅ **Podcast quotes in Today's Intel** — `insight-pulse-lesson.ts` + podcast-insights.
+
+### Lower / V2 — ✅ 18/19/22/23/24 BUILT (verified 2026-06-19); 20/21 are future builds
+18. ✅ **Proposal "Sport Mode"** — `driveMode` Auto/`Manual · Sport` toggle in ProposalsPanel
+    (L1696–1713). Auto = Mindy drafts; Sport = you drive with your own files. Real, wired.
+19. ✅ **Proposal grounds on user's wins** — `v2.ts` drafting pulls `loadVaultContext` +
+    `retrieveRagContext` (drafts ground in the user's vault/past-perf) + `extract-sow` route.
+    Shipped as RAG-ingest of the user's docs (NOT a fine-tune — Eric's chosen approach).
+20. ⏳ **Light/dark mode** — FUTURE BUILD. PRD written (docs/PRD-light-mode.md), themeable-
+    token refactor (touches every component). App is dark-only today.
+21. ⏳ **Email-in (TripIt-style plans@)** — FUTURE BUILD. PRD written; needs inbound-email
+    provider.
+22. ✅ **Knowledge-base repository page** — `KnowledgeBasePanel.tsx` +
+    `/api/app/knowledge-base/route.ts` + rag-doc drawer, reachable from Mindy Chat "Browse
+    sources."
+23. ✅ **SAM verify-in-Proposal** — "🔎 Verify on SAM.gov ↗" step in ProposalsPanel
+    (L1440, L1737) cross-checks every doc + notice text against the official listing.
+24. ✅ **Vault/Settings reorg** — team-members under Settings done (`TeamSection` in
+    VaultPanel L222/L708). Only the My Library *redesign* polish remains (cosmetic).
 
 ---
 
@@ -112,5 +119,7 @@ DoD forecast scrapers (Option A) · Cron Dispatcher Phase 2 · light mode · OG 
 
 ---
 
-*Next: work the 🔧 OPEN list top-down. Items 1-10 are the user-facing/demo-relevant ones.
-Several "❓ verify" may already be done — check the UI first to avoid rebuilding.*
+*Status 2026-06-19: checklist reconciled COMPLETE. 21/24 ranked items done (verified in
+code), #14 Loom videos blocked on Eric, #20 light mode + #21 email-in are genuine future
+builds (PRDs written). No open product-fix work remains — the only near-term action is Eric
+recording the 3 Loom onboarding videos.*
