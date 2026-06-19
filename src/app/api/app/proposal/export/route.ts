@@ -714,6 +714,14 @@ export async function POST(request: NextRequest) {
     // (memory: sources_sought_loi_prefill; this replaces the old key/value form.)
     const loiVault = await loadVaultForLoi(email).catch(() => ({ has_any: false } as VaultContext));
     const letter = assembleLoiTemplate({ fields: body.loiFields || null, vault: loiVault });
+
+    // PREVIEW MODE (?format=text): return the assembled LOI as plain text so the
+    // panel can show it on-screen BEFORE the user exports .docx (Eric QC: "drafted
+    // the LOI but no button to open and review"). Same text the .docx renders.
+    if (request.nextUrl.searchParams.get('format') === 'text') {
+      return NextResponse.json({ success: true, format: 'text', letter });
+    }
+
     children.push(...renderLoiTemplateParagraphs(letter));
 
     // Any AI-drafted narrative the user generated (Capability Fit, Why Us, etc.)

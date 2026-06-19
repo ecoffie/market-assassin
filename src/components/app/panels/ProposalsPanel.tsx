@@ -1030,6 +1030,10 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   // Final package export
   const [exporting, setExporting] = useState(false);
   const [exportError, setExportError] = useState<string | null>(null);
+  // LOI on-screen preview (review before exporting .docx) — Eric QC: "drafted the
+  // LOI but no button to open and review."
+  const [loiPreview, setLoiPreview] = useState<string | null>(null);
+  const [previewing, setPreviewing] = useState(false);
 
   const hasAnyDraft = useMemo(
     () => currentSectionTabs.some(t => !!drafts[t.id]?.draft),
@@ -1107,6 +1111,35 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       setExporting(false);
     }
   }, [email, uploadedRfp, isSimpleResponseMode, currentSectionTabs, drafts, getAuthHeaders, exportContextName, compliance, checklist, isLoiResponseMode, isRfqMode, loiFields]);
+
+  // Preview the assembled LOI on-screen (?format=text) BEFORE exporting .docx.
+  const previewLoi = useCallback(async () => {
+    if (!email) return;
+    setPreviewing(true);
+    setExportError(null);
+    try {
+      const res = await fetch(`/api/app/proposal/export?email=${encodeURIComponent(email)}&format=text`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        body: JSON.stringify({
+          packageType: 'sources_sought_loi',
+          loiFields: loiFields || undefined,
+          rfpFileName: exportContextName,
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (!res.ok || !data?.letter) {
+        setExportError(data?.error || 'Could not generate the preview. Try again.');
+        return;
+      }
+      setLoiPreview(data.letter as string);
+    } catch (err) {
+      console.error('LOI preview failed:', err);
+      setExportError('Request failed. Try again.');
+    } finally {
+      setPreviewing(false);
+    }
+  }, [email, getAuthHeaders, loiFields, exportContextName]);
 
   const exportComplianceCsv = useCallback(() => {
     if (compliance.length === 0) return;
@@ -2127,6 +2160,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 buttonLabel={exporting ? 'Assembling...' : isRfqMode ? 'Export RFQ .docx' : 'Export LOI .docx'}
                 disabled={exporting}
                 onClick={() => exportProposalPackage()}
+                secondaryLabel={!isRfqMode ? (previewing ? 'Loading preview…' : '👁 Preview LOI') : undefined}
+                onSecondary={!isRfqMode ? previewLoi : undefined}
+                secondaryDisabled={previewing}
               />
             ) : (
               <OutputActionCard
@@ -2215,6 +2251,28 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               onClick={() => runComplianceScan()}
             />
           </div>
+
+          {/* LOI on-screen preview (review before .docx). Same text the export renders. */}
+          {loiPreview && (
+            <div className="mt-4 rounded-xl border border-purple-500/30 bg-slate-950/60 p-4">
+              <div className="flex items-center justify-between gap-3 mb-3">
+                <p className="text-sm font-semibold text-purple-200">📄 LOI preview — review before you export</p>
+                <button
+                  type="button"
+                  onClick={() => setLoiPreview(null)}
+                  className="text-xs text-slate-400 hover:text-slate-200"
+                >
+                  Close ✕
+                </button>
+              </div>
+              <pre className="max-h-[28rem] overflow-auto whitespace-pre-wrap rounded-lg bg-slate-900 p-4 font-mono text-[13px] leading-relaxed text-slate-200">
+{loiPreview}
+              </pre>
+              <p className="mt-2 text-xs text-slate-500">
+                Text in <span className="text-slate-300">[brackets]</span> is a placeholder for you to fill in. Happy with it? Use “Export LOI .docx” above.
+              </p>
+            </div>
+          )}
 
           {/* Scan findings */}
           {scanError && (
@@ -3220,6 +3278,9 @@ function OutputActionCard({
   buttonLabel,
   disabled,
   onClick,
+  secondaryLabel,
+  onSecondary,
+  secondaryDisabled,
 }: {
   eyebrow: string;
   title: string;
@@ -3228,6 +3289,10 @@ function OutputActionCard({
   buttonLabel: string;
   disabled?: boolean;
   onClick: () => void;
+  // Optional secondary action (e.g. "Preview" before export).
+  secondaryLabel?: string;
+  onSecondary?: () => void;
+  secondaryDisabled?: boolean;
 }) {
   return (
     <div className="flex min-h-52 flex-col justify-between rounded-lg border border-slate-800 bg-slate-950/40 p-4">
@@ -3241,14 +3306,26 @@ function OutputActionCard({
         <h3 className="mt-2 text-base font-semibold text-white">{title}</h3>
         <p className="mt-2 text-sm leading-relaxed text-slate-400">{description}</p>
       </div>
-      <button
-        type="button"
-        onClick={onClick}
-        disabled={disabled}
-        className="mt-4 w-full rounded-lg bg-purple-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
-      >
-        {buttonLabel}
-      </button>
+      <div className="mt-4 space-y-2">
+        {secondaryLabel && onSecondary && (
+          <button
+            type="button"
+            onClick={onSecondary}
+            disabled={secondaryDisabled}
+            className="w-full rounded-lg border border-purple-500/40 bg-transparent px-3 py-2 text-sm font-semibold text-purple-200 transition-colors hover:bg-purple-500/10 disabled:cursor-not-allowed disabled:opacity-50"
+          >
+            {secondaryLabel}
+          </button>
+        )}
+        <button
+          type="button"
+          onClick={onClick}
+          disabled={disabled}
+          className="w-full rounded-lg bg-purple-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+        >
+          {buttonLabel}
+        </button>
+      </div>
     </div>
   );
 }
