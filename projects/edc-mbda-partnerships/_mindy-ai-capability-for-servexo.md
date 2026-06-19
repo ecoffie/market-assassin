@@ -14,9 +14,9 @@ answers, hallucination controls, and bounded agentic workflows** for market rese
 analysis, and response drafting.
 
 **Operating history:** federal market-intelligence software for the government-contracting community
-**since 2024** (product lineage: OpenGov IQ → GovCon Giants marketplace → Market Assassin → Mindy).
-**Current scale:** ~1,900 active users/customers — ~1,400 contractors receiving daily AI opportunity
-alerts and ~480 on **Mindy Pro** (AI-generated market briefings). Commercial product per FAR Part 12.
+**since 2024** — a suite of commercial GovCon products (Federal Market Assassin, Federal Contractor
+Database, Recompete Tracker, Content Reaper, Opportunity Hunter) now unified into **Mindy**.
+**Current scale:** **~1,900 users/customers.** Commercial product per FAR Part 12.
 **Capability website:** getmindy.ai
 
 On this requirement, **Servexo provides the GSA Schedule vehicle, cleared staffing, and program
@@ -65,10 +65,11 @@ to standard.
 
 ## Relevant experience (commercial — FAR Part 12)
 **Mindy (getmindy.ai)** — a deployed, commercial AI platform delivering grounded LLM/RAG and bounded
-agentic workflows over authoritative federal data. In production since 2024 (OpenGov-IQ-onward lineage);
-~1,900 active users/customers today. Demonstrates exactly the capabilities this requirement calls for:
-secure enterprise LLM/RAG integrated with authoritative data, citation-backed grounding, hallucination
-controls, and governed agentic automation. *Commercial item — no CPARS.* Capability URL: getmindy.ai.
+agentic workflows over authoritative federal data. In production since 2024 (the GovCon Giants product
+suite — Market Assassin, Federal Contractor Database, Recompete Tracker, Opportunity Hunter — unified
+into Mindy); ~1,900 users/customers today. Demonstrates exactly the capabilities this requirement calls
+for: secure enterprise LLM/RAG integrated with authoritative data, citation-backed grounding,
+hallucination controls, and governed agentic automation. *Commercial item — no CPARS.* getmindy.ai.
 
 ---
 

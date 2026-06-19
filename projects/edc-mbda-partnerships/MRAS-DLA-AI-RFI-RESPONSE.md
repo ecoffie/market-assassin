@@ -107,7 +107,8 @@ their cleared staff execute correctly. Flag on the call: source of cleared AI/ML
   answers, hallucination controls, and bounded agentic workflows** (market research, incumbent
   analysis, response drafting). getmindy.ai.
 - **Operating history (lineage):** federal market-intelligence software for the GovCon community
-  **since 2024** — product line: **OpenGov IQ → GovCon Giants shop (shop.govcongiants.com products)
+  **since 2024** — product suite: **GovCon Giants products (Market Assassin, Federal Contractor Database,
+  Recompete Tracker, Opportunity Hunter, Content Reaper)
   → Market Assassin → Mindy.** A multi-year track record of building + operating GovCon data/AI tools.
 - **Current scale (verified June 19 2026):** **~1,900 active users/customers** — ~1,400 contractors
   receiving daily AI opportunity alerts + ~480 on **Mindy Pro** (AI-generated market briefings).
@@ -116,7 +117,8 @@ their cleared staff execute correctly. Flag on the call: source of cleared AI/ML
   commercial determination the RFI explores. (Verified on the live command-center dashboard June 19:
   1,406 active alert audience + 478 on Pro briefings = ~1,884 active users/customers. ~9,700 total
   enrolled but ~1,900 actively receiving — we cite the ACTIVE number; it's defensible if probed.
-  "Since 2024" = the OpenGov-IQ→shop→MA→Mindy lineage Eric attests to.)
+  "Since 2024" = the GovCon Giants product suite → Mindy (OpenGov IQ dropped — separated from that firm).
+  Cite "users/customers" — don't split Pro vs alert.)
 
 ---
 
