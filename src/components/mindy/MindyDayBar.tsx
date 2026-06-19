@@ -12,7 +12,7 @@ import { useEffect, useState } from 'react';
  */
 const DISMISS_KEY = 'mindy-bootcamp-2026-06-27';
 
-export function BootcampBar() {
+export function MindyDayBar() {
   // Start hidden; reveal after the mount check so SSR/first paint never flashes
   // a bar the user already dismissed.
   const [show, setShow] = useState(false);

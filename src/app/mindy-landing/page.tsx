@@ -1,7 +1,7 @@
 import Link from 'next/link';
 import { MindySignupForm } from '@/components/mindy/MindySignupForm';
 import { DemoMedia } from '@/components/mindy/DemoMedia';
-import { BootcampBar } from '@/components/mindy/BootcampBar';
+import { MindyDayBar } from '@/components/mindy/MindyDayBar';
 
 // Product reels (vertical 9:16) for the "See Mindy in action" row. Vimeo player-
 // embed URLs WITH app_id — the exact form Vimeo's own oembed serves (a bare player
@@ -105,7 +105,7 @@ export default function MindyLandingPage() {
       {/* TOP ANNOUNCEMENT BAR — Mindy Day, the live product unveil (renamed from
           "Bootcamp"; training→tools). Pinned above the hero so every arrival sees it.
           Dismissible (× → localStorage); links to the GovCon Giants registration page. */}
-      <BootcampBar />
+      <MindyDayBar />
 
       {/* Hero Section — py-20→py-10 + tighter logo/heading margins so the signup
           form (and the beta-setup banner below) sit above the fold. Beta users land
