@@ -7,7 +7,7 @@ type StatusTone = 'green' | 'blue' | 'amber' | 'purple' | 'red' | 'slate';
 type HeatmapOpp = {
   noticeId: string; title: string; agency: string | null; setAside: string | null;
   responseDeadline: string | null; isSourcesSought: boolean; trackerCount: number;
-  pursuingCount: number; segments: Record<string, number>; collabReady: boolean;
+  pursuingCount: number; collabReady: boolean;
   collabPreview: string | null;
 };
 type DemandHeatmap = {
@@ -1303,8 +1303,8 @@ export default function LaunchCommandCenterPage() {
               <p className="text-sm uppercase tracking-[0.2em] text-cyan-300">Demand Heatmap</p>
               <h2 className="mt-1 text-xl font-bold text-white">Who&apos;s tracking what — collaboration signal</h2>
               <p className="mt-1 text-sm text-slate-400">
-                Opportunities ranked by how many Mindy users are tracking them, segmented by socioeconomic
-                status. Sources Sought flagged. The &quot;respond together&quot; collab alert fires at{' '}
+                Opportunities ranked by how many Mindy users are tracking them. Sources Sought flagged
+                (the collaboration sweet spot). The &quot;respond together&quot; collab alert fires at{' '}
                 {heatmap?.threshold ?? 3}+ trackers — below that the signal is too weak to send.
               </p>
             </div>
@@ -1330,7 +1330,6 @@ export default function LaunchCommandCenterPage() {
                   <tr className="text-left text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-700">
                     <th className="py-2 pr-3 font-semibold">Trackers</th>
                     <th className="py-2 pr-3 font-semibold">Opportunity</th>
-                    <th className="py-2 pr-3 font-semibold">Segments</th>
                     <th className="py-2 pr-3 font-semibold">Collab</th>
                   </tr>
                 </thead>
@@ -1345,11 +1344,6 @@ export default function LaunchCommandCenterPage() {
                         {o.isSourcesSought && <span className="mr-1.5 text-[10px] font-semibold text-purple-300 bg-purple-500/15 px-1.5 py-0.5 rounded uppercase">SS</span>}
                         {o.title}
                         {o.agency && <span className="block text-[11px] text-slate-500">{o.agency}</span>}
-                      </td>
-                      <td className="py-2.5 pr-3 text-slate-400 text-xs">
-                        {Object.keys(o.segments).length
-                          ? Object.entries(o.segments).map(([k, v]) => `${v} ${k}`).join(', ')
-                          : <span className="text-slate-600">—</span>}
                       </td>
                       <td className="py-2.5 pr-3">
                         {o.collabReady

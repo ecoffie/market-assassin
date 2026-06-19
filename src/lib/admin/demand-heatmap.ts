@@ -3,11 +3,16 @@
  * social-proof feature (the "aha moment").
  *
  * Aggregates which opportunities the MOST users are tracking (user_pipeline),
- * segments by socioeconomic status (set_aside_certifications), flags Sources
- * Sought (the collaboration sweet spot), and previews the "respond together"
- * collab alert — GATED on a minimum-tracker threshold so a weak signal ("1 other
- * person looking") never fires. Admin-only Phase 1: SEE the signal + control the
- * trigger before automating the user-facing viral loop.
+ * flags Sources Sought (the collaboration sweet spot), and previews the "respond
+ * together" collab alert — GATED on a minimum-tracker threshold so a weak signal
+ * ("1 other person looking") never fires. Admin-only Phase 1: SEE the signal +
+ * control the trigger before automating the user-facing viral loop.
+ *
+ * DELIBERATELY NOT segmenting by set-aside (WOSB/8a/etc.) yet (Eric, Jun 19):
+ * socioeconomic data is mostly empty + segmenting splits a small pool into tiny
+ * buckets = looks broken + too limiting. Lead with the RAW collaboration signal
+ * (who's tracking + responding) to PROVE the mechanic works and drive adoption.
+ * Add segmentation back as a Phase 2+ refinement once there's user-data volume.
  *
  * THE MOAT: no competitor has aggregated user-intent data. This is built entirely
  * from our own users' tracking behavior — uncopyable without the user base.
@@ -29,8 +34,6 @@ export interface HeatmapOpp {
   isSourcesSought: boolean;
   trackerCount: number;       // distinct users tracking (anonymous count)
   pursuingCount: number;      // subset actively "pursuing"
-  /** socioeconomic breakdown of the trackers (anonymous counts). */
-  segments: Record<string, number>; // e.g. { wosb: 6, '8a': 2, sdvosb: 1 }
   /** true when trackerCount >= COLLAB_THRESHOLD → eligible for a collab alert. */
   collabReady: boolean;
   /** the alert copy this opp WOULD trigger (preview; admin sends manually in P1). */
@@ -52,31 +55,13 @@ function sb(): SupabaseClient | null {
   return createClient(url, key, { auth: { persistSession: false } });
 }
 
-// Normalize a set_aside_certifications value (array or string) → canonical codes.
-function normCerts(v: unknown): string[] {
-  const raw = Array.isArray(v) ? v : typeof v === 'string' ? v.split(/[,;]/) : [];
-  const map: Record<string, string> = {
-    wosb: 'wosb', 'women': 'wosb', 'woman': 'wosb', edwosb: 'edwosb',
-    '8a': '8a', '8(a)': '8a', sdvosb: 'sdvosb', 'sdvo': 'sdvosb', vosb: 'vosb',
-    hubzone: 'hubzone', hz: 'hubzone', sdb: 'sdb',
-  };
-  return [...new Set(raw.map((s) => map[String(s).toLowerCase().trim().replace(/[^a-z0-9()]/g, '')] || null).filter(Boolean) as string[])];
-}
-
-const SEGMENT_LABEL: Record<string, string> = {
-  wosb: 'women-owned businesses', edwosb: 'EDWOSBs', '8a': '8(a) firms',
-  sdvosb: 'service-disabled veteran-owned businesses', vosb: 'veteran-owned businesses',
-  hubzone: 'HUBZone firms', sdb: 'small disadvantaged businesses',
-};
-
-function buildCollabPreview(opp: { title: string; segments: Record<string, number>; trackerCount: number; isSourcesSought: boolean }): string {
-  // Lead with the strongest socioeconomic segment if one is meaningful, else the raw count.
-  const topSeg = Object.entries(opp.segments).sort((a, b) => b[1] - a[1])[0];
-  const verb = opp.isSourcesSought ? 'are researching' : 'are tracking';
-  if (topSeg && topSeg[1] >= 2) {
-    return `${topSeg[1]} ${SEGMENT_LABEL[topSeg[0]] || topSeg[0]} ${verb} "${opp.title.slice(0, 60)}". Respond to the Sources Sought together — collaborate or team to strengthen the response.`;
+// Collab preview — raw collaboration signal (capabilities + responding), NO set-aside
+// segmentation. The "you're not the only one → respond together" FOMO driver.
+function buildCollabPreview(opp: { title: string; trackerCount: number; isSourcesSought: boolean }): string {
+  if (opp.isSourcesSought) {
+    return `${opp.trackerCount} contractors are researching "${opp.title.slice(0, 60)}". You're not the only one — respond to the Sources Sought together. The more capable businesses that respond, the stronger the signal to the agency.`;
   }
-  return `${opp.trackerCount} contractors ${verb} "${opp.title.slice(0, 60)}". You're not the only one — respond to the Sources Sought before it closes.`;
+  return `${opp.trackerCount} contractors are tracking "${opp.title.slice(0, 60)}". You're not the only one pursuing this — sharpen your response before it closes.`;
 }
 
 export async function getDemandHeatmap(limit = 40): Promise<DemandHeatmap> {
@@ -105,29 +90,14 @@ export async function getDemandHeatmap(limit = 40): Promise<DemandHeatmap> {
     if ((r.stage || '').toLowerCase() === 'pursuing') a.pursuing.add(email);
   }
 
-  // 3. Socioeconomic status per tracking user (one lookup for all involved emails).
-  const allEmails = [...new Set(pipe.map((r) => (r.user_email || '').toLowerCase()).filter(Boolean))];
-  const certsByEmail = new Map<string, string[]>();
-  for (let i = 0; i < allEmails.length; i += 300) {
-    const chunk = allEmails.slice(i, i + 300);
-    const { data: u } = await client
-      .from('user_notification_settings')
-      .select('user_email, business_type, set_aside_certifications')
-      .in('user_email', chunk);
-    for (const row of u || []) {
-      certsByEmail.set((row.user_email || '').toLowerCase(), normCerts(row.set_aside_certifications));
-    }
-  }
-
-  // 4. Build the ranked opp list with segments + collab preview.
+  // 3. Build the ranked opp list — RAW collaboration signal, no set-aside segmentation
+  //    (Eric: capabilities + responding first; segmentation is Phase 2+ once there's volume).
   const opps: HeatmapOpp[] = [...byNotice.entries()].map(([noticeId, a]) => {
-    const segments: Record<string, number> = {};
-    for (const email of a.users) for (const cert of certsByEmail.get(email) || []) segments[cert] = (segments[cert] || 0) + 1;
     const isSS = /sources sought|sources-sought|\bRFI\b/i.test(a.title);
     const trackerCount = a.users.size;
-    const base = { noticeId, title: a.title, agency: a.agency, setAside: a.setAside, responseDeadline: a.deadline, isSourcesSought: isSS, trackerCount, pursuingCount: a.pursuing.size, segments };
+    const base = { noticeId, title: a.title, agency: a.agency, setAside: a.setAside, responseDeadline: a.deadline, isSourcesSought: isSS, trackerCount, pursuingCount: a.pursuing.size };
     const collabReady = trackerCount >= COLLAB_THRESHOLD;
-    return { ...base, collabReady, collabPreview: collabReady ? buildCollabPreview({ title: a.title, segments, trackerCount, isSourcesSought: isSS }) : null };
+    return { ...base, collabReady, collabPreview: collabReady ? buildCollabPreview({ title: a.title, trackerCount, isSourcesSought: isSS }) : null };
   }).sort((x, y) => y.trackerCount - x.trackerCount).slice(0, limit);
 
   return {
