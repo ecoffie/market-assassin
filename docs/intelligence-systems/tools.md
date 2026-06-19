@@ -405,7 +405,7 @@ Response:
 | `/api/admin/agent-status` | View agent run status (planned) |
 | `/api/admin/trigger-agent` | Manual agent trigger (planned) |
 
-**Auth:** All admin endpoints require `?password=galata-assassin-2026`
+**Auth:** All admin endpoints require `?password=$ADMIN_PASSWORD`
 
 ---
 

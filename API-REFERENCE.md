@@ -8,7 +8,7 @@ Complete API endpoint inventory for the Market Assassin platform.
 
 | Method | Usage |
 |--------|-------|
-| **Admin Password** | `?password=galata-assassin-2026` (or `ADMIN_PASSWORD` env var) |
+| **Admin Password** | `?password=$ADMIN_PASSWORD` (or `ADMIN_PASSWORD` env var) |
 | **Cron Secret** | `Authorization: Bearer {CRON_SECRET}` header |
 | **Email-based** | Most user endpoints require `email` parameter |
 | **Stripe Signature** | Webhook verification via `stripe-signature` header |
@@ -19,7 +19,7 @@ Complete API endpoint inventory for the Market Assassin platform.
 
 ## Admin Endpoints
 
-All admin endpoints require `?password=galata-assassin-2026`
+All admin endpoints require `?password=$ADMIN_PASSWORD`
 
 | Endpoint | Method | Purpose |
 |----------|--------|---------|

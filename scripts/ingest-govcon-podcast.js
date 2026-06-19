@@ -362,7 +362,7 @@ async function main() {
   console.log(`  Failed:    ${failed}`);
   console.log(`  Elapsed:   ${elapsed}s`);
   console.log('');
-  console.log('  Try: /api/admin/rag-library?op=search&q=8a+certification+small+business&password=galata-assassin-2026');
+  console.log('  Try: /api/admin/rag-library?op=search&q=8a+certification+small+business&password=$ADMIN_PASSWORD');
 }
 
 main().catch(e => { console.error(e); process.exit(1); });

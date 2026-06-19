@@ -1,7 +1,7 @@
 Create a new admin endpoint at `/src/app/api/admin/$ARGUMENTS/route.ts`.
 
 Follow the Admin Endpoint Standard from CLAUDE.md:
-- Password auth via `?password=` query param (use `ADMIN_PASSWORD` env var with fallback `galata-assassin-2026`)
+- Password auth via `?password=` query param (use `ADMIN_PASSWORD` env var with fallback `$ADMIN_PASSWORD`)
 - GET = read/preview (safe, no side effects)
 - POST = execute (writes data), with `?mode=preview` (default) vs `?mode=execute`
 - Response shape: `{ success: boolean, message: string, data?: any, errors?: string[] }`

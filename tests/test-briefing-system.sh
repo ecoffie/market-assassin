@@ -19,7 +19,7 @@
 set -e
 
 ENV="${1:-local}"
-PASSWORD="galata-assassin-2026"
+PASSWORD="$ADMIN_PASSWORD"
 TEST_EMAIL="eric@govcongiants.com"
 
 if [ "$ENV" == "prod" ]; then

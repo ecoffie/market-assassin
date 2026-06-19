@@ -440,7 +440,7 @@ Applied Microsoft/Oracle-style enterprise pre-computation to ALL 3 briefing type
 
 Changed briefing rollout from `rollout` (250-user cohorts) to `beta_all` (all 927 users):
 ```bash
-curl -X POST "https://tools.govcongiants.org/api/admin/briefing-rollout?password=galata-assassin-2026" \
+curl -X POST "https://tools.govcongiants.org/api/admin/briefing-rollout?password=$ADMIN_PASSWORD" \
   -d '{"mode":"beta_all"}'
 # Response: {"success":true,"selectedUsers":927}
 ```
@@ -1005,7 +1005,7 @@ Replaced generic IDIQ content with Southern US / A/E/C-focused opportunities usi
   - Access Control: Content Generator Access Denied
   - Lead Capture: Lead Capture API
 - **Features:**
-  - Password auth (`galata-assassin-2026`) or CRON_SECRET bearer token
+  - Password auth (`$ADMIN_PASSWORD`) or CRON_SECRET bearer token
   - JSON and HTML output formats
   - Email alerts on failures (to `service@govcongiants.com`)
   - Response time tracking
@@ -1022,8 +1022,8 @@ Replaced generic IDIQ content with Southern US / A/E/C-focused opportunities usi
 
 ### Health Check Access URLs
 ```
-HTML: https://tools.govcongiants.org/api/cron/health-check?password=galata-assassin-2026&format=html
-JSON: https://tools.govcongiants.org/api/cron/health-check?password=galata-assassin-2026
+HTML: https://tools.govcongiants.org/api/cron/health-check?password=$ADMIN_PASSWORD&format=html
+JSON: https://tools.govcongiants.org/api/cron/health-check?password=$ADMIN_PASSWORD
 ```
 
 ### Content Reaper Length Optimization

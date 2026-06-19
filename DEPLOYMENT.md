@@ -45,7 +45,7 @@ vercel --prod --force
 | `SMTP_USER` | Email sender address | hello@govcongiants.com |
 | `SMTP_PASSWORD` | Email SMTP password | Email provider |
 | `CRON_SECRET` | Cron job authentication | Generate: `openssl rand -hex 32` |
-| `ADMIN_PASSWORD` | Admin endpoint auth | Default: galata-assassin-2026 |
+| `ADMIN_PASSWORD` | Admin endpoint auth | Default: $ADMIN_PASSWORD |
 | `SAM_API_KEY` | SAM.gov API key | SAM.gov Developer Portal |
 
 ### Optional
@@ -137,7 +137,7 @@ curl "https://tools.govcongiants.org/api/cron/health-check" \
   -H "Authorization: Bearer ${CRON_SECRET}"
 
 # Or via admin password
-curl "https://tools.govcongiants.org/api/admin/trigger-briefings?password=galata-assassin-2026"
+curl "https://tools.govcongiants.org/api/admin/trigger-briefings?password=$ADMIN_PASSWORD"
 ```
 
 ---

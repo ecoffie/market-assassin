@@ -7,7 +7,7 @@
  *
  * Run AFTER deploy lands.
  */
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const URL = `https://getmindy.ai/api/admin/proposal-ab?password=${encodeURIComponent(ADMIN_PASSWORD)}`;
 
 (async () => {

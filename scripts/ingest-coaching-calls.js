@@ -66,7 +66,7 @@ const ENDPOINT = (getArg('endpoint', 'https://getmindy.ai')).replace(/\/$/, '');
 const LIMIT = Number(getArg('limit', Infinity));
 const ONLY = getArg('only', null); // 'sales' | 'coaching' | null
 const CACHE_DIR = path.resolve(getArg('cache', path.join(__dirname, '..', 'tasks', 'cache', 'calls')));
-const PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const PASSWORD = process.env.ADMIN_PASSWORD;
 
 const sha256 = (buf) => crypto.createHash('sha256').update(buf).digest('hex');
 

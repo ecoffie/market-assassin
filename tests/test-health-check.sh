@@ -3,7 +3,7 @@
 # Usage: ./test-health-check.sh
 
 BASE_URL="https://tools.govcongiants.org"
-PASSWORD="galata-assassin-2026"
+PASSWORD="$ADMIN_PASSWORD"
 PASS=0
 FAIL=0
 SKIP=0

@@ -3,7 +3,7 @@ Check all access for a customer email across KV, Supabase, and Stripe.
 Open the check-access admin endpoint in the browser for the given email:
 
 ```
-https://tools.govcongiants.org/api/admin/check-access?password=galata-assassin-2026&email=$ARGUMENTS
+https://tools.govcongiants.org/api/admin/check-access?password=$ADMIN_PASSWORD&email=$ARGUMENTS
 ```
 
 This shows:

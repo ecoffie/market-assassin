@@ -1180,8 +1180,8 @@ Build native iOS/Android apps:
 
 **Health Check:**
 ```
-HTML: https://tools.govcongiants.org/api/cron/health-check?password=galata-assassin-2026&format=html
-JSON: https://tools.govcongiants.org/api/cron/health-check?password=galata-assassin-2026
+HTML: https://tools.govcongiants.org/api/cron/health-check?password=$ADMIN_PASSWORD&format=html
+JSON: https://tools.govcongiants.org/api/cron/health-check?password=$ADMIN_PASSWORD
 ```
 
 ---

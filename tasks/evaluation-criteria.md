@@ -101,7 +101,7 @@ WHERE tablename = '[table_name]';
 
 **Test command:**
 ```bash
-curl -X POST "https://tools.govcongiants.org/api/admin/send-test-email?email=[your-email]&template=[template-name]&password=galata-assassin-2026"
+curl -X POST "https://tools.govcongiants.org/api/admin/send-test-email?email=[your-email]&template=[template-name]&password=$ADMIN_PASSWORD"
 ```
 
 ---
@@ -118,7 +118,7 @@ curl -X POST "https://tools.govcongiants.org/api/admin/send-test-email?email=[yo
 
 **Test command:**
 ```bash
-curl -s "https://tools.govcongiants.org/api/admin/generate-[type]-briefing?email=test@example.com&password=galata-assassin-2026&format=full" | jq '.briefing | keys'
+curl -s "https://tools.govcongiants.org/api/admin/generate-[type]-briefing?email=test@example.com&password=$ADMIN_PASSWORD&format=full" | jq '.briefing | keys'
 ```
 
 ---

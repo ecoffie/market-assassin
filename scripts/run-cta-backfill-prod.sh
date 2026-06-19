@@ -2,7 +2,7 @@
 # PAUSED (Jun 2026): Pilot uses in-memory CTA tagging on the user feed slice.
 # Re-run after org-level CTA reporting + full backfill is scheduled.
 set -euo pipefail
-URL="https://getmindy.ai/api/cron/tag-cta?limit=100&password=galata-assassin-2026"
+URL="https://getmindy.ai/api/cron/tag-cta?limit=100&password=${ADMIN_PASSWORD}"
 LOG="$(dirname "$0")/../.cta-backfill.log"
 batch=0
 while true; do

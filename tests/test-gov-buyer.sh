@@ -22,7 +22,7 @@ set -uo pipefail
 
 ENV="${1:-local}"
 NAICS="${2:-541512}"
-PASSWORD="${ADMIN_PASSWORD:-galata-assassin-2026}"
+PASSWORD="${ADMIN_PASSWORD:-$ADMIN_PASSWORD}"
 TEST_EMAIL="${GOV_BUYER_TEST_EMAIL:-dryrun.tester@agency.gov}"
 SELLER_EMAIL="${GOV_BUYER_SELLER_EMAIL:-seller@example.com}"
 

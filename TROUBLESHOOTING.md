@@ -11,7 +11,7 @@ Common issues and solutions for the Market Assassin platform.
 **Diagnosis:**
 ```bash
 # Check access in admin panel
-curl "https://tools.govcongiants.org/api/admin/check-access?email=user@example.com&password=galata-assassin-2026"
+curl "https://tools.govcongiants.org/api/admin/check-access?email=user@example.com&password=$ADMIN_PASSWORD"
 ```
 
 **Common causes:**
@@ -22,7 +22,7 @@ curl "https://tools.govcongiants.org/api/admin/check-access?email=user@example.c
 **Fix:**
 ```bash
 # Grant access via admin endpoint
-curl -X POST "https://tools.govcongiants.org/api/admin/grant-ma-access?password=galata-assassin-2026" \
+curl -X POST "https://tools.govcongiants.org/api/admin/grant-ma-access?password=$ADMIN_PASSWORD" \
   -H "Content-Type: application/json" \
   -d '{"email": "user@example.com", "tier": "assassin_premium"}'
 ```
@@ -87,14 +87,14 @@ kv.del(`rl:content:user@example.com`)
 
 **Check status:**
 ```bash
-curl "https://tools.govcongiants.org/api/admin/abuse-report?email=user@example.com&password=galata-assassin-2026"
+curl "https://tools.govcongiants.org/api/admin/abuse-report?email=user@example.com&password=$ADMIN_PASSWORD"
 ```
 
 **Clear abuse flag:**
 ```bash
 curl -X POST "https://tools.govcongiants.org/api/admin/abuse-report" \
   -H "Content-Type: application/json" \
-  -d '{"password": "galata-assassin-2026", "action": "clear", "email": "user@example.com"}'
+  -d '{"password": "$ADMIN_PASSWORD", "action": "clear", "email": "user@example.com"}'
 ```
 
 ---
@@ -168,7 +168,7 @@ vercel logs --project=market-assassin | grep "send-briefings"
 
 **Manual trigger:**
 ```bash
-curl "https://tools.govcongiants.org/api/admin/trigger-briefings?password=galata-assassin-2026"
+curl "https://tools.govcongiants.org/api/admin/trigger-briefings?password=$ADMIN_PASSWORD"
 ```
 
 **Check user profile:**
@@ -188,7 +188,7 @@ curl "https://tools.govcongiants.org/api/briefings/preferences?email=user@exampl
 **Fix:**
 ```bash
 # Manually aggregate profile
-curl -X POST "https://tools.govcongiants.org/api/cron/aggregate-profiles?password=galata-assassin-2026" \
+curl -X POST "https://tools.govcongiants.org/api/cron/aggregate-profiles?password=$ADMIN_PASSWORD" \
   -d '{"email": "user@example.com"}'
 ```
 
@@ -221,7 +221,7 @@ console.log({ data, error });
 ```bash
 # In Vercel dashboard → Storage → KV
 # Or via API
-curl "https://tools.govcongiants.org/api/admin/kv?key=ma:test@example.com&password=galata-assassin-2026"
+curl "https://tools.govcongiants.org/api/admin/kv?key=ma:test@example.com&password=$ADMIN_PASSWORD"
 ```
 
 **Common issues:**

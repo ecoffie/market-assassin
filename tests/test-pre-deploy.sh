@@ -38,7 +38,7 @@ else
   BASE_URL="${PREDEPLOY_BASE_URL:-https://getmindy.ai}"
 fi
 
-ADMIN_PASSWORD="galata-assassin-2026"
+ADMIN_PASSWORD="$ADMIN_PASSWORD"
 
 echo ""
 echo -e "${BLUE}╔═══════════════════════════════════════════════════════════╗${NC}"

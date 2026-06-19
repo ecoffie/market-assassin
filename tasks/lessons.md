@@ -445,7 +445,7 @@ snapshot-contractors     →    tool: contractor_db         →    items for use
 
 **Pipeline Test Endpoint:**
 ```bash
-curl "https://tools.govcongiants.org/api/admin/test-market-intel-pipeline?password=galata-assassin-2026"
+curl "https://tools.govcongiants.org/api/admin/test-market-intel-pipeline?password=$ADMIN_PASSWORD"
 ```
 
 **What it checks:**
@@ -456,12 +456,12 @@ curl "https://tools.govcongiants.org/api/admin/test-market-intel-pipeline?passwo
 
 **Test specific user:**
 ```bash
-curl "https://tools.govcongiants.org/api/admin/test-market-intel-pipeline?password=galata-assassin-2026&email=user@example.com"
+curl "https://tools.govcongiants.org/api/admin/test-market-intel-pipeline?password=$ADMIN_PASSWORD&email=user@example.com"
 ```
 
 **Send test component:**
 ```bash
-curl -X POST "https://tools.govcongiants.org/api/admin/test-market-intel-pipeline?password=galata-assassin-2026&email=user@example.com&component=briefs"
+curl -X POST "https://tools.govcongiants.org/api/admin/test-market-intel-pipeline?password=$ADMIN_PASSWORD&email=user@example.com&component=briefs"
 ```
 
 ---
@@ -927,7 +927,7 @@ export async function GET(request: NextRequest) {
 
 **Monitor with:**
 ```bash
-curl "https://tools.govcongiants.org/api/admin/briefing-status?password=galata-assassin-2026"
+curl "https://tools.govcongiants.org/api/admin/briefing-status?password=$ADMIN_PASSWORD"
 ```
 
 **Rule:** Day-specific crons need TWO protections:

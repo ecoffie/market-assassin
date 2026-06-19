@@ -165,7 +165,7 @@ open https://tools.govcongiants.org/forecasts
 {
   "crons": [
     {
-      "path": "/api/cron/sync-forecasts?source=DHS&password=galata-assassin-2026",
+      "path": "/api/cron/sync-forecasts?source=DHS&password=$ADMIN_PASSWORD",
       "schedule": "0 2 * * *" // 2 AM daily
     }
   ]

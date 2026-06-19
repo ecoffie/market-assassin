@@ -206,7 +206,7 @@ WHERE table_name IN ('contacts', 'pipeline_items', 'conversations');
 
 ```bash
 # Verify migration
-curl -s "https://tools.govcongiants.org/api/admin/migration-status?password=galata-assassin-2026" | jq .
+curl -s "https://tools.govcongiants.org/api/admin/migration-status?password=$ADMIN_PASSWORD" | jq .
 ```
 
 #### C. Save to Pipeline Button (Day 3)

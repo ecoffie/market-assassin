@@ -51,7 +51,7 @@ For each cohort member email:
 
 ```bash
 # Admin grant Pro/briefings (repeat per member)
-curl "https://getmindy.ai/api/admin/grant-briefings?password=galata-assassin-2026&email=MEMBER@example.com"
+curl "https://getmindy.ai/api/admin/grant-briefings?password=$ADMIN_PASSWORD&email=MEMBER@example.com"
 ```
 
 Or batch via Command Center / `grant-ma-tier` when invoice clears.

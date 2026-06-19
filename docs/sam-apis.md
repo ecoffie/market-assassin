@@ -502,7 +502,7 @@ State: VA
 UEI: Look up Booz Allen or Lockheed
 
 # Test commands
-curl "https://tools.govcongiants.org/api/admin/test-sam-awards?password=galata-assassin-2026&naics=541512"
+curl "https://tools.govcongiants.org/api/admin/test-sam-awards?password=$ADMIN_PASSWORD&naics=541512"
 ```
 
 ---
@@ -557,7 +557,7 @@ USASpending award details include competition data in `latest_transaction_contra
 ### Test USASpending
 
 ```bash
-curl "https://tools.govcongiants.org/api/admin/test-usaspending?password=galata-assassin-2026&naics=541512"
+curl "https://tools.govcongiants.org/api/admin/test-usaspending?password=$ADMIN_PASSWORD&naics=541512"
 ```
 
 **Response includes:**

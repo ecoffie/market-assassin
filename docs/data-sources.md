@@ -131,7 +131,7 @@ Central registry for all BD Assist data sources. Makes it easy to add new source
 
 ### Data Health Dashboard
 
-**Admin Endpoint:** `/api/admin/data-health?password=galata-assassin-2026`
+**Admin Endpoint:** `/api/admin/data-health?password=$ADMIN_PASSWORD`
 
 Returns:
 - Overall health score (Good/Fair/Needs Work)

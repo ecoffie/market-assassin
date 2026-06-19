@@ -18,7 +18,7 @@ recurrence, and a full rotation of the admin password.
 ### Security
 - **Rotate admin password — strip hardcoded literal from 173 admin routes**
   (`79792563`). The password was a hardcoded fallback
-  (`process.env.ADMIN_PASSWORD || 'galata-assassin-2026'` + `!== 'literal'` variants)
+  (`process.env.ADMIN_PASSWORD || '$ADMIN_PASSWORD'` + `!== 'literal'` variants)
   in 173 files, so changing the env var alone did NOT rotate it — the old literal kept
   working everywhere. Stripped the literal so routes honor ONLY
   `process.env.ADMIN_PASSWORD`; every transform fails CLOSED (unset env → denies). New

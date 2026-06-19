@@ -61,7 +61,7 @@ Users hit $19 limit when they realize seeing opportunities isn't enough—they n
 ### Test Endpoint
 ```bash
 # Send all 3 report types to a user
-curl "https://tools.govcongiants.org/api/admin/send-all-briefings?password=galata-assassin-2026&email=user@example.com"
+curl "https://tools.govcongiants.org/api/admin/send-all-briefings?password=$ADMIN_PASSWORD&email=user@example.com"
 ```
 
 ### Slash Command
@@ -241,7 +241,7 @@ curl -X POST "https://tools.govcongiants.org/api/admin/briefing-rollout?password
 **Test manually:**
 ```bash
 # Test for specific email
-curl "https://tools.govcongiants.org/api/admin/send-test-briefing?password=galata-assassin-2026&email=user@example.com&test=true"
+curl "https://tools.govcongiants.org/api/admin/send-test-briefing?password=$ADMIN_PASSWORD&email=user@example.com&test=true"
 
 # Trigger full cron
 curl -H "Authorization: Bearer $CRON_SECRET" "https://tools.govcongiants.org/api/cron/send-briefings"
@@ -391,7 +391,7 @@ Top: [headline]. View: shop.govcongiants.org/briefings
 | `/api/admin/grant-briefings-all` | GET | Batch grant access |
 | `/api/admin/seed-test-briefing` | GET | Create test data |
 
-**Authentication:** `?password=galata-assassin-2026` or `ADMIN_PASSWORD` env
+**Authentication:** `?password=$ADMIN_PASSWORD` or `ADMIN_PASSWORD` env
 
 **Preview mode:** `?mode=preview` (safe)
 **Execute mode:** `?mode=execute` (performs action)
@@ -479,7 +479,7 @@ Briefings deliver between 6-10 AM local time:
 
 3. **Test specific user:**
    ```bash
-   curl "https://tools.govcongiants.org/api/admin/send-test-briefing?password=galata-assassin-2026&email=user@example.com&test=true"
+   curl "https://tools.govcongiants.org/api/admin/send-test-briefing?password=$ADMIN_PASSWORD&email=user@example.com&test=true"
    ```
 
 4. **Check logs:**

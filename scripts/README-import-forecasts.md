@@ -286,7 +286,7 @@ curl "https://tools.govcongiants.org/api/forecasts/sources"
 curl "https://tools.govcongiants.org/api/forecasts?naics=541512"
 
 # Admin: Trigger import (future feature)
-curl -X POST "https://tools.govcongiants.org/api/admin/sync-forecasts?password=galata-assassin-2026&source=DOE"
+curl -X POST "https://tools.govcongiants.org/api/admin/sync-forecasts?password=$ADMIN_PASSWORD&source=DOE"
 ```
 
 ## Troubleshooting

@@ -49,7 +49,7 @@ const limitArg = args.find((arg) => arg.startsWith('--limit='));
 const LIMIT = limitArg ? Number(limitArg.split('=')[1]) : Infinity;
 const endpointArg = args.find((arg) => arg.startsWith('--endpoint='));
 const ENDPOINT = (endpointArg ? endpointArg.split('=').slice(1).join('=') : 'https://getmindy.ai').replace(/\/$/, '');
-const PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const PASSWORD = process.env.ADMIN_PASSWORD;
 
 const HOME = os.homedir();
 const MY_DRIVE = path.join(

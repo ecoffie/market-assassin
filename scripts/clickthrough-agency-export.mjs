@@ -21,7 +21,7 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 dotenv.config({ path: join(__dirname, '..', '.env.local') });
 
 const BASE = process.env.AGENCY_BASE || 'https://mi.govcongiants.com';
-const PW = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const PW = process.env.ADMIN_PASSWORD;
 const EMAIL = process.env.CLICKTHROUGH_EMAIL || 'eric@koamana.com';
 const DL_DIR = '/tmp/agency-clickthrough';
 
