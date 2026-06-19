@@ -31,7 +31,7 @@
   SEO pages' impressions/position (feeds the build→measure→enrich loop).
 
 ### IN PROGRESS (self-completing, no action needed)
-- [ ] **SEO enrichment backlog drain** — 3,132/34,440 done at handoff, RESUMABLE
+- [ ] **SEO enrichment backlog drain — ✅ DONE: 34,440 active opps 100% enriched (34,437 AI summaries). Hourly cron keeps new opps enriched.
   (`npx tsx scripts/drain-seo-enrich.ts`), and the hourly `enrich-opportunity-seo` cron backstops
   the remainder. 100% summary rate. Just let it finish.
 
