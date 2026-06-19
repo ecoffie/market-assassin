@@ -2,7 +2,7 @@
  * Admin endpoint for generating Contractor DB briefings
  *
  * Usage:
- * GET /api/admin/generate-contractor-db-briefing?email=test@example.com&password=galata-assassin-2026
+ * GET /api/admin/generate-contractor-db-briefing?email=test@example.com&password=$ADMIN_PASSWORD
  *
  * Query params:
  * - email (required): User email to generate briefing for
@@ -16,7 +16,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateContractorDBBriefing } from '@/lib/briefings/contractor-db';
 import nodemailer from 'nodemailer';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);

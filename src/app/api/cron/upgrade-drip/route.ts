@@ -25,7 +25,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const CHECKOUT_URL = 'https://getmindy.ai/checkout/mindy-pro-monthly?utm_source=email&utm_medium=upgrade_drip';
 
 function sb() {

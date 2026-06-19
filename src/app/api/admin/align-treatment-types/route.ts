@@ -3,7 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
 import { sendEmail } from '@/lib/send-email';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 /**
  * Stripe Product IDs for bundle detection

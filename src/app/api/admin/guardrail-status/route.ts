@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getGuardrailStatus, CircuitBreaker } from '@/lib/intelligence/guardrails';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 /**
  * GET /api/admin/guardrail-status

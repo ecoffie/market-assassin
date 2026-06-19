@@ -4,7 +4,7 @@ import { getRotatedSAMKey, getKeyRotationStatus } from '@/lib/sam/utils';
 import { readFileSync } from 'fs';
 import { join } from 'path';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const SUPABASE_PAGE_SIZE = 1000;
 
 async function fetchAllRows<T>(

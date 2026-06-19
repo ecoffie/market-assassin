@@ -68,7 +68,7 @@ export async function GET(request: NextRequest) {
   const testEmail = url.searchParams.get('test');
   if (testEmail) {
     const pw = url.searchParams.get('password');
-    if (pw !== (process.env.ADMIN_PASSWORD || 'galata-assassin-2026')) {
+    if (pw !== (process.env.ADMIN_PASSWORD)) {
       return NextResponse.json({ error: 'test requires admin password' }, { status: 401 });
     }
     try {

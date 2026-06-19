@@ -56,7 +56,7 @@ function getSatBadgeForAgency(agencyName: string): { badge: string | null; level
   return { badge: null, level: 'unknown', satPercent: 0 };
 }
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const getAnthropicBriefingKey = () => process.env.BRIEFING_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY;
 
 // NAICS prefix expansion for 3-digit codes

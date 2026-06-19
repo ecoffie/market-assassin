@@ -27,7 +27,7 @@ export async function GET(request: NextRequest) {
   const auth = request.headers.get('authorization') || '';
   const pw = request.nextUrl.searchParams.get('password');
   const ok = (process.env.CRON_SECRET && auth === `Bearer ${process.env.CRON_SECRET}`)
-    || pw === (process.env.ADMIN_PASSWORD || 'galata-assassin-2026');
+    || pw === (process.env.ADMIN_PASSWORD);
   if (!ok) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);

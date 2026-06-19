@@ -18,7 +18,7 @@ import crypto from 'crypto';
 import { createClient } from '@supabase/supabase-js';
 import { createMIAuthSessionToken } from '@/lib/two-factor-session';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams;

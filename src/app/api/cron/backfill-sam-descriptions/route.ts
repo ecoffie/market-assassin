@@ -14,7 +14,7 @@
  * × 24 runs/day = 1,200/day distributed across keys, we're safe.
  *
  * GET /api/cron/backfill-sam-descriptions
- *   ?password=galata-assassin-2026  (manual trigger from a browser)
+ *   ?password=$ADMIN_PASSWORD  (manual trigger from a browser)
  *   ?limit=50                       (override MAX_PER_RUN)
  *
  * Vercel cron requests carry a special header (x-vercel-cron), and
@@ -56,7 +56,7 @@ function authorized(request: NextRequest): boolean {
   if (request.headers.get('x-vercel-cron')) return true;
   // Manual trigger from a browser or curl.
   const password = new URL(request.url).searchParams.get('password');
-  return password === process.env.ADMIN_PASSWORD || password === 'galata-assassin-2026';
+  return password === process.env.ADMIN_PASSWORD;
 }
 
 async function sleep(ms: number) {

@@ -19,7 +19,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 function internalBaseUrl(request: NextRequest): string {
   // Use the request's own host so server→server calls hit the same deployment
@@ -43,7 +43,7 @@ export async function GET(request: NextRequest) {
   }
 
   const base = internalBaseUrl(request);
-  const pw = encodeURIComponent(ADMIN_PASSWORD);
+  const pw = encodeURIComponent(ADMIN_PASSWORD || '');
   const results: Record<string, unknown> = {};
 
   // 1) Customers first (satisfies the subscriptions FK).

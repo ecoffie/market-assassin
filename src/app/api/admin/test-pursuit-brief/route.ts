@@ -13,7 +13,7 @@ import { sendEmail } from '@/lib/send-email';
 import { fetchExpiringContractsFromLocal, fetchExpiringContracts } from '@/lib/briefings/pipelines/fpds-recompete';
 import { prioritizeNaicsByIndustry } from '@/lib/industry-presets';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);

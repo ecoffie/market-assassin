@@ -8,7 +8,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 // Helper: Get date N days ago in MM/dd/yyyy format for SAM.gov
 function getDateDaysAgo(days: number): string {

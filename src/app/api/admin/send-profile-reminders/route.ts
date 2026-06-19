@@ -4,7 +4,7 @@ import { kv } from '@vercel/kv';
 import { sendEmail } from '@/lib/send-email';
 import { createSecureAccessUrl } from '@/lib/access-links';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const REMINDER_COOLDOWN_DAYS = 14;
 const CURSOR_KEY = 'admin:profile-reminder:cursor';
 const LAST_RUN_KEY = 'admin:profile-reminder:last-run';

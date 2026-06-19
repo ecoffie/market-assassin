@@ -16,7 +16,7 @@ import { generateAIEmailTemplate } from '@/lib/briefings/delivery/ai-email-templ
 import { sendEmail } from '@/lib/send-email';
 import { createEmailTrackingToken } from '@/lib/engagement';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const DEFAULT_LIMIT = 10; // Process 10 users at a time (sequential, not parallel)
 const DELAY_BETWEEN_USERS_MS = 2000; // 2 second delay between users to avoid rate limits
 

@@ -177,7 +177,7 @@ function findReclassCandidates(docs: RagDocRow[], typeFilter = ''): ReclassCandi
 
 export async function GET(request: NextRequest) {
   const password = request.nextUrl.searchParams.get('password');
-  if (password !== (process.env.ADMIN_PASSWORD || 'galata-assassin-2026')) {
+  if (password !== (process.env.ADMIN_PASSWORD)) {
     return unauthorized();
   }
 
@@ -352,7 +352,7 @@ export async function GET(request: NextRequest) {
 
 export async function POST(request: NextRequest) {
   const password = request.nextUrl.searchParams.get('password');
-  if (password !== (process.env.ADMIN_PASSWORD || 'galata-assassin-2026')) {
+  if (password !== (process.env.ADMIN_PASSWORD)) {
     return unauthorized();
   }
 

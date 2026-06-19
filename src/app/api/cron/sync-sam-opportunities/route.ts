@@ -22,7 +22,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const SAM_API_KEY = (process.env.SAM_API_KEY || '').trim();
 const SAM_API_BASE = 'https://api.sam.gov/opportunities/v2';
 
@@ -483,7 +483,7 @@ export async function GET(request: NextRequest) {
     if (!dryRun && syncType === 'full') {
       try {
         const origin = new URL(request.url).origin;
-        const pw = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+        const pw = process.env.ADMIN_PASSWORD;
         // Don't await — let it run independently; log only.
         fetch(`${origin}/api/cron/sync-gov-buyer-data?pull=both&password=${pw}`)
           .then(r => console.log(`[sync-sam] chained gov-buyer sync -> ${r.status}`))

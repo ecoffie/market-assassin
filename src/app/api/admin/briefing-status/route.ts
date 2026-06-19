@@ -6,7 +6,7 @@
  * - Any unexpected sends (wrong day)
  * - System health summary
  *
- * Usage: GET /api/admin/briefing-status?password=galata-assassin-2026
+ * Usage: GET /api/admin/briefing-status?password=$ADMIN_PASSWORD
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -17,7 +17,7 @@ import { createClient } from '@supabase/supabase-js';
 export async function GET(request: NextRequest) {
   const password = request.nextUrl.searchParams.get('password');
 
-  if (password !== process.env.ADMIN_PASSWORD && password !== 'galata-assassin-2026') {
+  if (password !== process.env.ADMIN_PASSWORD) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

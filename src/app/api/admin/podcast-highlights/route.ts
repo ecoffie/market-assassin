@@ -44,7 +44,7 @@ function unauthorized() {
 
 function checkPassword(request: NextRequest): boolean {
   const password = request.nextUrl.searchParams.get('password');
-  return password === (process.env.ADMIN_PASSWORD || 'galata-assassin-2026');
+  return password === (process.env.ADMIN_PASSWORD);
 }
 
 interface EpisodeRow {

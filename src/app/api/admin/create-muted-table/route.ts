@@ -17,7 +17,7 @@ function getSupabase() {
 export async function GET(request: NextRequest) {
   const password = request.nextUrl.searchParams.get('password');
 
-  if (password !== process.env.ADMIN_PASSWORD && password !== 'galata-assassin-2026') {
+  if (password !== process.env.ADMIN_PASSWORD) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

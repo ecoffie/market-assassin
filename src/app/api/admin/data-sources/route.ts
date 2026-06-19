@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
   const pw = request.nextUrl.searchParams.get('password');
-  if (pw !== (process.env.ADMIN_PASSWORD || 'galata-assassin-2026')) {
+  if (pw !== (process.env.ADMIN_PASSWORD)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
 

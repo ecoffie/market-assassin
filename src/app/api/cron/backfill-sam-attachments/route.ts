@@ -27,7 +27,7 @@
  * rotating so the budget is comfortable.
  *
  * Manual trigger:
- *   curl 'https://getmindy.ai/api/cron/backfill-sam-attachments?password=galata-assassin-2026&limit=100'
+ *   curl 'https://getmindy.ai/api/cron/backfill-sam-attachments?password=$ADMIN_PASSWORD&limit=100'
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
@@ -60,7 +60,7 @@ function authorized(request: NextRequest): boolean {
   }
   if (request.headers.get('x-vercel-cron')) return true;
   const password = new URL(request.url).searchParams.get('password');
-  return password === process.env.ADMIN_PASSWORD || password === 'galata-assassin-2026';
+  return password === process.env.ADMIN_PASSWORD;
 }
 
 async function sleep(ms: number) {

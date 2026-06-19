@@ -389,7 +389,7 @@ async function sendHealthAlert(metrics: HealthMetrics, date: string): Promise<vo
         : ''}
     </ul>
 
-    <p><a href="${BASE_URL}/api/admin/briefing-status?password=${process.env.ADMIN_PASSWORD || 'galata-assassin-2026'}">View Full Status</a></p>
+    <p><a href="${BASE_URL}/api/admin/briefing-status?password=${process.env.ADMIN_PASSWORD}">View Full Status</a></p>
   `;
 
   await sendEmail({
@@ -415,7 +415,7 @@ async function sendExhaustedAlert(count: number): Promise<void> {
       <li>Manually trigger briefings if needed</li>
     </ol>
 
-    <p><a href="${BASE_URL}/api/admin/briefing-dead-letter?password=${process.env.ADMIN_PASSWORD || 'galata-assassin-2026'}">View Dead Letter Queue</a></p>
+    <p><a href="${BASE_URL}/api/admin/briefing-dead-letter?password=${process.env.ADMIN_PASSWORD}">View Dead Letter Queue</a></p>
   `;
 
   await sendEmail({

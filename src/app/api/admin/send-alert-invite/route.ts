@@ -5,7 +5,7 @@ import { sendEmail } from '@/lib/send-email';
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
 const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 function getAdminClient() {
   if (!supabaseUrl || !supabaseServiceKey) return null;

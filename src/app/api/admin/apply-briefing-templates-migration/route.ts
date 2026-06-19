@@ -1,7 +1,7 @@
 /**
  * Admin endpoint to apply briefing_templates migration
  *
- * Usage: GET /api/admin/apply-briefing-templates-migration?password=galata-assassin-2026
+ * Usage: GET /api/admin/apply-briefing-templates-migration?password=$ADMIN_PASSWORD
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -22,7 +22,7 @@ function getSupabase() {
 export async function GET(request: NextRequest) {
   const password = request.nextUrl.searchParams.get('password');
 
-  if (password !== process.env.ADMIN_PASSWORD && password !== 'galata-assassin-2026') {
+  if (password !== process.env.ADMIN_PASSWORD) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

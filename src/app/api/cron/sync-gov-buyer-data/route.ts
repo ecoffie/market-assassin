@@ -35,7 +35,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { searchEntities } from '@/lib/sam/entity-api';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 // How many (NAICS,state) entity slices to pull per cron run. Bounded so
 // one invocation stays well under the SAM 1k/day cap and the timeout.

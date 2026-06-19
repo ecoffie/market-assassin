@@ -8,7 +8,7 @@
  * Synchronous — returns the actual fetch result so callers can see
  * what happened instead of guessing from logs.
  *
- * GET / POST  ?password=galata-assassin-2026&pipeline_id=<uuid>
+ * GET / POST  ?password=$ADMIN_PASSWORD&pipeline_id=<uuid>
  *   [&email=user@example.com]  — optional; auto-detected from pipeline row if omitted
  *
  * Returns:
@@ -30,7 +30,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;

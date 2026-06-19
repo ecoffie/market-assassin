@@ -8,7 +8,7 @@ import { MINDY_FROM_NAME, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/min
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const DEFAULT_LIMIT = 200;
 const DEFAULT_NAICS: string[] = [];
 const ATTENDEE_FILE = path.join(process.cwd(), 'data/bootcamp-attendees-to-enroll.txt');

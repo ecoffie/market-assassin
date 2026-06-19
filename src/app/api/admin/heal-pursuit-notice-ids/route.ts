@@ -8,7 +8,7 @@
  * cached attachments so 'Draft Proposal' auto-load works on the
  * healed pursuit.
  *
- * GET / POST ?password=galata-assassin-2026
+ * GET / POST ?password=$ADMIN_PASSWORD
  *   [&user_email=]       — heal only this user's pursuits (optional)
  *   [&dry_run=true]      — report what would change without writing
  *   [&limit=50]          — cap pursuits processed per call (default 50)
@@ -38,7 +38,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 600;  // up to 10 min — many docs, sequential
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const SAM_OPPS_URL = 'https://api.sam.gov/opportunities/v2/search';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

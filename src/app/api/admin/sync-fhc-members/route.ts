@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
 import Stripe from 'stripe';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 // FHC product IDs from Stripe
 const FHC_PRODUCT_IDS = [

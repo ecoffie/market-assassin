@@ -18,7 +18,7 @@ function authorized(request: NextRequest): boolean {
   const auth = request.headers.get('authorization');
   if (auth && auth === `Bearer ${process.env.CRON_SECRET}`) return true;
   const pw = new URL(request.url).searchParams.get('password');
-  if (pw && pw === (process.env.ADMIN_PASSWORD || 'galata-assassin-2026')) return true;
+  if (pw && pw === (process.env.ADMIN_PASSWORD)) return true;
   return false;
 }
 

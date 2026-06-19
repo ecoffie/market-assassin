@@ -59,3 +59,4 @@ backups/
 # Supabase CLI scratch — auto-rewritten on every `supabase` invocation
 supabase/.temp/
 .cta-backfill.log
+.env.local.bak*

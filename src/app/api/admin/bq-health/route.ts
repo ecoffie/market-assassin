@@ -16,7 +16,7 @@ export const maxDuration = 30;
 
 function authorized(request: NextRequest): boolean {
   const p = new URL(request.url).searchParams.get('password');
-  return p === process.env.ADMIN_PASSWORD || p === 'galata-assassin-2026';
+  return p === process.env.ADMIN_PASSWORD;
 }
 
 export async function GET(request: NextRequest) {

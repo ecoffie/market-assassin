@@ -19,7 +19,7 @@ import { isDue } from '@/lib/cron/cron-expr';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;

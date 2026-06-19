@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateRecompeteBriefing } from '@/lib/briefings/recompete';
 import nodemailer from 'nodemailer';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 /**
  * GET /api/admin/generate-recompete-briefing?password=xxx&email=xxx&format=full|condensed&send=true

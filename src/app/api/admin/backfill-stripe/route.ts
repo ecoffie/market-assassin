@@ -16,7 +16,7 @@ export async function GET(request: Request) {
   const mode = searchParams.get('mode') || 'preview'; // preview | backfill | classify
   const type = searchParams.get('type') || 'all'; // all | customers | charges | subscriptions | classify
 
-  if (password !== 'galata-assassin-2026') {
+  if (password !== process.env.ADMIN_PASSWORD) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

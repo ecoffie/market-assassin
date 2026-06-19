@@ -2,14 +2,14 @@
  * Apply MI Beta Relationships Migration
  *
  * Creates the mi_beta_contacts and related tables
- * GET /api/admin/apply-relationships-migration?password=galata-assassin-2026 - Check status
- * POST /api/admin/apply-relationships-migration?password=galata-assassin-2026 - Get SQL to run
+ * GET /api/admin/apply-relationships-migration?password=$ADMIN_PASSWORD - Check status
+ * POST /api/admin/apply-relationships-migration?password=$ADMIN_PASSWORD - Get SQL to run
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;

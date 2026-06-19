@@ -15,7 +15,7 @@ export const dynamic = 'force-dynamic';
 
 function authed(req: NextRequest): boolean {
   const pw = req.nextUrl.searchParams.get('password');
-  return pw === (process.env.ADMIN_PASSWORD || 'galata-assassin-2026');
+  return pw === (process.env.ADMIN_PASSWORD);
 }
 function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);

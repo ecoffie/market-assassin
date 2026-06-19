@@ -44,7 +44,7 @@ function isDefaultProfile(codes: string[]): boolean {
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const pw = url.searchParams.get('password');
-  if (pw !== (process.env.ADMIN_PASSWORD || 'galata-assassin-2026')) {
+  if (pw !== (process.env.ADMIN_PASSWORD)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   const execute = url.searchParams.get('mode') === 'execute';

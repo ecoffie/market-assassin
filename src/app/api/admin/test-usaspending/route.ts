@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { searchUSASpendingAwards, getUSASpendingAward } from '@/lib/sam/usaspending-fallback';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);

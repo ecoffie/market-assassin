@@ -19,7 +19,7 @@ function sb() {
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
-  if (url.searchParams.get('password') !== (process.env.ADMIN_PASSWORD || 'galata-assassin-2026')) {
+  if (url.searchParams.get('password') !== (process.env.ADMIN_PASSWORD)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   const days = Math.max(1, Math.min(180, Number(url.searchParams.get('days') || 30)));

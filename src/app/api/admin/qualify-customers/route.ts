@@ -23,7 +23,7 @@ import {
   getRecommendedAction,
 } from '@/lib/mindy/customer-segments';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 // Scoring weights from the spec
 const SCORE_WEIGHTS = {

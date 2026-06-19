@@ -161,7 +161,7 @@ function getSupabase() {
   const skipDayCheck = request.nextUrl.searchParams.get('skipDayCheck') === 'true';
   const isCatchup = request.nextUrl.searchParams.get('catchup') === 'true' || request.nextUrl.searchParams.get('force') === 'true';
   const adminPassword = request.nextUrl.searchParams.get('password');
-  const isAdminOverride = skipDayCheck && adminPassword === (process.env.ADMIN_PASSWORD || 'galata-assassin-2026');
+  const isAdminOverride = skipDayCheck && adminPassword === (process.env.ADMIN_PASSWORD);
 
   if (dayOfWeek !== 6 && !isTestMode && !isAdminOverride && !isCatchup) {
     console.log(`[SendPursuitFast] Skipped - not Saturday (day ${dayOfWeek})`);

@@ -17,7 +17,7 @@ import { resolveBriefingAudience } from '@/lib/briefings/delivery/rollout';
 import { sendEmail } from '@/lib/send-email';
 import { DEFAULT_NAICS_CODES } from '@/lib/config/defaults';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const BATCH_SIZE = 10; // Reduced to fit within 60s Vercel timeout (~6s/user)
 
 export async function GET(request: NextRequest) {

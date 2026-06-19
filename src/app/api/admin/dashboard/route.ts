@@ -2,7 +2,7 @@
  * Admin Dashboard API
  *
  * Comprehensive metrics for monitoring all GovCon Giants operations
- * GET /api/admin/dashboard?password=galata-assassin-2026
+ * GET /api/admin/dashboard?password=$ADMIN_PASSWORD
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -15,7 +15,7 @@ import path from 'path';
 export const dynamic = 'force-dynamic';
 export const revalidate = 0;
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const EMAIL_OPERATIONS_COMPLETE_HOUR_UTC = 9; // After briefings (08:30 UTC) are done - show today's data earlier
 const PAID_TIER_ACCESS_FLAGS = [
   'access_hunter_pro',

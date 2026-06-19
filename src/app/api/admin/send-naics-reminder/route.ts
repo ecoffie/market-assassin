@@ -17,7 +17,7 @@ import { kv } from '@vercel/kv';
 import nodemailer from 'nodemailer';
 import { createSecureAccessUrl } from '@/lib/access-links';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const SEND_DELAY_MS = 750;
 const CONCURRENCY_RETRY_DELAY_MS = 5000;
 const MAX_SEND_ATTEMPTS = 2;

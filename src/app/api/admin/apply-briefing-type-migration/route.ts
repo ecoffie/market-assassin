@@ -4,7 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 export async function GET(request: NextRequest) {
   // Verify admin password
   const password = request.nextUrl.searchParams.get('password');
-  if (password !== (process.env.ADMIN_PASSWORD || 'galata-assassin-2026')) {
+  if (password !== (process.env.ADMIN_PASSWORD)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -61,7 +61,7 @@ ON briefing_log(briefing_date, user_email, briefing_type);
 export async function POST(request: NextRequest) {
   // Verify admin password
   const password = request.nextUrl.searchParams.get('password');
-  if (password !== (process.env.ADMIN_PASSWORD || 'galata-assassin-2026')) {
+  if (password !== (process.env.ADMIN_PASSWORD)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

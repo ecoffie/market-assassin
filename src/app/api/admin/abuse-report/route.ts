@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getFlaggedUsers, clearAbuseFlag, getAbuseRecord, ABUSE_THRESHOLDS } from '@/lib/abuse-detection';
 import { checkAdminRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 /**
  * Admin endpoint to view and manage abuse reports

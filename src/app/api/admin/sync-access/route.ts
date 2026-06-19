@@ -17,7 +17,7 @@ import { checkAdminRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-
  *   POST /api/admin/sync-access?password=xxx&mode=execute     - Execute fixes
  */
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 interface AccessRecord {
   email: string;

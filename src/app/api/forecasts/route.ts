@@ -5,7 +5,7 @@ import { loadDodaacNames } from '@/lib/gov-contacts/dodaac-directory';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 function hasAdminAccess(request: NextRequest): boolean {
   const { searchParams } = new URL(request.url);

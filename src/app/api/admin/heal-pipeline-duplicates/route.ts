@@ -69,7 +69,7 @@ interface PipelineRow {
 
 async function handle(request: NextRequest, execute: boolean) {
   const password = request.nextUrl.searchParams.get('password');
-  if (password !== (process.env.ADMIN_PASSWORD || 'galata-assassin-2026')) {
+  if (password !== (process.env.ADMIN_PASSWORD)) {
     return unauthorized();
   }
 

@@ -1000,7 +1000,7 @@ export async function POST(request: NextRequest) {
   });
 }
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 /**
  * GET endpoint - runs the cron job when called by Vercel cron

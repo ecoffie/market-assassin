@@ -463,7 +463,7 @@ export async function POST(request: NextRequest) {
   // Verify cron secret
   const authHeader = request.headers.get('authorization');
   const adminPassword = request.nextUrl.searchParams.get('password');
-  const hasAdminPassword = adminPassword === (process.env.ADMIN_PASSWORD || 'galata-assassin-2026');
+  const hasAdminPassword = adminPassword === (process.env.ADMIN_PASSWORD);
   if (authHeader !== `Bearer ${process.env.CRON_SECRET}` && !hasAdminPassword) {
     if (process.env.NODE_ENV === 'production') {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -492,7 +492,7 @@ export async function GET(request: NextRequest) {
   const authHeader = request.headers.get('authorization');
   const hasCronSecret = authHeader === `Bearer ${process.env.CRON_SECRET}`;
   const adminPassword = request.nextUrl.searchParams.get('password');
-  const hasAdminPassword = adminPassword === (process.env.ADMIN_PASSWORD || 'galata-assassin-2026');
+  const hasAdminPassword = adminPassword === (process.env.ADMIN_PASSWORD);
 
   // Run the job if triggered by Vercel cron or has CRON_SECRET
   if (isVercelCron || hasCronSecret || hasAdminPassword) {

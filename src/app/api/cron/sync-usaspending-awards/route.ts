@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const USASPENDING_API = 'https://api.usaspending.gov/api/v2/search/spending_by_award';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

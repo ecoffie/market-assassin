@@ -7,7 +7,7 @@ import {
   saveBriefingRolloutConfig,
 } from '@/lib/briefings/delivery/rollout';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 function getAdminClient() {
   return createClient(

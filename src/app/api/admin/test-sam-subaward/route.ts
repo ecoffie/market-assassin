@@ -16,7 +16,7 @@ import {
 } from '@/lib/sam/subaward-api';
 import { getRateLimitStatus } from '@/lib/sam/utils';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);

@@ -7,7 +7,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { postSlackMessage } from '@/lib/slack/post-message';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 type SegmentKey = 'activation' | 'founder' | 'sales' | 'rescue';
 

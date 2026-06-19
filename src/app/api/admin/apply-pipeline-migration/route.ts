@@ -2,13 +2,13 @@
  * Apply Pipeline Migration
  *
  * Creates the pipeline tracker tables for BD Assist
- * POST /api/admin/apply-pipeline-migration?password=galata-assassin-2026
+ * POST /api/admin/apply-pipeline-migration?password=$ADMIN_PASSWORD
  */
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 // Lazy initialization to avoid build-time errors
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

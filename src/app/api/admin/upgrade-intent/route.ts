@@ -17,7 +17,7 @@ import {
   topFeature,
 } from '@/lib/mindy/upgrade-intent';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';

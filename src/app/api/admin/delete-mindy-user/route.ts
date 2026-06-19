@@ -43,7 +43,7 @@ const USER_EMAIL_TABLES = [
 
 function authorized(request: NextRequest): boolean {
   const password = new URL(request.url).searchParams.get('password');
-  return password === process.env.ADMIN_PASSWORD || password === 'galata-assassin-2026';
+  return password === process.env.ADMIN_PASSWORD;
 }
 
 function getSupabase() {

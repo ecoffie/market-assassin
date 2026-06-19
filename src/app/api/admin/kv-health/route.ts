@@ -19,7 +19,7 @@ import {
 } from '@/lib/kv-resilience';
 import { createClient } from '@supabase/supabase-js';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 function verifyAuth(request: NextRequest): boolean {
   const { searchParams } = new URL(request.url);

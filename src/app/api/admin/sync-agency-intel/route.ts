@@ -19,7 +19,7 @@ import {
   fetchers,
 } from '@/lib/agency-intelligence';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 export async function GET(request: NextRequest) {
   const password = request.nextUrl.searchParams.get('password');

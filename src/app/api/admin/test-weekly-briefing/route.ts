@@ -8,7 +8,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generateWeeklyBriefing, WeeklyBriefing } from '@/lib/briefings/delivery/weekly-briefing-generator';
 import { sendEmail } from '@/lib/send-email';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);

@@ -12,7 +12,7 @@ import { generateAIBriefing } from '@/lib/briefings/delivery/ai-briefing-generat
 import { generateAIEmailTemplate } from '@/lib/briefings/delivery/ai-email-template';
 import { sendEmail } from '@/lib/send-email';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const hasAnthropicBriefingKey = () => !!(process.env.BRIEFING_ANTHROPIC_API_KEY || process.env.ANTHROPIC_API_KEY);
 
 export async function GET(request: NextRequest) {

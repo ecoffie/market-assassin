@@ -12,7 +12,7 @@ import { generateBidTargetEmail, BidTargetEmailData, BidTargetOpportunity } from
 import { calculateBidScore, generateWinReasons, generateActionSteps } from '@/lib/briefings/win-probability';
 import { sendEmail } from '@/lib/send-email';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const SAM_API_KEY = process.env.SAM_API_KEY;
 
 interface SamOpportunity {

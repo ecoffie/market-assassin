@@ -18,7 +18,7 @@ function sb() {
 
 export async function GET(request: NextRequest) {
   const pw = request.nextUrl.searchParams.get('password');
-  if (pw !== (process.env.ADMIN_PASSWORD || 'galata-assassin-2026')) {
+  if (pw !== (process.env.ADMIN_PASSWORD)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   const days = Math.min(Number(request.nextUrl.searchParams.get('days') || 30), 90);

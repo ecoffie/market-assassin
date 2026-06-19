@@ -28,7 +28,7 @@ function getSupabase() {
 
 function authed(request: NextRequest): boolean {
   const pw = request.nextUrl.searchParams.get('password');
-  return !!pw && pw === (process.env.ADMIN_PASSWORD || 'galata-assassin-2026');
+  return !!pw && pw === (process.env.ADMIN_PASSWORD);
 }
 
 async function run(execute: boolean) {

@@ -19,7 +19,7 @@ import { buildReport, toSlackBlocks } from '@/lib/gsc/report';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 function authorized(req: NextRequest): boolean {
   if (req.headers.get('x-vercel-cron') === '1') return true;

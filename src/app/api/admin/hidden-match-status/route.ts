@@ -15,7 +15,7 @@ import { userInRollout } from '@/lib/intelligence/feature-flag';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 export async function GET(request: NextRequest) {
   if (request.nextUrl.searchParams.get('password') !== ADMIN_PASSWORD) {

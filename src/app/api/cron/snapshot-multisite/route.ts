@@ -50,7 +50,7 @@ import type {
 // CONFIGURATION
 // ============================================================================
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 // Supabase client
 function getSupabase() {

@@ -55,7 +55,7 @@ async function fetchAll<T>(q: (from: number, to: number) => PromiseLike<{ data: 
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
-  if (url.searchParams.get('password') !== (process.env.ADMIN_PASSWORD || 'galata-assassin-2026')) {
+  if (url.searchParams.get('password') !== (process.env.ADMIN_PASSWORD)) {
     return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
   }
   const sampleN = Math.max(1, Math.min(50, Number(url.searchParams.get('samples') || 15)));

@@ -15,7 +15,7 @@ import { createSecureAccessUrl } from '@/lib/access-links';
 import { persistSentAlert } from '@/lib/alerts/delivery-log';
 import { MINDY_APP_URL, MINDY_FROM_NAME, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const SHOP_ADMIN_PASSWORD = 'admin123';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

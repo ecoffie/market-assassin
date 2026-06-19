@@ -10,7 +10,7 @@ import { createClient } from '@supabase/supabase-js';
 
 export async function POST(request: NextRequest) {
   const password = request.nextUrl.searchParams.get('password');
-  const expectedPassword = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+  const expectedPassword = process.env.ADMIN_PASSWORD;
 
   if (password !== expectedPassword) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -78,7 +78,7 @@ function getSupabase() {
 
 export async function GET(request: NextRequest) {
   const password = request.nextUrl.searchParams.get('password');
-  const expectedPassword = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+  const expectedPassword = process.env.ADMIN_PASSWORD;
 
   if (password !== expectedPassword) {
     return NextResponse.json({

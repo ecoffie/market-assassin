@@ -6,7 +6,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { postSlackMessage } from '@/lib/slack/post-message';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 function internalBaseUrl(request: NextRequest): string {
   const host = request.headers.get('x-forwarded-host') || request.headers.get('host');

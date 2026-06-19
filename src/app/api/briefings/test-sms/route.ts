@@ -8,7 +8,7 @@
 import { NextResponse } from 'next/server';
 import twilio from 'twilio';
 
-const ADMIN_PASSWORD = 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 export async function POST(request: Request) {
   const body = await request.json();

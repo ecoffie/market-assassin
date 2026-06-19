@@ -20,7 +20,7 @@ import { fetchUpgradeEngagementRows } from '@/lib/mindy/upgrade-intent';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const MONTHLY_GOAL = 100_000;
 const PRO_PRICE = 149;
 

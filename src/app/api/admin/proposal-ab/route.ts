@@ -27,7 +27,7 @@ function unauthorized() {
 
 export async function POST(request: NextRequest) {
   const password = request.nextUrl.searchParams.get('password');
-  if (password !== (process.env.ADMIN_PASSWORD || 'galata-assassin-2026')) {
+  if (password !== (process.env.ADMIN_PASSWORD)) {
     return unauthorized();
   }
 

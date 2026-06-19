@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/send-email';
 
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'galata-assassin-2026';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 interface ProfileIssue {
   type: 'too_many_naics' | 'no_keywords' | 'no_agencies' | 'no_location' | 'generic_business_type';
