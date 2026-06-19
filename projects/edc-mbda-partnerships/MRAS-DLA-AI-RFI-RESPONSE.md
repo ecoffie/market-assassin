@@ -133,6 +133,10 @@ their cleared staff execute correctly. Flag on the call: source of cleared AI/ML
 - NAICS 541511: ✓ · GSA contract: Servexo's vehicle(s)
 - Capability website: **getmindy.ai** (+ Servexo's)
 
+## STATUS
+- [x] **Sent to JP (John Palmer, Servexo) — Jun 19** (email + Mindy-AI-Capability PDF). Awaiting his
+      reply / the 20-min call. Submission deadline **Sun 6/22 5pm ET** (Servexo submits via MRAS survey).
+
 ## TODO before 6/22
 - [ ] Send the John email → 20-min call
 - [ ] Confirm the cleared-AI-LCAT source (Q3 honest gap)
