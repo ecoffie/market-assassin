@@ -644,7 +644,7 @@ alert filters** with **fear-of-loss framing** from the market-coverage story (§
 real FY2025 USASpending proof (drones 70+ buying codes, cybersecurity/medical up to
 74% hidden). CTAs link to `/alerts/preferences` keyword setup, not a generic dashboard.
 Every email also promotes **Mindy v1.0 is now live** (positioning + platform CTA) and
-the **June 27 Mindy Bootcamp** (§29).
+the **June 27 Mindy Day** unveil (§29; renamed from "Bootcamp").
 
 **Why:** Gain framing ("get better matches") converts weaker than loss framing
 ("you're missing three-quarters of contracts that match your business"). Literature
@@ -852,22 +852,30 @@ buyers for a product".
 - "medical supplies" → **$25.2M**, **35 NAICS** codes (91% across 7), obvious code =
   25%, top PSC **6515 Medical & Surgical Instruments/Equipment/Supplies**.
 
-## 29. Live Mindy Bootcamp — registration pinned to the top of the homepage
+## 29. Mindy Day — the live product unveil (renamed from "Bootcamp", June 27)
 
-**What:** A top announcement bar across the Mindy homepage promotes the free live
-Mindy Bootcamp (launch June 27) and links straight to the GovCon Giants registration
-page (govcongiants.com/mindy-launch). Pinned above the hero so every visitor sees it.
+**What:** A top announcement bar across the Mindy homepage promotes **Mindy Day** — the
+free live product unveil (June 27) — and links to the GovCon Giants registration page
+(govcongiants.com/mindy-launch). Pinned above the hero. Reframed from "Mindy Bootcamp"
+to "Mindy Day" as part of the training→tools brand shift: the event opens cold on a live
+demo (Mindy finding a real expiring contract in 30s), features a real customer, and
+unveils one new capability — not a how-to class. (See `docs/strategy/MINDY-DAY-JUN27-RUNBOOK.md`.)
 
-**Why:** A live, hands-on session is the fastest way to convert a curious visitor into
-an activated user — they see Mindy win real contracts with AI before they sign up. The
-top-of-page placement is the standard for a time-sensitive launch and doesn't disrupt
-the existing free-signup and beta-setup paths below it.
+**Why:** "Bootcamp" is a *training* word; Mindy is a *tool*. The unveil format — watch
+the machine do the work, live — converts a curious visitor faster than a class, and
+positions Eric as the GovCon-tech founder, not the trainer. The recording becomes the
+proof reel that earns the major-stage keynotes (see `docs/strategy/MINDY-STAGE-STRATEGY.md`).
 
-**SEO:** "federal contracting bootcamp", "win government contracts with AI", "GovCon
-AI training", "Mindy launch".
+**SEO:** "win government contracts with AI", "federal contract software demo", "Mindy
+Day", "AI for GovCon", "find federal contracts automatically". (Dropped "bootcamp/
+training" terms — off-brand for the tools positioning.)
 
-**Proof:** Registration page live (HTTP 200) — "Meet Mindy — The AI BD Analyst for
-Federal Small Business | Live Launch June 27 | GovCon Giants".
+**Proof:** Registration page — "Meet Mindy — The AI BD Analyst for Federal Small
+Business | Mindy Day, June 27 | GovCon Giants". Announcement bar copy: "Mindy Day —
+watch it find you federal contracts, live."
+
+**NOTE for content team:** the 8,803-lead "bootcamp" attribution tag stays as-is (it's
+the real source label, not the event) — only user-facing EVENT copy renamed.
 
 ## 30. Agency pages, now backed by the real databases (10 pain points, budget, contacts)
 

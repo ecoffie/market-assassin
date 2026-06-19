@@ -31,9 +31,9 @@ export const ALERT_MARKETING = {
 export const ALERT_BOOTCAMP = {
   dateLabel: 'Saturday, June 27, 2026',
   shortDate: 'June 27',
-  title: 'Mindy Bootcamp',
+  title: 'Mindy Day',
   tagline:
-    'The fastest way to see Mindy win real federal contracts with AI — live, hands-on, before you configure a thing',
+    'Watch Mindy find real federal contracts, live — the product unveil. See it work before you configure a thing.',
   url: 'https://govcongiants.com/mindy-launch',
   registerLabel: 'Save Your Seat — Free →',
 } as const;

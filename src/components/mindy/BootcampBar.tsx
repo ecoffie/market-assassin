@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react';
 
 /**
- * Top announcement bar for the live Mindy Bootcamp (launch June 27).
+ * Top announcement bar for Mindy Day — the live product unveil (June 27).
  * Pinned above the hero on the homepage. Dismissible — the × stores a flag in
  * localStorage so a returning visitor who closed it doesn't see it again.
  *
@@ -42,13 +42,13 @@ export function BootcampBar() {
       >
         <span className="inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
           <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold uppercase tracking-wide">Free Live · June 27</span>
-          <span>🚀 Mindy Bootcamp — see how to win federal contracts with AI, live</span>
+          <span>🚀 Mindy Day — watch it find you federal contracts, live</span>
           <span className="underline underline-offset-2">Register free →</span>
         </span>
       </a>
       <button
         onClick={dismiss}
-        aria-label="Dismiss bootcamp announcement"
+        aria-label="Dismiss Mindy Day announcement"
         className="absolute right-2 top-1/2 -translate-y-1/2 flex h-6 w-6 items-center justify-center rounded-full text-white/80 hover:bg-white/20 hover:text-white transition-colors"
       >
         <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
