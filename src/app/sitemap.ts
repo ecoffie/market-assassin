@@ -29,6 +29,7 @@ import { BLOG_POSTS } from '@/data/blog-posts';
 import { NAICS_TOP_100 } from '@/data/naics-top100';
 import { AGENCIES_SEO } from '@/data/agencies-seo';
 import { getOpportunitySlugsForSitemap } from '@/lib/seo/opportunities';
+import { getFacetSlugsForSitemap } from '@/lib/seo/facets';
 import { LISTICLES } from '@/data/top-listicles';
 
 // Canonical SEO domain. Per [memory: mindy-domain-routing] updated
@@ -267,6 +268,30 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     opportunityEntries = [];
   }
 
+  // Phase-2 faceted pages: NAICS×state, PSC, set-aside×NAICS. Elon mode —
+  // index every facet with ≥1 active opp; enrich the winners later (Phase 4).
+  // Fail-safe to empty so a facet query never breaks the sitemap.
+  let facetEntries: MetadataRoute.Sitemap = [];
+  try {
+    const f = await getFacetSlugsForSitemap();
+    facetEntries = [
+      ...f.naicsState.map((x) => ({
+        url: `${SITE_URL}/naics/${x.naics}/${x.state.toLowerCase()}`,
+        lastModified: now, changeFrequency: 'daily' as const, priority: 0.6,
+      })),
+      ...f.psc.map((code) => ({
+        url: `${SITE_URL}/psc/${code.toLowerCase()}`,
+        lastModified: now, changeFrequency: 'daily' as const, priority: 0.6,
+      })),
+      ...f.setAsideNaics.map((x) => ({
+        url: `${SITE_URL}/set-aside/${x.setAside}/${x.naics}`,
+        lastModified: now, changeFrequency: 'daily' as const, priority: 0.7,
+      })),
+    ];
+  } catch {
+    facetEntries = [];
+  }
+
   return [
     ...topLevel,
     ...contractorEntries,
@@ -277,5 +302,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...setAsideEntries,
     ...listicleEntries,
     ...opportunityEntries,
+    ...facetEntries,
   ];
 }

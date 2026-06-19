@@ -44,9 +44,45 @@ data IS deal-diligence data). High-tier credibility + a second revenue vertical,
 4. **Persona pages** — `/for-primes`, `/for-investors` (M&A/depth play, high-tier credibility).
 5. Sitemap + robots + structured data (JSON-LD) on all → indexability.
 
-## Guardrails (memories)
-- **No thin pages** — GSC penalizes them (we've hit `fix/sitemap-gate-thin-subpages`). Gate weak
-  pages out of the sitemap; only index pages with real content.
+## ⭐ BIG-TECH SEO ROADMAP (Eric: "what would big SaaS/big tech do?") — June 19
+The Zillow/Yelp/G2/Crunchbase playbook: don't index a subset, **own the entire index.** It's a
+SEQUENCE, not a menu — each phase unlocks the next. Build straight through.
+
+**Phase 1 — Opportunity pages** ✅ SHIPPED (`/opportunity/[slug]`, ~34k, similar-opp cross-links).
+The atom.
+
+**Phase 2 — Faceted page explosion** (NEXT — pure data, biggest multiplier, no LLM)
+`/naics/[code]/[state]`, `/agency/[x]/naics/[y]`, `/set-aside/[type]/[naics]`, `/psc/[code]`,
+`/state/[st]/[naics]`. Every INTERSECTION = a page (Yelp: "plumbers in Austin 78704"). 34k → 100k+.
+Creates the HUB pages the opp pages link up into → build hubs before the link-web matters.
+
+**Phase 3 — Contractor + vs/alternatives pages** (highest commercial intent; reuses Phase-2 infra)
+317k contractor pages + `/[contractor]-vs-[contractor]` + `/alternatives/[competitor]` (G2 playbook).
+People searching contractors/competitors are close to buying.
+
+**Phase 4 — AI-generated analysis per page** (the moat + unlocks "thin" pages)
+Mindy's LLM writes a UNIQUE, data-grounded paragraph per page ("who wins this work, why it matters").
+Sits ON TOP of all pages from 1–3 → build after the skeletons exist. This makes thin pages
+NOT-thin → retroactively indexes the 78k empty-description opps we'd otherwise gate. The 2026 AI-SEO
+play; Mindy is uniquely positioned (we have the data + the LLM).
+
+**Phase 5 — Indexation engineering** (woven throughout, ramps at the end)
+Sitemap INDEX files (millions of URLs, not the 20k cap), IndexNow ping, max internal-link density
+(20–50 links/page), enrich-don't-gate. Gets 100k+ pages actually crawled.
+
+```
+P1 opp atoms ✅ → P2 faceted hubs (data) → P3 contractors+vs (intent) → P4 AI enrich (moat) ⟂ P5 indexation
+```
+
+## Guardrails — REFRAMED (Eric: "forget my guardrails, go big-tech")
+- **OLD (timid):** gate thin pages out of the sitemap. **NEW (big-tech):** don't HIDE thin pages —
+  make them NOT-thin (Phase 4 AI enrichment + pull SOW + similar awards). Zillow never 404s a boring
+  house; it enriches it until it ranks. Phase 1 still gates (no enrichment yet); Phase 4 flips the gate
+  to "enrich + index everything."
+- **The ONE real limit (not timidity):** Google penalizes DOORWAY/spam pages (mass pages, zero unique
+  value). Big-tech answer = "make each page genuinely useful AT SCALE" (engineering+data), NOT "make
+  fewer pages." That's the bar: every page must answer a real query with real data.
+- Real data only (rule #1); brand-led distribution (GovCon Giants) on getmindy.ai + govcongiants.com.
 - **Brand drives it** — host on getmindy.ai + govcongiants.com; GovCon Giants brand = the
   distribution layer (the "Nike" moat), Mindy = the product (keep exit-separation clean).
 - **Real data only** (rule #1) — every page from SAM/USASpending/BQ, never fabricated.

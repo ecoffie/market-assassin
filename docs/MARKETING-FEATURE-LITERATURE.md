@@ -2224,3 +2224,34 @@ opportunity, [agency] contract opportunity, government contract [title], who is 
 (opportunity block, capped, thin-gated). Verified live: a real CBP/DHS opportunity (NAICS 334220)
 resolves by slug and returns 6 NAICS-matched similar opportunities; production build emits the
 route as SSG/ISR. Every field is from sam_opportunities (SAM.gov) — no fabricated content.
+
+---
+
+## Programmatic SEO Phase 2 — faceted opportunity pages (June 19, 2026)
+
+**What:** Three new families of faceted, indexable pages: NAICS×state
+(`/naics/[code]/[state]` — "NAICS 541512 opportunities in Florida"), PSC
+(`/psc/[code]` — the product-service-code axis we previously lacked), and
+set-aside×NAICS (`/set-aside/8a/[naics]` — "8(a) opportunities in NAICS X"). Each
+lists the matching active SAM opportunities, cross-links to the per-opportunity pages
+and the parent NAICS page, and carries a free-alerts CTA. ~900 facet pages emitted to
+the sitemap today, growing as opportunities post.
+
+**Why:** This is the Yelp/Zillow faceting pattern — capture the long-tail "what + where"
+and "what + who-qualifies" searches a contractor actually types ("8(a) construction
+contracts in Texas," "PSC R425 opportunities"). Every intersection of code × geography ×
+set-aside is its own indexable page, multiplying the surface beyond the per-opportunity
+pages from Phase 1. PSC pages also close a real gap vs. competitors (HigherGov indexes
+PSC; we didn't). Shipped fast and indexed broadly — the pages that earn impressions get
+enriched with award-data and AI analysis in later phases (ship → measure → enrich).
+
+**SEO:** naics [code] [state], 8(a) contracts in [state], hubzone opportunities naics
+[code], psc [code] federal contracts, [set-aside] set aside [naics], product service
+code [code], small business set aside [naics].
+
+**Proof:** `src/lib/seo/facets.ts` (3 facet queries + sitemap slug generator),
+`src/components/seo/FacetPage.tsx` (shared layout), routes
+`src/app/naics/[code]/[state]/page.tsx`, `src/app/psc/[code]/page.tsx`,
+`src/app/set-aside/[type]/[naics]/page.tsx`, sitemap wired in `src/app/sitemap.ts`.
+Verified live: 906 facet pages (325 NAICS×state + 356 PSC + 225 set-aside×NAICS) from
+real sam_opportunities data; production build emits all three as SSG/ISR. Real data only.
