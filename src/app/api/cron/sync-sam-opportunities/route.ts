@@ -176,7 +176,10 @@ function mapToDbRecord(opp: SamOpportunity) {
     naics_code: opp.naicsCode || null,
     psc_code: opp.classificationCode || null,
     department: opp.department?.name || opp.fullParentPathName?.split('.')[0] || null,
-    sub_tier: opp.subtierAgency?.name || null,
+    // SAM's subtierAgency.name is null for most DoD notices, which left sub_tier 100%
+    // null and made Navy/Army/AF/DLA slicing impossible. Fall back to position 2 of the
+    // hierarchy path (the service branch / sub-agency), same pattern as department above.
+    sub_tier: opp.subtierAgency?.name || opp.fullParentPathName?.split('.')[1]?.trim() || null,
     office: opp.office?.name || null,
     agency_hierarchy: opp.fullParentPathName || null,
     posted_date: parseSamDate(opp.postedDate),

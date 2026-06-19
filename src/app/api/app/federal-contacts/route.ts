@@ -476,9 +476,28 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // Emailable count (honest reachability) within the SAME filters — ~40% of
+  // federal_contacts have an email; SAM POCs often don't. Surfacing this stops the
+  // headline total from overstating how many are actually contactable.
+  let emailableTotal: number | null = null;
+  try {
+    let eq = sb.from('federal_contacts').select('id', { count: 'exact', head: true }).not('contact_email', 'is', null);
+    if (search) eq = eq.or(`contact_fullname.ilike.%${search}%,contact_title.ilike.%${search}%`);
+    if (agency) {
+      const parentKeyword = subAgencyToParent(agency);
+      const keyword = parentKeyword || agency.replace(/\b(department|dept|of|the|agency|administration|us|u\.s\.|,)\b/gi, ' ').replace(/\s{2,}/g, ' ').trim();
+      eq = keyword.length >= 3 ? eq.ilike('department_ind_agency', `%${keyword}%`) : eq.ilike('department_ind_agency', `%${agency}%`);
+    }
+    if (office) eq = eq.ilike('office', `%${office}%`);
+    if (role) eq = eq.eq('role_category', role);
+    const { count: ec } = await eq;
+    emailableTotal = ec ?? null;
+  } catch { /* non-fatal; UI falls back to total only */ }
+
   return NextResponse.json({
     success: true,
     total: count ?? contacts.length, // pre-dedupe total (approx; for "X of N")
+    emailableTotal,                  // contacts with an email on file (honest reachability)
     count: contacts.length,
     offset,
     limit,

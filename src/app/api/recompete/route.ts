@@ -196,7 +196,11 @@ export async function GET(request: NextRequest) {
   maxDate.setMonth(maxDate.getMonth() + monthsAhead);
   query = query
     .gt('period_of_performance_current_end', new Date().toISOString().split('T')[0])
-    .lte('period_of_performance_current_end', maxDate.toISOString().split('T')[0]);
+    .lte('period_of_performance_current_end', maxDate.toISOString().split('T')[0])
+    // Data-quality quarantine: hide rows flagged with corrupt values (implausible
+    // $2.8T / round-number placeholders) — they'd sort to the top of the value view
+    // and look fake on stage. Reversible; nothing deleted. (migration 20260619)
+    .is('quality_flag', null);
 
   // NAICS filter
   if (naicsParam) {

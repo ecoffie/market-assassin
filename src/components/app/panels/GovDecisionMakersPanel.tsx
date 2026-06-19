@@ -39,6 +39,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
   const [contacts, setContacts] = useState<Contact[]>([]);
   const [agencies, setAgencies] = useState<string[]>([]);
   const [total, setTotal] = useState(0);
+  const [emailableTotal, setEmailableTotal] = useState<number | null>(null);
   const [search, setSearch] = useState('');
   const [agency, setAgency] = useState('');
   const [officeDetail, setOfficeDetail] = useState<Array<{ name: string; amount: number; awards: number }>>([]);
@@ -172,6 +173,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
       if (d.success) {
         setContacts(d.contacts || []);
         setTotal(d.total || 0);
+        setEmailableTotal(typeof d.emailableTotal === 'number' ? d.emailableTotal : null);
       } else {
         setError(d.error || 'Search failed');
         setContacts([]);
@@ -200,7 +202,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
       <div>
         <h1 className="text-2xl font-bold text-white">Government Decision Makers</h1>
         <p className="text-slate-400 mt-1">
-          Search {total ? total.toLocaleString() : ''} federal contacts from SAM — contracting officers and points of contact.
+          Search {total ? total.toLocaleString() : ''} federal contacts from SAM{emailableTotal != null ? ` (${emailableTotal.toLocaleString()} with email on file)` : ''} — contracting officers and points of contact.
           <span className="text-slate-500 ml-2 text-sm">Filter by agency &amp; office.</span>
         </p>
       </div>
