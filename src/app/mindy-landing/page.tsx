@@ -102,8 +102,8 @@ export default function MindyLandingPage() {
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
       />
 
-      {/* TOP ANNOUNCEMENT BAR — the live Mindy Bootcamp. Pinned above the hero so
-          every arrival sees it; the standard placement for a time-sensitive launch.
+      {/* TOP ANNOUNCEMENT BAR — Mindy Day, the live product unveil (renamed from
+          "Bootcamp"; training→tools). Pinned above the hero so every arrival sees it.
           Dismissible (× → localStorage); links to the GovCon Giants registration page. */}
       <BootcampBar />
 
