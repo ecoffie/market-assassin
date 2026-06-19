@@ -19,6 +19,17 @@
 - [x] **Strategy locked** (docs in `projects/edc-mbda-partnerships/`): master thesis, HigherGov
   teardown, CSO/OTA revenue map, SBIR vehicle sweep, DLA-NV012 partner kit, ClickFunnels playbook.
 
+### GSC — DONE (Jun 19)
+- [x] getmindy.ai already a verified GSC property (29.1K impressions / 0.6% CTR / **14.3 avg position**
+  over 3mo — page-2 territory; the SEO machine + P4 enrichment targets raising that).
+- [x] Submitted `sitemap-index.xml` (→ lists sitemap.xml + sitemap-opportunities.xml). Verified the
+  index serves valid XML to Googlebot (HTTP 200, application/xml). Status showed "Couldn't fetch" =
+  normal fresh-submission lag; CONFIRMED "Success" (Sitemap index type) within ~1 min.
+- Old standalone `getmindy.ai/sitemap.xml` still submitted (11,078 pages, harmless — also in the index).
+- GSC reporting tool exists in **govcon-funnels** (`src/lib/gsc/`, READ-ONLY, scoped to
+  `sc-domain:govcongiants.com`) → **next session: repoint/extend to getmindy.ai** to monitor the new
+  SEO pages' impressions/position (feeds the build→measure→enrich loop).
+
 ### IN PROGRESS (self-completing, no action needed)
 - [ ] **SEO enrichment backlog drain** — 3,132/34,440 done at handoff, RESUMABLE
   (`npx tsx scripts/drain-seo-enrich.ts`), and the hourly `enrich-opportunity-seo` cron backstops
