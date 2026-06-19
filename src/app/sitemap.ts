@@ -28,6 +28,7 @@ import { glossaryTerms } from '@/data/glossary';
 import { BLOG_POSTS } from '@/data/blog-posts';
 import { NAICS_TOP_100 } from '@/data/naics-top100';
 import { AGENCIES_SEO } from '@/data/agencies-seo';
+import { getOpportunitySlugsForSitemap } from '@/lib/seo/opportunities';
 import { LISTICLES } from '@/data/top-listicles';
 
 // Canonical SEO domain. Per [memory: mindy-domain-routing] updated
@@ -248,6 +249,24 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     priority: 0.8,
   }));
 
+  // Per-opportunity pages (/opportunity/[slug]) — the biggest SEO surface
+  // (~34k active opps). Only INDEXABLE (non-thin) opps are emitted; the lib
+  // gates on a real title + body so Google never sees a thin page. Capped to
+  // keep the sitemap well under the 50k URL limit. Failure → empty (never
+  // breaks the sitemap).
+  let opportunityEntries: MetadataRoute.Sitemap = [];
+  try {
+    const opps = await getOpportunitySlugsForSitemap();
+    opportunityEntries = opps.map((o) => ({
+      url: `${SITE_URL}/opportunity/${o.slug}`,
+      lastModified: o.lastModified,
+      changeFrequency: 'daily',
+      priority: 0.6,
+    }));
+  } catch {
+    opportunityEntries = [];
+  }
+
   return [
     ...topLevel,
     ...contractorEntries,
@@ -257,5 +276,6 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     ...agencyEntries,
     ...setAsideEntries,
     ...listicleEntries,
+    ...opportunityEntries,
   ];
 }

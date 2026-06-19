@@ -2195,3 +2195,32 @@ USASpending; the state filter scopes by place-of-performance and honors the exac
 chosen. Backed by an automated truth-check that re-derives each number from USASpending on
 every deploy and fails the build if a filter ever stops constraining results. Marketing
 literature updated (rule #8).
+
+---
+
+## Programmatic SEO Phase 1 — public opportunity pages (June 19, 2026)
+
+**What:** Every active SAM opportunity (~34,000) now has a public, indexable landing page at
+`getmindy.ai/opportunity/[slug]` — title, agency, NAICS/PSC, set-aside, deadline, full
+description, a "Track this in Mindy" CTA, and a **"Similar Active Opportunities"** block that
+cross-links to other opportunities in the same NAICS. Pages carry GovernmentService +
+BreadcrumbList JSON-LD and are emitted in the sitemap. ISR-cached; thin opportunities (no real
+body) are 404'd and kept out of the sitemap so Google never sees a low-value page.
+
+**Why:** The biggest competitor in GovCon market intelligence wins organic search by owning the
+index — a public page for every opportunity, NAICS, and agency, densely cross-linked. Every
+"<title> government contract" or "NAICS X opportunity" search lands on their page. Mindy already
+had the contractor/agency/NAICS page layer and the data (88K SAM opportunities); this adds the
+single biggest missing surface — the per-opportunity page — turning the opportunity database into
+~34,000 indexable top-of-funnel pages. It's the organic-acquisition engine that pairs with the
+free-alerts → Pro funnel: a contractor searching a specific solicitation finds Mindy, not just
+SAM.gov.
+
+**SEO:** federal contract opportunity, [solicitation number], sam.gov opportunity, NAICS [code]
+opportunity, [agency] contract opportunity, government contract [title], who is bidding on.
+
+**Proof:** `src/app/opportunity/[slug]/page.tsx` (the page) + `src/lib/seo/opportunities.ts`
+(slug ↔ row resolution, indexable-gate, NAICS-matched similar set) + `src/app/sitemap.ts`
+(opportunity block, capped, thin-gated). Verified live: a real CBP/DHS opportunity (NAICS 334220)
+resolves by slug and returns 6 NAICS-matched similar opportunities; production build emits the
+route as SSG/ISR. Every field is from sam_opportunities (SAM.gov) — no fabricated content.
