@@ -25,6 +25,7 @@
 
 import { createClient, SupabaseClient } from '@supabase/supabase-js';
 import { buildLooseRagSearchQuery } from './query';
+import { scrubPii } from './scrub-pii';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: SupabaseClient<any> | null = null;
@@ -135,7 +136,11 @@ export async function retrieveRagContext(opts: RetrieveOptions): Promise<RagChun
     out.push({
       document_id: row.document_id,
       chunk_index: row.chunk_index,
-      chunk_text: row.chunk_text,
+      // Scrub contact PII (emails/phones/SSNs) before the text leaves
+      // retrieval — Mindy Chat & Proposal Assist both ground on these
+      // chunks and must never volunteer a real person's contact details.
+      // See scrub-pii.ts.
+      chunk_text: scrubPii(row.chunk_text || ''),
       doc_title: row.doc_title,
       doc_type: row.doc_type,
       doc_top_level_folder: row.doc_top_level_folder,

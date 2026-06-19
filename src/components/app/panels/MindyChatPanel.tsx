@@ -18,6 +18,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
+import { UpgradeModal } from '../UpgradeModal';
 
 interface MindyChatPanelProps {
   email: string | null;
@@ -64,10 +65,17 @@ function renderMessageContent(content: string) {
   return <span className="whitespace-pre-wrap">{cleaned}</span>;
 }
 
-export default function MindyChatPanel({ email, tier: _tier, onPanelChange }: MindyChatPanelProps) {
+export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChatPanelProps) {
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [input, setInput] = useState('');
   const [isStreaming, setIsStreaming] = useState(false);
+  // Pro gate (Eric, Jun 2026): Mindy Chat retrieves from the proprietary KB,
+  // so it's Pro-only. The /api/app/chat route enforces this server-side (403
+  // pro_required); the modal is the friendly client-side surface. We open it
+  // pre-emptively for known-free users and as a fallback if the API 403s
+  // (covers stale tier props after a downgrade).
+  const [showUpgrade, setShowUpgrade] = useState(false);
+  const isFree = tier === 'free';
   const [sessionId, setSessionId] = useState<string | null>(null);
   // Conversation history sidebar.
   const [sessions, setSessions] = useState<Array<{ id: string; title: string | null; message_count: number; updated_at: string }>>([]);
@@ -99,6 +107,12 @@ export default function MindyChatPanel({ email, tier: _tier, onPanelChange }: Mi
   const sendMessage = useCallback(async (rawText: string) => {
     const text = rawText.trim();
     if (!text || isStreaming || !email) return;
+
+    // Pro gate: don't even send for free users — show the upgrade modal.
+    if (isFree) {
+      setShowUpgrade(true);
+      return;
+    }
 
     // Build the history payload from existing messages BEFORE we mutate state
     const historyForServer = messages
@@ -141,6 +155,14 @@ export default function MindyChatPanel({ email, tier: _tier, onPanelChange }: Mi
         signal: controller.signal,
       });
 
+      if (res.status === 403) {
+        // Server says Pro-required (e.g. tier prop stale after a downgrade).
+        // Drop the optimistic bubbles and surface the upgrade modal instead
+        // of a cryptic error.
+        setMessages(prev => prev.filter(m => m.id !== userMsg.id && m.id !== assistantMsg.id));
+        setShowUpgrade(true);
+        return;
+      }
       if (!res.ok || !res.body) {
         const errBody = await res.text().catch(() => '');
         throw new Error(`Chat ${res.status}: ${errBody.slice(0, 200) || 'no response body'}`);
@@ -201,7 +223,7 @@ export default function MindyChatPanel({ email, tier: _tier, onPanelChange }: Mi
       abortRef.current = null;
       inputRef.current?.focus();
     }
-  }, [email, isStreaming, messages, sessionId]);
+  }, [email, isStreaming, messages, sessionId, isFree]);
 
   // --- Conversation history ----------------------------------------
   const loadSessions = useCallback(async () => {
@@ -407,7 +429,39 @@ export default function MindyChatPanel({ email, tier: _tier, onPanelChange }: Mi
 
       {/* Message list */}
       <div ref={scrollRef} className="flex-1 overflow-y-auto px-6 py-6">
-        {messages.length === 0 ? (
+        {isFree && messages.length === 0 ? (
+          // Pro-locked empty state — Mindy Chat retrieves from the proprietary
+          // knowledge base, so it's a Pro feature. Show the value + a CTA.
+          <div className="max-w-2xl mx-auto pt-12">
+            <div className="text-center mb-8">
+              <div className="text-4xl mb-3">🔒💬</div>
+              <h2 className="text-xl font-semibold text-white mb-1">Mindy Chat is a Pro feature</h2>
+              <p className="text-sm text-slate-400 max-w-lg mx-auto">
+                Ask Mindy anything about federal contracting and get a straight answer,
+                grounded in 743 podcast interviews, real proposal templates, and 8 years
+                of teaching — with her sources cited.
+              </p>
+            </div>
+            <div className="text-center">
+              <button
+                onClick={() => setShowUpgrade(true)}
+                className="inline-flex items-center gap-2 rounded-lg bg-purple-600 hover:bg-purple-500 px-5 py-2.5 text-sm font-semibold text-white transition-colors"
+              >
+                Upgrade to Pro to chat
+              </button>
+            </div>
+            <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3 opacity-50 pointer-events-none">
+              {STARTER_PROMPTS.map((prompt) => (
+                <div
+                  key={prompt}
+                  className="text-left rounded-lg border border-slate-800 bg-slate-900/50 p-4"
+                >
+                  <div className="text-sm text-slate-300">{prompt}</div>
+                </div>
+              ))}
+            </div>
+          </div>
+        ) : messages.length === 0 ? (
           <div className="max-w-2xl mx-auto pt-12">
             <div className="text-center mb-8">
               <div className="text-4xl mb-3">💬</div>
@@ -563,6 +617,11 @@ export default function MindyChatPanel({ email, tier: _tier, onPanelChange }: Mi
           email={email}
           onClose={() => setDrawerDocId(null)}
         />
+      )}
+
+      {/* Pro-gate upsell — shown when a free user tries to chat */}
+      {showUpgrade && (
+        <UpgradeModal featureId="chat" onClose={() => setShowUpgrade(false)} />
       )}
     </div>
   );
