@@ -89,10 +89,13 @@ built from our own aggregated user-intent data — uncopyable without the user b
 - [x] **Phase 1 — Demand Heatmap (admin)** SHIPPED (`a5c3b6fb`): command-center panel + `/api/admin/
       demand-heatmap`. Ranks tracked opps, flags Sources Sought, socioeconomic segments, threshold-gated
       (≥3) "respond together" preview. Anonymous counts only. `src/lib/admin/demand-heatmap.ts`.
+- **Focus (Eric, Jun 19):** NO set-aside segmentation yet — too limiting + data's empty. Lead with the
+  RAW signal (capabilities + responding, "you're not the only one → respond together") to PROVE it works
+  + drive adoption. Segmentation = Phase 2+ once there's volume.
 - [ ] **Phase 2 — user-facing viral loop** (build when adoption fuels the counts): live "X others are
       tracking this" badge on opp pages + alerts (airline/hotel FOMO); auto-triggered "respond together"
-      collab alert to the segment (e.g. all WOSBs tracking it); "N businesses submitted a response"
-      confirmation. Gate on threshold so weak signals never fire.
+      collab alert; "N businesses submitted a response" confirmation. Gate on threshold so weak signals
+      never fire. (Add set-aside segmentation only AFTER volume + profile-data completeness.)
 - **Reality check (honest):** data is EARLY (max ~2 trackers/opp, socioeconomic fields mostly empty) —
   the feature DRIVES the tracking + profile completion it needs (chicken-and-egg). Admin-first lets us
   watch it grow + trigger manually before automating. Don't flip Phase 2 until counts are impressive.
