@@ -2156,3 +2156,42 @@ Conservative similarity threshold so only genuine matches surface; everything th
 already saw via normal search is excluded, so a Hidden-Match is always something new.
 Grounded in real federal scope text — never an AI guess about what the opportunity is.
 Marketing literature updated (rule #8).
+
+---
+
+## Mindy: Every Number on the Market Dashboard Ties to USASpending (June 18, 2026)
+
+**What:** The Market Research dashboard now shows market sizing you can fact-check
+against the government's own data — and the filters actually work. Search a NAICS code
+and the "Relevant spending" you see is the real federal obligation for that exact code,
+over a stated window (FY2023–2025), not an inflated sector-wide guess. Filter by state
+and the numbers narrow to that state's place-of-performance. Pick a set-aside (8(a),
+SDVOSB, WOSB, HUBZone, Small Business) and you see the real set-aside dollars. Search a
+keyword like "drones" and it sizes the actual drone market, not the whole federal
+budget. Top agencies, top vendors, and the leaderboards all derive from the same window
+and the same source, so the figures reconcile instead of contradicting each other.
+
+**Why:** Market intelligence is only worth anything if you can trust the number. A BD
+lead who pitches "this is a $95M market in our NAICS" to their boss needs that figure to
+hold up — and to match what their boss finds if they check USASpending themselves. Tools
+that quietly broaden a 6-digit code to its whole sector, or show one headline figure next
+to a contradictory one, get caught the moment a sharp prospect does the math. Mindy is
+built so every dollar on the screen is the real federal number, scoped to exactly what
+you searched, traceable to the source. No inflation, no guesses — the kind of number you
+can put in a capabilities deck and defend.
+
+**SEO:** federal market size by NAICS, how much does the government spend on my NAICS,
+set-aside spending by agency, 8(a) SDVOSB HUBZone contract dollars, USASpending market
+research, drone federal market size, verify federal spending data, place of performance
+state contract spend.
+
+**Proof:** All spend figures pull live from USASpending's spending_by_category /
+spending_by_award APIs over one canonical 3-fiscal-year window shared across the headline
+card, the spending-by-agency chart, the FPDS leaderboards, and the agency table — so they
+reconcile (the all-departments total is always ≥ the top-10 subset, to the dollar on the
+top buyer). 6-digit NAICS codes stay exact (no subsector sweep); keyword searches apply a
+real filter; set-aside codes are every one verified to return real spend against live
+USASpending; the state filter scopes by place-of-performance and honors the exact states
+chosen. Backed by an automated truth-check that re-derives each number from USASpending on
+every deploy and fails the build if a filter ever stops constraining results. Marketing
+literature updated (rule #8).
