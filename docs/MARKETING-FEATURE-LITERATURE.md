@@ -2315,3 +2315,30 @@ row), `scripts/drain-seo-enrich.ts` (one-time backlog drain, concurrency pool, r
 + partial index). Page renders the cached summary in `src/app/opportunity/[slug]/page.tsx`.
 Verified live on 3 real opportunities (CBP/DHS LMR, FDA HPLC maintenance, DoD steam trap):
 accurate, grounded, correctly interprets notice types — zero hallucination.
+
+---
+
+## Programmatic SEO Phase 5 — indexation engineering (June 19, 2026)
+
+**What:** The plumbing that gets the full page set actually crawled and indexed.
+(1) A **sitemap index** (`/sitemap-index.xml`) that splits the ~38K-URL single sitemap
+into child sitemaps (`/sitemap.xml` for everything + `/sitemap-opportunities.xml` for the
+~34K opportunity pages) so we never hit Google's 50K-URL-per-sitemap hard limit as pages
+grow. (2) **IndexNow** — instant ping to Bing/Yandex (and read by Google) when pages
+publish, so new opportunity pages get indexed in minutes instead of waiting for an organic
+crawl. robots.txt now points at the sitemap index.
+
+**Why:** A programmatic SEO machine is only worth as much as gets crawled. The single
+sitemap was at 38,734 URLs and climbing toward the 50K cap — past it, Google silently drops
+the overflow. Splitting into a sitemap index removes that ceiling entirely. IndexNow closes
+the time-to-index gap: a fresh federal opportunity posts, the page is generated, and the URL
+is submitted for indexing the same day — critical when opportunities have short response
+windows and the search traffic is time-sensitive.
+
+**SEO:** (infrastructure — supports all opportunity/facet/competitor page indexing.)
+
+**Proof:** `src/app/sitemap-index.xml/route.ts` (the index), `src/app/sitemap-opportunities.xml/route.ts`
+(child sitemap, ≤45K cap), `src/app/sitemap.ts` (opportunity block moved out to stay under
+cap), `src/lib/seo/indexnow.ts` (ping helper), `src/app/api/cron/indexnow-submit/route.ts`
+(steady-state URL submission), `public/<key>.txt` (IndexNow ownership verification),
+`src/app/robots.ts` (points at the index). Verified: production build emits all routes.

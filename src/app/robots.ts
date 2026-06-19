@@ -39,7 +39,10 @@ export default function robots(): MetadataRoute.Robots {
         ],
       },
     ],
-    sitemap: `${SITE_URL}/sitemap.xml`,
+    // Point at the sitemap INDEX (Phase 5) — lists /sitemap.xml +
+    // /sitemap-opportunities.xml so the full page set is crawled without
+    // hitting the 50k-URL single-sitemap cap.
+    sitemap: `${SITE_URL}/sitemap-index.xml`,
     host: SITE_URL,
   };
 }
