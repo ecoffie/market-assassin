@@ -82,6 +82,26 @@ enterprise sales — that IS Mindy's thesis. Study + adapt EVERYTHING:
 
 ---
 
+## ⭐ AHA FEATURE — Collaboration / social-proof flywheel (the "respond together" loop)
+The promised market-research aha moment. Aggregate user-intent → "X others tracking this" social proof
+→ segment by socioeconomic status → "respond to the Sources Sought together" collab alert. **Moat:
+built from our own aggregated user-intent data — uncopyable without the user base. Free-tier viral driver.**
+- [x] **Phase 1 — Demand Heatmap (admin)** SHIPPED (`a5c3b6fb`): command-center panel + `/api/admin/
+      demand-heatmap`. Ranks tracked opps, flags Sources Sought, socioeconomic segments, threshold-gated
+      (≥3) "respond together" preview. Anonymous counts only. `src/lib/admin/demand-heatmap.ts`.
+- **Focus (Eric, Jun 19):** NO set-aside segmentation yet — too limiting + data's empty. Lead with the
+  RAW signal (capabilities + responding, "you're not the only one → respond together") to PROVE it works
+  + drive adoption. Segmentation = Phase 2+ once there's volume.
+- [ ] **Phase 2 — user-facing viral loop** (build when adoption fuels the counts): live "X others are
+      tracking this" badge on opp pages + alerts (airline/hotel FOMO); auto-triggered "respond together"
+      collab alert; "N businesses submitted a response" confirmation. Gate on threshold so weak signals
+      never fire. (Add set-aside segmentation only AFTER volume + profile-data completeness.)
+- **Reality check (honest):** data is EARLY (max ~2 trackers/opp, socioeconomic fields mostly empty) —
+  the feature DRIVES the tracking + profile completion it needs (chicken-and-egg). Admin-first lets us
+  watch it grow + trigger manually before automating. Don't flip Phase 2 until counts are impressive.
+
+---
+
 ## 🗄️ DATA-EXPANSION BACKLOG (standing — review at every data-feature sprint)
 **Tracker:** `projects/edc-mbda-partnerships/DATA-EXPANSION-BACKLOG.md` · sources Mindy is MISSING vs
 HigherGov/Procurement Sciences. Add ONLY when they serve the small-biz user (master strategy):

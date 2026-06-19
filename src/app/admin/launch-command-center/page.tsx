@@ -4,6 +4,17 @@ import { FormEvent, useEffect, useMemo, useState } from 'react';
 
 type StatusTone = 'green' | 'blue' | 'amber' | 'purple' | 'red' | 'slate';
 
+type HeatmapOpp = {
+  noticeId: string; title: string; agency: string | null; setAside: string | null;
+  responseDeadline: string | null; isSourcesSought: boolean; trackerCount: number;
+  pursuingCount: number; collabReady: boolean;
+  collabPreview: string | null;
+};
+type DemandHeatmap = {
+  generatedAt: string; totalTrackedOpps: number; collabReadyCount: number;
+  threshold: number; opps: HeatmapOpp[];
+};
+
 type BetaConversion = {
   success: boolean;
   entitledTotal: number;
@@ -517,6 +528,9 @@ export default function LaunchCommandCenterPage() {
   const [launchBrief, setLaunchBrief] = useState<LaunchManagerBrief | null>(null);
   const [launchLoading, setLaunchLoading] = useState(false);
   const [launchError, setLaunchError] = useState('');
+  // Demand Heatmap — aggregated user-intent / collaboration signal (the "aha" feature)
+  const [heatmap, setHeatmap] = useState<DemandHeatmap | null>(null);
+  const [heatmapError, setHeatmapError] = useState('');
   const [qualBrief, setQualBrief] = useState<CustomerQualificationBrief | null>(null);
   const [qualLoading, setQualLoading] = useState(false);
   const [qualError, setQualError] = useState('');
@@ -855,6 +869,26 @@ export default function LaunchCommandCenterPage() {
       }
     }
     loadMrrGoal();
+    return () => { cancelled = true; };
+  }, [authenticated, password]);
+
+  // Demand Heatmap loader
+  useEffect(() => {
+    if (!authenticated || !password) return;
+    let cancelled = false;
+    async function loadHeatmap() {
+      setHeatmapError('');
+      try {
+        const response = await fetch(`/api/admin/demand-heatmap?password=${encodeURIComponent(password)}&limit=40`, { cache: 'no-store' });
+        const data = await response.json();
+        if (cancelled) return;
+        if (!response.ok || !data.success) { setHeatmapError(data.error || 'Could not load demand heatmap'); setHeatmap(null); return; }
+        setHeatmap(data as DemandHeatmap);
+      } catch {
+        if (!cancelled) { setHeatmapError('Could not load demand heatmap'); setHeatmap(null); }
+      }
+    }
+    loadHeatmap();
     return () => { cancelled = true; };
   }, [authenticated, password]);
 
@@ -1259,6 +1293,77 @@ export default function LaunchCommandCenterPage() {
                 </div>
               </div>
             </>
+          )}
+        </section>
+
+        {/* DEMAND HEATMAP — aggregated user-intent / collaboration signal (the "aha" feature) */}
+        <section className="rounded-lg border border-cyan-500/30 bg-gradient-to-br from-cyan-900/20 to-slate-900 p-6">
+          <div className="flex items-center justify-between flex-wrap gap-2">
+            <div>
+              <p className="text-sm uppercase tracking-[0.2em] text-cyan-300">Demand Heatmap</p>
+              <h2 className="mt-1 text-xl font-bold text-white">Who&apos;s tracking what — collaboration signal</h2>
+              <p className="mt-1 text-sm text-slate-400">
+                Opportunities ranked by how many Mindy users are tracking them. Sources Sought flagged
+                (the collaboration sweet spot). The &quot;respond together&quot; collab alert fires at{' '}
+                {heatmap?.threshold ?? 3}+ trackers — below that the signal is too weak to send.
+              </p>
+            </div>
+            {heatmap && (
+              <div className="text-right">
+                <div className="text-2xl font-bold text-cyan-300 tabular-nums">{heatmap.collabReadyCount}</div>
+                <div className="text-xs text-slate-400">collab-ready ({heatmap.totalTrackedOpps} tracked)</div>
+              </div>
+            )}
+          </div>
+
+          {heatmapError && <p className="mt-4 text-sm text-red-400">{heatmapError}</p>}
+          {!heatmap && !heatmapError && <p className="mt-4 text-sm text-slate-400">Loading the heatmap…</p>}
+
+          {heatmap && heatmap.opps.length === 0 && (
+            <p className="mt-4 text-sm text-slate-400">No tracked opportunities yet.</p>
+          )}
+
+          {heatmap && heatmap.opps.length > 0 && (
+            <div className="mt-5 overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="text-left text-[11px] uppercase tracking-wider text-slate-500 border-b border-slate-700">
+                    <th className="py-2 pr-3 font-semibold">Trackers</th>
+                    <th className="py-2 pr-3 font-semibold">Opportunity</th>
+                    <th className="py-2 pr-3 font-semibold">Collab</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-slate-800">
+                  {heatmap.opps.slice(0, 20).map((o) => (
+                    <tr key={o.noticeId} className="align-top hover:bg-slate-800/40">
+                      <td className="py-2.5 pr-3 tabular-nums">
+                        <span className="text-lg font-bold text-cyan-300">{o.trackerCount}</span>
+                        {o.pursuingCount > 0 && <span className="text-[11px] text-slate-500"> · {o.pursuingCount} pursuing</span>}
+                      </td>
+                      <td className="py-2.5 pr-3 text-slate-200 max-w-md">
+                        {o.isSourcesSought && <span className="mr-1.5 text-[10px] font-semibold text-purple-300 bg-purple-500/15 px-1.5 py-0.5 rounded uppercase">SS</span>}
+                        {o.title}
+                        {o.agency && <span className="block text-[11px] text-slate-500">{o.agency}</span>}
+                      </td>
+                      <td className="py-2.5 pr-3">
+                        {o.collabReady
+                          ? <span className="text-[10px] font-semibold text-emerald-300 bg-emerald-500/15 px-1.5 py-0.5 rounded uppercase">Ready</span>
+                          : <span className="text-[11px] text-slate-600">below {heatmap.threshold}</span>}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              {heatmap.collabReadyCount > 0 && (
+                <div className="mt-4 rounded-md border border-emerald-500/30 bg-emerald-900/15 p-3">
+                  <p className="text-xs font-semibold text-emerald-300 uppercase tracking-wide mb-1">Collab alert preview (≥{heatmap.threshold} trackers)</p>
+                  {heatmap.opps.filter((o) => o.collabReady).slice(0, 3).map((o) => (
+                    <p key={o.noticeId} className="text-sm text-slate-300 mt-1">“{o.collabPreview}”</p>
+                  ))}
+                  <p className="text-[11px] text-slate-500 mt-2">Phase 1: previews only — you control the first sends. Auto-trigger comes once volume proves the signal.</p>
+                </div>
+              )}
+            </div>
           )}
         </section>
 
