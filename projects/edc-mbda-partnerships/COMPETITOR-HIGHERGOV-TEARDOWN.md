@@ -65,11 +65,38 @@ workflows. Watch the integration rollout.
   constraints); revisit.
 - **Don't chase breadth-for-breadth** — Mindy's edge is depth + grounded answers, not feed count.
 
+## Competitor-as-future-acquirer lens (Eric's frame — Mindy is built to sell)
+Competitors here aren't just rivals — they're the **likely future buyers/partners** for Mindy
+(memory `exit_strategy_brand_separation`). The PSC × HigherGov deal is a **comp for Mindy's own exit.**
+- **Acquisition price: UNDISCLOSED** — confirmed across all sources (PRNewswire/ExecutiveBiz/citybiz);
+  no number was made public. Don't cite a figure.
+- **Who's buying in this space:** Procurement Sciences (now owns HigherGov + Awarded AI) is the
+  consolidator. Also watch Deltek/GovWin, Unanet, Sam.gov-adjacent platforms — all potential acquirers
+  as the market consolidates.
+- **Valuation FRAMEWORK (grounded, general — not HigherGov-specific):** 2026 GovCon/vertical SaaS is a
+  hot M&A category. Multiples: ~3–4x ARR (undifferentiated) → **6–8x ARR (high-growth + AI + strong
+  retention)**. Active deal sweet spot $10M–$50M EV; PE dry powder deploying.
+- **What it means for Mindy:** at ~$112K ARR (~$9.3K MRR, memory `mindy_100k_goal_math`) Mindy is
+  **pre-scale for acquisition today.** The deal proves BUYERS EXIST and are consolidating — good for the
+  exit thesis. Path to acquirable: grow ARR + prove retention + lean into the AI/grounded-generation
+  differentiation (that's the 6–8x multiple vs 3–4x). The differentiation that wins customers is the
+  SAME thing that earns the premium multiple.
+
+## HONEST GAPS in this research (not verified — don't overclaim)
+- HigherGov-specific **G2/Capterra user weaknesses NOT verified** — the review search got polluted by
+  "GoHighLevel" (different product). The weaknesses below are STRUCTURAL INFERENCES from platform
+  facts, not cited user reviews: (1) breadth → overwhelm for solo users; (2) AI is new/bolted-on
+  (May-2026 acquisition) so "grounded vs generic" gap is real now; (3) integration churn post-deal.
+  → TODO: hit g2.com / capterra HigherGov pages directly for real cons.
+- HigherGov **ARR / user count / valuation = unknown** (private). The valuation math above is the
+  market FRAMEWORK, not their actual numbers.
+
 ## Open items
 - [ ] Watch the PSC × HigherGov AI integration rollout (closes their drafting gap — our former moat)
 - [ ] Decide SLED: in or out of Mindy's scope
 - [ ] Price check: is $149/mo right vs their $500/yr entry? (separate pricing-benchmark task)
-- [ ] Pull real HigherGov user-reported weaknesses (reviews) — the search didn't surface specifics
+- [ ] Pull real HigherGov user-reported weaknesses from G2/Capterra directly (search was polluted)
+- [ ] Build a "potential acquirers" watchlist (PSC, Deltek/GovWin, Unanet, others) — exit intel
 
 *Created June 19 2026. Honest teardown: HG out-covers (SLED, feeds, price, reach, now AI too); Mindy
 out-reasons (grounded answers + drafting, solo-first, provenance). Compete on "answers not a database,"
