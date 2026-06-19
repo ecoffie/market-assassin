@@ -2350,3 +2350,33 @@ windows and the search traffic is time-sensitive.
 cap), `src/lib/seo/indexnow.ts` (ping helper), `src/app/api/cron/indexnow-submit/route.ts`
 (steady-state URL submission), `public/<key>.txt` (IndexNow ownership verification),
 `src/app/robots.ts` (points at the index). Verified: production build emits all routes.
+
+---
+
+## Demand Heatmap — collaboration & social-proof signal (Phase 1, June 19 2026)
+
+**What:** A new admin command-center panel (and API) that aggregates which opportunities Mindy's
+users are collectively tracking — ranked by tracker count, segmented by socioeconomic status (women-
+owned, 8(a), SDVOSB, HUBZone…), with Sources Sought flagged. When an opportunity crosses a tracker
+threshold, it previews a "respond together" collaboration alert (e.g. "6 women-owned businesses are
+researching this Sources Sought — respond together"). Phase 1 is admin-visible with manual trigger;
+the user-facing live "X others are tracking this" social-proof badge and auto-triggered collab alerts
+follow once adoption proves the signal.
+
+**Why:** This is the aha feature and a network-effect moat no competitor can copy — it's built entirely
+from Mindy's own aggregated user-intent data (who's tracking what), which only exists because of the
+free-tier user base. It turns solo opportunity research into collective action: airline/hotel-style
+social proof ("you're not the only one looking") drives FOMO and engagement, and the socioeconomic
+segmentation enables real teaming on Sources Sought — multiple small businesses discovering each
+other around the same requirement and responding together. It's a free-tier viral driver that
+reinforces the mass-adoption moat: more users → richer signal → more collaboration → more users.
+
+**SEO/Growth:** collaboration is the product mechanic, not a search play — it drives retention,
+word-of-mouth, and free-tier growth.
+
+**Proof:** `src/lib/admin/demand-heatmap.ts` (aggregation engine: user_pipeline tracker counts +
+socioeconomic segmentation from set_aside_certifications + threshold-gated collab preview, anonymous
+aggregate counts only — never identities), `src/app/api/admin/demand-heatmap/route.ts` (admin API),
+panel in `src/app/admin/launch-command-center/page.tsx`. Verified live: 140 tracked opportunities
+ranked, Sources Sought correctly flagged, threshold gate suppresses weak signals (won't fire below 3
+trackers). Built on real user-tracking data, privacy-safe (no names).
