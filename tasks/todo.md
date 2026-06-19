@@ -18,8 +18,15 @@ SBIR fit; this track is for revenue.
 - [ ] Decide on NSTXL membership ($500–$1,500) for broader prototype-call access
 - [ ] Pitch the 3 warm contacts (ACC-Orlando/DISA/Navy OSBP) on buying Mindy via a Tradewind task order
 
-**Also:** research **HigherGov** (govcon data/intel platform — competitor + possible data-source/partner
-angle for Mindy). [research in progress Jun 19]
+**HigherGov teardown DONE** (`COMPETITOR-HIGHERGOV-TEARDOWN.md`). Decisions: SLED→hold til Phase 3;
+keep $149/mo (win via CAC model + brand, not price); brand = the "Nike of GovCon" moat. Two builds out:
+- [ ] ⭐ **Mindy programmatic-SEO layer** — per-opportunity / per-NAICS / per-agency / per-contractor
+      indexable + cross-linked pages (HigherGov's real moat — they OWN the search index). Mass
+      top-of-funnel engine that pairs with the customer-acquisition model. We have the data (317K
+      contractors, 88K opps, NAICS/PSC). Biggest takeaway.
+- [ ] **Add DIBBS** (~3.3M small-buy records) — but FIRST research how HigherGov sourced it
+      (public-records request? bulk feed? partner?), since our own probe found DIBBS WAF/EULA-gated
+      and shelved it (memory `dla_dibbs_not_feasible`). Don't assume scraping works.
 
 ---
 

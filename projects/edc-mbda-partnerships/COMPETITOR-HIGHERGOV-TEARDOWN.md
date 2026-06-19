@@ -91,12 +91,63 @@ Competitors here aren't just rivals — they're the **likely future buyers/partn
 - HigherGov **ARR / user count / valuation = unknown** (private). The valuation math above is the
   market FRAMEWORK, not their actual numbers.
 
+## What we LEARN from them + DECISIONS (Eric, June 19 — from live walkthrough)
+
+### 1. ⭐ SEO is their real moat — STEAL THIS. (the #1 takeaway)
+Live screenshots show HigherGov runs a **programmatic-SEO machine**: a public, indexable page for
+**every entity**, deeply cross-linked. The footer is the blueprint —
+- **Per-PERSONA landing pages:** Contractors, Grant Recipients, Consultants, **Investors & Banks**,
+  Government Agencies (each a tailored page).
+- **Per-TAXONOMY pages:** NAICS, **NSNs**, Grant Programs, PSC, Contract Opps, Grant Opps, SLED Opps,
+  Defense Budget, Agencies, Vehicles, People, Documents.
+- **Per-OPPORTUNITY pages:** e.g. `highergov.com/contract-opportunity/ai-powered-tool-for-automated-
+  evaluation-of-vendor-dla26b03...` — a full keyword-rich page for the EXACT NV012 topic, with a
+  **"Similar Active Opportunities"** block (internal-link web = SEO juice + dwell time).
+**Why it wins:** every NAICS/PSC/agency/opp search a contractor types → a HigherGov page ranks → free
+top-of-funnel forever. They don't buy the traffic; they OWN the index.
+**Mindy already has the raw material for this** (317K contractors, 88K SAM opps, NAICS/PSC, the
+/contractors SEO pages exist). **Decision: build Mindy's programmatic-SEO layer** — per-opportunity,
+per-NAICS, per-agency, per-contractor pages, cross-linked, on getmindy.ai / govcongiants.com. This is
+the mass-acquisition engine that PAIRS with the customer-acquisition model. → new task.
+
+### 2. SLED — HOLD until Phase 3 (Eric's call)
+HigherGov's SLED is huge (2.8M opps, 10K+ agencies) but **out of scope for Mindy now.** Stay
+federal-focused; revisit SLED in Phase 3. (Don't chase their breadth.)
+
+### 3. DIBBS — ADD IT (Eric wants this)
+DIBBS is a **first-class tab** in HigherGov's opportunity view: **Opportunities 5.7M · Forecasts
+145K · DIBBS 3.3M.** So DIBBS = ~3.3M small-buy records, a real volume add for Mindy users.
+**HOWEVER (honest, memory `dla_dibbs_not_feasible`):** we already investigated DIBBS — **no public
+API, WAF-protected, session/EULA-gated** — and SHELVED it Jun 2026 as not feasible to scrape cleanly.
+**The open question Eric raised: "how did HigherGov get it?"** → research how (public-records request?
+bulk feed? partnership?). HigherGov's docs mention **"annual public records requests"** for historical
+award docs + SLED POs — DIBBS may come via a similar bulk/records route, NOT live scraping. → research task.
+
+### 4. Pricing — KEEP $149/mo; the moat is the ACQUISITION MODEL (Eric)
+HigherGov: $500/$2,500/$5,000 per YEAR (+ Investor tier, 50 licenses). Eric's call: **don't compete
+on price.** Mindy's edge = a **customer-acquisition model that wins in mass** (free daily alerts →
+funnel → Pro), not undercutting. Pricing is fine. (Pairs with the SEO engine above = volume top-of-funnel.)
+
+### 5. ⭐ BRAND is a moat HigherGov doesn't have (Eric — "the Nike of GovCon")
+HigherGov is a tool; **GovCon Giants is a BRAND** with audience, trust, content, a known founder.
+"Anyone can build a shoe" — the data/features are commoditizing (PSC just bought parity). The
+defensible layer is **brand + distribution + community.** Mindy rides the GovCon Giants brand into a
+market where competitors are faceless platforms. **This is the real durable moat** — lean into it in
+positioning, content, and the SEO play (branded authority pages, not just data pages).
+*(Tension to manage: `exit_strategy_brand_separation` says keep "Eric Coffie" OUT of Mindy's product
+to maximize sale value. Resolution: GovCon Giants brand = the DISTRIBUTION/marketing engine; Mindy =
+the clean, sellable product it feeds. Brand drives acquisition; product is the asset.)*
+
 ## Open items
+- [ ] ⭐ **Build Mindy's programmatic-SEO layer** (per-opp / per-NAICS / per-agency / per-contractor
+      indexable + cross-linked pages) — the mass top-of-funnel engine. Biggest takeaway.
+- [ ] **Add DIBBS** to Mindy — first research HOW HigherGov sourced it (public-records vs feed vs
+      partner), since our own probe found DIBBS WAF/EULA-gated (memory `dla_dibbs_not_feasible`).
+- [x] SLED — decided: HOLD until Phase 3
+- [x] Pricing — decided: keep $149/mo; win via acquisition model + brand, not price
 - [ ] Watch the PSC × HigherGov AI integration rollout (closes their drafting gap — our former moat)
-- [ ] Decide SLED: in or out of Mindy's scope
-- [ ] Price check: is $149/mo right vs their $500/yr entry? (separate pricing-benchmark task)
-- [ ] Pull real HigherGov user-reported weaknesses from G2/Capterra directly (search was polluted)
-- [ ] Build a "potential acquirers" watchlist (PSC, Deltek/GovWin, Unanet, others) — exit intel
+- [ ] Pull real HigherGov G2/Capterra weaknesses directly (search was polluted by GoHighLevel)
+- [ ] Build a "potential acquirers" watchlist (PSC, Deltek/GovWin, Unanet) — exit intel
 
 *Created June 19 2026. Honest teardown: HG out-covers (SLED, feeds, price, reach, now AI too); Mindy
 out-reasons (grounded answers + drafting, solo-first, provenance). Compete on "answers not a database,"
