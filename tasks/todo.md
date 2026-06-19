@@ -4,6 +4,24 @@
 
 ---
 
+## 📜 MASTER STRATEGY (governs all decisions) — `MINDY-MASTER-STRATEGY.md`
+
+**Operating policy:** condense the 10-yr plan to 6 months (Elon) — ask it of EVERY todo.
+**Moat:** mass adoption via freemium ("GovCon Brew" model) → every SMB on ONE platform →
+market research at scale (data nobody else has) → the DoW "we ARE the SMB industrial base" pitch.
+**Growth lane:** ClickFunnels/social/gamification/content (GovCon Giants brand = distribution),
+NOT enterprise sales. Don't compete with Deltek/GovWin's boring pitches — win on brand + virality.
+**Decision filters:** (1) serves mass adoption? (2) the 6-mo-compressed version? (3) social/content
+not boring-enterprise? (4) feeds the freemium→scale→DoW flywheel?
+
+- [ ] ⭐ **Study ClickFunnels FB + IG lead pages** — better indicators; adapt the social/lead/funnel/
+      gamification patterns to Mindy (Eric's lane, the content space). [next]
+- [ ] Build the DoW "every small business on one platform" pitch (once adoption proves out)
+- [ ] SEO machine continues: P1 opp pages ✅ · P2 facets ✅ · P3 contractors+vs/alternatives ·
+      P4 AI enrichment · P5 indexation engineering (`MINDY-PROGRAMMATIC-SEO-SCOPE.md`)
+
+---
+
 ## 🔲 ACTIVE — Mindy CSO/OTA revenue track (parallel to NV012 SBIR, started Jun 19)
 
 **Map:** `projects/edc-mbda-partnerships/MINDY-CSO-OTA-REVENUE-MAP.md`
