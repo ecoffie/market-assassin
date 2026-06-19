@@ -143,46 +143,6 @@
       "schedule": "30 8 * * 5"
     },
     {
-      "path": "/api/cron/send-pursuit-fast",
-      "schedule": "0 7 * * 6"
-    },
-    {
-      "path": "/api/cron/send-pursuit-fast",
-      "schedule": "10 7 * * 6"
-    },
-    {
-      "path": "/api/cron/send-pursuit-fast",
-      "schedule": "20 7 * * 6"
-    },
-    {
-      "path": "/api/cron/send-pursuit-fast",
-      "schedule": "30 7 * * 6"
-    },
-    {
-      "path": "/api/cron/send-pursuit-fast",
-      "schedule": "40 7 * * 6"
-    },
-    {
-      "path": "/api/cron/send-pursuit-fast",
-      "schedule": "50 7 * * 6"
-    },
-    {
-      "path": "/api/cron/send-pursuit-fast",
-      "schedule": "0 8 * * 6"
-    },
-    {
-      "path": "/api/cron/send-pursuit-fast",
-      "schedule": "10 8 * * 6"
-    },
-    {
-      "path": "/api/cron/send-pursuit-fast",
-      "schedule": "20 8 * * 6"
-    },
-    {
-      "path": "/api/cron/send-pursuit-fast",
-      "schedule": "30 8 * * 6"
-    },
-    {
       "path": "/api/cron/daily-alerts",
       "schedule": "0 5 * * *"
     },

@@ -123,6 +123,21 @@ function displaySource(source: string | undefined): string {
 }
 
 export async function GET(request: NextRequest) {
+  // Pursuit briefs CUT 2026-06-19 (Eric — low value/inconsistent; to be
+  // replaced later with weekly grants + old-SOW intel on tracked pursuits/
+  // target agencies). The precompute-pursuit-briefs cron_jobs row is disabled
+  // and the vercel.json send window was removed, so this should never fire —
+  // but fail closed against a manual hit. Reversible: set
+  // PURSUIT_BRIEFS_ENABLED=true to re-enable (and re-enable the precompute row
+  // + restore the vercel.json send schedule).
+  if (process.env.PURSUIT_BRIEFS_ENABLED !== 'true') {
+    return NextResponse.json({
+      skipped: true,
+      reason: 'pursuit_briefs_cut',
+      note: 'Pursuit briefs were retired 2026-06-19. Set PURSUIT_BRIEFS_ENABLED=true to re-enable.',
+    });
+  }
+
   const testEmail = request.nextUrl.searchParams.get('email');
   const isTest = request.nextUrl.searchParams.get('test') === 'true';
 
