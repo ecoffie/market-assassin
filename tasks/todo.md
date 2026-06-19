@@ -1,6 +1,25 @@
 # GovCon Giants - Tasks by Priority
 
-**Last Updated:** June 14, 2026
+**Last Updated:** June 19, 2026
+
+---
+
+## 🔲 ACTIVE — Mindy CSO/OTA revenue track (parallel to NV012 SBIR, started Jun 19)
+
+**Map:** `projects/edc-mbda-partnerships/MINDY-CSO-OTA-REVENUE-MAP.md`
+**Why:** the "sell commercial now" half of the Anduril model — vehicles that BUY built Mindy without
+needing the Phase III key (that's NV012's job). Full DoW+civilian SBIR sweep done → NV012 is the only
+SBIR fit; this track is for revenue.
+
+- [ ] **⭐ Tradewind Solutions Marketplace (CDAO)** — pull submission requirements → build vendor
+      profile + video pitch → apply for "awardable" designation. Free, 120+ DoD buyers incl. DLA.
+- [ ] Confirm GovCon Edu = nontraditional defense contractor (10 USC 4022(d)) — unlocks OTA fast-track
+- [ ] Watch DIU AOIs for a data/analytics/decision-support fit → Solution Brief ($500K–$2M)
+- [ ] Decide on NSTXL membership ($500–$1,500) for broader prototype-call access
+- [ ] Pitch the 3 warm contacts (ACC-Orlando/DISA/Navy OSBP) on buying Mindy via a Tradewind task order
+
+**Also:** research **HigherGov** (govcon data/intel platform — competitor + possible data-source/partner
+angle for Mindy). [research in progress Jun 19]
 
 ---
 
