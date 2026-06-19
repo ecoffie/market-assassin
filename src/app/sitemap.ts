@@ -30,6 +30,7 @@ import { NAICS_TOP_100 } from '@/data/naics-top100';
 import { AGENCIES_SEO } from '@/data/agencies-seo';
 import { getOpportunitySlugsForSitemap } from '@/lib/seo/opportunities';
 import { getFacetSlugsForSitemap } from '@/lib/seo/facets';
+import { COMPETITORS } from '@/data/competitors';
 import { LISTICLES } from '@/data/top-listicles';
 
 // Canonical SEO domain. Per [memory: mindy-domain-routing] updated
@@ -63,8 +64,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     // Comparison pages — target high-volume "alternative" keywords.
     // Priority 0.8 puts them in the top tier just below the homepage
     // since they're primary acquisition surfaces for paid + organic.
+    { url: `${SITE_URL}/compare`,               lastModified: now, changeFrequency: 'weekly',  priority: 0.8 },
     { url: `${SITE_URL}/compare/govwin`,        lastModified: now, changeFrequency: 'weekly',  priority: 0.8 },
     { url: `${SITE_URL}/compare/sam-gov`,       lastModified: now, changeFrequency: 'weekly',  priority: 0.8 },
+    // Data-driven competitor comparison pages (Phase 3 — "X alternative" intent)
+    ...COMPETITORS.map((c) => ({
+      url: `${SITE_URL}/compare/${c.slug}`,
+      lastModified: now, changeFrequency: 'weekly' as const, priority: 0.8,
+    })),
     // /pricing — primary conversion surface. Mirrors the SoftwareApplication
     // offers in JSON-LD so Google can surface price in rich snippets.
     { url: `${SITE_URL}/pricing`,               lastModified: now, changeFrequency: 'monthly', priority: 0.8 },

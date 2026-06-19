@@ -2255,3 +2255,32 @@ code [code], small business set aside [naics].
 `src/app/set-aside/[type]/[naics]/page.tsx`, sitemap wired in `src/app/sitemap.ts`.
 Verified live: 906 facet pages (325 NAICS×state + 356 PSC + 225 set-aside×NAICS) from
 real sam_opportunities data; production build emits all three as SSG/ISR. Real data only.
+
+---
+
+## Programmatic SEO Phase 3a — competitor "alternative" pages (June 19, 2026)
+
+**What:** A data-driven `/compare/[competitor]` system plus a `/compare` hub. New
+honest-comparison pages for **HigherGov, GovTribe, and Bloomberg Government** (joining the
+existing bespoke GovWin and SAM.gov pages), each targeting "[competitor] alternative" search
+intent with a comparison table, a "when to choose them instead" credibility section, an FAQ,
+and SoftwareApplication + FAQPage + Breadcrumb JSON-LD for rich results. Adding a new
+competitor is now ~40 lines of data, not a 590-line bespoke page.
+
+**Why:** "[competitor] alternative" is the highest commercial-intent keyword in the category —
+someone searching it is actively shopping. The timing is ideal: HigherGov and GovTribe were
+both acquired in 2026, so "highergov alternative" / "govtribe alternative" intent is rising and
+the incumbents are distracted by integration. Mindy's wedge is consistent and honest across all
+pages: answers + drafting + a permanent free tier vs. databases you interpret yourself at
+enterprise prices. The "when to choose them instead" sections are deliberate — Google rewards
+comparison pages that admit tradeoffs, and prospects trust them.
+
+**SEO:** highergov alternative, govtribe alternative, bloomberg government alternative, bgov
+alternative, cheaper than highergov, govcon software comparison, best federal contracting
+software, mindy vs.
+
+**Proof:** `src/data/competitors.ts` (competitor data + honest comparison rows/FAQs),
+`src/app/compare/[competitor]/page.tsx` (data-driven route, JSON-LD), `src/app/compare/page.tsx`
+(hub), sitemap wired in `src/app/sitemap.ts`. Verified: production build prerenders
+/compare/highergov, /compare/govtribe, /compare/bloomberg-government as SSG; the bespoke
+/compare/govwin + /compare/sam-gov routes are NOT shadowed by the dynamic segment.
