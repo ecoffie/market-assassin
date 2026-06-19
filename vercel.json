@@ -3,7 +3,12 @@
   "redirects": [
     {
       "source": "/:path*",
-      "has": [{ "type": "host", "value": "tools.govcongiants.org" }],
+      "has": [
+        {
+          "type": "host",
+          "value": "tools.govcongiants.org"
+        }
+      ],
       "destination": "https://mi.govcongiants.com/:path*",
       "permanent": true
     }
@@ -16,38 +21,6 @@
     {
       "path": "/api/cron/dispatch?tick=day",
       "schedule": "5 0 * * *"
-    },
-    {
-      "path": "/api/cron/sync-sam-opportunities",
-      "schedule": "0 1 * * *"
-    },
-    {
-      "path": "/api/cron/backfill-sam-descriptions",
-      "schedule": "0 3 * * *"
-    },
-    {
-      "path": "/api/cron/backfill-sam-descriptions",
-      "schedule": "0 15 * * *"
-    },
-    {
-      "path": "/api/cron/backfill-sam-attachments",
-      "schedule": "0 5 * * *"
-    },
-    {
-      "path": "/api/cron/sync-sam-opportunities?type=delta",
-      "schedule": "0 13 * * *"
-    },
-    {
-      "path": "/api/cron/sync-sam-opportunities?type=resume",
-      "schedule": "0 9 * * *"
-    },
-    {
-      "path": "/api/cron/sam-sync-watchdog",
-      "schedule": "0 15 * * *"
-    },
-    {
-      "path": "/api/planner/weekly-digest",
-      "schedule": "0 14 * * 1"
     },
     {
       "path": "/api/cron/weekly-alerts?catchup=true",
@@ -90,26 +63,6 @@
       "schedule": "30 0 * * 1"
     },
     {
-      "path": "/api/cron/precompute-briefings",
-      "schedule": "0 2 * * *"
-    },
-    {
-      "path": "/api/cron/precompute-briefings",
-      "schedule": "30 2 * * *"
-    },
-    {
-      "path": "/api/cron/precompute-briefings",
-      "schedule": "0 3 * * *"
-    },
-    {
-      "path": "/api/cron/precompute-briefings",
-      "schedule": "30 3 * * *"
-    },
-    {
-      "path": "/api/cron/precompute-briefings",
-      "schedule": "0 4 * * *"
-    },
-    {
       "path": "/api/cron/send-briefings-fast",
       "schedule": "0 7 * * *"
     },
@@ -148,26 +101,6 @@
     {
       "path": "/api/cron/send-briefings-fast",
       "schedule": "30 8 * * *"
-    },
-    {
-      "path": "/api/cron/precompute-weekly-briefings",
-      "schedule": "0 20 * * 4"
-    },
-    {
-      "path": "/api/cron/precompute-weekly-briefings",
-      "schedule": "30 20 * * 4"
-    },
-    {
-      "path": "/api/cron/precompute-weekly-briefings",
-      "schedule": "0 21 * * 4"
-    },
-    {
-      "path": "/api/cron/precompute-weekly-briefings",
-      "schedule": "30 21 * * 4"
-    },
-    {
-      "path": "/api/cron/precompute-weekly-briefings",
-      "schedule": "0 22 * * 4"
     },
     {
       "path": "/api/cron/send-weekly-fast?catchup=true",
@@ -210,26 +143,6 @@
       "schedule": "30 8 * * 5"
     },
     {
-      "path": "/api/cron/precompute-pursuit-briefs",
-      "schedule": "0 20 * * 5"
-    },
-    {
-      "path": "/api/cron/precompute-pursuit-briefs",
-      "schedule": "30 20 * * 5"
-    },
-    {
-      "path": "/api/cron/precompute-pursuit-briefs",
-      "schedule": "0 21 * * 5"
-    },
-    {
-      "path": "/api/cron/precompute-pursuit-briefs",
-      "schedule": "30 21 * * 5"
-    },
-    {
-      "path": "/api/cron/precompute-pursuit-briefs",
-      "schedule": "0 22 * * 5"
-    },
-    {
       "path": "/api/cron/send-pursuit-fast",
       "schedule": "0 7 * * 6"
     },
@@ -268,30 +181,6 @@
     {
       "path": "/api/cron/send-pursuit-fast",
       "schedule": "30 8 * * 6"
-    },
-    {
-      "path": "/api/cron/manage-briefing-rollout",
-      "schedule": "0 12 * * *"
-    },
-    {
-      "path": "/api/cron/bootcamp-rollout?limit=2000",
-      "schedule": "0 17 * * *"
-    },
-    {
-      "path": "/api/cron/check-briefing-health?email=true",
-      "schedule": "30 12 * * *"
-    },
-    {
-      "path": "/api/cron/check-fms-health?email=true",
-      "schedule": "45 12 * * *"
-    },
-    {
-      "path": "/api/cron/check-provider-health",
-      "schedule": "0 */6 * * *"
-    },
-    {
-      "path": "/api/cron/check-alert-throughput",
-      "schedule": "0 14 * * *"
     },
     {
       "path": "/api/cron/daily-alerts",
@@ -376,38 +265,6 @@
     {
       "path": "/api/cron/daily-alerts",
       "schedule": "0 10 * * *"
-    },
-    {
-      "path": "/api/cron/refresh-contracts",
-      "schedule": "0 23 * * 0"
-    },
-    {
-      "path": "/api/cron/snapshot-multisite?source=nih_reporter",
-      "schedule": "0 4 * * *"
-    },
-    {
-      "path": "/api/cron/snapshot-multisite?source=darpa_baa",
-      "schedule": "0 5 * * *"
-    },
-    {
-      "path": "/api/cron/snapshot-multisite?source=nsf_sbir",
-      "schedule": "0 6 * * *"
-    },
-    {
-      "path": "/api/cron/briefing-watchdog",
-      "schedule": "0 9 * * *"
-    },
-    {
-      "path": "/api/cron/briefing-watchdog",
-      "schedule": "30 9 * * *"
-    },
-    {
-      "path": "/api/cron/sync-usaspending-awards",
-      "schedule": "0 4 * * 0"
-    },
-    {
-      "path": "/api/cron/extract-sam-events",
-      "schedule": "0 7 * * *"
     }
   ]
 }
