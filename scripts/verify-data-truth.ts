@@ -24,8 +24,15 @@
 import { config } from 'dotenv';
 config({ path: '.env.local' });
 import { createMIAuthSessionToken } from '../src/lib/two-factor-session';
+import { createClient } from '@supabase/supabase-js';
 
 const BASE_URL = (process.env.BASE_URL || 'https://getmindy.ai').replace(/\/$/, '');
+
+// Service-role client for DATA-quality checks (corrupt-row guards) — distinct from the
+// API-behavior checks above. Guarded: if creds absent (bare CI), those checks skip.
+const SB_URL = process.env.NEXT_PUBLIC_SUPABASE_URL;
+const SB_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY;
+const sb = (SB_URL && SB_KEY) ? createClient(SB_URL, SB_KEY, { auth: { persistSession: false } }) : null;
 const USASPENDING = 'https://api.usaspending.gov/api/v2/search/spending_by_category';
 const WINDOW = { start_date: '2022-10-01', end_date: '2025-09-30' }; // MARKET_SPEND_WINDOW
 const AWARD_TYPES = ['A', 'B', 'C', 'D'];
@@ -246,6 +253,42 @@ async function checkSourceFeed() {
   ok('Source Feed keyword filter is selective (rare < broad)', rare.count >= 0 && rare.count < broad.count, `"hypersonic" ${rare.count} vs "services" ${broad.count}`);
 }
 
+// === DATA QUALITY GUARDS (cached-table integrity — the 2026-06-19 sweep) ==========
+// These assert the CACHED tables stay clean: corrupt recompete values stay quarantined,
+// sub_tier stays populated (Navy sliceable), contacts honesty data is intact. A
+// regression here = the next "renders fine, wrong number" bug. Skips if no DB creds.
+async function checkDataQuality() {
+  console.log('\n[Layer 4] Data-quality guards (cached tables — skip if no DB creds):');
+  if (!sb) { console.log('  ⊘ no SUPABASE_SERVICE_ROLE_KEY — skipping DB integrity checks'); return; }
+
+  async function count(table: string, build: (q: any) => any): Promise<number> {
+    const { count, error } = await build(sb!.from(table).select('*', { count: 'exact', head: true }));
+    return error ? -1 : (count || 0);
+  }
+
+  // 1. recompete: corrupt values must be quarantined (flag set) — i.e. NO clean row
+  //    should have an implausible >$100B value or the all-9s sentinel.
+  const leakBig = await count('recompete_opportunities', (q: any) => q.is('quality_flag', null).gt('potential_total_value', 100e9));
+  const leakSentinel = await count('recompete_opportunities', (q: any) => q.is('quality_flag', null).eq('potential_total_value', 99999999999));
+  ok('recompete: no corrupt >$100B values leak past quarantine', leakBig === 0, `${leakBig} clean rows >$100B`);
+  ok('recompete: no all-9s sentinel leaks past quarantine', leakSentinel === 0, `${leakSentinel} clean sentinel rows`);
+
+  // 2. sam_opportunities: sub_tier stays populated (Navy/Army/AF sliceable). Guard that
+  //    coverage doesn't regress — >95% of rows with a hierarchy should have sub_tier.
+  const total = await count('sam_opportunities', (q: any) => q.not('agency_hierarchy', 'is', null));
+  const missing = await count('sam_opportunities', (q: any) => q.is('sub_tier', null).not('agency_hierarchy', 'is', null));
+  const navy = await count('sam_opportunities', (q: any) => q.ilike('sub_tier', '%navy%'));
+  const covPct = total > 0 ? Math.round((1 - missing / total) * 100) : 0;
+  ok('sam_opportunities: sub_tier coverage ≥95% (service-branch sliceable)', covPct >= 95, `${covPct}% populated (${missing} missing)`);
+  ok('sam_opportunities: Navy is sliceable (sub_tier)', navy > 1000, `${navy} Navy rows`);
+
+  // 3. federal_contacts: the honesty data exists (emailable count is real, not 0/100%).
+  const ftotal = await count('federal_contacts', (q: any) => q);
+  const emailable = await count('federal_contacts', (q: any) => q.not('contact_email', 'is', null));
+  const pct = ftotal > 0 ? Math.round((emailable / ftotal) * 100) : 0;
+  ok('federal_contacts: emailable count is real (not 0%/100%)', emailable > 0 && emailable < ftotal, `${emailable}/${ftotal} (${pct}%) emailable`);
+}
+
 async function main() {
   console.log(`\n🔎 Data Truth Check — re-deriving truth from live USASpending / Grants`);
   console.log(`   Target: ${BASE_URL}\n`);
@@ -257,6 +300,7 @@ async function main() {
     await checkForecastsFilters();
     await checkSourceFeed();
     await checkGrants();
+    await checkDataQuality();
   } catch (e) {
     console.error('\n💥 Harness error:', e);
     process.exit(2);
