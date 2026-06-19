@@ -120,6 +120,61 @@ export function isDue(expr: string, date: Date): boolean {
   return true; // both wildcard
 }
 
+/**
+ * Catch-up check: did this job MISS its scheduled run?
+ *
+ * Vercel's hourly dispatch tick is best-effort — it occasionally skips a specific
+ * hour. A job pinned to one hour (e.g. `0 6 * * *`) is then silently never evaluated
+ * that day and the next exact-minute match isn't until tomorrow (so it's skipped two
+ * days in a row, as `aggregate-profiles` was). This returns true when: the job's
+ * scheduled time has already PASSED today (UTC), today's day-of-month/week matches the
+ * schedule, and it has NOT already run today — so the next tick that does fire will
+ * pick it up. Only applies to schedules with a SPECIFIC hour (single value); wildcard
+ * or multi-hour/sub-hour schedules fire often enough not to need catch-up.
+ */
+export function isMissed(expr: string, now: Date, lastRunAt: Date | null): boolean {
+  let p: ParsedCron;
+  try { p = parseCron(expr); } catch { return false; }
+
+  // Only daily-style schedules (a single specific hour, single specific minute).
+  // Multi-hour, every-hour (*), or sub-hour (*/N) schedules get many chances/day.
+  if (p.hour.size !== 1 || p.minute.size !== 1) return false;
+
+  const schedHour = [...p.hour][0];
+  const schedMin = [...p.minute][0];
+
+  // Day gate: today must match the schedule's day-of-month / day-of-week.
+  const mon = now.getUTCMonth() + 1;
+  if (!p.month.has(mon)) return false;
+  const dom = now.getUTCDate();
+  const dow = now.getUTCDay();
+  const domRestricted = p.dom.size < FIELDS[2].max - FIELDS[2].min + 1;
+  const dowRestricted = p.dow.size < FIELDS[4].max - FIELDS[4].min + 1;
+  let dayMatches = true;
+  if (domRestricted && dowRestricted) dayMatches = p.dom.has(dom) || p.dow.has(dow);
+  else if (domRestricted) dayMatches = p.dom.has(dom);
+  else if (dowRestricted) dayMatches = p.dow.has(dow);
+  if (!dayMatches) return false;
+
+  // Has the scheduled time already passed today (UTC)?
+  const nowMins = now.getUTCHours() * 60 + now.getUTCMinutes();
+  const schedMins = schedHour * 60 + schedMin;
+  if (nowMins < schedMins) return false; // not time yet today
+
+  // Already ran today (on/after the scheduled time)? Then not missed.
+  if (lastRunAt) {
+    const sameUTCDay =
+      lastRunAt.getUTCFullYear() === now.getUTCFullYear() &&
+      lastRunAt.getUTCMonth() === now.getUTCMonth() &&
+      lastRunAt.getUTCDate() === now.getUTCDate();
+    if (sameUTCDay) {
+      const lastMins = lastRunAt.getUTCHours() * 60 + lastRunAt.getUTCMinutes();
+      if (lastMins >= schedMins) return false; // already caught up today
+    }
+  }
+  return true; // scheduled time passed, day matches, hasn't run today → missed
+}
+
 /** Validate an expression up front (used by the admin endpoint). */
 export function validateCron(expr: string): { valid: boolean; error?: string } {
   try {

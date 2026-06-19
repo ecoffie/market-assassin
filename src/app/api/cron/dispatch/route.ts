@@ -14,7 +14,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { isDue } from '@/lib/cron/cron-expr';
+import { isDue, isMissed } from '@/lib/cron/cron-expr';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
@@ -83,7 +83,13 @@ export async function GET(request: NextRequest) {
   const skipped: Array<{ job: string; reason: string }> = [];
 
   for (const job of (jobs || []) as CronJob[]) {
-    if (!isDue(job.cron_expr, now)) continue;
+    // Fire on an exact schedule match OR if a daily job MISSED its run (Vercel's
+    // hourly tick occasionally skips an hour; without catch-up a once-daily job
+    // pinned to that hour is silently skipped — that's what froze the command
+    // center's snapshot-metrics + aggregate-profiles).
+    const dueNow = isDue(job.cron_expr, now);
+    const missed = !dueNow && isMissed(job.cron_expr, now, job.last_run_at ? new Date(job.last_run_at) : null);
+    if (!dueNow && !missed) continue;
 
     // Dedupe: already fired this minute?
     if (job.last_run_at && minuteKey(new Date(job.last_run_at)) === thisMinute) {
