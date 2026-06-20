@@ -47,8 +47,17 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const recipient = fmtCompanyName(award.recipient_name);
   const amount = fmtMoney(Number(award.obligation_amount));
   const agency = award.awarding_agency || 'federal agency';
-  const title = `${recipient} — ${amount} ${agency} Contract Award | Mindy`;
-  const description = `Federal contract award detail: ${recipient} received ${amount} from ${agency}${award.naics_description ? ` for ${award.naics_description}` : ''}. Action date ${fmtDate(award.action_date)}. PIID ${award.piid || award.award_id}.`;
+  // Lead the title with the contract number. Most organic traffic to this
+  // page comes from searchers pasting a raw PIID (GSC: "19aqmm21f1496",
+  // "140d0426p0078", …). Echoing that number first makes them recognize
+  // their result in the SERP and click — the prior "{recipient} — {amount}"
+  // title ranked well (pos 2-4) but drew ~0% CTR because it didn't visibly
+  // match the query they typed.
+  const contractNo = award.piid || award.award_id;
+  const title = contractNo
+    ? `Contract ${contractNo} — ${recipient}, ${amount} | Mindy`
+    : `${recipient} — ${amount} ${agency} Contract Award | Mindy`;
+  const description = `Federal contract ${contractNo}: ${recipient} received ${amount} from ${agency}${award.naics_description ? ` for ${award.naics_description}` : ''}. Action date ${fmtDate(award.action_date)}. View award details, period of performance, and NAICS.`;
 
   return {
     title,
