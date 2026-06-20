@@ -201,6 +201,15 @@ export async function getAwardIdByPiid(piid: string): Promise<{
     recipient_name: string;
   }>({
     cacheKey: `awards:by-piid:${norm}`,
+    // Opt INTO live BQ on a cold miss. The SEO-safe queryCached default
+    // (cacheOnly:true) returns [] on a miss to block crawler-driven cold
+    // scans — but that silently dead-ended every un-warmed PIID redirect to
+    // /awards, killing the contract-number organic traffic this route exists
+    // to capture (GSC: PIID searches ranking pos 2-4). This lookup is exactly
+    // the case the guard is meant to permit: a hash-bucket-pruned ~4.5 MB
+    // read, hard-capped at 100 MiB below, resolving ONE PIID and cached 90d
+    // after. It is not the 4.86 GB full-table scan that caused the cost spike.
+    cacheOnly: false,
     // Hash-partitioned lookup: the `bucket = MOD(...)` filter prunes to ONE of
     // 1024 partitions so a cold read scans ~4.5 MB (measured 10 MB billed)
     // instead of the ~4.86 GB an unpartitioned scan cost. BQ computes the hash
