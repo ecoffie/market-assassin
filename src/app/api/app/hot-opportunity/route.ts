@@ -28,6 +28,38 @@ export async function GET(request: NextRequest) {
   const auth = requireMIAuthSession(request, email);
   if (!auth.ok) return auth.response;
 
+  // --- DEMO SAFETY NET (YT Live) ----------------------------------------
+  // When COLLAB_DEMO_TITLE is set, force-return a synthetic hot opp so the
+  // "🔥 Hot right now" card is GUARANTEED on screen, independent of real
+  // tracking data. Turn OFF after the demo (unset the env). Real signal
+  // resumes automatically. Per-request override: ?demo=1 / ?demo=0.
+  const demoParam = request.nextUrl.searchParams.get('demo');
+  const demoOn = demoParam === '1' || (demoParam !== '0' && !!process.env.COLLAB_DEMO_TITLE);
+  if (demoOn && process.env.COLLAB_DEMO_TITLE) {
+    const count = Number(process.env.COLLAB_DEMO_COUNT) || 7;
+    const title = process.env.COLLAB_DEMO_TITLE;
+    const agency = process.env.COLLAB_DEMO_AGENCY || 'Department of Defense';
+    const isSS = /sources sought|sources-sought|\bRFI\b/i.test(title);
+    return NextResponse.json(
+      {
+        hot: {
+          noticeId: process.env.COLLAB_DEMO_NOTICE_ID || 'demo-collab',
+          title,
+          agency,
+          trackerCount: count,
+          isSourcesSought: isSS,
+          responseDeadline: process.env.COLLAB_DEMO_DEADLINE || null,
+          message: isSS
+            ? `${count} contractors are researching this Sources Sought. You're not the only one — respond together.`
+            : `${count} contractors are tracking this opportunity. You're not the only one pursuing it.`,
+          demo: true,
+        },
+      },
+      { headers: { 'Cache-Control': 'no-store' } }
+    );
+  }
+  // ----------------------------------------------------------------------
+
   try {
     const heatmap = await getDemandHeatmap(40);
     const ready = heatmap.opps.filter((o) => o.collabReady);

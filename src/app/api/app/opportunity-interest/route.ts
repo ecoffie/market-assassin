@@ -61,5 +61,17 @@ export async function POST(request: NextRequest) {
   for (const [nid, set] of usersByNotice) {
     if (set.size >= MIN_SHOW) counts[nid] = set.size; // only surface meaningful counts
   }
+
+  // --- DEMO SAFETY NET (YT Live) ---------------------------------------
+  // If COLLAB_DEMO_NOTICE_ID is set AND that notice is in the requested list,
+  // force its badge count so the inline "X others tracking" is guaranteed on
+  // screen during the demo. Unset the env after the live to resume real data.
+  const demoId = process.env.COLLAB_DEMO_NOTICE_ID;
+  if (demoId && noticeIds.includes(demoId)) {
+    const demoCount = Number(process.env.COLLAB_DEMO_COUNT) || 7;
+    counts[demoId] = Math.max(counts[demoId] || 0, demoCount);
+  }
+  // ---------------------------------------------------------------------
+
   return NextResponse.json({ counts }, { headers: { 'Cache-Control': 'no-store' } });
 }

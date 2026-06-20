@@ -2487,3 +2487,23 @@ stronger badges → more responding/upgrading → more trackers.
 wall. `AlertsPanel.tsx` `markInterested()` writes `user_pipeline` (source: 'interest_signal', stage:
 tracking) via the auth-only (no tier gate) `/api/pipeline` POST, optimistic count bump, rollback on
 failure. Counted by the same `/api/app/opportunity-interest` + `/api/app/hot-opportunity` engines.
+
+---
+
+## Collaboration signal — YT-Live demo safety net (June 20 2026, internal)
+
+**What:** Env-driven force-display for the collaboration card during a live demo. With COLLAB_DEMO_TITLE
+set, /api/app/hot-opportunity returns a synthetic "🔥 Hot right now" opp (configurable title, agency,
+count, deadline) so the hero card is GUARANTEED on screen regardless of real tracking data. With
+COLLAB_DEMO_NOTICE_ID set, /api/app/opportunity-interest force-counts that notice so the inline "X others
+tracking" badge fires on a chosen alert. Per-request override: ?demo=1 / ?demo=0. Turn OFF by unsetting
+the envs — real signal resumes automatically.
+
+**Why:** Live demos can't depend on real-time tracking volume being high enough at showtime. This makes
+the aha moment deterministic for a YT Live while keeping production behavior unchanged when the envs are
+absent. Internal/demo only — not a user feature.
+
+**Proof:** `src/app/api/app/hot-opportunity/route.ts` (demo branch before the heatmap query) +
+`src/app/api/app/opportunity-interest/route.ts` (demo count merge before the response). Envs:
+COLLAB_DEMO_TITLE, COLLAB_DEMO_COUNT (default 7), COLLAB_DEMO_AGENCY, COLLAB_DEMO_NOTICE_ID,
+COLLAB_DEMO_DEADLINE.
