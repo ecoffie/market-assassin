@@ -1078,6 +1078,10 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
   if (tier === 'free') {
     return (
       <div className="p-6">
+        {/* "🔥 Hot right now" — free/alerts users get the collaboration aha
+            moment too. The social-proof signal is the conversion driver, so it
+            renders ABOVE the upgrade wall, not behind it. */}
+        <CollabHotCard email={email} onPanelChange={onPanelChange} />
         <div className="border border-purple-500/30 bg-purple-950/20 p-8 text-center">
           <div className="text-4xl mb-4">📊</div>
           <h2 className="text-2xl font-bold text-white mb-3">Today&apos;s Intel</h2>

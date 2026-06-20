@@ -326,6 +326,53 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
     return () => { cancelled = true; };
   }, [email, alerts, getAuthHeaders]);
 
+  // One-tap "Interested" — the collaboration network-effect lever. ALL tiers
+  // (incl. free/alerts-only) can flag interest; it writes a lightweight
+  // user_pipeline row (stage: tracking) that the collab signal counts, WITHOUT
+  // exposing the full Pro pipeline. This is what generates the tracking volume
+  // that lights up everyone else's "X others tracking this" badge.
+  const [interestedAlertIds, setInterestedAlertIds] = useState<Set<string>>(new Set());
+  const markInterested = async (alert: Alert) => {
+    if (!email) {
+      showToast({ message: 'Sign in before tracking opportunities', variant: 'error' });
+      return;
+    }
+    // Optimistic: flip the button + bump the visible count immediately.
+    setInterestedAlertIds(prev => new Set(prev).add(alert.id));
+    setInterestCounts(prev => ({ ...prev, [alert.id]: (prev[alert.id] || 0) + 1 }));
+    try {
+      const res = await fetch('/api/pipeline', {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({
+          user_email: email,
+          notice_id: alert.id,
+          source: 'interest_signal',
+          external_url: alert.url,
+          title: alert.title,
+          agency: getAlertBuyer(alert).primary,
+          naics_code: alert.naicsCode,
+          set_aside: alert.setAside,
+          response_deadline: alert.responseDeadline,
+          stage: 'tracking',
+          priority: alert.isUrgent ? 'critical' : alert.isClosingSoon ? 'high' : 'medium',
+        }),
+      });
+      const data = await res.json().catch(() => null);
+      if (res.ok && data?.success) {
+        trackAlertEvent('tool_use', alert, 'mark_interested');
+        showToast({ message: "Tracked — you'll see how many others are too", variant: 'success' });
+        return;
+      }
+      throw new Error(data?.error || 'failed');
+    } catch {
+      // Roll back optimistic UI on failure.
+      setInterestedAlertIds(prev => { const n = new Set(prev); n.delete(alert.id); return n; });
+      setInterestCounts(prev => ({ ...prev, [alert.id]: Math.max(0, (prev[alert.id] || 1) - 1) }));
+      showToast({ message: 'Could not track that — try again', variant: 'error' });
+    }
+  };
+
   const saveToPipeline = async (alert: Alert) => {
     if (!email) {
       showToast({ message: 'Sign in before saving opportunities', variant: 'error' });
@@ -1202,7 +1249,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                         pitch lives in the drawer (Mindy Analyst card),
                         not on every card row. Per-card "Upgrade to Save"
                         was noise. */}
-                    {canUsePipeline && (
+                    {canUsePipeline ? (
                       <button
                         type="button"
                         onClick={(event) => {
@@ -1217,6 +1264,22 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                           : savingAlertIds.has(alert.id)
                             ? 'Saving...'
                             : 'Save'}
+                      </button>
+                    ) : (
+                      // Free / alerts-only: one-tap "Interested" — the collab
+                      // network-effect lever (writes a lightweight tracking row,
+                      // no Pro pipeline). Turns passive readers into the tracking
+                      // volume that powers everyone's "X others tracking" badge.
+                      <button
+                        type="button"
+                        onClick={(event) => {
+                          event.stopPropagation();
+                          markInterested(alert);
+                        }}
+                        disabled={interestedAlertIds.has(alert.id)}
+                        className="text-xs text-cyan-300 hover:text-cyan-200 disabled:text-cyan-500/60 disabled:cursor-default px-3 py-2 md:px-2 md:py-1 hover:bg-cyan-500/10 rounded min-h-[44px] md:min-h-0 inline-flex items-center"
+                      >
+                        {interestedAlertIds.has(alert.id) ? '✓ Tracking' : '➕ Interested'}
                       </button>
                     )}
                     <a

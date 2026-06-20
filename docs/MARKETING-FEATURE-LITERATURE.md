@@ -2463,3 +2463,27 @@ when an opp clears the collaboration threshold, never blocks the dashboard.
 Mindy palette) + `GET /api/app/hot-opportunity` (user-authed, reuses the Demand Heatmap engine, picks
 the hottest collab-ready opp preferring Sources Sought, anonymous count, gated on COLLAB_THRESHOLD).
 Mounted above MindyInsightCard in DashboardPanel. Built on real user-tracking data; anonymous + safe.
+
+---
+
+## Collaboration signal — free-tier access + one-tap "Interested" (Phase 2c, June 20 2026)
+
+**What:** Two changes that put the collaboration aha moment in front of the people it converts — free /
+alerts-only users. (1) The "🔥 Hot right now" hero card now renders for FREE users too, above the
+upgrade wall (it was Pro-gated). (2) Every alert now has a one-tap "➕ Interested" button for free
+users — it writes a lightweight tracking row (no Pro pipeline) so flagging interest is frictionless.
+
+**Why:** The social-proof signal IS the conversion driver, so hiding it behind the paywall was backwards
+— free users are exactly who we want to feel "others are mobilizing on this, I should respond / upgrade."
+And the badge only fires when 2+ people track the same opp, so the real lever is getting more people to
+track. The Pro "Save to Pipeline" was the only way to track — useless for free users. "➕ Interested"
+removes that barrier: any user can flag interest in one tap, which generates the tracking volume that
+lights up everyone else's "X others tracking this" badge. That's the network effect — more trackers →
+stronger badges → more responding/upgrading → more trackers.
+
+**Growth:** free-tier social proof + frictionless tracking = the viral loop's ignition.
+
+**Proof:** `DashboardPanel.tsx` renders `<CollabHotCard>` inside the free-tier branch above the upgrade
+wall. `AlertsPanel.tsx` `markInterested()` writes `user_pipeline` (source: 'interest_signal', stage:
+tracking) via the auth-only (no tier gate) `/api/pipeline` POST, optimistic count bump, rollback on
+failure. Counted by the same `/api/app/opportunity-interest` + `/api/app/hot-opportunity` engines.
