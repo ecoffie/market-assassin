@@ -124,6 +124,14 @@ export async function getAwardById(awardId: string): Promise<AwardDetailRow | nu
   if (!isValidAwardId(awardId)) return null;
   const rows = await queryCached<AwardDetailRow>({
     cacheKey: `awards:detail:${awardId}`,
+    // Opt INTO live BQ on a cold miss (same reasoning as getAwardIdByPiid).
+    // Without this, the SEO-safe default (cacheOnly:true) returns [] on a miss
+    // → getAwardById returns null → the /awards/[id] page 404s for every award
+    // not already warm in KV. That silently 404'd the PIID-redirect targets and
+    // the whole long tail of award detail pages. isValidAwardId() guards bot
+    // garbage before BQ, the bucket filter + 100 MiB cap bound the cold read,
+    // and the result caches 90d — safe to resolve on demand.
+    cacheOnly: false,
     // Reads the hash-partitioned award_detail_lookup table. The
     // `bucket = MOD(...)` filter prunes to ONE of 1024 partitions so a cold
     // lookup scans ~10-25 MB (measured 10 MB billed) instead of the ~27 GB an
