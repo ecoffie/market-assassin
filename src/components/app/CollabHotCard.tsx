@@ -37,23 +37,27 @@ export function CollabHotCard({ email, onPanelChange }: CollabHotCardProps) {
   const [hot, setHot] = useState<HotOpp | null>(null);
   const [hidden, setHidden] = useState(false);
 
+  // Re-poll every 15s so the hero appears/updates LIVE as others track the same
+  // opp (no refresh needed — ideal for demos).
   useEffect(() => {
     if (!email) return;
     let cancelled = false;
-    (async () => {
+    const poll = async () => {
       try {
         const res = await fetch(
           `/api/app/hot-opportunity?email=${encodeURIComponent(email)}`,
           { headers: getMIApiHeaders(email) }
         );
-        if (!res.ok) return;
+        if (!res.ok || cancelled) return;
         const data = await res.json();
         if (!cancelled && data.hot) setHot(data.hot);
       } catch {
         // silent — card just won't render
       }
-    })();
-    return () => { cancelled = true; };
+    };
+    poll();
+    const interval = setInterval(poll, 15000);
+    return () => { cancelled = true; clearInterval(interval); };
   }, [email]);
 
   // Take the user to the Alerts panel (where the opp + its badge live) so they

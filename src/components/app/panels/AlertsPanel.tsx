@@ -307,11 +307,14 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
 
   // Collaboration signal: how many OTHER users track each shown opp (anonymous,
   // server gates to >=2). Powers the "X others are tracking this" FOMO badge.
+  // Re-polls every 15s so the count climbs LIVE as others tap Interested (great
+  // for demos — no refresh needed). Merge with MAX so a refetch never drops an
+  // optimistic count from this user's own just-tapped "Interested".
   useEffect(() => {
     if (!email || alerts.length === 0) return;
     let cancelled = false;
     const noticeIds = alerts.map(a => a.id).filter(Boolean).slice(0, 200);
-    (async () => {
+    const poll = async () => {
       try {
         const res = await fetch('/api/app/opportunity-interest', {
           method: 'POST',
@@ -320,10 +323,20 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
         });
         if (!res.ok || cancelled) return;
         const data = await res.json();
-        if (!cancelled) setInterestCounts(data.counts || {});
+        if (cancelled) return;
+        const fresh = (data.counts || {}) as Record<string, number>;
+        setInterestCounts(prev => {
+          const merged = { ...prev };
+          for (const [nid, n] of Object.entries(fresh)) {
+            merged[nid] = Math.max(merged[nid] || 0, n);
+          }
+          return merged;
+        });
       } catch { /* badge is best-effort — never block the panel */ }
-    })();
-    return () => { cancelled = true; };
+    };
+    poll();
+    const interval = setInterval(poll, 15000);
+    return () => { cancelled = true; clearInterval(interval); };
   }, [email, alerts, getAuthHeaders]);
 
   // One-tap "Interested" — the collaboration network-effect lever. ALL tiers

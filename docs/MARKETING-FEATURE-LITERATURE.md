@@ -2507,3 +2507,20 @@ absent. Internal/demo only — not a user feature.
 `src/app/api/app/opportunity-interest/route.ts` (demo count merge before the response). Envs:
 COLLAB_DEMO_TITLE, COLLAB_DEMO_COUNT (default 7), COLLAB_DEMO_AGENCY, COLLAB_DEMO_NOTICE_ID,
 COLLAB_DEMO_DEADLINE.
+
+---
+
+## Collaboration signal — live auto-update (June 20 2026)
+
+**What:** The "X others tracking" badge (Alerts list) and the "🔥 Hot right now" hero card (dashboard)
+now re-poll every 15s, so the count climbs ON SCREEN as other users tap "Interested" — no page refresh.
+Counts merge with MAX, so a refetch never drops a user's own just-tapped optimistic count.
+
+**Why:** Makes the collaboration network effect feel alive — and makes the demo trivial: 3-4 accounts
+chase the same Sources Sought and everyone watches the number rise in real time. No env toggles, no
+staging — the real feature working live IS the demo.
+
+**Proof:** `AlertsPanel.tsx` badge effect (poll() + setInterval 15s, MAX merge) +
+`CollabHotCard.tsx` (poll() + setInterval 15s). Both best-effort; never block the panel.
+Note: the badge counts OTHERS (excludes viewer) and fires at >=2 others — so 3 trackers shows
+"2 others" to each, 4 trackers shows "3 others".
