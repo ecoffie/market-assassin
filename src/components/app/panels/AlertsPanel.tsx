@@ -307,9 +307,10 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
 
   // Collaboration signal: how many OTHER users track each shown opp (anonymous,
   // server gates to >=2). Powers the "X others are tracking this" FOMO badge.
-  // Re-polls every 15s so the count climbs LIVE as others tap Interested (great
-  // for demos — no refresh needed). Merge with MAX so a refetch never drops an
-  // optimistic count from this user's own just-tapped "Interested".
+  // Re-polls every 15s so the count tracks LIVE as others tap Interested (great
+  // for demos — no refresh needed). The server (which excludes the requester) is
+  // the source of truth, so we replace the polled notices' counts wholesale —
+  // letting the badge reflect both increases AND decreases without going stale.
   useEffect(() => {
     if (!email || alerts.length === 0) return;
     let cancelled = false;
@@ -325,12 +326,14 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
         const data = await res.json();
         if (cancelled) return;
         const fresh = (data.counts || {}) as Record<string, number>;
+        // Reset the counts for every notice we just polled, then apply the fresh
+        // server values. A notice that dropped below the gate falls out of `fresh`
+        // and correctly clears, instead of sticking at its old value.
         setInterestCounts(prev => {
-          const merged = { ...prev };
-          for (const [nid, n] of Object.entries(fresh)) {
-            merged[nid] = Math.max(merged[nid] || 0, n);
-          }
-          return merged;
+          const next = { ...prev };
+          for (const nid of noticeIds) delete next[nid];
+          for (const [nid, n] of Object.entries(fresh)) next[nid] = n;
+          return next;
         });
       } catch { /* badge is best-effort — never block the panel */ }
     };
@@ -350,9 +353,11 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
       showToast({ message: 'Sign in before tracking opportunities', variant: 'error' });
       return;
     }
-    // Optimistic: flip the button + bump the visible count immediately.
+    // Optimistic: flip the button immediately. Do NOT bump interestCounts — that
+    // metric is "X OTHER users" (the server excludes the requester), so counting
+    // your own tap would over-report by 1, and the Math.max merge below would make
+    // it permanently sticky. The next 15s poll reflects the true climb.
     setInterestedAlertIds(prev => new Set(prev).add(alert.id));
-    setInterestCounts(prev => ({ ...prev, [alert.id]: (prev[alert.id] || 0) + 1 }));
     try {
       const res = await fetch('/api/pipeline', {
         method: 'POST',
@@ -379,9 +384,8 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
       }
       throw new Error(data?.error || 'failed');
     } catch {
-      // Roll back optimistic UI on failure.
+      // Roll back optimistic UI on failure (button only — count was never bumped).
       setInterestedAlertIds(prev => { const n = new Set(prev); n.delete(alert.id); return n; });
-      setInterestCounts(prev => ({ ...prev, [alert.id]: Math.max(0, (prev[alert.id] || 1) - 1) }));
       showToast({ message: 'Could not track that — try again', variant: 'error' });
     }
   };
@@ -1175,7 +1179,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                   {interestCounts[alert.id] >= 2 && (
                     <p className="text-xs font-medium text-cyan-300 mb-1.5 flex items-center gap-1">
                       <span aria-hidden>👥</span>
-                      {interestCounts[alert.id]} other{interestCounts[alert.id] === 1 ? '' : 's'} {alert.noticeType?.toLowerCase().includes('sources') ? 'researching this Sources Sought' : 'tracking this'}
+                      {interestCounts[alert.id]} others {alert.noticeType?.toLowerCase().includes('sources') ? 'researching this Sources Sought' : 'tracking this'}
                       {alert.noticeType?.toLowerCase().includes('sources') && <span className="text-cyan-400/70"> — respond together</span>}
                     </p>
                   )}
