@@ -428,7 +428,6 @@ curl "https://getmindy.ai/api/admin/test-sam-subaward?password=$ADMIN_PASSWORD&p
 **Name:** Market Assassin (GovCon Tools Platform)
 **Framework:** Next.js 16.1.1 with Turbopack, React 19, TypeScript, Tailwind CSS
 **Database:** Supabase (PostgreSQL) | **Payments:** Stripe | **Email:** SMTP | **PDF:** jsPDF
-**Roadmap:** See [`TOOL-BUILD.md`](./TOOL-BUILD.md)
 **Session History:** See [`MEMORY.md`](./MEMORY.md)
 
 ---

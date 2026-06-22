@@ -7,9 +7,12 @@
  * (real PIID, agency, $ amount, period of performance, scope from the actual award
  * description). NO fabricated facts (rule #1). This is a demo persona, NOT Eric's
  * company — eric@govcongiants.com (GovCon Giants, a training co with 0 awards) is
- * left untouched.
+ * left untouched (and guarded against below).
  *
- * Run: npx tsx scripts/seed-demo-vault.ts
+ * Target account: defaults to demo@govcongiants.com; pass an email to seed a
+ * different demo account (e.g. a getmindy.ai address):
+ *   Run: npx tsx scripts/seed-demo-vault.ts                 # demo@govcongiants.com
+ *        npx tsx scripts/seed-demo-vault.ts demo@getmindy.ai
  */
 import { createClient } from '@supabase/supabase-js';
 import { config } from 'dotenv';
@@ -21,7 +24,19 @@ const supabase = createClient(
   { auth: { autoRefreshToken: false, persistSession: false } }
 );
 
-const EMAIL = 'demo@govcongiants.com';
+// Target demo account — override via the first CLI arg; defaults to the canonical
+// demo account. Validated + normalized so a typo can't silently seed the wrong row.
+const EMAIL = (process.argv[2] || 'demo@govcongiants.com').toLowerCase().trim();
+if (!EMAIL.includes('@')) {
+  console.error(`❌ Invalid email argument: "${EMAIL}". Usage: npx tsx scripts/seed-demo-vault.ts [email]`);
+  process.exit(1);
+}
+// Guard: never overwrite Eric's real account with the demo persona (the whole point
+// of this script is that the Tantus data is NOT his company).
+if (EMAIL === 'eric@govcongiants.com' || EMAIL === 'eric@getmindy.ai') {
+  console.error(`❌ Refusing to seed demo persona onto Eric's real account (${EMAIL}). Use a dedicated demo address.`);
+  process.exit(1);
+}
 
 // --- Vault identity (real, verifiable facts only) ---------------------------
 const identity = {
