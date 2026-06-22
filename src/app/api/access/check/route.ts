@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { verifyMIAccess } from '@/lib/api-auth';
+import { verifyMIAccess, canSeePrototypeSurfaces } from '@/lib/api-auth';
 import { resolveAccess } from '@/lib/access/resolve-access';
 import { resolveCoachAccess } from '@/lib/mindy/coach-access';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
@@ -46,6 +46,9 @@ export async function GET(request: NextRequest) {
       tier,
       isStaff: access.isStaff ?? false,
       staffRole: access.staffRole ?? 'none',
+      // Prototype demo tabs are gated on their own allowlist, NOT isStaff, so
+      // company/demo accounts get the clean Pro-member view by default.
+      canSeePrototypes: canSeePrototypeSurfaces(email),
       trialEndsAt: resolved.trialEndsAt,
       accessSource: resolved.source,
       access: {

@@ -69,10 +69,13 @@ function AppDashboard() {
   const [email, setEmail] = useState<string | null>(null);
   const [tier, setTier] = useState<AppTier>('free');
   const [coachModeAllowed, setCoachModeAllowed] = useState(false);
-  // Internal staff (govcongiants team). Gates the demo/case-study tabs (Vehicle
-  // Expiry Watch, SMB Market Research, Market Research Report) so paid Pro/Team
-  // customers never see them — only the internal team does (Eric QC 2026-06-17).
+  // Internal staff (govcongiants / getmindy team). Kept for staff-only treatment;
+  // no longer gates the prototype demo tabs.
   const [isStaff, setIsStaff] = useState(false);
+  // On the MINDY_PROTOTYPE_EMAILS allowlist → may see the demo/case-study prototype
+  // tabs (Vehicle Expiry Watch, SMB Market Research, Market Research Report). Off by
+  // default for everyone — incl. staff & demo accounts — so they get the clean view.
+  const [canSeePrototypes, setCanSeePrototypes] = useState(false);
   const [activePanel, setActivePanel] = useState<AppPanel>('dashboard');
   // Optional context the previous panel can pass to the next (e.g.
   // PipelinePanel sets { pursuit_id } when user clicks 'Draft Proposal'
@@ -245,6 +248,7 @@ function AppDashboard() {
       setTier(userTier);
       setCoachModeAllowed(!!accessData?.coachMode?.allowed);
       setIsStaff(!!accessData?.isStaff);
+      setCanSeePrototypes(!!accessData?.canSeePrototypes);
 
       // If the currently-active panel is gated for this tier, swap to the
       // first accessible one. Default panel is 'dashboard' (AI briefings) —
@@ -1268,6 +1272,7 @@ function AppDashboard() {
         userTier={tier}
         coachModeAllowed={coachModeAllowed}
         isStaff={isStaff}
+        canSeePrototypes={canSeePrototypes}
         userEmail={email}
         currentWorkspaceId={currentWorkspaceId}
         onWorkspaceChange={setCurrentWorkspaceId}

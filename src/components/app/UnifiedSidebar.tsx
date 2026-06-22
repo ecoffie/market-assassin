@@ -79,12 +79,13 @@ interface NavItem {
   description: string;
   tier: AppTier[];
   badge?: string;
-  // staffOnly: hide this item entirely unless the user is INTERNAL STAFF. Used for
-  // demo / case-study prototypes (Vehicle Expiry Watch, SMB Market Research,
-  // Market Research Report) that confused normal Pro/Team users (Eric QC
-  // 2026-06-17). NOT gated on coach-mode — paid Team customers have coach-mode too
-  // and must not see these; only the internal team does.
-  staffOnly?: boolean;
+  // prototypeOnly: hide this item entirely unless the user is on the prototype
+  // allowlist (MINDY_PROTOTYPE_EMAILS → canSeePrototypes). Used for demo / case-study
+  // prototypes (Vehicle Expiry Watch, SMB Market Research, Market Research Report)
+  // that confused normal Pro/Team users (Eric QC 2026-06-17). Gated on an EXPLICIT
+  // allowlist, NOT the broad staff flag — so company accounts (govcongiants.com /
+  // getmindy.ai) and demo accounts see the clean Pro-member view by default.
+  prototypeOnly?: boolean;
   // When set, clicking this item navigates to a route instead of
   // switching the active panel. Used for full-bleed pages like
   // /app/market-intel that aren't part of the panel container.
@@ -239,7 +240,7 @@ const NAV_SECTIONS: NavSection[] = [
         icon: Bell,
         description: 'Auto-notify on expiry',
         tier: ['pro', 'team', 'enterprise'],
-        staffOnly: true,   // demo/case-study — internal staff only (not paid Pro/Team)
+        prototypeOnly: true,   // demo/case-study — MINDY_PROTOTYPE_EMAILS allowlist only
       },
       {
         // Navy OSBP prototype (Jun 2026): find certified small/minority
@@ -249,7 +250,7 @@ const NAV_SECTIONS: NavSection[] = [
         icon: Search,
         description: 'Certified small-biz sourcing',
         tier: ['pro', 'team', 'enterprise'],
-        staffOnly: true,   // demo/case-study — internal staff only (not paid Pro/Team)
+        prototypeOnly: true,   // demo/case-study — MINDY_PROTOTYPE_EMAILS allowlist only
       },
       {
         // ACC-Orlando prototype (Jun 2026): auto-draft the official Army MRR
@@ -259,7 +260,7 @@ const NAV_SECTIONS: NavSection[] = [
         icon: FileText,
         description: 'Auto-draft the Army MRR',
         tier: ['pro', 'team', 'enterprise'],
-        staffOnly: true,   // demo/case-study — internal staff only (not paid Pro/Team)
+        prototypeOnly: true,   // demo/case-study — MINDY_PROTOTYPE_EMAILS allowlist only
       },
       {
         // Moved from its own "Opportunities" section (May 21, 2026).
@@ -350,9 +351,13 @@ interface UnifiedSidebarProps {
   userTier: AppTier;
   /** Staff / grandfathered org members on Pro can use My Clients. */
   coachModeAllowed?: boolean;
-  /** Internal team (govcongiants). Gates demo/case-study tabs so paid
-   *  Pro/Team customers never see them — only staff do. */
+  /** Internal team (govcongiants / getmindy / govconedu). Kept for any
+   *  staff-only treatment; NO LONGER gates the prototype demo tabs. */
   isStaff?: boolean;
+  /** On the MINDY_PROTOTYPE_EMAILS allowlist → may see the demo/case-study
+   *  prototype tabs (Vehicle Expiry Watch, SMB Market Research, MRR). Defaults
+   *  false so every account — incl. staff & demo accounts — gets the clean view. */
+  canSeePrototypes?: boolean;
   userEmail?: string | null;
   currentWorkspaceId?: string | null;
   onWorkspaceChange?: (workspaceId: string) => void;
@@ -376,6 +381,7 @@ export default function UnifiedSidebar({
   userTier,
   coachModeAllowed = false,
   isStaff = false,
+  canSeePrototypes = false,
   userEmail,
   currentWorkspaceId,
   onWorkspaceChange,
@@ -413,15 +419,16 @@ export default function UnifiedSidebar({
     if (item.id === 'coach') {
       return hasAccess(item.tier) || coachModeAllowed;
     }
-    // staffOnly demo surfaces: access gated on INTERNAL STAFF, not tier and not
-    // coach-mode (paid Team customers have coach-mode too, and must NOT see these).
-    if (item.staffOnly) return isStaff;
+    // prototypeOnly demo surfaces: gated on the explicit prototype allowlist
+    // (canSeePrototypes), NOT staff and NOT tier/coach-mode — so company accounts
+    // and demo accounts stay on the clean Pro-member view by default.
+    if (item.prototypeOnly) return canSeePrototypes;
     return hasAccess(item.tier);
   };
 
-  // staffOnly items are HIDDEN (not just locked) from everyone but internal staff,
-  // so paid Pro/Team customers never see the demo/case-study prototypes.
-  const isItemVisible = (item: NavItem) => !item.staffOnly || isStaff;
+  // prototypeOnly items are HIDDEN (not just locked) from everyone but allowlisted
+  // accounts, so normal accounts never see the demo/case-study prototypes.
+  const isItemVisible = (item: NavItem) => !item.prototypeOnly || canSeePrototypes;
 
   const getItemDisplay = (item: NavItem) => {
     if (userTier !== 'free') {
@@ -568,7 +575,7 @@ export default function UnifiedSidebar({
           // confusion that free users hit when Today's Intel sits above
           // Source Feed.
           const orderedItems = [...section.items]
-            .filter(isItemVisible)   // hide staffOnly demo tabs from non-staff
+            .filter(isItemVisible)   // hide prototype demo tabs from non-allowlisted accounts
             .sort((a, b) => {
               const aAccess = canAccessItem(a) ? 0 : 1;
               const bAccess = canAccessItem(b) ? 0 : 1;

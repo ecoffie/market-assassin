@@ -124,6 +124,7 @@ function getStaffRole(email: string): MIStaffRole {
   if (
     domain === 'govcongiants.com'
     || domain === 'govconedu.com'
+    || domain === 'getmindy.ai'
     || INTERNAL_TEAM_EMAILS.has(normalizedEmail)
     || configuredStaff.has(normalizedEmail)
   ) {
@@ -131,6 +132,19 @@ function getStaffRole(email: string): MIStaffRole {
   }
 
   return 'none';
+}
+
+/**
+ * Prototype / case-study demo surfaces (Vehicle Expiry Watch, SMB Market Research,
+ * Market Research Report) are gated behind an EXPLICIT allowlist — NOT the broad
+ * staff flag. This keeps company accounts (govcongiants.com / getmindy.ai) and demo
+ * accounts on the clean Pro-member view by default. Add an email to
+ * MINDY_PROTOTYPE_EMAILS (comma-separated) only when you want those tabs visible for it.
+ */
+export function canSeePrototypeSurfaces(email: string): boolean {
+  const normalizedEmail = (email || '').toLowerCase().trim();
+  if (!normalizedEmail) return false;
+  return parseEmailList(process.env.MINDY_PROTOTYPE_EMAILS).has(normalizedEmail);
 }
 
 /**
