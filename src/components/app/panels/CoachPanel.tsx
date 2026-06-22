@@ -2,6 +2,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
+import { setActiveWorkspace, clearActiveWorkspace, getActiveWorkspace } from '../activeWorkspace';
 
 interface ClientProfile {
   naics: string[];
@@ -24,8 +25,6 @@ interface OrgTab {
   changes: Array<{ pursuit_id: string; summary: string; change_type: string }>;
   news: Array<{ id: string; title: string; body?: string; pinned?: boolean; created_at: string }>;
 }
-
-const ACTIVE_KEY = 'mindy_active_workspace';
 
 const WORK_PANELS: Array<{ panel: AppPanel; label: string; desc: string }> = [
   { panel: 'target-list', label: 'Target agencies', desc: 'Who they should pursue' },
@@ -75,14 +74,14 @@ export default function CoachPanel({
   }, [email, headers]);
 
   useEffect(() => { load(); }, [load]);
-  useEffect(() => { try { setActiveWs(localStorage.getItem(ACTIVE_KEY) || ''); } catch { /* */ } }, []);
+  useEffect(() => { setActiveWs(getActiveWorkspace() || ''); }, []);
 
   const goApp = (panel?: AppPanel) => {
     window.location.href = panel && panel !== 'dashboard' ? `/app?panel=${panel}` : '/app';
   };
 
   const switchTo = (c: Client, thenPanel?: AppPanel) => {
-    try { localStorage.setItem(ACTIVE_KEY, c.workspaceId); } catch { /* */ }
+    setActiveWorkspace(c.workspaceId, email);
     if (thenPanel) {
       goApp(thenPanel);
       return;
@@ -91,7 +90,7 @@ export default function CoachPanel({
   };
 
   const clearActive = () => {
-    try { localStorage.removeItem(ACTIVE_KEY); } catch { /* */ }
+    clearActiveWorkspace();
     goApp();
   };
 
@@ -109,7 +108,7 @@ export default function CoachPanel({
       if (res.ok) {
         const wsId = d?.client?.workspaceId;
         if (wsId) {
-          try { localStorage.setItem(ACTIVE_KEY, wsId); } catch { /* */ }
+          setActiveWorkspace(wsId, email);
           window.location.href = '/app';
         }
       }

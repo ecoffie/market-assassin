@@ -1,3 +1,5 @@
+import { activeWorkspaceFor } from './activeWorkspace';
+
 export function getMIApiHeaders(email?: string | null, init?: HeadersInit) {
   const headers = new Headers(init);
 
@@ -18,7 +20,11 @@ export function getMIApiHeaders(email?: string | null, init?: HeadersInit) {
     // Coach Mode: when a coach/consultant has switched to a client, every
     // workspace-scoped route can operate as that client via this header. Routes
     // that opt in read x-active-workspace; others fall back to the user's own.
-    const activeWs = localStorage.getItem('mindy_active_workspace');
+    //
+    // SAFETY: only attach it when the active workspace was set by THIS logged-in
+    // user (owner stamp matches). A stale key from a prior login is ignored, so
+    // it can never silently make you operate as someone else's client.
+    const activeWs = activeWorkspaceFor(email);
     if (activeWs && !headers.has('x-active-workspace')) {
       headers.set('x-active-workspace', activeWs);
     }

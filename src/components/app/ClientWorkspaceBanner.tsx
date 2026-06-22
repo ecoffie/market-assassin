@@ -3,8 +3,7 @@
 import { useEffect, useState } from 'react';
 import type { AppPanel } from './UnifiedSidebar';
 import { getMIApiHeaders } from './authHeaders';
-
-const ACTIVE_KEY = 'mindy_active_workspace';
+import { getActiveWorkspace, clearActiveWorkspace } from './activeWorkspace';
 
 type ActiveClient = {
   businessName: string;
@@ -26,15 +25,25 @@ export default function ClientWorkspaceBanner({
   const [client, setClient] = useState<ActiveClient | null>(null);
 
   useEffect(() => {
-    if (!email || !coachModeAllowed || typeof window === 'undefined') {
+    if (typeof window === 'undefined') {
       setClient(null);
       return;
     }
-    const ws = localStorage.getItem(ACTIVE_KEY);
+    const ws = getActiveWorkspace();
     if (!ws) {
       setClient(null);
       return;
     }
+
+    // SAFETY: the active-workspace key drives the `x-active-workspace` header on
+    // EVERY workspace-scoped request (see authHeaders.ts), so as long as it's
+    // set we MUST surface it — even if coach mode isn't "allowed" or the coach
+    // check fails. A stale key must never silently make you operate as a client.
+    // Show the banner immediately from the key alone, then best-effort enrich
+    // with the friendly client name when we're allowed to call the coach API.
+    setClient({ businessName: 'Client', workspaceId: ws });
+
+    if (!email || !coachModeAllowed) return;
 
     let cancelled = false;
     (async () => {
@@ -51,11 +60,9 @@ export default function ClientWorkspaceBanner({
             workspaceId: match.workspaceId,
             profile: match.profile,
           });
-        } else {
-          setClient({ businessName: 'Client', workspaceId: ws });
         }
       } catch {
-        if (!cancelled) setClient({ businessName: 'Client', workspaceId: ws });
+        /* keep the key-only fallback already set above */
       }
     })();
 
@@ -65,7 +72,7 @@ export default function ClientWorkspaceBanner({
   if (!client || activePanel === 'coach') return null;
 
   const exit = () => {
-    try { localStorage.removeItem(ACTIVE_KEY); } catch { /* */ }
+    clearActiveWorkspace();
     window.location.href = '/app';
   };
 
@@ -80,37 +87,45 @@ export default function ClientWorkspaceBanner({
         <div className="min-w-0">
           <p className="text-xs uppercase tracking-wider text-emerald-400/80">Working as client</p>
           <p className="text-lg font-semibold text-white truncate">{client.businessName}</p>
-          <p className="text-xs text-slate-400 truncate">{profLine}</p>
+          <p className="text-xs text-slate-400 truncate">
+            {coachModeAllowed
+              ? profLine
+              : `Viewing ${client.workspaceId} — exit to return to your own workspace`}
+          </p>
         </div>
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] text-slate-500 mr-1 hidden sm:inline">Their workspace →</span>
-          {([
-            ['pipeline', 'Pipeline'],
-            ['target-list', 'Target agencies'],
-            ['research', 'Market research'],
-          ] as const).map(([panel, label]) => (
-            <button
-              key={panel}
-              type="button"
-              onClick={() => onPanelChange(panel)}
-              className="h-8 px-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-xs font-medium text-emerald-200 hover:bg-emerald-500/20"
-            >
-              {label}
-            </button>
-          ))}
-          <button
-            type="button"
-            onClick={() => onPanelChange('coach')}
-            className="h-8 px-3 rounded-lg border border-slate-700 text-xs text-slate-400 hover:text-white"
-          >
-            My Clients
-          </button>
+          {coachModeAllowed && (
+            <>
+              <span className="text-[11px] text-slate-500 mr-1 hidden sm:inline">Their workspace →</span>
+              {([
+                ['pipeline', 'Pipeline'],
+                ['target-list', 'Target agencies'],
+                ['research', 'Market research'],
+              ] as const).map(([panel, label]) => (
+                <button
+                  key={panel}
+                  type="button"
+                  onClick={() => onPanelChange(panel)}
+                  className="h-8 px-3 rounded-lg border border-emerald-500/40 bg-emerald-500/10 text-xs font-medium text-emerald-200 hover:bg-emerald-500/20"
+                >
+                  {label}
+                </button>
+              ))}
+              <button
+                type="button"
+                onClick={() => onPanelChange('coach')}
+                className="h-8 px-3 rounded-lg border border-slate-700 text-xs text-slate-400 hover:text-white"
+              >
+                My Clients
+              </button>
+            </>
+          )}
           <button
             type="button"
             onClick={exit}
-            className="h-8 px-3 rounded-lg text-xs text-purple-400 hover:text-purple-300 underline"
+            className="h-8 px-3 rounded-lg text-xs font-medium text-purple-300 hover:text-purple-200 underline"
           >
-            Exit
+            Exit to my workspace
           </button>
         </div>
       </div>

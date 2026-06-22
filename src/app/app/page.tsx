@@ -7,6 +7,7 @@ import GlobalLookup from '@/components/app/GlobalLookup';
 import ProductTour from '@/components/app/ProductTour';
 import PanelContainer from '@/components/app/panels';
 import ClientWorkspaceBanner from '@/components/app/ClientWorkspaceBanner';
+import { reconcileActiveWorkspace } from '@/components/app/activeWorkspace';
 import VoiceCaptureModal from '@/components/app/voice/VoiceCaptureModal';
 import { Mic, Menu } from 'lucide-react';
 import SettingsPanel from '@/components/briefings/SettingsPanel';
@@ -267,6 +268,10 @@ function AppDashboard() {
       if (typeof window !== 'undefined') {
         localStorage.setItem('mi_beta_email', userEmail);
         localStorage.setItem('mi_beta_authenticated_at', new Date().toISOString());
+        // SAFETY: drop any Coach Mode active-workspace that a DIFFERENT login set
+        // (or a legacy key with no owner stamp), so this session can never start
+        // silently operating as someone else's client.
+        reconcileActiveWorkspace(userEmail);
       }
     } catch (error) {
       console.error('Failed to load user profile:', error);
