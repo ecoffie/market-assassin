@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { callLLM } from '@/lib/llm/call-llm';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -6,9 +7,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
-const GROK_API_KEY = process.env.GROK_API_KEY;
-const GROK_API_URL = 'https://api.x.ai/v1/chat/completions';
-const GROK_MODEL = process.env.GROK_MODEL || 'grok-3';
+// At least one LLM provider key (Groq/Claude/OpenAI/Grok) must be present.
+const hasLLMProvider = () =>
+  !!(process.env.GROQ_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || process.env.GROK_API_KEY);
 
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders });
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400, headers: corsHeaders });
     }
 
-    if (!GROK_API_KEY) {
+    if (!hasLLMProvider()) {
       return NextResponse.json({
         success: false,
         error: 'API not configured'
@@ -43,26 +44,15 @@ ${postContent}
 
 Return just the quote text, nothing else.`;
 
-    const response = await fetch(GROK_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROK_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: GROK_MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7,
-        max_tokens: 200
-      })
+    // Groq → Claude → OpenAI → Grok fallback chain (no single-provider failure).
+    const { text } = await callLLM({
+      system: 'You extract powerful, shareable quotes from LinkedIn posts.',
+      user: prompt,
+      maxTokens: 200,
+      temperature: 0.7,
+      job: 'drafting',
     });
-
-    if (!response.ok) {
-      throw new Error('Failed to generate quote');
-    }
-
-    const data = await response.json();
-    const quote = data.choices[0].message.content.trim().replace(/^["']|["']$/g, '');
+    const quote = text.trim().replace(/^["']|["']$/g, '');
 
     return NextResponse.json({
       success: true,

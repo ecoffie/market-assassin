@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { callLLM } from '@/lib/llm/call-llm';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -6,9 +7,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
-const GROK_API_KEY = process.env.GROK_API_KEY;
-const GROK_API_URL = 'https://api.x.ai/v1/chat/completions';
-const GROK_MODEL = process.env.GROK_MODEL || 'grok-3';
+// At least one LLM provider key (Groq/Claude/OpenAI/Grok) must be present.
+const hasLLMProvider = () =>
+  !!(process.env.GROQ_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || process.env.GROK_API_KEY);
 
 type GraphicType = 'quote' | 'highlight';
 
@@ -70,7 +71,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400, headers: corsHeaders });
     }
 
-    if (!GROK_API_KEY) {
+    if (!hasLLMProvider()) {
       return NextResponse.json({
         success: false,
         error: 'API not configured'
@@ -82,26 +83,15 @@ export async function POST(request: NextRequest) {
 Post content:
 ${postContent}`;
 
-    const response = await fetch(GROK_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROK_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: GROK_MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.9,
-        max_tokens: 400
-      })
+    // Groq → Claude → OpenAI → Grok fallback chain (no single-provider failure).
+    const { text } = await callLLM({
+      system: 'You craft striking quotes and highlights for visual graphic cards.',
+      user: prompt,
+      maxTokens: 400,
+      temperature: 0.9,
+      job: 'drafting',
     });
-
-    if (!response.ok) {
-      throw new Error('Failed to generate graphic content');
-    }
-
-    const data = await response.json();
-    const rawContent = data.choices[0].message.content.trim();
+    const rawContent = text.trim();
 
     // Parse JSON from the AI response
     let parsed;

@@ -2549,3 +2549,25 @@ no-downtime AI tool, multi-model AI fallback.*
 `callLLM({ job: 'drafting' })` (chain: Groq → Claude → OpenAI → Grok). Verified
 live locally: HTTP 200 in ~4.7s generating a real post via Groq after the prior
 Grok-only path was failing with a 403 "out of credits" (surfacing as a 401 to users).
+
+---
+
+## Content Reaper — full provider-resilience (all generation routes)
+
+**What it does (plain English):** Every Content Reaper generation endpoint —
+posts, quote cards, carousels, and highlight graphics — now runs on the same
+multi-provider AI fallback chain. If one model is rate-limited or out of credits,
+generation rolls over to the next provider automatically.
+
+**Why it matters:** The earlier fix covered the main post generator; this extends
+the same resilience to the quote, carousel, and graphic tools, which were still
+single-provider (Grok-only) and would have failed the same way.
+
+**SEO angle:** *reliable AI content generator, no-downtime GovCon tools,
+multi-model AI fallback.*
+
+**Proof:** `generate`, `generate-quote`, `convert-post-to-carousel`, and
+`generate-graphic` routes all call `callLLM({ job: 'drafting' })` (chain:
+Groq → Claude → OpenAI → Grok). Verified live locally: all three secondary routes
+returned HTTP 200 with real output (quote, 3-slide carousel, highlight graphic) in
+1–3s via Groq.

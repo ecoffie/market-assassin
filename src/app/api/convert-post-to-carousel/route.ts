@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { callLLM } from '@/lib/llm/call-llm';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -6,9 +7,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
-const GROK_API_KEY = process.env.GROK_API_KEY;
-const GROK_API_URL = 'https://api.x.ai/v1/chat/completions';
-const GROK_MODEL = process.env.GROK_MODEL || 'grok-3';
+// At least one LLM provider key (Groq/Claude/OpenAI/Grok) must be present.
+const hasLLMProvider = () =>
+  !!(process.env.GROQ_API_KEY || process.env.ANTHROPIC_API_KEY || process.env.OPENAI_API_KEY || process.env.GROK_API_KEY);
 
 export async function OPTIONS() {
   return NextResponse.json({}, { headers: corsHeaders });
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest) {
       }, { status: 400, headers: corsHeaders });
     }
 
-    if (!GROK_API_KEY) {
+    if (!hasLLMProvider()) {
       return NextResponse.json({
         success: false,
         error: 'API not configured'
@@ -49,26 +50,14 @@ Return as JSON array:
 
 Make the first slide a hook/attention grabber and the last slide a call-to-action.`;
 
-    const response = await fetch(GROK_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${GROK_API_KEY}`,
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        model: GROK_MODEL,
-        messages: [{ role: 'user', content: prompt }],
-        temperature: 0.7,
-        max_tokens: 2000
-      })
+    // Groq → Claude → OpenAI → Grok fallback chain (no single-provider failure).
+    const { text: content } = await callLLM({
+      system: 'You convert LinkedIn posts into carousel slide formats.',
+      user: prompt,
+      maxTokens: 2000,
+      temperature: 0.7,
+      job: 'drafting',
     });
-
-    if (!response.ok) {
-      throw new Error('Failed to generate carousel');
-    }
-
-    const data = await response.json();
-    const content = data.choices[0].message.content;
 
     // Parse the JSON from the response
     const jsonMatch = content.match(/\[[\s\S]*\]/);
