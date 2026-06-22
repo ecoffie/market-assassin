@@ -5,6 +5,7 @@ import { checkContentRateLimit, checkIPRateLimit, getClientIP, rateLimitResponse
 import { trackGeneration } from '@/lib/abuse-detection';
 import { humanizePost, trimPost, getPostMetrics, POST_LENGTH_LIMITS } from '@/lib/utils/humanize-post';
 import { logToolError, recordToolSuccess, ToolNames, classifyError, AIProviders } from '@/lib/tool-errors';
+import { callLLM } from '@/lib/llm/call-llm';
 
 // Fisher-Yates shuffle — returns a new array in random order
 function shuffleArray<T>(arr: T[]): T[] {
@@ -52,10 +53,9 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'Content-Type',
 };
 
-// Grok API Configuration
+// Grok is only the LAST fallback in the LLM chain now (see callGrokAPI → callLLM).
+// Kept solely for the "is any provider configured?" gate below.
 const GROK_API_KEY = process.env.GROK_API_KEY;
-const GROK_API_URL = 'https://api.x.ai/v1/chat/completions';
-const GROK_MODEL = process.env.GROK_MODEL || 'grok-3';
 
 // LinkedIn optimal post length (based on 2026 engagement research):
 // - Sweet spot: 1,200-1,600 characters (~200-270 words)
@@ -216,44 +216,19 @@ Here's how to fix it:
   }
 };
 
-// Call Grok API
+// Call the LLM with automatic provider fallback (Groq → Claude → OpenAI → Grok).
+// Was a raw Grok-only call — when x.ai ran out of credits it returned 403/401 and
+// took the whole tool down. callLLM('drafting') leads with Groq for quality and
+// only ever touches Grok as a last resort, so a dead Grok key can't break this.
 async function callGrokAPI(prompt: string, systemPrompt: string | null = null, maxTokens: number = 2000, temperature: number = 0.7): Promise<string> {
-  if (!GROK_API_KEY) {
-    throw new Error('GROK_API_KEY not configured');
-  }
-
-  const messages: { role: string; content: string }[] = [];
-
-  if (systemPrompt) {
-    messages.push({ role: 'system', content: systemPrompt });
-  }
-
-  messages.push({ role: 'user', content: prompt });
-
-  const response = await fetch(GROK_API_URL, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${GROK_API_KEY}`,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify({
-      model: GROK_MODEL,
-      messages: messages,
-      temperature,
-      max_tokens: maxTokens
-    })
+  const { text } = await callLLM({
+    system: systemPrompt || 'You are an expert government contracting LinkedIn content writer.',
+    user: prompt,
+    maxTokens,
+    temperature,
+    job: 'drafting',
   });
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('Grok API Error:', error);
-    console.error('Grok API Status:', response.status);
-    console.error('Grok API Key present:', !!GROK_API_KEY);
-    throw new Error(`Grok API Error (${response.status}): ${error.substring(0, 200)}`);
-  }
-
-  const data = await response.json();
-  return data.choices[0].message.content;
+  return text;
 }
 
 // Handle OPTIONS preflight request
@@ -296,7 +271,9 @@ export async function POST(request: NextRequest) {
 
     console.log(`[Content Reaper] Request for ${numPosts} posts, agencies:`, targetAgencies, `| ${previousAngles.length} previous angles`);
 
-    if (!GROK_API_KEY) {
+    // At least one LLM provider must be funded (Groq is primary; Grok is just the
+    // last fallback). Don't hard-block on GROK_API_KEY alone anymore.
+    if (!process.env.GROQ_API_KEY && !process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY && !GROK_API_KEY) {
       return NextResponse.json({
         success: false,
         error: 'Content generation service not configured'
@@ -664,8 +641,8 @@ Output ONLY the post text, followed by hashtags on separate lines (separated by 
       metadata: {
         targetAgencies: targetAgencies,
         geoOptimized: geoBoost,
-        model: 'grok',
-        modelId: GROK_MODEL
+        model: 'llm-fallback-chain',
+        modelId: 'drafting'
       }
     }, { headers: corsHeaders });
 
@@ -681,7 +658,7 @@ Output ONLY the post text, followed by hashtags on separate lines (separated by 
       userEmail: undefined, // Could extract from request if available
       requestPath: '/api/content-generator/generate',
       aiProvider: AIProviders.GROQ,
-      aiModel: GROK_MODEL,
+      aiModel: 'llm-fallback-chain',
       errorStack: error instanceof Error ? error.stack : undefined,
     });
 

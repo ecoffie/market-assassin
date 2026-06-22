@@ -2524,3 +2524,28 @@ staging — the real feature working live IS the demo.
 `CollabHotCard.tsx` (poll() + setInterval 15s). Both best-effort; never block the panel.
 Note: the badge counts OTHERS (excludes viewer) and fires at >=2 others — so 3 trackers shows
 "2 others" to each, 4 trackers shows "3 others".
+
+---
+
+## Content Reaper — now provider-resilient (Groq → Claude → OpenAI → Grok)
+
+**What it does (plain English):** Content Reaper generates GovCon LinkedIn posts.
+It now runs on a multi-provider AI fallback chain instead of a single model API.
+If the primary model is rate-limited or out of credits, generation automatically
+falls through to the next provider — so the tool keeps working instead of erroring out.
+
+**Why it's different:** Single-provider AI tools go dark the moment that one vendor
+has an outage or a billing hiccup. Content Reaper leads with Groq for quality and
+falls back through Claude, OpenAI, and Grok — no single provider can take it down.
+
+**SEO angle:** *reliable AI content generator, GovCon LinkedIn post generator,
+no-downtime AI tool, multi-model AI fallback.*
+
+**Content hooks:**
+- "Your AI tool shouldn't break because one vendor ran out of credits."
+- "Groq-first for quality, three fallbacks for uptime."
+
+**Proof:** `src/app/api/content-generator/generate/route.ts` now calls
+`callLLM({ job: 'drafting' })` (chain: Groq → Claude → OpenAI → Grok). Verified
+live locally: HTTP 200 in ~4.7s generating a real post via Groq after the prior
+Grok-only path was failing with a 403 "out of credits" (surfacing as a 401 to users).
