@@ -111,7 +111,7 @@ const INTERNAL_TEAM_EMAILS = new Set([
   'sikandarphulpoto35@gmail.com',
 ]);
 
-function getStaffRole(email: string): MIStaffRole {
+export function getStaffRole(email: string): MIStaffRole {
   const normalizedEmail = email.toLowerCase();
   const domain = normalizedEmail.split('@')[1] || '';
   const configuredStaff = parseEmailList(process.env.MI_STAFF_EMAILS);
