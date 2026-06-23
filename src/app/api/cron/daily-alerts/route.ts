@@ -95,6 +95,9 @@ const TIMEZONE_OFFSETS: Record<string, number> = {
 
 interface AlertUser {
   user_email: string;
+  // Coach Mode: when set (e.g. on a {workspaceId}@clients.getmindy.ai client row),
+  // alerts are delivered HERE — the client's real inbox — instead of user_email.
+  alert_recipient_email?: string | null;
   naics_codes: string[];
   psc_codes?: string[] | null;
   keywords: string[] | null;
@@ -1577,7 +1580,9 @@ async function sendDailyAlertEmail(
 
   return sendEmail({
     from: `"${MINDY_FROM_NAME}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
-    to: email,
+    // Coach-managed client rows deliver to the client's real inbox (alert_recipient_email);
+    // everyone else falls back to their own address.
+    to: user.alert_recipient_email || email,
     subject: `Mindy Alert: ${totalCount} New Opportunities${grants.length > 0 ? ' + Grants' : ''} - ${formatDate(new Date().toISOString())}`,
     html: htmlContent,
     emailType: 'daily_alert',

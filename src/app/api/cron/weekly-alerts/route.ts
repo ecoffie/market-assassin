@@ -115,6 +115,8 @@ async function getAlertLimit(email: string): Promise<{ limit: number; tier: 'fre
 
 interface AlertUser {
   user_email: string;
+  // Coach Mode: deliver alerts to the client's real inbox when set (else user_email).
+  alert_recipient_email?: string | null;
   naics_codes: string[];
   keywords?: string[] | null;
   business_type: string | null;
@@ -735,7 +737,8 @@ async function sendAlertEmail(
 
   await sendEmail({
     from: `"${MINDY_FROM_NAME}" <${process.env.EMAIL_FROM || 'alerts@govcongiants.com'}>`,
-    to: email,
+    // Coach-managed client rows deliver to the client's real inbox; else user_email.
+    to: user.alert_recipient_email || email,
     subject: `Mindy Weekly Alert: ${opportunities.length} New SAM.gov Matches - Week of ${formatDate(new Date().toISOString())}`,
     html: htmlContent,
     text: `${opportunities.length} new opportunities matched your profile this week. Manage preferences: ${preferencesUrl}`,

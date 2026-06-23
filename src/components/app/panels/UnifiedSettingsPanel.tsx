@@ -25,6 +25,9 @@ interface SettingsForm {
   onboarding_completed: boolean;
   // States the user wants opportunities scoped to. Empty = national.
   location_states: string[];
+  // Coach Mode only: the client's real inbox for daily/weekly alerts (else they
+  // send to the synthetic {workspaceId}@clients.getmindy.ai address and bounce).
+  alert_recipient_email: string;
 }
 
 export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPanelProps) {
@@ -39,7 +42,11 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
     email_frequency: 'daily',
     onboarding_completed: false,
     location_states: [],
+    alert_recipient_email: '',
   });
+  // True when these Settings are for a coach-managed CLIENT (synthetic
+  // @clients.getmindy.ai profile) — gates the "Client alert email" field.
+  const [isClientProfile, setIsClientProfile] = useState(false);
   const [workspaceName, setWorkspaceName] = useState('Workspace');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -98,6 +105,10 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
       const realLocationStates: string[] = Array.isArray(prefs?.data?.locationStates)
         ? prefs.data.locationStates
         : [];
+      // Coach Mode: the prefs row email is the client's synthetic address when
+      // managing a client. That's the signal to surface the "Client alert email" field.
+      const prefsEmail: string = typeof prefs?.data?.email === 'string' ? prefs.data.email : '';
+      setIsClientProfile(prefsEmail.endsWith('@clients.getmindy.ai'));
 
       const settings = data.settings || {};
       // TARGETING (naics/keywords/agencies) lives in user_notification_settings —
@@ -128,6 +139,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
         // Canonical store for states is user_notification_settings,
         // surfaced via the alerts preferences endpoint.
         location_states: realLocationStates.map((s) => String(s || '').toUpperCase()),
+        alert_recipient_email: prefs?.data?.alertRecipientEmail || '',
       });
     } catch (err) {
       console.error('Failed to load settings:', err);
@@ -235,6 +247,9 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
             naicsCodes: parseList(form.naics_codes),
             pscCodes: parseList(form.psc_codes),
             targetAgencies: parseList(form.target_agencies),
+            // Coach Mode: only send when editing a client profile, so normal saves
+            // never touch the alert_recipient_email column.
+            ...(isClientProfile ? { alertRecipientEmail: form.alert_recipient_email.trim() } : {}),
           }),
         }),
       ]);
@@ -387,6 +402,21 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                   <option value="paused">Paused</option>
                 </select>
               </label>
+              {isClientProfile && (
+                <label className="block md:col-span-2">
+                  <span className="block text-sm text-slate-400 mb-1">Client Alert Email</span>
+                  <input
+                    type="email"
+                    value={form.alert_recipient_email}
+                    onChange={(e) => setForm({ ...form, alert_recipient_email: e.target.value })}
+                    placeholder="client@company.com"
+                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white outline-none focus:border-emerald-500"
+                  />
+                  <span className="block text-xs text-slate-500 mt-1">
+                    Daily/weekly alerts for this client go here. Leave blank and they fall back to your inbox.
+                  </span>
+                </label>
+              )}
             </div>
           </section>
 

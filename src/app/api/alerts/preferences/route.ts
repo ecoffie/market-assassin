@@ -113,6 +113,8 @@ export async function GET(request: NextRequest) {
         timezone: data.timezone || 'America/New_York',
         smsEnabled: data.sms_enabled,
         phoneNumber: data.phone_number,
+        alertRecipientEmail: data.alert_recipient_email || null, // Coach Mode: client's alert inbox
+
         // Status
         isActive: data.is_active,
         lastAlertSent: data.last_alert_sent,
@@ -158,6 +160,8 @@ export async function POST(request: NextRequest) {
       timezone,
       smsEnabled,
       phoneNumber,
+      alertRecipientEmail, // Coach Mode: route this client's alerts to their real inbox
+
       // Search criteria
       naicsCodes,
       pscCodes,
@@ -315,6 +319,14 @@ export async function POST(request: NextRequest) {
 
     if (targetAgencies !== undefined) {
       record.agencies = Array.isArray(targetAgencies) ? targetAgencies : [];
+    }
+
+    // Coach Mode: per-client alert recipient. Only included when explicitly provided
+    // so normal saves don't touch the column (which requires the alert_recipient_email
+    // migration). Empty string clears it → falls back to user_email in the crons.
+    if (alertRecipientEmail !== undefined) {
+      const trimmed = typeof alertRecipientEmail === 'string' ? alertRecipientEmail.trim() : '';
+      record.alert_recipient_email = trimmed || null;
     }
 
     if (locationState !== undefined) {
