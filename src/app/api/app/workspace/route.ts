@@ -8,6 +8,8 @@ import {
   getWorkspaceId,
   normalizeEmail,
   recordAppActivity,
+  resolveActiveWorkspace,
+  clientNotificationEmail,
 } from '@/lib/app/workspace';
 
 const TEAM_SEAT_LIMIT = 5;
@@ -25,6 +27,13 @@ export async function GET(request: NextRequest) {
   const { workspaceId, member } = await ensureWorkspaceMember(email);
   const supabase = getAppSupabase();
   const normalizedEmail = normalizeEmail(email);
+
+  // Coach Mode: the targeting card (NAICS/PSC/keywords) must reflect the CLIENT
+  // being managed, not the coach. Resolve the active workspace and read the
+  // client's notification row when operating as a client. (Display fields below
+  // stay on the coach's own rows — only targeting is client-scoped here.)
+  const { workspaceId: activeWsId, asClient } = await resolveActiveWorkspace(email, request);
+  const notifEmail = asClient ? clientNotificationEmail(activeWsId) : normalizedEmail;
 
   const [{ data: members }, { data: settings }, { data: workspaceSettings }, { data: notificationProfile }, { data: briefingProfile }, { data: activity }, { data: pipeline }] = await Promise.all([
     supabase.from('mi_beta_team_members').select('*').eq('workspace_id', workspaceId).order('created_at', { ascending: true }),
@@ -46,7 +55,7 @@ export async function GET(request: NextRequest) {
       // location_states exists too — surfaced so the targeting card shows coverage area.
       // (Verified columns exist before adding — a missing column nulls the WHOLE query.)
       .select('user_email, naics_codes, psc_codes, agencies, keywords, business_type, location_states, aggregated_profile')
-      .eq('user_email', normalizedEmail)
+      .eq('user_email', notifEmail)
       .maybeSingle(),
     supabase
       .from('user_briefing_profile')

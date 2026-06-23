@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { deriveBusinessDescriptionFromKeywords } from '@/lib/alerts/profile-setup';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
 /**
  * Generate MD5 hash of NAICS profile for template matching
@@ -59,10 +60,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Coach Mode: read the CLIENT's notification row when operating as a client.
+    const { workspaceId, asClient } = await resolveActiveWorkspace(email.toLowerCase(), request);
+    const rowEmail = asClient ? clientNotificationEmail(workspaceId) : email.toLowerCase();
+
     const { data, error } = await getSupabase()
       .from('user_notification_settings')
       .select('*')
-      .eq('user_email', email.toLowerCase())
+      .eq('user_email', rowEmail)
       .single();
 
     if (error || !data) {
@@ -76,7 +81,7 @@ export async function GET(request: NextRequest) {
     const { data: businessProfile } = await getSupabase()
       .from('user_business_profiles')
       .select('business_description')
-      .eq('user_email', email.toLowerCase())
+      .eq('user_email', rowEmail)
       .maybeSingle();
 
     const businessDescription =
@@ -187,16 +192,21 @@ export async function POST(request: NextRequest) {
 
     const normalizedEmail = auth.email!.toLowerCase();
 
+    // Coach Mode: when operating AS a client, write the CLIENT's notification row
+    // (synthetic clientNotificationEmail), not the coach's own. Mirrors target-list.
+    const { workspaceId, asClient } = await resolveActiveWorkspace(normalizedEmail, request);
+    const rowEmail = asClient ? clientNotificationEmail(workspaceId) : normalizedEmail;
+
     // Check if user exists
     const { data: existing } = await getSupabase()
       .from('user_notification_settings')
       .select('user_email')
-      .eq('user_email', normalizedEmail)
+      .eq('user_email', rowEmail)
       .single();
 
     // Build upsert object
     const record: Record<string, unknown> = {
-      user_email: normalizedEmail,
+      user_email: rowEmail,
       updated_at: new Date().toISOString(),
     };
 
@@ -327,7 +337,7 @@ export async function POST(request: NextRequest) {
       const result = await getSupabase()
         .from('user_notification_settings')
         .update(record)
-        .eq('user_email', normalizedEmail)
+        .eq('user_email', rowEmail)
         .select()
         .single();
       data = result.data;
@@ -371,7 +381,7 @@ export async function POST(request: NextRequest) {
         await getSupabase()
           .from('user_business_profiles')
           .upsert({
-            user_email: normalizedEmail,
+            user_email: rowEmail,
             business_description: cleanDescription || null,
             business_description_updated_at: cleanDescription ? new Date().toISOString() : null,
             updated_at: new Date().toISOString(),

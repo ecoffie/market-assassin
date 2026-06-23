@@ -45,6 +45,7 @@ async function seedClientProfile(
   await supabase.from('user_notification_settings').upsert({
     user_email: clientEmail,
     naics_codes: naics,
+    psc_codes: psc,
     keywords,
     location_states: states,
     set_aside_certifications: setAsides,

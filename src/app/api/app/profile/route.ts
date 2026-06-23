@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { verifyUserSession } from '@/lib/api-auth';
 import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
 import { applyPartnerReferralIfEligible } from '@/lib/mindy/apply-partner-referral';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
 /**
  * MI Beta Profile API
@@ -165,10 +166,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Coach Mode: a "save to profile" from Market Research while operating AS a
+    // client must persist to the CLIENT's row, not the coach's. rowEmail is the
+    // client's synthetic notification email when asClient, else the user's own.
+    const { workspaceId, asClient } = await resolveActiveWorkspace(normalizedEmail, request);
+    const rowEmail = asClient ? clientNotificationEmail(workspaceId) : normalizedEmail;
+
     const { data: existingSettings } = await supabase
       .from('user_notification_settings')
       .select('user_email, invitation_source, trial_source')
-      .eq('user_email', normalizedEmail)
+      .eq('user_email', rowEmail)
       .maybeSingle();
 
     if (referralCode && !existingSettings?.invitation_source?.startsWith('partner_')) {
@@ -180,7 +187,7 @@ export async function POST(request: NextRequest) {
     }
 
     const baseInsert = {
-      user_email: normalizedEmail,
+      user_email: rowEmail,
       treatment_type: 'free',
       alerts_enabled: true,
       briefings_enabled: false,
@@ -189,7 +196,7 @@ export async function POST(request: NextRequest) {
       created_at: new Date().toISOString(),
     };
     const runWrite = (payload: Record<string, unknown>) => existingSettings
-      ? supabase.from('user_notification_settings').update(payload).eq('user_email', normalizedEmail)
+      ? supabase.from('user_notification_settings').update(payload).eq('user_email', rowEmail)
       : supabase.from('user_notification_settings').insert({ ...baseInsert, ...payload });
 
     let { error: updateError } = await runWrite(updateData);
@@ -207,13 +214,13 @@ export async function POST(request: NextRequest) {
         const { data: cur } = await supabase
           .from('user_notification_settings')
           .select('keywords')
-          .eq('user_email', normalizedEmail)
+          .eq('user_email', rowEmail)
           .maybeSingle();
         const hasKw = Array.isArray(cur?.keywords) && cur!.keywords.length > 0;
         if (!hasKw) {
           await supabase.from('user_notification_settings')
             .update({ keywords: deriveKw })
-            .eq('user_email', normalizedEmail);
+            .eq('user_email', rowEmail);
         }
       } catch { /* non-fatal */ }
     }
@@ -239,7 +246,7 @@ export async function POST(request: NextRequest) {
     const { data: existingProfile } = await supabase
       .from('user_business_profiles')
       .select('user_email')
-      .eq('user_email', normalizedEmail)
+      .eq('user_email', rowEmail)
       .maybeSingle();
 
     if (existingProfile) {
@@ -251,11 +258,11 @@ export async function POST(request: NextRequest) {
           extracted_set_asides: safeSetAsides,
           updated_at: new Date().toISOString(),
         })
-        .eq('user_email', normalizedEmail);
+        .eq('user_email', rowEmail);
     } else {
       // Create new business profile
       await supabase.from('user_business_profiles').insert({
-        user_email: normalizedEmail,
+        user_email: rowEmail,
         business_description: businessDescription || null,
         extracted_naics_codes: expandedNaicsCodes,
         extracted_set_asides: safeSetAsides,
