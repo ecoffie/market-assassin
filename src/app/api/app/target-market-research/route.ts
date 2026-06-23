@@ -96,6 +96,50 @@ function categoryTotalForAgency(
 
 // Derive SEARCH KEYWORDS moved to @/lib/market/keyword-coverage (deriveCoverageKeywords).
 
+/**
+ * Apply the market's place-of-performance state scope to a raw USASpending filter
+ * object, matching how find-agencies scopes its search. Centralized so EVERY
+ * USASpending call in this route scopes states the same way — the $116B/FERC bug
+ * was the states dimension reaching find-agencies but NOT spending_by_category
+ * because each call hand-built its own filter. Any new USASpending call must run
+ * its filter through this (and read scope from the single `marketScope` object).
+ */
+function applyStateScope(filter: Record<string, unknown>, states: string[]): Record<string, unknown> {
+  if (states.length > 0) {
+    filter.place_of_performance_locations = states.map((state) => ({ country: 'USA', state }));
+  }
+  return filter;
+}
+
+/**
+ * Dev/observability tripwire: the headline market total and the displayed rows
+ * must be in the same ballpark, and no sub-agency can out-spend its own parent
+ * department. When either invariant breaks, the numbers came from MISMATCHED
+ * scopes (e.g. national total vs state-scoped rows) — log loudly so it's caught
+ * in review/logs instead of by a user staring at $116B. Never throws.
+ */
+function reconcileMarketTotals(opts: {
+  authoritativeMarketTotal: number;
+  rows: Array<{ name?: string; totalSpending?: number; metric_top_total?: number }>;
+  states: string[];
+}): void {
+  try {
+    const { authoritativeMarketTotal, rows, states } = opts;
+    if (!rows.length) return;
+    const topRow = Math.max(...rows.map((r) => r.metric_top_total || r.totalSpending || 0));
+    // A single agency/office can't exceed the WHOLE market total by a wide margin.
+    // >2× means a row carries a broader (e.g. national/parent) figure than the
+    // headline — the exact shape of the scope-mismatch + parent-inheritance bugs.
+    if (authoritativeMarketTotal > 0 && topRow > authoritativeMarketTotal * 2) {
+      console.warn(
+        `[target-market-research] RECONCILE: top row ($${Math.round(topRow / 1e6)}M) exceeds the ` +
+        `market total ($${Math.round(authoritativeMarketTotal / 1e6)}M) by >2× — likely a scope ` +
+        `mismatch (rows vs headline) or a sub-agency inheriting a parent total. states=[${states.join(',')}]`,
+      );
+    }
+  } catch { /* observability only — never affect the response */ }
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
 function getSupabase() {
@@ -316,6 +360,23 @@ export async function POST(request: NextRequest) {
       .map((s) => String(s).trim().toUpperCase()).filter((s) => /^[A-Z]{2}$/.test(s)).sort();
     const stateSuffix = normStates.length ? `|st:${normStates.join(',')}` : '';
 
+    // SINGLE SOURCE OF TRUTH for the market scope. Every USASpending call below
+    // derives its filter from THIS object — the $116B/FERC bug was the `states`
+    // dimension reaching find-agencies but not spending_by_category because each
+    // call hand-assembled its own filter. To add a filter dimension: add it here,
+    // then thread it into both the find-agencies body AND the category filter.
+    const marketScope = {
+      naics,
+      psc,
+      searchKeywords,
+      marketFilter,
+      states: normStates,                 // place of performance (2-letter codes)
+      businessType: effectiveBusinessType,
+      veteranStatus: veteranStatus || '',
+      zipCode,
+      excludeDOD,
+    };
+
     // Cache schema version. Bump when the COMPUTED figures change so stale rows
     // (24h TTL) don't serve old numbers. sv2 = state-scoped authoritative total +
     // sub-agencies no longer inherit the parent department's national total.
@@ -402,15 +463,15 @@ export async function POST(request: NextRequest) {
       redirect: 'follow' as const, // belt + suspenders if a redirect ever sneaks in
     };
     const findAgenciesBody = (withSetAside: boolean) => JSON.stringify({
-      naicsCode: marketFilter ? '' : naics,
-      businessType: withSetAside ? effectiveBusinessType : '',
-      veteranStatus: withSetAside ? veteranStatus : '',
-      zipCode,
-      locationStates,   // States filter → scopes spend to these states (was dropped)
-      pscCode: marketFilter ? '' : psc,
-      excludeDOD,
-      searchKeywords,
-      marketFilter: marketFilter || undefined,
+      naicsCode: marketScope.marketFilter ? '' : marketScope.naics,
+      businessType: withSetAside ? marketScope.businessType : '',
+      veteranStatus: withSetAside ? marketScope.veteranStatus : '',
+      zipCode: marketScope.zipCode,
+      locationStates: marketScope.states,   // states from the single scope object
+      pscCode: marketScope.marketFilter ? '' : marketScope.psc,
+      excludeDOD: marketScope.excludeDOD,
+      searchKeywords: marketScope.searchKeywords,
+      marketFilter: marketScope.marketFilter || undefined,
     });
     const [findRes, totalRes] = await Promise.all([
       fetch(`${baseUrl}/api/usaspending/find-agencies`, {
@@ -481,13 +542,11 @@ export async function POST(request: NextRequest) {
         catFilterBase.naics_codes = expanded;
       }
       // Scope the authoritative total to the SAME states as the agency search
-      // (place of performance), matching find-agencies. Without this the headline
-      // "Relevant spending" + the Total $ column showed NATIONAL figures while the
-      // agency list was state-scoped — so FL/GA janitorial read as $116B and a
-      // sub-agency like FERC inherited Department of Energy's national $65.9B.
-      if (normStates.length > 0) {
-        catFilterBase.place_of_performance_locations = normStates.map((state) => ({ country: 'USA', state }));
-      }
+      // (place of performance), via the shared helper + single marketScope. Without
+      // this the headline "Relevant spending" + the Total $ column showed NATIONAL
+      // figures while the agency list was state-scoped — FL/GA janitorial read as
+      // $116B and FERC inherited Department of Energy's national $65.9B.
+      applyStateScope(catFilterBase, marketScope.states);
       if (marketFilter || expanded.length > 0) {
         // Sub-agency + parent department totals (keyword or NAICS). Parent-level
         // keys let DoD/HHS rank correctly; sub-agency keys surface USACE/Navy.
@@ -808,6 +867,16 @@ export async function POST(request: NextRequest) {
 
     // Default sort: top total $ (matches UI default lens + FPDS leaderboards).
     rows.sort((x, y) => y.metric_top_total - x.metric_top_total);
+
+    // Tripwire (#2): the headline total and the rows must come from the SAME
+    // scope. If the top row dwarfs the market total, the numbers are mismatched
+    // (national vs state-scoped, or a sub-agency carrying a parent figure) — the
+    // shape of the bug we just fixed. Logs loudly; never blocks the response.
+    reconcileMarketTotals({
+      authoritativeMarketTotal: authoritativeMarketTotal || findData.totalSpending || 0,
+      rows,
+      states: marketScope.states,
+    });
 
     // Persist to cache. Idempotent upsert. Failures are non-fatal — we
     // still return the live data to the user.
