@@ -249,6 +249,15 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'email is required' }, { status: 400 });
     }
 
+    // DEFAULT THE SET-ASIDE TO SMALL BUSINESS (Eric, Jun 23, 2026). With no
+    // business type chosen, the WITH-set-aside pass collapsed to raw total, so
+    // the "Set-Aside $" column mirrored "Total $" on every row (meaningless).
+    // Default to general Total Small Business set-aside (setAsideMap['Small
+    // Business'] = SBA/SBP) so the column always shows a real carve-out. A user
+    // who picks a specific socioeconomic type (8(a)/SDVOSB/WOSB/HUBZone) still
+    // overrides this. The no-set-aside TOTAL pass below stays at '' regardless.
+    const effectiveBusinessType = (businessType || '').trim() || 'Small Business';
+
     // KEYWORD-FIRST resolution (#59 — Eric: NAICS is the wrong primary key; a
     // keyword like "drones" sprawls across 70+ codes and the obvious code is both
     // over-broad AND incomplete). When a keyword is given (and no explicit NAICS),
@@ -302,7 +311,7 @@ export async function POST(request: NextRequest) {
     const cacheKey = {
       naics_code: `${naics}${stateSuffix}`,
       psc_code: psc,
-      business_type: businessType || '',
+      business_type: effectiveBusinessType,
       veteran_status: veteranStatus || '',
     };
 
@@ -382,7 +391,7 @@ export async function POST(request: NextRequest) {
     };
     const findAgenciesBody = (withSetAside: boolean) => JSON.stringify({
       naicsCode: marketFilter ? '' : naics,
-      businessType: withSetAside ? businessType : '',
+      businessType: withSetAside ? effectiveBusinessType : '',
       veteranStatus: withSetAside ? veteranStatus : '',
       zipCode,
       locationStates,   // States filter → scopes spend to these states (was dropped)

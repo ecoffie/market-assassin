@@ -3910,7 +3910,7 @@ const SORT_LENSES: Array<{ id: SortLens; label: string; hint: string }> = [
   // crowded vendor density, more SAT contracts. Toggle when
   // you're looking for first-contract candidates.
   { id: 'civilian_first', label: 'Civilian First',  hint: 'Non-DOD agencies first — often easier for new entrants' },
-  { id: 'easy_entry',    label: 'Small Biz %',      hint: 'Highest % of agency spend that goes to small businesses (SBA Goaling Report FY23)' },
+  { id: 'easy_entry',    label: 'Easy Entry (SAT)', hint: 'Highest share of contracts under the $250K Simplified Acquisition Threshold — the easiest entry points for new contractors (weighted by volume). Most useful for services/products; construction rarely has SAT-eligible spend.' },
   { id: 'contracts',     label: 'Contracts',        hint: 'Most contract awards in your NAICS — high-frequency buyers' },
 ];
 
@@ -4379,14 +4379,14 @@ function AgencyTable({
         });
         break;
       case 'easy_entry':
-        // Repurposed May 23, 2026 — was sorting by satRatio × sqrt(
-        // satContractCount) which produced 0 for everyone in NAICS
-        // where no SAT-eligible spend exists (e.g. construction).
-        // Now sorts by SBA Goaling small-business share at the
-        // parent agency — same intent ("easy entry for small biz")
-        // but data we actually have via /api/sba-goaling/bulk.
-        // Agencies without SBA data sort to the bottom (share=0).
-        copy.sort((a, b) => sbShareFor(b) - sbShareFor(a));
+        // SAT% sort (restored Jun 23, 2026 per Eric — "swap back, don't add
+        // another column"). metric_easy_entry = satRatio × √satContractCount:
+        // the share of an office's contracts under the $250K Simplified
+        // Acquisition Threshold, weighted by how many such contracts exist so
+        // high-volume easy-entry offices outrank a 1-contract 100% fluke.
+        // Caveat: collapses to 0 for NAICS with no SAT-eligible spend (e.g.
+        // construction) — by design; the lens is for services/products.
+        copy.sort((a, b) => b.metric_easy_entry - a.metric_easy_entry);
         break;
       case 'contracts':
         copy.sort((a, b) => b.metric_contracts - a.metric_contracts);
