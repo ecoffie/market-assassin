@@ -80,9 +80,17 @@ function categoryTotalForAgency(
   parentAgency?: string,
   name?: string,
 ): number {
-  const keys = [subAgency, parentAgency, name]
-    .map((s) => normalizeAgencyKey(s || ''))
-    .filter(Boolean);
+  // Only fall back to the PARENT department total for a department-level row
+  // (no distinct sub-agency, or sub-agency === the department). A real
+  // sub-agency (e.g. FERC under Department of Energy) must NOT inherit the
+  // department-wide total — that's how FERC read $65.9B (Energy's number).
+  // It keys off its own sub-agency/name total, falling to its sampled award
+  // spend when it isn't in the category response.
+  const subKey = normalizeAgencyKey(subAgency || '');
+  const parentKey = normalizeAgencyKey(parentAgency || '');
+  const isDeptRow = !subKey || subKey === parentKey;
+  const lookups = isDeptRow ? [subAgency, parentAgency, name] : [subAgency, name];
+  const keys = lookups.map((s) => normalizeAgencyKey(s || '')).filter(Boolean);
   return keys.reduce((best, k) => Math.max(best, categoryTotalByKey[k] || 0), 0);
 }
 
@@ -308,8 +316,12 @@ export async function POST(request: NextRequest) {
       .map((s) => String(s).trim().toUpperCase()).filter((s) => /^[A-Z]{2}$/.test(s)).sort();
     const stateSuffix = normStates.length ? `|st:${normStates.join(',')}` : '';
 
+    // Cache schema version. Bump when the COMPUTED figures change so stale rows
+    // (24h TTL) don't serve old numbers. sv2 = state-scoped authoritative total +
+    // sub-agencies no longer inherit the parent department's national total.
+    const SPEND_SCHEMA_VERSION = 'sv2';
     const cacheKey = {
-      naics_code: `${naics}${stateSuffix}`,
+      naics_code: `${naics}${stateSuffix}|${SPEND_SCHEMA_VERSION}`,
       psc_code: psc,
       business_type: effectiveBusinessType,
       veteran_status: veteranStatus || '',
@@ -467,6 +479,14 @@ export async function POST(request: NextRequest) {
         Object.assign(catFilterBase, marketFilterToUsaspending(marketFilter));
       } else if (expanded.length > 0) {
         catFilterBase.naics_codes = expanded;
+      }
+      // Scope the authoritative total to the SAME states as the agency search
+      // (place of performance), matching find-agencies. Without this the headline
+      // "Relevant spending" + the Total $ column showed NATIONAL figures while the
+      // agency list was state-scoped — so FL/GA janitorial read as $116B and a
+      // sub-agency like FERC inherited Department of Energy's national $65.9B.
+      if (normStates.length > 0) {
+        catFilterBase.place_of_performance_locations = normStates.map((state) => ({ country: 'USA', state }));
       }
       if (marketFilter || expanded.length > 0) {
         // Sub-agency + parent department totals (keyword or NAICS). Parent-level
