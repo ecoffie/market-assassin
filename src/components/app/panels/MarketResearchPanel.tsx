@@ -728,6 +728,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   // and narrows the table to Army offices only. Null = no filter.
   const [parentAgencyFilter, setParentAgencyFilter] = useState<string | null>(null);
   const agencyTableRef = useRef<HTMLDivElement>(null);
+  const primesRef = useRef<HTMLDivElement>(null);
   // parentSbShareMap — SBA Goaling small-business share keyed by
   // agency name (parent / subAgency / name, whichever was passed
   // to the bulk endpoint). Populated by a parent-level effect once
@@ -2275,8 +2276,8 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <MetricCard label={`Agencies to review${stateScopeLabel}`} value={(chartBuyers.length || buyerSummary?.totalAgencies || buyers.length).toLocaleString()} />
             <MetricCard label={`Relevant spending${stateScopeLabel}`} value={formatCurrency(chartTotalSpending || buyerSummary?.totalSpending)} tone="green" hint={spendWindowLabel ? `Total federal contract obligations in this market${stateScopeLabel ? ` in ${formData.locationStates.join(', ')}` : ''}, ${spendWindowLabel}` : undefined} />
-            <MetricCard label="Competitors in your space" value={(primeSummary?.totalPrimes || vehicleSummary?.totalContracts || 0).toLocaleString()} hint="Incumbent primes already winning this work — who you'd compete against or could team with" />
-            <MetricCard label="Upcoming opportunities" value={(forecastSummary?.totalForecasts || painSummary?.highOpportunityMatches || 0).toLocaleString()} tone="amber" hint="Forecasted procurements + agency needs coming 6–18 months out" />
+            <MetricCard label="Competitors in your space" value={(primeSummary?.totalPrimes || vehicleSummary?.totalContracts || 0).toLocaleString()} hint="Incumbent primes already winning this work — who you'd compete against or could team with" onClick={() => primesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+            <MetricCard label="Upcoming opportunities" value={(forecastSummary?.totalForecasts || painSummary?.highOpportunityMatches || 0).toLocaleString()} tone="amber" hint="Forecasted procurements + agency needs coming 6–18 months out" onClick={() => onNavigate?.('forecasts')} />
           </section>
 
           {/* Chart placeholders — Slice 2 fills these with Recharts
@@ -2302,18 +2303,20 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               totalSpend={chartTotalSpending || buyerSummary?.totalSpending || 0}
               agencyCount={chartBuyers.length}
             />
-            <TopPrimesChart
-              primes={reportData?.primeContractor?.suggestedPrimes || []}
-              tier2={(reportData?.tier2Subcontracting?.suggestedPrimes || []).map(p => ({
-                name: p.name, reason: p.reason, email: p.email, phone: p.phone,
-              }))}
-              tribal={(reportData?.tribalContracting?.suggestedTribes || []).map(t => ({
-                name: t.name,
-                reason: t.region || (t.capabilities && t.capabilities.length > 0 ? t.capabilities[0] : undefined),
-                region: t.region,
-              }))}
-              email={email}
-            />
+            <div ref={primesRef}>
+              <TopPrimesChart
+                primes={reportData?.primeContractor?.suggestedPrimes || []}
+                tier2={(reportData?.tier2Subcontracting?.suggestedPrimes || []).map(p => ({
+                  name: p.name, reason: p.reason, email: p.email, phone: p.phone,
+                }))}
+                tribal={(reportData?.tribalContracting?.suggestedTribes || []).map(t => ({
+                  name: t.name,
+                  reason: t.region || (t.capabilities && t.capabilities.length > 0 ? t.capabilities[0] : undefined),
+                  region: t.region,
+                }))}
+                email={email}
+              />
+            </div>
           </section>
 
           {/* FPDS-style top-10 leaderboards (Departments / Contracting
@@ -2390,8 +2393,8 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
             <MetricCard label={`Agencies to review${stateScopeLabel}`} value={(chartBuyers.length || buyerSummary?.totalAgencies || buyers.length).toLocaleString()} />
             <MetricCard label={`Relevant spending${stateScopeLabel}`} value={formatCurrency(chartTotalSpending || buyerSummary?.totalSpending)} tone="green" hint={spendWindowLabel ? `Total federal contract obligations in this market${stateScopeLabel ? ` in ${formData.locationStates.join(', ')}` : ''}, ${spendWindowLabel}` : undefined} />
-            <MetricCard label="Competitors in your space" value={(primeSummary?.totalPrimes || vehicleSummary?.totalContracts || 0).toLocaleString()} hint="Incumbent primes already winning this work — who you'd compete against or could team with" />
-            <MetricCard label="Upcoming opportunities" value={(forecastSummary?.totalForecasts || painSummary?.highOpportunityMatches || 0).toLocaleString()} tone="amber" hint="Forecasted procurements + agency needs coming 6–18 months out" />
+            <MetricCard label="Competitors in your space" value={(primeSummary?.totalPrimes || vehicleSummary?.totalContracts || 0).toLocaleString()} hint="Incumbent primes already winning this work — who you'd compete against or could team with" onClick={() => primesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+            <MetricCard label="Upcoming opportunities" value={(forecastSummary?.totalForecasts || painSummary?.highOpportunityMatches || 0).toLocaleString()} tone="amber" hint="Forecasted procurements + agency needs coming 6–18 months out" onClick={() => onNavigate?.('forecasts')} />
           </section>
 
           {/* 'Start Here' 3-card row removed 2026-05-25 per Eric.
@@ -2806,12 +2809,23 @@ function DetailTile({ label, value }: { label: string; value: string }) {
   );
 }
 
-function MetricCard({ label, value, tone = 'default', hint }: { label: string; value: string; tone?: 'default' | 'green' | 'amber'; hint?: string }) {
+function MetricCard({ label, value, tone = 'default', hint, onClick }: { label: string; value: string; tone?: 'default' | 'green' | 'amber'; hint?: string; onClick?: () => void }) {
   const color = tone === 'green' ? 'text-emerald-400' : tone === 'amber' ? 'text-amber-300' : 'text-white';
+  const clickable = !!onClick;
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900 p-5" title={hint || undefined}>
+    <div
+      className={`rounded-xl border border-slate-800 bg-slate-900 p-5 ${clickable ? 'cursor-pointer transition-colors hover:border-emerald-500/50 hover:bg-slate-800/60' : ''}`}
+      title={hint || undefined}
+      onClick={onClick}
+      role={clickable ? 'button' : undefined}
+      tabIndex={clickable ? 0 : undefined}
+      onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick!(); } } : undefined}
+    >
       <div className={`text-2xl font-bold ${color}`}>{value}</div>
-      <div className="mt-1 text-sm text-slate-500">{label}</div>
+      <div className="mt-1 flex items-center gap-1 text-sm text-slate-500">
+        {label}
+        {clickable && <span className="text-emerald-400" aria-hidden="true">→</span>}
+      </div>
       {hint && <div className="mt-1 text-xs text-slate-600 leading-snug">{hint}</div>}
     </div>
   );
