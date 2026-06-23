@@ -3,9 +3,13 @@ import { sendEmail } from '@/lib/send-email';
 /**
  * Mindy Free Live Launch confirmation — Saturday, June 27, 2026, 10 AM–4 PM ET.
  *
- * Sent through the GUARDED sendEmail() (Resend → Office365 fallback, as
- * alerts@govcongiants.com — the Resend-verified domain) so it gets suppression-list
- * + deliverability tracking like every other Mindy stream. Marked transactional:
+ * Sent through the GUARDED sendEmail() (Resend → Office365 fallback) FROM the
+ * Resend-verified mail.getmindy.ai domain so it actually lands in the inbox. NOTE:
+ * govcongiants.com is NOT verified in Resend (status=failed) — sending as
+ * alerts@govcongiants.com 403s at Resend and silently falls back to Office365 SMTP,
+ * which fails the domain's SPF/DKIM and gets dropped/spam-filtered by Gmail.
+ * It gets suppression-list + deliverability tracking like every other Mindy stream.
+ * Marked transactional:
  * it's a confirmation the registrant expects in direct response to signing up, so it
  * bypasses the daily cap and always delivers.
  *
@@ -234,7 +238,7 @@ export async function sendMindyLaunchConfirmationEmail(params: {
     to: params.to,
     subject,
     html,
-    from: '"Mindy" <alerts@govcongiants.com>',
+    from: `"Mindy" <${process.env.EMAIL_FROM || 'mindy@mail.getmindy.ai'}>`,
     emailType: 'mindy_launch_confirmation',
     eventSource: 'mindy_launch',
     transactional: true, // confirmation in direct response to signup — always deliver
