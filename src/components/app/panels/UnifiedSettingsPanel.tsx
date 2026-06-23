@@ -539,15 +539,23 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
 
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
             <h2 className="font-semibold text-white">Getting started</h2>
-            <p className="text-sm text-slate-400 mt-1">New to Mindy? Take the 2-minute guided tour of the core workflow.</p>
-            {/* PRIMARY action: launch the tour (Eric: this card should let you
-                TAKE the tour, not mark it complete). */}
-            <button
-              onClick={() => window.dispatchEvent(new Event('mindy:start-tour'))}
-              className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-500 rounded-lg transition-colors"
-            >
-              🧭 Take the product tour
-            </button>
+            {/* The guided product tour is NEW-USER onboarding — hide it in Coach
+                Mode (a coach operating inside a client workspace). Eric, Jun 23
+                2026: "coach mode should not require a tour on clients." The setup
+                progress below still helps a coach finish the client's profile. */}
+            {!isClientProfile && (
+              <>
+                <p className="text-sm text-slate-400 mt-1">New to Mindy? Take the 2-minute guided tour of the core workflow.</p>
+                {/* PRIMARY action: launch the tour (Eric: this card should let you
+                    TAKE the tour, not mark it complete). */}
+                <button
+                  onClick={() => window.dispatchEvent(new Event('mindy:start-tour'))}
+                  className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-500 rounded-lg transition-colors"
+                >
+                  🧭 Take the product tour
+                </button>
+              </>
+            )}
             {/* Quiet setup-progress underneath (informational, not the CTA). */}
             <div className="mt-4 pt-4 border-t border-slate-800 space-y-2">
               <p className="text-[11px] uppercase tracking-wider text-slate-500">Setup progress</p>
