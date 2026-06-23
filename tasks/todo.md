@@ -1,6 +1,32 @@
 # GovCon Giants - Tasks by Priority
 
-**Last Updated:** June 19, 2026
+**Last Updated:** June 23, 2026
+
+---
+
+## 📋 SESSION HANDOFF — June 23, 2026 (Command Center + Coach Mode)
+
+### Completed + SHIPPED LIVE (getmindy.ai)
+- [x] **Member Access in Command Center** — grant/revoke Pro/Team without SQL/Stripe,
+  dark-themed inline section + standalone /admin/members fallback; members API accepts
+  staff session token OR admin password (`f6b246ef`). Verified prod: password path 200.
+- [x] **Coach Mode: profile-first** — no "Start here" checklist in client mode;
+  add-client routes to Settings unless capability text produced real codes; banner
+  empty-profile is an actionable button (`25d40334`).
+- [x] **FIXED data-loss bug** — client-mode saves were misfiling onto the COACH's own
+  profile (x-active-workspace header dropped when owner stamp missing/email absent).
+  `activeWorkspaceFor` now withholds only on definite different-owner mismatch (`75cd4903`).
+  Memory: `coach_mode_header_drop`.
+- [x] **Repaired misfiled data** — moved Excel Construction's codes (5 NAICS/5 PSC/kw/states/
+  agencies) from eric@govcongiants.com → the client row; cleared the coach row. NOTE: Eric's
+  ORIGINAL coach codes were overwritten (no backup) — he re-enters his own targeting.
+- [x] **Guard: name-only clients always get a profile row** — `ensureClientProfileRow()` in
+  coach/route.ts upserts an empty-targeting row (alerts off, ignoreDuplicates) when add_client
+  yields no codes (`1f2a1186`).
+
+### Carryover from Jun 19 (still open)
+- [ ] **Repoint/extend GSC reporting** (in govcon-funnels `src/lib/gsc/`, currently scoped to
+  `sc-domain:govcongiants.com`) → getmindy.ai, to monitor the new SEO pages' impressions/position.
 
 ---
 
