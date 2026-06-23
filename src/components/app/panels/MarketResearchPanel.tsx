@@ -636,7 +636,10 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   // Auto vs Sport mode (Eric): Auto uses your saved profile; Sport lets you
   // research ANY industry (manual NAICS/PSC/set-aside) without touching your
   // saved settings — for exploring expansion lanes / a report for someone else.
-  const [researchMode, setResearchMode] = useState<'auto' | 'sport'>('auto');
+  // Default to SPORT (Eric, Jun 2026): a fresh research session should start
+  // CLEAN — no auto-populating the fields from the saved/old profile. Auto remains
+  // one click away for users who want their profile codes pre-filled.
+  const [researchMode, setResearchMode] = useState<'auto' | 'sport'>('sport');
   const searchParams = useSearchParams();
   const deepLinkKeywordRef = useRef(false);
   // Sport-mode keyword→code lookup (Eric's "drone problem": don't make users
