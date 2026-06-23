@@ -378,7 +378,7 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
             <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Jane Doe" className={inputCls} />
             <label className="flex items-center gap-2 text-sm text-slate-300">
               <input type="checkbox" checked={sendWelcome} onChange={(e) => setSendWelcome(e.target.checked)} className="rounded border-slate-600 bg-slate-900" />
-              Send welcome email on grant
+              Email them a welcome message when I grant access
             </label>
           </div>
 
