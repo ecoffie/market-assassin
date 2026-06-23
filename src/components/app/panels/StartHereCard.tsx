@@ -63,8 +63,17 @@ export default function StartHereCard({ email, onGo }: StartHereCardProps) {
     const hasKeywords = Array.isArray(notif.keywords) && notif.keywords.length > 0;
     const hasPsc = Array.isArray(notif.psc_codes) && notif.psc_codes.length > 0;
     const targetCount = Number(tl?.count) || (Array.isArray(tl?.targets) ? tl.targets.length : 0);
-    const pipelineCount = Array.isArray(pl?.items) ? pl.items.length : (Array.isArray(pl) ? pl.length : Number(pl?.count) || 0);
-    const libraryCount = Array.isArray(lib?.items) ? lib.items.length : (Array.isArray(lib) ? lib.length : Number(lib?.count) || 0);
+    // /api/pipeline returns { opportunities: [...] }; /api/app/library returns
+    // { entries: [...], total }. The old parse looked for `items`/`count` (which
+    // neither sends), so both always read 0 → "Save your first pursuit" / "Draft
+    // your first response" stayed unchecked even with pursuits + drafts (Eric, Jun 22).
+    const pipelineCount = Array.isArray(pl?.opportunities) ? pl.opportunities.length
+      : Array.isArray(pl?.items) ? pl.items.length
+      : Array.isArray(pl) ? pl.length
+      : Number(pl?.count) || 0;
+    const libraryCount = Array.isArray(lib?.entries) ? lib.entries.length
+      : Number(lib?.total)
+      || (Array.isArray(lib?.items) ? lib.items.length : (Array.isArray(lib) ? lib.length : Number(lib?.count) || 0));
 
     setSteps([
       { key: 'profile', label: 'Set up your profile', detail: 'Add your codes + keywords so Mindy knows what to watch.', done: hasNaics && hasKeywords, panel: 'settings' },
