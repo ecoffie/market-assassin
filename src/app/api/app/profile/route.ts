@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserSession } from '@/lib/api-auth';
+import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
 import { applyPartnerReferralIfEligible } from '@/lib/mindy/apply-partner-referral';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
@@ -41,10 +42,13 @@ export async function POST(request: NextRequest) {
 
     const normalizedEmail = email.toLowerCase().trim();
 
-    const auth = await verifyUserSession(request);
-    if (!auth.authenticated || auth.email !== normalizedEmail) {
-      return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
-    }
+    // Auth via the MI session (x-mi-auth-token), matching the rest of /api/app/*
+    // and what the client actually sends. The previous verifyUserSession() required
+    // an Authorization: Bearer <supabase token> the Market Research save never sent,
+    // so every "Save this market to my profile" 401'd with "Missing or invalid
+    // authorization header" and nothing persisted (Eric, Jun 22 2026).
+    const authSession = requireMIAuthSession(request, normalizedEmail);
+    if (!authSession.ok) return authSession.response;
 
     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL;
     const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;

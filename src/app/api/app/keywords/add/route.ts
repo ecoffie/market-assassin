@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { verifyUserSession } from '@/lib/api-auth';
+import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
 /**
  * POST /api/app/keywords/add  { email, keywords: string[] }
@@ -19,10 +20,14 @@ export async function POST(request: NextRequest) {
     const incoming = Array.isArray(body?.keywords) ? body.keywords : [];
     if (!email) return NextResponse.json({ error: 'email required' }, { status: 400 });
 
-    const auth = await verifyUserSession(request);
-    if (!auth.authenticated || auth.email !== email) {
-      return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
-    }
+    // MI session auth (x-mi-auth-token) — matches /api/app/* and what the client
+    // sends. (Was verifyUserSession/Bearer, which the Sport-mode caller never sent.)
+    const authSession = requireMIAuthSession(request, email);
+    if (!authSession.ok) return authSession.response;
+
+    // Coach Mode: merge keywords into the CLIENT's row when managing a client.
+    const { workspaceId, asClient } = await resolveActiveWorkspace(email, request);
+    const rowEmail = asClient ? clientNotificationEmail(workspaceId) : email;
 
     const clean = Array.from(new Set(
       incoming.map((k: unknown) => String(k).trim().toLowerCase()).filter(Boolean),
@@ -40,7 +45,7 @@ export async function POST(request: NextRequest) {
     const { data: cur } = await supabase
       .from('user_notification_settings')
       .select('keywords')
-      .eq('user_email', email)
+      .eq('user_email', rowEmail)
       .maybeSingle();
 
     const existing = Array.isArray(cur?.keywords)
@@ -55,7 +60,7 @@ export async function POST(request: NextRequest) {
     const { error } = await supabase
       .from('user_notification_settings')
       .upsert(
-        { user_email: email, keywords: merged, updated_at: new Date().toISOString() },
+        { user_email: rowEmail, keywords: merged, updated_at: new Date().toISOString() },
         { onConflict: 'user_email' },
       );
     if (error) {
