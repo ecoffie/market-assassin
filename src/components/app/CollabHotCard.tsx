@@ -30,7 +30,7 @@ interface HotOpp {
 
 interface CollabHotCardProps {
   email: string | null;
-  onPanelChange?: (panel: AppPanel) => void;
+  onPanelChange?: (panel: AppPanel, context?: Record<string, unknown>) => void;
 }
 
 export function CollabHotCard({ email, onPanelChange }: CollabHotCardProps) {
@@ -60,11 +60,23 @@ export function CollabHotCard({ email, onPanelChange }: CollabHotCardProps) {
     return () => { cancelled = true; clearInterval(interval); };
   }, [email]);
 
-  // Take the user to the Alerts panel (where the opp + its badge live) so they
-  // can act. Falls back to a no-op if the dashboard didn't pass the handler.
+  // For a Sources Sought, take the user to Proposal Assist to actually DRAFT a
+  // response to THIS notice (passing the notice context so the panel can frame the
+  // draft around it) — not "respond together" with another contractor. For other
+  // opp types, fall back to the Source Feed to view it.
   const handleRespond = useCallback(() => {
-    onPanelChange?.('alerts');
-  }, [onPanelChange]);
+    if (!hot) return;
+    if (hot.isSourcesSought) {
+      onPanelChange?.('proposals', {
+        noticeId: hot.noticeId,
+        title: hot.title,
+        agency: hot.agency,
+        isSourcesSought: true,
+      });
+    } else {
+      onPanelChange?.('alerts');
+    }
+  }, [onPanelChange, hot]);
 
   if (hidden || !hot) return null;
 
@@ -114,7 +126,7 @@ export function CollabHotCard({ email, onPanelChange }: CollabHotCardProps) {
         {/* Social-proof line */}
         <p className="mt-2.5 text-sm text-slate-200">
           {hot.isSourcesSought
-            ? "You're not the only one researching this. The more capable businesses that respond, the stronger the signal to the agency — respond together."
+            ? "You're not the only one researching this. The more capable businesses that respond, the stronger the signal to the agency — make sure yours is one of them."
             : "You're not the only one pursuing this. Sharpen your response before it closes."}
         </p>
 
@@ -123,7 +135,7 @@ export function CollabHotCard({ email, onPanelChange }: CollabHotCardProps) {
           onClick={handleRespond}
           className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-gradient-to-r from-purple-600 to-fuchsia-600 hover:from-purple-500 hover:to-fuchsia-500 text-white text-sm font-semibold px-4 py-2 transition shadow shadow-purple-900/30"
         >
-          {hot.isSourcesSought ? 'Respond together' : 'View opportunity'} →
+          {hot.isSourcesSought ? 'Respond to this Sources Sought' : 'View opportunity'} →
         </button>
       </div>
     </div>

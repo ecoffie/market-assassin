@@ -253,6 +253,12 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   // users who open Proposal Assist directly can still begin a draft.
   const [localPursuitId, setLocalPursuitId] = useState<string | null>(null);
   const contextPursuitId = typeof panelContext?.pursuit_id === 'string' ? panelContext.pursuit_id : null;
+  // Sources Sought response: arrived from the dashboard "🔥 Hot right now" card's
+  // "Respond to this Sources Sought" button — frame the draft around that notice.
+  const contextNoticeTitle = typeof panelContext?.title === 'string' && panelContext?.isSourcesSought
+    ? panelContext.title
+    : null;
+  const contextNoticeAgency = typeof panelContext?.agency === 'string' ? panelContext.agency : null;
   const livePursuitIds = useMemo(() => new Set(opportunities.map((opp) => opp.id)), [opportunities]);
   const contextPursuitIsLive = Boolean(contextPursuitId && livePursuitIds.has(contextPursuitId));
   const activePursuitId = localPursuitId || (contextPursuitIsLive ? contextPursuitId : null);
@@ -1742,6 +1748,20 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           </div>
         </div>
         {sowError && <p className="mt-1 text-xs text-amber-400/80">{sowError}</p>}
+
+        {/* Sources Sought response banner — appears when the user clicked
+            "Respond to this Sources Sought" on the dashboard hot card. Frames the
+            draft around that notice; they paste/upload the SS text below to begin. */}
+        {contextNoticeTitle && !uploadedRfp && (
+          <div className="mb-4 rounded-lg border border-purple-500/30 bg-purple-500/10 p-3 text-sm text-purple-100">
+            <span className="font-semibold">Responding to a Sources Sought:</span>{' '}
+            {contextNoticeTitle}
+            {contextNoticeAgency && <span className="text-purple-300/80"> · {contextNoticeAgency}</span>}
+            <p className="mt-1 text-xs text-purple-300/80">
+              Paste or upload the notice text below and Mindy will draft your Sources Sought response.
+            </p>
+          </div>
+        )}
 
         {/* Auto-load status banner — appears when user landed here from
             PipelinePanel's 'Draft Proposal' button and a pursuit_id was
