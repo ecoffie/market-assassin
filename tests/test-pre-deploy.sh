@@ -114,6 +114,31 @@ else
 fi
 
 # ═══════════════════════════════════════════════════════════════
+# TEST 2b: Proposal Template Identity — UEI, never the retired DUNS
+# ═══════════════════════════════════════════════════════════════
+# DUNS was retired April 2022 in favor of the UEI. No proposal template should
+# ever render it again (the LOI letterhead regressed to "DUNS: [DUNS]" once).
+# Scoped to src/lib/proposal so legacy/internal field names elsewhere (e.g.
+# fpds-recompete incumbentDuns, a deliberately-deprecated column) don't trip it.
+echo ""
+echo -e "${BLUE}── Proposal Template Identity (UEI not DUNS) ──${NC}"
+
+DUNS_IN_TEMPLATES=$(grep -rni "duns" "$PROJECT_DIR/src/lib/proposal" 2>/dev/null | wc -l | tr -d ' ')
+if [ "$DUNS_IN_TEMPLATES" == "0" ]; then
+  test_result "No DUNS in proposal templates (retired → UEI)" "pass"
+else
+  test_result "Proposal templates contain DUNS" "fail" "$DUNS_IN_TEMPLATES reference(s) under src/lib/proposal — replace DUNS with UEI"
+fi
+
+# Positive assertion: the LOI letterhead still renders the UEI line.
+UEI_IN_LOI=$(grep -c "UEI:" "$PROJECT_DIR/src/lib/proposal/loi-template.ts" 2>/dev/null)
+if [ "$UEI_IN_LOI" -ge 1 ]; then
+  test_result "LOI letterhead renders UEI" "pass"
+else
+  test_result "LOI letterhead missing UEI" "fail" "loi-template.ts no longer renders 'UEI:' in the letterhead"
+fi
+
+# ═══════════════════════════════════════════════════════════════
 # TEST 3: Critical API Endpoints
 # ═══════════════════════════════════════════════════════════════
 echo ""
