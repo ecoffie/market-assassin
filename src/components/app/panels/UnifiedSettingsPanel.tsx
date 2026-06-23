@@ -6,6 +6,7 @@ import { getMIApiHeaders } from '../authHeaders';
 import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
 import { NaicsPicker } from '@/components/codes/NaicsPicker';
+import { getPsc } from '@/lib/codes/lookup';
 import TargetingCard from './TargetingCard';
 
 interface UnifiedSettingsPanelProps {
@@ -446,6 +447,27 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
               <p className="mt-1 text-xs text-slate-500">
                 Product/Service codes — <b>what the government actually buys</b> (more precise than NAICS). Comma-separated.
               </p>
+              {/* Labeled chips for the codes already entered — hover shows the full
+                  PSC title (restores the "hover tells you the code" behavior the
+                  plain text field lost). Read-only; edit in the field above. */}
+              {parseList(form.psc_codes).length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-1.5">
+                  {parseList(form.psc_codes).map((code) => {
+                    const entry = getPsc(code);
+                    const title = entry ? `${entry.code} — ${entry.title}` : `${code} — unknown PSC code`;
+                    return (
+                      <span
+                        key={code}
+                        title={title}
+                        className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs ${entry ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-200' : 'border-amber-500/40 bg-amber-500/10 text-amber-200'}`}
+                      >
+                        <span className="font-medium">{entry?.code || code}</span>
+                        <span className="max-w-[200px] truncate opacity-70">{entry ? entry.title : 'not a known PSC'}</span>
+                      </span>
+                    );
+                  })}
+                </div>
+              )}
               {pscSuggestions.length > 0 && (
                 <div className="mt-2">
                   <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Top codes for your market — tap to add or remove:</div>
