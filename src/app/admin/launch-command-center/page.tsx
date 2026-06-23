@@ -1297,9 +1297,10 @@ export default function LaunchCommandCenterPage() {
           )}
         </section>
 
-        {/* MEMBER ACCESS — grant / revoke Pro / Team without SQL or Stripe.
-            Authorized by the admin password the operator already entered. */}
-        <MemberAccessSection adminPassword={password} />
+        {/* MEMBER ACCESS — full member directory + verify-before-grant Pro/Team.
+            Employees work here, so the full table (tabs + counts + Stripe verify)
+            lives inline. Authorized by the admin password already entered. */}
+        <MemberAccessSection adminPassword={password} fullMode />
 
         {/* DEMAND HEATMAP — aggregated user-intent / collaboration signal (the "aha" feature) */}
         <section className="rounded-lg border border-cyan-500/30 bg-gradient-to-br from-cyan-900/20 to-slate-900 p-6">

@@ -47,7 +47,7 @@ export default function AdminMembersPage() {
 
   return (
     <main className="min-h-screen bg-slate-950 px-4 py-10 text-white">
-      <div className="mx-auto max-w-3xl">
+      <div className="mx-auto max-w-5xl">
         <div className="mb-6">
           <h1 className="text-2xl font-bold">Members — Grant Pro / Team Access</h1>
           <p className="mt-1 text-sm text-slate-400">
@@ -55,7 +55,7 @@ export default function AdminMembersPage() {
             user sees the change on their next sign-in or refresh.
           </p>
         </div>
-        <MemberAccessSection callerEmail={callerEmail} />
+        <MemberAccessSection callerEmail={callerEmail} fullMode />
       </div>
     </main>
   );

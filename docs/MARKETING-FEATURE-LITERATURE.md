@@ -2666,3 +2666,32 @@ on the coach's own account. This guard closes that gap at the source.
 **Proof:** `ensureClientProfileRow()` in `src/app/api/app/coach/route.ts` upserts an
 empty-targeting row (`alerts_enabled:false`, `ignoreDuplicates:true`) whenever
 `add_client` doesn't produce real NAICS/keywords. Typecheck + full build pass.
+
+---
+
+## Member Access v2 — verify-before-grant (off-link purchases)
+
+**What it does (plain English):** Rebuilt the Command Center's Member Access into
+a real member directory with a verify-before-grant flow, built for purchases made
+OUTSIDE the Stripe checkout link (manual sales, invoices, wires, in-person
+bootcamp, comps, bundles). Tier tabs with live counts (All / Pro / Team / Free), a
+browsable member list, and on lookup it shows the person's current Mindy access
+NEXT TO their real Stripe record (amount paid, active subs, refunds) plus a
+plain-English verdict — ✅ paid, safe to grant · ⚠️ no Stripe payment, pick a
+source · 🚫 has a refund, confirm. Granting without a clean Stripe payment requires
+choosing how it was verified (Invoice / Wire / Bootcamp / Comp / Bundle / Other) +
+a note, captured in the audit.
+
+**Why it matters:** The old version was a blind email box with no context — you
+couldn't see who had what, and you flipped access without knowing if the person
+actually paid. Enterprise SaaS provisions manual access by reconciling against the
+payment source of truth and leaving an audit trail; this does exactly that.
+
+**SEO angle:** none — internal admin tooling.
+
+**Proof:** `member-grants.ts` adds `getTierCounts`, `listMembers`,
+`getStripeVerification` (server-side Stripe), and `computeVerdict`. Verified on live
+data: 1,082 members (23 Pro / 4 Team / 1,055 Free); a known comp account
+(advocate, no Stripe payment) correctly returns verdict=warn, requiresReason=true.
+Audit row extended with grant_source + note (idempotent column add). Typecheck +
+full build pass.

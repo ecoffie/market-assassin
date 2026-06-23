@@ -14,11 +14,15 @@
  * Every grant/revoke is written to mi_admin_grants for an audit trail.
  */
 import { createClient } from '@supabase/supabase-js';
+import type Stripe from 'stripe';
 import { grantBriefingsAccess, revokeBriefingsAccess } from '@/lib/briefings/access';
 import { provisionTeamWorkspace } from '@/lib/app/workspace';
 
 export type GrantTier = 'pro' | 'team';
 export type GrantAction = 'grant' | 'revoke';
+
+/** Where an off-link grant's payment was verified (when not a Stripe checkout). */
+export type GrantSource = 'stripe' | 'invoice' | 'wire' | 'bootcamp' | 'comp' | 'bundle' | 'other';
 
 export interface MemberStatus {
   email: string;
@@ -26,6 +30,27 @@ export interface MemberStatus {
   accessBriefings: boolean; // Pro
   accessTeam: boolean; // Team
   tier: 'free' | 'pro' | 'team';
+}
+
+/** Stripe-side proof of purchase, used to verify off-link grants before flipping access. */
+export interface StripeVerification {
+  found: boolean;
+  customerId?: string;
+  name?: string | null;
+  totalPaid?: number;        // sum of paid checkout sessions, USD
+  activeSubscriptions?: number;
+  hasRefunds?: boolean;
+  lastPlan?: string | null;  // most recent subscription price id / product
+  error?: string;
+}
+
+/** Reconciliation verdict shown before a grant — current access vs Stripe truth. */
+export interface MemberVerdict {
+  level: 'ok' | 'warn' | 'block' | 'info';
+  headline: string;
+  detail: string;
+  /** True when there's no Stripe payment to point to → grant needs a reason. */
+  requiresReason: boolean;
 }
 
 export interface GrantResult {
@@ -46,6 +71,23 @@ export interface GrantLogEntry {
   tier: GrantTier;
   sent_welcome: boolean;
   created_at: string;
+  grant_source?: GrantSource | null;
+  note?: string | null;
+}
+
+export interface MemberListRow {
+  email: string;
+  name: string | null;
+  tier: 'free' | 'pro' | 'team';
+  created_at: string | null;
+  accessSource: string | null; // how they got access (stripe webhook, manual grant, bundle…)
+}
+
+export interface TierCounts {
+  all: number;
+  pro: number;
+  team: number;
+  free: number;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -83,10 +125,30 @@ export async function ensureGrantsAuditSchema(): Promise<void> {
         action TEXT NOT NULL,
         tier TEXT NOT NULL,
         sent_welcome BOOLEAN NOT NULL DEFAULT FALSE,
+        grant_source TEXT,
+        note TEXT,
         created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       );
       CREATE INDEX IF NOT EXISTS idx_mi_admin_grants_created ON mi_admin_grants(created_at DESC);
       CREATE INDEX IF NOT EXISTS idx_mi_admin_grants_target ON mi_admin_grants(target_email);
+    `,
+  });
+}
+
+/**
+ * Add the off-link provenance columns to an EXISTING audit table (the table may
+ * predate them). Best-effort + idempotent — never blocks a grant.
+ */
+async function ensureGrantProvenanceColumns(): Promise<void> {
+  const supabase = getSupabase();
+  if (!supabase) return;
+  // Probe one of the new columns; only run DDL if it's missing.
+  const { error } = await supabase.from('mi_admin_grants').select('grant_source').limit(1);
+  if (!error || error.code !== '42703') return; // 42703 = undefined_column
+  await supabase.rpc('exec_migration', {
+    sql_query: `
+      ALTER TABLE mi_admin_grants ADD COLUMN IF NOT EXISTS grant_source TEXT;
+      ALTER TABLE mi_admin_grants ADD COLUMN IF NOT EXISTS note TEXT;
     `,
   });
 }
@@ -154,6 +216,8 @@ async function recordGrant(entry: {
   action: GrantAction;
   tier: GrantTier;
   sentWelcome: boolean;
+  grantSource?: GrantSource | null;
+  note?: string | null;
 }): Promise<void> {
   const supabase = getSupabase();
   if (!supabase) return;
@@ -164,6 +228,8 @@ async function recordGrant(entry: {
       action: entry.action,
       tier: entry.tier,
       sent_welcome: entry.sentWelcome,
+      grant_source: entry.grantSource ?? null,
+      note: entry.note ?? null,
     });
   } catch (err) {
     console.error('[member-grants] failed to record audit row:', err);
@@ -181,6 +247,8 @@ export async function applyMemberGrant(opts: {
   action: GrantAction;
   sendWelcome?: boolean;
   customerName?: string;
+  grantSource?: GrantSource | null;
+  note?: string | null;
 }): Promise<GrantResult> {
   const email = normalize(opts.targetEmail);
   const granting = opts.action === 'grant';
@@ -194,6 +262,7 @@ export async function applyMemberGrant(opts: {
   }
 
   await ensureGrantsAuditSchema();
+  await ensureGrantProvenanceColumns();
 
   // 1) Flip the profile flags.
   const updates: Record<string, boolean> =
@@ -245,13 +314,15 @@ export async function applyMemberGrant(opts: {
     }
   }
 
-  // 5) Audit.
+  // 5) Audit (with off-link provenance when provided).
   await recordGrant({
     targetEmail: email,
     actorEmail: normalize(opts.actorEmail),
     action: opts.action,
     tier: opts.tier,
     sentWelcome: welcomeEmailSent,
+    grantSource: opts.grantSource ?? null,
+    note: opts.note ?? null,
   });
 
   const status = await getMemberStatus(email);
@@ -274,11 +345,176 @@ export async function getRecentGrants(limit = 25): Promise<GrantLogEntry[]> {
   const supabase = getSupabase();
   if (!supabase) return [];
   await ensureGrantsAuditSchema();
-  const { data, error } = await supabase
+  // Try the richer select (with provenance); fall back to the base columns if the
+  // table predates them, so an un-migrated table still shows recent activity.
+  let { data, error } = await supabase
     .from('mi_admin_grants')
-    .select('target_email, actor_email, action, tier, sent_welcome, created_at')
+    .select('target_email, actor_email, action, tier, sent_welcome, grant_source, note, created_at')
     .order('created_at', { ascending: false })
     .limit(limit);
+  if (error?.code === '42703') {
+    ({ data, error } = await supabase
+      .from('mi_admin_grants')
+      .select('target_email, actor_email, action, tier, sent_welcome, created_at')
+      .order('created_at', { ascending: false })
+      .limit(limit));
+  }
   if (error) return [];
   return (data || []) as GrantLogEntry[];
+}
+
+/**
+ * Tier counts across all members — drives the tab badges (All / Pro / Team / Free).
+ * "Pro" = access_briefings true & not Team; "Team" = access_team true.
+ */
+export async function getTierCounts(): Promise<TierCounts> {
+  const supabase = getSupabase();
+  if (!supabase) return { all: 0, pro: 0, team: 0, free: 0 };
+  const head = async (filter?: (q: any) => any): Promise<number> => { // eslint-disable-line @typescript-eslint/no-explicit-any
+    let q = supabase.from('user_profiles').select('email', { count: 'exact', head: true });
+    if (filter) q = filter(q);
+    const { count } = await q;
+    return count || 0;
+  };
+  const [all, team, briefings] = await Promise.all([
+    head(),
+    head((q) => q.eq('access_team', true)),
+    head((q) => q.eq('access_briefings', true)),
+  ]);
+  // Team is a superset of Pro (granting Team also sets access_briefings), so Pro =
+  // briefings minus the team rows, and Free = everyone else.
+  const pro = Math.max(0, briefings - team);
+  const free = Math.max(0, all - team - pro);
+  return { all, pro, team, free };
+}
+
+/**
+ * Paged member list for the table. `tier` filters by segment; `q` is a case-
+ * insensitive email/name substring search. Ordered newest-first.
+ */
+export async function listMembers(opts: {
+  tier?: 'all' | 'pro' | 'team' | 'free';
+  q?: string;
+  limit?: number;
+}): Promise<MemberListRow[]> {
+  const supabase = getSupabase();
+  if (!supabase) return [];
+  const limit = Math.min(opts.limit ?? 50, 200);
+  let query = supabase
+    .from('user_profiles')
+    .select('email, company_name, access_source, access_briefings, access_team, created_at')
+    .order('created_at', { ascending: false })
+    .limit(limit);
+
+  const tier = opts.tier || 'all';
+  if (tier === 'team') query = query.eq('access_team', true);
+  else if (tier === 'pro') query = query.eq('access_briefings', true).eq('access_team', false);
+  else if (tier === 'free') query = query.eq('access_briefings', false).eq('access_team', false);
+
+  const search = (opts.q || '').trim();
+  if (search) {
+    const safe = search.replace(/[%,]/g, '');
+    query = query.or(`email.ilike.%${safe}%,company_name.ilike.%${safe}%`);
+  }
+
+  const { data, error } = await query;
+  if (error) return [];
+  return (data || []).map((d: Record<string, unknown>) => ({
+    email: String(d.email),
+    name: (d.company_name as string) || null,
+    tier: deriveTier(!!d.access_team, !!d.access_briefings),
+    created_at: (d.created_at as string) || null,
+    accessSource: (d.access_source as string) || null,
+  }));
+}
+
+/**
+ * Verify an email against Stripe — the proof of purchase for off-link grants.
+ * Calls the same Stripe path /api/admin/stripe-lookup uses, server-side. Never
+ * throws: a Stripe outage degrades to found:false with an error note so the
+ * operator can still grant with an explicit reason.
+ */
+export async function getStripeVerification(email: string): Promise<StripeVerification> {
+  const normalized = normalize(email);
+  const secret = process.env.STRIPE_SECRET_KEY;
+  if (!secret) return { found: false, error: 'Stripe not configured' };
+  try {
+    const Stripe = (await import('stripe')).default;
+    const stripe = new Stripe(secret, { apiVersion: '2025-01-27.acacia' as Stripe.LatestApiVersion });
+    const customers = await stripe.customers.list({ email: normalized, limit: 1 });
+    const customer = customers.data[0];
+    if (!customer) return { found: false };
+
+    const [sessions, subscriptions, charges] = await Promise.all([
+      stripe.checkout.sessions.list({ customer: customer.id, limit: 20 }),
+      stripe.subscriptions.list({ customer: customer.id, limit: 10 }),
+      stripe.charges.list({ customer: customer.id, limit: 20 }),
+    ]);
+    const totalPaid = sessions.data
+      .filter((s) => s.payment_status === 'paid')
+      .reduce((sum, s) => sum + (s.amount_total ? s.amount_total / 100 : 0), 0);
+    const activeSubs = subscriptions.data.filter((s) => s.status === 'active');
+    return {
+      found: true,
+      customerId: customer.id,
+      name: customer.name,
+      totalPaid: Math.round(totalPaid * 100) / 100,
+      activeSubscriptions: activeSubs.length,
+      hasRefunds: charges.data.some((c) => c.refunded),
+      lastPlan: (activeSubs[0]?.items.data[0]?.price?.product as string) || null,
+    };
+  } catch (err) {
+    return { found: false, error: err instanceof Error ? err.message : 'Stripe lookup failed' };
+  }
+}
+
+/**
+ * Reconcile current access vs Stripe truth into a one-line verdict the operator
+ * reads BEFORE granting. The whole point of this tool is off-link purchases, so a
+ * no-Stripe-payment result is a "needs a reason" warning, never a hard block.
+ */
+export function computeVerdict(status: MemberStatus, stripe: StripeVerification): MemberVerdict {
+  if (stripe.error) {
+    return {
+      level: 'info',
+      headline: 'Stripe check unavailable',
+      detail: `Could not verify against Stripe (${stripe.error}). Grant with an explicit source + note.`,
+      requiresReason: true,
+    };
+  }
+  if (stripe.hasRefunds) {
+    return {
+      level: 'block',
+      headline: 'Has a refunded charge',
+      detail: `This customer has at least one refund on file${status.tier !== 'free' ? ` but still holds ${status.tier.toUpperCase()} access` : ''}. Confirm before granting; consider revoking.`,
+      requiresReason: true,
+    };
+  }
+  if (stripe.found && (stripe.activeSubscriptions || 0) > 0) {
+    return {
+      level: 'ok',
+      headline: `Active Stripe subscription · $${(stripe.totalPaid || 0).toLocaleString()} paid`,
+      detail: status.tier === 'free'
+        ? 'Paid in Stripe but has no access yet — safe to grant.'
+        : `Already has ${status.tier.toUpperCase()} access, matching their Stripe subscription.`,
+      requiresReason: false,
+    };
+  }
+  if (stripe.found && (stripe.totalPaid || 0) > 0) {
+    return {
+      level: 'ok',
+      headline: `One-time Stripe payment · $${(stripe.totalPaid || 0).toLocaleString()}`,
+      detail: 'Paid in Stripe (no active subscription). Safe to grant the matching tier.',
+      requiresReason: false,
+    };
+  }
+  // No Stripe payment found — the off-link case. Allowed, but needs a reason.
+  return {
+    level: 'warn',
+    headline: 'No Stripe payment on file',
+    detail: status.tier !== 'free'
+      ? `Holds ${status.tier.toUpperCase()} access with no Stripe payment — likely a manual/comp grant. Pick a source so it's traceable.`
+      : 'No Stripe record — if this is an off-link sale (invoice, wire, bootcamp, comp), pick a source + note before granting.',
+    requiresReason: true,
+  };
 }

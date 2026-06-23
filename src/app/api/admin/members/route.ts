@@ -22,8 +22,13 @@ import {
   getMemberStatus,
   applyMemberGrant,
   getRecentGrants,
+  getTierCounts,
+  listMembers,
+  getStripeVerification,
+  computeVerdict,
   type GrantTier,
   type GrantAction,
+  type GrantSource,
 } from '@/lib/admin/member-grants';
 
 export const runtime = 'nodejs';
@@ -80,12 +85,30 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, log }, { headers: { 'Cache-Control': 'no-store' } });
   }
 
+  // Member list + tier counts (the table view). `?list=1&tier=&q=`
+  if (searchParams.get('list') === '1') {
+    const tierParam = (searchParams.get('tier') || 'all') as 'all' | 'pro' | 'team' | 'free';
+    const q = searchParams.get('q') || undefined;
+    const [members, counts] = await Promise.all([
+      listMembers({ tier: tierParam, q, limit: 100 }),
+      getTierCounts(),
+    ]);
+    return NextResponse.json({ success: true, members, counts }, { headers: { 'Cache-Control': 'no-store' } });
+  }
+
   const email = searchParams.get('email')?.trim();
   if (!email) {
     return NextResponse.json({ success: false, error: 'email is required' }, { status: 400 });
   }
+  // Look up current access AND verify against Stripe → a verdict the operator
+  // reads before granting (the off-link-purchase use case).
   const status = await getMemberStatus(email);
-  return NextResponse.json({ success: true, status }, { headers: { 'Cache-Control': 'no-store' } });
+  const stripe = await getStripeVerification(email);
+  const verdict = computeVerdict(status, stripe);
+  return NextResponse.json(
+    { success: true, status, stripe, verdict },
+    { headers: { 'Cache-Control': 'no-store' } },
+  );
 }
 
 export async function POST(request: NextRequest) {
@@ -96,6 +119,8 @@ export async function POST(request: NextRequest) {
     sendWelcome?: boolean;
     customerName?: string;
     password?: string;
+    grantSource?: GrantSource;
+    note?: string;
   };
   try {
     body = await request.json();
@@ -119,6 +144,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: "action must be 'grant' or 'revoke'" }, { status: 400 });
   }
 
+  const VALID_SOURCES: GrantSource[] = ['stripe', 'invoice', 'wire', 'bootcamp', 'comp', 'bundle', 'other'];
+  const grantSource =
+    body.grantSource && VALID_SOURCES.includes(body.grantSource) ? body.grantSource : undefined;
+  const note = (body.note || '').trim().slice(0, 500) || undefined;
+
   const result = await applyMemberGrant({
     targetEmail: email,
     actorEmail: staff.email,
@@ -126,6 +156,8 @@ export async function POST(request: NextRequest) {
     action,
     sendWelcome: body.sendWelcome !== false, // default ON for grants
     customerName: body.customerName,
+    grantSource: grantSource ?? null,
+    note: note ?? null,
   });
 
   return NextResponse.json(result, {
