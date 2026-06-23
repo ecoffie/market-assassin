@@ -24,6 +24,7 @@ import { createClient } from '@supabase/supabase-js';
 import { getRotatedSAMKey } from './utils';
 import { extractPdf, extractDocx, extractTxt, extractXlsx } from './pdf-extract';
 import { classifyDoc } from '@/lib/proposal/classify-doc';
+import { parseSamAttachment } from '@/lib/sam/attachment-metadata';
 
 const SAM_OPPS_URL = 'https://api.sam.gov/opportunities/v2/search';
 const SAM_FILE_URL_PREFIX = 'https://sam.gov/api/prod/opps/v3/opportunities/resources/files/';
@@ -185,8 +186,19 @@ async function resolveFromCache(
   }
   if (!row?.notice_id) return null;
 
+  // sam_opportunities.attachments is MIXED-shape: the nightly sync writes bare
+  // URL strings (resourceLinks), but backfill-sam-attachments enriches them to
+  // { url, name, fileId } OBJECTS. parseSamAttachment normalizes both shapes
+  // (and skips the { _no_attachments } sentinel) — exactly like the Market
+  // Dashboard does. The old `typeof u === 'string'` filter dropped every
+  // object-form (backfilled) attachment, so resolveFromCache returned [] for
+  // the vast majority of notices → cache treated as a miss → fell through to
+  // the date-window-bounded live discover → Proposal Assist showed
+  // "SAM attachment download failed" while the dashboard listed the same files.
   const attachments = Array.isArray(row.attachments)
-    ? (row.attachments as unknown[]).filter((u): u is string => typeof u === 'string' && u.length > 0)
+    ? (row.attachments as unknown[])
+        .map((entry) => parseSamAttachment(entry)?.url)
+        .filter((u): u is string => typeof u === 'string' && u.length > 0)
     : [];
   return { uuid: row.notice_id, attachments };
 }

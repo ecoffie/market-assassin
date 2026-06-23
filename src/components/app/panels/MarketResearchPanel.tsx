@@ -4887,16 +4887,20 @@ function AgencyTable({
         </div>
 
         {!showAll && (hasSelection ? unselectedRows.length > 0 : sortedRows.length > 10) && (
-          <div className="border-t border-slate-800 p-3 text-center">
+          <div className="border-t border-slate-800 p-4 text-center">
             <button
               type="button"
               onClick={() => setShowAll(true)}
-              className="text-xs text-emerald-400 hover:text-emerald-300 underline"
+              className="inline-flex items-center gap-2 rounded-lg border border-emerald-500/50 bg-emerald-500/10 px-5 py-2.5 text-sm font-semibold text-emerald-200 shadow-sm transition-colors hover:bg-emerald-500/20 hover:text-white"
             >
-              {hasSelection
-                ? `Showing your ${selectedRows.length} selected — show all ${filteredRows.length} agencies`
-                : `Show all ${sortedRows.length} agencies`}
+              <span>Show all {filteredRows.length} agencies</span>
+              <span aria-hidden="true">↓</span>
             </button>
+            {hasSelection && (
+              <p className="mt-2 text-xs text-slate-500">
+                Showing your {selectedRows.length} selected of {filteredRows.length}
+              </p>
+            )}
           </div>
         )}
         {showAll && hasSelection && (

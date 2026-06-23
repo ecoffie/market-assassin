@@ -133,7 +133,7 @@ export function assembleLoiTemplate({ fields, vault }: LoiTemplateInput): string
 
   // --- Letterhead (bidder identity) ---
   const company = s(id.legal_name) || ph('Your company name');
-  const duns = s(id.duns) || ph('DUNS');
+  const uei = s(id.uei) || ph('UEI');
   const cage = s(id.cage_code) || ph('CAGE');
   const addr = s(id.office_address) || ph('Your company address');
   const phone = s(id.contact_phone) || ph('Office phone');
@@ -185,7 +185,7 @@ export function assembleLoiTemplate({ fields, vault }: LoiTemplateInput): string
   const contactCell = s(id.contact_phone) || ph('Cell phone');
 
   const letter = `${company}
-DUNS: ${duns}    CAGE Code: ${cage}
+UEI: ${uei}    CAGE Code: ${cage}
 ${addr}
 ${phone}
 
