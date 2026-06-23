@@ -137,9 +137,17 @@ async function recordProviderSend({
   status: string;
 }) {
   try {
+    // Plain insert (NOT upsert-with-onConflict). The dedup index
+    // idx_eps_provider_msg is PARTIAL (WHERE provider_message_id IS NOT NULL),
+    // and PostgREST's onConflict cannot target a partial index — so the old
+    // upsert threw 42P10 for every Resend send (which always has a message id)
+    // and the catch below silently dropped the row. Only Office365 rows (null
+    // message id → no onConflict) ever recorded. A plain insert records both;
+    // the partial unique index still rejects a true duplicate (same
+    // provider+message_id), which lands in the catch as a harmless no-op.
     await getSupabase()
       .from('email_provider_sends')
-      .upsert({
+      .insert({
         provider,
         provider_message_id: providerMessageId || null,
         user_email: to.toLowerCase().trim(),
@@ -150,7 +158,7 @@ async function recordProviderSend({
         metadata: metadata || {},
         status,
         sent_at: new Date().toISOString(),
-      }, providerMessageId ? { onConflict: 'provider,provider_message_id' } : undefined);
+      });
   } catch (error) {
     console.error('[SendEmail] Failed to record provider send:', error);
   }
