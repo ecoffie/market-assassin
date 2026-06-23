@@ -46,16 +46,30 @@ export function getActiveWorkspace(): string | null {
 }
 
 /**
- * The active workspace ONLY if it was set by `email`. Returns null otherwise, so
- * the header is never sent for a workspace another login selected.
+ * The active workspace for `email`, used to attach the `x-active-workspace`
+ * header. Returns the key UNLESS it was demonstrably set by a DIFFERENT login
+ * (owner stamp present AND mismatched) — in which case we withhold it so one
+ * login never operates as another's client.
+ *
+ * Note: a missing owner stamp (legacy key from before stamping existed) or a
+ * missing `email` at call time does NOT withhold the key. The server is the real
+ * authority — resolveActiveWorkspace() re-verifies org_clients + org_members and
+ * ignores any header the caller isn't authorized for. Over-withholding here was
+ * silently dropping the header for legitimate coaches, so client-mode SAVES
+ * landed on the coach's own profile and looked like "my data vanished"
+ * (Eric, Jun 23 2026). reconcileActiveWorkspace() still clears foreign keys on
+ * login, so a stale cross-login key is gone before this is read.
  */
 export function activeWorkspaceFor(email: string | null | undefined): string | null {
-  if (typeof window === 'undefined' || !email) return null;
+  if (typeof window === 'undefined') return null;
   try {
     const ws = localStorage.getItem(ACTIVE_KEY);
     if (!ws) return null;
     const owner = localStorage.getItem(OWNER_KEY);
-    return owner && owner === normalizeEmail(email) ? ws : null;
+    // Withhold ONLY on a definite different-owner mismatch. No stamp or no email
+    // → trust the key (server re-verifies authorization regardless).
+    if (owner && email && owner !== normalizeEmail(email)) return null;
+    return ws;
   } catch { return null; }
 }
 
