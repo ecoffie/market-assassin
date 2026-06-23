@@ -7,7 +7,7 @@ import {
   PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { Zap, Gauge } from 'lucide-react';
+import { Zap, Gauge, Loader2 } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import MarketCoverageBanner, { type MarketCoverage } from '../market/MarketCoverageBanner';
@@ -695,6 +695,10 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   // The TMR endpoint is independently cacheable (24h) and idempotent
   // so firing it eagerly costs nothing.
   const [tmrRows, setTmrRows] = useState<AgencyTableRow[]>([]);
+  // True while the AgencyTable's slow find-agencies fetch is in flight — drives
+  // the moving "Loading agency data" indicator next to the panel title so users
+  // know the page isn't fully rendered yet (Eric, Jun 23 2026).
+  const [agencyLoading, setAgencyLoading] = useState(false);
   const [marketCoverage, setMarketCoverage] = useState<MarketCoverage | null>(null);  // #59
   // Authoritative "Relevant spending" from spending_by_category (department total)
   // + the window label, so the headline figure reconciles with the table/leaderboards.
@@ -1748,6 +1752,18 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-3">
           <h1 className="text-2xl font-bold text-white">Market Research</h1>
+          {/* Moving indicator while the slow agency fetch finishes after the
+              leaderboards already rendered — signals "more is still loading". */}
+          {agencyLoading && (
+            <span
+              className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-2.5 py-1 text-xs font-medium text-emerald-300"
+              role="status"
+              aria-live="polite"
+            >
+              <Loader2 className="w-3.5 h-3.5 animate-spin" strokeWidth={2.5} />
+              Loading agency data…
+            </span>
+          )}
           {/* Auto / Sport mode toggle — Mindy colors (purple/emerald). */}
           <div className="inline-flex rounded-lg bg-slate-800/60 p-0.5 text-xs">
             <button
@@ -2337,6 +2353,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               onSelectedAgenciesChange={setStarredAgencies}
               parentAgencyFilter={parentAgencyFilter}
               onClearParentFilter={() => setParentAgencyFilter(null)}
+              onLoadingChange={setAgencyLoading}
             />
           </div>
 
@@ -3959,6 +3976,7 @@ function AgencyTable({
   onSelectedAgenciesChange,
   parentAgencyFilter,
   onClearParentFilter,
+  onLoadingChange,
 }: {
   email: string | null;
   naicsCode: string;
@@ -3985,9 +4003,16 @@ function AgencyTable({
   parentAgencyFilter?: string | null;
   /** Clear handler, fired by the filter pill's X button. */
   onClearParentFilter?: () => void;
+  /** Bubbles the agency-fetch loading state up so the panel header can show a
+   *  moving indicator while the slow find-agencies call is still in flight. */
+  onLoadingChange?: (loading: boolean) => void;
 }) {
   const [rows, setRows] = useState<AgencyTableRow[]>([]);
   const [loading, setLoading] = useState(false);
+  // Bubble the agency-fetch loading state to the panel header so it can show a
+  // moving indicator (the find-agencies call runs ~3-8s after the leaderboards
+  // already rendered — users couldn't tell more was still coming).
+  useEffect(() => { onLoadingChange?.(loading); }, [loading, onLoadingChange]);
   const [error, setError] = useState<string | null>(null);
   // Populated when find-agencies rejects the NAICS itself (invalid_naics).
   // Lets the error block offer real replacement codes instead of a dead end.
@@ -4564,7 +4589,10 @@ function AgencyTable({
   if (loading) {
     return (
       <section className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
-        <p className="text-sm text-slate-400">Loading agency data...</p>
+        <p className="flex items-center gap-2 text-sm text-slate-400">
+          <Loader2 className="w-4 h-4 animate-spin text-emerald-400" strokeWidth={2.5} />
+          Loading agency data…
+        </p>
       </section>
     );
   }
