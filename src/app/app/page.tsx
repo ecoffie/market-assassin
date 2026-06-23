@@ -7,7 +7,7 @@ import GlobalLookup from '@/components/app/GlobalLookup';
 import ProductTour from '@/components/app/ProductTour';
 import PanelContainer from '@/components/app/panels';
 import ClientWorkspaceBanner from '@/components/app/ClientWorkspaceBanner';
-import { reconcileActiveWorkspace } from '@/components/app/activeWorkspace';
+import { reconcileActiveWorkspace, getActiveWorkspace } from '@/components/app/activeWorkspace';
 import VoiceCaptureModal from '@/components/app/voice/VoiceCaptureModal';
 import { Mic, Menu } from 'lucide-react';
 import SettingsPanel from '@/components/briefings/SettingsPanel';
@@ -474,6 +474,11 @@ function AppDashboard() {
   // never blocking the app on page load.
   useEffect(() => {
     const replay = () => {
+      // Coach Mode: never run the client onboarding tour while operating inside
+      // a client's workspace (Eric, Jun 23 2026 — "coach mode should not require
+      // a tour on clients"). The tour highlights new-user onboarding panels that
+      // are irrelevant (and broke) when a coach is working as a client.
+      if (getActiveWorkspace()) return;
       localStorage.removeItem('mindy_tour_completed');
       setTourRunId((n) => n + 1);   // force a fresh remount
       setRunTour(true);
