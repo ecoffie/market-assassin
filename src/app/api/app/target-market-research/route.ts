@@ -380,7 +380,7 @@ export async function POST(request: NextRequest) {
     // Cache schema version. Bump when the COMPUTED figures change so stale rows
     // (24h TTL) don't serve old numbers. sv2 = state-scoped authoritative total +
     // sub-agencies no longer inherit the parent department's national total.
-    const SPEND_SCHEMA_VERSION = 'sv2';
+    const SPEND_SCHEMA_VERSION = 'sv3';
     const cacheKey = {
       naics_code: `${naics}${stateSuffix}|${SPEND_SCHEMA_VERSION}`,
       psc_code: psc,
@@ -868,12 +868,24 @@ export async function POST(request: NextRequest) {
     // Default sort: top total $ (matches UI default lens + FPDS leaderboards).
     rows.sort((x, y) => y.metric_top_total - x.metric_top_total);
 
+    // FULL-MARKET total for the "Relevant spending" headline + SB-mix denominator.
+    // CRITICAL: findData is the WITH-set-aside pass (defaulted to Small Business),
+    // so findData.totalSpending is the SET-ASIDE number, NOT the market. totalData
+    // is the no-set-aside pass = the real market. Use the authoritative category
+    // total first; fall back to the no-set-aside total (NEVER the set-aside one).
+    // Using findData here is what made the headline collapse to $160M and pushed
+    // the SB mix past 100% ($646M ÷ $160M = 403%) when the category call returned 0.
+    const noSetAsideMarketTotal = (totalData.success && typeof totalData.totalSpending === 'number' && totalData.totalSpending > 0)
+      ? totalData.totalSpending
+      : (findData.totalSpending || 0);
+    const relevantSpending = authoritativeMarketTotal || noSetAsideMarketTotal || 0;
+
     // Tripwire (#2): the headline total and the rows must come from the SAME
     // scope. If the top row dwarfs the market total, the numbers are mismatched
     // (national vs state-scoped, or a sub-agency carrying a parent figure) — the
     // shape of the bug we just fixed. Logs loudly; never blocks the response.
     reconcileMarketTotals({
-      authoritativeMarketTotal: authoritativeMarketTotal || findData.totalSpending || 0,
+      authoritativeMarketTotal: relevantSpending,
       rows,
       states: marketScope.states,
     });
@@ -890,7 +902,7 @@ export async function POST(request: NextRequest) {
           veteran_status: cacheKey.veteran_status,
           agencies: rows,
           total_count: rows.length,
-          total_spending: findData.totalSpending || 0,
+          total_spending: noSetAsideMarketTotal,
           sat_summary: findData.satSummary || null,
           generated_at: new Date().toISOString(),
           generation_ms: Date.now() - startedAt,
@@ -901,7 +913,7 @@ export async function POST(request: NextRequest) {
             pain_ms: painMs,
             // Authoritative category total stashed here (no schema change needed) so
             // cache hits also serve the reconciled "Relevant spending" figure.
-            relevant_spending: authoritativeMarketTotal || findData.totalSpending || 0,
+            relevant_spending: relevantSpending,
           },
         }, { onConflict: 'naics_code,psc_code,business_type,veteran_status' });
     } catch (cacheWriteErr) {
@@ -914,11 +926,12 @@ export async function POST(request: NextRequest) {
       success: true,
       agencies: sliced,
       total_count: rows.length,
-      total_spending: findData.totalSpending || 0,
+      total_spending: noSetAsideMarketTotal,
       // Authoritative market total from spending_by_category (department level) —
       // the figure the "Relevant spending" card should show. Falls back to the
-      // find-agencies total, then 0, if the category pass failed (#2 reconciliation).
-      relevant_spending: authoritativeMarketTotal || findData.totalSpending || 0,
+      // NO-SET-ASIDE market total (never the set-aside pass), then 0, if the
+      // category pass returned nothing (#2 reconciliation).
+      relevant_spending: relevantSpending,
       spend_window_label: MARKET_SPEND_WINDOW_LABEL,
       sat_summary: findData.satSummary,
       // KEYWORD-FIRST coverage (#59) — when researched by keyword, tell the UI the
