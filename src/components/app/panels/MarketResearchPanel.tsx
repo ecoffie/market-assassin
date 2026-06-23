@@ -1351,7 +1351,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     const debounce = setTimeout(() => {
     fetch('/api/app/target-market-research', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         email,
         // Pass the keyword whenever the user researched by keyword (#59) — the
@@ -3694,7 +3694,7 @@ function MindyNarrative({
 
     fetch('/api/app/market-narrative', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         email,
         naicsCode,
@@ -4072,7 +4072,7 @@ function AgencyTable({
 
     fetch('/api/app/target-market-research', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
+      headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
       body: JSON.stringify({
         email,
         keyword: sportKw || undefined,
@@ -4182,7 +4182,7 @@ function AgencyTable({
   useEffect(() => {
     if (!email || !naicsCode.trim()) return;
     let cancelled = false;
-    fetch(`/api/app/triage?email=${encodeURIComponent(email)}&naics=${encodeURIComponent(naicsCode)}`)
+    fetch(`/api/app/triage?email=${encodeURIComponent(email)}&naics=${encodeURIComponent(naicsCode)}`, { headers: getMIApiHeaders(email) })
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (cancelled || !data?.success) return;
