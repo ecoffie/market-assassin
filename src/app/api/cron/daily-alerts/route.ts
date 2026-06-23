@@ -602,11 +602,17 @@ async function runDailyAlertJob(options?: {
 
           // PSC = what was actually BOUGHT — the most precise opportunity signal.
           // OR'd with NAICS/keywords in the cache fetcher (psc_code.like.X%).
+          // Prefer the user's MANUAL psc_codes, but fall back to the PSCs we
+          // already auto-derived from their NAICS (uniquePSCs, via the crosswalk
+          // above) when they haven't entered any. This was computed-then-discarded
+          // — so the PSC recall net only fired for users who hand-entered codes.
+          // Keyword-first means PSC should be invisible/auto: derive it, don't nag.
           const userPsc = (user.psc_codes || []).filter(Boolean);
+          const effectivePsc = userPsc.length > 0 ? userPsc : uniquePSCs;
 
           const cacheResult = await fetchSamOpportunitiesFromCache({
             naicsCodes: expandedNaics,
-            pscCodes: userPsc.length > 0 ? userPsc : undefined,
+            pscCodes: effectivePsc.length > 0 ? effectivePsc : undefined,
             keywords: userKeywords.length > 0 ? userKeywords : undefined,
             setAsides,
             states: userStates,

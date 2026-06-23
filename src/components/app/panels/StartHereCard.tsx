@@ -84,7 +84,12 @@ export default function StartHereCard({ email, onGo }: StartHereCardProps) {
 
     setSteps([
       { key: 'profile', label: 'Set up your profile', detail: 'Add your codes + keywords so Mindy knows what to watch.', done: hasNaics && hasKeywords, panel: 'settings' },
-      { key: 'psc', label: 'Add your PSC codes', detail: 'The product/service codes the government actually buys.', done: hasPsc, panel: 'settings' },
+      // PSC is auto-derived from NAICS (the daily-alerts matcher crosswalks
+      // NAICS→PSC), so this is DONE the moment the user has NAICS — adding PSC
+      // by hand is an optional precision tweak, not a required step. This stops
+      // the checklist contradicting the targeting card's "your codes already
+      // cover 96% — keywords catch the rest." (Eric, Jun 23 2026.)
+      { key: 'psc', label: 'PSC codes (auto-handled)', detail: 'Mindy derives these from your NAICS automatically. Add specific ones in Settings for extra precision (optional).', done: hasPsc || hasNaics, panel: 'settings' },
       { key: 'targets', label: 'Build your target list', detail: 'Pick the agencies + offices you want to pursue.', done: targetCount > 0, panel: 'target-list' },
       { key: 'pursuit', label: 'Save your first pursuit', detail: 'Track an opportunity you’re going after.', done: pipelineCount > 0, panel: 'pipeline' },
       { key: 'bid', label: 'Draft your first response', detail: 'Let Mindy help you write a proposal/LOI.', done: libraryCount > 0, panel: 'proposals' },
