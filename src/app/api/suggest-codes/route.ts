@@ -234,15 +234,50 @@ function suggestKeywordCandidates(input: string): string[] {
   return out.slice(0, 4);
 }
 
+// Broad sector terms whose specialty SUB-trades never surface under a literal
+// keyword match — an electrical/plumbing contractor's awards say "electrical" or
+// "plumbing", NOT "construction", so `keyword=construction` returns building +
+// heavy-civil + (legitimately) shipbuilding, but ZERO of the 238xxx specialty
+// trades. When a query hits a sector here we ALSO ground these sub-trade keywords
+// and merge, so e.g. "construction" surfaces 238210/238220/238160/238910… — still
+// award-backed (real USASpending $), not invented. (Eric, Jun 22 2026.)
+const SECTOR_EXPANSIONS: { match: RegExp; keywords: string[] }[] = [
+  {
+    match: /\b(construction|contractor|contracting|building|builder|renovation|remodel(?:ing)?)\b/i,
+    keywords: [
+      'electrical contractor', 'plumbing heating air conditioning', 'roofing',
+      'masonry', 'site preparation', 'concrete', 'painting', 'drywall',
+      'framing carpentry', 'glass glazing', 'flooring',
+    ],
+  },
+];
+
+/** Merge two grounded lists, dedupe by code (primary wins ordering), cap at limit. */
+function mergeDedupeCodes(primary: CodeSuggestion[], extra: CodeSuggestion[], limit: number): CodeSuggestion[] {
+  const seen = new Set<string>();
+  const out: CodeSuggestion[] = [];
+  for (const s of [...primary, ...extra]) {
+    if (!s.code || seen.has(s.code)) continue;
+    seen.add(s.code);
+    out.push(s);
+    if (out.length >= limit) break;
+  }
+  return out;
+}
+
 async function groundCodesFromUsaspending(keyword: string, maxResults: number): Promise<{ naicsSuggestions: CodeSuggestion[]; pscSuggestions: CodeSuggestion[] } | null> {
   const base = 'https://api.usaspending.gov/api/v2/search/spending_by_category';
-  const fetchCat = async (kw: string, cat: 'naics' | 'psc'): Promise<CodeSuggestion[]> => {
+  // kw can be a single phrase or an array (USASpending ORs the array) — the latter
+  // is how a sector's sub-trades are grounded in one call.
+  const fetchCat = async (kw: string | string[], cat: 'naics' | 'psc', limit: number): Promise<CodeSuggestion[]> => {
+    const kws = Array.isArray(kw) ? kw : [kw];
+    const label = Array.isArray(kw) ? 'related trades' : kw;
     try {
       const res = await fetch(`${base}/${cat}/`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          filters: { keywords: [kw], time_period: [fiscalYearTimePeriod()], award_type_codes: ['A', 'B', 'C', 'D'] },
-          limit: maxResults,
+          filters: { keywords: kws, time_period: [fiscalYearTimePeriod()], award_type_codes: ['A', 'B', 'C', 'D'] },
+          limit,
         }),
       });
       if (!res.ok) return [];
@@ -252,18 +287,35 @@ async function groundCodesFromUsaspending(keyword: string, maxResults: number): 
           code: r.code,
           name: r.name || r.code,
           confidence: 'high' as const,
-          reason: `$${(r.amount / 1e6).toFixed(1)}M in ${fiscalYearLabel()} federal awards under "${kw}"`,
+          reason: `$${(r.amount / 1e6).toFixed(1)}M in ${fiscalYearLabel()} federal awards under "${label}"`,
         }));
     } catch { return []; }
   };
   // Try candidates until one yields real award data (phrase resilience).
+  let primary: { naicsSuggestions: CodeSuggestion[]; pscSuggestions: CodeSuggestion[] } | null = null;
   for (const cand of suggestKeywordCandidates(keyword)) {
-    const [naicsSuggestions, pscSuggestions] = await Promise.all([fetchCat(cand, 'naics'), fetchCat(cand, 'psc')]);
+    const [naicsSuggestions, pscSuggestions] = await Promise.all([fetchCat(cand, 'naics', maxResults), fetchCat(cand, 'psc', maxResults)]);
     if (naicsSuggestions.length > 0 || pscSuggestions.length > 0) {
-      return { naicsSuggestions, pscSuggestions };
+      primary = { naicsSuggestions, pscSuggestions };
+      break;
     }
   }
-  return null;
+  if (!primary) return null;
+
+  // Sector expansion: surface specialty sub-trades a literal keyword can't reach
+  // (e.g. construction → the 238xxx family). Still award-grounded; merged in.
+  const sector = SECTOR_EXPANSIONS.find((s) => s.match.test(keyword));
+  if (sector) {
+    const [exN, exP] = await Promise.all([
+      fetchCat(sector.keywords, 'naics', 15),
+      fetchCat(sector.keywords, 'psc', 12),
+    ]);
+    return {
+      naicsSuggestions: mergeDedupeCodes(primary.naicsSuggestions, exN, Math.max(maxResults, 10)),
+      pscSuggestions: mergeDedupeCodes(primary.pscSuggestions, exP, Math.max(maxResults, 8)),
+    };
+  }
+  return primary;
 }
 
 export async function POST(request: NextRequest): Promise<NextResponse<SuggestCodesResponse>> {
