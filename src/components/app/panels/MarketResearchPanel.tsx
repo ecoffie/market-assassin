@@ -2299,10 +2299,10 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                 totalSpend={chartTotalSpending || buyerSummary?.totalSpending || 0}
               />
             )}
-            <TrendPlaceholderChart
-              totalSpend={chartTotalSpending || buyerSummary?.totalSpending || 0}
-              agencyCount={chartBuyers.length}
-            />
+            {/* "Market Total" trend tile removed (Eric, Jun 23) — it duplicated
+                the "Relevant spending" headline card and showed an empty $0 +
+                placeholder text while loading, reading as broken. Re-add a real
+                year-over-year line once USASpending's annual breakdown is wired. */}
             <div ref={primesRef}>
               <TopPrimesChart
                 primes={reportData?.primeContractor?.suggestedPrimes || []}
@@ -3185,25 +3185,6 @@ function SetAsideMixChart({
 // we don't carry USASpending FY-broken data in reportData yet. Shows
 // the total spend as a single anchor + explains what's missing so
 // reviewers know it's not a bug.
-function TrendPlaceholderChart({ totalSpend, agencyCount }: { totalSpend: number; agencyCount: number }) {
-  return (
-    <ChartShell
-      title="Market Total"
-      subtitle="Combined tracked spend in your NAICS profile"
-    >
-      <div className="h-full flex flex-col items-center justify-center text-center px-4">
-        <div className="text-3xl font-bold text-emerald-400 mb-1">{chartMoney(totalSpend)}</div>
-        <div className="text-xs text-slate-500 mb-3">across {agencyCount.toLocaleString()} {agencyCount === 1 ? 'agency' : 'agencies'}</div>
-        <p className="text-[11px] text-slate-500 italic max-w-sm">
-          Year-over-year trend line (FY 2022 → 2024 etc.) ships when
-          we wire USASpending&apos;s annual breakdown. Today this tile
-          shows the market&apos;s current total — a snapshot, not a delta.
-        </p>
-      </div>
-    </ChartShell>
-  );
-}
-
 // 4) Top Primes — horizontal bar list of suggested primes. We don't
 // have per-prime spending or win count, so the chart is rank-only:
 // the bar length is uniform (signals "these are the top 5"), and the
@@ -3413,16 +3394,24 @@ function TopPrimesChart({ primes, tier2 = [], tribal = [], email }: TopPrimesCha
     </div>
   );
 
+  // Only render the tiers that actually have candidates, and size the grid to
+  // that count — a fixed 3-col grid left an empty third column (cards looked
+  // "off") whenever Tier 1 primes were absent (Eric, Jun 23).
+  const tierCards = [
+    tierCard('🪶 Tribal / Native-owned', 'Sole-source eligible — fastest teaming path for small business.', tribalList),
+    tierCard('🥈 Tier 2 Subcontractors', 'Mid-size firms that sub on this work — realistic partners.', tier2List),
+    tierCard('🏢 Tier 1 Primes', 'The incumbents — sub under them or size up the competition.', tier1List),
+  ].filter(Boolean);
+  const colClass = tierCards.length >= 3 ? 'md:grid-cols-3' : tierCards.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-1';
+
   return (
     <div className="lg:col-span-2">
       <div className="mb-2">
         <h3 className="text-sm font-semibold text-white">Teaming Candidates</h3>
         <p className="text-[11px] text-slate-500">{subtitle}</p>
       </div>
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
-        {tierCard('🪶 Tribal / Native-owned', 'Sole-source eligible — fastest teaming path for small business.', tribalList)}
-        {tierCard('🥈 Tier 2 Subcontractors', 'Mid-size firms that sub on this work — realistic partners.', tier2List)}
-        {tierCard('🏢 Tier 1 Primes', 'The incumbents — sub under them or size up the competition.', tier1List)}
+      <div className={`grid grid-cols-1 ${colClass} gap-3`}>
+        {tierCards}
       </div>
       <div className="mt-2">{footer}</div>
     </div>
@@ -3541,9 +3530,15 @@ function FpdsLeaderboards({
 
   if (!useKeyword && !primaryNaics) return null;
 
+  // The leaderboards + Tracked total are scoped to a SINGLE code (the primary
+  // NAICS), nationwide — unlike "Relevant spending" up top, which spans the full
+  // code set and any state filter. Disclose that so $4.9B here doesn't read as
+  // contradicting $24.4B above (Eric, Jun 23).
+  const allNaicsCodes = (naicsCode || '').split(',').map((t) => t.trim()).filter(Boolean);
+  const multiCode = allNaicsCodes.length > 1;
   const subtitle = useKeyword
     ? (rankingLabel || `keyword "${keyword}"`)
-    : `NAICS ${primaryNaics}`;
+    : `NAICS ${primaryNaics}${multiCode ? ' (your primary code, nationwide)' : ' · nationwide'}`;
 
   return (
     <section className="space-y-3">
@@ -3558,7 +3553,7 @@ function FpdsLeaderboards({
         </div>
         {data?.total_obligation !== undefined && data.total_obligation > 0 && (
           <div className="text-right">
-            <div className="text-xs text-slate-500">Tracked total</div>
+            <div className="text-xs text-slate-500">Tracked total · {primaryNaics}{multiCode ? ' only' : ''}</div>
             <div className="text-sm font-bold text-emerald-400">{chartMoney(data.total_obligation)}</div>
           </div>
         )}
@@ -4613,6 +4608,25 @@ function AgencyTable({
         <p className="flex items-center gap-2 text-sm text-slate-400">
           <Loader2 className="w-4 h-4 animate-spin text-emerald-400" strokeWidth={2.5} />
           Loading agency data…
+        </p>
+      </section>
+    );
+  }
+
+  // A 0-results response (find-agencies found the NAICS valid but nothing matched
+  // the state/set-aside filters) comes back as an "error" string. That's NOT a
+  // failure — show it as a calm "broaden your filters" state, not an alarming red
+  // banner that contradicts the FPDS leaderboard above (Eric, Jun 23). A genuine
+  // server/validation error (with replacement code suggestions) still shows red.
+  const isEmptyResult = !!error && !naicsSuggestions.length && /no matching agencies|no agencies/i.test(error);
+  if (isEmptyResult) {
+    return (
+      <section className="rounded-xl border border-slate-800 bg-slate-900/40 p-5 text-sm text-slate-400">
+        <p className="text-slate-300 font-medium">No agencies matched these exact filters.</p>
+        <p className="mt-1 text-slate-500">
+          The leaderboards above show this market exists — your <strong>state</strong> or
+          <strong> set-aside</strong> filter is likely too narrow. Try clearing the state filter or
+          switching set-aside to “Small Business” / “Any”.
         </p>
       </section>
     );
