@@ -184,9 +184,17 @@ export async function GET(request: NextRequest) {
         VA: 'VIRGINIA', WA: 'WASHINGTON', WV: 'WEST VIRGINIA', WI: 'WISCONSIN', WY: 'WYOMING',
         DC: 'DISTRICT OF COLUMBIA',
       };
-      const s = state.trim().toUpperCase();
-      const term = s.length === 2 && STATE_NAMES[s] ? STATE_NAMES[s] : s;
-      query = query.ilike('pop_state', `%${term}%`);
+      // Accept a comma-separated list so a multi-state profile (e.g. "FL,GA,SC")
+      // scopes forecasts to ALL of them, not just the first — OR'd together.
+      const terms = state.split(',')
+        .map((x) => x.trim().toUpperCase())
+        .filter(Boolean)
+        .map((s) => (s.length === 2 && STATE_NAMES[s] ? STATE_NAMES[s] : s));
+      if (terms.length === 1) {
+        query = query.ilike('pop_state', `%${terms[0]}%`);
+      } else if (terms.length > 1) {
+        query = query.or(terms.map((t) => `pop_state.ilike.%${t}%`).join(','));
+      }
     }
 
     if (setAside) {
