@@ -9,10 +9,12 @@ import { sendEmail } from '@/lib/send-email';
  * it's a confirmation the registrant expects in direct response to signing up, so it
  * bypasses the daily cap and always delivers.
  *
- * Keeps the REAL access framing — first 150 registrants get the live Zoom (100
- * seats), the rest watch on YouTube — but the actual join LINK isn't confirmed yet,
- * so this is a save-the-date: it tells them their tier and drives the calendar add.
- * The join link goes out in a reminder email closer to the event.
+ * Standard event confirmation: everyone who registers gets the same "you're in +
+ * save the date" email. The actual join LINK isn't here — it goes out in a reminder
+ * email before the event — so this drives the calendar add and sets expectations.
+ *
+ * `getsZoom` is accepted for backward-compat with the caller but no longer changes
+ * the email (the Zoom/YouTube tier split was removed).
  *
  * Facts verified from govcongiants.com/mindy-launch.
  */
@@ -22,7 +24,6 @@ export async function sendMindyLaunchConfirmationEmail(params: {
   getsZoom?: boolean;
 }): Promise<boolean> {
   const firstName = (params.name || '').split(' ')[0] || 'there';
-  const getsZoom = params.getsZoom !== false; // default to the better experience if unknown
   const eventUrl = 'https://govcongiants.com/mindy-launch';
 
   // Google Calendar add-event link (June 27, 2026, 10:00 AM–4:00 PM EDT = 14:00–20:00 UTC)
@@ -33,22 +34,13 @@ export async function sendMindyLaunchConfirmationEmail(params: {
     '&details=' + encodeURIComponent(`Free full-day live working session: build your own federal market map with Mindy on real government data. Demo + hands-on workshops + lifetime recording + free Mindy account.\n\nWe'll email your join link before the event.\n\nDetails: ${eventUrl}`) +
     '&location=' + encodeURIComponent(eventUrl);
 
-  // Real access framing (first 150 → live Zoom / 100 seats; rest → YouTube), but the
-  // link itself isn't confirmed yet — so each tier says the link is coming, not here.
-  const accessBlock = getsZoom
-    ? `<table width="100%" cellpadding="0" cellspacing="0" style="background-color: #ecfdf5; border: 2px solid #a7f3d0; border-radius: 12px;">
+  // Universal access note — everyone gets the live link by email before the event.
+  // No tier; no join link in this confirmation (that goes out in the reminder).
+  const accessBlock = `<table width="100%" cellpadding="0" cellspacing="0" style="background-color: #eff6ff; border: 2px solid #bfdbfe; border-radius: 12px;">
         <tr>
           <td style="padding: 24px; text-align: center;">
-            <p style="color: #047857; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 8px;">&#10003; You got a live Zoom seat</p>
-            <p style="color: #1e293b; font-size: 16px; margin: 0; line-height: 1.6;">You&rsquo;re in the live room &mdash; one of the first 150 to register. You&rsquo;ll be able to ask questions and build alongside us. <strong>We&rsquo;ll email your Zoom link before we go live &mdash; add the date to your calendar now so you don&rsquo;t miss it.</strong></p>
-          </td>
-        </tr>
-      </table>`
-    : `<table width="100%" cellpadding="0" cellspacing="0" style="background-color: #eff6ff; border: 2px solid #bfdbfe; border-radius: 12px;">
-        <tr>
-          <td style="padding: 24px; text-align: center;">
-            <p style="color: #1d4ed8; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 8px;">You&rsquo;re on the YouTube stream</p>
-            <p style="color: #1e293b; font-size: 16px; margin: 0; line-height: 1.6;">The live Zoom room (first 150) is full, so you&rsquo;ll watch the full day on our YouTube live stream &mdash; still 100% free, and you keep the recording. <strong>We&rsquo;ll email your stream link before we go live &mdash; add the date to your calendar now so you don&rsquo;t miss it.</strong></p>
+            <p style="color: #1d4ed8; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 8px;">Your access link is coming</p>
+            <p style="color: #1e293b; font-size: 16px; margin: 0; line-height: 1.6;">You&rsquo;re registered for the live launch &mdash; 100% free, and you keep the recording. <strong>We&rsquo;ll email your live access link before we go on &mdash; add the date to your calendar now so you don&rsquo;t miss it.</strong></p>
           </td>
         </tr>
       </table>`;
@@ -105,7 +97,7 @@ export async function sendMindyLaunchConfirmationEmail(params: {
             </td>
           </tr>
 
-          <!-- Access Tier (Zoom vs YouTube — link coming) -->
+          <!-- Access note (link emailed before the event) -->
           <tr>
             <td style="padding: 24px 32px 0;">
               ${accessBlock}
@@ -236,9 +228,7 @@ export async function sendMindyLaunchConfirmationEmail(params: {
 </body>
 </html>`;
 
-  const subject = getsZoom
-    ? `${firstName}, your live Zoom seat is confirmed — Mindy Launch, Sat June 27`
-    : `${firstName}, you're registered — Mindy Launch, Sat June 27 (10 AM ET)`;
+  const subject = `${firstName}, you're registered — Mindy Launch, Sat June 27 (10 AM ET)`;
 
   return sendEmail({
     to: params.to,
@@ -248,6 +238,6 @@ export async function sendMindyLaunchConfirmationEmail(params: {
     emailType: 'mindy_launch_confirmation',
     eventSource: 'mindy_launch',
     transactional: true, // confirmation in direct response to signup — always deliver
-    tags: { stream: 'mindy_launch', tier: getsZoom ? 'zoom' : 'youtube' },
+    tags: { stream: 'mindy_launch' },
   });
 }
