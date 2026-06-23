@@ -18,6 +18,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { logToolError, recordToolSuccess, ToolNames, classifyError, AIProviders } from '@/lib/tool-errors';
 import { fiscalYearTimePeriod, fiscalYearLabel } from '@/lib/utils/fiscal-year';
+import { sectorSubTradeKeywords } from '@/lib/market/sector-expansions';
 
 // Groq API configuration
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -234,24 +235,6 @@ function suggestKeywordCandidates(input: string): string[] {
   return out.slice(0, 4);
 }
 
-// Broad sector terms whose specialty SUB-trades never surface under a literal
-// keyword match — an electrical/plumbing contractor's awards say "electrical" or
-// "plumbing", NOT "construction", so `keyword=construction` returns building +
-// heavy-civil + (legitimately) shipbuilding, but ZERO of the 238xxx specialty
-// trades. When a query hits a sector here we ALSO ground these sub-trade keywords
-// and merge, so e.g. "construction" surfaces 238210/238220/238160/238910… — still
-// award-backed (real USASpending $), not invented. (Eric, Jun 22 2026.)
-const SECTOR_EXPANSIONS: { match: RegExp; keywords: string[] }[] = [
-  {
-    match: /\b(construction|contractor|contracting|building|builder|renovation|remodel(?:ing)?)\b/i,
-    keywords: [
-      'electrical contractor', 'plumbing heating air conditioning', 'roofing',
-      'masonry', 'site preparation', 'concrete', 'painting', 'drywall',
-      'framing carpentry', 'glass glazing', 'flooring',
-    ],
-  },
-];
-
 /** Merge two grounded lists, dedupe by code (primary wins ordering), cap at limit. */
 function mergeDedupeCodes(primary: CodeSuggestion[], extra: CodeSuggestion[], limit: number): CodeSuggestion[] {
   const seen = new Set<string>();
@@ -304,11 +287,11 @@ async function groundCodesFromUsaspending(keyword: string, maxResults: number): 
 
   // Sector expansion: surface specialty sub-trades a literal keyword can't reach
   // (e.g. construction → the 238xxx family). Still award-grounded; merged in.
-  const sector = SECTOR_EXPANSIONS.find((s) => s.match.test(keyword));
-  if (sector) {
+  const sectorKeywords = sectorSubTradeKeywords(keyword);
+  if (sectorKeywords) {
     const [exN, exP] = await Promise.all([
-      fetchCat(sector.keywords, 'naics', 15),
-      fetchCat(sector.keywords, 'psc', 12),
+      fetchCat(sectorKeywords, 'naics', 15),
+      fetchCat(sectorKeywords, 'psc', 12),
     ]);
     return {
       naicsSuggestions: mergeDedupeCodes(primary.naicsSuggestions, exN, Math.max(maxResults, 10)),

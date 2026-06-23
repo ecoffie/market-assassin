@@ -54,6 +54,13 @@ const STATE_NAME_TO_CODE: Record<string, string> = {
 };
 const ALL_STATE_CODES = Object.values(STATE_NAME_TO_CODE).concat(['VI', 'GU']);
 
+// Multi-state regions a user names instead of a specific state — captured as a
+// LOCATION (place of performance) so "construction Caribbean" scopes alerts to the
+// region rather than leaking "caribbean" as a capability keyword. (Eric, Jun 23 2026.)
+const REGION_TO_STATES: Record<string, string[]> = {
+  caribbean: ['PR', 'VI'],
+};
+
 function detectStates(text: string): string[] {
   const found = new Set<string>();
   const lower = text.toLowerCase();
@@ -65,6 +72,9 @@ function detectStates(text: string): string[] {
   }
   for (const code of ALL_STATE_CODES) {
     if (new RegExp(`\\b${code}\\b`).test(text)) found.add(code);
+  }
+  for (const [region, codes] of Object.entries(REGION_TO_STATES)) {
+    if (new RegExp(`\\b${region}\\b`).test(lower)) codes.forEach((c) => found.add(c));
   }
   return Array.from(found);
 }

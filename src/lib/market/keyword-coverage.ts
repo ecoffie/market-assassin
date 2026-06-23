@@ -12,6 +12,7 @@
  * the smallest code set that covers ~90% of the spend (for eligibility filtering).
  */
 import { fiscalYearTimePeriod } from '@/lib/utils/fiscal-year';
+import { sectorSubTradeKeywords } from './sector-expansions';
 
 const BASE = 'https://api.usaspending.gov/api/v2/search/spending_by_category';
 
@@ -214,12 +215,14 @@ export async function keywordCoverage(keyword: string, coverageTarget = 0.9): Pr
   const raw = (keyword || '').trim();
   if (raw.length < 2) return null;
 
-  const fetchCat = async (kw: string, cat: 'naics' | 'psc') => {
+  // kw can be a single phrase OR an array (USASpending ORs the array) — the array
+  // form grounds a sector's specialty sub-trades in one call.
+  const fetchCat = async (kw: string | string[], cat: 'naics' | 'psc') => {
     try {
       const res = await fetch(`${BASE}/${cat}/`, {
         method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          filters: { keywords: [kw], time_period: [fiscalYearTimePeriod()], award_type_codes: ['A', 'B', 'C', 'D'] },
+          filters: { keywords: Array.isArray(kw) ? kw : [kw], time_period: [fiscalYearTimePeriod()], award_type_codes: ['A', 'B', 'C', 'D'] },
           category: cat, limit: 100,
         }),
       });
@@ -259,6 +262,25 @@ export async function keywordCoverage(keyword: string, coverageTarget = 0.9): Pr
       }
     }
     if (rows.length === 0) return null;
+
+    // Sector expansion (Eric, Jun 22 2026) — a literal keyword like "construction"
+    // can't reach the 238xxx specialty trades (their awards say "electrical" /
+    // "plumbing", not "construction"). When the term hits a broad sector, also
+    // ground its sub-trade keywords and merge the NAICS in, so the auto-derived
+    // coverage set includes the specialty trades. Still award-backed real $;
+    // deduped by code (keep the larger amount when a code appears in both passes).
+    const subTrades = sectorSubTradeKeywords(raw);
+    if (subTrades) {
+      const subRows = await fetchCat(subTrades, 'naics');
+      if (subRows.length) {
+        const byCode = new Map<string, { code: string; name?: string; amount: number }>();
+        for (const r of [...rows, ...subRows]) {
+          const ex = byCode.get(r.code);
+          if (!ex || (r.amount || 0) > (ex.amount || 0)) byCode.set(r.code, r);
+        }
+        rows = Array.from(byCode.values()).sort((a, b) => (b.amount || 0) - (a.amount || 0));
+      }
+    }
 
     const total = rows.reduce((s: number, r: { amount: number }) => s + r.amount, 0);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
