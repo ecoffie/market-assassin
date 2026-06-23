@@ -2,7 +2,7 @@
 # Test script for /api/suggest-codes endpoint
 # Tests both POST (AI suggestions) and GET (direct search)
 
-BASE_URL="https://tools.govcongiants.org"
+BASE_URL="https://getmindy.ai"
 PASSED=0
 FAILED=0
 
@@ -34,16 +34,19 @@ NAICS_COUNT=$(echo "$RESULT" | jq '.naicsSuggestions | length')
 PSC_COUNT=$(echo "$RESULT" | jq '.pscSuggestions | length')
 FIRST_NAICS=$(echo "$RESULT" | jq -r '.naicsSuggestions[0].code')
 FIRST_PSC=$(echo "$RESULT" | jq -r '.pscSuggestions[0].code')
-HAS_541512=$(echo "$RESULT" | jq '[.naicsSuggestions[].code] | contains(["541512"])')
-HAS_D310=$(echo "$RESULT" | jq '[.pscSuggestions[].code] | contains(["D310"])')
+# Suggestions are now GROUNDED in real USASpending award data (not LLM-guessed
+# reference codes), so we assert the grounding invariant + the IT-services NAICS
+# family (5415x) rather than pinning exact codes that shift with each FY's awards.
+SOURCE=$(echo "$RESULT" | jq -r '.source')
+HAS_5415=$(echo "$RESULT" | jq '[.naicsSuggestions[].code] | any(startswith("5415"))')
 
 test_result "Returns success=true" "$([ "$SUCCESS" = "true" ] && echo true || echo false)"
 test_result "Returns 5 NAICS suggestions" "$([ "$NAICS_COUNT" = "5" ] && echo true || echo false)"
 test_result "Returns 5 PSC suggestions" "$([ "$PSC_COUNT" = "5" ] && echo true || echo false)"
 test_result "NAICS codes are 6 digits" "$([ ${#FIRST_NAICS} = 6 ] && echo true || echo false)"
 test_result "PSC codes are 4 characters" "$([ ${#FIRST_PSC} = 4 ] && echo true || echo false)"
-test_result "IT Security → includes 541512 (Computer Systems Design)" "$HAS_541512"
-test_result "IT Security → includes D310 (Cyber Security)" "$HAS_D310"
+test_result "IT Security → grounded in USASpending (source=usaspending)" "$([ "$SOURCE" = "usaspending" ] && echo true || echo false)"
+test_result "IT Security → includes a 5415x IT-services NAICS" "$HAS_5415"
 
 echo ""
 echo "--- Test 2: POST with Construction description ---"
@@ -54,9 +57,15 @@ RESULT=$(curl -s -X POST "$BASE_URL/api/suggest-codes" \
 SUCCESS=$(echo "$RESULT" | jq -r '.success')
 HAS_236=$(echo "$RESULT" | jq '[.naicsSuggestions[].code] | any(startswith("236"))')
 HIGH_CONF=$(echo "$RESULT" | jq '[.naicsSuggestions[].confidence] | contains(["high"])')
+# Bug regression (Eric, Jun 22-23 2026): a literal "construction" keyword can't
+# reach the 238xxx specialty trades (their awards say "electrical"/"plumbing"),
+# so sector expansion must surface them. Without it, builders miss the bulk of
+# their real market (238210 Electrical alone is the single biggest code).
+HAS_238=$(echo "$RESULT" | jq '[.naicsSuggestions[].code] | any(startswith("238"))')
 
 test_result "Construction query returns success=true" "$([ "$SUCCESS" = "true" ] && echo true || echo false)"
 test_result "Construction → includes 236xxx codes" "$HAS_236"
+test_result "Construction → includes 238xxx specialty trades (sector expansion)" "$HAS_238"
 test_result "Has at least one high confidence suggestion" "$HIGH_CONF"
 
 echo ""

@@ -36,6 +36,33 @@ const STOPWORDS = new Set([
   'specialists', 'professional', 'professionals',
 ]);
 
+// Geography is a PLACE OF PERFORMANCE, not a capability — "construction Caribbean"
+// must not leak "caribbean" as a keyword (it'd match unrelated titles that merely
+// mention the region). Locations are captured separately as states/territories.
+// Covers single-word US state names, territories, regions, scope words, and common
+// continents/oceans. (Eric, Jun 23 2026 — "distinguish what they DO from WHERE.")
+const GEO_TERMS = new Set([
+  // US states (single-word) + territories
+  'alabama', 'alaska', 'arizona', 'arkansas', 'california', 'colorado',
+  'connecticut', 'delaware', 'florida', 'georgia', 'hawaii', 'idaho', 'illinois',
+  'indiana', 'iowa', 'kansas', 'kentucky', 'louisiana', 'maine', 'maryland',
+  'massachusetts', 'michigan', 'minnesota', 'mississippi', 'missouri', 'montana',
+  'nebraska', 'nevada', 'ohio', 'oklahoma', 'oregon', 'pennsylvania', 'tennessee',
+  'texas', 'utah', 'vermont', 'virginia', 'washington', 'wisconsin', 'wyoming',
+  'hampshire', 'jersey', 'mexico', 'york', 'carolina', 'dakota', 'island',
+  'guam', 'samoa', 'mariana', 'rico', 'puerto',
+  // Regions / scope / direction
+  'caribbean', 'nationwide', 'worldwide', 'domestic', 'overseas', 'international',
+  'national', 'regional', 'global', 'conus', 'oconus', 'continental',
+  'northeast', 'southeast', 'northwest', 'southwest', 'midwest',
+  // Continents / oceans
+  'africa', 'asia', 'europe', 'america', 'americas', 'pacific', 'atlantic',
+  // Common multi-word geographies (only matched when a phrase comes through whole)
+  'middle east', 'new york', 'new jersey', 'new mexico', 'puerto rico',
+  'north carolina', 'south carolina', 'north dakota', 'south dakota',
+  'rhode island', 'west virginia', 'new hampshire',
+]);
+
 // A "word" with no vowels or absurd consonant runs is keyboard mash (zxcvbnm,
 // asdfqwer), not a real industry term. Cheap heuristic to keep gibberish out.
 function looksLikeRealWord(w: string): boolean {
@@ -49,6 +76,7 @@ export function isSearchableKeyword(term: string): boolean {
   const t = (term || '').trim().toLowerCase();
   if (!t) return false;
   if (STOPWORDS.has(t)) return false;
+  if (GEO_TERMS.has(t)) return false;               // location, not a capability
   if (t.includes(' ')) return true;                 // multi-word phrase = specific
   if (SAFE_ABBREVIATIONS.has(t)) return true;       // known clean abbreviation
   const word = t.replace(/[^a-z0-9]/g, '');
