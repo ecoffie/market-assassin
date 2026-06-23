@@ -305,6 +305,9 @@ export default function AdminDashboard() {
   const adminTabs = [
     { href: '/admin/dashboard', label: 'Operations', icon: '📊' },
     { href: '/admin', label: 'Access Control', icon: '🔐' },
+    // Staff self-serve Pro/Team grants — uses the team /app login, not the
+    // admin password the other tabs share.
+    { href: '/admin/members', label: 'Members', icon: '👥' },
     { href: '/admin/purchases', label: 'Purchases', icon: '💳' },
     { href: '/admin/emails', label: 'Email History', icon: '📧' },
     { href: '/admin/feedback', label: 'Feedback', icon: '💬' },
