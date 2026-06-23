@@ -96,6 +96,9 @@ export interface GrantResult {
   welcomeEmailSent: boolean;
   message: string;
   error?: string;
+  /** Non-fatal note (e.g. profile-flag row couldn't be created because the user
+   *  hasn't signed up yet — KV still granted access). */
+  warning?: string;
 }
 
 export interface GrantLogEntry {
@@ -221,7 +224,7 @@ async function applyProfileFlags(
   supabase: any,
   email: string,
   updates: Record<string, boolean>,
-): Promise<{ error?: string }> {
+): Promise<{ error?: string; softSkip?: string }> {
   const { data: existing } = await supabase
     .from('user_profiles')
     .select('email')
@@ -238,10 +241,53 @@ async function applyProfileFlags(
 
   // No row yet. Only worth creating one if we're granting (any flag true).
   if (Object.values(updates).some(Boolean)) {
-    const { error } = await supabase.from('user_profiles').insert({ email, ...updates });
+    // user_profiles.user_id is NOT NULL (FK to auth.users). A user who hasn't
+    // signed up yet has no auth account, so we CANNOT create their row — that's
+    // expected, NOT an error: KV is the primary access gate, and the profile row
+    // gets created at signup. Inserting without user_id throws the constraint
+    // violation that surfaced as "access not working". So: resolve the auth id
+    // and only insert when it exists; otherwise soft-skip.
+    const userId = await resolveAuthUserId(supabase, email);
+    if (!userId) {
+      return { softSkip: 'user has not signed up yet — profile row deferred to signup (KV grants access now)' };
+    }
+    const { error } = await supabase.from('user_profiles').insert({ user_id: userId, email, ...updates });
     return { error: error?.message };
   }
   return {}; // nothing to revoke
+}
+
+/** Best-effort auth.users id lookup for an email (service-role only). Returns null
+ *  when the user has no auth account yet — the caller treats that as a soft skip. */
+async function resolveAuthUserId(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any,
+  email: string,
+): Promise<string | null> {
+  // 1) Fast path: a profiles row may already carry the user_id (covers the case
+  //    where a row exists but the select-by-email above missed on casing).
+  try {
+    const { data } = await supabase
+      .from('user_profiles')
+      .select('user_id')
+      .eq('email', email)
+      .not('user_id', 'is', null)
+      .maybeSingle();
+    if (data?.user_id) return data.user_id;
+  } catch { /* fall through */ }
+  // 2) Auth admin lookup (paginated). Most grant targets are recent, so a couple
+  //    of pages covers them; we stop as soon as we match.
+  try {
+    for (let page = 1; page <= 5; page++) {
+      const { data, error } = await supabase.auth.admin.listUsers({ page, perPage: 1000 });
+      if (error || !data?.users?.length) break;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const match = data.users.find((u: any) => (u.email || '').toLowerCase().trim() === email);
+      if (match?.id) return match.id;
+      if (data.users.length < 1000) break; // last page
+    }
+  } catch { /* no admin access / SDK shape mismatch — treat as not found */ }
+  return null;
 }
 
 async function recordGrant(entry: {
@@ -306,16 +352,23 @@ export async function applyMemberGrant(opts: {
       ? (granting ? { access_team: true, access_briefings: true } : { access_team: false })
       : { access_briefings: granting };
 
-  const { error: flagError } = await applyProfileFlags(supabase, email, updates);
+  // The profile-flag write is SECONDARY and best-effort. It can legitimately fail
+  // (or soft-skip) when the user hasn't signed up — user_profiles.user_id is NOT
+  // NULL, so there's no row to create yet. This must NEVER abort the grant: KV
+  // (step 2) is the PRIMARY access gate, and aborting here was exactly why the
+  // grant reported "access not working" while the user had paid (Eric, Jun 23).
+  const { error: flagError, softSkip } = await applyProfileFlags(supabase, email, updates);
+  let warning: string | undefined;
   if (flagError) {
-    const status = await getMemberStatus(email);
-    return {
-      success: false, email, tier: opts.tier, action: opts.action, status,
-      welcomeEmailSent: false, message: `Failed to update access: ${flagError}`, error: flagError,
-    };
+    warning = `profile flags not written (${flagError}) — KV still gates access`;
+    console.warn('[member-grants] profile flag write failed (non-fatal):', flagError);
+  } else if (softSkip) {
+    warning = softSkip;
   }
 
-  // 2) Sync the KV briefings gate (the fast Pro check) to match the flag.
+  // 2) KV briefings gate — the ACTUAL access check (what gates tools + what
+  //    /activate reads). Grant SUCCESS hinges on this, not the profile flag.
+  let kvError: string | null = null;
   try {
     if (opts.tier === 'pro') {
       if (granting) await grantBriefingsAccess(email);
@@ -325,7 +378,16 @@ export async function applyMemberGrant(opts: {
     }
     // Team revoke intentionally leaves the briefings KV alone (see updates above).
   } catch (err) {
-    console.error('[member-grants] KV briefings sync failed (non-fatal):', err);
+    kvError = err instanceof Error ? err.message : String(err);
+    console.error('[member-grants] KV briefings grant FAILED (fatal):', err);
+  }
+
+  if (kvError) {
+    const status = await getMemberStatus(email);
+    return {
+      success: false, email, tier: opts.tier, action: opts.action, status,
+      welcomeEmailSent: false, message: `Failed to grant access: ${kvError}`, error: kvError,
+    };
   }
 
   // 3) Team grant also provisions the shared workspace + seats.
@@ -368,8 +430,9 @@ export async function applyMemberGrant(opts: {
     action: opts.action,
     status,
     welcomeEmailSent,
+    warning,
     message: granting
-      ? `${tierLabel} access GRANTED to ${email}.${welcomeEmailSent ? ' Welcome email sent.' : ''} They'll see it on next sign-in / refresh.`
+      ? `${tierLabel} access GRANTED to ${email}.${welcomeEmailSent ? ' Welcome email sent.' : ''}${warning ? ` (${warning})` : ''} They'll see it on next sign-in / refresh.`
       : `${tierLabel} access REVOKED for ${email}. Takes effect on their next page load.`,
   };
 }
