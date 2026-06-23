@@ -1714,6 +1714,13 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       ? chartBuyers.reduce((sum, row) => sum + (row.spending || 0), 0)
       : sportKeywordActive ? 0 : (buyerSummary?.totalSpending || 0);
 
+  // #4 scope label: when a state filter is active, append it to the headline
+  // numbers so a state-scoped figure can never be mistaken for a national one
+  // (the human safety net — a "$116B (FL, GA)" label reads as obviously wrong).
+  const stateScopeLabel = (formData.locationStates && formData.locationStates.length > 0)
+    ? ` (${formData.locationStates.join(', ')})`
+    : '';
+
   // chartSatTotal — repurposed May 23, 2026 to represent SMALL
   // BUSINESS spend (not SAT-threshold spend). The donut's "satTotal"
   // parameter is now misnamed in its internal API but the math is
@@ -2266,8 +2273,8 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           {/* Headline stats — same 4 numbers as the reports view's
               MetricCards but with stronger visual hierarchy here. */}
           <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <MetricCard label="Agencies to review" value={(chartBuyers.length || buyerSummary?.totalAgencies || buyers.length).toLocaleString()} />
-            <MetricCard label="Relevant spending" value={formatCurrency(chartTotalSpending || buyerSummary?.totalSpending)} tone="green" hint={spendWindowLabel ? `Total federal contract obligations in this market, ${spendWindowLabel}` : undefined} />
+            <MetricCard label={`Agencies to review${stateScopeLabel}`} value={(chartBuyers.length || buyerSummary?.totalAgencies || buyers.length).toLocaleString()} />
+            <MetricCard label={`Relevant spending${stateScopeLabel}`} value={formatCurrency(chartTotalSpending || buyerSummary?.totalSpending)} tone="green" hint={spendWindowLabel ? `Total federal contract obligations in this market${stateScopeLabel ? ` in ${formData.locationStates.join(', ')}` : ''}, ${spendWindowLabel}` : undefined} />
             <MetricCard label="Competitors in your space" value={(primeSummary?.totalPrimes || vehicleSummary?.totalContracts || 0).toLocaleString()} hint="Incumbent primes already winning this work — who you'd compete against or could team with" />
             <MetricCard label="Upcoming opportunities" value={(forecastSummary?.totalForecasts || painSummary?.highOpportunityMatches || 0).toLocaleString()} tone="amber" hint="Forecasted procurements + agency needs coming 6–18 months out" />
           </section>
@@ -2381,8 +2388,8 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       {showResults && viewMode === 'reports' && reportData && (
         <>
           <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <MetricCard label="Agencies to review" value={(chartBuyers.length || buyerSummary?.totalAgencies || buyers.length).toLocaleString()} />
-            <MetricCard label="Relevant spending" value={formatCurrency(chartTotalSpending || buyerSummary?.totalSpending)} tone="green" hint={spendWindowLabel ? `Total federal contract obligations in this market, ${spendWindowLabel}` : undefined} />
+            <MetricCard label={`Agencies to review${stateScopeLabel}`} value={(chartBuyers.length || buyerSummary?.totalAgencies || buyers.length).toLocaleString()} />
+            <MetricCard label={`Relevant spending${stateScopeLabel}`} value={formatCurrency(chartTotalSpending || buyerSummary?.totalSpending)} tone="green" hint={spendWindowLabel ? `Total federal contract obligations in this market${stateScopeLabel ? ` in ${formData.locationStates.join(', ')}` : ''}, ${spendWindowLabel}` : undefined} />
             <MetricCard label="Competitors in your space" value={(primeSummary?.totalPrimes || vehicleSummary?.totalContracts || 0).toLocaleString()} hint="Incumbent primes already winning this work — who you'd compete against or could team with" />
             <MetricCard label="Upcoming opportunities" value={(forecastSummary?.totalForecasts || painSummary?.highOpportunityMatches || 0).toLocaleString()} tone="amber" hint="Forecasted procurements + agency needs coming 6–18 months out" />
           </section>
