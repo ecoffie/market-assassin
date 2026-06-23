@@ -1,6 +1,7 @@
 'use client';
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
+import MemberAccessSection from '@/components/admin/MemberAccessSection';
 
 type StatusTone = 'green' | 'blue' | 'amber' | 'purple' | 'red' | 'slate';
 
@@ -1295,6 +1296,10 @@ export default function LaunchCommandCenterPage() {
             </>
           )}
         </section>
+
+        {/* MEMBER ACCESS — grant / revoke Pro / Team without SQL or Stripe.
+            Authorized by the admin password the operator already entered. */}
+        <MemberAccessSection adminPassword={password} />
 
         {/* DEMAND HEATMAP — aggregated user-intent / collaboration signal (the "aha" feature) */}
         <section className="rounded-lg border border-cyan-500/30 bg-gradient-to-br from-cyan-900/20 to-slate-900 p-6">

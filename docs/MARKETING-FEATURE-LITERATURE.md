@@ -2594,3 +2594,28 @@ multi-model AI fallback.*
 Groq → Claude → OpenAI → Grok). Verified live locally: all three secondary routes
 returned HTTP 200 with real output (quote, 3-slide carousel, highlight graphic) in
 1–3s via Groq.
+
+---
+
+## Member Access — in Command Center (internal ops, not customer-facing)
+
+**What it does (plain English):** The team can grant or revoke Pro / Team access
+to any user straight from the Command Center (getmindy.ai/command-center → "Member
+Access" section) — no SQL, no Stripe, no shared password handoff. Look up an email,
+see their current tier, click Grant or Revoke. A manual grant behaves identically
+to a real purchase (access flags + KV gate + team workspace + optional welcome
+email) and every action is audited.
+
+**Why it matters:** Coaches, comp/testimonial accounts, partner advocates, and
+white-glove buyers all need manual access provisioning. This puts it where the team
+already works (Command Center) instead of a standalone page, and matches the
+dashboard's look so it isn't a bolt-on. The standalone /admin/members page still
+works as a password-free fallback for staff (staff-session auth).
+
+**SEO angle:** none — internal admin tooling.
+
+**Proof:** `MemberAccessSection` shared between Command Center
+(admin-password auth) and /admin/members (staff-session auth); members API accepts
+either auth path; grants mirror the Stripe webhook via `applyMemberGrant`
+(`src/lib/admin/member-grants.ts`); audited to `mi_admin_grants`. Typecheck + full
+`npm run build` pass.
