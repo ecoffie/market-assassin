@@ -16,7 +16,9 @@
  *   setup_emails_sent    — account-setup/welcome/reminder emails sent TODAY
  *
  * Idempotent: re-running the same day overwrites that day's rows (upsert).
- * ?date=YYYY-MM-DD backfills a specific day (defaults to today UTC).
+ * ?date=YYYY-MM-DD backfills a specific day. With no ?date, defaults to YESTERDAY
+ * (UTC) — the cron fires at 00:00 UTC, so "today" has no data yet; snapshotting the
+ * just-closed day captures a full day's alerts/engagement instead of zeros.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
@@ -48,7 +50,10 @@ export async function GET(request: NextRequest) {
   const supabase = sb();
   const url = new URL(request.url);
 
-  const today = url.searchParams.get('date') || new Date().toISOString().split('T')[0];
+  // No ?date → snapshot YESTERDAY (the just-closed UTC day). The cron fires at 00:00
+  // UTC; using new Date() here would summarize a day that has barely begun → all zeros.
+  const yesterday = new Date(Date.now() - 86400_000).toISOString().split('T')[0];
+  const today = url.searchParams.get('date') || yesterday;
   const dayStart = `${today}T00:00:00.000Z`;
   const dayEnd = `${today}T23:59:59.999Z`;
   const sevenDaysAgo = new Date(new Date(today).getTime() - 6 * 86400_000).toISOString().split('T')[0];

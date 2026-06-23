@@ -17,8 +17,9 @@
  * sends collapsed from ~919/day to 1/day and nobody noticed for 4
  * days. This cron closes that detection gap.
  *
- * Auth: x-vercel-cron header OR ?password=<ADMIN_PASSWORD> for
- * manual triggering.
+ * Auth: x-vercel-cron header, the cron dispatcher's
+ * `Authorization: Bearer <CRON_SECRET>`, OR ?password=<ADMIN_PASSWORD>
+ * for manual triggering.
  */
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -88,7 +89,12 @@ interface TypeReport {
 export async function GET(request: NextRequest) {
   const isVercelCron = request.headers.get('x-vercel-cron') === '1';
   const passwordOk = request.nextUrl.searchParams.get('password') === process.env.ADMIN_PASSWORD;
-  if (!isVercelCron && !passwordOk) {
+  // The cron dispatcher fires this route with a Bearer CRON_SECRET header
+  // (see /api/cron/dispatch). Without this it returned 401 every night and the
+  // throughput watchdog was blind — it never ran.
+  const hasCronSecret =
+    !!process.env.CRON_SECRET && request.headers.get('authorization') === `Bearer ${process.env.CRON_SECRET}`;
+  if (!isVercelCron && !passwordOk && !hasCronSecret) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
