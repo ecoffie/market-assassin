@@ -9,6 +9,39 @@ volunteer finds **nothing ~99% of the time**. So we PRE-STAGE and VERIFY, never 
 
 ---
 
+## Demo account & prototype tabs — UPDATED Jun 22, 2026
+
+**What changed (deploy `fe3de6ac`):**
+- **Prototype tabs are now allowlist-gated, not staff-gated.** *Vehicle Expiry Watch*,
+  *SMB Market Research*, and *Market Research Report* no longer show for ANY account by
+  default — including `@govcongiants.com` staff and demo accounts. To show them for a
+  demo, add the demo account's email to the **`MINDY_PROTOTYPE_EMAILS`** Vercel env var
+  (comma-separated) and redeploy. Unset = hidden everywhere. This is the only way to
+  surface those three tabs now.
+- **`getmindy.ai` is now a staff/company domain** (alongside `govcongiants.com` /
+  `govconedu.com`). Being staff no longer reveals the prototype tabs — that's the
+  `MINDY_PROTOTYPE_EMAILS` allowlist's job now.
+- **The default demo view is the clean Pro-member view** (no prototype clutter) — which
+  is what you want for a customer-facing demo.
+
+**Logging into a demo account (the `demo@govcongiants.com` inbox is NOT accessible):**
+- Magic-link / Google sign-in to `demo@govcongiants.com` won't work (no inbox access). Either:
+  - **Set a password via admin**, then sign in at `getmindy.ai/app` with email + password:
+    `POST /api/admin/set-mindy-password?password=<ADMIN_PASSWORD>` with body
+    `{"email":"<demo>","newPassword":"<8+ chars>"}` (account must already exist; 404 → create it first).
+  - **Or use a `getmindy.ai` demo address** whose inbox you CAN read (magic link / signup confirm).
+- `@getmindy.ai` and `@govcongiants.com` are auto-staff (no access grant needed). A demo
+  email on any other domain needs `/api/admin/grant-team-access` or `/api/admin/grant-ma-tier` first.
+
+**Seeding a demo persona** — `scripts/seed-demo-vault.ts` now takes the target email as an arg:
+```bash
+npx tsx scripts/seed-demo-vault.ts                  # demo@govcongiants.com (default)
+npx tsx scripts/seed-demo-vault.ts demo@getmindy.ai # seed a getmindy.ai demo account
+```
+Guarded against `eric@govcongiants.com` / `eric@getmindy.ai` so it never clobbers Eric's real account.
+
+---
+
 ## The tool: `scripts/demo-prep.ts`
 
 Builds (or refreshes) an account's capability vector with the **real production

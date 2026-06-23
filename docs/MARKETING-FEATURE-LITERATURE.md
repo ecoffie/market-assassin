@@ -2485,8 +2485,10 @@ stronger badges → more responding/upgrading → more trackers.
 
 **Proof:** `DashboardPanel.tsx` renders `<CollabHotCard>` inside the free-tier branch above the upgrade
 wall. `AlertsPanel.tsx` `markInterested()` writes `user_pipeline` (source: 'interest_signal', stage:
-tracking) via the auth-only (no tier gate) `/api/pipeline` POST, optimistic count bump, rollback on
-failure. Counted by the same `/api/app/opportunity-interest` + `/api/app/hot-opportunity` engines.
+tracking) via the auth-only (no tier gate) `/api/pipeline` POST, with an optimistic button flip (rolled
+back on failure). The "X others" count is NOT bumped optimistically — that metric excludes the requester,
+so it climbs on the next 15s poll from the server (the source of truth). Counted by the same
+`/api/app/opportunity-interest` + `/api/app/hot-opportunity` engines.
 
 ---
 
@@ -2507,6 +2509,27 @@ absent. Internal/demo only — not a user feature.
 `src/app/api/app/opportunity-interest/route.ts` (demo count merge before the response). Envs:
 COLLAB_DEMO_TITLE, COLLAB_DEMO_COUNT (default 7), COLLAB_DEMO_AGENCY, COLLAB_DEMO_NOTICE_ID,
 COLLAB_DEMO_DEADLINE.
+
+---
+
+## Prototype demo tabs — allowlist gating (June 22 2026, internal)
+
+**What:** The case-study prototype tabs — *Vehicle Expiry Watch* (DISA), *SMB Market Research*
+(Navy OSBP), *Market Research Report* (ACC-Orlando MRR) — are gated behind an explicit email
+allowlist, **`MINDY_PROTOTYPE_EMAILS`** (comma-separated), instead of the broad staff flag. Unset
+= the tabs are hidden for EVERY account, including `@govcongiants.com` / `@getmindy.ai` staff and
+demo accounts. Add an email to the env (and redeploy) only to surface those tabs for that account
+during a prototype demo.
+
+**Why:** Staff-domain gating meant every company/demo login saw the prototypes (clutter), and made
+it impossible to show the clean Pro-member view on a `@govcongiants.com` or `@getmindy.ai` account.
+Decoupling onto an allowlist keeps everyone on the customer view by default while still letting a
+specific demo account show a prototype on demand. Also recognizes `getmindy.ai` as a staff/company
+domain in `getStaffRole()`.
+
+**Proof:** `src/lib/api-auth.ts` (`getStaffRole` + `canSeePrototypeSurfaces`), `/api/access/check`
+(`canSeePrototypes`), `src/components/app/UnifiedSidebar.tsx` (`prototypeOnly` gated on
+`canSeePrototypes`). Env: `MINDY_PROTOTYPE_EMAILS`.
 
 ---
 
