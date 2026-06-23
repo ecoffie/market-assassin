@@ -109,7 +109,16 @@ export default function CoachPanel({
         const wsId = d?.client?.workspaceId;
         if (wsId) {
           setActiveWorkspace(wsId, email);
-          window.location.href = '/app';
+          // Setting up the client's market profile is the FIRST thing to do.
+          // The POST returns `seeded` (the extraction result when a capability
+          // statement was pasted). Only treat it as real if it actually produced
+          // codes — vague text can return an empty object. If real → land on the
+          // dashboard; otherwise send the coach straight to Settings to set up
+          // the profile instead of dropping them into an empty, nagging
+          // workspace. (Eric, Jun 23.)
+          const s = d?.seeded;
+          const reallySeeded = !!s && ((s.naics?.length ?? 0) > 0 || (s.keywords?.length ?? 0) > 0);
+          window.location.href = reallySeeded ? '/app' : '/app?panel=settings';
         }
       }
     } catch { /* */ }

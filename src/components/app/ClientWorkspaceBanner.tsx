@@ -77,9 +77,10 @@ export default function ClientWorkspaceBanner({
   };
 
   const prof = client.profile;
-  const profLine = prof && (prof.naicsCount > 0 || prof.keywordCount > 0)
-    ? `${prof.naicsCount} NAICS · ${prof.keywordCount} keywords${prof.states?.length ? ` · ${prof.states.join('/')}` : ''}`
-    : 'No profile seeded yet — paste capability text when adding the client';
+  const hasProfile = !!prof && (prof.naicsCount > 0 || prof.keywordCount > 0);
+  const profLine = hasProfile
+    ? `${prof!.naicsCount} NAICS · ${prof!.keywordCount} keywords${prof!.states?.length ? ` · ${prof!.states.join('/')}` : ''}`
+    : 'No profile yet';
 
   return (
     <div className="border-b border-emerald-500/30 bg-emerald-950/40 px-4 md:px-6 py-3">
@@ -87,11 +88,25 @@ export default function ClientWorkspaceBanner({
         <div className="min-w-0">
           <p className="text-xs uppercase tracking-wider text-emerald-400/80">Working as client</p>
           <p className="text-lg font-semibold text-white truncate">{client.businessName}</p>
-          <p className="text-xs text-slate-400 truncate">
-            {coachModeAllowed
-              ? profLine
-              : `Viewing ${client.workspaceId} — exit to return to your own workspace`}
-          </p>
+          {coachModeAllowed ? (
+            hasProfile ? (
+              <p className="text-xs text-slate-400 truncate">{profLine}</p>
+            ) : (
+              // First thing to do for a brand-new client: set up their market
+              // profile. Make it an action, not a dead-end hint. (Eric, Jun 23.)
+              <button
+                type="button"
+                onClick={() => onPanelChange('settings')}
+                className="mt-0.5 inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-2 py-0.5 text-xs font-medium text-amber-300 hover:bg-amber-500/25"
+              >
+                ⚠️ No profile yet — set up their codes &amp; keywords →
+              </button>
+            )
+          ) : (
+            <p className="text-xs text-slate-400 truncate">
+              Viewing {client.workspaceId} — exit to return to your own workspace
+            </p>
+          )}
         </div>
         <div className="flex flex-wrap items-center gap-2">
           {coachModeAllowed && (

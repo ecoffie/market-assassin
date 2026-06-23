@@ -20,6 +20,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
+import { getActiveWorkspace } from '../activeWorkspace';
 
 interface StartHereCardProps {
   email: string | null;
@@ -39,15 +40,21 @@ const DISMISS_KEY = 'mindy_start_here_dismissed';
 export default function StartHereCard({ email, onGo }: StartHereCardProps) {
   const [steps, setSteps] = useState<Step[] | null>(null);
   const [dismissed, setDismissed] = useState(false);
+  // Coach Mode: when operating inside a client workspace, the personal
+  // "first time, set up your profile" checklist doesn't apply — the coach set
+  // the client up when they created it, and a coach with clients isn't a
+  // first-timer. Hide the card entirely in client mode. (Eric, Jun 23.)
+  const [inClientMode, setInClientMode] = useState(false);
 
   useEffect(() => {
     if (typeof window !== 'undefined' && window.localStorage.getItem(DISMISS_KEY) === '1') {
       setDismissed(true);
     }
+    setInClientMode(!!getActiveWorkspace());
   }, []);
 
   const load = useCallback(async () => {
-    if (!email) return;
+    if (!email || inClientMode) return;
     const h = getMIApiHeaders(email);
     const e = encodeURIComponent(email);
     // Fetch all signals in parallel; any failure degrades that step to "not done"
@@ -84,7 +91,7 @@ export default function StartHereCard({ email, onGo }: StartHereCardProps) {
     ]);
   }, [email]);
 
-  useEffect(() => { load(); }, [load]);
+  useEffect(() => { if (!inClientMode) load(); }, [load, inClientMode]);
   // Re-check when the user returns to the dashboard after doing a step.
   useEffect(() => {
     const onFocus = () => load();
@@ -92,7 +99,8 @@ export default function StartHereCard({ email, onGo }: StartHereCardProps) {
     return () => window.removeEventListener('focus', onFocus);
   }, [load]);
 
-  if (dismissed || !steps) return null;
+  // Never show the first-timer checklist while operating a client workspace.
+  if (inClientMode || dismissed || !steps) return null;
   const doneCount = steps.filter((s) => s.done).length;
   // Auto-hide once everything is done — never nag an established user.
   if (doneCount === steps.length) return null;

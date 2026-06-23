@@ -2619,3 +2619,29 @@ works as a password-free fallback for staff (staff-session auth).
 either auth path; grants mirror the Stripe webhook via `applyMemberGrant`
 (`src/lib/admin/member-grants.ts`); audited to `mi_admin_grants`. Typecheck + full
 `npm run build` pass.
+
+---
+
+## Coach Mode — profile setup is the first step (UX fix)
+
+**What it does (plain English):** When a coach manages a client, two things now
+behave correctly: (1) the personal "First time? Start here" getting-started
+checklist no longer appears in client mode — a coach with clients isn't a
+first-timer, and the client was already set up when created; (2) setting up the
+client's market profile (NAICS + keywords) is now the FIRST thing you do. Adding a
+client without a capability statement drops you straight into Settings to set up
+their codes, and the client banner's "no profile yet" hint is a one-click button
+to that same editor instead of a dead-end message.
+
+**Why it matters:** Coaches were being nagged to "set up your profile" inside a
+client workspace with no obvious way to do it — the only path was redoing client
+creation. This makes profile setup the deliberate first step and reachable any
+time from the banner.
+
+**SEO angle:** *GovCon consultant tools, manage multiple clients, coach mode.*
+
+**Proof:** `StartHereCard` hides when `getActiveWorkspace()` is set (client mode);
+`ClientWorkspaceBanner` renders an actionable "set up their codes & keywords →"
+button → Settings when the client profile is empty; `CoachPanel.addClient` routes
+to `/app?panel=settings` unless the pasted capability statement actually produced
+NAICS/keywords (`seeded` with real codes). Typecheck + full build pass.
