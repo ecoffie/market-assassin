@@ -2695,3 +2695,29 @@ data: 1,082 members (23 Pro / 4 Team / 1,055 Free); a known comp account
 (advocate, no Stripe payment) correctly returns verdict=warn, requiresReason=true.
 Audit row extended with grant_source + note (idempotent column add). Typecheck +
 full build pass.
+
+---
+
+## Member Access — comp/advocate/partner auto-labels (verdict enhancement)
+
+**What it does (plain English):** When you look up a known non-customer account in
+Member Access — a comp/testimonial demo, an advocate (creator with complimentary
+Pro), or a partner contact — it now shows a clean violet "complimentary Pro" label
+and a green verdict instead of the scary "⚠️ no Stripe payment" warning. The grant
+source pre-fills to "comp" with the account's class as the note, so the operator
+doesn't have to classify a known account. Regular off-link accounts still get the
+warning + required source.
+
+**Why it matters:** These accounts intentionally have no Stripe payment (they're
+complimentary by design). Flagging them as "unverified" was noise; now the tool
+recognizes them and explains why no payment is expected. A refund still overrides
+to the block verdict — known status never hides a real problem.
+
+**SEO angle:** none — internal admin tooling.
+
+**Proof:** `classifySpecialAccount()` reads the existing comp/advocate/partner
+registries (campaign-exclusions, advocate-accounts, partner-referrals);
+`computeVerdict()` short-circuits to an ok-level label for them (unless refunded).
+Verified live: westover105 → "Advocate — Sue Kranes — complimentary Pro" (no
+reason required); aj@cypherintel.com → "Comp / testimonial"; a random email still
+warns + requires a source. Typecheck + full build pass.

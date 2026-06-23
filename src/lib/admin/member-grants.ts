@@ -17,6 +17,9 @@ import { createClient } from '@supabase/supabase-js';
 import type Stripe from 'stripe';
 import { grantBriefingsAccess, revokeBriefingsAccess } from '@/lib/briefings/access';
 import { provisionTeamWorkspace } from '@/lib/app/workspace';
+import { isAdvocateAccount, getAdvocateName } from '@/lib/mindy/advocate-accounts';
+import { COMP_TESTIMONIAL_EMAILS } from '@/lib/mindy/campaign-exclusions';
+import { isPartnerContactEmail } from '@/lib/mindy/partner-referrals';
 
 export type GrantTier = 'pro' | 'team';
 export type GrantAction = 'grant' | 'revoke';
@@ -51,6 +54,37 @@ export interface MemberVerdict {
   detail: string;
   /** True when there's no Stripe payment to point to → grant needs a reason. */
   requiresReason: boolean;
+}
+
+/**
+ * Known non-customer account class (comp/testimonial, advocate, partner). These
+ * intentionally have NO Stripe payment — complimentary Pro for marketing/creators/
+ * partners — so the verdict treats "no payment" as expected, not a red flag, and
+ * pre-fills the grant source. (Registries: campaign-exclusions, advocate-accounts,
+ * partner-referrals.)
+ */
+export interface SpecialAccount {
+  isSpecial: boolean;
+  kind: 'comp' | 'advocate' | 'partner' | null;
+  label: string | null;   // human label, e.g. "Advocate — Sue Kranes"
+  name: string | null;
+}
+
+/** Classify an email against the comp / advocate / partner registries. */
+export function classifySpecialAccount(email: string | null | undefined): SpecialAccount {
+  const normalized = (email || '').toLowerCase().trim();
+  if (!normalized) return { isSpecial: false, kind: null, label: null, name: null };
+  if (COMP_TESTIMONIAL_EMAILS.has(normalized)) {
+    return { isSpecial: true, kind: 'comp', label: 'Comp / testimonial', name: null };
+  }
+  if (isAdvocateAccount(normalized)) {
+    const name = getAdvocateName(normalized) || null;
+    return { isSpecial: true, kind: 'advocate', label: name ? `Advocate — ${name}` : 'Advocate', name };
+  }
+  if (isPartnerContactEmail(normalized)) {
+    return { isSpecial: true, kind: 'partner', label: 'Partner contact', name: null };
+  }
+  return { isSpecial: false, kind: null, label: null, name: null };
 }
 
 export interface GrantResult {
@@ -473,7 +507,22 @@ export async function getStripeVerification(email: string): Promise<StripeVerifi
  * reads BEFORE granting. The whole point of this tool is off-link purchases, so a
  * no-Stripe-payment result is a "needs a reason" warning, never a hard block.
  */
-export function computeVerdict(status: MemberStatus, stripe: StripeVerification): MemberVerdict {
+export function computeVerdict(
+  status: MemberStatus,
+  stripe: StripeVerification,
+  special?: SpecialAccount,
+): MemberVerdict {
+  // Known comp / advocate / partner → complimentary by design. A refund still
+  // matters (don't hide a real problem), but otherwise "no Stripe payment" is
+  // EXPECTED, not a warning. Clean label, no required reason (source pre-fills).
+  if (special?.isSpecial && !stripe.hasRefunds) {
+    return {
+      level: 'ok',
+      headline: `${special.label} — complimentary Pro`,
+      detail: 'Known non-customer account (no Stripe payment expected). Safe to grant; logged as comp.',
+      requiresReason: false,
+    };
+  }
   if (stripe.error) {
     return {
       level: 'info',

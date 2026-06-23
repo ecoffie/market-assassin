@@ -26,6 +26,7 @@ import {
   listMembers,
   getStripeVerification,
   computeVerdict,
+  classifySpecialAccount,
   type GrantTier,
   type GrantAction,
   type GrantSource,
@@ -101,12 +102,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'email is required' }, { status: 400 });
   }
   // Look up current access AND verify against Stripe → a verdict the operator
-  // reads before granting (the off-link-purchase use case).
+  // reads before granting (the off-link-purchase use case). Known comp/advocate/
+  // partner accounts get a clean label instead of a no-payment warning.
   const status = await getMemberStatus(email);
   const stripe = await getStripeVerification(email);
-  const verdict = computeVerdict(status, stripe);
+  const special = classifySpecialAccount(email);
+  const verdict = computeVerdict(status, stripe, special);
   return NextResponse.json(
-    { success: true, status, stripe, verdict },
+    { success: true, status, stripe, special, verdict },
     { headers: { 'Cache-Control': 'no-store' } },
   );
 }

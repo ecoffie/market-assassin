@@ -43,6 +43,12 @@ interface Verdict {
   detail: string;
   requiresReason: boolean;
 }
+interface SpecialAccount {
+  isSpecial: boolean;
+  kind: 'comp' | 'advocate' | 'partner' | null;
+  label: string | null;
+  name: string | null;
+}
 interface MemberRow {
   email: string;
   name: string | null;
@@ -100,6 +106,7 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
 
   const [status, setStatus] = useState<MemberStatus | null>(null);
   const [stripe, setStripe] = useState<StripeVerification | null>(null);
+  const [special, setSpecial] = useState<SpecialAccount | null>(null);
   const [verdict, setVerdict] = useState<Verdict | null>(null);
   const [lookupLoading, setLookupLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
@@ -161,13 +168,20 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
     if (override) setEmail(override);
     setLookupLoading(true);
     setMessage(null);
-    setStatus(null); setStripe(null); setVerdict(null);
+    setStatus(null); setStripe(null); setVerdict(null); setSpecial(null);
     setGrantSource(''); setNote('');
     try {
       const res = await fetch(withPassword(`/api/admin/members?email=${encodeURIComponent(target)}`), { headers: authHeaders() });
       const d = await res.json();
       if (res.ok && d.success) {
         setStatus(d.status); setStripe(d.stripe || null); setVerdict(d.verdict || null);
+        setSpecial(d.special || null);
+        // Known comp/advocate/partner → pre-fill the source as comp and note the
+        // class, so the operator doesn't have to classify a known account.
+        if (d.special?.isSpecial) {
+          setGrantSource('comp');
+          setNote(d.special.label || '');
+        }
       } else if (res.status === 401 || res.status === 403) {
         setMessage({ kind: 'err', text: d.error || 'Not authorized.' });
       } else {
@@ -311,7 +325,14 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
               <p className="text-sm font-medium text-slate-100">{status.email}</p>
               <p className="text-xs text-slate-500">{status.found ? 'Profile exists' : 'No profile yet — granting creates one'}</p>
             </div>
-            <span className={`rounded-full px-3 py-1 text-xs font-semibold ${tierBadge[status.tier].cls}`}>{tierBadge[status.tier].label}</span>
+            <div className="flex items-center gap-2">
+              {special?.isSpecial && (
+                <span className="rounded-full border border-violet-500/40 bg-violet-500/15 px-2.5 py-1 text-xs font-semibold text-violet-200" title="Complimentary Pro — excluded from campaigns + revenue metrics">
+                  {special.kind === 'advocate' ? '★ ' : special.kind === 'partner' ? '🤝 ' : '🎁 '}{special.label}
+                </span>
+              )}
+              <span className={`rounded-full px-3 py-1 text-xs font-semibold ${tierBadge[status.tier].cls}`}>{tierBadge[status.tier].label}</span>
+            </div>
           </div>
 
           {/* Stripe verification + verdict — the proof of purchase */}
