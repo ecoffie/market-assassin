@@ -251,10 +251,15 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
         setProfileDefaults(defaults);
         const profileNaics = defaults.naicsCodes.join(', ');
         const profileAgencies = defaults.agencies.join(', ');
+        // Pre-fill the State field from the saved profile (multi-state supported)
+        // so forecasts auto-scope to where the user works — and apply it to the
+        // initial search instead of computing it then dropping it (Eric, Jun 23).
+        const profileStates = defaults.states.join(', ');
         setNaicsFilter(profileNaics);
+        setStateFilter(profileStates);
         setUsingProfileDefaults(defaults.naicsCodes.length > 0 || defaults.agencies.length > 0);
         if (profileNaics || profileAgencies) {
-          handleSearchWithParams(profileNaics, profileAgencies, '');
+          handleSearchWithParams(profileNaics, profileAgencies, '', profileStates);
         }
       } catch (err) {
         console.error('Failed to load profile for forecasts:', err);
@@ -280,11 +285,13 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
   const useSavedProfile = () => {
     const profileNaics = profileDefaults?.naicsCodes.join(', ') || '';
     const profileAgencies = profileDefaults?.agencies.join(', ') || '';
+    const profileStates = profileDefaults?.states.join(', ') || '';
     setNaicsFilter(profileNaics);
     setAgencyFilter('');
     setSearchQuery('');
+    setStateFilter(profileStates);
     setUsingProfileDefaults(true);
-    handleSearchWithParams(profileNaics, profileAgencies, '');
+    handleSearchWithParams(profileNaics, profileAgencies, '', profileStates);
     track('tool_use', 'forecasts', {
       action: 'use_saved_profile',
       naics_count: profileDefaults?.naicsCodes.length || 0,
@@ -405,6 +412,12 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
                   {profileDefaults.agencies.length} target agencies
                 </span>
               )}
+              {profileDefaults.states.length > 0 && (
+                <span className="px-2 py-1 rounded bg-slate-800 text-slate-300">
+                  {profileDefaults.states.slice(0, 6).join(', ')}
+                  {profileDefaults.states.length > 6 ? ` +${profileDefaults.states.length - 6}` : ''}
+                </span>
+              )}
             </div>
           )}
         </div>
@@ -503,10 +516,9 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
             <input
               type="text"
               value={stateFilter}
-              onChange={(e) => setStateFilter(e.target.value.toUpperCase().slice(0, 2))}
+              onChange={(e) => setStateFilter(e.target.value.toUpperCase())}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
-              placeholder="FL"
-              maxLength={2}
+              placeholder="FL, GA"
               className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-amber-500 focus:outline-none uppercase"
             />
           </div>
