@@ -138,6 +138,7 @@ interface SectionDraft {
   targetWords: number;
   generatedAt: number;
   profileGrounded?: boolean;
+  vaultGrounded?: boolean;
 }
 
 interface ChecklistItemState {
@@ -869,6 +870,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           wordCount: data.wordCount,
           targetWords: data.targetWords,
           profileGrounded: data.meta?.profileGrounded,
+          vaultGrounded: data.meta?.vaultGrounded,
           generatedAt: Date.now(),
         },
       }));
@@ -928,6 +930,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             wordCount: section.wordCount,
             targetWords: section.targetWords,
             profileGrounded: section.meta?.profileGrounded,
+            vaultGrounded: section.meta?.vaultGrounded,
             generatedAt: Date.now(),
           };
         }
@@ -2804,7 +2807,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                         <span className={current.wordCount > meta.targetWords * 1.5 ? 'text-amber-400' : 'text-slate-400'}>
                           {current.wordCount} words written
                         </span>
-                        {current.profileGrounded === false && (
+                        {current.profileGrounded === false && current.vaultGrounded === false && (
                           <>
                             <span className="mx-2 text-slate-700">·</span>
                             <span className="text-amber-400">No profile saved — placeholders used</span>
