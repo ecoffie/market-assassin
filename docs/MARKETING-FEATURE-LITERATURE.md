@@ -2645,3 +2645,24 @@ time from the banner.
 button → Settings when the client profile is empty; `CoachPanel.addClient` routes
 to `/app?panel=settings` unless the pasted capability statement actually produced
 NAICS/keywords (`seeded` with real codes). Typecheck + full build pass.
+
+---
+
+## Coach Mode — name-only clients always get a profile row (guard)
+
+**What it does (plain English):** When a coach adds a client without pasting a
+capability statement (or the text produced no codes), Mindy now writes a minimal,
+empty profile row for that client immediately. The client always exists in the
+single source-of-truth table, so reads never come back blank-by-accident and the
+"set up their profile" flow has a real row to fill in. Alerts stay off until the
+coach actually adds codes, so nobody gets emailed an empty profile.
+
+**Why it matters:** Previously a name-only client had NO profile row at all — the
+client view looked broken, and (combined with a header bug) a save could even land
+on the coach's own account. This guard closes that gap at the source.
+
+**SEO angle:** none — internal reliability fix.
+
+**Proof:** `ensureClientProfileRow()` in `src/app/api/app/coach/route.ts` upserts an
+empty-targeting row (`alerts_enabled:false`, `ignoreDuplicates:true`) whenever
+`add_client` doesn't produce real NAICS/keywords. Typecheck + full build pass.

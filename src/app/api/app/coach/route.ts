@@ -75,6 +75,36 @@ async function seedClientProfile(
   return { naics, psc, keywords, states, setAsides, agencies: agenciesSeeded };
 }
 
+/**
+ * Guard for name-only clients: even with no capability text we write a minimal
+ * (empty-targeting) notification row so the client ALWAYS exists in
+ * user_notification_settings — the single source of truth alerts/feed/settings
+ * read. Without this row, a client-mode read silently has nothing to return and
+ * "set up profile" surfaces feel broken; worse, a write-path bug could fall back
+ * to the coach's own row. The row is empty (no NAICS/keywords) so no alerts fire
+ * until the coach fills it in, and onboarding/Start-Here still flags it as
+ * needing setup. (Eric, Jun 23 2026 — companion to the header-drop fix.)
+ */
+async function ensureClientProfileRow(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  supabase: any, workspaceId: string, businessName: string,
+): Promise<void> {
+  const clientEmail = `${workspaceId}@clients.getmindy.ai`;
+  await supabase.from('user_notification_settings').upsert({
+    user_email: clientEmail,
+    naics_codes: [],
+    psc_codes: [],
+    keywords: [],
+    location_states: [],
+    set_aside_certifications: [],
+    business_type: 'Small Business',
+    primary_industry: businessName,
+    alerts_enabled: false,        // nothing to alert on yet — don't email an empty profile
+    alert_frequency: 'weekly',
+    is_active: true,
+  }, { onConflict: 'user_email', ignoreDuplicates: true });
+}
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -304,6 +334,14 @@ export async function POST(request: NextRequest) {
     const capabilityText = String(body.capability_text || '').trim();
     if (capabilityText) {
       seeded = await seedClientProfile(supabase, workspaceId, businessName, capabilityText);
+    }
+
+    // GUARD: a name-only client (no capability text) — or one whose text yielded
+    // no codes — must still get a profile row so it exists in the source-of-truth
+    // table. The client UI routes the coach to Settings to fill it in.
+    const reallySeeded = !!seeded && (seeded.naics.length > 0 || seeded.keywords.length > 0);
+    if (!reallySeeded) {
+      await ensureClientProfileRow(supabase, workspaceId, businessName);
     }
 
     return NextResponse.json({ success: true, client: { id: data.id, workspaceId, businessName }, seeded });
