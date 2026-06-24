@@ -63,6 +63,29 @@ export async function GET(request: NextRequest) {
       .order('started_at', { ascending: false })
       .limit(10);
 
+    // PSC vs NAICS coverage on ACTIVE rows — decides whether PSC can be a
+    // first-class match anchor (clean S208 = pest control) or must stay a booster.
+    const activeNotNull = (col: string) =>
+      supabase
+        .from('sam_opportunities')
+        .select('*', { count: 'exact', head: true })
+        .eq('active', true)
+        .not(col, 'is', null)
+        .neq(col, '');
+    const [{ count: pscPresent }, { count: naicsPresent }] = await Promise.all([
+      activeNotNull('psc_code'),
+      activeNotNull('naics_code'),
+    ]);
+    const activeBase = activeRecords || 0;
+    const pct = (n: number | null) => (activeBase > 0 ? Math.round(((n || 0) / activeBase) * 1000) / 10 : 0);
+    const coverage = {
+      activeRecords: activeBase,
+      pscPresent: pscPresent || 0,
+      pscCoveragePct: pct(pscPresent),
+      naicsPresent: naicsPresent || 0,
+      naicsCoveragePct: pct(naicsPresent),
+    };
+
     // Get recent health checks
     const { data: healthChecks } = await supabase
       .from('sam_sync_health')
@@ -98,6 +121,7 @@ export async function GET(request: NextRequest) {
         newestSyncedAt: newestRecord?.synced_at,
         cacheAgeHours: cacheAgeHours ? Math.round(cacheAgeHours * 100) / 100 : null,
       },
+      coverage,
       health: {
         score: healthScore,
         status: healthStatus,
