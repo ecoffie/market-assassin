@@ -6,6 +6,7 @@ import type { AppPanel, AppTier } from '../UnifiedSidebar';
 // Lazy load panels for better performance
 const MindyChatPanel = lazy(() => import('./MindyChatPanel'));
 const DashboardPanel = lazy(() => import('./DashboardPanel'));
+const MarketDossierPanel = lazy(() => import('./MarketDossierPanel'));
 const AlertsPanel = lazy(() => import('./AlertsPanel'));
 const MarketResearchPanel = lazy(() => import('./MarketResearchPanel'));
 const ForecastsPanel = lazy(() => import('./ForecastsPanel'));
@@ -58,6 +59,8 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
         return <MindyChatPanel email={email} tier={tier} onPanelChange={onPanelChange} />;
       case 'dashboard':
         return <DashboardPanel email={email} tier={tier} onPanelChange={onPanelChange} />;
+      case 'my-market':
+        return <MarketDossierPanel email={email} onNavigate={onPanelChange} />;
       case 'alerts':
         return <AlertsPanel email={email} tier={tier} onPanelChange={onPanelChange} />;
       case 'research':
