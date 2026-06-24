@@ -38,6 +38,19 @@ interface DossierOpp {
   incumbent?: string | null;     // recompete only
 }
 
+/** Tidy a recompete title: strip a trailing NAICS code (", 5613"), title-case an
+ *  all-caps description, cap length. Avoids "COMPUTER SYSTEMS DESIGN SERVICES, 5613". */
+function cleanTitle(s: string): string {
+  let t = (s || '').replace(/,?\s*\d{4,6}\s*$/, '').trim();
+  if (!t) return 'Recompete opportunity';
+  if (t === t.toUpperCase()) t = t.toLowerCase().replace(/\b\w/g, (c) => c.toUpperCase());
+  return t.slice(0, 90);
+}
+
+// Mega-IDV ceilings + round-number placeholders ($50B etc.) aren't pursuits for a
+// small business — they dwarf real opportunities and read as fake. Cap the dossier.
+const MAX_REALISTIC_VALUE = 5_000_000_000; // $5B
+
 export async function GET(request: NextRequest) {
   const email = request.nextUrl.searchParams.get('email')?.toLowerCase().trim();
   if (!email) return NextResponse.json({ success: false, error: 'email is required' }, { status: 400 });
@@ -78,8 +91,9 @@ export async function GET(request: NextRequest) {
           .gt('period_of_performance_current_end', today)
           .lte('period_of_performance_current_end', max18.toISOString().split('T')[0])
           .is('quality_flag', null)
+          .lt('potential_total_value', MAX_REALISTIC_VALUE)   // drop mega-IDV ceilings / placeholders
           .or(recompeteOr)
-          .order('potential_total_value', { ascending: false })
+          .order('period_of_performance_current_end', { ascending: true })  // soonest to expire first
           .limit(18)
       : Promise.resolve({ data: [] as unknown[] }),
   ]);
@@ -112,7 +126,7 @@ export async function GET(request: NextRequest) {
     recompeteOpps.push({
       id: String(r.contract_id || ''),
       kind: 'recompete',
-      title: String(r.naics_description || r.description || 'Recompete').slice(0, 90),
+      title: cleanTitle(String(r.naics_description || r.description || '')),
       agency: String(r.awarding_agency || ''),
       naics: String(r.naics_code || ''),
       value: num(r.potential_total_value),
@@ -127,12 +141,11 @@ export async function GET(request: NextRequest) {
 
   opps.push(...recompeteOpps);
 
-  // 3) Order: open opps first (biddable NOW) by soonest deadline, then recompetes
-  //    by biggest value. (Competition/offers signal deferred — data isn't reliable.)
+  // 3) Order: open opps first (biddable NOW), then recompetes — both by soonest
+  //    deadline/expiry (most actionable first; avoids surfacing giant placeholders).
   opps.sort((a, b) => {
     if (a.kind !== b.kind) return a.kind === 'open' ? -1 : 1;
-    if (a.kind === 'open') return (a.deadline || '9999').localeCompare(b.deadline || '9999');
-    return b.value - a.value;
+    return (a.deadline || '9999').localeCompare(b.deadline || '9999');
   });
 
   return NextResponse.json(
