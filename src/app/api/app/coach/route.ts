@@ -32,7 +32,7 @@ import {
  */
 async function seedClientProfile(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any, workspaceId: string, businessName: string, text: string,
+  supabase: any, workspaceId: string, businessName: string, text: string, primaryEmail?: string | null,
 ): Promise<{ naics: string[]; psc: string[]; keywords: string[]; states: string[]; setAsides: string[]; agencies: number }> {
   const p = await buildProfileFromText(text);
   const naics = p?.naics || [];
@@ -42,8 +42,13 @@ async function seedClientProfile(
   const setAsides = p?.setAsides || [];
 
   const clientEmail = `${workspaceId}@clients.getmindy.ai`;
+  // Route alerts to the client's REAL inbox when the coach provided one — the
+  // synthetic user_email has no MX and is guarded out of sendEmail(), so without
+  // this the client gets nothing. Falls back to null (no send) when absent.
+  const recipient = recipientFromPrimary(primaryEmail);
   await supabase.from('user_notification_settings').upsert({
     user_email: clientEmail,
+    alert_recipient_email: recipient,
     naics_codes: naics,
     psc_codes: psc,
     keywords,
@@ -87,11 +92,12 @@ async function seedClientProfile(
  */
 async function ensureClientProfileRow(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any, workspaceId: string, businessName: string,
+  supabase: any, workspaceId: string, businessName: string, primaryEmail?: string | null,
 ): Promise<void> {
   const clientEmail = `${workspaceId}@clients.getmindy.ai`;
   await supabase.from('user_notification_settings').upsert({
     user_email: clientEmail,
+    alert_recipient_email: recipientFromPrimary(primaryEmail),  // stored now; alerts fire once codes are added
     naics_codes: [],
     psc_codes: [],
     keywords: [],
@@ -103,6 +109,14 @@ async function ensureClientProfileRow(
     alert_frequency: 'weekly',
     is_active: true,
   }, { onConflict: 'user_email', ignoreDuplicates: true });
+}
+
+/** A coach-supplied client email → a deliverable recipient, or null. Rejects blanks
+ *  and the synthetic namespace so we never echo an undeliverable address back. */
+function recipientFromPrimary(primaryEmail?: string | null): string | null {
+  const e = (primaryEmail || '').trim().toLowerCase();
+  if (!e || !e.includes('@') || e.endsWith('@clients.getmindy.ai')) return null;
+  return e;
 }
 
 export const runtime = 'nodejs';
@@ -333,7 +347,7 @@ export async function POST(request: NextRequest) {
     let seeded: Awaited<ReturnType<typeof seedClientProfile>> | null = null;
     const capabilityText = String(body.capability_text || '').trim();
     if (capabilityText) {
-      seeded = await seedClientProfile(supabase, workspaceId, businessName, capabilityText);
+      seeded = await seedClientProfile(supabase, workspaceId, businessName, capabilityText, body.primary_email);
     }
 
     // GUARD: a name-only client (no capability text) — or one whose text yielded
@@ -341,7 +355,7 @@ export async function POST(request: NextRequest) {
     // table. The client UI routes the coach to Settings to fill it in.
     const reallySeeded = !!seeded && (seeded.naics.length > 0 || seeded.keywords.length > 0);
     if (!reallySeeded) {
-      await ensureClientProfileRow(supabase, workspaceId, businessName);
+      await ensureClientProfileRow(supabase, workspaceId, businessName, body.primary_email);
     }
 
     return NextResponse.json({ success: true, client: { id: data.id, workspaceId, businessName }, seeded });
