@@ -68,14 +68,15 @@ function forecastTile(codes: string[]): { count: number; value: number } {
   return { count: stats.totalForecasts, value: stats.totalValue };
 }
 
-/** Recompete count, total ceiling $, and distinct-incumbent (competitor) count for
- *  the NAICS set — our proprietary recompete table joined to USASpending awards. */
+/** Recompete count + total ceiling $ for the NAICS set, plus how much of that
+ *  expiring work is SMALL-BUSINESS SET-ASIDE (the "can I actually win it?" signal
+ *  contractors care about — not competitor counts). Our proprietary recompete
+ *  table joined to USASpending awards. */
 async function recompeteTile(
   codes: string[],
-): Promise<{ count: number; value: number; competitors: number }> {
-  if (!supabaseUrl || !supabaseKey || codes.length === 0) {
-    return { count: 0, value: 0, competitors: 0 };
-  }
+): Promise<{ count: number; value: number; setAsideCount: number; setAsideValue: number }> {
+  const empty = { count: 0, value: 0, setAsideCount: 0, setAsideValue: 0 };
+  if (!supabaseUrl || !supabaseKey || codes.length === 0) return empty;
   try {
     const supabase = createClient(supabaseUrl, supabaseKey);
     const today = new Date().toISOString().split('T')[0];
@@ -88,7 +89,7 @@ async function recompeteTile(
       .join(',');
     const { data, count, error } = await supabase
       .from('recompete_opportunities')
-      .select('potential_total_value, incumbent_name', { count: 'exact' })
+      .select('potential_total_value, set_aside_type', { count: 'exact' })
       .gt('period_of_performance_current_end', today)
       .lte('period_of_performance_current_end', maxDate.toISOString().split('T')[0])
       .is('quality_flag', null)
@@ -96,17 +97,27 @@ async function recompeteTile(
       .limit(3000);
     if (error) {
       console.warn('[market-overview] recompete query failed:', error.message);
-      return { count: 0, value: 0, competitors: 0 };
+      return empty;
     }
     const rows = data || [];
-    const value = rows.reduce((s, r) => s + num((r as Record<string, unknown>).potential_total_value), 0);
-    const incumbents = new Set(
-      rows.map((r) => String((r as Record<string, unknown>).incumbent_name || '').trim().toUpperCase()).filter(Boolean),
-    );
-    return { count: count ?? rows.length, value, competitors: incumbents.size };
+    let value = 0;
+    let setAsideCount = 0;
+    let setAsideValue = 0;
+    // A non-empty set_aside_type that isn't full-and-open = reserved for small
+    // business (Total SB, 8(a), WOSB, SDVOSB, HUBZone, VOSB…).
+    const isSetAside = (s: string) => !!s && !/full and open|none|no set aside/i.test(s);
+    for (const r of rows) {
+      const v = num((r as Record<string, unknown>).potential_total_value);
+      value += v;
+      if (isSetAside(String((r as Record<string, unknown>).set_aside_type || '').trim())) {
+        setAsideCount++;
+        setAsideValue += v;
+      }
+    }
+    return { count: count ?? rows.length, value, setAsideCount, setAsideValue };
   } catch (err) {
     console.warn('[market-overview] recompete tile threw:', err);
-    return { count: 0, value: 0, competitors: 0 };
+    return empty;
   }
 }
 
@@ -176,8 +187,8 @@ export async function GET(request: NextRequest) {
   const tiles: Tile[] = [
     { key: 'forecasts', label: 'Forecasted buys', icon: '📋', count: forecasts.count, value: forecasts.value, locked: !isPaid, detailPanel: 'forecasts' },
     { key: 'recompetes', label: 'Recompetes expiring (18 mo)', icon: '🔁', count: recompete.count, value: recompete.value, locked: !isPaid, detailPanel: 'recompetes' },
+    { key: 'setasides', label: 'Reserved for small business', icon: '🎯', count: recompete.setAsideCount, value: recompete.setAsideValue, locked: !isPaid, detailPanel: 'recompetes', note: 'set-aside' },
     { key: 'grants', label: 'Grant opportunities', icon: '💰', count: grants.count, value: grants.value, locked: !isPaid, detailPanel: 'grants', note: 'award ceiling' },
-    { key: 'competitors', label: 'Incumbents to beat or team with', icon: '🏢', count: recompete.competitors, value: 0, locked: !isPaid, detailPanel: 'contractors' },
   ];
 
   return NextResponse.json(
