@@ -309,6 +309,7 @@ export default function AdminDashboard() {
     // admin password the other tabs share.
     { href: '/admin/members', label: 'Members', icon: '👥' },
     { href: '/admin/purchases', label: 'Purchases', icon: '💳' },
+    { href: '/admin/data-inventory', label: 'Mindy Data Core', icon: '🧠' },
     { href: '/admin/emails', label: 'Email History', icon: '📧' },
     { href: '/admin/feedback', label: 'Feedback', icon: '💬' },
   ];
