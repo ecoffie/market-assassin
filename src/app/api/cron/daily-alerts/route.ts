@@ -1347,6 +1347,28 @@ async function sendDailyAlertEmail(
 
   const moreCount = opportunities.length > 20 ? opportunities.length - 20 : 0;
 
+  // "Your full market" breadth banner — mirrors the in-app My Market dossier
+  // ("you're seeing 5 of 40"). Uses ONLY data already in this send loop
+  // (allActiveOpportunities = the user's full open-market match count from the
+  // same cache the dossier reads) — NO new per-user query in the hot path.
+  // Tier-safe destination: /market-intelligence does access verification —
+  // FREE recipients see the upsell/checkout, existing/Pro auto-redirect to their
+  // dashboard — so the same email works for the mixed free+Pro alert audience
+  // (My Market itself is OAuth-gated /app, unreachable from a free email).
+  // Recompetes mentioned without a count (true, no query needed).
+  const shownCount = Math.min(opportunities.length, 20);
+  const fullMarketOpen = Math.max(allActiveOpportunities.length, opportunities.length);
+  const moreInMarket = Math.max(0, fullMarketOpen - shownCount);
+  const myMarketBannerHtml = (moreInMarket > 0 && shownCount > 0) ? `
+  <div style="margin: 16px 0; background: linear-gradient(135deg, #064e3b 0%, #065f46 100%); border-radius: 12px; padding: 18px 20px; text-align: center;">
+    <p style="color: #6ee7b7; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 6px 0;">Your Market</p>
+    <p style="color: #ffffff; font-size: 15px; margin: 0 0 12px 0; line-height: 1.5;">
+      You're seeing <strong>${shownCount}</strong> of <strong>${fullMarketOpen}</strong> open opportunities matched to your profile — <strong style="color:#6ee7b7;">${moreInMarket} more</strong> plus expiring recompetes are assembled in My Market.
+    </p>
+    <a href="${trackedUrl(`${MINDY_SITE_URL}/market-intelligence`, 'my_market', 'my_market_banner')}" style="background:#10b981;color:#04241b;padding:10px 20px;border-radius:999px;font-weight:700;font-size:13px;text-decoration:none;display:inline-block;">See your full market →</a>
+  </div>
+  ` : '';
+
   // Mindy Insight — pick the dominant notice-type bucket from this
   // user's batch, fetch one teaching quote for that bucket. The helper
   // is process-cached, so 500 users across 5 buckets in one cron run
@@ -1489,6 +1511,8 @@ async function sendDailyAlertEmail(
     </div>
   </div>
   `}
+
+  ${myMarketBannerHtml}
 
   ${hiddenMatchHtml}
 
