@@ -8,7 +8,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import {
-  PieChart, Pie, Cell, ResponsiveContainer, Tooltip, Legend,
+  PieChart, Pie, Cell, ResponsiveContainer, Tooltip,
 } from 'recharts';
 
 type Provenance = 'exclusive' | 'curated' | 'cache' | 'passthrough';
@@ -150,26 +150,26 @@ export default function DataInventoryPage() {
         {/* Pies */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
           <ChartCard title="By dataset">
-            <ResponsiveContainer width="100%" height={320}>
+            <ResponsiveContainer width="100%" height={240}>
               <PieChart>
-                <Pie data={datasetPie} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={110}>
+                <Pie data={datasetPie} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={95}>
                   {datasetPie.map((d, i) => <Cell key={i} fill={d.color} />)}
                 </Pie>
                 <Tooltip formatter={(value) => fmt(Number(value))} contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8 }} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
               </PieChart>
             </ResponsiveContainer>
+            <ChartLegend items={datasetPie} />
           </ChartCard>
           <ChartCard title="By provenance (the moat story)">
-            <ResponsiveContainer width="100%" height={320}>
+            <ResponsiveContainer width="100%" height={240}>
               <PieChart>
-                <Pie data={provenancePie} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={110}>
+                <Pie data={provenancePie} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={48} outerRadius={95}>
                   {provenancePie.map((d, i) => <Cell key={i} fill={d.color} />)}
                 </Pie>
                 <Tooltip formatter={(value) => fmt(Number(value))} contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8 }} />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
               </PieChart>
             </ResponsiveContainer>
+            <ChartLegend items={provenancePie} />
           </ChartCard>
         </div>
 
@@ -231,6 +231,20 @@ function BuildStat({ value, label, title }: { value: string; label: string; titl
     <div className="text-center" title={title}>
       <div className="text-3xl font-bold text-emerald-300">{value}</div>
       <div className="text-[11px] uppercase tracking-wider text-slate-400 mt-1">{label}</div>
+    </div>
+  );
+}
+
+function ChartLegend({ items }: { items: { name: string; value: number; color: string }[] }) {
+  return (
+    <div className="mt-2 grid grid-cols-2 gap-x-4 gap-y-1">
+      {items.map((it) => (
+        <div key={it.name} className="flex items-center gap-2 text-xs min-w-0">
+          <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: it.color }} />
+          <span className="truncate text-slate-300">{it.name}</span>
+          <span className="ml-auto shrink-0 font-mono text-slate-400">{it.value.toLocaleString()}</span>
+        </div>
+      ))}
     </div>
   );
 }
