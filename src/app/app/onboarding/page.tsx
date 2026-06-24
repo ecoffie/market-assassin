@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import SampleOpportunitiesPicker from '@/components/briefings/SampleOpportunitiesPicker';
+import MarketDataMap from '@/components/app/market/MarketDataMap';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import { getSupabase } from '@/lib/supabase/client';
 import { useAppTracker } from '@/components/app/track';
@@ -977,6 +978,18 @@ export default function OnboardingPage() {
                     ) : null}
                     {' '}— so your alerts catch opportunities the single-code crowd misses.
                   </p>
+                </div>
+              )}
+              {/* Market Data Map (#4) — the conversion teaser: what's IN your
+                  market right now (forecasts, recompetes, grants, competitors).
+                  Counts + $ are free; the detail behind each is Pro. */}
+              {(autoProfile.industryPhrase || (autoProfile.naics?.length || 0) > 0) && (
+                <div className="mb-4">
+                  <MarketDataMap
+                    keyword={autoProfile.industryPhrase}
+                    naics={(autoProfile.naics || []).join(',')}
+                    email={email}
+                  />
                 </div>
               )}
               <div className="space-y-3 text-sm">
