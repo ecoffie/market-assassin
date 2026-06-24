@@ -29,6 +29,7 @@ interface RecreateCost {
   formatList: string[];
   agencies: string;
   linesOfCode: number;
+  linesBreakdown?: { code: number; curatedData: number; assets: number; docs: number };
   commits: number;
 }
 
@@ -133,7 +134,11 @@ export default function DataInventoryPage() {
               <BuildStat value={`${data.recreateCost.distinctSources}`} label="distinct sources" />
               <BuildStat value={`${data.recreateCost.formats}`} label="data formats" title={data.recreateCost.formatList.join(' · ')} />
               <BuildStat value={data.recreateCost.agencies} label="federal agencies" />
-              <BuildStat value={`${Math.round(data.recreateCost.linesOfCode / 1000)}K+`} label="lines of code" />
+              <BuildStat
+                value={`${Math.round(data.recreateCost.linesOfCode / 1000)}K`}
+                label="lines (code + data)"
+                title={data.recreateCost.linesBreakdown ? `${fmt(data.recreateCost.linesBreakdown.code)} app code · ${fmt(data.recreateCost.linesBreakdown.curatedData)} curated databases · ${fmt(data.recreateCost.linesBreakdown.assets)} assets · ${fmt(data.recreateCost.linesBreakdown.docs)} docs` : undefined}
+              />
               <BuildStat value={`${data.recreateCost.commits.toLocaleString()}`} label="commits" />
             </div>
             <p className="mt-3 text-xs text-slate-400">
@@ -147,7 +152,7 @@ export default function DataInventoryPage() {
           <ChartCard title="By dataset">
             <ResponsiveContainer width="100%" height={320}>
               <PieChart>
-                <Pie data={datasetPie} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={110} label={(e) => fmt(e.value)}>
+                <Pie data={datasetPie} dataKey="value" nameKey="name" cx="50%" cy="50%" outerRadius={110}>
                   {datasetPie.map((d, i) => <Cell key={i} fill={d.color} />)}
                 </Pie>
                 <Tooltip formatter={(value) => fmt(Number(value))} contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8 }} />
@@ -158,7 +163,7 @@ export default function DataInventoryPage() {
           <ChartCard title="By provenance (the moat story)">
             <ResponsiveContainer width="100%" height={320}>
               <PieChart>
-                <Pie data={provenancePie} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={110} label={(e) => fmt(e.value)}>
+                <Pie data={provenancePie} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={110}>
                   {provenancePie.map((d, i) => <Cell key={i} fill={d.color} />)}
                 </Pie>
                 <Tooltip formatter={(value) => fmt(Number(value))} contentStyle={{ background: '#0f172a', border: '1px solid #334155', borderRadius: 8 }} />
