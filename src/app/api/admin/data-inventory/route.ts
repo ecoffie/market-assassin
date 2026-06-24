@@ -32,11 +32,23 @@ type Provenance = 'exclusive' | 'curated' | 'cache' | 'passthrough';
 interface DatasetEntry {
   key: string;
   label: string;
-  source: string;        // raw origin
+  source: string;        // raw origin (short)
   provenance: Provenance;
   count: number | null;  // null = couldn't measure
   note?: string;
+  sources?: string[];    // the physical places this dataset is pulled from
 }
+
+// The "recreate cost" story — breadth, not a copy-paste recipe. Static (changes
+// slowly); the exact source list lives in docs/MINDY-DATA-CORE-SOURCES.md.
+const RECREATE_COST = {
+  distinctSources: 28,
+  formats: 6,                  // REST · Excel · CSV · PDF · scraped HTML · BigQuery
+  formatList: ['REST API', 'Excel', 'CSV', 'PDF', 'Scraped HTML', 'BigQuery bulk'],
+  agencies: '300+',
+  linesOfCode: 330000,
+  commits: 1846,
+};
 
 /** Supabase exact head-count (no rows pulled). Optional column-not-null filter. */
 async function headCount(
@@ -110,15 +122,15 @@ export async function GET(request: NextRequest) {
   ]);
 
   const datasets: DatasetEntry[] = [
-    { key: 'contractors', label: 'Contractor database', source: 'USASpending recipients (BigQuery) + SBLO contacts', provenance: 'curated', count: contractors, note: 'who you compete with / team with' },
-    { key: 'decision_makers', label: 'Decision makers', source: 'SAM POCs (daily sync) + DoDAAC office rostering', provenance: 'curated', count: decisionMakers, note: 'contracting officers + buying-office rosters' },
-    { key: 'sam_opps', label: 'SAM opportunities (cache)', source: 'SAM.gov Opportunities API', provenance: 'cache', count: samOpps, note: 'live open-opportunity corpus' },
-    { key: 'embedded_opps', label: 'Semantic-indexed opportunities', source: 'Our SOW embeddings on the SAM cache', provenance: 'exclusive', count: embeddedOpps, note: 'powers hidden-match (beats keyword/NAICS filters)' },
-    { key: 'forecasts', label: 'Forecasts (upcoming buys)', source: 'Scraped + unified from 12 agencies', provenance: 'exclusive', count: forecasts, note: '6-18 months before solicitation' },
-    { key: 'recompetes', label: 'Recompetes (expiring contracts)', source: 'USASpending awards, our identify/score/resolve', provenance: 'curated', count: recompetes },
-    { key: 'pain_points', label: 'Agency pain points', source: 'Hand-curated from GAO / IG / CRS', provenance: 'exclusive', count: pp.painPoints, note: `${pp.agencies} agencies` },
-    { key: 'priorities', label: 'Agency spending priorities', source: 'Hand-curated funded programs', provenance: 'exclusive', count: pp.priorities, note: 'where the money is going' },
-    { key: 'grants', label: 'Federal grants', source: 'Grants.gov API (live)', provenance: 'passthrough', count: null, note: 'queried live per search' },
+    { key: 'contractors', label: 'Contractor database', source: 'USASpending recipients (BigQuery) + SBLO contacts', provenance: 'curated', count: contractors, note: 'who you compete with / team with', sources: ['USASpending recipients (BigQuery)', 'SBA Prime Directory FY24', 'SAM.gov Entity API'] },
+    { key: 'decision_makers', label: 'Decision makers', source: 'SAM POCs (daily sync) + DoDAAC office rostering', provenance: 'curated', count: decisionMakers, note: 'contracting officers + buying-office rosters', sources: ['SAM.gov POCs (daily sync)', 'DoDAAC directory (FPDS/BigQuery)'] },
+    { key: 'sam_opps', label: 'SAM opportunities (cache)', source: 'SAM.gov Opportunities API', provenance: 'cache', count: samOpps, note: 'live open-opportunity corpus', sources: ['SAM.gov Opportunities API'] },
+    { key: 'embedded_opps', label: 'Semantic-indexed opportunities', source: 'Our SOW embeddings on the SAM cache', provenance: 'exclusive', count: embeddedOpps, note: 'powers hidden-match (beats keyword/NAICS filters)', sources: ['SAM.gov SOW text', 'OpenAI text-embedding-3-small'] },
+    { key: 'forecasts', label: 'Forecasts (upcoming buys)', source: 'Scraped + unified from 12 agencies', provenance: 'exclusive', count: forecasts, note: '12 agency feeds · 7 portals · 4 formats', sources: ['justice.gov (Excel)', 'energy.gov (Excel)', 'nasa.gov (Excel)', 'ssa.gov (Excel)', 'nsf.gov (PDF)', 'dhs.gov (scraper)', 'GSA Acquisition Gateway (CSV ×6 agencies)'] },
+    { key: 'recompetes', label: 'Recompetes (expiring contracts)', source: 'USASpending awards, our identify/score/resolve', provenance: 'curated', count: recompetes, sources: ['USASpending Awards API'] },
+    { key: 'pain_points', label: 'Agency pain points', source: 'Hand-curated from GAO / IG / CRS', provenance: 'exclusive', count: pp.painPoints, note: `${pp.agencies} agencies`, sources: ['GAO reports', 'IG audits', 'CRS analyses', 'Budget justifications', 'Strategic plans', 'GovInfo API'] },
+    { key: 'priorities', label: 'Agency spending priorities', source: 'Hand-curated funded programs', provenance: 'exclusive', count: pp.priorities, note: 'where the money is going', sources: ['Budget justifications', 'GAO reports', 'Strategic plans', 'USASpending patterns'] },
+    { key: 'grants', label: 'Federal grants', source: 'Grants.gov API (live)', provenance: 'passthrough', count: null, note: 'queried live per search', sources: ['Grants.gov API'] },
   ];
 
   const byProvenance = (p: Provenance) =>
@@ -136,6 +148,8 @@ export async function GET(request: NextRequest) {
         cachedRecords: byProvenance('cache'),
         allMeasured: datasets.reduce((s, d) => s + (d.count || 0), 0),
       },
+      // The breadth-of-build story for demo day (counts, not a copy-paste recipe).
+      recreateCost: RECREATE_COST,
       // Source-level "trace back" — forecasts broken down by the agency they were
       // scraped from (the registry's per-source record counts).
       sourceTrace: { forecastsByAgency: getRegistrySummary() },
