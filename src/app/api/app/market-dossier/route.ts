@@ -108,11 +108,18 @@ export async function GET(request: NextRequest) {
 
   const opps: DossierOpp[] = [];
 
+  // A single notice can match on multiple NAICS codes AND a keyword, so the cache
+  // returns it more than once — dedupe so the dossier never shows "Custodial…" 3×.
+  const seenOpen = new Set<string>();
+
   // Open SAM opportunities — not awarded yet, so no offer count exists.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const o of (samResult.opportunities || []) as any[]) {
     // fetchSamOpportunitiesFromCache returns camelCase (SAMOpportunity shape).
     const noticeId = String(o.noticeId || '');
+    const dedupeKey = noticeId || `${String(o.title || '')}|${o.responseDeadline || ''}`.toLowerCase();
+    if (seenOpen.has(dedupeKey)) continue;
+    seenOpen.add(dedupeKey);
     opps.push({
       id: noticeId,
       kind: 'open',
@@ -131,8 +138,13 @@ export async function GET(request: NextRequest) {
   // Recompetes — the real offer count comes from the award DETAIL endpoint, fetched
   // for the top set below.
   const recompeteOpps: DossierOpp[] = [];
+  const seenRecompete = new Set<string>();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const r of ((recompeteRes as any).data || []) as any[]) {
+    const cid = String(r.contract_id || '');
+    const rKey = cid || `${String(r.naics_description || r.description || '')}|${r.awarding_agency || ''}`.toLowerCase();
+    if (seenRecompete.has(rKey)) continue;
+    seenRecompete.add(rKey);
     recompeteOpps.push({
       id: String(r.contract_id || ''),
       kind: 'recompete',
