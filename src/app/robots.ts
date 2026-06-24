@@ -11,6 +11,12 @@
  *   - Block /admin/* (internal team tools)
  *   - Block /app/* (post-login UI — won't render anything useful
  *     to a crawler anyway, but explicit > implicit)
+ *   - Block /_next/ in general, but EXPLICITLY ALLOW /_next/static/ and
+ *     /_next/image so Googlebot can fetch the JS/CSS/images it needs to
+ *     render pages. Blocking these resources outright (the old behavior)
+ *     made GSC flag ~1,140 "Blocked by robots.txt" chunk URLs and can
+ *     degrade how Google renders/indexes the page. Allow is matched by
+ *     most-specific rule, so the narrower /_next/static/ wins over /_next/.
  *   - Point at /sitemap.xml so Googlebot finds the contractor URLs
  *     it wouldn't discover otherwise
  */
@@ -25,7 +31,10 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: '*',
-        allow: '/',
+        // /_next/static/ (hashed JS/CSS) and /_next/image must stay
+        // crawlable so Google can render pages — these Allow rules are
+        // more specific than the /_next/ Disallow below and win.
+        allow: ['/', '/_next/static/', '/_next/image'],
         disallow: [
           '/api/',
           '/admin/',
