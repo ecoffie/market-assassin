@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunitiesFromCache } from '@/lib/briefings/pipelines/sam-gov';
 import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
+import { verifyMIAccess } from '@/lib/api-auth';
 
 export const dynamic = 'force-dynamic';
 
@@ -170,12 +171,34 @@ export async function GET(request: NextRequest) {
     return (a.deadline || '9999').localeCompare(b.deadline || '9999');
   });
 
+  // 4) Tier-gated capping. Every onboarded user — including FREE — sees their
+  //    assembled market (the demo "aha"), but free gets a PREVIEW: the top few of
+  //    each, with the remainder locked behind a Pro upgrade. Counts stay FULL so
+  //    the UI can say "5 of 23" and the locked CTA shows the real prize. Pro/Team/
+  //    Enterprise get the whole dossier.
+  const access = await verifyMIAccess(email).catch(() => null);
+  const tier = access?.tier || 'free';
+  const isPaid = tier === 'pro' || tier === 'team' || tier === 'enterprise';
+
+  const FREE_OPEN_CAP = 5;
+  const FREE_RECOMPETE_CAP = 3;
+  const openAll = opps.filter((o) => o.kind === 'open');
+  const recompeteAll = opps.filter((o) => o.kind === 'recompete');
+  const shownOpen = isPaid ? openAll.slice(0, 20) : openAll.slice(0, FREE_OPEN_CAP);
+  const shownRecompete = isPaid ? recompeteAll.slice(0, 10) : recompeteAll.slice(0, FREE_RECOMPETE_CAP);
+
   return NextResponse.json(
     {
       success: true,
+      tier,
+      capped: !isPaid,
       profile: { naicsCodes, keywords, businessType, states },
-      counts: { open: opps.filter((o) => o.kind === 'open').length, recompete: opps.filter((o) => o.kind === 'recompete').length },
-      opportunities: opps.slice(0, 25),
+      counts: { open: openAll.length, recompete: recompeteAll.length },
+      locked: {
+        open: Math.max(0, openAll.length - shownOpen.length),
+        recompete: Math.max(0, recompeteAll.length - shownRecompete.length),
+      },
+      opportunities: [...shownOpen, ...shownRecompete],
       generatedAt: new Date().toISOString(),
     },
     { headers: { 'Cache-Control': 'private, max-age=600' } },

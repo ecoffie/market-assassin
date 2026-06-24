@@ -29,8 +29,11 @@ interface DossierOpp {
 
 interface DossierData {
   success: boolean;
+  tier?: string;
+  capped?: boolean;
   profile: { naicsCodes: string[]; keywords: string[]; businessType: string; states: string[] };
   counts: { open: number; recompete: number };
+  locked?: { open: number; recompete: number };
   opportunities: DossierOpp[];
   generatedAt: string;
   message?: string;
@@ -76,6 +79,10 @@ export default function MarketDossierPanel({ email, onNavigate }: { email: strin
   const naics = data?.profile?.naicsCodes?.join(',') || '';
   const open = (data?.opportunities || []).filter((o) => o.kind === 'open');
   const recompetes = (data?.opportunities || []).filter((o) => o.kind === 'recompete');
+  const capped = !!data?.capped;
+  const lockedOpen = data?.locked?.open || 0;
+  const lockedRecompete = data?.locked?.recompete || 0;
+  const lockedTotal = lockedOpen + lockedRecompete;
 
   return (
     <div className="p-6 space-y-6">
@@ -99,25 +106,57 @@ export default function MarketDossierPanel({ email, onNavigate }: { email: strin
       )}
 
       {open.length > 0 && (
-        <Section title="Open now — biddable" count={open.length}>
+        <Section title="Open now — biddable" count={open.length} total={data?.counts?.open ?? open.length}>
           {open.map((o) => <OppCard key={o.id} opp={o} onNavigate={onNavigate} />)}
         </Section>
       )}
       {recompetes.length > 0 && (
-        <Section title="Coming up for recompete (18 mo)" count={recompetes.length}>
+        <Section title="Coming up for recompete (18 mo)" count={recompetes.length} total={data?.counts?.recompete ?? recompetes.length}>
           {recompetes.map((o) => <OppCard key={o.id} opp={o} onNavigate={onNavigate} />)}
         </Section>
+      )}
+
+      {capped && lockedTotal > 0 && (
+        <UpgradeCard lockedOpen={lockedOpen} lockedRecompete={lockedRecompete} />
       )}
     </div>
   );
 }
 
-function Section({ title, count, children }: { title: string; count: number; children: React.ReactNode }) {
+function Section({ title, count, total, children }: { title: string; count: number; total?: number; children: React.ReactNode }) {
+  const label = total && total > count ? `${count} of ${total}` : `${count}`;
   return (
     <section>
-      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-slate-400">{title} <span className="text-slate-600">· {count}</span></h2>
+      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-slate-400">{title} <span className="text-slate-600">· {label}</span></h2>
       <div className="space-y-2">{children}</div>
     </section>
+  );
+}
+
+/** Free-tier preview wall — every onboarded user sees their assembled market, but
+ *  the remainder unlocks on Pro. The prize (real locked counts) sells the upgrade. */
+function UpgradeCard({ lockedOpen, lockedRecompete }: { lockedOpen: number; lockedRecompete: number }) {
+  const parts: string[] = [];
+  if (lockedOpen > 0) parts.push(`${lockedOpen} more open ${lockedOpen === 1 ? 'opportunity' : 'opportunities'}`);
+  if (lockedRecompete > 0) parts.push(`${lockedRecompete} more recompete${lockedRecompete === 1 ? '' : 's'}`);
+  return (
+    <div className="rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 to-slate-900/40 p-5">
+      <div className="flex items-start gap-3">
+        <span className="text-xl">🔒</span>
+        <div className="min-w-0">
+          <h3 className="font-semibold text-white">Unlock your full market</h3>
+          <p className="mt-0.5 text-sm text-slate-300">
+            You&apos;re seeing a preview. <span className="font-semibold text-emerald-300">{parts.join(' + ')}</span> matched to your profile — plus draft-ready responses, tracking, and daily change alerts — are waiting in Mindy Pro.
+          </p>
+          <a
+            href="/market-intelligence"
+            className="mt-3 inline-block rounded-md bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+          >
+            Upgrade to Pro →
+          </a>
+        </div>
+      </div>
+    </div>
   );
 }
 

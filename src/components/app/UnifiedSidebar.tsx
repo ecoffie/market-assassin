@@ -143,7 +143,10 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'My Market',
         icon: Target,
         description: 'Your whole market, assembled',
-        tier: ['pro', 'team', 'enterprise'],
+        // FREE can OPEN it — they get a capped preview (top 5 open + 3 recompetes)
+        // with the remainder behind a Pro upgrade card. The dossier IS the "aha",
+        // so it should do conversion work, not sit locked behind the sidebar.
+        tier: ['free', 'pro', 'team', 'enterprise'],
         badge: 'NEW',
       },
       {
