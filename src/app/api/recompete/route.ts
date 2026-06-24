@@ -107,6 +107,63 @@ interface RecompeteStats {
   last_sync: string;
 }
 
+/**
+ * Compute recompete stats directly from recompete_opportunities — the resilient
+ * fallback for when the recompete_stats VIEW is missing (it currently is in prod,
+ * which made ?stats=true return all-zeros despite thousands of rows). Scopes to
+ * future-expiring + quality-clean rows, matching the list query. One read.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function computeRecompeteStatsFromTable(supabase: any) {
+  const empty = {
+    total_contracts: 0, total_value: 0, high_likelihood: 0, medium_likelihood: 0,
+    low_likelihood: 0, expiring_6_months: 0, expiring_12_months: 0, expiring_18_months: 0,
+    agencies: 0, incumbents: 0, naics_codes: 0, last_sync: null as string | null,
+  };
+  try {
+    const now = new Date();
+    const iso = (d: Date) => d.toISOString().split('T')[0];
+    const plusMonths = (n: number) => { const d = new Date(now); d.setMonth(d.getMonth() + n); return iso(d); };
+    const today = iso(now);
+    const end18 = plusMonths(18);
+    const { data, error } = await supabase
+      .from('recompete_opportunities')
+      .select('potential_total_value, recompete_likelihood, awarding_agency, incumbent_name, naics_code, period_of_performance_current_end')
+      .gt('period_of_performance_current_end', today)
+      .lte('period_of_performance_current_end', end18)
+      .is('quality_flag', null)
+      .limit(20000);
+    if (error || !data) return empty;
+    const end6 = plusMonths(6);
+    const end12 = plusMonths(12);
+    const agencies = new Set<string>();
+    const incumbents = new Set<string>();
+    const naics = new Set<string>();
+    const s = { ...empty };
+    for (const r of data as Array<Record<string, unknown>>) {
+      s.total_contracts++;
+      s.total_value += Number(r.potential_total_value) || 0;
+      const lk = String(r.recompete_likelihood || '').toLowerCase();
+      if (lk === 'high') s.high_likelihood++;
+      else if (lk === 'medium') s.medium_likelihood++;
+      else if (lk === 'low') s.low_likelihood++;
+      const end = String(r.period_of_performance_current_end || '');
+      if (end && end <= end6) s.expiring_6_months++;
+      if (end && end <= end12) s.expiring_12_months++;
+      if (end && end <= end18) s.expiring_18_months++;
+      const ag = String(r.awarding_agency || '').trim(); if (ag) agencies.add(ag);
+      const inc = String(r.incumbent_name || '').trim().toUpperCase(); if (inc) incumbents.add(inc);
+      const nc = String(r.naics_code || '').trim(); if (nc) naics.add(nc);
+    }
+    s.agencies = agencies.size;
+    s.incumbents = incumbents.size;
+    s.naics_codes = naics.size;
+    return s;
+  } catch {
+    return empty;
+  }
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
 
@@ -136,26 +193,13 @@ export async function GET(request: NextRequest) {
       .select('*')
       .single();
 
-    if (error) {
-      // If view doesn't exist yet, return empty stats
-      return NextResponse.json({
-        success: true,
-        stats: {
-          total_contracts: 0,
-          total_value: 0,
-          high_likelihood: 0,
-          medium_likelihood: 0,
-          low_likelihood: 0,
-          expiring_6_months: 0,
-          expiring_12_months: 0,
-          expiring_18_months: 0,
-          agencies: 0,
-          incumbents: 0,
-          naics_codes: 0,
-          last_sync: null,
-          message: 'No data synced yet. Run /api/admin/sync-recompete to populate.',
-        },
-      });
+    // The recompete_stats VIEW is missing/unbuilt in prod, so this used to return
+    // all-zeros even though recompete_opportunities has thousands of rows (Eric,
+    // Jun 24). Compute the stats straight from the table instead — never report 0
+    // when there's data. (If the view exists and works, we still prefer it.)
+    if (error || !stats) {
+      const computed = await computeRecompeteStatsFromTable(supabase);
+      return NextResponse.json({ success: true, stats: computed });
     }
 
     return NextResponse.json({
