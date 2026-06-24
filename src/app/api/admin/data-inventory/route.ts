@@ -46,7 +46,11 @@ const RECREATE_COST = {
   formats: 6,                  // REST · Excel · CSV · PDF · scraped HTML · BigQuery
   formatList: ['REST API', 'Excel', 'CSV', 'PDF', 'Scraped HTML', 'BigQuery bulk'],
   agencies: '300+',
-  linesOfCode: 330000,
+  // Whole repo (~975K). Breakdown: ~344K application code + ~333K curated data
+  // (the databases) + ~217K assets + ~81K docs. NOT just code — counting "what it
+  // took to get the databases" too (Eric, Jun 24).
+  linesOfCode: 975000,
+  linesBreakdown: { code: 343753, curatedData: 333223, assets: 217438, docs: 81486 },
   commits: 1846,
 };
 
