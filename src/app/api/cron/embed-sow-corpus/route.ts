@@ -31,6 +31,21 @@ function sb(): any {
 const BATCH_SIZE = parseInt(process.env.SOW_EMBED_BATCH_SIZE || '40', 10);
 const SOFT_BUDGET_MS = 90_000; // headroom under maxDuration
 
+/**
+ * Update a row, including the embedding_source tag — but degrade gracefully if the
+ * column isn't migrated yet (retry without it). Keeps deploy order from mattering.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function tagUpdate(supabase: any, id: unknown, fields: Record<string, unknown>) {
+  let { error } = await supabase.from('sam_opportunities').update(fields).eq('id', id);
+  if (error && /embedding_source|column|schema cache/i.test(error.message || '')) {
+    const rest = { ...fields };
+    delete rest.embedding_source;
+    ({ error } = await supabase.from('sam_opportunities').update(rest).eq('id', id));
+  }
+  return error;
+}
+
 export async function GET(request: NextRequest) {
   const startedAt = Date.now();
   const supabase = sb();
@@ -80,16 +95,18 @@ export async function GET(request: NextRequest) {
       // Nothing meaningful to embed. Stamp an empty-array sentinel so this row
       // isn't re-selected every run (sow_embedding IS NULL is the retry flag).
       // parseEmbedding treats a non-1536 array as null → hidden-match ignores it.
-      await supabase.from('sam_opportunities').update({ sow_embedding: [] }).eq('id', row.id).then(() => {}, () => {});
+      await tagUpdate(supabase, row.id, { sow_embedding: [], embedding_source: 'none' });
       skipped++;
       continue;
     }
     try {
       const vec = await embedText(text);
-      const { error: upErr } = await supabase
-        .from('sam_opportunities')
-        .update({ sow_embedding: vec })
-        .eq('id', row.id);
+      // Tag the source: SOW text (high-precision, drives alerts) vs the notice
+      // description fallback (broad/discovery only). Keeps the corpora straight.
+      const upErr = await tagUpdate(supabase, row.id, {
+        sow_embedding: vec,
+        embedding_source: row.sow_text ? 'sow' : 'description',
+      });
       if (upErr) { failed++; continue; }
       embedded++;
     } catch {
