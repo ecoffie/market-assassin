@@ -79,8 +79,14 @@ function isTransactionalType(emailType?: string): boolean {
  */
 const DAILY_EMAIL_CAP = Number(process.env.EMAIL_DAILY_CAP || 3); // non-transactional / recipient / day
 async function emailGuardBlock(to: string, emailType: string | undefined, transactional: boolean): Promise<string | null> {
-  if (transactional || isTransactionalType(emailType)) return null;
   const email = to.toLowerCase().trim();
+  // NEVER email a synthetic Coach-Mode client address. {workspaceId}@clients.getmindy.ai
+  // is an internal namespace with no MX record — a client row whose
+  // alert_recipient_email was never set would otherwise hard-bounce to a non-mail
+  // domain, damaging the sender reputation every real Mindy email depends on.
+  // Unconditional: even "transactional" must not be delivered here.
+  if (email.endsWith('@clients.getmindy.ai')) return 'synthetic_client_address';
+  if (transactional || isTransactionalType(emailType)) return null;
   try {
     const sb = getSupabase();
     // 1) Suppression list (unsubscribe / complaint / bounce / frequency).
