@@ -141,10 +141,15 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Expand prefixes to full 6-digit codes (e.g., "236" → all 236xxx codes)
-    const expandedNaics = allNaicsCodes.length > 0 ? expandNAICSCodes(allNaicsCodes) : [];
+    // Expand short PREFIXES ("236" → all 236xxx) but KEEP fully-specified 6-digit
+    // codes EXACT (expandFullCodes=false). Blowing 561710 (pest control) out to its
+    // whole 561 family re-buried the user under unrelated office-admin/security/
+    // telemarketing codes they never picked, and polluted alert matching. The
+    // matcher widens to the 4-digit industry group at query time for recall, so we
+    // persist what the user actually chose.
+    const expandedNaics = allNaicsCodes.length > 0 ? expandNAICSCodes(allNaicsCodes, false) : [];
     if (allNaicsCodes.length > 0) {
-      console.log(`[Alerts] Expanded ${allNaicsCodes.length} input codes to ${expandedNaics.length} NAICS codes`);
+      console.log(`[Alerts] Normalized ${allNaicsCodes.length} input codes to ${expandedNaics.length} NAICS codes (6-digit kept exact)`);
     }
 
     // For paid features (Pro), verify MA Premium access

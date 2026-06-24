@@ -126,7 +126,9 @@ async function fetchDataForUser(
   samApiKey: string
 ): Promise<FetchedData> {
   const userNaics = user.naics_codes?.length > 0 ? user.naics_codes : FALLBACK_NAICS;
-  const expandedNaics = expandNAICSCodes(userNaics);
+  // Keep 6-digit codes exact (false) — recall comes from the matcher's 4-digit
+  // industry-group widening, not a full 3-digit-family blow-out that re-adds noise.
+  const expandedNaics = expandNAICSCodes(userNaics, false);
   const userKeywords = user.keywords || [];
   const setAsides = user.business_type
     ? [businessTypeToSetAside[user.business_type] || user.business_type]
