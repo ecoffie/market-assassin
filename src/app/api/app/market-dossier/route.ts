@@ -15,15 +15,37 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunitiesFromCache } from '@/lib/briefings/pipelines/sam-gov';
 import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
-import { internalBaseUrl } from '@/lib/utils/internal-base-url';
+import { resolvePiidToId } from '@/lib/usaspending/award-detail';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60; // per-award offers fetch for the top recompetes
+
+/** Real # offers received for a recompete, from the USASpending award DETAIL
+ *  endpoint (the bulk search returns null — offers only live on the award). PIID
+ *  → generated_internal_id → award detail. Best-effort; null on any miss. */
+async function fetchOffersForPiid(piid: string): Promise<number | null> {
+  try {
+    const id = await resolvePiidToId(piid);
+    if (!id) return null;
+    const res = await fetch(`https://api.usaspending.gov/api/v2/awards/${encodeURIComponent(id)}/`, {
+      headers: { Accept: 'application/json' },
+    });
+    if (!res.ok) return null;
+    const j = await res.json();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const cd = (j?.latest_transaction?.contract_data || {}) as any;
+    const raw = cd.number_of_offers_received;
+    const n = raw == null ? NaN : Number(raw);
+    return Number.isFinite(n) && n > 0 ? n : null;
+  } catch {
+    return null;
+  }
+}
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
 
 const num = (v: unknown): number => { const n = Number(v); return Number.isFinite(n) ? n : 0; };
-const firstWord = (s: string) => (s || '').trim().split(/[\s,]+/)[0]?.toUpperCase() || '';
 
 interface DossierOpp {
   id: string;
@@ -46,31 +68,6 @@ function competitionBucket(offers: number | null): 'low' | 'medium' | 'high' | n
   if (offers <= 3) return 'low';
   if (offers <= 7) return 'medium';
   return 'high';
-}
-
-/** agency-name (first word) → avg offers received, from find-agencies (USASpending). */
-async function agencyOffersMap(request: NextRequest, naics: string): Promise<Map<string, number>> {
-  const map = new Map<string, number>();
-  if (!naics) return map;
-  try {
-    const res = await fetch(`${internalBaseUrl(request)}/api/usaspending/find-agencies`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ naicsCode: naics }),
-    });
-    if (!res.ok) return map;
-    const json = await res.json();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    for (const a of (json?.agencies || []) as any[]) {
-      const avg = a?.avgBidders;
-      if (avg == null) continue;
-      for (const name of [a.name, a.subAgency, a.parentAgency]) {
-        const k = firstWord(String(name || ''));
-        if (k && !map.has(k)) map.set(k, Number(avg));
-      }
-    }
-  } catch { /* offers stay null — non-fatal */ }
-  return map;
 }
 
 export async function GET(request: NextRequest) {
@@ -104,7 +101,7 @@ export async function GET(request: NextRequest) {
     .map((c) => (c.length < 6 ? `naics_code.like.${c}%` : `naics_code.eq.${c}`))
     .join(',');
 
-  const [samResult, recompeteRes, offersMap] = await Promise.all([
+  const [samResult, recompeteRes] = await Promise.all([
     fetchSamOpportunitiesFromCache({ naicsCodes, pscCodes, keywords, limit: 40 }).catch(() => ({ opportunities: [] as unknown[] })),
     naicsCodes.length
       ? supabase
@@ -114,58 +111,65 @@ export async function GET(request: NextRequest) {
           .lte('period_of_performance_current_end', max18.toISOString().split('T')[0])
           .is('quality_flag', null)
           .or(recompeteOr)
-          .order('period_of_performance_current_end', { ascending: true })
-          .limit(20)
+          .order('potential_total_value', { ascending: false })
+          .limit(18)
       : Promise.resolve({ data: [] as unknown[] }),
-    agencyOffersMap(request, naicsCodes.join(', ')),
   ]);
 
   const opps: DossierOpp[] = [];
 
-  // Open SAM opportunities.
+  // Open SAM opportunities — not awarded yet, so no offer count exists.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const o of (samResult.opportunities || []) as any[]) {
-    const agency = String(o.department || o.agency || o.fullParentPathName || '');
-    const offers = offersMap.get(firstWord(agency)) ?? null;
     opps.push({
       id: String(o.notice_id || o.noticeId || o.id || ''),
       kind: 'open',
       title: String(o.title || 'Untitled'),
-      agency,
+      agency: String(o.department || o.agency || o.fullParentPathName || ''),
       naics: String(o.naics_code || o.naicsCode || ''),
       value: num(o.award_amount || o.value),
       deadline: o.response_deadline || o.responseDeadLine || null,
       setAside: o.set_aside || o.typeOfSetAside || null,
-      offers: offers != null ? Math.round(offers * 10) / 10 : null,
-      competition: competitionBucket(offers),
+      offers: null,
+      competition: null,
       url: o.ui_link || (o.notice_id ? `https://sam.gov/workspace/contract/opp/${o.notice_id}/view` : '#'),
     });
   }
 
-  // Recompetes — prefer the contract's own offers, else the lane average.
+  // Recompetes — the real offer count comes from the award DETAIL endpoint, fetched
+  // for the top set below.
+  const recompeteOpps: DossierOpp[] = [];
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const r of ((recompeteRes as any).data || []) as any[]) {
-    const agency = String(r.awarding_agency || '');
-    const own = num(r.number_of_offers);
-    const offers = own > 0 ? own : (offersMap.get(firstWord(agency)) ?? null);
-    opps.push({
+    recompeteOpps.push({
       id: String(r.contract_id || ''),
       kind: 'recompete',
       title: String(r.naics_description || r.description || 'Recompete').slice(0, 90),
-      agency,
+      agency: String(r.awarding_agency || ''),
       naics: String(r.naics_code || ''),
       value: num(r.potential_total_value),
       deadline: r.period_of_performance_current_end || null,
       setAside: r.set_aside_type || null,
-      offers: offers != null ? Math.round(offers * 10) / 10 : null,
-      competition: competitionBucket(offers),
+      offers: null,
+      competition: null,
       url: r.source_url || '#',
       incumbent: r.incumbent_name || null,
     });
   }
 
-  // 3) Rank: most winnable first (fewest offers), then soonest deadline. Items with
-  //    no offer data sort after those with a known (low) competition signal.
+  // Fetch REAL offer counts for the top recompetes (per-award detail; capped to keep
+  // latency + USASpending load sane). Best-effort — misses stay null.
+  await Promise.all(
+    recompeteOpps.slice(0, 12).map(async (o) => {
+      if (!o.id) return;
+      const offers = await fetchOffersForPiid(o.id);
+      if (offers != null) { o.offers = offers; o.competition = competitionBucket(offers); }
+    }),
+  );
+  opps.push(...recompeteOpps);
+
+  // 3) Rank: recompetes with a KNOWN offer count first, fewest offers = most
+  //    winnable; then everything else by soonest deadline.
   opps.sort((a, b) => {
     const ao = a.offers ?? 999;
     const bo = b.offers ?? 999;
