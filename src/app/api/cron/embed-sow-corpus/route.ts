@@ -40,12 +40,15 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'OPENAI_API_KEY not set' }, { status: 500 });
   }
 
-  // Needs embedding = has extracted scope text but no vector yet.
+  // Needs embedding = no vector yet AND has SOME text to embed (SOW scope text OR
+  // the notice description). The description fallback (Eric, Jun 24) grows the
+  // semantic corpus past the ~10K SOW-attachment ceiling toward the full opp
+  // corpus — most opps have a description even without a SOW/PWS attachment.
   const needsEmbed = () => supabase
     .from('sam_opportunities')
-    .select('id, notice_id, title, sow_text')
-    .not('sow_text', 'is', null)
-    .is('sow_embedding', null);
+    .select('id, notice_id, title, sow_text, description')
+    .is('sow_embedding', null)
+    .or('sow_text.not.is.null,description.not.is.null');
 
   // Active (biddable now) first, then fall through to inactive (recompete corpus).
   let phase = 'active';
@@ -70,10 +73,14 @@ export async function GET(request: NextRequest) {
 
   for (const row of rows || []) {
     if (Date.now() - startedAt > SOFT_BUDGET_MS) break;
-    const text = (row.sow_text || '').trim();
-    if (!text) {
-      // No usable text — stamp an empty vector? No: just skip; nothing to embed.
-      // Leaving sow_embedding null is correct (it has no scope to match on).
+    // Prefer SOW/PWS scope text (richest signal); fall back to the notice
+    // description so opps without a SOW attachment still join the corpus.
+    const text = (row.sow_text || row.description || '').trim();
+    if (text.length < 80) {
+      // Nothing meaningful to embed. Stamp an empty-array sentinel so this row
+      // isn't re-selected every run (sow_embedding IS NULL is the retry flag).
+      // parseEmbedding treats a non-1536 array as null → hidden-match ignores it.
+      await supabase.from('sam_opportunities').update({ sow_embedding: [] }).eq('id', row.id).then(() => {}, () => {});
       skipped++;
       continue;
     }
@@ -96,8 +103,8 @@ export async function GET(request: NextRequest) {
   const { count: remaining } = await supabase
     .from('sam_opportunities')
     .select('*', { count: 'exact', head: true })
-    .not('sow_text', 'is', null)
-    .is('sow_embedding', null);
+    .is('sow_embedding', null)
+    .or('sow_text.not.is.null,description.not.is.null');
 
   return NextResponse.json({
     success: true,
