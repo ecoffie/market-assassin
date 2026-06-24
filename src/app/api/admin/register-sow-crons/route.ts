@@ -29,11 +29,11 @@ const JOBS = [
   },
   {
     job_name: 'embed-sow-corpus',
-    route: '/api/cron/embed-sow-corpus?limit=40',
+    route: '/api/cron/embed-sow-corpus?limit=150',
     cron_expr: '5,20,35,50 * * * *',
     timeout_ms: 120000,
     enabled: true,
-    notes: 'Embed sow_text -> sow_embedding (text-embedding-3-small) for hidden-match. Offset 5 min after sow-catalog.',
+    notes: 'Embed sow_text (else description) -> sow_embedding for hidden-match. limit=150 to drain the ~90K description backlog. Offset 5 min after sow-catalog.',
   },
 ];
 

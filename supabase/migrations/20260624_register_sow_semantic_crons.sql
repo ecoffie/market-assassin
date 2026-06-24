@@ -14,8 +14,8 @@
 INSERT INTO cron_jobs (job_name, route, cron_expr, timeout_ms, enabled, notes) VALUES
   ('sow-catalog', '/api/cron/sow-catalog?limit=25', '0,15,30,45 * * * *', 120000, true,
    'Extract SOW/PWS scope text from opps with attachments -> sow_text. Feeds the semantic corpus; resumable, dispatcher re-fires until drained.'),
-  ('embed-sow-corpus', '/api/cron/embed-sow-corpus?limit=40', '5,20,35,50 * * * *', 120000, true,
-   'Embed sow_text -> sow_embedding (text-embedding-3-small) for hidden-match. Offset 5 min after sow-catalog so it embeds freshly-extracted SOWs.')
+  ('embed-sow-corpus', '/api/cron/embed-sow-corpus?limit=150', '5,20,35,50 * * * *', 120000, true,
+   'Embed sow_text (else description) -> sow_embedding for hidden-match. limit=150 to drain the ~90K description backlog. Offset 5 min after sow-catalog.')
 ON CONFLICT (job_name) DO UPDATE SET
   route      = EXCLUDED.route,
   cron_expr  = EXCLUDED.cron_expr,
