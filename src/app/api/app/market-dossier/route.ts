@@ -103,18 +103,20 @@ export async function GET(request: NextRequest) {
   // Open SAM opportunities — not awarded yet, so no offer count exists.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   for (const o of (samResult.opportunities || []) as any[]) {
+    // fetchSamOpportunitiesFromCache returns camelCase (SAMOpportunity shape).
+    const noticeId = String(o.noticeId || '');
     opps.push({
-      id: String(o.notice_id || o.noticeId || o.id || ''),
+      id: noticeId,
       kind: 'open',
       title: String(o.title || 'Untitled'),
-      agency: String(o.department || o.agency || o.fullParentPathName || ''),
-      naics: String(o.naics_code || o.naicsCode || ''),
-      value: num(o.award_amount || o.value),
-      deadline: o.response_deadline || o.responseDeadLine || null,
-      setAside: o.set_aside || o.typeOfSetAside || null,
+      agency: String(o.department || '') || 'Federal',
+      naics: String(o.naicsCode || ''),
+      value: 0,                                   // open opps aren't awarded — no $ yet
+      deadline: o.responseDeadline || null,
+      setAside: o.setAsideDescription || o.setAside || null,
       offers: null,
       competition: null,
-      url: o.ui_link || (o.notice_id ? `https://sam.gov/workspace/contract/opp/${o.notice_id}/view` : '#'),
+      url: o.uiLink || (noticeId ? `https://sam.gov/opp/${noticeId}/view` : '#'),
     });
   }
 
