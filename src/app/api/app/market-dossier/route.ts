@@ -16,6 +16,7 @@ import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunitiesFromCache } from '@/lib/briefings/pipelines/sam-gov';
 import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
 import { verifyMIAccess } from '@/lib/api-auth';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
 export const dynamic = 'force-dynamic';
 
@@ -67,11 +68,18 @@ export async function GET(request: NextRequest) {
 
   const supabase = createClient(supabaseUrl, supabaseKey);
 
+  // Coach Mode: when the logged-in user has switched INTO a client workspace, the
+  // client's profile lives under the synthetic workspace email — not the coach's.
+  // Mirror /api/app/profile so My Market shows the CLIENT's market, not the coach's.
+  // (Tier still comes from the coach below: a paid coach viewing a client = uncapped.)
+  const { workspaceId, asClient } = await resolveActiveWorkspace(email, request);
+  const profileEmail = asClient ? clientNotificationEmail(workspaceId) : email;
+
   // 1) Profile — the codes/keywords Mindy watches.
   const { data: prof } = await supabase
     .from('user_notification_settings')
     .select('naics_codes, keywords, business_type, location_states')
-    .eq('user_email', email)
+    .eq('user_email', profileEmail)
     .maybeSingle();
   const naicsCodes: string[] = (prof?.naics_codes || []).map(String).filter(Boolean);
   const keywords: string[] = (prof?.keywords || []).map(String).filter(Boolean);
