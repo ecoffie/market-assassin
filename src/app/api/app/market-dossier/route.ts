@@ -2,11 +2,11 @@
  * Market Dossier — the "one-shot" output (Eric, Jun 2026).
  *
  * The user said what they do once; Mindy already ran the searches. This returns
- * their market as a finished, ranked brief: SAM open opportunities + recompetes,
- * matched to their profile, each tagged with the REAL competition signal — the
- * average number of offers that lane receives (USASpending "Number of Offers
- * Received"). No computed score: fewest offers = most winnable, and the data does
- * the ranking. Drill-down sections reuse the existing panels.
+ * their market as a finished brief: SAM open opportunities (biddable now) +
+ * expiring recompetes, matched to their profile, ordered by soonest deadline/
+ * expiry. Mega-IDV ceilings + placeholders are filtered, titles tidied, and only
+ * real set-asides surface. (Per-opp competition/offers signal deferred — the
+ * offer-count data isn't reliably available; see the demo notes.)
  *
  * GET /api/app/market-dossier?email=
  */
@@ -50,6 +50,14 @@ function cleanTitle(s: string): string {
 // Mega-IDV ceilings + round-number placeholders ($50B etc.) aren't pursuits for a
 // small business — they dwarf real opportunities and read as fake. Cap the dossier.
 const MAX_REALISTIC_VALUE = 5_000_000_000; // $5B
+
+/** Only return a set-aside string when it's a REAL carve-out — "No Set Aside Used" /
+ *  "Full and Open" mean the opposite, so they must NOT render a 🎯 badge. */
+function realSetAside(s: unknown): string | null {
+  const t = String(s || '').trim();
+  if (!t || /no set[- ]?aside|^none$|^n\/?a$|full and open|not? applicable/i.test(t)) return null;
+  return t;
+}
 
 export async function GET(request: NextRequest) {
   const email = request.nextUrl.searchParams.get('email')?.toLowerCase().trim();
@@ -113,7 +121,7 @@ export async function GET(request: NextRequest) {
       naics: String(o.naicsCode || ''),
       value: 0,                                   // open opps aren't awarded — no $ yet
       deadline: o.responseDeadline || null,
-      setAside: o.setAsideDescription || o.setAside || null,
+      setAside: realSetAside(o.setAsideDescription || o.setAside),
       offers: null,
       competition: null,
       url: o.uiLink || (noticeId ? `https://sam.gov/opp/${noticeId}/view` : '#'),
@@ -133,7 +141,7 @@ export async function GET(request: NextRequest) {
       naics: String(r.naics_code || ''),
       value: num(r.potential_total_value),
       deadline: r.period_of_performance_current_end || null,
-      setAside: r.set_aside_type || null,
+      setAside: realSetAside(r.set_aside_type),
       offers: null,
       competition: null,
       url: r.source_url || '#',
