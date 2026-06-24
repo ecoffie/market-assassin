@@ -370,8 +370,8 @@ export default function MIAccountsAdminPage() {
                 </div>
               </div>
 
-              <div className="mt-6 overflow-hidden rounded-lg border border-slate-800">
-                <table className="w-full min-w-[1100px] border-collapse text-left text-sm">
+              <div className="mt-6 overflow-x-auto rounded-lg border border-slate-800">
+                <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
                   <thead className="bg-slate-950 text-xs uppercase tracking-[0.14em] text-slate-500">
                     <tr>
                       <th className="px-4 py-3">User</th>
@@ -379,7 +379,7 @@ export default function MIAccountsAdminPage() {
                       <th className="px-4 py-3">Auth</th>
                       <th className="px-4 py-3">Profile</th>
                       <th className="px-4 py-3">Setup Email</th>
-                      <th className="px-4 py-3">Next Action</th>
+                      <th className="px-4 py-3 min-w-[260px]">Next Action</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-slate-800">
@@ -416,8 +416,8 @@ export default function MIAccountsAdminPage() {
                           <p className="mt-1 text-xs text-slate-500">{formatDate(account.setupEmail.sentAt)}</p>
                           <p className="mt-1 text-xs text-slate-500">{account.setupEmail.status || ''}</p>
                         </td>
-                        <td className="px-4 py-4 text-slate-300">
-                          <p className="max-w-md">{account.recommendedAction}</p>
+                        <td className="px-4 py-4 text-slate-300 min-w-[260px]">
+                          <p className="min-w-[240px] whitespace-normal leading-relaxed">{account.recommendedAction}</p>
                         </td>
                       </tr>
                     ))}
