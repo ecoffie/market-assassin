@@ -41,6 +41,7 @@ import { useAppTracker } from './track';
 export type AppPanel =
   | 'chat'           // Mindy Chat - RAG-backed Q&A (v1, #117)
   | 'dashboard'      // AI Briefings - Daily/Weekly/Pursuit
+  | 'my-market'      // Market Dossier — the one-shot assembled market
   | 'alerts'         // Daily Alerts - opportunity list
   | 'market-intel'   // /app/market-intel — full-bleed dashboard route (not a panel)
   | 'research'       // Market Research (Federal Market Assassin)
@@ -136,6 +137,14 @@ const NAV_SECTIONS: NavSection[] = [
         description: 'AI-prioritized opportunities',
         tier: ['pro', 'team', 'enterprise'],
         badge: 'AI',
+      },
+      {
+        id: 'my-market',
+        label: 'My Market',
+        icon: Target,
+        description: 'Your whole market, assembled',
+        tier: ['pro', 'team', 'enterprise'],
+        badge: 'NEW',
       },
       {
         id: 'alerts',

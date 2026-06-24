@@ -15,32 +15,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunitiesFromCache } from '@/lib/briefings/pipelines/sam-gov';
 import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
-import { resolvePiidToId } from '@/lib/usaspending/award-detail';
 
 export const dynamic = 'force-dynamic';
-export const maxDuration = 60; // per-award offers fetch for the top recompetes
-
-/** Real # offers received for a recompete, from the USASpending award DETAIL
- *  endpoint (the bulk search returns null — offers only live on the award). PIID
- *  → generated_internal_id → award detail. Best-effort; null on any miss. */
-async function fetchOffersForPiid(piid: string): Promise<number | null> {
-  try {
-    const id = await resolvePiidToId(piid);
-    if (!id) return null;
-    const res = await fetch(`https://api.usaspending.gov/api/v2/awards/${encodeURIComponent(id)}/`, {
-      headers: { Accept: 'application/json' },
-    });
-    if (!res.ok) return null;
-    const j = await res.json();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const cd = (j?.latest_transaction?.contract_data || {}) as any;
-    const raw = cd.number_of_offers_received;
-    const n = raw == null ? NaN : Number(raw);
-    return Number.isFinite(n) && n > 0 ? n : null;
-  } catch {
-    return null;
-  }
-}
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -60,14 +36,6 @@ interface DossierOpp {
   competition: 'low' | 'medium' | 'high' | null;
   url: string;
   incumbent?: string | null;     // recompete only
-}
-
-/** Bucket the avg-offers into a winnability signal. ≤3 = low competition (winnable). */
-function competitionBucket(offers: number | null): 'low' | 'medium' | 'high' | null {
-  if (offers == null) return null;
-  if (offers <= 3) return 'low';
-  if (offers <= 7) return 'medium';
-  return 'high';
 }
 
 export async function GET(request: NextRequest) {
@@ -157,24 +125,14 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // Fetch REAL offer counts for the top recompetes (per-award detail; capped to keep
-  // latency + USASpending load sane). Best-effort — misses stay null.
-  await Promise.all(
-    recompeteOpps.slice(0, 12).map(async (o) => {
-      if (!o.id) return;
-      const offers = await fetchOffersForPiid(o.id);
-      if (offers != null) { o.offers = offers; o.competition = competitionBucket(offers); }
-    }),
-  );
   opps.push(...recompeteOpps);
 
-  // 3) Rank: recompetes with a KNOWN offer count first, fewest offers = most
-  //    winnable; then everything else by soonest deadline.
+  // 3) Order: open opps first (biddable NOW) by soonest deadline, then recompetes
+  //    by biggest value. (Competition/offers signal deferred — data isn't reliable.)
   opps.sort((a, b) => {
-    const ao = a.offers ?? 999;
-    const bo = b.offers ?? 999;
-    if (ao !== bo) return ao - bo;
-    return (a.deadline || '9999').localeCompare(b.deadline || '9999');
+    if (a.kind !== b.kind) return a.kind === 'open' ? -1 : 1;
+    if (a.kind === 'open') return (a.deadline || '9999').localeCompare(b.deadline || '9999');
+    return b.value - a.value;
   });
 
   return NextResponse.json(
