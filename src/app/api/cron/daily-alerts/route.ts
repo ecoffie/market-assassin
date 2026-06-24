@@ -556,8 +556,13 @@ async function runDailyAlertJob(options?: {
           console.log(`[Daily Alerts] Using default NAICS for ${user.user_email}: ${userNaics.join(', ')}`);
         }
 
-        // EXPAND NAICS codes to include related codes (e.g., 541 → all 541xxx)
-        const expandedNaics = expandNAICSCodes(userNaics);
+        // Normalize codes — expand short prefixes ("541" → 541xxx) but KEEP
+        // 6-digit codes EXACT (expandFullCodes=false). Recall comes from the
+        // matcher widening each code to its 4-digit industry group at query time;
+        // blowing 6-digit codes out to the full 3-digit family here would re-add
+        // the cross-industry noise (561710 pest control → 561xxx office-admin /
+        // security guards) that the matcher fix removes.
+        const expandedNaics = expandNAICSCodes(userNaics, false);
 
         // Get related PSC codes for broader search
         const relatedPSCs: string[] = [];

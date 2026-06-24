@@ -1026,10 +1026,21 @@ function applySamCacheFilters(query: any, params: SAMSearchParams) {
   const whatClauses: string[] = [];
 
   if (naicsCodes.length > 0) {
+    // Widen each code to its 4-digit INDUSTRY GROUP, not the 3-digit subsector.
+    // The 4-digit level groups genuinely-similar industries (5617 = ALL building
+    // services: pest control, janitorial, landscaping, carpet cleaning). The
+    // 3-digit subsector is a grab-bag — 561 also lumps in security guards (5616),
+    // office admin (5611) and telemarketing (5614), so a pest-control profile was
+    // getting security-camera and call-center alerts. 4-digit keeps the relevant
+    // neighbors and drops the cross-industry noise — tighter matching for EVERY
+    // tool (daily alerts, briefings, dossier, market dashboard share this filter).
+    // A code stored shorter than 4 digits (user typed a 3-digit subsector on
+    // purpose) passes through at its own length.
     const prefixes = new Set<string>();
     for (const code of naicsCodes) {
-      const prefix = code.slice(0, 3);
-      if (prefix.length === 3 && /^\d{3}$/.test(prefix)) prefixes.add(prefix);
+      const digits = String(code).replace(/[^\d]/g, '');
+      if (digits.length < 2) continue;
+      prefixes.add(digits.length <= 4 ? digits : digits.slice(0, 4));
     }
     for (const prefix of prefixes) whatClauses.push(`naics_code.like.${prefix}%`);
   }
