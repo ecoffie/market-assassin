@@ -20,6 +20,16 @@ interface DatasetEntry {
   provenance: Provenance;
   count: number | null;
   note?: string;
+  sources?: string[];
+}
+
+interface RecreateCost {
+  distinctSources: number;
+  formats: number;
+  formatList: string[];
+  agencies: string;
+  linesOfCode: number;
+  commits: number;
 }
 
 interface InventoryData {
@@ -27,6 +37,7 @@ interface InventoryData {
   generatedAt: string;
   datasets: DatasetEntry[];
   totals: { exclusiveRecords: number; curatedRecords: number; cachedRecords: number; allMeasured: number };
+  recreateCost?: RecreateCost;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   sourceTrace?: { forecastsByAgency?: any[] };
 }
@@ -114,6 +125,23 @@ export default function DataInventoryPage() {
           <Stat label="All measured" value={fmt(data.totals.allMeasured)} color="text-white" />
         </div>
 
+        {/* What it took to build — the breadth / recreate-cost story (demo day) */}
+        {data.recreateCost && (
+          <div className="mb-6 rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/40 to-slate-900 p-5">
+            <h2 className="text-sm font-semibold uppercase tracking-wider text-emerald-300 mb-3">🏗️ What it took to build</h2>
+            <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+              <BuildStat value={`${data.recreateCost.distinctSources}`} label="distinct sources" />
+              <BuildStat value={`${data.recreateCost.formats}`} label="data formats" title={data.recreateCost.formatList.join(' · ')} />
+              <BuildStat value={data.recreateCost.agencies} label="federal agencies" />
+              <BuildStat value={`${Math.round(data.recreateCost.linesOfCode / 1000)}K+`} label="lines of code" />
+              <BuildStat value={`${data.recreateCost.commits.toLocaleString()}`} label="commits" />
+            </div>
+            <p className="mt-3 text-xs text-slate-400">
+              ~{fmt(data.totals.allMeasured)} records pulled from {data.recreateCost.distinctSources} sources in {data.recreateCost.formats} formats across {data.recreateCost.agencies} agencies — then normalized, scored, embedded, and joined to one market.
+            </p>
+          </div>
+        )}
+
         {/* Pies */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-6">
           <ChartCard title="By dataset">
@@ -147,21 +175,31 @@ export default function DataInventoryPage() {
               <tr>
                 <th className="text-left px-4 py-2">Dataset</th>
                 <th className="text-right px-4 py-2">Count</th>
+                <th className="text-center px-4 py-2">Sources</th>
                 <th className="text-left px-4 py-2">Provenance</th>
-                <th className="text-left px-4 py-2">Source</th>
+                <th className="text-left px-4 py-2">Pulled from</th>
               </tr>
             </thead>
             <tbody>
               {data.datasets.map((d) => (
-                <tr key={d.key} className="border-t border-slate-800">
+                <tr key={d.key} className="border-t border-slate-800 align-top">
                   <td className="px-4 py-2 text-white">{d.label}{d.note && <span className="block text-[11px] text-slate-500">{d.note}</span>}</td>
                   <td className="px-4 py-2 text-right font-mono text-emerald-300">{typeof d.count === 'number' ? fmt(d.count) : 'live'}</td>
+                  <td className="px-4 py-2 text-center font-mono text-amber-300">{d.sources?.length ?? '—'}</td>
                   <td className="px-4 py-2">
                     <span className="rounded px-2 py-0.5 text-[11px]" style={{ background: PROVENANCE_META[d.provenance].color + '22', color: PROVENANCE_META[d.provenance].color }}>
                       {PROVENANCE_META[d.provenance].label}
                     </span>
                   </td>
-                  <td className="px-4 py-2 text-slate-400 text-xs">{d.source}</td>
+                  <td className="px-4 py-2 text-slate-400 text-xs">
+                    {d.sources?.length ? (
+                      <div className="flex flex-wrap gap-1">
+                        {d.sources.map((s) => (
+                          <span key={s} className="rounded border border-slate-700 bg-slate-800/50 px-1.5 py-0.5 text-[11px] text-slate-300">{s}</span>
+                        ))}
+                      </div>
+                    ) : d.source}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -179,6 +217,15 @@ function Stat({ label, value, color }: { label: string; value: string; color: st
     <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
       <div className={`text-2xl font-bold ${color}`}>{value}</div>
       <div className="text-xs text-slate-500 mt-0.5">{label}</div>
+    </div>
+  );
+}
+
+function BuildStat({ value, label, title }: { value: string; label: string; title?: string }) {
+  return (
+    <div className="text-center" title={title}>
+      <div className="text-3xl font-bold text-emerald-300">{value}</div>
+      <div className="text-[11px] uppercase tracking-wider text-slate-400 mt-1">{label}</div>
     </div>
   );
 }
