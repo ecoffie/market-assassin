@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { isSearchableKeyword } from '@/lib/market/keyword-sanitize';
 import { naicsSubsectorPrefixes } from '@/lib/utils/naics-expansion';
 import { getMindyFeedbackSignals, scoreOpportunityWithMindyFeedback } from '@/lib/mindy/feedback-scoring';
@@ -338,11 +339,21 @@ export async function GET(request: NextRequest) {
   let naicsCodes: string[] = [];
   let userProfile: UserOpportunityProfile | null = null;
 
+  // Coach Mode: when operating a client, the feed must match the CLIENT's
+  // profile, not the coach's. Without this, a client (esp. one with no codes)
+  // showed the coach's matched opportunities (Eric, Jun 25 — Drone Monster saw
+  // GovCon Giants' construction Sources Sought). Resolve the active workspace and
+  // read the client's synthetic notification row.
+  const { workspaceId: activeWsId, asClient } = email
+    ? await resolveActiveWorkspace(email, request)
+    : { workspaceId: '', asClient: false };
+  const profileEmail = asClient ? clientNotificationEmail(activeWsId) : email;
+
   if (email) {
     const { data: profile } = await supabase
       .from('user_notification_settings')
       .select('naics_codes,keywords,business_description,business_type,set_aside_preferences,location_states')
-      .eq('user_email', email)
+      .eq('user_email', profileEmail)
       .maybeSingle();
 
     userProfile = profile || null;
@@ -357,7 +368,21 @@ export async function GET(request: NextRequest) {
     naicsCodes = naicsParam.split(',').map(n => n.trim());
   }
 
-  // Default NAICS if none specified
+  // A coach-managed CLIENT with no codes yet must NOT inherit the generic default
+  // NAICS — returning consulting opps for a drone client is just as wrong as
+  // showing the coach's. Return empty so the UI prompts to set up the client.
+  // (Eric, Jun 25.) Own-account users keep the default so they always see SOMETHING.
+  if (naicsCodes.length === 0 && asClient && !naicsParam && !keyword) {
+    return NextResponse.json({
+      success: true,
+      opportunities: [],
+      total: 0,
+      needsClientSetup: true,
+      message: 'This client has no NAICS codes yet — set up their profile to see matched opportunities.',
+    });
+  }
+
+  // Default NAICS if none specified (own-account fallback only).
   if (naicsCodes.length === 0) {
     naicsCodes = ['541512', '541611', '541330', '541990', '561210'];
   }
