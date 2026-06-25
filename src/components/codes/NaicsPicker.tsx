@@ -39,6 +39,7 @@ export function NaicsPicker({
 }: NaicsPickerProps) {
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<NaicsEntry[]>([]);
+  const [searching, setSearching] = useState(false);
   const [isOpen, setIsOpen] = useState(false);
   const [activeIndex, setActiveIndex] = useState(0);
   const inputRef = useRef<HTMLInputElement>(null);
@@ -47,12 +48,49 @@ export function NaicsPicker({
   useEffect(() => {
     if (query.trim().length < 2) {
       setResults([]);
+      setSearching(false);
       return;
     }
+    // 1) Local title-search first (instant). Works for terms that appear in a
+    // NAICS title ("cybersecurity", "aircraft").
     const r = searchNaics(query, { limit: 8, level });
-    // Exclude already-picked codes
-    setResults(r.filter(e => !value.includes(e.code)));
-    setActiveIndex(0);
+    const local = r.filter(e => !value.includes(e.code));
+    if (local.length > 0) {
+      setResults(local);
+      setActiveIndex(0);
+      setSearching(false);
+      return;
+    }
+
+    // 2) Nothing locally → colloquial term ("drone", "demolition"). Fall back to
+    // the keyword-coverage engine (USASpending-grounded), debounced. This is the
+    // "drone problem" fix: NAICS titles never contain "drone", so title-search
+    // alone returned nothing and the user couldn't add codes (Eric, Jun 25).
+    let cancelled = false;
+    setSearching(true);
+    const t = setTimeout(async () => {
+      try {
+        const res = await fetch('/api/suggest-codes', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ description: query.trim() }),
+        });
+        const d = await res.json().catch(() => null);
+        if (cancelled) return;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const sugg = (Array.isArray(d?.naicsSuggestions) ? d.naicsSuggestions : []) as Array<{ code: string; name: string }>;
+        const mapped: NaicsEntry[] = sugg
+          .filter((s) => s.code && !value.includes(s.code))
+          .map((s) => ({ code: s.code, title: s.name } as NaicsEntry));
+        setResults(mapped);
+        setActiveIndex(0);
+      } catch {
+        if (!cancelled) setResults([]);
+      } finally {
+        if (!cancelled) setSearching(false);
+      }
+    }, 350);
+    return () => { cancelled = true; clearTimeout(t); };
   }, [query, value, level]);
 
   useEffect(() => {
@@ -140,8 +178,11 @@ export function NaicsPicker({
         />
 
         {/* Suggestions dropdown */}
-        {isOpen && (results.length > 0 || showAddRawHint) && (
+        {isOpen && (results.length > 0 || showAddRawHint || searching) && (
           <div className="absolute z-20 mt-1 w-full max-h-64 overflow-y-auto rounded-lg border border-slate-700 bg-slate-900 shadow-xl">
+            {searching && results.length === 0 && (
+              <div className="px-3 py-2 text-sm text-slate-400">Finding codes for &ldquo;{query.trim()}&rdquo;…</div>
+            )}
             {results.map((entry, i) => (
               <button
                 key={entry.code}
