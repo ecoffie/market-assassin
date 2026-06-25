@@ -2744,3 +2744,28 @@ walked all ~800 customers with a 1s sleep per page before subscriptions. New
 inline, and BULK-upserts — measured end-to-end at **6.4s, 0 errors** (was 290s+
 timeout). `?full=1` keeps the deep customers sync for periodic runs. Cache verified
 current (90 active subs). Typecheck + full build pass.
+
+---
+
+## "Set up my Mindy" — Auto-setup populates your real surfaces (My Market → receipt)
+
+**What it does (plain English):** Instead of a separate "My Market" page that
+re-aggregated everything in one place, Mindy now has a one-click "✨ Set up my
+Mindy" that puts what it found into the surfaces you actually work in. v1 fills My
+Target List with the agencies buying in your market — each carrying its sources
+sought, events, and contacts in context. Then it shows a short receipt ("added N
+agencies → Open My Target List"). It's ADD-ONLY: it never overwrites anything you
+set by hand, so the customize ("Sport") path always survives. Power users who want
+to build it all themselves still can.
+
+**Why it matters:** This is the standard-setup-vs-customize pattern every good SaaS
+offers on first open. It SIMPLIFIES Mindy — "My Market" is removed from the sidebar
+(one less destination to manage), data stays in context next to the agency it
+describes, and a new user goes from empty to a working Target List in one click.
+
+**SEO angle:** *automatic GovCon market setup, done-for-you federal target list.*
+
+**Proof:** `/api/app/auto-setup` reuses the existing target-market-research scan +
+the existing user_target_list write (no new tables/columns); add-only via the
+table's unique constraint (23505 → skipped). Sidebar `my-market` item removed; the
+Dossier panel becomes the receipt with a deep link. Typecheck + full build pass.

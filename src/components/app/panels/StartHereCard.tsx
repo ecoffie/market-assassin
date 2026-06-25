@@ -90,7 +90,10 @@ export default function StartHereCard({ email, onGo }: StartHereCardProps) {
       // the checklist contradicting the targeting card's "your codes already
       // cover 96% — keywords catch the rest." (Eric, Jun 23 2026.)
       { key: 'psc', label: 'PSC codes (auto-handled)', detail: 'Mindy derives these from your NAICS automatically. Add specific ones in Settings for extra precision (optional).', done: hasPsc || hasNaics, panel: 'settings' },
-      { key: 'targets', label: 'Build your target list', detail: 'Pick the agencies + offices you want to pursue.', done: targetCount > 0, panel: 'target-list' },
+      // Routes to Auto-setup ("Set up my Mindy") so a first-timer gets their
+      // Target List populated in one click instead of facing an empty list.
+      // Once they have targets, the step is done and the link is moot.
+      { key: 'targets', label: 'Build your target list', detail: 'Let Mindy add the agencies buying in your market — or pick your own.', done: targetCount > 0, panel: 'my-market' },
       { key: 'pursuit', label: 'Save your first pursuit', detail: 'Track an opportunity you’re going after.', done: pipelineCount > 0, panel: 'pipeline' },
       { key: 'bid', label: 'Draft your first response', detail: 'Let Mindy help you write a proposal/LOI.', done: libraryCount > 0, panel: 'proposals' },
     ]);

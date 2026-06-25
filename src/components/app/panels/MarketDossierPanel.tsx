@@ -58,10 +58,44 @@ function daysLeft(deadline: string | null): string {
   return new Date(deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
 }
 
+interface AutoSetupReceipt {
+  added: number;
+  skipped: number;
+  agenciesFound: number;
+  addedNames: string[];
+}
+
 export default function MarketDossierPanel({ email, onNavigate }: { email: string | null; onNavigate?: (p: AppPanel) => void }) {
   const [data, setData] = useState<DossierData | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  // "Set up my Mindy" (Auto): seeds the Target List from the scan, then shows a
+  // receipt with a deep link. Add-only — never touches what you set by hand.
+  const [autoRunning, setAutoRunning] = useState(false);
+  const [receipt, setReceipt] = useState<AutoSetupReceipt | null>(null);
+  const [autoError, setAutoError] = useState<string | null>(null);
+
+  const runAutoSetup = useCallback(async () => {
+    if (!email || autoRunning) return;
+    setAutoRunning(true); setAutoError(null); setReceipt(null);
+    try {
+      const res = await fetch('/api/app/auto-setup', {
+        method: 'POST',
+        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ email }),
+      });
+      const d = await res.json();
+      if (res.ok && d.success) {
+        setReceipt({ added: d.added, skipped: d.skipped, agenciesFound: d.agenciesFound, addedNames: d.addedNames || [] });
+      } else {
+        setAutoError(d.error || d.message || 'Could not set up your Mindy. Try again.');
+      }
+    } catch {
+      setAutoError('Something went wrong. Try again.');
+    } finally {
+      setAutoRunning(false);
+    }
+  }, [email, autoRunning]);
 
   const load = useCallback(async () => {
     if (!email) return;
@@ -93,6 +127,47 @@ export default function MarketDossierPanel({ email, onNavigate }: { email: strin
           {data?.generatedAt && <span className="text-slate-600">· updated {timeAgo(data.generatedAt)}</span>}
         </p>
       </div>
+
+      {/* Auto-setup: one click to put what Mindy found into the surfaces you
+          actually work in. Becomes a receipt with a deep link after it runs. */}
+      {receipt ? (
+        <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-5">
+          <p className="text-sm font-semibold text-emerald-200">✅ Your Mindy is set up</p>
+          <p className="mt-1 text-sm text-slate-300">
+            Added <b className="text-white">{receipt.added}</b> buying {receipt.added === 1 ? 'agency' : 'agencies'} to your Target List
+            {receipt.skipped > 0 && <span className="text-slate-400"> · {receipt.skipped} already there</span>}.
+            Each one carries its sources sought, events, and contacts.
+          </p>
+          {receipt.addedNames.length > 0 && (
+            <p className="mt-1 text-xs text-slate-500 truncate">{receipt.addedNames.slice(0, 5).join(' · ')}</p>
+          )}
+          <button
+            onClick={() => onNavigate?.('target-list')}
+            className="mt-3 rounded-lg bg-emerald-600 px-4 py-2 text-sm font-semibold text-white hover:bg-emerald-500"
+          >
+            Open My Target List →
+          </button>
+        </div>
+      ) : (
+        <div className="rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 to-slate-900/40 p-5">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <div className="min-w-0">
+              <p className="text-sm font-semibold text-white">Want Mindy to set this up for you?</p>
+              <p className="mt-0.5 text-sm text-slate-400">
+                We&apos;ll add the agencies buying in your market to your Target List — with their sources sought, events, and contacts attached. You can fine-tune anything after.
+              </p>
+              {autoError && <p className="mt-1 text-xs text-red-300">{autoError}</p>}
+            </div>
+            <button
+              onClick={runAutoSetup}
+              disabled={autoRunning}
+              className="shrink-0 rounded-lg bg-emerald-600 px-4 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+            >
+              {autoRunning ? 'Setting up…' : '✨ Set up my Mindy'}
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Market hero (reuses the aggregator) */}
       {naics && <MarketDataMap naics={naics} email={email || undefined} />}

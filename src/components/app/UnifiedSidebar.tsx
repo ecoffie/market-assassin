@@ -138,17 +138,11 @@ const NAV_SECTIONS: NavSection[] = [
         tier: ['pro', 'team', 'enterprise'],
         badge: 'AI',
       },
-      {
-        id: 'my-market',
-        label: 'My Market',
-        icon: Target,
-        description: 'Your whole market, assembled',
-        // FREE can OPEN it — they get a capped preview (top 5 open + 3 recompetes)
-        // with the remainder behind a Pro upgrade card. The dossier IS the "aha",
-        // so it should do conversion work, not sit locked behind the sidebar.
-        tier: ['free', 'pro', 'team', 'enterprise'],
-        badge: 'NEW',
-      },
+      // 'my-market' removed from the sidebar (Eric, Jun 25): it was a parallel
+      // aggregated destination that duplicated data the real surfaces already
+      // hold in-context. The Dossier panel now serves as the one-time "receipt"
+      // after Auto-setup ("Set up my Mindy"), reached from onboarding + the
+      // Today's Intel empty state — not a nav item to manage.
       {
         id: 'alerts',
         label: 'Source Feed',
