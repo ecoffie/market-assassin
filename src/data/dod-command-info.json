@@ -1,7 +1,7 @@
 {
   "metadata": {
     "description": "Federal Agency Information Database - Forecasts, Websites, and Office of Small Business Programs (OSBP) Contacts for DoD and Civilian Agencies",
-    "lastUpdated": "2025-12-26",
+    "lastUpdated": "2026-06-25",
     "version": "2.0"
   },
   "commands": {
@@ -2774,7 +2774,7 @@
       "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=DFAS",
       "smallBusinessOffice": {
         "name": "DoD Office of Small Business Programs",
-        "director": "Ms. Farooq Mitha",
+        "director": "Mr. James R. Mismash",
         "phone": "(571) 372-6289",
         "email": "osd.osbp@mail.mil",
         "address": "4800 Mark Center Drive, Suite 15G08, Alexandria, VA 22350"
@@ -2794,7 +2794,7 @@
       "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=DTRA",
       "smallBusinessOffice": {
         "name": "DoD Office of Small Business Programs",
-        "director": "Ms. Farooq Mitha",
+        "director": "Mr. James R. Mismash",
         "phone": "(571) 372-6289",
         "email": "osd.osbp@mail.mil",
         "address": "4800 Mark Center Drive, Suite 15G08, Alexandria, VA 22350"
@@ -3445,7 +3445,7 @@
       "smallBusinessWebsite": "https://business.defense.gov/",
       "smallBusinessOffice": {
         "name": "DoD Office of Small Business Programs",
-        "director": "Ms. Farooq Mitha",
+        "director": "Mr. James R. Mismash",
         "phone": "(571) 372-6289",
         "email": "osd.osbp@mail.mil",
         "address": "4800 Mark Center Drive, Suite 15G08, Alexandria, VA 22350"

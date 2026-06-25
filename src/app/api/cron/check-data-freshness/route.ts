@@ -7,6 +7,12 @@
  * Surfaces the stale list (and optionally emails it). Does NOT auto-refresh —
  * the refresh scripts (~/Bootcamp/*.py, scripts/*.js) are run deliberately; this
  * is the watchdog that says "it's time."
+ *
+ * Also monitors LIVE syncs (LIVE_SYNC_CHECKS) by table recency, so a silently
+ * broken pipeline (e.g. the daily federal_contacts SAM sync) raises the same
+ * alert instead of rotting unnoticed. NOTE: for that live-sync alert to be
+ * timely, the dispatcher should fire this daily — quarterly only is too slow to
+ * catch a down sync.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
@@ -61,6 +67,33 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // Live-sync freshness (not curated scrapers — these are crons that must keep
+  // running; there's nothing to "stamp"). We read each monitored table's newest
+  // row: if the pipeline has gone quiet past its window the cron is likely down,
+  // so we flag it like a stale source and the same alert fires. Closes the gap
+  // where a silently-broken daily federal_contacts sync raised no alarm.
+  for (const lc of LIVE_SYNC_CHECKS) {
+    try {
+      const { data: latest } = await sb
+        .from(lc.table)
+        .select(lc.column)
+        .order(lc.column, { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      const ts = (latest as Record<string, string> | null)?.[lc.column];
+      if (!ts) {
+        stale.push({ key: lc.key, name: lc.name, cadence: 'live-sync', ageDays: 9999, refreshWith: `${lc.refreshWith} (table empty / no timestamp)` });
+        continue;
+      }
+      const ageDays = Math.round((now - new Date(ts).getTime()) / 86400_000);
+      if (ageDays > lc.staleDays) {
+        stale.push({ key: lc.key, name: lc.name, cadence: 'live-sync', ageDays, refreshWith: lc.refreshWith });
+      }
+    } catch (e) {
+      stale.push({ key: lc.key, name: lc.name, cadence: 'live-sync', ageDays: -1, refreshWith: `${lc.refreshWith} (check failed: ${e instanceof Error ? e.message : 'unknown'})` });
+    }
+  }
+
   // When sources are overdue, EMAIL the refresh checklist (cron runs unattended,
   // so JSON alone is invisible). The refreshes are human-run scrapers; the email
   // tells Eric exactly which script to run, then ?stamp=<key> marks it done.
@@ -75,10 +108,10 @@ export async function GET(request: NextRequest) {
       ).join('');
       await sendEmail({
         to: 'evankoffdev@gmail.com',
-        subject: `📊 ${stale.length} Mindy data source(s) due for refresh`,
+        subject: `📊 ${stale.length} Mindy data source(s) need attention`,
         html: `<div style="font-family:system-ui;max-width:640px">
-          <h2 style="color:#1e3a8a">Quarterly data refresh due</h2>
-          <p>${stale.length} curated source(s) are past their refresh cadence. Run each script, then mark it refreshed.</p>
+          <h2 style="color:#1e3a8a">Data freshness check</h2>
+          <p>${stale.length} source(s) need attention — curated sources past their refresh cadence (run the script, then mark refreshed) and/or a live sync that has gone quiet (check its cron). See the "Refresh with" column.</p>
           <table style="border-collapse:collapse;width:100%"><thead><tr style="background:#f3f4f6">
             <th style="padding:6px 12px;text-align:left">Source</th><th style="padding:6px 12px;text-align:left">Age</th><th style="padding:6px 12px;text-align:left">Refresh with</th></tr></thead>
           <tbody>${rows}</tbody></table>
@@ -105,6 +138,20 @@ export async function GET(request: NextRequest) {
     message: stale.length === 0 ? 'All curated data sources are within cadence.' : `${stale.length} source(s) due for refresh.`,
   });
 }
+
+// Live syncs we monitor by table recency (max updated_at), NOT by a stamped
+// last_built. If the newest row is older than staleDays, the cron is probably
+// down. Add a row here to bring another live pipeline under the watchdog.
+const LIVE_SYNC_CHECKS: Array<{ key: string; name: string; table: string; column: string; staleDays: number; refreshWith: string }> = [
+  {
+    key: 'federal_contacts_sync',
+    name: 'Government contacts (SAM POC daily sync)',
+    table: 'federal_contacts',
+    column: 'updated_at',
+    staleDays: 3, // daily sync; 3d of silence = pipeline likely broken
+    refreshWith: 'live sync — verify /api/cron/sync-gov-buyer-data is running',
+  },
+];
 
 // How to refresh each curated source (the runnable path — keep in sync with the
 // registry doc's "Refresh ownership" section).
