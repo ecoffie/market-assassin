@@ -1,6 +1,38 @@
 # GovCon Giants - Tasks by Priority
 
-**Last Updated:** June 23, 2026
+**Last Updated:** June 25, 2026
+
+---
+
+## 🔜 AFTER DEMO — deferred cleanup
+
+- [ ] **Retire legacy `mi_beta_user_settings.naics_codes` column.** Dead: never
+  written anymore (Settings stopped writing it in the June consistency pass), only
+  read as a stale fallback for un-migrated profiles. It's a `DROP COLUMN` →
+  hand-run Supabase DDL, so do it carefully as its own task: grep every read →
+  confirm fallback-only → write idempotent migration → Eric runs it in Supabase →
+  verify. Low-risk but it's DDL. Context: `docs/strategy/MINDY-NAV-CONSOLIDATION.md`.
+
+---
+
+## 📋 SESSION HANDOFF — June 25, 2026 (Coach Mode fixes + nav simplification)
+
+Shipped live to getmindy.ai this session (all verified Ready on prod):
+- Stripe-cache sync timeout fixed (290s→8s, subscriptions-fast path) + Command
+  Center "Refresh purchases" button.
+- Coach Mode leak fixes: display identity (Cassandra/Excell) was leaking the coach's
+  name to every client — now client-scoped; Source Feed / matched-opps now scope to
+  the active client (was showing coach's construction opps for a drone client); empty
+  client shows "set up this client", not coach data or default NAICS.
+- Auto-setup "✨ Set up my Mindy": distributes the market scan into My Target List
+  (add-only); removed "My Market" from sidebar (Dossier = receipt). Fixed it returning
+  0 agencies (wrong TMR field names → now calls find-agencies directly).
+- NaicsPicker resolves colloquial terms ("drone"→336411/334511 via keyword-coverage).
+- Settings: one "describe what you do" box → NAICS+PSC together; manual fields collapse.
+- Vault↔Settings: NAICS sync now additive + visible; cross-links both ways.
+- My Library folded into My Vault as the "Generated" tab; removed from sidebar
+  (`?panel=library` deep links redirect into Vault). Member Access v2 (verify-before-
+  grant + comp/advocate auto-labels) shipped earlier.
 
 ---
 
