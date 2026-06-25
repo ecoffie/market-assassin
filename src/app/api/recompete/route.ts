@@ -230,15 +230,19 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // Build query
-  let query = supabase
-    .from('recompete_opportunities')
-    .select('*', { count: 'exact' });
-
-  // Filter: contracts expiring in the future
   const monthsAhead = parseInt(monthsParam, 10) || 18;
   const maxDate = new Date();
   maxDate.setMonth(maxDate.getMonth() + monthsAhead);
+
+  // Build a freshly-filtered query each call — lets us PAGE (PostgREST caps each
+  // response at 1000) without reusing a consumed builder. All filters below are
+  // applied inside; the caller adds .order()/.range().
+  function buildBaseQuery() {
+  let query = supabase
+    .from('recompete_opportunities')
+    .select('*');
+
+  // Filter: contracts expiring in the future
   query = query
     .gt('period_of_performance_current_end', new Date().toISOString().split('T')[0])
     .lte('period_of_performance_current_end', maxDate.toISOString().split('T')[0])
@@ -300,6 +304,9 @@ export async function GET(request: NextRequest) {
     query = query.eq('recompete_likelihood', likelihoodParam);
   }
 
+  return query;
+  }
+
   // Sorting
   const sortField = {
     value: 'total_obligation',
@@ -309,15 +316,30 @@ export async function GET(request: NextRequest) {
     lead_time: 'lead_time_months',
   }[sortParam] || 'total_obligation';
 
-  query = query.order(sortField, { ascending: orderParam === 'asc' });
-
-  // Pagination
   const limit = Math.min(parseInt(limitParam, 10) || 50, 200);
   const offset = parseInt(offsetParam, 10) || 0;
-  query = query.range(offset, offset + limit - 1);
 
-  // Execute query
-  const { data: contracts, count, error } = await query;
+  // GROUP-THEN-PAGINATE (Eric, Jun 25): to de-duplicate multiple-award IDIQs we
+  // must group across the WHOLE filtered set, then paginate the VEHICLES — not the
+  // raw awardee rows (per-page grouping was a no-op, since a vehicle's winners
+  // rarely land on one page). PostgREST caps a single response at 1000 rows, so
+  // PAGE THROUGH the filtered set (up to a safe cap), then group + slice. The
+  // filtered set (after NAICS/agency/value) is normally well under this cap.
+  const GROUP_FETCH_CAP = 6000;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const allFiltered: any[] = [];
+  let error: { message?: string } | null = null;
+  // Page through (PostgREST caps each response at 1000). A fresh builder per page
+  // (buildBaseQuery) avoids reusing a consumed query object.
+  for (let from = 0; from < GROUP_FETCH_CAP; from += 1000) {
+    const pageQuery = buildBaseQuery().order(sortField, { ascending: orderParam === 'asc' }).range(from, from + 999);
+    const { data: chunk, error: chunkErr } = await pageQuery;
+    if (chunkErr) { error = chunkErr; break; }
+    if (!chunk || chunk.length === 0) break;
+    allFiltered.push(...chunk);
+    if (chunk.length < 1000) break;
+  }
+  const contracts = allFiltered; // (kept name for the rest of the handler)
 
   if (error) {
     console.error('Recompete query error:', error);
@@ -361,13 +383,24 @@ export async function GET(request: NextRequest) {
     .map(([name, count]) => ({ name, count }));
 
   // VEHICLE ROLLUP (Eric, Jun 25): a multiple-award IDIQ has N winners stored as
-  // N rows — counting them as N recompetes is inflated (1 vehicle, 5 awardees).
-  // Collapse this page into vehicles so the user sees ONE card per IDIQ with its
-  // awardees listed, not 23 identical VA T4NG rows. (Pure display-time grouping;
-  // raw rows unchanged. True cross-page vehicle total is a post-demo follow-up —
-  // see todo. For now the page is de-duplicated + a note flags when it collapsed.)
-  const groups = groupRecompetesByVehicle(contracts || []);
-  const vehicles = groups.map((g) => ({
+  // N rows — counting them as N recompetes is inflated (1 vehicle, N awardees).
+  // Group the WHOLE filtered set into vehicles, then paginate the VEHICLES so the
+  // count + cards both reflect real vehicles (CIO-SP3 196 winners → 1 vehicle).
+  const allGroups = groupRecompetesByVehicle(contracts || []);
+  const vehicleTotal = allGroups.length;
+  // Re-apply the requested sort at the VEHICLE level (group order isn't guaranteed
+  // to match the row sort). Sort by the lead row's chosen field.
+  const sortGetter = (v: { lead: Record<string, unknown> }): number | string => {
+    const val = v.lead[sortField];
+    return typeof val === 'number' ? val : String(val ?? '');
+  };
+  allGroups.sort((a, b) => {
+    const av = sortGetter(a), bv = sortGetter(b);
+    const cmp = av < bv ? -1 : av > bv ? 1 : 0;
+    return orderParam === 'asc' ? cmp : -cmp;
+  });
+  const pageGroups = allGroups.slice(offset, offset + limit);
+  const vehicles = pageGroups.map((g) => ({
     ...g.lead,
     is_multi_award: g.members.length > 1,
     awardee_count: g.incumbentCount,
@@ -376,7 +409,9 @@ export async function GET(request: NextRequest) {
     vehicle_expiry: g.latestExpiry,
     vehicle_key: g.key,
   }));
-  const collapsedFrom = (contracts?.length || 0) - vehicles.length;
+  const collapsedFrom = (contracts?.length || 0) - vehicleTotal;
+  // The page of raw rows for back-compat consumers = the members of this page's vehicles.
+  const pageContracts = pageGroups.flatMap((g) => g.members);
 
   return NextResponse.json({
     success: true,
@@ -394,13 +429,15 @@ export async function GET(request: NextRequest) {
     pagination: {
       limit,
       offset,
-      total: count || 0,
-      hasMore: (offset + limit) < (count || 0),
+      // Count is now VEHICLES (de-inflated), not raw awardee rows.
+      total: vehicleTotal,
+      hasMore: (offset + limit) < vehicleTotal,
+      rawRowTotal: contracts?.length || 0,  // pre-rollup count (for transparency)
     },
     summary: {
-      resultCount: contracts?.length || 0,
-      vehicleCount: vehicles.length,        // de-duplicated: 1 per IDIQ vehicle
-      collapsedFrom,                        // how many awardee rows folded into vehicles on this page
+      resultCount: vehicles.length,         // vehicles on this page
+      vehicleCount: vehicleTotal,           // total de-duplicated vehicles in the filtered set
+      collapsedFrom,                        // awardee rows folded out across the whole set
       totalValue,
       totalValueFormatted: `$${(totalValue / 1000000).toFixed(1)}M`,
       byLikelihood: likelyhoodCounts,
@@ -408,8 +445,8 @@ export async function GET(request: NextRequest) {
     },
     // Vehicle-grouped view (1 card per IDIQ with its awardees) — prefer this in UI.
     vehicles,
-    // Raw awardee rows kept for back-compat / drill-down.
-    contracts: contracts || [],
+    // Raw awardee rows for THIS PAGE's vehicles (back-compat / drill-down).
+    contracts: pageContracts,
     endpoints: {
       stats: '/api/recompete?stats=true',
       byNaics: '/api/recompete?naics=541512',
