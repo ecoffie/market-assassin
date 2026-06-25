@@ -1856,26 +1856,6 @@
       },
       "keyCapabilities": ["Scientific Research", "STEM Education", "Research Grants", "IT Systems", "Laboratory Equipment"]
     },
-    "USAID": {
-      "fullName": "U.S. Agency for International Development",
-      "abbreviation": "USAID",
-      "parentAgency": "U.S. Agency for International Development",
-      "website": "https://www.usaid.gov",
-      "forecastUrl": "https://www.usaid.gov/work-usaid/how-to-work-with-usaid/resources-for-partners",
-      "samForecastUrl": "https://sam.gov/search/?index=opp&sort=-relevance&page=1&pageSize=25&sfm%5Bstatus%5D%5Bis_active%5D=true&sfm%5BsimpleSearch%5D%5BkeywordRadio%5D=ALL&sfm%5BsimpleSearch%5D%5BkeywordTags%5D%5B0%5D%5Bkey%5D=USAID",
-      "smallBusinessOffice": {
-        "name": "USAID Office of Small and Disadvantaged Business Utilization",
-        "director": "Mauricio Vera",
-        "phone": "(202) 567-4730",
-        "email": "osdbu@usaid.gov",
-        "address": "1300 Pennsylvania Avenue NW, Washington, DC 20523"
-      },
-      "acquisitionOffice": {
-        "name": "USAID Office of Acquisition and Assistance",
-        "website": "https://www.usaid.gov/work-usaid"
-      },
-      "keyCapabilities": ["International Development", "Humanitarian Aid", "Global Health", "Economic Growth", "Democracy Programs"]
-    },
     "NRC": {
       "fullName": "Nuclear Regulatory Commission",
       "abbreviation": "NRC",
