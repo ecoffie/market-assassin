@@ -48,6 +48,8 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
   // True when these Settings are for a coach-managed CLIENT (synthetic
   // @clients.getmindy.ai profile) — gates the "Client alert email" field.
   const [isClientProfile, setIsClientProfile] = useState(false);
+  // Styled "Start over?" confirm (replaces native window.confirm).
+  const [showResetConfirm, setShowResetConfirm] = useState(false);
   const [workspaceName, setWorkspaceName] = useState('Workspace');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -313,12 +315,16 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
   // can rebuild from scratch (Eric QC 2026-06-17: no in-product "start over"; you
   // could only delete codes one by one). Clears the form, persists the empty state
   // to user_notification_settings (the source of truth), refreshes the card.
-  const resetProfile = async () => {
+  // Open the styled in-app confirm (replaces the native window.confirm, which
+  // didn't match Mindy's UI). The actual reset runs in confirmResetProfile().
+  const resetProfile = () => {
     if (!email) return;
-    if (typeof window !== 'undefined' &&
-        !window.confirm('Start over? This clears your codes, keywords, and agencies, then walks you back through guided setup to rebuild your profile.')) {
-      return;
-    }
+    setShowResetConfirm(true);
+  };
+
+  const confirmResetProfile = async () => {
+    if (!email) return;
+    setShowResetConfirm(false);
     setSaving(true); setError(null); setMessage(null);
     try {
       const res = await fetch('/api/alerts/preferences', {
@@ -368,6 +374,40 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
 
   return (
     <div className="p-6 space-y-6 max-w-6xl">
+      {/* Styled "Start over?" confirm — replaces the native window.confirm so it
+          matches Mindy's dark UI. */}
+      {showResetConfirm && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
+          onClick={() => setShowResetConfirm(false)}
+        >
+          <div
+            className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h3 className="text-lg font-bold text-white">Start over?</h3>
+            <p className="mt-2 text-sm text-slate-400">
+              This clears your codes, keywords, and agencies, then walks you back through guided setup to rebuild your
+              profile. Your saved pursuits and target list aren&apos;t touched.
+            </p>
+            <div className="mt-5 flex justify-end gap-3">
+              <button
+                onClick={() => setShowResetConfirm(false)}
+                className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={confirmResetProfile}
+                className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-500"
+              >
+                Start over
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div>
         <h1 className="text-2xl font-bold text-white">Settings</h1>
         <p className="text-slate-400 mt-1">{workspaceName} • {tierLabel(tier)}</p>
