@@ -96,37 +96,37 @@ export async function POST(request: NextRequest) {
     );
   }
 
-  // 2) Run the SAME buying-agency scan Market Research uses (don't reinvent it).
-  // TMR takes ONE naicsCode, so scan the top few codes and merge — keeps coverage
-  // broad without the user managing codes. Dedup by agency+office name.
-  const tmrHeaders: Record<string, string> = {
-    'Content-Type': 'application/json',
-    // Forward auth so the scan runs as this user / workspace.
-    'x-mi-auth-token': request.headers.get('x-mi-auth-token') || '',
-    'x-mi-2fa-token': request.headers.get('x-mi-2fa-token') || '',
-    ...(request.headers.get('x-active-workspace') ? { 'x-active-workspace': request.headers.get('x-active-workspace')! } : {}),
-  };
+  // 2) Find the buying agencies — call find-agencies directly (NOT the richer
+  // target-market-research). find-agencies needs NO MI session auth and returns
+  // the exact fields we map, so it avoids the server→server auth-forward + 308
+  // body-drop fragility that made Auto silently return 0 agencies in Coach Mode.
+  // It takes ONE naicsCode, so scan the top 3 profile codes and merge/dedup.
   const base = internalBaseUrl(request);
-  const codesToScan = naicsCodes.slice(0, 3); // top 3 codes → plenty of agencies
+  const codesToScan = naicsCodes.slice(0, 3);
   const byKey = new Map<string, ScanAgency>();
+  const scanErrors: string[] = [];
   try {
     const scans = await Promise.all(
-      (codesToScan.length ? codesToScan : ['']).map((code) =>
-        fetch(`${base}/api/app/target-market-research`, {
+      codesToScan.map((code) =>
+        fetch(`${base}/api/usaspending/find-agencies`, {
           method: 'POST',
-          headers: tmrHeaders,
-          // TMR's real field names (NOT naics/keywords): one `naicsCode` + the
-          // saved `profileKeywords` (Auto mode unions them into discovery).
-          // Passing `naics`/`keywords` was silently ignored → 0 agencies.
-          body: JSON.stringify({ email, naicsCode: code, profileKeywords: keywords, locationStates: states }),
-        }).then((r) => r.json()).catch(() => null),
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ naicsCode: code, ...(states.length ? { locationStates: states } : {}) }),
+        })
+          .then(async (r) => ({ ok: r.ok, status: r.status, body: await r.json().catch(() => null) }))
+          .catch((e) => ({ ok: false, status: 0, body: null as unknown, err: String(e) })),
       ),
     );
-    for (const data of scans) {
-      for (const a of (Array.isArray(data?.agencies) ? data.agencies : []) as ScanAgency[]) {
+    for (const s of scans) {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sb = s as any;
+      if (!s.ok || !sb.body?.success) {
+        scanErrors.push(sb.body?.error || `find-agencies ${s.status}`);
+        continue;
+      }
+      for (const a of (Array.isArray(sb.body.agencies) ? sb.body.agencies : []) as ScanAgency[]) {
         const key = `${(a.name || '').toLowerCase()}|${(a.contractingOffice || '').toLowerCase()}`;
         const prev = byKey.get(key);
-        // Keep the higher-spend instance when the same office shows up twice.
         if (!prev || (a.setAsideSpending || 0) > (prev.setAsideSpending || 0)) byKey.set(key, a);
       }
     }
@@ -141,9 +141,18 @@ export async function POST(request: NextRequest) {
     .sort((x, y) => (y.setAsideSpending || 0) - (x.setAsideSpending || 0));
 
   if (agencies.length === 0) {
+    // Surface the REAL reason instead of a generic "none found" (the silent
+    // failure). If every scan errored, say so; otherwise it's genuinely empty.
+    const allFailed = scanErrors.length > 0 && scanErrors.length === codesToScan.length;
     return NextResponse.json(
-      { success: false, error: 'No matching buying agencies found for your codes.' },
-      { status: 200 },
+      {
+        success: false,
+        error: allFailed
+          ? `Market scan failed: ${scanErrors[0]}`
+          : 'No matching buying agencies found for your codes.',
+        scanErrors: scanErrors.slice(0, 3),
+      },
+      { status: allFailed ? 502 : 200 },
     );
   }
 
@@ -152,6 +161,7 @@ export async function POST(request: NextRequest) {
   let added = 0;
   let skipped = 0;
   const addedNames: string[] = [];
+  let insertError: string | null = null;
 
   for (const a of agencies.slice(0, MAX_AGENCIES)) {
     const officeName = a.contractingOffice || a.name;
@@ -166,7 +176,9 @@ export async function POST(request: NextRequest) {
       office_name: officeName,
       location: a.location || null,
       source_naics: sourceNaics,
-      set_aside_spending: Math.round(a.setAsideSpending || 0),
+      // set_aside_spending can be billions — round to a safe integer; clamp so a
+      // bigint/int column can't reject the row and fail the whole batch silently.
+      set_aside_spending: Math.min(Math.round(a.setAsideSpending || 0), 9_000_000_000),
       contract_count: Math.round(a.contractCount || 0),
       status: 'targeting',
       priority: 'medium',
@@ -178,8 +190,18 @@ export async function POST(request: NextRequest) {
       addedNames.push(a.name);
     } else if (error.code === '23505') {
       skipped++; // already in their list — add-only, leave it
+    } else if (!insertError) {
+      insertError = error.message; // remember the first real failure
     }
-    // other errors: skip silently, keep going (best-effort batch)
+  }
+
+  // If we found agencies but couldn't write ANY (and none were dupes), that's a
+  // real failure — surface it instead of a misleading "added 0".
+  if (added === 0 && skipped === 0 && insertError) {
+    return NextResponse.json(
+      { success: false, error: `Found ${agencies.length} agencies but couldn't save them: ${insertError}`, agenciesFound: agencies.length },
+      { status: 500 },
+    );
   }
 
   return NextResponse.json({
@@ -188,7 +210,6 @@ export async function POST(request: NextRequest) {
     added,
     skipped,
     addedNames,
-    // The receipt deep-links here.
     surface: 'target-list',
   });
 }
