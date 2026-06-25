@@ -50,6 +50,15 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
   const [isClientProfile, setIsClientProfile] = useState(false);
   // Styled "Start over?" confirm (replaces native window.confirm).
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  // Unified "describe what you do → codes" box (the Market Research pattern):
+  // one input → suggest NAICS + PSC together, tap to add. So users never have to
+  // know which box (NAICS vs PSC) a thing goes in. The manual fields collapse
+  // below for power users. (Eric, Jun 25: "1 search box gives all results".)
+  const [describeText, setDescribeText] = useState('');
+  const [describing, setDescribing] = useState(false);
+  const [describeNaics, setDescribeNaics] = useState<Array<{ code: string; name: string }>>([]);
+  const [describePsc, setDescribePsc] = useState<Array<{ code: string; name: string }>>([]);
+  const [showManualCodes, setShowManualCodes] = useState(false);
   const [workspaceName, setWorkspaceName] = useState('Workspace');
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -181,6 +190,35 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
     const cur = parseList(form.psc_codes);
     const next = cur.includes(code) ? cur.filter((c) => c !== code) : [...cur, code];
     setForm((f) => ({ ...f, psc_codes: next.join(', ') }));
+  }
+
+  // Unified describe → suggest NAICS + PSC together (one box, the MR pattern).
+  async function runDescribeSuggest() {
+    const text = describeText.trim();
+    if (!text || describing) return;
+    setDescribing(true);
+    setDescribeNaics([]); setDescribePsc([]);
+    try {
+      const res = await fetch('/api/suggest-codes', {
+        method: 'POST',
+        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ description: text, maxResults: 6 }),
+      });
+      const d = await res.json().catch(() => null);
+      setDescribeNaics((d?.naicsSuggestions || []).map((s: { code: string; name: string }) => ({ code: s.code, name: s.name })));
+      setDescribePsc((d?.pscSuggestions || []).map((s: { code: string; name: string }) => ({ code: s.code, name: s.name })));
+      // Also seed the keyword so alerts catch the work the codes miss.
+      const kws = parseList(form.keywords);
+      if (!kws.includes(text)) setForm((f) => ({ ...f, keywords: [...kws, text].join(', ') }));
+    } catch { /* leave chips empty; user can fine-tune manually */ }
+    finally { setDescribing(false); }
+  }
+
+  // Toggle a NAICS suggestion into/out of the naics_codes field.
+  function toggleNaicsCode(code: string) {
+    const cur = parseList(form.naics_codes);
+    const next = cur.includes(code) ? cur.filter((c) => c !== code) : [...cur, code];
+    setForm((f) => ({ ...f, naics_codes: next.join(', ') }));
   }
 
   const saveSettings = async (markComplete = form.onboarding_completed) => {
@@ -469,6 +507,81 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                 Your company profile (legal name, UEI, certifications) lives in <span className="text-slate-300">My Vault → Identity</span>.
               </p>
             </div>
+
+            {/* UNIFIED describe → codes. One box; Mindy finds the NAICS + PSC so
+                users never have to know which is which. (Manual fields below.) */}
+            <div className="rounded-xl border border-purple-500/30 bg-purple-500/5 p-4">
+              <label className="block text-sm font-medium text-white mb-1">Not sure of the codes? Describe what you do</label>
+              <div className="flex flex-col gap-2 sm:flex-row">
+                <input
+                  type="text"
+                  value={describeText}
+                  onChange={(e) => setDescribeText(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); runDescribeSuggest(); } }}
+                  placeholder='e.g. "drone repair", "demolition", "IT cybersecurity"'
+                  className="h-10 flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 text-sm text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
+                />
+                <button
+                  onClick={runDescribeSuggest}
+                  disabled={describing || !describeText.trim()}
+                  className="h-10 shrink-0 rounded-lg bg-purple-600 px-5 text-sm font-semibold text-white hover:bg-purple-500 disabled:opacity-50"
+                >
+                  {describing ? 'Finding…' : 'Suggest codes'}
+                </button>
+              </div>
+              {(describeNaics.length > 0 || describePsc.length > 0) && (
+                <div className="mt-3 space-y-2">
+                  {describeNaics.length > 0 && (
+                    <div>
+                      <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">NAICS — tap to add</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {describeNaics.map((s) => {
+                          const added = parseList(form.naics_codes).includes(s.code);
+                          return (
+                            <button key={s.code} onClick={() => toggleNaicsCode(s.code)} title={s.name}
+                              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors ${added ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-200' : 'border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700'}`}>
+                              {added ? '✓' : '+'} {s.code} <span className="max-w-[150px] truncate opacity-70">{s.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                  {describePsc.length > 0 && (
+                    <div>
+                      <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">PSC — what the gov actually buys — tap to add</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {describePsc.map((s) => {
+                          const added = parseList(form.psc_codes).includes(s.code);
+                          return (
+                            <button key={s.code} onClick={() => togglePscSuggestion(s.code)} title={s.name}
+                              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors ${added ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-200' : 'border-purple-500/40 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20'}`}>
+                              {added ? '✓' : '+'} {s.code} <span className="max-w-[150px] truncate opacity-70">{s.name}</span>
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Manual fine-tune — collapsed by default so most users just use the
+                describe box above. Power users expand to paste/edit codes directly. */}
+            <button
+              onClick={() => setShowManualCodes((v) => !v)}
+              className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-200"
+            >
+              <span className={`transition-transform ${showManualCodes ? 'rotate-90' : ''}`}>▸</span>
+              Fine-tune codes manually
+              {(parseList(form.naics_codes).length > 0 || parseList(form.psc_codes).length > 0) && (
+                <span className="text-xs text-slate-500">({parseList(form.naics_codes).length} NAICS · {parseList(form.psc_codes).length} PSC)</span>
+              )}
+            </button>
+
+            {showManualCodes && (
+            <div className="space-y-5 rounded-xl border border-slate-800 bg-slate-950/30 p-4">
             <div>
               <label className="block text-sm font-medium text-slate-300 mb-1">NAICS Codes</label>
               <NaicsPicker
@@ -542,6 +655,8 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                 &ldquo;Save this market to my profile&rdquo; to fill these automatically.
               </p>
             </div>
+            </div>
+            )}
             <Field label="Target Agencies" value={form.target_agencies} onChange={(value) => setForm({ ...form, target_agencies: value })} placeholder="VA, DHS, Army, GSA" />
 
             <StatesField

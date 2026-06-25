@@ -2769,3 +2769,28 @@ describes, and a new user goes from empty to a working Target List in one click.
 the existing user_target_list write (no new tables/columns); add-only via the
 table's unique constraint (23505 → skipped). Sidebar `my-market` item removed; the
 Dossier panel becomes the receipt with a deep link. Typecheck + full build pass.
+
+---
+
+## Settings — one "describe what you do" box (no more NAICS-vs-PSC guessing)
+
+**What it does (plain English):** Settings used to show three separate boxes —
+NAICS, PSC, and Keywords — and users didn't know which to use or which codes to
+pick. Now there's ONE box at the top: "Not sure of the codes? Describe what you
+do." Type "drone repair" → Mindy returns the matching NAICS *and* PSC codes
+together (grounded in real USASpending awards), each as a tap-to-add chip. The
+individual code fields collapse under a "Fine-tune codes manually" expander for
+power users.
+
+**Why it matters:** It's the same pattern that already works in Market Research,
+brought to Settings where the confusing three-box layout lived. Most users never
+touch a code field again — they describe their work in plain words and tap the
+suggestions. Simplifies the highest-friction screen in onboarding.
+
+**SEO angle:** *easy NAICS code finder, describe your business get codes, GovCon
+profile setup.*
+
+**Proof:** Reuses POST /api/suggest-codes (returns naicsSuggestions +
+pscSuggestions from USASpending). Verified: "drones" → 336411 Aircraft Mfg
+($68.9M), 334511 Navigation/Guidance ($41.6M) + PSC 1550 Unmanned Aircraft.
+Manual NAICS/PSC/Keyword fields collapse by default. Typecheck + full build pass.
