@@ -34,6 +34,11 @@ interface ExpiringContract {
   competitionType: string;
   location: { city?: string; state?: string; zip?: string };
   locationMatch?: LocationMatch; // computed vs. the user's service area
+  // Vehicle rollup: when this card represents a multiple-award IDIQ, the other
+  // awardees on the same vehicle (the lead incumbent is `incumbent.name`).
+  isMultiAward?: boolean;
+  awardeeCount?: number;
+  awardees?: string[];
 }
 
 // IDV/IDIQ + task-order row from /api/app/idv-contracts (USASpending). Eric: the
@@ -97,6 +102,11 @@ interface RecompeteApiContract {
   competition_type?: string | null;
   number_of_offers?: number | null;
   recompete_likelihood?: string | null;
+  // Vehicle rollup (multiple-award IDIQ collapsed to 1 card with N awardees).
+  is_multi_award?: boolean;
+  awardee_count?: number;
+  awardees?: string[];
+  combined_ceiling?: number | null;
 }
 
 interface StaticRecompeteContract {
@@ -251,6 +261,9 @@ function mapRecompeteContract(contract: RecompeteApiContract): ExpiringContract 
       state: contract.place_of_performance_state || undefined,
       zip: contract.place_of_performance_zip || undefined,
     },
+    isMultiAward: contract.is_multi_award || false,
+    awardeeCount: contract.awardee_count || 0,
+    awardees: contract.awardees || [],
   };
 }
 
@@ -1038,7 +1051,9 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                       {/* Incumbent — clickable to open YoY award history */}
                       {contract.incumbent?.name && (
                         <div className="flex items-center gap-1.5 mb-2">
-                          <span className="text-xs text-amber-500">Incumbent:</span>
+                          <span className="text-xs text-amber-500">
+                            {contract.isMultiAward ? 'Lead incumbent:' : 'Incumbent:'}
+                          </span>
                           <ContractorLink
                             name={contract.incumbent.name}
                             email={email}
@@ -1047,6 +1062,29 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                           >
                             {contract.incumbent.name}
                           </ContractorLink>
+                        </div>
+                      )}
+
+                      {/* Multiple-award IDIQ rollup: one card = one vehicle, with
+                          its other awardees listed (Eric, Jun 25 — 5 winners = 1
+                          vehicle, not 5 recompetes). */}
+                      {contract.isMultiAward && (contract.awardeeCount || 0) > 1 && (
+                        <div className="mb-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-2.5 py-2">
+                          <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-200">
+                            <span>🏢 Multiple-award IDIQ · {contract.awardeeCount} awardees</span>
+                          </div>
+                          {contract.awardees && contract.awardees.length > 0 && (
+                            <div className="mt-1.5 flex flex-wrap gap-1">
+                              {contract.awardees.slice(0, 12).map((name) => (
+                                <span key={name} className="rounded bg-slate-800 px-1.5 py-0.5 text-[11px] text-slate-300">
+                                  {name}
+                                </span>
+                              ))}
+                              {contract.awardees.length > 12 && (
+                                <span className="px-1 py-0.5 text-[11px] text-slate-500">+{contract.awardees.length - 12} more</span>
+                              )}
+                            </div>
+                          )}
                         </div>
                       )}
 
