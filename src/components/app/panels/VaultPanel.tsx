@@ -5,13 +5,16 @@ import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import { NaicsPicker } from '@/components/codes/NaicsPicker';
 import { NaicsBadgeList } from '@/components/codes/NaicsBadge';
+import LibraryPanel from './LibraryPanel';
 
 interface Props {
   email: string | null;
   tier: AppTier;
+  /** Open straight to a section (e.g. the old /library deep link → 'generated'). */
+  initialSection?: VaultSection;
 }
 
-type VaultSection = 'identity' | 'past_performance' | 'capabilities' | 'team' | 'documents';
+type VaultSection = 'identity' | 'past_performance' | 'capabilities' | 'team' | 'documents' | 'generated';
 
 interface IdentityProfile {
   user_email?: string;
@@ -93,16 +96,20 @@ interface BoilerplateDoc {
   created_at: string;
 }
 
-const SECTIONS: { id: VaultSection; label: string; icon: string; blurb: string }[] = [
+const SECTIONS: { id: VaultSection; label: string; icon: string; blurb: string; proOnly?: boolean }[] = [
   { id: 'identity', label: 'Identity', icon: '🪪', blurb: 'UEI, CAGE, certifications, one-liner' },
   { id: 'past_performance', label: 'Past Performance', icon: '🏆', blurb: 'Real contracts you have won' },
   { id: 'capabilities', label: 'Capabilities', icon: '🛠️', blurb: 'What you can do, tagged by NAICS' },
   { id: 'team', label: 'Key Personnel', icon: '👤', blurb: 'People you put in proposals — bios, clearances' },
   { id: 'documents', label: 'Documents', icon: '📄', blurb: 'Capability statements + boilerplate' },
+  // Folded in from the old top-level "My Library" tab (Eric, Jun 25): Mindy's
+  // generated outputs (drafts, briefings, capability statements) live with the
+  // rest of "your stuff" instead of a separate nav item. Pro+ (as Library was).
+  { id: 'generated', label: 'Generated', icon: '📚', blurb: 'Everything Mindy has drafted for you', proOnly: true },
 ];
 
-export default function VaultPanel({ email, tier }: Props) {
-  const [section, setSection] = useState<VaultSection>('identity');
+export default function VaultPanel({ email, tier, initialSection }: Props) {
+  const [section, setSection] = useState<VaultSection>(initialSection || 'identity');
   const [identity, setIdentity] = useState<IdentityProfile | null>(null);
   const [pastPerf, setPastPerf] = useState<PastPerf[]>([]);
   const [capabilities, setCapabilities] = useState<Capability[]>([]);
@@ -168,8 +175,12 @@ export default function VaultPanel({ email, tier }: Props) {
 
       {/* Section tabs */}
       <div className="flex gap-1 px-4 pt-3 border-b border-slate-800 overflow-x-auto">
-        {SECTIONS.map((s) => {
-          const count = s.id === 'identity' ? null : counts[s.id as keyof typeof counts];
+        {SECTIONS.filter((s) => !s.proOnly || tier !== 'free').map((s) => {
+          // 'identity' has no count; 'generated' (folded-in Library) isn't in the
+          // vault counts map — guard both so the lookup never breaks.
+          const count = (s.id === 'identity' || s.id === 'generated')
+            ? null
+            : counts[s.id as keyof typeof counts];
           const active = section === s.id;
           return (
             <button
@@ -223,6 +234,10 @@ export default function VaultPanel({ email, tier }: Props) {
         )}
         {section === 'documents' && (
           <DocumentsSection email={email} items={docs} onChanged={load} />
+        )}
+        {section === 'generated' && (
+          // Folded-in My Library — Mindy's generated outputs archive.
+          <LibraryPanel email={email} tier={tier} />
         )}
       </div>
     </div>

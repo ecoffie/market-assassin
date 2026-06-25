@@ -312,13 +312,10 @@ const NAV_SECTIONS: NavSection[] = [
         description: 'Your past perf, capabilities, team',
         tier: ['free', 'pro', 'team', 'enterprise'],
       },
-      {
-        id: 'library',
-        label: 'My Library',
-        icon: Library,
-        description: 'Every AI draft, searchable',
-        tier: ['pro', 'team', 'enterprise'],
-      },
+      // 'library' removed from the sidebar (Eric, Jun 25): folded into My Vault
+      // as the "Generated" tab — Mindy's outputs live with the rest of "your
+      // stuff" instead of a separate nav item. The 'library' panel route still
+      // exists and redirects into Vault for old deep links.
       {
         // Account-level team management (seats + roles) — moved here from
         // Pipeline (Eric 2026-06-05): Pipeline is the DEAL board; team admin is

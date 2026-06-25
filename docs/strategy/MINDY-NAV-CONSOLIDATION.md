@@ -38,10 +38,16 @@ do we need My Library as its own tab?"_
   - Vault Identity NAICS now says "the codes Mindy actively watches live in Settings →
     Opportunity Matching."
 
+## Also shipped (Jun 25, second pass)
+
+- **My Library folded into My Vault** as a "Generated" tab. Removed `library` from the
+  sidebar (net-negative surface area); `VaultPanel` gained a `generated` section that
+  renders `LibraryPanel`, Pro+ gated as before. The `library` panel id still routes —
+  it opens Vault straight to the Generated tab (`initialSection="generated"`) so old
+  deep links / `?panel=library` keep working.
+
 ## Deferred / open (not done — decide later)
 
-- **Fold My Library into Vault** as a "Generated" tab (removes a top-level nav item).
-  Deferred per Eric's "lightest" choice; revisit if the sidebar feels heavy.
 - **Retire `mi_beta_user_settings.naics_codes`** (legacy column, never written, only read
   for un-migrated profiles). Code already doesn't write it; the column lingering just
   confuses readers. Safe DROP candidate after verifying no live reads depend on it.

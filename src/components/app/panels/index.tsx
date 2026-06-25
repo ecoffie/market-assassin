@@ -24,7 +24,9 @@ const GrantsPanel = lazy(() => import('./GrantsPanel'));
 const VaultPanel = lazy(() => import('./VaultPanel'));
 const KnowledgeBasePanel = lazy(() => import('./KnowledgeBasePanel'));
 const CoachPanel = lazy(() => import('./CoachPanel'));
-const LibraryPanel = lazy(() => import('./LibraryPanel'));
+// LibraryPanel is no longer routed at top level — it's rendered inside
+// VaultPanel's "Generated" tab (folded in Jun 25). The 'library' panel id
+// redirects into Vault for old deep links.
 const DisaVehicleWatchPanel = lazy(() => import('./DisaVehicleWatchPanel'));
 const OsbpSmbResearchPanel = lazy(() => import('./OsbpSmbResearchPanel'));
 const MiccMrrPanel = lazy(() => import('./MiccMrrPanel'));
@@ -102,7 +104,8 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
       case 'vault':
         return <VaultPanel email={email} tier={tier} />;
       case 'library':
-        return <LibraryPanel email={email} tier={tier} />;
+        // Library folded into Vault's "Generated" tab — old deep links land there.
+        return <VaultPanel email={email} tier={tier} initialSection="generated" />;
       default:
         return <DashboardPanel email={email} tier={tier} onPanelChange={onPanelChange} />;
     }
