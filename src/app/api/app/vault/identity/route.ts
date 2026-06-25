@@ -64,16 +64,19 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   }
 
-  // NAICS SYNC (guarded): the daily-alerts cron reads NAICS from
-  // user_notification_settings, NOT from the Vault. A user who set their NAICS
-  // only in the Vault would never get matching alerts (the gap Eric flagged
-  // 2026-06-04). Seed the alert NAICS from the Vault — but ONLY when the alert
-  // NAICS is currently EMPTY. We must NOT overwrite a tuned alert filter:
-  // Vault primary_naics = all registered codes (identity); alert naics_codes =
-  // what the user chose to watch (preference). Verified those diverge in
-  // practice, so a blind copy would clobber the filter. This makes the Vault a
-  // helpful starting point for new users without being destructive.
-  let alertNaicsSeeded = false;
+  // NAICS SYNC (additive): the daily-alerts cron reads NAICS from
+  // user_notification_settings (Settings = the single source of truth alerts
+  // read), NOT the Vault. A user who set NAICS only in the Vault would never get
+  // matching alerts (the gap Eric flagged 2026-06-04). So Vault Identity NAICS
+  // now SYNC INTO Settings — but ADDITIVELY: we only ADD Vault codes the alert
+  // filter is missing, never remove/overwrite the user's tuned picks (Vault
+  // primary_naics = all registered codes; alert naics_codes = what they chose to
+  // watch — those legitimately diverge). The route returns how many were added so
+  // the UI can confirm "synced to your alerts" instead of the old silent seed.
+  // (Eric, Jun 25: Settings owns targeting; Vault auto-syncs into it, visibly.)
+  let alertNaicsSeeded = false;       // kept for back-compat (true if any added)
+  let alertNaicsAdded = 0;
+  let alertNaicsTotal = 0;
   const vaultNaics = Array.isArray(row.primary_naics)
     ? row.primary_naics.filter((c: unknown) => typeof c === 'string' && /^\d{2,6}$/.test(c))
     : [];
@@ -84,21 +87,28 @@ export async function PUT(request: NextRequest) {
         .select('naics_codes')
         .eq('user_email', auth.email!)
         .maybeSingle();
-      const alertEmpty = !ns || !Array.isArray(ns.naics_codes) || ns.naics_codes.length === 0;
-      if (alertEmpty) {
+      const current: string[] = Array.isArray(ns?.naics_codes) ? ns!.naics_codes.map(String) : [];
+      const currentSet = new Set(current);
+      const missing = vaultNaics.filter((c: string) => !currentSet.has(c));
+      if (missing.length > 0) {
+        const merged = [...current, ...missing];
         await getSupabase()
           .from('user_notification_settings')
           .upsert(
-            { user_email: auth.email!, naics_codes: vaultNaics, updated_at: new Date().toISOString() },
+            { user_email: auth.email!, naics_codes: merged, updated_at: new Date().toISOString() },
             { onConflict: 'user_email' },
           );
+        alertNaicsAdded = missing.length;
         alertNaicsSeeded = true;
+        alertNaicsTotal = merged.length;
+      } else {
+        alertNaicsTotal = current.length;
       }
     } catch (e) {
       // Non-fatal — the identity save already succeeded. Log only.
-      console.error('[vault/identity] alert NAICS seed failed:', (e as Error)?.message);
+      console.error('[vault/identity] alert NAICS sync failed:', (e as Error)?.message);
     }
   }
 
-  return NextResponse.json({ success: true, identity: data, alertNaicsSeeded });
+  return NextResponse.json({ success: true, identity: data, alertNaicsSeeded, alertNaicsAdded, alertNaicsTotal });
 }

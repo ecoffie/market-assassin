@@ -262,11 +262,15 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const result = await res.json().catch(() => ({}));
-      // If the save seeded the user's alert NAICS from this profile (because
-      // their alert filter was empty), tell them — otherwise the sync is
-      // invisible. We don't auto-overwrite an existing alert filter.
-      if (result?.alertNaicsSeeded) {
-        setNaicsSeededNote('Your NAICS were also applied to alerts & briefings. Fine-tune them anytime in Settings.');
+      // Vault NAICS sync ADDITIVELY into Settings (the source of truth alerts
+      // read). Report the actual count so the sync is concrete, not invisible —
+      // and point users to Settings as the home for fine-tuning. Add-only: we
+      // never remove the user's tuned alert codes.
+      if (result?.alertNaicsAdded > 0) {
+        const n = result.alertNaicsAdded;
+        setNaicsSeededNote(`Added ${n} NAICS ${n === 1 ? 'code' : 'codes'} to your alerts & briefings. Fine-tune them anytime in Settings → Opportunity Matching.`);
+      } else if (result?.alertNaicsSeeded) {
+        setNaicsSeededNote('Your NAICS were applied to alerts & briefings. Fine-tune them anytime in Settings.');
       }
       setSavedAt(new Date().toLocaleTimeString());
       onSaved();
@@ -356,7 +360,8 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
           placeholder='Search NAICS by description (e.g. "consulting") or paste code'
         />
         <p className="text-xs text-slate-500 mt-1">
-          The NAICS codes you bid on. Powers opportunity matching across alerts + briefings.
+          The NAICS codes you bid on — your company identity. Saving here also <b className="text-slate-300">adds them to your alerts</b>.
+          The codes Mindy actively watches live in <b className="text-slate-300">Settings → Opportunity Matching</b> (you can fine-tune there).
         </p>
       </div>
 
