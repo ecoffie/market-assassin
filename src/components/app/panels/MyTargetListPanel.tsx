@@ -125,8 +125,41 @@ export default function MyTargetListPanel({
   const [agencyResults, setAgencyResults] = useState<Array<{ name: string; parent?: string }>>([]);
   const [searchingAgencies, setSearchingAgencies] = useState(false);
   const [addingAgency, setAddingAgency] = useState<string | null>(null);
+  // "Set up my Mindy" (Auto): one click seeds the empty list from the market
+  // scan. Add-only on the server, so it's safe to offer right here.
+  const [autoRunning, setAutoRunning] = useState(false);
+  const [autoError, setAutoError] = useState<string | null>(null);
   const { showToast } = useToast();
   const track = useAppTracker(email);
+
+  const runAutoSetup = useCallback(async () => {
+    if (!email || autoRunning) return;
+    setAutoRunning(true); setAutoError(null);
+    try {
+      const res = await fetch('/api/app/auto-setup', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
+        body: JSON.stringify({ email }),
+      });
+      const d = await res.json();
+      if (res.ok && d.success) {
+        showToast({ message: `Added ${d.added} ${d.added === 1 ? 'agency' : 'agencies'} to your Target List${d.skipped ? ` (${d.skipped} already there)` : ''}`, variant: 'success' });
+        await loadTargets();
+      } else if (d.needsProfile) {
+        setAutoError('Add NAICS codes or keywords to your profile first.');
+      } else if (d.upgrade_required) {
+        setAutoError(d.message || 'Saved target lists are a Mindy Pro feature.');
+      } else {
+        setAutoError(d.error || 'Could not set up your list. Try again.');
+      }
+    } catch {
+      setAutoError('Something went wrong. Try again.');
+    } finally {
+      setAutoRunning(false);
+    }
+  // loadTargets is declared just below; referenced lazily so order is fine.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email, autoRunning]);
 
   const loadTargets = useCallback(async () => {
     if (!email) {
@@ -547,11 +580,22 @@ export default function MyTargetListPanel({
       )}
 
       {targets.length === 0 && !isFree && !error && (
-        <div className="rounded-lg border border-slate-800 bg-slate-900/30 p-8 text-center">
-          <p className="text-slate-200 mb-2">Your target list is empty.</p>
-          <p className="text-xs text-slate-500">
-            Use the <span className="text-emerald-400">search box above</span> to add an agency,
-            or open <span className="text-purple-300">Market Research</span> to add a specific office.
+        <div className="rounded-lg border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 to-slate-900/40 p-8 text-center">
+          <p className="text-lg font-semibold text-white">Want Mindy to set this up for you?</p>
+          <p className="mx-auto mt-1 max-w-md text-sm text-slate-400">
+            We&apos;ll add the agencies buying in your market — each with its sources sought, events, and contacts attached. You can fine-tune anything after.
+          </p>
+          {autoError && <p className="mt-2 text-xs text-red-300">{autoError}</p>}
+          <button
+            onClick={runAutoSetup}
+            disabled={autoRunning}
+            className="mt-4 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
+          >
+            {autoRunning ? 'Setting up…' : '✨ Set up my Mindy'}
+          </button>
+          <p className="mt-4 text-xs text-slate-500">
+            Or build it yourself — use the <span className="text-emerald-400">search box above</span> to add an agency,
+            or open <span className="text-purple-300">Market Research</span> for a specific office.
           </p>
         </div>
       )}
