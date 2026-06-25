@@ -16,7 +16,7 @@ import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { getOfficesForAgency } from '@/lib/bigquery/agencies';
 import { deriveSubAgency } from '@/lib/gov-contacts/derive-subagency';
 import { decodeDodaac, expandOfficeName } from '@/lib/gov-contacts/dodaac';
-import { loadDodaacNames } from '@/lib/gov-contacts/dodaac-directory';
+import { loadDodaacNames, dodaacCodesForAgency } from '@/lib/gov-contacts/dodaac-directory';
 import { getEnhancedAgencyInfo } from '@/lib/utils/command-info';
 
 export const dynamic = 'force-dynamic';
@@ -340,7 +340,27 @@ export async function GET(request: NextRequest) {
     // name OR title match
     q = q.or(`contact_fullname.ilike.%${search}%,contact_title.ilike.%${search}%`);
   }
+  // DoDAAC ANCHORING (the factual fix): DoD POCs in federal_contacts are ALL
+  // tagged "DEPT OF DEFENSE", so a sub-agency (DARPA, MDA, NAVAIR…) collapses to
+  // the whole department and shows the same DoD-wide people — the wrong contacts
+  // (@dla.mil under DARPA). But the solicitation_number's DoDAAC prefix
+  // identifies the REAL office (DARPA = HR0011, MDA = HQ08xx). When the target
+  // agency resolves to office codes in dodaac_directory, filter by those prefixes
+  // instead of the broad department label. (Eric, Jun 25 — competitors anchor on
+  // the office, not the department.)
+  let anchoredByDodaac = false;
   if (agency) {
+    const dodaacCodes = await dodaacCodesForAgency(agency);
+    if (dodaacCodes.length > 0) {
+      // solicitation_number STARTS WITH a 6-char DoDAAC. Match any of the
+      // sub-agency's codes. (PostgREST .or with ilike per code.)
+      const orExpr = dodaacCodes.slice(0, 60).map((c) => `solicitation_number.ilike.${c}%`).join(',');
+      q = q.or(orExpr);
+      anchoredByDodaac = true;
+    }
+  }
+  if (agency && !anchoredByDodaac) {
+    // Fallback (civilian agencies, or DoD sub-agencies not in the directory):
     // federal_contacts stores by PARENT department ("INTERIOR, DEPARTMENT OF"),
     // but a target may be a SUB-agency ("Bureau of Land Management" → 0 matches).
     // Map common sub-agencies to their parent keyword first.

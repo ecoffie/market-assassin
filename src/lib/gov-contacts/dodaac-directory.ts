@@ -14,6 +14,14 @@ let _cache: Map<string, string> | null = null;
 let _cacheAt = 0;
 const TTL_MS = 60 * 60 * 1000; // 1h
 
+// sub_agency (lowercased) → set of DoDAAC codes. Lets us anchor contacts to the
+// REAL contracting office instead of the broad department label — DoD POCs in
+// federal_contacts are all tagged "DEPT OF DEFENSE", so DARPA/MDA/etc. collapse
+// to the whole department. The solicitation_number prefix (a DoDAAC) identifies
+// the actual sub-agency (DARPA = HR0011, MDA = HQ08xx). (Eric, Jun 25.)
+let _subAgencyCodes: Map<string, Set<string>> | null = null;
+let _subAgencyCodesAt = 0;
+
 function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 }
@@ -42,4 +50,64 @@ export async function loadDodaacNames(): Promise<Map<string, string>> {
   _cache = map;
   _cacheAt = Date.now();
   return map;
+}
+
+/** Load (and cache) sub_agency → set of DoDAAC codes. */
+async function loadSubAgencyCodes(): Promise<Map<string, Set<string>>> {
+  if (_subAgencyCodes && Date.now() - _subAgencyCodesAt < TTL_MS) return _subAgencyCodes;
+  const map = new Map<string, Set<string>>();
+  try {
+    for (let from = 0; from < 60000; from += 1000) {
+      const { data, error } = await sb()
+        .from('dodaac_directory')
+        .select('dodaac, sub_agency')
+        .not('sub_agency', 'is', null)
+        .range(from, from + 999);
+      if (error || !data || data.length === 0) break;
+      for (const r of data as { dodaac: string; sub_agency: string }[]) {
+        if (!r.dodaac || !r.sub_agency) continue;
+        const key = r.sub_agency.toLowerCase().trim();
+        if (!map.has(key)) map.set(key, new Set());
+        map.get(key)!.add(r.dodaac.toUpperCase());
+      }
+      if (data.length < 1000) break;
+    }
+  } catch { /* unreachable — callers fall back to the department-label filter */ }
+  _subAgencyCodes = map;
+  _subAgencyCodesAt = Date.now();
+  return map;
+}
+
+/** Normalize an agency name for sub-agency matching (drop generic words). */
+function normalizeAgencyKey(name: string): string {
+  return name
+    .toLowerCase()
+    .replace(/\b(department|dept|of|the|us|u\.s\.|,|\(.*?\))\b/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+}
+
+/**
+ * Resolve a target agency name → the DoDAAC office codes that belong to it, so
+ * contacts can be anchored to the REAL office (DARPA, MDA, NAVAIR…) instead of
+ * the whole "DEPT OF DEFENSE" pool. Matches the directory's sub_agency labels
+ * (exact, then either-contains). Returns [] when nothing maps (caller keeps the
+ * department-label filter — civilian agencies, unknown names).
+ */
+export async function dodaacCodesForAgency(agencyName: string): Promise<string[]> {
+  const target = normalizeAgencyKey(agencyName);
+  if (target.length < 3) return [];
+  const bySubAgency = await loadSubAgencyCodes();
+  const codes = new Set<string>();
+  for (const [subAgency, codeSet] of bySubAgency) {
+    const sa = normalizeAgencyKey(subAgency);
+    if (!sa) continue;
+    // Exact, or either side contains the other (handles "Missile Defense Agency"
+    // vs the directory's "missile defense agency (mda)"). Guard against the
+    // 1-word over-match by requiring the shorter string be a real token-run.
+    if (sa === target || (target.length >= 4 && (sa.includes(target) || target.includes(sa)))) {
+      for (const c of codeSet) codes.add(c);
+    }
+  }
+  return Array.from(codes);
 }
