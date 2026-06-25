@@ -30,14 +30,18 @@ export async function GET(request: NextRequest) {
 
   // Coach Mode: the targeting card (NAICS/PSC/keywords) must reflect the CLIENT
   // being managed, not the coach. Resolve the active workspace and read the
-  // client's notification row when operating as a client. (Display fields below
-  // stay on the coach's own rows — only targeting is client-scoped here.)
+  // client's notification row when operating as a client. Display fields are
+  // ALSO client-scoped (a client's name/company must not show the coach's — that
+  // leaked "Cassandra / Excell" into every client's Settings; Eric, Jun 25).
   const { workspaceId: activeWsId, asClient } = await resolveActiveWorkspace(email, request);
   const notifEmail = asClient ? clientNotificationEmail(activeWsId) : normalizedEmail;
+  // Display identity (name/company) is keyed by the client's synthetic email when
+  // operating as a client, so it reads THAT client's row, not the coach's.
+  const displayEmail = notifEmail;
 
   const [{ data: members }, { data: settings }, { data: workspaceSettings }, { data: notificationProfile }, { data: briefingProfile }, { data: activity }, { data: pipeline }] = await Promise.all([
     supabase.from('mi_beta_team_members').select('*').eq('workspace_id', workspaceId).order('created_at', { ascending: true }),
-    supabase.from('mi_beta_user_settings').select('*').eq('user_email', normalizedEmail).maybeSingle(),
+    supabase.from('mi_beta_user_settings').select('*').eq('user_email', displayEmail).maybeSingle(),
     // Workspace-level defaults (company, NAICS, agencies) shared by all members —
     // distinct from the per-user mi_beta_user_settings row above. Tolerate the
     // table not existing yet (migration 20260602_workspace_settings.sql) so the
@@ -350,7 +354,14 @@ export async function PATCH(request: NextRequest) {
     });
   }
 
-  const workspaceId = getWorkspaceId(email);
+  // Coach Mode: a client's display fields (name/company) must save to the
+  // CLIENT's row, not the coach's — otherwise editing a client's name overwrites
+  // the coach's identity and leaks across every client (the "Cassandra / Excell"
+  // bug; Eric, Jun 25). Resolve the active workspace and key the write by the
+  // client's synthetic email when operating as a client.
+  const { workspaceId: activeWsId, asClient } = await resolveActiveWorkspace(email, request);
+  const workspaceId = asClient ? activeWsId : getWorkspaceId(email);
+  const displayEmail = asClient ? clientNotificationEmail(activeWsId) : email;
   // DISPLAY FIELDS ONLY. Targeting (naics_codes, target_agencies, psc, keywords,
   // states) is OWNED by user_notification_settings — the table alerts/feed/briefings
   // read. We deliberately do NOT write targeting here anymore: writing it to BOTH
@@ -360,7 +371,7 @@ export async function PATCH(request: NextRequest) {
   // workspace-display flags only.
   const updates = {
     workspace_id: workspaceId,
-    user_email: email,
+    user_email: displayEmail,
     company_name: body.company_name || null,
     display_name: body.display_name || null,
     role_title: body.role_title || null,
