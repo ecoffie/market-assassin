@@ -28,6 +28,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { groupRecompetesByVehicle } from '@/lib/recompete/vehicle-grouping';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -359,6 +360,24 @@ export async function GET(request: NextRequest) {
     .slice(0, 10)
     .map(([name, count]) => ({ name, count }));
 
+  // VEHICLE ROLLUP (Eric, Jun 25): a multiple-award IDIQ has N winners stored as
+  // N rows — counting them as N recompetes is inflated (1 vehicle, 5 awardees).
+  // Collapse this page into vehicles so the user sees ONE card per IDIQ with its
+  // awardees listed, not 23 identical VA T4NG rows. (Pure display-time grouping;
+  // raw rows unchanged. True cross-page vehicle total is a post-demo follow-up —
+  // see todo. For now the page is de-duplicated + a note flags when it collapsed.)
+  const groups = groupRecompetesByVehicle(contracts || []);
+  const vehicles = groups.map((g) => ({
+    ...g.lead,
+    is_multi_award: g.members.length > 1,
+    awardee_count: g.incumbentCount,
+    awardees: g.incumbentNames.slice(0, 25),
+    combined_ceiling: g.combinedCeiling,
+    vehicle_expiry: g.latestExpiry,
+    vehicle_key: g.key,
+  }));
+  const collapsedFrom = (contracts?.length || 0) - vehicles.length;
+
   return NextResponse.json({
     success: true,
     query: {
@@ -380,11 +399,16 @@ export async function GET(request: NextRequest) {
     },
     summary: {
       resultCount: contracts?.length || 0,
+      vehicleCount: vehicles.length,        // de-duplicated: 1 per IDIQ vehicle
+      collapsedFrom,                        // how many awardee rows folded into vehicles on this page
       totalValue,
       totalValueFormatted: `$${(totalValue / 1000000).toFixed(1)}M`,
       byLikelihood: likelyhoodCounts,
       topIncumbents,
     },
+    // Vehicle-grouped view (1 card per IDIQ with its awardees) — prefer this in UI.
+    vehicles,
+    // Raw awardee rows kept for back-compat / drill-down.
     contracts: contracts || [],
     endpoints: {
       stats: '/api/recompete?stats=true',

@@ -6,6 +6,16 @@
 
 ## 🔜 AFTER DEMO — deferred cleanup
 
+- [ ] **Recompete vehicle rollup — make the GLOBAL count true.** Shipped query-time
+  grouping: `groupRecompetesByVehicle()` collapses multiple-award IDIQ winners
+  (same IDV root + agency + NAICS) into ONE vehicle with N awardees — fixes the
+  "196 NIH CIO-SP3 winners showed as 196 recompetes" inflation (9,481 rows → 8,639
+  vehicles, 120 true clusters). BUT it currently groups only the RETURNED PAGE, so
+  the headline `pagination.total` is still the raw DB count and a cluster only fully
+  collapses if all its awardees are on one page. To make the global count truthful:
+  either (a) persist a `vehicle_key` column (migration + backfill) and COUNT/paginate
+  on it, or (b) group-then-paginate in the query layer. Lib: `src/lib/recompete/
+  vehicle-grouping.ts`; UI should prefer the new `vehicles[]` array over `contracts[]`.
 - [ ] **DoD sub-agency collapse — remaining surfaces.** Fixed the demo-critical ones
   (contacts directory, office-roster facet, TMR open-opp count — all DoDAAC-anchored).
   Remaining from the audit (`commit 73f107d8` + the count fix): (a) **events count**

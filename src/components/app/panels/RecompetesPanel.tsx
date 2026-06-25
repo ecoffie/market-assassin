@@ -422,7 +422,11 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
 
       if (!data.success) throw new Error(data.error || 'Failed to search contracts');
 
-      const mappedContracts = ((data.contracts || []) as RecompeteApiContract[]).map(mapRecompeteContract);
+      // Prefer the VEHICLE-grouped view (1 card per IDIQ, awardees listed) over
+      // raw awardee rows, so a 196-winner vehicle isn't 196 duplicate cards
+      // (Eric, Jun 25). Falls back to contracts if vehicles isn't present.
+      const source = (data.vehicles?.length ? data.vehicles : data.contracts) || [];
+      const mappedContracts = (source as RecompeteApiContract[]).map(mapRecompeteContract);
       applyFilters(mappedContracts, naics, months, competition, usingProfileDefaults ? profileDefaults : null);
     } catch (err) {
       console.error('Contract search error:', err);
