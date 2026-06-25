@@ -446,7 +446,9 @@ function MarketIntelDashboard() {
       params.set('mode', 'stats');
       if (isProfileFiltered) params.set('email', email);
 
-      const res = await fetch(`/api/mi-dashboard?${params.toString()}`);
+      // Coach Mode: forward x-active-workspace so the dashboard scopes to the
+      // active CLIENT's profile, not the coach's (mirrors every other MI fetch).
+      const res = await fetch(`/api/mi-dashboard?${params.toString()}`, { headers: getMIApiHeaders(email) });
       const data = await res.json();
       if (data.success) {
         setStats(data.stats);
@@ -473,7 +475,9 @@ function MarketIntelDashboard() {
       if (hasSow) params.set('hasSow', 'true');
       if (status !== 'active') params.set('status', status); // active(default)|inactive|all
 
-      const res = await fetch(`/api/mi-dashboard?${params.toString()}`);
+      // Coach Mode: forward x-active-workspace so opportunities scope to the
+      // active CLIENT's profile, not the coach's.
+      const res = await fetch(`/api/mi-dashboard?${params.toString()}`, { headers: getMIApiHeaders(email) });
       const data = await res.json();
       if (data.success) {
         setOpportunities(data.opportunities);
