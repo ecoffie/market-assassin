@@ -7,6 +7,12 @@ import commandInfoData from '@/data/dod-command-info.json';
 export interface SmallBusinessOffice {
   name: string;
   director: string;
+  /**
+   * "YYYY-MM" when the named director was last verified against an official
+   * source. Present → show a freshness stamp. Absent → treat `director` as an
+   * unverified name or a role-title; the office + mailbox is the starting point.
+   */
+  directorVerified?: string;
   phone: string;
   email: string;
   address: string;

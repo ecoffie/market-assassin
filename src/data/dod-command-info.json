@@ -15,6 +15,7 @@
       "smallBusinessOffice": {
         "name": "NAVFAC Office of Small Business Programs",
         "director": "Bianca Henderson",
+        "directorVerified": "2026-06",
         "phone": "(202) 685-9119",
         "email": "navfac_small_business@us.navy.mil",
         "address": "1322 Patterson Ave SE, Washington Navy Yard, DC 20374"
@@ -35,6 +36,7 @@
       "smallBusinessOffice": {
         "name": "NAVSEA Office of Small Business Programs",
         "director": "Patricia Anne Bannister",
+        "directorVerified": "2026-06",
         "phone": "(202) 781-3939",
         "email": "navsea_small_business@navy.mil",
         "address": "1333 Isaac Hull Ave SE, Washington Navy Yard, DC 20376"
@@ -55,6 +57,7 @@
       "smallBusinessOffice": {
         "name": "NAVAIR Office of Small Business Programs",
         "director": "LaDonne Liebler",
+        "directorVerified": "2026-06",
         "phone": "(301) 342-2358",
         "email": "navair_small_business@navy.mil",
         "address": "Building 2272, 47123 Buse Rd, Patuxent River, MD 20670"
@@ -75,6 +78,7 @@
       "smallBusinessOffice": {
         "name": "NAVWAR Office of Small Business Programs",
         "director": "Kimberly A. Reidy",
+        "directorVerified": "2026-06",
         "phone": "(619) 524-7700",
         "email": "navwar_osbp@navy.mil",
         "address": "4301 Pacific Highway, San Diego, CA 92110"
@@ -95,6 +99,7 @@
       "smallBusinessOffice": {
         "name": "MCSC Office of Small Business Programs",
         "director": "Marisa Perez",
+        "directorVerified": "2026-06",
         "phone": "(703) 432-3946",
         "email": "mcsc_smallbusiness@usmc.mil",
         "address": "2200 Lester Street, Quantico, VA 22134"
@@ -375,6 +380,7 @@
       "smallBusinessOffice": {
         "name": "USACE Office of Small Business Programs",
         "director": "Beth White (Acting)",
+        "directorVerified": "2026-06",
         "phone": "(202) 761-0725",
         "email": "usace.smallbusiness@usace.army.mil",
         "address": "441 G Street NW, Washington, DC 20314"
@@ -415,6 +421,7 @@
       "smallBusinessOffice": {
         "name": "AMC Office of Small Business Programs",
         "director": "Thaddeus L. Martin",
+        "directorVerified": "2026-06",
         "phone": "(256) 450-7828",
         "email": "usarmy.redstone.amc.mbx.small-business@army.mil",
         "address": "4400 Martin Road, Redstone Arsenal, AL 35898"
@@ -635,6 +642,7 @@
       "smallBusinessOffice": {
         "name": "AFMC Office of Small Business Programs",
         "director": "Luke Schultz (Acting)",
+        "directorVerified": "2026-06",
         "phone": "(937) 656-8101",
         "email": "afmc.sb@us.af.mil",
         "address": "4375 Chidlaw Road, Wright-Patterson AFB, OH 45433"
@@ -675,6 +683,7 @@
       "smallBusinessOffice": {
         "name": "SSC Office of Small Business Programs",
         "director": "Aaron Parra",
+        "directorVerified": "2026-06",
         "phone": "(310) 653-3290",
         "email": "ssc.smallbusiness@spaceforce.mil",
         "address": "483 N. Aviation Blvd, El Segundo, CA 90245"
@@ -855,6 +864,7 @@
       "smallBusinessOffice": {
         "name": "DLA Office of Small Business Programs",
         "director": "Daniele J. Kurze",
+        "directorVerified": "2026-06",
         "phone": "(571) 767-1661",
         "email": "SmallBusinessPrograms@dla.mil",
         "address": "8725 John J. Kingman Rd, Fort Belvoir, VA 22060"
@@ -875,6 +885,7 @@
       "smallBusinessOffice": {
         "name": "DISA Office of Small Business Programs",
         "director": "Carlen Capenos",
+        "directorVerified": "2026-06",
         "phone": "(301) 225-9632",
         "email": "disa.smallbusiness@mail.mil",
         "address": "6910 Cooper Avenue, Fort Meade, MD 20755"
@@ -895,6 +906,7 @@
       "smallBusinessOffice": {
         "name": "MDA Office of Small Business Programs",
         "director": "Tim Cole",
+        "directorVerified": "2026-06",
         "phone": "(256) 450-3183",
         "email": "mda.osbp@mda.mil",
         "address": "5700 18th Street, Bldg 5222, Redstone Arsenal, AL 35898"
@@ -915,6 +927,7 @@
       "smallBusinessOffice": {
         "name": "DARPA Small Business Programs Office",
         "director": "Jennifer Thabet",
+        "directorVerified": "2026-06",
         "phone": "(571) 218-4953",
         "email": "DARPA-SBO@darpa.mil",
         "address": "675 North Randolph Street, Arlington, VA 22203"
@@ -935,6 +948,7 @@
       "smallBusinessOffice": {
         "name": "DHA Office of Small Business Programs",
         "director": "Cassandra Wells Martin",
+        "directorVerified": "2026-06",
         "phone": "(703) 681-8000",
         "email": "dha.ncr.pcld.mbx.small-business-office@health.mil",
         "address": "7700 Arlington Blvd, Falls Church, VA 22042"
@@ -955,6 +969,7 @@
       "smallBusinessOffice": {
         "name": "DCMA Office of Small Business Programs",
         "director": "Kelli Ann Zagata",
+        "directorVerified": "2026-06",
         "phone": "(804) 734-0378",
         "email": "dcma.osbp@dcma.mil",
         "address": "3901 A Ave, Building 10500, Fort Gregg-Adams, VA 23801"
@@ -975,6 +990,7 @@
       "smallBusinessOffice": {
         "name": "DHS Office of Small and Disadvantaged Business Utilization",
         "director": "Dina Thompson",
+        "directorVerified": "2026-06",
         "phone": "(202) 447-0826",
         "email": "dhsosdbu@hq.dhs.gov",
         "address": "245 Murray Lane SW, Washington, DC 20528"
@@ -1055,6 +1071,7 @@
       "smallBusinessOffice": {
         "name": "USCG Office of Small and Disadvantaged Business Utilization",
         "director": "Maria L. Kersey-Robinson",
+        "directorVerified": "2026-06",
         "phone": "(202) 475-5550",
         "email": "uscg-smallbusiness@uscg.mil",
         "address": "2703 Martin Luther King Jr Ave SE, Washington, DC 20593"
@@ -1255,6 +1272,7 @@
       "smallBusinessOffice": {
         "name": "GSA Office of Small and Disadvantaged Business Utilization",
         "director": "Greg Justice",
+        "directorVerified": "2026-06",
         "phone": "(202) 501-1021",
         "email": "small.business@gsa.gov",
         "address": "1800 F Street NW, Washington, DC 20405"
@@ -1275,6 +1293,7 @@
       "smallBusinessOffice": {
         "name": "VA Office of Small and Disadvantaged Business Utilization",
         "director": "Chanel Bankston-Carter",
+        "directorVerified": "2026-06",
         "phone": "(202) 461-4300",
         "email": "osdbu@va.gov",
         "address": "810 Vermont Avenue NW, Washington, DC 20420"
@@ -1315,6 +1334,7 @@
       "smallBusinessOffice": {
         "name": "HHS Office of Small and Disadvantaged Business Utilization",
         "director": "Shannon Jackson",
+        "directorVerified": "2026-06",
         "phone": "(202) 690-7235",
         "email": "sbo@hhs.gov",
         "address": "200 Independence Avenue SW, Washington, DC 20201"
@@ -1415,6 +1435,7 @@
       "smallBusinessOffice": {
         "name": "DOE Office of Small and Disadvantaged Business Utilization",
         "director": "Charlie Smith",
+        "directorVerified": "2026-06",
         "phone": "(202) 586-7377",
         "email": "osdbu@hq.doe.gov",
         "address": "1000 Independence Avenue SW, Washington, DC 20585"
@@ -1455,6 +1476,7 @@
       "smallBusinessOffice": {
         "name": "NASA Office of Small Business Programs",
         "director": "Dwight Deneal",
+        "directorVerified": "2026-06",
         "phone": "(202) 358-2088",
         "email": "smallbusiness@nasa.gov",
         "address": "300 E Street SW, Washington, DC 20546"
@@ -1475,6 +1497,7 @@
       "smallBusinessOffice": {
         "name": "Treasury Office of Small and Disadvantaged Business Utilization",
         "director": "Michele Sharpe (Acting)",
+        "directorVerified": "2026-06",
         "phone": "(202) 622-0530",
         "email": "OSDBU@treasury.gov",
         "address": "1500 Pennsylvania Avenue NW, Washington, DC 20220"
@@ -1515,6 +1538,7 @@
       "smallBusinessOffice": {
         "name": "DOI Office of Small and Disadvantaged Business Utilization",
         "director": "Colleen Finnegan",
+        "directorVerified": "2026-06",
         "phone": "(202) 208-3493",
         "email": "osdbu@ios.doi.gov",
         "address": "1849 C Street NW, Washington, DC 20240"
@@ -1555,6 +1579,7 @@
       "smallBusinessOffice": {
         "name": "Commerce Office of Small and Disadvantaged Business Utilization",
         "director": "Joann J. Hill",
+        "directorVerified": "2026-06",
         "phone": "(202) 482-1472",
         "email": "osdbu@doc.gov",
         "address": "1401 Constitution Avenue NW, Washington, DC 20230"
@@ -1595,6 +1620,7 @@
       "smallBusinessOffice": {
         "name": "DOL Office of Small and Disadvantaged Business Utilization",
         "director": "Peter Kontakos",
+        "directorVerified": "2026-06",
         "phone": "(202) 693-7222",
         "email": "osdbu@dol.gov",
         "address": "200 Constitution Avenue NW, Washington, DC 20210"
@@ -1615,6 +1641,7 @@
       "smallBusinessOffice": {
         "name": "USDA Office of Small and Disadvantaged Business Utilization",
         "director": "George Sears",
+        "directorVerified": "2026-06",
         "phone": "(202) 720-7117",
         "email": "osdbu@usda.gov",
         "address": "1400 Independence Avenue SW, Washington, DC 20250"
@@ -1655,6 +1682,7 @@
       "smallBusinessOffice": {
         "name": "DOT Office of Small and Disadvantaged Business Utilization",
         "director": "Allen Gutierrez",
+        "directorVerified": "2026-06",
         "phone": "(202) 366-1930",
         "email": "osdbu@dot.gov",
         "address": "1200 New Jersey Avenue SE, Washington, DC 20590"
@@ -1735,6 +1763,7 @@
       "smallBusinessOffice": {
         "name": "EPA Office of Small and Disadvantaged Business Utilization",
         "director": "Jerome Greene (Acting)",
+        "directorVerified": "2026-06",
         "phone": "(202) 566-2075",
         "email": "osdbu@epa.gov",
         "address": "1200 Pennsylvania Avenue NW, Washington, DC 20460"
@@ -1775,6 +1804,7 @@
       "smallBusinessOffice": {
         "name": "SSA Office of Small and Disadvantaged Business Utilization",
         "director": "Leslie Ford",
+        "directorVerified": "2026-06",
         "phone": "(410) 965-7467",
         "email": "ssa.osdbu@ssa.gov",
         "address": "6401 Security Boulevard, Baltimore, MD 21235"
@@ -1815,6 +1845,7 @@
       "smallBusinessOffice": {
         "name": "NSF Office of Small and Disadvantaged Business Utilization",
         "director": "Anita Perkins (Deputy)",
+        "directorVerified": "2026-06",
         "phone": "(703) 292-8330",
         "email": "OSDBU@nsf.gov",
         "address": "2415 Eisenhower Avenue, Alexandria, VA 22314"
@@ -2775,6 +2806,7 @@
       "smallBusinessOffice": {
         "name": "DoD Office of Small Business Programs",
         "director": "Mr. James R. Mismash",
+        "directorVerified": "2026-06",
         "phone": "(571) 372-6289",
         "email": "osd.osbp@mail.mil",
         "address": "4800 Mark Center Drive, Suite 15G08, Alexandria, VA 22350"
@@ -2795,6 +2827,7 @@
       "smallBusinessOffice": {
         "name": "DoD Office of Small Business Programs",
         "director": "Mr. James R. Mismash",
+        "directorVerified": "2026-06",
         "phone": "(571) 372-6289",
         "email": "osd.osbp@mail.mil",
         "address": "4800 Mark Center Drive, Suite 15G08, Alexandria, VA 22350"
@@ -2935,6 +2968,7 @@
       "smallBusinessOffice": {
         "name": "Air Force Office of Small Business Programs",
         "director": "Scott A. Kiser",
+        "directorVerified": "2026-06",
         "phone": "(571) 256-8052",
         "email": "saf.sb.workflow@us.af.mil",
         "address": "1060 Air Force Pentagon, Washington, DC 20330"
@@ -2955,6 +2989,7 @@
       "smallBusinessOffice": {
         "name": "Air Force Office of Small Business Programs",
         "director": "Scott A. Kiser",
+        "directorVerified": "2026-06",
         "phone": "(571) 256-8052",
         "email": "saf.sb.workflow@us.af.mil",
         "address": "1060 Air Force Pentagon, Washington, DC 20330"
@@ -2995,6 +3030,7 @@
       "smallBusinessOffice": {
         "name": "Army Office of Small Business Programs",
         "director": "Pamela D. Callicutt (Acting)",
+        "directorVerified": "2026-06",
         "phone": "(703) 697-2868",
         "email": "usarmy.pentagon.sbo.mbx.osbp-info@army.mil",
         "address": "106 Army Pentagon, Washington, DC 20310"
@@ -3015,6 +3051,7 @@
       "smallBusinessOffice": {
         "name": "Army Office of Small Business Programs",
         "director": "Pamela D. Callicutt (Acting)",
+        "directorVerified": "2026-06",
         "phone": "(703) 697-2868",
         "email": "usarmy.pentagon.sbo.mbx.osbp-info@army.mil",
         "address": "106 Army Pentagon, Washington, DC 20310"
@@ -3035,6 +3072,7 @@
       "smallBusinessOffice": {
         "name": "Army Office of Small Business Programs",
         "director": "Pamela D. Callicutt (Acting)",
+        "directorVerified": "2026-06",
         "phone": "(703) 697-2868",
         "email": "usarmy.pentagon.sbo.mbx.osbp-info@army.mil",
         "address": "106 Army Pentagon, Washington, DC 20310"
@@ -3055,6 +3093,7 @@
       "smallBusinessOffice": {
         "name": "Army Office of Small Business Programs",
         "director": "Pamela D. Callicutt (Acting)",
+        "directorVerified": "2026-06",
         "phone": "(703) 697-2868",
         "email": "usarmy.pentagon.sbo.mbx.osbp-info@army.mil",
         "address": "106 Army Pentagon, Washington, DC 20310"
@@ -3075,6 +3114,7 @@
       "smallBusinessOffice": {
         "name": "Army Office of Small Business Programs",
         "director": "Pamela D. Callicutt (Acting)",
+        "directorVerified": "2026-06",
         "phone": "(703) 697-2868",
         "email": "usarmy.pentagon.sbo.mbx.osbp-info@army.mil",
         "address": "106 Army Pentagon, Washington, DC 20310"
@@ -3095,6 +3135,7 @@
       "smallBusinessOffice": {
         "name": "Army Office of Small Business Programs",
         "director": "Pamela D. Callicutt (Acting)",
+        "directorVerified": "2026-06",
         "phone": "(703) 697-2868",
         "email": "usarmy.pentagon.sbo.mbx.osbp-info@army.mil",
         "address": "106 Army Pentagon, Washington, DC 20310"
@@ -3115,6 +3156,7 @@
       "smallBusinessOffice": {
         "name": "Army Office of Small Business Programs",
         "director": "Pamela D. Callicutt (Acting)",
+        "directorVerified": "2026-06",
         "phone": "(703) 697-2868",
         "email": "usarmy.pentagon.sbo.mbx.osbp-info@army.mil",
         "address": "106 Army Pentagon, Washington, DC 20310"
@@ -3135,6 +3177,7 @@
       "smallBusinessOffice": {
         "name": "Army Office of Small Business Programs",
         "director": "Pamela D. Callicutt (Acting)",
+        "directorVerified": "2026-06",
         "phone": "(703) 697-2868",
         "email": "usarmy.pentagon.sbo.mbx.osbp-info@army.mil",
         "address": "106 Army Pentagon, Washington, DC 20310"
@@ -3235,6 +3278,7 @@
       "smallBusinessOffice": {
         "name": "NAVSEA Office of Small Business Programs",
         "director": "Patricia Anne Bannister",
+        "directorVerified": "2026-06",
         "phone": "(202) 781-3939",
         "email": "navsea_small_business@navy.mil",
         "address": "1333 Isaac Hull Ave SE, Washington Navy Yard, DC 20376"
@@ -3255,6 +3299,7 @@
       "smallBusinessOffice": {
         "name": "NAVSEA Office of Small Business Programs",
         "director": "Patricia Anne Bannister",
+        "directorVerified": "2026-06",
         "phone": "(202) 781-3939",
         "email": "navsea_small_business@navy.mil",
         "address": "1333 Isaac Hull Ave SE, Washington Navy Yard, DC 20376"
@@ -3275,6 +3320,7 @@
       "smallBusinessOffice": {
         "name": "NAVSEA Office of Small Business Programs",
         "director": "Patricia Anne Bannister",
+        "directorVerified": "2026-06",
         "phone": "(202) 781-3939",
         "email": "navsea_small_business@navy.mil",
         "address": "1333 Isaac Hull Ave SE, Washington Navy Yard, DC 20376"
@@ -3295,6 +3341,7 @@
       "smallBusinessOffice": {
         "name": "NAVSEA Office of Small Business Programs",
         "director": "Patricia Anne Bannister",
+        "directorVerified": "2026-06",
         "phone": "(202) 781-3939",
         "email": "navsea_small_business@navy.mil",
         "address": "1333 Isaac Hull Ave SE, Washington Navy Yard, DC 20376"
@@ -3395,6 +3442,7 @@
       "smallBusinessOffice": {
         "name": "NAVAIR Office of Small Business Programs",
         "director": "LaDonne Liebler",
+        "directorVerified": "2026-06",
         "phone": "(301) 342-2358",
         "email": "navair_small_business@navy.mil",
         "address": "Building 2272, 47123 Buse Rd, Patuxent River, MD 20670"
@@ -3424,6 +3472,7 @@
       "smallBusinessOffice": {
         "name": "Army Office of Small Business Programs",
         "director": "Pamela D. Callicutt (Acting)",
+        "directorVerified": "2026-06",
         "phone": "(703) 697-2868",
         "email": "usarmy.pentagon.sbo.mbx.osbp-info@army.mil",
         "address": "106 Army Pentagon, Washington, DC 20310"
@@ -3435,6 +3484,7 @@
       "smallBusinessOffice": {
         "name": "Air Force Office of Small Business Programs",
         "director": "Scott A. Kiser",
+        "directorVerified": "2026-06",
         "phone": "(571) 256-8052",
         "email": "saf.sb.workflow@us.af.mil",
         "address": "1060 Air Force Pentagon, Washington, DC 20330"
@@ -3446,6 +3496,7 @@
       "smallBusinessOffice": {
         "name": "DoD Office of Small Business Programs",
         "director": "Mr. James R. Mismash",
+        "directorVerified": "2026-06",
         "phone": "(571) 372-6289",
         "email": "osd.osbp@mail.mil",
         "address": "4800 Mark Center Drive, Suite 15G08, Alexandria, VA 22350"

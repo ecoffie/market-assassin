@@ -21,6 +21,16 @@ import { getEnhancedAgencyInfo } from '@/lib/utils/command-info';
 
 export const dynamic = 'force-dynamic';
 
+// "2026-06" → "Jun 2026" for the OSBP director freshness stamp. Empty for
+// missing/malformed input (→ no stamp shown).
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+function formatVerified(yyyymm?: string): string {
+  const m = /^(\d{4})-(\d{2})$/.exec(yyyymm || '');
+  if (!m) return '';
+  const mon = MONTHS[Number(m[2]) - 1];
+  return mon ? `${mon} ${m[1]}` : '';
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _sb: any = null;
 function getSupabase() {
@@ -488,17 +498,23 @@ export async function GET(request: NextRequest) {
   if (agency) {
     const osbp = getEnhancedAgencyInfo(agency, agency, agency).smallBusinessContact;
     if (osbp?.director && osbp.director !== `${agency} OSBP Director`) {
+      // Hybrid freshness: the office + mailbox is always the starting point; a
+      // named director that was verified against an official source carries a
+      // "verified <Mon YYYY>" stamp so the user knows how much to trust the name.
+      const verified = formatVerified(osbp.directorVerified);
+      const title = osbp.name || 'Office of Small Business Programs';
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       (contacts as any[]).unshift({
         id: `osbp:${agency}`,
         contact_fullname: osbp.director,
-        contact_title: osbp.name || 'Office of Small Business Programs',
+        contact_title: verified ? `${title} · verified ${verified}` : title,
         contact_email: osbp.email || null,
         contact_phone: osbp.phone || null,
         role_category: 'small_business',
         role: 'OSBP',
         roleCategory: 'Small Business',
         derivedOffice: osbp.name || null,
+        directorVerified: osbp.directorVerified || null,
         sub_tier: null,
       });
     }
