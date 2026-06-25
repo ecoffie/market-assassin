@@ -6,6 +6,18 @@
 
 ## 🔜 AFTER DEMO — deferred cleanup
 
+- [ ] **DoD sub-agency collapse — remaining surfaces.** Fixed the demo-critical ones
+  (contacts directory, office-roster facet, TMR open-opp count — all DoDAAC-anchored).
+  Remaining from the audit (`commit 73f107d8` + the count fix): (a) **events count**
+  (`sam_events` has only an `agency` col, no office key — add a DoDAAC/office key or
+  join to opps, then anchor like the opp count); (b) **backfill saved
+  `user_target_list.open_opp_count`** — existing saved agency cards show the OLD
+  inflated snapshot until re-saved (the live TMR number is now correct); (c) the
+  `?agency=` param on `/api/app/opportunities` is unused/dead (harmless — wire or
+  remove); (d) `agency-offices` uses USASpending `awarding_sub_agency` text match
+  (works, but could anchor on office code for precision). Surfaces already correct:
+  award detail/incumbent, recompetes, expiring contracts, TMR total spend (all
+  USASpending sub-agency tier).
 - [ ] **Retire legacy `mi_beta_user_settings.naics_codes` column.** Dead: never
   written anymore (Settings stopped writing it in the June consistency pass), only
   read as a stale fallback for un-migrated profiles. It's a `DROP COLUMN` →

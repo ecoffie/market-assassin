@@ -54,6 +54,7 @@ import { getEnhancedAgencyInfo, getAllCommands } from '@/lib/utils/command-info'
 import { keywordCoverage, deriveCoverageKeywords, buildSearchKeywords, buildMarketFilter, marketFilterToUsaspending } from '@/lib/market/keyword-coverage';
 import { internalBaseUrl } from '@/lib/utils/internal-base-url';
 import { MARKET_SPEND_WINDOW, MARKET_SPEND_WINDOW_LABEL } from '@/lib/utils/usaspending-helpers';
+import { dodaacCodesForAgency } from '@/lib/gov-contacts/dodaac-directory';
 
 const FREE_TIER_ROW_LIMIT = 10;
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000;
@@ -231,7 +232,11 @@ interface TargetMarketResearchRow {
 
   // Enrichments
   painPointCount: number;          // # pain points logged for this agency
-  openOppCount: number;            // # current SAM opps
+  openOppCount: number;            // # current SAM opps (office-anchored for DoD sub-agencies)
+  // For a DoDAAC-anchored DoD sub-agency, the broader department-wide open count
+  // — so the UI can be honest when the office count is 0 ("none open at DARPA now;
+  // N at DoD-wide"). null for agencies that aren't office-anchored.
+  oppCountDodWide?: number | null;
   upcomingEventCount: number;      // # events in next 90 days
 
   // Decision intel added 2026-05-25 for the triage card (StartTrackingModal).
@@ -601,15 +606,24 @@ export async function POST(request: NextRequest) {
     // normalized key. (Eric 2026-06-04: "open opportunities column shows 0".)
     const oppsStart = Date.now();
     const oppCounts: Record<string, number> = {};   // keyed by normalizeAgencyKey()
+    // DoDAAC-anchored count: opps grouped by the 6-char DoDAAC prefix of their
+    // solicitation_number. A DoD sub-agency (DARPA/MDA) shares ONE department
+    // label, so the department count over-counts the whole DoD; the prefix count
+    // is the agency's REAL open-opp number (mirrors the contacts fix). Eric, Jun 25.
+    const oppCountsByDodaac: Record<string, number> = {};
     try {
       const { data: oppRows } = await supabase
         .from('sam_opportunities')
-        .select('department')
+        .select('department, solicitation_number')
         .gte('response_deadline', new Date().toISOString());
       for (const row of oppRows || []) {
         const key = normalizeAgencyKey(row.department || '');
-        if (!key) continue;
-        oppCounts[key] = (oppCounts[key] || 0) + 1;
+        if (key) oppCounts[key] = (oppCounts[key] || 0) + 1;
+        const sol = (row.solicitation_number || '').toUpperCase().replace(/[^A-Z0-9]/g, '');
+        if (sol.length >= 6) {
+          const code = sol.slice(0, 6);
+          oppCountsByDodaac[code] = (oppCountsByDodaac[code] || 0) + 1;
+        }
       }
     } catch (oppErr) {
       console.warn('[target-market-research] sam_opportunities count failed:', oppErr);
@@ -742,6 +756,17 @@ export async function POST(request: NextRequest) {
     }
     const primesMs = Date.now() - primesStart;
 
+    // Pre-resolve each agency's DoDAAC office codes (async) so the row map below
+    // can look up the DoDAAC-anchored opp count synchronously. Only sub-agencies
+    // in dodaac_directory resolve; others stay on the department count.
+    const dodaacByAgency = new Map<string, string[]>();
+    await Promise.all(
+      Array.from(new Set(findAgencies.map((a) => a.subAgency || a.name).filter(Boolean) as string[]))
+        .map(async (nm) => {
+          try { dodaacByAgency.set(nm, await dodaacCodesForAgency(nm)); } catch { /* skip */ }
+        }),
+    );
+
     // Build the merged research rows. Each row gets all 4 sort
     // metrics pre-computed so the UI can sort without re-fetching.
     const rows: TargetMarketResearchRow[] = findAgencies.map((a) => {
@@ -759,7 +784,17 @@ export async function POST(request: NextRequest) {
       const oppKeyCandidates = [a.parentAgency, a.subAgency, a.name, lookupKey]
         .map(s => normalizeAgencyKey(s || ''))
         .filter(Boolean);
-      const openOppCount = oppKeyCandidates.reduce((n, k) => n || oppCounts[k] || 0, 0);
+      // DoDAAC-anchored count first: if this (sub-)agency maps to office codes,
+      // sum the opps whose solicitation prefix is one of those codes — the REAL
+      // count (DARPA ≠ all-of-DoD). Fall back to the department count otherwise.
+      const dodaacCodes = dodaacByAgency.get(a.subAgency || a.name || '') || [];
+      const dodaacOppCount = dodaacCodes.reduce((n, c) => n + (oppCountsByDodaac[c] || 0), 0);
+      const deptWideOppCount = oppKeyCandidates.reduce((n, k) => n || oppCounts[k] || 0, 0);
+      const isOfficeAnchored = dodaacCodes.length > 0;
+      const openOppCount = isOfficeAnchored ? dodaacOppCount : deptWideOppCount;
+      // Expose the department-wide number only for office-anchored agencies, so
+      // the card can say "0 open at DARPA now · N DoD-wide" honestly.
+      const oppCountDodWide = isOfficeAnchored ? deptWideOppCount : null;
       const upcomingEventCount = oppKeyCandidates.reduce((n, k) => n || eventCounts[k] || 0, 0);
       const satRatio = (a.contractCount && a.contractCount > 0)
         ? (a.satContractCount || 0) / a.contractCount
@@ -826,6 +861,7 @@ export async function POST(request: NextRequest) {
 
         painPointCount: painPointCount + (naicsAligned ? 5 : 0), // boost for NAICS-aligned
         openOppCount,
+        oppCountDodWide,
         upcomingEventCount,
 
         // Decision intel: passed through from find-agencies aggregation

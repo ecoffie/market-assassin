@@ -246,15 +246,23 @@ export async function GET(request: NextRequest) {
     const officeName = (sp.get('office') || '').trim();   // optional: drill into one office
     if (!facetAgency) return NextResponse.json({ success: true, offices: [], rosters: {} });
     const rosterDodaacNames = await loadDodaacNames();
-    // The agency column is stored "DEFENSE, DEPARTMENT OF" (not "Department of
-    // Defense"), so match on the most distinctive word, not the full phrase.
-    const agencyKeyword = facetAgency.replace(/department of|dept of|the|,/gi, '').trim().split(/\s+/)[0] || facetAgency;
-    const { data } = await sb
+    // Anchor by DoDAAC office code when the target is a DoD sub-agency in the
+    // directory (DARPA=HR0011, MDA=HQ08xx) — precise + efficient. Otherwise fall
+    // back to the distinctive department keyword. (Eric, Jun 25 — same office
+    // anchoring as the contacts directory.)
+    const rosterCodes = await dodaacCodesForAgency(facetAgency);
+    let rosterQuery = sb
       .from('federal_contacts')
       .select('contact_fullname, contact_email, contact_phone, contact_title, solicitation_number, office, department_ind_agency')
-      .ilike('department_ind_agency', `%${agencyKeyword}%`)
       .not('solicitation_number', 'is', null)
       .limit(8000);
+    if (rosterCodes.length > 0) {
+      rosterQuery = rosterQuery.or(rosterCodes.slice(0, 60).map((c) => `solicitation_number.ilike.${c}%`).join(','));
+    } else {
+      const agencyKeyword = facetAgency.replace(/department of|dept of|the|,/gi, '').trim().split(/\s+/)[0] || facetAgency;
+      rosterQuery = rosterQuery.ilike('department_ind_agency', `%${agencyKeyword}%`);
+    }
+    const { data } = await rosterQuery;
     // Group contacts by decoded office, dropping overseas + dupes.
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const byOffice = new Map<string, any[]>();
