@@ -97,32 +97,48 @@ export async function POST(request: NextRequest) {
   }
 
   // 2) Run the SAME buying-agency scan Market Research uses (don't reinvent it).
-  let agencies: ScanAgency[] = [];
+  // TMR takes ONE naicsCode, so scan the top few codes and merge — keeps coverage
+  // broad without the user managing codes. Dedup by agency+office name.
+  const tmrHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+    // Forward auth so the scan runs as this user / workspace.
+    'x-mi-auth-token': request.headers.get('x-mi-auth-token') || '',
+    'x-mi-2fa-token': request.headers.get('x-mi-2fa-token') || '',
+    ...(request.headers.get('x-active-workspace') ? { 'x-active-workspace': request.headers.get('x-active-workspace')! } : {}),
+  };
+  const base = internalBaseUrl(request);
+  const codesToScan = naicsCodes.slice(0, 3); // top 3 codes → plenty of agencies
+  const byKey = new Map<string, ScanAgency>();
   try {
-    const res = await fetch(`${internalBaseUrl(request)}/api/app/target-market-research`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        // Forward auth so the scan runs as this user / workspace.
-        'x-mi-auth-token': request.headers.get('x-mi-auth-token') || '',
-        'x-mi-2fa-token': request.headers.get('x-mi-2fa-token') || '',
-        ...(request.headers.get('x-active-workspace') ? { 'x-active-workspace': request.headers.get('x-active-workspace')! } : {}),
-      },
-      body: JSON.stringify({
-        email,
-        naics: naicsCodes.join(','),
-        keywords: keywords.join(','),
-        states,
-      }),
-    });
-    const data = await res.json().catch(() => null);
-    agencies = Array.isArray(data?.agencies) ? data.agencies : [];
+    const scans = await Promise.all(
+      (codesToScan.length ? codesToScan : ['']).map((code) =>
+        fetch(`${base}/api/app/target-market-research`, {
+          method: 'POST',
+          headers: tmrHeaders,
+          // TMR's real field names (NOT naics/keywords): one `naicsCode` + the
+          // saved `profileKeywords` (Auto mode unions them into discovery).
+          // Passing `naics`/`keywords` was silently ignored → 0 agencies.
+          body: JSON.stringify({ email, naicsCode: code, profileKeywords: keywords, locationStates: states }),
+        }).then((r) => r.json()).catch(() => null),
+      ),
+    );
+    for (const data of scans) {
+      for (const a of (Array.isArray(data?.agencies) ? data.agencies : []) as ScanAgency[]) {
+        const key = `${(a.name || '').toLowerCase()}|${(a.contractingOffice || '').toLowerCase()}`;
+        const prev = byKey.get(key);
+        // Keep the higher-spend instance when the same office shows up twice.
+        if (!prev || (a.setAsideSpending || 0) > (prev.setAsideSpending || 0)) byKey.set(key, a);
+      }
+    }
   } catch (err) {
     return NextResponse.json(
       { success: false, error: `Could not scan your market: ${err instanceof Error ? err.message : 'unknown'}` },
       { status: 502 },
     );
   }
+  // Highest set-aside spend first — the most relevant buyers lead.
+  const agencies: ScanAgency[] = Array.from(byKey.values())
+    .sort((x, y) => (y.setAsideSpending || 0) - (x.setAsideSpending || 0));
 
   if (agencies.length === 0) {
     return NextResponse.json(
