@@ -2721,3 +2721,26 @@ registries (campaign-exclusions, advocate-accounts, partner-referrals);
 Verified live: westover105 → "Advocate — Sue Kranes — complimentary Pro" (no
 reason required); aj@cypherintel.com → "Comp / testimonial"; a random email still
 warns + requires a source. Typecheck + full build pass.
+
+---
+
+## Command Center — live "Refresh purchases" + fixed Stripe sync timeout
+
+**What it does (plain English):** The $100K-goal MRR widget reads a Stripe cache
+that's refreshed nightly, so a new purchase used to lag up to a day — and worse,
+the nightly sync was timing out, so it was even staler. Two fixes: (1) a "↻ Refresh
+purchases" button on the Command Center goal card pulls the latest Stripe data on
+demand and re-reads the number, so the team sees a new sale immediately; (2) the
+nightly sync no longer times out.
+
+**Why it matters:** The team runs launch off this dashboard; a purchase number
+that's a day behind (or stuck) erodes trust in every other number on the page.
+
+**SEO angle:** none — internal ops.
+
+**Proof:** The sync was timing out at the dispatcher's 290s budget because it
+walked all ~800 customers with a 1s sleep per page before subscriptions. New
+`subscriptions-fast` path syncs subscriptions only, self-heals the customer FK
+inline, and BULK-upserts — measured end-to-end at **6.4s, 0 errors** (was 290s+
+timeout). `?full=1` keeps the deep customers sync for periodic runs. Cache verified
+current (90 active subs). Typecheck + full build pass.

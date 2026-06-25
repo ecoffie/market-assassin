@@ -104,6 +104,15 @@ export async function GET(request: Request) {
         await backfillSubscriptions(supabase, stats, errors);
       }
 
+      // Fast path for the nightly MRR sync: subscriptions only, no per-page
+      // sleep, and it self-heals the customer FK inline (upserts a minimal
+      // customer row when a subscription references an uncached customer) so we
+      // can skip the slow full-customers walk. Keeps the whole sync well under
+      // the dispatcher's 290s budget. (Fixes the sync-stripe-cache timeout.)
+      if (type === 'subscriptions-fast') {
+        await backfillSubscriptionsFast(supabase, stats, errors);
+      }
+
       if (type === 'all' || type === 'classify') {
         await computeAllClassifications(supabase, stats, errors);
       }
@@ -413,6 +422,108 @@ async function backfillSubscriptions(supabase: any, stats: any, errors: string[]
 
     // Rate limiting
     if (hasMore) await sleep(DELAY_BETWEEN_BATCHES);
+  }
+}
+
+/**
+ * Subscriptions-only sync optimized for the nightly cron: no per-page sleep, and
+ * it satisfies the customer FK inline so we don't need the slow full-customers
+ * walk first. Expands `customer` on the list so the minimal customer upsert is
+ * free (no extra API call). ~365 subs ≈ 4 pages → a few seconds.
+ */
+async function backfillSubscriptionsFast(supabase: any, stats: any, errors: string[]) {
+  let hasMore = true;
+  let startingAfter: string | undefined;
+  const seenCustomers = new Set<string>();
+  // Collect all rows, then BULK upsert once at the end — ~365 sequential
+  // per-row round-trips was the slow part (~100s); two batched upserts is
+  // seconds. (Fixes the residual slowness in the timeout fix.)
+  const customerRows: Record<string, unknown>[] = [];
+  const subRows: Record<string, unknown>[] = [];
+
+  while (hasMore) {
+    const params: Stripe.SubscriptionListParams = {
+      limit: BATCH_SIZE,
+      status: 'all',
+      expand: ['data.customer'],
+    };
+    if (startingAfter) params.starting_after = startingAfter;
+
+    const subscriptions = await getStripe().subscriptions.list(params);
+
+    for (const subscription of subscriptions.data) {
+      if (subscription.livemode === false) continue;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const sub = subscription as any;
+      const customerId = typeof sub.customer === 'string' ? sub.customer : sub.customer?.id;
+
+      // Self-heal the FK: stage a minimal customer row for any referenced
+      // customer (REFERENCES stripe_customers(id)). `customer` is expanded so
+      // this needs no extra API call.
+      if (customerId && !seenCustomers.has(customerId)) {
+        seenCustomers.add(customerId);
+        const cust = typeof sub.customer === 'object' && sub.customer && !sub.customer.deleted ? sub.customer : null;
+        customerRows.push({
+          id: customerId,
+          email: cust?.email || '',
+          name: cust?.name ?? null,
+          phone: cust?.phone ?? null,
+          metadata: cust?.metadata || {},
+          created_at: cust?.created ? new Date(cust.created * 1000).toISOString() : new Date().toISOString(),
+          livemode: cust?.livemode ?? true,
+          deleted: cust?.deleted || false,
+        });
+      }
+
+      stats.subscriptions.fetched++;
+      const item = sub.items?.data?.[0];
+      const plan = item?.plan;
+      subRows.push({
+        id: sub.id,
+        customer_id: customerId,
+        status: sub.status,
+        current_period_start: sub.current_period_start ? new Date(sub.current_period_start * 1000).toISOString() : null,
+        current_period_end: sub.current_period_end ? new Date(sub.current_period_end * 1000).toISOString() : null,
+        cancel_at_period_end: sub.cancel_at_period_end,
+        canceled_at: sub.canceled_at ? new Date(sub.canceled_at * 1000).toISOString() : null,
+        ended_at: sub.ended_at ? new Date(sub.ended_at * 1000).toISOString() : null,
+        trial_start: sub.trial_start ? new Date(sub.trial_start * 1000).toISOString() : null,
+        trial_end: sub.trial_end ? new Date(sub.trial_end * 1000).toISOString() : null,
+        metadata: sub.metadata || {},
+        created_at: new Date(sub.created * 1000).toISOString(),
+        livemode: sub.livemode,
+        plan_id: plan?.id,
+        plan_amount: plan?.amount,
+        plan_interval: plan?.interval,
+      });
+    }
+
+    hasMore = subscriptions.has_more;
+    if (subscriptions.data.length > 0) {
+      startingAfter = subscriptions.data[subscriptions.data.length - 1].id;
+    }
+    // No sleep — Stripe allows 100 reads/s and we're doing ~4 pages.
+  }
+
+  // Customers FIRST (the FK), then subscriptions. Chunked so a big account still
+  // sends reasonable payloads.
+  const chunk = <T,>(arr: T[], n: number): T[][] => {
+    const out: T[][] = [];
+    for (let i = 0; i < arr.length; i += n) out.push(arr.slice(i, i + n));
+    return out;
+  };
+  for (const batch of chunk(customerRows, 500)) {
+    const { error } = await supabase.from('stripe_customers').upsert(batch, { onConflict: 'id' });
+    if (error) errors.push(`Customers (fk) batch: ${error.message}`);
+  }
+  for (const batch of chunk(subRows, 500)) {
+    const { error } = await supabase.from('stripe_subscriptions').upsert(batch, { onConflict: 'id' });
+    if (error) {
+      stats.subscriptions.errors += batch.length;
+      errors.push(`Subscriptions batch: ${error.message}`);
+    } else {
+      stats.subscriptions.inserted += batch.length;
+    }
   }
 }
 

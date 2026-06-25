@@ -543,6 +543,11 @@ export default function LaunchCommandCenterPage() {
   const [betaConvError, setBetaConvError] = useState('');
   const [mrrGoal, setMrrGoal] = useState<MrrGoal | null>(null);
   const [mrrGoalError, setMrrGoalError] = useState('');
+  // On-demand "Refresh purchases": bumps a key to re-run the MRR loader, and
+  // mrrSyncing covers the live Stripe→cache sync the button kicks off first.
+  const [mrrRefreshKey, setMrrRefreshKey] = useState(0);
+  const [mrrSyncing, setMrrSyncing] = useState(false);
+  const [mrrSyncedAt, setMrrSyncedAt] = useState<string | null>(null);
   const [upgradeIntent, setUpgradeIntent] = useState<UpgradeIntentBrief | null>(null);
   const [upgradeIntentError, setUpgradeIntentError] = useState('');
   const [partnerBrief, setPartnerBrief] = useState<PartnerProgramsBrief | null>(null);
@@ -871,7 +876,23 @@ export default function LaunchCommandCenterPage() {
     }
     loadMrrGoal();
     return () => { cancelled = true; };
-  }, [authenticated, password]);
+  }, [authenticated, password, mrrRefreshKey]);
+
+  // "Refresh purchases": the MRR widget reads a daily Stripe cache, so a fresh
+  // purchase lags until the nightly sync. This triggers the sync on demand, then
+  // re-reads the goal so the number reflects reality right now.
+  async function refreshPurchases() {
+    if (!password || mrrSyncing) return;
+    setMrrSyncing(true);
+    try {
+      await fetch(`/api/cron/sync-stripe-cache?password=${encodeURIComponent(password)}`, { cache: 'no-store' });
+      setMrrSyncedAt(new Date().toLocaleTimeString());
+    } catch { /* surfaced via the (unchanged) MRR error if the reload fails */ }
+    finally {
+      setMrrSyncing(false);
+      setMrrRefreshKey((k) => k + 1); // re-run loadMrrGoal with the fresh cache
+    }
+  }
 
   // Demand Heatmap loader
   useEffect(() => {
@@ -1115,6 +1136,17 @@ export default function LaunchCommandCenterPage() {
             <div>
               <p className="text-sm uppercase tracking-[0.2em] text-emerald-300">★ The Goal — $100K / month</p>
               <h2 className="mt-2 text-3xl font-bold md:text-4xl">Where we are, and what it takes to get there</h2>
+            </div>
+            <div className="flex items-center gap-3">
+              {mrrSyncedAt && <span className="text-xs text-slate-500">synced {mrrSyncedAt}</span>}
+              <button
+                onClick={refreshPurchases}
+                disabled={mrrSyncing}
+                title="Pull the latest purchases from Stripe now (the MRR number reads a daily cache otherwise)"
+                className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-sm font-medium text-emerald-200 hover:bg-emerald-500/20 disabled:opacity-50"
+              >
+                {mrrSyncing ? 'Syncing Stripe…' : '↻ Refresh purchases'}
+              </button>
             </div>
           </div>
 
