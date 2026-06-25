@@ -24,6 +24,13 @@ import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { verifyMIAccess } from '@/lib/api-auth';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { internalBaseUrl } from '@/lib/utils/internal-base-url';
+import {
+  MAX_AGENCIES,
+  type ScanAgency,
+  mergeScanAgencies,
+  buildTargetRow,
+  summarizeEmptyScan,
+} from '@/lib/app/auto-setup';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -35,22 +42,6 @@ function getSupabase() {
     _sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   }
   return _sb;
-}
-
-/** How many of the top buying agencies Auto seeds into the Target List. */
-const MAX_AGENCIES = 8;
-
-interface ScanAgency {
-  name: string;
-  contractingOffice?: string;
-  subAgency?: string;
-  parentAgency?: string;
-  agencyCode?: string;
-  subAgencyCode?: string;
-  officeId?: string;
-  location?: string;
-  setAsideSpending?: number;
-  contractCount?: number;
 }
 
 export async function POST(request: NextRequest) {
@@ -103,7 +94,7 @@ export async function POST(request: NextRequest) {
   // It takes ONE naicsCode, so scan the top 3 profile codes and merge/dedup.
   const base = internalBaseUrl(request);
   const codesToScan = naicsCodes.slice(0, 3);
-  const byKey = new Map<string, ScanAgency>();
+  const agencyLists: ScanAgency[][] = [];
   const scanErrors: string[] = [];
   try {
     const scans = await Promise.all(
@@ -124,11 +115,7 @@ export async function POST(request: NextRequest) {
         scanErrors.push(sb.body?.error || `find-agencies ${s.status}`);
         continue;
       }
-      for (const a of (Array.isArray(sb.body.agencies) ? sb.body.agencies : []) as ScanAgency[]) {
-        const key = `${(a.name || '').toLowerCase()}|${(a.contractingOffice || '').toLowerCase()}`;
-        const prev = byKey.get(key);
-        if (!prev || (a.setAsideSpending || 0) > (prev.setAsideSpending || 0)) byKey.set(key, a);
-      }
+      agencyLists.push((Array.isArray(sb.body.agencies) ? sb.body.agencies : []) as ScanAgency[]);
     }
   } catch (err) {
     return NextResponse.json(
@@ -137,23 +124,13 @@ export async function POST(request: NextRequest) {
     );
   }
   // Highest set-aside spend first — the most relevant buyers lead.
-  const agencies: ScanAgency[] = Array.from(byKey.values())
-    .sort((x, y) => (y.setAsideSpending || 0) - (x.setAsideSpending || 0));
+  const agencies = mergeScanAgencies(agencyLists);
 
   if (agencies.length === 0) {
     // Surface the REAL reason instead of a generic "none found" (the silent
     // failure). If every scan errored, say so; otherwise it's genuinely empty.
-    const allFailed = scanErrors.length > 0 && scanErrors.length === codesToScan.length;
-    return NextResponse.json(
-      {
-        success: false,
-        error: allFailed
-          ? `Market scan failed: ${scanErrors[0]}`
-          : 'No matching buying agencies found for your codes.',
-        scanErrors: scanErrors.slice(0, 3),
-      },
-      { status: allFailed ? 502 : 200 },
-    );
+    const { status, ...payload } = summarizeEmptyScan(scanErrors, codesToScan.length);
+    return NextResponse.json(payload, { status });
   }
 
   // 3) ADD-ONLY insert into user_target_list. 23505 (already saved) → skipped.
@@ -164,26 +141,7 @@ export async function POST(request: NextRequest) {
   let insertError: string | null = null;
 
   for (const a of agencies.slice(0, MAX_AGENCIES)) {
-    const officeName = a.contractingOffice || a.name;
-    const payload = {
-      user_email: rowEmail,
-      workspace_id: asClient ? workspaceId : null,
-      agency_code: a.agencyCode || null,
-      agency_name: a.name,
-      sub_agency_code: a.subAgencyCode || null,
-      sub_agency_name: a.subAgency || null,
-      office_code: a.officeId || null,
-      office_name: officeName,
-      location: a.location || null,
-      source_naics: sourceNaics,
-      // set_aside_spending can be billions — round to a safe integer; clamp so a
-      // bigint/int column can't reject the row and fail the whole batch silently.
-      set_aside_spending: Math.min(Math.round(a.setAsideSpending || 0), 9_000_000_000),
-      contract_count: Math.round(a.contractCount || 0),
-      status: 'targeting',
-      priority: 'medium',
-      added_from: 'auto_setup',
-    };
+    const payload = buildTargetRow(a, { rowEmail, asClient, workspaceId, sourceNaics });
     const { error } = await getSupabase().from('user_target_list').insert(payload);
     if (!error) {
       added++;
