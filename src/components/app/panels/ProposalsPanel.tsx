@@ -1227,27 +1227,32 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     }
   }, [email, getAuthHeaders, loiFields, exportContextName]);
 
-  const exportComplianceCsv = useCallback(() => {
+  const exportComplianceExcel = useCallback(() => {
     if (compliance.length === 0) return;
+    // True Excel (.xls) via an Excel-openable HTML table — Eric wants the matrix as
+    // Excel, separate from the Word package (Jun 26). HTML-table .xls opens natively
+    // in Excel + Google Sheets with no library/bundle bloat, and keeps a named tab.
     const headers = ['ID', 'Requirement', 'Category', 'Section', 'Owner', 'Status', 'Source'];
-    const rows = compliance.map(r => [
-      r.id,
-      r.requirement,
-      CATEGORY_LABELS[r.category]?.label || r.category,
-      r.section || '',
-      r.owner,
-      STATUS_LABELS[r.status],
-      r.source_quote || '',
-    ]);
-    const csv = [headers, ...rows]
-      .map(row => row.map(cell => `"${String(cell).replace(/"/g, '""')}"`).join(','))
-      .join('\n');
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+    const esc = (s: unknown) => String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const body = compliance.map(r => `<tr>`
+      + `<td>${esc(r.id)}</td>`
+      + `<td>${esc(r.requirement)}</td>`
+      + `<td>${esc(CATEGORY_LABELS[r.category]?.label || r.category)}</td>`
+      + `<td>${esc(r.section || '')}</td>`
+      + `<td>${esc(r.owner)}</td>`
+      + `<td>${esc(STATUS_LABELS[r.status])}</td>`
+      + `<td>${esc(r.source_quote || '')}</td>`
+      + `</tr>`).join('');
+    const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:x='urn:schemas-microsoft-com:office:excel' xmlns='http://www.w3.org/TR/REC-html40'>`
+      + `<head><meta charset='utf-8'>`
+      + `<!--[if gte mso 9]><xml><x:ExcelWorkbook><x:ExcelWorksheets><x:ExcelWorksheet><x:Name>Compliance Matrix</x:Name><x:WorksheetOptions><x:DisplayGridlines/></x:WorksheetOptions></x:ExcelWorksheet></x:ExcelWorksheets></x:ExcelWorkbook></xml><![endif]-->`
+      + `</head><body><table border="1"><thead><tr>${headers.map(h => `<th style="background:#eee">${esc(h)}</th>`).join('')}</tr></thead><tbody>${body}</tbody></table></body></html>`;
+    const blob = new Blob(['﻿', html], { type: 'application/vnd.ms-excel' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
     const safeName = (uploadedRfp?.fileName || 'rfp').replace(/[^a-z0-9-_.]/gi, '_');
-    link.download = `compliance-${safeName}-${new Date().toISOString().split('T')[0]}.csv`;
+    link.download = `compliance-${safeName}-${new Date().toISOString().split('T')[0]}.xls`;
     link.click();
     URL.revokeObjectURL(url);
   }, [compliance, uploadedRfp]);
@@ -2529,10 +2534,10 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                   {compliance.length > 0 && (
                     <button
                       type="button"
-                      onClick={exportComplianceCsv}
+                      onClick={exportComplianceExcel}
                       className="px-3 py-2 text-xs rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors"
                     >
-                      Export CSV
+                      Export Excel
                     </button>
                   )}
                   <button

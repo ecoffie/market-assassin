@@ -390,37 +390,6 @@ function paragraphsFromMarkdown(md: string): (Paragraph | Table)[] {
   return out;
 }
 
-function buildComplianceTable(rows: ComplianceRow[]): Table {
-  const header = new TableRow({
-    tableHeader: true,
-    children: ['ID', 'Requirement', 'Category', 'Section', 'Owner', 'Status'].map(t =>
-      new TableCell({
-        width: { size: 100 / 6, type: WidthType.PERCENTAGE },
-        children: [new Paragraph({ children: [new TextRun({ text: t, bold: true })] })],
-        borders: HEADING_BORDER,
-      })
-    ),
-  });
-
-  const body = rows.map(r =>
-    new TableRow({
-      children: [
-        new TableCell({ children: [plain(r.id)], borders: HEADING_BORDER }),
-        new TableCell({ children: [plain(r.requirement)], borders: HEADING_BORDER }),
-        new TableCell({ children: [plain(r.category || '')], borders: HEADING_BORDER }),
-        new TableCell({ children: [plain(r.section || '')], borders: HEADING_BORDER }),
-        new TableCell({ children: [plain(r.owner || '')], borders: HEADING_BORDER }),
-        new TableCell({ children: [plain(r.status || 'open')], borders: HEADING_BORDER }),
-      ],
-    })
-  );
-
-  return new Table({
-    width: { size: 100, type: WidthType.PERCENTAGE },
-    rows: [header, ...body],
-  });
-}
-
 function blank(label: string) {
   return `${label}: ______________________________`;
 }
@@ -925,8 +894,8 @@ export async function POST(request: NextRequest) {
   const tocItems: string[] = [];
   if (compliance.length > 0) {
     tocItems.push(isSimpleResponsePackage
-      ? `Response Requirements (${compliance.length} items)`
-      : `Compliance Matrix (${compliance.length} requirements)`);
+      ? `Response Requirements (${compliance.length}) — separate Excel file`
+      : `Compliance Matrix (${compliance.length}) — separate Excel file`);
   }
   for (const id of orderedSections) {
     const s = drafts[id];
@@ -941,22 +910,23 @@ export async function POST(request: NextRequest) {
 
   children.push(new Paragraph({ children: [new PageBreak()] }));
 
-  // --- Compliance matrix ---
+  // --- Compliance matrix: NOT embedded ---
+  // The full matrix is a working TRACKER (owner/status per requirement), not
+  // response prose — embedding all 286 rows bloated the Word package to 500+ pages
+  // (Eric, Jun 26). It now ships as a SEPARATE Excel workbook (Export Excel on the
+  // Compliance Matrix view). Keep only a one-line pointer so the package stays a
+  // readable response document.
   if (compliance.length > 0) {
     children.push(heading(isSimpleResponsePackage ? 'Response Requirements' : 'Compliance Matrix'));
     children.push(
       new Paragraph({
         children: [new TextRun({
-          text: isLoiPackage
-            ? `${compliance.length} response instructions / requested content items extracted from ${rfpName}.`
-            : `${compliance.length} requirements extracted from ${rfpName}.`,
+          text: `${compliance.length} ${isLoiPackage ? 'response instructions / requested items' : 'requirements'} extracted from ${rfpName}. Provided as a separate Excel workbook (use "Export Excel" on the Compliance Matrix) so this package stays a clean response document.`,
           italics: true,
           color: '666666',
         })],
       })
     );
-    children.push(new Paragraph({ children: [new TextRun({ text: '' })] }));
-    children.push(buildComplianceTable(compliance));
     children.push(new Paragraph({ children: [new PageBreak()] }));
   }
 
