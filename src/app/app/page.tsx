@@ -1091,6 +1091,13 @@ function AppDashboard() {
                 >
                   {authLoading ? 'Sending link…' : 'Email me a sign-in link'}
                 </button>
+                {/* Give the password path equal visual weight so it's discoverable
+                    — the old gray text link was unfindable (Eric Jun 25). */}
+                <div className="flex items-center gap-3 py-1" aria-hidden="true">
+                  <div className="h-px flex-1 bg-gray-700" />
+                  <span className="text-xs text-gray-500">or</span>
+                  <div className="h-px flex-1 bg-gray-700" />
+                </div>
                 <button
                   type="button"
                   onClick={() => {
@@ -1098,9 +1105,9 @@ function AppDashboard() {
                     setAuthMessage(null);
                     setUsePasswordSignIn(true);
                   }}
-                  className="w-full text-sm text-gray-500 hover:text-gray-300"
+                  className="w-full px-4 py-3 border border-gray-600 hover:border-emerald-500 bg-gray-800/40 hover:bg-gray-800 text-gray-100 text-sm font-semibold rounded-lg transition-colors flex items-center justify-center gap-2"
                 >
-                  Sign in with password instead
+                  🔑 Sign in with a password
                 </button>
               </form>
             ) : authStep === 'credentials' ? (
