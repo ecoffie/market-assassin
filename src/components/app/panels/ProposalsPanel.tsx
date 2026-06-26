@@ -3150,7 +3150,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               <button
                 type="button"
                 onClick={() => exportProposalPackage()}
-                disabled={exporting || (!hasAnyDraft && (!compliance.length || isLoiResponseMode))}
+                disabled={exporting}
                 className="px-5 py-2.5 text-sm rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:opacity-50 disabled:cursor-not-allowed text-white font-medium flex items-center gap-2 transition-colors"
               >
                 {exporting && (
@@ -3166,11 +3166,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               </div>
             )}
 
-            {!hasAnyDraft && (isLoiResponseMode || compliance.length === 0) && !exporting && (
+            {!hasAnyDraft && !exporting && (
               <p className="text-xs text-slate-500">
-                {isLoiResponseMode
-                  ? 'Draft at least one LOI response section before exporting.'
-                  : 'Generate at least the compliance matrix or one section before exporting.'}
+                Exports a fill-in template now — or click <span className="font-semibold text-slate-300">&ldquo;Draft my response&rdquo;</span> first to have Mindy write the sections for you.
               </p>
             )}
           </div>
