@@ -53,9 +53,10 @@ function bucketsForSection(sectionType: SectionType): string[] {
   }
 }
 
-/** Build the "requirements this section must satisfy" prompt block. */
-function formatSectionRequirements(requirements: ComplianceReq[] | undefined, sectionType: SectionType): string {
-  if (!requirements || requirements.length === 0) return '';
+/** The compliance requirements that map to THIS section (critical-first). The
+ *  COUNT drives the situation-aware length target, and the list feeds the prompt. */
+function sectionAlignedReqs(requirements: ComplianceReq[] | undefined, sectionType: SectionType): ComplianceReq[] {
+  if (!requirements || requirements.length === 0) return [];
   // The client sends category as a human LABEL ("Technical") — normalize to the
   // enum so alignMatrix buckets correctly (else everything falls to 'all').
   const normalized = requirements.map((r) => ({ ...r, category: normalizeCategory(r.category, r.requirement) }));
@@ -69,13 +70,35 @@ function formatSectionRequirements(requirements: ComplianceReq[] | undefined, se
       if (k && !seen.has(k)) { seen.add(k); mine.push(r); }
     }
   }
-  if (mine.length === 0) return '';
-  // Critical first; cap so the prompt doesn't explode on a 200-req RFP.
   const order = { critical: 0, standard: 1, final: 2 } as const;
   mine.sort((a, b) => order[priorityOf(a)] - order[priorityOf(b)]);
-  const lines = mine.slice(0, 15).map((r) => `- ${r.section ? r.section + ' — ' : ''}${(r.requirement || '').slice(0, 160)}`);
-  const more = mine.length > 15 ? `\n(+${mine.length - 15} more — covered by other sections / the compliance matrix)` : '';
-  return `### Requirements THIS section MUST address (from the compliance matrix)\nWrite the section so an evaluator can trace each of these to your response. Do not skip a stated requirement; if you can't fully answer one, name it and bracket the specifics.\n${lines.join('\n')}${more}`;
+  return mine;
+}
+
+/** Build the "requirements this section must satisfy" prompt block from the
+ *  pre-aligned list. Caps at 60 (was 15) so a requirement-heavy section actually
+ *  addresses most of its shalls instead of summarizing 15 (Eric, Jun 26 — sparse). */
+function formatSectionRequirements(mine: ComplianceReq[]): string {
+  if (mine.length === 0) return '';
+  const CAP = 60;
+  const lines = mine.slice(0, CAP).map((r) => `- ${r.section ? r.section + ' — ' : ''}${(r.requirement || '').slice(0, 200)}`);
+  const more = mine.length > CAP ? `\n(+${mine.length - CAP} more — keep going in the same structure; cover them too)` : '';
+  return `### Requirements THIS section MUST address (${mine.length} from the compliance matrix)\nGive EACH requirement its own treatment — a dedicated subsection or paragraph an evaluator can trace one-to-one to your response. Do not skip a stated requirement; if you can't fully answer one, name it and bracket the specifics.\n${lines.join('\n')}${more}`;
+}
+
+/** Situation-aware length target for a section, from its mapped-requirement count.
+ *  ~70 words of substantive response per requirement, floored at the section's
+ *  editorial default and capped so a single pass stays coherent (Tier 1 — Eric,
+ *  Jun 26). True multi-volume length (hundreds of pages) is the Tier 2 multi-pass
+ *  build. Returns the word target + the output-token budget to allow it. */
+function situationAwareLength(baseTargetWords: number, reqCount: number): { targetWords: number; maxOutputTokens: number } {
+  const WORDS_PER_REQ = 70;
+  const MAX_WORDS = 5000;     // ~10 pages per section in a single pass
+  const targetWords = Math.min(MAX_WORDS, Math.max(baseTargetWords, reqCount * WORDS_PER_REQ));
+  // ~1.5 output tokens per word + headroom; floor at the old 2200, cap at 8000
+  // (Groq llama-3.3-70b's max output) so every provider in the chain can serve it.
+  const maxOutputTokens = Math.min(8000, Math.max(2200, Math.round(targetWords * 1.6)));
+  return { targetWords, maxOutputTokens };
 }
 
 export async function buildV2Prompt(opts: {
@@ -162,7 +185,7 @@ General rules:
 - ANCHOR EVERY PARAGRAPH IN THIS SPECIFIC NOTICE. Name the actual scope, tasks, deliverables, location, equipment, or evaluation factors from the source text — quote or paraphrase the agency's own words. A reader must be unable to swap this draft onto a different solicitation. Generic capability prose that could fit any RFP is the #1 failure — do not write it.
 - NEVER FABRICATE FACTS. Do not invent numbers, percentages, dollar amounts, contract counts, "X% cost savings", satisfaction scores, customer names, agencies, contract titles, dates, names, emails, or phone numbers. Use ONLY figures and facts present in the bidder profile / vault or the source notice. If a fact isn't given, write a bracketed [placeholder] (e.g. [number of employees]) — NEVER a plausible-sounding invented value. A single invented fact disqualifies the whole response.
 - Minimize [placeholders]: use real vault/notice facts wherever they exist; only bracket what is genuinely unknown.
-- Be concise and on-target to the stated word count. Cut throat-clearing, restated mission boilerplate, and padding. Every sentence must earn its place against THIS requirement.
+- Be THOROUGH and specific to the stated length below — fully address every mapped requirement with real substance. "Concise" does NOT mean short here: cut throat-clearing, restated mission boilerplate, and adjective padding, but DO expand with concrete approach, methods, and requirement-by-requirement detail. Every sentence must earn its place by advancing THIS section's requirements, not by filling space.
 - Use clear markdown subheadings to organize anything longer than two paragraphs, so an evaluator can scan it.
 ${honestRule}
 - Mirror language from the source document where it shows you understand the scope.
@@ -204,10 +227,19 @@ ${honestRule}
   // we feed THIS section its own shalls + the cross-cutting ('all') ones, sorted
   // critical-first, so the draft actually covers what the RFP demands instead of
   // being disconnected from the compliance matrix.
-  const reqBlock = formatSectionRequirements(requirements, sectionType);
+  const mine = sectionAlignedReqs(requirements, sectionType);
+  const reqBlock = formatSectionRequirements(mine);
   if (reqBlock) parts.push(reqBlock);
 
+  // SITUATION-AWARE LENGTH (Tier 1, Eric Jun 26): scale the target to how many
+  // requirements this section actually owns, so a 147-requirement Technical volume
+  // runs long and a 1-requirement Management note stays short — instead of every
+  // section hitting the same ~1-page default.
+  const { targetWords, maxOutputTokens } = situationAwareLength(sectionMeta.targetWords, mine.length);
+
   parts.push(`### Section to draft: ${sectionMeta.label}\n${sectionMeta.basePrompt}`);
+
+  parts.push(`### Length & depth for THIS section\nWrite a THOROUGH, evaluator-ready ${sectionMeta.label} of approximately ${targetWords.toLocaleString()} words${mine.length > 0 ? ` — this section owns ${mine.length} compliance requirement${mine.length === 1 ? '' : 's'}, so give each its own subsection with specifics, not a one-line mention` : ''}. Depth comes from concretely addressing the notice's scope, tasks, and every mapped requirement with your real approach — NOT from filler, restated mission, or adjective stacks. Use markdown subheadings so an evaluator can navigate it. Going short and skipping requirements is the failure here; going long with substance is the goal.`);
 
   parts.push(`### Source solicitation${opts ? '' : ''}\n--- SOURCE TEXT (${inputText.length.toLocaleString()} chars${wasTruncated ? ', truncated' : ''}) ---\n${inputText}`);
 
@@ -224,6 +256,8 @@ ${honestRule}
       lens,
       inputChars: inputText.length,
       wasTruncated,
+      targetWords,
+      maxOutputTokens,
     },
   };
 }
@@ -254,7 +288,9 @@ export async function generateV2Draft(opts: {
     system: built.systemPrompt,
     user: built.userPrompt,
     temperature: 0.5,
-    maxTokens: 2200,
+    // Situation-aware output budget (scales with the section's requirement count);
+    // falls back to the old 2200 cap when no matrix was provided.
+    maxTokens: built.context.maxOutputTokens ?? 2200,
     job: 'drafting',
   });
   const rawDraft = (rawDraftRaw || '').trim();
@@ -287,7 +323,7 @@ export async function generateV2Draft(opts: {
     label: sectionMeta.label,
     draft: finalDraft,
     wordCount,
-    targetWords: sectionMeta.targetWords,
+    targetWords: built.context.targetWords ?? sectionMeta.targetWords,
     meta: {
       model: provider,
       pipeline: 'v2',
