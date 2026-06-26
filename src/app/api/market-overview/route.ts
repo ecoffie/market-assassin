@@ -183,6 +183,27 @@ async function grantTile(
   }
 }
 
+/** Active SAM solicitations reserved for small business (a real set-aside_code,
+ *  excluding full-and-open "NONE"). The recompete table carries no set-aside data,
+ *  so this is the honest "reserved for small business" signal — biddable now. */
+async function setAsideTile(codes: string[]): Promise<{ count: number }> {
+  if (!supabaseUrl || !supabaseKey || codes.length === 0) return { count: 0 };
+  try {
+    const supabase = createClient(supabaseUrl, supabaseKey);
+    const orFilter = codes.map((c) => (c.length < 6 ? `naics_code.like.${c}%` : `naics_code.eq.${c}`)).join(',');
+    const { count, error } = await supabase
+      .from('sam_opportunities')
+      .select('id', { count: 'exact', head: true })
+      .eq('active', true)
+      .or(orFilter)
+      .not('set_aside_code', 'is', null)
+      .neq('set_aside_code', '')
+      .neq('set_aside_code', 'NONE');
+    if (error) { console.warn('[market-overview] set-aside query failed:', error.message); return { count: 0 }; }
+    return { count: count ?? 0 };
+  } catch { return { count: 0 }; }
+}
+
 export async function GET(request: NextRequest) {
   const sp = request.nextUrl.searchParams;
   const keyword = (sp.get('keyword') || '').trim();
@@ -203,10 +224,11 @@ export async function GET(request: NextRequest) {
     : (coverage?.coverageCodes || []);
 
   // 2) Proprietary + API tiles in parallel.
-  const [recompete, grants, agencies] = await Promise.all([
+  const [recompete, grants, agencies, setAside] = await Promise.all([
     recompeteTile(codes),
     grantTile(request, keyword),
     agencyCount(codes),
+    setAsideTile(codes),
   ]);
   const forecasts = forecastTile(codes);
 
@@ -225,7 +247,7 @@ export async function GET(request: NextRequest) {
   const tiles: Tile[] = [
     { key: 'forecasts', label: 'Forecasted buys', icon: '📋', count: forecasts.count, value: forecasts.value, locked: !isPaid, detailPanel: 'forecasts' },
     { key: 'recompetes', label: 'Recompetes expiring (18 mo)', icon: '🔁', count: recompete.count, value: recompete.value, locked: !isPaid, detailPanel: 'recompetes' },
-    { key: 'setasides', label: 'Reserved for small business', icon: '🎯', count: recompete.setAsideCount, value: recompete.setAsideValue, locked: !isPaid, detailPanel: 'recompetes', note: 'set-aside' },
+    { key: 'setasides', label: 'Reserved for small business', icon: '🎯', count: setAside.count, value: 0, locked: !isPaid, detailPanel: 'alerts' },
     { key: 'grants', label: 'Grant opportunities', icon: '💰', count: grants.count, value: grants.value, locked: !isPaid, detailPanel: 'grants', note: 'award ceiling' },
   ];
 
