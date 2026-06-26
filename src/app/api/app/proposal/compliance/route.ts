@@ -8,6 +8,24 @@ import { callLLM } from '@/lib/llm/call-llm';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// Large packages (13+ docs) ran the chunk extraction serially and blew past the
+// default function limit — Eric saw it fail at 88s, then ~200s (Jun 26). Give it
+// headroom AND parallelize the chunks below so it finishes in ~30-40s.
+export const maxDuration = 300;
+
+// Run an async fn over items with bounded concurrency, preserving input order.
+async function mapPool<T, R>(items: T[], concurrency: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
+  const results = new Array<R>(items.length);
+  let cursor = 0;
+  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
+    while (cursor < items.length) {
+      const i = cursor++;
+      results[i] = await fn(items[i], i);
+    }
+  });
+  await Promise.all(workers);
+  return results;
+}
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = process.env.PROPOSAL_GROQ_MODEL || 'llama-3.3-70b-versatile';
@@ -174,28 +192,52 @@ async function extractMultiDoc(apiKey: string, pipelineId: string, email: string
   const map = new Map<string, ComplianceRequirement>();
   const sources: string[] = [];
   const sigOf = (r: ComplianceRequirement) => (r.requirement || '').toLowerCase().replace(/\s+/g, ' ').slice(0, 60);
-  for (const doc of ordered) {
-    // Chunk the WHOLE document (Eric QC: a 350K-char solicitation was sliced to
-    // 50K → 86% of requirements missed). Cap chunks per doc so a giant drawing-
-    // set PDF can't run away, but cover the real requirement-bearing text.
+
+  // Build the chunk worklist across ALL docs IN PRECEDENCE ORDER (base first,
+  // amendments last). Bounded per-doc AND globally so a 13-doc package can't spawn
+  // hundreds of serial LLM calls and time out (Eric, Jun 26). Chunks are then
+  // extracted in PARALLEL (bounded) and merged back in order, so amendments still
+  // override base requirements.
+  const MAX_CHUNKS_PER_DOC = 30;   // 30 × 14K ≈ 420K chars covered per doc
+  // High ceiling so coverage isn't cut (a 13-doc package needs ~120 chunks for its
+  // 286 requirements — Eric, Jun 26). Speed comes from PARALLELISM below, not from
+  // dropping chunks: ~120 chunks ÷ 6 concurrent ≈ 60s vs the old ~300s serial.
+  const MAX_TOTAL_CHUNKS = 200;
+  const EXTRACT_CONCURRENCY = 6;
+  type ChunkTask = { docIndex: number; label: string; isAmendment: boolean; isChange: boolean; filename?: string; chunk: string };
+  const tasks: ChunkTask[] = [];
+  ordered.forEach((doc, docIndex) => {
     const text = doc.extracted_text || '';
     const label = doc.doc_kind === 'amendment'
       ? `Amendment ${String(amdNum(doc.filename || '')).padStart(4, '0')}`
       : (doc.doc_kind || 'document');
     const isChange = doc.doc_kind === 'amendment' || doc.doc_kind === 'qa';
-    const MAX_CHUNKS_PER_DOC = 30; // 30 × 14K ≈ 420K chars covered per doc
     const chunks = chunkText(text, 14000).slice(0, MAX_CHUNKS_PER_DOC);
-    const reqs: ComplianceRequirement[] = [];
-    for (const c of chunks) { const r = await extractChunk(apiKey, doc.filename, c, isChange); if (r) reqs.push(...r); }
-    if (reqs.length) sources.push(`${label} (${reqs.length})`);
+    for (const c of chunks) {
+      if (tasks.length >= MAX_TOTAL_CHUNKS) break;
+      tasks.push({ docIndex, label, isAmendment: doc.doc_kind === 'amendment', isChange, filename: doc.filename, chunk: c });
+    }
+  });
+
+  const taskResults = await mapPool(tasks, EXTRACT_CONCURRENCY, (t) => extractChunk(apiKey, t.filename, t.chunk, t.isChange));
+
+  // Merge in task order (== precedence order) so amendments overwrite base.
+  const perDocCount = new Map<number, number>();
+  taskResults.forEach((reqs, i) => {
+    if (!reqs) return;
+    const t = tasks[i];
+    perDocCount.set(t.docIndex, (perDocCount.get(t.docIndex) || 0) + reqs.length);
     for (const r of reqs) {
       const sig = sigOf(r);
       if (!sig) continue;
-      const isAmendment = doc.doc_kind === 'amendment';
-      const tagged = { ...r, source_doc: label, revised: isAmendment && map.has(sig) };
-      map.set(sig, tagged); // later docs (amendments) overwrite → precedence
+      const tagged = { ...r, source_doc: t.label, revised: t.isAmendment && map.has(sig) };
+      map.set(sig, tagged);
     }
-  }
+  });
+  ordered.forEach((_, docIndex) => {
+    const count = perDocCount.get(docIndex) || 0;
+    if (count) sources.push(`${tasks.find(t => t.docIndex === docIndex)?.label || 'document'} (${count})`);
+  });
   const requirements = Array.from(map.values()).map((r, i) => ({ ...r, id: `REQ-${String(i + 1).padStart(3, '0')}` }));
   // Store in the shared cache so the next user bidding this notice is instant +
   // free (only for public SAM doc sets).
@@ -266,12 +308,12 @@ export async function POST(request: NextRequest) {
       anyOk = merged.length > 0;
       docSources = multiDocResult.sources;
     } else {
-      // Single-doc (legacy): chunk the flat text, extract, merge.
-      const chunks = chunkText(inputText, 14000);
+      // Single-doc (legacy): chunk the flat text, extract IN PARALLEL, merge.
+      const chunks = chunkText(inputText, 14000).slice(0, 48);
       merged = [];
       anyOk = false;
-      for (const chunk of chunks) {
-        const reqs = await extractChunk(apiKey, body.fileName, chunk);
+      const chunkResults = await mapPool(chunks, 6, (chunk) => extractChunk(apiKey, body.fileName, chunk));
+      for (const reqs of chunkResults) {
         if (reqs !== null) { anyOk = true; merged.push(...reqs); }
       }
     }
