@@ -53,7 +53,8 @@ import { getPrimesByAgency } from '@/lib/utils/prime-contractors';
 import { getEnhancedAgencyInfo, getAllCommands } from '@/lib/utils/command-info';
 import { keywordCoverage, deriveCoverageKeywords, buildSearchKeywords, buildMarketFilter, marketFilterToUsaspending } from '@/lib/market/keyword-coverage';
 import { internalBaseUrl } from '@/lib/utils/internal-base-url';
-import { MARKET_SPEND_WINDOW, MARKET_SPEND_WINDOW_LABEL } from '@/lib/utils/usaspending-helpers';
+import { MARKET_SPEND_WINDOW, MARKET_SPEND_WINDOW_LABEL, setAsideMap, veteranMap } from '@/lib/utils/usaspending-helpers';
+import { SIMPLIFIED_ACQUISITION_THRESHOLD } from '@/lib/utils/agency-priority';
 import { dodaacCodesForAgency } from '@/lib/gov-contacts/dodaac-directory';
 
 const FREE_TIER_ROW_LIMIT = 10;
@@ -409,7 +410,8 @@ export async function POST(request: NextRequest) {
     // first post-deploy hit for any keyword recomputes once and then stays put.
     // sv5 = agency roster anchored to spending_by_category (complete + stable buyer
     // list); bump so any sv4 rows recompute with the full roster.
-    const SPEND_SCHEMA_VERSION = 'sv5';
+    // sv6 = anchored rows now carry authoritative Set-Aside $ + SAT $ columns.
+    const SPEND_SCHEMA_VERSION = 'sv6';
     // Stable cache token. KEYWORD searches key on the normalized phrase — the
     // derived NAICS coverage set can drift run-to-run (keywordCoverage re-queries
     // live), so keying on it would miss every repeat and recompute different
@@ -567,6 +569,13 @@ export async function POST(request: NextRequest) {
     // because it didn't land in the sampled-award set (Eric: "it should not change
     // that drastically"). The sampled awards only ENRICH (offices, vendors, SAT).
     const subagencyCategoryTotals: Array<{ name: string; amount: number }> = [];
+    // Authoritative per-sub-agency SET-ASIDE $ and SAT-eligible $ (≤ SAT threshold),
+    // both from spending_by_category with the matching filter — deterministic, like
+    // the total. Used to fill the Set-Aside $ and Easy-Entry/SAT columns on the
+    // category-anchored rows (the buyers the award sample missed). Keyed by
+    // normalizeAgencyKey(name).
+    const setAsideCatByKey: Record<string, number> = {};
+    const satCatByKey: Record<string, number> = {};
     // Authoritative market total from spending_by_category at the DEPARTMENT level
     // (awarding_agency). Departments don't overlap, so summing them gives the true
     // market size WITHOUT the double-count you'd get summing sampled award rows.
@@ -627,6 +636,41 @@ export async function POST(request: NextRequest) {
             authoritativeMarketTotal = catResults.reduce((s, r) => s + (r.amount || 0), 0);
           }
         }
+
+        // TWO more deterministic sub-agency aggregates so the anchored rows get real
+        // Set-Aside $ and SAT $ columns (not just the total). Same scope/filter as the
+        // total — just adds (a) the SB set-aside codes for this businessType/veteran
+        // status, and (b) the ≤ SAT-threshold amount bound. One call each, not per
+        // agency, so it stays cheap + deterministic.
+        const setAsideTypeCodes = [
+          ...(setAsideMap[effectiveBusinessType] || []),
+          ...(veteranMap[veteranStatus || ''] || []),
+        ];
+        const extraPasses: Array<{ key: 'setAside' | 'sat'; filters: Record<string, unknown> }> = [];
+        if (setAsideTypeCodes.length > 0) {
+          extraPasses.push({ key: 'setAside', filters: { ...catFilterBase, set_aside_type_codes: setAsideTypeCodes } });
+        }
+        extraPasses.push({
+          key: 'sat',
+          filters: { ...catFilterBase, award_amounts: [{ lower_bound: 1, upper_bound: SIMPLIFIED_ACQUISITION_THRESHOLD }] },
+        });
+        await Promise.all(extraPasses.map(async ({ key, filters }) => {
+          try {
+            const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_category', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ category: 'awarding_subagency', filters, subawards: false, limit: 100, page: 1 }),
+            });
+            if (!res.ok) return;
+            const json = await res.json();
+            const results = (json.results || []) as Array<{ name: string; amount: number }>;
+            const target = key === 'setAside' ? setAsideCatByKey : satCatByKey;
+            for (const r of results) {
+              const k = normalizeAgencyKey(r.name || '');
+              if (k) target[k] = Math.max(target[k] || 0, r.amount || 0);
+            }
+          } catch { /* best-effort; column falls back to 0 */ }
+        }));
       }
     } catch (catErr) {
       console.warn('[target-market-research] spending_by_category total failed:', catErr);
@@ -990,6 +1034,14 @@ export async function POST(request: NextRequest) {
         ? { name: sb.name, director: sb.director, email: sb.email, phone: sb.phone, address: sb.address }
         : (sb ? { name: sb.name, email: sb.email, phone: sb.phone, address: sb.address } : null);
 
+      // Authoritative dollar columns from the extra category passes (deterministic).
+      const setAsideSpending = setAsideCatByKey[key] || 0;
+      const satSpending = satCatByKey[key] || 0;
+      // Dollar-based SAT ratio (sample-free): share of this buyer's spend that's
+      // under the SAT threshold. Stands in for the count-based ratio the sampled
+      // rows use (no per-agency contract-count aggregate exists in USASpending).
+      const satRatio = amount > 0 ? Math.min(1, satSpending / amount) : 0;
+
       rows.push({
         id: `cat:${key}`,
         name,
@@ -998,15 +1050,19 @@ export async function POST(request: NextRequest) {
         parentAgency: '',
         officeId: '',
         location: '',
-        setAsideSpending: 0,
+        setAsideSpending,
         totalSpending: amount,
         contractCount: 0,
-        satSpending: 0,
+        satSpending,
         satContractCount: 0,
-        metric_top_spending: keywordGrounded ? amount : 0,
+        // Set-Aside lens sort: real set-aside $ for NAICS searches now that we have
+        // it; keyword searches still rank on the keyword-grounded total.
+        metric_top_spending: keywordGrounded ? amount : setAsideSpending,
         metric_top_total: amount,
         metric_contracts: 0,
-        metric_easy_entry: 0,
+        // Easy-Entry magnitude: SAT $ scaled by the SAT ratio (replaces the
+        // count-based score the sampled rows use). Ranks SAT-friendly buyers up.
+        metric_easy_entry: satRatio * Math.sqrt(satSpending),
         metric_budget_growth: 0,
         painPointCount: painPointCount + (naicsAligned ? 5 : 0),
         openOppCount,
@@ -1019,7 +1075,7 @@ export async function POST(request: NextRequest) {
         osbp,
         hasOSBP: !!osbp,
         isSubAgency: true,
-        satRatio: 0,
+        satRatio,
       });
     }
 
