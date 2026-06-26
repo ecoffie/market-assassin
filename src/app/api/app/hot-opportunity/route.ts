@@ -15,11 +15,30 @@
  *                                 isSourcesSought, message } | null }
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { getDemandHeatmap } from '@/lib/admin/demand-heatmap';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+
+/** Has the viewer saved a real NAICS profile? The hot-SS card is social proof for
+ *  ENGAGED members — surfacing it to a brand-new user with NO market set up yet is
+ *  nonsensical (Eric, Jun 25: "shows the hot SS on every profile including a new
+ *  user who has no NAICS codes"). On error → false (better to hide than to mislead). */
+async function viewerHasProfile(email: string): Promise<boolean> {
+  try {
+    const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    const { data } = await sb
+      .from('user_notification_settings')
+      .select('naics_codes')
+      .eq('user_email', email)
+      .maybeSingle();
+    return Array.isArray(data?.naics_codes) && (data!.naics_codes as string[]).length > 0;
+  } catch {
+    return false;
+  }
+}
 
 export async function GET(request: NextRequest) {
   const email = request.nextUrl.searchParams.get('email')?.toLowerCase().trim();
@@ -27,6 +46,12 @@ export async function GET(request: NextRequest) {
 
   const auth = requireMIAuthSession(request, email);
   if (!auth.ok) return auth.response;
+
+  // PROFILE GATE. No saved NAICS profile → no market yet → don't pretend a hot
+  // opportunity is relevant to this user. Applies to the demo card too.
+  if (!(await viewerHasProfile(email))) {
+    return NextResponse.json({ hot: null }, { headers: { 'Cache-Control': 'no-store' } });
+  }
 
   // --- DEMO SAFETY NET (YT Live) ----------------------------------------
   // When COLLAB_DEMO_TITLE is set, force-return a synthetic hot opp so the
