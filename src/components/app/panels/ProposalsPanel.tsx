@@ -772,7 +772,11 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   // Show the compliance-matrix variant of the output section whenever we're in a
   // full-proposal flow OR the user has elected to build a matrix in a simple flow
   // (RFQ/LOI). The matrix is an always-available option (Eric, Jun 26).
-  const showComplianceMatrix = !isSimpleResponseMode || compliance.length > 0 || complianceLoading;
+  // The compliance matrix is overkill for a Sources Sought / RFI — it's market
+  // research, not a solicitation with shall/must clauses (Eric, Jun 26: "hide by
+  // default for sources sought"). Show the matrix for full proposals + RFQ, but
+  // never auto-surface it for LOI mode even if one was generated.
+  const showComplianceMatrix = !isSimpleResponseMode || (!isLoiResponseMode && (compliance.length > 0 || complianceLoading));
   // User-facing label for the notice type. Prefer SAM's authoritative
   // classification (e.g. "Combined Synopsis") over the internal simple-mode flag,
   // so a Combined Synopsis/Solicitation that cites an "RFQ ####" in its body isn't
@@ -2124,22 +2128,42 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             </p>
           )}
 
-          {/* THE one button. ALWAYS draft via the LLM first. RFQ mode used to wire
-              straight to exportProposalPackage(), SKIPPING drafting entirely — so it
-              exported a BLANK template with no content (Eric QC 2026-06-25: "it didn't
-              write anything / didn't read the documents"). Every simple-response mode
-              now drafts the same way; export happens once a draft exists. */}
-          <button
-            onClick={generateAllDrafts}
-            disabled={draftAllLoading || !!draftLoading}
-            className="w-full sm:w-auto px-6 py-3 bg-gradient-to-br from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white text-base font-semibold rounded-xl shadow-lg shadow-purple-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {draftAllLoading ? '⏳ Drafting your response…' : draftAllSummary ? '✨ Redraft my response' : '✨ Draft my response'}
-          </button>
+          {/* Primary + secondary actions in ONE aligned row — the compliance button
+              used to be a bare text link tacked underneath, looking like an
+              afterthought (Eric, Jun 26). */}
+          <div className="flex flex-wrap items-center gap-3">
+            {/* THE one button. ALWAYS draft via the LLM first (RFQ used to skip
+                drafting and export a blank template — Eric QC 2026-06-25). */}
+            <button
+              onClick={generateAllDrafts}
+              disabled={draftAllLoading || !!draftLoading}
+              className="w-full sm:w-auto px-6 py-3 bg-gradient-to-br from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white text-base font-semibold rounded-xl shadow-lg shadow-purple-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {draftAllLoading ? '⏳ Drafting your response…' : draftAllSummary ? '✨ Redraft my response' : '✨ Draft my response'}
+            </button>
+
+            {/* Compliance matrix — an ALIGNED secondary action (same height as the
+                primary). Hidden for Sources Sought / RFI: it's market research with
+                no shall/must clauses, so the matrix is overkill (Eric, Jun 26). */}
+            {uploadedRfp && !draftAllLoading && !isLoiResponseMode && (
+              <button
+                type="button"
+                onClick={generateCompliance}
+                disabled={complianceLoading}
+                className="w-full sm:w-auto px-5 py-3 rounded-xl border border-slate-700 bg-slate-800/60 text-sm font-semibold text-slate-200 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
+              >
+                <span>📋</span>
+                {complianceLoading
+                  ? 'Building compliance matrix…'
+                  : compliance.length > 0
+                    ? `Compliance matrix · ${compliance.length} (rebuild)`
+                    : 'Build compliance matrix'}
+              </button>
+            )}
+          </div>
 
           {/* Show the work while drafting — a believable step-by-step narration so
-              the button doesn't just sit silent (Eric, Jun 26: "show something on
-              screen like the aha moment"). */}
+              the button doesn't just sit silent (Eric, Jun 26). */}
           {draftAllLoading && (
             <div className="mt-4">
               <ComplianceMatrixProgress
@@ -2152,26 +2176,6 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 messages={DRAFT_PROGRESS_MESSAGES}
               />
             </div>
-          )}
-
-          {/* Compliance matrix is an ALWAYS-available option — even in RFQ/LOI mode
-              the user can elect to build one (Eric, Jun 26: "make the compliance
-              matrix option available all the time… even with RFQ"). Building it
-              renders the matrix in the output section below. */}
-          {uploadedRfp && !draftAllLoading && (
-            <button
-              type="button"
-              onClick={generateCompliance}
-              disabled={complianceLoading}
-              className="mt-3 inline-flex items-center gap-1.5 text-sm text-purple-300 hover:text-purple-200 disabled:opacity-50"
-            >
-              <span>📋</span>
-              {complianceLoading
-                ? 'Building compliance matrix…'
-                : compliance.length > 0
-                  ? `Compliance matrix ready — ${compliance.length} requirements (rebuild)`
-                  : 'Build a compliance matrix (optional)'}
-            </button>
           )}
 
           {/* Surface draft errors HERE in the hero card — the other draftError
