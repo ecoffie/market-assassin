@@ -136,9 +136,17 @@ export default function CompetitivePositioningPage() {
           <p className="mt-2 text-sm text-slate-400">
             The closest AI-native competitor — strong, funded, built for proposal shops and primes. We don&rsquo;t out-enterprise a $42M company; we win the lane they price out of, on things they can&rsquo;t copy.
           </p>
+
+          {/* The frame: in the AI era, software is replicable — the moat is brand. */}
+          <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-center">
+            <p className="text-[11px] uppercase tracking-wider text-emerald-300/80">In the AI era, anyone can replicate the software</p>
+            <p className="mt-0.5 text-lg font-black text-white">The moat is <span className="text-emerald-300">Brand · Attention · Distribution</span></p>
+            <p className="text-[12px] text-slate-400">…and that&rsquo;s exactly what GovCon Giants is. A $42M feature factory can&rsquo;t buy it.</p>
+          </div>
+
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-300">Our durable moat (they can&rsquo;t copy)</p>
+              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-300">The moat: Brand · Attention · Distribution</p>
               <ul className="mt-1.5 space-y-1 text-[13px] text-slate-200">
                 <li>• 8 yrs of teaching + 743 interviews — Mindy <span className="font-semibold">teaches</span> while it works</li>
                 <li>• The GovCon Giants audience — distribution money can&rsquo;t buy fast</li>
