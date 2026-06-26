@@ -56,9 +56,9 @@ const SCAN_STEPS: { icon: string; label: string }[] = [
   { icon: '✨', label: 'Resolving it all into your one market' },
 ];
 
-const STEP_MS = 360;
+const STEP_MS = 600;   // deliberate "watch it work" pace (Eric Jun 25: slow it down)
 
-function useCountUp(target: number | undefined, run: boolean, ms = 900): number {
+function useCountUp(target: number | undefined, run: boolean, ms = 1300): number {
   const [n, setN] = useState(0);
   const raf = useRef<number | null>(null);
   useEffect(() => {
@@ -88,7 +88,7 @@ export default function OnboardingScan({ reveal, onContinue }: Props) {
       // Reached the end of the visible scan. Flip to reveal once data is ready;
       // otherwise keep holding here (the last step reads "Resolving…").
       if (reveal) {
-        const t = setTimeout(() => setPhase('reveal'), 500);
+        const t = setTimeout(() => setPhase('reveal'), 750);
         return () => clearTimeout(t);
       }
       return;
