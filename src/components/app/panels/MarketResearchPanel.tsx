@@ -4940,7 +4940,11 @@ function AgencyTable({
                   </td>
                   <td className="text-right px-4 py-2 text-white font-bold">{formatRowCurrency(row.totalSpending)}</td>
                   <td className="text-right px-4 py-2 text-emerald-400 font-semibold">{formatRowCurrency(row.setAsideSpending)}</td>
-                  <td className="text-right px-4 py-2">{row.contractCount.toLocaleString()}</td>
+                  <td className="text-right px-4 py-2">
+                    {row.id?.startsWith('cat:') && row.contractCount === 0
+                      ? <span className="text-slate-600" title="Authoritative spend total; this buyer's individual awards weren't sampled, so the contract count isn't available">—</span>
+                      : row.contractCount.toLocaleString()}
+                  </td>
                   <td className="text-right px-4 py-2">
                     {(() => {
                       // SB % from the SBA Goaling Report (FY23). Looked
@@ -5314,19 +5318,28 @@ function AgencyDrawer({
             />
             <DrawerStat
               label="Total Contracts"
-              value={row.contractCount.toLocaleString()}
+              value={row.id?.startsWith('cat:') && row.contractCount === 0 ? '—' : row.contractCount.toLocaleString()}
               tone="slate"
+              hint={row.id?.startsWith('cat:') && row.contractCount === 0
+                ? 'Authoritative spend total; individual awards not sampled for this buyer, so the count is unavailable'
+                : undefined}
             />
             <DrawerStat
               label="SAT %"
-              value={row.satContractCount > 0 ? `${Math.round(row.satRatio * 100)}%` : '—'}
+              value={
+                row.satContractCount > 0 || (row.id?.startsWith('cat:') && row.satRatio > 0)
+                  ? `${Math.round(row.satRatio * 100)}%`
+                  : '—'
+              }
               tone="blue"
               hint={
                 row.satContractCount > 0
                   ? `${row.satContractCount} of ${row.contractCount} contracts under $350K`
-                  : row.contractCount > 0
-                    ? 'No small-dollar awards (<$350K) in our USAspending sample. Pipeline skews to large contracts; true SAT count needs SAM Contract Data API.'
-                    : undefined
+                  : row.id?.startsWith('cat:')
+                    ? 'Share of this buyer’s spend on awards under $350K (dollar-based, from aggregated totals)'
+                    : row.contractCount > 0
+                      ? 'No small-dollar awards (<$350K) in our USAspending sample. Pipeline skews to large contracts; true SAT count needs SAM Contract Data API.'
+                      : undefined
               }
             />
           </div>

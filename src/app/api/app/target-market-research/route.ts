@@ -55,6 +55,10 @@ import { keywordCoverage, deriveCoverageKeywords, buildSearchKeywords, buildMark
 import { internalBaseUrl } from '@/lib/utils/internal-base-url';
 import { MARKET_SPEND_WINDOW, MARKET_SPEND_WINDOW_LABEL, setAsideMap, veteranMap } from '@/lib/utils/usaspending-helpers';
 import { SIMPLIFIED_ACQUISITION_THRESHOLD } from '@/lib/utils/agency-priority';
+
+// Bounded per-agency contract-count calls (anchored rows, cache-miss only) push the
+// worst case past the default; give the function room. Cache hits are instant.
+export const maxDuration = 120;
 import { dodaacCodesForAgency } from '@/lib/gov-contacts/dodaac-directory';
 
 const FREE_TIER_ROW_LIMIT = 10;
@@ -411,7 +415,8 @@ export async function POST(request: NextRequest) {
     // sv5 = agency roster anchored to spending_by_category (complete + stable buyer
     // list); bump so any sv4 rows recompute with the full roster.
     // sv6 = anchored rows now carry authoritative Set-Aside $ + SAT $ columns.
-    const SPEND_SCHEMA_VERSION = 'sv6';
+    // sv7 = anchored rows now carry contract COUNT (bounded per-agency count calls).
+    const SPEND_SCHEMA_VERSION = 'sv7';
     // Stable cache token. KEYWORD searches key on the normalized phrase — the
     // derived NAICS coverage set can drift run-to-run (keywordCoverage re-queries
     // live), so keying on it would miss every repeat and recompute different
@@ -582,30 +587,33 @@ export async function POST(request: NextRequest) {
     // This is what the top "Relevant spending" card should show (#2 reconciliation).
     let authoritativeMarketTotal = 0;
     const keywordGrounded = Boolean(marketFilter);
+    // Shared category filter — hoisted out of the try so the anchored-row contract
+    // COUNT calls below can reuse the exact same market scope.
+    // expandFullCodes=false: 6-digit codes stay EXACT so the authoritative
+    // "Relevant spending" total reflects the SEARCHED market, not the whole
+    // 3-digit subsector (was inflating 541512 → all of 541xxx, 7×). Prefixes
+    // still expand. Matches find-agencies + fpds-top-n.
+    const expanded = expandNAICSCodes(parseNAICSInput(naics), false);
+    const catFilterBase: Record<string, unknown> = {
+      // Canonical 3-FY window shared with find-agencies + fpds-top-n so the
+      // accurate-total figures reconcile with the rest of the dashboard.
+      time_period: [{ start_date: MARKET_SPEND_WINDOW.start_date, end_date: MARKET_SPEND_WINDOW.end_date }],
+      award_type_codes: ['A', 'B', 'C', 'D'],
+    };
+    if (marketFilter) {
+      Object.assign(catFilterBase, marketFilterToUsaspending(marketFilter));
+    } else if (expanded.length > 0) {
+      catFilterBase.naics_codes = expanded;
+    }
+    // Scope the authoritative total to the SAME states as the agency search
+    // (place of performance), via the shared helper + single marketScope. Without
+    // this the headline "Relevant spending" + the Total $ column showed NATIONAL
+    // figures while the agency list was state-scoped — FL/GA janitorial read as
+    // $116B and FERC inherited Department of Energy's national $65.9B.
+    applyStateScope(catFilterBase, marketScope.states);
+    const catScopeUsable = Boolean(marketFilter || expanded.length > 0);
     try {
-      // expandFullCodes=false: 6-digit codes stay EXACT so the authoritative
-      // "Relevant spending" total reflects the SEARCHED market, not the whole
-      // 3-digit subsector (was inflating 541512 → all of 541xxx, 7×). Prefixes
-      // still expand. Matches find-agencies + fpds-top-n.
-      const expanded = expandNAICSCodes(parseNAICSInput(naics), false);
-      const catFilterBase: Record<string, unknown> = {
-        // Canonical 3-FY window shared with find-agencies + fpds-top-n so the
-        // accurate-total figures reconcile with the rest of the dashboard.
-        time_period: [{ start_date: MARKET_SPEND_WINDOW.start_date, end_date: MARKET_SPEND_WINDOW.end_date }],
-        award_type_codes: ['A', 'B', 'C', 'D'],
-      };
-      if (marketFilter) {
-        Object.assign(catFilterBase, marketFilterToUsaspending(marketFilter));
-      } else if (expanded.length > 0) {
-        catFilterBase.naics_codes = expanded;
-      }
-      // Scope the authoritative total to the SAME states as the agency search
-      // (place of performance), via the shared helper + single marketScope. Without
-      // this the headline "Relevant spending" + the Total $ column showed NATIONAL
-      // figures while the agency list was state-scoped — FL/GA janitorial read as
-      // $116B and FERC inherited Department of Energy's national $65.9B.
-      applyStateScope(catFilterBase, marketScope.states);
-      if (marketFilter || expanded.length > 0) {
+      if (catScopeUsable) {
         // Sub-agency + parent department totals (keyword or NAICS). Parent-level
         // keys let DoD/HHS rank correctly; sub-agency keys surface USACE/Navy.
         for (const category of ['awarding_subagency', 'awarding_agency'] as const) {
@@ -1081,6 +1089,42 @@ export async function POST(request: NextRequest) {
 
     // Default sort: top total $ (matches UI default lens + FPDS leaderboards).
     rows.sort((x, y) => y.metric_top_total - x.metric_top_total);
+
+    // Fill contract COUNT on the top category-anchored rows. There's no grouped
+    // count aggregate in USASpending, so it's one spending_by_award_count call per
+    // agency — bounded to the highest-spend anchored rows (the ones that actually
+    // show) and run in small parallel batches so it stays inside maxDuration. Only
+    // the recovered rows (id 'cat:') need it; sampled rows already counted real
+    // awards. Runs only on a cache MISS (cache hits already carry the counts).
+    if (catScopeUsable) {
+      const ANCHORED_COUNT_CAP = 20;
+      const CONC = 6;
+      const needCount = rows
+        .filter((r) => r.id.startsWith('cat:'))
+        .sort((a, b) => b.totalSpending - a.totalSpending)
+        .slice(0, ANCHORED_COUNT_CAP);
+      for (let i = 0; i < needCount.length; i += CONC) {
+        const batch = needCount.slice(i, i + CONC);
+        await Promise.all(batch.map(async (r) => {
+          try {
+            const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_award_count/', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                filters: { ...catFilterBase, agencies: [{ type: 'awarding', tier: 'subtier', name: r.name }] },
+              }),
+            });
+            if (!res.ok) return;
+            const j = await res.json();
+            const c = j?.results?.contracts;
+            if (typeof c === 'number' && c > 0) {
+              r.contractCount = c;
+              r.metric_contracts = c;
+            }
+          } catch { /* leave 0 → table shows "—" for unsampled rows */ }
+        }));
+      }
+    }
 
     // FULL-MARKET total for the "Relevant spending" headline + SB-mix denominator.
     // CRITICAL: findData is the WITH-set-aside pass (defaulted to Small Business),
