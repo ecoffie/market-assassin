@@ -1471,11 +1471,19 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     <div className="p-6 space-y-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-white">Proposal Assist</h1>
+          <div className="flex items-center gap-2">
+            <h1 className="text-2xl font-bold text-white">Proposal Assist</h1>
+            <span className="px-1.5 py-0.5 rounded text-[10px] font-bold tracking-wide bg-purple-500/20 text-purple-300 border border-purple-500/30">
+              BETA
+            </span>
+          </div>
           <p className="text-slate-400 mt-1">
             {activePursuitId
               ? `${proposalFlowName} workspace for ${activePursuit?.title || 'this pursuit'}.`
               : 'Start from a saved pursuit or upload a source document to prepare the response.'}
+          </p>
+          <p className="text-xs text-amber-300/80 mt-1.5">
+            A starting draft, not a finished submission — review, edit, and add your own proof before you submit.
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
