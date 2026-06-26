@@ -1029,11 +1029,19 @@ function formatEventDate(iso: string | null): string {
 // market research, but I also want actual industry day and
 // conference events."
 const RFI_EVENT_TYPES = new Set(['rfi', 'forecast']);
-function isScheduledEvent(e: TargetEvent): boolean {
-  return !RFI_EVENT_TYPES.has(e.event_type);
-}
+// Some Sources Sought / RFI notices reach sam_events with a GENERIC event_type
+// (not 'rfi'), so they leaked into the Scheduled Events bucket — Eric saw RFIs and
+// "SOURCES SOUGHT / CRFI" notices listed as events (Jun 26). Belt-and-suspenders:
+// also classify by the title. Real events (industry day / conference / webinar /
+// symposium) win even if the title also says "RFI".
+const SS_TITLE_RE = /\b(sources?\s+sought|request for information|\brfi\b|\bcrfi\b|market research|market survey|presolicitation)\b/i;
+const EVENT_TITLE_RE = /\b(industry day|conference|webinar|symposium|expo|summit|forum|matchmaking|pre[- ]?proposal|pre[- ]?bid|networking|workshop|town hall|outreach event)\b/i;
 function isSourcesSoughtEvent(e: TargetEvent): boolean {
-  return RFI_EVENT_TYPES.has(e.event_type);
+  if (EVENT_TITLE_RE.test(e.title || '')) return false; // a real event, keep it scheduled
+  return RFI_EVENT_TYPES.has(e.event_type) || SS_TITLE_RE.test(e.title || '');
+}
+function isScheduledEvent(e: TargetEvent): boolean {
+  return !isSourcesSoughtEvent(e);
 }
 
 function EventSection({
