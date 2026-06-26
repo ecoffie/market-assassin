@@ -175,6 +175,20 @@ const COMPLIANCE_PROGRESS_MESSAGES = [
   'Organizing requirements into your matrix…',
 ] as const;
 
+// Steps shown while Mindy drafts the response (generateAllDrafts is one server
+// call, so this is a believable timed narration of the work — Eric, Jun 26:
+// "show something on screen so users know what's going on, like the aha moment").
+const DRAFT_PROGRESS_MESSAGES = [
+  'Reading the solicitation and your uploaded documents…',
+  'Mapping the requirements to each section…',
+  'Pulling your past performance and capabilities from your profile…',
+  'Drafting your cover letter…',
+  'Writing your relevant experience and capability fit…',
+  'Tailoring the language to this agency and notice…',
+  'Checking it addresses every requirement…',
+  'Assembling your response package…',
+] as const;
+
 function detectNoticeTypeFromText(sourceText: string): 'rfp' | 'sources_sought' | 'rfi' | 'rfq' | 'unknown' {
   const head = sourceText.slice(0, 3000).toLowerCase();
   if (
@@ -558,6 +572,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     return () => clearInterval(interval);
   }, [complianceLoading]);
 
+
   // ── Sources Sought / RFI: extract LOI fields straight from the notice text ──
   // The notice text IS the input — no document upload needed for 90% of SS.
   // We pull agency/address/solicitation #/deadline/submission method/required
@@ -754,6 +769,10 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   const isLoiResponseMode = effectiveNoticeType === 'sources_sought' || effectiveNoticeType === 'rfi';
   const isRfqMode = effectiveNoticeType === 'rfq';
   const isSimpleResponseMode = isLoiResponseMode || isRfqMode;
+  // Show the compliance-matrix variant of the output section whenever we're in a
+  // full-proposal flow OR the user has elected to build a matrix in a simple flow
+  // (RFQ/LOI). The matrix is an always-available option (Eric, Jun 26).
+  const showComplianceMatrix = !isSimpleResponseMode || compliance.length > 0 || complianceLoading;
   const proposalFlowName = isLoiResponseMode ? 'LOI Response' : isRfqMode ? 'RFQ Response' : 'Proposal';
   const canUseTemplateWithoutSource = Boolean(activePursuitId && isSimpleResponseMode);
   const responseOutputsReady = Boolean(uploadedRfp || canUseTemplateWithoutSource);
@@ -844,7 +863,34 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   const [draftError, setDraftError] = useState<string | null>(null);
   const [draftAllLoading, setDraftAllLoading] = useState(false);
   const [draftAllSummary, setDraftAllSummary] = useState<{ count: number; ms: number; errors: number } | null>(null);
+  const [draftAllProgressIdx, setDraftAllProgressIdx] = useState(0);
+  const [draftAllElapsedSec, setDraftAllElapsedSec] = useState(0);
+  const draftAllStartedAtRef = useRef<number | null>(null);
   const reviewSectionRef = useRef<HTMLElement | null>(null);
+
+  // Drive the drafting progress card (elapsed timer + cycling step) — same engine
+  // as the compliance matrix progress so "Draft my response" shows visible work
+  // instead of sitting silent (Eric, Jun 26).
+  useEffect(() => {
+    if (!draftAllLoading) {
+      setDraftAllElapsedSec(0);
+      return;
+    }
+    const tick = setInterval(() => {
+      if (draftAllStartedAtRef.current) {
+        setDraftAllElapsedSec(Math.floor((Date.now() - draftAllStartedAtRef.current) / 1000));
+      }
+    }, 1000);
+    return () => clearInterval(tick);
+  }, [draftAllLoading]);
+
+  useEffect(() => {
+    if (!draftAllLoading) return;
+    const interval = setInterval(() => {
+      setDraftAllProgressIdx(i => (i + 1) % DRAFT_PROGRESS_MESSAGES.length);
+    }, 4000);
+    return () => clearInterval(interval);
+  }, [draftAllLoading]);
 
   const scrollToReview = useCallback(() => {
     setShowAdvancedOutputs(true);
@@ -904,6 +950,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     setDraftAllLoading(true);
     setDraftError(null);
     setDraftAllSummary(null);
+    setDraftAllProgressIdx(0);
+    setDraftAllElapsedSec(0);
+    draftAllStartedAtRef.current = Date.now();
     try {
       const res = await fetch(`/api/app/proposal/draft-all?email=${encodeURIComponent(email)}`, {
         method: 'POST',
@@ -2052,6 +2101,43 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             {draftAllLoading ? '⏳ Drafting your response…' : draftAllSummary ? '✨ Redraft my response' : '✨ Draft my response'}
           </button>
 
+          {/* Show the work while drafting — a believable step-by-step narration so
+              the button doesn't just sit silent (Eric, Jun 26: "show something on
+              screen like the aha moment"). */}
+          {draftAllLoading && (
+            <div className="mt-4">
+              <ComplianceMatrixProgress
+                charCount={uploadedRfp?.charCount || uploadedRfp?.text?.length || 0}
+                elapsedSec={draftAllElapsedSec}
+                messageIdx={draftAllProgressIdx}
+                hasPursuit={!!activePursuitId}
+                compactTitle="Mindy is writing your response…"
+                fullTitle="Mindy is writing your response"
+                messages={DRAFT_PROGRESS_MESSAGES}
+              />
+            </div>
+          )}
+
+          {/* Compliance matrix is an ALWAYS-available option — even in RFQ/LOI mode
+              the user can elect to build one (Eric, Jun 26: "make the compliance
+              matrix option available all the time… even with RFQ"). Building it
+              renders the matrix in the output section below. */}
+          {uploadedRfp && !draftAllLoading && (
+            <button
+              type="button"
+              onClick={generateCompliance}
+              disabled={complianceLoading}
+              className="mt-3 inline-flex items-center gap-1.5 text-sm text-purple-300 hover:text-purple-200 disabled:opacity-50"
+            >
+              <span>📋</span>
+              {complianceLoading
+                ? 'Building compliance matrix…'
+                : compliance.length > 0
+                  ? `Compliance matrix ready — ${compliance.length} requirements (rebuild)`
+                  : 'Build a compliance matrix (optional)'}
+            </button>
+          )}
+
           {/* Surface draft errors HERE in the hero card — the other draftError
               render is below the fold behind "More options", so a hero-button
               failure was invisible (Eric QC 2026-06-13: "click, nothing happens"). */}
@@ -2161,7 +2247,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           )}
 
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
-            {isSimpleResponseMode ? (
+            {isSimpleResponseMode && (
               <OutputActionCard
                 eyebrow={isRfqMode ? 'RFQ' : 'LOI / Market Research'}
                 title={isRfqMode ? 'Export RFQ response template' : 'Export LOI response template'}
@@ -2178,17 +2264,21 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 onSecondary={!isRfqMode ? previewLoi : undefined}
                 secondaryDisabled={previewing}
               />
-            ) : (
-              <OutputActionCard
-                eyebrow="Compliance"
-                title="Build compliance matrix"
-                description="Extract shall / must / required clauses into a working table with owner and status fields."
-                status={compliance.length > 0 ? `${compliance.length} requirements` : complianceLoading ? 'Extracting...' : 'Not generated'}
-                buttonLabel={complianceLoading ? 'Extracting...' : compliance.length > 0 ? 'Regenerate matrix' : 'Generate matrix'}
-                disabled={complianceLoading}
-                onClick={generateCompliance}
-              />
             )}
+            {/* Compliance matrix is ALWAYS available — the user can elect to use it
+                in any mode, including RFQ (Eric, Jun 26: "make the compliance matrix
+                option available all the time, even with RFQ"). */}
+            <OutputActionCard
+              eyebrow="Compliance"
+              title="Build compliance matrix"
+              description={isSimpleResponseMode
+                ? 'Optional — pull every shall / must / required clause into a working table with owner and status. Useful even for an RFQ.'
+                : 'Extract shall / must / required clauses into a working table with owner and status fields.'}
+              status={compliance.length > 0 ? `${compliance.length} requirements` : complianceLoading ? 'Extracting...' : 'Optional'}
+              buttonLabel={complianceLoading ? 'Extracting...' : compliance.length > 0 ? 'Regenerate matrix' : 'Generate matrix'}
+              disabled={complianceLoading || !uploadedRfp}
+              onClick={generateCompliance}
+            />
 
             {!isRfqMode && (
               <OutputActionCard
@@ -2335,13 +2425,13 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       {/* In simple mode this (blank template export) is a secondary option —
           only when "More options" is expanded. Full-proposal mode always shows
           the compliance-matrix variant. */}
-      {responseOutputsReady && driveMode === 'auto' && (!isSimpleResponseMode || showAdvancedOutputs) && (
+      {responseOutputsReady && driveMode === 'auto' && (showComplianceMatrix || showAdvancedOutputs) && (
         <section
-          id={isSimpleResponseMode ? 'proposal-response-template' : 'proposal-compliance-section'}
+          id={showComplianceMatrix ? 'proposal-compliance-section' : 'proposal-response-template'}
           ref={complianceSectionRef}
           className="bg-slate-900 border border-slate-800 rounded-xl p-5"
         >
-          {isSimpleResponseMode ? (
+          {!showComplianceMatrix ? (
             <>
               <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
                 <div>
@@ -3199,14 +3289,20 @@ function ComplianceMatrixProgress({
   messageIdx,
   hasPursuit,
   compact = false,
+  compactTitle = 'Building compliance matrix…',
+  fullTitle = 'Mindy is building your compliance matrix',
+  messages = COMPLIANCE_PROGRESS_MESSAGES,
 }: {
   charCount: number;
   elapsedSec: number;
   messageIdx: number;
   hasPursuit: boolean;
   compact?: boolean;
+  compactTitle?: string;
+  fullTitle?: string;
+  messages?: readonly string[];
 }) {
-  const message = COMPLIANCE_PROGRESS_MESSAGES[messageIdx % COMPLIANCE_PROGRESS_MESSAGES.length];
+  const message = messages[messageIdx % messages.length];
   const estSections = Math.max(1, Math.ceil(charCount / 14000));
   const timeHint = charCount > 120000
     ? 'Large packages can take 1–3 minutes — Mindy reads each section separately.'
@@ -3220,7 +3316,7 @@ function ComplianceMatrixProgress({
         <div className="flex items-center gap-3">
           <span className="inline-block w-4 h-4 border-2 border-purple-300 border-t-transparent rounded-full animate-spin shrink-0" />
           <div className="flex-1 min-w-0">
-            <p className="text-sm font-semibold text-purple-100">Building compliance matrix…</p>
+            <p className="text-sm font-semibold text-purple-100">{compactTitle}</p>
             <p key={messageIdx} className="text-xs text-purple-200/80 truncate animate-[complianceFadeIn_0.3s_ease-out]">
               {message} ({elapsedSec}s — still working)
             </p>
@@ -3251,7 +3347,7 @@ function ComplianceMatrixProgress({
           <span className="relative inline-flex h-4 w-4 rounded-full bg-purple-500" />
         </span>
         <div className="flex-1 min-w-0">
-          <p className="text-sm font-semibold text-purple-100">Mindy is building your compliance matrix</p>
+          <p className="text-sm font-semibold text-purple-100">{fullTitle}</p>
           <p key={messageIdx} className="mt-1 text-sm text-slate-200 animate-[complianceFadeIn_0.3s_ease-out]">
             {message}
           </p>
