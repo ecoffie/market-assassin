@@ -151,7 +151,10 @@ export default function SetAsideImpactPage() {
               })}
             </div>
             <p className="mt-3 text-[11px] text-slate-500">
-              Goal &amp; Achieved = % of eligible federal <span className="font-semibold">dollars</span> (SBA FY2024 scorecard). &ldquo;Solicited as set-aside&rdquo; = share of {live.biddable.total.toLocaleString()} live biddable solicitations actually issued under that category&rsquo;s set-aside (our SAM cache, refreshed daily). The red numbers are the needle: <span className="font-semibold text-rose-300">HUBZone is &ldquo;met&rdquo; at 2.75% of dollars but solicited as a HUBZone set-aside under 0.5% of the time.</span>
+              Goal &amp; Achieved = % of eligible federal <span className="font-semibold">dollars</span> (SBA FY2024 scorecard). &ldquo;Solicited as set-aside&rdquo; = share of {live.biddable.total.toLocaleString()} live biddable solicitations actually issued under that category&rsquo;s set-aside (our SAM cache, refreshed daily).
+            </p>
+            <p className="mt-2 rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-2 text-[11px] text-slate-400">
+              <span className="font-semibold text-slate-300">Why the dollar % outruns the solicitation %:</span> two reasons — (1) <span className="font-semibold">IDV / IDIQ leverage</span>: one set-aside vehicle (esp. 8(a)) spawns many task orders and big obligations off a single solicitation that never re-posts on SAM; and (2) firms <span className="font-semibold">credited for full-and-open wins</span> (HUBZone&rsquo;s 10% price preference; SBA admits ~$60B is won in full-and-open). Neither fully explains it: <span className="font-semibold text-emerald-300">SDVOSB uses IDVs too, yet is both well-solicited (6.1%) and the one category that truly hits its goal</span> — so the under-solicitation in HUBZone / 8(a) / WOSB is real on top of the IDV effect. That&rsquo;s the needle.
             </p>
           </div>
         )}
