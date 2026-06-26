@@ -22,7 +22,7 @@ import type { ComplianceReq } from '@/lib/proposal/section-alignment';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-export const maxDuration = 120;  // up to 2 min for the full pipeline
+export const maxDuration = 300;  // Tier 1: situation-aware sections run longer (up to ~5K words each)
 
 const GROQ_MODEL = process.env.PROPOSAL_GROQ_MODEL || 'llama-3.3-70b-versatile';
 

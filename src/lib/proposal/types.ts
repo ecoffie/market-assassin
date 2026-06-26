@@ -113,6 +113,10 @@ export interface BuiltPrompt {
     lens: LensOption | null;
     inputChars: number;
     wasTruncated: boolean;
+    /** Situation-aware length: word target + the output-token budget to allow it
+     *  (scaled to the section's mapped-requirement count). */
+    targetWords?: number;
+    maxOutputTokens?: number;
   };
 }
 

@@ -31,6 +31,9 @@ import type { ComplianceReq } from '@/lib/proposal/section-alignment';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// Situation-aware sections can now run to ~5,000 words (Tier 1) — give a single
+// section room to finish even when a provider falls back.
+export const maxDuration = 180;
 
 const GROQ_MODEL = process.env.PROPOSAL_GROQ_MODEL || 'llama-3.3-70b-versatile';
 
