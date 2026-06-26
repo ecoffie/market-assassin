@@ -84,7 +84,10 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
 
 **Newly deferred this session (Jun 26):**
 
-### Ingest the FULL GovCon Giants content library into Mindy RAG (moat)
+### Ingest the FULL GovCon Giants content library into Mindy RAG (moat) — ⭐ V2 FLAGSHIP
+- **When:** **V2 — start AFTER Mindy Day** (demo Jun 27, 2026). Confirmed by Eric
+  Jun 26: do the full ingestion post-demo as the headline v2 capability. Not a
+  pre-demo task; the demo runs on the current ~1,364-doc slice.
 - **Why:** the knowledge base IS the moat (8 yrs teaching). Mindy's RAG today
   (`mindy_rag_documents` ~1,364 docs / 12,534 chunks) has only a SLICE — ~136
   course_material, 103 slide_deck, 31 webinar_resource, 743 podcast_interview. Two
