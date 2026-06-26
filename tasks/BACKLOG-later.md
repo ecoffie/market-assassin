@@ -61,6 +61,56 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
 
 ---
 
+## 🔄 Reviewed & updated 2026-06-26 (demo-prep session)
+
+**Status corrections — these were marked deferred but are already DONE since the Jun 5 snapshot:**
+- ✅ **Coach Mode v1 — SHIPPED** (was P0 #1z "designed, never built"). Client
+  switcher + per-client pipeline/vault/profile, workspace-scoped reads
+  (`src/lib/mindy/coach-access.ts`, `/api/app/coach`, Source Feed/Auto-setup
+  scoped to active client). **v2 still deferred:** Slack/Outlook/Drive
+  integrations, branding, coach analytics.
+- ✅ **Cron Dispatcher Phase 2 — largely done.** Many jobs migrated since Jun 5
+  (setup-invite-batch, zero-alert-nudge, snapshot-metrics, pursuit-changes,
+  check-data-freshness, refresh-dodaac-directory, backfill-event-offices).
+  Remaining: confirm the load-bearing send pipelines are migrated LAST with
+  watchdog backstop intact.
+- ✅ **dodaac_directory monthly refresh — SHIPPED** (`refresh-dodaac-directory`
+  on the dispatcher).
+- ✅ **Event office-tagging — SHIPPED this session (PR #28).** Events decode their
+  buying office from the solicitation-number DoDAAC (`inferred_office`/
+  `inferred_subagency`); backfill drained (~40% of ~1,980 events tagged). **This
+  makes P2 "Civilian office decode" the clear next step** — civilian agencies
+  (GSA/VA/HHS) have no DoDAAC and still fall back to department-level.
+
+**Newly deferred this session (Jun 26):**
+
+### Proposal Assist — Tier 2 multi-pass volumes
+- **Status:** Built. **PR #34 open, NOT merged**, gated behind `PROPOSAL_MULTIPASS=1`.
+- **What:** batches a section's compliance requirements → drafts each batch in
+  parallel as a subsection → assembles 50-100+ page volumes. Tier 1
+  (situation-aware single-pass length) already SHIPPED (PR #33).
+- **To enable after demo:** merge #34, set `PROPOSAL_MULTIPASS=1` (+ optional
+  `_THRESHOLD`/`_BATCH`/`_CONCURRENCY`), QA. Follow-ups in
+  `src/lib/proposal/multi-pass.ts` header: context-reuse refactor (load vault/RAG
+  once per section), optional intro+TOC pass, per-user LLM budget guardrails.
+
+### Free-user tracking (pricing decision — parked, Eric's call)
+- **What:** let FREE users track opportunities (My Pursuits) from Market Research.
+  Backend `/api/pipeline` already accepts free posts — it's purely a UI/pricing
+  gate (UnifiedSidebar tier list + MarketResearchPanel track button + target-list
+  402).
+- **Open question:** full-free vs capped (e.g. 10 items) vs keep Pro-only.
+  Changes a documented Pro differentiator → Eric decides.
+
+### RFP-page-limit-aware section targets (Tier 1 refinement)
+- **What:** Tier 1 (PR #33) scales section length by mapped-requirement count +
+  fixed editorial defaults. v2 refinement: read the RFP's ACTUAL Section L page
+  limits (the compliance matrix already extracts them) → map to per-section word
+  targets (~500 words/page) and show "Target: 10 pages (~5,000 words) — per the
+  RFP" instead of a generic number.
+
+---
+
 ## ⏰ DEADLINE — June 19 (Juneteenth) work
 
 ### 0. Proposal Assist — Manual Drive (Perplexity-style proposal LLM)
@@ -85,7 +135,9 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
 
 ## 🔴 P0 — Big features with a PRD, ready to build
 
-### 1z. Coach Mode (APEX Accelerators) — strategic
+### 1z. Coach Mode (APEX Accelerators) — ✅ v1 SHIPPED (see 2026-06-26 review above)
+- **v1 DONE:** client switcher + per-client pipeline/vault/profile, workspace-scoped.
+  Remaining v2: APEX cross-client Tab polish, Slack/Outlook/Drive, branding, analytics.
 - **What:** one counselor manages MANY client businesses — client switcher +
   per-client pipeline/vault/profile + an "APEX Tab" (cross-client deadlines/
   alerts/news). Knowledge Base = the APEX "Workbench". From the APEX Illinois
