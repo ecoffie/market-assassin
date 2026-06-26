@@ -25,6 +25,43 @@ import { keywordCoverage } from '@/lib/market/keyword-coverage';
 import { getForecastsByNAICS, getForecastStatistics, type Forecast } from '@/lib/utils/agency-forecasts';
 import { internalBaseUrl } from '@/lib/utils/internal-base-url';
 import { verifyMIAccess } from '@/lib/api-auth';
+import { fiscalYearTimePeriod } from '@/lib/utils/fiscal-year';
+import primeDb from '@/data/prime-contractors-database.json';
+
+/** Distinct federal agencies buying in the user's NAICS (USASpending). Best-effort
+ *  — an external hiccup must never break the onboarding reveal (returns 0). */
+async function agencyCount(codes: string[]): Promise<number> {
+  if (!codes.length) return 0;
+  try {
+    const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_category/awarding_agency/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filters: { naics_codes: codes, time_period: [fiscalYearTimePeriod()], award_type_codes: ['A', 'B', 'C', 'D'] },
+        category: 'awarding_agency', limit: 100,
+      }),
+    });
+    if (!res.ok) return 0;
+    const j = await res.json();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (j.results || []).filter((r: any) => (r.amount || 0) > 0).length;
+  } catch { return 0; }
+}
+
+/** Prime contractors active in the user's space (NAICS industry-group overlap).
+ *  Static file → instant, no external call. Powers the onboarding reveal's
+ *  "contractors in your space" (teaming partners + competitors). */
+function contractorCount(codes: string[]): number {
+  if (!codes.length) return 0;
+  const prefixes = new Set(codes.map((c) => c.slice(0, 4)));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const primes = (((primeDb as any).primes) || []) as Array<{ naicsCategories?: string[] }>;
+  let n = 0;
+  for (const p of primes) {
+    if ((p.naicsCategories || []).some((c) => prefixes.has(String(c).slice(0, 4)))) n++;
+  }
+  return n;
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -166,9 +203,10 @@ export async function GET(request: NextRequest) {
     : (coverage?.coverageCodes || []);
 
   // 2) Proprietary + API tiles in parallel.
-  const [recompete, grants] = await Promise.all([
+  const [recompete, grants, agencies] = await Promise.all([
     recompeteTile(codes),
     grantTile(request, keyword),
+    agencyCount(codes),
   ]);
   const forecasts = forecastTile(codes);
 
@@ -202,6 +240,9 @@ export async function GET(request: NextRequest) {
         codes,
         topPsc: coverage?.topPsc ?? null,
       },
+      // Extra scope counts for the onboarding reveal (not tiles — the "so many
+      // contractors in your space" number). Best-effort; 0 just omits the stat.
+      scope: { contractors: contractorCount(codes), agencies },
       tiles,
     },
     { headers: { 'Cache-Control': 'private, max-age=300' } },

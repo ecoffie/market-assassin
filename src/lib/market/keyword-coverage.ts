@@ -211,7 +211,24 @@ export function buildSearchKeywords(opts: {
   return out.slice(0, 6);
 }
 
+// In-memory cache (10-min TTL). keywordCoverage is called 3× on a single onboarding
+// confirm screen (profile-from-text, market-overview, code suggestions), each doing
+// several USASpending round-trips. Dedupe so calls 2-3 are instant and we don't
+// triple the live-API flake surface during a demo. USASpending data is slow-moving,
+// so a short per-instance cache is safe.
+const _covCache = new Map<string, { at: number; val: KeywordCoverage | null }>();
+const COV_TTL_MS = 10 * 60 * 1000;
+
 export async function keywordCoverage(keyword: string, coverageTarget = 0.9): Promise<KeywordCoverage | null> {
+  const cacheKey = `${(keyword || '').trim().toLowerCase()}|${coverageTarget}`;
+  const hit = _covCache.get(cacheKey);
+  if (hit && Date.now() - hit.at < COV_TTL_MS) return hit.val;
+  const val = await keywordCoverageUncached(keyword, coverageTarget);
+  _covCache.set(cacheKey, { at: Date.now(), val });
+  return val;
+}
+
+async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): Promise<KeywordCoverage | null> {
   const raw = (keyword || '').trim();
   if (raw.length < 2) return null;
 

@@ -38,6 +38,8 @@ export interface MarketDataMapProps {
   /** Where the locked-chip CTA points (default the pricing/upgrade page). */
   upgradeHref?: string;
   className?: string;
+  /** Pre-fetched overview (e.g. onboarding already loaded it) → skip the fetch. */
+  initialData?: MarketOverview | null;
 }
 
 function money(n: number): string {
@@ -48,12 +50,14 @@ function money(n: number): string {
   return `$${n}`;
 }
 
-export default function MarketDataMap({ keyword, naics, state, email, upgradeHref = '/pricing', className }: MarketDataMapProps) {
-  const [data, setData] = useState<MarketOverview | null>(null);
-  const [loading, setLoading] = useState(true);
+export default function MarketDataMap({ keyword, naics, state, email, upgradeHref = '/pricing', className, initialData }: MarketDataMapProps) {
+  const [data, setData] = useState<MarketOverview | null>(initialData ?? null);
+  const [loading, setLoading] = useState(!initialData);
   const [error, setError] = useState(false);
 
   useEffect(() => {
+    // Parent already fetched it (onboarding) → use it, skip the round-trip.
+    if (initialData) { setData(initialData); setLoading(false); setError(false); return; }
     if (!keyword && !naics) { setLoading(false); return; }
     let cancelled = false;
     setLoading(true);
@@ -68,7 +72,7 @@ export default function MarketDataMap({ keyword, naics, state, email, upgradeHre
       .then((d) => { if (!cancelled) { if (d?.success) setData(d); else setError(true); setLoading(false); } })
       .catch(() => { if (!cancelled) { setError(true); setLoading(false); } });
     return () => { cancelled = true; };
-  }, [keyword, naics, state, email]);
+  }, [keyword, naics, state, email, initialData]);
 
   if (loading) {
     return (
@@ -80,7 +84,16 @@ export default function MarketDataMap({ keyword, naics, state, email, upgradeHre
       </div>
     );
   }
-  if (error || !data) return null;
+  // Graceful fallback — NEVER silently vanish (a demo killer). If the live fetch
+  // failed, keep a slim placeholder card instead of returning null.
+  if (error || !data) {
+    return (
+      <div className={`rounded-2xl border border-slate-800 bg-slate-900/60 p-5 text-center ${className || ''}`}>
+        <p className="text-xs font-semibold uppercase tracking-wider text-emerald-300">Your federal market</p>
+        <p className="mt-1 text-sm text-slate-400">Mapping forecasts, recompetes &amp; grants for your codes…</p>
+      </div>
+    );
+  }
 
   const isPaid = data.tier === 'pro' || data.tier === 'team';
   const m = data.market;
