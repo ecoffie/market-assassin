@@ -55,7 +55,7 @@ function bucketsForSection(sectionType: SectionType): string[] {
 
 /** The compliance requirements that map to THIS section (critical-first). The
  *  COUNT drives the situation-aware length target, and the list feeds the prompt. */
-function sectionAlignedReqs(requirements: ComplianceReq[] | undefined, sectionType: SectionType): ComplianceReq[] {
+export function sectionAlignedReqs(requirements: ComplianceReq[] | undefined, sectionType: SectionType): ComplianceReq[] {
   if (!requirements || requirements.length === 0) return [];
   // The client sends category as a human LABEL ("Technical") — normalize to the
   // enum so alignMatrix buckets correctly (else everything falls to 'all').
@@ -109,8 +109,12 @@ export async function buildV2Prompt(opts: {
   lensSeed?: number;  // for deterministic A/B testing
   noticePoc?: NoticePocSet | null;  // government POC from the SAM notice
   requirements?: ComplianceReq[];  // the compliance matrix — section gets ITS shalls
+  // TIER 2 (multi-pass): draft only ONE subsection covering a SUBSET of this
+  // section's requirements. Set by the multi-pass orchestrator; absent = the
+  // normal single-pass (Tier 1) whole-section draft.
+  subsection?: { index: number; total: number; reqs: ComplianceReq[] };
 }): Promise<BuiltPrompt> {
-  const { email, sectionType, sourceText, rfpAgency, lensSeed, noticePoc, requirements } = opts;
+  const { email, sectionType, sourceText, rfpAgency, lensSeed, noticePoc, requirements, subsection } = opts;
   const sectionMeta = getSectionMeta(sectionType);
   const isCapStmt = isCapStatementSection(sectionType);
 
@@ -227,7 +231,9 @@ ${honestRule}
   // we feed THIS section its own shalls + the cross-cutting ('all') ones, sorted
   // critical-first, so the draft actually covers what the RFP demands instead of
   // being disconnected from the compliance matrix.
-  const mine = sectionAlignedReqs(requirements, sectionType);
+  // In multi-pass mode this call drafts ONE subsection over a subset of reqs;
+  // otherwise it's the whole section's mapped requirements (Tier 1).
+  const mine = subsection ? subsection.reqs : sectionAlignedReqs(requirements, sectionType);
   const reqBlock = formatSectionRequirements(mine);
   if (reqBlock) parts.push(reqBlock);
 
@@ -239,7 +245,12 @@ ${honestRule}
 
   parts.push(`### Section to draft: ${sectionMeta.label}\n${sectionMeta.basePrompt}`);
 
-  parts.push(`### Length & depth for THIS section\nWrite a THOROUGH, evaluator-ready ${sectionMeta.label} of approximately ${targetWords.toLocaleString()} words${mine.length > 0 ? ` — this section owns ${mine.length} compliance requirement${mine.length === 1 ? '' : 's'}, so give each its own subsection with specifics, not a one-line mention` : ''}. Depth comes from concretely addressing the notice's scope, tasks, and every mapped requirement with your real approach — NOT from filler, restated mission, or adjective stacks. Use markdown subheadings so an evaluator can navigate it. Going short and skipping requirements is the failure here; going long with substance is the goal.`);
+  if (subsection) {
+    // TIER 2: write only this subsection of a larger volume.
+    parts.push(`### You are drafting ONE PART of the ${sectionMeta.label} volume (part ${subsection.index} of ${subsection.total})\nWrite ONLY a self-contained subsection that fully addresses the ${mine.length} requirement${mine.length === 1 ? '' : 's'} listed above — give EACH its own \`###\` subheading and a thorough, specific response with your real approach, methods, and how it satisfies the requirement. Do NOT write an overall section introduction or conclusion (those are assembled separately). Do NOT repeat requirements handled in other parts. Aim for roughly ${targetWords.toLocaleString()} words of substance — depth from concrete approach, not filler or adjective stacks.`);
+  } else {
+    parts.push(`### Length & depth for THIS section\nWrite a THOROUGH, evaluator-ready ${sectionMeta.label} of approximately ${targetWords.toLocaleString()} words${mine.length > 0 ? ` — this section owns ${mine.length} compliance requirement${mine.length === 1 ? '' : 's'}, so give each its own subsection with specifics, not a one-line mention` : ''}. Depth comes from concretely addressing the notice's scope, tasks, and every mapped requirement with your real approach — NOT from filler, restated mission, or adjective stacks. Use markdown subheadings so an evaluator can navigate it. Going short and skipping requirements is the failure here; going long with substance is the goal.`);
+  }
 
   parts.push(`### Source solicitation${opts ? '' : ''}\n--- SOURCE TEXT (${inputText.length.toLocaleString()} chars${wasTruncated ? ', truncated' : ''}) ---\n${inputText}`);
 
@@ -273,6 +284,7 @@ export async function generateV2Draft(opts: {
   lensSeed?: number;
   noticePoc?: NoticePocSet | null;  // government POC from the SAM notice
   requirements?: ComplianceReq[];   // compliance matrix → section gets its shalls
+  subsection?: { index: number; total: number; reqs: ComplianceReq[] };  // TIER 2 multi-pass
 }): Promise<DraftResult> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) throw new Error('GROQ_API_KEY not configured');

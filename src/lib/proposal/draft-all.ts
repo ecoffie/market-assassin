@@ -22,6 +22,7 @@
  */
 
 import { generateV2Draft } from './v2';
+import { generateMultiPassSection, MULTIPASS_ENABLED } from './multi-pass';
 import type { NoticePocSet } from './notice-poc';
 import type { ComplianceReq } from './section-alignment';
 import { getSectionMeta } from './sections';
@@ -183,7 +184,7 @@ async function renderSectionsInBatches(
           const outlineBlock = `\n\n### STRATEGIC DIRECTION FOR THIS SECTION (from proposal outline pass)\nEmphasis: ${outline.emphasis}\n${outline.keyAngles.length > 0 ? `Key angles to hit:\n${outline.keyAngles.map(a => `  - ${a}`).join('\n')}` : ''}\n`;
           augmentedSource = opts.sourceText + outlineBlock;
         }
-        return generateV2Draft({
+        const sectionArgs = {
           email: opts.email,
           sectionType: outline.sectionType,
           sourceText: augmentedSource,
@@ -191,7 +192,12 @@ async function renderSectionsInBatches(
           rfpAgency: opts.rfpAgency,
           noticePoc: opts.noticePoc,
           requirements: opts.requirements,
-        });
+        };
+        // TIER 2 (gated off via PROPOSAL_MULTIPASS): requirement-heavy sections draft
+        // as multi-pass volumes; otherwise the normal single-pass draft.
+        return MULTIPASS_ENABLED
+          ? generateMultiPassSection(sectionArgs)
+          : generateV2Draft(sectionArgs);
       })
     );
     for (let j = 0; j < results.length; j++) {
