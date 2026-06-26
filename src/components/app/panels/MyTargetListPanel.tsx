@@ -80,6 +80,19 @@ function fmtMoney(n: number): string {
   return `$${Math.round(n)}`;
 }
 
+/** Strip a leading DoDAAC office code ("Fa8614", "Fa8627", "W912DY") and a trailing
+ *  "/xx" code suffix from a saved office name for DISPLAY — the code already shows
+ *  as the badge beside it (Eric, Jun 26). The stored office_name is untouched (it's
+ *  the match / dedup key). Falls back to the original if stripping would empty it. */
+function cleanOfficeNameForDisplay(name: string): string {
+  if (!name) return name;
+  const s = name.trim()
+    .replace(/^[A-Za-z]{1,2}\d{2,4}[A-Za-z0-9]{0,3}\s+/, '') // leading DoDAAC code
+    .replace(/\s*\/\s*\w{2,5}\s*$/, '')                       // trailing /xx suffix
+    .trim();
+  return s || name.trim();
+}
+
 export default function MyTargetListPanel({
   email,
   tier,
@@ -629,7 +642,7 @@ export default function MyTargetListPanel({
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className="text-base font-semibold text-white truncate">{t.office_name}</h3>
+                        <h3 className="text-base font-semibold text-white truncate">{cleanOfficeNameForDisplay(t.office_name)}</h3>
                         {t.office_code && (
                           <span className="text-[10px] font-mono text-slate-500">{t.office_code}</span>
                         )}
