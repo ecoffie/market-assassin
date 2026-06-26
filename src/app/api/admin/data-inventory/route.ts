@@ -42,7 +42,7 @@ interface DatasetEntry {
 // The "recreate cost" story — breadth, not a copy-paste recipe. Static (changes
 // slowly); the exact source list lives in docs/MINDY-DATA-CORE-SOURCES.md.
 const RECREATE_COST = {
-  distinctSources: 28,
+  distinctSources: 31,         // +3 genuinely new: 8-yr teaching corpus, 743 podcast interviews, winning-proposal corpus (knowledge base)
   formats: 6,                  // REST · Excel · CSV · PDF · scraped HTML · BigQuery
   formatList: ['REST API', 'Excel', 'CSV', 'PDF', 'Scraped HTML', 'BigQuery bulk'],
   agencies: '300+',
@@ -116,6 +116,10 @@ export async function GET(request: NextRequest) {
     recompetes,
     forecasts,
     contractors,
+    ragDocs,
+    ragChunks,
+    events,
+    agencyIntel,
   ] = await Promise.all([
     headCount(supabase, 'federal_contacts'),
     headCount(supabase, 'sam_opportunities'),
@@ -123,6 +127,10 @@ export async function GET(request: NextRequest) {
     headCount(supabase, 'recompete_opportunities'),
     headCount(supabase, 'agency_forecasts'),
     bqRecipientsCount(),
+    headCount(supabase, 'mindy_rag_documents'),
+    headCount(supabase, 'mindy_rag_chunks'),
+    headCount(supabase, 'sam_events'),
+    headCount(supabase, 'agency_intelligence'),
   ]);
 
   // SOW-vs-description embedding split (best-effort — column may be un-migrated).
@@ -149,6 +157,12 @@ export async function GET(request: NextRequest) {
     { key: 'recompetes', label: 'Recompetes (expiring contracts)', source: 'USASpending awards, our identify/score/resolve', provenance: 'curated', count: recompetes, sources: ['USASpending Awards API'] },
     { key: 'pain_points', label: 'Agency pain points', source: 'Hand-curated from GAO / IG / CRS', provenance: 'exclusive', count: pp.painPoints, note: `${pp.agencies} agencies`, sources: ['GAO reports', 'IG audits', 'CRS analyses', 'Budget justifications', 'Strategic plans', 'GovInfo API'] },
     { key: 'priorities', label: 'Agency spending priorities', source: 'Hand-curated funded programs', provenance: 'exclusive', count: pp.priorities, note: 'where the money is going', sources: ['Budget justifications', 'GAO reports', 'Strategic plans', 'USASpending patterns'] },
+    // The KNOWLEDGE moat — 8 yrs of teaching + 743 interviews + winning proposals.
+    // Counted by DOCUMENTS (conservative); ragChunks is the searchable-passage depth.
+    // Powers Mindy Chat AND Proposal Assist's winning-proposal style corpus.
+    { key: 'knowledge_base', label: 'Knowledge base (RAG)', source: '8 yrs teaching corpus + 743 podcast interviews + winning proposals', provenance: 'exclusive', count: ragDocs, note: `${(ragChunks ?? 0).toLocaleString()} searchable passages · powers Mindy Chat + Proposal Assist`, sources: ['GovCon Giants teaching corpus (8 yrs)', '743 podcast interviews', 'Winning proposal / cap-statement corpus', 'OpenAI embeddings'] },
+    { key: 'events', label: 'Event Radar', source: 'SAM Special Notices, decoded to buying office', provenance: 'curated', count: events, note: 'industry days + sources sought, DoDAAC-decoded to the real command', sources: ['SAM.gov Special Notices', 'DoDAAC office decode'] },
+    { key: 'agency_intel', label: 'Agency intelligence', source: 'GAO high-risk + contract patterns', provenance: 'exclusive', count: agencyIntel, note: 'GAO/GovInfo high-risk + USASpending contract patterns', sources: ['GovInfo API', 'GAO high-risk reports', 'USASpending contract patterns'] },
     { key: 'grants', label: 'Federal grants', source: 'Grants.gov API (live)', provenance: 'passthrough', count: null, note: 'queried live per search', sources: ['Grants.gov API'] },
   ];
 
