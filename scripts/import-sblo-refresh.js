@@ -95,7 +95,7 @@ if (!Array.isArray(primes)) { console.error('✗ Unexpected DB shape (expected {
 const rows = parseCsv(fs.readFileSync(CSV_PATH, 'utf8'));
 const header = rows.shift().map((h) => h.trim().toLowerCase());
 const col = (name) => header.indexOf(name);
-const ci = { company: col('company'), sbloName: col('sbloname'), title: col('title'), email: col('email'), phone: col('phone') };
+const ci = { company: col('company'), sbloName: col('sbloname'), title: col('title'), email: col('email'), phone: col('phone'), vendorPortal: col('vendorportal') };
 if (ci.company < 0) { console.error('✗ CSV must have a "company" column.'); process.exit(1); }
 
 // index primes by normalized name (first wins; report collisions are rare)
@@ -104,7 +104,10 @@ primes.forEach((p, idx) => { const k = norm(p.name); if (k && !byNorm.has(k)) by
 
 // ---- merge ----
 let updated = 0, cleared = 0, blankSkipped = 0, unmatched = [];
-const FIELDS = [['sbloName', 'sbloName'], ['title', 'title'], ['email', 'email'], ['phone', 'phone']];
+// [csvColumn, dbField]. vendorPortal → supplierPortal: the supplier-registration
+// URL is the most common usable contact point in the refresh (a majority of
+// companies have a portal but no named SBLO), so it must come across too.
+const FIELDS = [['sbloName', 'sbloName'], ['title', 'title'], ['email', 'email'], ['phone', 'phone'], ['vendorPortal', 'supplierPortal']];
 const changes = [];
 for (const r of rows) {
   const company = (r[ci.company] || '').trim();
@@ -112,11 +115,26 @@ for (const r of rows) {
   const idx = byNorm.get(norm(company));
   if (idx === undefined) { unmatched.push(company); continue; }
   const p = primes[idx];
-  const csvName = ci.sbloName >= 0 ? (r[ci.sbloName] || '').trim() : '';
 
-  if (!csvName) {
-    if (CLEAR_STALE && p.sbloName) {
-      changes.push(`  CLEAR  ${p.name}: "${p.sbloName}" → (none, unconfirmed)`);
+  // Collect every non-empty incoming value. A row with NO name but a mailbox
+  // email and/or a supplier portal is still a real, usable contact (office/
+  // portal-only) — import it; don't skip on a missing name (that dropped ~70
+  // mailbox/portal contacts in the first cut).
+  const incoming = [];
+  for (const [csvKey, dbKey] of FIELDS) {
+    const c = ci[csvKey];
+    if (c == null || c < 0) continue;
+    const v = (r[c] || '').trim();
+    if (v) incoming.push([dbKey, v]);
+  }
+  // "Usable" = a real contact point (name/email/phone/portal), not just a title.
+  const usable = incoming.some(([k]) => k !== 'title');
+
+  if (!usable) {
+    // Nothing findable for this company. Leave as-is (no stamp — we won't claim a
+    // verify we couldn't make), or --clear-stale to null a prior unconfirmed one.
+    if (CLEAR_STALE && (p.sbloName || p.email)) {
+      changes.push(`  CLEAR  ${p.name}: dropped unconfirmed contact (${p.sbloName || p.email})`);
       if (WRITE) { p.sbloName = null; p.email = null; p.phone = null; delete p.sbloVerified; }
       cleared++;
     } else { blankSkipped++; }
@@ -124,11 +142,8 @@ for (const r of rows) {
   }
 
   const diffs = [];
-  for (const [csvKey, dbKey] of FIELDS) {
-    const ci2 = ci[csvKey];
-    if (ci2 < 0) continue;
-    const val = (r[ci2] || '').trim();
-    if (val && val !== p[dbKey]) { diffs.push(`${dbKey}: ${p[dbKey] ?? '∅'} → ${val}`); if (WRITE) p[dbKey] = val; }
+  for (const [dbKey, v] of incoming) {
+    if (v !== p[dbKey]) { diffs.push(`${dbKey}: ${p[dbKey] ?? '∅'} → ${v}`); if (WRITE) p[dbKey] = v; }
   }
   if (WRITE) p.sbloVerified = VERIFIED;
   if (diffs.length || !p.sbloVerified) {
