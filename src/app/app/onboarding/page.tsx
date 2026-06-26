@@ -516,9 +516,11 @@ export default function OnboardingPage() {
     const market = overview?.market?.totalMarket || autoProfile.totalMarket || 0;
     const codeCount = autoProfile.naicsCount || (autoProfile.naics || []).length || 0;
     const contractors = overview?.scope?.contractors || 0;
+    const agencies = overview?.scope?.agencies || 0;
     const stats: RevealData['stats'] = [];
     if (market > 0) stats.push({ icon: '💰', display: money(market), label: 'addressable market', accent: true });
     if (codeCount) stats.push({ icon: '🧩', value: codeCount, label: 'NAICS codes mapped' });
+    if (agencies) stats.push({ icon: '🏛️', value: agencies, label: 'buying agencies' });
     if (contractors) stats.push({ icon: '🏢', value: contractors, label: 'contractors in your space' });
     if (tileCount('forecasts')) stats.push({ icon: '📋', value: tileCount('forecasts'), label: 'forecasted buys' });
     if (tileCount('recompetes')) stats.push({ icon: '🔁', value: tileCount('recompetes'), label: 'recompetes expiring' });
