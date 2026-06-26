@@ -250,6 +250,23 @@ function AppDashboard() {
       setIsStaff(!!accessData?.isStaff);
       setCanSeePrototypes(!!accessData?.canSeePrototypes);
 
+      // New-user gate: a signed-in user with NO saved profile belongs in the
+      // onboarding slurpee, not the bare dashboard. Once per browser session (so it
+      // never traps someone who intentionally returns to /app). OAuth already
+      // redirects to onboarding; this covers password / session logins that land
+      // here directly (Eric Jun 25: "wire the routing back").
+      try {
+        if (typeof window !== 'undefined' && sessionStorage.getItem('mindy_onboard_checked') !== '1') {
+          sessionStorage.setItem('mindy_onboard_checked', '1');
+          const prefRes = await fetch(`/api/alerts/preferences?email=${encodeURIComponent(userEmail)}`, { headers: getTwoFactorHeaders() });
+          if (prefRes.ok) {
+            const pref = await prefRes.json();
+            const codes: string[] = pref?.data?.naicsCodes || [];
+            if (codes.length === 0) { window.location.href = '/app/onboarding'; return; }
+          }
+        }
+      } catch { /* never block the dashboard on a hiccup */ }
+
       // If the currently-active panel is gated for this tier, swap to the
       // first accessible one. Default panel is 'dashboard' (AI briefings) —
       // gated to Pro+, so free users would otherwise land on a locked screen.

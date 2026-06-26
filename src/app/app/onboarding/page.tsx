@@ -363,18 +363,20 @@ export default function OnboardingPage() {
   useEffect(() => {
     async function checkAuth() {
       const supabase = getSupabase();
-      if (!supabase) {
-        router.push('/signup');
-        return;
-      }
+      const sessionRes = supabase ? await supabase.auth.getSession() : { data: { session: null } };
+      const session = sessionRes.data?.session;
+      let userEmail = session?.user?.email?.toLowerCase() || '';
+      let token = session?.access_token || '';
 
-      const { data: { session } } = await supabase.auth.getSession();
-      if (!session?.user?.email || !session.access_token) {
-        router.push('/signup');
-        return;
+      // Non-OAuth logins (password / MI-token) have no Supabase session but a valid
+      // MI auth token + email in localStorage. Honor it so onboarding works for EVERY
+      // sign-in method instead of bouncing to /signup (Eric Jun 25).
+      if (!userEmail || !token) {
+        const miEmail = (typeof window !== 'undefined' ? (localStorage.getItem('mi_beta_email') || '') : '').toLowerCase();
+        const miToken = typeof window !== 'undefined' ? (localStorage.getItem('mi_beta_auth_token') || '') : '';
+        if (miEmail && miToken) { userEmail = miEmail; token = ''; }
+        else { router.push('/signup'); return; }
       }
-
-      const userEmail = session.user.email.toLowerCase();
 
       // OAuth's redirectTo always lands here, so returning users hit the
       // onboarding wizard on every sign-in. Check whether they've already
@@ -384,7 +386,7 @@ export default function OnboardingPage() {
       try {
         const res = await fetch(
           `/api/alerts/preferences?email=${encodeURIComponent(userEmail)}`,
-          { headers: { Authorization: `Bearer ${session.access_token}` } }
+          { headers: getMIApiHeaders(userEmail, token ? { Authorization: `Bearer ${token}` } : undefined) }
         );
         if (res.ok) {
           const data = await res.json();
@@ -401,7 +403,7 @@ export default function OnboardingPage() {
       }
 
       setEmail(userEmail);
-      setAccessToken(session.access_token);
+      setAccessToken(token);
       setLoading(false);
     }
 
