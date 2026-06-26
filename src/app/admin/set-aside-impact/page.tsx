@@ -16,7 +16,17 @@
  * Route: /admin/set-aside-impact
  */
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
+
+interface LiveStats {
+  window: { newestPosted: string | null; oldestPosted: string | null };
+  activeTotal: number | null;
+  biddable: { total: number; setAside: number; setAsidePct: number; fullAndOpen: number; fullAndOpenPct: number };
+  dollarShareSmallBusinessPct: number;
+}
+
+const fmtDate = (s: string | null) =>
+  s ? new Date(s).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) : '—';
 
 // FY2024 federal prime-contract obligations (SBA scorecard / CRS / FPDS).
 const TOTAL_B = 755;          // total federal prime obligations ($B)
@@ -37,6 +47,14 @@ const PROBLEM = [
 
 export default function SetAsideImpactPage() {
   const [pct, setPct] = useState(10);
+  const [live, setLive] = useState<LiveStats | null>(null);
+
+  useEffect(() => {
+    fetch('/api/admin/set-aside-stats')
+      .then((r) => (r.ok ? r.json() : null))
+      .then((d) => { if (d?.success) setLive(d as LiveStats); })
+      .catch(() => {});
+  }, []);
 
   const redirected = OTSB_B * (pct / 100);          // $B moved to small business
   const newSmall = SMALL_B + redirected;            // $B
@@ -56,6 +74,40 @@ export default function SetAsideImpactPage() {
             Free agentic tools put more small businesses in the game. Once two are capable and bidding, the <span className="font-semibold text-emerald-300">FAR 19.502-2 &ldquo;Rule of Two&rdquo;</span> <span className="italic">forces</span> the contract to be set aside for small business. At scale, free tools turn Full-and-Open dollars into set-asides.
           </p>
         </header>
+
+        {/* ── the gap, measured LIVE from our own platform ────────────────── */}
+        <div className="mb-6 rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-950/30 to-slate-950 p-5">
+          <div className="flex items-center justify-between gap-3">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-emerald-300">The gap — measured live, right now</h2>
+            <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-400">
+              <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
+              {live ? `${live.biddable.total.toLocaleString()} live solicitations · ${fmtDate(live.window.oldestPosted)}–${fmtDate(live.window.newestPosted)}` : 'loading…'}
+            </span>
+          </div>
+          {live ? (
+            <>
+              <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+                  <div className="text-3xl font-black text-emerald-300">{live.biddable.setAsidePct}%</div>
+                  <p className="mt-1 text-[12px] text-slate-400">of biddable solicitations are set aside for small business</p>
+                </div>
+                <div className="rounded-xl border border-rose-500/25 bg-rose-500/5 p-4">
+                  <div className="text-3xl font-black text-rose-300">{live.biddable.fullAndOpenPct}%</div>
+                  <p className="mt-1 text-[12px] text-slate-300">are still <span className="font-semibold">full-and-open</span> — and they carry the bigger dollars</p>
+                </div>
+                <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+                  <div className="text-3xl font-black text-white">{live.dollarShareSmallBusinessPct}%</div>
+                  <p className="mt-1 text-[12px] text-slate-400">of all federal <span className="font-semibold">dollars</span> reach small business (SBA FY2024)</p>
+                </div>
+              </div>
+              <p className="mt-3 text-[12px] text-slate-400">
+                The real discrepancy: small businesses win <span className="font-semibold text-slate-200">~half the solicitations but only ~{live.dollarShareSmallBusinessPct}% of the money</span> — because the set-asides are the <span className="font-semibold">small</span> contracts and the big ones stay open. Measured from our own SAM cache (true biddable solicitations only; DLA parts-buy award notices excluded), refreshed daily.
+              </p>
+            </>
+          ) : (
+            <p className="mt-3 text-sm text-slate-500">Measuring live from our SAM opportunity cache…</p>
+          )}
+        </div>
 
         {/* ── the problem ─────────────────────────────────────────────────── */}
         <div className="mb-6 grid gap-3 sm:grid-cols-3">
