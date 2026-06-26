@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
@@ -289,6 +289,10 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
   const [naicsFilter, setNaicsFilter] = useState('');
   const [monthsFilter, setMonthsFilter] = useState('24');
   const [competitionFilter, setCompetitionFilter] = useState('');
+  // "My states only" — hard-filter the list to the user's selected service states
+  // (place of performance in hq/service). Off by default so the page keeps its
+  // show-all-and-label behavior; on = strict to where you work (Eric, Jun 26 2026).
+  const [myStatesOnly, setMyStatesOnly] = useState(false);
 
   // Award-type view (Eric: IDV is the same USASpending data, a different slice —
   // a toggle here, not a separate panel). 'definitive' = current recompete view.
@@ -604,7 +608,30 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
     if (days <= 180) return { bg: 'bg-blue-500/20', text: 'text-blue-400', label: '📅 6 mo' };
     return { bg: 'bg-slate-500/20', text: 'text-slate-400', label: `${Math.round(days / 30)} mo` };
   };
-  const shownContractsCount = summary?.totalContracts || 0;
+  // "My states only" view. classifyLocation already tagged each row vs. the user's
+  // hq/service states, so in-state = hq | service (the states you actually selected;
+  // neighbor/outside/overseas/unknown are excluded). When off, show everything.
+  const hasStateProfile = (profileDefaults?.states?.length || 0) > 0;
+  const visibleContracts = useMemo(
+    () => (myStatesOnly
+      ? contracts.filter((c) => c.locationMatch === 'hq' || c.locationMatch === 'service')
+      : contracts),
+    [contracts, myStatesOnly],
+  );
+  // Keep the summary cards consistent with the filtered list.
+  const visibleSummary = useMemo(() => {
+    if (!summary) return null;
+    if (!myStatesOnly) return summary;
+    const totalValue = visibleContracts.reduce((s, c) => s + c.value, 0);
+    return {
+      ...summary,
+      totalContracts: visibleContracts.length,
+      totalValue,
+      urgentContracts: visibleContracts.filter((c) => c.daysUntilExpiration > 0 && c.daysUntilExpiration <= 90).length,
+    };
+  }, [summary, myStatesOnly, visibleContracts]);
+
+  const shownContractsCount = (myStatesOnly ? visibleContracts.length : summary?.totalContracts) || 0;
 
   if (loading) {
     return (
@@ -668,28 +695,28 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
 
       {/* Summary Cards — reflect the ACTIVE view (Eric: was stuck on the 804
           expiring numbers when switched to Subcontracting). */}
-      {awardType === 'definitive' && summary && (
+      {awardType === 'definitive' && visibleSummary && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <div className="text-2xl font-bold text-white">{summary.totalContracts}</div>
-            <div className="text-xs text-slate-500">{usingProfileDefaults ? 'Profile Matches' : 'Expiring Awards Shown'}</div>
+            <div className="text-2xl font-bold text-white">{visibleSummary.totalContracts}</div>
+            <div className="text-xs text-slate-500">{myStatesOnly ? 'In Your States' : usingProfileDefaults ? 'Profile Matches' : 'Expiring Awards Shown'}</div>
             {/* The static recompete dataset has no place-of-performance state, so the
                 "in your service area" count was always 0. Show the honest DB total. */}
             <div className="text-[11px] text-slate-600 mt-1">{allContracts.length.toLocaleString()} total in database</div>
           </div>
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <div className="text-2xl font-bold text-emerald-400">{formatCurrency(summary.totalValue)}</div>
+            <div className="text-2xl font-bold text-emerald-400">{formatCurrency(visibleSummary.totalValue)}</div>
             <div className="text-xs text-slate-500">Potential Rebid Value</div>
           </div>
           {/* Was "Sole Source" — always 0 (static data has no competition_type).
               Replaced with average rebid value, which the dataset DOES carry. */}
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <div className="text-2xl font-bold text-green-400">{formatCurrency(summary.totalContracts ? summary.totalValue / summary.totalContracts : 0)}</div>
+            <div className="text-2xl font-bold text-green-400">{formatCurrency(visibleSummary.totalContracts ? visibleSummary.totalValue / visibleSummary.totalContracts : 0)}</div>
             <div className="text-xs text-slate-500">Avg Rebid Value</div>
             <div className="text-[11px] text-slate-600 mt-1">Per expiring award</div>
           </div>
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
-            <div className="text-2xl font-bold text-red-400">{summary.urgentContracts}</div>
+            <div className="text-2xl font-bold text-red-400">{visibleSummary.urgentContracts}</div>
             <div className="text-xs text-slate-500">Ending Soon</div>
             <div className="text-[11px] text-slate-600 mt-1">Within 90 days</div>
           </div>
@@ -801,9 +828,23 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
             </button>
           </div>
         </div>
+        {awardType === 'definitive' && hasStateProfile && (
+          <label className="mt-3 flex items-center gap-2 text-sm text-slate-300 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              checked={myStatesOnly}
+              onChange={(e) => setMyStatesOnly(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-600 bg-slate-800 text-amber-500 focus:ring-amber-500"
+            />
+            <span className="font-medium">My states only</span>
+            <span className="text-xs text-slate-500">
+              {profileDefaults?.states?.join(', ')} — hides out-of-area &amp; overseas work
+            </span>
+          </label>
+        )}
         {awardType === 'definitive' && usingProfileDefaults && allContracts.length > shownContractsCount && (
           <div className="rounded-lg border border-slate-700 bg-slate-950/50 p-3 text-sm text-slate-400">
-            Showing {shownContractsCount.toLocaleString()} matches from your saved profile. The full database has {allContracts.length.toLocaleString()} expiring awards.
+            Showing {shownContractsCount.toLocaleString()} matches{myStatesOnly ? ' in your states' : ' from your saved profile'}. The full database has {allContracts.length.toLocaleString()} expiring awards.
             <button
               type="button"
               onClick={viewAllContracts}
@@ -1001,11 +1042,19 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
         <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
           <div className="px-5 py-4 border-b border-slate-800">
             <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
-              {contracts.length.toLocaleString()} Expiring Awards
+              {visibleContracts.length.toLocaleString()} Expiring Awards{myStatesOnly ? ' · in your states' : ''}
             </h3>
           </div>
+          {myStatesOnly && visibleContracts.length === 0 ? (
+            <div className="px-5 py-8 text-center text-sm text-slate-500">
+              No expiring awards with a place of performance in {profileDefaults?.states?.join(', ')}.
+              <button type="button" onClick={() => setMyStatesOnly(false)} className="ml-1 font-medium text-amber-300 hover:text-amber-200">
+                Show all areas
+              </button>
+            </div>
+          ) : (
           <div className="divide-y divide-slate-800">
-            {contracts.slice(0, 1000).map((contract) => {
+            {visibleContracts.slice(0, 1000).map((contract) => {
               const urgency = getUrgencyBadge(contract.daysUntilExpiration);
               const isExpanded = expandedContracts.has(contract.piid);
 
@@ -1262,12 +1311,13 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                 </div>
               );
             })}
-            {contracts.length > 1000 && (
+            {visibleContracts.length > 1000 && (
               <div className="p-5 text-center text-sm text-slate-400">
                 Showing first 1,000 by value. Narrow the filters or open the full tool for export.
               </div>
             )}
           </div>
+          )}
         </div>
       )}
 
