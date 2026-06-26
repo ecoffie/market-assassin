@@ -25,25 +25,32 @@ different, and an honest read on our moat (where we're ahead, where we're not).
   onboarding, dedicated support. Built for primes + serious mid-market.
 - **Funded + staffed** — $42M and 45+ people means fast product velocity.
 
-## Where MINDY is genuinely different (the moat)
-1. **Mindy arrives FULL; GovDash arrives EMPTY.** GovDash's own onboarding requires
-   the customer to upload a corpus of past proposals, contracts, RFPs, and resumes
-   before it's effective ("the challenge of making LLMs understand everything about
-   a company across thousands of documents"). **Mindy brings its own brain on day
-   one** — the 604K-record Data Core + a 1,364-doc / 12,534-passage knowledge base
-   (8 yrs of teaching, 743 interviews, winning proposals). No data-onboarding tax.
-2. **The teaching/coaching moat.** GovDash is a workflow tool. Mindy is built on
-   GovCon Giants — 8 years of Eric's teaching + 743 podcast interviews + a real
-   audience. Mindy doesn't just DO the work, it TEACHES (coach angle). GovDash has
-   **no proprietary education corpus and no audience** to replicate this.
-3. **Self-serve + transparent.** GovDash is **sales-gated, quote-based, high-touch
-   onboarding** ("submit a form," "less expensive than a lost bid"). Mindy is sign
-   up and go. Their own analysis says small contractors "default to more generic,
-   lower-cost tools" because of this — **that's exactly Mindy's lane.**
-4. **All-in-one AND simple.** GovDash is an enterprise platform needing change
-   management + training. Mindy is ask-a-question simple for one person.
-5. **Distribution / CAC moat.** GovCon Giants brand + existing community = near-zero
-   CAC vs a $42M direct-sales motion. **This is the real durable moat.**
+## Where MINDY is different — separate the DURABLE moat from the copyable edge
+
+**DURABLE moat — what GovDash CANNOT easily replicate (lead with these):**
+1. **A proprietary education corpus that took 8 years to make.** 8 yrs of Eric's
+   teaching + 743 podcast interviews + winning proposals — original content, not
+   scraped data. GovDash can buy data and engineers; it cannot buy 8 years of
+   trusted GovCon teaching. **Mindy doesn't just do the work, it teaches** (the
+   coach angle). This is the un-recreatable asset.
+2. **The GovCon Giants audience / distribution / CAC moat.** GovDash raised $42M to
+   *buy* customers through a sales team. Eric already *has* the audience. A
+   distribution moat money can't quickly buy — and the single biggest structural
+   advantage. **This is the real moat.**
+3. **The coach brand.** "Mindy teaches you while it does the work" is inseparable
+   from GovCon Giants. A funded workflow startup has no equivalent.
+
+**REAL today, but a business-model choice GovDash COULD copy (use as demo proof,
+don't claim as a permanent moat):**
+4. **Arrives full, not empty.** GovDash's onboarding makes you upload your company
+   (past proposals, contracts, resumes) before it's useful; Mindy brings its own
+   604K-record Data Core day one. Honest read (Eric): *GovDash could auto-ingest
+   and be day-1 useful if they wanted — it's just not their model.* So this is a
+   killer **demo contrast**, not a defensible moat.
+5. **Self-serve + transparent vs sales-gated/quote.** Their own analysis says small
+   contractors "default to lower-cost tools" because of the sales gate — that's our
+   lane. Also a model choice they could change.
+6. **All-in-one AND simple** (ask-a-question vs enterprise change-management).
 
 ## Where GovDash is AHEAD (be honest)
 - **Capital + team + runway** — $42M, 45+ people. We don't match that.
@@ -72,3 +79,14 @@ different, and an honest read on our moat (where we're ahead, where we're not).
   we teach you while we do it."*
 - *"We're not competing for the prime with a proposal department. We're the brain
   for everyone they leave behind."*
+
+## Appendix — Govly & Hazel (intel only; keep OFF the demo screen)
+Researched 2026-06-26. Neither is well-known to the everyday-contractor audience, so
+don't name them on stage (Eric's call). Logged for awareness:
+- **Govly** (2021; ~$13M, Insight Partners + YC) — opportunity-intel + **partner
+  network for the federal IT reseller supply chain** (Cisco, HPE, VARs/OEMs). ~400
+  orgs, ~$1.2M ARR (2023). Narrow, IT-channel; not chasing the SMB-contractor lane.
+- **Hazel** (YC W24, very early, murky funding) — **BUY-SIDE: helps GOVERNMENT
+  AGENCIES write RFPs / evaluate bids.** Opposite side of the table — **not a
+  contractor-side competitor.** (Unrelated "Altruist Hazel" = wealth management.)
+- Takeaway: GovDash is the only contractor-side AI competitor worth naming on screen.
