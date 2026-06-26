@@ -18,6 +18,17 @@ const http = require('http');
 const XLSX = require('xlsx');
 const { createClient } = require('@supabase/supabase-js');
 
+// ⚠️ DEPRECATED 2026-06 — superseded by scripts/import-forecasts-live.js.
+// Hardcodes a dated DOE URL and writes external_ids under a divergent scheme
+// (e.g. "DOE-<num>", NASA 10000-based), so re-running it after the 2026-06 refresh
+// reintroduces STALE rows as DUPLICATES. Use:
+//   node scripts/import-forecasts-live.js --write --replace --skip-nasa-awarded
+if (!process.argv.includes('--force')) {
+  console.warn('⚠️  import-forecasts.js is DEPRECATED. Use: node scripts/import-forecasts-live.js --write --replace');
+  console.warn('   (pass --force to run the legacy importer anyway)');
+  process.exit(0);
+}
+
 // Load env
 const envPath = path.join(__dirname, '..', '.env.local');
 const envContent = fs.readFileSync(envPath, 'utf8');

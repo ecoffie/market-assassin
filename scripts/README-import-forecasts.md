@@ -1,5 +1,22 @@
 # Forecast Intelligence Import Script
 
+> ⚠️ **DEPRECATED (2026-06).** `import-forecasts.js` and `import-gsa-forecasts.js`
+> are superseded by **`import-forecasts-live.js`**, which pulls all five sources
+> (DHS, DOE, NASA, DOJ, GSA-FCO) from their **current** endpoints and writes under
+> the same `source_agency`/`external_id` scheme now in `agency_forecasts` — so
+> re-runs refresh in place instead of creating duplicates. The two old scripts now
+> no-op (pass `--force` to override). **Cron should call:**
+>
+> ```bash
+> node scripts/import-forecasts-live.js --write --replace --skip-nasa-awarded
+> ```
+>
+> What changed and why: the old DOE URL was hardcoded to a dated file (404s monthly);
+> GSA read a manual ~2,848-row CSV export; both used divergent external_id schemes
+> (`DOE-<num>`, `GSA-AG-<nid>`) that duplicate rather than upsert. The live importer
+> auto-discovers the DOE link, hits the DHS + GSA JSON APIs directly (GSA paginated at
+> `range=25`), and reads the DOJ interim Excel sheet `Sheet2`.
+
 ## Overview
 
 The `import-forecasts.js` script automates downloading and importing federal agency forecast Excel files into the `agency_forecasts` Supabase table. It handles Phase 1 agencies (DOE, NASA, DOJ) with built-in Excel parsing, normalization, and upsert logic.

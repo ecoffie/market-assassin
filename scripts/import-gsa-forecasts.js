@@ -32,6 +32,18 @@ const CSV_PATH = path.join(__dirname, '..', '..', 'Eric Docs', 'forecast_export.
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_KEY);
 
+// ⚠️ DEPRECATED 2026-06 — superseded by scripts/import-forecasts-live.js.
+// This reads a stale MANUAL CSV export (~2,848 rows) and writes external_ids as
+// "GSA-AG-<nid>" (an old snapshot whose node-ids rotate), so re-running it after the
+// 2026-06 refresh reintroduces STALE rows as DUPLICATES. The live importer pulls the
+// full ~7,600 rows straight from the Acquisition Gateway API. Use:
+//   node scripts/import-forecasts-live.js --source=GSA --write --replace
+if (!process.argv.includes('--force')) {
+  console.warn('⚠️  import-gsa-forecasts.js is DEPRECATED. Use: node scripts/import-forecasts-live.js --source=GSA --write --replace');
+  console.warn('   (pass --force to run the legacy importer anyway)');
+  process.exit(0);
+}
+
 // Map agency names to our standard codes
 const AGENCY_MAP = {
   'Department of the Interior': 'DOI',
