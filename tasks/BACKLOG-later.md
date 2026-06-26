@@ -90,12 +90,19 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
   course_material, 103 slide_deck, 31 webinar_resource, 743 podcast_interview. Two
   big sources are NOT fully ingested (Eric, Jun 26 — "make sure later our Mindy RAG
   has all of this content"):
-  1. **Federal Help Center course videos** — the Library of Course Videos: Federal
-     Contract Academy **Essentials (81) + Comprehensive (108) + Mastery (68) = 257
-     lessons**, the 258-lesson Overview library, plus **Bootcamp Replays, Webinar
-     Replays, Q&A Sessions, First Partner Challenge, Roadmap/Action Plan**. VIDEO →
-     needs transcription (Whisper) → text → embeddings (same pipeline as the 743
-     podcasts).
+  1. **Federal Help Center course videos** — MUCH bigger than first noted (Eric
+     screenshots Jun 26). VIDEO → transcription (Whisper) → embeddings (same pipeline
+     as the 743 podcasts). Scope:
+     - **Federal Contract Academy**: Essentials 81 + Comprehensive 108 + Mastery 68
+       = 257 lessons; plus a 258-lesson Overview library.
+     - **Bootcamp Replays**: years of **Coaching Call Replays 2018→2024** (~137
+       lessons) + recent **Surge/Proposal/Business-Readiness Bootcamps 2024→2026**
+       (~65 lessons).
+     - **First Partner Challenge**: 1st Cohort Recordings (30) + cohorts + Blueprint
+       to Consulting Course (13) + Resources/Templates/Scripts (~60 lessons total).
+     - **Webinar Replays, Q&A Sessions, Roadmap/Action Plan**.
+     - Rough total: **~700–1,000+ video lessons** — a real transcription budget;
+       phase it (Academy first, then bootcamps/coaching, then replays).
   2. **GOVCON EDU "The Vault" Google Drive** — document library: Teaming/
      Subcontracting, Target Market List, Supplier Credit, Scripts, SB Certification,
      SAM Bid Sites, Proposal Writing, NAVFAC SB Specialist POCs, Joint Venture Docs,
