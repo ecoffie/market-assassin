@@ -55,7 +55,7 @@ const PROBLEM = [
 ];
 
 export default function SetAsideImpactPage() {
-  const [pct, setPct] = useState(10);
+  const [pct, setPct] = useState(0.5);
   const [live, setLive] = useState<LiveStats | null>(null);
 
   useEffect(() => {
@@ -174,26 +174,39 @@ export default function SetAsideImpactPage() {
         <div className="rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-950/30 to-slate-950 p-6">
           <div className="flex flex-wrap items-end justify-between gap-3">
             <div>
-              <p className="text-xs uppercase tracking-wider text-emerald-300">If we convert</p>
+              <p className="text-xs uppercase tracking-wider text-emerald-300">Even a fraction of a percent moves billions. Convert</p>
               <div className="flex items-baseline gap-2">
-                <span className="text-5xl font-black text-white tabular-nums">{pct}%</span>
+                <span className="text-5xl font-black text-white tabular-nums">{pct < 1 ? pct.toFixed(2).replace(/\.?0+$/, '') : pct}%</span>
                 <span className="text-sm text-slate-400">of the $571.5B Full-and-Open pool into set-asides…</span>
               </div>
             </div>
             <div className="text-right">
               <p className="text-xs uppercase tracking-wider text-slate-400">→ redirected to small business</p>
-              <div className="text-4xl font-black text-emerald-300 tabular-nums">{fmtB(redirected)}<span className="text-base font-semibold text-slate-400">/yr</span></div>
+              <div className="text-4xl font-black text-emerald-300 tabular-nums">{fmtMoney(redirected * 1e9)}<span className="text-base font-semibold text-slate-400">/yr</span></div>
             </div>
           </div>
 
-          {/* slider */}
+          {/* preset chips — the small-but-huge numbers */}
+          <div className="mt-4 flex flex-wrap gap-2">
+            {[0.01, 0.1, 0.5, 1, 2, 5].map((m) => (
+              <button
+                key={m}
+                onClick={() => setPct(m)}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${pct === m ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+              >
+                {m < 1 ? `${m}%` : `${m}%`} → {fmtMoney(OTSB_B * (m / 100) * 1e9)}
+              </button>
+            ))}
+          </div>
+
+          {/* slider — fine granularity down to one-hundredth of a percent */}
           <input
-            type="range" min={1} max={25} value={pct}
+            type="range" min={0.01} max={5} step={0.01} value={pct}
             onChange={(e) => setPct(Number(e.target.value))}
-            className="mt-5 w-full accent-emerald-400"
+            className="mt-4 w-full accent-emerald-400"
           />
           <div className="mt-1 flex justify-between text-[10px] text-slate-500">
-            {[1, 5, 10, 15, 20, 25].map((m) => <span key={m}>{m}%</span>)}
+            {['0.01%', '1%', '2%', '3%', '4%', '5%'].map((m) => <span key={m}>{m}</span>)}
           </div>
 
           {/* stacked bar: small business share grows */}
