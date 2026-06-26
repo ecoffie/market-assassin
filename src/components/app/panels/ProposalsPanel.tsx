@@ -773,7 +773,14 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   // full-proposal flow OR the user has elected to build a matrix in a simple flow
   // (RFQ/LOI). The matrix is an always-available option (Eric, Jun 26).
   const showComplianceMatrix = !isSimpleResponseMode || compliance.length > 0 || complianceLoading;
-  const proposalFlowName = isLoiResponseMode ? 'LOI Response' : isRfqMode ? 'RFQ Response' : 'Proposal';
+  // User-facing label for the notice type. Prefer SAM's authoritative
+  // classification (e.g. "Combined Synopsis") over the internal simple-mode flag,
+  // so a Combined Synopsis/Solicitation that cites an "RFQ ####" in its body isn't
+  // mislabeled "RFQ" (Eric, Jun 26). Falls back to the mode label when SAM gives
+  // nothing. The internal isRfqMode flag still drives the flow — this is display only.
+  const noticeDisplayLabel = noticeTypeLabel(activePursuitNoticeType)
+    || (isRfqMode ? 'RFQ' : isLoiResponseMode ? (effectiveNoticeType === 'rfi' ? 'RFI' : 'Sources Sought') : 'Proposal');
+  const proposalFlowName = isLoiResponseMode ? 'LOI Response' : isRfqMode ? `${noticeDisplayLabel} Response` : 'Proposal';
   const canUseTemplateWithoutSource = Boolean(activePursuitId && isSimpleResponseMode);
   const responseOutputsReady = Boolean(uploadedRfp || canUseTemplateWithoutSource);
   const exportContextName = useMemo(
@@ -2064,7 +2071,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           </div>
           <h2 className="text-xl font-semibold text-white">Let Mindy write your response</h2>
           <p className="text-sm text-slate-400 mt-1 mb-4">
-            Mindy reads {uploadedRfp ? 'the notice' : 'this opportunity'} and your saved profile, then drafts the full {isRfqMode ? 'RFQ response' : 'letter of intent / response'} — opening, relevant experience, capability fit, and point of contact. One click.
+            Mindy reads {uploadedRfp ? 'the notice' : 'this opportunity'} and your saved profile, then drafts the full {isRfqMode ? 'response' : 'letter of intent / response'} — opening, relevant experience, capability fit, and point of contact. One click.
           </p>
 
           {/* What Mindy pre-filled from the notice (LOI field extraction). */}
@@ -2249,15 +2256,15 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-3">
             {isSimpleResponseMode && (
               <OutputActionCard
-                eyebrow={isRfqMode ? 'RFQ' : 'LOI / Market Research'}
-                title={isRfqMode ? 'Export RFQ response template' : 'Export LOI response template'}
+                eyebrow={isRfqMode ? noticeDisplayLabel : 'LOI / Market Research'}
+                title={isRfqMode ? 'Export response template' : 'Export LOI response template'}
                 description={isRfqMode
                   ? 'Create a Word response template with blanks for pricing, attachments, and submission details.'
                   : loiFields
                     ? 'Mindy read the notice and pre-filled the agency, solicitation number, deadline, submission method, NAICS, and required content. Export the LOI with those fields already in place.'
                     : 'Create a Word LOI from Mindy\'s curated response-template library, with blanks for anything the user must complete.'}
                 status={exporting ? 'Working...' : 'Ready'}
-                buttonLabel={exporting ? 'Assembling...' : isRfqMode ? 'Export RFQ .docx' : 'Export LOI .docx'}
+                buttonLabel={exporting ? 'Assembling...' : isRfqMode ? 'Export response .docx' : 'Export LOI .docx'}
                 disabled={exporting}
                 onClick={() => exportProposalPackage()}
                 secondaryLabel={!isRfqMode ? (previewing ? 'Loading preview…' : '👁 Preview LOI') : undefined}
@@ -2437,7 +2444,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 <div>
                   <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Output · Word Response Template</p>
                   <h2 className="text-lg font-semibold text-white">
-                    {isRfqMode ? 'Create RFQ response template' : 'Create LOI response template'}
+                    {isRfqMode ? 'Create response template' : 'Create LOI response template'}
                   </h2>
                   <p className="text-sm text-slate-400 mt-1">
                     {isRfqMode
@@ -2454,7 +2461,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                   {exporting && (
                     <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />
                   )}
-                  {exporting ? 'Assembling…' : isRfqMode ? 'Export RFQ Template (.docx)' : 'Export LOI Template (.docx)'}
+                  {exporting ? 'Assembling…' : isRfqMode ? 'Export Response Template (.docx)' : 'Export LOI Template (.docx)'}
                 </button>
               </div>
 
