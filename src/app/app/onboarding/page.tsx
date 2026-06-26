@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import SampleOpportunitiesPicker from '@/components/briefings/SampleOpportunitiesPicker';
 import MarketDataMap from '@/components/app/market/MarketDataMap';
+import OnboardingScan, { type RevealData } from '@/components/app/onboarding/OnboardingScan';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import { getSupabase } from '@/lib/supabase/client';
 import { useAppTracker } from '@/components/app/track';
@@ -339,6 +340,11 @@ export default function OnboardingPage() {
   const [autoLoading, setAutoLoading] = useState(false);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [autoProfile, setAutoProfile] = useState<any | null>(null);   // the confirm-screen extraction
+  // Slurpee choreography: 'scanning' shows the source-by-source scan + count-up
+  // reveal; 'done' = user clicked through → the editable confirm screen.
+  const [scanPhase, setScanPhase] = useState<'idle' | 'scanning' | 'done'>('idle');
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [overview, setOverview] = useState<any | null>(null);   // /api/market-overview — feeds the reveal counts + MarketDataMap
 
   const [businessDescription, setBusinessDescription] = useState('');
   const [selectedIndustries, setSelectedIndustries] = useState<string[]>([]);
@@ -465,7 +471,7 @@ export default function OnboardingPage() {
   async function runAutoExtract() {
     const text = autoText.trim();
     if (text.length < 4) { setError('Tell us what you do + where (e.g. "janitorial in Florida").'); return; }
-    setAutoLoading(true); setError('');
+    setAutoLoading(true); setError(''); setOverview(null); setScanPhase('scanning');
     try {
       const res = await fetch('/api/app/profile-from-text', {
         method: 'POST',
@@ -473,13 +479,52 @@ export default function OnboardingPage() {
         body: JSON.stringify({ email, text }),
       });
       const d = await res.json();
-      if (!res.ok || !d.success) { setError(d.error || 'Couldn’t read that — try naming the service + state.'); return; }
+      if (!res.ok || !d.success) { setScanPhase('idle'); setError(d.error || 'Couldn’t read that — try naming the service + state.'); return; }
       setAutoProfile(d.profile);
       track('onboarding_step', 'onboarding', { step: 'auto_extract', industry: d.profile?.industryPhrase });
+      void loadOverview(d.profile);   // reveal counts + confirm tiles (one fetch, passed down)
     } catch {
+      setScanPhase('idle');
       setError('Something went wrong extracting your profile. Try again or set up manually.');
     } finally { setAutoLoading(false); }
   }
+
+  // Best-effort market-overview load — powers the reveal counters AND the confirm
+  // screen's MarketDataMap (handed down as initialData → one fetch, not two).
+  // Never blocks the reveal: on failure it shows market $ + codes + source count.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  async function loadOverview(profile: any) {
+    try {
+      const qs = new URLSearchParams();
+      if (profile?.industryPhrase) qs.set('keyword', profile.industryPhrase);
+      if ((profile?.naics || []).length) qs.set('naics', (profile.naics || []).join(','));
+      if (email) qs.set('email', email);
+      const r = await fetch(`/api/market-overview?${qs.toString()}`);
+      const j = await r.json();
+      if (j?.success) setOverview(j);
+    } catch { /* reveal degrades gracefully */ }
+  }
+
+  // Reveal stats — every number is REAL (extraction + /api/market-overview). Built
+  // reactively; the choreography holds the scan until this is non-null, then enriches
+  // as the overview lands. Market $ + code count + source count always show.
+  const revealData: RevealData | null = useMemo(() => {
+    if (!autoProfile) return null;
+    const money = (n: number) => n >= 1e9 ? `$${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `$${Math.round(n / 1e6)}M` : n > 0 ? `$${Math.round(n / 1e3)}K` : '—';
+    const tiles = (overview?.tiles || []) as Array<{ key: string; count: number }>;
+    const tileCount = (k: string) => tiles.find((t) => t.key === k)?.count || 0;
+    const market = overview?.market?.totalMarket || autoProfile.totalMarket || 0;
+    const codeCount = autoProfile.naicsCount || (autoProfile.naics || []).length || 0;
+    const stats: RevealData['stats'] = [];
+    if (market > 0) stats.push({ icon: '💰', display: money(market), label: 'addressable market', accent: true });
+    if (codeCount) stats.push({ icon: '🧩', value: codeCount, label: 'NAICS codes mapped' });
+    if (tileCount('forecasts')) stats.push({ icon: '📋', value: tileCount('forecasts'), label: 'forecasted buys' });
+    if (tileCount('recompetes')) stats.push({ icon: '🔁', value: tileCount('recompetes'), label: 'recompetes expiring' });
+    if (tileCount('setasides')) stats.push({ icon: '🎯', value: tileCount('setasides'), label: 'reserved for small biz' });
+    if (tileCount('grants')) stats.push({ icon: '💵', value: tileCount('grants'), label: 'grant programs' });
+    stats.push({ icon: '🗂️', value: 28, label: 'data sources, one market' });
+    return { headline: autoProfile.industryPhrase || 'your business', stats };
+  }, [autoProfile, overview]);
 
   // UEI path — the highest-quality setup. Pull SAM registration + USASpending
   // award history, then map into the SAME autoProfile shape the confirm screen
@@ -489,7 +534,7 @@ export default function OnboardingPage() {
   async function runUeiExtract() {
     const uei = ueiInput.trim().toUpperCase();
     if (!/^[A-Z0-9]{12}$/.test(uei)) { setError('A UEI is 12 letters/numbers (from your SAM.gov registration).'); return; }
-    setAutoLoading(true); setError('');
+    setAutoLoading(true); setError(''); setOverview(null); setScanPhase('scanning');
     try {
       // Preview pull (identity + past performance + AI-drafted capabilities).
       const res = await fetch(`/api/app/vault/prefill?uei=${encodeURIComponent(uei)}&email=${encodeURIComponent(email)}`, {
@@ -497,6 +542,7 @@ export default function OnboardingPage() {
       });
       const d = await res.json();
       if (!res.ok || !d.success) {
+        setScanPhase('idle');
         setError(d.error || `No SAM.gov registration found for ${uei}. Check it, or describe your business instead.`);
         return;
       }
@@ -524,7 +570,11 @@ export default function OnboardingPage() {
         pastPerfCount: (d.past_performance || []).length,
       });
       track('onboarding_step', 'onboarding', { step: 'uei_extract', uei, pastPerf: (d.past_performance || []).length });
+      // Even the UEI path gets a market reveal — overview grounds $ + tiles from the
+      // one-liner + the registration's NAICS (covers UEI's totalMarket=0).
+      void loadOverview({ industryPhrase: (d.ai_coach?.one_liner || identity.legal_name || ''), naics });
     } catch {
+      setScanPhase('idle');
       setError('Couldn’t reach SAM.gov just now. Try again or describe your business instead.');
     } finally { setAutoLoading(false); }
   }
@@ -886,7 +936,13 @@ export default function OnboardingPage() {
           )}
 
           {/* UEI input — paste → pull → the shared confirm screen. */}
-          {mode === 'uei' && !autoProfile && (
+          {/* Slurpee choreography — the source-by-source scan + count-up reveal.
+              Shows for BOTH auto + uei while extracting; replaces the blank pause. */}
+          {(mode === 'auto' || mode === 'uei') && scanPhase === 'scanning' && (
+            <OnboardingScan reveal={revealData} onContinue={() => setScanPhase('done')} />
+          )}
+
+          {mode === 'uei' && !autoProfile && scanPhase === 'idle' && (
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/10 p-5">
               <button onClick={() => { setMode('choose'); setError(''); }} className="text-xs text-slate-400 hover:text-white mb-3">← Back</button>
               <label className="block text-sm font-medium text-white mb-2">Your SAM.gov UEI</label>
@@ -912,7 +968,7 @@ export default function OnboardingPage() {
           )}
 
           {/* AUTO — paste, then a LIGHT confirm screen */}
-          {mode === 'auto' && !autoProfile && (
+          {mode === 'auto' && !autoProfile && scanPhase === 'idle' && (
             <div className="rounded-xl border border-purple-500/30 bg-purple-950/20 p-5">
               <button onClick={() => setMode('choose')} className="text-xs text-slate-400 hover:text-white mb-3">← Back</button>
               <label className="block text-sm font-medium text-white mb-2">Tell Mindy what you do</label>
@@ -942,7 +998,7 @@ export default function OnboardingPage() {
           )}
 
           {/* AUTO confirm — the wow + safety net (editable states) */}
-          {(mode === 'auto' || mode === 'uei') && autoProfile && (
+          {(mode === 'auto' || mode === 'uei') && autoProfile && scanPhase === 'done' && (
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/10 p-5">
               <div className="text-sm text-slate-400 mb-3">
                 {autoProfile.uei
@@ -989,6 +1045,7 @@ export default function OnboardingPage() {
                     keyword={autoProfile.industryPhrase}
                     naics={(autoProfile.naics || []).join(',')}
                     email={email}
+                    initialData={overview}
                   />
                 </div>
               )}
