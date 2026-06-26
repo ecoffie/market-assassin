@@ -3,20 +3,20 @@
 /**
  * Competitive positioning 2×2 — the Steve Jobs iPhone-2007 slide, for Mindy.
  *
- * Demo-day visual (Eric, Jun 26): competitors crammed in the weak quadrants,
- * Mindy ALONE in the winning corner. Axes: Completeness (single-purpose → all-in-
- * one) × Price (expensive → affordable). Winning quadrant = top-right (affordable
- * AND complete), the empty spot nobody else occupies — same as iPhone's top-right.
+ * Demo-day visual (Eric, Jun 26). NON-PRICE axes by design — we don't win on price,
+ * we win like the iPhone did: SMART (all-in-one) × EASY TO USE. Competitors cram
+ * the weak quadrants; Mindy is alone top-right (all-in-one AND simple).
+ *   X: Single-purpose → All-in-one   ·   Y: Complicated → Easy to use
  *
- * Pure static visual (no data fetch) — screen-share it or screenshot for the deck.
+ * Pure static visual — screen-share or screenshot for the deck.
  * Route: /admin/competitive-positioning
  */
 
 interface Player {
   name: string;
-  /** completeness 0-100 (left → right) */
+  /** completeness / all-in-one 0-100 (left → right) */
   x: number;
-  /** affordability 0-100 (bottom → top) */
+  /** ease of use 0-100 (bottom → top) */
   y: number;
   weakness: string;
   tone: 'mindy' | 'enterprise' | 'free' | 'point';
@@ -24,15 +24,22 @@ interface Player {
 }
 
 const PLAYERS: Player[] = [
-  { name: 'Mindy', x: 86, y: 86, weakness: 'All-in-one GovCon intelligence + AI — $149/mo', tone: 'mindy', size: 'lg' },
-  // Complicated AND pricey — the enterprise quadrant (bottom-right).
-  { name: 'GovWin IQ (Deltek)', x: 84, y: 10, weakness: '$$$$ enterprise (~$20K+/yr) · complex · sales-gated', tone: 'enterprise', size: 'md' },
-  { name: 'Bloomberg Gov', x: 66, y: 17, weakness: 'Pricey (~$5K+/yr) · heavy · built for analysts', tone: 'enterprise', size: 'md' },
-  { name: 'HigherGov', x: 52, y: 44, weakness: 'Cheaper, but narrower — data without the AI workflow', tone: 'point', size: 'sm' },
-  // Cheap but limited (top-left) — the free gov sites + a point AI tool.
-  { name: 'SAM.gov', x: 19, y: 82, weakness: 'Free, but raw — open opps only, no intelligence', tone: 'free', size: 'sm' },
-  { name: 'USASpending.gov', x: 13, y: 73, weakness: 'Free, but backward-looking — past awards, no forward signal', tone: 'free', size: 'sm' },
-  { name: 'ChatGPT', x: 33, y: 64, weakness: 'Cheap, but one trick — drafts text, knows no GovCon data', tone: 'point', size: 'sm' },
+  { name: 'Mindy', x: 88, y: 88, weakness: 'All-in-one — and simple as a chat', tone: 'mindy', size: 'lg' },
+
+  // Powerful but COMPLICATED — the enterprise cluster (bottom-right).
+  { name: 'Unanet', x: 84, y: 10, weakness: 'ERP/CRM — broad, but implementation-heavy', tone: 'enterprise', size: 'md' },
+  { name: 'GovWin IQ (Deltek)', x: 80, y: 16, weakness: 'Deep data, but analyst-complex + sales-gated', tone: 'enterprise', size: 'md' },
+  { name: 'Bloomberg Gov', x: 64, y: 22, weakness: 'Broad, but built for analysts', tone: 'enterprise', size: 'sm' },
+  { name: 'GovDash', x: 76, y: 46, weakness: 'Capable AI suite — but enterprise / sales-gated', tone: 'enterprise', size: 'md' },
+
+  // Easy but SINGLE-PURPOSE (top-left) — point tools.
+  { name: 'ChatGPT', x: 24, y: 84, weakness: 'Easy, but one trick — knows no GovCon data', tone: 'point', size: 'sm' },
+  { name: 'EZGovOpps', x: 34, y: 58, weakness: 'Opportunity search — stops at discovery', tone: 'point', size: 'sm' },
+  { name: 'BidSpeed', x: 46, y: 50, weakness: 'Bid intel only — partial workflow', tone: 'point', size: 'sm' },
+
+  // Single-purpose AND clunky (bottom-left) — the free gov sites.
+  { name: 'SAM.gov', x: 18, y: 36, weakness: 'Raw open opps — clunky, no intelligence', tone: 'free', size: 'sm' },
+  { name: 'USASpending.gov', x: 13, y: 28, weakness: 'Backward-looking — analyst-only, no workflow', tone: 'free', size: 'sm' },
 ];
 
 const TONE: Record<Player['tone'], { bg: string; ring: string; text: string }> = {
@@ -49,9 +56,9 @@ const SIZE: Record<NonNullable<Player['size']>, string> = {
 };
 
 const SOLVES = [
-  { gap: 'Pricey & complicated', who: 'GovWin · Bloomberg Gov', mindy: 'Enterprise-grade intel at $149/mo — no sales call, set up in minutes.' },
-  { gap: 'Free but limited', who: 'SAM.gov · USASpending.gov', mindy: 'Joins, scores & enriches the raw gov data into ONE market view (599K-record Data Core).' },
-  { gap: 'One-trick AI', who: 'ChatGPT', mindy: 'Drafts grounded in YOUR vault + live SAM/USASpending + a winning-proposal corpus — not generic text.' },
+  { gap: 'Powerful but complicated', who: 'GovWin · Bloomberg · Unanet · GovDash', mindy: 'Same depth — but you just ask a question. No analyst training, no sales-gated onboarding.' },
+  { gap: 'Easy but single-purpose', who: 'ChatGPT · EZGovOpps · BidSpeed', mindy: 'One tool for the whole journey — discover, analyze, track, and draft — grounded in real GovCon data.' },
+  { gap: 'Free but raw', who: 'SAM.gov · USASpending.gov', mindy: 'Turns the raw government data into answers — joined, scored, and explained across one market.' },
 ];
 
 export default function CompetitivePositioningPage() {
@@ -61,7 +68,7 @@ export default function CompetitivePositioningPage() {
         <header className="mb-6">
           <h1 className="text-2xl font-black">Why Mindy — the GovCon tool landscape</h1>
           <p className="mt-1 text-sm text-slate-400">
-            Everyone else forces a trade-off: powerful but pricey &amp; complex, or cheap but limited. Mindy is the only one in the winning corner — <span className="font-semibold text-emerald-300">complete AND affordable</span>.
+            Everyone else forces a trade-off: powerful but complicated, or simple but single-purpose. Mindy is the only one in the winning corner — <span className="font-semibold text-emerald-300">all-in-one AND simple</span>.
           </p>
         </header>
 
@@ -75,8 +82,8 @@ export default function CompetitivePositioningPage() {
           <div className="pointer-events-none absolute inset-y-4 left-1/2 w-px -translate-x-1/2 bg-slate-700/70" />
 
           {/* axis labels */}
-          <span className="absolute left-1/2 top-2 -translate-x-1/2 text-xs font-semibold uppercase tracking-wider text-slate-400">Affordable</span>
-          <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-xs font-semibold uppercase tracking-wider text-slate-400">Expensive</span>
+          <span className="absolute left-1/2 top-2 -translate-x-1/2 text-xs font-semibold uppercase tracking-wider text-slate-400">Easy to use</span>
+          <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-xs font-semibold uppercase tracking-wider text-slate-400">Complicated</span>
           <span className="absolute left-2 top-1/2 -translate-y-1/2 -rotate-90 text-xs font-semibold uppercase tracking-wider text-slate-400">Single-purpose</span>
           <span className="absolute right-2 top-1/2 -translate-y-1/2 rotate-90 text-xs font-semibold uppercase tracking-wider text-slate-400">All-in-one</span>
 
@@ -115,6 +122,9 @@ export default function CompetitivePositioningPage() {
               </div>
             ))}
           </div>
+          <p className="mt-4 text-[11px] text-slate-500">
+            Note: Govology is training/education, not an operating platform — different category, intentionally off the map.
+          </p>
         </div>
       </div>
     </div>
