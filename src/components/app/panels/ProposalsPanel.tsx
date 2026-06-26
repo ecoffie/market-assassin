@@ -2867,7 +2867,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
 
           {/* Section tabs — RFP set OR LOI/response set
               based on detected notice type. */}
-          <div className="flex flex-wrap items-center gap-1 border-b border-slate-800 mb-4 -mx-1 px-1">
+          <div className="flex flex-wrap items-center gap-1 border-b border-slate-800 mb-2 -mx-1 px-1">
             {currentSectionTabs.map(tab => {
               const hasDraft = !!drafts[tab.id];
               const isActive = activeSection === tab.id;
@@ -2894,6 +2894,15 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               );
             })}
           </div>
+
+          {/* Legend — explains the tab badges (only meaningful once a matrix exists). */}
+          {compliance.length > 0 && (
+            <p className="mb-4 text-[11px] leading-snug text-slate-500">
+              <span className="font-semibold text-amber-300/80">amber number</span> = compliance requirements mapped to that section
+              <span className="mx-1.5 text-slate-700">·</span>
+              <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 align-middle" /> = section drafted
+            </p>
+          )}
 
           {/* Active section pane */}
           {(() => {
