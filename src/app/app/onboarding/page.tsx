@@ -515,9 +515,11 @@ export default function OnboardingPage() {
     const tileCount = (k: string) => tiles.find((t) => t.key === k)?.count || 0;
     const market = overview?.market?.totalMarket || autoProfile.totalMarket || 0;
     const codeCount = autoProfile.naicsCount || (autoProfile.naics || []).length || 0;
+    const contractors = overview?.scope?.contractors || 0;
     const stats: RevealData['stats'] = [];
     if (market > 0) stats.push({ icon: '💰', display: money(market), label: 'addressable market', accent: true });
     if (codeCount) stats.push({ icon: '🧩', value: codeCount, label: 'NAICS codes mapped' });
+    if (contractors) stats.push({ icon: '🏢', value: contractors, label: 'contractors in your space' });
     if (tileCount('forecasts')) stats.push({ icon: '📋', value: tileCount('forecasts'), label: 'forecasted buys' });
     if (tileCount('recompetes')) stats.push({ icon: '🔁', value: tileCount('recompetes'), label: 'recompetes expiring' });
     if (tileCount('setasides')) stats.push({ icon: '🎯', value: tileCount('setasides'), label: 'reserved for small biz' });

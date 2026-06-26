@@ -25,6 +25,22 @@ import { keywordCoverage } from '@/lib/market/keyword-coverage';
 import { getForecastsByNAICS, getForecastStatistics, type Forecast } from '@/lib/utils/agency-forecasts';
 import { internalBaseUrl } from '@/lib/utils/internal-base-url';
 import { verifyMIAccess } from '@/lib/api-auth';
+import primeDb from '@/data/prime-contractors-database.json';
+
+/** Prime contractors active in the user's space (NAICS industry-group overlap).
+ *  Static file → instant, no external call. Powers the onboarding reveal's
+ *  "contractors in your space" (teaming partners + competitors). */
+function contractorCount(codes: string[]): number {
+  if (!codes.length) return 0;
+  const prefixes = new Set(codes.map((c) => c.slice(0, 4)));
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const primes = (((primeDb as any).primes) || []) as Array<{ naicsCategories?: string[] }>;
+  let n = 0;
+  for (const p of primes) {
+    if ((p.naicsCategories || []).some((c) => prefixes.has(String(c).slice(0, 4)))) n++;
+  }
+  return n;
+}
 
 export const dynamic = 'force-dynamic';
 
@@ -202,6 +218,9 @@ export async function GET(request: NextRequest) {
         codes,
         topPsc: coverage?.topPsc ?? null,
       },
+      // Extra scope counts for the onboarding reveal (not tiles — the "so many
+      // contractors in your space" number). Best-effort; 0 just omits the stat.
+      scope: { contractors: contractorCount(codes) },
       tiles,
     },
     { headers: { 'Cache-Control': 'private, max-age=300' } },
