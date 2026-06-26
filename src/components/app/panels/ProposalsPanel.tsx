@@ -1043,11 +1043,35 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     const meta = currentSectionTabs.find(t => t.id === sectionType);
     const label = meta?.label || sectionType;
     const safeName = (uploadedRfp?.fileName || 'proposal').replace(/[^a-z0-9-_.]/gi, '_');
-    const blob = new Blob([d.draft], { type: 'text/markdown;charset=utf-8;' });
+
+    // Word .doc (HTML-based) — people want Word, not markdown (Eric, Jun 26). An
+    // HTML doc with the msword MIME opens natively in Word + Google Docs, no server
+    // round-trip. Light markdown → HTML so headings/bold/bullets carry over.
+    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+    const inline = (s: string) => esc(s)
+      .replace(/\*\*(.+?)\*\*/g, '<strong>$1</strong>')
+      .replace(/(^|[^*])\*([^*]+?)\*/g, '$1<em>$2</em>');
+    const out: string[] = [];
+    let inList = false;
+    const closeList = () => { if (inList) { out.push('</ul>'); inList = false; } };
+    for (const raw of (d.draft || '').split(/\r?\n/)) {
+      const line = raw.trimEnd();
+      if (!line.trim()) { closeList(); continue; }
+      const h = line.match(/^(#{1,3})\s+(.*)$/);
+      if (h) { closeList(); out.push(`<h${h[1].length}>${inline(h[2])}</h${h[1].length}>`); continue; }
+      const b = line.match(/^[-*]\s+(.*)$/);
+      if (b) { if (!inList) { out.push('<ul>'); inList = true; } out.push(`<li>${inline(b[1])}</li>`); continue; }
+      closeList();
+      out.push(`<p>${inline(line)}</p>`);
+    }
+    closeList();
+    const html = `<html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'><head><meta charset='utf-8'><title>${esc(label)}</title></head><body style="font-family:Calibri,Arial,sans-serif;font-size:11pt;line-height:1.4;"><h2>${esc(label)}</h2>${out.join('')}</body></html>`;
+
+    const blob = new Blob(['﻿', html], { type: 'application/msword' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `${safeName}-${label.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.md`;
+    link.download = `${safeName}-${label.toLowerCase().replace(/\s+/g, '-')}-${new Date().toISOString().split('T')[0]}.doc`;
     link.click();
     URL.revokeObjectURL(url);
   }, [drafts, uploadedRfp, currentSectionTabs]);
@@ -2948,7 +2972,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                           onClick={() => downloadDraft(activeSection)}
                           className="px-3 py-1.5 text-xs rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
                         >
-                          Download .md
+                          Download Word
                         </button>
                       </>
                     )}
