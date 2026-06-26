@@ -695,6 +695,18 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   // The TMR endpoint is independently cacheable (24h) and idempotent
   // so firing it eagerly costs nothing.
   const [tmrRows, setTmrRows] = useState<AgencyTableRow[]>([]);
+  // bootstrapRows — the SAME TMR row set, but fetched at the parent level so the
+  // charts can paint BEFORE the AgencyTable mounts (it only mounts inside the
+  // {reportData && (...)} gate). CRITICAL: this is a chart-only fallback, NOT a
+  // second writer to tmrRows. Earlier both the parent fetch AND AgencyTable's
+  // onRowsChange wrote tmrRows, racing — the chart (parent fetch) could show the
+  // current research while the table (AgencyTable's own rows) showed a stale/profile
+  // set, so "Spending by Agency" and "Your Selected Agencies" diverged (Eric, Jun 26
+  // 2026 — "medical supplies": chart correct, table showed Coast Guard/FAA/NOAA).
+  // Now tmrRows has ONE writer (AgencyTable, the authoritative current-params fetch);
+  // the parent fetch fills bootstrapRows, which the charts use ONLY until AgencyTable
+  // reports. Once it does, chart === table, always.
+  const [bootstrapRows, setBootstrapRows] = useState<AgencyTableRow[]>([]);
   // True while the AgencyTable's slow find-agencies fetch is in flight — drives
   // the moving "Loading agency data" indicator next to the panel title so users
   // know the page isn't fully rendered yet (Eric, Jun 23 2026).
@@ -718,11 +730,12 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   // settling, looked broken. Flips true ~2.5s after tmrRows arrive.
   const [chartsReady, setChartsReady] = useState(true);
   useEffect(() => {
-    if (tmrRows.length === 0) return;
+    const rows = tmrRows.length > 0 ? tmrRows : bootstrapRows;
+    if (rows.length === 0) return;
     setChartsReady(false);
     const t = setTimeout(() => setChartsReady(true), 2500);
     return () => clearTimeout(t);
-  }, [tmrRows]);
+  }, [tmrRows, bootstrapRows]);
   // Parent-agency filter for AgencyTable. Wired from FpdsLeaderboards
   // so clicking 'Department of the Army' in a leaderboard scrolls down
   // and narrows the table to Army offices only. Null = no filter.
@@ -1381,7 +1394,11 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       .then((data) => {
         if (cancelled) return;
         if (data?.success) {
-          setTmrRows((data.agencies || []) as AgencyTableRow[]);
+          // Bootstrap ONLY — feeds the charts until AgencyTable mounts and
+          // reports its authoritative current-params rows (which then own
+          // tmrRows). Never write tmrRows here, or the chart can diverge from
+          // the table (see bootstrapRows declaration comment).
+          setBootstrapRows((data.agencies || []) as AgencyTableRow[]);
           setMarketCoverage(data.keyword_coverage || null);   // #59 — the coverage lesson
           setTmrRelevantSpending(typeof data.relevant_spending === 'number' ? data.relevant_spending : null);
           setSpendWindowLabel(data.spend_window_label || null);
@@ -1415,10 +1432,14 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   // Mindy Says narrative. Failures are silent: charts fall back to
   // legacy SAT-based math.
   useEffect(() => {
-    if (tmrRows.length === 0) return;
+    // Use the same rows the charts render from (authoritative AgencyTable rows,
+    // else the parent bootstrap) so the SB-share donut paints early instead of
+    // waiting for AgencyTable to mount.
+    const rows = tmrRows.length > 0 ? tmrRows : bootstrapRows;
+    if (rows.length === 0) return;
 
     const uniqueAgencies = Array.from(new Set(
-      tmrRows
+      rows
         .flatMap((r) => [r.parentAgency, r.subAgency, r.name])
         .filter(Boolean)
     ));
@@ -1449,7 +1470,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
         if (!cancelled) setParentSbShareLoading(false);
       });
     return () => { cancelled = true; };
-  }, [tmrRows]);
+  }, [tmrRows, bootstrapRows]);
 
   useEffect(() => {
     // NEVER auto-generate in Sport mode (Eric: Sport is user-driven, must stay
@@ -1700,8 +1721,14 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   // back to the legacy 7-row governmentBuyers ONLY in Auto mode (Sport
   // keyword searches must not show generate-all buyers — wrong market).
   const sportKeywordActive = researchMode === 'sport' && !!(sportReportRan || sportBuildActive) && !!sportKeyword.trim();
-  const chartBuyers: BuyerLike[] = tmrRows.length > 0
-    ? rollupChartBuyers(tmrRows)
+  // chartRows — the single row set the charts render from. Prefer the
+  // AUTHORITATIVE AgencyTable rows (tmrRows); fall back to the parent bootstrap
+  // fetch ONLY before AgencyTable has reported. Once it reports, the chart and
+  // the "Your Selected Agencies" table render from the exact same rows → they
+  // can never diverge again (see bootstrapRows declaration comment).
+  const chartRows = tmrRows.length > 0 ? tmrRows : bootstrapRows;
+  const chartBuyers: BuyerLike[] = chartRows.length > 0
+    ? rollupChartBuyers(chartRows)
     : sportKeywordActive ? [] : buyers;
 
   // Prefer the AUTHORITATIVE market total from spending_by_category (department
@@ -1735,8 +1762,8 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   //
   // Falls back to legacy SAT spend (always 0 for NAICS without SAT
   // data) when the SBA bulk fetch hasn't loaded yet.
-  const chartSatTotal = tmrRows.length > 0 && Object.keys(parentSbShareMap).length > 0
-    ? tmrRows.reduce((sum, row) => {
+  const chartSatTotal = chartRows.length > 0 && Object.keys(parentSbShareMap).length > 0
+    ? chartRows.reduce((sum, row) => {
         const sbShare =
           parentSbShareMap[row.parentAgency] ??
           parentSbShareMap[row.subAgency] ??
@@ -1744,8 +1771,8 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           0;
         return sum + (row.setAsideSpending || 0) * sbShare;
       }, 0)
-    : tmrRows.length > 0
-      ? tmrRows.reduce((sum, row) => sum + (row.satSpending || 0), 0)
+    : chartRows.length > 0
+      ? chartRows.reduce((sum, row) => sum + (row.satSpending || 0), 0)
       : 0;
   const painSummary = reportData?.agencyPainPoints?.summary;
   const primeSummary = reportData?.primeContractor?.summary;
@@ -2287,7 +2314,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <SpendingByAgencyChart
               buyers={chartBuyers}
-              loading={sportKeywordActive && tmrRows.length === 0}
+              loading={sportKeywordActive && chartRows.length === 0}
             />
             {/* Small Business Mix is about YOUR profile's SBA goaling — not a
                 one-off industry exploration. Remove it in Sport (Eric: "serves a
