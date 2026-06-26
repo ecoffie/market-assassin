@@ -1,17 +1,6 @@
 import Link from 'next/link';
 import { MindySignupForm } from '@/components/mindy/MindySignupForm';
-import { DemoMedia } from '@/components/mindy/DemoMedia';
 import { MindyDayBar } from '@/components/mindy/MindyDayBar';
-
-// Product reels (vertical 9:16) for the "See Mindy in action" row. Vimeo player-
-// embed URLs WITH app_id — the exact form Vimeo's own oembed serves (a bare player
-// URL 401s for these Business team-library videos). Matched to captions by title:
-//   1200736343 "5 Active Solicitations - Friday"            → "worth bidding"
-//   1200736054 "1_Mindy_Reel_1"                             → morning briefing
-//   1200735215 "Mindy Chat (CTA)"                           → ask Mindy anything
-const VIMEO_APP = 'app_id=122963';
-const reel = (id: string) => `https://player.vimeo.com/video/${id}?${VIMEO_APP}`;
-const DEMO_REELS = [reel('1200736343'), reel('1200736054'), reel('1200735215')];
 
 // Route paid CTAs through /checkout first so purchase attribution (UTM /
 // referrer captured pre-checkout) is joined to the Stripe purchase event.
@@ -196,25 +185,20 @@ export default function MindyLandingPage() {
         </div>
       </section>
 
-      {/* WATCH MINDY WORK — three short capability demos. Show, don't tell. Swap the
-          DemoMedia placeholders for real GIFs/screen-captures as they're produced. */}
-      <section className="max-w-6xl mx-auto px-4 py-16">
+      {/* WATCH MINDY WORK — full product demo. Show, don't tell. */}
+      <section className="max-w-4xl mx-auto px-4 py-16">
         <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-3">See Mindy in action</h2>
         <p className="text-slate-400 text-center max-w-2xl mx-auto mb-10">
           Not screenshots of a pitch deck — the actual product, working on real federal data.
         </p>
-        <div className="grid md:grid-cols-3 gap-6">
-          {[
-            { cap: 'Know which ones are worth bidding', sub: 'Mindy reads each opportunity and tells you the signals that matter — competition, timing, and fit — so you stop guessing.', embed: DEMO_REELS[0] },
-            { cap: 'Your daily briefing, before coffee', sub: 'The active solicitations that fit your business, delivered every morning — already filtered, ranked, and explained.', embed: DEMO_REELS[1] },
-            { cap: 'Ask Mindy anything', sub: 'Your 24/7 market intelligence analyst — ask about opportunities, agencies, or competitors and get a straight answer.', embed: DEMO_REELS[2] },
-          ].map((d) => (
-            <div key={d.cap}>
-              <DemoMedia embed={d.embed} caption={d.cap} aspect="reel" />
-              <h3 className="mt-4 text-base font-bold text-white text-center">{d.cap}</h3>
-              <p className="mt-1 text-sm text-slate-400 text-center">{d.sub}</p>
-            </div>
-          ))}
+        <div className="relative aspect-video overflow-hidden rounded-2xl border border-purple-500/30 shadow-2xl shadow-purple-500/20">
+          <iframe
+            src="https://player.vimeo.com/video/1204629383?badge=0&autopause=0&player_id=0&app_id=122963"
+            className="absolute inset-0 h-full w-full"
+            allow="autoplay; fullscreen; picture-in-picture; clipboard-write; encrypted-media; web-share"
+            allowFullScreen
+            title="See Mindy in Action — Demo"
+          />
         </div>
       </section>
 
