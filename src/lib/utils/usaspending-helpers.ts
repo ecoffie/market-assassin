@@ -406,6 +406,20 @@ export const officeNameEnhancements: Record<string, string> = {
 export function enhanceOfficeName(officeName: string | null): string | null {
   if (!officeName) return officeName;
 
+  // Strip a leading DoDAAC code (6-char alphanumeric office code, e.g. "FA8614",
+  // "FA8627", "W912DY", "N00024") that USASpending prepends to Air Force / DoD
+  // office names — it rendered as an ugly "Fa8614 Air Force…" after title-casing
+  // (Eric, Jun 25). Only strips a 6-char token with a letter + ≥2 digits (a code,
+  // never a real word like "CENTER"/"OFFICE") followed by a separator, and only
+  // when a readable name remains.
+  const dodaac = officeName.match(/^([A-Za-z0-9]{6})[\s:.\-]+(\S.*)$/);
+  if (dodaac) {
+    const [, code, rest] = dodaac;
+    if (/[A-Za-z]/.test(code) && (code.match(/\d/g)?.length ?? 0) >= 2) {
+      officeName = rest.trim();
+    }
+  }
+
   // Check for direct match
   if (officeNameEnhancements[officeName]) {
     return officeNameEnhancements[officeName];
