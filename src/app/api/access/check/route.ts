@@ -1,8 +1,20 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
 import { verifyMIAccess, canSeePrototypeSurfaces } from '@/lib/api-auth';
 import { resolveAccess } from '@/lib/access/resolve-access';
 import { resolveCoachAccess } from '@/lib/mindy/coach-access';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+
+// Has the user saved a real profile yet? Drives the new-user → onboarding gate on
+// /app (every login lands here, including password logins that skip OAuth's
+// onboarding redirect). On error → true (never force-onboard a real user).
+async function hasSavedProfile(email: string): Promise<boolean> {
+  try {
+    const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+    const { data } = await sb.from('user_notification_settings').select('naics_codes').eq('user_email', email).maybeSingle();
+    return Array.isArray(data?.naics_codes) && (data!.naics_codes as string[]).length > 0;
+  } catch { return true; }
+}
 
 export async function GET(request: NextRequest) {
   try {
@@ -18,10 +30,11 @@ export async function GET(request: NextRequest) {
     const authSession = requireMIAuthSession(request, email);
     if (!authSession.ok) return authSession.response;
 
-    const [access, resolved, coachMode] = await Promise.all([
+    const [access, resolved, coachMode, profileExists] = await Promise.all([
       verifyMIAccess(email),
       resolveAccess(email),
       resolveCoachAccess(email),
+      hasSavedProfile(email),
     ]);
 
     // Partner trials (and other per-user trial_ends_at) stamp Pro via
@@ -44,6 +57,7 @@ export async function GET(request: NextRequest) {
       success: true,
       email,
       tier,
+      needsOnboarding: !profileExists,
       isStaff: access.isStaff ?? false,
       staffRole: access.staffRole ?? 'none',
       // Prototype demo tabs are gated on their own allowlist, NOT isStaff, so
