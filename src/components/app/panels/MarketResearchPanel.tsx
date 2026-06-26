@@ -2303,7 +2303,11 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                 the "Relevant spending" headline card and showed an empty $0 +
                 placeholder text while loading, reading as broken. Re-add a real
                 year-over-year line once USASpending's annual breakdown is wired. */}
-            <div ref={primesRef}>
+            {/* col-span-2 on the GRID ITEM (this wrapper) — the lg:col-span-2 inside
+                TopPrimesChart had no effect (it's not the grid child), so the teaming
+                columns were stuck in one half-width cell with the other half blank
+                (Eric, Jun 26: "let them take up the rest of the page"). */}
+            <div ref={primesRef} className="lg:col-span-2">
               <TopPrimesChart
                 primes={reportData?.primeContractor?.suggestedPrimes || []}
                 tier2={(reportData?.tier2Subcontracting?.suggestedPrimes || []).map(p => ({
@@ -3402,16 +3406,15 @@ function TopPrimesChart({ primes, tier2 = [], tribal = [], email }: TopPrimesCha
     tierCard('🥈 Tier 2 Subcontractors', 'Mid-size firms that sub on this work — realistic partners.', tier2List),
     tierCard('🏢 Tier 1 Primes', 'The incumbents — sub under them or size up the competition.', tier1List),
   ].filter(Boolean);
-  // Go 3-up ONLY at xl (1280px+). At md/lg the panel minus the sidebar is ~480px
-  // wide, so a 3-col grid crushed each card to ~160px and truncated every company
-  // name (Eric, Jun 25: "squished together, not usable"). 2-up until there's real
-  // room; names now wrap instead of truncating.
+  // Now that the wrapper actually spans full width (the grid-item col-span fix),
+  // go 3-up at lg+ so the three columns fill the page (Eric, Jun 26). 2-up on
+  // small/medium; names wrap instead of truncating.
   const colClass = tierCards.length >= 3
-    ? 'sm:grid-cols-2 xl:grid-cols-3'
+    ? 'sm:grid-cols-2 lg:grid-cols-3'
     : tierCards.length === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-1';
 
   return (
-    <div className="lg:col-span-2">
+    <div className="w-full">
       <div className="mb-2">
         <h3 className="text-sm font-semibold text-white">Teaming Candidates</h3>
         <p className="text-[11px] text-slate-500">{subtitle}</p>
