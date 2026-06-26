@@ -126,6 +126,34 @@ export default function CompetitivePositioningPage() {
             Note: Govology is training/education, not an operating platform — different category, intentionally off the map.
           </p>
         </div>
+
+        {/* ── vs GovDash — the only real contractor-side AI competitor ─────── */}
+        <div className="mt-8 rounded-xl border border-rose-500/20 bg-gradient-to-br from-slate-900 to-slate-950 p-5">
+          <div className="flex flex-wrap items-baseline justify-between gap-2">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-300">The one to know: GovDash</h2>
+            <span className="text-[11px] text-slate-500">YC · ~$42M raised · enterprise / sales-gated</span>
+          </div>
+          <p className="mt-2 text-sm text-slate-400">
+            The closest AI-native competitor — strong, funded, built for proposal shops and primes. We don&rsquo;t out-enterprise a $42M company; we win the lane they price out of, on things they can&rsquo;t copy.
+          </p>
+          <div className="mt-4 grid gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-emerald-500/25 bg-emerald-500/5 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-emerald-300">Our durable moat (they can&rsquo;t copy)</p>
+              <ul className="mt-1.5 space-y-1 text-[13px] text-slate-200">
+                <li>• 8 yrs of teaching + 743 interviews — Mindy <span className="font-semibold">teaches</span> while it works</li>
+                <li>• The GovCon Giants audience — distribution money can&rsquo;t buy fast</li>
+                <li>• The coach brand, not just a workflow tool</li>
+              </ul>
+            </div>
+            <div className="rounded-lg border border-slate-700/50 bg-slate-800/30 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Live demo contrast (true today)</p>
+              <ul className="mt-1.5 space-y-1 text-[13px] text-slate-300">
+                <li>• <span className="font-semibold">Arrives full</span> — GovDash makes you upload your company first; Mindy already knows your market at login</li>
+                <li>• <span className="font-semibold">Self-serve</span> — sign up &amp; go vs &ldquo;submit a form&rdquo; + onboarding</li>
+              </ul>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   );
