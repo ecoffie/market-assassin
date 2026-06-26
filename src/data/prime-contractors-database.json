@@ -578,8 +578,8 @@
       "supplierPortal": null
     },
     {
-      "sbloName": null,
-      "title": "SBLO",
+      "sbloName": "Carla Jamison",
+      "title": "Senior Manager / Small Business Liaison Officer, Accenture Federal Services",
       "email": null,
       "phone": null,
       "address": null,
@@ -610,7 +610,8 @@
         "541612",
         "541613"
       ],
-      "supplierPortal": "https://supplierhub.accenture.com/"
+      "supplierPortal": "https://www.accenture.com/us-en/support/us-federal-government/small-business-services-overview",
+      "sbloVerified": "2026-06"
     },
     {
       "sbloName": null,
@@ -1036,7 +1037,7 @@
     {
       "sbloName": null,
       "title": "SBLO",
-      "email": null,
+      "email": "SBLO@Amentum.com",
       "phone": null,
       "address": null,
       "source": "SBA Prime Directory FY24",
@@ -1066,7 +1067,8 @@
         "541513",
         "541519"
       ],
-      "supplierPortal": "https://supplier.amentum.com/SupplierRegistration"
+      "supplierPortal": "https://supplier.amentum.com/SupplierRegistration",
+      "sbloVerified": "2026-06"
     },
     {
       "sbloName": null,
@@ -2681,9 +2683,9 @@
       "supplierPortal": null
     },
     {
-      "sbloName": null,
-      "title": "SBLO",
-      "email": null,
+      "sbloName": "Delores Johnson-Cooper",
+      "title": "Director, Supplier Diversity and Supplier Quality",
+      "email": "delores.johnson-cooper@verizon.com",
       "phone": null,
       "address": null,
       "source": "SBA Prime Directory FY24",
@@ -2708,7 +2710,8 @@
         "517111",
         "517911"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.verizon.com/about/our-company/supplier-diversity",
+      "sbloVerified": "2026-06"
     },
     {
       "sbloName": null,
@@ -3231,7 +3234,7 @@
       "sbloName": null,
       "title": "SBLO",
       "email": null,
-      "phone": null,
+      "phone": "410-821-1100",
       "address": null,
       "source": "SBA Prime Directory FY24",
       "contractCount": 36,
@@ -3251,13 +3254,14 @@
       "naicsCategories": [
         "236220"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.whiting-turner.com/subcontractor-prequalification/",
+      "sbloVerified": "2026-06"
     },
     {
-      "sbloName": null,
-      "title": "SBLO",
-      "email": null,
-      "phone": null,
+      "sbloName": "Eric Causey",
+      "title": "Small Business Liaison Officer",
+      "email": "ecausey@kpmg.com",
+      "phone": "(202) 533-6732",
       "address": null,
       "source": "SBA Prime Directory FY24",
       "contractCount": 38,
@@ -3282,7 +3286,8 @@
         "541611",
         "541690"
       ],
-      "supplierPortal": "https://kpmg.supplierone.co/"
+      "supplierPortal": "https://kpmg.supplierone.co/",
+      "sbloVerified": "2026-06"
     },
     {
       "sbloName": "Lauren Terry",
@@ -7504,7 +7509,8 @@
         "236220",
         "237990"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.mortenson.com/contact/trade-partner-registration-small-business",
+      "sbloVerified": "2026-06"
     },
     {
       "sbloName": null,
@@ -7854,7 +7860,7 @@
       "sbloName": null,
       "title": "SBLO",
       "email": null,
-      "phone": null,
+      "phone": "+1 310-978-1457",
       "address": null,
       "source": "SBA Prime Directory FY24",
       "contractCount": 6,
@@ -7877,7 +7883,8 @@
         "811210",
         "811310"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.rapiscansystems.com/en/contact",
+      "sbloVerified": "2026-06"
     },
     {
       "sbloName": null,
@@ -9423,7 +9430,8 @@
         "561422",
         "561439"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://maximus.com/federal-government/small-business-and-strategic-partnership-office",
+      "sbloVerified": "2026-06"
     },
     {
       "sbloName": null,
@@ -10223,8 +10231,8 @@
     {
       "sbloName": null,
       "title": "SBLO",
-      "email": null,
-      "phone": null,
+      "email": "supplierinfo@dewberry.com",
+      "phone": "703-849-0100",
       "address": null,
       "source": "SBA Prime Directory FY24",
       "contractCount": 30,
@@ -10247,7 +10255,8 @@
         "541614",
         "561210"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.dewberry.com/contact",
+      "sbloVerified": "2026-06"
     },
     {
       "sbloName": null,
@@ -12834,7 +12843,7 @@
     {
       "sbloName": null,
       "title": null,
-      "email": null,
+      "email": "FedSmallBiz@stantec.com",
       "phone": null,
       "address": null,
       "source": "SBA Prime Directory FY24",
@@ -12857,7 +12866,8 @@
         "541620",
         "541690"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.stantec.com/en/about/federal-small-disadvantaged-business-program",
+      "sbloVerified": "2026-06"
     },
     {
       "sbloName": null,
@@ -52584,9 +52594,9 @@
       "supplierPortal": null
     },
     {
-      "sbloName": "IAN MACFARLANE",
-      "title": "SBLO",
-      "email": null,
+      "sbloName": "Sarah Shaw",
+      "title": "Director, Procurement",
+      "email": "Vendor@eaest.com",
       "phone": "(410)584.7000",
       "address": "225 SCHILLING CIRCLE HUNT VALLEY, MD. 21031",
       "source": "DOT Subcontracting Directory FY2025",
@@ -52603,7 +52613,8 @@
       "naicsCategories": [
         "541330"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://eaest.com/teaming-partners/",
+      "sbloVerified": "2026-06"
     },
     {
       "sbloName": null,
