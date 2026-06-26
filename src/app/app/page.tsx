@@ -261,8 +261,18 @@ function AppDashboard() {
         && typeof window !== 'undefined'
         && !window.location.pathname.startsWith('/app/onboarding')
       ) {
-        window.location.href = '/app/onboarding';
-        return;
+        // Stamp the email FIRST + only redirect when the MI token is present — the
+        // onboarding page needs BOTH in localStorage to auth a password/session
+        // login. The gate previously redirected before loadUserProfile wrote
+        // mi_beta_email (~20 lines below), so onboarding couldn't find the session
+        // and bounced to /signup → a login loop (Eric Jun 25). No token → stay on
+        // the dashboard rather than loop.
+        const miTok = localStorage.getItem('mi_beta_auth_token');
+        if (miTok) {
+          try { localStorage.setItem('mi_beta_email', userEmail); } catch { /* */ }
+          window.location.href = '/app/onboarding';
+          return;
+        }
       }
 
       // If the currently-active panel is gated for this tier, swap to the
