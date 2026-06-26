@@ -11,6 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { inferOfficeFromSolicitation } from '@/lib/gov-contacts/event-office';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -50,6 +51,7 @@ interface SamOpportunity {
   posted_date: string | null;
   response_deadline: string | null;
   ui_link: string | null;
+  solicitation_number: string | null;
 }
 
 function classifyEvent(title: string, description: string | null): string | null {
@@ -129,7 +131,7 @@ export async function GET(request: NextRequest) {
   // Fetch Special Notices and Presolicitations from sam_opportunities
   const { data: notices, error: fetchError } = await getSupabase()
     .from('sam_opportunities')
-    .select('notice_id, title, description, department, notice_type, posted_date, response_deadline, ui_link')
+    .select('notice_id, title, description, department, notice_type, posted_date, response_deadline, ui_link, solicitation_number')
     .in('notice_type', ['Special Notice', 'Presolicitation', 'Sources Sought'])
     .eq('active', true)
     .order('posted_date', { ascending: false })
@@ -148,6 +150,10 @@ export async function GET(request: NextRequest) {
     event_location: string | null;
     description: string | null;
     source_notice_type: string;
+    solicitation_number: string | null;
+    inferred_dodaac: string | null;
+    inferred_office: string | null;
+    inferred_subagency: string | null;
   }[] = [];
 
   for (const notice of notices as SamOpportunity[]) {
@@ -157,6 +163,9 @@ export async function GET(request: NextRequest) {
       const fullText = `${notice.title} ${notice.description || ''}`;
       const eventDate = extractEventDate(fullText);
       const location = extractLocation(fullText);
+      // Decode the buying office from the solicitation-number DoDAAC so events can
+      // be scoped to the real command, not just "DEPT OF DEFENSE" (cached lookup).
+      const office = await inferOfficeFromSolicitation(notice.solicitation_number);
 
       events.push({
         notice_id: notice.notice_id,
@@ -167,6 +176,10 @@ export async function GET(request: NextRequest) {
         event_location: location,
         description: notice.description?.substring(0, 2000) || null,
         source_notice_type: notice.notice_type,
+        solicitation_number: notice.solicitation_number || null,
+        inferred_dodaac: office.dodaac,
+        inferred_office: office.office,
+        inferred_subagency: office.subAgency,
       });
     }
   }

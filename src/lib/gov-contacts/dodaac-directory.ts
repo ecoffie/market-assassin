@@ -52,6 +52,33 @@ export async function loadDodaacNames(): Promise<Map<string, string>> {
   return map;
 }
 
+// dodaac → { officeName, subAgency } — the forward map, for tagging a notice's
+// buying office from its solicitation-number DoDAAC (event office re-tagging).
+let _dir: Map<string, { officeName: string | null; subAgency: string | null }> | null = null;
+let _dirAt = 0;
+
+/** Load (and cache) dodaac → {officeName, subAgency} from the directory table. */
+export async function loadDodaacDirectory(): Promise<Map<string, { officeName: string | null; subAgency: string | null }>> {
+  if (_dir && Date.now() - _dirAt < TTL_MS) return _dir;
+  const map = new Map<string, { officeName: string | null; subAgency: string | null }>();
+  try {
+    for (let from = 0; from < 60000; from += 1000) {
+      const { data, error } = await sb()
+        .from('dodaac_directory')
+        .select('dodaac, office_name, sub_agency')
+        .range(from, from + 999);
+      if (error || !data || data.length === 0) break;
+      for (const r of data as { dodaac: string; office_name: string | null; sub_agency: string | null }[]) {
+        if (r.dodaac) map.set(r.dodaac.toUpperCase(), { officeName: r.office_name || null, subAgency: r.sub_agency || null });
+      }
+      if (data.length < 1000) break;
+    }
+  } catch { /* unreachable — callers fall back to the in-code names + raw code */ }
+  _dir = map;
+  _dirAt = Date.now();
+  return map;
+}
+
 /** Load (and cache) sub_agency → set of DoDAAC codes. */
 async function loadSubAgencyCodes(): Promise<Map<string, Set<string>>> {
   if (_subAgencyCodes && Date.now() - _subAgencyCodesAt < TTL_MS) return _subAgencyCodes;
