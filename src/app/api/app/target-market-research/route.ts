@@ -382,12 +382,44 @@ export async function POST(request: NextRequest) {
       excludeDOD,
     };
 
+    // The keyword_coverage payload (#59 lesson banner + derived keywords). Built
+    // ONCE here so it can be both returned live AND persisted to the cache — that
+    // way a keyword search can be cached without the coverage vanishing on a hit
+    // (the original reason keyword searches skipped the cache).
+    const keywordCoveragePayload = coverage ? {
+      keyword: coverage.keyword,
+      total_market: coverage.totalMarket,
+      naics_count: coverage.naicsCount,
+      codes_used: coverage.coverageCodes.length,
+      coverage_pct: Math.round(coverage.coveragePct * 100),
+      top_code_pct: Math.round(coverage.topCodePct * 100),
+      psc_count: coverage.pscCount,
+      top_psc: coverage.topPsc,
+      top_psc_pct: Math.round(coverage.topPscPct * 100),
+      ranking_mode: marketFilter?.mode || 'keyword',
+      ranking_label: marketFilter?.rankingLabel || `keyword "${coverage.keyword}"`,
+      uses_psc_ranking: marketFilter?.mode === 'keyword_psc',
+      keywords: deriveCoverageKeywords(coverage),
+    } : null;
+
     // Cache schema version. Bump when the COMPUTED figures change so stale rows
     // (24h TTL) don't serve old numbers. sv2 = state-scoped authoritative total +
     // sub-agencies no longer inherit the parent department's national total.
-    const SPEND_SCHEMA_VERSION = 'sv3';
+    // sv4 = keyword searches are now cached (keyed on the phrase) — bump so the
+    // first post-deploy hit for any keyword recomputes once and then stays put.
+    const SPEND_SCHEMA_VERSION = 'sv4';
+    // Stable cache token. KEYWORD searches key on the normalized phrase — the
+    // derived NAICS coverage set can drift run-to-run (keywordCoverage re-queries
+    // live), so keying on it would miss every repeat and recompute different
+    // numbers each time (Eric: "different even using the same search terms").
+    // Keying on the phrase makes repeats deterministic + instant. Code searches
+    // key on the NAICS set, folding in any profile keywords that also scope it.
+    const kwNorm = (keyword || '').trim().toLowerCase();
+    const cacheToken = kwNorm
+      ? `kw:${kwNorm}`
+      : `${naics}${searchKeywords.length ? `|sk:${searchKeywords.join(',').toLowerCase()}` : ''}`;
     const cacheKey = {
-      naics_code: `${naics}${stateSuffix}|${SPEND_SCHEMA_VERSION}`,
+      naics_code: `${cacheToken}${stateSuffix}|${SPEND_SCHEMA_VERSION}`,
       psc_code: psc,
       business_type: effectiveBusinessType,
       veteran_status: veteranStatus || '',
@@ -397,12 +429,14 @@ export async function POST(request: NextRequest) {
     // through to the live merge. Stale rows are overwritten by the
     // upsert at the bottom of the success path.
     const supabase = getSupabase();
-    // SKIP the cache for KEYWORD searches. The cached return path doesn't include
-    // keyword_coverage (the lesson banner + derived keywords), so a cache hit made
-    // them vanish — "drones" showed no coverage/keywords while a fresh keyword
-    // ("cybersecurity") worked. Keyword research is exploratory + teaching; always
-    // compute it live so the coverage + keyword output is present and current.
-    const skipCache = Boolean(keyword && keyword.trim()) || searchKeywords.length > 0;
+    // Keyword searches are now CACHEABLE: the cache key is keyed on the phrase
+    // (cacheToken above) and keyword_coverage is persisted in source_versions and
+    // returned on a hit, so the lesson banner + derived keywords survive. This
+    // makes repeat keyword research deterministic (same phrase → same numbers)
+    // AND instant — the fix for "different even using the same search terms" and
+    // the "still loading" wait. (Previously keyword/profile-keyword searches
+    // skipped the cache, recomputing a live, slightly-different result each time.)
+    const skipCache = false;
     try {
       const { data: cacheRow } = skipCache ? { data: null } : await supabase
         .from('agency_target_data_cache')
@@ -439,6 +473,8 @@ export async function POST(request: NextRequest) {
             relevant_spending: cacheRow.source_versions?.relevant_spending || cacheRow.total_spending || 0,
             spend_window_label: MARKET_SPEND_WINDOW_LABEL,
             sat_summary: cacheRow.sat_summary,
+            // #59 lesson banner survives the cache hit (persisted on write below).
+            keyword_coverage: cacheRow.source_versions?.keyword_coverage || null,
             cached: true,
             cache_age_ms: age,
             free_tier_limited: isFree && rows.length > FREE_TIER_ROW_LIMIT,
@@ -950,6 +986,8 @@ export async function POST(request: NextRequest) {
             // Authoritative category total stashed here (no schema change needed) so
             // cache hits also serve the reconciled "Relevant spending" figure.
             relevant_spending: relevantSpending,
+            // #59 coverage payload so keyword searches keep their lesson banner on a hit.
+            keyword_coverage: keywordCoveragePayload,
           },
         }, { onConflict: 'naics_code,psc_code,business_type,veteran_status' });
     } catch (cacheWriteErr) {
@@ -972,22 +1010,9 @@ export async function POST(request: NextRequest) {
       sat_summary: findData.satSummary,
       // KEYWORD-FIRST coverage (#59) — when researched by keyword, tell the UI the
       // full market: "drones = $245M across 70+ codes; we covered 90%". Lets the
-      // panel show coverage instead of asking the user to manage codes.
-      keyword_coverage: coverage ? {
-        keyword: coverage.keyword,
-        total_market: coverage.totalMarket,
-        naics_count: coverage.naicsCount,
-        codes_used: coverage.coverageCodes.length,
-        coverage_pct: Math.round(coverage.coveragePct * 100),
-        top_code_pct: Math.round(coverage.topCodePct * 100),
-        psc_count: coverage.pscCount,
-        top_psc: coverage.topPsc,
-        top_psc_pct: Math.round(coverage.topPscPct * 100),
-        ranking_mode: marketFilter?.mode || 'keyword',
-        ranking_label: marketFilter?.rankingLabel || `keyword "${coverage.keyword}"`,
-        uses_psc_ranking: marketFilter?.mode === 'keyword_psc',
-        keywords: deriveCoverageKeywords(coverage),
-      } : null,
+      // panel show coverage instead of asking the user to manage codes. Built once
+      // above (keywordCoveragePayload) so the cache write persists the same shape.
+      keyword_coverage: keywordCoveragePayload,
       cached: false,
       generation_ms: Date.now() - startedAt,
       source_versions: {
