@@ -24,18 +24,23 @@ export async function POST(request: NextRequest) {
 
   const supabase = createClient(supabaseUrl, supabaseKey, { auth: { persistSession: false } });
 
-  const { error } = await supabase.rpc('exec', {
-    query: `
-      ALTER TABLE sam_events ADD COLUMN IF NOT EXISTS solicitation_number TEXT;
-      ALTER TABLE sam_events ADD COLUMN IF NOT EXISTS inferred_dodaac TEXT;
-      ALTER TABLE sam_events ADD COLUMN IF NOT EXISTS inferred_office TEXT;
-      ALTER TABLE sam_events ADD COLUMN IF NOT EXISTS inferred_subagency TEXT;
-      CREATE INDEX IF NOT EXISTS idx_sam_events_inferred_subagency ON sam_events (inferred_subagency);
-    `,
-  });
+  // exec_sql runs ONE statement per call (it's the working RPC in this instance —
+  // `exec` doesn't exist here). Run each separately.
+  const statements = [
+    `ALTER TABLE sam_events ADD COLUMN IF NOT EXISTS solicitation_number TEXT`,
+    `ALTER TABLE sam_events ADD COLUMN IF NOT EXISTS inferred_dodaac TEXT`,
+    `ALTER TABLE sam_events ADD COLUMN IF NOT EXISTS inferred_office TEXT`,
+    `ALTER TABLE sam_events ADD COLUMN IF NOT EXISTS inferred_subagency TEXT`,
+    `CREATE INDEX IF NOT EXISTS idx_sam_events_inferred_subagency ON sam_events (inferred_subagency)`,
+  ];
+  const errors: string[] = [];
+  for (const sql of statements) {
+    const { error } = await supabase.rpc('exec_sql', { sql });
+    if (error) errors.push(`${sql.slice(0, 60)}… → ${error.message}`);
+  }
 
-  if (error) {
-    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  if (errors.length) {
+    return NextResponse.json({ success: false, errors }, { status: 500 });
   }
   return NextResponse.json({
     success: true,
