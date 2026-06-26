@@ -1727,6 +1727,13 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   // the "Your Selected Agencies" table render from the exact same rows → they
   // can never diverge again (see bootstrapRows declaration comment).
   const chartRows = tmrRows.length > 0 ? tmrRows : bootstrapRows;
+  // agencySpendLoading — keep the Spending by Agency chart in its loading state
+  // until the AUTHORITATIVE AgencyTable rows have landed (tmrRows populated AND
+  // not re-fetching). This prevents the jarring "data changed" swap Eric saw: the
+  // chart used to flash the parent bootstrap rows, then replace them with the
+  // table's rows. Now it shows "Searching agency spend…" until the real,
+  // deterministic (24h-cached) result is in, then renders once and stays put.
+  const agencySpendLoading = agencyLoading || (sportKeywordActive && tmrRows.length === 0);
   const chartBuyers: BuyerLike[] = chartRows.length > 0
     ? rollupChartBuyers(chartRows)
     : sportKeywordActive ? [] : buyers;
@@ -2314,7 +2321,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
             <SpendingByAgencyChart
               buyers={chartBuyers}
-              loading={sportKeywordActive && chartRows.length === 0}
+              loading={agencySpendLoading}
             />
             {/* Small Business Mix is about YOUR profile's SBA goaling — not a
                 one-off industry exploration. Remove it in Sport (Eric: "serves a
@@ -3028,9 +3035,13 @@ function SpendingByAgencyChart({ buyers, loading }: { buyers: BuyerLike[]; loadi
 
   if (loading) {
     return (
-      <ChartShell title="Spending by Agency" subtitle="Top 10 by total spend (loading…)">
-        <div className="flex items-center justify-center h-full text-xs text-slate-500">
-          Loading agency spend…
+      <ChartShell title="Spending by Agency" subtitle="Searching federal spend for this market…">
+        <div className="flex flex-col items-center justify-center h-full gap-3 text-xs text-slate-400">
+          <div className="flex items-center gap-2">
+            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-emerald-400/30 border-t-emerald-400" />
+            <span className="text-slate-300 font-medium">Searching agency spend…</span>
+          </div>
+          <span className="text-[11px] text-slate-500">Pulling the full agency breakdown — this can take a few seconds. Numbers stay put once it lands.</span>
         </div>
       </ChartShell>
     );
