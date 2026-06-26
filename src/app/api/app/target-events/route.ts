@@ -149,6 +149,27 @@ function variantMatches(candidate: string | null | undefined, variants: Set<stri
   return null;
 }
 
+// --- Service-branch conflict filter -------------------------------
+//
+// sam_events.agency is DEPARTMENT-level only ("DEPT OF DEFENSE" for every DoD
+// event — the real command lives in the TITLE). So a department-level variant
+// match floods an Army office with USAF / DISA / Navy events (Eric, Jun 26).
+// We can't scope to a single office, but we CAN drop confident cross-branch
+// mismatches: infer the branch from the target and from the event title, and
+// when BOTH are known and DIFFER, exclude the event. Conservative — an event with
+// no detectable branch (generic DoD industry day) is always kept.
+function detectBranch(text: string | null | undefined): string | null {
+  if (!text) return null;
+  const t = ` ${text.toLowerCase()} `;
+  if (/\b(air force|usaf|afmc|aflcmc|afsoc|afgsc|\bdaf\b|wright[- ]patterson|\baess\b|\bafb\b|f-16|f-35|f-22|awacs)\b/.test(t)) return 'air_force';
+  if (/\b(space force|ussf|space systems command|\bssc\b)\b/.test(t)) return 'space_force';
+  if (/\b(marine corps|usmc|marforsyscom|marcorsyscom)\b/.test(t)) return 'marines';
+  if (/\b(navy|naval|navsea|navair|navsup|navwar|nuwc|nswc|spawar|nawc|fleet|shipyard|submarine)\b/.test(t)) return 'navy';
+  if (/\b(army|usace|amcom|tacom|acc-|aviation and missile|sustainment command|corps of engineers|\bftig\b|fort )\b/.test(t)) return 'army';
+  if (/\b(disa|defense logistics|\bdla\b|darpa|missile defense agency|\bmda\b|defense health|\bdha\b|defense threat|\bdtra\b)\b/.test(t)) return 'defense_agency';
+  return null;
+}
+
 // --- Endpoint -----------------------------------------------------
 
 export async function GET(request: NextRequest) {
@@ -228,6 +249,11 @@ export async function GET(request: NextRequest) {
 
     for (const target of targets as TargetRow[]) {
       const variants = buildAgencyVariants(target);
+      // The target's service branch (from office/sub-agency/agency names) — used to
+      // drop cross-branch event noise that department-level agency matching can't.
+      const targetBranch = detectBranch(
+        [target.office_name, target.sub_agency_name, target.agency_name].filter(Boolean).join(' ')
+      );
       const events: EventCard[] = [];
       const seen = new Set<string>(); // de-dupe by title within target
 
@@ -235,6 +261,11 @@ export async function GET(request: NextRequest) {
       for (const row of (samEventsAll || [])) {
         const matched = variantMatches(row.agency, variants);
         if (!matched) continue;
+        // Drop a confident cross-branch mismatch (e.g. a USAF event under an Army
+        // office). Only when BOTH branches are known and differ — generic events
+        // with no detectable branch always pass.
+        const eventBranch = detectBranch(`${row.title || ''} ${row.description || ''}`);
+        if (targetBranch && eventBranch && targetBranch !== eventBranch) continue;
         const key = `sam:${row.notice_id}`;
         if (seen.has(key)) continue;
         seen.add(key);
