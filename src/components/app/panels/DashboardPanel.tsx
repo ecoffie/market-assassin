@@ -596,6 +596,22 @@ function getBriefingItems(entry: BriefingEntry | null): BriefingItem[] {
     items = greenItems.length > 0 ? greenItems : collectLegacyItems(content);
   }
 
+  // DEDUP by the stable opportunity id (solicitation #). The same opp can appear
+  // in BOTH the opportunities bucket AND deadlinesThisWeek (matched AND due-soon),
+  // so it rendered twice — and since tracking is keyed by the shared notice_id,
+  // clicking Track on one flipped both (Eric, Jun 26). Keep the first occurrence
+  // (opportunities come before deadlines; the opportunity card already carries the
+  // deadline in its narrative). Only collapses on a REAL solicitation key, never on
+  // the title/id fallback, so distinct items are never wrongly merged.
+  const seenIds = new Set<string>();
+  items = items.filter((it) => {
+    const sol = getSolicitationFromSignals(it.signals);
+    if (!sol) return true; // no stable solicitation → can't safely dedup; keep it
+    if (seenIds.has(sol)) return false;
+    seenIds.add(sol);
+    return true;
+  });
+
   // Namespace each item id with the briefing key. The collectors
   // generate ids like `legacy-0` / `opp-{sol}` that REPEAT across
   // briefings for the same opportunity — so dismissing an item in one
