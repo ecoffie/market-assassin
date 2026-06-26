@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { samHtmlToText, looksLikeHtml } from '@/lib/sam/description-text';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
 // Lazy initialization to avoid build-time errors
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -209,10 +210,17 @@ export async function GET(request: NextRequest) {
     let userNaicsCodes: string[] = [];
     let userStates: string[] = [];
     if (email) {
+      // Coach Mode: when a coach has switched to a client, scope the dashboard to
+      // the CLIENT's profile, not the coach's (mirrors /api/app/opportunities,
+      // commit f33d1df4). Without this the Market Dashboard always read the coach's
+      // NAICS/states → a coach saw their own drones feed while viewing a
+      // construction client (Eric, Jun 25).
+      const { workspaceId: activeWsId, asClient } = await resolveActiveWorkspace(email, request);
+      const profileEmail = asClient ? clientNotificationEmail(activeWsId) : email;
       const { data: profile } = await supabase
         .from('user_notification_settings')
         .select('naics_codes, location_states')
-        .ilike('user_email', email)
+        .eq('user_email', profileEmail)
         .maybeSingle();
 
       if (profile?.naics_codes?.length > 0 && !naics) {
