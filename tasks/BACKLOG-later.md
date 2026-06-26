@@ -84,6 +84,28 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
 
 **Newly deferred this session (Jun 26):**
 
+### Ingest the FULL GovCon Giants content library into Mindy RAG (moat)
+- **Why:** the knowledge base IS the moat (8 yrs teaching). Mindy's RAG today
+  (`mindy_rag_documents` ~1,364 docs / 12,534 chunks) has only a SLICE — ~136
+  course_material, 103 slide_deck, 31 webinar_resource, 743 podcast_interview. Two
+  big sources are NOT fully ingested (Eric, Jun 26 — "make sure later our Mindy RAG
+  has all of this content"):
+  1. **Federal Help Center course videos** — the Library of Course Videos: Federal
+     Contract Academy **Essentials (81) + Comprehensive (108) + Mastery (68) = 257
+     lessons**, the 258-lesson Overview library, plus **Bootcamp Replays, Webinar
+     Replays, Q&A Sessions, First Partner Challenge, Roadmap/Action Plan**. VIDEO →
+     needs transcription (Whisper) → text → embeddings (same pipeline as the 743
+     podcasts).
+  2. **GOVCON EDU "The Vault" Google Drive** — document library: Teaming/
+     Subcontracting, Target Market List, Supplier Credit, Scripts, SB Certification,
+     SAM Bid Sites, Proposal Writing, NAVFAC SB Specialist POCs, Joint Venture Docs,
+     Indefinite Delivery Vehicles, FAR, Estimating, + more. DOCS → ingest via the
+     existing RAG doc pipeline (pdf-extract + embeddings; Google Drive MCP available).
+- **Scope/effort:** transcription cost for ~500+ videos + Drive folder crawl +
+  embeddings + doc-type tagging. Strengthens the Data Core "knowledge base" count
+  and every grounded surface (Mindy Chat + Proposal Assist's winning-proposal corpus).
+- **Guardrail:** filter `has_pii` / internal-only docs (same as Knowledge Base repo).
+
 ### Proposal Assist — Tier 2 multi-pass volumes
 - **Status:** Built. **PR #34 open, NOT merged**, gated behind `PROPOSAL_MULTIPASS=1`.
 - **What:** batches a section's compliance requirements → drafts each batch in
