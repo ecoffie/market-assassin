@@ -3360,13 +3360,13 @@ function TopPrimesChart({ primes, tier2 = [], tribal = [], email }: TopPrimesCha
         </div>
         <div className="min-w-0 flex-1">
           {p.tier === 'tier1' ? (
-            <ContractorLink name={p.name} email={email} variant="plain" className="text-xs font-medium block truncate">
+            <ContractorLink name={p.name} email={email} variant="plain" className="text-xs font-medium block break-words leading-snug">
               {p.name}
             </ContractorLink>
           ) : (
-            <span className="text-xs font-medium text-slate-200 block truncate">{p.name}</span>
+            <span className="text-xs font-medium text-slate-200 block break-words leading-snug">{p.name}</span>
           )}
-          {p.reason && <div className="text-[10px] text-slate-500 truncate">{p.reason}</div>}
+          {p.reason && <div className="text-[10px] text-slate-500 break-words leading-snug">{p.reason}</div>}
           {/* POC contact (Eric: POC is sufficient, skip history). */}
           {hasPoc ? (
             <div className="text-[10px] text-slate-500">
@@ -3402,7 +3402,13 @@ function TopPrimesChart({ primes, tier2 = [], tribal = [], email }: TopPrimesCha
     tierCard('🥈 Tier 2 Subcontractors', 'Mid-size firms that sub on this work — realistic partners.', tier2List),
     tierCard('🏢 Tier 1 Primes', 'The incumbents — sub under them or size up the competition.', tier1List),
   ].filter(Boolean);
-  const colClass = tierCards.length >= 3 ? 'md:grid-cols-3' : tierCards.length === 2 ? 'md:grid-cols-2' : 'md:grid-cols-1';
+  // Go 3-up ONLY at xl (1280px+). At md/lg the panel minus the sidebar is ~480px
+  // wide, so a 3-col grid crushed each card to ~160px and truncated every company
+  // name (Eric, Jun 25: "squished together, not usable"). 2-up until there's real
+  // room; names now wrap instead of truncating.
+  const colClass = tierCards.length >= 3
+    ? 'sm:grid-cols-2 xl:grid-cols-3'
+    : tierCards.length === 2 ? 'sm:grid-cols-2' : 'sm:grid-cols-1';
 
   return (
     <div className="lg:col-span-2">

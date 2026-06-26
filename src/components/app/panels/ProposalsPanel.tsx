@@ -2039,24 +2039,18 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             </p>
           )}
 
-          {/* THE one button */}
-          {!isRfqMode ? (
-            <button
-              onClick={generateAllDrafts}
-              disabled={draftAllLoading || !!draftLoading}
-              className="w-full sm:w-auto px-6 py-3 bg-gradient-to-br from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white text-base font-semibold rounded-xl shadow-lg shadow-purple-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {draftAllLoading ? '⏳ Drafting your response…' : draftAllSummary ? '✨ Redraft my response' : '✨ Draft my response'}
-            </button>
-          ) : (
-            <button
-              onClick={() => exportProposalPackage()}
-              disabled={exporting}
-              className="w-full sm:w-auto px-6 py-3 bg-gradient-to-br from-emerald-600 to-emerald-700 hover:from-emerald-500 hover:to-emerald-600 text-white text-base font-semibold rounded-xl shadow-lg disabled:opacity-50"
-            >
-              {exporting ? 'Assembling…' : '✨ Build my RFQ response'}
-            </button>
-          )}
+          {/* THE one button. ALWAYS draft via the LLM first. RFQ mode used to wire
+              straight to exportProposalPackage(), SKIPPING drafting entirely — so it
+              exported a BLANK template with no content (Eric QC 2026-06-25: "it didn't
+              write anything / didn't read the documents"). Every simple-response mode
+              now drafts the same way; export happens once a draft exists. */}
+          <button
+            onClick={generateAllDrafts}
+            disabled={draftAllLoading || !!draftLoading}
+            className="w-full sm:w-auto px-6 py-3 bg-gradient-to-br from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white text-base font-semibold rounded-xl shadow-lg shadow-purple-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {draftAllLoading ? '⏳ Drafting your response…' : draftAllSummary ? '✨ Redraft my response' : '✨ Draft my response'}
+          </button>
 
           {/* Surface draft errors HERE in the hero card — the other draftError
               render is below the fold behind "More options", so a hero-button
