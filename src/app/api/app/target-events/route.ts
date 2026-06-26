@@ -98,7 +98,10 @@ interface StaticConference {
 // Returns a Set so callers can do .has() / .forEach() cheaply.
 function buildAgencyVariants(target: TargetRow): Set<string> {
   const variants = new Set<string>();
-  const raw = [target.agency_name, target.sub_agency_name].filter(Boolean) as string[];
+  // Include the OFFICE name (cleaned of a trailing "/ysk" DoDAAC suffix) so a
+  // specific command can match an event's decoded inferred_office.
+  const office = (target.office_name || '').replace(/\s*\/\s*\w+\s*$/, '').trim();
+  const raw = [target.agency_name, target.sub_agency_name, office].filter(Boolean) as string[];
   const aliases = (agencyAliasesData as { aliases: Record<string, string> }).aliases || {};
 
   for (const name of raw) {
@@ -227,7 +230,7 @@ export async function GET(request: NextRequest) {
 
     const { data: samEventsAll, error: eErr } = await supabase
       .from('sam_events')
-      .select('notice_id, title, event_type, agency, event_date, event_location, description, registration_url, source_notice_type, source, confidence')
+      .select('notice_id, title, event_type, agency, event_date, event_location, description, registration_url, source_notice_type, source, confidence, inferred_office, inferred_subagency')
       .gte('event_date', today.toISOString().slice(0, 10))
       .lte('event_date', horizon.toISOString().slice(0, 10))
       .order('event_date', { ascending: true });
@@ -259,12 +262,18 @@ export async function GET(request: NextRequest) {
 
       // 1) sam_events (cron-populated SAM Special Notices)
       for (const row of (samEventsAll || [])) {
-        const matched = variantMatches(row.agency, variants);
+        // Match the decoded buying office / sub-agency (precise) OR the
+        // department-level agency (broad fallback for civilian / undecoded events).
+        const officeMatch = variantMatches(row.inferred_office, variants)
+          || variantMatches(row.inferred_subagency, variants);
+        const matched = officeMatch || variantMatches(row.agency, variants);
         if (!matched) continue;
         // Drop a confident cross-branch mismatch (e.g. a USAF event under an Army
-        // office). Only when BOTH branches are known and differ — generic events
-        // with no detectable branch always pass.
-        const eventBranch = detectBranch(`${row.title || ''} ${row.description || ''}`);
+        // office). inferred_subagency is DoDAAC-decoded → a far more reliable branch
+        // signal than the title. Only filters when BOTH branches are known + differ.
+        const eventBranch = detectBranch(
+          `${row.inferred_subagency || ''} ${row.inferred_office || ''} ${row.title || ''} ${row.description || ''}`
+        );
         if (targetBranch && eventBranch && targetBranch !== eventBranch) continue;
         const key = `sam:${row.notice_id}`;
         if (seen.has(key)) continue;
@@ -281,7 +290,8 @@ export async function GET(request: NextRequest) {
           location: row.event_location,
           url: row.registration_url,
           description: row.description,
-          matched_agency: matched,
+          // Show the real decoded office when we have it, not "DEFENSE".
+          matched_agency: row.inferred_office || row.inferred_subagency || matched,
           confidence: isAi && typeof row.confidence === 'number' ? row.confidence : null,
         });
       }
