@@ -96,6 +96,41 @@ export function classifyLocation(contractState: string | null | undefined, geo: 
   return 'outside';
 }
 
+// Overseas / OCONUS buying-office markers. The static recompete dataset's `State`
+// field is the VENDOR's state, not place of performance — so an Alabama firm running
+// the Japan Engineer District ("W2SN ENDIST JAPAN") carries State="AL" and falsely
+// badges as the user's HQ state (Eric, Jun 26 2026: "if I selected my states why is
+// japan showing up"). When the buying OFFICE name is clearly overseas, the vendor
+// state is meaningless for "is this in my area" — surface the real region instead.
+// Whole-word, conservative list to avoid domestic false-positives.
+const OVERSEAS_OFFICE_MARKERS: Array<[RegExp, string]> = [
+  [/\bJAPAN\b/i, 'Japan'],
+  [/\bOKINAWA\b/i, 'Okinawa'],
+  [/\b(KOREA|FAR EAST)\b/i, 'Korea'],
+  [/\bGUAM\b/i, 'Guam'],
+  [/\bKWAJALEIN\b/i, 'Kwajalein'],
+  [/\bDIEGO GARCIA\b/i, 'Diego Garcia'],
+  [/\b(GERMANY|WIESBADEN)\b/i, 'Germany'],
+  [/\b(ITALY|VICENZA)\b/i, 'Italy'],
+  [/\b(EUROPE|EUROPEAN)\b/i, 'Europe'],
+  [/\bUNITED KINGDOM\b/i, 'United Kingdom'],
+  [/\b(BAHRAIN|QATAR|KUWAIT|AFGHANISTAN|IRAQ|DJIBOUTI)\b/i, 'Overseas'],
+  [/\bAFRICA\b/i, 'Africa'],
+];
+
+/**
+ * If the buying office is clearly overseas/OCONUS, return its region label; else null.
+ * Used to override the vendor-derived `State` so foreign work doesn't masquerade as
+ * being in the user's service area.
+ */
+export function overseasRegionFromOffice(office: string | null | undefined): string | null {
+  if (!office) return null;
+  for (const [re, label] of OVERSEAS_OFFICE_MARKERS) {
+    if (re.test(office)) return label;
+  }
+  return null;
+}
+
 // Display metadata for each tier (label + a short why).
 export const MATCH_META: Record<LocationMatch, { label: string; hint: string; rank: number }> = {
   hq:      { label: 'HQ state',        hint: 'Your headquarters state',            rank: 0 },

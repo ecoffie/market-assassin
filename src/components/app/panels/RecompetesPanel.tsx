@@ -9,7 +9,7 @@ import ContractorLink from '../contractors/ContractorLink';
 import AwardDetailDrawer from '../awards/AwardDetailDrawer';
 import RecompeteSowMatch from '../awards/RecompeteSowMatch';
 import SaveContactButton from '../contacts/SaveContactButton';
-import { classifyLocation, MATCH_META, type LocationMatch } from '@/lib/geo/location-match';
+import { classifyLocation, MATCH_META, overseasRegionFromOffice, type LocationMatch } from '@/lib/geo/location-match';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 import { useDodaacNames } from '@/components/app/useDodaacNames';
 
@@ -228,9 +228,14 @@ function mapStaticContract(contract: StaticRecompeteContract): ExpiringContract 
     bidsReceived: 0,
     competitionLevel: 'full',
     competitionType: 'Expiring contract',
-    location: {
-      state: contract.State || undefined,
-    },
+    // The dataset's `State` is the VENDOR's state, not place of performance. For
+    // clearly-overseas buying offices (e.g. "ENDIST JAPAN"), that vendor state would
+    // falsely match the user's service area, so surface the real region instead —
+    // it classifies as "outside your area" and sorts down, not a green "HQ state".
+    location: (() => {
+      const overseas = overseasRegionFromOffice(contract.Office);
+      return overseas ? { state: overseas } : { state: contract.State || undefined };
+    })(),
   };
 }
 
