@@ -407,7 +407,9 @@ export async function POST(request: NextRequest) {
     // sub-agencies no longer inherit the parent department's national total.
     // sv4 = keyword searches are now cached (keyed on the phrase) — bump so the
     // first post-deploy hit for any keyword recomputes once and then stays put.
-    const SPEND_SCHEMA_VERSION = 'sv4';
+    // sv5 = agency roster anchored to spending_by_category (complete + stable buyer
+    // list); bump so any sv4 rows recompute with the full roster.
+    const SPEND_SCHEMA_VERSION = 'sv5';
     // Stable cache token. KEYWORD searches key on the normalized phrase — the
     // derived NAICS coverage set can drift run-to-run (keywordCoverage re-queries
     // live), so keying on it would miss every repeat and recompute different
@@ -559,6 +561,12 @@ export async function POST(request: NextRequest) {
     // agency name and use it as the authoritative metric_top_total. Falls back
     // to the sampled total when an agency isn't in the category response.
     const categoryTotalByKey: Record<string, number> = {};
+    // Authoritative sub-agency roster (name + true total) from spending_by_category.
+    // This is the COMPLETE, deterministic list of buyers in this market — used below
+    // to anchor the agency rows so the chart/table can't be missing a real buyer just
+    // because it didn't land in the sampled-award set (Eric: "it should not change
+    // that drastically"). The sampled awards only ENRICH (offices, vendors, SAT).
+    const subagencyCategoryTotals: Array<{ name: string; amount: number }> = [];
     // Authoritative market total from spending_by_category at the DEPARTMENT level
     // (awarding_agency). Departments don't overlap, so summing them gives the true
     // market size WITHOUT the double-count you'd get summing sampled award rows.
@@ -607,6 +615,12 @@ export async function POST(request: NextRequest) {
           for (const r of catResults) {
             const k = normalizeAgencyKey(r.name || '');
             if (k) categoryTotalByKey[k] = Math.max(categoryTotalByKey[k] || 0, r.amount || 0);
+          }
+          // Keep the SUB-AGENCY roster (true totals) to anchor the agency rows below.
+          if (category === 'awarding_subagency') {
+            for (const r of catResults) {
+              if (r.name && (r.amount || 0) > 0) subagencyCategoryTotals.push({ name: r.name, amount: r.amount });
+            }
           }
           // Department-level pass = the authoritative non-overlapping market total.
           if (category === 'awarding_agency') {
@@ -936,6 +950,78 @@ export async function POST(request: NextRequest) {
         satRatio,
       };
     });
+
+    // ---- Roster anchoring (Eric, Jun 26 2026) ----
+    // Append an agency-level row for every authoritative sub-agency buyer the
+    // SAMPLED award set missed. The sampled-award path only sees ~5k awards, so a
+    // real buyer that didn't make the slice vanished from the chart/table and
+    // reappeared on the next run (the "it should not change that drastically" bug).
+    // spending_by_category gives the COMPLETE, deterministic buyer list with true
+    // totals — anchor to it. Double-count-safe: each sampled office row already
+    // carries its sub-agency's accurate total in metric_top_total and
+    // rollupChartBuyers takes the MAX per agency, so an already-present agency keeps
+    // its value; only genuinely-missing buyers get a new row. Award-sample-only
+    // fields (contractCount, set-aside split, SAT, bidders) stay 0/null — honest:
+    // we have the true spend but didn't sample this buyer's individual awards.
+    const representedKeys = new Set<string>();
+    for (const r of rows) {
+      for (const cand of [r.subAgency, r.parentAgency, r.name]) {
+        const k = normalizeAgencyKey(cand || '');
+        if (k) representedKeys.add(k);
+      }
+    }
+    for (const { name, amount } of subagencyCategoryTotals) {
+      const key = normalizeAgencyKey(name);
+      if (!key || representedKeys.has(key)) continue;
+      representedKeys.add(key); // guard against category-response dupes
+
+      const nk = normalizeAgencyKey(name);
+      const openOppCount = oppCounts[nk] || 0;
+      const upcomingEventCount = eventCounts[nk] || 0;
+      const painData = getPainPointsForAgency(name);
+      const painPointCount = painData
+        ? (painData.painPoints?.length || 0) + (painData.priorities?.length || 0)
+        : 0;
+      const naicsAligned = naicsAlignedPainAgencies.has(name.toLowerCase());
+      loadPrimesForKey(name);
+      const topPrimes = primesByAgencyKey.get(name) || [];
+      const sb = resolveOsbp('', name, '');
+      const osbp = sb?.director && !/ OSBP Director$/.test(sb.director)
+        ? { name: sb.name, director: sb.director, email: sb.email, phone: sb.phone, address: sb.address }
+        : (sb ? { name: sb.name, email: sb.email, phone: sb.phone, address: sb.address } : null);
+
+      rows.push({
+        id: `cat:${key}`,
+        name,
+        contractingOffice: name,
+        subAgency: name,
+        parentAgency: '',
+        officeId: '',
+        location: '',
+        setAsideSpending: 0,
+        totalSpending: amount,
+        contractCount: 0,
+        satSpending: 0,
+        satContractCount: 0,
+        metric_top_spending: keywordGrounded ? amount : 0,
+        metric_top_total: amount,
+        metric_contracts: 0,
+        metric_easy_entry: 0,
+        metric_budget_growth: 0,
+        painPointCount: painPointCount + (naicsAligned ? 5 : 0),
+        openOppCount,
+        oppCountDodWide: null,
+        upcomingEventCount,
+        avgBidders: null,
+        uniqueVendorCount: 0,
+        smallBizPercent: lookupSmallBiz(name),
+        topPrimes,
+        osbp,
+        hasOSBP: !!osbp,
+        isSubAgency: true,
+        satRatio: 0,
+      });
+    }
 
     // Default sort: top total $ (matches UI default lens + FPDS leaderboards).
     rows.sort((x, y) => y.metric_top_total - x.metric_top_total);
