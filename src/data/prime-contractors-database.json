@@ -26,10 +26,10 @@
     {
       "sbloName": "Tina T. Wang",
       "title": "SBLO",
-      "email": "tina.t.wang@boeing.com",
+      "email": "boeingassessment@boeing.com",
       "phone": null,
       "address": null,
-      "source": "DHS Prime Contractors Page",
+      "source": "boeingsuppliers.com supplier portal; Boeing uses multiple BU-specific SBLOs (no single corporate-wide named SBLO on official pages); SBIR via BoeingSBIR@boeing.com, Jun 2026",
       "contractCount": 514,
       "totalContractValue": 20494724379.68,
       "agencies": [
@@ -56,7 +56,7 @@
         "336413",
         "336414"
       ],
-      "supplierPortal": "https://boeing.suppliergateway.com/"
+      "supplierPortal": "https://www.boeingsuppliers.com"
     },
     {
       "sbloName": null,
@@ -144,10 +144,10 @@
     {
       "sbloName": "Ashley Burtonsmallbusinesscompliance",
       "title": "SBLO",
-      "email": "Burtonsmallbusinesscompliance@bah.comSmall",
+      "email": "SmallBusinessStrategyGroup@bah.com",
       "phone": null,
       "address": null,
-      "source": "DHS Prime Contractors Page",
+      "source": "boozallen.com Suppliers & Small Businesses / Small Business Office page; no SBLO named on official pages (Dan Ryan listed as Deputy SBLO on LinkedIn only), Jun 2026",
       "contractCount": 153,
       "totalContractValue": 10737593516.500006,
       "agencies": [
@@ -174,7 +174,7 @@
         "541714",
         "541715"
       ],
-      "supplierPortal": "https://doingbusiness.bah.com/"
+      "supplierPortal": "https://www.boozallen.com/menu/suppliers-and-small-businesses.html"
     },
     {
       "sbloName": null,
@@ -259,12 +259,12 @@
       "supplierPortal": null
     },
     {
-      "sbloName": null,
-      "title": "SBLO",
-      "email": null,
+      "sbloName": "Yadira Beltre",
+      "title": "Small Business Liaison Officer",
+      "email": "yadira.beltre@caci.com",
       "phone": null,
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "CACI Small Business brochure (caci.com, Jan 2024) lists Beltre as SBLO; Wayne Pizer (old hint) is Small Business Advocacy Officer/Exec Director, not SBLO; supplier.caci.com portal, Jun 2026",
       "contractCount": 67,
       "totalContractValue": 8769426755.479998,
       "agencies": [
@@ -290,7 +290,7 @@
         "541990",
         "561611"
       ],
-      "supplierPortal": "https://supplier.caci.com/"
+      "supplierPortal": "https://supplier.caci.com"
     },
     {
       "sbloName": null,
@@ -328,12 +328,12 @@
       "supplierPortal": "https://oasis-sbeforms.myngc.com/"
     },
     {
-      "sbloName": null,
-      "title": "SBLO",
+      "sbloName": "Brittany Claud",
+      "title": "Leader, GPS Office of Small Business Programs / designated SBLO, Deloitte Consulting LLP",
       "email": null,
       "phone": null,
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "Deloitte GPS Small Business & SLHE Supplier Programs page (GPS Vendor Connect registration); SBLO name per Brittany Claud LinkedIn, no email/phone on Deloitte page, Jun 2026",
       "contractCount": 145,
       "totalContractValue": 6570100703.170001,
       "agencies": [
@@ -360,7 +360,7 @@
         "541690",
         "541715"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.deloitte.com/us/en/industries/government-public/about/gps-small-business.html"
     },
     {
       "sbloName": null,
@@ -396,10 +396,10 @@
     {
       "sbloName": "Robyn Card",
       "title": "SBLO",
-      "email": "Robyn.card@gdit.com",
-      "phone": null,
+      "email": "smallbusiness@gdit.com",
+      "phone": "703-995-5148",
       "address": null,
-      "source": "DHS Prime Contractors Page",
+      "source": "gdit.com Small Business Partners and Suppliers Center + Small Business Teaming doc (mailbox/phone); no named SBLO, Jun 2026",
       "contractCount": 166,
       "totalContractValue": 5290596546.350003,
       "agencies": [
@@ -426,7 +426,7 @@
         "541611",
         "541613"
       ],
-      "supplierPortal": "https://suppliers.gendyn.com/"
+      "supplierPortal": "https://www.gdit.com/about-gdit/doing-business-with-gdit/small-business-partners-suppliers/"
     },
     {
       "sbloName": null,
@@ -452,12 +452,12 @@
       "supplierPortal": null
     },
     {
-      "sbloName": null,
-      "title": "SBLO",
-      "email": null,
-      "phone": null,
+      "sbloName": "Rita (Marguerite) Brooks",
+      "title": "Director, Small Business Programs (Corporate)",
+      "email": "marguerite.brooks@saic.com",
+      "phone": "(571) 203-6832",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "SAIC 'Doing Business with SAIC' webinars (she gives marguerite.brooks/rita.brooks@saic.com) + FAA Subcontracting Directory listing for SAIC (phone, title). Verified 2026.",
       "contractCount": 248,
       "totalContractValue": 5125092304.629998,
       "agencies": [
@@ -484,7 +484,7 @@
         "541330",
         "541512"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.saic.com/who-we-are/suppliers-and-small-business"
     },
     {
       "sbloName": null,
@@ -509,12 +509,12 @@
       "supplierPortal": null
     },
     {
-      "sbloName": null,
-      "title": "SBLO",
-      "email": null,
-      "phone": null,
+      "sbloName": "Sefnee Manzanares",
+      "title": "Regulatory Compliance & Supplier Diversity Senior Manager / SBLO",
+      "email": "sefnee.a.manzanares@lmco.com",
+      "phone": "(817) 777-0997",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "DoD CSP Prime Contractor Directory Aug 2024 + lockheedmartin.com small-business-programs (Feb 2026)",
       "contractCount": 87,
       "totalContractValue": 4519747643.079999,
       "agencies": [
@@ -541,7 +541,7 @@
         "541511",
         "541512"
       ],
-      "supplierPortal": "https://www.myexostar.com/"
+      "supplierPortal": "https://www.lockheedmartin.com/en-us/suppliers/small-business-programs.html"
     },
     {
       "sbloName": null,
@@ -572,12 +572,12 @@
       "supplierPortal": null
     },
     {
-      "sbloName": null,
-      "title": "SBLO",
+      "sbloName": "Carla Jamison",
+      "title": "Senior Manager / Small Business Liaison Officer, Accenture Federal Services",
       "email": null,
       "phone": null,
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "AFS Small Business Services page lists Carla Jamison as SBLO (Sherry Penson deputy); no public personal email; supplier portal supplierhub.accenture.com, Jun 2026",
       "contractCount": 96,
       "totalContractValue": 3916762888.780001,
       "agencies": [
@@ -604,7 +604,7 @@
         "541612",
         "541613"
       ],
-      "supplierPortal": "https://supplierhub.accenture.com/"
+      "supplierPortal": "https://www.accenture.com/us-en/support/us-federal-government/small-business-services-overview"
     },
     {
       "sbloName": null,
@@ -766,12 +766,12 @@
       "supplierPortal": null
     },
     {
-      "sbloName": null,
-      "title": "SBLO",
-      "email": null,
-      "phone": null,
+      "sbloName": "Crystal L. King",
+      "title": "Supplier Diversity Lead & Small Business Liaison Officer",
+      "email": "crystal.l.king@rtx.com",
+      "phone": "(571) 274-8407",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "FAA & NASA MSFC subcontracting directories + DoD SBLO listing name Crystal L. King as Raytheon SBLO/Supplier Diversity Lead (corrects stale 'Valerie King'); RTX page lists raytheon_smallbusiness@rtx.com",
       "contractCount": 85,
       "totalContractValue": 2978919609.52,
       "agencies": [
@@ -798,7 +798,7 @@
         "541511",
         "541512"
       ],
-      "supplierPortal": "https://rtx.supplierone.co/"
+      "supplierPortal": "https://www.rtx.com/suppliers/small-business"
     },
     {
       "sbloName": null,
@@ -826,11 +826,11 @@
     },
     {
       "sbloName": "Joan Branson",
-      "title": "SBLO",
+      "title": "Small Business Liaison Officer, Ingalls Shipbuilding (SEBP)",
       "email": "joan.branson@hii-ingalls.com",
       "phone": null,
       "address": null,
-      "source": "DHS Prime Contractors Page",
+      "source": "hii.com Ingalls Small Business Office (SEBP) page Oct 2025; Branson named in SBLO directory (2024) - verify recency",
       "contractCount": 91,
       "totalContractValue": 2877924805.99,
       "agencies": [
@@ -850,7 +850,7 @@
         "811219",
         "811310"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.hii.com/suppliers"
     },
     {
       "sbloName": null,
@@ -934,12 +934,12 @@
       "supplierPortal": null
     },
     {
-      "sbloName": null,
-      "title": "SBLO",
-      "email": null,
-      "phone": null,
+      "sbloName": "Carla Undurraga",
+      "title": "Sector Manager / SBLO, Defense Systems, Office of Small Business Programs",
+      "email": "carla.undurraga@ngc.com",
+      "phone": "703-713-4574",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "northropgrumman.com OSBP page + SBLOlist.pdf (2026) name Carla Undurraga as Defense Systems Sector Mgr/SBLO; corporate mailbox NGCSmallBusiness@ngc.com",
       "contractCount": 73,
       "totalContractValue": 2271796813.12,
       "agencies": [
@@ -966,7 +966,7 @@
         "336414",
         "541330"
       ],
-      "supplierPortal": "https://oasis-sbeforms.myngc.com/"
+      "supplierPortal": "https://www.northropgrumman.com/suppliers/osbp"
     },
     {
       "sbloName": null,
@@ -1096,12 +1096,12 @@
       "supplierPortal": "Contact SBLO directly"
     },
     {
-      "sbloName": null,
-      "title": "SBLO",
-      "email": null,
-      "phone": null,
+      "sbloName": "Amy Dawson",
+      "title": "Small Business Liaison Officer",
+      "email": "Amy.Dawson@mantech.com",
+      "phone": "(571) 446-9496",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "mantech.com ASTRO contract page lists Amy Dawson as SBLO w/ email+phone; corporate Small Business Office mailbox SBLO@mantech.com on mantech.com/contact (2026)",
       "contractCount": 32,
       "totalContractValue": 1980820022.7900002,
       "agencies": [
@@ -1126,7 +1126,7 @@
         "541715",
         "541990"
       ],
-      "supplierPortal": "https://myhub.mantech.com/psc/FMSPRDGST/SUPPLIER/ERP/c/SUP_OB_MENU.AUC_BIDDER_REGISTR.GBL"
+      "supplierPortal": "https://www.mantech.com/small-business-program/"
     },
     {
       "sbloName": null,
@@ -1271,7 +1271,7 @@
       "email": null,
       "phone": null,
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "mitre.org Vendor Registration page (subcontract vendor profile form, 2026); MITRE Small Business Office exists but no named person/email/phone published",
       "contractCount": 133,
       "totalContractValue": 1698933474.1799996,
       "agencies": [
@@ -1290,7 +1290,7 @@
         "541715",
         "541990"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.mitre.org/contact-us/vendor-registration"
     },
     {
       "sbloName": null,
@@ -1321,7 +1321,7 @@
       "email": null,
       "phone": null,
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "Alion acquired by HII; register via HII Mission Technologies graphiteConnect supplier portal, Jun 2026",
       "contractCount": 16,
       "totalContractValue": 1631620203.56,
       "agencies": [
@@ -1338,7 +1338,7 @@
         "333318",
         "541715"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.hii.com/suppliers/become-a-mission-technologies-supplier"
     },
     {
       "sbloName": null,
@@ -1365,10 +1365,10 @@
     {
       "sbloName": "Wanda Montague",
       "title": "SBLO",
-      "email": "Wanda.Montague@serco-na.com",
-      "phone": null,
+      "email": "Agencies@serco-na.com",
+      "phone": "(703) 263-6000",
       "address": null,
-      "source": "DHS Prime Contractors Page",
+      "source": "No named SBLO/supplier-diversity contact publicly listed on Serco-NA pages. Agencies@serco-na.com is Serco-NA's approved-vendor inquiry mailbox; (703) 263-6000 is corporate HQ. Verified 2026.",
       "contractCount": 81,
       "totalContractValue": 1477534032.41,
       "agencies": [
@@ -1454,10 +1454,10 @@
     {
       "sbloName": null,
       "title": "SBLO",
-      "email": null,
+      "email": "SBLO@Amentum.com",
       "phone": null,
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "Amentum 'Tips for Potential Suppliers' PDF lists SBLO@Amentum.com mailbox; no current named SBLO publicly verifiable, Jun 2026",
       "contractCount": 49,
       "totalContractValue": 1338389027.6399999,
       "agencies": [
@@ -1487,12 +1487,12 @@
       "supplierPortal": "https://supplier.amentum.com/SupplierRegistration"
     },
     {
-      "sbloName": null,
-      "title": "SBLO",
-      "email": null,
-      "phone": null,
+      "sbloName": "Lisa King",
+      "title": "Federal Small Business Liaison Officer",
+      "email": "lisa.king@ibm.com",
+      "phone": "(301) 803-2083",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "Large Prime SBLO directory (LinkedIn) + ibm.com Federal/Public Sector supplier diversity page; office mailbox federal@us.ibm.com",
       "contractCount": 52,
       "totalContractValue": 1330610689.0600002,
       "agencies": [
@@ -1515,7 +1515,7 @@
         "541512",
         "541519"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.ibm.com/solutions/procurement/supplier-diversity"
     },
     {
       "sbloName": null,
@@ -1653,12 +1653,12 @@
       "supplierPortal": null
     },
     {
-      "sbloName": "Ronald Penick",
-      "title": "SBLO",
-      "email": "Ronald.penick@peraton.com",
+      "sbloName": "Yuri Cruz",
+      "title": "Small Business Liaison Officer / Small Business Office Manager",
+      "email": "peratonsmallbusiness@peraton.com",
       "phone": null,
       "address": null,
-      "source": "DHS Prime Contractors Page",
+      "source": "peraton.com Supplier Partnerships + Small Business Program Office PDF list peratonsmallbusiness@peraton.com (2026); Yuri Cruz named as Peraton SBLO (LinkedIn, Mar 2026-present), direct email not published",
       "contractCount": 60,
       "totalContractValue": 1143793954.89,
       "agencies": [
@@ -1684,15 +1684,15 @@
         "541712",
         "541720"
       ],
-      "supplierPortal": "https://www.peraton.com/suppliers/prospective-supplier-intake-form"
+      "supplierPortal": "https://www.peraton.com/suppliers/supplier-partnerships/"
     },
     {
-      "sbloName": null,
-      "title": "SBLO",
-      "email": null,
+      "sbloName": "Holly Hutson",
+      "title": "Small Business Liaison Officer",
+      "email": "Small.Business@APTIM.com",
       "phone": null,
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "aptim.com/supplier-diversity-program + ASDP/LinkedIn confirm Hutson as SBLO; office mailbox only (no personal email), Jun 2026",
       "contractCount": 41,
       "totalContractValue": 1131017123.4399998,
       "agencies": [
@@ -1717,7 +1717,7 @@
         "561210",
         "562910"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://smallbusinessregistrationportal.aptim.com"
     },
     {
       "sbloName": null,
@@ -1900,12 +1900,12 @@
       "supplierPortal": null
     },
     {
-      "sbloName": null,
-      "title": "SBLO",
-      "email": null,
-      "phone": null,
+      "sbloName": "Tyler Brooks-Craft",
+      "title": "Small Business Program Contact / SBLO",
+      "email": "tyler.brooks-craft@cgifederal.com",
+      "phone": "703-227-6000",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "CGI Federal Small Business Programs page (still lists Brooks-Craft, c2026) + State/NASA SBLO rosters; NOTE LinkedIn/RocketReach indicate he left CGI for Peraton ~Mar 2025 - verify, Jun 2026",
       "contractCount": 41,
       "totalContractValue": 983719151.9400002,
       "agencies": [
@@ -1929,7 +1929,7 @@
         "561210",
         "561990"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.cgi.com/us/en-us/federal/small-business-programs"
     },
     {
       "sbloName": null,
@@ -2456,12 +2456,12 @@
       "supplierPortal": null
     },
     {
-      "sbloName": "Rebecca Thompson",
-      "title": "SBLO",
-      "email": "sbcomp@leidos.com",
-      "phone": null,
+      "sbloName": "Chireda Gaither",
+      "title": "Small Business Liaison Officer",
+      "email": "Chireda.b.Gaither@leidos.com",
+      "phone": "(571) 526-6026",
       "address": null,
-      "source": "DHS Prime Contractors Page",
+      "source": "SSA OSDBU subcontracting directory + leidos.com/suppliers; office mailbox sbcomp@leidos.com",
       "contractCount": 26,
       "totalContractValue": 753753275.0100001,
       "agencies": [
@@ -2777,7 +2777,7 @@
       "email": "novelette.josephs@clarkconstruction.com",
       "phone": null,
       "address": null,
-      "source": "DHS Prime Contractors Page",
+      "source": "clarkconstruction.com Business With Us / Trade Contractors interest form; no named SBLO (EVP Jay Grauberger oversees small business but no contact listed), Jun 2026",
       "contractCount": 4,
       "totalContractValue": 652553876,
       "agencies": [
@@ -2793,15 +2793,15 @@
       "naicsCategories": [
         "236220"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.clarkconstruction.com/business-with-us/trade-contractors"
     },
     {
-      "sbloName": null,
-      "title": "SBLO",
-      "email": null,
-      "phone": null,
+      "sbloName": "Shawn Ralston",
+      "title": "SB Program Manager & SBLO",
+      "email": "shawn.ralston@aecom.com",
+      "phone": "(703) 559-1338",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "aecom.com supplier diversity page + AECOM Small Business handout naming SBLO Shawn Ralston (subcontractor prequal at prequal.aecom.com/SUBPORT), Jun 2026",
       "contractCount": 101,
       "totalContractValue": 649261225.0999999,
       "agencies": [
@@ -2827,7 +2827,7 @@
         "561210",
         "562910"
       ],
-      "supplierPortal": "https://aecom.ayrus.com/wgint/"
+      "supplierPortal": "https://aecom.com/our-supply-chain/small-businesssupplier-diversity/"
     },
     {
       "sbloName": null,
@@ -2856,12 +2856,12 @@
       "supplierPortal": null
     },
     {
-      "sbloName": null,
-      "title": "SBLO",
-      "email": null,
-      "phone": null,
+      "sbloName": "Tony Vigo",
+      "title": "Senior Manager, Small Business Program / Small Business Liaison Officer",
+      "email": "anthony.vigo@ga-asi.com",
+      "phone": "858-524-8904",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "ga-asi.com Suppliers / Small Business Program page + GA-ASI small business flyer (named SBLO, direct email/phone); office mailbox GA-ASI-Small-Business@ga-asi.com, Jun 2026",
       "contractCount": 16,
       "totalContractValue": 617547227.05,
       "agencies": [
@@ -2883,7 +2883,7 @@
         "336611",
         "541715"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.ga-asi.com/suppliers/small-business-program"
     },
     {
       "sbloName": null,
@@ -3215,9 +3215,9 @@
       "sbloName": null,
       "title": "SBLO",
       "email": null,
-      "phone": null,
+      "phone": "410-821-1100",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "No single named SBLO ('Joanna Harmon' not found on W-T pages). Subcontractor/supplier prequalification portal; diversity page (whiting-turner.com/diversity-inclusion/trade-partners-and-suppliers/) lists 7 regional diversity reps via 'Send a Message' links (no direct emails shown). HQ phone 410-821-1100. Verified 2026.",
       "contractCount": 36,
       "totalContractValue": 537791429.1899999,
       "agencies": [
@@ -3235,15 +3235,15 @@
       "naicsCategories": [
         "236220"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.whiting-turner.com/subcontractor-prequalification/"
     },
     {
-      "sbloName": null,
-      "title": "SBLO",
-      "email": null,
-      "phone": null,
+      "sbloName": "Eric Causey",
+      "title": "Small Business Liaison Officer",
+      "email": "ecausey@kpmg.com",
+      "phone": "(202) 533-6732",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "Large Prime SBLO directory (LinkedIn); alts Tina Ho tinaho@kpmg.com, Kyle Petroske kpetroske@kpmg.com - verify recency",
       "contractCount": 38,
       "totalContractValue": 535744691.4900002,
       "agencies": [
@@ -3269,12 +3269,12 @@
       "supplierPortal": "https://kpmg.supplierone.co/"
     },
     {
-      "sbloName": "Willie Franklin",
-      "title": "SBLO",
-      "email": "Willie.franklin@jacobs.com",
-      "phone": null,
+      "sbloName": "Lauren Terry",
+      "title": "Federal Small Business Liaison Officer (SBLO) & Program Manager",
+      "email": "Lauren.Terry@jacobs.com",
+      "phone": "(720) 286-5318",
       "address": null,
-      "source": "DHS Prime Contractors Page",
+      "source": "jacobs.com supplier-diversity PDF + FAA Subcontracting Directory (current)",
       "contractCount": 54,
       "totalContractValue": 530558255.12,
       "agencies": [
@@ -3301,7 +3301,7 @@
         "562910",
         "811219"
       ],
-      "supplierPortal": "https://www.jacobs.com/contact/suppliers"
+      "supplierPortal": "https://www.jacobs.com/suppliers/supplier-diversity-and-small-business-program"
     },
     {
       "sbloName": null,
@@ -3543,10 +3543,10 @@
     {
       "sbloName": "Celia Marino",
       "title": "SBLO",
-      "email": "celia.marino@ey.com",
+      "email": "EYInclusiveProcurement@eyg.ey.com",
       "phone": null,
       "address": null,
-      "source": "DHS Prime Contractors Page",
+      "source": "EY SupplierGateway registration portal + ey.com inclusive-procurement mailbox; no named US supplier-diversity lead, Jun 2026",
       "contractCount": 27,
       "totalContractValue": 469408100.0399999,
       "agencies": [
@@ -3566,7 +3566,7 @@
         "541611",
         "561450"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://ey.suppliergateway.com"
     },
     {
       "sbloName": null,
@@ -3622,11 +3622,11 @@
     },
     {
       "sbloName": "Anna Crawley",
-      "title": "SBLO",
-      "email": "anna.crawley@noblis.org",
-      "phone": null,
+      "title": "Small Business Liaison Officer",
+      "email": "sblo@noblis.org",
+      "phone": "703-610-2000",
       "address": null,
-      "source": "DHS Prime Contractors Page",
+      "source": "noblis.org Small Business Collaboration + Contact pages list SBLO mailbox sblo@noblis.org (2026); name not published, phone is HQ general",
       "contractCount": 39,
       "totalContractValue": 457076017.55999994,
       "agencies": [
@@ -3649,7 +3649,7 @@
         "541715",
         "541990"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://noblis.org/work-with-us/small-business/"
     },
     {
       "sbloName": null,
@@ -3779,7 +3779,7 @@
       "email": null,
       "phone": null,
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "Penn State Procurement 'Become a Supplier' + supplier-diversity program (PaymentWorks registration), Jun 2026",
       "contractCount": 66,
       "totalContractValue": 445877607.28,
       "agencies": [
@@ -3797,7 +3797,7 @@
       "naicsCategories": [
         "541715"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://procurement.psu.edu/become-supplier"
     },
     {
       "sbloName": null,
@@ -3846,10 +3846,10 @@
     {
       "sbloName": "Edith Moralis",
       "title": "SBLO",
-      "email": "edith.moralis@motorolasolutions.com",
+      "email": "supplier.diversity@motorolasolutions.com",
       "phone": null,
       "address": null,
-      "source": "DHS Prime Contractors Page",
+      "source": "Motorola Solutions Supplier Diversity (SupplierOne) page lists supplier.diversity@motorolasolutions.com (2026); office team, no named SBLO",
       "contractCount": 16,
       "totalContractValue": 435372137.21,
       "agencies": [
@@ -3870,7 +3870,7 @@
         "541513",
         "811210"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.motorolasolutions.com/en_us/about/suppliers.html"
     },
     {
       "sbloName": null,
@@ -4043,7 +4043,7 @@
       "email": null,
       "phone": null,
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "vigormarine.com Supplier Resources page (terms, size/classification cert, cyber requirements), Jun 2026",
       "contractCount": 17,
       "totalContractValue": 419826643.16,
       "agencies": [
@@ -4058,7 +4058,7 @@
       "naicsCategories": [
         "336611"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.vigormarine.com/supplier-resources"
     },
     {
       "sbloName": null,
@@ -4426,11 +4426,11 @@
     },
     {
       "sbloName": null,
-      "title": "SBLO",
-      "email": null,
+      "title": "Small Business Liaison Officer (mailbox)",
+      "email": "sblo@textronsystems.com",
       "phone": null,
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "AAI is now Textron Systems; SBLO mailbox sblo@textronsystems.com per Textron Systems supplier classification forms, Jun 2026",
       "contractCount": 6,
       "totalContractValue": 373660248.21,
       "agencies": [
@@ -4445,7 +4445,7 @@
         "333613",
         "336611"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.textronsystems.com/contact/suppliers"
     },
     {
       "sbloName": null,
@@ -5305,12 +5305,12 @@
       "supplierPortal": null
     },
     {
-      "sbloName": null,
-      "title": "SBLO",
-      "email": null,
+      "sbloName": "Delores Johnson-Cooper",
+      "title": "Director, Supplier Diversity and Supplier Quality",
+      "email": "delores.johnson-cooper@verizon.com",
       "phone": null,
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "Verizon Supplier Diversity program lead per Verizon-filed Maryland PSC supplier-diversity report (email) + Verizon supplier-diversity video. Stale 'Emily Bien/Brandilynn Collins' not corroborated. Supplier registration: verizon.com/suppliers; help desk ariba.supplier.helpdesk@verizon.com. Verified 2026.",
       "contractCount": 54,
       "totalContractValue": 275577362.92,
       "agencies": [
@@ -5332,7 +5332,7 @@
         "517312",
         "517911"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.verizon.com/about/our-company/supplier-diversity"
     },
     {
       "sbloName": null,
@@ -5436,12 +5436,12 @@
       "supplierPortal": null
     },
     {
-      "sbloName": null,
-      "title": "SBLO",
-      "email": null,
-      "phone": null,
+      "sbloName": "Martha L. Crawford",
+      "title": "Supplier Diversity Manager / SBLO, Sikorsky (LM Rotary & Mission Systems)",
+      "email": "martha.crawford@lmco.com",
+      "phone": "(203) 386-3241",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "DoD CSP Prime Contractor Directory + ct.supplierone.co Sikorsky page; office mailbox supplier_diversity.gr-sik@lmco.com",
       "contractCount": 37,
       "totalContractValue": 271408504.16,
       "agencies": [
@@ -5459,7 +5459,7 @@
         "336411",
         "336413"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.lockheedmartin.com/en-us/suppliers/small-business-programs.html"
     },
     {
       "sbloName": null,
@@ -5659,11 +5659,11 @@
     },
     {
       "sbloName": null,
-      "title": "SBLO",
-      "email": null,
-      "phone": null,
+      "title": "Corporate Small Business Liaison Officer (mailbox)",
+      "email": "sblo@ara.com",
+      "phone": "(505) 881-8074",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "ara.com vendor-information / small business program page; SBLO mailbox sblo@ara.com, supplier.compliance@ara.com, Jun 2026",
       "contractCount": 20,
       "totalContractValue": 246858950.39,
       "agencies": [
@@ -5686,7 +5686,7 @@
         "561210",
         "611430"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.ara.com/vendor-information/"
     },
     {
       "sbloName": null,
@@ -5970,7 +5970,7 @@
       "email": null,
       "phone": null,
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "grunley.com subcontractor/small-business engagement page (online qualification + size self-cert form), Jun 2026; stale hint email was garbled, dropped",
       "contractCount": 19,
       "totalContractValue": 227957015.62000003,
       "agencies": [
@@ -5988,7 +5988,7 @@
       "naicsCategories": [
         "236220"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://grunley.com/subcontractors/small-business-engagement/"
     },
     {
       "sbloName": null,
@@ -6065,12 +6065,12 @@
       "supplierPortal": null
     },
     {
-      "sbloName": null,
-      "title": "SBLO",
-      "email": null,
-      "phone": null,
+      "sbloName": "Debra Sampson",
+      "title": "Small Business Liaison Officer, Fluor Government Group / Fluor Federal Services Inc.",
+      "email": "debra.sampson@fluor.com",
+      "phone": "864-281-6034",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "Fluor Small Business Master Subcontracting Plan (DOE/NNSA contract, Fluor-authored) names SBLO; fluor.com supplier portal for registration, Jun 2026",
       "contractCount": 6,
       "totalContractValue": 221249633.81,
       "agencies": [
@@ -6084,7 +6084,7 @@
       "naicsCategories": [
         "541611"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.fluor.com/services-and-expertise/procurement/supplier-and-contractor-portal/"
     },
     {
       "sbloName": null,
@@ -6112,9 +6112,9 @@
       "sbloName": "Ray Castro",
       "title": "SBLO",
       "email": "racastro@geogroup.com",
-      "phone": null,
+      "phone": "561-893-0101",
       "address": null,
-      "source": "DHS Prime Contractors Page",
+      "source": "No named SBLO/supplier-diversity contact on GEO pages ('Ray Castro' not verifiable). Vendors landing page + Vendor Application; corporate phone 561-893-0101. Verified 2026.",
       "contractCount": 14,
       "totalContractValue": 218769672.46,
       "agencies": [
@@ -6131,7 +6131,7 @@
         "561612",
         "922140"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.geogroup.com/vendors/"
     },
     {
       "sbloName": null,
@@ -6518,10 +6518,10 @@
     {
       "sbloName": "Mark Youman",
       "title": "SBLO",
-      "email": "Mark.youman@icf.com",
+      "email": "icfsupplierhub@icf.com",
       "phone": null,
       "address": null,
-      "source": "DHS Prime Contractors Page",
+      "source": "icf.com Supplier Hub (icfsupplierhub@icf.com); PA supplier-search lists procurementcompliance@icf.com as SB main; no named public SBLO",
       "contractCount": 46,
       "totalContractValue": 198295453.18,
       "agencies": [
@@ -6546,7 +6546,7 @@
         "541720",
         "541990"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.icf.com/company/about/partners/suppliers"
     },
     {
       "sbloName": null,
@@ -7172,10 +7172,10 @@
     {
       "sbloName": null,
       "title": "SBLO",
-      "email": null,
+      "email": "aviation.suppliercommunications@geaerospace.com",
       "phone": null,
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "GE Aerospace Supplier Diversity / Small Business Program page (supplier-communications mailbox, handles gov subcontracting/SF294); no named SBLO, Jun 2026",
       "contractCount": 32,
       "totalContractValue": 175199931.91,
       "agencies": [
@@ -7196,7 +7196,7 @@
         "541330",
         "541715"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.geaerospace.com/company/doing-business/supplier-diversity-program"
     },
     {
       "sbloName": null,
@@ -7459,7 +7459,7 @@
       "email": null,
       "phone": null,
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "mortenson.com small-business trade-partner registration (prequal via TradeTapp), Jun 2026",
       "contractCount": 10,
       "totalContractValue": 163946393.65,
       "agencies": [
@@ -7477,7 +7477,7 @@
         "236220",
         "237990"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.mortenson.com/contact/trade-partner-registration-small-business"
     },
     {
       "sbloName": null,
@@ -7532,7 +7532,7 @@
       "email": null,
       "phone": null,
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "kiewit.com Business With Us / supplier registration (GEP SMART; vendor participation at kiewit.mwdbe.com), Jun 2026",
       "contractCount": 5,
       "totalContractValue": 160695799.98,
       "agencies": [
@@ -7549,7 +7549,7 @@
         "237310",
         "237990"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.kiewit.com/business-with-us/"
     },
     {
       "sbloName": null,
@@ -7605,7 +7605,7 @@
       "email": null,
       "phone": null,
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "graniteconstruction.com Partner With Us / Subcontractor Registration database, Jun 2026; no named SB contact published",
       "contractCount": 5,
       "totalContractValue": 158844996.82,
       "agencies": [
@@ -7621,7 +7621,7 @@
         "237310",
         "237990"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.graniteconstruction.com/company/contact-us"
     },
     {
       "sbloName": null,
@@ -7825,9 +7825,9 @@
       "sbloName": null,
       "title": "SBLO",
       "email": null,
-      "phone": null,
+      "phone": "+1 310-978-1457",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "No SBLO/supplier-diversity contact or page found on rapiscansystems.com or parent osi-systems.com (2026); only general Americas corporate contact",
       "contractCount": 6,
       "totalContractValue": 155666215.41,
       "agencies": [
@@ -7848,7 +7848,7 @@
         "811210",
         "811310"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.rapiscansystems.com/en/contact"
     },
     {
       "sbloName": null,
@@ -7947,12 +7947,12 @@
       "supplierPortal": null
     },
     {
-      "sbloName": null,
-      "title": "SBLO",
+      "sbloName": "Bridget Davis-Tobias",
+      "title": "Supplier Diversity Coordinator, Skanska USA",
       "email": null,
-      "phone": null,
+      "phone": "+1 917 438 4500",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "Skanska USA vendor-diversity contact page (usa.skanska.com/.../vendor-diversity/bridget-davistobias). Page shows 'Email Bridget' link but no exposed address. Joycelyn Yue is National Director of Supplier Diversity (Skanska USA Building). Verified 2026.",
       "contractCount": 1,
       "totalContractValue": 149950000,
       "agencies": [
@@ -7966,7 +7966,7 @@
       "naicsCategories": [
         "237990"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.skanska.com/us/en/construction/approach/subcontractors--suppliers"
     },
     {
       "sbloName": null,
@@ -8089,9 +8089,9 @@
       "sbloName": "Lori Riley",
       "title": "SBLO",
       "email": "lriely@deployedresources.com",
-      "phone": null,
+      "phone": "(315) 281-0039",
       "address": null,
-      "source": "DHS Prime Contractors Page",
+      "source": "deployedresources.com 'Doing Business With DR / Subcontracting' page (no named contact; Lori Riley unverified), Jun 2026",
       "contractCount": 3,
       "totalContractValue": 146662009.37,
       "agencies": [
@@ -8105,7 +8105,7 @@
       "naicsCategories": [
         "541614"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.deployedresources.com/doing-business-with-dr/"
     },
     {
       "sbloName": null,
@@ -8404,12 +8404,12 @@
       "supplierPortal": null
     },
     {
-      "sbloName": "Nannette Woods",
-      "title": "SBLO",
-      "email": "Nannette.woods@jacobs.com",
-      "phone": null,
+      "sbloName": "Lauren Terry",
+      "title": "Federal Small Business Liaison Officer (SBLO) & Program Manager",
+      "email": "Lauren.Terry@jacobs.com",
+      "phone": "(720) 286-5318",
       "address": null,
-      "source": "DHS Prime Contractors Page",
+      "source": "CH2M acquired by Jacobs; Jacobs US Federal Small Business Program page + jacobs.com/people/lauren-terry, Jun 2026",
       "contractCount": 64,
       "totalContractValue": 139937530.19,
       "agencies": [
@@ -8427,7 +8427,7 @@
         "541330",
         "562910"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.jacobs.com/suppliers/us-federal-small-business-program"
     },
     {
       "sbloName": null,
@@ -8647,12 +8647,12 @@
       "supplierPortal": null
     },
     {
-      "sbloName": null,
-      "title": "SBLO",
-      "email": null,
-      "phone": null,
+      "sbloName": "Marianne Tenore",
+      "title": "Small Business Liaison Officer, Electronic Systems",
+      "email": "Marianne.Tenore@BaeSystems.com",
+      "phone": "(603) 885-8470",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "DoD Comprehensive Subcontracting Test Program participant listing (business.defense.gov) confirms Tenore as ES SBLO with phone/email (matches stale hint). Corporate small-business mailbox: smallbusiness.ushq@baesystems.us; supplier reg via baesystems.hicx.net. Verified 2026.",
       "contractCount": 4,
       "totalContractValue": 136618266.62,
       "agencies": [
@@ -8666,15 +8666,15 @@
       "naicsCategories": [
         "325920"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.baesystems.com/en-us/partnership/suppliers/small-business-programs"
     },
     {
       "sbloName": null,
-      "title": "SBLO",
-      "email": null,
+      "title": "Marine Purchasing Department",
+      "email": "deptpurc@toteservices.com",
       "phone": null,
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "toteservices.com Vendor Resources page; purchasing dept deptpurc@toteservices.com, profiles to TSVendorProfiles@toteservices.com, Jun 2026",
       "contractCount": 24,
       "totalContractValue": 134375993.69,
       "agencies": [
@@ -8690,7 +8690,7 @@
         "336611",
         "483111"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.toteservices.com/about/vendor-resources/"
     },
     {
       "sbloName": null,
@@ -9366,7 +9366,7 @@
       "email": null,
       "phone": null,
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "maximus.com Small Business & Strategic Partnership Office page (2026); no named SBLO or direct email/phone published, web intake only",
       "contractCount": 16,
       "totalContractValue": 120157707.54000002,
       "agencies": [
@@ -9390,7 +9390,7 @@
         "561422",
         "561439"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://maximus.com/federal-government/small-business-and-strategic-partnership-office"
     },
     {
       "sbloName": null,
@@ -10190,10 +10190,10 @@
     {
       "sbloName": null,
       "title": "SBLO",
-      "email": null,
-      "phone": null,
+      "email": "supplierinfo@dewberry.com",
+      "phone": "703-849-0100",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "dewberry.com/contact Small Business section + Small Business Inquiry form (supplierinfo mailbox, (c)2026); no named SBLO, Jun 2026",
       "contractCount": 30,
       "totalContractValue": 104874535.57999998,
       "agencies": [
@@ -10214,7 +10214,7 @@
         "541614",
         "561210"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.dewberry.com/contact"
     },
     {
       "sbloName": null,
@@ -11045,10 +11045,10 @@
     {
       "sbloName": "Dawn Mason",
       "title": "SBLO",
-      "email": "dawn.mason@corecivic.com",
-      "phone": null,
+      "email": "DBI@CoreCivic.com",
+      "phone": "615-263-3000",
       "address": null,
-      "source": "DHS Prime Contractors Page",
+      "source": "corecivic.com/purchasing Local and Diverse Suppliers (Diversity Business Inclusion mailbox); no named SBLO, Jun 2026",
       "contractCount": 15,
       "totalContractValue": 91787813.24,
       "agencies": [
@@ -11064,7 +11064,7 @@
         "561612",
         "623990"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.corecivic.com/purchasing"
     },
     {
       "sbloName": null,
@@ -12800,10 +12800,10 @@
     {
       "sbloName": null,
       "title": null,
-      "email": null,
+      "email": "FedSmallBiz@stantec.com",
       "phone": null,
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "No individual SBLO named on Stantec pages. FedSmallBiz@stantec.com is the federal small-business teaming mailbox (Federal Small & Disadvantaged Business Program page); supplierdiversity@stantec.com is the corporate supplier-diversity inbox. Verified 2026.",
       "contractCount": 27,
       "totalContractValue": 71731182.00000001,
       "agencies": [
@@ -12823,7 +12823,7 @@
         "541620",
         "541690"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.stantec.com/en/about/federal-small-disadvantaged-business-program"
     },
     {
       "sbloName": null,
@@ -13355,12 +13355,12 @@
       "supplierPortal": null
     },
     {
-      "sbloName": "Jackie Hacker",
-      "title": "SBLO",
+      "sbloName": "Nancy Perusich",
+      "title": "National Supplier Diversity & Small Business Program Specialist",
       "email": null,
       "phone": "(913) 485-1345",
       "address": "440 S. CHURCH STREET, CHARLOTTE, NC. 28202",
-      "source": "DOT Subcontracting Directory FY2025",
+      "source": "hdrinc.com supplier-diversity page + SignalHire (named role, Jan 2026); exact email not publicly verifiable",
       "contractCount": 21,
       "totalContractValue": 65858803.86000001,
       "agencies": [
@@ -13380,7 +13380,7 @@
         "541320",
         "541330"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.hdrinc.com/supplier-diversity-and-small-business-statement"
     },
     {
       "sbloName": null,
@@ -13664,12 +13664,12 @@
       "supplierPortal": null
     },
     {
-      "sbloName": "Sunni Richmond",
-      "title": "SBLO",
-      "email": "sunni.richmond@aus.com",
-      "phone": null,
+      "sbloName": "Teja Kappagantula",
+      "title": "Vice President of Corporate Spend (Head of Procurement & Real Estate) — supplier diversity contact",
+      "email": "teja.kappagantula@aus.com",
+      "phone": "714-619-9787",
       "address": null,
-      "source": "DHS Prime Contractors Page",
+      "source": "G4S now part of Allied Universal; aus.com North America Supplier Diversity Policy POL-1513 (Apr 2025) names this contact; not titled SBLO but is the supplier-diversity POC, Jun 2026",
       "contractCount": 10,
       "totalContractValue": 62088095.21,
       "agencies": [
@@ -13683,7 +13683,7 @@
       "naicsCategories": [
         "561612"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.aus.com/sites/default/files/2025-04/pol-1513_north_america_supplier_diversity_policy_04152025.pdf"
     },
     {
       "sbloName": null,
@@ -14334,9 +14334,9 @@
       "sbloName": "Kathryn Dewitt",
       "title": "SBLO",
       "email": null,
-      "phone": "(734)936-1288",
+      "phone": "(734)615-2000",
       "address": "503 THOMPSON ST ANN ARBOR, MI 48109",
-      "source": "DOT Subcontracting Directory FY2025",
+      "source": "U-M Procurement Services; supplier registration via MConnect, supplier-diversity program, Jun 2026",
       "contractCount": 7,
       "totalContractValue": 58569823,
       "agencies": [
@@ -14357,7 +14357,7 @@
         "541715",
         "541720"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://procurement.umich.edu/um-suppliers/supplier-basics/"
     },
     {
       "sbloName": null,
@@ -15022,7 +15022,7 @@
       "email": "vigila@cdmsmith.com",
       "phone": null,
       "address": null,
-      "source": "DHS Prime Contractors Page",
+      "source": "cdmsmith.com Subcontracting page; vendor-database registration only, no named SBLO or mailbox (Antoinette Vigil unverified), Jun 2026",
       "contractCount": 21,
       "totalContractValue": 54374524.8,
       "agencies": [
@@ -15043,7 +15043,7 @@
         "541715",
         "562910"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.cdmsmith.com/en/subcontracting"
     },
     {
       "sbloName": null,
@@ -15596,7 +15596,7 @@
       "email": null,
       "phone": null,
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "No SBLO/small-business contact published for NTT DATA Federal (2026); supplier.nttdatafed.com is a vendor payment-setup portal only, not small-business labeled",
       "contractCount": 1,
       "totalContractValue": 50053780.31,
       "agencies": [
@@ -15610,7 +15610,7 @@
       "naicsCategories": [
         "541511"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://supplier.nttdatafed.com"
     },
     {
       "sbloName": null,
@@ -17413,12 +17413,12 @@
       "supplierPortal": null
     },
     {
-      "sbloName": null,
-      "title": null,
-      "email": null,
-      "phone": null,
+      "sbloName": "Laura Unger",
+      "title": "Small Business Liaison Officer, WSP USA",
+      "email": "SBLO@wsp.com",
+      "phone": "(212) 465-5000",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "WSP USA Supplier Registration 'Contact Us' page (ussuppliers.wspis.com/contact_us.aspx) names Laura Unger as designated SBLO, SBLO@wsp.com. Stale 'Bernard Fanfan' not on WSP pages. Phone is WSP EEO/compliance line (212-465-5000); registration support prequalus@wsp.com. Verified 2026.",
       "contractCount": 15,
       "totalContractValue": 41796811.73,
       "agencies": [
@@ -17434,7 +17434,7 @@
         "541330",
         "611430"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://ussuppliers.wspis.com"
     },
     {
       "sbloName": null,
@@ -18034,11 +18034,11 @@
     },
     {
       "sbloName": "Shawn Ralston",
-      "title": "SBLO",
-      "email": "Shawn.ralston@aecom.com",
-      "phone": null,
+      "title": "Small Business Program Manager & SBLO, National Governments",
+      "email": "shawn.ralston@aecom.com",
+      "phone": "703-559-1338",
       "address": null,
-      "source": "DHS Prime Contractors Page",
+      "source": "AECOM Supplier Diversity Points-of-Contact list + aecom.com/blog; general supplier mailbox supplier@aecom.com, Jun 2026",
       "contractCount": 7,
       "totalContractValue": 38909153.67,
       "agencies": [
@@ -18057,7 +18057,7 @@
         "541330",
         "562910"
       ],
-      "supplierPortal": "https://aecom.ayrus.com/wgint/"
+      "supplierPortal": "https://aecom.com/our-supply-chain/small-business-supplier-diversity/"
     },
     {
       "sbloName": null,
@@ -18844,10 +18844,10 @@
     {
       "sbloName": "Heidi Anderson",
       "title": "SBLO",
-      "email": "Heidi.anderson@akima.com",
-      "phone": null,
+      "email": "info@akima.com",
+      "phone": "(844) 675-7686",
       "address": null,
-      "source": "DHS Prime Contractors Page",
+      "source": "No named SBLO on akima.com; Doing Business With Us page + general mailbox only (AGS GSA listing uses GSA.MAS@akimaglobal.com), Jun 2026",
       "contractCount": 4,
       "totalContractValue": 34657742,
       "agencies": [
@@ -18861,7 +18861,7 @@
       "naicsCategories": [
         "561612"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.akima.com/doing-business-with-us/"
     },
     {
       "sbloName": null,
@@ -19225,7 +19225,7 @@
       "email": "teri.williams@haskell.com",
       "phone": null,
       "address": null,
-      "source": "DHS Prime Contractors Page",
+      "source": "haskell.com Subcontractors/Vendors page; prequalification via TradeTapp, Jun 2026",
       "contractCount": 3,
       "totalContractValue": 32882564.75,
       "agencies": [
@@ -19241,7 +19241,7 @@
       "naicsCategories": [
         "236220"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.haskell.com/who-we-are/subcontractors-vendors/"
     },
     {
       "sbloName": null,
@@ -21174,12 +21174,12 @@
       "supplierPortal": null
     },
     {
-      "sbloName": null,
-      "title": "SBLO",
-      "email": null,
-      "phone": null,
+      "sbloName": "Geraldine Zabala Cordero",
+      "title": "Small Business Liaison Officer, Honeywell Aerospace Technologies",
+      "email": "geraldine.zabalacordero@honeywell.com",
+      "phone": "727-294-1005",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "DoW/DoD CSP Prime Contractor Directory May 2026 + honeywell.com small-business-liaison page (Jan 2026)",
       "contractCount": 3,
       "totalContractValue": 27581040.509999998,
       "agencies": [
@@ -21195,7 +21195,7 @@
         "333611",
         "336320"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.honeywell.com/us/en/contact/small-business-liaison"
     },
     {
       "sbloName": null,
@@ -30575,12 +30575,12 @@
       "supplierPortal": "https://www.myexostar.com/"
     },
     {
-      "sbloName": null,
-      "title": null,
-      "email": null,
-      "phone": null,
+      "sbloName": "Thosie Varga",
+      "title": "Small Business Liaison Officer (Corporate HQ, Melbourne FL)",
+      "email": "Thosie.Varga@L3Harris.com",
+      "phone": "(903) 274-7336",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "DoD CSP Prime Contractor Directory Aug 2024 (corporate SBLO); L3Harris is segmented - portal shown is Aerojet/SupplierNet segment",
       "contractCount": 3,
       "totalContractValue": 11664846,
       "agencies": [
@@ -30594,7 +30594,7 @@
       "naicsCategories": [
         "541511"
       ],
-      "supplierPortal": "Contact SBLO directly"
+      "supplierPortal": "https://arsuppliernet.l3harris.com/suppliernet/doing-business-ar/small-business-and-small-business-liaison-officers-sblo"
     },
     {
       "sbloName": null,
@@ -31917,10 +31917,10 @@
     {
       "sbloName": "Chris Remont",
       "title": "SBLO",
-      "email": "Markm@bollingershipyards.com",
-      "phone": null,
+      "email": "sales@bollingershipyards.com",
+      "phone": "(985) 532-2554",
       "address": null,
-      "source": "DHS Prime Contractors Page",
+      "source": "No named SBLO on bollingershipyards.com; Vendors/Clients page + general sales mailbox only, Jun 2026",
       "contractCount": 1,
       "totalContractValue": 10215883,
       "agencies": [
@@ -31934,7 +31934,7 @@
       "naicsCategories": [
         "336611"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.bollingershipyards.com/clients/"
     },
     {
       "sbloName": null,
@@ -32074,9 +32074,9 @@
       "sbloName": "David A. Martin",
       "title": "SBLO",
       "email": null,
-      "phone": "(703) 968-0900",
+      "phone": "303-383-2300",
       "address": "ONE CAMBRIDGE CENTER 50 HAMPSHIRE ST<br> CAMBRIDGE, MA. 02139",
-      "source": "DOT Subcontracting Directory FY2025",
+      "source": "cdmsmith.com Subcontracting page (vendor registration) + GSA eLibrary contact; no named SBLO publicly listed (Jeffrey Montera unverified), Jun 2026",
       "contractCount": 1,
       "totalContractValue": 10081803.45,
       "agencies": [
@@ -32090,7 +32090,7 @@
       "naicsCategories": [
         "541330"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.cdmsmith.com/en/subcontracting"
     },
     {
       "sbloName": null,
@@ -32331,7 +32331,7 @@
       "email": null,
       "phone": null,
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "no single national SBLO; A&E firm assigns SBLOs per contract/region (e.g. CA HSR program), Jun 2026",
       "contractCount": 2,
       "totalContractValue": 9842538,
       "agencies": [
@@ -32345,7 +32345,7 @@
       "naicsCategories": [
         "541330"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.hntb.com/"
     },
     {
       "sbloName": null,
@@ -32921,9 +32921,9 @@
       "sbloName": null,
       "title": null,
       "email": null,
-      "phone": null,
+      "phone": "(202)334-1347",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "No dedicated small-business/supplier portal found, Jun 2026",
       "contractCount": 5,
       "totalContractValue": 9305670,
       "agencies": [
@@ -36202,10 +36202,10 @@
     {
       "sbloName": null,
       "title": null,
-      "email": null,
-      "phone": null,
+      "email": "supplychain@gilbaneco.com",
+      "phone": "401-456-5588",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "gilbaneco.com Become a Subcontractor + Suppliers page (Supply Chain dept mailbox/phone); no named SBLO/supplier-diversity officer, Jun 2026",
       "contractCount": 4,
       "totalContractValue": 7048222.279999999,
       "agencies": [
@@ -36220,7 +36220,7 @@
       "naicsCategories": [
         "236220"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.gilbaneco.com/partner-with-us/building/become-a-subcontractor/"
     },
     {
       "sbloName": null,
@@ -36494,9 +36494,9 @@
       "sbloName": null,
       "title": null,
       "email": null,
-      "phone": null,
+      "phone": "+1 781-684-4000",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "qinetiq.com Suppliers & SMEs page + US Small Business policy PDF (2026); no named SBLO or small-business email published. Phone is general corporate",
       "contractCount": 2,
       "totalContractValue": 6967295.9,
       "agencies": [
@@ -36510,7 +36510,7 @@
       "naicsCategories": [
         "541715"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.qinetiq.com/en/who-we-are/suppliers-and-smes"
     },
     {
       "sbloName": null,
@@ -36585,7 +36585,7 @@
       "email": null,
       "phone": null,
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "GE Power now GE Vernova; gevernova.com/suppliers supplier registration page (no public procurement email/phone), Jun 2026",
       "contractCount": 3,
       "totalContractValue": 6928373.630000001,
       "agencies": [
@@ -36602,7 +36602,7 @@
         "336611",
         "541330"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.gevernova.com/suppliers"
     },
     {
       "sbloName": null,
@@ -37424,7 +37424,7 @@
       "email": "rodney.templon@nbacc.dhs.gov",
       "phone": null,
       "address": null,
-      "source": "DHS Prime Contractors Page",
+      "source": "Register via Battelle corporate Supplier Portal (battelle.org/doing-business-with-us/suppliers, SupplierGateway); no named small-business contact published, Jun 2026",
       "contractCount": 1,
       "totalContractValue": 6417700.12,
       "agencies": [
@@ -37438,7 +37438,7 @@
       "naicsCategories": [
         "541711"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.battelle.org/doing-business-with-us/suppliers"
     },
     {
       "sbloName": null,
@@ -38013,9 +38013,9 @@
       "sbloName": "Leslei Schmidt",
       "title": "SBLO",
       "email": null,
-      "phone": "(406)994-2381",
+      "phone": "(406)994-3211",
       "address": "307 MONTANA HALL<br>BOZEMAN, MT 59717",
-      "source": "DOT Subcontracting Directory FY2025",
+      "source": "MSU Procurement Services; vendor registration via Montana eMACS (vendorportal.mt.gov), Jun 2026",
       "contractCount": 4,
       "totalContractValue": 6007962.26,
       "agencies": [
@@ -38031,7 +38031,7 @@
         "541715",
         "611310"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.montana.edu/ubs/procurementservices/"
     },
     {
       "sbloName": null,
@@ -39379,9 +39379,9 @@
       "sbloName": "Ted Williams",
       "title": "SBLO",
       "email": null,
-      "phone": "(503) 499-0394",
+      "phone": "(800) 721-1916",
       "address": "2100 SW RIVER PKWY<br> PORTLAND, OR 97201",
-      "source": "DOT Subcontracting Directory FY2025",
+      "source": "deainc.com Subconsultants & Vendors prequalification page (no named procurement contact), Jun 2026",
       "contractCount": 1,
       "totalContractValue": 5529316.73,
       "agencies": [
@@ -39395,7 +39395,7 @@
       "naicsCategories": [
         "541370"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.deainc.com/suppliers/subconsultants-and-vendors/"
     },
     {
       "sbloName": null,
@@ -43243,10 +43243,10 @@
     {
       "sbloName": null,
       "title": "SBLO",
-      "email": null,
-      "phone": null,
+      "email": "Connect@Battelle.org",
+      "phone": "1-800-201-2011",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "battelle.org Small Business Programs Office page; no named SBLO (Warren Weaver not found); office mailbox + Potential Supplier Registration portal, Jun 2026",
       "contractCount": 3,
       "totalContractValue": 4031982.0699999994,
       "agencies": [
@@ -43260,7 +43260,7 @@
       "naicsCategories": [
         "541711"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.battelle.org/doing-business-with-us/suppliers/small-business-programs-office"
     },
     {
       "sbloName": null,
@@ -44388,7 +44388,7 @@
       "email": null,
       "phone": "(305)514-3238",
       "address": "4030 WEST BOY SCOUT BOULEVARD, SUITE 700<br>TAMPA, FL 33607",
-      "source": "DOT Subcontracting Directory FY2025",
+      "source": "Atkins North America = AtkinsRealis; supplier registration via SAP Ariba on atkinsrealis.com 'Working with suppliers', Jun 2026",
       "contractCount": 2,
       "totalContractValue": 3659504.0300000003,
       "agencies": [
@@ -44402,7 +44402,7 @@
       "naicsCategories": [
         "541330"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.atkinsrealis.com/en/about/working-with-suppliers"
     },
     {
       "sbloName": null,
@@ -45298,12 +45298,12 @@
       "supplierPortal": null
     },
     {
-      "sbloName": null,
-      "title": "SBLO",
+      "sbloName": "Tamara Nicholson",
+      "title": "Subcontracting Liaison",
       "email": null,
-      "phone": null,
+      "phone": "(215) 979-7700",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "Verified current in DOT FY2026 Subcontracting Directory (Tamara Nicholson); no supplier page found, Jun 2026",
       "contractCount": 2,
       "totalContractValue": 3449065.9000000004,
       "agencies": [
@@ -46470,10 +46470,10 @@
     {
       "sbloName": null,
       "title": null,
-      "email": null,
+      "email": "supplierdiversity@stantec.com",
       "phone": null,
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "Cardno acquired by Stantec; register via stantec.com Vendor/Supplier Diversity page, supplierdiversity@stantec.com, Jun 2026",
       "contractCount": 3,
       "totalContractValue": 3165153.06,
       "agencies": [
@@ -46487,7 +46487,7 @@
       "naicsCategories": [
         "541330"
       ],
-      "supplierPortal": "https://www.leidos.com/suppliers"
+      "supplierPortal": "https://www.stantec.com/en/about/vendor-supplier-diversity"
     },
     {
       "sbloName": null,
@@ -47872,11 +47872,11 @@
     },
     {
       "sbloName": "Michael Griffin",
-      "title": "SBLO",
-      "email": null,
+      "title": "Subcontracting Liaison Representative",
+      "email": "SubContractor-Supplier@hillintl.com",
       "phone": "(215) 309-7750",
       "address": "30 SOUTH 15TH ST PHILADELPHIA, PA 19102",
-      "source": "DOT Subcontracting Directory FY2025",
+      "source": "DOT Subcontracting Directory Dec 2025 (Griffin) + hillintl.com supplier mailbox SubContractor-Supplier@hillintl.com",
       "contractCount": 1,
       "totalContractValue": 2742631.1,
       "agencies": [
@@ -50451,10 +50451,10 @@
     {
       "sbloName": "Mike Laskofski",
       "title": "SBLO",
-      "email": null,
+      "email": "purch1@gmu.edu",
       "phone": "(703)993-2295",
       "address": "4400 UNIVERSITY DR FAIRFAX, VA. 22030",
-      "source": "DOT Subcontracting Directory FY2025",
+      "source": "GMU Purchasing 'Do Business with Mason' page (vendor registration + eVA + Bonfire); purch1@gmu.edu purchasing inbox, Jun 2026",
       "contractCount": 2,
       "totalContractValue": 2088427,
       "agencies": [
@@ -50468,7 +50468,7 @@
       "naicsCategories": [
         "541715"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://fiscal.gmu.edu/purchasing/do-business-with-mason/"
     },
     {
       "sbloName": null,
@@ -52530,12 +52530,12 @@
       "supplierPortal": null
     },
     {
-      "sbloName": "IAN MACFARLANE",
-      "title": "SBLO",
-      "email": null,
+      "sbloName": "Sarah Shaw",
+      "title": "Director, Procurement",
+      "email": "Vendor@eaest.com",
       "phone": "(410)584.7000",
       "address": "225 SCHILLING CIRCLE HUNT VALLEY, MD. 21031",
-      "source": "DOT Subcontracting Directory FY2025",
+      "source": "eaest.com Subcontractors/Suppliers page lists Sarah Shaw, Director Procurement; Vendor@eaest.com per published invoice requirements, Jun 2026",
       "contractCount": 2,
       "totalContractValue": 1771565.3199999998,
       "agencies": [
@@ -52549,7 +52549,7 @@
       "naicsCategories": [
         "541330"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://eaest.com/teaming-partners/"
     },
     {
       "sbloName": null,
@@ -54524,10 +54524,10 @@
     {
       "sbloName": "Darren Keser",
       "title": "SBLO",
-      "email": null,
+      "email": "bids@lasvegaspaving.com",
       "phone": "(702) 251-5800",
       "address": "4420 S DECATUR BLVD<br>LAS VEGAS, NV 89103",
-      "source": "DOT Subcontracting Directory FY2025",
+      "source": "lasvegaspaving.com Jobs/Bidding page solicits sub bids from MBE/DBE/WBE/SBE; bids email + main line verified, Jun 2026",
       "contractCount": 1,
       "totalContractValue": 1443958,
       "agencies": [
@@ -54541,7 +54541,7 @@
       "naicsCategories": [
         "237310"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://lasvegaspaving.com/jobs-bidding/"
     },
     {
       "sbloName": null,
@@ -58479,7 +58479,7 @@
       "email": null,
       "phone": "(617) 924-1770",
       "address": "101 WALNUT ST<br> WATERTOWN, MA. 02472",
-      "source": "DOT Subcontracting Directory FY2025",
+      "source": "vhb.com Supplier Engagement / supplier-diversity page (sub/subconsultant partnering), Jun 2026",
       "contractCount": 1,
       "totalContractValue": 991006,
       "agencies": [
@@ -58493,7 +58493,7 @@
       "naicsCategories": [
         "541330"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.vhb.com/supplier-diversity/"
     },
     {
       "sbloName": null,
@@ -60493,7 +60493,7 @@
       "email": null,
       "phone": "(410) 266-2314",
       "address": "2551 RIVA RD<br> ANNAPOLIS, MD. 21401",
-      "source": "DOT Subcontracting Directory FY2025",
+      "source": "ARINC now Collins Aerospace (RTX); register via RTX potential supplier portal, Collins SBLO contact listed on rtx.com/suppliers/small-business, Jun 2026",
       "contractCount": 1,
       "totalContractValue": 853800,
       "agencies": [
@@ -60507,7 +60507,7 @@
       "naicsCategories": [
         "334220"
       ],
-      "supplierPortal": null
+      "supplierPortal": "https://www.rtx.com/suppliers/small-business"
     },
     {
       "sbloName": null,
@@ -61662,9 +61662,9 @@
       "sbloName": null,
       "title": null,
       "email": null,
-      "phone": null,
+      "phone": "(415)813-5000",
       "address": null,
-      "source": "SBA Prime Directory FY24",
+      "source": "Program/construction management firm; no supplier/SB portal found, Jun 2026",
       "contractCount": 1,
       "totalContractValue": 789954,
       "agencies": [
