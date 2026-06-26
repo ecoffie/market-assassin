@@ -20,6 +20,7 @@ import { bqQuery, BQ_TABLES } from '@/lib/bigquery/client';
 import { getRegistrySummary } from '@/lib/data-sources/registry';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 import painPointsData from '@/data/agency-pain-points.json';
+import budgetData from '@/data/agency-budget-data.json';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,7 +43,7 @@ interface DatasetEntry {
 // The "recreate cost" story — breadth, not a copy-paste recipe. Static (changes
 // slowly); the exact source list lives in docs/MINDY-DATA-CORE-SOURCES.md.
 const RECREATE_COST = {
-  distinctSources: 31,         // +3 genuinely new: 8-yr teaching corpus, 743 podcast interviews, winning-proposal corpus (knowledge base)
+  distinctSources: 34,         // +knowledge base (teaching corpus, podcasts, winning proposals) +OMB budget +NIH RePORTER +SBIR Multisite
   formats: 6,                  // REST · Excel · CSV · PDF · scraped HTML · BigQuery
   formatList: ['REST API', 'Excel', 'CSV', 'PDF', 'Scraped HTML', 'BigQuery bulk'],
   agencies: '300+',
@@ -120,6 +121,7 @@ export async function GET(request: NextRequest) {
     ragChunks,
     events,
     agencyIntel,
+    dodaacDir,
   ] = await Promise.all([
     headCount(supabase, 'federal_contacts'),
     headCount(supabase, 'sam_opportunities'),
@@ -131,7 +133,14 @@ export async function GET(request: NextRequest) {
     headCount(supabase, 'mindy_rag_chunks'),
     headCount(supabase, 'sam_events'),
     headCount(supabase, 'agency_intelligence'),
+    headCount(supabase, 'dodaac_directory'),
   ]);
+
+  // Budget authority is a curated static file (toptier agencies × fiscal years).
+  const budgetAgencies = (() => {
+    try { return Object.keys((budgetData as { agencies?: Record<string, unknown> }).agencies || {}).length; }
+    catch { return null; }
+  })();
 
   // SOW-vs-description embedding split (best-effort — column may be un-migrated).
   const srcCount = async (src: string): Promise<number | null> => {
@@ -163,7 +172,10 @@ export async function GET(request: NextRequest) {
     { key: 'knowledge_base', label: 'Knowledge base (RAG)', source: '8 yrs teaching corpus + 743 podcast interviews + winning proposals', provenance: 'exclusive', count: ragDocs, note: `${(ragChunks ?? 0).toLocaleString()} searchable passages · powers Mindy Chat + Proposal Assist`, sources: ['GovCon Giants teaching corpus (8 yrs)', '743 podcast interviews', 'Winning proposal / cap-statement corpus', 'OpenAI embeddings'] },
     { key: 'events', label: 'Event Radar', source: 'SAM Special Notices, decoded to buying office', provenance: 'curated', count: events, note: 'industry days + sources sought, DoDAAC-decoded to the real command', sources: ['SAM.gov Special Notices', 'DoDAAC office decode'] },
     { key: 'agency_intel', label: 'Agency intelligence', source: 'GAO high-risk + contract patterns', provenance: 'exclusive', count: agencyIntel, note: 'GAO/GovInfo high-risk + USASpending contract patterns', sources: ['GovInfo API', 'GAO high-risk reports', 'USASpending contract patterns'] },
+    { key: 'dodaac_dir', label: 'Buying-office directory', source: 'DoDAAC decode from FPDS/BigQuery', provenance: 'curated', count: dodaacDir, note: 'decoded DoD/agency contracting offices behind the codes', sources: ['FPDS awards (BigQuery)', 'DoDAAC decode'] },
+    { key: 'budget_authority', label: 'Budget authority', source: 'OMB / USASpending toptier budgets', provenance: 'curated', count: budgetAgencies, note: 'toptier agency budget trends (winners/losers)', sources: ['OMB budget data', 'USASpending toptier accounts'] },
     { key: 'grants', label: 'Federal grants', source: 'Grants.gov API (live)', provenance: 'passthrough', count: null, note: 'queried live per search', sources: ['Grants.gov API'] },
+    { key: 'sbir', label: 'SBIR / STTR', source: 'NIH RePORTER + SBIR Multisite (live)', provenance: 'passthrough', count: null, note: 'queried live per search', sources: ['NIH RePORTER API', 'SBIR.gov Multisite'] },
   ];
 
   const byProvenance = (p: Provenance) =>
