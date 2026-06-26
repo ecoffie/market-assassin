@@ -378,6 +378,35 @@ export default function OnboardingPage() {
         else { router.push('/signup'); return; }
       }
 
+      // Mint the MI auth token for THIS account UP FRONT (not just on the way out).
+      // Onboarding's in-flow saves (profile-from-text, mindy/profile, vault) are
+      // 2FA-gated; without a current-account token they failed with "two-factor
+      // session does not match this account" — especially after switching accounts,
+      // where a stale prior-account token lingered in localStorage. Purge any
+      // mismatched token, then mint fresh from the Supabase session so every save
+      // below is authorized. Best-effort; the ensureMIToken backstop still runs.
+      if (typeof window !== 'undefined') {
+        const storedEmail = (localStorage.getItem('mi_beta_email') || '').toLowerCase();
+        if (storedEmail && storedEmail !== userEmail) {
+          localStorage.removeItem('mi_beta_auth_token');
+          localStorage.removeItem('mi_beta_2fa_token');
+        }
+        if (token) {
+          try {
+            const mintRes = await fetch('/api/auth/mi-session', {
+              method: 'POST',
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            const mintData = await mintRes.json().catch(() => null);
+            if (mintRes.ok && mintData?.success && mintData.sessionToken) {
+              localStorage.setItem('mi_beta_auth_token', mintData.sessionToken);
+              localStorage.setItem('mi_beta_authenticated_at', mintData.authenticatedAt || new Date().toISOString());
+              localStorage.setItem('mi_beta_email', userEmail);
+            }
+          } catch { /* ensureMIToken backstop retries before leaving onboarding */ }
+        }
+      }
+
       // OAuth's redirectTo always lands here, so returning users hit the
       // onboarding wizard on every sign-in. Check whether they've already
       // filled in a real profile — if so, skip the wizard and drop them
