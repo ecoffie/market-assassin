@@ -16,7 +16,7 @@ import crypto from 'crypto';
  * Get all available SAM API keys from environment
  * Supports: SAM_API_KEY, SAM_API_KEY_1, SAM_API_KEY_2, etc.
  */
-function getAvailableSAMKeys(): string[] {
+export function getAvailableSAMKeys(): string[] {
   const keys: string[] = [];
 
   // Check numbered keys first (SAM_API_KEY_1, SAM_API_KEY_2, etc.)

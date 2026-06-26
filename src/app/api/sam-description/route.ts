@@ -19,7 +19,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { getRotatedSAMKey } from '@/lib/sam/utils';
+import { getRotatedSAMKey, getAvailableSAMKeys } from '@/lib/sam/utils';
 import { samHtmlToText, looksLikeHtml } from '@/lib/sam/description-text';
 import { fetchNoticeDescription, isDescriptionLink } from '@/lib/sam/notice-description';
 
@@ -93,26 +93,37 @@ export async function GET(request: NextRequest) {
     });
   }
 
-  // Need to resolve from SAM — use stored URL or build from notice_id.
-  if (!cached || !isHttpUrl(cached)) {
-    const apiKey = getRotatedSAMKey();
-    if (!apiKey) {
-      return NextResponse.json(
-        { success: false, error: 'SAM API key not configured' },
-        { status: 500 },
-      );
-    }
+  // Need to resolve from SAM. Use the stored noticedesc URL if we have one, else
+  // build the request from notice_id. fetchNoticeDescription handles both.
+  //
+  // CRITICAL (Eric, Jun 26 2026): try EVERY configured key, not just today's
+  // rotated one. SAM enforces a per-key DAILY quota, so one key can be 429 while
+  // another is fine. The old code used a single rotated key and, when it was
+  // throttled, surfaced the 429 as "no description URL on file for this
+  // opportunity" — the SAM Synopsis silently broke whenever the day's key was hot.
+  const keys = getAvailableSAMKeys();
+  if (keys.length === 0) {
+    return NextResponse.json({ success: false, error: 'SAM API key not configured' }, { status: 500 });
+  }
+  // Start from today's rotated key so load still spreads, then fall through the rest.
+  const startKey = getRotatedSAMKey();
+  const orderedKeys = [startKey, ...keys.filter((k) => k && k !== startKey)].filter(Boolean);
 
+  const linkOrId = cached && isDescriptionLink(cached) ? cached : noticeId;
+  let lastStatus = 0;
+  let sawRateLimit = false;
+
+  for (const key of orderedKeys) {
     try {
-      const linkOrId = cached && isDescriptionLink(cached) ? cached : noticeId;
-      const cleaned = (await fetchNoticeDescription(linkOrId, apiKey)).slice(0, MAX_DESCRIPTION_LENGTH);
+      const cleaned = (await fetchNoticeDescription(linkOrId, key)).slice(0, MAX_DESCRIPTION_LENGTH);
+      // 200 with an empty body = SAM genuinely has no description for this notice.
+      // No other key will differ, so stop here.
       if (!cleaned) {
         return NextResponse.json(
-          { success: false, error: 'SAM.gov returned no description text' },
-          { status: 502 },
+          { success: false, error: 'SAM.gov has no description text for this opportunity' },
+          { status: 404 },
         );
       }
-
       void supabase
         .from('sam_opportunities')
         .update({ description: cleaned })
@@ -120,117 +131,27 @@ export async function GET(request: NextRequest) {
         .then((res) => {
           if (res.error) console.warn('[sam-description] cache write failed:', res.error.message);
         });
-
-      return NextResponse.json({
-        success: true,
-        noticeId,
-        description: cleaned,
-        source: 'sam.gov+noticeid',
-      });
+      return NextResponse.json({ success: true, noticeId, description: cleaned, source: 'sam.gov' });
     } catch (err) {
-      console.error('[sam-description] noticedesc fetch failed:', err);
-      return NextResponse.json(
-        { success: false, error: 'no description URL on file for this opportunity' },
-        { status: 404 },
-      );
+      const msg = err instanceof Error ? err.message : String(err);
+      const m = msg.match(/noticedesc (\d+)/);
+      if (m) lastStatus = Number(m[1]);
+      if (lastStatus === 429) sawRateLimit = true;
+      // try the next key
     }
   }
 
-  const apiKey = getRotatedSAMKey();
-  if (!apiKey) {
+  // Every key failed. Distinguish throttling (transient, the Retry button helps)
+  // from a real upstream error so the UI can say something honest.
+  if (sawRateLimit) {
     return NextResponse.json(
-      { success: false, error: 'SAM API key not configured' },
-      { status: 500 }
+      { success: false, error: 'SAM.gov is rate-limiting our keys right now — tap Retry in a moment.' },
+      { status: 429 },
     );
   }
-
-  // Append the api_key (or include it as query param) — SAM.gov noticedesc
-  // accepts the key as a query param like every other v2 endpoint.
-  let upstreamUrl: URL;
-  try {
-    upstreamUrl = new URL(cached);
-    if (!upstreamUrl.searchParams.has('api_key')) {
-      upstreamUrl.searchParams.set('api_key', apiKey);
-    }
-  } catch {
-    return NextResponse.json(
-      { success: false, error: 'stored description URL is not parseable' },
-      { status: 500 }
-    );
-  }
-
-  let fetched: Response;
-  try {
-    fetched = await fetch(upstreamUrl.toString(), {
-      headers: { Accept: 'application/json' },
-    });
-  } catch (err) {
-    console.error('[sam-description] fetch failed:', err);
-    return NextResponse.json(
-      { success: false, error: 'could not reach SAM.gov' },
-      { status: 502 }
-    );
-  }
-
-  if (!fetched.ok) {
-    return NextResponse.json(
-      { success: false, error: `SAM.gov returned ${fetched.status}` },
-      { status: 502 }
-    );
-  }
-
-  // SAM's noticedesc endpoint returns JSON like { description: "..." }
-  // or sometimes returns the text body directly. Handle both.
-  let descriptionText: string | null = null;
-  const contentType = fetched.headers.get('content-type') || '';
-  if (contentType.includes('application/json')) {
-    const payload = await fetched.json().catch(() => null);
-    if (payload && typeof payload === 'object') {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const p = payload as any;
-      descriptionText = typeof p.description === 'string'
-        ? p.description
-        : typeof p.body === 'string'
-        ? p.body
-        : typeof p.text === 'string'
-        ? p.text
-        : null;
-    }
-  }
-  if (!descriptionText) {
-    const text = await fetched.text().catch(() => '');
-    descriptionText = text || null;
-  }
-
-  if (!descriptionText) {
-    return NextResponse.json(
-      { success: false, error: 'SAM.gov returned no description text' },
-      { status: 502 }
-    );
-  }
-
-  // SAM's noticedesc endpoint returns HTML markup (<p>, <ul>, <li>,
-  // <strong>, &nbsp;, etc.). Convert to readable plain text before
-  // storing so the UI doesn't render raw tags.
-  const cleaned = samHtmlToText(descriptionText).slice(0, MAX_DESCRIPTION_LENGTH);
-
-  // Cache the resolved text back into the row so future requests hit
-  // the cache path. Fire-and-forget — if the update fails (RLS, etc.)
-  // we still return the text to the caller.
-  void supabase
-    .from('sam_opportunities')
-    .update({ description: cleaned })
-    .eq('notice_id', noticeId)
-    .then((res) => {
-      if (res.error) {
-        console.warn('[sam-description] cache write failed:', res.error.message);
-      }
-    });
-
-  return NextResponse.json({
-    success: true,
-    noticeId,
-    description: cleaned,
-    source: 'sam.gov',
-  });
+  console.error(`[sam-description] all ${orderedKeys.length} keys failed for ${noticeId} (last status ${lastStatus})`);
+  return NextResponse.json(
+    { success: false, error: `SAM.gov did not return a description (status ${lastStatus || 'unknown'})` },
+    { status: 502 },
+  );
 }
