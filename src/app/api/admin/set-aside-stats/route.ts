@@ -34,12 +34,24 @@ export async function GET() {
   };
   const base = () => supabase.from('sam_opportunities').select('id', { count: 'exact', head: true });
 
-  const [activeTotal, biddableTotal, biddableSetAside] = await Promise.all([
+  // Socioeconomic categories → their SAM set_aside_code values, with the statutory
+  // dollar goal and FY2024 SBA-scorecard achievement (so the page can show the gap
+  // between "solicited as a set-aside" (live, ours) and "credited by dollars").
+  const CATEGORIES = [
+    { key: 'sb', label: 'Total Small Business', codes: ['SBA', 'SBP', 'SB'], goalPct: 23, achievedPct: 28.8 },
+    { key: 'sdb', label: '8(a) / SDB', codes: ['8A', '8AN'], goalPct: 13, achievedPct: 12.27 },
+    { key: 'wosb', label: 'WOSB / EDWOSB', codes: ['WOSB', 'WOSBSS', 'EDWOSB', 'EDWOSBSS'], goalPct: 5, achievedPct: 4.97 },
+    { key: 'hubzone', label: 'HUBZone', codes: ['HZC', 'HZS'], goalPct: 3, achievedPct: 2.75 },
+    { key: 'sdvosb', label: 'SDVOSB', codes: ['SDVOSBC', 'SDVOSBS'], goalPct: 5, achievedPct: 5.14 },
+  ];
+
+  const [activeTotal, biddableTotal, biddableSetAside, ...categoryCounts] = await Promise.all([
     headCount((q) => q.eq('active', true)),
     headCount((q) => q.eq('active', true).in('notice_type', BIDDABLE)),
     // "Set aside" = a real set-aside code (not null / '' / NONE).
     headCount((q) => q.eq('active', true).in('notice_type', BIDDABLE)
       .not('set_aside_code', 'is', null).neq('set_aside_code', '').neq('set_aside_code', 'NONE')),
+    ...CATEGORIES.map((c) => headCount((q) => q.eq('active', true).in('notice_type', BIDDABLE).in('set_aside_code', c.codes))),
   ]);
 
   // Freshness window (newest + oldest posted among active).
@@ -62,6 +74,19 @@ export async function GET() {
   const setAside = biddableSetAside ?? 0;
   const open = Math.max(0, biddable - setAside);
   const pct = (n: number) => (biddable > 0 ? Math.round((n / biddable) * 1000) / 10 : 0);
+  const pct2 = (n: number) => (biddable > 0 ? Math.round((n / biddable) * 10000) / 100 : 0);
+
+  const categories = CATEGORIES.map((c, i) => {
+    const solicited = categoryCounts[i] ?? 0;
+    return {
+      key: c.key,
+      label: c.label,
+      goalPct: c.goalPct,
+      achievedPct: c.achievedPct,           // by DOLLARS (SBA FY2024 scorecard)
+      solicitedCount: solicited,
+      solicitedPct: pct2(solicited),         // share of biddable solicitations that are THIS set-aside (live, ours)
+    };
+  });
 
   return NextResponse.json(
     {
@@ -81,6 +106,10 @@ export async function GET() {
       // big contracts stay full-and-open. The DLA parts-buy 'Award Notice' bucket is
       // excluded (it's not set-aside-eligible competed work).
       dollarShareSmallBusinessPct: 28.8,
+      // Per-category: GOAL & DOLLAR achievement vs how often it's actually SOLICITED
+      // as that set-aside (live). HUBZone/8(a)/WOSB "meet" the $ goal largely by
+      // crediting firms that win full-and-open — they're barely solicited as set-asides.
+      categories,
     },
     { headers: { 'Cache-Control': 'private, max-age=600' } },
   );

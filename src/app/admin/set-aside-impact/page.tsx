@@ -18,11 +18,20 @@
 
 import { useEffect, useState } from 'react';
 
+interface CategoryRow {
+  key: string;
+  label: string;
+  goalPct: number;
+  achievedPct: number;
+  solicitedCount: number;
+  solicitedPct: number;
+}
 interface LiveStats {
   window: { newestPosted: string | null; oldestPosted: string | null };
   activeTotal: number | null;
   biddable: { total: number; setAside: number; setAsidePct: number; fullAndOpen: number; fullAndOpenPct: number };
   dollarShareSmallBusinessPct: number;
+  categories: CategoryRow[];
 }
 
 const fmtDate = (s: string | null) =>
@@ -108,6 +117,44 @@ export default function SetAsideImpactPage() {
             <p className="mt-3 text-sm text-slate-500">Measuring live from our SAM opportunity cache…</p>
           )}
         </div>
+
+        {/* ── per-category: goal met by $, but barely solicited ───────────── */}
+        {live?.categories && (
+          <div className="mb-6 rounded-2xl border border-slate-800 bg-slate-900/50 p-5">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-300">&ldquo;Goal met&rdquo; ≠ actually set aside</h2>
+            <p className="mt-1 text-[12px] text-slate-400">
+              Agencies hit the dollar goals partly by <span className="font-semibold text-slate-200">crediting firms that win in full-and-open</span> (HUBZone alone gets a 10% price preference). But the share of solicitations actually <span className="italic">issued</span> as that set-aside is a fraction of the goal. SDVOSB is the proof: solicit it, and the category wins.
+            </p>
+            <div className="mt-4 space-y-2.5">
+              {/* header */}
+              <div className="grid grid-cols-[1.4fr_repeat(3,1fr)] gap-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+                <span>Category</span>
+                <span className="text-right">Goal ($)</span>
+                <span className="text-right">Achieved ($)</span>
+                <span className="text-right">Solicited as set-aside</span>
+              </div>
+              {live.categories.map((c) => {
+                const met = c.achievedPct >= c.goalPct;
+                const solicitWins = c.solicitedPct >= c.goalPct;
+                return (
+                  <div key={c.key} className="grid grid-cols-[1.4fr_repeat(3,1fr)] items-center gap-2 rounded-lg bg-slate-900/70 px-3 py-2 text-sm">
+                    <span className="font-semibold text-slate-200">{c.label}</span>
+                    <span className="text-right tabular-nums text-slate-400">{c.goalPct}%</span>
+                    <span className={`text-right tabular-nums font-semibold ${met ? 'text-emerald-300' : 'text-amber-300'}`}>
+                      {c.achievedPct}% {met ? '✓' : '✕'}
+                    </span>
+                    <span className={`text-right tabular-nums font-bold ${solicitWins ? 'text-emerald-300' : 'text-rose-300'}`}>
+                      {c.solicitedPct}%
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+            <p className="mt-3 text-[11px] text-slate-500">
+              Goal &amp; Achieved = % of eligible federal <span className="font-semibold">dollars</span> (SBA FY2024 scorecard). &ldquo;Solicited as set-aside&rdquo; = share of {live.biddable.total.toLocaleString()} live biddable solicitations actually issued under that category&rsquo;s set-aside (our SAM cache, refreshed daily). The red numbers are the needle: <span className="font-semibold text-rose-300">HUBZone is &ldquo;met&rdquo; at 2.75% of dollars but solicited as a HUBZone set-aside under 0.5% of the time.</span>
+            </p>
+          </div>
+        )}
 
         {/* ── the problem ─────────────────────────────────────────────────── */}
         <div className="mb-6 grid gap-3 sm:grid-cols-3">
