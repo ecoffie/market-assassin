@@ -116,6 +116,28 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
   and every grounded surface (Mindy Chat + Proposal Assist's winning-proposal corpus).
 - **Guardrail:** filter `has_pii` / internal-only docs (same as Knowledge Base repo).
 
+### Auto-seed My Target List from the profile's chosen target agencies — V2 (Eric, Jun 27)
+- **The gap:** today there are TWO disconnected concepts. The profile's **target
+  agencies** (`user_notification_settings.agencies`) drive view filters/defaults
+  (e.g. Decision Makers "⭐ My Targets"), but **My Target List** (`user_target_list`)
+  only fills when the user clicks **"✨ Set up my Mindy"** — which seeds the top ~8
+  *buying* agencies by set-aside spend from the NAICS scan (`/api/app/auto-setup`,
+  `MAX_AGENCIES=8`), NOT the agencies the user explicitly picked. Onboarding doesn't
+  seed the list at all. So a user who hand-picks target agencies never sees them in
+  My Target List automatically — an expectation mismatch (Eric, coffiemiami test).
+- **V2 behavior:** on onboarding finish AND on profile save, automatically upsert the
+  user's chosen `agencies` into `user_target_list` — enriched the same way auto-setup
+  enriches each row (spend, sources-sought, events, contacts). ADD-ONLY (reuse the
+  existing 23505 unique-constraint → "skipped", never clobber Sport/hand-added rows).
+- **Approach:** reuse `auto-setup`'s add-only insert + the find-agencies/office
+  resolution to turn each chosen agency NAME into a proper target row (resolve its
+  buying office/spend). Optionally MERGE: chosen target agencies first, then fill to
+  N with the top NAICS buyers (so the list = "who I picked" + "who else buys my work").
+- **Trigger:** onboarding completion hook + a `save-profile`/notification-settings
+  write hook (debounced) so changing target agencies keeps the list in sync (add-only).
+- **Guardrail:** never delete user rows on profile change (add-only); a removed target
+  agency stays in the list unless the user removes it explicitly.
+
 ### Proposal Assist — Tier 2 multi-pass volumes
 - **Status:** Built. **PR #34 open, NOT merged**, gated behind `PROPOSAL_MULTIPASS=1`.
 - **What:** batches a section's compliance requirements → drafts each batch in
