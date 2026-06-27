@@ -14,6 +14,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { sendMindyLaunchReminderEmail } from '@/lib/mindy/launch-reminder-email';
+import { sendMindyLaunchLifetimeEmail } from '@/lib/mindy/launch-lifetime-email';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -29,7 +30,12 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  let body: { email?: string; name?: string; variant?: 'reminder' | 'live' };
+  let body: {
+    email?: string;
+    name?: string;
+    variant?: 'reminder' | 'live' | 'lifetime';
+    phase?: 'deal' | 'lastcall' | 'extension' | 'finalclose';
+  };
   try {
     body = await request.json();
   } catch {
@@ -41,11 +47,13 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const ok = await sendMindyLaunchReminderEmail({
-      to: email,
-      name: body.name?.trim() || '',
-      variant: body.variant === 'live' ? 'live' : 'reminder',
-    });
+    const name = body.name?.trim() || '';
+    // 'lifetime' = the POST-webinar Founders Lifetime offer (pricing). The pre-event
+    // 'reminder'/'live' variants never carry pricing.
+    const ok =
+      body.variant === 'lifetime'
+        ? await sendMindyLaunchLifetimeEmail({ to: email, name, phase: body.phase ?? 'deal' })
+        : await sendMindyLaunchReminderEmail({ to: email, name, variant: body.variant === 'live' ? 'live' : 'reminder' });
     return NextResponse.json({ ok });
   } catch (err) {
     console.error('[mindy-launch/send-reminder] failed:', err);
