@@ -30,21 +30,29 @@ export async function sendMindyLaunchConfirmationEmail(params: {
   const firstName = (params.name || '').split(' ')[0] || 'there';
   const eventUrl = 'https://govcongiants.com/mindy-launch';
 
-  // Google Calendar add-event link (June 27, 2026, 10:00 AM–4:00 PM EDT = 14:00–20:00 UTC)
+  // Live Zoom join details — included directly so last-minute registrants can
+  // join instantly (no waiting on a separate reminder email).
+  const zoomUrl = 'https://us06web.zoom.us/j/89280506481?pwd=zFol5CPiXUW5PtO51FhDlwbuWrLQVi.1';
+  const zoomMeetingId = '892 8050 6481';
+  const zoomPasscode = '206225';
+
+  // Google Calendar add-event link (June 27, 2026, 10:00 AM–1:00 PM EDT = 14:00–17:00 UTC)
   const calendarUrl =
     'https://www.google.com/calendar/render?action=TEMPLATE' +
     '&text=' + encodeURIComponent('Mindy Free Live Launch — GovCon Giants') +
-    '&dates=20260627T140000Z/20260627T200000Z' +
-    '&details=' + encodeURIComponent(`Free full-day live working session: build your own federal market map with Mindy on real government data. Demo + hands-on workshops + lifetime recording + free Mindy account.\n\nWe'll email your join link before the event.\n\nDetails: ${eventUrl}`) +
-    '&location=' + encodeURIComponent(eventUrl);
+    '&dates=20260627T140000Z/20260627T170000Z' +
+    '&details=' + encodeURIComponent(`Free live working session: build your own federal market map with Mindy on real government data. Demo + hands-on workshops + lifetime recording + free Mindy account.\n\nJoin Zoom: ${zoomUrl}\nMeeting ID: ${zoomMeetingId} · Passcode: ${zoomPasscode}\n\nDetails: ${eventUrl}`) +
+    '&location=' + encodeURIComponent(zoomUrl);
 
-  // Universal access note — everyone gets the live link by email before the event.
-  // No tier; no join link in this confirmation (that goes out in the reminder).
-  const accessBlock = `<table width="100%" cellpadding="0" cellspacing="0" style="background-color: #eff6ff; border: 2px solid #bfdbfe; border-radius: 12px;">
+  // Join card — the real Zoom link, in the confirmation, so anyone who registers
+  // (including last-minute) can join immediately.
+  const accessBlock = `<table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f3ff; border: 2px solid #ddd6fe; border-radius: 12px;">
         <tr>
-          <td style="padding: 24px; text-align: center;">
-            <p style="color: #1d4ed8; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 8px;">Your access link is coming</p>
-            <p style="color: #1e293b; font-size: 16px; margin: 0; line-height: 1.6;">You&rsquo;re registered for the live launch &mdash; 100% free, and you keep the recording. <strong>We&rsquo;ll email your live access link before we go on &mdash; add the date to your calendar now so you don&rsquo;t miss it.</strong></p>
+          <td style="padding: 26px 24px; text-align: center;">
+            <p style="color: #5b21b6; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 10px;">Your Zoom link — save this email</p>
+            <a href="${zoomUrl}" style="display: inline-block; background-color: #7c3aed; color: #ffffff; padding: 16px 36px; border-radius: 10px; text-decoration: none; font-weight: 800; font-size: 17px;">Join on Zoom</a>
+            <p style="color: #64748b; font-size: 13px; margin: 16px 0 0; line-height: 1.6;">Meeting ID: <strong style="color:#0f172a;">${zoomMeetingId}</strong> &nbsp;&middot;&nbsp; Passcode: <strong style="color:#0f172a;">${zoomPasscode}</strong></p>
+            <p style="color: #64748b; font-size: 12px; margin: 8px 0 0; line-height: 1.6;"><a href="${zoomUrl}" style="color:#7c3aed;text-decoration:none;word-break:break-all;">${zoomUrl}</a></p>
           </td>
         </tr>
       </table>`;
@@ -90,7 +98,7 @@ export async function sendMindyLaunchConfirmationEmail(params: {
                       Saturday, June 27, 2026
                     </p>
                     <p style="color: #475569; font-size: 16px; margin: 0 0 16px;">
-                      10:00 AM &ndash; 4:00 PM ET <span style="color: #94a3b8; font-size: 14px;">(full-day working session)</span>
+                      10:00 AM &ndash; 1:00 PM ET <span style="color: #94a3b8; font-size: 14px;">(live working session)</span>
                     </p>
                     <a href="${calendarUrl}" style="display: inline-block; background-color: #4338ca; color: #ffffff; padding: 12px 24px; border-radius: 8px; text-decoration: none; font-weight: 700; font-size: 14px;">
                       + Add to Google Calendar
@@ -189,7 +197,7 @@ export async function sendMindyLaunchConfirmationEmail(params: {
                     <h3 style="color: #0f172a; font-size: 16px; font-weight: 800; margin: 0 0 12px;">How to prepare</h3>
                     <ul style="color: #475569; font-size: 14px; line-height: 1.8; margin: 0; padding-left: 20px;">
                       <li>Bring a NAICS code (or a contract you&rsquo;re curious about) &mdash; we&rsquo;ll run it together.</li>
-                      <li>Block 10 AM&ndash;4 PM ET &mdash; this is hands-on, not a passive watch.</li>
+                      <li>Block 10 AM&ndash;1 PM ET &mdash; this is hands-on, not a passive watch.</li>
                       <li>Have your laptop ready so you can build your own market map alongside us.</li>
                     </ul>
                   </td>
