@@ -12,7 +12,6 @@ import {
   FOUNDERS_LIFETIME_PRICE,
   BOOTCAMP_LIFETIME_PRICE,
   BOOTCAMP_LIFETIME_DEADLINE_ISO,
-  bootcampDeadlineLabel,
   PRO_ANNUAL,
   PRO_MONTHLY,
   foundersBreakEvenMonths,
@@ -31,6 +30,11 @@ const ANNUAL_CHECKOUT = 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D';
 function isBootcampSpecialActive(): boolean {
   return Date.now() <= new Date(`${BOOTCAMP_LIFETIME_DEADLINE_ISO}T23:59:59-04:00`).getTime();
 }
+
+// Display label for the deadline day, anchored at noon EDT to avoid the
+// EST/EDT midnight-rollover that makes the shared helper render the next day.
+const bootcampDeadlineLabel = new Date(`${BOOTCAMP_LIFETIME_DEADLINE_ISO}T12:00:00-04:00`)
+  .toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' });
 
 const breakEvenMonths = foundersBreakEvenMonths();
 
@@ -153,7 +157,7 @@ export default function LifetimePage() {
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/40 rounded-full mb-6">
             <span className="text-amber-200 text-sm font-semibold uppercase tracking-wide">
               {special
-                ? `Mindy Day · $${fmt(BOOTCAMP_LIFETIME_PRICE)} lifetime — ends ${bootcampDeadlineLabel()}`
+                ? `Mindy Day · $${fmt(BOOTCAMP_LIFETIME_PRICE)} lifetime — ends ${bootcampDeadlineLabel}`
                 : `Founders Lifetime · ${FOUNDERS_LIFETIME_CAP} seats`}
             </span>
           </div>
@@ -303,7 +307,7 @@ export default function LifetimePage() {
         <div className="max-w-3xl mx-auto text-center rounded-3xl border border-purple-500/30 bg-gradient-to-br from-purple-900/40 to-slate-900 p-10">
           <h2 className="text-3xl font-bold text-white mb-4">
             {special
-              ? `$${fmt(livePrice)} once. Mindy Day — ends ${bootcampDeadlineLabel()}.`
+              ? `$${fmt(livePrice)} once. Mindy Day — ends ${bootcampDeadlineLabel}.`
               : `$${fmt(FOUNDERS_LIFETIME_PRICE)} once. ${FOUNDERS_LIFETIME_CAP} seats.`}
           </h2>
           <Link
