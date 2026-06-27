@@ -10,14 +10,27 @@ import Link from 'next/link';
 import {
   FOUNDERS_LIFETIME_CAP,
   FOUNDERS_LIFETIME_PRICE,
+  BOOTCAMP_LIFETIME_PRICE,
+  BOOTCAMP_LIFETIME_DEADLINE_ISO,
+  bootcampDeadlineLabel,
   PRO_ANNUAL,
   PRO_MONTHLY,
   foundersBreakEvenMonths,
 } from '@/lib/mindy/lifetime-pricing';
 
+// Re-evaluate the date gate on every request so the special auto-expires.
+export const dynamic = 'force-dynamic';
+
 const FOUNDERS_CHECKOUT = '/checkout/founders-lifetime';
+const BOOTCAMP_CHECKOUT = '/checkout/bootcamp-lifetime';
 const MONTHLY_CHECKOUT = 'https://buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C';
 const ANNUAL_CHECKOUT = 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D';
+
+// Mindy Day special ($2,997) is live through the end of the deadline day (ET).
+// After that the page reverts to Founders Lifetime ($4,997).
+function isBootcampSpecialActive(): boolean {
+  return Date.now() <= new Date(`${BOOTCAMP_LIFETIME_DEADLINE_ISO}T23:59:59-04:00`).getTime();
+}
 
 const breakEvenMonths = foundersBreakEvenMonths();
 
@@ -123,6 +136,11 @@ export default function LifetimePage() {
   const fiveYearMonthly = PRO_MONTHLY * 12 * 5;
   const fiveYearAnnual = PRO_ANNUAL * 5;
 
+  // Mindy Day special: same lifetime product, $2,997 instead of $4,997, until it expires.
+  const special = isBootcampSpecialActive();
+  const checkoutHref = special ? BOOTCAMP_CHECKOUT : FOUNDERS_CHECKOUT;
+  const livePrice = special ? BOOTCAMP_LIFETIME_PRICE : FOUNDERS_LIFETIME_PRICE;
+
   return (
     <main className="min-h-screen bg-slate-950">
       <script
@@ -134,7 +152,9 @@ export default function LifetimePage() {
         <div className="max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/40 rounded-full mb-6">
             <span className="text-amber-200 text-sm font-semibold uppercase tracking-wide">
-              Founders Lifetime · {FOUNDERS_LIFETIME_CAP} seats
+              {special
+                ? `Mindy Day · $${fmt(BOOTCAMP_LIFETIME_PRICE)} lifetime — ends ${bootcampDeadlineLabel()}`
+                : `Founders Lifetime · ${FOUNDERS_LIFETIME_CAP} seats`}
             </span>
           </div>
 
@@ -144,18 +164,26 @@ export default function LifetimePage() {
           </h1>
 
           <p className="text-xl text-slate-300 max-w-2xl mx-auto mb-4">
-            One payment of <span className="text-white font-semibold">${fmt(FOUNDERS_LIFETIME_PRICE)}</span>.
-            Full Pro access for life — the same lifetime price our course buyers already trusted.
+            One payment of{' '}
+            {special && (
+              <span className="text-slate-500 line-through mr-1">${fmt(FOUNDERS_LIFETIME_PRICE)}</span>
+            )}
+            <span className="text-white font-semibold">${fmt(livePrice)}</span>.{' '}
+            {special
+              ? 'Full Pro access for life — Mindy Day pricing, today only.'
+              : 'Full Pro access for life — the same lifetime price our course buyers already trusted.'}
           </p>
           <p className="text-slate-400 text-sm mb-10">
             Serious federal intelligence. Not a discount tool — a founding seat in the platform.
           </p>
 
           <Link
-            href={FOUNDERS_CHECKOUT}
+            href={checkoutHref}
             className="inline-block bg-gradient-to-r from-emerald-500 to-emerald-600 hover:from-emerald-400 hover:to-emerald-500 text-white font-bold text-lg px-10 py-4 rounded-xl shadow-xl shadow-emerald-500/25 transition-colors"
           >
-            Become a Founding Member — ${fmt(FOUNDERS_LIFETIME_PRICE)} →
+            {special
+              ? `Claim your lifetime seat — $${fmt(livePrice)} →`
+              : `Become a Founding Member — $${fmt(FOUNDERS_LIFETIME_PRICE)} →`}
           </Link>
           <p className="text-slate-400 text-sm mt-4">30-day money back · One-time payment</p>
         </div>
@@ -164,7 +192,7 @@ export default function LifetimePage() {
       <section className="px-4 py-20">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-12">
-            The math at ${fmt(FOUNDERS_LIFETIME_PRICE)}
+            The math at ${fmt(livePrice)}
           </h2>
 
           <div className="grid md:grid-cols-3 gap-6">
@@ -189,14 +217,19 @@ export default function LifetimePage() {
             <div className="bg-gradient-to-br from-emerald-900/40 to-slate-900 border-2 border-emerald-500 rounded-2xl p-6 relative shadow-xl shadow-emerald-500/10">
               <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                 <span className="bg-emerald-500 text-slate-950 text-xs font-bold px-4 py-1 rounded-full">
-                  FOUNDERS
+                  {special ? 'MINDY DAY' : 'FOUNDERS'}
                 </span>
               </div>
               <h3 className="text-sm font-semibold text-emerald-300 uppercase mb-3">Lifetime</h3>
-              <p className="text-4xl font-black text-white">${fmt(FOUNDERS_LIFETIME_PRICE)}<span className="text-lg text-slate-400"> once</span></p>
+              <p className="text-4xl font-black text-white">
+                {special && (
+                  <span className="text-2xl text-slate-500 line-through mr-2">${fmt(FOUNDERS_LIFETIME_PRICE)}</span>
+                )}
+                ${fmt(livePrice)}<span className="text-lg text-slate-400"> once</span>
+              </p>
               <ul className="mt-4 space-y-2 text-sm text-slate-200 border-t border-emerald-500/30 pt-4">
-                <li>Break-even: <span className="text-emerald-300 font-semibold">~{breakEvenMonths} months</span> vs monthly</li>
-                <li>5-year savings: <span className="text-emerald-300 font-semibold">${fmt(fiveYearMonthly - FOUNDERS_LIFETIME_PRICE)}+</span></li>
+                <li>Break-even: <span className="text-emerald-300 font-semibold">~{Math.ceil(livePrice / PRO_MONTHLY)} months</span> vs monthly</li>
+                <li>5-year savings: <span className="text-emerald-300 font-semibold">${fmt(fiveYearMonthly - livePrice)}+</span></li>
               </ul>
             </div>
           </div>
@@ -269,13 +302,15 @@ export default function LifetimePage() {
       <section className="px-4 py-20">
         <div className="max-w-3xl mx-auto text-center rounded-3xl border border-purple-500/30 bg-gradient-to-br from-purple-900/40 to-slate-900 p-10">
           <h2 className="text-3xl font-bold text-white mb-4">
-            ${fmt(FOUNDERS_LIFETIME_PRICE)} once. {FOUNDERS_LIFETIME_CAP} seats.
+            {special
+              ? `$${fmt(livePrice)} once. Mindy Day — ends ${bootcampDeadlineLabel()}.`
+              : `$${fmt(FOUNDERS_LIFETIME_PRICE)} once. ${FOUNDERS_LIFETIME_CAP} seats.`}
           </h2>
           <Link
-            href={FOUNDERS_CHECKOUT}
+            href={checkoutHref}
             className="inline-block mt-6 bg-gradient-to-r from-emerald-500 to-emerald-600 text-white font-bold text-lg px-10 py-4 rounded-xl"
           >
-            Claim Founders Lifetime →
+            {special ? `Claim your lifetime seat — $${fmt(livePrice)} →` : 'Claim Founders Lifetime →'}
           </Link>
           <p className="mt-6 text-sm text-slate-400">
             Not ready?{' '}
