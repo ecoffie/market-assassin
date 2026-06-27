@@ -121,6 +121,20 @@ const OFFICE_ABBREV: Record<string, string> = {
   SOPS: 'Space Operations Squadron',
   CONTR: 'Contracting',
   PK: '', // 'PK' = a contracting subgroup; drop the noise token
+  // Army command tokens — so the many Army commands read as distinct names instead
+  // of terse codes (Eric, Jun 27: "how do we distinguish Army commands"). Only
+  // UNAMBIGUOUS tokens — deliberately NOT 'ACC' (Army Contracting Command vs Air
+  // Force Air Combat Command) so we never mislabel an office. Recognizable command
+  // acronyms (MICC, AMC) pass through unchanged.
+  ENDIST: 'Engineer District',          // USACE districts (e.g. W2SN ENDIST JAPAN)
+  USACE: 'US Army Corps of Engineers',
+  USAG: 'US Army Garrison',
+  USARC: 'US Army Reserve Command',
+  AMCOM: 'Aviation & Missile Command',
+  ECC: 'Expeditionary Contracting Command',
+  RCO: 'Regional Contracting Office',
+  DIST: 'District',
+  FT: 'Fort',                            // e.g. MICC FT JACKSON → MICC Fort Jackson
 };
 export function expandOfficeName(name: string): string {
   if (!name) return name;
