@@ -71,6 +71,14 @@ function isTransactionalType(emailType?: string): boolean {
   return /(two_factor|password_reset|magic_link|_receipt|access_grant|verification)/i.test(emailType);
 }
 
+// Cap-EXEMPT but suppression-RESPECTED: an expected, time-boxed event sequence the
+// recipient registered for (Mindy Launch reminders + the post-event offer). These
+// must always reach a registrant on the day regardless of the 3/day cap, but a
+// person who UNSUBSCRIBED still gets honored (unlike fully-transactional types).
+const CAP_EXEMPT_TYPES = new Set([
+  'mindy_launch_confirmation', 'mindy_launch_reminder', 'mindy_launch_lifetime',
+]);
+
 /**
  * Global send guard (#58) — checks BEFORE any provider call, across ALL ~15 email
  * streams. Returns a reason string to BLOCK, or null to allow. Transactional
@@ -92,7 +100,9 @@ async function emailGuardBlock(to: string, emailType: string | undefined, transa
     // 1) Suppression list (unsubscribe / complaint / bounce / frequency).
     const { data: supp } = await sb.from('email_suppressions').select('reason').eq('user_email', email).maybeSingle();
     if (supp) return `suppressed:${supp.reason}`;
-    // 2) Per-recipient daily cap across every stream.
+    // 2) Per-recipient daily cap across every stream — EXCEPT cap-exempt event
+    //    sequences (Mindy Launch), which the registrant expects on the day.
+    if (emailType && CAP_EXEMPT_TYPES.has(emailType)) return null;
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
     const { count } = await sb.from('email_provider_sends')
       .select('*', { count: 'exact', head: true })
