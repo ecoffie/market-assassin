@@ -138,6 +138,47 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
 - **Guardrail:** never delete user rows on profile change (add-only); a removed target
   agency stays in the list unless the user removes it explicitly.
 
+### Office / agency-name normalization — full pass (POST-DEMO, scope-first per Eric Jun 27)
+- **Why:** terse military/civilian office codes read as alphabet soup, and command
+  families blur together. PR #69 already added the Army command tokens; this is the
+  REST, scoped as ONE deliberate pass instead of piecemeal token adds (Eric: "before
+  making sweeping changes scope everything first").
+- **Surface (why it's sweeping):** there are THREE parallel normalizers, consumed
+  across ~14 files — do NOT extend them independently again:
+  - `expandOfficeName` + `OFFICE_ABBREV` + `formatDodaacOffice` (`src/lib/gov-contacts/dodaac.ts`)
+  - `cleanOfficeNameForDisplay` + `OFFICE_ABBREV` + `OFFICE_ACRONYMS` (`MyTargetListPanel.tsx`)
+  - `enhanceOfficeName` (`src/lib/utils/usaspending-helpers.ts`)
+  - Consumers: Alerts, MarketResearch, MyTargetList, Pipeline, Proposals, Recompetes
+    panels + find-agencies / find-hit-list / government-contracts / forecasts /
+    federal-contacts routes + `useDodaacNames.ts`.
+- **Gaps (data-driven from public/contracts-data.js Office field):**
+  - **GSA — biggest (~2,300 offices), slash-delimited soup** `GSA/FAS/PSHC/PROF SRVCS
+    SCHED-PSS`: FAS→Federal Acquisition Service, PBS→Public Buildings Service,
+    ITC→IT Category, PSS→Professional Services Schedule, SCHED→Schedule, ACQ→Acquisition,
+    SRVCS/SVCS→Services. **Needs a splitter tweak** — the expander only splits on
+    whitespace, so `GSA/FAS/ITC` is one token and never expands today.
+  - **Air Force AFLCMC** (Life Cycle Management Center; strip the leading `FA####` DoDAAC,
+    leave program codes `LPK/EBHK` as-is), **Navy NSWC** (Naval Surface Warfare Center),
+    **VA NAC** (National Acquisition Center), **FWS** (Fish & Wildlife Service).
+  - **Leave alone:** DLA (already reads fine), NIH internal codes (`NITAA DITA-DVI`),
+    raw DoDAACs (`W6QK`, `36F797` — those should be DECODED/stripped, not expanded),
+    generic words (TECH/INFO/HQ/AWARD).
+- **Ambiguity to handle (don't blind-expand):** `ACC` = Army Contracting Command
+  (`W6QK ACC-PICA`) vs Air Force **Air Combat Command**. Make it **context-aware**:
+  expand to Army Contracting Command ONLY when the DoDAAC/PIID starts with `W`.
+- **Proposed phases:**
+  1. **Consolidate** the 3 normalizers into ONE shared `normalizeOfficeName()` (parity
+     first — no display change), swap all 14 consumers to it.
+  2. Add **delimiter handling** (split on `/` and `-`) + the **GSA** token set (the win).
+  3. AF/Navy/VA acronyms + **context-aware ACC** + DoDAAC-code stripping.
+  4. **Golden-file test**: real office strings (from contracts-data.js + sam_opportunities)
+     → expected display, so behavior is locked across every surface.
+- **Risks:** broad blast radius (14 files); over-expansion verbosity vs 28-char chart
+  truncation (favor recognizable acronyms where space is tight); mislabeling from
+  ambiguous tokens (the ACC trap). The golden-file test is the guardrail.
+- **Effort:** ~½–1 day for the consolidation + GSA; the rest is incremental token adds
+  behind the shared normalizer + test.
+
 ### Proposal Assist — Tier 2 multi-pass volumes
 - **Status:** Built. **PR #34 open, NOT merged**, gated behind `PROPOSAL_MULTIPASS=1`.
 - **What:** batches a section's compliance requirements → drafts each batch in
