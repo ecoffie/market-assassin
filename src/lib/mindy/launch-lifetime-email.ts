@@ -19,6 +19,16 @@ import { sendEmail } from '@/lib/send-email';
 
 const LIFETIME_URL = 'https://getmindy.ai/lifetime';
 
+// The full Mindy Launch slide deck (hosted PDF) — delivered in the Monday recap.
+const SLIDES_URL = 'https://govcongiants.com/mindy-launch/slides/Mindy-Launch-Slides.pdf';
+
+// "Download the slides" card — the lead element of the Monday recap email.
+const slidesCardHtml = `<table width="100%" cellpadding="0" cellspacing="0" style="background-color: #eff6ff; border: 2px solid #bfdbfe; border-radius: 12px;"><tr><td style="padding: 24px; text-align: center;">
+        <p style="color: #1d4ed8; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 8px;">As promised — your slides</p>
+        <p style="color: #1e293b; font-size: 16px; margin: 0 0 18px; line-height: 1.6;">The full Mindy Launch deck &mdash; every slide from Saturday, yours to keep.</p>
+        <a href="${SLIDES_URL}" style="display: inline-block; background-color: #1d4ed8; color: #ffffff; padding: 14px 32px; border-radius: 10px; text-decoration: none; font-weight: 800; font-size: 16px;">&#11015;&nbsp; Download the Slides (PDF)</a>
+      </td></tr></table>`;
+
 /**
  * The 4-phase offer sequence. Headline deadline is "tonight" (matches the deck),
  * then an HONEST extension through Monday — framed as a real extension, not a
@@ -70,13 +80,14 @@ const PHASE_COPY: Record<LifetimePhase, {
       P(`You can&rsquo;t really lose here: try it free, claim it risk-free, and keep it for life. But the Founders price goes at midnight.`),
   },
   extension: {
-    subject: (n) => `${n}, you asked — extended (and it pays for itself)`,
-    badge: 'Extended · Final seats',
-    deadlineLine: 'Extended — final seats, through tonight (Monday, June 29).',
+    subject: (n) => `${n}, here are your Mindy Launch slides`,
+    badge: 'Your Slides · Lifetime extended',
+    deadlineLine: 'Founders price extended — through tonight (Monday, June 29).',
     intro: (n) =>
-      P(`${n} &mdash; a few of you needed a day to think it over. Fair. $2,997 once is a real decision, so we extended the Founders price through tonight.`) +
-      P(`Here&rsquo;s the math that makes it easy: at <strong style="color:#0f172a;">$149/month</strong>, you&rsquo;d cross $2,997 in about <strong style="color:#0f172a;">20 months</strong> &mdash; and keep paying every month after. Pay once now, and everything past month 20 is free, for life.`) +
-      P(`Still want to kick the tires? Mindy&rsquo;s free to try at getmindy.ai, and the lifetime seat is 30-day money-back. Here it is:`),
+      P(`${n} &mdash; thanks again for being part of Mindy Day. As promised, here&rsquo;s the full deck from Saturday &mdash; every slide, yours to keep:`) +
+      slidesCardHtml +
+      P(`<br>And one more thing: a few of you asked for more time on the Founders Lifetime &mdash; $2,997 once is a real decision. So we extended it through tonight.`) +
+      P(`The math makes it easy: at <strong style="color:#0f172a;">$149/month</strong> you&rsquo;d cross $2,997 in about <strong style="color:#0f172a;">20 months</strong> &mdash; then keep paying. Pay once now and everything after is free, for life. It&rsquo;s also 30-day money-back, and Mindy&rsquo;s free to try at getmindy.ai if you want to kick the tires first.`),
     outro:
       P(`This is a genuine extension &mdash; and the last one. When the final seats go, the lifetime price goes with them.`),
   },
