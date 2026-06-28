@@ -14,7 +14,6 @@
  */
 import Link from 'next/link';
 import BackToAppHeader from '@/components/BackToAppHeader';
-import { SUBPAGE_MIN_ROWS } from '@/lib/bigquery/recipients';
 
 interface SubpageTab {
   href: string;
@@ -43,19 +42,11 @@ export function SubpageLayout({
   activeTab,
   children,
 }: Props) {
-  // Only show the /agencies and /naics tabs when they clear the same
-  // SUBPAGE_MIN_ROWS thin-page gate those pages enforce with notFound() — else
-  // the nav links Googlebot to 404s. The active tab is always kept (you're on a
-  // page that already passed the gate). Mirrors the contractor profile + sitemap.
   const tabs: SubpageTab[] = [
     { href: `/contractors/${slug}`, label: 'Overview', active: activeTab === 'overview' },
     { href: `/contractors/${slug}/contracts`, label: 'Contracts', active: activeTab === 'contracts' },
-    ...(agencyCount >= SUBPAGE_MIN_ROWS || activeTab === 'agencies'
-      ? [{ href: `/contractors/${slug}/agencies`, label: 'Agencies', active: activeTab === 'agencies' }]
-      : []),
-    ...(naicsCount >= SUBPAGE_MIN_ROWS || activeTab === 'naics'
-      ? [{ href: `/contractors/${slug}/naics`, label: 'NAICS', active: activeTab === 'naics' }]
-      : []),
+    { href: `/contractors/${slug}/agencies`, label: 'Agencies', active: activeTab === 'agencies' },
+    { href: `/contractors/${slug}/naics`, label: 'NAICS', active: activeTab === 'naics' },
   ];
 
   return (
