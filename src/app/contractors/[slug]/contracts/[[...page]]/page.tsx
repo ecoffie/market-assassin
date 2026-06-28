@@ -60,8 +60,17 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const name = fmtCompanyName(recipient.rollup_name);
   const canonical = recipient.canonical_slug;
   const pageLabel = pageNum > 1 ? ` — Page ${pageNum}` : '';
-  const title = `${name} Federal Contracts${pageLabel} | Mindy`;
-  const description = `Browse ${recipient.award_count.toLocaleString()} federal contracts awarded to ${name}. ${fmtMoney(recipient.total_obligated)} obligated across ${recipient.distinct_agency_count} agencies.`;
+  const awardCount = Number(recipient.award_count || 0);
+  const awardsStr = awardCount.toLocaleString();
+  // Lead the title with the award count + dollar total (numbers lift CTR), and
+  // spell out in the description that every award lists its contract number —
+  // this page ranks p1 for raw solicitation/PIID searches at ~0% CTR, so the
+  // snippet needs to signal it answers contract-number lookups.
+  const title =
+    awardCount > 0
+      ? `${name} — ${awardsStr} Federal Contracts (${fmtMoney(recipient.total_obligated)})${pageLabel} | Mindy`
+      : `${name} Federal Contracts${pageLabel} | Mindy`;
+  const description = `Browse all ${awardsStr} federal contracts awarded to ${name} — ${fmtMoney(recipient.total_obligated)} across ${recipient.distinct_agency_count} agencies. See each award's contract number, agency, amount, and date.`;
   const canonicalPath = pageNum === 1 ? `/contractors/${canonical}/contracts` : `/contractors/${canonical}/contracts/${pageNum}`;
 
   return {

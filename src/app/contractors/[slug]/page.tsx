@@ -88,7 +88,14 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
     return { title: 'Contractor Not Found | Mindy' };
   }
   const displayName = fmtCompanyName(recipient.rollup_name);
-  const title = `${displayName} — Federal Contract Awards & Sales History | Mindy`;
+  // Front-load the total-obligated figure: it's the distinctive hook that sets
+  // a Mindy data page apart from the company's own site / Wikipedia in the SERP
+  // and lifts CTR on page-1 impressions. Fall back to generic copy at $0.
+  const totalObligated = Number(recipient.total_obligated || 0);
+  const title =
+    totalObligated > 0
+      ? `${displayName} — ${fmtMoney(totalObligated)} in Federal Contracts | Mindy`
+      : `${displayName} — Federal Contract Awards & History | Mindy`;
   const description = `${displayName} federal contracting profile: ${fmtMoney(recipient.total_obligated)} across ${Number(recipient.award_count || 0).toLocaleString()} awards from ${Number(recipient.distinct_agency_count || 0)} agencies. UEI, NAICS, recent contracts, year-over-year trends.`;
 
   // Canonical always points at the rollup's own slug, even when this page
