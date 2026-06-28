@@ -42,10 +42,16 @@ const APPLY = ARGS.includes('--apply');
 const FOLDER = (ARGS.find((a) => a.startsWith('--folder=')) || '').split('=')[1] || process.env.VAULT_FOLDER_ID || '';
 const ROOT_RESOURCE_KEY = (ARGS.find((a) => a.startsWith('--resourcekey=')) || '').split('=')[1] || process.env.VAULT_RESOURCE_KEY || '';
 const LIMIT = Number((ARGS.find((a) => a.startsWith('--limit=')) || '').split('=')[1]) || Infinity;
+// --from-cache=<dir>: skip Drive entirely; ingest from a disk cache of
+// <dir>/<id>.json (metadata) + <dir>/<id>.txt (text), populated out-of-band (e.g.
+// via the Drive MCP) when no Drive REST token is available. Same chunk/insert path.
+const CACHE_DIR = (ARGS.find((a) => a.startsWith('--from-cache=')) || '').split('=')[1] || '';
 
 const TOKEN = process.env.ACCESS_TOKEN;
-if (!TOKEN) { console.error('Missing ACCESS_TOKEN — see header for the gcloud command.'); process.exit(1); }
-if (!FOLDER) { console.error('Missing --folder=<VAULT_FOLDER_ID>.'); process.exit(1); }
+if (!CACHE_DIR) {
+  if (!TOKEN) { console.error('Missing ACCESS_TOKEN — see header (or use --from-cache=<dir>).'); process.exit(1); }
+  if (!FOLDER) { console.error('Missing --folder=<VAULT_FOLDER_ID> (or use --from-cache=<dir>).'); process.exit(1); }
+}
 
 // ---- env (Supabase) ---------------------------------------------
 const envPath = path.join(__dirname, '..', '.env.local');
@@ -60,8 +66,11 @@ if (fs.existsSync(envPath)) {
     envVars[k.trim()] = v;
   });
 }
+// `vercel env pull` can leave a literal "\n" (or whitespace) on the end of values
+// → a trailing char on the URL/key corrupts the apikey header ("Invalid API key").
+const clean = (s) => (s || '').replace(/\\n/g, '').replace(/[\s]+$/g, '').trim();
 const supabase = APPLY
-  ? createClient(envVars.NEXT_PUBLIC_SUPABASE_URL, envVars.SUPABASE_SERVICE_ROLE_KEY, { auth: { persistSession: false } })
+  ? createClient(clean(envVars.NEXT_PUBLIC_SUPABASE_URL), clean(envVars.SUPABASE_SERVICE_ROLE_KEY), { auth: { persistSession: false } })
   : null;
 if (APPLY && (!envVars.NEXT_PUBLIC_SUPABASE_URL || !envVars.SUPABASE_SERVICE_ROLE_KEY)) {
   console.error('Missing Supabase keys in .env.local (needed for --apply).');
@@ -183,10 +192,25 @@ function extFromMime(m) {
 // 0.2 meta boost + downstream filters exclude them). Vault is curated, so this is light.
 const EXCLUDE_RE = /(team meeting|internal only|do not share|payroll|invoice|password|bank|ssn)/i;
 
+// Cache mode: each <dir>/<id>.json = {id,name,mimeType,folderPath,size,modifiedTime};
+// text lives in <dir>/<id>.txt. Returned files carry a __cacheText marker path.
+function loadCache(dir) {
+  const abs = path.isAbsolute(dir) ? dir : path.join(process.cwd(), dir);
+  return fs.readdirSync(abs).filter((f) => f.endsWith('.json')).map((j) => {
+    const meta = JSON.parse(fs.readFileSync(path.join(abs, j), 'utf8'));
+    return { ...meta, __txt: path.join(abs, j.replace(/\.json$/, '.txt')) };
+  });
+}
+
+async function getText(f) {
+  if (f.__txt) return fs.existsSync(f.__txt) ? fs.readFileSync(f.__txt, 'utf8') : null;
+  return fetchText(f);
+}
+
 async function main() {
-  console.log(`[vault] ${APPLY ? 'APPLY' : 'DRY-RUN'} — walking folder ${FOLDER} …`);
-  const files = await walkFolder(FOLDER, 'The Vault', []);
-  console.log(`[vault] found ${files.length} files (recursive).`);
+  console.log(`[vault] ${APPLY ? 'APPLY' : 'DRY-RUN'} — source: ${CACHE_DIR ? `cache ${CACHE_DIR}` : `Drive folder ${FOLDER}`} …`);
+  const files = CACHE_DIR ? loadCache(CACHE_DIR) : await walkFolder(FOLDER, 'The Vault', []);
+  console.log(`[vault] found ${files.length} files.`);
 
   let done = 0, skipped = 0, failed = 0, excluded = 0;
   const failures = [];
@@ -202,7 +226,7 @@ async function main() {
 
     let text;
     try {
-      text = await fetchText(f);
+      text = await getText(f);
     } catch (e) {
       failed++; failures.push({ name: f.name, id: f.id, error: e.message });
       log(`FAIL extract ${f.name} (${f.id}): ${e.message}`);
