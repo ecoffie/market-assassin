@@ -184,8 +184,19 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
      **Scope held:** `clean` mode only (the wired GSA surface — My Target List).
      Wiring GSA normalization into other panels that show raw office (Recompetes
      fallback, etc.) is a 2d/display decision.
-  3. ⏳ **NEXT (phase 2d)** — AF/Navy/VA acronyms + **context-aware ACC** + DoDAAC-code
-     stripping. ALSO fold in the **4th cluster discovered during 2a**:
+  3. **Phase 2d, in flight (approved Jun 28 — build 2d-1→2d-2→2d-3 as separate PRs):**
+     - ✅ **2d-1 DONE 2026-06-28** (`feat/office-name-2d1-acc-parens`) — `clean`+`enhance`
+       only, NO expand/6-panel change. (a) Strip trailing parenthetical office codes
+       (`(36C245)`, digit-gated so `(EGLIN)` kept) — 53 clean + 69 enhance strings.
+       (b) Fixed the Army Contracting Command over-collapse in enhance (bare-`W6QK`
+       dict entry silently mapped ANAD/RRAD/WVA/APG→one string; now keeps the
+       sub-office, known ones → full name). Golden re-blessed; parity green.
+     - ⏳ **2d-2 NEXT (the 6-panel one)** — AF `FA####` stripping + Navy acronym
+       expansion (NSWC/NIWC/NAVSEA) + context-aware ACC in `expand` mode (feeds
+       formatDodaacOffice across Alerts/Pipeline/MarketResearch/Proposals/Recompetes/
+       forecasts). Show the golden diff before merge.
+     - ⏳ **2d-3** — GSA wiring into panels that still show raw office (Recompetes
+       fallback) + fold in the **4th cluster discovered during 2a**:
      `src/lib/government-contracts.ts` has its OWN `expandOfficeName` /
      `enhanceOfficeName` / `officeNameEnhancements` (agency-acronym expansion; only
      consumed by `/api/government-contracts/search`) — left untouched in 2a to hold
