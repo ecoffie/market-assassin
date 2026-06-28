@@ -10,15 +10,22 @@
  *   - cleanOfficeNameForDisplay (was src/components/app/panels/MyTargetListPanel.tsx)
  *   - enhanceOfficeName        (was src/lib/utils/usaspending-helpers.ts)
  *
- * PARITY-FIRST: each old function had a genuinely different algorithm AND its own
- * token map, so this phase does NOT merge the data or change any output — the three
+ * Phase 2a (PARITY-FIRST): each old function had a genuinely different algorithm
+ * AND its own token map, so 2a merged NO data and changed NO output — the three
  * behaviors are ported VERBATIM as three internal `mode`s selected via opts, locked
  * by a characterization test over a 793-string real corpus
  * (tests/office-name-parity.test.mts + tests/fixtures/office-name-*.json).
  *
- * The data MERGE + new tokens (GSA slash-splitter, AF/Navy/VA acronyms,
- * context-aware ACC, DoDAAC-stripping) is the DELIBERATE next phase (2c/2d), where
- * golden expectations change on purpose.
+ * Phase 2c (GSA slash-soup): the FIRST deliberate behavior change — `clean` mode now
+ * has a delimiter-aware path for GSA office strings ("GSA/FAS/PSHC/…", ~2,300
+ * offices) so they read as names instead of raw soup. Gated to strings starting
+ * "GSA/", so every NON-GSA `clean` output (and all of expand/enhance) stays
+ * byte-for-byte identical. The golden baseline was regenerated to bless the 22
+ * changed GSA strings.
+ *
+ * Still DEFERRED to phase 2d: AF/Navy/VA acronyms, context-aware ACC, DoDAAC-code
+ * stripping, expand/enhance convergence, and folding in the government-contracts.ts
+ * cluster below.
  *
  * NOT consolidated here (separate, out-of-scope cluster): src/lib/government-contracts.ts
  * has its OWN expandOfficeName/enhanceOfficeName/officeNameEnhancements (agency-acronym
@@ -99,23 +106,56 @@ const CLEAN_ACRONYMS = new Set([
 const CLEAN_DROP = new Set(['PK']); // FPDS noise token
 const CLEAN_SMALL_WORDS = new Set(['and', 'of', 'the', 'for', 'a', 'an', 'to', 'in', 'at']);
 
+// Phase 2c — GSA slash-soup. GSA office strings are slash/dash/comma-delimited
+// ("GSA/FAS/PSHC/PROF SRVCS SCHED-PSS", ~2,300 offices), which the whitespace-only
+// tokenizer never split → they rendered as raw soup. These tokens expand the GSA
+// service/category acronyms. Unknown sub-codes (GSS, QSCA…) fall through to
+// title-case — still far more readable than the raw string.
+const GSA_TOKENS: Record<string, string> = {
+  FAS: 'Federal Acquisition Service',
+  PBS: 'Public Buildings Service',
+  ITC: 'IT Category',
+  PSS: 'Professional Services Schedule',
+  SCHED: 'Schedule',
+  ACQ: 'Acquisition',
+  SRVCS: 'Services',
+  SVCS: 'Services',
+};
+
+// Map one token to its display form. `gsa` enables the GSA token set (phase 2c) —
+// it is OFF for the non-GSA path so that path stays byte-for-byte identical to the
+// original cleanMode (a stray "ACQ"/"PSS"/"PBS" token must NOT expand outside GSA).
+function titleCaseToken(tok: string, index: number, gsa: boolean): string[] {
+  const up = tok.toUpperCase().replace(/[^A-Z0-9]/g, '');
+  if (CLEAN_DROP.has(up)) return [];
+  if (gsa && up === 'GSA') return ['GSA'];
+  if (gsa && GSA_TOKENS[up]) return [GSA_TOKENS[up]];
+  if (CLEAN_ABBREV[up]) return [CLEAN_ABBREV[up]];
+  if (CLEAN_ACRONYMS.has(up)) return [up];
+  if (/^\d+$/.test(tok)) return [tok];
+  const lower = tok.toLowerCase();
+  if (index > 0 && CLEAN_SMALL_WORDS.has(lower)) return [lower];
+  return [tok.charAt(0).toUpperCase() + lower.slice(1)];
+}
+
 function cleanMode(name: string): string {
   if (!name) return name;
+
+  // GSA strings are slash-delimited and the LAST segment is meaningful (don't let
+  // the trailing-"/xx" stripper eat it), so they get their own delimiter-aware
+  // path. Everything else keeps the original behavior BYTE-FOR-BYTE (parity).
+  if (/^GSA\s*\//i.test(name.trim())) {
+    const out = name.trim().split(/[\s/\-,]+/).filter(Boolean)
+      .flatMap((tok, i) => titleCaseToken(tok, i, true));
+    return out.join(' ') || name.trim();
+  }
+
   const stripped = name.trim()
     .replace(/^[A-Za-z]{1,2}\d{2,4}[A-Za-z0-9]{0,3}\s+/, '') // leading DoDAAC code
     .replace(/\s*\/\s*\w{2,5}\s*$/, '')                       // trailing /xx suffix
     .trim();
   if (!stripped) return name.trim();
-  const out = stripped.split(/\s+/).flatMap((tok, i) => {
-    const up = tok.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (CLEAN_DROP.has(up)) return [];
-    if (CLEAN_ABBREV[up]) return [CLEAN_ABBREV[up]];
-    if (CLEAN_ACRONYMS.has(up)) return [up];
-    if (/^\d+$/.test(tok)) return [tok];
-    const lower = tok.toLowerCase();
-    if (i > 0 && CLEAN_SMALL_WORDS.has(lower)) return [lower];
-    return [tok.charAt(0).toUpperCase() + lower.slice(1)];
-  });
+  const out = stripped.split(/\s+/).flatMap((tok, i) => titleCaseToken(tok, i, false));
   return out.join(' ') || name.trim();
 }
 

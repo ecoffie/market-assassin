@@ -175,8 +175,15 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
      (dodaac.ts → federal-contacts + internal formatDodaacOffice), `enhanceOfficeName`
      + `officeNameEnhancements` (usaspending-helpers → find-hit-list + find-agencies),
      `cleanOfficeNameForDisplay` (MyTargetListPanel).
-  2. ⏳ **NEXT (phase 2c)** — Add **delimiter handling** (split on `/` and `-`) + the
-     **GSA** token set (the win). Behavior changes on purpose → regenerate golden.
+  2. ✅ **DONE 2026-06-28 (phase 2c) — GSA slash-soup.** `clean` mode gained a
+     delimiter-aware path (split on `/ - ,`) + a GSA token set (FAS→Federal
+     Acquisition Service, PBS→Public Buildings Service, ITC→IT Category, PSS, SCHED,
+     ACQ, SRVCS/SVCS). Gated to strings starting `GSA/` → 22 GSA strings improved in
+     My Target List; every non-GSA `clean` + all expand/enhance output stays
+     byte-identical. Golden regenerated to bless the diff; parity green (2,379).
+     **Scope held:** `clean` mode only (the wired GSA surface — My Target List).
+     Wiring GSA normalization into other panels that show raw office (Recompetes
+     fallback, etc.) is a 2d/display decision.
   3. ⏳ **NEXT (phase 2d)** — AF/Navy/VA acronyms + **context-aware ACC** + DoDAAC-code
      stripping. ALSO fold in the **4th cluster discovered during 2a**:
      `src/lib/government-contracts.ts` has its OWN `expandOfficeName` /
