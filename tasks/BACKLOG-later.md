@@ -222,19 +222,18 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
 - **Effort:** ~½–1 day for the consolidation + GSA; the rest is incremental token adds
   behind the shared normalizer + test.
 
-### Proposal Assist — Tier 2 multi-pass volumes
-- **Status:** ✅ **MERGED 2026-06-28 (PR #34, commit `6d919b46`)** — still gated OFF
-  via `PROPOSAL_MULTIPASS` (unset = no behavior change in prod). Code is on main.
+### Proposal Assist — Tier 2 multi-pass volumes  → PUSHED TO NEXT PHASE (Eric, Jun 28)
+- **Status:** Code MERGED 2026-06-28 (PR #34, commit `6d919b46`) but **gated OFF** via
+  `PROPOSAL_MULTIPASS` (unset = zero prod behavior change). **NOT a Phase-1 item** —
+  Eric pushed enabling it to the **next phase**. It sits dormant on main until then.
 - **What:** batches a section's compliance requirements → drafts each batch in
   parallel as a subsection → assembles 50-100+ page volumes. Tier 1
   (situation-aware single-pass length) already SHIPPED (PR #33).
-- **TABLED 2026-06-28 (Eric) — intentionally NOT enabled.** Code is merged but
-  dormant (no `PROPOSAL_MULTIPASS` env = zero prod behavior change). Enabling is a
-  WATCHED step (a heavy section fires ~25 LLM calls) and Eric does not want to babysit
-  it right now. To turn on LATER: set `PROPOSAL_MULTIPASS=1` in Vercel (+ optional
-  `_THRESHOLD`/`_BATCH`/`_CONCURRENCY`), redeploy, QA one long RFP. Follow-ups in
-  `src/lib/proposal/multi-pass.ts` header: context-reuse refactor (load vault/RAG
-  once per section), optional intro+TOC pass, per-user LLM budget guardrails.
+- **To enable in the next phase:** set `PROPOSAL_MULTIPASS=1` in Vercel (+ optional
+  `_THRESHOLD`/`_BATCH`/`_CONCURRENCY`), redeploy, QA one long RFP — a WATCHED step
+  (a heavy section fires ~25 LLM calls). Follow-ups in `src/lib/proposal/multi-pass.ts`
+  header: context-reuse refactor (load vault/RAG once per section), optional intro+TOC
+  pass, per-user LLM budget guardrails.
 
 ### Free-user tracking (pricing decision — parked, Eric's call)
 - **What:** let FREE users track opportunities (My Pursuits) from Market Research.
