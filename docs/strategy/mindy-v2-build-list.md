@@ -121,6 +121,19 @@
 
 ---
 
+### 10. Event contact follow-up
+**Estimated build:** 2-3 days (MVP)
+**Dev Tier requirement:** Pro for auto-send; capture + calendar reminders on Free
+**Pitch:** Walk out of an industry day with 15 business cards. Drop them into Mindy — she drafts the follow-up, sends it, and puts the next touch on your calendar. Never lose a contact again.
+
+**Why it matters:** BD is relationships, not just opportunities. Converts Mindy from "find the opp" to "work the relationship that wins it" — the other half of BD. High-ceiling/low-floor, no new surface area.
+
+**Build (reuse, don't add):** extend `user_teaming_partners` (+6 nullable cols: source, met_at, met_on, followup_cadence, followup_paused, last_followup_day); quick-capture in the Teaming/Contacts panel; AI-drafted first email via `callLLM()` grounded in notes; **dispatcher** job `contact-followups` (mirrors `upgrade-drip`, Day 1→7→30→90) via `sendEmail()` from `mail.getmindy.ai`; calendar reminders reuse the launch `.ics`/Google-Calendar helper. Status ≥ responded pauses the cadence. No vercel.json cron.
+
+**Full spec:** [`docs/PRD-event-contact-followup.md`](../PRD-event-contact-followup.md) — incl. 3 open questions (auto-send on Free?, sender deliverability, CAN-SPAM posture).
+
+---
+
 ## Tier 3 — Mature platform features (months 2-3)
 
 ### 10. Pursuit Brief autofill from meeting transcript
