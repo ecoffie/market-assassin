@@ -23,9 +23,16 @@
  * byte-for-byte identical. The golden baseline was regenerated to bless the 22
  * changed GSA strings.
  *
- * Still DEFERRED to phase 2d: AF/Navy/VA acronyms, context-aware ACC, DoDAAC-code
- * stripping, expand/enhance convergence, and folding in the government-contracts.ts
- * cluster below.
+ * Phase 2d-1 (clean+enhance only — NOT expand, so no 6-panel change): strip a
+ * trailing parenthetical office code ("(36C245)", digit-gated so "(EGLIN)" is kept)
+ * and fix the Army Contracting Command over-collapse in enhance (the bare-"W6QK"
+ * dict entry silently mapped ANAD/RRAD/WVA/APG to one string — now the sub-office is
+ * kept). The "W" DoDAAC prefix disambiguates ACC = Army Contracting Command.
+ *
+ * Still DEFERRED to phase 2d-2/2d-3: AF FA#### stripping + Navy acronyms +
+ * context-aware ACC in EXPAND mode (the 6-panel change), expand/enhance convergence,
+ * GSA wiring into panels that show raw office, and folding in the
+ * government-contracts.ts cluster below.
  *
  * NOT consolidated here (separate, out-of-scope cluster): src/lib/government-contracts.ts
  * has its OWN expandOfficeName/enhanceOfficeName/officeNameEnhancements (agency-acronym
@@ -122,6 +129,16 @@ const GSA_TOKENS: Record<string, string> = {
   SVCS: 'Services',
 };
 
+// Phase 2d-1 — strip a trailing parenthetical DoDAAC/office code ("…OFFICE 5
+// (36C245)", "NAC PHARMACEUTICALS (36E797)", "IBC ACQ SVCS DIRECTORATE (00004)").
+// Digit-gated: the code always has a digit, so a real trailing name like "(EGLIN)"
+// (pure alpha) is KEPT. Shared by clean + enhance.
+function stripTrailingCodeParen(s: string): string {
+  const m = s.match(/^(.*?)\s*\(([0-9A-Za-z]{4,6})\)\s*$/);
+  if (m && /\d/.test(m[2])) return m[1].trim();
+  return s;
+}
+
 // Map one token to its display form. `gsa` enables the GSA token set (phase 2c) —
 // it is OFF for the non-GSA path so that path stays byte-for-byte identical to the
 // original cleanMode (a stray "ACQ"/"PSS"/"PBS" token must NOT expand outside GSA).
@@ -150,7 +167,7 @@ function cleanMode(name: string): string {
     return out.join(' ') || name.trim();
   }
 
-  const stripped = name.trim()
+  const stripped = stripTrailingCodeParen(name.trim())
     .replace(/^[A-Za-z]{1,2}\d{2,4}[A-Za-z0-9]{0,3}\s+/, '') // leading DoDAAC code
     .replace(/\s*\/\s*\w{2,5}\s*$/, '')                       // trailing /xx suffix
     .trim();
@@ -191,8 +208,31 @@ export const officeNameEnhancements: Record<string, string> = {
   'Ctr': 'Center',
 };
 
+// Phase 2d-1 — known Army Contracting Command sub-offices get their canonical name.
+const ACC_KNOWN: Record<string, string> = {
+  APG: 'Aberdeen Proving Ground',
+  PICA: 'Program Integration and Contracting Activity',
+  RSA: 'Redstone Arsenal',
+};
+
 function enhanceMode(officeName: string): string {
   if (!officeName) return officeName;
+
+  // 2d-1: drop a trailing parenthetical office code so it doesn't defeat the dict
+  // match (e.g. "NAC PHARMACEUTICALS (36E797)" → "NAC PHARMACEUTICALS").
+  officeName = stripTrailingCodeParen(officeName);
+
+  // 2d-1: Army Contracting Command. The bare-"W6QK" dict entry below used to
+  // substring-collapse EVERY sub-office ("W6QK ACC ANAD", "…RRAD", "…WVA") to the
+  // same "Army Contracting Command" — silent data loss. Keep the specific suffix,
+  // mapping the well-known ones to their full name. The "W" DoDAAC prefix is what
+  // disambiguates Army Contracting Command from Air Force Air Combat Command.
+  const acc = officeName.match(/^W6QK\s+ACC[\s-]+(.+)$/i);
+  if (acc) {
+    const suffix = acc[1].trim();
+    return `Army Contracting Command - ${ACC_KNOWN[suffix.toUpperCase()] || suffix}`;
+  }
+  if (/^W6QK(\s+ACC)?\s*$/i.test(officeName)) return 'Army Contracting Command';
 
   // Strip a leading DoDAAC code (6-char alphanumeric office code, e.g. "FA8614",
   // "W912DY", "N00024") that USASpending prepends to office names. Only strips a
