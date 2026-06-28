@@ -374,66 +374,10 @@ export const industryNames: Record<string, string> = {
   '928': 'National Security and International Affairs'
 };
 
-// Office name enhancements
-export const officeNameEnhancements: Record<string, string> = {
-  'Endist Omaha': 'U.S. Army Engineer District, Omaha',
-  'W071': 'U.S. Army Engineer District, Omaha',
-  'Endist Sacramento': 'U.S. Army Engineer District, Sacramento',
-  'Endist Louisville': 'U.S. Army Engineer District, Louisville',
-  'Endist Norfolk': 'U.S. Army Engineer District, Norfolk',
-  'USA Eng Spt Ctr Huntsvil': 'U.S. Army Engineering and Support Center, Huntsville, Alabama',
-  '2V6': 'U.S. Army Engineering and Support Center, Huntsville, Alabama',
-  'ACC-PICA': 'Army Contracting Command - Program Integration and Contracting Activity',
-  'W6QK': 'Army Contracting Command',
-  'ACC-APG Natick': 'Army Contracting Command - Aberdeen Proving Ground, Natick',
-  'ACC-RSA': 'Army Contracting Command - Redstone Arsenal',
-  'ACC-APG': 'Army Contracting Command - Aberdeen Proving Ground',
-  'Afmc Wpafb Oh': 'Air Force Materiel Command - Wright-Patterson AFB, Ohio',
-  'Afsc Maxwell Afb Al': 'Air Force Sustainment Center - Maxwell AFB, Alabama',
-  '772 ESS PKD': '772 Enterprise Sourcing Squadron - Wright-Patterson AFB',
-  'Navfac Northwest': 'Naval Facilities Engineering Command Northwest',
-  'Navfac Atlantic': 'Naval Facilities Engineering Command Atlantic',
-  'Navfac Pacific': 'Naval Facilities Engineering Command Pacific',
-  'Navsup Flc Norfolk': 'Naval Supply Systems Command Fleet Logistics Center Norfolk',
-  'Cbp Oaq': 'U.S. Customs and Border Protection - Office of Acquisition',
-  'Svc': 'Service',
-  'Dept': 'Department',
-  'Hq': 'Headquarters',
-  'Cmd': 'Command',
-  'Ctr': 'Center'
-};
-
-export function enhanceOfficeName(officeName: string | null): string | null {
-  if (!officeName) return officeName;
-
-  // Strip a leading DoDAAC code (6-char alphanumeric office code, e.g. "FA8614",
-  // "FA8627", "W912DY", "N00024") that USASpending prepends to Air Force / DoD
-  // office names — it rendered as an ugly "Fa8614 Air Force…" after title-casing
-  // (Eric, Jun 25). Only strips a 6-char token with a letter + ≥2 digits (a code,
-  // never a real word like "CENTER"/"OFFICE") followed by a separator, and only
-  // when a readable name remains.
-  const dodaac = officeName.match(/^([A-Za-z0-9]{6})[\s:.\-]+(\S.*)$/);
-  if (dodaac) {
-    const [, code, rest] = dodaac;
-    if (/[A-Za-z]/.test(code) && (code.match(/\d/g)?.length ?? 0) >= 2) {
-      officeName = rest.trim();
-    }
-  }
-
-  // Check for direct match
-  if (officeNameEnhancements[officeName]) {
-    return officeNameEnhancements[officeName];
-  }
-
-  // Check for partial matches
-  for (const [abbrev, fullName] of Object.entries(officeNameEnhancements)) {
-    if (officeName.includes(abbrev)) {
-      return fullName;
-    }
-  }
-
-  return officeName;
-}
+// Office-name normalization moved to the shared normalizer
+// (src/lib/gov-contacts/office-name.ts). Callers use
+// `normalizeOfficeName(name, { mode: 'enhance' })` instead of the old
+// `enhanceOfficeName` / `officeNameEnhancements` that lived here.
 
 // State mapping (ZIP code to state) - Comprehensive implementation
 export function getStateFromZip(zip: string): string | null {

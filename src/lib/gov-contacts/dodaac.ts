@@ -17,6 +17,7 @@
  * DoD contacts) — far finer than the parent agency. We decode the CODE always,
  * and resolve a friendly OFFICE NAME for the common ones via DODAAC_NAMES.
  */
+import { normalizeOfficeName } from './office-name';
 
 // 9th-char instrument type. Per Eric + DFARS PGI 204.7003.
 const TYPE_BY_CHAR: Record<string, string> = {
@@ -106,48 +107,6 @@ export function decodeDodaac(solicitationNumber: string | null): DodaacInfo | nu
  * (civilian formats, non-DoD) so callers can fall back to the agency name.
  * e.g. "NAVSUP Weapon Systems Support" or "DLA Aviation · IDIQ" or "N00104".
  */
-// FPDS office names are terse military abbreviations ("87 CONS PK", "765 ABS
-// CONF"). Expand the common tokens so they read like names, not codes (Eric:
-// "still showing codes not names"). Keeps the numeric unit prefix.
-const OFFICE_ABBREV: Record<string, string> = {
-  CONS: 'Contracting Squadron',
-  CONF: 'Contracting Flight',
-  ABS: 'Air Base Squadron',
-  ABW: 'Air Base Wing',
-  CES: 'Civil Engineer Squadron',
-  LGC: 'Logistics Contracting',
-  LRS: 'Logistics Readiness Squadron',
-  MSC: 'Mission Support',
-  SOPS: 'Space Operations Squadron',
-  CONTR: 'Contracting',
-  PK: '', // 'PK' = a contracting subgroup; drop the noise token
-  // Army command tokens — so the many Army commands read as distinct names instead
-  // of terse codes (Eric, Jun 27: "how do we distinguish Army commands"). Only
-  // UNAMBIGUOUS tokens — deliberately NOT 'ACC' (Army Contracting Command vs Air
-  // Force Air Combat Command) so we never mislabel an office. Recognizable command
-  // acronyms (MICC, AMC) pass through unchanged.
-  ENDIST: 'Engineer District',          // USACE districts (e.g. W2SN ENDIST JAPAN)
-  USACE: 'US Army Corps of Engineers',
-  USAG: 'US Army Garrison',
-  USARC: 'US Army Reserve Command',
-  AMCOM: 'Aviation & Missile Command',
-  ECC: 'Expeditionary Contracting Command',
-  RCO: 'Regional Contracting Office',
-  DIST: 'District',
-  FT: 'Fort',                            // e.g. MICC FT JACKSON → MICC Fort Jackson
-};
-export function expandOfficeName(name: string): string {
-  if (!name) return name;
-  // Only expand when it looks like a terse code-name (has a SHORT all-caps token).
-  const tokens = name.trim().split(/\s+/);
-  const expanded = tokens.map(t => {
-    const up = t.toUpperCase();
-    if (up in OFFICE_ABBREV) return OFFICE_ABBREV[up];
-    return t;
-  }).filter(Boolean).join(' ').replace(/\s{2,}/g, ' ').trim();
-  return expanded || name;
-}
-
 export function formatDodaacOffice(
   solicitationNumber: string | null,
   nameMap?: Map<string, string>,
@@ -156,6 +115,8 @@ export function formatDodaacOffice(
   if (!d) return null;
   // Name resolution: directory table (passed in) > in-code map > raw code.
   const raw = (nameMap && nameMap.get(d.dodaac)) || d.officeName || d.dodaac;
-  const office = expandOfficeName(raw);
+  // FPDS office names are terse military abbreviations ("87 CONS PK") — the
+  // 'expand' mode of the shared normalizer expands the common tokens.
+  const office = normalizeOfficeName(raw, { mode: 'expand' });
   return d.instrumentType ? `${office} · ${d.instrumentType}` : office;
 }

@@ -5,7 +5,6 @@ import {
   veteranMap,
   naicsExpansion,
   industryNames,
-  enhanceOfficeName,
   getStateFromZip,
   getBorderingStates,
   getExtendedRegionStates,
@@ -16,6 +15,7 @@ import {
   MARKET_SPEND_WINDOW
 } from '@/lib/utils/usaspending-helpers';
 import { fetchFPDSByNaics, mapFPDSToAgencies } from '@/lib/utils/fpds-api';
+import { normalizeOfficeName } from '@/lib/gov-contacts/office-name';
 import { expandGenericDoDAgency } from '@/lib/utils/command-info';
 import { expandNAICSCodes, parseNAICSInput } from '@/lib/utils/naics-expansion';
 import { marketFilterToUsaspending } from '@/lib/market/keyword-coverage';
@@ -862,10 +862,10 @@ export async function POST(request: NextRequest) {
       // Don't fall back to sub-agency - keep as null/empty if no specific office
       const rawAwardingOffice = award['Awarding Office'] || null;
 
-      const awardingSubAgency = enhanceOfficeName(rawAwardingSubAgency) || rawAwardingSubAgency;
+      const awardingSubAgency = normalizeOfficeName(rawAwardingSubAgency, { mode: 'enhance' }) || rawAwardingSubAgency;
       // If no office provided, use sub-agency for display but track that it's aggregated
       const awardingOffice = rawAwardingOffice
-        ? (enhanceOfficeName(rawAwardingOffice) || rawAwardingOffice)
+        ? (normalizeOfficeName(rawAwardingOffice, { mode: 'enhance' }) || rawAwardingOffice)
         : awardingSubAgency; // Fall back for aggregation key
 
       const awardingAgencyCode = award['Awarding Agency Code'] || '';

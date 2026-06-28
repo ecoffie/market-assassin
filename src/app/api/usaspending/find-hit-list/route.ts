@@ -4,8 +4,8 @@ import {
   setAsideMap,
   veteranMap,
   naicsExpansion,
-  enhanceOfficeName,
 } from '@/lib/utils/usaspending-helpers';
+import { normalizeOfficeName } from '@/lib/gov-contacts/office-name';
 
 interface HitListContract {
   id: string;
@@ -201,7 +201,7 @@ export async function POST(request: NextRequest) {
       }
 
       const officeName = result['Awarding Office Name'] || 'Unknown Office';
-      const enhancedOfficeName = enhanceOfficeName(officeName) || officeName;
+      const enhancedOfficeName = normalizeOfficeName(officeName, { mode: 'enhance' }) || officeName;
 
       return {
         id: result['Award ID'] || `hit-list-${index + 1}`,
