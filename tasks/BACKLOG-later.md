@@ -191,16 +191,25 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
        (b) Fixed the Army Contracting Command over-collapse in enhance (bare-`W6QK`
        dict entry silently mapped ANAD/RRAD/WVA/APG→one string; now keeps the
        sub-office, known ones → full name). Golden re-blessed; parity green.
-     - ⏳ **2d-2 NEXT (the 6-panel one)** — AF `FA####` stripping + Navy acronym
-       expansion (NSWC/NIWC/NAVSEA) + context-aware ACC in `expand` mode (feeds
-       formatDodaacOffice across Alerts/Pipeline/MarketResearch/Proposals/Recompetes/
-       forecasts). Show the golden diff before merge.
-     - ⏳ **2d-3** — GSA wiring into panels that still show raw office (Recompetes
-       fallback) + fold in the **4th cluster discovered during 2a**:
-     `src/lib/government-contracts.ts` has its OWN `expandOfficeName` /
-     `enhanceOfficeName` / `officeNameEnhancements` (agency-acronym expansion; only
-     consumed by `/api/government-contracts/search`) — left untouched in 2a to hold
-     scope; converge it here.
+     - ❌ **2d-2 DROPPED as redundant (Eric, Jun 28).** Investigation showed `expand`
+       is fed by `formatDodaacOffice` → `dodaac_directory`, whose populate script
+       (`scripts/populate-dodaac-directory.mjs` `cleanName()`) ALREADY strips the
+       leading `FA####`/DoDAAC prefix at write time. So AF-prefix stripping in `expand`
+       is a no-op in prod; the raw corpus strings flow through `clean`/`enhance`
+       (already handled by 2c/2d-1). The only visible expand-mode lever was Navy
+       full-name expansion (NSWC→Naval Surface Warfare Center), a verbosity tradeoff
+       against 28-char chart labels — not worth a 6-panel change.
+     - ❌ **2d-3 DROPPED as redundant (Eric, Jun 28).** Recompetes renders
+       `agency • subAgency • formatDodaacOffice(piid)` — it shows the SUB-AGENCY, not a
+       raw GSA `Office` string, so there's no GSA soup to wire there. And the
+       `government-contracts.ts` "4th cluster" is genuinely DIFFERENT functionality
+       (agency-acronym expansion: USCIS/CISA/abbreviationExpansions + DoDAAC→name map,
+       only consumed by `/api/government-contracts/search`) — folding it into the
+       office-TOKEN normalizer would re-merge two unlike algorithms for little gain.
+       Leave it as its own module.
+     - ✅ **Office-name normalization track CLOSED after 2d-1.** Covered surfaces: My
+       Target List (`clean`), find-agencies/hit-list (`enhance`), the 6 `expand` panels
+       (directory pre-cleans). PRs: #71 (2a/2b/2c), #72 (2d-1).
   4. ✅ **DONE 2026-06-28 (phase 2b) — Golden-file test.** `tests/office-name-parity.test.mts`
      locks `normalizeOfficeName` output against a frozen baseline of 793 REAL office
      strings (`tests/fixtures/office-name-corpus.json` from contracts-data.js) × 3 modes
