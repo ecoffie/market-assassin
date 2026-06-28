@@ -24,6 +24,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { logToolError, ToolNames, AIProviders, classifyError } from '@/lib/tool-errors';
 import { generateV2Draft } from '@/lib/proposal/v2';
+import { generateMultiPassSection, MULTIPASS_ENABLED } from '@/lib/proposal/multi-pass';
 import { SECTION_META } from '@/lib/proposal/sections';
 import type { SectionType } from '@/lib/proposal/types';
 import { archiveContent } from '@/lib/archive/persist';
@@ -86,7 +87,7 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const result = await generateV2Draft({
+    const draftArgs = {
       email,
       sectionType,
       sourceText,
@@ -96,7 +97,12 @@ export async function POST(request: NextRequest) {
       requirements: Array.isArray(body.requirements)
         ? body.requirements.filter(r => r?.requirement).map(r => ({ id: r.id, requirement: r.requirement!, category: (r.category as ComplianceReq['category']) || 'other', section: r.section }))
         : undefined,
-    });
+    };
+    // TIER 2 (gated off): when PROPOSAL_MULTIPASS=1, a requirement-heavy section is
+    // drafted as a multi-pass volume; otherwise this is the normal single-pass draft.
+    const result = MULTIPASS_ENABLED
+      ? await generateMultiPassSection(draftArgs)
+      : await generateV2Draft(draftArgs);
 
     // Auto-library: fire-and-forget archive of this draft so the user
     // can recall it later via /app/library. Failure is non-blocking.
