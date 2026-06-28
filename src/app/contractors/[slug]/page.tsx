@@ -35,6 +35,7 @@ import {
   getExecutivesForRecipient,
   getSimilarRecipients,
   recipientSlug,
+  SUBPAGE_MIN_ROWS,
 } from '@/lib/bigquery/recipients';
 import { ContractorAnalytics } from '@/components/contractors/ContractorAnalytics';
 import {
@@ -292,18 +293,26 @@ export default async function ContractorPage({ params }: PageProps) {
           >
             Contracts
           </Link>
-          <Link
-            href={`/contractors/${slug}/agencies`}
-            className="px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700 transition-colors"
-          >
-            Agencies
-          </Link>
-          <Link
-            href={`/contractors/${slug}/naics`}
-            className="px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700 transition-colors"
-          >
-            NAICS
-          </Link>
+          {/* Only link the /agencies and /naics sub-pages when they clear the
+              same SUBPAGE_MIN_ROWS thin-page gate those pages enforce with
+              notFound() (and the sitemap uses). Linking them unconditionally
+              sent Googlebot to thousands of 404s for thin contractors. */}
+          {(recipient.distinct_agency_count || 0) >= SUBPAGE_MIN_ROWS && (
+            <Link
+              href={`/contractors/${slug}/agencies`}
+              className="px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700 transition-colors"
+            >
+              Agencies
+            </Link>
+          )}
+          {(recipient.distinct_naics_count || 0) >= SUBPAGE_MIN_ROWS && (
+            <Link
+              href={`/contractors/${slug}/naics`}
+              className="px-4 py-3 text-sm font-medium whitespace-nowrap border-b-2 border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-700 transition-colors"
+            >
+              NAICS
+            </Link>
+          )}
         </div>
       </div>
 
