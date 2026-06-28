@@ -40,6 +40,7 @@ const { createClient } = require('@supabase/supabase-js');
 const ARGS = process.argv.slice(2);
 const APPLY = ARGS.includes('--apply');
 const FOLDER = (ARGS.find((a) => a.startsWith('--folder=')) || '').split('=')[1] || process.env.VAULT_FOLDER_ID || '';
+const ROOT_RESOURCE_KEY = (ARGS.find((a) => a.startsWith('--resourcekey=')) || '').split('=')[1] || process.env.VAULT_RESOURCE_KEY || '';
 const LIMIT = Number((ARGS.find((a) => a.startsWith('--limit=')) || '').split('=')[1]) || Infinity;
 
 const TOKEN = process.env.ACCESS_TOKEN;
@@ -68,7 +69,21 @@ if (APPLY && (!envVars.NEXT_PUBLIC_SUPABASE_URL || !envVars.SUPABASE_SERVICE_ROL
 }
 
 // ---- Drive ------------------------------------------------------
-const auth = { headers: { Authorization: `Bearer ${TOKEN}` } };
+// Old-style shared folders/files (0B… ids) carry a resourceKey that MUST be sent
+// on every request (Google's 2021 link-security change) or the API 404s. We
+// accumulate fileId→resourceKey as we traverse and send them all via the
+// X-Goog-Drive-Resource-Keys header (comma-separated `<id>/<key>` pairs).
+const RESOURCE_KEYS = new Map();
+if (ROOT_RESOURCE_KEY) RESOURCE_KEYS.set(FOLDER, ROOT_RESOURCE_KEY);
+function rkHeaderValue() {
+  return [...RESOURCE_KEYS.entries()].map(([id, k]) => `${id}/${k}`).join(',');
+}
+function driveHeaders() {
+  const h = { Authorization: `Bearer ${TOKEN}` };
+  const rk = rkHeaderValue();
+  if (rk) h['X-Goog-Drive-Resource-Keys'] = rk;
+  return h;
+}
 const GOOGLE_DOC = 'application/vnd.google-apps.document';
 const GOOGLE_SLIDES = 'application/vnd.google-apps.presentation';
 const GOOGLE_SHEET = 'application/vnd.google-apps.spreadsheet';
@@ -77,7 +92,7 @@ const DOCX = 'application/vnd.openxmlformats-officedocument.wordprocessingml.doc
 const PDF = 'application/pdf';
 
 async function driveJson(url) {
-  const r = await fetch(url, auth);
+  const r = await fetch(url, { headers: driveHeaders() });
   if (!r.ok) throw new Error(`${r.status} ${(await r.text()).slice(0, 200)}`);
   return r.json();
 }
@@ -89,12 +104,14 @@ async function walkFolder(folderId, folderPath, out) {
     const u = new URL('https://www.googleapis.com/drive/v3/files');
     u.searchParams.set('q', `'${folderId}' in parents and trashed=false`);
     u.searchParams.set('pageSize', '200');
-    u.searchParams.set('fields', 'nextPageToken,files(id,name,mimeType,size,modifiedTime)');
+    u.searchParams.set('fields', 'nextPageToken,files(id,name,mimeType,size,modifiedTime,resourceKey)');
     u.searchParams.set('supportsAllDrives', 'true');
     u.searchParams.set('includeItemsFromAllDrives', 'true');
     if (pageToken) u.searchParams.set('pageToken', pageToken);
     const j = await driveJson(u.toString());
     for (const f of j.files || []) {
+      // Record each child's resourceKey so later export/media/list calls carry it.
+      if (f.resourceKey) RESOURCE_KEYS.set(f.id, f.resourceKey);
       if (f.mimeType === GOOGLE_FOLDER) {
         await walkFolder(f.id, `${folderPath}/${f.name}`, out);
       } else {
@@ -110,17 +127,17 @@ async function walkFolder(folderId, folderPath, out) {
 async function fetchText(file) {
   const { id, mimeType } = file;
   if (mimeType === GOOGLE_DOC || mimeType === GOOGLE_SLIDES) {
-    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${id}/export?mimeType=text/plain`, auth);
+    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${id}/export?mimeType=text/plain`, { headers: driveHeaders() });
     if (!r.ok) throw new Error(`export ${r.status}`);
     return r.text();
   }
   if (mimeType === GOOGLE_SHEET) {
-    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${id}/export?mimeType=text/csv`, auth);
+    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${id}/export?mimeType=text/csv`, { headers: driveHeaders() });
     if (!r.ok) throw new Error(`export ${r.status}`);
     return r.text();
   }
   if (mimeType === DOCX || mimeType === PDF || mimeType === 'text/plain') {
-    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media&supportsAllDrives=true`, auth);
+    const r = await fetch(`https://www.googleapis.com/drive/v3/files/${id}?alt=media&supportsAllDrives=true`, { headers: driveHeaders() });
     if (!r.ok) throw new Error(`media ${r.status}`);
     const buf = Buffer.from(await r.arrayBuffer());
     if (mimeType === DOCX) {
