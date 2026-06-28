@@ -237,8 +237,12 @@ async function main() {
 
     const chunks = chunkText(text);
     const wordCount = text.split(/\s+/).filter(Boolean).length;
-    const title = f.name.replace(/\.(docx?|pdf|txt)$/i, '').trim();
+    const title = f.name.replace(/\.(docx?|pdf|txt|pptx?|dotx)$/i, '').trim();
     const topicTags = ['vault', ...f.folderPath.split('/').slice(1).map(slug).filter(Boolean)].slice(0, 8);
+    // Per-doc doc_type override (e.g. proposal_template / cap_statement / past_performance
+    // / teaching_handout) so high-value docs get their proper retrieval boost; default
+    // vault_doc (1.3) for general Vault teaching material.
+    const docType = f.docType || 'vault_doc';
 
     console.log(`  ${done + 1}. ${f.folderPath}/${f.name}  →  ${chunks.length} chunks${isExcluded ? '  [EXCLUDED]' : ''}`);
     log(`OK ${f.folderPath}/${f.name} (${f.id}) ${wordCount}w ${chunks.length}ch${isExcluded ? ' EXCLUDED' : ''}`);
@@ -263,7 +267,7 @@ async function main() {
         size_bytes: f.size ? Number(f.size) : null,
         file_mtime: f.modifiedTime || null,
         file_sha256: sha,
-        doc_type: 'vault_doc',
+        doc_type: docType,
         top_level_folder: 'The Vault',
         folder_path: f.folderPath,
         title,
@@ -285,7 +289,7 @@ async function main() {
 
     const rows = chunks.map((t, idx) => ({
       document_id: doc.id, chunk_index: idx, chunk_text: t,
-      doc_type: 'vault_doc', doc_title: title, doc_top_level_folder: 'The Vault',
+      doc_type: docType, doc_title: title, doc_top_level_folder: 'The Vault',
       source_path: sourcePath, word_count: t.split(/\s+/).filter(Boolean).length, char_count: t.length,
     }));
     for (let i = 0; i < rows.length; i += 100) {
