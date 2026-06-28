@@ -17,6 +17,7 @@ import { getMIApiHeaders } from '../authHeaders';
 import { useToast } from '../Toast';
 import { useAppTracker } from '../track';
 import SaveContactButton from '../contacts/SaveContactButton';
+import { normalizeOfficeName } from '@/lib/gov-contacts/office-name';
 
 interface TargetRow {
   id: string;
@@ -78,46 +79,6 @@ function fmtMoney(n: number): string {
   if (n >= 1_000_000) return `$${(n / 1_000_000).toFixed(1)}M`;
   if (n >= 1_000) return `$${(n / 1_000).toFixed(0)}K`;
   return `$${Math.round(n)}`;
-}
-
-// Make terse FPDS office names readable for DISPLAY. The dodaac_directory stores
-// the RAW abbreviation ("AFLCMC WLMK HEAVY AIRLIFT DV"), so we expand here instead.
-const OFFICE_ABBREV: Record<string, string> = {
-  ENDIST: 'Engineer District', DIST: 'District', DET: 'Detachment',
-  DV: 'Division', DIV: 'Division', BN: 'Battalion', BDE: 'Brigade',
-  SQ: 'Squadron', WG: 'Wing', GP: 'Group', BW: 'Bomb Wing',
-  CONS: 'Contracting Squadron', CONF: 'Contracting Flight', CONTR: 'Contracting',
-  RCO: 'Regional Contracting Office', CTR: 'Center', CMD: 'Command',
-};
-// Keep these as uppercase acronyms (don't title-case to "Aflcmc").
-const OFFICE_ACRONYMS = new Set([
-  'AFLCMC', 'AESS', 'NAVSUP', 'NAVSEA', 'NAVAIR', 'NAVWAR', 'NAVFAC', 'NUWC', 'NSWC',
-  'DLA', 'MICC', 'USACE', 'SOCOM', 'AFB', 'USAF', 'JBSA', 'PEO', 'DHA', 'DTRA', 'MDA',
-]);
-const OFFICE_DROP = new Set(['PK']); // FPDS noise token
-const SMALL_WORDS = new Set(['and', 'of', 'the', 'for', 'a', 'an', 'to', 'in', 'at']);
-
-/** Strip a leading DoDAAC code ("Fa8614") + trailing "/xx" suffix (the code already
- *  shows as the badge), then expand abbreviations + title-case for a readable name
- *  (Eric, Jun 26). Stored office_name is untouched — it's the match/dedup key. */
-function cleanOfficeNameForDisplay(name: string): string {
-  if (!name) return name;
-  const stripped = name.trim()
-    .replace(/^[A-Za-z]{1,2}\d{2,4}[A-Za-z0-9]{0,3}\s+/, '') // leading DoDAAC code
-    .replace(/\s*\/\s*\w{2,5}\s*$/, '')                       // trailing /xx suffix
-    .trim();
-  if (!stripped) return name.trim();
-  const out = stripped.split(/\s+/).flatMap((tok, i) => {
-    const up = tok.toUpperCase().replace(/[^A-Z0-9]/g, '');
-    if (OFFICE_DROP.has(up)) return [];
-    if (OFFICE_ABBREV[up]) return [OFFICE_ABBREV[up]];
-    if (OFFICE_ACRONYMS.has(up)) return [up];
-    if (/^\d+$/.test(tok)) return [tok];
-    const lower = tok.toLowerCase();
-    if (i > 0 && SMALL_WORDS.has(lower)) return [lower];
-    return [tok.charAt(0).toUpperCase() + lower.slice(1)];
-  });
-  return out.join(' ') || name.trim();
 }
 
 export default function MyTargetListPanel({
@@ -669,7 +630,7 @@ export default function MyTargetListPanel({
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
-                        <h3 className="text-base font-semibold text-white truncate">{cleanOfficeNameForDisplay(t.office_name)}</h3>
+                        <h3 className="text-base font-semibold text-white truncate">{normalizeOfficeName(t.office_name, { mode: 'clean' })}</h3>
                         {t.office_code && (
                           <span className="text-[10px] font-mono text-slate-500">{t.office_code}</span>
                         )}

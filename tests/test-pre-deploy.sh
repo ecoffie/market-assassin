@@ -271,6 +271,17 @@ for var in "${REQUIRED_VARS[@]}"; do
 done
 
 # ═══════════════════════════════════════════════════════════════
+# TEST 9: Office-name normalizer parity (consolidation guard)
+# ═══════════════════════════════════════════════════════════════
+echo ""
+echo -e "${BLUE}── Office-name Normalizer Parity ──${NC}"
+if npx tsx "$PROJECT_DIR/tests/office-name-parity.test.mts" > /tmp/office-name-parity.log 2>&1; then
+  test_result "Office-name normalizer parity (793 strings x 3 modes)" "pass"
+else
+  test_result "Office-name normalizer parity" "fail" "$(tail -1 /tmp/office-name-parity.log)"
+fi
+
+# ═══════════════════════════════════════════════════════════════
 # SUMMARY
 # ═══════════════════════════════════════════════════════════════
 echo ""

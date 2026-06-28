@@ -167,12 +167,28 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
   (`W6QK ACC-PICA`) vs Air Force **Air Combat Command**. Make it **context-aware**:
   expand to Army Contracting Command ONLY when the DoDAAC/PIID starts with `W`.
 - **Proposed phases:**
-  1. **Consolidate** the 3 normalizers into ONE shared `normalizeOfficeName()` (parity
-     first — no display change), swap all 14 consumers to it.
-  2. Add **delimiter handling** (split on `/` and `-`) + the **GSA** token set (the win).
-  3. AF/Navy/VA acronyms + **context-aware ACC** + DoDAAC-code stripping.
-  4. **Golden-file test**: real office strings (from contracts-data.js + sam_opportunities)
-     → expected display, so behavior is locked across every surface.
+  1. ✅ **DONE 2026-06-28 (phase 2a) — branch `feat/office-name-normalizer-consolidation`.**
+     Consolidated the 3 normalizers into ONE shared `normalizeOfficeName(name, {mode})`
+     (`src/lib/gov-contacts/office-name.ts`); the three legacy behaviors are ported
+     VERBATIM as `mode: 'expand' | 'clean' | 'enhance'` (parity-first, ZERO display
+     change). All in-scope consumers swapped + old fns deleted: `expandOfficeName`
+     (dodaac.ts → federal-contacts + internal formatDodaacOffice), `enhanceOfficeName`
+     + `officeNameEnhancements` (usaspending-helpers → find-hit-list + find-agencies),
+     `cleanOfficeNameForDisplay` (MyTargetListPanel).
+  2. ⏳ **NEXT (phase 2c)** — Add **delimiter handling** (split on `/` and `-`) + the
+     **GSA** token set (the win). Behavior changes on purpose → regenerate golden.
+  3. ⏳ **NEXT (phase 2d)** — AF/Navy/VA acronyms + **context-aware ACC** + DoDAAC-code
+     stripping. ALSO fold in the **4th cluster discovered during 2a**:
+     `src/lib/government-contracts.ts` has its OWN `expandOfficeName` /
+     `enhanceOfficeName` / `officeNameEnhancements` (agency-acronym expansion; only
+     consumed by `/api/government-contracts/search`) — left untouched in 2a to hold
+     scope; converge it here.
+  4. ✅ **DONE 2026-06-28 (phase 2b) — Golden-file test.** `tests/office-name-parity.test.mts`
+     locks `normalizeOfficeName` output against a frozen baseline of 793 REAL office
+     strings (`tests/fixtures/office-name-corpus.json` from contracts-data.js) × 3 modes
+     = 2,379 checks. Baseline regenerator: `scripts/office-name-golden.mts`. Wired into
+     `tests/test-pre-deploy.sh`. When 2c/2d changes behavior, re-run the generator and
+     commit the blessed diff.
 - **Risks:** broad blast radius (14 files); over-expansion verbosity vs 28-char chart
   truncation (favor recognizable acronyms where space is tight); mislabeling from
   ambiguous tokens (the ACC trap). The golden-file test is the guardrail.
@@ -180,12 +196,14 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
   behind the shared normalizer + test.
 
 ### Proposal Assist — Tier 2 multi-pass volumes
-- **Status:** Built. **PR #34 open, NOT merged**, gated behind `PROPOSAL_MULTIPASS=1`.
+- **Status:** ✅ **MERGED 2026-06-28 (PR #34, commit `6d919b46`)** — still gated OFF
+  via `PROPOSAL_MULTIPASS` (unset = no behavior change in prod). Code is on main.
 - **What:** batches a section's compliance requirements → drafts each batch in
   parallel as a subsection → assembles 50-100+ page volumes. Tier 1
   (situation-aware single-pass length) already SHIPPED (PR #33).
-- **To enable after demo:** merge #34, set `PROPOSAL_MULTIPASS=1` (+ optional
-  `_THRESHOLD`/`_BATCH`/`_CONCURRENCY`), QA. Follow-ups in
+- **REMAINING to turn it on:** set `PROPOSAL_MULTIPASS=1` in Vercel (+ optional
+  `_THRESHOLD`/`_BATCH`/`_CONCURRENCY`) and QA one long RFP — this is a WATCHED step
+  (a heavy section fires ~25 LLM calls), do NOT enable blindly. Follow-ups in
   `src/lib/proposal/multi-pass.ts` header: context-reuse refactor (load vault/RAG
   once per section), optional intro+TOC pass, per-user LLM budget guardrails.
 

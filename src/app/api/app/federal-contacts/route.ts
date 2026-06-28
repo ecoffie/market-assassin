@@ -15,7 +15,8 @@ import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { getOfficesForAgency } from '@/lib/bigquery/agencies';
 import { deriveSubAgency } from '@/lib/gov-contacts/derive-subagency';
-import { decodeDodaac, expandOfficeName } from '@/lib/gov-contacts/dodaac';
+import { decodeDodaac } from '@/lib/gov-contacts/dodaac';
+import { normalizeOfficeName } from '@/lib/gov-contacts/office-name';
 import { loadDodaacNames, dodaacCodesForAgency } from '@/lib/gov-contacts/dodaac-directory';
 import { getEnhancedAgencyInfo } from '@/lib/utils/command-info';
 
@@ -441,14 +442,14 @@ export async function GET(request: NextRequest) {
     const rawOffice = dod?.dodaac
       ? (dodaacNames.get(dod.dodaac) || dod.officeName || dod.dodaac)
       : null;
-    let officeName = rawOffice ? expandOfficeName(rawOffice) : null;
+    let officeName = rawOffice ? normalizeOfficeName(rawOffice, { mode: 'expand' }) : null;
     // Fallback: if no DoDAAC office, try the raw `office` column — but it's messy
     // SAM POC data (often a foreign CITY like "CONSTANTA, ROMANIA" or a bare
     // base code). Expand what we can; reject obvious junk so the UI shows the
     // clean sub-agency instead of garbage (Eric QC: office codes/cities showing).
     if (!officeName && r.office) {
       const cleaned = cleanRawOffice(String(r.office));
-      if (cleaned) officeName = expandOfficeName(cleaned);
+      if (cleaned) officeName = normalizeOfficeName(cleaned, { mode: 'expand' });
     }
     return {
       ...r,
