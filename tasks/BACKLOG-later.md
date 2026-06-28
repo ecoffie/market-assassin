@@ -208,9 +208,11 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
 - **What:** batches a section's compliance requirements → drafts each batch in
   parallel as a subsection → assembles 50-100+ page volumes. Tier 1
   (situation-aware single-pass length) already SHIPPED (PR #33).
-- **REMAINING to turn it on:** set `PROPOSAL_MULTIPASS=1` in Vercel (+ optional
-  `_THRESHOLD`/`_BATCH`/`_CONCURRENCY`) and QA one long RFP — this is a WATCHED step
-  (a heavy section fires ~25 LLM calls), do NOT enable blindly. Follow-ups in
+- **TABLED 2026-06-28 (Eric) — intentionally NOT enabled.** Code is merged but
+  dormant (no `PROPOSAL_MULTIPASS` env = zero prod behavior change). Enabling is a
+  WATCHED step (a heavy section fires ~25 LLM calls) and Eric does not want to babysit
+  it right now. To turn on LATER: set `PROPOSAL_MULTIPASS=1` in Vercel (+ optional
+  `_THRESHOLD`/`_BATCH`/`_CONCURRENCY`), redeploy, QA one long RFP. Follow-ups in
   `src/lib/proposal/multi-pass.ts` header: context-reuse refactor (load vault/RAG
   once per section), optional intro+TOC pass, per-user LLM budget guardrails.
 
