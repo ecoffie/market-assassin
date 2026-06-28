@@ -313,14 +313,29 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
 - **PRD:** `docs/PRD-dod-forecast-scrapers.md` (parent: `PRD-dod-forecast-coverage.md`)
 - **Effort:** medium per component; do one, verify, next.
 
-### 2. Cron Dispatcher — Phase 2 (migrate the rest)
-- **What:** Phase 1 SHIPPED (dispatcher live, 3 jobs migrated, refresh-dodaac
-  added). Phase 2 migrates the remaining ~24 routes off `vercel.json` and
-  collapses the 21 daily-alerts timezone windows into data-driven dispatch →
-  ~6 native crons total.
-- **Critical:** migrate the **load-bearing send pipelines LAST**, incrementally,
-  with day-guards + watchdogs intact. Keep briefing-watchdog on native cron as a
-  backstop (the dispatcher is now a single point of failure).
+### 2. Cron Dispatcher — Phase 2 (send-pipeline cutover DEFERRED; hardening DONE)
+- **Decision (Eric, Jun 28): DEFER the send-pipeline cutover, HARDEN instead.**
+  Inventory showed `vercel.json` is down to **5 distinct routes / 53 entries**: the
+  2 dispatch ticks + the 4 LOAD-BEARING send pipelines (daily-alerts ×21,
+  weekly-alerts ×10, send-briefings-fast ×10, send-weekly-fast ×10). Everything
+  else is ALREADY on the dispatcher. So Phase 2's only remaining work is the
+  dangerous send cutover — and at **53/100 crons there's no cap pressure**, so the
+  risk/urgency math says don't touch the send pipelines now.
+  - The daily-alerts collapse also has a real wrinkle: it runs every 15 min for
+    throughput but the dispatcher only ticks **hourly** → needs a sub-hour tick or
+    proof one hourly batch drains everyone. Revisit when cap pressure returns.
+- ✅ **HARDENING DONE 2026-06-28 (`feat/dispatcher-watchdog`) — the real Phase-1
+  resilience gap.** The dispatcher is a SPOF for ~20 jobs, and the PRD's intended
+  backstop (`briefing-watchdog` on NATIVE cron) was itself MIGRATED ONTO the
+  dispatcher in Phase 1 (`scripts/migrate-crons-phase1.ts:33`) → if the dispatcher
+  died, nothing noticed. Added `GET /api/cron/dispatcher-watchdog` as a NATIVE
+  vercel.json cron (`0 */3 * * *`, independent of the dispatcher): liveness (no job
+  run in 150 min → dispatcher down → poke `dispatch?tick=hour` + alert), overdue
+  (isMissed daily jobs), stuck locks (locked_at > 3× timeout), failing
+  (last_status error/timeout). Emails `WATCHDOG_ALERT_EMAIL` (transactional).
+  `?dry_run=true` reports without emailing.
+- **When cap pressure returns** — do the send cutover incrementally, send pipelines
+  LAST, day-guards intact, with the new dispatcher-watchdog now watching.
 - **PRD:** `docs/PRD-cron-dispatcher.md` (§4 Phase 2)
 
 ---
