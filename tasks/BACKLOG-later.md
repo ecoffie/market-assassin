@@ -365,6 +365,13 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
 - **PRD:** `docs/PRD-relationships-from-target-list.md`
 
 ### 1. DoD Forecast Coverage (the real one)
+- ⚠️ **VERIFIED 2026-06-29 — "scrapers" framing is a dead end; needs a manual
+  file.** Probed the GSA Acquisition Gateway FCO API (the real civilian source):
+  all 320 pages / 7,629 rows = 0 DoD (only DOI/USDA/VA/DOT/GSA/DOL/NRC/NSF). DoD
+  component pages are .mil behind WAFs (403/TLS) or Tableau; no consolidated DoD
+  feed exists. Only real path = manual file → SheetJS importer per component
+  (cleanest = Air Force LRAF .xlsx). Build WITH the file in hand, not blind. Full
+  finding in PRD decision log. Option-B SAM early signals remain DoD coverage.
 - **What:** DoD is the ~$400B largest buyer but we have **0 formal forecasts**.
   Option B (SAM Sources Sought as "early signals") already SHIPPED as the
   interim. This is **Option A** — real component LRAF scrapers.
