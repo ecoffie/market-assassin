@@ -22,10 +22,26 @@ import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 import { DEFAULT_NAICS_CODES } from '@/lib/config/defaults';
 import crypto from 'crypto';
 
-// Process up to 10 profiles per cron run (52s each = ~9 minutes)
-// Multiple runs from 2-5 AM will process all profiles
+// Each (possibly self-chained) invocation needs room to finish one ~52s briefing
+// generation. force-dynamic so it never gets statically optimized/cached.
+export const maxDuration = 60;
+export const dynamic = 'force-dynamic';
+
+// SOFT TIMEOUT: the DISPATCHER aborts a job at 55s, but each profile takes ~52s
+// to generate. So we cap the loop at a wall-clock budget BELOW 55s and stop
+// cleanly between profiles — the resumable design (we skip profiles whose
+// template already exists) means the next hourly dispatcher tick continues the
+// backlog instead of being killed mid-generation. PROFILES_PER_RUN is now just a
+// safety ceiling; the time budget is the real limit.
 const PROFILES_PER_RUN = 10;
 const DELAY_BETWEEN_PROFILES_MS = 1000;
+// Don't START a profile unless we have runway to FINISH it under the dispatcher's
+// 55s abort. Each generation is ~52s (it does an HTTP recompete fallback for
+// profiles without snapshots — we can't skip that without emptying the briefing),
+// so realistically ~1 profile completes per run. The job is scheduled every 10
+// min across the 2-5 AM window so the resumable skip-existing logic drains the
+// full profile set (~49) well before the 7 AM send. 4s = require near-fresh start.
+const PROFILE_START_BUDGET_MS = 4_000;
 
 interface NaicsProfile {
   naics_profile: string;
@@ -137,8 +153,17 @@ function getSupabase() {
       });
     }
 
-    // Step 3: Generate template for each profile
+    // Step 3: Generate template for each profile (until the time budget runs out)
+    let stoppedEarly = false;
     for (const profile of profilesToProcess) {
+      // Don't START a profile we can't finish before the dispatcher's 55s abort.
+      // Each generation is ~52s, so we require near-zero elapsed → ~1 profile/run;
+      // the resumable skip-existing logic lets the next tick continue the rest.
+      if (Date.now() - startTime > PROFILE_START_BUDGET_MS) {
+        stoppedEarly = true;
+        console.log(`[PrecomputeBriefings] Out of runway (${Date.now() - startTime}ms) — stopping; ${templatesGenerated} done this run, rest resume next tick.`);
+        break;
+      }
       try {
         console.log(`[PrecomputeBriefings] Generating template for profile with ${profile.user_count} users: ${profile.naics_profile.slice(0, 50)}...`);
 
@@ -211,8 +236,30 @@ function getSupabase() {
 
     console.log(`[PrecomputeBriefings] Complete: ${templatesGenerated} generated, ${templatesFailed} failed, ${remaining} remaining`);
 
+    // SELF-CHAIN: the dispatcher only ticks hourly and each run does ~1 profile,
+    // so waiting for the next tick would take ~49 hours to warm the full set.
+    // Instead, if we stopped early with work left, fire ourselves again
+    // (fire-and-forget) so the backlog drains in a chain of <55s runs that
+    // completes minutes after the 2 AM start, well before the 7 AM send. Guard
+    // with ?chain=1 depth so a bug can't loop forever (cap at totalProfiles+5).
+    if (stoppedEarly && remaining > 0) {
+      const chainDepth = parseInt(request.nextUrl.searchParams.get('chain') || '0', 10);
+      if (chainDepth < allProfiles.length + 5) {
+        const origin = request.nextUrl.origin;
+        const nextUrl = `${origin}/api/cron/precompute-briefings?chain=${chainDepth + 1}`;
+        // Don't await — let this response return while the next link runs.
+        void fetch(nextUrl, {
+          headers: { authorization: `Bearer ${process.env.CRON_SECRET || ''}`, 'x-cron-dispatch': '1' },
+        }).catch((e) => console.error('[PrecomputeBriefings] self-chain failed:', e));
+        console.log(`[PrecomputeBriefings] Chaining next run (depth ${chainDepth + 1}), ${remaining} remaining`);
+      } else {
+        console.warn(`[PrecomputeBriefings] chain depth cap hit (${chainDepth}) — stopping self-chain`);
+      }
+    }
+
     return NextResponse.json({
       success: true,
+      stoppedEarly,
       templatesGenerated,
       templatesFailed,
       totalProfiles: allProfiles.length,
@@ -221,7 +268,7 @@ function getSupabase() {
       totalUsers: users?.length,
       errors: errors.length > 0 ? errors : undefined,
       elapsed,
-      estimatedCompletion: remaining > 0 ? `${Math.ceil(remaining / PROFILES_PER_RUN)} more cron runs needed` : 'Done!',
+      estimatedCompletion: remaining > 0 ? `~${remaining} more cron ticks needed (1 profile/run)` : 'Done!',
     });
 
   } catch (error) {
