@@ -85,8 +85,8 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
 **Newly deferred this session (Jun 26):**
 
 ### Ingest the FULL GovCon Giants content library into Mindy RAG (moat) — ⭐ V2 FLAGSHIP
-- **IN PROGRESS 2026-06-28 — Phase 1 (Vault DOCS) running.** Tooling +
-  pipeline proven; **17 high-value Vault teaching docs ingested** & retrievable
+- **IN PROGRESS 2026-06-28 — Phase 1 (Vault + Courses DOCS).** Tooling +
+  pipeline proven; **21 high-value teaching docs ingested** & retrievable
   (verified via get_rag_chunks). See "Phase 1 progress" below.
 - **When:** **V2 — start AFTER Mindy Day** (demo Jun 27, 2026). Confirmed by Eric
   Jun 26: do the full ingestion post-demo as the headline v2 capability. Not a
@@ -117,11 +117,26 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
   `.dotx` templates (MCP returns no text), (d) pricing spreadsheets (low text value).
 - **PENDING for Eric:** hand-run `supabase/migrations/20260628_rag_vault_doctype.sql`
   (vault_doc → 1.3 boost). Until then vault_doc ranks at the 0.8 ELSE.
-- **Remaining Vault long-tail (lower value):** DIBBS Quoting deck, JV SOP, client
-  questionnaire, SAM/DIBBS screenshot how-tos, Bid Forms, Construction Submittal
-  Plans, NAVFAC POC list, Target Market List, tax-exemption certs. **Phase 2 = the
-  VIDEO folders** (Courses, Webinars, YouTube Videos) — Eric confirmed the platform
-  HAS transcripts, so pull text (cheap, skip Whisper).
+- **Courses / Bootcamps folder** (`1Yi0ug2XmtFrf5tslnQzvrnJH7SMGvspc`, inside the
+  Vault top level — Eric pointed here for "all our bootcamps"): 16+ course/bootcamp
+  subfolders (Proposal Bootcamp, Business Readiness, Surge, 5/30-Day Challenge,
+  First Partner Challenge, Accelerator, GovCon Giants Course, Dummies…). Ingested
+  the accessible GOLD: **10-week Accelerator syllabus (course_material), Eric's
+  6-step proposal system + Proposal Bootcamp outline (proposal_template), 8(a)
+  bootcamp curriculum.**
+  - **⚠️ KEY LIMITATION:** the bootcamp SLIDE DECKS are almost all Apple Keynote
+    (`.key`) — the Drive integration CANNOT extract them (returns empty, like
+    `.dotx`). Not a token/tooling gap — Keynote isn't text-extractable without
+    conversion. Eric's call (Jun 28): SKIP the `.key` decks (don't hand-export),
+    just grab readable PDF/docx/gdoc/pptx. The slide TEACHING comes in via Phase 2
+    video transcripts (the recordings of these exact bootcamps).
+- **Remaining long-tail (lower value, optional):** DIBBS Quoting deck, JV SOP,
+  client questionnaire, SAM/DIBBS screenshot how-tos, Bid Forms, NAVFAC POC list,
+  Target Market List, tax-exemption certs, + the rest of the course subfolders
+  (mostly `.key`/video/spreadsheet/admin).
+- **Phase 2 = the VIDEO folders** (Courses' bootcamp recordings, Webinars, YouTube
+  Videos) — Eric confirmed the platform HAS transcripts → pull text (cheap, skip
+  Whisper). This is where the bootcamp/course teaching is fully captured.
 - **Why:** the knowledge base IS the moat (8 yrs teaching). Mindy's RAG today
   (`mindy_rag_documents` ~1,364 docs / 12,534 chunks) has only a SLICE — ~136
   course_material, 103 slide_deck, 31 webinar_resource, 743 podcast_interview. Two
