@@ -129,6 +129,15 @@ export async function GET(request: NextRequest) {
   });
 }
 
+// The dispatcher fires every due job in one Promise.all, so it can only safely
+// wait this long per job before its OWN function would time out.
+const DISPATCH_AWAIT_CAP_MS = 55000;
+// For long-running jobs (timeout_ms beyond the cap) we fire-and-forget: wait
+// just long enough to catch an immediate failure (auth/500), then let the job
+// finish on its own function instance (verified: a Vercel function continues to
+// completion after the dispatcher aborts the client fetch).
+const LONG_JOB_ACK_MS = 12000;
+
 async function fireJob(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
@@ -172,12 +181,18 @@ async function fireJob(
   let httpStatus: number | null = null;
   let errorMsg: string | null = null;
 
+  // Long jobs can't be fully awaited without timing out the dispatcher itself,
+  // so we fire-and-forget them (see LONG_JOB_ACK_MS): the route keeps running on
+  // its own instance to completion, and we record 'dispatched' (which the
+  // watchdog ignores) instead of a false 'timeout' that would also alert.
+  const isLongJob = job.timeout_ms > DISPATCH_AWAIT_CAP_MS;
   try {
     // Build the absolute URL for the internal route fetch.
     const origin = new URL(request.url).origin;
     const url = job.route.startsWith('http') ? job.route : `${origin}${job.route}`;
+    const waitMs = isLongJob ? LONG_JOB_ACK_MS : Math.min(job.timeout_ms, DISPATCH_AWAIT_CAP_MS);
     const controller = new AbortController();
-    const timer = setTimeout(() => controller.abort(), Math.min(job.timeout_ms, 55000));
+    const timer = setTimeout(() => controller.abort(), waitMs);
     const res = await fetch(url, {
       headers: { authorization: `Bearer ${process.env.CRON_SECRET || ''}`, 'x-cron-dispatch': '1' },
       signal: controller.signal,
@@ -188,8 +203,15 @@ async function fireJob(
       errorMsg = `route returned ${res.status}`;
     }
   } catch (e) {
-    status = (e as Error)?.name === 'AbortError' ? 'timeout' : 'error';
-    errorMsg = (e as Error)?.message || 'fire failed';
+    if ((e as Error)?.name === 'AbortError') {
+      // Long job still running past the ack window → it completes on its own.
+      // Short job → a genuine timeout.
+      status = isLongJob ? 'dispatched' : 'timeout';
+      errorMsg = isLongJob ? null : ((e as Error)?.message || 'timed out');
+    } else {
+      status = 'error';
+      errorMsg = (e as Error)?.message || 'fire failed';
+    }
   }
 
   const duration = Date.now() - start;
