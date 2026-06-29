@@ -2,6 +2,7 @@
 
 import { FormEvent, useEffect, useMemo, useState } from 'react';
 import MemberAccessSection from '@/components/admin/MemberAccessSection';
+import MemberLookup from '@/components/admin/MemberLookup';
 
 type StatusTone = 'green' | 'blue' | 'amber' | 'purple' | 'red' | 'slate';
 
@@ -1130,6 +1131,9 @@ export default function LaunchCommandCenterPage() {
       </header>
 
       <div className="mx-auto max-w-7xl space-y-8 px-6 py-8">
+        {/* Member Lookup — case-by-case Founders inquiry tool (live Stripe spend +
+            Ultimate Giant ownership + recommended offer). Read-only. */}
+        <MemberLookup password={password} />
         {/* ★ NORTH STAR — $100K/mo goal + the lead targets to hit it. The whole
             team sees this. Real MRR from Stripe; lead math from real close rates. */}
         <section className="rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-900/25 via-slate-900 to-slate-900 p-6">
