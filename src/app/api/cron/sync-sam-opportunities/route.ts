@@ -21,10 +21,26 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getAllDistinctSAMKeys } from '@/lib/sam/utils';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
-const SAM_API_KEY = (process.env.SAM_API_KEY || '').trim();
 const SAM_API_BASE = 'https://api.sam.gov/opportunities/v2';
+
+// All distinct SAM keys for 429 fail-over. SAM.gov throttles at 1,000/day PER
+// KEY; with N keys we try the next one when the current is "Message throttled
+// out", turning a daily outage into a non-event. `samKeyIndex` advances on 429.
+const SAM_KEYS = getAllDistinctSAMKeys();
+let samKeyIndex = 0;
+function currentSamKey(): string {
+  return SAM_KEYS[samKeyIndex] || '';
+}
+/** Advance to the next key after a 429. Returns false if no keys remain to try. */
+function advanceSamKey(): boolean {
+  if (samKeyIndex >= SAM_KEYS.length - 1) return false;
+  samKeyIndex++;
+  console.warn(`[SAM sync] key ${samKeyIndex} throttled → failing over to key ${samKeyIndex + 1}/${SAM_KEYS.length}`);
+  return true;
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -130,25 +146,43 @@ async function fetchOpportunitiesPage(
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - lookbackDays);
 
-  const params = new URLSearchParams({
-    api_key: SAM_API_KEY,
-    limit: String(limit),
-    offset: String(offset),
-    postedFrom: formatDateForSam(startDate),
-    postedTo: formatDateForSam(today),
-  });
+  const buildUrl = () => {
+    const params = new URLSearchParams({
+      api_key: currentSamKey(),
+      limit: String(limit),
+      offset: String(offset),
+      postedFrom: formatDateForSam(startDate),
+      postedTo: formatDateForSam(today),
+    });
+    return `${SAM_API_BASE}/search?${params.toString()}`;
+  };
 
-  const url = `${SAM_API_BASE}/search?${params.toString()}`;
-
-  // Use retry wrapper with 90-second timeout per request
+  // Use retry wrapper with 90-second timeout per request. On a 429 (quota
+  // throttle) we fail over to the NEXT key before retrying — a throttled key
+  // never recovers same-day, so retrying it is pointless; the next key may have
+  // quota left. If all keys are throttled, the error propagates (resumable).
   return fetchWithRetry(async () => {
-    const response = await fetch(url, {
+    const response = await fetch(buildUrl(), {
       headers: { 'Accept': 'application/json' },
       signal: AbortSignal.timeout(90000), // 90 seconds
     });
 
     if (!response.ok) {
       const errorText = await response.text().catch(() => 'Unknown error');
+      if (response.status === 429 && advanceSamKey()) {
+        // Retry immediately with the next key (don't count the throttle as a
+        // backoff-worthy transient — it's a hard per-key daily cap).
+        const retry = await fetch(buildUrl(), {
+          headers: { 'Accept': 'application/json' },
+          signal: AbortSignal.timeout(90000),
+        });
+        if (retry.ok) {
+          const d = await retry.json();
+          return { opportunities: d.opportunitiesData || [], total: d.totalRecords || 0 };
+        }
+        const retryErr = await retry.text().catch(() => 'Unknown error');
+        throw new Error(`SAM.gov API error: ${retry.status} - ${retryErr.substring(0, 200)}`);
+      }
       throw new Error(`SAM.gov API error: ${response.status} - ${errorText.substring(0, 200)}`);
     }
 
@@ -260,9 +294,12 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  if (!SAM_API_KEY) {
-    return NextResponse.json({ error: 'SAM_API_KEY not configured' }, { status: 500 });
+  if (SAM_KEYS.length === 0) {
+    return NextResponse.json({ error: 'No SAM API keys configured (SAM_API_KEY / SAM_API_KEY_1..N / SAM_API_KEY_BACKUP)' }, { status: 500 });
   }
+  // Start each run from the first key so keys whose quota has reset get re-tried
+  // (the module-level index can otherwise stay advanced across warm invocations).
+  samKeyIndex = 0;
 
   const startTime = Date.now();
   const maxRecords = limitParam ? parseInt(limitParam) : 50000;

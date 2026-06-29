@@ -39,6 +39,27 @@ export function getAvailableSAMKeys(): string[] {
 }
 
 /**
+ * Get ALL distinct SAM API keys from env, deduped — across every naming
+ * convention: SAM_API_KEY, SAM_API_KEY_1..10, SAM_API_KEY_BACKUP. Order:
+ * numbered first, then base, then backup. Used for 429 fail-over (try each key
+ * until one isn't throttled) — better than day-rotation, which still dies when
+ * the day's single key hits its 1,000/day quota mid-day.
+ */
+export function getAllDistinctSAMKeys(): string[] {
+  const raw: string[] = [];
+  for (let i = 1; i <= 10; i++) {
+    const k = process.env[`SAM_API_KEY_${i}`];
+    if (k && k.trim()) raw.push(k.trim());
+  }
+  const base = process.env.SAM_API_KEY;
+  if (base && base.trim()) raw.push(base.trim());
+  const backup = process.env.SAM_API_KEY_BACKUP;
+  if (backup && backup.trim()) raw.push(backup.trim());
+  // Dedupe, preserve order.
+  return [...new Set(raw)];
+}
+
+/**
  * Get the rotated SAM API key for today
  * Rotates based on day of year to spread load across keys
  */
