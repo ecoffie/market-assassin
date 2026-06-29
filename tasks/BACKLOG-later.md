@@ -436,6 +436,11 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
 - **Priority:** exploratory/nice-to-have (Eric, 2026-06-05).
 
 ### 4. Newcomer clarity — finish it
+- ✅ **OG images DONE 2026-06-29** — per-entity dynamic opengraph-image.tsx for
+  `/contractors/[slug]`, `/agencies/[slug]`, `/awards/[id]` (mirrors the shared/opp
+  template: Mindy gradient card + the entity name + key stat + CTA). Shared links /
+  SERP cards now show the firm name + $obligated / agency $spend / contract # + amount
+  instead of the generic site card. Reuses each page's resolver; try/catch fallback.
 - **Done:** MeetMindyStrip shipped on /shared/opp + contractors/agencies/awards;
   dynamic share preview live.
 - **Remaining:** specific OG previews on public pages that still lack them
