@@ -67,6 +67,10 @@ export default function MemberLookup({ password }: { password: string }) {
         <p className="text-sm text-slate-400">For inbound questions from old lifetime members. Live Stripe spend + Ultimate Giant ownership (the minimum requirement) + a recommended offer. Read-only — you decide case-by-case.</p>
       </div>
 
+      <div className="mt-3 rounded-lg border border-amber-500/40 bg-amber-900/15 px-4 py-3 text-sm text-amber-200">
+        <span className="font-semibold">⚠️ Heads up:</span> this matches by the member&apos;s <span className="font-semibold">login email</span>. If someone paid under a <span className="font-semibold">different email</span>, they&apos;ll show <span className="font-semibold">$0 / no Ultimate</span> here even if they really bought it. When the spend looks wrong, search their other email(s) or check Stripe directly before deciding — don&apos;t deny access on a $0 alone.
+      </div>
+
       <form onSubmit={lookup} className="mt-4 flex gap-2">
         <input
           type="email" value={email} onChange={(e) => setEmail(e.target.value)}
