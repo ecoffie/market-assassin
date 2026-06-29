@@ -107,7 +107,7 @@ export interface RollupProfile {
 // Shared SQL fragment: the computed-slug expression mirrors recipientSlug()
 // exactly (lowercase, & → " and ", non-alphanum → "-", trim, 120 cap). Used
 // by both the rollup slug lookup and the sibling-redirect resolver.
-const COMPUTED_SLUG_SQL = (col: string) => `
+export const COMPUTED_SLUG_SQL = (col: string) => `
   SUBSTR(
     REGEXP_REPLACE(
       REGEXP_REPLACE(
@@ -905,6 +905,10 @@ export interface SimilarRecipientRow {
   recipient_uei: string;
   recipient_name: string;
   total_obligated: number;
+  // The matching rollup's computed slug, or null when this entity has no
+  // contractor profile. Non-null is guaranteed to resolve — the page links
+  // by this and renders unmatched entities as plain text (no 404).
+  canonical_slug: string | null;
 }
 
 /**
@@ -973,20 +977,37 @@ export async function getSimilarRecipients(
   // as competitors.
   const currentYear = new Date().getFullYear();
   return queryCached<SimilarRecipientRow>({
-    cacheKey: `rollup:${rollupUei}:similar:${topNaicsCode}:${limit}:v2-m`,
+    // v3: LEFT JOIN the rollup table so we return the canonical (resolvable)
+    // slug + name and never link to an entity without a profile.
+    cacheKey: `rollup:${rollupUei}:similar:${topNaicsCode}:${limit}:v3-slug`,
     query: `
+      WITH similar AS (
+        SELECT
+          COALESCE(parent_uei, recipient_uei) AS recipient_uei,
+          ANY_VALUE(COALESCE(parent_name, recipient_name)) AS recipient_name,
+          SUM(obligation_amount) AS total_obligated
+        FROM ${BQ_TABLES.awards}
+        WHERE naics_code = @naics
+          AND recipient_uei IS NOT NULL
+          AND recipient_uei NOT IN UNNEST(@ueis)
+          AND fiscal_year BETWEEN @minYear AND @maxYear
+        GROUP BY COALESCE(parent_uei, recipient_uei)
+        ORDER BY total_obligated DESC
+        LIMIT @limit
+      )
       SELECT
-        COALESCE(parent_uei, recipient_uei) AS recipient_uei,
-        ANY_VALUE(COALESCE(parent_name, recipient_name)) AS recipient_name,
-        SUM(obligation_amount) AS total_obligated
-      FROM ${BQ_TABLES.awards}
-      WHERE naics_code = @naics
-        AND recipient_uei IS NOT NULL
-        AND recipient_uei NOT IN UNNEST(@ueis)
-        AND fiscal_year BETWEEN @minYear AND @maxYear
-      GROUP BY COALESCE(parent_uei, recipient_uei)
-      ORDER BY total_obligated DESC
-      LIMIT @limit
+        s.recipient_uei,
+        COALESCE(r.rollup_name, s.recipient_name) AS recipient_name,
+        s.total_obligated,
+        r.canonical_slug AS canonical_slug
+      FROM similar s
+      LEFT JOIN (
+        SELECT rollup_uei, rollup_name, ${COMPUTED_SLUG_SQL('rollup_name')} AS canonical_slug
+        FROM ${BQ_TABLES.recipientsRollup}
+        WHERE rollup_name IS NOT NULL
+      ) r
+        ON r.rollup_uei = s.recipient_uei
+      ORDER BY s.total_obligated DESC
     `,
     params: {
       ueis,

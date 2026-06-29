@@ -12,11 +12,20 @@
  */
 import { BQ_TABLES } from './client';
 import { queryCached } from './cache';
+import { COMPUTED_SLUG_SQL } from './recipients';
 
 const BQ_SUBAWARDS = '`market-assasin.usaspending.subawards`';
 const BQ_SUB_BY_PRIME = '`market-assasin.usaspending.subawards_by_prime`';
 const BQ_SUB_BY_SUBAWARDEE = '`market-assasin.usaspending.subawards_by_subawardee`';
-void BQ_TABLES; // unused but reserved for cross-table joins
+
+// Subquery that maps a partner UEI to its rollup's canonical (resolvable)
+// slug + name. LEFT JOIN against this so partners with a profile link to a
+// URL that resolves, and partners without one render as plain text (no 404).
+const ROLLUP_SLUG_SUBQUERY = `
+  SELECT rollup_uei, rollup_name, ${COMPUTED_SLUG_SQL('rollup_name')} AS canonical_slug
+  FROM ${BQ_TABLES.recipientsRollup}
+  WHERE rollup_name IS NOT NULL
+`;
 
 export interface SubawardSummary {
   uei: string;
@@ -95,6 +104,10 @@ export interface SubawardPartnerRow {
   partner_name: string;
   total_amount: number;
   count: number;
+  // Rollup's computed slug, or null when the partner has no contractor
+  // profile. Non-null is guaranteed to resolve; the page links by it and
+  // renders unmatched partners as plain text (no 404).
+  canonical_slug: string | null;
 }
 
 /**
@@ -106,18 +119,30 @@ export async function getTopSubawardeesForPrime(
   limit = 20,
 ): Promise<SubawardPartnerRow[]> {
   return queryCached<SubawardPartnerRow>({
-    cacheKey: `subaward:paid-out:top:${primeUei}:${limit}`,
+    cacheKey: `subaward:paid-out:top:${primeUei}:${limit}:v2-slug`,
     query: `
+      WITH partners AS (
+        SELECT
+          subawardee_uei AS partner_uei,
+          ANY_VALUE(subawardee_name) AS partner_name,
+          SUM(subaward_amount) AS total_amount,
+          COUNT(*) AS count
+        FROM ${BQ_SUBAWARDS}
+        WHERE prime_uei = @uei
+        GROUP BY subawardee_uei
+        ORDER BY total_amount DESC
+        LIMIT @limit
+      )
       SELECT
-        subawardee_uei AS partner_uei,
-        ANY_VALUE(subawardee_name) AS partner_name,
-        SUM(subaward_amount) AS total_amount,
-        COUNT(*) AS count
-      FROM ${BQ_SUBAWARDS}
-      WHERE prime_uei = @uei
-      GROUP BY subawardee_uei
-      ORDER BY total_amount DESC
-      LIMIT @limit
+        p.partner_uei,
+        COALESCE(r.rollup_name, p.partner_name) AS partner_name,
+        p.total_amount,
+        p.count,
+        r.canonical_slug AS canonical_slug
+      FROM partners p
+      LEFT JOIN (${ROLLUP_SLUG_SUBQUERY}) r
+        ON r.rollup_uei = p.partner_uei
+      ORDER BY p.total_amount DESC
     `,
     params: { uei: primeUei, limit },
   });
@@ -132,18 +157,30 @@ export async function getTopPrimesForSubawardee(
   limit = 20,
 ): Promise<SubawardPartnerRow[]> {
   return queryCached<SubawardPartnerRow>({
-    cacheKey: `subaward:received:top:${subawardeeUei}:${limit}`,
+    cacheKey: `subaward:received:top:${subawardeeUei}:${limit}:v2-slug`,
     query: `
+      WITH partners AS (
+        SELECT
+          prime_uei AS partner_uei,
+          ANY_VALUE(prime_name) AS partner_name,
+          SUM(subaward_amount) AS total_amount,
+          COUNT(*) AS count
+        FROM ${BQ_SUBAWARDS}
+        WHERE subawardee_uei = @uei
+        GROUP BY prime_uei
+        ORDER BY total_amount DESC
+        LIMIT @limit
+      )
       SELECT
-        prime_uei AS partner_uei,
-        ANY_VALUE(prime_name) AS partner_name,
-        SUM(subaward_amount) AS total_amount,
-        COUNT(*) AS count
-      FROM ${BQ_SUBAWARDS}
-      WHERE subawardee_uei = @uei
-      GROUP BY prime_uei
-      ORDER BY total_amount DESC
-      LIMIT @limit
+        p.partner_uei,
+        COALESCE(r.rollup_name, p.partner_name) AS partner_name,
+        p.total_amount,
+        p.count,
+        r.canonical_slug AS canonical_slug
+      FROM partners p
+      LEFT JOIN (${ROLLUP_SLUG_SUBQUERY}) r
+        ON r.rollup_uei = p.partner_uei
+      ORDER BY p.total_amount DESC
     `,
     params: { uei: subawardeeUei, limit },
   });
