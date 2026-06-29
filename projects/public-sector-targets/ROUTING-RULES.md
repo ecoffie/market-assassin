@@ -108,4 +108,17 @@ Do not add to registry or pursue:
 
 ---
 
-*Last updated: June 28, 2026*
+## Rule 9 — GTM segment boundaries
+
+| Do | Don't |
+|----|-------|
+| Pitch EDC + APEX with **gov_intel** playbook | Merge APEX with association acquired-rights |
+| Keep **each NMSDC council** on its own row | Lump FSMSDC + CRMSDC + DFW into one deal |
+| Pitch chambers via **`chamber`** segment | Pitch chambers as industry_traction |
+| Chapter outreach: `org_level=chapter` + `priority=P1` (**646 rows**, all 51 states) | Limit outreach to four states |
+
+See [`CHAPTER-BLAST-RADIUS.md`](CHAPTER-BLAST-RADIUS.md) and [`CONSTRUCTION-DIVISIONS.md`](CONSTRUCTION-DIVISIONS.md).
+
+---
+
+*Last updated: June 29, 2026*

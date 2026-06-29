@@ -8,7 +8,7 @@
 
 ## Overview
 
-Every organization in the master registry belongs to **exactly one channel**. Channels determine pitch angle, pricing SKU, buyer persona, and which advisor owns the intro.
+Every organization belongs to **exactly one channel** and one **`registry_segment`** (`gov_intel`, `nmsdc_council`, `chamber`, `industry_traction`, `minority_operator`, `direct_gov`). See [`MASTER-REGISTRY.csv`](MASTER-REGISTRY.csv) columns `org_level` + `parent_org` for chapter blast radius.
 
 **Commercial models:**
 

@@ -3,7 +3,7 @@
 **Status:** ACTIVE — June 28, 2026  
 **Owner:** Eric / Head of Public Sector Partnerships & Funding
 
-Unified target inventory for all partnership and government sales motions — APEX, EDC, NMSDC, state divisions, **and** trade associations / 501(c)(6) leagues (acquired-rights model).
+Unified target inventory — **1,713 orgs**, **1,635 chapter rows**, all **51 states + DC**, CSI Div **01–10**.
 
 ---
 
@@ -11,8 +11,11 @@ Unified target inventory for all partnership and government sales motions — AP
 
 | Doc | Purpose |
 |-----|---------|
-| [`MASTER-REGISTRY.csv`](MASTER-REGISTRY.csv) | One row per org — pipeline source of truth |
-| [`CHANNEL-TAXONOMY.md`](CHANNEL-TAXONOMY.md) | 14 channels, pricing SKUs, event paths |
+| [`MASTER-REGISTRY.csv`](MASTER-REGISTRY.csv) | Source of truth — filter `org_level`, `priority`, `registry_segment` |
+| [`CHAPTER-BLAST-RADIUS.md`](CHAPTER-BLAST-RADIUS.md) | Nationwide chapter outreach — **5–10 meetings/week** |
+| [`TEAM-OUTREACH-MEMO.md`](TEAM-OUTREACH-MEMO.md) | Team operating memo (also [`TEAM-OUTREACH-MEMO.docx`](TEAM-OUTREACH-MEMO.docx) for Google Docs) |
+| [`CONSTRUCTION-DIVISIONS.md`](CONSTRUCTION-DIVISIONS.md) | CSI Div 01–10 → trade associations |
+| [`CHANNEL-TAXONOMY.md`](CHANNEL-TAXONOMY.md) | 14 channels, GTM segments, pricing SKUs |
 | [`ROUTING-RULES.md`](ROUTING-RULES.md) | Anti double-pitch rules |
 
 ### Association channel (acquired rights)
@@ -44,4 +47,4 @@ Unified target inventory for all partnership and government sales motions — AP
 
 ---
 
-*Migrated from `landscape-research-phase2.md` June 28, 2026. Association channel added per Association & 501(c)(6) Channel Expansion Plan.*
+*1,713 registry rows · 1,635 chapters · June 29, 2026.*

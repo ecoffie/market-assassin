@@ -1,0 +1,257 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Team Memo — Association &amp; Chapter Outreach Program</title>
+<style>
+  body { font-family: Arial, Helvetica, sans-serif; font-size: 11pt; line-height: 1.45; max-width: 7.5in; margin: 0.75in auto; color: #111; }
+  h1 { font-size: 18pt; color: #1e3a8a; border-bottom: 2px solid #1e3a8a; padding-bottom: 6px; }
+  h2 { font-size: 13pt; color: #1e3a8a; margin-top: 22px; }
+  h3 { font-size: 11pt; color: #333; margin-top: 16px; }
+  .meta { margin: 16px 0 24px; }
+  .meta p { margin: 4px 0; }
+  table { border-collapse: collapse; width: 100%; margin: 12px 0 16px; font-size: 10pt; }
+  th, td { border: 1px solid #ccc; padding: 6px 8px; text-align: left; vertical-align: top; }
+  th { background: #f0f4ff; font-weight: bold; }
+  code, .mono { font-family: Consolas, monospace; font-size: 9.5pt; background: #f5f5f5; padding: 1px 4px; }
+  pre { font-family: Consolas, monospace; font-size: 9.5pt; background: #f5f5f5; padding: 10px; border: 1px solid #ddd; }
+  ul, ol { margin: 8px 0 12px; }
+  li { margin: 4px 0; }
+  hr { border: none; border-top: 1px solid #ddd; margin: 20px 0; }
+  .callout { background: #f0f4ff; border-left: 4px solid #1e3a8a; padding: 10px 14px; margin: 12px 0; }
+  .footer { margin-top: 32px; font-size: 10pt; color: #555; }
+  strong { color: #000; }
+</style>
+</head>
+<body>
+
+<h1>Team Memo — Association &amp; Chapter Outreach Program</h1>
+
+<div class="meta">
+  <p><strong>To:</strong> Public Sector Partnerships &amp; Outreach Team</p>
+  <p><strong>From:</strong> Eric Coffie</p>
+  <p><strong>Date:</strong> June 28, 2026</p>
+  <p><strong>Re:</strong> Nationwide chapter outreach — how we hit 5–10 partner meetings per week</p>
+</div>
+
+<p>Team,</p>
+
+<p>We are launching a structured outreach program to trade associations, construction division chapters, and related member organizations. The goal is <strong>5–10 qualified partner meetings per week</strong> — not retail signups, but <strong>org-level deals</strong> where the association acquires Mindy usage rights and extends access to members as a membership benefit.</p>
+
+<p>This memo is your operating guide. Read it once, bookmark the files below, and start pulling from the registry this week.</p>
+
+<hr>
+
+<h2>1. What we're selling (one sentence)</h2>
+
+<div class="callout">
+  <strong>The association buys the rights; their members get the wins — included with membership, not another subscription.</strong>
+</div>
+
+<p>We are <strong>not</strong> pitching individual contractors to sign up at getmindy.ai. We are pitching EVPs, chapter executives, and membership directors on an <strong>org license</strong> ($18K–$50K/yr depending on segment) with a coach dashboard and quarterly board report.</p>
+
+<p><strong>Mantra to use on every call:</strong> <em>"You acquire the rights; your members get the federal wins."</em></p>
+
+<hr>
+
+<h2>2. Your primary tool — the Master Registry</h2>
+
+<p><strong>File:</strong> <code>projects/public-sector-targets/MASTER-REGISTRY.csv</code><br>
+<strong>Size:</strong> 1,713 organizations · <strong>1,635 chapter-level targets</strong> · all <strong>51 states + DC</strong></p>
+
+<p>Open in Google Sheets or Excel. Each row is one organization. <strong>One row = one outreach thread. Do not merge rows.</strong></p>
+
+<h3>Columns you will use daily</h3>
+<table>
+  <tr><th>Column</th><th>What it means</th></tr>
+  <tr><td><code>org_name</code></td><td>Who you're contacting</td></tr>
+  <tr><td><code>registry_segment</code></td><td>Which playbook (see Section 3)</td></tr>
+  <tr><td><code>org_level</code></td><td><strong>chapter</strong> = your daily queue; national = air cover only</td></tr>
+  <tr><td><code>parent_org</code></td><td>National body (AGC, NRCA, NECA, etc.)</td></tr>
+  <tr><td><code>csi_division</code></td><td>Construction trade (01=GC, 07=roofing, 03=concrete, etc.)</td></tr>
+  <tr><td><code>state</code></td><td>Geography — <strong>any state is valid</strong>; do not limit to four states</td></tr>
+  <tr><td><code>priority</code></td><td><strong>P1</strong> = outreach this week; P2/P3 = next waves</td></tr>
+  <tr><td><code>contact_name</code> / email / phone</td><td>Fill in as you research</td></tr>
+  <tr><td><code>pipeline_stage</code></td><td>Research → Outreach → Meeting → Eval → Closed</td></tr>
+  <tr><td><code>research_status</code></td><td>seed = verify on call · verified = use as-is</td></tr>
+  <tr><td><code>next_action</code></td><td>Your task for this row</td></tr>
+</table>
+
+<h3>Your daily filter</h3>
+<pre>org_level = chapter
+priority = P1
+pipeline_stage = Research (or Outreach)</pre>
+
+<p>That gives you <strong>646 P1 chapters</strong> nationwide. Rotate <code>csi_division</code> by day so pitches stay fresh (Monday = Div 07 roofing, Tuesday = Div 01 GC, etc.).</p>
+
+<hr>
+
+<h2>3. Five tracks — never mix them in one email</h2>
+
+<p>Each org belongs to <strong>exactly one track</strong>. Wrong track = wasted meeting or double-pitch conflict.</p>
+
+<table>
+  <tr><th>Track</th><th>registry_segment</th><th>Who</th><th>Price anchor</th><th>Template</th></tr>
+  <tr><td><strong>Government partners</strong></td><td>gov_intel</td><td>EDC, APEX, state HUB</td><td>$35K–$200K</td><td>Eric leads P1</td></tr>
+  <tr><td><strong>NMSDC councils</strong></td><td>nmsdc_council</td><td>Each MBE council separate</td><td>$35K–$50K</td><td>Never lump councils</td></tr>
+  <tr><td><strong>Chambers</strong></td><td>chamber</td><td>USHCC, regional chambers</td><td>$18K</td><td>USHCC playbook</td></tr>
+  <tr><td><strong>Industry / construction</strong></td><td>industry_traction</td><td><strong>Your main queue</strong></td><td>$25K–$50K</td><td>Outreach §2</td></tr>
+  <tr><td><strong>Direct government</strong></td><td>direct_gov</td><td>DoD / Air Force</td><td>$15K pilot</td><td>Eric only</td></tr>
+</table>
+
+<p><strong>Your lane:</strong> industry_traction chapter rows + chamber rows (when assigned).</p>
+
+<p><strong>Hard rules:</strong></p>
+<ul>
+  <li>Do <strong>not</strong> pitch an APEX center as an EDC cohort.</li>
+  <li>Do <strong>not</strong> combine FSMSDC + CRMSDC + DFW into one email.</li>
+  <li>Do <strong>not</strong> pitch NACC and AGC in the same thread.</li>
+  <li>Same state, different tracks = separate emails.</li>
+</ul>
+
+<hr>
+
+<h2>4. Weekly cadence — how we hit 5–10 meetings</h2>
+
+<table>
+  <tr><th>Day</th><th>Team action</th><th>Target</th></tr>
+  <tr><td><strong>Monday</strong></td><td>Each rep pulls 8–10 P1 chapter rows; assign owner</td><td>8–10 outreach emails sent</td></tr>
+  <tr><td><strong>Tue–Thu</strong></td><td>Follow up; book 15-min EVP intro calls</td><td>1–2 booked calls per rep per day</td></tr>
+  <tr><td><strong>Friday</strong></td><td>Update CSV: contact, pipeline_stage, next_action</td><td>Pipeline clean for next week</td></tr>
+</table>
+
+<p><strong>Math:</strong> 10 emails → ~30% reply → ~3 calls booked → 2 reps = <strong>5–10 meetings/week</strong>.</p>
+
+<h3>Division rotation</h3>
+<table>
+  <tr><th>Day</th><th>Filter csi_division</th><th>Pitch hook</th></tr>
+  <tr><td>Mon</td><td>07</td><td>Roof sustainment, federal renovation IDIQs</td></tr>
+  <tr><td>Tue</td><td>01</td><td>GC/sub federal intel, Federal Construction 101</td></tr>
+  <tr><td>Wed</td><td>03</td><td>Concrete / MILCON / USACE</td></tr>
+  <tr><td>Thu</td><td>09 or multi</td><td>Finishes or electrical/mechanical</td></tr>
+  <tr><td>Fri</td><td>04–06 or 10</td><td>Masonry, wood, specialties</td></tr>
+</table>
+
+<hr>
+
+<h2>5. Outreach copy — do not rewrite from scratch</h2>
+
+<p><strong>Templates:</strong> <code>projects/public-sector-targets/outreach-templates-associations.md</code></p>
+
+<table>
+  <tr><th>Target</th><th>Use section</th></tr>
+  <tr><td>Trade / manufacturing assoc</td><td>§1</td></tr>
+  <tr><td>Construction chapter (AGC, ABC, NECA, NRCA)</td><td>§2</td></tr>
+  <tr><td>Chamber / USHCC</td><td>§3</td></tr>
+  <tr><td>Veteran fraternal (Legion, VFW)</td><td>§4</td></tr>
+</table>
+
+<p><strong>Lead magnet on every first touch:</strong> Free <strong>Federal Market Snapshot</strong> for their trade + state (15-min walkthrough).</p>
+<p><strong>Send from:</strong> Eric Coffie or hello@govconedu.com</p>
+
+<hr>
+
+<h2>6. Seed rows — what to expect</h2>
+
+<p>Most chapter rows are <strong>research_status=seed</strong>. Verify the real chapter name and EVP on first contact, then update the CSV.</p>
+
+<p><strong>Start with these verified contacts:</strong></p>
+<table>
+  <tr><th>Chapter</th><th>Contact</th><th>Phone / email</th></tr>
+  <tr><td>ABC Florida Gulf Coast</td><td>Steve Cona III</td><td>813-876-1970</td></tr>
+  <tr><td>ABC Florida East Coast</td><td>Peter Dyga</td><td>954-984-4905</td></tr>
+  <tr><td>ABC Greater Houston</td><td>Mylene Pham</td><td>m.pham@abchouston.org</td></tr>
+  <tr><td>ABC Central Texas</td><td>Crystal Smith</td><td>csmith@abccentraltexas.org</td></tr>
+  <tr><td>ABC North Florida</td><td>DeeDee Rasmussen</td><td>rasmussen@abcnorthflorida.org</td></tr>
+  <tr><td>ABC Florida First Coast</td><td>Karin Tucker Hoffman</td><td>abcflorida.com/contact</td></tr>
+</table>
+
+<hr>
+
+<h2>7. Call structure (15 minutes)</h2>
+<ol>
+  <li><strong>Their world:</strong> What do members ask about federal work?</li>
+  <li><strong>Our model:</strong> Org acquires rights → members get intel → board gets quarterly report.</li>
+  <li><strong>Lead magnet:</strong> Federal Market Snapshot for their division + state.</li>
+  <li><strong>Close:</strong> 60-day director eval — up to 20 member firms, no cost.</li>
+</ol>
+<p><strong>Do not</strong> demo unshipped features. <strong>Do</strong> demo Market Analytics, matching, and coach dashboard.</p>
+
+<hr>
+
+<h2>8. What to log after every touch</h2>
+<table>
+  <tr><th>Field</th><th>Values</th></tr>
+  <tr><td>pipeline_stage</td><td>Research → Outreach → Meeting → Eval → Won / Lost</td></tr>
+  <tr><td>owner</td><td>Your name</td></tr>
+  <tr><td>next_action</td><td>Follow-up task</td></tr>
+  <tr><td>contact_name</td><td>Real EVP name</td></tr>
+  <tr><td>notes</td><td>Date + one-line outcome</td></tr>
+</table>
+<p>Eric reviews pipeline every <strong>Friday EOD</strong>.</p>
+
+<hr>
+
+<h2>9. Reference library</h2>
+<table>
+  <tr><th>#</th><th>File</th><th>Purpose</th></tr>
+  <tr><td>1</td><td>MASTER-REGISTRY.csv</td><td>Daily queue</td></tr>
+  <tr><td>2</td><td>CHAPTER-BLAST-RADIUS.md</td><td>Cadence &amp; filters</td></tr>
+  <tr><td>3</td><td>outreach-templates-associations.md</td><td>Email copy</td></tr>
+  <tr><td>4</td><td>ROUTING-RULES.md</td><td>What not to mix</td></tr>
+  <tr><td>5</td><td>CONSTRUCTION-DIVISIONS.md</td><td>Div 01–10 map</td></tr>
+  <tr><td>6</td><td>ASSOCIATION-MEMBER-VALUE.md</td><td>Acquired rights pitch</td></tr>
+  <tr><td>7</td><td>FEDERAL-MARKET-SNAPSHOT-SPEC.md</td><td>Lead magnet</td></tr>
+  <tr><td>8</td><td>ASSOCIATION-OUTCOMES-SCORECARD.md</td><td>Board metrics</td></tr>
+</table>
+<p>All paths: <code>projects/public-sector-targets/</code> in the market-assassin repo.</p>
+
+<hr>
+
+<h2>10. Escalate to Eric immediately</h2>
+<ul>
+  <li>MBDA Business Center (verify funding first)</li>
+  <li>NACC row — copy Eric on reply</li>
+  <li>direct_gov rows — not your lane</li>
+  <li>gov_intel P1 EDC rows — Eric closes</li>
+  <li>Deal size $75K+ or multi-state rollup</li>
+  <li>Legal, pricing exception, or custom contract</li>
+</ul>
+
+<hr>
+
+<h2>11. Success metrics</h2>
+<table>
+  <tr><th>Metric</th><th>Weekly target</th></tr>
+  <tr><td>Outreach emails sent</td><td>20–40 (team total)</td></tr>
+  <tr><td>Replies / positive responses</td><td>6–12</td></tr>
+  <tr><td><strong>Partner meetings booked</strong></td><td><strong>5–10</strong></td></tr>
+  <tr><td>Rows → Meeting or Eval</td><td>3–5</td></tr>
+  <tr><td>Contacts verified (seed → verified)</td><td>10+</td></tr>
+</table>
+
+<hr>
+
+<h2>12. This week's assignment</h2>
+<ol>
+  <li>Open MASTER-REGISTRY.csv in Sheets.</li>
+  <li>Filter: org_level=chapter, priority=P1, registry_segment=industry_traction, pipeline_stage=Research.</li>
+  <li>Claim 10 rows each — put your name in owner.</li>
+  <li>Send §2 construction template (personalize division + state).</li>
+  <li>Report booked meetings by <strong>Friday 5 PM ET</strong>.</li>
+</ol>
+
+<p>Questions → Eric. Do not improvise new pitch tracks without checking ROUTING-RULES.md first.</p>
+
+<p><strong>Let's fill the calendar.</strong></p>
+
+<p><strong>Eric Coffie</strong><br>
+Founder, GovCon Giants / Mindy<br>
+hello@govconedu.com | getmindy.ai</p>
+
+<div class="footer">
+  <p><em>Internal only. Registry and templates live in the market-assassin repo under projects/public-sector-targets/.</em></p>
+</div>
+
+</body>
+</html>
