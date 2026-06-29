@@ -458,9 +458,13 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
 ## 🟡 P2 — Follow-ups & polish (smaller, incremental)
 
 ### Decision Makers / DoDAAC
-- [ ] **Civilian office decode** — GSA/VA/HHS solicitation formats don't use
-  DoDAACs; decode those, or join `awards.awarding_office` for civilian. (DoDAAC
-  decoder is DoD-only by design.)
+- ✅ **Civilian office decode DONE 2026-06-29** (PR pending) — DoDAAC decode is
+  DoD-only, but SAM already reports a real buying `office`+`sub_tier` for civilian
+  notices (GSA/VA/HHS). New `resolveEventOffice()` falls back to those (normalized
+  via `clean` mode) when no DoDAAC decodes — wired into extract-sam-events (live)
+  + backfill-event-offices. `?retag=1` one-time drain re-tags already-attempted
+  civilian rows (also rescues DoD notices whose DoDAAC did not decode). No new
+  table/source; reuses existing SAM columns.
 - [ ] **5-role gov contacts** — Decision Makers shows only contracting POCs;
   PM/engineer/end-user need the enrichment source (P1 #5 above).
 - [ ] **Office → contact join** — the solicitation prefix could link POC
