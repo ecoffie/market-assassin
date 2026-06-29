@@ -31,7 +31,7 @@ const TASK_ROUTES: Record<BriefingTask, RouteCandidate[]> = {
     // Fallback 2: OpenAI
     {
       provider: 'openai',
-      model: process.env.BRIEFING_DAILY_FALLBACK_MODEL || 'gpt-5-mini',
+      model: process.env.BRIEFING_DAILY_FALLBACK_MODEL || 'gpt-4o-mini',
     },
   ],
   weekly: [
@@ -43,7 +43,7 @@ const TASK_ROUTES: Record<BriefingTask, RouteCandidate[]> = {
     // Fallback 1: OpenAI
     {
       provider: 'openai',
-      model: process.env.BRIEFING_WEEKLY_PRIMARY_MODEL || 'gpt-5-mini',
+      model: process.env.BRIEFING_WEEKLY_PRIMARY_MODEL || 'gpt-4o-mini',
     },
     // Fallback 2: Claude Sonnet (higher quality)
     {
@@ -65,7 +65,7 @@ const TASK_ROUTES: Record<BriefingTask, RouteCandidate[]> = {
     // Fallback 2: OpenAI
     {
       provider: 'openai',
-      model: process.env.BRIEFING_PURSUIT_FALLBACK_MODEL || 'gpt-5-mini',
+      model: process.env.BRIEFING_PURSUIT_FALLBACK_MODEL || 'gpt-4o-mini',
     },
   ],
 };
