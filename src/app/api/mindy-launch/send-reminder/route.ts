@@ -15,6 +15,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { sendMindyLaunchReminderEmail } from '@/lib/mindy/launch-reminder-email';
 import { sendMindyLaunchLifetimeEmail } from '@/lib/mindy/launch-lifetime-email';
+import { sendMindyApexOfferEmail } from '@/lib/mindy/apex-offer-email';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -33,7 +34,7 @@ export async function POST(request: NextRequest) {
   let body: {
     email?: string;
     name?: string;
-    variant?: 'reminder' | 'live' | 'lifetime';
+    variant?: 'reminder' | 'live' | 'lifetime' | 'apex-offer';
     phase?: 'deal' | 'lastcall' | 'extension' | 'finalclose';
   };
   try {
@@ -51,7 +52,9 @@ export async function POST(request: NextRequest) {
     // 'lifetime' = the POST-webinar Founders Lifetime offer (pricing). The pre-event
     // 'reminder'/'live' variants never carry pricing.
     const ok =
-      body.variant === 'lifetime'
+      body.variant === 'apex-offer'
+        ? await sendMindyApexOfferEmail({ to: email, name })
+        : body.variant === 'lifetime'
         ? await sendMindyLaunchLifetimeEmail({ to: email, name, phase: body.phase ?? 'deal' })
         : await sendMindyLaunchReminderEmail({ to: email, name, variant: body.variant === 'live' ? 'live' : 'reminder' });
     return NextResponse.json({ ok });
