@@ -109,6 +109,9 @@ const CLEAN_ABBREV: Record<string, string> = {
 const CLEAN_ACRONYMS = new Set([
   'AFLCMC', 'AESS', 'NAVSUP', 'NAVSEA', 'NAVAIR', 'NAVWAR', 'NAVFAC', 'NUWC', 'NSWC',
   'DLA', 'MICC', 'USACE', 'SOCOM', 'AFB', 'USAF', 'JBSA', 'PEO', 'DHA', 'DTRA', 'MDA',
+  // Phase 2d-2 — Air Force / Army office acronyms (so "Oklahoma City Alc" reads as
+  // "Oklahoma City ALC", "Smc"→"SMC", "Usa Aviation"→"USA Aviation").
+  'ALC', 'SMC', 'USA', 'AMC', 'AFMC', 'AFNWC', 'AFSC', 'AFRL', 'SDA',
 ]);
 const CLEAN_DROP = new Set(['PK']); // FPDS noise token
 const CLEAN_SMALL_WORDS = new Set(['and', 'of', 'the', 'for', 'a', 'an', 'to', 'in', 'at']);
@@ -153,6 +156,8 @@ function titleCaseToken(tok: string, index: number, gsa: boolean): string[] {
   // Dotted initialism (U.S., U.S.C., U.S.A.) — keep uppercase, don't title-case
   // it to "U.s." Two or more single-letter+dot groups.
   if (/^(?:[a-z]\.){2,}$/i.test(tok)) return [tok.toUpperCase()];
+  // Air Force Air Logistics Complex codes (WR-ALC, OO-ALC, OC-ALC) — keep uppercase.
+  if (/^[a-z]{2,3}-alc$/i.test(tok)) return [tok.toUpperCase()];
   const lower = tok.toLowerCase();
   if (index > 0 && CLEAN_SMALL_WORDS.has(lower)) return [lower];
   return [tok.charAt(0).toUpperCase() + lower.slice(1)];
@@ -170,9 +175,18 @@ function cleanMode(name: string): string {
     return out.join(' ') || name.trim();
   }
 
-  const stripped = stripTrailingCodeParen(name.trim())
-    .replace(/^[A-Za-z]{1,2}\d{2,4}[A-Za-z0-9]{0,3}\s+/, '') // leading DoDAAC code
-    .replace(/\s*\/\s*\w{2,5}\s*$/, '')                       // trailing /xx suffix
+  const trimmed = name.trim();
+  // Phase 2d-2 — AF/Army office names carry slash program codes ("Smc/pkh Los
+  // Angeles Afb", "Oo-Alc/pkc/lck", "Army Sustainment Command/rwkr"). Strip those,
+  // but ONLY for AF/Army strings so civilian slashes aren't mangled (A/E architect-
+  // engineer, USDA/RD, ACQ/PER).
+  const isAfArmy = /\b(alc|afb|smc|afsc|afrl|afnwc|afmc|aflcmc|nswc|sustainment command|aviation and missile)\b/i.test(trimmed);
+  let pre = stripTrailingCodeParen(trimmed)
+    .replace(/^[A-Za-z]{1,2}\d{2,4}[A-Za-z0-9]{0,3}\s+/, ''); // leading DoDAAC code
+  if (isAfArmy) pre = pre.replace(/\/[A-Za-z0-9]{1,5}(?=\s|\/|$)/g, ' ');
+  const stripped = pre
+    .replace(/\s*\/\s*\w{2,5}\s*$/, '')                       // trailing /xx suffix (legacy)
+    .replace(/\s{2,}/g, ' ')
     .trim();
   if (!stripped) return name.trim();
   const out = stripped.split(/\s+/).flatMap((tok, i) => titleCaseToken(tok, i, false));
