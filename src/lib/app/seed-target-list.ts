@@ -61,8 +61,9 @@ function matchesChosen(scan: ScanAgency, chosenNorm: string): boolean {
   return false;
 }
 
-const MAX_CHOSEN = 15;          // cap how many picked agencies we process
-const MAX_OFFICES_PER_AGENCY = 3; // top buying offices per chosen agency (by spend)
+const MAX_CHOSEN = 15;            // cap how many picked agencies we process
+const MAX_OFFICES_PER_AGENCY = 15; // top buying offices per chosen agency (by spend)
+const MAX_NAICS_SCAN = 12;        // scan up to this many of the user's NAICS codes
 
 export async function seedTargetListFromAgencies(opts: {
   supabase: Supabase;
@@ -78,10 +79,12 @@ export async function seedTargetListFromAgencies(opts: {
   const chosen = (opts.chosenAgencies || []).map((a) => String(a).trim()).filter(Boolean).slice(0, MAX_CHOSEN);
   if (chosen.length === 0) return { added: 0, skipped: 0, dropped: 0 };
 
-  // 1) Scan buying agencies for the top 3 NAICS (same call auto-setup uses —
-  //    find-agencies needs no MI session and returns the fields we map).
+  // 1) Scan buying agencies across the user's NAICS (same call auto-setup uses —
+  //    find-agencies needs no MI session and returns the fields we map). We scan
+  //    ALL the user's codes (bounded) so a chosen agency surfaces every office that
+  //    buys ANY of their work, not just the top-3 codes.
   const byKey = new Map<string, ScanAgency>();
-  const codesToScan = (naicsCodes || []).map(String).filter(Boolean).slice(0, 3);
+  const codesToScan = (naicsCodes || []).map(String).filter(Boolean).slice(0, MAX_NAICS_SCAN);
   if (codesToScan.length > 0) {
     try {
       const scans = await Promise.all(
@@ -112,11 +115,14 @@ export async function seedTargetListFromAgencies(opts: {
   );
 
   const sourceNaics = naicsCodes.join(',') || null;
-  let added = 0, skipped = 0, dropped = 0;
+  let dropped = 0;
 
-  // 2) For each chosen agency: add its matching buying offices (enriched). An
-  //    agency with NO matching offices (buys nothing in the user's codes) is
-  //    skipped entirely — no clutter from irrelevant buyers.
+  // 2) For each chosen agency, collect its matching buying offices (enriched, top
+  //    by spend). An agency with NO matching offices (buys nothing in the user's
+  //    codes) is skipped entirely — no clutter from irrelevant buyers. Dedup by
+  //    office_name (the table's unique key) so each office is inserted once.
+  const seenOffice = new Set<string>();
+  const payloads: RowPayload[] = [];
   for (const chosenName of chosen) {
     const chosenNorm = norm(chosenName);
     const offices = scanAgencies
@@ -126,10 +132,14 @@ export async function seedTargetListFromAgencies(opts: {
     if (offices.length === 0) { dropped++; continue; }
 
     for (const a of offices) {
-      const r = await insertRow(supabase, {
+      const officeName = a.contractingOffice || a.name;
+      const key = officeName.toLowerCase();
+      if (seenOffice.has(key)) continue;
+      seenOffice.add(key);
+      payloads.push({
         rowEmail, workspaceId, asClient, sourceNaics,
         agency_name: a.name,
-        office_name: a.contractingOffice || a.name,
+        office_name: officeName,
         agency_code: a.agencyCode || null,
         sub_agency_code: a.subAgencyCode || null,
         sub_agency_name: a.subAgency || null,
@@ -138,21 +148,27 @@ export async function seedTargetListFromAgencies(opts: {
         set_aside_spending: Math.min(Math.round(a.setAsideSpending || 0), 9_000_000_000),
         contract_count: Math.round(a.contractCount || 0),
       });
-      if (r === 'added') added++; else if (r === 'skipped') skipped++;
     }
   }
+
+  // Insert all in parallel (add-only; each 23505 = already saved).
+  const results = await Promise.all(payloads.map((p) => insertRow(supabase, p)));
+  const added = results.filter((r) => r === 'added').length;
+  const skipped = results.filter((r) => r === 'skipped').length;
 
   return { added, skipped, dropped };
 }
 
+interface RowPayload {
+  rowEmail: string; workspaceId: string | null; asClient: boolean; sourceNaics: string | null;
+  agency_name: string; office_name: string; agency_code: string | null;
+  sub_agency_code: string | null; sub_agency_name: string | null; office_code: string | null;
+  location: string | null; set_aside_spending: number; contract_count: number;
+}
+
 async function insertRow(
   supabase: Supabase,
-  f: {
-    rowEmail: string; workspaceId: string | null; asClient: boolean; sourceNaics: string | null;
-    agency_name: string; office_name: string; agency_code: string | null;
-    sub_agency_code: string | null; sub_agency_name: string | null; office_code: string | null;
-    location: string | null; set_aside_spending: number; contract_count: number;
-  },
+  f: RowPayload,
 ): Promise<'added' | 'skipped' | 'error'> {
   const { error } = await supabase.from('user_target_list').insert({
     user_email: f.rowEmail,
