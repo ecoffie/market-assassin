@@ -886,6 +886,7 @@ export default function MyTargetListPanel({
                       agency={t.agency_name}
                       subAgency={t.sub_agency_name}
                       office={t.office_name}
+                      officeCode={t.office_code}
                       email={email}
                     />
                   )}
@@ -1323,7 +1324,7 @@ const isJunkPhone = (p?: string | null) => !p || /^0+$/.test(p.replace(/\D/g, ''
 const isJunkTitle = (t?: string | null) => !t || /^(primary|secondary)\s*(contact)?$/i.test(t.trim());
 
 const PREVIEW_COUNT = 8; // curated preview size; rest behind search (SaaS pattern)
-function TargetContacts({ agency, subAgency, office, email }: { agency: string; subAgency?: string | null; office?: string | null; email: string }) {
+function TargetContacts({ agency, subAgency, office, officeCode, email }: { agency: string; subAgency?: string | null; office?: string | null; officeCode?: string | null; email: string }) {
   // Key + query by the MOST SPECIFIC identity the target has. Passing only the
   // broad agency made every DoD/Interior card match the parent department and
   // return the globally-newest contacts — i.e. the SAME wrong people on every
@@ -1333,7 +1334,13 @@ function TargetContacts({ agency, subAgency, office, email }: { agency: string; 
   // often saved with office_name = agency name) — that over-narrows to zero.
   const off = (office || '').trim();
   const officeParam = off && off.toLowerCase() !== agency.toLowerCase() && off.toLowerCase() !== subA.toLowerCase() ? off : '';
-  const cacheKey = `${email}:${agency}:${subA}:${officeParam}`;
+  // A real 6-char DoDAAC (letter + 5 alnum) lets the API narrow contacts by the
+  // solicitation-number prefix — the reliable way to surface the office's OWN
+  // POCs (e.g. USACE district @usace.army.mil) instead of the parent dept, since
+  // the SAM POC `office` column is almost always NULL and can't be filtered on.
+  const dodaac = (officeCode || '').trim().toUpperCase();
+  const validDodaac = /^[A-Z][A-Z0-9]{5}$/.test(dodaac) ? dodaac : '';
+  const cacheKey = `${email}:${agency}:${subA}:${officeParam}:${validDodaac}`;
   const [contacts, setContacts] = useState<TargetContact[]>(() => _contactsCache.get(cacheKey) || []);
   const [loading, setLoading] = useState(() => !_contactsCache.has(cacheKey));
   const [total, setTotal] = useState(0);
@@ -1354,6 +1361,7 @@ function TargetContacts({ agency, subAgency, office, email }: { agency: string; 
     const p = new URLSearchParams({ email, agency, limit: '250' });
     if (subA) p.set('subAgency', subA);
     if (officeParam) p.set('office', officeParam);
+    if (validDodaac) p.set('dodaac', validDodaac);
     fetch(`/api/app/federal-contacts?${p.toString()}`, { headers: getMIApiHeaders(email) })
       .then(r => r.json())
       .then(d => {
@@ -1364,7 +1372,7 @@ function TargetContacts({ agency, subAgency, office, email }: { agency: string; 
       .catch(() => {})
       .finally(() => { if (active) setLoading(false); });
     return () => { active = false; };
-  }, [tab, agency, subA, officeParam, email, cacheKey]);
+  }, [tab, agency, subA, officeParam, validDodaac, email, cacheKey]);
 
   // Format the name "Last, First" → "First Last".
   const fmtName = (n: string) => /,/.test(n) ? n.split(',').reverse().map(s => s.trim()).join(' ') : n;

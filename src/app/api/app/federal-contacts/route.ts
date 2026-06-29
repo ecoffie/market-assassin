@@ -347,23 +347,36 @@ export async function GET(request: NextRequest) {
   const role = (sp.get('role') || '').trim();
   const limit = Math.min(Number(sp.get('limit')) || 50, 200);
   const offset = Math.max(Number(sp.get('offset')) || 0, 0);
+  // Explicit office DoDAAC (from a target's office_code). When present and valid
+  // it is the single most precise filter we have: solicitation_number STARTS
+  // WITH the office's DoDAAC, so we can surface that office's OWN POCs (e.g. a
+  // USACE district's @usace.army.mil engineers) directly — bypassing the office
+  // ILIKE (which fails because the SAM `office` column is almost always NULL) and
+  // the sub-agency narrowing (which would otherwise drop them to the parent dept).
+  const dodaacRaw = (sp.get('dodaac') || '').trim().toUpperCase();
+  const validDodaac = /^[A-Z][A-Z0-9]{5}$/.test(dodaacRaw) ? dodaacRaw : '';
 
   let subAgency = (sp.get('subAgency') || '').trim();
   // If the target agency NAMES a specific branch (e.g. "Naval Facilities
   // Engineering Command") it collapses to the DEFENSE parent in the SQL filter,
   // which pulls the whole DoD (Army, Air Force, …). Auto-narrow to the branch the
   // user actually targeted so the Navy card shows Navy contacts, not all of DoD.
-  if (!subAgency && agency) {
-    const expected = agencyToExpectedSubAgency(agency);
-    if (expected) subAgency = expected;
-  }
-  // The branch signal often lives in the OFFICE name, not the agency — e.g. a
-  // "USA Engineer District" office whose agency collapses to "Department of
-  // Defense". Fall back to the office name so contacts narrow to the real branch
-  // (Army/USACE) instead of the dept-wide DoD firehose.
-  if (!subAgency && office) {
-    const expected = agencyToExpectedSubAgency(office);
-    if (expected) subAgency = expected;
+  // A valid office DoDAAC already pins the exact office, so sub-agency narrowing
+  // (which only knows the branch, not the office) would just risk dropping the
+  // office's real POCs. Skip it entirely and let the DoDAAC prefix do the work.
+  if (!validDodaac) {
+    if (!subAgency && agency) {
+      const expected = agencyToExpectedSubAgency(agency);
+      if (expected) subAgency = expected;
+    }
+    // The branch signal often lives in the OFFICE name, not the agency — e.g. a
+    // "USA Engineer District" office whose agency collapses to "Department of
+    // Defense". Fall back to the office name so contacts narrow to the real branch
+    // (Army/USACE) instead of the dept-wide DoD firehose.
+    if (!subAgency && office) {
+      const expected = agencyToExpectedSubAgency(office);
+      if (expected) subAgency = expected;
+    }
   }
 
   let q = sb
@@ -386,7 +399,13 @@ export async function GET(request: NextRequest) {
   // instead of the broad department label. (Eric, Jun 25 — competitors anchor on
   // the office, not the department.)
   let anchoredByDodaac = false;
-  if (agency) {
+  // Most precise path: an explicit office DoDAAC anchors directly on it. This is
+  // how a USACE district card surfaces its own engineers instead of dept-wide DoD.
+  if (validDodaac) {
+    q = q.ilike('solicitation_number', `${validDodaac}%`);
+    anchoredByDodaac = true;
+  }
+  if (agency && !anchoredByDodaac) {
     const dodaacCodes = await dodaacCodesForAgency(agency);
     if (dodaacCodes.length > 0) {
       // solicitation_number STARTS WITH a 6-char DoDAAC. Match any of the
@@ -411,7 +430,10 @@ export async function GET(request: NextRequest) {
       ? q.ilike('department_ind_agency', `%${keyword}%`)
       : q.ilike('department_ind_agency', `%${agency}%`);
   }
-  if (office) q = q.ilike('office', `%${office}%`);
+  // The SAM `office` column is almost always NULL for POCs, so a hard ILIKE on it
+  // EXCLUDES the very contacts we want. When a valid DoDAAC pins the office we
+  // skip this filter (the prefix is doing the narrowing instead).
+  if (office && !validDodaac) q = q.ilike('office', `%${office}%`);
   if (role) q = q.eq('role_category', role);
   // subAgency is DERIVED (from email domain / solicitation prefix), not a
   // column — so it's filtered in JS below. When set, pull a wider window so
@@ -546,12 +568,17 @@ export async function GET(request: NextRequest) {
   try {
     let eq = sb.from('federal_contacts').select('id', { count: 'exact', head: true }).not('contact_email', 'is', null);
     if (search) eq = eq.or(`contact_fullname.ilike.%${search}%,contact_title.ilike.%${search}%`);
-    if (agency) {
+    // Mirror the main query's filters so the emailable count matches the result
+    // set. A valid DoDAAC anchors on the solicitation prefix (skipping the agency
+    // keyword + office ILIKE, which would otherwise broaden/exclude wrongly).
+    if (validDodaac) {
+      eq = eq.ilike('solicitation_number', `${validDodaac}%`);
+    } else if (agency) {
       const parentKeyword = subAgencyToParent(agency);
       const keyword = parentKeyword || agency.replace(/\b(department|dept|of|the|agency|administration|us|u\.s\.|,)\b/gi, ' ').replace(/\s{2,}/g, ' ').trim();
       eq = keyword.length >= 3 ? eq.ilike('department_ind_agency', `%${keyword}%`) : eq.ilike('department_ind_agency', `%${agency}%`);
     }
-    if (office) eq = eq.ilike('office', `%${office}%`);
+    if (office && !validDodaac) eq = eq.ilike('office', `%${office}%`);
     if (role) eq = eq.eq('role_category', role);
     const { count: ec } = await eq;
     emailableTotal = ec ?? null;
