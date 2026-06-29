@@ -18,54 +18,60 @@ interface RouteCandidate {
  */
 const TASK_ROUTES: Record<BriefingTask, RouteCandidate[]> = {
   daily: [
-    // Primary: Groq for speed (10-50x faster than Claude)
+    // PRIMARY: gpt-4o-mini. Daily briefings are HIGH-VOLUME (230 templates/day)
+    // and Groq's free 70B is capped at 100K tokens/day (paid tier is CLOSED), so
+    // leading with Groq fails ~daily and wastes a call before fallback. Per the
+    // LLM strategy, gpt-4o-mini is the cost-sensitive primary (no daily cap,
+    // ~$0.15/$0.60 per 1M, near-Claude on this task). See memory llm_provider_strategy.
+    {
+      provider: 'openai',
+      model: process.env.BRIEFING_DAILY_PRIMARY_MODEL || 'gpt-4o-mini',
+    },
+    // Fallback 1: Groq 70B — fast + free WHEN it has quota left that day.
     {
       provider: 'groq',
       model: process.env.BRIEFING_DAILY_GROQ_MODEL || 'llama-3.3-70b-versatile',
     },
-    // Fallback 1: Claude Haiku (fast, reliable)
+    // Fallback 2: Claude Haiku — only if both above fail (needs funded credits).
     {
       provider: 'anthropic',
-      model: process.env.BRIEFING_DAILY_PRIMARY_MODEL || 'claude-3-5-haiku-latest',
-    },
-    // Fallback 2: OpenAI
-    {
-      provider: 'openai',
-      model: process.env.BRIEFING_DAILY_FALLBACK_MODEL || 'gpt-4o-mini',
+      model: process.env.BRIEFING_DAILY_FALLBACK_MODEL || 'claude-3-5-haiku-latest',
     },
   ],
   weekly: [
-    // Primary: Groq for speed
-    {
-      provider: 'groq',
-      model: process.env.BRIEFING_WEEKLY_GROQ_MODEL || 'llama-3.3-70b-versatile',
-    },
-    // Fallback 1: OpenAI
+    // PRIMARY: gpt-4o-mini (same reasoning as daily — Groq's daily cap makes it
+    // an unreliable primary; lead with the uncapped, cheap model).
     {
       provider: 'openai',
       model: process.env.BRIEFING_WEEKLY_PRIMARY_MODEL || 'gpt-4o-mini',
     },
-    // Fallback 2: Claude Sonnet (higher quality)
+    // Fallback 1: Groq 70B when it has quota.
+    {
+      provider: 'groq',
+      model: process.env.BRIEFING_WEEKLY_GROQ_MODEL || 'llama-3.3-70b-versatile',
+    },
+    // Fallback 2: Claude Sonnet (higher quality, needs funded credits).
     {
       provider: 'anthropic',
       model: process.env.BRIEFING_WEEKLY_FALLBACK_MODEL || 'claude-sonnet-4-20250514',
     },
   ],
   pursuit: [
-    // Primary: Claude Opus for highest quality strategic analysis
+    // Pursuit briefs are low-volume/high-value, so Claude quality is justified —
+    // BUT only when credits are funded. Lead with the always-available providers
+    // so a dead-credit Anthropic doesn't fail every call; Claude Opus is the
+    // quality fallback. (Pursuit briefs are currently disabled — memory pursuit_briefs_cut.)
     {
-      provider: 'anthropic',
-      model: process.env.BRIEFING_PURSUIT_PRIMARY_MODEL || 'claude-opus-4-20250514',
+      provider: 'openai',
+      model: process.env.BRIEFING_PURSUIT_FALLBACK_MODEL || 'gpt-4o-mini',
     },
-    // Fallback 1: Groq for speed if Opus unavailable
     {
       provider: 'groq',
       model: 'llama-3.3-70b-versatile',
     },
-    // Fallback 2: OpenAI
     {
-      provider: 'openai',
-      model: process.env.BRIEFING_PURSUIT_FALLBACK_MODEL || 'gpt-4o-mini',
+      provider: 'anthropic',
+      model: process.env.BRIEFING_PURSUIT_PRIMARY_MODEL || 'claude-opus-4-20250514',
     },
   ],
 };
