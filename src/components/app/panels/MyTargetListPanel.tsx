@@ -521,7 +521,7 @@ export default function MyTargetListPanel({
           through Market Research. Type an agency name → click to add. */}
       {!isFree && (
         <div className="relative">
-          <div className="flex items-center gap-2 bg-slate-900/60 border border-slate-800 rounded-lg p-3">
+          <div data-tour="target-add" className="flex items-center gap-2 bg-slate-900/60 border border-slate-800 rounded-lg p-3">
             <span className="text-slate-500">🔍</span>
             <input
               type="text"

@@ -1794,7 +1794,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             </p>
             {/* Auto ↔ Manual choice — at the TOP / Start Here (Eric QA: it was
                 buried at the bottom; users decide their style up front). */}
-            <div className="mt-3 inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800/60 p-1 text-sm">
+            <div data-tour="proposals-mode" className="mt-3 inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800/60 p-1 text-sm">
               <span className="pl-2 text-xs text-slate-500">Mode:</span>
               <button
                 onClick={() => setDriveMode('auto')}
