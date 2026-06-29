@@ -8,10 +8,14 @@
  * Detects, by diffing the live SAM state (sam_opportunities cache) against the
  * last snapshot in pursuit_monitor_state:
  *   - deadline      response_deadline moved
- *   - amendment     SAM last_modified bumped (a new amendment posted)
  *   - notice_type   e.g. Sources Sought → Solicitation (went live)
- *   - documents     docs_count increased (new attachments / Q&A / revised SOW)
  *   - cancelled / awarded  notice_type indicates the pursuit is over
+ *   - closed        active went true → false (archived/closed)
+ *   - amendment     posted_date changed (SAM re-posts a notice when amended —
+ *                   this is the PROXY: SAM's API has NO real last-modified field,
+ *                   verified, so we use postedDate. Catches re-posts, may miss a
+ *                   quiet text-only amendment.)
+ *   - documents     docs_count increased (new attachments / Q&A / revised SOW)
  *
  * Each change → a pursuit_change_log row (drives the in-app badge) + a per-user
  * email digest via the shared sendEmail() (Resend primary). Registerable on the
@@ -39,9 +43,16 @@ function fmtDate(d: string | null): string {
 }
 
 // Diff a pursuit's live SAM state against its last snapshot.
+//
+// IMPORTANT: SAM's opportunities API does NOT publish a per-notice last-modified
+// timestamp (verified — the v2 /search response has only postedDate, archiveDate,
+// responseDeadLine, active; no modified/amendment/version field anywhere). So we
+// CANNOT diff on last_modified — it's null cache-wide. Instead we detect on the
+// real fields SAM does return, and use a re-posted `postedDate` as the amendment
+// proxy (SAM signals an amendment by re-posting the notice).
 function detectChanges(
-  prev: { last_deadline?: string | null; last_notice_type?: string | null; last_modified?: string | null; last_docs_count?: number | null } | null,
-  live: { response_deadline?: string | null; notice_type?: string | null; last_modified?: string | null; docs_count?: number | null },
+  prev: { last_deadline?: string | null; last_notice_type?: string | null; last_posted?: string | null; last_active?: boolean | null; last_docs_count?: number | null } | null,
+  live: { response_deadline?: string | null; notice_type?: string | null; posted_date?: string | null; active?: boolean | null; docs_count?: number | null },
 ): Change[] {
   const out: Change[] = [];
   if (!prev) return out; // first sight — just snapshot, don't alert.
@@ -55,9 +66,14 @@ function detectChanges(
     else if (nt.includes('award')) out.push({ change_type: 'awarded', summary: 'Award posted — this pursuit is decided', old_value: prev.last_notice_type, new_value: live.notice_type });
     else out.push({ change_type: 'notice_type', summary: `Notice type changed: ${prev.last_notice_type} → ${live.notice_type}`, old_value: prev.last_notice_type, new_value: live.notice_type });
   }
-  if (live.last_modified && prev.last_modified && live.last_modified !== prev.last_modified) {
-    // last_modified bump that isn't already captured as a deadline/type change.
-    if (!out.length) out.push({ change_type: 'amendment', summary: `Amendment posted (updated ${fmtDate(live.last_modified)})`, old_value: prev.last_modified, new_value: live.last_modified });
+  // Became inactive/archived = the pursuit closed.
+  if (typeof prev.last_active === 'boolean' && live.active === false && prev.last_active === true) {
+    out.push({ change_type: 'closed', summary: 'Opportunity is no longer active (archived/closed)', old_value: 'active', new_value: 'inactive' });
+  }
+  // AMENDMENT PROXY: SAM re-posts a notice when it amends it → postedDate changes.
+  // Only flag if not already captured as a deadline/type/close change above.
+  if (!out.length && live.posted_date && prev.last_posted && live.posted_date !== prev.last_posted) {
+    out.push({ change_type: 'amendment', summary: `Notice updated/re-posted (${fmtDate(live.posted_date)})`, old_value: prev.last_posted, new_value: live.posted_date });
   }
   if (typeof live.docs_count === 'number' && typeof prev.last_docs_count === 'number' && live.docs_count > prev.last_docs_count) {
     out.push({ change_type: 'documents', summary: `${live.docs_count - prev.last_docs_count} new document(s) added`, old_value: String(prev.last_docs_count), new_value: String(live.docs_count) });
@@ -164,20 +180,30 @@ export async function GET(request: NextRequest) {
   const pursuits = ordered.slice(0, BATCH_SIZE);
   const remaining = Math.max(0, totalMonitorable - pursuits.length);
 
-  // Batch-load live SAM state for all notice_ids in one query.
+  // Batch-load live SAM state for all notice_ids in one query. We diff on the
+  // fields SAM actually publishes (deadline, notice_type, posted_date, active) —
+  // NOT last_modified, which SAM never returns (always null cache-wide).
   const noticeIds = Array.from(new Set(pursuits.map((p: { notice_id: string }) => p.notice_id)));
   const { data: samRows } = await supabase
     .from('sam_opportunities')
-    .select('notice_id, response_deadline, notice_type, last_modified')
+    .select('notice_id, response_deadline, notice_type, posted_date, active')
     .in('notice_id', noticeIds);
-  const samByNotice = new Map<string, { response_deadline: string; notice_type: string; last_modified: string }>();
+  const samByNotice = new Map<string, { response_deadline: string; notice_type: string; posted_date: string; active: boolean }>();
   for (const r of (samRows || [])) samByNotice.set(r.notice_id, r);
 
   // Existing snapshots.
   const pursuitIds = pursuits.map((p: { id: string }) => p.id);
   const { data: snaps } = await supabase.from('pursuit_monitor_state').select('*').in('pursuit_id', pursuitIds);
-  const snapById = new Map<string, { last_deadline: string; last_notice_type: string; last_modified: string; last_docs_count: number }>();
-  for (const s of (snaps || [])) snapById.set(s.pursuit_id, s);
+  // The `last_modified` column now stores posted_date (see upsert note). Map it
+  // to last_posted for detectChanges; last_active is the new migration column.
+  const snapById = new Map<string, { last_deadline: string; last_notice_type: string; last_posted: string; last_active: boolean | null; last_docs_count: number }>();
+  for (const s of (snaps || [])) snapById.set(s.pursuit_id, {
+    last_deadline: s.last_deadline,
+    last_notice_type: s.last_notice_type,
+    last_posted: s.last_modified, // reused column
+    last_active: typeof s.last_active === 'boolean' ? s.last_active : null,
+    last_docs_count: s.last_docs_count,
+  });
 
   const changesByUser = new Map<string, Array<{ title: string; changes: Change[] }>>();
   let totalChanges = 0;
@@ -194,7 +220,8 @@ export async function GET(request: NextRequest) {
     const live = {
       response_deadline: sam?.response_deadline || p.response_deadline,
       notice_type: sam?.notice_type || null,
-      last_modified: sam?.last_modified || null,
+      posted_date: sam?.posted_date || null,
+      active: typeof sam?.active === 'boolean' ? sam.active : null,
       docs_count: p.docs_count ?? null,
     };
     const prev = snapById.get(p.id) || null;
@@ -216,13 +243,17 @@ export async function GET(request: NextRequest) {
       changesByUser.get(owner)!.push({ title: p.title || 'Untitled pursuit', changes });
     }
 
-    // Upsert the snapshot to the current live state.
+    // Upsert the snapshot to the current live state. NOTE: we reuse the existing
+    // `last_modified` TEXT column to store SAM's posted_date (SAM has no real
+    // last-modified; postedDate is the amendment proxy) — avoids a migration for
+    // that field. `last_active` is a new column (migration 20260629).
     await supabase.from('pursuit_monitor_state').upsert({
       pursuit_id: p.id,
       notice_id: p.notice_id,
       last_deadline: live.response_deadline,
       last_notice_type: live.notice_type,
-      last_modified: live.last_modified,
+      last_modified: live.posted_date,   // reused column = posted_date snapshot
+      last_active: live.active,
       last_docs_count: live.docs_count,
       last_checked_at: new Date().toISOString(),
     });
