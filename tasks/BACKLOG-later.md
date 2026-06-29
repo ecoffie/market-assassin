@@ -85,9 +85,63 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
 **Newly deferred this session (Jun 26):**
 
 ### Ingest the FULL GovCon Giants content library into Mindy RAG (moat) — ⭐ V2 FLAGSHIP
+- **IN PROGRESS 2026-06-28 — Phase 1 (Vault + Courses DOCS).** Tooling +
+  pipeline proven; **21 high-value teaching docs ingested** & retrievable
+  (verified via get_rag_chunks). See "Phase 1 progress" below.
 - **When:** **V2 — start AFTER Mindy Day** (demo Jun 27, 2026). Confirmed by Eric
   Jun 26: do the full ingestion post-demo as the headline v2 capability. Not a
   pre-demo task; the demo runs on the current ~1,364-doc slice.
+
+**Phase 1 progress (Vault docs) — 2026-06-28:**
+- **Access:** gcloud NOT installed on Eric's machine → use the **claude.ai Google
+  Drive MCP** (account `evankoffdev@gmail.com`, which OWNS the Vault). Vault root
+  folder `0B5-58IRcecZucWRNeVZJVGJlcTQ` (resourcekey `0-2Yfe9SGWpnazdYgHxmCOew`);
+  the curated teaching library is the NESTED "The Vault" folder
+  `1uT3iXHaOEZpgzQNE2IeLchufds14B1oD` (~18 topic subfolders).
+- **Pipeline:** `scripts/ingest-vault-docs.js` — Drive REST (with `ACCESS_TOKEN`)
+  OR `--from-cache=<dir>` (MCP-read → disk `<id>.json`+`.txt` → direct Supabase
+  insert, idempotent by `source_path=gdrive:vault/<id>`). Per-doc `docType`
+  override so high-value docs get the right boost. Reuses FTS pipeline
+  (`mindy_rag_documents`/`_chunks`), NO embeddings/transcription. `.env.local`
+  pulled via `vercel env pull --environment=production` (sanitize trailing `\n`).
+- **Ingested (17):** cap statements (GovconEDU, Tavares), acquisition-process flow,
+  Top-10 subcontractor clauses, teaming-agreement template, OSDBU call checklist,
+  15 APEX questions, sources-sought + technical-approach samples, agency-outreach
+  email scripts ×2, 8(a) JV checklist + JV agreement example, calling-8(a) phone
+  script, how-to-find-an-8(a) guide, consultant-agreement template, DLA DIBBS
+  Solicitations deck. Tiers: 7 teaching_handout, 6 vault_doc, 3 proposal_template,
+  1 cap_statement.
+- **Curation rule:** SKIP (a) PII/admin (corp filings, signed NDAs, CRM/contact
+  lists), (b) docs already in the corpus (the big Miami Wiipica / MACC / NAVFAC
+  winning proposals ARE already ingested — confirmed by title match), (c) empty
+  `.dotx` templates (MCP returns no text), (d) pricing spreadsheets (low text value).
+- **PENDING for Eric:** hand-run `supabase/migrations/20260628_rag_vault_doctype.sql`
+  (vault_doc → 1.3 boost). Until then vault_doc ranks at the 0.8 ELSE.
+- **Courses / Bootcamps folder** (`1Yi0ug2XmtFrf5tslnQzvrnJH7SMGvspc`, inside the
+  Vault top level — Eric pointed here for "all our bootcamps"): 16+ course/bootcamp
+  subfolders (Proposal Bootcamp, Business Readiness, Surge, 5/30-Day Challenge,
+  First Partner Challenge, Accelerator, GovCon Giants Course, Dummies…). Ingested
+  the accessible GOLD: **10-week Accelerator syllabus (course_material), Eric's
+  6-step proposal system + Proposal Bootcamp outline (proposal_template), 8(a)
+  bootcamp curriculum.**
+  - **⚠️ KEY LIMITATION:** the bootcamp SLIDE DECKS are almost all Apple Keynote
+    (`.key`) — the Drive integration CANNOT extract them (returns empty, like
+    `.dotx`). Not a token/tooling gap — Keynote isn't text-extractable without
+    conversion. Eric's call (Jun 28): SKIP the `.key` decks (don't hand-export),
+    just grab readable PDF/docx/gdoc/pptx. The slide TEACHING comes in via Phase 2
+    video transcripts (the recordings of these exact bootcamps).
+- **Remaining long-tail (lower value, optional):** DIBBS Quoting deck, JV SOP,
+  client questionnaire, SAM/DIBBS screenshot how-tos, Bid Forms, NAVFAC POC list,
+  Target Market List, tax-exemption certs, + the rest of the course subfolders
+  (mostly `.key`/video/spreadsheet/admin).
+- **Phase 2 = the VIDEO library** (Courses' bootcamp/course recordings, Webinars,
+  YouTube). **CORRECTION (Eric, Jun 28): the platform does NOT have transcripts** —
+  the cheap pull-captions path is OFF. Phase 2 now requires real **Whisper
+  transcription** (download mp4 → ffmpeg audio → split <25MB → Whisper → ingest),
+  ~$200–400 Whisper + a download/transcode pipeline + a Drive REST token (gcloud not
+  installed → OAuth Playground). **Full scope written up:
+  `tasks/PLAN-rag-video-transcription-phase2.md`** (pipeline, cost table, phasing,
+  pilot = Proposal Bootcamp). This is where the bulk of the moat (~925 lessons) lives.
 - **Why:** the knowledge base IS the moat (8 yrs teaching). Mindy's RAG today
   (`mindy_rag_documents` ~1,364 docs / 12,534 chunks) has only a SLICE — ~136
   course_material, 103 slide_deck, 31 webinar_resource, 743 podcast_interview. Two

@@ -79,14 +79,21 @@ export async function generateMetadata({
     : `${agency.name} is a federal buyer worth tracking.`;
   const desc = `${spendClause} Daily opportunity alerts, NAICS tracking, recompete monitoring from Mindy.`;
 
+  // Front-load the agency's annual contract spend — a concrete number that
+  // differentiates this from generic .gov results and lifts CTR — and match
+  // buyer-intent ("what they buy", set-asides) the page actually delivers.
+  const title = agency.fy26BudgetB
+    ? `${agency.name}: $${agency.fy26BudgetB.toLocaleString()}B/yr — What They Buy & How to Win | Mindy`
+    : `${agency.name}: What They Buy & How to Win Contracts | Mindy`;
+
   return {
-    title: `${agency.name} Contract Opportunities — Federal Market Intel | Mindy`,
+    title,
     description: desc.length > 158 ? `${desc.slice(0, 155)}...` : desc,
     alternates: {
       canonical: `https://getmindy.ai/agencies/${agency.slug}`,
     },
     openGraph: {
-      title: `${agency.name} Contract Opportunities | Mindy`,
+      title,
       description: desc,
       type: 'article',
       url: `https://getmindy.ai/agencies/${agency.slug}`,
