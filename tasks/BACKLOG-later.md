@@ -171,6 +171,13 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
 - **Guardrail:** filter `has_pii` / internal-only docs (same as Knowledge Base repo).
 
 ### Auto-seed My Target List from the profile's chosen target agencies — V2 (Eric, Jun 27)
+- ✅ **DONE 2026-06-28 — auto-seed** (`feat/auto-seed-target-list`). On profile
+  save / onboarding finish (`/api/app/profile` POST — the single trigger both hit),
+  chosen `agencies` are seeded into `user_target_list` ADD-ONLY, Pro-gated,
+  non-blocking. HYBRID (`src/lib/app/seed-target-list.ts`): reuses the find-agencies
+  NAICS scan to add each chosen agency's matching BUYING OFFICES (enriched
+  spend/contacts), else one bare department row so it still shows. Dedup via
+  UNIQUE(user_email, office_name)→23505 skip (verified). `added_from=profile_agency`.
 - **The gap:** today there are TWO disconnected concepts. The profile's **target
   agencies** (`user_notification_settings.agencies`) drive view filters/defaults
   (e.g. Decision Makers "⭐ My Targets"), but **My Target List** (`user_target_list`)

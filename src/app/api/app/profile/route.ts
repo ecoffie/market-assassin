@@ -275,6 +275,40 @@ export async function POST(request: NextRequest) {
       });
     }
 
+    // Auto-seed My Target List from the user's CHOSEN target agencies (add-only,
+    // non-blocking). Closes the gap where picked agencies drove filters but never
+    // appeared in My Target List. Pro-gated like the rest of Target List. Hybrid:
+    // enriched buying offices that match each chosen agency, else a bare row.
+    if (safeAgencies.length > 0) {
+      try {
+        const { verifyMIAccess } = await import('@/lib/api-auth');
+        const access = await verifyMIAccess(normalizedEmail);
+        if (access.tier !== 'free' || access.isStaff) {
+          // Use the user's CURRENT saved codes (this save may be agencies-only).
+          const { data: prof } = await supabase
+            .from('user_notification_settings')
+            .select('naics_codes, location_states')
+            .eq('user_email', rowEmail)
+            .maybeSingle();
+          const { internalBaseUrl } = await import('@/lib/utils/internal-base-url');
+          const { seedTargetListFromAgencies } = await import('@/lib/app/seed-target-list');
+          const seeded = await seedTargetListFromAgencies({
+            supabase,
+            base: internalBaseUrl(request),
+            rowEmail,
+            workspaceId,
+            asClient,
+            naicsCodes: (prof?.naics_codes || []).map(String).filter(Boolean),
+            states: (prof?.location_states || []).map(String).filter(Boolean),
+            chosenAgencies: safeAgencies,
+          });
+          console.log(`[Mindy Profile] Target-list seed for ${rowEmail}:`, seeded);
+        }
+      } catch (seedErr) {
+        console.warn('[Mindy Profile] Target-list seed failed (non-fatal):', seedErr);
+      }
+    }
+
     console.log(`[MI Beta Profile] Updated profile for ${normalizedEmail}`, {
       naicsCodes: expandedNaicsCodes.length,
       setAsides: safeSetAsides.length,
