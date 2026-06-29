@@ -19,7 +19,7 @@ interface RecompeteSyncRow {
   started_at: string | null;
   completed_at: string | null;
   status: string | null;
-  records_processed: number | null;
+  contracts_fetched: number | null;
 }
 
 function getAdminClient() {
@@ -127,7 +127,7 @@ export async function GET(request: NextRequest) {
       .select('agency_code, agency_name, total_records, last_success_at, last_failure_at, consecutive_failures, is_active'),
     supabase
       .from('recompete_sync_runs')
-      .select('started_at, completed_at, status, records_processed')
+      .select('started_at, completed_at, status, contracts_fetched')
       .order('started_at', { ascending: false })
       .limit(5),
   ]);
@@ -195,7 +195,7 @@ export async function GET(request: NextRequest) {
       latestCompletedAt: latestRecompete?.completed_at || null,
       latestStartedAt: latestRecompete?.started_at || null,
       daysSinceLatestRun: recompeteDaysAgo,
-      recordsProcessed: latestRecompete?.records_processed || 0,
+      recordsProcessed: latestRecompete?.contracts_fetched || 0,
     },
   };
 
