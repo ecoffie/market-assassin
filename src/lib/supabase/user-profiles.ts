@@ -306,26 +306,20 @@ export async function updateAccessFlags(
 
   // Bundle access grants (supports both short names and full product IDs)
   if (bundle) {
-    // GovCon Starter Bundle ($697): Hunter Pro + Recompete + Contractor DB.
-    // Grandfather (Eric, 2026-06-29): legacy_bundle → LIFETIME Mindy Pro
-    // (PRD-trial-vs-paid-access §A; CLAUDE.md "Tool bundles → Lifetime MI Pro").
-    // access_briefings with NO expiry written = lifetime.
+    // GovCon Starter Bundle ($697): Hunter Pro + Recompete + Contractor DB (NO Market Intelligence)
     if (bundle === 'starter' || bundle === 'govcon-starter-bundle') {
       updates.access_hunter_pro = true;
       updates.access_recompete = true;
       updates.access_contractor_db = true;
-      updates.access_briefings = true; // grandfather: lifetime Mindy Pro
+      // No access_briefings - Starter bundle doesn't include Market Intelligence
     }
-    // Pro Giant Bundle ($997): Contractor DB + Recompete + MA Standard + Content Reaper.
-    // Grandfather: legacy_bundle → LIFETIME Mindy Pro. No briefings_expires_at is ever
-    // written on purchase, so this has always been lifetime in practice — the old
-    // "1 year" note was never implemented.
+    // Pro Giant Bundle ($997): Contractor DB + Recompete + MA Standard + Content Reaper + 1 Year Briefings
     else if (bundle === 'pro' || bundle === 'pro-giant-bundle') {
       updates.access_contractor_db = true;
       updates.access_recompete = true;
       updates.access_assassin_standard = true;
       updates.access_content_standard = true;
-      updates.access_briefings = true; // grandfather: lifetime Mindy Pro (no expiry)
+      updates.access_briefings = true; // 1 year - handled by briefings_expires_at
     }
     // Ultimate GovCon Bundle ($1497): All products + MA Premium + Content Full Fix + Lifetime Briefings
     else if (bundle === 'ultimate' || bundle === 'ultimate-govcon-bundle' || bundle === 'complete') {
