@@ -98,8 +98,39 @@ export async function GET(request: NextRequest) {
       .eq('emailed', true)
       .order('detected_at', { ascending: false })
       .limit(10);
+
+    // ROOT-CAUSE DIAGNOSTICS: is detection silent because nothing changed, or
+    // because the inputs are missing? Check (1) how many snapshots exist, and
+    // (2) whether the SAM cache has the compare fields (last_modified /
+    // response_deadline) populated for the actually-tracked notice_ids.
+    const snapCountRes = await supabase.from('pursuit_monitor_state').select('pursuit_id', { count: 'exact', head: true });
+    const { data: trackedRows } = await supabase
+      .from('user_pipeline')
+      .select('notice_id')
+      .not('notice_id', 'is', null)
+      .limit(500);
+    const trackedNotices = Array.from(new Set((trackedRows || []).map((r: { notice_id: string }) => r.notice_id)));
+    const { data: samRows } = await supabase
+      .from('sam_opportunities')
+      .select('notice_id, last_modified, response_deadline, notice_type')
+      .in('notice_id', trackedNotices.slice(0, 300));
+    const inCache = (samRows || []).length;
+    const withLastMod = (samRows || []).filter((r: { last_modified: string | null }) => r.last_modified).length;
+    const withDeadline = (samRows || []).filter((r: { response_deadline: string | null }) => r.response_deadline).length;
+
     return NextResponse.json(
-      { stats: { total, emailed, acknowledged: acked }, recentEmailed: recent || [] },
+      {
+        stats: { total, emailed, acknowledged: acked },
+        recentEmailed: recent || [],
+        diagnostics: {
+          snapshotsStored: snapCountRes.count ?? 0,
+          trackedNoticeIds: trackedNotices.length,
+          ofThoseInSamCache: inCache,
+          cacheHasLastModified: withLastMod,   // ← if low/0, detection can't see amendments
+          cacheHasResponseDeadline: withDeadline,
+          note: 'If ofThoseInSamCache is low → tracked notices not in cache. If cacheHasLastModified is low → amendment detection is blind.',
+        },
+      },
       { headers: { 'Cache-Control': 'no-store' } },
     );
   }
