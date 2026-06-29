@@ -12,7 +12,6 @@ interface ForecastSourceRow {
   last_success_at: string | null;
   last_failure_at: string | null;
   consecutive_failures: number | null;
-  health_status: string | null;
   is_active: boolean | null;
 }
 
@@ -20,7 +19,7 @@ interface RecompeteSyncRow {
   started_at: string | null;
   completed_at: string | null;
   status: string | null;
-  records_processed: number | null;
+  contracts_fetched: number | null;
 }
 
 function getAdminClient() {
@@ -125,10 +124,10 @@ export async function GET(request: NextRequest) {
   const [{ data: forecastSources, error: forecastError }, { data: recompeteSyncs, error: recompeteError }] = await Promise.all([
     supabase
       .from('forecast_sources')
-      .select('agency_code, agency_name, total_records, last_success_at, last_failure_at, consecutive_failures, health_status, is_active'),
+      .select('agency_code, agency_name, total_records, last_success_at, last_failure_at, consecutive_failures, is_active'),
     supabase
       .from('recompete_sync_runs')
-      .select('started_at, completed_at, status, records_processed')
+      .select('started_at, completed_at, status, contracts_fetched')
       .order('started_at', { ascending: false })
       .limit(5),
   ]);
@@ -152,7 +151,6 @@ export async function GET(request: NextRequest) {
       last_success_at: null,
       last_failure_at: null,
       consecutive_failures: 0,
-      health_status: null,
       is_active: false,
     };
 
@@ -197,7 +195,7 @@ export async function GET(request: NextRequest) {
       latestCompletedAt: latestRecompete?.completed_at || null,
       latestStartedAt: latestRecompete?.started_at || null,
       daysSinceLatestRun: recompeteDaysAgo,
-      recordsProcessed: latestRecompete?.records_processed || 0,
+      recordsProcessed: latestRecompete?.contracts_fetched || 0,
     },
   };
 

@@ -272,7 +272,14 @@ function deriveAccessFromPurchase({
   }
 
   if (!tier) {
-    if (normalizedName.includes('market intelligence') || normalizedName.includes('daily briefing') || normalizedName.includes('briefing')) {
+    if (
+      normalizedName.includes('market intelligence') || normalizedName.includes('daily briefing') || normalizedName.includes('briefing')
+      // Mindy Pro is the flagship product but its checkout description isn't
+      // "briefings" — recognize its real names too (was silently unprovisioned).
+      || normalizedName.includes('mindy pro') || normalizedName.includes('pro member')
+      || normalizedName.includes('mindy ai') || normalizedName.includes('mi pro')
+      || normalizedName.includes('founders')
+    ) {
       tier = normalizedName.includes('lifetime')
         ? 'briefings_lifetime'
         : normalizedName.includes('annual')
@@ -283,6 +290,17 @@ function deriveAccessFromPurchase({
     } else if (normalizedName.includes('recompete')) {
       tier = 'recompete';
     }
+  }
+
+  // Mindy Pro + Mindy lifetime checkouts use payment links that inject NO tier
+  // metadata, and recurring subscription charges carry a generic "Subscription"
+  // description — so neither the metadata nor the name path resolves a tier and
+  // the buyer was never provisioned (Eric, 2026-06-29). Map the known Mindy prices
+  // by amount as the backstop: $149/mo + $1,490/yr = Mindy Pro (briefings);
+  // $2,997 bootcamp + $4,997 Founders = lifetime.
+  if (!tier && !bundle) {
+    if (amount === 14900 || amount === 149000) tier = 'briefings';
+    else if (amount === 299700 || amount === 499700) tier = 'briefings_lifetime';
   }
 
   return { tier, bundle };
