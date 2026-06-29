@@ -12,7 +12,6 @@ interface ForecastSourceRow {
   last_success_at: string | null;
   last_failure_at: string | null;
   consecutive_failures: number | null;
-  health_status: string | null;
   is_active: boolean | null;
 }
 
@@ -125,7 +124,7 @@ export async function GET(request: NextRequest) {
   const [{ data: forecastSources, error: forecastError }, { data: recompeteSyncs, error: recompeteError }] = await Promise.all([
     supabase
       .from('forecast_sources')
-      .select('agency_code, agency_name, total_records, last_success_at, last_failure_at, consecutive_failures, health_status, is_active'),
+      .select('agency_code, agency_name, total_records, last_success_at, last_failure_at, consecutive_failures, is_active'),
     supabase
       .from('recompete_sync_runs')
       .select('started_at, completed_at, status, records_processed')
@@ -152,7 +151,6 @@ export async function GET(request: NextRequest) {
       last_success_at: null,
       last_failure_at: null,
       consecutive_failures: 0,
-      health_status: null,
       is_active: false,
     };
 
