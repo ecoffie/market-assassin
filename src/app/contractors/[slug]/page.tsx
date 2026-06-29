@@ -34,6 +34,7 @@ import {
   getRecentAwardsForRecipient,
   getExecutivesForRecipient,
   getSimilarRecipients,
+  recipientSlug,
 } from '@/lib/bigquery/recipients';
 import { ContractorAnalytics } from '@/components/contractors/ContractorAnalytics';
 import {
@@ -485,16 +486,12 @@ export default async function ContractorPage({ params }: PageProps) {
               {topSubawardees.map((s) => (
                 <li key={s.partner_uei} className="flex items-center justify-between gap-4 py-2.5">
                   <div className="min-w-0">
-                    {s.canonical_slug ? (
-                      <Link
-                        href={`/contractors/${s.canonical_slug}`}
-                        className="text-slate-200 hover:text-purple-400 font-medium"
-                      >
-                        {fmtCompanyName(s.partner_name)}
-                      </Link>
-                    ) : (
-                      <span className="text-slate-200 font-medium">{fmtCompanyName(s.partner_name)}</span>
-                    )}
+                    <Link
+                      href={`/contractors/${recipientSlug(s.partner_name)}`}
+                      className="text-slate-200 hover:text-purple-400 font-medium"
+                    >
+                      {fmtCompanyName(s.partner_name)}
+                    </Link>
                     <p className="text-xs text-slate-500">{Number(s.count).toLocaleString()} subawards</p>
                   </div>
                   <span className="font-mono text-purple-400 font-semibold shrink-0">{fmtMoney(Number(s.total_amount))}</span>
@@ -526,16 +523,12 @@ export default async function ContractorPage({ params }: PageProps) {
               {topPrimes.map((p) => (
                 <li key={p.partner_uei} className="flex items-center justify-between gap-4 py-2.5">
                   <div className="min-w-0">
-                    {p.canonical_slug ? (
-                      <Link
-                        href={`/contractors/${p.canonical_slug}`}
-                        className="text-slate-200 hover:text-purple-400 font-medium"
-                      >
-                        {fmtCompanyName(p.partner_name)}
-                      </Link>
-                    ) : (
-                      <span className="text-slate-200 font-medium">{fmtCompanyName(p.partner_name)}</span>
-                    )}
+                    <Link
+                      href={`/contractors/${recipientSlug(p.partner_name)}`}
+                      className="text-slate-200 hover:text-purple-400 font-medium"
+                    >
+                      {fmtCompanyName(p.partner_name)}
+                    </Link>
                     <p className="text-xs text-slate-500">{Number(p.count).toLocaleString()} subawards</p>
                   </div>
                   <span className="font-mono text-purple-400 font-semibold shrink-0">{fmtMoney(Number(p.total_amount))}</span>
@@ -554,30 +547,16 @@ export default async function ContractorPage({ params }: PageProps) {
             Other companies active in NAICS {topNaicsCode} — {topNaics[0]?.naics_description}.
           </p>
           <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4">
-            {related.map((r) => {
-              const inner = (
-                <>
-                  <p className="text-sm font-medium text-slate-100 line-clamp-2">{fmtCompanyName(r.recipient_name)}</p>
-                  <p className="mt-2 font-mono text-xs text-purple-400">{fmtMoney(Number(r.total_obligated))}</p>
-                </>
-              );
-              return r.canonical_slug ? (
-                <Link
-                  key={r.recipient_uei}
-                  href={`/contractors/${r.canonical_slug}`}
-                  className="rounded-lg border border-slate-800 bg-slate-900 p-4 hover:border-purple-500/50 hover:bg-slate-800 transition-colors"
-                >
-                  {inner}
-                </Link>
-              ) : (
-                <div
-                  key={r.recipient_uei}
-                  className="rounded-lg border border-slate-800 bg-slate-900 p-4"
-                >
-                  {inner}
-                </div>
-              );
-            })}
+            {related.map((r) => (
+              <Link
+                key={r.recipient_uei}
+                href={`/contractors/${recipientSlug(r.recipient_name)}`}
+                className="rounded-lg border border-slate-800 bg-slate-900 p-4 hover:border-purple-500/50 hover:bg-slate-800 transition-colors"
+              >
+                <p className="text-sm font-medium text-slate-100 line-clamp-2">{fmtCompanyName(r.recipient_name)}</p>
+                <p className="mt-2 font-mono text-xs text-purple-400">{fmtMoney(Number(r.total_obligated))}</p>
+              </Link>
+            ))}
           </div>
         </section>
       )}
