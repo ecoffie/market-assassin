@@ -780,9 +780,14 @@ function detectServiceBranch(officeName: string, officeId: string, agencyName: s
     return 'Department of the Navy';
   }
 
-  // Army indicators in office name
+  // Army indicators in office name. NOTE: USACE districts are named "USA Engineer
+  // District, <city>" / "Engineer District <city>" — no "ARMY"/"USACE" token — and
+  // "Army Sustainment Command" must match here even when the code isn't a W-DoDAAC,
+  // otherwise they collapse to generic DoD (the wrong-sub-agency / dept-wide-contacts bug).
   if (nameUpper.includes('ARMY') || nameUpper.includes('FORT ') ||
       nameUpper.includes('MICC') || nameUpper.includes('USACE') ||
+      nameUpper.includes('ENGINEER DISTRICT') || nameUpper.includes('ENGINEER DIVISION') ||
+      nameUpper.includes('SUSTAINMENT COMMAND') ||
       nameUpper.includes('ACC ') || nameUpper.includes('ACA ') ||
       nameUpper.includes('TACOM') || nameUpper.includes('CECOM') ||
       nameUpper.includes('AMCOM') || nameUpper.includes('PEO ')) {

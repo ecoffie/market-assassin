@@ -24,6 +24,7 @@ import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { verifyMIAccess } from '@/lib/api-auth';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { internalBaseUrl } from '@/lib/utils/internal-base-url';
+import { normalizeOfficeName } from '@/lib/gov-contacts/office-name';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -164,7 +165,15 @@ export async function POST(request: NextRequest) {
   let insertError: string | null = null;
 
   for (const a of agencies.slice(0, MAX_AGENCIES)) {
-    const officeName = a.contractingOffice || a.name;
+    const rawOfficeName = a.contractingOffice || a.name;
+    // DODAAC ingestion guard: the FPDS path can emit a bogus office_code (e.g.
+    // "GU22"/"CA09" — postcode-ish junk, NOT a 6-char DoDAAC) and an office name
+    // with a stray "/xx" suffix ("Army Sustainment Command/ysk"). Only persist a
+    // real DoDAAC, and clean the name — so auto_setup stops saving the garbage the
+    // manual-save path would have caught via dodaac_directory enrichment.
+    const codeUpper = String(a.officeId || '').toUpperCase().trim();
+    const officeCode = /^[A-Z][A-Z0-9]{5}$/.test(codeUpper) ? codeUpper : null;
+    const officeName = normalizeOfficeName(rawOfficeName, { mode: 'clean' }) || rawOfficeName;
     const payload = {
       user_email: rowEmail,
       workspace_id: asClient ? workspaceId : null,
@@ -172,7 +181,7 @@ export async function POST(request: NextRequest) {
       agency_name: a.name,
       sub_agency_code: a.subAgencyCode || null,
       sub_agency_name: a.subAgency || null,
-      office_code: a.officeId || null,
+      office_code: officeCode,
       office_name: officeName,
       location: a.location || null,
       source_naics: sourceNaics,
