@@ -88,6 +88,19 @@ export async function GET(request: NextRequest) {
       if (!data || data.length < 1000) break;
     }
 
+    // When was the Stripe→Supabase cache last synced? Surface it so the page can
+    // show "as of <time>" — this number is the daily cache, not live Stripe.
+    let cacheUpdatedAt: string | null = null;
+    try {
+      const { data: freshRow } = await supabase
+        .from('stripe_subscriptions')
+        .select('updated_at')
+        .order('updated_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      cacheUpdatedAt = (freshRow as { updated_at?: string } | null)?.updated_at || null;
+    } catch { /* updated_at column optional — leave null */ }
+
     // Exclude comp/advocate/partner subscriptions from MRR. Stripe subs only carry
     // customer_id, so join customer_id → email via stripe_customers, then drop any
     // sub whose email is a special account. (If a partner gets comp Pro via a real
@@ -234,6 +247,7 @@ export async function GET(request: NextRequest) {
       success: true,
       goal: MONTHLY_GOAL,
       proPrice: PRO_PRICE,
+      cacheUpdatedAt,  // ISO timestamp of the last Stripe→cache sync (or null)
       activeSubs,
       mrr: Math.round(mrr),
       arpu: Math.round(arpu),

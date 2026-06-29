@@ -38,6 +38,7 @@ type MrrGoal = {
   success: boolean;
   goal: number;
   proPrice: number;
+  cacheUpdatedAt?: string | null;
   activeSubs: number;
   mrr: number;
   arpu: number;
@@ -1138,7 +1139,22 @@ export default function LaunchCommandCenterPage() {
               <h2 className="mt-2 text-3xl font-bold md:text-4xl">Where we are, and what it takes to get there</h2>
             </div>
             <div className="flex items-center gap-3">
-              {mrrSyncedAt && <span className="text-xs text-slate-500">synced {mrrSyncedAt}</span>}
+              {(() => {
+                // Freshness indicator. After a manual refresh, show that time;
+                // otherwise show when the daily Stripe→cache sync last ran. The
+                // MRR number reads this cache, not live Stripe — so make it explicit.
+                const cacheLabel = mrrGoal?.cacheUpdatedAt
+                  ? new Date(mrrGoal.cacheUpdatedAt).toLocaleString(undefined, {
+                      month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit',
+                    })
+                  : null;
+                const label = mrrSyncedAt ? `synced ${mrrSyncedAt}` : cacheLabel ? `as of ${cacheLabel}` : null;
+                return label ? (
+                  <span className="text-xs text-slate-500" title="MRR reads a daily Stripe cache; this is its last sync. Click Refresh purchases to pull live.">
+                    {label}
+                  </span>
+                ) : null;
+              })()}
               <button
                 onClick={refreshPurchases}
                 disabled={mrrSyncing}
