@@ -7,10 +7,11 @@
  * filled from the "✨ Set up my Mindy" NAICS-buyer scan). Expectation mismatch
  * (Eric, coffiemiami test).
  *
- * HYBRID (Eric, Jun 28): for each chosen agency, add its actual BUYING OFFICES that
- * match the user's NAICS (enriched with spend/contacts, reusing the same
- * find-agencies scan auto-setup uses); if an agency buys nothing in the user's
- * codes (no scan match), add ONE bare department-level row so it still shows up.
+ * ENRICHED-ONLY (Eric, Jun 28): for each chosen agency, add its actual BUYING
+ * OFFICES that match the user's NAICS (enriched with spend/contacts, reusing the
+ * same find-agencies scan auto-setup uses). An agency that buys NOTHING in the
+ * user's codes is SKIPPED — irrelevant buyers (e.g. VA/HHS for a drone maker)
+ * should not clutter the list (was: a bare department-level fallback row).
  *
  * Principles (mirrors auto-setup, memory: simplify-not-complicate):
  *   - Reuses EXISTING pieces (find-agencies scan, user_target_list). No new tables.
@@ -72,10 +73,10 @@ export async function seedTargetListFromAgencies(opts: {
   naicsCodes: string[];
   states: string[];
   chosenAgencies: string[];
-}): Promise<{ added: number; skipped: number; bare: number }> {
+}): Promise<{ added: number; skipped: number; dropped: number }> {
   const { supabase, base, rowEmail, workspaceId, asClient, naicsCodes, states } = opts;
   const chosen = (opts.chosenAgencies || []).map((a) => String(a).trim()).filter(Boolean).slice(0, MAX_CHOSEN);
-  if (chosen.length === 0) return { added: 0, skipped: 0, bare: 0 };
+  if (chosen.length === 0) return { added: 0, skipped: 0, dropped: 0 };
 
   // 1) Scan buying agencies for the top 3 NAICS (same call auto-setup uses —
   //    find-agencies needs no MI session and returns the fields we map).
@@ -111,45 +112,37 @@ export async function seedTargetListFromAgencies(opts: {
   );
 
   const sourceNaics = naicsCodes.join(',') || null;
-  let added = 0, skipped = 0, bare = 0;
+  let added = 0, skipped = 0, dropped = 0;
 
-  // 2) For each chosen agency: enriched offices that match it, else a bare row.
+  // 2) For each chosen agency: add its matching buying offices (enriched). An
+  //    agency with NO matching offices (buys nothing in the user's codes) is
+  //    skipped entirely — no clutter from irrelevant buyers.
   for (const chosenName of chosen) {
     const chosenNorm = norm(chosenName);
     const offices = scanAgencies
       .filter((a) => matchesChosen(a, chosenNorm))
       .slice(0, MAX_OFFICES_PER_AGENCY);
 
-    if (offices.length > 0) {
-      for (const a of offices) {
-        const r = await insertRow(supabase, {
-          rowEmail, workspaceId, asClient, sourceNaics,
-          agency_name: a.name,
-          office_name: a.contractingOffice || a.name,
-          agency_code: a.agencyCode || null,
-          sub_agency_code: a.subAgencyCode || null,
-          sub_agency_name: a.subAgency || null,
-          office_code: a.officeId || null,
-          location: a.location || null,
-          set_aside_spending: Math.min(Math.round(a.setAsideSpending || 0), 9_000_000_000),
-          contract_count: Math.round(a.contractCount || 0),
-        });
-        if (r === 'added') added++; else if (r === 'skipped') skipped++;
-      }
-    } else {
-      // Bare department-level fallback so the chosen agency still appears.
+    if (offices.length === 0) { dropped++; continue; }
+
+    for (const a of offices) {
       const r = await insertRow(supabase, {
         rowEmail, workspaceId, asClient, sourceNaics,
-        agency_name: chosenName,
-        office_name: chosenName,
-        agency_code: null, sub_agency_code: null, sub_agency_name: null,
-        office_code: null, location: null, set_aside_spending: 0, contract_count: 0,
+        agency_name: a.name,
+        office_name: a.contractingOffice || a.name,
+        agency_code: a.agencyCode || null,
+        sub_agency_code: a.subAgencyCode || null,
+        sub_agency_name: a.subAgency || null,
+        office_code: a.officeId || null,
+        location: a.location || null,
+        set_aside_spending: Math.min(Math.round(a.setAsideSpending || 0), 9_000_000_000),
+        contract_count: Math.round(a.contractCount || 0),
       });
-      if (r === 'added') bare++; else if (r === 'skipped') skipped++;
+      if (r === 'added') added++; else if (r === 'skipped') skipped++;
     }
   }
 
-  return { added, skipped, bare };
+  return { added, skipped, dropped };
 }
 
 async function insertRow(
