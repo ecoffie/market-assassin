@@ -22,7 +22,11 @@ import { isAdvocateAccount } from '@/lib/mindy/advocate-accounts';
 
 export const dynamic = 'force-dynamic';
 
-const FOUNDERS_PRICE = 2997;
+// Founders qualification is EITHER/OR (Eric, 2026-06-29): paid >= $4,997 OR owns
+// the Ultimate Giant bundle. $2,997 is the DISCOUNTED rate for everyone who does
+// not qualify — it is NOT the Founders rate.
+const FOUNDERS_AMOUNT = 4997;
+const DISCOUNT_RATE = 2997;
 const ENTITLED_TIERS = new Set(['lifetime', '1_year', '6_month', 'subscription', 'beta_preview']);
 // Owning the Ultimate Giant bundle is the MINIMUM requirement for permanent tool
 // access — past buyers still had to buy it regardless of other spend (Eric, 2026-06-29).
@@ -81,14 +85,18 @@ async function stripeLifetimePaid(stripe: Stripe, email: string) {
   };
 }
 
-function recommendedOffer(paidUsd: number, flags: { advocate: boolean; comp: boolean; internal: boolean; test: boolean }) {
+function recommendedOffer(paidUsd: number, ownsUltimate: boolean, flags: { advocate: boolean; comp: boolean; internal: boolean; test: boolean }) {
   if (flags.internal || flags.test) return { tier: 'internal_test', label: 'Internal / test account', action: 'Not a customer — no offer' };
   if (flags.advocate) return { tier: 'advocate', label: 'Advocate (intentional comp)', action: 'Keep complimentary Pro' };
   if (flags.comp) return { tier: 'comp', label: 'Comp / testimonial', action: 'Keep complimentary' };
-  if (paidUsd >= FOUNDERS_PRICE) return { tier: 'paid_founders', label: `Paid $${paidUsd.toLocaleString()} (≥ Founders)`, action: 'Already paid Founders-equivalent — grant Founders lifetime on request' };
-  if (paidUsd >= 500) return { tier: 'credit', label: `Paid $${paidUsd.toLocaleString()}`, action: `Credit $${paidUsd.toLocaleString()} toward Founders ($2,997 / $4,997)` };
-  if (paidUsd >= 1) return { tier: 'alumni', label: `Paid $${paidUsd.toLocaleString()}`, action: 'Offer alumni rate $2,997' };
-  return { tier: 'comp_zero', label: 'No payment found in live Stripe', action: 'Comp — decide case-by-case (verify before granting)' };
+  // Founders = EITHER/OR: owns Ultimate Giant OR paid >= $4,997.
+  if (ownsUltimate || paidUsd >= FOUNDERS_AMOUNT) {
+    const why = ownsUltimate ? 'owns Ultimate Giant bundle' : `paid $${paidUsd.toLocaleString()} (≥ $${FOUNDERS_AMOUNT.toLocaleString()})`;
+    return { tier: 'founders', label: `Founders-qualified — ${why}`, action: 'Grant Founders lifetime (permanent)' };
+  }
+  // Everyone else → the discounted rate (NOT Founders).
+  if (paidUsd >= 1) return { tier: 'discount', label: `Paid $${paidUsd.toLocaleString()} — does not meet Founders bar`, action: `Offer the discounted rate ($${DISCOUNT_RATE.toLocaleString()})` };
+  return { tier: 'discount_zero', label: 'No payment + no Ultimate Giant bundle', action: `Offer the discounted rate ($${DISCOUNT_RATE.toLocaleString()}), or remove from Pro` };
 }
 
 export async function GET(request: NextRequest) {
@@ -148,7 +156,7 @@ export async function GET(request: NextRequest) {
       internal: isInternal(email),
       test: isTest(email),
     };
-    const offer = recommendedOffer(paid.lifetimeUsd, flags);
+    const offer = recommendedOffer(paid.lifetimeUsd, ownsUltimate, flags);
 
     return NextResponse.json({
       success: true,

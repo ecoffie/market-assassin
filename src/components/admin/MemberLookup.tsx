@@ -27,10 +27,9 @@ interface LookupResult {
 }
 
 const OFFER_TONE: Record<string, string> = {
-  paid_founders: 'border-emerald-500/40 bg-emerald-900/20 text-emerald-200',
-  credit: 'border-blue-500/40 bg-blue-900/20 text-blue-200',
-  alumni: 'border-amber-500/40 bg-amber-900/20 text-amber-200',
-  comp_zero: 'border-slate-500/40 bg-slate-800/40 text-slate-300',
+  founders: 'border-emerald-500/40 bg-emerald-900/20 text-emerald-200',
+  discount: 'border-amber-500/40 bg-amber-900/20 text-amber-200',
+  discount_zero: 'border-slate-500/40 bg-slate-800/40 text-slate-300',
   advocate: 'border-purple-500/40 bg-purple-900/20 text-purple-200',
   comp: 'border-purple-500/40 bg-purple-900/20 text-purple-200',
   internal_test: 'border-slate-600/40 bg-slate-800/40 text-slate-400',
@@ -120,11 +119,11 @@ export default function MemberLookup({ password }: { password: string }) {
 
           {/* Recommended offer (spend-based) */}
           <div className={`rounded-xl border p-4 ${OFFER_TONE[result.offer.tier] || 'border-slate-700 bg-slate-950 text-slate-200'}`}>
-            <p className="text-xs uppercase tracking-wide opacity-80">Recommended offer (spend-based)</p>
+            <p className="text-xs uppercase tracking-wide opacity-80">Recommended offer · Founders = Ultimate Giant <span className="opacity-70">OR</span> paid ≥ $4,997</p>
             <p className="mt-1 text-lg font-bold">{result.offer.label}</p>
             <p className="mt-1 text-sm">{result.offer.action}</p>
-            {!result.ultimateGiant.owns && result.offer.tier !== 'internal_test' && (
-              <p className="mt-2 text-xs text-amber-300/90">⚠️ No Ultimate Giant bundle on record — past buyers had to own it for permanent tools. Confirm before granting.</p>
+            {(result.offer.tier === 'discount' || result.offer.tier === 'discount_zero') && (
+              <p className="mt-2 text-xs text-amber-300/90">Does not meet the Founders bar (no Ultimate Giant bundle and under $4,997 paid) → $2,997 discounted rate. If they may have paid under another email, verify first.</p>
             )}
           </div>
 
