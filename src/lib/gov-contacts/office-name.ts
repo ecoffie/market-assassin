@@ -150,6 +150,9 @@ function titleCaseToken(tok: string, index: number, gsa: boolean): string[] {
   if (CLEAN_ABBREV[up]) return [CLEAN_ABBREV[up]];
   if (CLEAN_ACRONYMS.has(up)) return [up];
   if (/^\d+$/.test(tok)) return [tok];
+  // Dotted initialism (U.S., U.S.C., U.S.A.) — keep uppercase, don't title-case
+  // it to "U.s." Two or more single-letter+dot groups.
+  if (/^(?:[a-z]\.){2,}$/i.test(tok)) return [tok.toUpperCase()];
   const lower = tok.toLowerCase();
   if (index > 0 && CLEAN_SMALL_WORDS.has(lower)) return [lower];
   return [tok.charAt(0).toUpperCase() + lower.slice(1)];
