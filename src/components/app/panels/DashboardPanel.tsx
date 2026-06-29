@@ -1406,6 +1406,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                             return (
                               <button
                                 type="button"
+                                data-tour="dash-track"
                                 onClick={(event) => {
                                   event.stopPropagation();
                                   handleTrackInPipeline(item);

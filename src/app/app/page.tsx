@@ -512,6 +512,21 @@ function AppDashboard() {
     return () => window.removeEventListener('mindy:start-tour', replay);
   }, []);
 
+  // Auto-start the tour ONCE for genuinely new users — gated to the ?onboarded=1
+  // redirect from onboarding, NOT every load. The old always-on auto-start swallowed
+  // clicks when the overlay initialized too early on a deploy/session-restore;
+  // ?onboarded=1 only fires on the deliberate post-onboarding hop, and a short delay
+  // lets the shell + first panel mount before the overlay opens. Coach mode + the
+  // completion flag still apply.
+  useEffect(() => {
+    if (typeof window === 'undefined') return;
+    if (new URLSearchParams(window.location.search).get('onboarded') !== '1') return;
+    if (getActiveWorkspace()) return;
+    if (localStorage.getItem('mindy_tour_completed') === '1') return;
+    const t = setTimeout(() => { setTourRunId((n) => n + 1); setRunTour(true); }, 1200);
+    return () => clearTimeout(t);
+  }, []);
+
   const finishTour = useCallback(() => {
     setRunTour(false);
     if (typeof window !== 'undefined') localStorage.setItem('mindy_tour_completed', '1');

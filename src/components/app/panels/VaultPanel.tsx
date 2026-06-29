@@ -174,7 +174,7 @@ export default function VaultPanel({ email, tier, initialSection }: Props) {
       </div>
 
       {/* Section tabs */}
-      <div className="flex gap-1 px-4 pt-3 border-b border-slate-800 overflow-x-auto">
+      <div data-tour="vault-tabs" className="flex gap-1 px-4 pt-3 border-b border-slate-800 overflow-x-auto">
         {SECTIONS.filter((s) => !s.proOnly || tier !== 'free').map((s) => {
           // 'identity' has no count; 'generated' (folded-in Library) isn't in the
           // vault counts map — guard both so the lookup never breaks.

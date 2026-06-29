@@ -28,9 +28,9 @@ const STEPS: TourStep[] = [
   },
   {
     panel: 'dashboard',
-    element: '[data-tour="nav-dashboard"]',
+    element: '[data-tour="dash-track"]',
     title: "Today's Intel — your daily feed",
-    description: 'Fresh opportunities matched to your profile land here every day. Each card lets you Review Fit, ＋ Track it, or Share it.',
+    description: 'Fresh opportunities matched to your profile land here every day. On any card: Review Fit to see why it matches, ＋ Track to add it to your pipeline, or Share it. Tracking is how the whole workflow starts.',
   },
   {
     panel: 'pipeline',
@@ -40,15 +40,15 @@ const STEPS: TourStep[] = [
   },
   {
     panel: 'proposals',
-    element: '[data-tour="nav-proposals"]',
+    element: '[data-tour="proposals-mode"]',
     title: 'Proposal Assist — draft a response',
-    description: 'Pick a pursuit and Mindy reads the whole solicitation: a bid/no-bid gate, a compliance matrix, grounded draft sections, and an independent compliance check. Auto mode drafts for you; Sport mode lets you direct it.',
+    description: 'Pick a tracked pursuit and Mindy reads the whole solicitation: a bid/no-bid gate, a compliance matrix, grounded draft sections, and an independent compliance check. Auto mode drafts for you; Manual · Sport mode lets you direct it.',
   },
   {
     panel: 'target-list',
-    element: '[data-tour="nav-target-list"]',
+    element: '[data-tour="target-add"]',
     title: 'My Target List — agencies you\'re going after',
-    description: 'Pick the agencies you want to win work with. Mindy focuses your decision-makers, relationships, and research around them.',
+    description: 'Type an agency name right here to add it to your hit list. Mindy then focuses your decision-makers, relationships, and research around the agencies you pick.',
   },
   {
     panel: 'research',
@@ -64,9 +64,9 @@ const STEPS: TourStep[] = [
   },
   {
     panel: 'vault',
-    element: '[data-tour="nav-vault"]',
+    element: '[data-tour="vault-tabs"]',
     title: 'My Vault — the profile that powers every draft',
-    description: 'Add your capability statement, past performance, key personnel, and resumes once. Mindy pulls from your Vault so drafts use YOUR real info — not placeholders.',
+    description: 'Add your capability statement, past performance, key personnel, and resumes under these tabs — once. Mindy pulls from your Vault so drafts use YOUR real info, not placeholders.',
   },
   {
     panel: 'contractors',
