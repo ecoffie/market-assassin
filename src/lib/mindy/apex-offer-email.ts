@@ -26,20 +26,19 @@ const templateCard = (label: string, subjectLine: string, bodyHtml: string) =>
 
 const TEMPLATE_A = templateCard(
   'If you HAVE used Mindy',
-  'Quick intro — a tool your clients should see',
+  'A tool worth 20 minutes for your clients?',
   `Hi [Counselor],<br><br>
-   I've been using <strong>Mindy</strong> from GovCon Giants — an AI tool that helps small businesses find and pursue the right federal contracts. It's been a real time-saver, and it feels like something a lot of the businesses you work with could use.<br><br>
-   I'm looping in <strong>Eric Coffie</strong> (cc'd), who founded it. Would you be open to a short 20–30 min call to see if it's useful for your clients?<br><br>
+   I've been using <strong>Mindy</strong> from GovCon Giants — an AI tool that helps small businesses find and pursue the right federal contracts. It's been a real help for me, and I think it could do a lot for the businesses you work with.<br><br>
+   Would you be open to a short 20–30 min look? If so, I'll connect you with the Mindy team to find a time that works.<br><br>
    Thanks!<br>[Your Name]`,
 );
 
 const TEMPLATE_B = templateCard(
   "Haven't tried Mindy yet? Use this",
-  'Quick intro — a resource worth a look for your clients',
+  'A resource worth 20 minutes for your clients?',
   `Hi [Counselor],<br><br>
-   I wanted to connect you with something I came across through GovCon Giants — an AI tool called <strong>Mindy</strong> that helps small businesses find and pursue federal contracts.<br><br>
-   It looks like exactly the kind of resource the businesses you support could use, so I'm introducing you to <strong>Eric Coffie</strong> (cc'd), who founded it.<br><br>
-   Eric — meet [Counselor], who counsels small businesses on government contracting locally. Open to a short 20–30 min call?<br><br>
+   I came across an AI tool from GovCon Giants called <strong>Mindy</strong> that helps small businesses find and pursue federal contracts — it looks like a strong fit for the businesses you support.<br><br>
+   Would you be open to a short 20–30 min intro? If you're interested, I'll connect you with the founder to set up a time.<br><br>
    Thanks!<br>[Your Name]`,
 );
 
@@ -62,22 +61,23 @@ export async function sendMindyApexOfferEmail(params: {
       </td></tr>
       <tr><td style="padding: 30px 32px 8px;">
         ${P(`${firstName} — thanks for being part of Mindy Day.`)}
-        ${P(`Here's a way to get Mindy <strong style="color:#0f172a;">Pro free for a full year</strong> without paying a cent: <strong style="color:#0f172a;">introduce me to your local APEX Accelerator, SBDC, or Economic Development Office.</strong>`)}
-        ${P(`These offices help thousands of small businesses win government contracts — exactly who Mindy is built for. Set up one meeting for me, and your account gets credited a full year of Pro.`)}
+        ${P(`Here's a way to get Mindy <strong style="color:#0f172a;">Pro free for a full year</strong> without paying a cent: <strong style="color:#0f172a;">get your local APEX Accelerator, SBDC, or Economic Development Office to agree to a quick meeting with me.</strong>`)}
+        ${P(`These offices help thousands of small businesses win government contracts — exactly who Mindy is built for. Warm up the conversation, get them to say yes to a 20–30 minute look, then introduce us — and your account gets credited a full year of Pro.`)}
       </td></tr>
       <tr><td style="padding: 8px 32px 0;">
         <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #ecfdf5; border: 2px solid #a7f3d0; border-radius: 12px;"><tr><td style="padding: 26px 24px; text-align: center;">
           <p style="color: #047857; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 10px;">Your reward</p>
           <p style="color: #0f172a; font-size: 30px; font-weight: 800; margin: 0 0 4px;">A full year of Pro</p>
           <p style="color: #475569; font-size: 15px; margin: 0 0 8px;"><strong style="color:#0f172a;">$1,788 in savings.</strong></p>
-          <p style="color: #047857; font-size: 14px; margin: 0; line-height: 1.6;">Just <strong>CC ${CLAIM_CC}</strong> on the intro to claim it.</p>
+          <p style="color: #047857; font-size: 14px; margin: 0; line-height: 1.6;">Get them to agree to a meeting, then introduce us (<strong>${CLAIM_CC}</strong>) — that warm intro is your claim.</p>
         </td></tr></table>
       </td></tr>
       <tr><td style="padding: 26px 32px 0;">
-        ${P(`<strong style="color:#0f172a;">It takes 5 minutes.</strong> Pick your local office, send one of the emails below, and CC me. That's it.`)}
+        ${P(`<strong style="color:#0f172a;">Here's how &mdash; two quick steps:</strong>`)}
+        ${P(`<strong style="color:#0f172a;">1. Ask your counselor first.</strong> Reach out to your local office and see if they're open to a short look &mdash; no need to loop me in yet. Use one of these:`)}
         ${TEMPLATE_A}
         ${TEMPLATE_B}
-        ${P(`Replace the brackets, hit send, and you're done. I'll take it from there.`)}
+        ${P(`<strong style="color:#0f172a;">2. Once they say yes, introduce us.</strong> Reply to me or email <strong>${CLAIM_CC}</strong> &mdash; &ldquo;[Counselor] is open to a meeting&rdquo; &mdash; and I'll coordinate the time. That warm intro is your claim for the free year of Pro.`)}
         <p style="color: #334155; font-size: 16px; line-height: 1.65; margin: 0 0 4px;">Talk soon,</p>
         <p style="color: #0f172a; font-size: 16px; line-height: 1.5; font-weight: 700; margin: 16px 0 0;">Eric Coffie</p>
         <p style="color: #64748b; font-size: 14px; margin: 2px 0 0;">Founder, GovCon Giants</p>
