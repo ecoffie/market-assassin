@@ -134,9 +134,14 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
   client questionnaire, SAM/DIBBS screenshot how-tos, Bid Forms, NAVFAC POC list,
   Target Market List, tax-exemption certs, + the rest of the course subfolders
   (mostly `.key`/video/spreadsheet/admin).
-- **Phase 2 = the VIDEO folders** (Courses' bootcamp recordings, Webinars, YouTube
-  Videos) — Eric confirmed the platform HAS transcripts → pull text (cheap, skip
-  Whisper). This is where the bootcamp/course teaching is fully captured.
+- **Phase 2 = the VIDEO library** (Courses' bootcamp/course recordings, Webinars,
+  YouTube). **CORRECTION (Eric, Jun 28): the platform does NOT have transcripts** —
+  the cheap pull-captions path is OFF. Phase 2 now requires real **Whisper
+  transcription** (download mp4 → ffmpeg audio → split <25MB → Whisper → ingest),
+  ~$200–400 Whisper + a download/transcode pipeline + a Drive REST token (gcloud not
+  installed → OAuth Playground). **Full scope written up:
+  `tasks/PLAN-rag-video-transcription-phase2.md`** (pipeline, cost table, phasing,
+  pilot = Proposal Bootcamp). This is where the bulk of the moat (~925 lessons) lives.
 - **Why:** the knowledge base IS the moat (8 yrs teaching). Mindy's RAG today
   (`mindy_rag_documents` ~1,364 docs / 12,534 chunks) has only a SLICE — ~136
   course_material, 103 slide_deck, 31 webinar_resource, 743 podcast_interview. Two
