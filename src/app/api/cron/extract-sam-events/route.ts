@@ -11,7 +11,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { inferOfficeFromSolicitation } from '@/lib/gov-contacts/event-office';
+import { resolveEventOffice } from '@/lib/gov-contacts/event-office';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -52,6 +52,8 @@ interface SamOpportunity {
   response_deadline: string | null;
   ui_link: string | null;
   solicitation_number: string | null;
+  office: string | null;
+  sub_tier: string | null;
 }
 
 function classifyEvent(title: string, description: string | null): string | null {
@@ -131,7 +133,7 @@ export async function GET(request: NextRequest) {
   // Fetch Special Notices and Presolicitations from sam_opportunities
   const { data: notices, error: fetchError } = await getSupabase()
     .from('sam_opportunities')
-    .select('notice_id, title, description, department, notice_type, posted_date, response_deadline, ui_link, solicitation_number')
+    .select('notice_id, title, description, department, notice_type, posted_date, response_deadline, ui_link, solicitation_number, office, sub_tier')
     .in('notice_type', ['Special Notice', 'Presolicitation', 'Sources Sought'])
     .eq('active', true)
     .order('posted_date', { ascending: false })
@@ -163,9 +165,10 @@ export async function GET(request: NextRequest) {
       const fullText = `${notice.title} ${notice.description || ''}`;
       const eventDate = extractEventDate(fullText);
       const location = extractLocation(fullText);
-      // Decode the buying office from the solicitation-number DoDAAC so events can
-      // be scoped to the real command, not just "DEPT OF DEFENSE" (cached lookup).
-      const office = await inferOfficeFromSolicitation(notice.solicitation_number);
+      // Resolve the buying office: DoD via the solicitation-number DoDAAC, civilian
+      // via SAM's own office/sub_tier columns — so events scope to the real command
+      // (GSA/VA/HHS included), not just "DEPT OF DEFENSE" (cached lookup).
+      const office = await resolveEventOffice(notice.solicitation_number, notice.office, notice.sub_tier);
 
       events.push({
         notice_id: notice.notice_id,
