@@ -467,8 +467,14 @@ getmindy.ai, dynamic share previews (OG), Meet Mindy strip on public pages.
   table/source; reuses existing SAM columns.
 - [ ] **5-role gov contacts** — Decision Makers shows only contracting POCs;
   PM/engineer/end-user need the enrichment source (P1 #5 above).
-- [ ] **Office → contact join** — the solicitation prefix could link POC
-  contacts to offices (sub-project).
+- ✅ **Office → contact join DONE 2026-06-29** (PR pending) — the office-roster
+  facet (#16) joined POC contacts → office via the solicitation DoDAAC for DoD
+  only; civilian rows decoded to nothing and were skipped ("preview only").
+  Civilian agencies (GSA/VA/HHS) now group by SAM's own `office` column (cleaned
+  via cleanRawOffice), and the civilian roster query requires `office` not a
+  DoDAAC sol number. Decision Makers "📇 Full contact rosters by buying office"
+  now populates for civilian, not just DoD/DLA/Navy. Pairs with the civilian
+  office-decode (PR #81).
 
 ### Contractors
 - [ ] **NAICS + state combo** — state filter is name-search only (the NAICS

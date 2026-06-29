@@ -250,8 +250,9 @@ export async function GET(request: NextRequest) {
   // office (the clean DOMESTIC signal — DLA Land & Maritime, NAVSUP WSS, NAVFAC
   // Mid-Atlantic — vs the raw `office` column which is embassy-contaminated).
   // Returns offices that have a real roster (3+ people) so the UI can show a
-  // full buying-location list. Honest: this works for DoD/DLA/Navy where
-  // solicitations decode to DoDAACs; civilian agencies fall back to preview.
+  // full buying-location list. DoD/DLA/Navy group by the DoDAAC-decoded office;
+  // CIVILIAN agencies (GSA/VA/HHS) have no DoDAAC, so they group by SAM's own
+  // `office` column (cleaned) — the office→contact join for civilian.
   if (sp.get('facets') === 'office-roster') {
     const facetAgency = (sp.get('agency') || '').trim();
     const officeName = (sp.get('office') || '').trim();   // optional: drill into one office
@@ -265,13 +266,18 @@ export async function GET(request: NextRequest) {
     let rosterQuery = sb
       .from('federal_contacts')
       .select('contact_fullname, contact_email, contact_phone, contact_title, solicitation_number, office, department_ind_agency')
-      .not('solicitation_number', 'is', null)
       .limit(8000);
     if (rosterCodes.length > 0) {
-      rosterQuery = rosterQuery.or(rosterCodes.slice(0, 60).map((c) => `solicitation_number.ilike.${c}%`).join(','));
+      // DoD: need the DoDAAC in the solicitation number to decode the office.
+      rosterQuery = rosterQuery
+        .not('solicitation_number', 'is', null)
+        .or(rosterCodes.slice(0, 60).map((c) => `solicitation_number.ilike.${c}%`).join(','));
     } else {
+      // Civilian: group by SAM's `office` column → require it, not a sol number.
       const agencyKeyword = facetAgency.replace(/department of|dept of|the|,/gi, '').trim().split(/\s+/)[0] || facetAgency;
-      rosterQuery = rosterQuery.ilike('department_ind_agency', `%${agencyKeyword}%`);
+      rosterQuery = rosterQuery
+        .not('office', 'is', null)
+        .ilike('department_ind_agency', `%${agencyKeyword}%`);
     }
     const { data } = await rosterQuery;
     // Group contacts by decoded office, dropping overseas + dupes.
@@ -280,7 +286,11 @@ export async function GET(request: NextRequest) {
     const seen = new Set<string>();
     for (const r of (data || []) as Record<string, string | null>[]) {
       const dod = decodeDodaac(r.solicitation_number);
-      const office = dod?.dodaac ? (rosterDodaacNames.get(dod.dodaac) || dod.officeName || '') : '';
+      let office = dod?.dodaac ? (rosterDodaacNames.get(dod.dodaac) || dod.officeName || '') : '';
+      // Civilian fallback: no DoDAAC → group by SAM's own `office` column,
+      // cleaned (drops foreign cities / junk, expands cryptic codes). This is
+      // what gives GSA/VA/HHS a real roster instead of "preview only".
+      if (!office && r.office) office = cleanRawOffice(String(r.office)) || '';
       if (!office) continue;
       if (FOREIGN_OFFICE_RE.test(office)) continue;       // domestic only (#43)
       const key = (r.contact_email || `${r.contact_fullname}`).toLowerCase();

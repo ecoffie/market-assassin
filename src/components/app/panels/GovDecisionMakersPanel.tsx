@@ -134,7 +134,8 @@ export default function GovDecisionMakersPanel({ email }: Props) {
       .then(d => { if (d.success) setSubAgencies(d.subAgencies || []); })
       .catch(() => {});
     // Office rosters (#16) — the buying offices with a COMPLETE contact list
-    // (DoDAAC-decoded, domestic). Populated for DoD/DLA/Navy; empty for civilian.
+    // (domestic). DoD/DLA/Navy group by the DoDAAC-decoded office; civilian
+    // (GSA/VA/HHS) group by SAM's office column. Empty only when neither resolves.
     fetch(`/api/app/federal-contacts?facets=office-roster&agency=${encodeURIComponent(agency)}&email=${encodeURIComponent(email)}`, { headers: getMIApiHeaders(email) })
       .then(r => r.json())
       .then(d => { if (d.success) setOfficeRosters(d.offices || []); })
