@@ -94,7 +94,7 @@ const AGENCY_TO_SUBAGENCY: Array<{ re: RegExp; label: string }> = [
   { re: /\bnavy\b|\bnaval\b|navfac|navsup|navsea|navair|navwar|\bnswc\b|\bnuwc\b|marine corps mat|\bspawar\b/i, label: 'Navy' },
   { re: /marine corps/i, label: 'Marine Corps' },
   { re: /air force|\busaf\b|\bafmc\b/i, label: 'Air Force' },
-  { re: /corps of engineers|\busace\b/i, label: 'Army Corps of Engineers' },
+  { re: /corps of engineers|\busace\b|engineer district/i, label: 'Army Corps of Engineers' },
   { re: /\barmy\b/i, label: 'Army' },
   { re: /defense logistics|\bdla\b/i, label: 'Defense Logistics Agency' },
   { re: /defense health|\bdha\b/i, label: 'Defense Health Agency' },
@@ -355,6 +355,14 @@ export async function GET(request: NextRequest) {
   // user actually targeted so the Navy card shows Navy contacts, not all of DoD.
   if (!subAgency && agency) {
     const expected = agencyToExpectedSubAgency(agency);
+    if (expected) subAgency = expected;
+  }
+  // The branch signal often lives in the OFFICE name, not the agency — e.g. a
+  // "USA Engineer District" office whose agency collapses to "Department of
+  // Defense". Fall back to the office name so contacts narrow to the real branch
+  // (Army/USACE) instead of the dept-wide DoD firehose.
+  if (!subAgency && office) {
+    const expected = agencyToExpectedSubAgency(office);
     if (expected) subAgency = expected;
   }
 
