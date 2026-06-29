@@ -79,6 +79,31 @@ export async function GET(request: NextRequest) {
   const supabase = sb();
   const testEmail = request.nextUrl.searchParams.get('email');
 
+  // ?stats=1&password=<ADMIN_PASSWORD> — read-only health view of pursuit_change_log
+  // (total changes ever logged, how many were emailed/acknowledged, and the
+  // 10 most-recent emailed rows). Proves real alerts have actually fired.
+  if (request.nextUrl.searchParams.get('stats') === '1') {
+    if (request.nextUrl.searchParams.get('password') !== process.env.ADMIN_PASSWORD) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+    }
+    const totalRes = await supabase.from('pursuit_change_log').select('id', { count: 'exact', head: true });
+    const emailedRes = await supabase.from('pursuit_change_log').select('id', { count: 'exact', head: true }).eq('emailed', true);
+    const ackedRes = await supabase.from('pursuit_change_log').select('id', { count: 'exact', head: true }).eq('acknowledged', true);
+    const total = totalRes.count ?? 0;
+    const emailed = emailedRes.count ?? 0;
+    const acked = ackedRes.count ?? 0;
+    const { data: recent } = await supabase
+      .from('pursuit_change_log')
+      .select('user_email, change_type, summary, detected_at, emailed')
+      .eq('emailed', true)
+      .order('detected_at', { ascending: false })
+      .limit(10);
+    return NextResponse.json(
+      { stats: { total, emailed, acknowledged: acked }, recentEmailed: recent || [] },
+      { headers: { 'Cache-Control': 'no-store' } },
+    );
+  }
+
   // All monitorable pursuits (has SAM notice_id, not archived).
   let pq = supabase
     .from('user_pipeline')
