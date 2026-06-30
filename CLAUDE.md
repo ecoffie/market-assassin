@@ -482,6 +482,18 @@ curl "https://getmindy.ai/api/admin/test-sam-subaward?password=$ADMIN_PASSWORD&p
 **Price:** $397
 **Features:** Pagination, CSV/Excel/PDF export, location filtering, mobile responsive
 
+**Vehicle rollup — truthful global count (`src/app/api/recompete/route.ts`, Jun 29):**
+Multiple-award IDIQs store N winner rows; we collapse them to ONE vehicle via
+`recompeteVehicleKey` (IDV root + agency + NAICS — `src/lib/recompete/vehicle-grouping.ts`).
+To make `pagination.total` truthful the route must group the WHOLE filtered set, but
+Supabase hard-caps responses at **1000 rows**. So it: (1) head-counts the filtered set,
+(2) fires `ceil(N/1000)` LIGHT-column page reads **in parallel** (total-ordered by
+sort + `contract_id` so windows partition cleanly), groups all of it, then (3) hydrates
+FULL rows for only the page's vehicles via `.in('contract_id', …)`. The old fixed
+`GROUP_FETCH_CAP = 6000` under-counted once the set crossed ~6k (it was 6,191 on Jun 28).
+No schema change; the JS key is the single source of truth. `SCAN_ROW_CAP = 20000`
+guards a runaway filter. Verified live: 5,066 rows → 4,796 vehicles (270 collapsed).
+
 ### 5. Opportunity Hunter
 **Location:** `/src/app/opportunity-hunter/`
 **Purpose:** Find government buyers — agency spending analysis, NAICS targeting

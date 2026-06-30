@@ -6,16 +6,18 @@
 
 ## 🔜 AFTER DEMO — deferred cleanup
 
-- [ ] **Recompete vehicle rollup — make the GLOBAL count true.** Shipped query-time
-  grouping: `groupRecompetesByVehicle()` collapses multiple-award IDIQ winners
-  (same IDV root + agency + NAICS) into ONE vehicle with N awardees — fixes the
-  "196 NIH CIO-SP3 winners showed as 196 recompetes" inflation (9,481 rows → 8,639
-  vehicles, 120 true clusters). BUT it currently groups only the RETURNED PAGE, so
-  the headline `pagination.total` is still the raw DB count and a cluster only fully
-  collapses if all its awardees are on one page. To make the global count truthful:
-  either (a) persist a `vehicle_key` column (migration + backfill) and COUNT/paginate
-  on it, or (b) group-then-paginate in the query layer. Lib: `src/lib/recompete/
-  vehicle-grouping.ts`; UI should prefer the new `vehicles[]` array over `contracts[]`.
+- [x] **Recompete vehicle rollup — GLOBAL count is now true** (DONE Jun 29, `commit`
+  this session). The route already group-then-paginated, but capped the grouping scan
+  at `GROUP_FETCH_CAP = 6000` while the default 18-mo set is ~5–6.2k rows (it was 6,191
+  yesterday — OVER the cap → silent ~3% under-count, and it grew with the data). Fixed
+  in `src/app/api/recompete/route.ts`: count the filtered set first, then fire
+  ceil(N/1000) page requests IN PARALLEL pulling only LIGHT columns, group the WHOLE
+  set (truthful), and hydrate FULL rows for just the page's vehicles via a targeted
+  `.in(contract_id)`. Total ordering (sort + `contract_id`) so parallel windows
+  partition cleanly. No schema change — the JS `recompeteVehicleKey` stays the single
+  source of truth. Verified live: total=4,796 vehicles over 5,066 rows (270 collapsed),
+  page1/page2 zero overlap, GSA IDIQs roll up 18/28 awardees → 1 card. Hard scan
+  ceiling `SCAN_ROW_CAP = 20000`. (UI already prefers `vehicles[]` over `contracts[]`.)
 - [ ] **DoD sub-agency collapse — remaining surfaces.** Fixed the demo-critical ones
   (contacts directory, office-roster facet, TMR open-opp count — all DoDAAC-anchored).
   Contacts directory got a further fix Jun 29 (`commit 3f555e31`): a target's saved
