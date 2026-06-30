@@ -77,6 +77,7 @@ function isTransactionalType(emailType?: string): boolean {
 // person who UNSUBSCRIBED still gets honored (unlike fully-transactional types).
 const CAP_EXEMPT_TYPES = new Set([
   'mindy_launch_confirmation', 'mindy_launch_reminder', 'mindy_launch_lifetime',
+  'mindy_apex_offer', // the post-event referral offer — same registrant sequence
 ]);
 
 /**
