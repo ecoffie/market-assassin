@@ -738,17 +738,28 @@ export async function POST(request: NextRequest) {
     const eventsStart = Date.now();
     const eventHorizon = new Date();
     eventHorizon.setDate(eventHorizon.getDate() + EVENT_HORIZON_DAYS);
-    const eventCounts: Record<string, number> = {};   // keyed by normalizeAgencyKey()
+    const eventCounts: Record<string, number> = {};          // keyed by normalizeAgencyKey()
+    const eventCountsByDodaac: Record<string, number> = {};   // keyed by 6-char inferred DoDAAC
     try {
+      // backfill-event-offices tags each event's REAL buying office via the
+      // solicitation-number DoDAAC (`inferred_dodaac`). Pull it alongside `agency`
+      // so a specific DoD office gets ITS event count, not the whole-DoD bucket —
+      // the same anchoring the opportunities count uses. (sam_events.agency is
+      // department-level, so without this every DARPA/USACE office inherits all of
+      // DoD's events.)
       const { data: eventRows } = await supabase
         .from('sam_events')
-        .select('agency')
+        .select('agency, inferred_dodaac')
         .gte('event_date', new Date().toISOString().slice(0, 10))
         .lte('event_date', eventHorizon.toISOString().slice(0, 10));
       for (const row of eventRows || []) {
         const key = normalizeAgencyKey(row.agency || '');
-        if (!key) continue;
-        eventCounts[key] = (eventCounts[key] || 0) + 1;
+        if (key) eventCounts[key] = (eventCounts[key] || 0) + 1;
+        const dod = String(row.inferred_dodaac || '').toUpperCase().trim();
+        if (dod.length >= 6) {
+          const code = dod.slice(0, 6);
+          eventCountsByDodaac[code] = (eventCountsByDodaac[code] || 0) + 1;
+        }
       }
     } catch (eventErr) {
       console.warn('[target-market-research] sam_events count failed:', eventErr);
@@ -897,7 +908,11 @@ export async function POST(request: NextRequest) {
       // Expose the department-wide number only for office-anchored agencies, so
       // the card can say "0 open at DARPA now · N DoD-wide" honestly.
       const oppCountDodWide = isOfficeAnchored ? deptWideOppCount : null;
-      const upcomingEventCount = oppKeyCandidates.reduce((n, k) => n || eventCounts[k] || 0, 0);
+      // Events anchor the SAME way as opps: an office-anchored agency counts only
+      // events tagged to ITS DoDAACs (via inferred_dodaac), not the whole-DoD bucket.
+      const dodaacEventCount = dodaacCodes.reduce((n, c) => n + (eventCountsByDodaac[c] || 0), 0);
+      const deptWideEventCount = oppKeyCandidates.reduce((n, k) => n || eventCounts[k] || 0, 0);
+      const upcomingEventCount = isOfficeAnchored ? dodaacEventCount : deptWideEventCount;
       const satRatio = (a.contractCount && a.contractCount > 0)
         ? (a.satContractCount || 0) / a.contractCount
         : 0;

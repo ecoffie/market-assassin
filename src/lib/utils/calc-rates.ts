@@ -6,7 +6,32 @@
  * No auth required. ~240K records, refreshed daily.
  */
 
+import naicsData from '@/data/naics-codes.json';
+
 const CALC_API = 'https://api.gsa.gov/acquisition/calc/v3/api/ceilingrates/';
+
+// NAICS code → official title (1,741 codes). Used to derive per-code CALC search
+// keywords when there's no curated mapping — so each NAICS returns DISTINCT,
+// relevant labor categories instead of a shared generic fallback.
+const NAICS_TITLES = (naicsData as { codes: Record<string, { title: string }> }).codes;
+const TITLE_STOPWORDS = new Set([
+  'other', 'services', 'service', 'and', 'for', 'all', 'except', 'related', 'activities',
+  'general', 'miscellaneous', 'establishments', 'including', 'their', 'manufacturing',
+]);
+
+/** Significant keywords from a NAICS title (walks up to the parent code if needed). */
+function keywordsFromNaicsTitle(code: string): string[] {
+  const title =
+    NAICS_TITLES[code]?.title ||
+    NAICS_TITLES[code.slice(0, 5)]?.title ||
+    NAICS_TITLES[code.slice(0, 4)]?.title ||
+    NAICS_TITLES[code.slice(0, 3)]?.title ||
+    NAICS_TITLES[code.slice(0, 2)]?.title;
+  if (!title) return [];
+  const words = title.toLowerCase().replace(/[^a-z\s]/g, ' ').split(/\s+/)
+    .filter((w) => w.length >= 4 && !TITLE_STOPWORDS.has(w));
+  return [...new Set(words)].slice(0, 3);
+}
 
 export interface CalcRateRecord {
   labor_category: string;
@@ -128,7 +153,12 @@ function getSearchTermsForNAICS(naicsCode: string): string[] {
   if (naicsSearchTerms[code.slice(0, 5)]) return naicsSearchTerms[code.slice(0, 5)];
   // Try 3-digit prefix
   if (naicsPrefixTerms[code.slice(0, 3)]) return naicsPrefixTerms[code.slice(0, 3)];
-  // Fallback
+  // Derive keywords from the NAICS title — DISTINCT per code, so two different
+  // unmapped NAICS no longer return the identical generic result set (the bug:
+  // 541219 "Other Accounting Services" was returning engineers via the fallback).
+  const titleTerms = keywordsFromNaicsTitle(code);
+  if (titleTerms.length > 0) return titleTerms;
+  // Last resort only when the code has no title at all (very rare).
   return ['analyst', 'specialist', 'manager', 'engineer'];
 }
 
