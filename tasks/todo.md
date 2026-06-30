@@ -102,8 +102,16 @@ Shipped live to getmindy.ai this session (all verified Ready on prod):
   yields no codes (`1f2a1186`).
 
 ### Carryover from Jun 19 (still open)
-- [ ] **Repoint/extend GSC reporting** (in govcon-funnels `src/lib/gsc/`, currently scoped to
-  `sc-domain:govcongiants.com`) → getmindy.ai, to monitor the new SEO pages' impressions/position.
+- [x] **GSC reporting for getmindy.ai — DONE/operational** (verified Jun 29). The tool was
+  already ported into market-assassin: `src/lib/gsc/{client,query,report}.ts` targets
+  `sc-domain:getmindy.ai` (URL-prefix fallback). On-demand: `npx tsx scripts/seo-report.ts`
+  (needs `vercel env pull .env.local` for GCP_SA_JSON). Weekly Slack cron `seo-report`
+  (`/api/cron/seo-report`, Mondays 13:00 UTC) is registered + enabled + last ran SUCCESS
+  2026-06-29. **Snapshot (28d):** clicks 206 (+1773%), impressions 33.7K (+901%), CTR 0.6%,
+  avg pos 11.8 (was 28.1) — the programmatic-SEO pages are landing. Follow-ups (separate
+  SEO-content tasks, not this item): meta-title/snippet CTR work on high-impression/0-CTR
+  `/contractors/*` + `/contractors` index + `/agencies/*`; treat raw-solicitation-number
+  queries (ranking ~pos 2-4, 0% CTR) with better titles/snippets on opp/contract pages.
 
 ---
 
