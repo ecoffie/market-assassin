@@ -166,11 +166,16 @@ async function queryCalcAPI(params: {
   keyword?: string;
   businessSize?: 'S' | 'O';
   pageSize?: number;
+  page?: number;
 }): Promise<CalcApiResponse> {
   const url = new URL(CALC_API);
   if (params.keyword) url.searchParams.set('keyword', params.keyword);
   if (params.businessSize) url.searchParams.set('filter', `business_size:${params.businessSize}`);
-  url.searchParams.set('page_size', String(params.pageSize || 100));
+  // NOTE: GSA CALC ceilingrates hard-caps at 20 records/response (page_size is
+  // ignored for the cap), BUT `page=N` ONLY paginates when page_size is ALSO
+  // present. So we always set page_size to enable ?page= walking.
+  url.searchParams.set('page_size', String(params.pageSize || 20));
+  if (params.page) url.searchParams.set('page', String(params.page));
   url.searchParams.set('ordering', 'current_price');
   url.searchParams.set('sort', 'asc');
 
@@ -183,6 +188,37 @@ async function queryCalcAPI(params: {
   }
 
   return response.json();
+}
+
+/**
+ * Pull ALL records for a keyword by walking pages (the API returns max 20/page).
+ * Used for the complete labor-category table. Bounded by MAX_PAGES so a huge
+ * keyword can't run away on API calls. Returns the merged records + the server
+ * total + the first page's aggregations (server-computed stats over ALL records).
+ */
+const MAX_PAGES = 60; // 60 × 20 = up to 1,200 records; plenty for any role
+async function queryCalcAPIAllPages(params: {
+  keyword: string;
+  businessSize?: 'S' | 'O';
+  maxPages?: number;
+}): Promise<{ records: CalcRateRecord[]; total: number; aggregations: CalcApiResponse['aggregations'] }> {
+  const first = await queryCalcAPI({ ...params, page: 1, pageSize: 20 });
+  const total = first.hits.total.value;
+  const records: CalcRateRecord[] = first.hits.hits.map((h) => h._source);
+  const aggregations = first.aggregations;
+
+  const pagesNeeded = Math.min(params.maxPages ?? MAX_PAGES, Math.ceil(total / 20));
+  for (let page = 2; page <= pagesNeeded; page++) {
+    try {
+      const j = await queryCalcAPI({ ...params, page, pageSize: 20 });
+      const hits = j.hits.hits.map((h) => h._source);
+      if (!hits.length) break;
+      records.push(...hits);
+    } catch {
+      break; // partial data is fine — stop on the first failing page
+    }
+  }
+  return { records, total, aggregations };
 }
 
 export interface LaborCategorySummary {
@@ -261,19 +297,25 @@ export async function fetchPricingIntelByKeywords(rawKeywords: string): Promise<
 async function runPricingIntel(searchTerms: string[], naicsCode: string, naicsDescription: string): Promise<PricingIntelData | null> {
   console.log(`[CALC+] Pricing intel — terms: ${searchTerms.join(', ')}${naicsCode ? ` (NAICS ${naicsCode})` : ''}`);
 
-  // Run ALL queries in parallel for speed (avoid sequential timeout issues)
+  // Fetch the FULL record set for each term by paginating (the API caps at 20/
+  // page). This is what makes the labor-category table complete — we walk all
+  // pages, not just the first 20. Primary term gets full pagination; the small/
+  // large-biz splits also paginate (for the business-size comparison). Aggregations
+  // come from page 1 (server-computed over ALL records — still correct).
   const termQueries = searchTerms.slice(0, 3).map(term =>
-    queryCalcAPI({ keyword: term, pageSize: 100 })
-      .then(result => ({ term, result, error: null as string | null }))
-      .catch(err => ({ term, result: null as CalcApiResponse | null, error: String(err) }))
+    queryCalcAPIAllPages({ keyword: term })
+      .then(out => ({ term, out, error: null as string | null }))
+      .catch(err => ({ term, out: null as { records: CalcRateRecord[]; total: number; aggregations: CalcApiResponse['aggregations'] } | null, error: String(err) }))
   );
 
-  const sbQuery = queryCalcAPI({ keyword: searchTerms[0], businessSize: 'S', pageSize: 100 })
-    .then(r => ({ results: r.hits.hits.map(h => h._source), error: null as string | null }))
+  // Biz-size splits only need a representative median, not the full table —
+  // cap at 10 pages (200 records) to save API calls.
+  const sbQuery = queryCalcAPIAllPages({ keyword: searchTerms[0], businessSize: 'S', maxPages: 10 })
+    .then(r => ({ results: r.records, error: null as string | null }))
     .catch(err => ({ results: [] as CalcRateRecord[], error: String(err) }));
 
-  const lgQuery = queryCalcAPI({ keyword: searchTerms[0], businessSize: 'O', pageSize: 100 })
-    .then(r => ({ results: r.hits.hits.map(h => h._source), error: null as string | null }))
+  const lgQuery = queryCalcAPIAllPages({ keyword: searchTerms[0], businessSize: 'O', maxPages: 10 })
+    .then(r => ({ results: r.records, error: null as string | null }))
     .catch(err => ({ results: [] as CalcRateRecord[], error: String(err) }));
 
   const [termResults, sbResult, lgResult] = await Promise.all([
@@ -282,19 +324,17 @@ async function runPricingIntel(searchTerms: string[], naicsCode: string, naicsDe
     lgQuery,
   ]);
 
-  // Combine search term results
+  // Combine search term results (full paginated record sets)
   const allRecords: CalcRateRecord[] = [];
   const seenIds = new Set<string>();
 
-  for (const { term, result, error } of termResults) {
-    if (error || !result) {
+  for (const { term, out, error } of termResults) {
+    if (error || !out) {
       console.error(`[CALC+] Error querying "${term}": ${error}`);
       continue;
     }
-    const hits = result.hits.hits;
-    console.log(`[CALC+] "${term}": ${result.hits.total.value} total, ${hits.length} returned`);
-    for (const hit of hits) {
-      const rec = hit._source;
+    console.log(`[CALC+] "${term}": ${out.total} total, ${out.records.length} fetched (all pages)`);
+    for (const rec of out.records) {
       const key = `${rec.vendor_name}:${rec.labor_category}:${rec.current_price}`;
       if (!seenIds.has(key)) {
         seenIds.add(key);
@@ -326,9 +366,9 @@ async function runPricingIntel(searchTerms: string[], naicsCode: string, naicsDe
   // Build sorted category summaries
   const laborCategories: LaborCategorySummary[] = [];
   for (const [cat, prices] of categoryMap.entries()) {
-    if (prices.length < 1) continue; // keep any category with a data point (the
-    // API returns only ~20 hits/query so most categories have 1 here; the headline
-    // price-to-win uses the SERVER aggregation over all records, not this table).
+    if (prices.length < 2) continue; // need ≥2 points for a meaningful per-category
+    // spread (now that we paginate the FULL record set, real categories like
+    // "Senior Accountant" have 30+ records — no longer nuked to a single survivor).
     const sorted = [...prices].sort((a, b) => a - b);
     const nextPrices = categoryNextYear.get(cat) || [];
     const nextSorted = [...nextPrices].sort((a, b) => a - b);
@@ -397,7 +437,7 @@ async function runPricingIntel(searchTerms: string[], naicsCode: string, naicsDe
   // at the cheap end — which produced a $40 "median" for accountants whose REAL
   // median is $102. The aggregations.histogram_percentiles / median_price are the
   // true distribution. Fall back to the local computation only if absent.
-  const agg = termResults.find((t) => t.result?.aggregations)?.result?.aggregations;
+  const agg = termResults.find((t) => t.out?.aggregations)?.out?.aggregations;
   const aggPct = agg?.histogram_percentiles?.values;
   const aggMedian = agg?.median_price?.values?.['50.0'];
   const aggCount = agg?.wage_stats?.count;
