@@ -33,11 +33,15 @@ export const maxDuration = 60;
 
 const GROQ_MODEL = 'llama-3.1-8b-instant';
 const TEMPERATURE = 0.4;        // a touch more deterministic for proposal copy
-const MAX_TOKENS = 1400;
+const MAX_TOKENS = 4000;        // ~3,000 words — was 1400 (~1,000), which truncated
+                                // requirement breakdowns + drafted sections. gpt-4o-mini
+                                // (the primary) supports 16K out; 4K is the substance/cost balance.
 const HISTORY_LIMIT = 6;
 const RFP_MAX_CHARS = 200000;   // accept the FULL combined doc text (we select
                                 // the relevant slices below, not first-8K)
-const RFP_CONTEXT_BUDGET = 40000; // chars of RFP in the prompt — Claude (primary
+const RFP_CONTEXT_BUDGET = 60000; // chars of RFP in the prompt (~15K tokens) — more
+                                  // relevant excerpts reach the model so answers go
+                                  // deeper on long docs. Well within gpt-4o-mini's 128K. Claude (primary
                                   // for Manual Drive) has the window for it, so
                                   // feed more so the answer's section is present
 
