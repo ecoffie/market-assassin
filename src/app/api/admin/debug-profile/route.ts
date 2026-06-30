@@ -155,9 +155,9 @@ export async function GET(request: NextRequest) {
     user_briefing_profile: briefing
       ? { present: true, naics_codes: briefing.naics_codes, invalid_naics: invalidNaics(briefing.naics_codes) }
       : { present: false },
-    mi_beta_user_settings: miBeta
-      ? { present: true, naics_codes: miBeta.naics_codes, invalid_naics: invalidNaics(miBeta.naics_codes) }
-      : { present: false },
+    // naics_codes column RETIRED from mi_beta_user_settings (migration 20260629);
+    // targeting NAICS lives in user_notification_settings (shown above).
+    mi_beta_user_settings: miBeta ? { present: true } : { present: false },
     user_identity_profile: vault
       ? {
           present: true,
@@ -177,7 +177,8 @@ export async function GET(request: NextRequest) {
 const NAICS_NCOL: Record<string, string> = {
   user_notification_settings: 'naics_codes',
   user_briefing_profile: 'naics_codes',
-  mi_beta_user_settings: 'naics_codes',
+  // mi_beta_user_settings.naics_codes RETIRED (migration 20260629) — the column is
+  // dropped; targeting lives in user_notification_settings. Do not re-add.
   user_business_profiles: 'extracted_naics_codes',
   user_identity_profile: 'primary_naics', // Vault — UEI-imported company NAICS
 };

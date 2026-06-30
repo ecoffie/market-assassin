@@ -52,7 +52,8 @@ export async function ensureAppWorkspaceSchema() {
         company_name TEXT,
         display_name TEXT,
         role_title TEXT,
-        naics_codes TEXT[],
+        -- naics_codes RETIRED (migration 20260629): targeting lives in
+        -- user_notification_settings. Omitted here so this CREATE never re-adds it.
         target_agencies TEXT[],
         email_frequency TEXT DEFAULT 'daily',
         onboarding_completed BOOLEAN DEFAULT false,
