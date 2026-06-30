@@ -326,7 +326,9 @@ async function runPricingIntel(searchTerms: string[], naicsCode: string, naicsDe
   // Build sorted category summaries
   const laborCategories: LaborCategorySummary[] = [];
   for (const [cat, prices] of categoryMap.entries()) {
-    if (prices.length < 2) continue; // Need at least 2 data points
+    if (prices.length < 1) continue; // keep any category with a data point (the
+    // API returns only ~20 hits/query so most categories have 1 here; the headline
+    // price-to-win uses the SERVER aggregation over all records, not this table).
     const sorted = [...prices].sort((a, b) => a - b);
     const nextPrices = categoryNextYear.get(cat) || [];
     const nextSorted = [...nextPrices].sort((a, b) => a - b);
@@ -388,10 +390,22 @@ async function runPricingIntel(searchTerms: string[], naicsCode: string, naicsDe
     .sort((a, b) => b.recordCount - a.recordCount)
     .slice(0, 15);
 
-  // Price-to-win guidance from overall percentiles
-  const p25 = computePercentile(allPrices, 25);
-  const p50 = computePercentile(allPrices, 50);
-  const p75 = computePercentile(allPrices, 75);
+  // Price-to-win guidance. PREFER the SERVER-COMPUTED aggregations from the
+  // CALC API (computed over ALL matching records — e.g. 683 for "accountant"),
+  // NOT computePercentile over allPrices. allPrices is only the ~20 hits the API
+  // returns per page (it ignores page_size + doesn't paginate), and they cluster
+  // at the cheap end — which produced a $40 "median" for accountants whose REAL
+  // median is $102. The aggregations.histogram_percentiles / median_price are the
+  // true distribution. Fall back to the local computation only if absent.
+  const agg = termResults.find((t) => t.result?.aggregations)?.result?.aggregations;
+  const aggPct = agg?.histogram_percentiles?.values;
+  const aggMedian = agg?.median_price?.values?.['50.0'];
+  const aggCount = agg?.wage_stats?.count;
+  const p25 = aggPct?.['25.0'] ?? computePercentile(allPrices, 25);
+  const p50 = aggMedian ?? aggPct?.['50.0'] ?? computePercentile(allPrices, 50);
+  const p75 = aggPct?.['75.0'] ?? computePercentile(allPrices, 75);
+  // Real total record count for the headline (server count, not the page slice).
+  const realRecordCount = aggCount ?? allRecords.length;
 
   return {
     laborCategories: laborCategories.slice(0, 25),
@@ -410,7 +424,7 @@ async function runPricingIntel(searchTerms: string[], naicsCode: string, naicsDe
     naicsCode,
     naicsDescription,
     searchTermsUsed: searchTerms.slice(0, 4),
-    totalRecordsAnalyzed: allRecords.length,
+    totalRecordsAnalyzed: realRecordCount,
     queryDate: new Date().toISOString(),
   };
 }
