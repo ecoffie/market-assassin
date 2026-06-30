@@ -42,12 +42,18 @@
   W912PL→11, W912BV→15 `@usace.army.mil` POCs). See CLAUDE.md "Office contacts anchored
   on DoDAAC prefix". Surfaces already correct: award detail/incumbent, recompetes,
   expiring contracts, TMR total spend (all USASpending sub-agency tier).
-- [ ] **Retire legacy `mi_beta_user_settings.naics_codes` column.** Dead: never
-  written anymore (Settings stopped writing it in the June consistency pass), only
-  read as a stale fallback for un-migrated profiles. It's a `DROP COLUMN` →
-  hand-run Supabase DDL, so do it carefully as its own task: grep every read →
-  confirm fallback-only → write idempotent migration → Eric runs it in Supabase →
-  verify. Low-risk but it's DDL. Context: `docs/strategy/MINDY-NAV-CONSOLIDATION.md`.
+- [~] **Retire legacy `mi_beta_user_settings.naics_codes` column** — code shipped,
+  AWAITING Eric to run the DDL (`commit 62088ac3`, Jun 29). Audit (Explore) confirmed
+  the column is read-DEAD (both Settings panels read `user_notification_settings`, NOT
+  mi_beta) — the todo's "stale fallback" was inaccurate, there's no fallback read at
+  all. Removed the two remaining references: the `debug-profile` NAICS-scrub write-map
+  entry and the `workspace.ts` `ensureAppWorkspaceSchema` CREATE line (would recreate
+  it). Migration `supabase/migrations/20260629_drop_mi_beta_naics_codes.sql` is
+  idempotent: (1) data-preserving UPDATE that restores legacy naics into the canonical
+  table ONLY where canonical is empty — exactly ONE user (biznlync@gmail.com, 21 codes,
+  empty canonical stub); (2) `ALTER TABLE ... DROP COLUMN IF EXISTS naics_codes`. No
+  index/view depends on it. **TODO: Eric pastes the migration into the Supabase SQL
+  editor, then we verify the column is gone + biznlync restored.**
 
 ---
 
