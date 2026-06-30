@@ -64,3 +64,4 @@ supabase/.temp/
 # Standalone design/email preview mockups (open in a browser to eyeball;
 # referenced nowhere in the app build — scratch, not source)
 preview-*.html
+.ghl-tag-sync-cursor.json
