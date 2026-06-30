@@ -534,6 +534,7 @@ export default function LaunchCommandCenterPage() {
   // Demand Heatmap — aggregated user-intent / collaboration signal (the "aha" feature)
   const [heatmap, setHeatmap] = useState<DemandHeatmap | null>(null);
   const [heatmapError, setHeatmapError] = useState('');
+  const [heatmapOpen, setHeatmapOpen] = useState(false); // collapse the heatmap table by default — keep the stat + collab preview visible
   const [qualBrief, setQualBrief] = useState<CustomerQualificationBrief | null>(null);
   const [qualLoading, setQualLoading] = useState(false);
   const [qualError, setQualError] = useState('');
@@ -1367,9 +1368,20 @@ export default function LaunchCommandCenterPage() {
               </p>
             </div>
             {heatmap && (
-              <div className="text-right">
-                <div className="text-2xl font-bold text-cyan-300 tabular-nums">{heatmap.collabReadyCount}</div>
-                <div className="text-xs text-slate-400">collab-ready ({heatmap.totalTrackedOpps} tracked)</div>
+              <div className="flex items-center gap-4">
+                <div className="text-right">
+                  <div className="text-2xl font-bold text-cyan-300 tabular-nums">{heatmap.collabReadyCount}</div>
+                  <div className="text-xs text-slate-400">collab-ready ({heatmap.totalTrackedOpps} tracked)</div>
+                </div>
+                {heatmap.opps.length > 0 && (
+                  <button
+                    onClick={() => setHeatmapOpen((o) => !o)}
+                    className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800"
+                    aria-expanded={heatmapOpen}
+                  >
+                    {heatmapOpen ? 'Hide' : `Show ${heatmap.collabReadyCount}`} {heatmapOpen ? '▲' : '▼'}
+                  </button>
+                )}
               </div>
             )}
           </div>
@@ -1381,7 +1393,7 @@ export default function LaunchCommandCenterPage() {
             <p className="mt-4 text-sm text-slate-400">No tracked opportunities yet.</p>
           )}
 
-          {heatmap && heatmap.opps.length > 0 && (
+          {heatmap && heatmap.opps.length > 0 && heatmapOpen && (
             <div className="mt-5 overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
@@ -1412,15 +1424,17 @@ export default function LaunchCommandCenterPage() {
                   ))}
                 </tbody>
               </table>
-              {heatmap.collabReadyCount > 0 && (
-                <div className="mt-4 rounded-md border border-emerald-500/30 bg-emerald-900/15 p-3">
-                  <p className="text-xs font-semibold text-emerald-300 uppercase tracking-wide mb-1">Collab alert preview (≥{heatmap.threshold} trackers)</p>
-                  {heatmap.opps.filter((o) => o.collabReady).slice(0, 3).map((o) => (
-                    <p key={o.noticeId} className="text-sm text-slate-300 mt-1">“{o.collabPreview}”</p>
-                  ))}
-                  <p className="text-[11px] text-slate-500 mt-2">Phase 1: previews only — you control the first sends. Auto-trigger comes once volume proves the signal.</p>
-                </div>
-              )}
+            </div>
+          )}
+
+          {/* Collab alert preview — the actionable signal; stays visible even when the table is collapsed. */}
+          {heatmap && heatmap.collabReadyCount > 0 && (
+            <div className="mt-4 rounded-md border border-emerald-500/30 bg-emerald-900/15 p-3">
+              <p className="text-xs font-semibold text-emerald-300 uppercase tracking-wide mb-1">Collab alert preview (≥{heatmap.threshold} trackers)</p>
+              {heatmap.opps.filter((o) => o.collabReady).slice(0, 3).map((o) => (
+                <p key={o.noticeId} className="text-sm text-slate-300 mt-1">“{o.collabPreview}”</p>
+              ))}
+              <p className="text-[11px] text-slate-500 mt-2">Phase 1: previews only — you control the first sends. Auto-trigger comes once volume proves the signal.</p>
             </div>
           )}
         </section>
