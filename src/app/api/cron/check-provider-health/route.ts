@@ -21,7 +21,7 @@ function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 }
 
-interface Check { provider: string; status: 'healthy' | 'degraded' | 'down' | 'skipped'; latency?: number; error?: string }
+interface Check { provider: string; status: 'healthy' | 'degraded' | 'down' | 'skipped'; latency?: number; error?: string; rateLimitRemaining?: number }
 
 // Each checker returns a status. Missing key → 'skipped' (not an error — we just
 // don't use it), so the dashboard doesn't show a false "down".
@@ -61,12 +61,13 @@ export async function GET(request: NextRequest) {
       const latency = Date.now() - start;
       const remaining = Number(res.headers.get('x-ratelimit-remaining'));
       const limit = Number(res.headers.get('x-ratelimit-limit'));
-      if (res.status === 429) return { provider: 'gsa_calc', status: 'down', latency, error: 'HTTP 429 — daily CALC quota EXHAUSTED' };
+      const rl = Number.isFinite(remaining) ? remaining : undefined;
+      if (res.status === 429) return { provider: 'gsa_calc', status: 'down', latency, error: 'HTTP 429 — daily CALC quota EXHAUSTED', rateLimitRemaining: 0 };
       if (!res.ok) return { provider: 'gsa_calc', status: 'down', latency, error: `HTTP ${res.status}` };
       if (Number.isFinite(remaining) && remaining < 150) {
-        return { provider: 'gsa_calc', status: 'degraded', latency, error: `Only ${remaining}/${limit} CALC requests left today (~${Math.floor(remaining / 70)} searches) — usage ramping, consider caching aggregations` };
+        return { provider: 'gsa_calc', status: 'degraded', latency, error: `Only ${remaining}/${limit} CALC requests left today (~${Math.floor(remaining / 70)} searches) — usage ramping, consider caching aggregations`, rateLimitRemaining: rl };
       }
-      return { provider: 'gsa_calc', status: 'healthy', latency, error: Number.isFinite(remaining) ? `${remaining}/${limit} CALC requests left today` : undefined };
+      return { provider: 'gsa_calc', status: 'healthy', latency, error: Number.isFinite(remaining) ? `${remaining}/${limit} CALC requests left today` : undefined, rateLimitRemaining: rl };
     } catch (e) {
       return { provider: 'gsa_calc', status: 'down', error: e instanceof Error ? e.message.slice(0, 120) : 'fetch failed' };
     }
@@ -108,8 +109,9 @@ export async function GET(request: NextRequest) {
       provider: c.provider,
       status: c.status,
       last_check_at: now,
-      ...(c.status === 'healthy' ? { last_success_at: now, last_error_message: null } : { last_error_at: now, last_error_message: c.error || null }),
+      ...(c.status === 'healthy' ? { last_success_at: now, last_error_message: c.error || null } : { last_error_at: now, last_error_message: c.error || null }),
       ...(c.latency != null ? { avg_latency_ms: c.latency } : {}),
+      ...(c.rateLimitRemaining != null ? { rate_limit_remaining: c.rateLimitRemaining } : {}),
       updated_at: now,
     }, { onConflict: 'provider' });
   }

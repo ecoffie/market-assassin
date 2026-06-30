@@ -209,6 +209,8 @@ export default function ToolHealthDashboard() {
     sam_gov: 'SAM.gov',
     usaspending: 'USASpending',
     grants_gov: 'Grants.gov',
+    gsa_calc: 'GSA CALC (Pricing Intel)',
+    anthropic: 'Anthropic (AI)',
   };
 
   // Filter out OpenAI from display (it's only a fallback, not monitored)
@@ -293,8 +295,13 @@ export default function ToolHealthDashboard() {
                     Latency: <span className="text-purple-400">{provider.latency_ms}ms</span>
                   </div>
                 )}
+                {provider.rate_limit_remaining != null && (
+                  <div className="text-sm text-gray-400">
+                    Quota left today: <span className={provider.rate_limit_remaining < 150 ? 'text-yellow-400' : 'text-green-400'}>{provider.rate_limit_remaining}</span>
+                  </div>
+                )}
                 {provider.last_error && (
-                  <div className="text-sm text-red-400 mt-2 truncate" title={provider.last_error}>
+                  <div className={`text-sm mt-2 truncate ${provider.status === 'healthy' ? 'text-gray-500' : 'text-red-400'}`} title={provider.last_error}>
                     {provider.last_error}
                   </div>
                 )}
