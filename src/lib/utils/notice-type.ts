@@ -59,7 +59,7 @@ export function classifyNoticeType(nt?: string | null, title?: string | null): N
   // Notice whose TITLE shows proposal-request intent must NOT be gated as
   // informational. (Eric: gov uses these to take bids — allow drafting.)
   const isProposalRequest =
-    /request for (project )?proposal|\brpp\b|request for solution|\brfs\b|request for (white )?paper|other transaction|\bota\b|\bcso\b|commercial solutions opening|request for (project )?submission/.test(ttl);
+    /request for (project )?proposal|\brpp\b|request for solution|\brfs\b|request for (white )?paper|other transaction|\bota\b|\bcso\b|commercial solutions opening|broad agency announcement|\bbaa\b|request for (project )?submission/.test(ttl);
 
   // --- Not respondable: informational only ---------------------------------
   if (t.includes('award')) return { label: 'Award Notice', respondability: 'none' };
@@ -90,6 +90,11 @@ export function classifyNoticeType(nt?: string | null, title?: string | null): N
   }
 
   // --- Biddable: real priced proposal / quote ------------------------------
+  // R&D / non-FAR vehicles that take proposals — sometimes their OWN notice_type,
+  // not just a title under Special Notice (handled above). All biddable.
+  if (t.includes('broad agency') || /\bbaa\b/.test(t)) return { label: 'BAA', respondability: 'bid' };
+  if (t.includes('commercial solutions') || /\bcso\b/.test(t)) return { label: 'CSO', respondability: 'bid' };
+  if (t.includes('other transaction') || /\bota\b/.test(t)) return { label: 'OTA', respondability: 'bid' };
   if (t.includes('combined')) return { label: 'Combined Synopsis', respondability: 'bid' };
   if (t.includes('bundle') || t.includes('consolidat')) {
     return { label: 'Consolidate / Bundle', respondability: 'bid' };
