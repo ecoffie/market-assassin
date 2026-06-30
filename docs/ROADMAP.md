@@ -24,13 +24,14 @@ release buckets. Pick an item, open its PRD/SPEC, build it.
 ## 📍 What's actually left (2026-06-30 audit summary)
 
 **Already shipped (don't rebuild):** v1.1 #1 Recompete SOW Match (engine+API+UI),
-v1.1 #4 Product Tour, v2.0 #F SOW archive backfill, v2.0 #B engine half.
+v1.1 #4 Product Tour, v2.0 #F SOW archive backfill, **v2.0 #B "find work like mine"**
+(engine + the onboarding **slurpee** user surface — `OnboardingScan.tsx`).
 
 **Cheapest wins left (engine exists — finish the surface):**
-1. **v2.0 #B user surface** — "describe your work → matched opps" route + panel (the
-   hidden-match engine already runs silently in alerts).
-2. **v1.1 #7 polish** — per-doc notes + draft version history (who/status already done).
-3. **v1.1 #3** — FY year-selector in Market Research (small, fully open).
+1. **v1.1 #7 polish** — per-doc notes + draft version history (who/status already done).
+2. **v1.1 #3** — FY year-selector in Market Research (small, fully open).
+3. *(optional)* a standalone re-run-anytime "find work like mine" panel — the slurpee
+   already covers the core intent at onboarding, so this is a nice-to-have, not a gap.
 
 **Net-new builds (real infra/scope):** v1.1 #2 Content Reaper weave · #5 dark mode ·
 #6 amendments-in-alerts · v2.0 #A Email-in · #C/#D scrapers · #E contact-role enrichment.
@@ -105,7 +106,7 @@ done-when.** Run the **Data Feature Builder** agent on data features, `/ship` to
 | # | Item | Status | Scope / what's left |
 |---|------|--------|---------------------|
 | A | **Email-in to Mindy** (TripIt model) | ⬜ NOT STARTED | Forward any opp email → tracked pursuit. No `inbound-email`/`in.getmindy.ai`/webhook in code yet. Needs Resend Inbound + MX + per-user address map + DKIM/dedup. PRD ready: **`docs/PRD-email-in.md`**. The natural v2.0 lead. |
-| B | **Semantic "find work like mine"** | 🟡 PARTIAL (engine done, no user surface) | Engine SHIPPED: `src/lib/alerts/hidden-match.ts` + `capability-vector.ts`, wired into `daily-alerts` behind `ENABLE_HIDDEN_MATCH`/rollout/whitelist flags; status at `admin/hidden-match-status`. LEFT: a user-facing "describe your work → matched opps" search route + panel (today it only runs silently inside alerts). |
+| B | **Semantic "find work like mine"** | ✅ SHIPPED (engine + user surface) | Engine: `src/lib/alerts/hidden-match.ts` + `capability-vector.ts` (in `daily-alerts` behind `ENABLE_HIDDEN_MATCH`/rollout flags; status at `admin/hidden-match-status`). USER SURFACE = the onboarding **"slurpee"** (`src/components/app/onboarding/OnboardingScan.tsx`): describe your business → ground codes → embed → resolve to a matched market. Optional later: a standalone re-run-anytime search panel (the slurpee covers the core intent at onboarding). |
 | C | **Multi-source opportunity adapters** | 🟡 PARTIAL | Have adapters: NIH, DARPA, NSF(SBIR), NECO (`src/lib/scrapers/apis/*`, `SourceId` in `scrapers/types.ts`); snapshot cron exists. LEFT: AF, Army, GSA eBuy as distinct adapters; a user-facing unified `/api/app/multisite` search. |
 | D | **DoD Forecast Coverage (real)** | 🟡 PARTIAL (scaffolded) | `src/lib/forecasts/scrapers/dod-multi-source.ts` has Army/Navy/AF/DLA source URLs + `parseDODRow` (Phase 4). LEFT: file-import is stubbed ("not implemented yet"); no NAVFAC scraper. Option B early-signals shipped as interim. |
 | E | **Real gov-contact roles** | 🟡 PARTIAL (column only) | `role_category` column exists (`20260604_federal_contacts.sql`) but only `contracting`/`small_business` populated from SAM POCs. LEFT: CO/PM/engineer/end-user — blocked on a commercial-enrichment buy decision. |
