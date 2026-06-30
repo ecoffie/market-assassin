@@ -1233,7 +1233,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                           Award / Justification). */}
                       <td className="px-4 py-3 max-w-[160px]">
                         {(() => {
-                          const { label, respondability } = classifyNoticeType(opp.notice_type);
+                          const { label, respondability } = classifyNoticeType(opp.notice_type, opp.title);
                           if (!label) return <span className="text-xs text-slate-600">-</span>;
                           const styles =
                             respondability === 'bid'

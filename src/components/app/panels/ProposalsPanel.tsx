@@ -287,9 +287,15 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   // Respondability of the active pursuit's notice type. 'none' (Special / Award
   // / Justification / Sale of Surplus) means there is nothing to submit, so the
   // workbench is blocked with an explanation instead of showing response outputs.
+  const activePursuitTitle = useMemo(
+    () => opportunities.find((opp) => opp.id === activePursuitId)?.title ?? null,
+    [opportunities, activePursuitId]
+  );
   const activePursuitNotice = useMemo(
-    () => classifyNoticeType(activePursuitNoticeType),
-    [activePursuitNoticeType]
+    // Pass the title too: an OTA "Request for Project Proposal" filed as a Special
+    // Notice IS biddable — the classifier checks the title for proposal-request intent.
+    () => classifyNoticeType(activePursuitNoticeType, activePursuitTitle),
+    [activePursuitNoticeType, activePursuitTitle]
   );
   const activePursuitDetectedType = useMemo(
     () => noticeTypeToDetected(activePursuitNoticeType),
@@ -1655,7 +1661,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             </div>
             {(() => {
               const picked = opportunities.find(o => o.id === selectedId);
-              const respondable = classifyNoticeType(picked?.notice_type).respondability !== 'none';
+              const respondable = classifyNoticeType(picked?.notice_type, picked?.title).respondability !== 'none';
               return (
                 <button
                   type="button"
@@ -1675,7 +1681,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               respondable at all (slate: Special / Award / Justification). */}
           {(() => {
             const picked = opportunities.find(o => o.id === selectedId);
-            const { label, respondability } = classifyNoticeType(picked?.notice_type);
+            const { label, respondability } = classifyNoticeType(picked?.notice_type, picked?.title);
             if (!label) return null;
             const styles =
               respondability === 'bid'

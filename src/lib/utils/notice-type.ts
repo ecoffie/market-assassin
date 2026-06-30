@@ -41,7 +41,7 @@ export interface NoticeTypeInfo {
  * so it tolerates the many spellings SAM emits ("Combined Synopsis/Solicitation",
  * "presol.", "RFP", "Request for Quote", etc.).
  */
-export function classifyNoticeType(nt?: string | null): NoticeTypeInfo {
+export function classifyNoticeType(nt?: string | null, title?: string | null): NoticeTypeInfo {
   // Unknown / blank notice_type: we have NO label to show (badge hidden), but
   // respondability MUST default to 'bid' — never block drafting on uncertainty.
   // Many pursuits predate notice_type enrichment and have a null value; treating
@@ -50,6 +50,16 @@ export function classifyNoticeType(nt?: string | null): NoticeTypeInfo {
   // Award / Justification / Surplus) should block.
   if (!nt || !nt.trim()) return { label: null, respondability: 'bid' };
   const t = nt.toLowerCase();
+  const ttl = (title || '').toLowerCase();
+
+  // OTA / proposal-request signals: agencies increasingly issue actual CALLS FOR
+  // PROPOSALS under "Special Notice" — especially OTA "Request for Project
+  // Proposals" (RPP), "Request for Solutions" (RFS), "Request for Proposals", and
+  // CSO/commercial-solutions-opening flows. These ARE biddable, so a Special
+  // Notice whose TITLE shows proposal-request intent must NOT be gated as
+  // informational. (Eric: gov uses these to take bids — allow drafting.)
+  const isProposalRequest =
+    /request for (project )?proposal|\brpp\b|request for solution|\brfs\b|request for (white )?paper|other transaction|\bota\b|\bcso\b|commercial solutions opening|request for (project )?submission/.test(ttl);
 
   // --- Not respondable: informational only ---------------------------------
   if (t.includes('award')) return { label: 'Award Notice', respondability: 'none' };
@@ -57,9 +67,15 @@ export function classifyNoticeType(nt?: string | null): NoticeTypeInfo {
   if (t.includes('surplus') || t.includes('sale of')) {
     return { label: 'Sale of Surplus Property', respondability: 'none' };
   }
-  // "Special Notice" is informational. Guard it BEFORE the solicitation check
-  // so "special" never falls through to a biddable bucket.
-  if (t.includes('special')) return { label: 'Special Notice', respondability: 'none' };
+  // "Special Notice" is USUALLY informational — but if the title shows it's a
+  // call for proposals (OTA RPP, RFS, etc.), it's biddable. Guard BEFORE the
+  // solicitation check so a plain "special" never falls through to biddable, yet
+  // an OTA RPP special notice still gets drafted.
+  if (t.includes('special')) {
+    return isProposalRequest
+      ? { label: 'Special Notice · RPP', respondability: 'bid' }
+      : { label: 'Special Notice', respondability: 'none' };
+  }
   // Presolicitation: a heads-up that a solicitation is coming. You do NOT
   // respond — the action is to track it and bid when the solicitation drops.
   // Guard BEFORE the solicitation check so "pre-solicitation" doesn't match it.
