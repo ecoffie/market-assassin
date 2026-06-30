@@ -17,8 +17,11 @@ import { FOUNDERS_LIFETIME_CAP } from './lifetime-pricing';
 const KV_KEY = 'founders:seats';
 // $2,997 bootcamp + $4,997 Founders — the actual Mindy lifetime products.
 const LIFETIME_CENTS = new Set([299700, 499700]);
-// Exclude old course/coaching charges that happen to be $2,997/$4,997 (NOT Mindy).
-const NOT_MINDY = /coaching|accelerator|academy|challenge|partner|blueprint|target market|group coaching/i;
+// Exclude old course/coaching + MANUAL-INVOICE charges that happen to be
+// $2,997/$4,997 (NOT Mindy). Real Mindy lifetime is sold via payment links (blank/
+// checkout description); a "Payment for Invoice" at $4,997 is a coaching invoice
+// (e.g. Candice Prentiss, Jan 2026), not a Founders purchase.
+const NOT_MINDY = /coaching|accelerator|academy|challenge|partner|blueprint|target market|group coaching|invoice/i;
 const ULTIMATE_BUNDLES = ['ultimate', 'ultimate-govcon-bundle', 'complete'];
 
 export interface FoundersSeats {
