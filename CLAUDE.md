@@ -256,6 +256,20 @@ NAVSUP=41), NOT the raw `office` column (embassy-contaminated). Foreign-filtered
 preview. UI: Decision Makers "📇 Full contact rosters by buying office". Agency
 matched by keyword ("DEFENSE, DEPARTMENT OF" not "Department of Defense").
 
+### Office contacts anchored on DoDAAC prefix (June 29, 2026)
+
+A target's saved `office_code` (a real 6-char DoDAAC like `W912PL`) is threaded
+from the Target List card (`MyTargetListPanel.tsx` → `TargetContacts`) into
+`GET /api/app/federal-contacts` as a `dodaac` param. When valid
+(`/^[A-Z][A-Z0-9]{5}$/`) the route filters `solicitation_number ILIKE '<DODAAC>%'`
+and **skips** both the `office` ILIKE and the sub-agency narrowing.
+**Why:** SAM POC rows have a NULL `office` column, so the hard office filter
+EXCLUDED the office's own people → a USACE district card fell back to dept-wide
+DoD (`osd.osbp@mail.mil`). The solicitation prefix is the reliable office key.
+Verified live on prod: W912PL (LA District) → 11 `@usace.army.mil` engineers,
+W912BV (Tulsa) → 15; without the param the same card returns 0 + narrowedToParent.
+(The OSBP small-business contact still prepends by design.)
+
 ### LLM cost discipline
 
 `callLLM({ job: 'reasoning' })` → **gpt-4o-mini first** (Claude not scalable at

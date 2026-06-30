@@ -18,6 +18,11 @@
   vehicle-grouping.ts`; UI should prefer the new `vehicles[]` array over `contracts[]`.
 - [ ] **DoD sub-agency collapse — remaining surfaces.** Fixed the demo-critical ones
   (contacts directory, office-roster facet, TMR open-opp count — all DoDAAC-anchored).
+  Contacts directory got a further fix Jun 29 (`commit 3f555e31`): a target's saved
+  `office_code` now anchors `federal-contacts` on `solicitation_number ILIKE '<DODAAC>%'`
+  instead of the NULL-excluding `office` ILIKE, so a USACE district card surfaces its
+  OWN `@usace.army.mil` POCs (verified live: W912PL→11, W912BV→15) instead of dept-wide
+  DoD. See CLAUDE.md "Office contacts anchored on DoDAAC prefix".
   Remaining from the audit (`commit 73f107d8` + the count fix): (a) **events count**
   (`sam_events` has only an `agency` col, no office key — add a DoDAAC/office key or
   join to opps, then anchor like the opp count); (b) **backfill saved
