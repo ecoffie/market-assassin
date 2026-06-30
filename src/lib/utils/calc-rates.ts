@@ -242,7 +242,24 @@ function computePercentile(sorted: number[], p: number): number {
  */
 export async function fetchPricingIntel(naicsCode: string): Promise<PricingIntelData | null> {
   const searchTerms = getSearchTermsForNAICS(naicsCode);
-  console.log(`[CALC+] Fetching pricing intel for NAICS ${naicsCode}, terms: ${searchTerms.join(', ')}`);
+  const label = NAICS_TITLES[naicsCode]?.title || `NAICS ${naicsCode}`;
+  return runPricingIntel(searchTerms, naicsCode, label);
+}
+
+/**
+ * Fetch pricing intelligence by labor-category keyword(s) — the NATIVE CALC way
+ * (CALC has no NAICS; you search by the role you staff). Accepts comma-separated
+ * roles, e.g. "Software Engineer, Project Manager". More accurate than NAICS→keyword
+ * translation because it queries the exact labor categories the user is pricing.
+ */
+export async function fetchPricingIntelByKeywords(rawKeywords: string): Promise<PricingIntelData | null> {
+  const terms = rawKeywords.split(',').map((s) => s.trim()).filter((s) => s.length >= 2).slice(0, 4);
+  if (terms.length === 0) return null;
+  return runPricingIntel(terms, '', terms.join(', '));
+}
+
+async function runPricingIntel(searchTerms: string[], naicsCode: string, naicsDescription: string): Promise<PricingIntelData | null> {
+  console.log(`[CALC+] Pricing intel — terms: ${searchTerms.join(', ')}${naicsCode ? ` (NAICS ${naicsCode})` : ''}`);
 
   // Run ALL queries in parallel for speed (avoid sequential timeout issues)
   const termQueries = searchTerms.slice(0, 3).map(term =>
@@ -376,26 +393,6 @@ export async function fetchPricingIntel(naicsCode: string): Promise<PricingIntel
   const p50 = computePercentile(allPrices, 50);
   const p75 = computePercentile(allPrices, 75);
 
-  // NAICS description lookup
-  const naicsDescriptions: Record<string, string> = {
-    '541511': 'Custom Computer Programming',
-    '541512': 'Computer Systems Design',
-    '541513': 'Computer Facilities Management',
-    '541519': 'Other Computer Related Services',
-    '541330': 'Engineering Services',
-    '541611': 'Management Consulting',
-    '541612': 'Human Resources Consulting',
-    '541614': 'Process & Logistics Consulting',
-    '541690': 'Scientific & Technical Consulting',
-    '541715': 'R&D in Physical Sciences',
-    '541720': 'Testing Laboratories',
-    '561210': 'Facilities Support Services',
-    '561720': 'Janitorial Services',
-    '236220': 'Commercial Building Construction',
-    '621399': 'Offices of Other Health Practitioners',
-    '611430': 'Professional Development Training',
-  };
-
   return {
     laborCategories: laborCategories.slice(0, 25),
     businessSizeComparison: {
@@ -411,7 +408,7 @@ export async function fetchPricingIntel(naicsCode: string): Promise<PricingIntel
     },
     topVendors,
     naicsCode,
-    naicsDescription: naicsDescriptions[naicsCode] || `NAICS ${naicsCode}`,
+    naicsDescription,
     searchTermsUsed: searchTerms.slice(0, 4),
     totalRecordsAnalyzed: allRecords.length,
     queryDate: new Date().toISOString(),

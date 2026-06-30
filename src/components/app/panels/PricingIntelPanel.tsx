@@ -73,6 +73,10 @@ export default function PricingIntelPanel({ email, tier }: Props) {
   const { showToast } = useToast();
 
   const [naicsInput, setNaicsInput] = useState('');
+  // Search mode: by NAICS (industry → derived keywords) or by labor category
+  // directly (the native CALC way — most accurate for the roles you staff).
+  const [mode, setMode] = useState<'naics' | 'role'>('naics');
+  const [roleInput, setRoleInput] = useState('');
   const [data, setData] = useState<PricingData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -99,8 +103,10 @@ export default function PricingIntelPanel({ email, tier }: Props) {
       showToast({ message: 'Sign in before running pricing intel', variant: 'error' });
       return;
     }
-    if (!naicsInput.trim()) {
-      showToast({ message: 'Enter a NAICS code', variant: 'error' });
+    const isRole = mode === 'role';
+    const value = (isRole ? roleInput : naicsInput).trim();
+    if (!value) {
+      showToast({ message: isRole ? 'Enter a role / labor category' : 'Enter a NAICS code', variant: 'error' });
       return;
     }
 
@@ -110,8 +116,9 @@ export default function PricingIntelPanel({ email, tier }: Props) {
     setData(null);
 
     try {
+      const param = isRole ? `keyword=${encodeURIComponent(value)}` : `naics=${encodeURIComponent(value)}`;
       const res = await fetch(
-        `/api/app/pricing-intel?email=${encodeURIComponent(email)}&naics=${encodeURIComponent(naicsInput.trim())}`
+        `/api/app/pricing-intel?email=${encodeURIComponent(email)}&${param}`
       );
       const payload = await res.json().catch(() => null);
 
@@ -127,7 +134,8 @@ export default function PricingIntelPanel({ email, tier }: Props) {
       setData(payload.data as PricingData);
       track('tool_use', 'pricing_intel', {
         action: 'query',
-        naics: naicsInput.trim(),
+        mode,
+        query: value,
         categories_returned: payload.data?.laborCategories?.length || 0,
       });
     } catch (err) {
@@ -136,7 +144,7 @@ export default function PricingIntelPanel({ email, tier }: Props) {
     } finally {
       setLoading(false);
     }
-  }, [email, naicsInput, showToast, track]);
+  }, [email, mode, naicsInput, roleInput, showToast, track]);
 
   return (
     <div className="p-6 space-y-6">
@@ -170,24 +178,60 @@ export default function PricingIntelPanel({ email, tier }: Props) {
 
       {/* Query bar — NAICS in, "Run" out. Defaults to user's primary
           NAICS from their profile (fetched on mount). */}
-      <div className="flex items-center gap-3 bg-slate-900/60 border border-slate-800 rounded-lg p-3">
-        <label className="text-sm text-slate-400">NAICS Code:</label>
-        <input
-          type="text"
-          value={naicsInput}
-          onChange={(e) => setNaicsInput(e.target.value)}
-          onKeyDown={(e) => { if (e.key === 'Enter') runQuery(); }}
-          placeholder="541512"
-          className="flex-1 max-w-xs rounded bg-slate-950 border border-slate-700 px-3 py-1.5 text-sm text-white outline-none focus:border-emerald-500"
-        />
-        <button
-          type="button"
-          onClick={runQuery}
-          disabled={loading}
-          className="px-4 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-sm font-medium text-white"
-        >
-          {loading ? 'Running…' : 'Run Pricing Intel'}
-        </button>
+      <div className="bg-slate-900/60 border border-slate-800 rounded-lg p-3 space-y-3">
+        {/* Mode toggle: NAICS (industry) vs Labor Category (the native CALC way). */}
+        <div className="inline-flex rounded-md border border-slate-700 overflow-hidden text-xs">
+          <button type="button" onClick={() => setMode('naics')}
+            className={`px-3 py-1.5 ${mode === 'naics' ? 'bg-emerald-600 text-white' : 'bg-slate-950 text-slate-400 hover:text-white'}`}>
+            By NAICS
+          </button>
+          <button type="button" onClick={() => setMode('role')}
+            className={`px-3 py-1.5 ${mode === 'role' ? 'bg-emerald-600 text-white' : 'bg-slate-950 text-slate-400 hover:text-white'}`}>
+            By Labor Category
+          </button>
+        </div>
+
+        <div className="flex items-center gap-3">
+          {mode === 'naics' ? (
+            <>
+              <label className="text-sm text-slate-400 whitespace-nowrap">NAICS Code:</label>
+              <input
+                type="text"
+                value={naicsInput}
+                onChange={(e) => setNaicsInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') runQuery(); }}
+                placeholder="541512"
+                className="flex-1 max-w-xs rounded bg-slate-950 border border-slate-700 px-3 py-1.5 text-sm text-white outline-none focus:border-emerald-500"
+              />
+            </>
+          ) : (
+            <>
+              <label className="text-sm text-slate-400 whitespace-nowrap">Role(s):</label>
+              <input
+                type="text"
+                value={roleInput}
+                onChange={(e) => setRoleInput(e.target.value)}
+                onKeyDown={(e) => { if (e.key === 'Enter') runQuery(); }}
+                placeholder="Software Engineer, Project Manager"
+                className="flex-1 rounded bg-slate-950 border border-slate-700 px-3 py-1.5 text-sm text-white outline-none focus:border-emerald-500"
+              />
+            </>
+          )}
+          <button
+            type="button"
+            onClick={runQuery}
+            disabled={loading}
+            className="px-4 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-sm font-medium text-white whitespace-nowrap"
+          >
+            {loading ? 'Running…' : 'Run Pricing Intel'}
+          </button>
+        </div>
+
+        {mode === 'role' && (
+          <p className="text-xs text-slate-500">
+            CALC is keyed by job title — search the exact roles you&apos;re staffing for the most accurate rates. Separate multiple with commas.
+          </p>
+        )}
       </div>
 
       {/* Free-tier upgrade teaser. Renders only when the API replies
@@ -230,7 +274,7 @@ export default function PricingIntelPanel({ email, tier }: Props) {
           {/* Headline stats: 4 cards summarizing the report */}
           <div>
             <h2 className="text-lg font-semibold text-white mb-3">
-              {data.naicsCode} — {data.naicsDescription}
+              {data.naicsCode ? `${data.naicsCode} — ${data.naicsDescription}` : data.naicsDescription}
             </h2>
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
               <StatCard
