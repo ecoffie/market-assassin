@@ -18,23 +18,30 @@
   source of truth. Verified live: total=4,796 vehicles over 5,066 rows (270 collapsed),
   page1/page2 zero overlap, GSA IDIQs roll up 18/28 awardees → 1 card. Hard scan
   ceiling `SCAN_ROW_CAP = 20000`. (UI already prefers `vehicles[]` over `contracts[]`.)
-- [ ] **DoD sub-agency collapse — remaining surfaces.** Fixed the demo-critical ones
-  (contacts directory, office-roster facet, TMR open-opp count — all DoDAAC-anchored).
-  Contacts directory got a further fix Jun 29 (`commit 3f555e31`): a target's saved
-  `office_code` now anchors `federal-contacts` on `solicitation_number ILIKE '<DODAAC>%'`
-  instead of the NULL-excluding `office` ILIKE, so a USACE district card surfaces its
-  OWN `@usace.army.mil` POCs (verified live: W912PL→11, W912BV→15) instead of dept-wide
-  DoD. See CLAUDE.md "Office contacts anchored on DoDAAC prefix".
-  Remaining from the audit (`commit 73f107d8` + the count fix): (a) **events count**
-  (`sam_events` has only an `agency` col, no office key — add a DoDAAC/office key or
-  join to opps, then anchor like the opp count); (b) **backfill saved
-  `user_target_list.open_opp_count`** — existing saved agency cards show the OLD
-  inflated snapshot until re-saved (the live TMR number is now correct); (c) the
-  `?agency=` param on `/api/app/opportunities` is unused/dead (harmless — wire or
-  remove); (d) `agency-offices` uses USASpending `awarding_sub_agency` text match
-  (works, but could anchor on office code for precision). Surfaces already correct:
-  award detail/incumbent, recompetes, expiring contracts, TMR total spend (all
-  USASpending sub-agency tier).
+- [x] **DoD sub-agency collapse — remaining surfaces DONE** (Jun 29). All four closed:
+  - (a) **events count** — `target-market-research` counted upcoming `sam_events` by
+    department-level `agency`, so every DoD office inherited the whole-DoD bucket. Now
+    reads `inferred_dodaac` (populated by backfill-event-offices) and, for
+    office-anchored agencies, counts only events on that office's DoDAACs — mirrors the
+    opp anchoring. Verified: 135 distinct office DoDAACs have upcoming events.
+  - (b) **stale `open_opp_count`** — it's a client snapshot frozen at save time, so
+    saved USACE cards kept the inflated dept-wide number. New
+    `/api/admin/backfill-target-opp-counts` (GET=preview, POST?mode=execute, daily cron
+    `0 14 * * *` after the opp delta-sync) recomputes ONLY office-anchored targets
+    (valid 6-char `office_code` → opps by solicitation prefix); dept-level/junk-code
+    rows are left untouched so we never re-inflate. Executed live: W912BV 410→5,
+    W912PL 410→9, plus Navy/Army offices 0→36/32/19; 17 updated, 185 skipped, idempotent.
+  - (c) **`?agency=` on `/api/app/opportunities`** — verified already clean: the param
+    is never read or passed anywhere. Nothing to remove.
+  - (d) **`agency-offices` text match** — left as-is. It's a NAICS drill-down that LISTS
+    offices within a sub-agency (returns `awarding_office_code` already); the
+    `LOWER(awarding_sub_agency) LIKE @needle` keyword is the correct key and works.
+    "Anchor on office code" doesn't apply (the code is the output). Not worth churning.
+  Contacts directory fix (Jun 29, `commit 3f555e31`): a target's saved `office_code`
+  anchors `federal-contacts` on `solicitation_number ILIKE '<DODAAC>%'` (verified live:
+  W912PL→11, W912BV→15 `@usace.army.mil` POCs). See CLAUDE.md "Office contacts anchored
+  on DoDAAC prefix". Surfaces already correct: award detail/incumbent, recompetes,
+  expiring contracts, TMR total spend (all USASpending sub-agency tier).
 - [ ] **Retire legacy `mi_beta_user_settings.naics_codes` column.** Dead: never
   written anymore (Settings stopped writing it in the June consistency pass), only
   read as a stale fallback for un-migrated profiles. It's a `DROP COLUMN` →

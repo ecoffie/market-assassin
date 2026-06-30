@@ -270,6 +270,22 @@ Verified live on prod: W912PL (LA District) → 11 `@usace.army.mil` engineers,
 W912BV (Tulsa) → 15; without the param the same card returns 0 + narrowedToParent.
 (The OSBP small-business contact still prepends by design.)
 
+### DoD office anchoring — events count + open_opp_count backfill (June 29, 2026)
+
+Two more surfaces brought in line with the contacts/opp DoDAAC anchoring:
+- **TMR events count** (`target-market-research/route.ts`): was bucketed by
+  department-level `sam_events.agency`, so every DoD office inherited the whole-DoD
+  event count. Now also reads `inferred_dodaac` (set by `backfill-event-offices`) and,
+  for office-anchored agencies, counts only events on that office's DoDAACs.
+- **`user_target_list.open_opp_count`** is a CLIENT SNAPSHOT frozen at save time, so
+  saved cards kept the old inflated dept-wide number. `/api/admin/backfill-target-opp-counts`
+  (GET=preview, POST?mode=execute, daily cron `0 14 * * *`) recomputes ONLY
+  office-anchored targets (valid 6-char `office_code` → opps by `solicitation_number`
+  prefix). Dept-level / junk-code rows are deliberately LEFT UNTOUCHED — a dept-wide
+  fallback would re-inflate (a "Dept of Defense" card jumping to 8,000+ is the bug, not
+  the fix). Shared `normalizeAgencyKey` + `isValidDodaac` live in
+  `src/lib/gov-contacts/agency-key.ts`. Executed live: W912BV 410→5, W912PL 410→9.
+
 ### LLM cost discipline
 
 `callLLM({ job: 'reasoning' })` → **gpt-4o-mini first** (Claude not scalable at
