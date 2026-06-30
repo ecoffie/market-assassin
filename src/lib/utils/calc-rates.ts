@@ -195,8 +195,15 @@ export interface PricingIntelData {
 
 function computePercentile(sorted: number[], p: number): number {
   if (sorted.length === 0) return 0;
-  const idx = Math.ceil((p / 100) * sorted.length) - 1;
-  return sorted[Math.max(0, Math.min(idx, sorted.length - 1))];
+  if (sorted.length === 1) return sorted[0];
+  // Linear interpolation between ranks (numpy/Excel PERCENTILE.INC method). The old
+  // nearest-rank (Math.ceil) collapsed p25 and p50 to the same value for small
+  // samples — e.g. a 2-record category showed identical 25th %ile and median.
+  const rank = (p / 100) * (sorted.length - 1);
+  const lo = Math.floor(rank);
+  const hi = Math.ceil(rank);
+  if (lo === hi) return sorted[lo];
+  return sorted[lo] + (rank - lo) * (sorted[hi] - sorted[lo]);
 }
 
 /**
