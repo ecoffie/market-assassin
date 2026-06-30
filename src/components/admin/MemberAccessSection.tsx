@@ -118,6 +118,7 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
   const [counts, setCounts] = useState<TierCounts | null>(null);
   const [members, setMembers] = useState<MemberRow[]>([]);
   const [listLoading, setListLoading] = useState(false);
+  const [listOpen, setListOpen] = useState(false); // collapse the member list by default — keeps the section compact
 
   const authHeaders = useCallback(
     (json = false): HeadersInit => {
@@ -260,11 +261,19 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
                 {counts && <span className="ml-1.5 text-xs opacity-70">{counts[t].toLocaleString()}</span>}
               </button>
             ))}
-            <button onClick={() => loadList(tab)} className="ml-auto rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-800">
+            <button
+              onClick={() => setListOpen((o) => !o)}
+              className="ml-auto rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800"
+              aria-expanded={listOpen}
+            >
+              {listOpen ? 'Hide' : 'Show'}{counts ? ` ${counts[tab].toLocaleString()}` : ''} members {listOpen ? '▲' : '▼'}
+            </button>
+            <button onClick={() => loadList(tab)} className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-800">
               Refresh
             </button>
           </div>
 
+          {listOpen && (
           <div className="mt-3 overflow-x-auto rounded-xl border border-slate-800">
             <table className="w-full text-left text-sm">
               <thead className="bg-slate-900/80 text-xs uppercase tracking-wide text-slate-500">
@@ -302,7 +311,10 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
               </tbody>
             </table>
           </div>
-          <p className="mt-1.5 text-[11px] text-slate-500">Showing up to 100 per tier. Use look-up below for a specific email.</p>
+          )}
+          {listOpen && (
+            <p className="mt-1.5 text-[11px] text-slate-500">Showing up to 100 per tier. Use look-up below for a specific email.</p>
+          )}
         </div>
       )}
 
