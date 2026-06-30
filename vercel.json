@@ -27,6 +27,10 @@
       "schedule": "0 */3 * * *"
     },
     {
+      "path": "/api/cron/founders-seats-refresh",
+      "schedule": "30 */6 * * *"
+    },
+    {
       "path": "/api/cron/weekly-alerts?catchup=true",
       "schedule": "0 23 * * 0"
     },

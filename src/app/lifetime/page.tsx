@@ -7,6 +7,7 @@
  */
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import FoundersSeats from '@/components/lifetime/FoundersSeats';
 import {
   FOUNDERS_LIFETIME_CAP,
   FOUNDERS_LIFETIME_PRICE,
@@ -180,6 +181,8 @@ export default function LifetimePage() {
           <p className="text-slate-400 text-sm mb-10">
             Serious federal intelligence. Not a discount tool — a founding seat in the platform.
           </p>
+
+          <FoundersSeats />
 
           <Link
             href={checkoutHref}
