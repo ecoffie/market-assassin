@@ -24,6 +24,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/send-email';
+import { sendRawSMS } from '@/lib/briefings/delivery/sender';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -259,8 +260,26 @@ export async function GET(request: NextRequest) {
     });
   }
 
+  // SMS opt-in: amendment/deadline changes are time-sensitive, so users who
+  // turned on SMS get the same digest as a text. Batch-fetch prefs for just the
+  // affected owners (sms_enabled + phone_number live in the canonical
+  // user_notification_settings table). Owner-attributed like the email/badge.
+  const affectedOwners = Array.from(changesByUser.keys());
+  const smsPrefs = new Map<string, string>(); // email → E.164-ish phone
+  if (affectedOwners.length) {
+    const { data: prefRows } = await supabase
+      .from('user_notification_settings')
+      .select('user_email, sms_enabled, phone_number')
+      .in('user_email', affectedOwners)
+      .eq('sms_enabled', true);
+    for (const r of (prefRows || []) as Array<{ user_email: string; phone_number: string | null }>) {
+      if (r.phone_number) smsPrefs.set(r.user_email, r.phone_number);
+    }
+  }
+
   // Email each affected user a digest.
   let emailsSent = 0;
+  let smsSent = 0;
   for (const [email, items] of changesByUser) {
     const rows = items.map(it => `
       <div style="margin:0 0 14px;padding:12px;border:1px solid #e2e8f0;border-radius:8px">
@@ -286,6 +305,21 @@ export async function GET(request: NextRequest) {
       // Mark those rows emailed.
       await supabase.from('pursuit_change_log').update({ emailed: true }).eq('user_email', email).eq('emailed', false);
     }
+
+    // SMS (opt-in): a short text with the most urgent change(s). The email is the
+    // full digest; the SMS is the nudge. 160-char-friendly — list up to 2 changes,
+    // then a count + deep link.
+    const phone = smsPrefs.get(email);
+    if (phone) {
+      const flat = items.flatMap(it => it.changes.map(c => `${it.title.slice(0, 40)}: ${c.summary}`));
+      const total = flat.length;
+      const head = flat.slice(0, 2).join(' | ');
+      const more = total > 2 ? ` (+${total - 2} more)` : '';
+      const smsBody = `Mindy: ${total} update${total === 1 ? '' : 's'} on your tracked pursuit${total === 1 ? '' : 's'}. ${head}${more}. getmindy.ai/app`;
+      const res = await sendRawSMS(phone, smsBody);
+      if (res.success) smsSent++;
+      else console.warn(`[pursuit-changes] SMS failed for ${email}: ${res.error}`);
+    }
   }
 
   // `remaining` = pursuits not yet touched this run (batch cap) PLUS any
@@ -297,6 +331,7 @@ export async function GET(request: NextRequest) {
     processed,
     changes: totalChanges,
     emailsSent,
+    smsSent,
     remaining: remainingThisRun,
     batchSize: BATCH_SIZE,
   });

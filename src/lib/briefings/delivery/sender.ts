@@ -252,6 +252,44 @@ export async function sendBriefingSMS(
 }
 
 /**
+ * Send a plain-text SMS to one number. The channel-only primitive (no briefing
+ * object, no delivery-logging) that any feature can reuse — e.g. pursuit
+ * amendment alerts. Reuses the same Twilio client + E.164 normalization +
+ * messaging-service-vs-from-number logic as sendBriefingSMS.
+ *
+ * Returns { success, messageId? , error? }. Caller decides what to log.
+ */
+export async function sendRawSMS(
+  phoneNumber: string,
+  body: string,
+): Promise<{ success: boolean; messageId?: string; error?: string }> {
+  const twilioClient = getTwilioClient();
+  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
+  const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
+
+  if (!twilioClient) return { success: false, error: 'SMS service not configured' };
+  if (!fromNumber && !messagingServiceSid) return { success: false, error: 'SMS sender not configured' };
+
+  const normalizedPhone = normalizePhoneNumber(phoneNumber);
+  if (!normalizedPhone) return { success: false, error: 'Invalid phone number format' };
+
+  try {
+    const messageOptions: { body: string; to: string; from?: string; messagingServiceSid?: string } = {
+      body: body.slice(0, 320), // ~2 SMS segments; Twilio concatenates
+      to: normalizedPhone,
+    };
+    if (messagingServiceSid) messageOptions.messagingServiceSid = messagingServiceSid;
+    else messageOptions.from = fromNumber;
+
+    const message = await twilioClient.messages.create(messageOptions);
+    return { success: true, messageId: message.sid };
+  } catch (error) {
+    console.error('[sendRawSMS] error', error);
+    return { success: false, error: String(error) };
+  }
+}
+
+/**
  * Normalize phone number to E.164 format
  * Handles common US formats: (555) 123-4567, 555-123-4567, 5551234567, +15551234567
  */

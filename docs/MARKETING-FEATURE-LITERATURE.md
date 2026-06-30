@@ -2794,3 +2794,34 @@ profile setup.*
 pscSuggestions from USASpending). Verified: "drones" → 336411 Aircraft Mfg
 ($68.9M), 334511 Navigation/Guidance ($41.6M) + PSC 1550 Unmanned Aircraft.
 Manual NAICS/PSC/Keyword fields collapse by default. Typecheck + full build pass.
+
+---
+
+## SMS alerts when your tracked pursuit changes (amendments / deadline moves)
+
+**What it does (plain English):** When you're tracking a federal opportunity and
+the agency changes it — moves the response deadline, posts an amendment, cancels
+it, or awards it — Mindy can now **text you**, not just email you. Turn on SMS in
+your notification settings, add your phone, and the moment Mindy detects a change
+on a pursuit you're tracking/pursuing/bidding, you get a short text:
+*"Mindy: 2 updates on your tracked pursuits. [Title]: Deadline moved May 12 → May
+19 | [Title]: Amendment posted. getmindy.ai/app"*
+
+**Why it matters:** Amendment and deadline changes are time-sensitive — a moved
+deadline you find out about a day late can cost you the bid. Email is easy to miss;
+a text isn't. This is the "don't lose a bid to a change you didn't see" channel.
+Built on the existing pursuit-change detection (it already emails a digest) — the
+SMS is the same owner-attributed, deduped alert delivered where you'll actually
+see it. Opt-in; the full digest still comes by email.
+
+**SEO angle:** *federal contract amendment SMS alert, RFP deadline change text
+notification, SAM.gov pursuit change alert, never miss a solicitation amendment.*
+
+**Proof:** `src/app/api/cron/pursuit-changes/route.ts` sends an SMS alongside the
+email digest when the owner has `sms_enabled` + `phone_number` in
+`user_notification_settings`. New reusable primitive
+`sendRawSMS(phone, body)` in `src/lib/briefings/delivery/sender.ts` (reuses the
+Twilio client + E.164 normalization + messaging-service logic from briefing SMS).
+Owner-attributed + deduped via the existing `changesByUser` map; response reports
+`smsSent`. Fires via the dispatcher (`pursuit-changes` cron_jobs row, `*/15`) —
+zero new vercel.json crons (Cron Dispatcher Phase 2). Typecheck: 0 errors.
