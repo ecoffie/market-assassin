@@ -42,8 +42,11 @@
   W912PL→11, W912BV→15 `@usace.army.mil` POCs). See CLAUDE.md "Office contacts anchored
   on DoDAAC prefix". Surfaces already correct: award detail/incumbent, recompetes,
   expiring contracts, TMR total spend (all USASpending sub-agency tier).
-- [~] **Retire legacy `mi_beta_user_settings.naics_codes` column** — code shipped,
-  AWAITING Eric to run the DDL (`commit 62088ac3`, Jun 29). Audit (Explore) confirmed
+- [x] **Retire legacy `mi_beta_user_settings.naics_codes` column** — DONE Jun 29.
+  Code shipped (`commit 62088ac3`) + Eric ran the DDL in Supabase; verified live:
+  column dropped (`42703 does not exist`), biznlync@gmail.com's 21 NAICS restored to
+  the canonical table, mi_beta_user_settings otherwise intact, app loads 200. Audit
+  (Explore) confirmed
   the column is read-DEAD (both Settings panels read `user_notification_settings`, NOT
   mi_beta) — the todo's "stale fallback" was inaccurate, there's no fallback read at
   all. Removed the two remaining references: the `debug-profile` NAICS-scrub write-map
