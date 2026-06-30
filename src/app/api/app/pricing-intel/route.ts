@@ -10,19 +10,21 @@
  * payload matching the Mindy Analyst pattern (c9004f4).
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { fetchPricingIntel } from '@/lib/utils/calc-rates';
+import { fetchPricingIntel, fetchPricingIntelByKeywords } from '@/lib/utils/calc-rates';
 import { verifyMIAccess } from '@/lib/api-auth';
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
   const email = url.searchParams.get('email');
   const naics = url.searchParams.get('naics');
+  // Native CALC search: query labor categories directly by role keyword(s).
+  const keyword = url.searchParams.get('keyword');
 
   if (!email) {
     return NextResponse.json({ error: 'email parameter required' }, { status: 400 });
   }
-  if (!naics) {
-    return NextResponse.json({ error: 'naics parameter required' }, { status: 400 });
+  if (!naics && !keyword) {
+    return NextResponse.json({ error: 'naics or keyword parameter required' }, { status: 400 });
   }
 
   // Pro gate. verifyMIAccess returns { tier, email, isStaff, ... } —
@@ -44,12 +46,16 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const data = await fetchPricingIntel(naics);
+    const data = keyword
+      ? await fetchPricingIntelByKeywords(keyword)
+      : await fetchPricingIntel(naics!);
     if (!data || data.laborCategories.length === 0) {
       return NextResponse.json(
         {
           success: false,
-          message: 'No pricing data found for this NAICS code. Try a broader or sibling code (e.g. 541512 → 541511).',
+          message: keyword
+            ? `No CALC rates found for "${keyword}". Try a broader role title (e.g. "Engineer" instead of "Senior Systems Engineer III").`
+            : 'No pricing data found for this NAICS code. Try a broader or sibling code (e.g. 541512 → 541511).',
         },
         { status: 404 }
       );
