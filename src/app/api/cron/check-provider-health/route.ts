@@ -51,8 +51,30 @@ export async function GET(request: NextRequest) {
     || pw === (process.env.ADMIN_PASSWORD);
   if (!ok) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });
 
+  // GSA CALC — special check: it returns x-ratelimit-remaining, so we report
+  // QUOTA HEADROOM (this is how we see Pricing Intel usage ramping). 1,000/day;
+  // a single Pricing Intel search burns ~70 calls, so 'degraded' below ~150 left.
+  async function checkCalc(): Promise<Check> {
+    try {
+      const start = Date.now();
+      const res = await fetch('https://api.gsa.gov/acquisition/calc/v3/api/ceilingrates/?keyword=engineer', { signal: AbortSignal.timeout(10000) });
+      const latency = Date.now() - start;
+      const remaining = Number(res.headers.get('x-ratelimit-remaining'));
+      const limit = Number(res.headers.get('x-ratelimit-limit'));
+      if (res.status === 429) return { provider: 'gsa_calc', status: 'down', latency, error: 'HTTP 429 — daily CALC quota EXHAUSTED' };
+      if (!res.ok) return { provider: 'gsa_calc', status: 'down', latency, error: `HTTP ${res.status}` };
+      if (Number.isFinite(remaining) && remaining < 150) {
+        return { provider: 'gsa_calc', status: 'degraded', latency, error: `Only ${remaining}/${limit} CALC requests left today (~${Math.floor(remaining / 70)} searches) — usage ramping, consider caching aggregations` };
+      }
+      return { provider: 'gsa_calc', status: 'healthy', latency, error: Number.isFinite(remaining) ? `${remaining}/${limit} CALC requests left today` : undefined };
+    } catch (e) {
+      return { provider: 'gsa_calc', status: 'down', error: e instanceof Error ? e.message.slice(0, 120) : 'fetch failed' };
+    }
+  }
+
   const samKey = getRotatedSAMKey();
   const checks = await Promise.all([
+    checkCalc(),
     ping('groq', process.env.GROQ_API_KEY, () =>
       fetch('https://api.groq.com/openai/v1/models', { headers: { Authorization: `Bearer ${process.env.GROQ_API_KEY}` } })),
     ping('openai', process.env.OPENAI_API_KEY, () =>
