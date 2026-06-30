@@ -6,6 +6,15 @@ import { createSecureAccessUrl } from '@/lib/access-links';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const REMINDER_COOLDOWN_DAYS = 14;
+
+// The 5-code starter set seeded by bulk enroll (seed-alerts). Having ONLY these
+// means the user never picked their own industry — they still need a real profile.
+// Mirrors the dashboard's hasCustomNaics so "needs profile" means the same thing everywhere.
+const DEFAULT_NAICS_SET = new Set(['541512', '541611', '541330', '541990', '561210']);
+function hasCustomProfile(naics: string[], keywords: string[], agencies: string[]): boolean {
+  const hasCustomNaics = naics.length > 0 && !naics.every((c) => DEFAULT_NAICS_SET.has(c));
+  return hasCustomNaics || keywords.length > 0 || agencies.length > 0;
+}
 const CURSOR_KEY = 'admin:profile-reminder:cursor';
 const LAST_RUN_KEY = 'admin:profile-reminder:last-run';
 
@@ -65,7 +74,10 @@ export async function POST(request: NextRequest) {
       .from('user_notification_settings')
       .select('user_email, naics_codes, keywords, agencies, created_at, updated_at')
       .eq('is_active', true)
-      .eq('briefings_enabled', true)
+      // NOTE: do NOT gate on briefings_enabled — bulk-enrolled (bootcamp) users were
+      // signed up for alerts, not briefings, so that flag is false for ~99% of the
+      // real "needs profile" audience. Gate on is_active only; the cohort that needs
+      // a profile is determined by NAICS below.
       .range(from, from + pageSize - 1);
 
     if (fetchError) {
@@ -76,12 +88,14 @@ export async function POST(request: NextRequest) {
     if (!data || data.length < pageSize) break;
   }
 
-  // Filter to only users with empty profiles (no NAICS, keywords, or agencies)
+  // Needs a profile = no CUSTOM signal. That means empty profile OR only the seeded
+  // default NAICS (bulk-enrolled users were stamped with defaults, so "empty" alone
+  // missed them). Matches the dashboard's hasCustomNaics definition.
   const usersNeedingSetup = (emptyProfileUsers || []).filter(u => {
     const naics = u.naics_codes || [];
     const keywords = u.keywords || [];
     const agencies = u.agencies || [];
-    return naics.length === 0 && keywords.length === 0 && agencies.length === 0;
+    return !hasCustomProfile(naics, keywords, agencies);
   });
 
   const cooldownStartedAt = new Date(Date.now() - REMINDER_COOLDOWN_DAYS * 24 * 60 * 60 * 1000).toISOString();
