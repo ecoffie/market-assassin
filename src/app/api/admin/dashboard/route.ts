@@ -600,16 +600,16 @@ async function getUserHealth() {
         const hasBusinessType = user.business_type && user.business_type.trim() !== '';
         const normalizedEmail = user.user_email.toLowerCase();
 
-        // CUSTOM = NAICS array isn't exactly the 5-code default set. (Eric: keep the
-        // original looser count for continuity — display-only, no send impact. The
-        // tighter "exclude sweeps + healthcare default" definition is available via
-        // the shape diagnostic / zero-alert-diagnosis endpoint when we want the
-        // honest activation number.)
+        // CONFIGURED = has a real profile by the SAME test the card + GHL reignite
+        // drip use: custom NAICS (beyond the 5 defaults) OR any keywords OR any
+        // agencies. Counting NAICS alone overcounted "unconfigured" by ~3,485 users
+        // who set keywords/agencies but kept default NAICS — they DO have a profile.
         const hasOnlyDefaults = hasNaics &&
           naicsCodes.every((code: string) => DEFAULT_NAICS_SET.has(code));
         const hasCustomNaics = hasNaics && !hasOnlyDefaults;
+        const configured = hasCustomProfile(user.naics_codes, user.keywords, user.agencies);
 
-        if (hasCustomNaics) {
+        if (configured) {
           health.naicsConfigured++;
         } else if (hasOnlyDefaults) {
           health.defaultNaicsOnly++;
@@ -1200,6 +1200,8 @@ async function getMiGrowthMetrics() {
       fetchAllRows<{
         user_email: string;
         naics_codes?: string[] | null;
+        keywords?: string[] | null;
+        agencies?: string[] | null;
         alerts_enabled?: boolean | null;
         alert_frequency?: string | null;
         briefings_enabled?: boolean | null;
@@ -1209,7 +1211,7 @@ async function getMiGrowthMetrics() {
       }>((from, to) =>
         supabase
           .from('user_notification_settings')
-          .select('user_email, naics_codes, alerts_enabled, alert_frequency, briefings_enabled, is_active, created_at, updated_at')
+          .select('user_email, naics_codes, keywords, agencies, alerts_enabled, alert_frequency, briefings_enabled, is_active, created_at, updated_at')
           .range(from, to)
       ),
       fetchAllRows<{
@@ -1263,8 +1265,9 @@ async function getMiGrowthMetrics() {
     for (const user of settings) {
       const email = user.user_email.toLowerCase();
       const active = user.is_active !== false;
-      const customProfile = hasCustomNaics(user.naics_codes);
-      const defaultProfile = isDefaultNaicsOnly(user.naics_codes);
+      // Same profile test as the card + GHL drip: NAICS OR keywords OR agencies.
+      const customProfile = hasCustomProfile(user.naics_codes, user.keywords, user.agencies);
+      const defaultProfile = !customProfile && isDefaultNaicsOnly(user.naics_codes);
       const createdAt = user.created_at ? new Date(user.created_at).getTime() : 0;
       const updatedAt = user.updated_at ? new Date(user.updated_at).getTime() : 0;
 
@@ -2645,7 +2648,7 @@ async function getSystemAlerts(today: string) {
   if (unconfiguredPercent > 30 && !profileReminderQueueComplete) {
     alerts.push({
       level: 'warning',
-      message: `${unconfiguredPercent}% of users (${userHealth.totalUsers - userHealth.naicsConfigured}) have no NAICS configured`
+      message: `${unconfiguredPercent}% of users (${userHealth.totalUsers - userHealth.naicsConfigured}) have no profile configured (no custom NAICS, keywords, or agencies)`
     });
   }
 
