@@ -2076,8 +2076,11 @@ export default function AdminDashboard() {
             </div>
           </div>
 
-          {/* Bootcamp Rollout */}
-          {data.bootcampRollout && (
+          {/* Bootcamp Rollout — only while a rollout is actually active (invites
+              still going out). The May 2026 rollout finished (0 remaining), so
+              this section hides itself instead of showing a completed campaign
+              as if it were ongoing. Auto-reappears if a new rollout starts. */}
+          {data.bootcampRollout && data.bootcampRollout.invitationsRemaining > 0 && (
             <div id="bootcamp-rollout" className="scroll-mt-6 bg-gray-800 rounded-lg p-6">
               <div className="flex justify-between items-start gap-4 mb-5">
                 <div>
