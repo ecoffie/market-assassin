@@ -225,7 +225,14 @@ async function getBootcampRollout() {
     profileCompletionRate: '0%',
     readyForAlerts: 0,
     conversionRate: '0%',
-    lastInvitationSent: null as string | null
+    lastInvitationSent: null as string | null,
+    // Verified classification from the 2026-06-30 cleanup: the cohort was split
+    // by treatment_type. This is the source of truth for who's activated vs still
+    // pending setup — more precise than the custom-NAICS heuristic above.
+    treatmentAlerts: 0,      // activated: receiving alerts
+    treatmentBriefings: 0,   // activated: receiving briefings
+    treatmentNeedsSetup: 0,  // still pending profile setup
+    treatmentActivated: 0    // alerts + briefings
   };
 
   try {
@@ -298,7 +305,13 @@ async function getBootcampRollout() {
         if (hasCustomNaics && user.alerts_enabled && user.treatment_type === 'alerts') {
           rollout.readyForAlerts++;
         }
+
+        // Verified treatment_type buckets (2026-06-30 cleanup classification).
+        if (user.treatment_type === 'alerts') rollout.treatmentAlerts++;
+        else if (user.treatment_type === 'briefings') rollout.treatmentBriefings++;
+        else if (user.treatment_type === 'needs_setup') rollout.treatmentNeedsSetup++;
       }
+      rollout.treatmentActivated = rollout.treatmentAlerts + rollout.treatmentBriefings;
 
       rollout.invitationsRemaining = Math.max(rollout.totalAttendees - rollout.invitationsSent, 0);
       rollout.profileCompletionRate = rollout.invitationsSent > 0
