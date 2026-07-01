@@ -2825,3 +2825,27 @@ Twilio client + E.164 normalization + messaging-service logic from briefing SMS)
 Owner-attributed + deduped via the existing `changesByUser` map; response reports
 `smsSent`. Fires via the dispatcher (`pursuit-changes` cron_jobs row, `*/15`) —
 zero new vercel.json crons (Cron Dispatcher Phase 2). Typecheck: 0 errors.
+
+---
+
+## SMS opt-in now in Settings (turn on pursuit-change texts)
+
+**What it does (plain English):** The SMS amendment alerts now have a switch.
+Settings → notifications has a "Text me when a tracked pursuit changes" toggle;
+flip it on, enter your phone, hit save. From then on, when Mindy spots an
+amendment / deadline move / cancellation on a pursuit you're tracking, you get a
+text — no more digging through email for the change that decides your bid.
+
+**Why it matters:** The backend shipped first; this is the surface that makes it
+reachable. Opt-in and self-contained — the SMS toggle saves on its own, so a phone
+typo never blocks saving your NAICS/keywords (and vice-versa). Phone numbers are
+validated + normalized to E.164 server-side before any text is sent.
+
+**SEO angle:** *enable SMS contract alerts, GovCon text notifications setup, phone
+alerts for federal opportunity changes.*
+
+**Proof:** `UnifiedSettingsPanel.tsx` renders the toggle + phone field under Email
+Frequency; loads current state from GET /api/briefings/preferences; saves via POST
+(server validates/normalizes the phone, clears it on disable). Reaches the
+pursuit-changes SMS path shipped in the prior commit. Typecheck 0 errors; full
+production build passes.

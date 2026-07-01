@@ -48,6 +48,12 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
   // True when these Settings are for a coach-managed CLIENT (synthetic
   // @clients.getmindy.ai profile) — gates the "Client alert email" field.
   const [isClientProfile, setIsClientProfile] = useState(false);
+  // SMS opt-in (pursuit amendment/change alerts). Separate from the targeting
+  // form — lives on user_notification_settings via /api/briefings/preferences.
+  const [smsEnabled, setSmsEnabled] = useState(false);
+  const [smsPhone, setSmsPhone] = useState('');
+  const [smsSaving, setSmsSaving] = useState(false);
+  const [smsMsg, setSmsMsg] = useState<string | null>(null);
   // Styled "Start over?" confirm (replaces native window.confirm).
   const [showResetConfirm, setShowResetConfirm] = useState(false);
   // Unified "describe what you do → codes" box (the Market Research pattern):
@@ -89,7 +95,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
       // user_notification_settings.alert_frequency, surfaced via the alerts
       // preferences endpoint — read it there too so the dropdown reflects
       // the value that actually controls the daily-alerts cron.
-      const [workspaceRes, prefsRes, targetsRes] = await Promise.all([
+      const [workspaceRes, prefsRes, targetsRes, briefingPrefsRes] = await Promise.all([
         fetch(`/api/app/workspace?email=${encodeURIComponent(email)}`, {
           headers: getAuthHeaders(),
         }),
@@ -100,10 +106,19 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
         fetch(`/api/app/target-list?email=${encodeURIComponent(email)}`, {
           headers: getAuthHeaders(),
         }).catch(() => null),
+        // SMS opt-in state (sms_enabled + phone_number).
+        fetch(`/api/briefings/preferences?email=${encodeURIComponent(email)}`, {
+          headers: getAuthHeaders(),
+        }).catch(() => null),
       ]);
       try {
         const tj = targetsRes && targetsRes.ok ? await targetsRes.json() : null;
         setTargetListCount(Number(tj?.count) || (Array.isArray(tj?.targets) ? tj.targets.length : 0));
+      } catch { /* non-fatal */ }
+      try {
+        const bj = briefingPrefsRes && briefingPrefsRes.ok ? await briefingPrefsRes.json() : null;
+        setSmsEnabled(Boolean(bj?.preferences?.sms_enabled));
+        setSmsPhone(bj?.preferences?.phone_number || '');
       } catch { /* non-fatal */ }
 
       const data = await workspaceRes.json();
@@ -220,6 +235,39 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
     const next = cur.includes(code) ? cur.filter((c) => c !== code) : [...cur, code];
     setForm((f) => ({ ...f, naics_codes: next.join(', ') }));
   }
+
+  // SMS opt-in save — its own small write to /api/briefings/preferences
+  // (user_notification_settings.sms_enabled + phone_number). Decoupled from the
+  // targeting save so a phone typo can't block a profile save and vice-versa.
+  const saveSms = async () => {
+    if (!email) return;
+    setSmsSaving(true);
+    setSmsMsg(null);
+    try {
+      const phone = smsPhone.trim();
+      if (smsEnabled && !phone) {
+        setSmsMsg('Add a phone number to receive SMS alerts.');
+        setSmsSaving(false);
+        return;
+      }
+      const res = await fetch('/api/briefings/preferences', {
+        method: 'POST',
+        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ email, sms_enabled: smsEnabled, phone_number: smsEnabled ? phone : null }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.success !== false) {
+        if (data?.preferences?.phone_number) setSmsPhone(data.preferences.phone_number);
+        setSmsMsg(smsEnabled ? '✓ SMS alerts on — you’ll get a text when a tracked pursuit changes.' : '✓ SMS alerts off.');
+      } else {
+        setSmsMsg(data?.error || 'Could not save SMS settings. Check the phone number.');
+      }
+    } catch {
+      setSmsMsg('Could not save SMS settings.');
+    } finally {
+      setSmsSaving(false);
+    }
+  };
 
   const saveSettings = async (markComplete = form.onboarding_completed) => {
     if (!email) return;
@@ -481,6 +529,47 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                   <option value="paused">Paused</option>
                 </select>
               </label>
+
+              {/* SMS alerts — time-sensitive pursuit changes (amendments,
+                  deadline moves, cancels). Opt-in; own save so it never blocks
+                  a profile save. */}
+              <div className="md:col-span-2 rounded-lg border border-slate-700 bg-slate-800/40 p-4">
+                <label className="flex items-start gap-3 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={smsEnabled}
+                    onChange={(e) => { setSmsEnabled(e.target.checked); setSmsMsg(null); }}
+                    className="mt-1 h-4 w-4 accent-emerald-500"
+                  />
+                  <span>
+                    <span className="block text-sm font-medium text-white">Text me when a tracked pursuit changes</span>
+                    <span className="block text-xs text-slate-400 mt-0.5">
+                      Amendments, deadline moves, cancellations — the time-sensitive stuff. You still get the full email digest.
+                    </span>
+                  </span>
+                </label>
+                {smsEnabled && (
+                  <input
+                    type="tel"
+                    value={smsPhone}
+                    onChange={(e) => { setSmsPhone(e.target.value); setSmsMsg(null); }}
+                    placeholder="(555) 123-4567"
+                    className="mt-3 w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white outline-none focus:border-emerald-500"
+                  />
+                )}
+                <div className="mt-3 flex items-center gap-3">
+                  <button
+                    type="button"
+                    onClick={saveSms}
+                    disabled={smsSaving}
+                    className="px-3 py-1.5 text-sm rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium disabled:opacity-50"
+                  >
+                    {smsSaving ? 'Saving…' : 'Save SMS settings'}
+                  </button>
+                  {smsMsg && <span className="text-xs text-slate-300">{smsMsg}</span>}
+                </div>
+              </div>
+
               {isClientProfile && (
                 <label className="block md:col-span-2">
                   <span className="block text-sm text-slate-400 mb-1">Client Alert Email</span>
