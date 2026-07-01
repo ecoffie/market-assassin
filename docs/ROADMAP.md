@@ -36,9 +36,11 @@ v1.1 #4 Product Tour, v2.0 #F SOW archive backfill, **v2.0 #B "find work like mi
 **Net-new builds (real infra/scope):** v1.1 #2 Content Reaper weave · #5 dark mode ·
 #6 amendments-in-alerts · v2.0 #A Email-in · #C/#D scrapers · #E contact-role enrichment.
 
-**⚠️ Highest-priority non-feature:** **Cron Dispatcher Phase 2** — `vercel.json` is at
-~55 native crons (cap 100); only ~2 jobs run via the dispatcher. This is a latent
-ship-blocker, not a feature. Treat as P0.
+**✅ Cron Dispatcher Phase 2 — SHIPPED (2026-06-30/07-01).** `vercel.json` cut from
+~55 native crons to **5** (3 dispatch ticks + watchdog + founders-seats-refresh). Added
+the **minute tick** (`/api/cron/dispatch?tick=minute`, `* * * * *`) and migrated the 4
+send pipelines (daily-alerts, weekly-alerts, send-briefings-fast, send-weekly-fast) into
+`cron_jobs`. The 100-cron cap is no longer a ship-blocker. See memory `cron_dispatcher_phase2`.
 
 ---
 
@@ -153,7 +155,7 @@ These have full PRDs (phasing/risks/success criteria worked out) — "open the d
 | Pri | Item | Status | PRD |
 |---|---|---|---|
 | **P0** | **DoD Forecast Coverage — Option A** (component LRAF scrapers into `agency_forecasts`). Same work as v2.0 #D. | 🟡 PARTIAL — `dod-multi-source.ts` scaffolded, file-import stubbed. Option B interim shipped. | `docs/PRD-dod-forecast-scrapers.md` |
-| **P0** | **Cron Dispatcher — Phase 2** — migrate remaining native crons onto the dispatcher; load-bearing send pipelines LAST. Unblocks scale past the Vercel 100-cron cap. | ⬜ NOT STARTED — **dispatcher infra is live but only ~2 jobs registered in `cron_jobs`; `vercel.json` still holds ~55 native crons (grew, not shrank).** Real ship-blocker: 45 crons from the cap, and one new `vercel.json` cron blocks the whole deploy. | `docs/PRD-cron-dispatcher.md` |
+| **P0** | **Cron Dispatcher — Phase 2** — migrate remaining native crons onto the dispatcher; load-bearing send pipelines LAST. Unblocks scale past the Vercel 100-cron cap. | ✅ SHIPPED (2026-06-30/07-01) — minute tick added; 4 send pipelines migrated to `cron_jobs`; `vercel.json` 55→5. Cap no longer a blocker. Also shipped: compliant double-opt-in **SMS pursuit-change alerts** via GHL + STOP self-heal. | `docs/PRD-cron-dispatcher.md` |
 | **P1** | Light/dark mode (also v1.1 #5) · Newcomer clarity (OG previews on last public pages) · Real gov-contact roles (v2.0 #E — needs a commercial-enrichment buy decision) | ⬜ open | — |
 
 ---

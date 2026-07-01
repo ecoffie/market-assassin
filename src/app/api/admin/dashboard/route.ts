@@ -9,6 +9,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
+import { hasCustomProfile } from '@/lib/ghl/tag-sync';
 import fs from 'fs';
 import path from 'path';
 
@@ -226,13 +227,19 @@ async function getBootcampRollout() {
     readyForAlerts: 0,
     conversionRate: '0%',
     lastInvitationSent: null as string | null,
-    // Verified classification from the 2026-06-30 cleanup: the cohort was split
-    // by treatment_type. This is the source of truth for who's activated vs still
-    // pending setup — more precise than the custom-NAICS heuristic above.
-    treatmentAlerts: 0,      // activated: receiving alerts
-    treatmentBriefings: 0,   // activated: receiving briefings
-    treatmentNeedsSetup: 0,  // still pending profile setup
-    treatmentActivated: 0    // alerts + briefings
+    // treatment_type buckets from the 2026-06-30 cleanup. NOTE: this label went
+    // stale — many needs_setup users have since configured a profile. Kept for
+    // reference/debug, but the card leads with the *real* content test below.
+    treatmentAlerts: 0,      // labeled: receiving alerts
+    treatmentBriefings: 0,   // labeled: receiving briefings
+    treatmentNeedsSetup: 0,  // labeled: pending setup (may be stale)
+    treatmentActivated: 0,   // alerts + briefings
+    // Source of truth = actual profile content (same hasCustomProfile() test the
+    // GHL reignite drip uses), so the dashboard and the campaign agree on who
+    // genuinely still needs setup.
+    configuredReal: 0,       // has a real profile (custom NAICS / keywords / agencies)
+    needsSetupReal: 0,       // empty profile — the true reignite audience
+    labelStale: 0            // treatment_type=needs_setup but actually configured
   };
 
   try {
@@ -240,6 +247,8 @@ async function getBootcampRollout() {
     let bootcampUsers: Array<{
       user_email: string;
       naics_codes?: string[] | null;
+      keywords?: string[] | null;
+      agencies?: string[] | null;
       alerts_enabled?: boolean | null;
       treatment_type?: string | null;
       invitation_sent_at?: string | null;
@@ -260,7 +269,7 @@ async function getBootcampRollout() {
         const chunk = attendeeEmails.slice(i, i + 500);
         const { data, error } = await supabase
           .from('user_notification_settings')
-          .select('user_email, naics_codes, alerts_enabled, treatment_type, invitation_sent_at, invitation_source')
+          .select('user_email, naics_codes, keywords, agencies, alerts_enabled, treatment_type, invitation_sent_at, invitation_source')
           .in('user_email', chunk);
 
         if (error) throw error;
@@ -306,10 +315,19 @@ async function getBootcampRollout() {
           rollout.readyForAlerts++;
         }
 
-        // Verified treatment_type buckets (2026-06-30 cleanup classification).
+        // treatment_type buckets (2026-06-30 cleanup label — may be stale).
         if (user.treatment_type === 'alerts') rollout.treatmentAlerts++;
         else if (user.treatment_type === 'briefings') rollout.treatmentBriefings++;
         else if (user.treatment_type === 'needs_setup') rollout.treatmentNeedsSetup++;
+
+        // Real profile-content test (matches the GHL reignite audience).
+        const configured = hasCustomProfile(user.naics_codes, user.keywords, user.agencies);
+        if (configured) {
+          rollout.configuredReal++;
+          if (user.treatment_type === 'needs_setup') rollout.labelStale++;
+        } else {
+          rollout.needsSetupReal++;
+        }
       }
       rollout.treatmentActivated = rollout.treatmentAlerts + rollout.treatmentBriefings;
 

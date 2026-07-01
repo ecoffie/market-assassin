@@ -242,6 +242,9 @@ interface DashboardData {
     treatmentBriefings?: number;
     treatmentNeedsSetup?: number;
     treatmentActivated?: number;
+    configuredReal?: number;
+    needsSetupReal?: number;
+    labelStale?: number;
   };
   systemAlerts: Array<{ level: 'critical' | 'warning' | 'info'; message: string }>;
   profileReminderLastRun?: ProfileReminderRun | null;
@@ -2080,53 +2083,55 @@ export default function AdminDashboard() {
             const bc = data.bootcampRollout;
             const rolloutDone = bc.invitationsRemaining === 0;
             const cohort = bc.totalBootcampUsers;
-            // Prefer the VERIFIED treatment_type classification from the 2026-06-30
-            // cleanup. Fall back to the custom-NAICS heuristic only if the API
-            // response predates the buckets.
-            const hasVerified = typeof bc.treatmentNeedsSetup === 'number';
-            const needsSetup = hasVerified ? bc.treatmentNeedsSetup! : Math.max(cohort - bc.profilesCompleted, 0);
-            const activated = hasVerified ? (bc.treatmentActivated ?? 0) : bc.readyForAlerts;
+            // Source of truth = REAL profile content (hasCustomProfile), the same
+            // test the GHL reignite drip uses — so the dashboard and the campaign
+            // agree. The treatment_type label went stale after 6/30 (many labeled
+            // needs_setup have since configured), so we don't lead with it.
+            const hasReal = typeof bc.needsSetupReal === 'number';
+            const needsSetup = hasReal ? bc.needsSetupReal! : Math.max(cohort - bc.profilesCompleted, 0);
+            const activated = hasReal ? (bc.configuredReal ?? 0) : bc.readyForAlerts;
             const activatedPct = cohort > 0 ? Math.round((activated / cohort) * 100) : 0;
+            const staleLabel = bc.labelStale ?? 0;
             return (
             <div id="bootcamp-rollout" className="scroll-mt-6 bg-gray-800 rounded-lg p-6">
               <div className="flex justify-between items-start gap-4 mb-5">
                 <div>
                   <h2 className="text-lg font-semibold text-white">Profile Setup</h2>
                   <p className="mt-1 text-xs text-gray-500">
-                    Bootcamp cohort, classified by treatment_type (verified 6/30 cleanup). Reignited via GHL + weekly reminder cron.
+                    Bootcamp cohort by actual profile content (matches the GHL reignite audience). Worked by the drip + weekly reminder cron.
                   </p>
                 </div>
                 <span className="shrink-0 text-xs text-emerald-400 bg-emerald-900/30 px-2 py-1 rounded">
                   {cohort.toLocaleString()} cohort
                 </span>
               </div>
-              {/* Lead metric = the ONGOING lever: how many still need setup (what the reignite drip works). */}
+              {/* Lead metric = who GENUINELY still needs setup, by real profile content. */}
               <div className="mb-5">
                 <p className="text-5xl font-bold text-yellow-400">{needsSetup.toLocaleString()}</p>
                 <p className="mt-1 text-sm text-gray-400">
                   still need setup{cohort > 0 ? ` (${Math.round((needsSetup / cohort) * 100)}% of cohort)` : ''}
-                  {hasVerified && <span className="text-gray-600"> · treatment_type=needs_setup</span>}
+                  {hasReal && <span className="text-gray-600"> · empty profile = reignite audience</span>}
                 </p>
               </div>
               <div className="space-y-3">
                 <div className="flex justify-between items-center">
-                  <span className="text-gray-400">Activated (set up)</span>
+                  <span className="text-gray-400">Configured (real profile)</span>
                   <div className="flex items-center gap-2">
                     <span className="text-emerald-400 font-mono">{activated.toLocaleString()}</span>
                     <span className="text-gray-500 text-sm">({activatedPct}%)</span>
                   </div>
                 </div>
-                {hasVerified && (
-                  <>
-                    <div className="flex justify-between items-center pl-4">
-                      <span className="text-gray-500 text-sm">↳ getting alerts</span>
-                      <span className="text-gray-300 font-mono text-sm">{(bc.treatmentAlerts ?? 0).toLocaleString()}</span>
-                    </div>
-                    <div className="flex justify-between items-center pl-4">
-                      <span className="text-gray-500 text-sm">↳ getting briefings</span>
-                      <span className="text-gray-300 font-mono text-sm">{(bc.treatmentBriefings ?? 0).toLocaleString()}</span>
-                    </div>
-                  </>
+                {hasReal && staleLabel > 0 && (
+                  <div className="flex justify-between items-center pl-4">
+                    <span className="text-gray-500 text-sm">↳ mislabeled needs_setup (stale)</span>
+                    <span className="text-amber-300/80 font-mono text-sm">{staleLabel.toLocaleString()}</span>
+                  </div>
+                )}
+                {hasReal && typeof bc.treatmentNeedsSetup === 'number' && (
+                  <div className="flex justify-between items-center">
+                    <span className="text-gray-500 text-sm">treatment_type=needs_setup (stale label)</span>
+                    <span className="text-gray-500 font-mono text-sm">{bc.treatmentNeedsSetup.toLocaleString()}</span>
+                  </div>
                 )}
                 <div className="pt-2 border-t border-gray-700 flex justify-between items-center">
                   <span className="text-gray-400">Invite rollout</span>
@@ -2145,9 +2150,9 @@ export default function AdminDashboard() {
                   </div>
                 )}
                 <p className="text-xs text-gray-500 pt-2 border-t border-gray-700">
-                  6/30 cleanup split the {cohort.toLocaleString()} cohort by treatment_type. The {needsSetup.toLocaleString()} needs_setup
-                  users are worked by the GHL reignite drip (<span className="text-gray-400">mindy-profile-incomplete</span> tag) and the
-                  weekly <span className="text-gray-400">profile-completion-reminders</span> cron. Setup moves them into &quot;activated.&quot;
+                  {needsSetup.toLocaleString()} empty-profile users are the reignite audience (GHL <span className="text-gray-400">mindy-profile-incomplete</span> tag
+                  + weekly <span className="text-gray-400">profile-completion-reminders</span> cron).
+                  {staleLabel > 0 && <> The 6/30 treatment_type label is stale — {staleLabel.toLocaleString()} still tagged needs_setup have actually configured; re-run the sync to refresh.</>}
                 </p>
               </div>
             </div>
