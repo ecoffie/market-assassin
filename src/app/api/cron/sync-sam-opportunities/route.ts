@@ -577,10 +577,30 @@ export async function GET(request: NextRequest) {
         .eq('id', syncRunId);
     }
 
+    // Transient UPSTREAM failure (SAM.gov gateway 5xx / "no healthy upstream")
+    // is not OUR bug — it happens most days at the 9am sync rush. Return a SOFT
+    // skip (HTTP 200) so the dispatcher records success and the watchdog doesn't
+    // alert daily on an external hiccup. Genuine failures (auth/DB/our code)
+    // still 500 → still alert. The run stays resumable; next tick retries.
+    const msg = err instanceof Error ? err.message : String(err);
+    const isUpstreamTransient = /SAM\.gov API error:\s*(502|503|504)\b|no healthy upstream/i.test(msg);
+    if (isUpstreamTransient && totalFetched === 0) {
+      console.warn('[sync-sam] soft-skip: transient SAM.gov upstream error —', msg);
+      return NextResponse.json({
+        success: true, // dispatcher/watchdog treat as OK; this is SAM.gov being down, not us
+        skipped: true,
+        syncType,
+        note: 'SAM.gov upstream unavailable (transient) — will retry next run',
+        error: msg,
+        stats: { totalFetched, apiCallsMade, durationSeconds: duration, lastSuccessfulOffset },
+        resumable: true,
+      }, { status: 200 });
+    }
+
     return NextResponse.json({
       success: false,
       syncType,
-      error: err instanceof Error ? err.message : String(err),
+      error: msg,
       stats: {
         totalFetched,
         apiCallsMade,
