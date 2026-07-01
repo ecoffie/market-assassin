@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import nodemailer from 'nodemailer';
 import { createClient } from '@supabase/supabase-js';
+import { sendOpsAlert } from '@/lib/ops-alert';
 
 const BASE_URL = 'https://getmindy.ai';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
@@ -654,16 +655,15 @@ export async function GET(request: NextRequest) {
         </p>
       `;
 
-      await getTransporter().sendMail({
-        from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <hello@govcongiants.com>`,
-        to: 'hello@govcongiants.com',
-        subject: `🚨 Health Check: ${failed} tests failed (${report.passRate} pass rate)`,
+      // Ops alert → Slack (moved off email 2026-07-01).
+      await sendOpsAlert({
+        subject: `Health Check: ${failed} tests failed (${report.passRate} pass rate)`,
         html: emailHtml,
       });
 
-      console.log('[Health Check] Alert email sent');
+      console.log('[Health Check] Alert sent to Slack');
     } catch (emailError) {
-      console.error('[Health Check] Failed to send alert email:', emailError);
+      console.error('[Health Check] Failed to send alert:', emailError);
     }
   }
 

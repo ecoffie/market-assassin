@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { FORECAST_SOURCE_POLICY, type ForecastSourcePolicy } from '@/lib/forecasts/source-policy';
-import { sendEmail } from '@/lib/send-email';
+import { sendOpsAlert } from '@/lib/ops-alert';
 
 type HealthStatus = 'healthy' | 'warning' | 'critical';
 
@@ -206,7 +206,7 @@ export async function GET(request: NextRequest) {
       .map(source => `<li><strong>${source.agencyCode}</strong>: ${source.reasons.join('; ') || source.status}</li>`)
       .join('');
 
-    await sendEmail({
+    await sendOpsAlert({
       to: alertEmail,
       subject: `[${status.toUpperCase()}] FMS Health Check`,
       html: `

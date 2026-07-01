@@ -24,7 +24,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { sendEmail } from '@/lib/send-email';
+import { sendOpsAlert } from '@/lib/ops-alert';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -182,7 +182,7 @@ export async function GET(request: NextRequest) {
   </p>
 </div>`;
     try {
-      await sendEmail({
+      await sendOpsAlert({
         to: ADMIN_EMAIL,
         subject,
         html,

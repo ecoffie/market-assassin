@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { previewBriefingRollout } from '@/lib/briefings/delivery/rollout';
-import { sendEmail } from '@/lib/send-email';
+import { sendOpsAlert } from '@/lib/ops-alert';
 
 type HealthStatus = 'healthy' | 'warning' | 'critical';
 
@@ -121,7 +121,7 @@ export async function GET(request: NextRequest) {
 
   const alertEmail = process.env.ADMIN_ALERT_EMAIL;
   if (shouldEmail && alertEmail && status !== 'healthy') {
-    await sendEmail({
+    await sendOpsAlert({
       to: alertEmail,
       subject: `[${status.toUpperCase()}] Briefing Health Check`,
       html: `

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { sendEmail } from '@/lib/send-email';
+import { sendOpsAlert } from '@/lib/ops-alert';
 
 /**
  * Briefing Watchdog - Automated Failsafe System
@@ -392,7 +392,7 @@ async function sendHealthAlert(metrics: HealthMetrics, date: string): Promise<vo
     <p><a href="${BASE_URL}/api/admin/briefing-status?password=${process.env.ADMIN_PASSWORD}">View Full Status</a></p>
   `;
 
-  await sendEmail({
+  await sendOpsAlert({
     to: ALERT_EMAIL,
     subject,
     html,
@@ -418,7 +418,7 @@ async function sendExhaustedAlert(count: number): Promise<void> {
     <p><a href="${BASE_URL}/api/admin/briefing-dead-letter?password=${process.env.ADMIN_PASSWORD}">View Dead Letter Queue</a></p>
   `;
 
-  await sendEmail({
+  await sendOpsAlert({
     to: ALERT_EMAIL,
     subject,
     html,
@@ -444,7 +444,7 @@ async function sendWatchdogFailureAlert(error: unknown): Promise<void> {
     </ol>
   `;
 
-  await sendEmail({
+  await sendOpsAlert({
     to: ALERT_EMAIL,
     subject,
     html,

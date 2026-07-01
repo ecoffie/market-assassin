@@ -30,7 +30,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { sendEmail } from '@/lib/send-email';
+import { sendOpsAlert } from '@/lib/ops-alert';
 import { isMissed } from '@/lib/cron/cron-expr';
 
 export const dynamic = 'force-dynamic';
@@ -155,7 +155,7 @@ export async function GET(request: NextRequest) {
     if (stuck.length) lines.push(`<p><strong>🔒 Stuck (lock never released):</strong> ${stuck.join(', ')}</p>`);
     if (overdue.length) lines.push(`<p><strong>⏰ Overdue (daily job past due, not run today):</strong> ${overdue.join(', ')}</p>`);
 
-    await sendEmail({
+    await sendOpsAlert({
       to: ALERT_TO,
       transactional: true,
       emailType: 'dispatcher_watchdog',

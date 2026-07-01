@@ -19,7 +19,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { sendEmail } from '@/lib/send-email';
+import { sendOpsAlert } from '@/lib/ops-alert';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -212,7 +212,7 @@ async function sendAlertEmail(health: CacheHealth, action: string): Promise<void
     </div>
   `;
 
-  await sendEmail({
+  await sendOpsAlert({
     to: 'eric@govcongiants.com',
     subject,
     html,
