@@ -261,17 +261,22 @@ export async function GET(request: NextRequest) {
   }
 
   // SMS opt-in: amendment/deadline changes are time-sensitive, so users who
-  // turned on SMS get the same digest as a text. Batch-fetch prefs for just the
-  // affected owners (sms_enabled + phone_number live in the canonical
-  // user_notification_settings table). Owner-attributed like the email/badge.
+  // turned on SMS get the same digest as a text. Owner-attributed like the
+  // email/badge. COMPLIANCE GATE (TCPA/CTIA + carrier A2P): we text ONLY numbers
+  // that are (a) toggled on, (b) VERIFIED via the double opt-in handshake
+  // (phone_verified), and (c) NOT opted out via STOP (sms_opted_out). An
+  // unverified/unconsented number is never messaged — sms_enabled alone is not
+  // enough.
   const affectedOwners = Array.from(changesByUser.keys());
-  const smsPrefs = new Map<string, string>(); // email → E.164-ish phone
+  const smsPrefs = new Map<string, string>(); // email → E.164 phone (verified)
   if (affectedOwners.length) {
     const { data: prefRows } = await supabase
       .from('user_notification_settings')
-      .select('user_email, sms_enabled, phone_number')
+      .select('user_email, phone_number')
       .in('user_email', affectedOwners)
-      .eq('sms_enabled', true);
+      .eq('sms_enabled', true)
+      .eq('phone_verified', true)
+      .eq('sms_opted_out', false);
     for (const r of (prefRows || []) as Array<{ user_email: string; phone_number: string | null }>) {
       if (r.phone_number) smsPrefs.set(r.user_email, r.phone_number);
     }
