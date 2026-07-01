@@ -83,7 +83,23 @@ export async function GET(request: NextRequest) {
     if (dayOfWeek === 5) briefingTypes.push('weekly');  // Friday
     if (dayOfWeek === 6) briefingTypes.push('pursuit'); // Saturday
 
-    // 1. Health Check for each briefing type
+    // 1. Process retry queue FIRST. The per-briefing-type health checks below
+    // are DB-heavy and can eat the whole function budget; when they did, this
+    // loop never ran and pending dead-letter entries sat un-retried for days
+    // (22 stuck at retry_count=2 since 2026-06-13). Draining the queue up front
+    // guarantees retries happen even if the health pass later times out.
+    const retries = await getRetryQueue();
+    for (const retry of retries.slice(0, MAX_RETRIES_PER_RUN)) {
+      results.retriesProcessed++;
+      const success = await processRetry(retry);
+      if (success) {
+        results.retriesSucceeded++;
+      } else {
+        results.retriesFailed++;
+      }
+    }
+
+    // 2. Health Check for each briefing type
     for (const briefingType of briefingTypes) {
       const metrics = await checkBriefingHealth(briefingType, today);
       results.healthChecks.push(metrics);
@@ -103,18 +119,6 @@ export async function GET(request: NextRequest) {
         if (healed) {
           results.selfHealingActions.push(`Triggered precompute for ${briefingType}`);
         }
-      }
-    }
-
-    // 2. Process retry queue
-    const retries = await getRetryQueue();
-    for (const retry of retries.slice(0, MAX_RETRIES_PER_RUN)) {
-      results.retriesProcessed++;
-      const success = await processRetry(retry);
-      if (success) {
-        results.retriesSucceeded++;
-      } else {
-        results.retriesFailed++;
       }
     }
 
@@ -281,7 +285,27 @@ async function getRetryQueue(): Promise<RetryCandidate[]> {
   return data || [];
 }
 
+// A briefing is time-sensitive content; re-sending one that's days old delivers
+// stale alerts nobody wants. Past this age we stop retrying and retire the entry
+// so the queue can't accumulate un-sendable rows (the June-13 pile-up).
+const MAX_RETRY_AGE_DAYS = 3;
+
 async function processRetry(retry: RetryCandidate): Promise<boolean> {
+  // Retire stale entries instead of re-sending outdated briefings.
+  const ageDays = (Date.now() - new Date(`${retry.briefing_date}T00:00:00Z`).getTime()) / 86400000;
+  if (ageDays > MAX_RETRY_AGE_DAYS) {
+    console.log(`[Watchdog] Retiring stale ${retry.briefing_type} for ${retry.user_email} (${Math.round(ageDays)}d old)`);
+    await getSupabase()
+      .from('briefing_dead_letter')
+      .update({
+        status: 'exhausted',
+        failure_reason: `Retired: briefing ${Math.round(ageDays)}d stale (>${MAX_RETRY_AGE_DAYS}d)`,
+        resolved_at: new Date().toISOString(),
+      })
+      .eq('id', retry.id);
+    return false;
+  }
+
   console.log(`[Watchdog] Retrying ${retry.briefing_type} for ${retry.user_email} (attempt ${retry.retry_count + 1})`);
 
   // Mark as retrying

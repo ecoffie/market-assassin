@@ -46,12 +46,18 @@ function getCursorWindow<T>(items: T[], cursor: number, limit: number): T[] {
  */
 export async function POST(request: NextRequest) {
   const { searchParams } = request.nextUrl;
+  const bearer = request.headers.get('authorization')?.replace('Bearer ', '');
   const password = searchParams.get('password');
-  const mode = searchParams.get('mode') || 'preview';
-  const limit = parseInt(searchParams.get('limit') || '50');
+  const isCron = request.headers.get('x-cron-dispatch') === '1'
+    || (!!process.env.CRON_SECRET && bearer === process.env.CRON_SECRET);
+  // Dispatcher fires (GET→POST) → execute. Cap the cron batch so an automated
+  // run can never blast the whole list; the cursor + 14-day cooldown drain the
+  // rest over subsequent daily ticks. Human callers keep the ?mode= they pass.
+  const mode = isCron ? 'execute' : (searchParams.get('mode') || 'preview');
+  const limit = parseInt(searchParams.get('limit') || (isCron ? '75' : '50'));
   const batchSize = parseInt(searchParams.get('batchSize') || '10');
 
-  if (password !== ADMIN_PASSWORD) {
+  if (!isCron && password !== ADMIN_PASSWORD) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

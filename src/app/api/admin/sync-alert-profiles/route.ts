@@ -13,6 +13,16 @@ import { createClient } from '@supabase/supabase-js';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
+// Auth: human via ?password=ADMIN_PASSWORD, or the cron dispatcher via
+// Bearer CRON_SECRET / x-cron-dispatch header (see /api/cron/dispatch).
+function authed(request: NextRequest): boolean {
+  const pw = new URL(request.url).searchParams.get('password');
+  const bearer = request.headers.get('authorization')?.replace('Bearer ', '');
+  const isCron = request.headers.get('x-cron-dispatch') === '1'
+    || (!!process.env.CRON_SECRET && bearer === process.env.CRON_SECRET);
+  return (!!pw && pw === ADMIN_PASSWORD) || isCron;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
 function getSupabase() {
@@ -122,10 +132,11 @@ function getStateFromZip(zip: string): string | null {
 
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const password = searchParams.get('password');
-  const mode = searchParams.get('mode') || 'preview';
+  const isCron = request.headers.get('x-cron-dispatch') === '1';
+  // Dispatcher fires GET → execute so the sync stays fresh without a separate POST.
+  const mode = isCron ? 'execute' : (searchParams.get('mode') || 'preview');
 
-  if (password !== ADMIN_PASSWORD) {
+  if (!authed(request)) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 

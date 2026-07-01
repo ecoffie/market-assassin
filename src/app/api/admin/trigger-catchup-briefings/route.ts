@@ -20,18 +20,29 @@ import { DEFAULT_NAICS_CODES } from '@/lib/config/defaults';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const BATCH_SIZE = 10; // Reduced to fit within 60s Vercel timeout (~6s/user)
 
+// Auth: human via ?password=ADMIN_PASSWORD, or the cron dispatcher via
+// Bearer CRON_SECRET / x-cron-dispatch header (see /api/cron/dispatch).
+function authed(request: NextRequest): boolean {
+  const pw = new URL(request.url).searchParams.get('password');
+  const bearer = request.headers.get('authorization')?.replace('Bearer ', '');
+  const isCron = request.headers.get('x-cron-dispatch') === '1'
+    || (!!process.env.CRON_SECRET && bearer === process.env.CRON_SECRET);
+  return (!!pw && pw === ADMIN_PASSWORD) || isCron;
+}
+
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
-  const password = searchParams.get('password');
-  const mode = searchParams.get('mode') || 'preview';
+  const isCron = request.headers.get('x-cron-dispatch') === '1';
+  // Dispatcher fires GET → execute so users missed by the main window still get sent.
+  const mode = isCron ? 'execute' : (searchParams.get('mode') || 'preview');
   const batches = parseInt(searchParams.get('batch') || '1');
 
-  if (password !== ADMIN_PASSWORD) {
+  if (!authed(request)) {
     return NextResponse.json({
       endpoint: '/api/admin/trigger-catchup-briefings',
       description: 'Trigger catch-up briefings when daily cron window has passed',
       usage: '?password=xxx&mode=execute&batch=1',
-    });
+    }, { status: 401 });
   }
 
   const supabase = createClient(
