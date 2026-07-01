@@ -50,9 +50,13 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
   const [isClientProfile, setIsClientProfile] = useState(false);
   // SMS opt-in (pursuit amendment/change alerts). Separate from the targeting
   // form — lives on user_notification_settings via /api/briefings/preferences.
-  const [smsEnabled, setSmsEnabled] = useState(false);
+  // SMS double opt-in flow. phoneVerified drives whether we show the verified
+  // badge (done) or the "Send code → enter code" handshake (not yet).
   const [smsPhone, setSmsPhone] = useState('');
-  const [smsSaving, setSmsSaving] = useState(false);
+  const [smsVerified, setSmsVerified] = useState(false);
+  const [smsCode, setSmsCode] = useState('');
+  const [smsStage, setSmsStage] = useState<'idle' | 'code_sent'>('idle'); // idle = enter phone; code_sent = enter code
+  const [smsBusy, setSmsBusy] = useState(false);
   const [smsMsg, setSmsMsg] = useState<string | null>(null);
   // Styled "Start over?" confirm (replaces native window.confirm).
   const [showResetConfirm, setShowResetConfirm] = useState(false);
@@ -117,7 +121,9 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
       } catch { /* non-fatal */ }
       try {
         const bj = briefingPrefsRes && briefingPrefsRes.ok ? await briefingPrefsRes.json() : null;
-        setSmsEnabled(Boolean(bj?.preferences?.sms_enabled));
+        // Verified = SMS is actually on (double opt-in complete). phone_verified
+        // is the real gate; sms_enabled alone no longer activates texts.
+        setSmsVerified(Boolean(bj?.phone_verified) && Boolean(bj?.preferences?.sms_enabled));
         setSmsPhone(bj?.preferences?.phone_number || '');
       } catch { /* non-fatal */ }
 
@@ -236,36 +242,85 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
     setForm((f) => ({ ...f, naics_codes: next.join(', ') }));
   }
 
-  // SMS opt-in save — its own small write to /api/briefings/preferences
-  // (user_notification_settings.sms_enabled + phone_number). Decoupled from the
-  // targeting save so a phone typo can't block a profile save and vice-versa.
-  const saveSms = async () => {
+  // SMS double opt-in (its own flow, decoupled from the targeting save):
+  //   sendSmsCode → texts a 6-digit code via GHL → verifySmsCode activates.
+  // Only a verified number is ever texted (pursuit-changes gates on phone_verified).
+  const sendSmsCode = async () => {
     if (!email) return;
-    setSmsSaving(true);
+    const phone = smsPhone.trim();
+    if (!phone) { setSmsMsg('Enter your phone number first.'); return; }
+    setSmsBusy(true);
     setSmsMsg(null);
     try {
-      const phone = smsPhone.trim();
-      if (smsEnabled && !phone) {
-        setSmsMsg('Add a phone number to receive SMS alerts.');
-        setSmsSaving(false);
-        return;
-      }
-      const res = await fetch('/api/briefings/preferences', {
+      const res = await fetch('/api/app/sms/verify/send', {
         method: 'POST',
         headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
-        body: JSON.stringify({ email, sms_enabled: smsEnabled, phone_number: smsEnabled ? phone : null }),
+        body: JSON.stringify({ email, phone }),
       });
       const data = await res.json().catch(() => ({}));
-      if (res.ok && data?.success !== false) {
-        if (data?.preferences?.phone_number) setSmsPhone(data.preferences.phone_number);
-        setSmsMsg(smsEnabled ? '✓ SMS alerts on — you’ll get a text when a tracked pursuit changes.' : '✓ SMS alerts off.');
+      if (res.ok && data?.success) {
+        setSmsStage('code_sent');
+        setSmsMsg('We texted you a 6-digit code. Enter it below to confirm.');
       } else {
-        setSmsMsg(data?.error || 'Could not save SMS settings. Check the phone number.');
+        setSmsMsg(data?.error || 'Could not send the code. Check the number.');
       }
     } catch {
-      setSmsMsg('Could not save SMS settings.');
+      setSmsMsg('Could not send the code.');
     } finally {
-      setSmsSaving(false);
+      setSmsBusy(false);
+    }
+  };
+
+  const verifySmsCode = async () => {
+    if (!email) return;
+    const code = smsCode.trim();
+    if (!/^\d{6}$/.test(code)) { setSmsMsg('Enter the 6-digit code.'); return; }
+    setSmsBusy(true);
+    setSmsMsg(null);
+    try {
+      const res = await fetch('/api/app/sms/verify/check', {
+        method: 'POST',
+        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ email, code }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.success) {
+        setSmsVerified(true);
+        setSmsStage('idle');
+        setSmsCode('');
+        setSmsMsg('✓ Verified — you’ll get a text when a tracked pursuit changes.');
+      } else {
+        setSmsMsg(data?.error || 'Incorrect code.');
+      }
+    } catch {
+      setSmsMsg('Could not verify the code.');
+    } finally {
+      setSmsBusy(false);
+    }
+  };
+
+  const disableSms = async () => {
+    if (!email) return;
+    setSmsBusy(true);
+    setSmsMsg(null);
+    try {
+      const res = await fetch('/api/app/sms/disable', {
+        method: 'POST',
+        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+        body: JSON.stringify({ email }),
+      });
+      if (res.ok) {
+        setSmsVerified(false);
+        setSmsStage('idle');
+        setSmsCode('');
+        setSmsMsg('SMS alerts turned off.');
+      } else {
+        setSmsMsg('Could not turn off SMS.');
+      }
+    } catch {
+      setSmsMsg('Could not turn off SMS.');
+    } finally {
+      setSmsBusy(false);
     }
   };
 
@@ -531,42 +586,92 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
               </label>
 
               {/* SMS alerts — time-sensitive pursuit changes (amendments,
-                  deadline moves, cancels). Opt-in; own save so it never blocks
-                  a profile save. */}
+                  deadline moves, cancels). Double opt-in: verify the number by
+                  code before it's ever texted (TCPA/CTIA + carrier A2P). */}
               <div className="md:col-span-2 rounded-lg border border-slate-700 bg-slate-800/40 p-4">
-                <label className="flex items-start gap-3 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={smsEnabled}
-                    onChange={(e) => { setSmsEnabled(e.target.checked); setSmsMsg(null); }}
-                    className="mt-1 h-4 w-4 accent-emerald-500"
-                  />
-                  <span>
-                    <span className="block text-sm font-medium text-white">Text me when a tracked pursuit changes</span>
+                <div className="flex items-start gap-3">
+                  <span className="mt-0.5 text-lg leading-none">💬</span>
+                  <div className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium text-white">
+                      Text me when a tracked pursuit changes
+                      {smsVerified && (
+                        <span className="ml-2 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300 align-middle">✓ VERIFIED</span>
+                      )}
+                    </span>
                     <span className="block text-xs text-slate-400 mt-0.5">
                       Amendments, deadline moves, cancellations — the time-sensitive stuff. You still get the full email digest.
                     </span>
-                  </span>
-                </label>
-                {smsEnabled && (
-                  <input
-                    type="tel"
-                    value={smsPhone}
-                    onChange={(e) => { setSmsPhone(e.target.value); setSmsMsg(null); }}
-                    placeholder="(555) 123-4567"
-                    className="mt-3 w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white outline-none focus:border-emerald-500"
-                  />
-                )}
-                <div className="mt-3 flex items-center gap-3">
-                  <button
-                    type="button"
-                    onClick={saveSms}
-                    disabled={smsSaving}
-                    className="px-3 py-1.5 text-sm rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium disabled:opacity-50"
-                  >
-                    {smsSaving ? 'Saving…' : 'Save SMS settings'}
-                  </button>
-                  {smsMsg && <span className="text-xs text-slate-300">{smsMsg}</span>}
+
+                    {smsVerified ? (
+                      // Verified state — show the number + turn-off.
+                      <div className="mt-3 flex items-center gap-3">
+                        <span className="text-sm text-slate-200">{smsPhone}</span>
+                        <button
+                          type="button"
+                          onClick={disableSms}
+                          disabled={smsBusy}
+                          className="px-3 py-1.5 text-xs rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+                        >
+                          {smsBusy ? '…' : 'Turn off'}
+                        </button>
+                      </div>
+                    ) : (
+                      // Not verified — the send-code → enter-code handshake.
+                      <div className="mt-3 space-y-2">
+                        <div className="flex flex-col sm:flex-row gap-2">
+                          <input
+                            type="tel"
+                            value={smsPhone}
+                            onChange={(e) => { setSmsPhone(e.target.value); setSmsMsg(null); }}
+                            placeholder="(555) 123-4567"
+                            disabled={smsStage === 'code_sent'}
+                            className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white outline-none focus:border-emerald-500 disabled:opacity-60"
+                          />
+                          <button
+                            type="button"
+                            onClick={sendSmsCode}
+                            disabled={smsBusy}
+                            className="px-3 py-2 text-sm rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium disabled:opacity-50 whitespace-nowrap"
+                          >
+                            {smsBusy && smsStage === 'idle' ? 'Sending…' : smsStage === 'code_sent' ? 'Resend code' : 'Send code'}
+                          </button>
+                        </div>
+                        {smsStage === 'code_sent' && (
+                          <div className="flex flex-col sm:flex-row gap-2">
+                            <input
+                              type="text"
+                              inputMode="numeric"
+                              maxLength={6}
+                              value={smsCode}
+                              onChange={(e) => { setSmsCode(e.target.value.replace(/\D/g, '')); setSmsMsg(null); }}
+                              placeholder="6-digit code"
+                              className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white tracking-widest outline-none focus:border-emerald-500"
+                            />
+                            <button
+                              type="button"
+                              onClick={verifySmsCode}
+                              disabled={smsBusy}
+                              className="px-3 py-2 text-sm rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium disabled:opacity-50 whitespace-nowrap"
+                            >
+                              {smsBusy ? 'Verifying…' : 'Verify'}
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
+
+                    {smsMsg && <p className="mt-2 text-xs text-slate-300">{smsMsg}</p>}
+
+                    {/* TCPA / CTIA consent + carrier disclosure. Required for A2P. */}
+                    <p className="mt-3 text-[11px] leading-4 text-slate-500">
+                      By verifying your number you agree to receive automated alert texts from Mindy about
+                      pursuits you track. Message frequency varies. Msg &amp; data rates may apply. Reply STOP
+                      to cancel, HELP for help. Consent is not a condition of purchase. See our{' '}
+                      <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-slate-400 underline">Terms</a>{' '}
+                      and{' '}
+                      <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-slate-400 underline">Privacy Policy</a>.
+                    </p>
+                  </div>
                 </div>
               </div>
 

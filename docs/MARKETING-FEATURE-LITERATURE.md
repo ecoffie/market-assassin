@@ -2849,3 +2849,32 @@ Frequency; loads current state from GET /api/briefings/preferences; saves via PO
 (server validates/normalizes the phone, clears it on disable). Reaches the
 pursuit-changes SMS path shipped in the prior commit. Typecheck 0 errors; full
 production build passes.
+
+---
+
+## SMS pursuit-change alerts — compliant double opt-in (verify + consent)
+
+**What it does (plain English):** Settings now has a proper "Text me when a tracked
+pursuit changes" opt-in. You enter your phone, tap **Send code**, get a 6-digit
+code by text, enter it, and only THEN do SMS alerts turn on — with a green
+**✓ VERIFIED** badge. The form shows the required consent language (msg & data
+rates, reply STOP/HELP, consent not a condition of purchase) with links to Terms
+and Privacy. Turn it off anytime; re-enabling requires a fresh verify.
+
+**Why it matters:** This is how real SaaS ships SMS. It proves the number is real,
+reachable, and consented BEFORE anything is sent — no texting a typo'd or
+unconsented number. It's also a compliance requirement: TCPA/CTIA + carrier A2P
+10DLC rules mandate documented consent. Texts route through GoHighLevel, where our
+A2P 10DLC brand + verified sending numbers already live (not a raw unregistered
+number that carriers would filter).
+
+**SEO angle:** *verified SMS alerts, opt-in text notifications GovCon, secure phone
+verification, TCPA-compliant contract alerts.*
+
+**Proof:** `UnifiedSettingsPanel.tsx` double opt-in flow → `POST /api/app/sms/verify/send`
+(6-digit code via crypto.randomInt, 10-min expiry, rate-limited 5/hr, texted through
+GHL with consent+STOP/HELP language) → `POST /api/app/sms/verify/check` (validates
+code, activates sms_enabled+phone_verified). `src/lib/ghl/sms.ts` sends via GHL
+Conversations API (verified live: real code delivered to a test phone). pursuit-changes
+gates on phone_verified=true AND sms_opted_out=false. Typecheck 0 errors; production
+build passes.
