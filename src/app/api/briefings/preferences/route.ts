@@ -49,7 +49,7 @@ export async function GET(request: NextRequest) {
 
   const { data, error } = await getSupabase()
     .from('user_notification_settings')
-    .select('timezone, briefing_frequency, preferred_delivery_hour, sms_enabled, phone_number')
+    .select('timezone, briefing_frequency, preferred_delivery_hour, sms_enabled, phone_number, phone_verified, sms_opted_out')
     .eq('user_email', auth.email!)
     .single();
 
@@ -68,7 +68,12 @@ export async function GET(request: NextRequest) {
     phone_number: data?.phone_number || null,
   };
 
-  return NextResponse.json({ preferences });
+  return NextResponse.json({
+    preferences,
+    // Verification state drives the double opt-in UI (verified badge vs "Send code").
+    phone_verified: Boolean(data?.phone_verified),
+    sms_opted_out: Boolean(data?.sms_opted_out),
+  });
 }
 
 /**
