@@ -315,6 +315,11 @@ const launchHealthClasses: Record<LaunchHealth, string> = {
   red: 'border-red-500/40 bg-red-500/10 text-red-200',
 };
 
+// Operating lanes/queues below are a HAND-MAINTAINED org snapshot (owners +
+// per-queue status), not live data. Stamp it so a reader knows how fresh it is;
+// bump this date whenever the lane/queue statuses are reviewed.
+const OPS_SNAPSHOT_AS_OF = 'Jul 2026';
+
 const roleLanes: RoleLane[] = [
   {
     name: 'Customer Validation',
@@ -2151,6 +2156,7 @@ export default function LaunchCommandCenterPage() {
             <div>
               <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Operating Lanes</p>
               <h2 className="mt-2 text-3xl font-bold">Who owns what</h2>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Manual org snapshot · owners as of {OPS_SNAPSHOT_AS_OF}</p>
             </div>
             <p className="max-w-2xl text-sm text-slate-400">
               Every lane should produce a customer signal, a next action, or a decision. If it does not, it does not belong in the launch workflow.
@@ -2235,9 +2241,10 @@ export default function LaunchCommandCenterPage() {
             <div>
               <p className="text-sm uppercase tracking-[0.2em] text-slate-500">Operating Queues</p>
               <h2 className="mt-2 text-3xl font-bold">Team work that should become data</h2>
+              <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Manual snapshot · queue statuses as of {OPS_SNAPSHOT_AS_OF} (not live)</p>
             </div>
             <p className="max-w-2xl text-sm text-slate-400">
-              V1 shows the operating design. V2 should let each owner update status, notes, source, and next action directly from this page.
+              Hand-maintained operating design. Each owner should be able to update status, notes, source, and next action directly from this page.
             </p>
           </div>
           <div className="mt-6 grid gap-4 lg:grid-cols-2">
