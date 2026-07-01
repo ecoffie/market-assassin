@@ -311,10 +311,6 @@ function trendClass(metric: TrendMetric) {
   return 'text-gray-400';
 }
 
-function percentNumber(numerator: number, denominator: number) {
-  return denominator > 0 ? Math.round((numerator / denominator) * 100) : 0;
-}
-
 function formatCurrencyCompact(value: number) {
   if (!value) return '$0';
   return new Intl.NumberFormat('en-US', {
@@ -714,10 +710,6 @@ export default function AdminDashboard() {
   const briefingAttempts = data.emailOperations.briefings.sent + data.emailOperations.briefings.failed;
   const briefingProcessed = briefingAttempts + data.emailOperations.briefings.skipped + data.emailOperations.briefings.pending;
   const briefingAudience = data.miGrowth?.audience.briefingsEligible || data.userHealth.briefingsCronEligible;
-  const bootcampAudience = data.bootcampRollout?.totalAttendees || data.bootcampRollout?.totalBootcampUsers || 0;
-  const bootcampSentRate = data.bootcampRollout
-    ? percentNumber(data.bootcampRollout.invitationsSent, bootcampAudience)
-    : 0;
   const profileReminderRemaining = profileReminderRun?.summary?.remaining;
   const opsChecks = [
     {
@@ -2080,58 +2072,64 @@ export default function AdminDashboard() {
               still going out). The May 2026 rollout finished (0 remaining), so
               this section hides itself instead of showing a completed campaign
               as if it were ongoing. Auto-reappears if a new rollout starts. */}
-          {data.bootcampRollout && data.bootcampRollout.invitationsRemaining > 0 && (
+          {data.bootcampRollout && data.bootcampRollout.totalBootcampUsers > 0 && (() => {
+            const bc = data.bootcampRollout;
+            const rolloutDone = bc.invitationsRemaining === 0;
+            const needsSetup = Math.max(bc.totalBootcampUsers - bc.profilesCompleted, 0);
+            return (
             <div id="bootcamp-rollout" className="scroll-mt-6 bg-gray-800 rounded-lg p-6">
               <div className="flex justify-between items-start gap-4 mb-5">
                 <div>
-                  <h2 className="text-lg font-semibold text-white">Bootcamp Onboarding</h2>
-                  <p className="mt-1 text-xs text-gray-500">Invitation rollout and profile conversion.</p>
+                  <h2 className="text-lg font-semibold text-white">Profile Setup</h2>
+                  <p className="mt-1 text-xs text-gray-500">
+                    Bootcamp cohort profile completion. Nudged weekly by the automated reminder cron.
+                  </p>
                 </div>
                 <span className="shrink-0 text-xs text-emerald-400 bg-emerald-900/30 px-2 py-1 rounded">
-                  {bootcampAudience.toLocaleString()} audience
+                  {bc.totalBootcampUsers.toLocaleString()} cohort
                 </span>
               </div>
+              {/* Lead metric is now the ONGOING lever: completed profiles, not the finished invite rollout. */}
               <div className="mb-5">
-                <p className="text-5xl font-bold text-emerald-400">{data.bootcampRollout.invitationsSent.toLocaleString()}</p>
-                <p className="mt-1 text-sm text-gray-400">invites sent, {bootcampSentRate}% of rollout audience</p>
+                <p className="text-5xl font-bold text-emerald-400">{bc.profilesCompleted.toLocaleString()}</p>
+                <p className="mt-1 text-sm text-gray-400">profiles completed ({bc.profileCompletionRate} of cohort)</p>
               </div>
               <div className="space-y-3">
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Imported into MI settings</span>
-                  <span className="text-white font-mono">{data.bootcampRollout.totalBootcampUsers.toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-gray-400">Remaining to invite</span>
-                  <span className="text-yellow-400 font-mono">{data.bootcampRollout.invitationsRemaining.toLocaleString()}</span>
-                </div>
-                <div className="pt-2 border-t border-gray-700 flex justify-between items-center">
-                  <span className="text-gray-400">Profiles completed from rollout</span>
-                  <div className="flex items-center gap-2">
-                    <span className="text-white font-mono">{data.bootcampRollout.profilesCompleted}</span>
-                    <span className="text-gray-500 text-sm">({data.bootcampRollout.profileCompletionRate})</span>
-                  </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-gray-400">Still needs setup</span>
+                  <span className="text-yellow-400 font-mono">{needsSetup.toLocaleString()}</span>
                 </div>
                 <div className="flex justify-between items-center">
                   <span className="text-gray-400">Alert-ready after setup</span>
                   <div className="flex items-center gap-2">
-                    <span className="text-emerald-400 font-mono">{data.bootcampRollout.readyForAlerts}</span>
-                    <span className="text-gray-500 text-sm">({data.bootcampRollout.conversionRate})</span>
+                    <span className="text-emerald-400 font-mono">{bc.readyForAlerts}</span>
+                    <span className="text-gray-500 text-sm">({bc.conversionRate})</span>
                   </div>
                 </div>
-                {data.bootcampRollout.lastInvitationSent && (
-                  <div className="pt-2 border-t border-gray-700 flex justify-between">
-                    <span className="text-gray-400">Last Email Sent</span>
+                <div className="pt-2 border-t border-gray-700 flex justify-between items-center">
+                  <span className="text-gray-400">Invite rollout</span>
+                  <span className="text-gray-300 text-sm font-mono">
+                    {rolloutDone
+                      ? `Complete — ${bc.invitationsSent.toLocaleString()} sent`
+                      : `${bc.invitationsSent.toLocaleString()} sent, ${bc.invitationsRemaining.toLocaleString()} left`}
+                  </span>
+                </div>
+                {bc.lastInvitationSent && (
+                  <div className="flex justify-between">
+                    <span className="text-gray-400">Last invite email</span>
                     <span className="text-gray-300 text-sm">
-                      {new Date(data.bootcampRollout.lastInvitationSent).toLocaleString()}
+                      {new Date(bc.lastInvitationSent).toLocaleDateString()}
                     </span>
                   </div>
                 )}
                 <p className="text-xs text-gray-500 pt-2 border-t border-gray-700">
-                  Lever: the next win is profile setup, not more dashboard counting. Completed profiles turn into alert-ready users.
+                  Lever: completed profiles become alert-ready users. The invite rollout is done — the weekly
+                  <span className="text-gray-400"> profile-completion-reminders</span> cron (Tue 15:00 UTC) now works the {needsSetup.toLocaleString()} still incomplete.
                 </p>
               </div>
             </div>
-          )}
+            );
+          })()}
 
           {/* User Health */}
           <div id="user-health" className="scroll-mt-6 bg-gray-800 rounded-lg p-6">
