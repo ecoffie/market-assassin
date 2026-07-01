@@ -17,6 +17,7 @@ import {
   Telescope,
   Clock,
   Banknote,
+  Package,
   Building2,
   Landmark,
   BookOpen,
@@ -61,6 +62,7 @@ export type AppPanel =
   | 'proposals'      // AI Proposal Assist (Estimating section)
   | 'target-list'    // My Target List — saved BD targets (Pipeline section, Slice 3 of TMR roadmap)
   | 'grants'         // Federal grants
+  | 'dibbs'          // DLA DIBBS small-buy RFQs (NSN/parts, not on SAM)
   | 'disa-watch'     // Vehicle Expiry Watch — DISA prototype (IDIQ/IDV expiry auto-notify)
   | 'osbp-smb'       // SMB Market Research — Navy OSBP prototype (certified small-biz sourcing)
   | 'micc-mrr';      // Market Research Report — ACC-Orlando prototype (auto-draft the MRR .docx)
@@ -280,6 +282,13 @@ const NAV_SECTIONS: NavSection[] = [
         label: 'Federal Grants',
         icon: Banknote,
         description: 'Grants.gov search',
+        tier: ['pro', 'team', 'enterprise'],
+      },
+      {
+        id: 'dibbs',
+        label: 'DIBBS',
+        icon: Package,
+        description: 'DLA small-buy RFQs (NSN/parts)',
         tier: ['pro', 'team', 'enterprise'],
       },
       {

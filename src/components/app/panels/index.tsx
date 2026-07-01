@@ -21,6 +21,7 @@ const ProposalsPanel = lazy(() => import('./ProposalsPanel'));
 const PricingIntelPanel = lazy(() => import('./PricingIntelPanel'));
 const MyTargetListPanel = lazy(() => import('./MyTargetListPanel'));
 const GrantsPanel = lazy(() => import('./GrantsPanel'));
+const DibbsPanel = lazy(() => import('./DibbsPanel'));
 const VaultPanel = lazy(() => import('./VaultPanel'));
 const KnowledgeBasePanel = lazy(() => import('./KnowledgeBasePanel'));
 const CoachPanel = lazy(() => import('./CoachPanel'));
@@ -95,6 +96,8 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
         return <CoachPanel email={email} onPanelChange={onPanelChange} />;
       case 'grants':
         return <GrantsPanel email={email} tier={tier} />;
+      case 'dibbs':
+        return <DibbsPanel email={email} tier={tier} />;
       case 'disa-watch':
         return <DisaVehicleWatchPanel email={email || ''} />;
       case 'osbp-smb':
