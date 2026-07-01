@@ -31,12 +31,20 @@ function getSupabase() {
 
 // Pull phone + message body out of whatever shape GHL sends.
 function parsePayload(body: Record<string, unknown>): { phone: string | null; text: string } {
+  // GHL may put the workflow "Custom Data" at the top level OR nested under
+  // customData / data / payload. Merge those so we find the fields either way.
+  const cd = (body.customData || body.custom_data || body.data || body.payload || {}) as Record<string, unknown>;
+  const get = (...keys: string[]): unknown => {
+    for (const k of keys) {
+      if (body[k] != null && body[k] !== '') return body[k];
+      if (cd[k] != null && cd[k] !== '') return cd[k];
+    }
+    return '';
+  };
   const phoneRaw =
-    body.phone || body.phoneNumber || body.from || body.contactPhone ||
+    get('phone', 'phoneNumber', 'from', 'contactPhone') ||
     (body.contact as Record<string, unknown> | undefined)?.phone || '';
-  const textRaw =
-    body.message || body.body || body.sms || body.text || body.messageBody ||
-    (body.message as Record<string, unknown> | undefined)?.body || '';
+  const textRaw = get('message', 'body', 'sms', 'text', 'messageBody');
   return { phone: normalizePhoneNumber(String(phoneRaw)), text: String(textRaw || '') };
 }
 
