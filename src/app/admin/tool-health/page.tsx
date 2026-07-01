@@ -242,7 +242,7 @@ export default function ToolHealthDashboard() {
               </div>
               <div>
                 <h1 className="text-xl font-semibold">Tool Health</h1>
-                <p className="text-xs text-gray-400">GovCon Giants</p>
+                <p className="text-xs text-gray-400">Mindy</p>
               </div>
             </div>
             <div className="flex items-center gap-4">
@@ -550,7 +550,7 @@ export default function ToolHealthDashboard() {
 
         {/* Footer */}
         <div className="mt-8 text-center text-gray-500 text-sm">
-          AI Tool Health Dashboard • GovCon Giants
+          AI Tool Health Dashboard • Mindy
         </div>
       </div>
     </div>

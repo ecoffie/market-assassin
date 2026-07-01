@@ -870,7 +870,7 @@ export default function AdminDashboard() {
         {/* Header */}
         <div className="flex justify-between items-center mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-white">GovCon Giants Admin</h1>
+            <h1 className="text-3xl font-bold text-white">Mindy Admin</h1>
             <p className="text-gray-400">Last updated: {new Date(data.timestamp).toLocaleString()}</p>
           </div>
           <div className="flex gap-3">

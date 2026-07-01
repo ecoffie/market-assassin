@@ -824,7 +824,7 @@ function MIDashboardContent() {
       <footer className="border-t border-gray-800 py-6 mt-12">
         <div className="max-w-7xl mx-auto px-4 text-center">
           <p className="text-sm text-gray-500">
-            Data sourced from SAM.gov • Refreshed daily at 6 AM UTC • GovCon Giants AI
+            Data sourced from SAM.gov • Refreshed daily at 6 AM UTC • Mindy AI
           </p>
         </div>
       </footer>
