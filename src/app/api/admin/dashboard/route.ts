@@ -484,7 +484,8 @@ const DEFAULT_NAICS_SET = new Set(['541512', '541611', '541330', '541990', '5612
 async function getUserHealth() {
   const health = {
     totalUsers: 0,
-    naicsConfigured: 0,      // Custom NAICS (not defaults)
+    naicsConfigured: 0,      // RAW: custom NAICS beyond the 5 defaults (breakdown line)
+    profileConfigured: 0,    // Custom NAICS OR keywords OR agencies (real profile test)
     naicsPercent: '0%',
     defaultNaicsOnly: 0,     // Has NAICS but only defaults
     noNaics: 0,              // No NAICS at all
@@ -600,16 +601,21 @@ async function getUserHealth() {
         const hasBusinessType = user.business_type && user.business_type.trim() !== '';
         const normalizedEmail = user.user_email.toLowerCase();
 
-        // CONFIGURED = has a real profile by the SAME test the card + GHL reignite
-        // drip use: custom NAICS (beyond the 5 defaults) OR any keywords OR any
-        // agencies. Counting NAICS alone overcounted "unconfigured" by ~3,485 users
-        // who set keywords/agencies but kept default NAICS — they DO have a profile.
+        // Two distinct measures, kept separate on purpose:
+        //   naicsConfigured  = RAW custom-NAICS split (Custom / Default-only / None
+        //                      sum to totalUsers — the User Inventory Health card).
+        //   profileConfigured = real profile test (NAICS OR keywords OR agencies) —
+        //                      the same test the Profile Setup card + GHL reignite
+        //                      drip + the "no profile configured" alert use.
         const hasOnlyDefaults = hasNaics &&
           naicsCodes.every((code: string) => DEFAULT_NAICS_SET.has(code));
         const hasCustomNaics = hasNaics && !hasOnlyDefaults;
-        const configured = hasCustomProfile(user.naics_codes, user.keywords, user.agencies);
 
-        if (configured) {
+        if (hasCustomProfile(user.naics_codes, user.keywords, user.agencies)) {
+          health.profileConfigured++;
+        }
+
+        if (hasCustomNaics) {
           health.naicsConfigured++;
         } else if (hasOnlyDefaults) {
           health.defaultNaicsOnly++;
@@ -2636,8 +2642,12 @@ async function getSystemAlerts(today: string) {
     });
   }
 
-  // Warning: Many unconfigured users
-  const unconfiguredPercent = 100 - parseInt(userHealth.naicsPercent);
+  // Warning: Many unconfigured users — measured by the REAL profile test
+  // (profileConfigured), not the raw custom-NAICS split, so it matches the card.
+  const profileConfiguredPct = userHealth.totalUsers > 0
+    ? Math.round((userHealth.profileConfigured / userHealth.totalUsers) * 100)
+    : 0;
+  const unconfiguredPercent = 100 - profileConfiguredPct;
   const profileReminderSummary = profileReminderLastRun?.summary;
   const profileReminderQueueComplete = profileReminderSummary
     ? (profileReminderSummary.remaining || 0) === 0 &&
@@ -2648,7 +2658,7 @@ async function getSystemAlerts(today: string) {
   if (unconfiguredPercent > 30 && !profileReminderQueueComplete) {
     alerts.push({
       level: 'warning',
-      message: `${unconfiguredPercent}% of users (${userHealth.totalUsers - userHealth.naicsConfigured}) have no profile configured (no custom NAICS, keywords, or agencies)`
+      message: `${unconfiguredPercent}% of users (${userHealth.totalUsers - userHealth.profileConfigured}) have no profile configured (no custom NAICS, keywords, or agencies)`
     });
   }
 

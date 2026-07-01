@@ -16,7 +16,8 @@ interface DashboardData {
   };
   userHealth: {
     totalUsers: number;
-    naicsConfigured: number;      // Custom NAICS (not defaults)
+    naicsConfigured: number;      // RAW: custom NAICS (not defaults) — breakdown line
+    profileConfigured?: number;   // Custom NAICS OR keywords OR agencies (real profile)
     naicsPercent: string;
     defaultNaicsOnly?: number;    // Has NAICS but only defaults
     noNaics?: number;             // No NAICS at all
@@ -2205,6 +2206,12 @@ export default function AdminDashboard() {
                   <span className="text-red-400 font-mono text-sm">{data.userHealth.noNaics || 0}</span>
                 </div>
               </div>
+              {typeof data.userHealth.profileConfigured === 'number' && (
+                <div className="flex justify-between items-center pt-1">
+                  <span className="text-gray-500 text-xs">↳ real profile (NAICS, keywords, or agencies)</span>
+                  <span className="text-emerald-400 font-mono text-xs">{data.userHealth.profileConfigured.toLocaleString()}</span>
+                </div>
+              )}
               <div className="flex justify-between items-center">
                 <span className="text-gray-400">Business Type Set</span>
                 <div className="flex items-center gap-2">
