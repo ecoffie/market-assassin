@@ -1,11 +1,30 @@
-# GHL Workflow Setup — Mindy SMS STOP Sync
+# GHL SMS STOP Sync
 
-Syncs an inbound **STOP** reply → our `user_notification_settings.sms_opted_out`
-so `pursuit-changes` stops texting that user. GHL/carrier already honor STOP
-natively (users are protected regardless); this workflow keeps OUR DB flag in sync.
+Keeps our `user_notification_settings.sms_opted_out` in sync with a user's real
+STOP so `pursuit-changes` stops texting them. **GHL/carrier already honor STOP
+natively — users are protected regardless of our flag.**
 
-**Why manual:** GHL has no create-workflow API (`POST /workflows/` → 404) and no
-PIT-token webhook registration. Workflow creation is UI-only. Verified 2026-07-01.
+## How STOP actually syncs (verified 2026-07-01)
+
+**GHL intercepts STOP as a system keyword.** When a user texts STOP, GHL sets the
+contact to permanent SMS DND (`dndSettings.SMS = {status:'permanent', message:'STOP_KEYWORD'}`)
+and sends the native unsubscribe reply — it does **NOT** fire the "Customer Replied"
+workflow for STOP. So a webhook/workflow **cannot** catch STOP. Proven live:
+- Contact after STOP: `dndSettings.SMS.status = 'permanent'` (STOP_KEYWORD).
+- Sending to that contact returns `400 CONVERSATIONS_MSG_UNSUBSCRIBED_SMS`
+  ("Cannot send message as <phone> has unsubscribed").
+
+**The real sync path = self-healing on send.** `sendViaGHL` detects that 400 and
+returns `optedOut:true`; `pursuit-changes` then sets `sms_opted_out=true` +
+`sms_enabled=false` on the matching row. GHL is the source of truth; our DB
+mirrors it the first time we try to text an opted-out user. Zero new infra.
+
+The inbound webhook below still exists and is useful for **non-STOP** control words
+(HELP is auto-answered by GHL; a manual "UNSUBSCRIBE"/"CANCEL" typed as a normal
+reply, or a "START"/"SUBSCRIBE" re-opt-in) — those DO fire the workflow. STOP does not.
+
+**Why the workflow is manual:** GHL has no create-workflow API (`POST /workflows/`
+→ 404) and no PIT-token webhook registration. Workflow creation is UI-only.
 
 **Account:** Govcon EDU (Mindy), Delray Beach FL · **Time:** ~2 min
 

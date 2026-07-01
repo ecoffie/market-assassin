@@ -322,8 +322,21 @@ export async function GET(request: NextRequest) {
       const more = total > 2 ? ` (+${total - 2} more)` : '';
       const smsBody = `Mindy: ${total} update${total === 1 ? '' : 's'} on your tracked pursuit${total === 1 ? '' : 's'}. ${head}${more}. getmindy.ai/app`;
       const res = await sendViaGHL(phone, smsBody);
-      if (res.success) smsSent++;
-      else console.warn(`[pursuit-changes] SMS failed for ${email}: ${res.error}`);
+      if (res.success) {
+        smsSent++;
+      } else if (res.optedOut) {
+        // GHL is the source of truth for STOP and blocked the send. GHL intercepts
+        // STOP natively (the inbound webhook never fires for it), so this rejection
+        // is how we learn they opted out — mirror it to our DB so the UI is honest
+        // and we stop attempting sends. No error log: this is expected + handled.
+        await supabase
+          .from('user_notification_settings')
+          .update({ sms_opted_out: true, sms_enabled: false, updated_at: new Date().toISOString() })
+          .eq('phone_number', phone);
+        console.log(`[pursuit-changes] ${email} is opted out in GHL → synced sms_opted_out=true`);
+      } else {
+        console.warn(`[pursuit-changes] SMS failed for ${email}: ${res.error}`);
+      }
     }
   }
 
