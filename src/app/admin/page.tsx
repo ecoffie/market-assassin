@@ -390,8 +390,8 @@ export default function AdminDashboard() {
                     onChange={(e) => setGrantTier(e.target.value as MarketAssassinTier)}
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 text-slate-900 bg-white"
                   >
-                    <option value="standard">Standard ($297)</option>
-                    <option value="premium">Premium ($497)</option>
+                    <option value="standard">Standard</option>
+                    <option value="premium">Premium</option>
                   </select>
                 </div>
               )}
@@ -404,8 +404,8 @@ export default function AdminDashboard() {
                     onChange={(e) => setGrantCgTier(e.target.value as ContentGeneratorTier)}
                     className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-purple-500 text-slate-900 bg-white"
                   >
-                    <option value="content-engine">Content Engine ($197)</option>
-                    <option value="full-fix">Full Fix ($297)</option>
+                    <option value="content-engine">Content Engine</option>
+                    <option value="full-fix">Full Fix</option>
                   </select>
                 </div>
               )}

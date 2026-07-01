@@ -79,6 +79,7 @@ export default function SetAsideImpactPage() {
       <div className="mx-auto max-w-4xl">
         <header className="mb-6">
           <h1 className="text-2xl font-black">The Mission — reversing the shrinking industrial base</h1>
+          <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Macro figures: FY2024 federal prime-contract data (static). Live set-aside gap cards update from the DB.</p>
           <p className="mt-1 text-sm text-slate-400">
             Free agentic tools put more small businesses in the game. Once two are capable and bidding, the <span className="font-semibold text-emerald-300">FAR 19.502-2 &ldquo;Rule of Two&rdquo;</span> <span className="italic">forces</span> the contract to be set aside for small business. At scale, free tools turn Full-and-Open dollars into set-asides.
           </p>

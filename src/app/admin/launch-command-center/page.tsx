@@ -362,8 +362,8 @@ const priorities: Priority[] = [
   {
     priority: 'Create one operating link for launch execution',
     owner: 'Product',
-    decision: 'Use this page as the internal launch command center V1.',
-    status: 'Built as V1 shell',
+    decision: 'Use this page as the internal launch command center.',
+    status: 'Live',
     tone: 'green',
   },
   {
@@ -390,9 +390,9 @@ const priorities: Priority[] = [
   {
     priority: 'Live data wiring',
     owner: 'Engineering',
-    decision: 'Wire Supabase, Stripe, email engagement, and app activity after V1 shell is approved.',
-    status: 'Next phase',
-    tone: 'slate',
+    decision: 'MRR, conversions, upgrade intent, referrals, and coach activity pull from live APIs (Supabase + Stripe).',
+    status: 'Wired',
+    tone: 'green',
   },
 ];
 
@@ -1094,7 +1094,7 @@ export default function LaunchCommandCenterPage() {
             <div className="flex flex-wrap items-center gap-3">
               <span className="rounded-lg bg-purple-500 px-3 py-2 text-lg font-black text-white">M</span>
               <span className="rounded-full border border-amber-400/40 bg-amber-400/10 px-3 py-1 text-sm font-semibold text-amber-200">
-                Internal V1
+                Internal
               </span>
               <span className="rounded-full border border-purple-400/40 bg-purple-400/10 px-3 py-1 text-sm font-semibold text-purple-200">
                 Customer first. Advisory second.

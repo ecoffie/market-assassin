@@ -67,6 +67,7 @@ export default function CompetitivePositioningPage() {
       <div className="mx-auto max-w-5xl">
         <header className="mb-6">
           <h1 className="text-2xl font-black">Why Mindy — the GovCon tool landscape</h1>
+          <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Static positioning deck · competitor figures as of Jun 2026 (verify before citing externally)</p>
           <p className="mt-1 text-sm text-slate-400">
             Everyone else forces a trade-off: powerful but complicated, or simple but single-purpose. Mindy is the only one in the winning corner — <span className="font-semibold text-emerald-300">all-in-one AND simple</span>.
           </p>
