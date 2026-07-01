@@ -27,6 +27,20 @@ function ghlHeaders(token: string): HeadersInit {
   };
 }
 
+/**
+ * Normalize a phone number to E.164 (US-friendly). Returns null if it can't be
+ * coerced to a plausible E.164 number. Lives here because SMS is the only thing
+ * that needs it now (moved off the old Twilio sender).
+ */
+export function normalizePhoneNumber(phone: string): string | null {
+  const cleaned = (phone || '').replace(/[^\d+]/g, '');
+  if (cleaned.startsWith('+1') && cleaned.length === 12) return cleaned;
+  if (cleaned.startsWith('+')) return cleaned.length >= 10 ? cleaned : null;
+  if (cleaned.length === 10) return `+1${cleaned}`;
+  if (cleaned.length === 11 && cleaned.startsWith('1')) return `+${cleaned}`;
+  return null;
+}
+
 export interface GhlSmsResult {
   success: boolean;
   contactId?: string;

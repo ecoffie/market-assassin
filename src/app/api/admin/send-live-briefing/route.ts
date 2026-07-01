@@ -56,10 +56,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Deliver briefing via email
-    const results = await deliverBriefing(briefing, {
-      email,
-      method: 'email',
-    });
+    const results = await deliverBriefing(briefing, { email });
 
     const anySuccess = results.some(r => r.success);
 

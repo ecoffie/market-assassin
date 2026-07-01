@@ -13,8 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
-import { normalizePhoneNumber } from '@/lib/briefings/delivery/sender';
-import { sendViaGHL } from '@/lib/ghl/sms';
+import { sendViaGHL, normalizePhoneNumber } from '@/lib/ghl/sms';
 import { checkRateLimit } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';

@@ -1,18 +1,19 @@
 /**
  * Briefing Delivery Sender
  *
- * Handles sending briefings via email and SMS.
- * Uses nodemailer for email, Twilio for SMS.
+ * Handles sending briefings via EMAIL (nodemailer).
+ * SMS is NOT here — all outbound SMS goes through GoHighLevel
+ * (src/lib/ghl/sms.ts, sendViaGHL), which is our A2P-10DLC-compliant sender.
+ * The old Twilio SMS path was removed 2026-07-01 (it was dead code + an
+ * unregistered number carriers would filter).
  */
 
 import nodemailer from 'nodemailer';
-import twilio from 'twilio';
 import { createClient } from '@supabase/supabase-js';
 import {
   GeneratedBriefing,
   DeliveryResult,
   BriefingDeliveryRecord,
-  SMSMessage,
 } from './types';
 import { generateEmailTemplate } from './email-template';
 import { createEmailTrackingToken } from '@/lib/engagement';
@@ -20,20 +21,6 @@ import { MINDY_FROM_NAME } from '@/lib/mindy/email-branding';
 
 const FROM_EMAIL = process.env.EMAIL_FROM || process.env.SMTP_USER || 'alerts@govcongiants.com';
 const FROM_NAME = MINDY_FROM_NAME;
-
-/**
- * Get Twilio client
- */
-function getTwilioClient() {
-  const accountSid = process.env.TWILIO_ACCOUNT_SID;
-  const authToken = process.env.TWILIO_AUTH_TOKEN;
-
-  if (!accountSid || !authToken) {
-    return null;
-  }
-
-  return twilio(accountSid, authToken);
-}
 
 /**
  * Create nodemailer transporter
@@ -115,212 +102,6 @@ export async function sendBriefingEmail(
 }
 
 /**
- * Generate SMS message from briefing (truncated for SMS limits)
- */
-export function generateSMSMessage(briefing: GeneratedBriefing): SMSMessage {
-  const MAX_SMS_LENGTH = 160;
-
-  const urgentCount = briefing.summary.urgentAlerts;
-  const totalItems = briefing.totalItems;
-
-  let body = `GovCon Briefing: `;
-
-  if (urgentCount > 0) {
-    body += `${urgentCount} urgent alert${urgentCount > 1 ? 's' : ''}, `;
-  }
-
-  body += `${totalItems} total items. `;
-
-  // Add first item headline if space allows
-  const firstItem = briefing.topItems[0]?.items[0];
-  if (firstItem) {
-    const headline = firstItem.title.substring(0, 60);
-    body += `Top: ${headline}`;
-  }
-
-  body += ' View: shop.govcongiants.com/briefings';
-
-  const truncated = body.length > MAX_SMS_LENGTH;
-
-  return {
-    body: body.substring(0, MAX_SMS_LENGTH),
-    truncated,
-  };
-}
-
-/**
- * Send briefing via SMS using Twilio
- */
-export async function sendBriefingSMS(
-  briefing: GeneratedBriefing,
-  phoneNumber: string
-): Promise<DeliveryResult> {
-  const twilioClient = getTwilioClient();
-  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
-  const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
-
-  if (!twilioClient) {
-    console.error('[BriefingSender] Twilio not configured (missing TWILIO_ACCOUNT_SID or TWILIO_AUTH_TOKEN)');
-    return {
-      success: false,
-      method: 'sms',
-      error: 'SMS service not configured',
-    };
-  }
-
-  if (!fromNumber && !messagingServiceSid) {
-    console.error('[BriefingSender] No TWILIO_PHONE_NUMBER or TWILIO_MESSAGING_SERVICE_SID configured');
-    return {
-      success: false,
-      method: 'sms',
-      error: 'SMS sender not configured',
-    };
-  }
-
-  // Normalize phone number (ensure E.164 format)
-  const normalizedPhone = normalizePhoneNumber(phoneNumber);
-  if (!normalizedPhone) {
-    console.error(`[BriefingSender] Invalid phone number: ${phoneNumber}`);
-    return {
-      success: false,
-      method: 'sms',
-      error: 'Invalid phone number format',
-    };
-  }
-
-  const smsMessage = generateSMSMessage(briefing);
-
-  try {
-    // Use Messaging Service SID if available, otherwise use phone number
-    const messageOptions: {
-      body: string;
-      to: string;
-      from?: string;
-      messagingServiceSid?: string;
-    } = {
-      body: smsMessage.body,
-      to: normalizedPhone,
-    };
-
-    if (messagingServiceSid) {
-      messageOptions.messagingServiceSid = messagingServiceSid;
-    } else {
-      messageOptions.from = fromNumber;
-    }
-
-    const message = await twilioClient.messages.create(messageOptions);
-
-    // Record the delivery
-    await recordDelivery({
-      id: `delivery-${briefing.id}-sms`,
-      userId: briefing.userId,
-      briefingId: briefing.id,
-      deliveryMethod: 'sms',
-      status: 'sent',
-      messageId: message.sid,
-      sentAt: new Date().toISOString(),
-    });
-
-    console.log(`[BriefingSender] SMS sent to ${normalizedPhone}: ${message.sid}`);
-
-    return {
-      success: true,
-      method: 'sms',
-      messageId: message.sid,
-      deliveredAt: new Date().toISOString(),
-    };
-  } catch (error) {
-    console.error(`[BriefingSender] Error sending SMS:`, error);
-
-    // Record failed delivery
-    await recordDelivery({
-      id: `delivery-${briefing.id}-sms`,
-      userId: briefing.userId,
-      briefingId: briefing.id,
-      deliveryMethod: 'sms',
-      status: 'failed',
-      sentAt: new Date().toISOString(),
-      error: String(error),
-    });
-
-    return {
-      success: false,
-      method: 'sms',
-      error: String(error),
-    };
-  }
-}
-
-/**
- * Send a plain-text SMS to one number. The channel-only primitive (no briefing
- * object, no delivery-logging) that any feature can reuse — e.g. pursuit
- * amendment alerts. Reuses the same Twilio client + E.164 normalization +
- * messaging-service-vs-from-number logic as sendBriefingSMS.
- *
- * Returns { success, messageId? , error? }. Caller decides what to log.
- */
-export async function sendRawSMS(
-  phoneNumber: string,
-  body: string,
-): Promise<{ success: boolean; messageId?: string; error?: string }> {
-  const twilioClient = getTwilioClient();
-  const fromNumber = process.env.TWILIO_PHONE_NUMBER;
-  const messagingServiceSid = process.env.TWILIO_MESSAGING_SERVICE_SID;
-
-  if (!twilioClient) return { success: false, error: 'SMS service not configured' };
-  if (!fromNumber && !messagingServiceSid) return { success: false, error: 'SMS sender not configured' };
-
-  const normalizedPhone = normalizePhoneNumber(phoneNumber);
-  if (!normalizedPhone) return { success: false, error: 'Invalid phone number format' };
-
-  try {
-    const messageOptions: { body: string; to: string; from?: string; messagingServiceSid?: string } = {
-      body: body.slice(0, 320), // ~2 SMS segments; Twilio concatenates
-      to: normalizedPhone,
-    };
-    if (messagingServiceSid) messageOptions.messagingServiceSid = messagingServiceSid;
-    else messageOptions.from = fromNumber;
-
-    const message = await twilioClient.messages.create(messageOptions);
-    return { success: true, messageId: message.sid };
-  } catch (error) {
-    console.error('[sendRawSMS] error', error);
-    return { success: false, error: String(error) };
-  }
-}
-
-/**
- * Normalize phone number to E.164 format
- * Handles common US formats: (555) 123-4567, 555-123-4567, 5551234567, +15551234567
- */
-export function normalizePhoneNumber(phone: string): string | null {
-  // Remove all non-digit characters except leading +
-  const cleaned = phone.replace(/[^\d+]/g, '');
-
-  // Already in E.164 format
-  if (cleaned.startsWith('+1') && cleaned.length === 12) {
-    return cleaned;
-  }
-
-  // Has + but not +1 (international)
-  if (cleaned.startsWith('+')) {
-    return cleaned.length >= 10 ? cleaned : null;
-  }
-
-  // US number without country code
-  if (cleaned.length === 10) {
-    return `+1${cleaned}`;
-  }
-
-  // US number with leading 1
-  if (cleaned.length === 11 && cleaned.startsWith('1')) {
-    return `+${cleaned}`;
-  }
-
-  return null;
-}
-
-/**
  * Record delivery in database
  */
 async function recordDelivery(record: BriefingDeliveryRecord): Promise<void> {
@@ -361,27 +142,15 @@ function getSupabaseClient() {
 }
 
 /**
- * Send briefing to user based on their preferences
+ * Send briefing to user by email. (SMS delivery was removed — outbound SMS now
+ * goes through GHL via sendViaGHL; this path is email-only.)
  */
 export async function deliverBriefing(
   briefing: GeneratedBriefing,
-  config: {
-    email: string;
-    phone?: string;
-    method: 'email' | 'sms' | 'both';
-  }
+  config: { email: string },
 ): Promise<DeliveryResult[]> {
   const results: DeliveryResult[] = [];
-
-  if (config.method === 'email' || config.method === 'both') {
-    const emailResult = await sendBriefingEmail(briefing, config.email);
-    results.push(emailResult);
-  }
-
-  if ((config.method === 'sms' || config.method === 'both') && config.phone) {
-    const smsResult = await sendBriefingSMS(briefing, config.phone);
-    results.push(smsResult);
-  }
-
+  const emailResult = await sendBriefingEmail(briefing, config.email);
+  results.push(emailResult);
   return results;
 }

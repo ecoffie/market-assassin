@@ -12,8 +12,6 @@ export { generateBriefing, formatItem, formatAmount, truncate } from './generato
 export { generateEmailTemplate } from './email-template';
 export {
   sendBriefingEmail,
-  sendBriefingSMS,
-  generateSMSMessage,
   deliverBriefing,
 } from './sender';
 
