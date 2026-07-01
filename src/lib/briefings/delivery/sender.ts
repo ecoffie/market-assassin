@@ -293,7 +293,7 @@ export async function sendRawSMS(
  * Normalize phone number to E.164 format
  * Handles common US formats: (555) 123-4567, 555-123-4567, 5551234567, +15551234567
  */
-function normalizePhoneNumber(phone: string): string | null {
+export function normalizePhoneNumber(phone: string): string | null {
   // Remove all non-digit characters except leading +
   const cleaned = phone.replace(/[^\d+]/g, '');
 

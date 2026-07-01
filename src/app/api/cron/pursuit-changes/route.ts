@@ -24,7 +24,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/send-email';
-import { sendRawSMS } from '@/lib/briefings/delivery/sender';
+import { sendViaGHL } from '@/lib/ghl/sms';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -321,7 +321,7 @@ export async function GET(request: NextRequest) {
       const head = flat.slice(0, 2).join(' | ');
       const more = total > 2 ? ` (+${total - 2} more)` : '';
       const smsBody = `Mindy: ${total} update${total === 1 ? '' : 's'} on your tracked pursuit${total === 1 ? '' : 's'}. ${head}${more}. getmindy.ai/app`;
-      const res = await sendRawSMS(phone, smsBody);
+      const res = await sendViaGHL(phone, smsBody);
       if (res.success) smsSent++;
       else console.warn(`[pursuit-changes] SMS failed for ${email}: ${res.error}`);
     }
