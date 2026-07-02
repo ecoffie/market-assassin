@@ -1,0 +1,33 @@
+{
+  "name": "eric-construction-abatement",
+  "email": "eric@govcongiants.com",
+  "requirements": [
+    {
+      "id": "REQ-001",
+      "requirement": "Contractor shall perform asbestos abatement and hazardous material remediation in occupied facilities.",
+      "source_quote": "removal and lawful disposal of asbestos-containing material",
+      "expect_labels": ["South Street", "Longmeadow", "Easton"],
+      "expect_gap": false
+    },
+    {
+      "id": "REQ-002",
+      "requirement": "Offeror shall demonstrate experience rehabilitating historic buildings while preserving character-defining features.",
+      "source_quote": "rehabilitation of a historic structure listed on the National Register",
+      "expect_labels": ["Boott Cotton Mills"],
+      "expect_gap": false
+    },
+    {
+      "id": "REQ-003",
+      "requirement": "Provide FedRAMP-authorized cloud hosting with continuous ATO monitoring and SOC operations.",
+      "source_quote": "FedRAMP Moderate authorization and continuous monitoring",
+      "expect_gap": true
+    },
+    {
+      "id": "REQ-004",
+      "requirement": "Contractor shall manage general construction and renovation of federal office space.",
+      "source_quote": "general contracting for interior renovation of a federal building",
+      "expect_labels": ["Poff Federal Building", "Renovation Office Building"],
+      "expect_gap": false
+    }
+  ]
+}

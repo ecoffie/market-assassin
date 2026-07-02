@@ -3044,3 +3044,49 @@ Verified against the real Tavares doc: 15 PP + 10 caps, 0 skipped. Typecheck 0, 
 **SEO / positioning:** Reinforces "Mindy shows you the market" — even free users feel the depth (real counts from 88K SAM opps, 317K contractors, 7,800+ forecasts, federal contact directory) before paying.
 
 **Proof:** Real counts pulled live from the same endpoints the paid panels use — verified on getmindy.ai: recompete NAICS 236220 → 440 expiring contracts; contractors NAICS 236220 → real totalCount + real company names (e.g. "BL HARBERT INTERNATIONAL LLC"). No fabricated numbers or rows — blurred rows are real records obscured with CSS, never invented (rule #1). Endpoints are auth-gated (not tier-gated), so a logged-in free user gets a genuine profile-scoped count.
+
+---
+
+## Proposal Assist: semantic requirement→evidence weave (2026-07-02)
+
+**What:** When Mindy drafts a proposal or Sources Sought response, it now connects
+the RFP's actual requirements to YOUR real past performance — semantically, by
+meaning, not keyword overlap. For each requirement in the compliance matrix, Mindy
+finds the specific contracts / capabilities in your Vault that support it and tells
+the draft to cite THAT contract for THAT requirement, one-to-one. Where your Vault
+has nothing to support a requirement, Mindy flags it as an honest gap to fill in —
+it never manufactures experience you don't have. The result: drafts that read like
+"our $5.3M abatement scope on South Street Landing demonstrates the hazardous-material
+handling this notice requires," not a generic "proven track record."
+
+**Why:** A federal evaluator scores you requirement-by-requirement. A draft that
+dumps your whole past-performance list and hopes the reader connects the dots loses
+to one that maps each shall to a named, relevant project. Top proposal shops do this
+by hand (the Shipley "requirement → response → proof" thread); Mindy does it
+automatically from your Vault. It's also the honest version: it brackets what you
+can't prove instead of bluffing, which is what keeps a response from getting tossed
+for an unsupportable claim.
+
+**How it works (the enterprise pattern):** Every Vault item (past performance,
+capabilities, key personnel) is embedded into native Postgres pgvector. For each
+requirement, Mindy runs a hybrid search — semantic vector recall (catches meaning:
+"asbestos abatement" ↔ "hazardous material remediation" with no shared words) fused
+with exact keyword/code recall (catches the precise NAICS, PSC, "8(a)", clearance) —
+then an AI reranker picks the best 3–5 and writes the one-line "why this fits." Every
+citation is a real Vault row; a fabrication guard + an automated eval gate (blocks any
+deploy where the matcher cites evidence not in the Vault) enforce rule #1.
+
+**SEO angle:** *AI proposal writing federal, RFP requirement compliance matrix,
+past performance matching, Shipley proposal method AI, government proposal automation,
+capability to requirement mapping, federal proposal evidence.*
+
+**Proof:** `src/lib/proposal/evidence-match.ts` (hybrid vector+lexical retrieval,
+RRF fusion, LLM rerank) + the `match_vault_evidence` pgvector RPC, woven into the v2
+drafter (`src/lib/proposal/v2.ts`). Verified live against a real construction/abatement
+Vault: the asbestos requirement mapped to the three real asbestos-abatement contracts
+(South Street Landing, Longmeadow HS, Easton Building), historic-rehab → Boott Cotton
+Mills historic windows, general renovation → Poff Federal Building — each with a cited
+rationale — while a FedRAMP cloud-hosting requirement was correctly returned as an
+honest gap (no cloud evidence in a construction Vault). Automated grounding eval
+(`npm run eval:evidence-match`) gates predeploy: 4 requirements, 3 grounded matches,
+1 honest gap, 0 fabrications. Typecheck 0.

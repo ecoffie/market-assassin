@@ -33,7 +33,16 @@ import { matchRequirementsToEvidence, formatEvidenceMapForPrompt, type Requireme
 // Evidence weave (Phase 4) is env-gated for a controlled rollout. When off, the
 // drafter keeps the existing behavior (whole-vault dump + gap nudges). When on, it
 // ALSO gets a per-requirement "cite THIS contract" map from the semantic matcher.
-const EVIDENCE_WEAVE_ON = process.env.ENABLE_EVIDENCE_WEAVE === 'true';
+// ENABLE_EVIDENCE_WEAVE=true turns it on for everyone; EVIDENCE_WEAVE_WHITELIST
+// (comma-separated emails) turns it on for just those accounts even when the global
+// flag is off — a safety valve to smoke-test on prod before the 100% flip.
+const EVIDENCE_WEAVE_GLOBAL = process.env.ENABLE_EVIDENCE_WEAVE === 'true';
+const EVIDENCE_WEAVE_WHITELIST = new Set(
+  (process.env.EVIDENCE_WEAVE_WHITELIST || '').split(',').map((e) => e.trim().toLowerCase()).filter(Boolean),
+);
+function evidenceWeaveEnabledFor(email: string): boolean {
+  return EVIDENCE_WEAVE_GLOBAL || EVIDENCE_WEAVE_WHITELIST.has((email || '').toLowerCase());
+}
 // Cap requirements sent to the matcher per section — protects the LLM budget on a
 // 147-shall Technical volume (each requirement is an embed + a rerank call).
 const EVIDENCE_WEAVE_MAX_REQS = parseInt(process.env.EVIDENCE_WEAVE_MAX_REQS || '20', 10);
@@ -253,7 +262,7 @@ ${honestRule}
   // the model no longer guesses which of 10 contracts fits a given shall.
   // Gated + fail-safe: any error just falls back to the existing whole-vault dump.
   let evidenceMapCount = 0;
-  if (EVIDENCE_WEAVE_ON && vault.has_any && mine.length > 0) {
+  if (evidenceWeaveEnabledFor(email) && vault.has_any && mine.length > 0) {
     try {
       const reqInputs: RequirementInput[] = mine.map((r, i) => ({
         id: r.id || `REQ-${i + 1}`,
