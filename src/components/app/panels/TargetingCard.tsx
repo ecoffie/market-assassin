@@ -238,7 +238,12 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
   // Only expose Edit affordances when a navigation handler is wired. On the Settings
   // panel itself there's no target to send the user to (they're already editing), so
   // onEdit is omitted and the buttons hide — no dead clicks.
+  // `canEdit` gates the "Edit codes & keywords →" button that routes to Settings —
+  // this card's ONLY editing path. Inline chip add/remove is DISABLED on purpose
+  // (Eric QC 2026-07-02: "I don't want people adding here, only inside Settings"),
+  // so all mutation happens in one place. Read-only display + a jump to Settings.
   const canEdit = typeof onEdit === 'function';
+  const canInlineEdit = false;
   const edit = () => onEdit?.('settings');
   // One-line summary shown when collapsed (glanceable verify without the full card).
   const statesLabel = states.length > 0 ? states.join(', ') : 'Nationwide';
@@ -294,7 +299,7 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
             {naics.map((c) => (
               <span key={c} className="group inline-flex items-center gap-1 rounded bg-slate-800 px-2 py-0.5 text-xs text-slate-200">
                 {c}
-                {canEdit && (
+                {canInlineEdit && (
                   <button
                     onClick={() => removeItem('naics', c)}
                     disabled={saving}
@@ -305,7 +310,7 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
                 )}
               </span>
             ))}
-            {canEdit && (
+            {canInlineEdit && (
               addingField === 'naics' ? (
                 <input
                   autoFocus
@@ -324,7 +329,7 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
                 >+ add</button>
               )
             )}
-            {naics.length === 0 && !canEdit && (
+            {naics.length === 0 && !canInlineEdit && (
               <span className="text-xs text-slate-500">No codes set</span>
             )}
           </div>
@@ -339,7 +344,7 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
             {keywords.map((k) => (
               <span key={k} className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-300">
                 {k}
-                {canEdit && (
+                {canInlineEdit && (
                   <button
                     onClick={() => removeItem('keywords', k)}
                     disabled={saving}
@@ -350,7 +355,7 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
                 )}
               </span>
             ))}
-            {canEdit && (
+            {canInlineEdit && (
               addingField === 'keywords' ? (
                 <input
                   autoFocus
@@ -371,8 +376,8 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
                 >{noKeywords ? '⚠ Add keywords so alerts catch mislabeled opps' : '+ add'}</button>
               )
             )}
-            {noKeywords && !canEdit && (
-              <span className="text-xs text-amber-300">⚠ No keywords yet</span>
+            {noKeywords && !canInlineEdit && (
+              <span className="text-xs text-amber-300">⚠ No keywords yet — add in Settings</span>
             )}
           </div>
         </div>
@@ -386,7 +391,7 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
             {psc.map((c) => (
               <span key={c} className="inline-flex items-center gap-1 rounded bg-purple-500/15 px-2 py-0.5 text-xs text-purple-300">
                 {c}
-                {canEdit && (
+                {canInlineEdit && (
                   <button
                     onClick={() => removeItem('psc', c)}
                     disabled={saving}
@@ -397,7 +402,7 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
                 )}
               </span>
             ))}
-            {canEdit && (
+            {canInlineEdit && (
               addingField === 'psc' ? (
                 <input
                   autoFocus
@@ -416,7 +421,7 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
                 >+ add</button>
               )
             )}
-            {psc.length === 0 && !canEdit && (
+            {psc.length === 0 && !canInlineEdit && (
               <span className="text-xs text-slate-500">None set</span>
             )}
           </div>
