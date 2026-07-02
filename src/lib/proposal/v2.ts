@@ -28,6 +28,15 @@ import { formatNoticePocForPrompt, noticePocGroundingText, type NoticePocSet } f
 import { isCapStatementSection, type SectionType, type BuiltPrompt, type DraftResult } from './types';
 import { alignMatrix, priorityOf, normalizeCategory, type ComplianceReq } from './section-alignment';
 import { buildTemplateCorpusQuery, getTemplateCorpusDocTypes } from './template-corpus';
+import { matchRequirementsToEvidence, formatEvidenceMapForPrompt, type RequirementInput } from './evidence-match';
+
+// Evidence weave (Phase 4) is env-gated for a controlled rollout. When off, the
+// drafter keeps the existing behavior (whole-vault dump + gap nudges). When on, it
+// ALSO gets a per-requirement "cite THIS contract" map from the semantic matcher.
+const EVIDENCE_WEAVE_ON = process.env.ENABLE_EVIDENCE_WEAVE === 'true';
+// Cap requirements sent to the matcher per section — protects the LLM budget on a
+// 147-shall Technical volume (each requirement is an embed + a rerank call).
+const EVIDENCE_WEAVE_MAX_REQS = parseInt(process.env.EVIDENCE_WEAVE_MAX_REQS || '20', 10);
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = process.env.PROPOSAL_GROQ_MODEL || 'llama-3.3-70b-versatile';
@@ -237,6 +246,34 @@ ${honestRule}
   const reqBlock = formatSectionRequirements(mine);
   if (reqBlock) parts.push(reqBlock);
 
+  // PHASE 4 — semantic evidence weave. For THIS section's mapped requirements,
+  // find the bidder's real vault evidence that satisfies each one and tell the
+  // drafter to cite it one-to-one (and to bracket the requirements the vault
+  // can't support). This is the upgrade over formatVaultForPrompt's blind dump:
+  // the model no longer guesses which of 10 contracts fits a given shall.
+  // Gated + fail-safe: any error just falls back to the existing whole-vault dump.
+  let evidenceMapCount = 0;
+  if (EVIDENCE_WEAVE_ON && vault.has_any && mine.length > 0) {
+    try {
+      const reqInputs: RequirementInput[] = mine.map((r, i) => ({
+        id: r.id || `REQ-${i + 1}`,
+        requirement: r.requirement,
+        section: r.section,
+      }));
+      const evidenceMap = await matchRequirementsToEvidence(email, reqInputs, {
+        useRerank: true,
+        maxRequirements: EVIDENCE_WEAVE_MAX_REQS,
+      });
+      const evidenceBlock = formatEvidenceMapForPrompt(evidenceMap);
+      if (evidenceBlock) {
+        parts.push(evidenceBlock);
+        evidenceMapCount = evidenceMap.filter((m) => m.evidence.length > 0).length;
+      }
+    } catch (err) {
+      console.error('[proposal/v2] evidence weave failed (falling back to vault dump):', err);
+    }
+  }
+
   // SITUATION-AWARE LENGTH (Tier 1, Eric Jun 26): scale the target to how many
   // requirements this section actually owns, so a 147-requirement Technical volume
   // runs long and a 1-requirement Management note stays short — instead of every
@@ -269,6 +306,7 @@ ${honestRule}
       wasTruncated,
       targetWords,
       maxOutputTokens,
+      evidenceMapped: evidenceMapCount,
     },
   };
 }
@@ -355,6 +393,10 @@ export async function generateV2Draft(opts: {
       painPointsUsed: built.context.agency.painPoints.length,
       lensId: built.context.lens?.id || null,
       humanized: true,
+      // Phase 4 evidence weave: requirements mapped to real vault evidence for
+      // this section (0 when the weave is off). The UI can surface "N requirements
+      // matched to your past performance".
+      evidenceMapped: built.context.evidenceMapped ?? 0,
       // Fact-guard: how many ungrounded facts were caught + neutralized. >0
       // means the model tried to invent something the guard replaced with a
       // [placeholder]; the UI can surface "N unverified facts removed".

@@ -117,6 +117,9 @@ export interface BuiltPrompt {
      *  (scaled to the section's mapped-requirement count). */
     targetWords?: number;
     maxOutputTokens?: number;
+    /** Phase 4 evidence weave: how many of this section's requirements were mapped
+     *  to real vault evidence (0 when the weave is off or nothing matched). */
+    evidenceMapped?: number;
   };
 }
 
@@ -141,6 +144,8 @@ export interface DraftResult {
     painPointsUsed: number;
     lensId: string | null;
     humanized: boolean;
+    /** Phase 4 evidence weave: requirements mapped to real vault evidence (0=off/none). */
+    evidenceMapped?: number;
     /** Fact-guard: count of ungrounded facts caught + neutralized to [placeholders]. */
     factGuardFlags?: number;
     /** Fact-guard: the actual ungrounded values that were removed (capped). */

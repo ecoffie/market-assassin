@@ -281,6 +281,40 @@ async function mapPool<T, R>(items: T[], concurrency: number, fn: (item: T, i: n
 }
 
 /**
+ * Render a requirement→evidence map as a prompt block the drafter can cite from.
+ * This is the point of Phase 4: instead of dumping the vault's first 10 rows, the
+ * model is told, per requirement, WHICH real contract/capability to cite — and
+ * where the vault has NOTHING, to bracket the gap rather than bluff.
+ *
+ * Returns '' when there is no useful mapping (empty vault / all gaps handled
+ * elsewhere), so the caller can skip the block cleanly.
+ */
+export function formatEvidenceMapForPrompt(map: RequirementEvidence[]): string {
+  const withEvidence = map.filter((m) => m.evidence.length > 0);
+  const gaps = map.filter((m) => m.gap);
+  if (!withEvidence.length && !gaps.length) return '';
+
+  const lines: string[] = [];
+  for (const m of withEvidence) {
+    lines.push(`- **${m.requirement}**`);
+    for (const e of m.evidence) {
+      const why = e.why ? ` — ${e.why}` : '';
+      lines.push(`    → cite [${e.kind}] "${e.label}"${why}`);
+    }
+  }
+
+  let block = '';
+  if (withEvidence.length) {
+    block += `### Requirement → your real evidence (CITE THESE, one-to-one)\nFor each requirement below, the matcher found the bidder's ACTUAL past work that supports it. When you address that requirement, cite the named contract/capability specifically — do NOT substitute a generic "proven track record" claim, and do NOT cite a different requirement's evidence here.\n${lines.join('\n')}`;
+  }
+  if (gaps.length) {
+    const gapLines = gaps.slice(0, 12).map((g) => `- ${g.requirement}`).join('\n');
+    block += `${block ? '\n\n' : ''}### Requirements with NO matching evidence in the vault — BRACKET, do not bluff\nThe vault has no past performance or capability that supports these. Address them honestly: state any directly transferable strength plainly, then bracket the specifics the bidder must supply (e.g. "[relevant contract — title, agency, value]"). Never claim experience the vault can't back.\n${gapLines}`;
+  }
+  return block;
+}
+
+/**
  * Match a batch of requirements to the bidder's vault evidence.
  * Loads the vault ONCE, then runs hybrid retrieve → fuse → (rerank) per requirement.
  */
