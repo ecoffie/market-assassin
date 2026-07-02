@@ -1373,24 +1373,34 @@ function ParsedDocReview({
         // period is a single string like "2022-2025"; the schema stores
         // period_start/period_end as dates — split it into year bounds.
         const { start: periodStart, end: periodEnd } = splitPeriod(p.period);
-        const res = await fetch('/api/app/vault/past-performance', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
-          body: JSON.stringify({
-            email,
-            entry: {
-              contract_title: p.contract_title,
-              agency: p.agency,
-              contract_number: p.contract_number || '',
-              role: p.role || '',
-              scope_description: p.scope_description || '',
-              ...(numericValue != null ? { contract_value: numericValue } : {}),
-              ...(periodStart ? { period_start: periodStart } : {}),
-              ...(periodEnd ? { period_end: periodEnd } : {}),
-            },
-          }),
-        });
-        if (res.ok) saved += 1; else errors.push(p.contract_title);
+        // The route REQUIRES contract_title AND agency (400 otherwise). Some
+        // subcontract blocks parse without an agency/customer — rather than drop
+        // the whole row on a 400, save it with a clear placeholder the user can
+        // fix. (This was silently losing rows: a missing agency 400'd the POST.)
+        const agency = p.agency || '(add customer/agency)';
+        try {
+          const res = await fetch('/api/app/vault/past-performance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
+            body: JSON.stringify({
+              email,
+              entry: {
+                contract_title: p.contract_title,
+                agency,
+                contract_number: p.contract_number || '',
+                role: p.role || '',
+                scope_description: p.scope_description || '',
+                ...(numericValue != null ? { contract_value: numericValue } : {}),
+                ...(periodStart ? { period_start: periodStart } : {}),
+                ...(periodEnd ? { period_end: periodEnd } : {}),
+              },
+            }),
+          });
+          if (res.ok) saved += 1;
+          else errors.push(`${p.contract_title} (HTTP ${res.status})`);
+        } catch {
+          errors.push(`${p.contract_title} (network)`);
+        }
       }
 
       // 3) Capability rows.
@@ -1413,11 +1423,19 @@ function ParsedDocReview({
       }
 
       if (errors.length) {
-        setResult(`Saved ${saved} item${saved === 1 ? '' : 's'}. ${errors.length} couldn't be saved.`);
+        // Loud + specific so a partial/failed save is never invisible again.
+        setResult(`Saved ${saved} of ${selectedCount}. ${errors.length} failed: ${errors.slice(0, 4).join('; ')}${errors.length > 4 ? '…' : ''}`);
+        alert(`Saved ${saved} item${saved === 1 ? '' : 's'} to your Vault. ${errors.length} couldn't be saved:\n\n${errors.join('\n')}`);
+        // Still refresh + close so the ones that DID save show up immediately.
+        if (saved > 0) onSaved();
       } else {
         onSaved();
         return;
       }
+    } catch (e) {
+      // A thrown request used to vanish into finally — surface it.
+      setResult(`Save failed: ${e instanceof Error ? e.message : String(e)}`);
+      alert(`Couldn't save to your Vault: ${e instanceof Error ? e.message : String(e)}`);
     } finally {
       setSaving(false);
     }
