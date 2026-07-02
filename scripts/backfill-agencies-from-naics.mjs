@@ -21,6 +21,14 @@ const BASE = 'https://getmindy.ai';
 const CONCURRENCY = 6;          // polite to find-agencies (each call scans USASpending)
 const AGENCIES_PER_USER = 10;
 
+// Target ONLY custom-NAICS users (Eric 2026-07-02): people who replaced the
+// pre-populated default template, not the ~7,877 who kept it. A user is "custom"
+// if their NAICS includes ANY code outside this default 5-set. Default/subset-of-
+// default users are skipped here (new-user seed-on-save still covers them going
+// forward; Decision Makers also derives agencies on the fly).
+const DEFAULT_NAICS = new Set(['541512', '541611', '541330', '541990', '561210']);
+const isCustomNaics = (codes) => codes.map(String).some((c) => !DEFAULT_NAICS.has(c));
+
 const clean = v => v.trim().replace(/^["']|["']$/g, '').replace(/\\n$/, '').trim();
 const env = Object.fromEntries(
   fs.readFileSync('.env.vercel.tmp', 'utf8').split('\n').filter(l => l.includes('='))
@@ -68,7 +76,8 @@ async function fetchAllTargets() {
     for (const r of data) {
       const hasNaics = Array.isArray(r.naics_codes) && r.naics_codes.length > 0;
       const emptyAgencies = !Array.isArray(r.agencies) || r.agencies.length === 0;
-      if (hasNaics && emptyAgencies) targets.push(r);
+      // Custom-NAICS only — skip users who kept the pre-populated default set.
+      if (hasNaics && emptyAgencies && isCustomNaics(r.naics_codes)) targets.push(r);
     }
     if (data.length < PAGE) break;
   }
