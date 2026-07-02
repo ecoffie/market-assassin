@@ -20,6 +20,7 @@ const WRITABLE = [
   'full_name', 'title', 'email', 'phone', 'linkedin_url',
   'years_experience', 'certifications', 'security_clearance',
   'bio_short', 'bio_full', 'role_type', 'is_key_personnel',
+  'resume_storage_path', 'resume_filename',
 ];
 
 function pick(input: Record<string, unknown>) {

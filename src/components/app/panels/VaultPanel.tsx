@@ -84,6 +84,8 @@ interface TeamMember {
   years_experience?: number | null;
   bio_short?: string | null;
   is_key_personnel?: boolean;
+  resume_storage_path?: string | null;
+  resume_filename?: string | null;
 }
 
 interface BoilerplateDoc {
@@ -858,6 +860,47 @@ function TeamForm({ email, initial, editId, onSaved, onCancel }: { email: string
     is_key_personnel: initial?.is_key_personnel ?? true,
   });
   const [saving, setSaving] = useState(false);
+  // Resume upload → parse → pre-fill. We keep the stored file's key so it saves
+  // with the person; parsed fields land in the form for the user to REVIEW.
+  const [resumeStoragePath, setResumeStoragePath] = useState(initial?.resume_storage_path || '');
+  const [resumeFilename, setResumeFilename] = useState(initial?.resume_filename || '');
+  const [parsing, setParsing] = useState(false);
+  const [resumeMsg, setResumeMsg] = useState<string | null>(null);
+
+  const onResume = async (file: File) => {
+    setParsing(true);
+    setResumeMsg(null);
+    try {
+      const fd = new FormData();
+      fd.append('file', file);
+      fd.append('email', email);
+      const res = await fetch('/api/app/vault/team/resume', {
+        method: 'POST',
+        headers: getMIApiHeaders(email), // NOTE: no Content-Type — browser sets multipart boundary
+        body: fd,
+      });
+      const data = await res.json();
+      if (!data.success) throw new Error(data.error || 'Could not read the resume');
+      if (data.storage_path) { setResumeStoragePath(data.storage_path); setResumeFilename(data.filename || file.name); }
+      if (data.parsed && data.fields) {
+        const f = data.fields;
+        setForm(prev => ({
+          ...prev,
+          full_name: f.full_name || prev.full_name,
+          title: f.title || prev.title,
+          security_clearance: f.security_clearance || prev.security_clearance,
+          certifications: Array.isArray(f.certifications) && f.certifications.length ? f.certifications.join(', ') : prev.certifications,
+          years_experience: f.years_experience ? String(f.years_experience) : prev.years_experience,
+          bio_short: f.bio_short || prev.bio_short,
+        }));
+        setResumeMsg('Pre-filled from the resume — review the fields below and edit anything before saving.');
+      } else {
+        setResumeMsg(data.note || 'Resume saved, but the fields couldn’t be auto-read — please fill them in.');
+      }
+    } catch (e) {
+      setResumeMsg(e instanceof Error ? e.message : 'Resume upload failed');
+    } finally { setParsing(false); }
+  };
 
   const save = async () => {
     if (!form.full_name.trim() || !form.title.trim()) return;
@@ -873,6 +916,8 @@ function TeamForm({ email, initial, editId, onSaved, onCancel }: { email: string
             ...form,
             years_experience: form.years_experience ? Number(form.years_experience) : null,
             certifications: form.certifications.split(',').map(s => s.trim()).filter(Boolean),
+            resume_storage_path: resumeStoragePath || null,
+            resume_filename: resumeFilename || null,
           },
         }),
       });
@@ -883,6 +928,31 @@ function TeamForm({ email, initial, editId, onSaved, onCancel }: { email: string
   return (
     <div className="border border-emerald-900 rounded-lg p-5 mb-5 bg-emerald-950/20 space-y-3">
       <h3 className="text-white font-medium">{editId ? 'Edit key personnel' : 'New key personnel'}</h3>
+
+      {/* Resume auto-fill — the 10x shortcut. Parse → review → save. */}
+      <div className="rounded-lg border border-dashed border-emerald-700/50 bg-emerald-950/30 p-3">
+        <div className="flex items-center justify-between gap-3 flex-wrap">
+          <div className="text-sm text-slate-300">
+            <span className="font-medium text-white">📄 Auto-fill from a resume</span>
+            <span className="text-slate-400"> — upload a PDF or DOCX and Mindy fills the fields for you to review.</span>
+          </div>
+          <label className={`shrink-0 px-3 py-1.5 rounded text-sm cursor-pointer ${parsing ? 'bg-slate-700 text-slate-400' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}>
+            {parsing ? 'Reading…' : (resumeFilename ? 'Replace resume' : 'Upload resume')}
+            <input
+              type="file"
+              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+              className="hidden"
+              disabled={parsing}
+              onChange={(e) => { const file = e.target.files?.[0]; if (file) onResume(file); e.target.value = ''; }}
+            />
+          </label>
+        </div>
+        {resumeFilename && !parsing && (
+          <p className="text-xs text-emerald-300/90 mt-2">Attached: {resumeFilename}</p>
+        )}
+        {resumeMsg && <p className="text-xs text-slate-400 mt-2">{resumeMsg}</p>}
+      </div>
+
       <div className="grid grid-cols-2 gap-3">
         <Field label="Full name *" value={form.full_name} onChange={(v) => setForm(f => ({ ...f, full_name: v }))} />
         <Field label="Title *" value={form.title} onChange={(v) => setForm(f => ({ ...f, title: v }))} placeholder="Program Manager" />
