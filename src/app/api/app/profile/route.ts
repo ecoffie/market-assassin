@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
 
     const { data: existingSettings } = await supabase
       .from('user_notification_settings')
-      .select('user_email, invitation_source, trial_source, agencies')
+      .select('user_email, invitation_source, trial_source, agencies, keywords')
       .eq('user_email', rowEmail)
       .maybeSingle();
 
@@ -190,20 +190,26 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // AUTO-SEED target agencies from NAICS (Eric 2026-07-02) — the OTHER slurpee
-    // save path (this route == /api/mindy/profile). Mirror the same seed added to
-    // /api/alerts/preferences so agencies get populated no matter which onboarding
-    // branch a new user takes. Seed when: NAICS is being written non-empty, the
-    // caller didn't explicitly set agencies, and stored agencies are still empty.
-    // ALL tiers. Best-effort — a scan failure just leaves agencies empty.
-    const savingNaics = Array.isArray(updateData.naics_codes) && (updateData.naics_codes as string[]).length > 0;
+    // AUTO-SEED target agencies from the profile (Eric 2026-07-02) — the OTHER slurpee
+    // save path (this route == /api/mindy/profile). Mirror the keyword-first seed added
+    // to /api/alerts/preferences so agencies populate no matter which onboarding branch
+    // a new user takes. Seed when the profile has a targeting signal (NAICS or keyword),
+    // the caller didn't set agencies, and stored agencies are empty. KEYWORD-FIRST —
+    // keyword is more precise + better covered than NAICS. ALL tiers. Best-effort.
+    const effectiveKeywords = Array.isArray(updateData.keywords)
+      ? (updateData.keywords as string[])
+      : (Array.isArray(existingSettings?.keywords) ? (existingSettings!.keywords as string[]) : []);
+    const effectiveNaics = Array.isArray(updateData.naics_codes) ? (updateData.naics_codes as string[]) : [];
+    const hasSignal = effectiveKeywords.length > 0 || effectiveNaics.length > 0;
     const callerSetAgencies = Array.isArray(targetAgencies);
     const existingAgencies = Array.isArray(existingSettings?.agencies) ? (existingSettings!.agencies as string[]) : [];
-    if (savingNaics && !callerSetAgencies && existingAgencies.length === 0) {
+    if (hasSignal && !callerSetAgencies && existingAgencies.length === 0) {
       try {
-        const { deriveAgenciesFromNaics } = await import('@/lib/app/derive-agencies-from-naics');
+        const { deriveAgenciesFromProfile } = await import('@/lib/app/derive-agencies-from-naics');
         const base = new URL(request.url).origin;
-        const seeded = await deriveAgenciesFromNaics(updateData.naics_codes as string[], base, 10);
+        const seeded = await deriveAgenciesFromProfile(
+          { keywords: effectiveKeywords, naics: effectiveNaics }, base, 10,
+        );
         if (seeded.length > 0) updateData.agencies = seeded;
       } catch (e) {
         console.warn('[app/profile] agency auto-seed skipped:', (e as Error).message);

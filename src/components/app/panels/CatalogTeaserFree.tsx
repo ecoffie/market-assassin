@@ -31,7 +31,7 @@ interface Props {
   onPanelChange?: (panel: AppPanel) => void;
 }
 
-type Profile = { naics: string[]; agencies: string[] };
+type Profile = { naics: string[]; agencies: string[]; keywords: string[] };
 
 // Per-surface config: title/noun for copy, and a builder that turns the user's
 // profile into the real request URL. All endpoints are auth-gated (not tier-gated),
@@ -64,11 +64,18 @@ const CONFIG: Record<FeatureId, {
     title: 'Upcoming Buys',
     noun: 'upcoming agency forecasts',
     setupPrompt: 'Set your NAICS codes, PSC codes, and keywords',
+    // KEYWORD-FIRST: forecasts supports ?search= (free-text), which is tighter than
+    // NAICS. Use the user's keyword when present, else fall back to NAICS. (recompete
+    // and contractors have NO keyword filter, so those stay NAICS-only.)
     build: (p) => {
+      const keyword = p.keywords[0];
       const naics = p.naics[0];
-      if (!naics) return null;
+      if (!keyword && !naics) return null;
+      const scope = keyword
+        ? `search=${encodeURIComponent(keyword)}`
+        : `naics=${encodeURIComponent(naics)}`;
       return {
-        url: `/api/forecasts?naics=${encodeURIComponent(naics)}&limit=5`,
+        url: `/api/forecasts?${scope}&limit=5`,
         countKeys: ['pagination.total', 'summary.totalForecasts'],
         labelKeys: ['title', 'agency', 'department'],
       };
@@ -153,6 +160,7 @@ export default function CatalogTeaserFree({ email, featureId, onPanelChange }: P
       const profile: Profile = {
         naics: Array.isArray(s.naics_codes) ? s.naics_codes.map(String) : [],
         agencies: Array.isArray(s.agencies) ? s.agencies.map(String) : [],
+        keywords: Array.isArray(s.keywords) ? s.keywords.map(String) : [],
       };
 
       // Decision Makers is agency-scoped, but agencies are often empty on the
@@ -160,10 +168,12 @@ export default function CatalogTeaserFree({ email, featureId, onPanelChange }: P
       // "add agencies" nudge, DERIVE the top buying agencies from the user's NAICS
       // on the fly — the same source that now seeds the profile on save. This makes
       // the surface work the moment they have NAICS, no agency step required.
-      if (featureId === 'decision-makers' && profile.agencies.length === 0 && profile.naics.length > 0) {
+      if (featureId === 'decision-makers' && profile.agencies.length === 0 && (profile.keywords.length > 0 || profile.naics.length > 0)) {
         try {
-          const { deriveAgenciesFromNaics } = await import('@/lib/app/derive-agencies-from-naics');
-          const derived = await deriveAgenciesFromNaics(profile.naics, window.location.origin, 10);
+          const { deriveAgenciesFromProfile } = await import('@/lib/app/derive-agencies-from-naics');
+          const derived = await deriveAgenciesFromProfile(
+            { keywords: profile.keywords, naics: profile.naics }, window.location.origin, 10,
+          );
           if (derived.length > 0) profile.agencies = derived;
         } catch { /* fall through — build() will show the nudge if still empty */ }
       }

@@ -772,6 +772,33 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
               )}
             </div>
 
+            {/* PSC-ADOPTION NUDGE (Eric 2026-07-02). Only 0.4% of users have PSC codes,
+                yet PSC is the most precise targeting signal ("what the gov actually buys").
+                The one-tap PSC picker lived buried inside the collapsed "Fine-tune" section,
+                so nobody found it. Surface a proactive callout when the user has NO PSC but
+                we have suggestions for their market — one tap adds the tightest signal. */}
+            {parseList(form.psc_codes).length === 0 && pscSuggestions.length > 0 && (
+              <div className="rounded-xl border border-purple-500/30 bg-purple-500/5 p-3">
+                <p className="text-sm text-purple-100">
+                  <b>Sharpen your matches with PSC codes.</b> NAICS is your industry; PSC is
+                  exactly <i>what the government buys</i> — the most precise signal Mindy can match on.
+                </p>
+                <div className="mt-2 text-[11px] uppercase tracking-wide text-slate-500">Top codes for your market — tap to add:</div>
+                <div className="mt-1 flex flex-wrap gap-1.5">
+                  {pscSuggestions.slice(0, 6).map((p) => (
+                    <button
+                      key={p.code}
+                      onClick={() => togglePscSuggestion(p.code)}
+                      title={p.name}
+                      className="inline-flex items-center gap-1 rounded-full border border-purple-500/40 bg-purple-500/10 px-2.5 py-1 text-xs text-purple-200 hover:bg-purple-500/20 transition-colors"
+                    >
+                      + {p.code} <span className="max-w-[150px] truncate opacity-70">{p.name}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Manual fine-tune — collapsed by default so most users just use the
                 describe box above. Power users expand to paste/edit codes directly. */}
             <button
