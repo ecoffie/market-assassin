@@ -156,13 +156,22 @@ export async function loadVaultContext(email: string, sectionType: SectionType):
   return ctx;
 }
 
-// Format a stored money value (often a bare integer string like "15000000")
-// as clean, citable currency: "$15,000,000". Without this the model sees a raw
-// number, can't phrase it, and emits garbage like "$[amount]illion".
+// Format a stored money value as clean, citable currency. Two shapes reach here:
+//  - a bare number ("15000000") → "$15,000,000"
+//  - a human string carrying a magnitude word ("$25 Million") → must NOT be
+//    truncated to "$25" (the old bug: stripping non-digits killed "Million").
+//    We expand the magnitude to a full number so the model can phrase it.
 function fmtMoney(v: unknown): string | null {
   if (v == null || v === '') return null;
-  const n = Number(String(v).replace(/[^0-9.]/g, ''));
-  if (!Number.isFinite(n) || n <= 0) return typeof v === 'string' ? v : null;
+  const raw = String(v).trim();
+  const numMatch = raw.replace(/,/g, '').match(/([\d.]+)/);
+  if (!numMatch) return null;
+  let n = Number(numMatch[1]);
+  if (!Number.isFinite(n) || n <= 0) return raw || null;
+  // Expand a trailing magnitude word so "$25 Million" → 25,000,000.
+  if (/\bthousand\b|\bk\b/i.test(raw)) n *= 1e3;
+  else if (/\bmillion\b|\bmm?\b/i.test(raw)) n *= 1e6;
+  else if (/\bbillion\b|\bb\b/i.test(raw)) n *= 1e9;
   return `$${n.toLocaleString('en-US')}`;
 }
 
