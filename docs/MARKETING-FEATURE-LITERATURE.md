@@ -2914,3 +2914,42 @@ runs daily via the `sync-dibbs` dispatcher cron. **Verified live on production:*
 `sync-dibbs` returned `{"success":true,"fetched":5,"upserted":1}`, and real DLA Troop
 Support RFQs (e.g. SPE1C1-26-Q-0325, NSN 8415-01-534-8411, helmet liner) confirmed in
 the table. Ingest dedupes by solicitation_number (idempotent). Typecheck 0 errors.
+
+---
+
+## Vault: Capability Statement → Structured Sections (July 2, 2026)
+
+**What:** When you upload a capability statement to your Vault, Mindy now reads it
+and pulls it apart into the Vault's structured sections — your **Overview**, your
+**Past Performance** contracts, and your **Capabilities** — and shows them to you in a
+review screen. You check off what's right (uncheck anything wrong) and save it all to
+your Vault in one click. No retyping your whole cap statement into forms.
+
+**Why:** Every contractor already has a capability statement — it's the one document
+they've polished. But that value was trapped as a flat PDF. Retyping it into
+Overview/Past-Perf/Capability forms is exactly the friction that leaves a Vault empty,
+and an empty Vault means generic proposal drafts. Turning the cap statement into
+structured, editable Vault data means Mindy writes proposals grounded in your real
+past performance and capabilities — not placeholders. Same parse→review→save pattern
+as the Key Personnel resume upload: fast intake, human confirms, nothing auto-committed.
+
+**Honesty note:** The old "parse into editable sections" copy on this upload card
+promised structured section-splitting the code didn't actually do (it only extracted
+flat text). This feature makes the promise true rather than rewriting the copy to be
+smaller — the cap statement now genuinely powers the structured Vault.
+
+**SEO angle:** *capability statement parser, capability statement to proposal, import
+capability statement, GovCon Vault, federal past performance library, auto-fill
+proposal from cap statement.*
+
+**Proof:** `POST /api/app/vault/documents/parse` (authed via `verifyUserOwnsEmail`)
+loads the already-extracted text of an uploaded `cap_stmt` doc and runs
+`callLLM({ job:'reasoning' })` (gpt-4o-mini-first cost chain) with a strict schema +
+a hard "use ONLY text present in the document, NEVER invent a contract/agency/value"
+rule (grounds every fact in the source, per the #1 quality principle). It returns
+suggested Overview / Past Performance[] / Capabilities[] — and writes NOTHING. The
+`ParsedDocReview` modal in `VaultPanel.tsx` lets the user select which items to keep;
+each accepted item POSTs to the existing structured routes (`vault/identity`,
+`vault/past-performance`, `vault/capabilities`), reusing them with zero new tables.
+A "Pull into sections" button also re-parses any already-uploaded cap statement.
+Typecheck 0 errors, lint clean.

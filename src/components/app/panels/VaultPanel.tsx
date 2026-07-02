@@ -1040,10 +1040,25 @@ function TeamRow({ m, email, onChanged }: { m: TeamMember; email: string; onChan
 }
 
 // ---- Documents (boilerplate / cap statements) -------------------------
+// Shape of the parsed cap-statement (mirrors /api/app/vault/documents/parse).
+interface ParsedDoc {
+  overview: { one_liner: string; elevator_pitch: string };
+  past_performance: {
+    contract_title: string; agency: string; contract_number: string;
+    role: string; scope_description: string; period: string; contract_value: string;
+  }[];
+  capabilities: { capability_name: string; description: string; keywords: string[] }[];
+}
+
 function DocumentsSection({ email, items, onChanged }: { email: string; items: BoilerplateDoc[]; onChanged: () => void }) {
   const [uploading, setUploading] = useState(false);
+  const [parsing, setParsing] = useState(false);
+  // The parse→review modal state. `review` holds the parsed sections awaiting confirm.
+  const [review, setReview] = useState<{ parsed: ParsedDoc; filename: string } | null>(null);
 
-  const upload = async (file: File, doc_type: string) => {
+  // Upload a doc. Returns the created document row (with id) so cap statements
+  // can immediately be parsed into structured sections.
+  const upload = async (file: File, doc_type: string): Promise<BoilerplateDoc | null> => {
     setUploading(true);
     try {
       const fd = new FormData();
@@ -1059,12 +1074,46 @@ function DocumentsSection({ email, items, onChanged }: { email: string; items: B
         const txt = await res.text();
         throw new Error(txt || `HTTP ${res.status}`);
       }
+      const data = await res.json();
       onChanged();
+      return (data?.document as BoilerplateDoc) || null;
     } catch (e) {
       alert(`Upload failed: ${e instanceof Error ? e.message : String(e)}`);
+      return null;
     } finally {
       setUploading(false);
     }
+  };
+
+  // Ask the LLM to split an uploaded doc's text into Vault sections, then open
+  // the review modal. Never auto-commits — the user confirms in the modal.
+  const parseDoc = async (documentId: string, filename: string) => {
+    setParsing(true);
+    try {
+      const res = await fetch('/api/app/vault/documents/parse', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
+        body: JSON.stringify({ email, document_id: documentId }),
+      });
+      const data = await res.json();
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || `HTTP ${res.status}`);
+      }
+      if (!data.counts?.total) {
+        alert('Mindy stored the document, but found nothing structured to pull out. You can add sections manually.');
+        return;
+      }
+      setReview({ parsed: data.parsed as ParsedDoc, filename: data.filename || filename });
+    } catch (e) {
+      alert(`Couldn't parse into sections: ${e instanceof Error ? e.message : String(e)}\n\nThe document is still saved as reference material.`);
+    } finally {
+      setParsing(false);
+    }
+  };
+
+  const onCapStatement = async (f: File) => {
+    const doc = await upload(f, 'cap_stmt');
+    if (doc?.id) await parseDoc(doc.id, doc.original_filename);
   };
 
   return (
@@ -1072,25 +1121,32 @@ function DocumentsSection({ email, items, onChanged }: { email: string; items: B
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
         <UploadCard
           title="Upload Capability Statement"
-          body="PDF or Word. Mindy will parse it into editable sections (Overview, Past Performance, Capabilities, etc.) so the content powers every cap statement going forward."
+          body="PDF or Word. Mindy reads it and pulls out your Overview, Past Performance, and Capabilities into editable Vault sections — you review each before it's saved."
           accept=".pdf,.docx,.doc"
-          disabled={uploading}
-          onFile={(f) => upload(f, 'cap_stmt')}
+          disabled={uploading || parsing}
+          onFile={onCapStatement}
         />
         <UploadCard
           title="Upload Company Overview / Other"
           body="Any boilerplate doc — company overview, cover letter template, past perf table. Mindy extracts the text and uses it as reference material."
           accept=".pdf,.docx,.doc,.txt"
-          disabled={uploading}
+          disabled={uploading || parsing}
           onFile={(f) => upload(f, 'other')}
         />
       </div>
+
+      {parsing && (
+        <div className="mb-4 flex items-center gap-2 text-sm text-emerald-400">
+          <span className="inline-block h-3 w-3 rounded-full border-2 border-emerald-400 border-t-transparent animate-spin" />
+          Reading your capability statement into sections…
+        </div>
+      )}
 
       {items.length === 0 ? (
         <EmptyState
           icon="📄"
           title="No documents uploaded yet"
-          body="Upload your existing capability statement to get started. Mindy will parse it into structured sections you can edit and reuse."
+          body="Upload your existing capability statement to get started. Mindy pulls it apart into structured sections you can review, edit, and reuse."
         />
       ) : (
         <div className="space-y-2">
@@ -1106,10 +1162,226 @@ function DocumentsSection({ email, items, onChanged }: { email: string; items: B
                   </span>
                 </p>
               </div>
+              {/* Re-parse an already-uploaded cap statement into sections. */}
+              {d.doc_type === 'cap_stmt' && d.parse_status === 'parsed' && (
+                <button
+                  onClick={() => parseDoc(d.id, d.original_filename)}
+                  disabled={parsing}
+                  className="ml-3 shrink-0 text-xs px-2.5 py-1 rounded border border-emerald-700/60 text-emerald-300 hover:bg-emerald-900/30 disabled:opacity-50"
+                >
+                  Pull into sections
+                </button>
+              )}
             </div>
           ))}
         </div>
       )}
+
+      {review && (
+        <ParsedDocReview
+          email={email}
+          filename={review.filename}
+          parsed={review.parsed}
+          onClose={() => setReview(null)}
+          onSaved={() => { setReview(null); onChanged(); }}
+        />
+      )}
+    </div>
+  );
+}
+
+// Review modal: shows what Mindy pulled out of the capability statement and lets
+// the user pick which pieces to save. Each accepted item POSTs to its existing
+// structured route (identity / past-performance / capabilities) — nothing is
+// written until the user clicks Save.
+function ParsedDocReview({
+  email, filename, parsed, onClose, onSaved,
+}: {
+  email: string;
+  filename: string;
+  parsed: ParsedDoc;
+  onClose: () => void;
+  onSaved: () => void;
+}) {
+  const hasOverview = Boolean(parsed.overview.one_liner || parsed.overview.elevator_pitch);
+  const [takeOverview, setTakeOverview] = useState(hasOverview);
+  const [ppChecked, setPpChecked] = useState<boolean[]>(parsed.past_performance.map(() => true));
+  const [capChecked, setCapChecked] = useState<boolean[]>(parsed.capabilities.map(() => true));
+  const [saving, setSaving] = useState(false);
+  const [result, setResult] = useState<string | null>(null);
+
+  const toggle = (arr: boolean[], i: number, set: (v: boolean[]) => void) => {
+    const next = [...arr];
+    next[i] = !next[i];
+    set(next);
+  };
+
+  const selectedCount =
+    (takeOverview && hasOverview ? 1 : 0) +
+    ppChecked.filter(Boolean).length +
+    capChecked.filter(Boolean).length;
+
+  const save = async () => {
+    setSaving(true);
+    let saved = 0;
+    const errors: string[] = [];
+    try {
+      // 1) Overview → identity (merge into one_liner / elevator_pitch).
+      if (takeOverview && hasOverview) {
+        const res = await fetch('/api/app/vault/identity', {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
+          body: JSON.stringify({
+            email,
+            profile: {
+              ...(parsed.overview.one_liner ? { one_liner: parsed.overview.one_liner } : {}),
+              ...(parsed.overview.elevator_pitch ? { elevator_pitch: parsed.overview.elevator_pitch } : {}),
+            },
+          }),
+        });
+        if (res.ok) saved += 1; else errors.push('overview');
+      }
+
+      // 2) Past performance rows.
+      for (let i = 0; i < parsed.past_performance.length; i++) {
+        if (!ppChecked[i]) continue;
+        const p = parsed.past_performance[i];
+        const res = await fetch('/api/app/vault/past-performance', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
+          body: JSON.stringify({
+            email,
+            entry: {
+              contract_title: p.contract_title,
+              agency: p.agency,
+              contract_number: p.contract_number || '',
+              role: p.role || '',
+              scope_description: p.scope_description || '',
+            },
+          }),
+        });
+        if (res.ok) saved += 1; else errors.push(p.contract_title);
+      }
+
+      // 3) Capability rows.
+      for (let i = 0; i < parsed.capabilities.length; i++) {
+        if (!capChecked[i]) continue;
+        const c = parsed.capabilities[i];
+        const res = await fetch('/api/app/vault/capabilities', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
+          body: JSON.stringify({
+            email,
+            entry: {
+              capability_name: c.capability_name,
+              description: c.description,
+              keywords: c.keywords || [],
+            },
+          }),
+        });
+        if (res.ok) saved += 1; else errors.push(c.capability_name);
+      }
+
+      if (errors.length) {
+        setResult(`Saved ${saved} item${saved === 1 ? '' : 's'}. ${errors.length} couldn't be saved.`);
+      } else {
+        onSaved();
+        return;
+      }
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
+      <div
+        className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-xl border border-slate-700 bg-slate-950 shadow-2xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-800 bg-slate-950 px-5 py-4">
+          <div>
+            <h3 className="text-white font-semibold">Review what Mindy found</h3>
+            <p className="text-xs text-slate-400 truncate max-w-md">From <span className="text-slate-300">{filename}</span> · uncheck anything wrong before saving</p>
+          </div>
+          <button onClick={onClose} className="text-slate-400 hover:text-white text-xl leading-none">×</button>
+        </div>
+
+        <div className="p-5 space-y-6">
+          {/* Overview */}
+          {hasOverview && (
+            <section>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input type="checkbox" checked={takeOverview} onChange={() => setTakeOverview((v) => !v)} className="mt-1 accent-emerald-500" />
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-emerald-300 mb-1">Overview → Identity</p>
+                  {parsed.overview.one_liner && <p className="text-sm text-white">{parsed.overview.one_liner}</p>}
+                  {parsed.overview.elevator_pitch && <p className="text-xs text-slate-400 mt-1">{parsed.overview.elevator_pitch}</p>}
+                </div>
+              </label>
+            </section>
+          )}
+
+          {/* Past performance */}
+          {parsed.past_performance.length > 0 && (
+            <section>
+              <p className="text-sm font-medium text-emerald-300 mb-2">Past Performance ({ppChecked.filter(Boolean).length}/{parsed.past_performance.length})</p>
+              <div className="space-y-2">
+                {parsed.past_performance.map((p, i) => (
+                  <label key={i} className="flex items-start gap-2 cursor-pointer border border-slate-800 rounded-lg p-3 bg-slate-900/40">
+                    <input type="checkbox" checked={ppChecked[i]} onChange={() => toggle(ppChecked, i, setPpChecked)} className="mt-1 accent-emerald-500" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white">{p.contract_title}</p>
+                      <p className="text-xs text-slate-400">
+                        {p.agency}
+                        {p.contract_number ? ` · ${p.contract_number}` : ''}
+                        {p.period ? ` · ${p.period}` : ''}
+                        {p.contract_value ? ` · ${p.contract_value}` : ''}
+                      </p>
+                      {p.scope_description && <p className="text-xs text-slate-500 mt-1 line-clamp-2">{p.scope_description}</p>}
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Capabilities */}
+          {parsed.capabilities.length > 0 && (
+            <section>
+              <p className="text-sm font-medium text-emerald-300 mb-2">Capabilities ({capChecked.filter(Boolean).length}/{parsed.capabilities.length})</p>
+              <div className="space-y-2">
+                {parsed.capabilities.map((c, i) => (
+                  <label key={i} className="flex items-start gap-2 cursor-pointer border border-slate-800 rounded-lg p-3 bg-slate-900/40">
+                    <input type="checkbox" checked={capChecked[i]} onChange={() => toggle(capChecked, i, setCapChecked)} className="mt-1 accent-emerald-500" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm text-white">{c.capability_name}</p>
+                      {c.description && <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{c.description}</p>}
+                      {c.keywords.length > 0 && <p className="text-[11px] text-slate-500 mt-1">{c.keywords.join(' · ')}</p>}
+                    </div>
+                  </label>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {result && <p className="text-sm text-amber-400">{result}</p>}
+        </div>
+
+        <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-slate-800 bg-slate-950 px-5 py-4">
+          <p className="text-xs text-slate-500">Mindy only pulls text that&apos;s in your document. Nothing saves until you click below.</p>
+          <div className="flex gap-2 shrink-0">
+            <button onClick={onClose} className="text-sm px-3 py-2 text-slate-300 hover:text-white">Cancel</button>
+            <button
+              onClick={save}
+              disabled={saving || selectedCount === 0}
+              className="text-sm px-4 py-2 rounded bg-emerald-600 hover:bg-emerald-500 text-white font-medium disabled:opacity-50"
+            >
+              {saving ? 'Saving…' : `Save ${selectedCount} to Vault`}
+            </button>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }
