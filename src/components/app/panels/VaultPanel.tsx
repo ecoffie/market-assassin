@@ -1081,45 +1081,15 @@ const IDENTITY_LABELS: { key: keyof ParsedIdentityFields; label: string }[] = [
   { key: 'bonding_aggregate', label: 'Bonding (aggregate)' },
 ];
 
-// The parser returns contract_value as a formatted string ("$10,900,000",
-// "$2.4M", "1,176,585.00"); the DB column is NUMERIC. Coerce to a number so the
-// value actually lands. Returns null if there's no parseable number (so we omit
-// the field rather than send NaN/"" to a numeric column).
-function parseCurrency(raw: string | null | undefined): number | null {
-  if (!raw) return null;
-  const s = String(raw).trim().toLowerCase();
-  // Support a trailing magnitude suffix (2.4m / 900k / 1.2b).
-  const m = s.match(/([\d,]+(?:\.\d+)?)\s*(k|m|b|million|billion|thousand)?/);
-  if (!m) return null;
-  const num = parseFloat(m[1].replace(/,/g, ''));
-  if (!isFinite(num)) return null;
-  const suffix = m[2];
-  const mult =
-    suffix === 'k' || suffix === 'thousand' ? 1e3
-    : suffix === 'm' || suffix === 'million' ? 1e6
-    : suffix === 'b' || suffix === 'billion' ? 1e9
-    : 1;
-  const val = Math.round(num * mult);
-  return val > 0 ? val : null;
-}
-
-// period is a single string like "2022-2025" / "2021 – 2023" / "FY2024". Split
-// into period_start / period_end as Jan-1 / Dec-31 dates for the two date cols.
-// Returns empty strings when no year is found (fields are then omitted).
-function splitPeriod(raw: string | null | undefined): { start: string; end: string } {
-  if (!raw) return { start: '', end: '' };
-  const years = String(raw).match(/(19|20)\d{2}/g);
-  if (!years || years.length === 0) return { start: '', end: '' };
-  const start = `${years[0]}-01-01`;
-  const end = years.length > 1 ? `${years[years.length - 1]}-12-31` : '';
-  return { start, end };
-}
+// NOTE: contract_value coercion + period splitting now live SERVER-SIDE in
+// src/lib/vault/normalize.ts (used by /api/app/vault/documents/commit). The client
+// no longer maps parser output → columns — it just sends the kept selections.
 
 function DocumentsSection({ email, items, onChanged }: { email: string; items: BoilerplateDoc[]; onChanged: () => void }) {
   const [uploading, setUploading] = useState(false);
   const [parsing, setParsing] = useState(false);
   // The parse→review modal state. `review` holds the parsed sections awaiting confirm.
-  const [review, setReview] = useState<{ parsed: ParsedDoc; filename: string } | null>(null);
+  const [review, setReview] = useState<{ parsed: ParsedDoc; filename: string; documentId: string } | null>(null);
 
   // Upload a doc. Returns the created document row (with id) so cap statements
   // can immediately be parsed into structured sections.
@@ -1168,7 +1138,7 @@ function DocumentsSection({ email, items, onChanged }: { email: string; items: B
         alert('Mindy stored the document, but found nothing structured to pull out. You can add sections manually.');
         return;
       }
-      setReview({ parsed: data.parsed as ParsedDoc, filename: data.filename || filename });
+      setReview({ parsed: data.parsed as ParsedDoc, filename: data.filename || filename, documentId });
     } catch (e) {
       alert(`Couldn't parse into sections: ${e instanceof Error ? e.message : String(e)}\n\nThe document is still saved as reference material.`);
     } finally {
@@ -1280,6 +1250,7 @@ function DocumentsSection({ email, items, onChanged }: { email: string; items: B
         <ParsedDocReview
           email={email}
           filename={review.filename}
+          documentId={review.documentId}
           parsed={review.parsed}
           onClose={() => setReview(null)}
           onSaved={() => { setReview(null); onChanged(); }}
@@ -1294,10 +1265,11 @@ function DocumentsSection({ email, items, onChanged }: { email: string; items: B
 // structured route (identity / past-performance / capabilities) — nothing is
 // written until the user clicks Save.
 function ParsedDocReview({
-  email, filename, parsed, onClose, onSaved,
+  email, filename, documentId, parsed, onClose, onSaved,
 }: {
   email: string;
   filename: string;
+  documentId: string;
   parsed: ParsedDoc;
   onClose: () => void;
   onSaved: () => void;
@@ -1332,108 +1304,62 @@ function ParsedDocReview({
 
   const save = async () => {
     setSaving(true);
-    let saved = 0;
-    const errors: string[] = [];
     try {
-      // 1) Overview + Identity → the identity profile. Both write to the SAME
-      // identity PUT route, so build ONE merged payload (a second PUT would just
-      // overwrite the first's updated_at without conflict, but one call is cleaner
-      // and avoids a wasted round-trip). Only include fields the user kept + that
-      // carry a value — the route's upsert preserves any column we don't send.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const profile: Record<string, any> = {};
+      // ONE transactional call. The client's only job is to send the pieces the
+      // user KEPT (checked); the /commit route does ALL coercion + validation +
+      // batch insert server-side and returns an authoritative summary. This
+      // replaced ~30 hand-assembled POSTs that silently dropped rows on any
+      // mapping mismatch (string vs numeric value, missing agency 400, etc.).
+      const selections: {
+        overview?: { one_liner: string; elevator_pitch: string };
+        identity?: Record<string, string | string[]>;
+        past_performance?: typeof parsed.past_performance;
+        capabilities?: typeof parsed.capabilities;
+      } = {};
+
       if (takeOverview && hasOverview) {
-        if (parsed.overview.one_liner) profile.one_liner = parsed.overview.one_liner;
-        if (parsed.overview.elevator_pitch) profile.elevator_pitch = parsed.overview.elevator_pitch;
+        selections.overview = {
+          one_liner: parsed.overview.one_liner,
+          elevator_pitch: parsed.overview.elevator_pitch,
+        };
       }
       if (takeIdentity && hasIdentity) {
+        const idOut: Record<string, string | string[]> = {};
         for (const { key } of identityFields) {
           const v = parsed.identity[key];
-          if (Array.isArray(v) ? v.length > 0 : v) profile[key] = v;
+          if (Array.isArray(v) ? v.length > 0 : v) idOut[key] = v;
         }
+        selections.identity = idOut;
       }
-      if (Object.keys(profile).length > 0) {
-        const res = await fetch('/api/app/vault/identity', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
-          body: JSON.stringify({ email, profile }),
-        });
-        if (res.ok) saved += (takeOverview && hasOverview ? 1 : 0) + (takeIdentity && hasIdentity ? 1 : 0);
-        else errors.push('company info');
+      selections.past_performance = parsed.past_performance.filter((_, i) => ppChecked[i]);
+      selections.capabilities = parsed.capabilities.filter((_, i) => capChecked[i]);
+
+      const res = await fetch('/api/app/vault/documents/commit', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
+        body: JSON.stringify({ email, document_id: documentId, selections }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data?.success) {
+        throw new Error(data?.error || `HTTP ${res.status}`);
       }
 
-      // 2) Past performance rows.
-      for (let i = 0; i < parsed.past_performance.length; i++) {
-        if (!ppChecked[i]) continue;
-        const p = parsed.past_performance[i];
-        // contract_value is a NUMERIC column, but the parser returns a formatted
-        // string like "$10,900,000" — coerce to a number (strip $ , and spaces),
-        // else the value silently never lands (the bug: imported rows showed no $).
-        const numericValue = parseCurrency(p.contract_value);
-        // period is a single string like "2022-2025"; the schema stores
-        // period_start/period_end as dates — split it into year bounds.
-        const { start: periodStart, end: periodEnd } = splitPeriod(p.period);
-        // The route REQUIRES contract_title AND agency (400 otherwise). Some
-        // subcontract blocks parse without an agency/customer — rather than drop
-        // the whole row on a 400, save it with a clear placeholder the user can
-        // fix. (This was silently losing rows: a missing agency 400'd the POST.)
-        const agency = p.agency || '(add customer/agency)';
-        try {
-          const res = await fetch('/api/app/vault/past-performance', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
-            body: JSON.stringify({
-              email,
-              entry: {
-                contract_title: p.contract_title,
-                agency,
-                contract_number: p.contract_number || '',
-                role: p.role || '',
-                scope_description: p.scope_description || '',
-                ...(numericValue != null ? { contract_value: numericValue } : {}),
-                ...(periodStart ? { period_start: periodStart } : {}),
-                ...(periodEnd ? { period_end: periodEnd } : {}),
-              },
-            }),
-          });
-          if (res.ok) saved += 1;
-          else errors.push(`${p.contract_title} (HTTP ${res.status})`);
-        } catch {
-          errors.push(`${p.contract_title} (network)`);
-        }
-      }
-
-      // 3) Capability rows.
-      for (let i = 0; i < parsed.capabilities.length; i++) {
-        if (!capChecked[i]) continue;
-        const c = parsed.capabilities[i];
-        const res = await fetch('/api/app/vault/capabilities', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
-          body: JSON.stringify({
-            email,
-            entry: {
-              capability_name: c.capability_name,
-              description: c.description,
-              keywords: c.keywords || [],
-            },
-          }),
-        });
-        if (res.ok) saved += 1; else errors.push(c.capability_name);
-      }
-
-      if (errors.length) {
-        // Loud + specific so a partial/failed save is never invisible again.
-        setResult(`Saved ${saved} of ${selectedCount}. ${errors.length} failed: ${errors.slice(0, 4).join('; ')}${errors.length > 4 ? '…' : ''}`);
-        alert(`Saved ${saved} item${saved === 1 ? '' : 's'} to your Vault. ${errors.length} couldn't be saved:\n\n${errors.join('\n')}`);
-        // Still refresh + close so the ones that DID save show up immediately.
-        if (saved > 0) onSaved();
+      const total = Number(data.total_saved || 0);
+      const skipped: { section: string; item: string; reason: string }[] = data.skipped || [];
+      if (skipped.length) {
+        // Loud + specific — a partial save is never invisible again.
+        setResult(`Saved ${total}. ${skipped.length} skipped.`);
+        alert(
+          `Saved ${total} item${total === 1 ? '' : 's'} to your Vault.\n\n` +
+          `${skipped.length} couldn't be saved:\n` +
+          skipped.map((s) => `• ${s.item} (${s.reason})`).join('\n'),
+        );
+        onSaved(); // refresh + close so the saved ones show
       } else {
         onSaved();
         return;
       }
     } catch (e) {
-      // A thrown request used to vanish into finally — surface it.
       setResult(`Save failed: ${e instanceof Error ? e.message : String(e)}`);
       alert(`Couldn't save to your Vault: ${e instanceof Error ? e.message : String(e)}`);
     } finally {

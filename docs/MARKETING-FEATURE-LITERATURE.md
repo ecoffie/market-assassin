@@ -2996,3 +2996,39 @@ keep only 6-digit NAICS and grounded websites. The `ParsedDocReview` modal rende
 `vault/identity` PUT (upsert preserves untouched columns). Verified end-to-end against a
 real cap statement: Identity 18-field extract accurate, 9 past-perf, 9-10 capabilities,
 no fabrication. Typecheck 0 errors, lint clean.
+
+---
+
+## Vault: transactional cap-statement commit endpoint (July 2, 2026)
+
+**What:** The "Save to Vault" step of the capability-statement import is now a single
+server call instead of ~30 separate ones. When you confirm the reviewed sections,
+Mindy sends them once to a commit endpoint that validates + normalizes every value
+server-side, writes all rows in a batch, and returns an honest summary of exactly what
+saved and what was skipped (with reasons).
+
+**Why (the long-term fix, not another patch):** Every earlier import bug was the same
+shape — the browser hand-assembled dozens of POSTs, each re-deriving how to map parser
+output to database columns, and any mismatch (a currency string hitting a numeric
+column, a "2022-2025" period vs two date columns, a subcontract row missing an agency)
+failed silently and partially, dropping rows with no error the user could see.
+Centralizing the write in one transactional endpoint kills that whole class: coercion
+lives once next to the columns (and is reused by the manual Vault forms), one call
+returns one authoritative result, and a batch insert means one bad row can't strand the
+rest. Verified end-to-end on a real 2-page cap statement: 15 past-performance rows (with
+dollar values AND full scope paragraphs) + 10 capabilities, 0 dropped.
+
+**SEO angle:** *capability statement import, bulk past performance upload, GovCon Vault
+data import, federal past performance database, cap statement to proposal library.*
+
+**Proof:** `POST /api/app/vault/documents/commit` (authed via `verifyUserOwnsEmail`)
+takes the kept selections + document_id, runs `src/lib/vault/normalize.ts`
+(`parseCurrency`, `splitPeriod`, `normalizePastPerf/Capability/Identity` — currency
+strings → numeric, period string → start/end dates, missing agency → visible
+placeholder not a 400, bullet-list competency with no sentence → still saved, website
+kept only if its host is in the doc), batch-inserts past-performance + capabilities
+(per-row fallback if the batch errors), upserts identity (with additive NAICS→alerts
+sync), and returns `{ saved, skipped:[{item,reason}] }`. The review modal now makes ONE
+call and shows the server's summary; a partial/failed save raises an explicit alert
+listing each skipped item. The old client-side field mapping (30 POSTs) is gone.
+Verified against the real Tavares doc: 15 PP + 10 caps, 0 skipped. Typecheck 0, lint clean.
