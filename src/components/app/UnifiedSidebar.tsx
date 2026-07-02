@@ -427,6 +427,15 @@ export default function UnifiedSidebar({
     return itemTier.includes(userTier);
   };
 
+  // Panels that render a free-tier "data behind glass" preview instead of a blank
+  // upgrade wall (enterprise-SaaS pattern). A free click ROUTES to the panel (which
+  // shows their own data read-only, or a real count + blurred rows) rather than
+  // popping the upgrade modal. The 🔒 badge still shows — it IS a Pro feature — but
+  // the click leads to the preview, where the upgrade CTA lives.
+  const FREE_PREVIEW_PANELS: ReadonlySet<AppPanel> = new Set<AppPanel>([
+    'pipeline', 'recompetes', 'forecasts', 'contractors', 'decision-makers',
+  ]);
+
   const canAccessItem = (item: NavItem) => {
     if (item.id === 'coach') {
       return hasAccess(item.tier) || coachModeAllowed;
@@ -680,6 +689,12 @@ export default function UnifiedSidebar({
                         // a panel — they expect the chosen panel to
                         // take focus, not stare at the menu.
                         onMobileClose?.();
+                      } else if (userTier === 'free' && FREE_PREVIEW_PANELS.has(item.id)) {
+                        // Locked, but this panel has a free "data behind glass"
+                        // preview — route to it (the upgrade CTA lives inside).
+                        onPanelChange(item.id);
+                        onMobileClose?.();
+                        track('link_click', 'sidebar', { action: 'free_preview_shown', feature: item.id, tier: userTier });
                       } else {
                         // Locked feature — open upgrade modal (Pro for most panels,
                         // Teams for My Clients).

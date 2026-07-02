@@ -1022,7 +1022,22 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
             <span className="flex items-center gap-2 text-sm font-semibold text-white">
               <span className="text-emerald-400">✓</span> You&rsquo;re tracking {tracked.length} opportunit{tracked.length === 1 ? 'y' : 'ies'}
             </span>
-            <span className={`text-slate-500 transition-transform ${trackedOpen ? '' : '-rotate-90'}`}>▾</span>
+            <span className="flex items-center gap-3">
+              {/* The receipt's headline doubles as the door to My Pursuits — the
+                  real home for managing tracked opps (Pro). Feed = receipt + funnel. */}
+              {onPanelChange && (
+                <span
+                  role="link"
+                  tabIndex={0}
+                  onClick={(e) => { e.stopPropagation(); onPanelChange('pipeline'); }}
+                  onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); onPanelChange('pipeline'); } }}
+                  className="text-xs font-medium text-purple-400 hover:text-purple-300 whitespace-nowrap cursor-pointer"
+                >
+                  open My Pursuits →
+                </span>
+              )}
+              <span className={`text-slate-500 transition-transform ${trackedOpen ? '' : '-rotate-90'}`}>▾</span>
+            </span>
           </button>
           {trackedOpen && (
             <ul className="divide-y divide-slate-800 border-t border-slate-800">

@@ -14,6 +14,11 @@ const RecompetesPanel = lazy(() => import('./RecompetesPanel'));
 const ContractorsPanel = lazy(() => import('./ContractorsPanel'));
 const GovDecisionMakersPanel = lazy(() => import('./GovDecisionMakersPanel'));
 const PipelinePanel = lazy(() => import('./PipelinePanel'));
+// Free-tier "data behind glass" preview surfaces (enterprise-SaaS pattern):
+// free users see their own tracked pursuits read-only, or a count+blurred-rows
+// teaser for catalog surfaces, instead of a blank upgrade wall.
+const PipelinePreviewFree = lazy(() => import('./PipelinePreviewFree'));
+const CatalogTeaserFree = lazy(() => import('./CatalogTeaserFree'));
 const RelationshipsPanel = lazy(() => import('./RelationshipsPanel'));
 const TeamPanel = lazy(() => import('./TeamPanel'));
 const UnifiedSettingsPanel = lazy(() => import('./UnifiedSettingsPanel'));
@@ -69,15 +74,25 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
       case 'research':
         return <MarketResearchPanel email={email} tier={tier} />;
       case 'forecasts':
-        return <ForecastsPanel email={email} tier={tier} />;
+        return email && tier === 'free'
+          ? <CatalogTeaserFree email={email} featureId="forecasts" />
+          : <ForecastsPanel email={email} tier={tier} />;
       case 'recompetes':
-        return <RecompetesPanel email={email} tier={tier} />;
+        return email && tier === 'free'
+          ? <CatalogTeaserFree email={email} featureId="recompetes" />
+          : <RecompetesPanel email={email} tier={tier} />;
       case 'contractors':
-        return <ContractorsPanel email={email} tier={tier} />;
+        return email && tier === 'free'
+          ? <CatalogTeaserFree email={email} featureId="contractors" />
+          : <ContractorsPanel email={email} tier={tier} />;
       case 'decision-makers':
-        return <GovDecisionMakersPanel email={email} tier={tier} />;
+        return email && tier === 'free'
+          ? <CatalogTeaserFree email={email} featureId="decision-makers" />
+          : <GovDecisionMakersPanel email={email} tier={tier} />;
       case 'pipeline':
-        return <PipelinePanel email={email} tier={tier} onPanelChange={onPanelChange} />;
+        return email && tier === 'free'
+          ? <PipelinePreviewFree email={email} tier={tier} />
+          : <PipelinePanel email={email} tier={tier} onPanelChange={onPanelChange} />;
       case 'contacts':
         return <RelationshipsPanel email={email} tier={tier} panelContext={panelContext} />;
       case 'team':
