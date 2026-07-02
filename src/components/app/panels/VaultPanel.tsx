@@ -419,8 +419,17 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
 
       {/* Point of contact (#41) — proposals fill "Responsible Office / Contact
           Person" + Point-of-Contact sections from these instead of [placeholders]. */}
-      <div className="pt-2 mt-2 border-t border-slate-800">
-        <div className="text-xs font-semibold text-slate-400 uppercase tracking-wider mb-2">Point of Contact (for proposals)</div>
+      <div className="pt-4 mt-4 border-t border-slate-700">
+        <div className="flex items-center gap-2 mb-1">
+          <span className="h-4 w-1 rounded-full bg-emerald-500" />
+          <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Point of Contact</h3>
+          <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-emerald-500/15 text-emerald-300 uppercase tracking-wide">
+            Used in proposals
+          </span>
+        </div>
+        <p className="text-xs text-slate-500 mb-3">
+          Mindy drops these into the point-of-contact &amp; cap-statement sections of your proposals — so drafts show your real details, not [placeholders].
+        </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
           <Field label="Contact name" value={form.contact_name || ''} onChange={(v) => onField('contact_name', v)} placeholder="Eric Coffie" hint="The responsible person on cert packages" />
           <Field label="Contact title" value={form.contact_title || ''} onChange={(v) => onField('contact_title', v)} placeholder="Founder / President" />
