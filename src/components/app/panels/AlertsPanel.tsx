@@ -397,7 +397,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
   // Pursuits is Pro-locked, so "✓ Tracking" was a dead-end (Eric QC 2026-07-02).
   // Read the same user_pipeline rows back (GET /api/pipeline, no tier gate) and
   // show a lightweight read-only list here.
-  type TrackedItem = { id?: string; notice_id?: string; title?: string; agency?: string; external_url?: string; response_deadline?: string };
+  type TrackedItem = { id?: string; notice_id?: string; title?: string; agency?: string; external_url?: string; response_deadline?: string; notice_type?: string | null; set_aside?: string | null; value_estimate?: string | null };
   const [tracked, setTracked] = useState<TrackedItem[]>([]);
   const [trackedOpen, setTrackedOpen] = useState(false);
 
@@ -985,8 +985,33 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
       )}
 
       {/* The user's OWN tracked opportunities. Free users track opps but My Pursuits
-          is Pro-locked, so this read-only list is where they see what they saved. */}
-      {tracked.length > 0 && (
+          (the full managed pipeline) is Pro-locked. This is a deliberate TEASER of
+          that Pro surface (Eric growth-strategy call 2026-07-02): the list is useful
+          on its own (deadline countdown + real notice-type/set-aside badge) but each
+          row shows a greyed "Contact · Docs · Synopsis — Unlock in Pro" strip so the
+          completeness gap vs the Market Dashboard card is VISIBLE, not hidden. We cap
+          the on-page VIEW at 5 (tracking itself stays unlimited) and push the rest
+          into My Pursuits (Pro). All badge fields are real user_pipeline columns —
+          no invented richness. */}
+      {tracked.length > 0 && (() => {
+        // Deadline countdown from a real response_deadline. Grounded, not decorative.
+        const dueLabel = (iso?: string): { text: string; tone: string } | null => {
+          if (!iso) return null;
+          const d = new Date(iso);
+          if (isNaN(d.getTime())) return null;
+          const today = new Date(); today.setHours(0, 0, 0, 0);
+          const day = new Date(d); day.setHours(0, 0, 0, 0);
+          const days = Math.round((day.getTime() - today.getTime()) / 86_400_000);
+          if (days < 0) return { text: 'Closed', tone: 'text-slate-500' };
+          if (days === 0) return { text: 'Due today', tone: 'text-red-400' };
+          if (days === 1) return { text: 'Due tomorrow', tone: 'text-red-400' };
+          if (days <= 7) return { text: `Due in ${days} days`, tone: 'text-amber-400' };
+          return { text: `Due in ${days} days`, tone: 'text-slate-400' };
+        };
+        const VIEW_CAP = 5;
+        const shown = tracked.slice(0, VIEW_CAP);
+        const overflow = tracked.length - shown.length;
+        return (
         <div className="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden">
           <button
             type="button"
@@ -1001,36 +1026,80 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
           </button>
           {trackedOpen && (
             <ul className="divide-y divide-slate-800 border-t border-slate-800">
-              {tracked.slice(0, 25).map((t, i) => (
-                <li key={t.id || t.notice_id || i} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
-                  <div className="min-w-0">
-                    <div className="truncate text-slate-200">{t.title || t.notice_id || 'Tracked opportunity'}</div>
-                    {(t.agency || t.response_deadline) && (
-                      <div className="truncate text-xs text-slate-500">
-                        {t.agency}{t.agency && t.response_deadline ? ' • ' : ''}
-                        {t.response_deadline ? `Due ${new Date(t.response_deadline).toLocaleDateString()}` : ''}
+              {shown.map((t, i) => {
+                const due = dueLabel(t.response_deadline);
+                const badge = t.notice_type || t.set_aside || null;
+                return (
+                <li key={t.id || t.notice_id || i} className="px-4 py-3 text-sm">
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <div className="truncate text-slate-200">{t.title || t.notice_id || 'Tracked opportunity'}</div>
+                      <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
+                        {t.agency && <span className="truncate text-slate-500">{t.agency}</span>}
+                        {badge && (
+                          <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[11px] text-slate-300">{badge}</span>
+                        )}
+                        {t.set_aside && t.notice_type && (
+                          <span className="rounded bg-purple-500/15 px-1.5 py-0.5 text-[11px] text-purple-300">{t.set_aside}</span>
+                        )}
+                        {due && <span className={`${due.tone} font-medium`}>{due.text}</span>}
                       </div>
+                    </div>
+                    {t.external_url && (
+                      <a
+                        href={t.external_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="shrink-0 text-xs text-purple-400 hover:text-purple-300"
+                      >
+                        SAM.gov →
+                      </a>
                     )}
                   </div>
-                  {t.external_url && (
-                    <a
-                      href={t.external_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="shrink-0 text-xs text-purple-400 hover:text-purple-300"
+                  {/* Locked Pro strip — advertises what My Pursuits adds (POC, docs,
+                      synopsis) without giving it away. Only on free; paid users get
+                      the real thing in My Pursuits. */}
+                  {isFreeTier && (
+                    <button
+                      type="button"
+                      onClick={() => onPanelChange?.('pipeline')}
+                      className="mt-2 flex w-full items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/50 px-2.5 py-1.5 text-[11px] text-slate-500 hover:border-purple-500/40 hover:text-slate-400 transition-colors"
+                      title="Unlock the full pursuit view in Pro"
                     >
-                      SAM.gov →
-                    </a>
+                      <span className="text-slate-600">🔒</span>
+                      <span>Contact · Documents · AI synopsis</span>
+                      <span className="ml-auto text-purple-400 font-medium">Unlock in Pro →</span>
+                    </button>
                   )}
                 </li>
-              ))}
-              {tracked.length > 25 && (
-                <li className="px-4 py-2 text-xs text-slate-500">+{tracked.length - 25} more — {isFreeTier ? 'the full pipeline view is in Pro.' : 'see My Pursuits.'}</li>
+                );
+              })}
+              {overflow > 0 && (
+                <li className="px-4 py-2.5 text-xs">
+                  {isFreeTier ? (
+                    <button
+                      type="button"
+                      onClick={() => onPanelChange?.('pipeline')}
+                      className="text-purple-400 hover:text-purple-300 font-medium"
+                    >
+                      +{overflow} more tracked — manage your full pipeline in My Pursuits (Pro) →
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => onPanelChange?.('pipeline')}
+                      className="text-purple-400 hover:text-purple-300 font-medium"
+                    >
+                      +{overflow} more — see all in My Pursuits →
+                    </button>
+                  )}
+                </li>
               )}
             </ul>
           )}
         </div>
-      )}
+        );
+      })()}
 
       {!isFreeTier && (
         <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4">
