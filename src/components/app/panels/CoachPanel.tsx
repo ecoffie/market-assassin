@@ -54,6 +54,12 @@ export default function CoachPanel({
   const [capabilityText, setCapabilityText] = useState('');
   const [seededNote, setSeededNote] = useState<string | null>(null);
   const [activeWs, setActiveWs] = useState<string>('');
+  // Bulk import
+  const [bulkOpen, setBulkOpen] = useState(false);
+  const [bulkText, setBulkText] = useState('');
+  const [bulkRunning, setBulkRunning] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
+  const [bulkSummary, setBulkSummary] = useState<{ added: number; duplicates: number; failed: number; rejectedForCap: number } | null>(null);
   const headers = useCallback(() => getMIApiHeaders(email), [email]);
 
   const load = useCallback(async () => {
@@ -123,6 +129,61 @@ export default function CoachPanel({
       }
     } catch { /* */ }
     setAdding(false);
+  };
+
+  // Parse the bulk textarea → rows. One client per line:
+  //   Business Name | capability text (optional) | email (optional)
+  // Only the name is required; pipes are optional. A leading "#" comments a line.
+  const parseBulk = (raw: string) => {
+    return raw
+      .split('\n')
+      .map(l => l.trim())
+      .filter(l => l && !l.startsWith('#'))
+      .map(line => {
+        const [name, cap, mail] = line.split('|').map(s => (s || '').trim());
+        return { business_name: name, capability_text: cap || undefined, primary_email: mail || undefined };
+      })
+      .filter(r => r.business_name);
+  };
+
+  const runBulkImport = async () => {
+    if (!email) return;
+    const rows = parseBulk(bulkText);
+    if (!rows.length) return;
+    setBulkRunning(true);
+    setBulkSummary(null);
+    setBulkProgress({ done: 0, total: rows.length });
+
+    // Chunk client-side so each request stays well under the function timeout and
+    // the coach sees real progress (each row may run an LLM extraction server-side).
+    const BATCH = 12;
+    const totals = { added: 0, duplicates: 0, failed: 0, rejectedForCap: 0 };
+    for (let i = 0; i < rows.length; i += BATCH) {
+      const batch = rows.slice(i, i + BATCH);
+      try {
+        const res = await fetch('/api/app/coach', {
+          method: 'POST', headers: { 'Content-Type': 'application/json', ...headers() },
+          body: JSON.stringify({ email, action: 'bulk_import', clients: batch }),
+        });
+        const d = await res.json().catch(() => null);
+        if (res.ok && d?.summary) {
+          totals.added += d.summary.added || 0;
+          totals.duplicates += d.summary.duplicates || 0;
+          totals.failed += d.summary.failed || 0;
+          totals.rejectedForCap += d.summary.rejected_for_cap || 0;
+        } else {
+          totals.failed += batch.length;
+        }
+      } catch {
+        totals.failed += batch.length;
+      }
+      setBulkProgress({ done: Math.min(i + BATCH, rows.length), total: rows.length });
+    }
+
+    setBulkSummary(totals);
+    setBulkRunning(false);
+    setBulkText('');
+    await load();  // refresh the client list with the newly imported clients
   };
 
   const profileStats = (c: Client) => {
@@ -284,12 +345,18 @@ export default function CoachPanel({
         })}
       </div>
 
-      <div className="mt-8">
+      <div className="mt-8 grid gap-4 md:grid-cols-2">
         <AddClientCard
           newName={newName} setNewName={setNewName}
           capabilityText={capabilityText} setCapabilityText={setCapabilityText}
           adding={adding} onAdd={addClient} seededNote={seededNote}
           compactTitle="Add another client"
+        />
+        <BulkImportCard
+          open={bulkOpen} setOpen={setBulkOpen}
+          bulkText={bulkText} setBulkText={setBulkText}
+          running={bulkRunning} progress={bulkProgress} summary={bulkSummary}
+          onRun={runBulkImport} parseCount={parseBulk(bulkText).length}
         />
       </div>
 
@@ -371,6 +438,84 @@ function AddClientCard({
         className="w-full mt-3 px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-purple-500 focus:outline-none resize-none"
       />
       {seededNote && <p className="text-xs text-emerald-300 mt-2">{seededNote}</p>}
+    </div>
+  );
+}
+
+function BulkImportCard({
+  open, setOpen, bulkText, setBulkText, running, progress, summary, onRun, parseCount,
+}: {
+  open: boolean;
+  setOpen: (v: boolean) => void;
+  bulkText: string;
+  setBulkText: (v: string) => void;
+  running: boolean;
+  progress: { done: number; total: number } | null;
+  summary: { added: number; duplicates: number; failed: number; rejectedForCap: number } | null;
+  onRun: () => void;
+  parseCount: number;
+}) {
+  const pct = progress && progress.total ? Math.round((progress.done / progress.total) * 100) : 0;
+  return (
+    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+      <div className="flex items-center justify-between">
+        <h3 className="text-sm font-semibold text-white">Import a client roster</h3>
+        {!open && (
+          <button type="button" onClick={() => setOpen(true)} className="text-xs text-blue-300 hover:text-blue-200">
+            Bulk add →
+          </button>
+        )}
+      </div>
+      <p className="mt-1 text-xs text-slate-500 mb-3">
+        Add dozens or hundreds of clients at once. One per line:{' '}
+        <code className="text-slate-400">Business Name | capability text | email</code>{' '}
+        (only the name is required).
+      </p>
+
+      {open && (
+        <>
+          <textarea
+            value={bulkText}
+            onChange={e => setBulkText(e.target.value)}
+            placeholder={"Acme Fabrication | steel fabrication and welding for federal facilities | ops@acme.com\nCoastal IT Services | managed IT and cybersecurity\nPiedmont Logistics"}
+            rows={8}
+            disabled={running}
+            className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs font-mono leading-relaxed placeholder-slate-600 focus:border-purple-500 focus:outline-none resize-y disabled:opacity-60"
+          />
+          <div className="mt-3 flex items-center justify-between gap-3">
+            <span className="text-xs text-slate-500">
+              {parseCount > 0 ? `${parseCount} client${parseCount === 1 ? '' : 's'} ready` : 'Paste your roster above'}
+            </span>
+            <button
+              type="button"
+              onClick={onRun}
+              disabled={running || parseCount === 0}
+              className="h-9 px-5 shrink-0 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 text-white text-sm font-medium rounded-lg"
+            >
+              {running ? 'Importing…' : `Import ${parseCount || ''} client${parseCount === 1 ? '' : 's'}`}
+            </button>
+          </div>
+
+          {running && progress && (
+            <div className="mt-3">
+              <div className="h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
+                <div className="h-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
+              </div>
+              <p className="mt-1.5 text-xs text-slate-400">{progress.done} of {progress.total} processed…</p>
+            </div>
+          )}
+        </>
+      )}
+
+      {summary && !running && (
+        <div className="mt-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-200">
+          ✅ Imported {summary.added} client{summary.added === 1 ? '' : 's'}
+          {summary.duplicates > 0 && ` · ${summary.duplicates} already existed`}
+          {summary.failed > 0 && ` · ${summary.failed} failed`}
+          {summary.rejectedForCap > 0 && ` · ${summary.rejectedForCap} over your plan limit`}
+          . They're in your client list now.
+        </div>
+      )}
     </div>
   );
 }

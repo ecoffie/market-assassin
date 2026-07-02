@@ -1,0 +1,75 @@
+# NCMBC demo roster — ILLUSTRATIVE sample NC small businesses (synthetic, for demo only).
+# Format: Business Name | capability text | email   (only the name is required)
+# Paste into My Clients → Import a client roster.
+#
+# --- Construction / facilities (heavy GovCon sector) ---
+Cape Fear Fabrication | Structural steel fabrication, welding, and metal building erection for military and federal facilities across eastern North Carolina | ops@capefearfab.com
+Piedmont General Contractors | General construction, renovation, and design-build for federal office space and installations | bd@piedmontgc.com
+Sandhills Site Development | Site grading, utilities, paving, and stormwater for base infrastructure projects | info@sandhillssite.com
+Triangle Mechanical Systems | HVAC, plumbing, and mechanical installation and maintenance for government buildings | service@trianglemech.com
+Coastal Roofing & Waterproofing | Commercial roofing, waterproofing, and building envelope repair for federal facilities | estimating@coastalroof.com
+Blue Ridge Electrical Contractors | Electrical construction, switchgear, and backup power systems for military installations | office@blueridgeelectric.com
+Tar Heel Demolition & Abatement | Selective demolition, asbestos and lead abatement, and hazardous material remediation | safety@tarheeldemo.com
+Fort Bragg Facility Services | Facility maintenance, custodial, and grounds services for large federal campuses | contracts@ftbraggfs.com
+Neuse River Environmental | Environmental remediation, wetland restoration, and site assessment | projects@neuseenv.com
+Carolina Concrete & Paving | Concrete, asphalt paving, and hardscape for base roads and parking | bids@carolinaconcrete.com
+#
+# --- IT / cyber / professional services ---
+Coastal IT Services | Managed IT services, network engineering, and cybersecurity for federal clients | sales@coastalit.com
+Research Triangle Cyber | Cybersecurity assessments, RMF authorization support, and continuous monitoring | info@rtcyber.com
+Piedmont Software Solutions | Custom software development, cloud migration, and DevSecOps for government agencies | hello@piedmontsoft.com
+Old North State Data | Data analytics, dashboarding, and business intelligence for federal programs | contact@onsdata.com
+Fayetteville Network Systems | Structured cabling, network infrastructure, and audiovisual installation | ops@fayettevillenet.com
+Carolina GIS & Mapping | Geospatial analysis, GIS mapping, and remote sensing services | maps@carolinagis.com
+Wilmington Health Informatics | Health IT, electronic records support, and medical data services for VA facilities | info@wilmingtonhealthit.com
+Blue Heron Consulting | Program management, acquisition support, and technical writing for federal agencies | pm@blueheronconsulting.com
+Piedmont Training Group | Instructional design, training delivery, and e-learning development for government | learn@piedmonttraining.com
+Cardinal Financial Advisory | Accounting, financial management, and DCAA-compliant support services | admin@cardinalfinancial.com
+#
+# --- Manufacturing / supply / logistics ---
+Catawba Valley Machining | Precision CNC machining and manufacturing of defense components | quotes@catawbamachining.com
+Smoky Mountain Textiles | Technical textiles, uniforms, and protective apparel manufacturing | orders@smokytextiles.com
+Piedmont Packaging & Crating | Military-spec packaging, crating, and export preservation | ship@piedmontpack.com
+Carolina Logistics Group | Warehousing, distribution, and third-party logistics for federal supply chains | ops@carolinalogistics.com
+Tar Heel Industrial Supply | Industrial MRO supplies, tools, and hardware distribution | sales@tarheelsupply.com
+Coastal Marine Fabricators | Marine fabrication, vessel repair, and shipyard support services | yard@coastalmarine.com
+Appalachian Wood Products | Millwork, custom cabinetry, and architectural woodwork | shop@appalachianwood.com
+Piedmont Fleet Services | Vehicle maintenance, fleet management, and mobile equipment repair | service@piedmontfleet.com
+Carolina Safety Equipment | Safety equipment, PPE, and fall-protection systems distribution | info@carolinasafety.com
+Cape Lookout Electronics | Electronic assembly, cable harnesses, and testing for defense systems | mfg@capelookoutelec.com
+#
+# --- Aviation / defense / specialized ---
+Sandhills Aerospace Support | Aircraft ground support equipment maintenance and MRO services | mro@sandhillsaero.com
+Carolina UAS Solutions | Unmanned aircraft systems integration, training, and ISR support | fly@carolinauas.com
+Fort Liberty Range Services | Firing range construction, maintenance, and targetry systems | range@ftlibertyranges.com
+Piedmont Simulation Systems | Simulation, modeling, and training device development | sim@piedmontsim.com
+Coastal Defense Logistics | Munitions handling, ammunition storage design, and EOD support services | ops@coastaldeflog.com
+Blue Ridge Optics | Optical systems, night vision maintenance, and precision instruments | info@blueridgeoptics.com
+Cape Fear Communications | Tactical communications, radio systems, and antenna installation | comms@capefearcomm.com
+Carolina Body Armor | Body armor, ballistic protection, and tactical gear manufacturing | sales@carolinaarmor.com
+Tar Heel Vehicle Armoring | Vehicle up-armoring, tactical vehicle modification, and maintenance | ops@tarheelarmor.com
+Piedmont Power Systems | Generators, mobile power, and microgrid installation for installations | power@piedmontpower.com
+#
+# --- Healthcare / staffing / support ---
+Carolina Medical Staffing | Healthcare staffing, nurses, and clinical support for VA and DoD facilities | staff@carolinamedstaff.com
+Coastal Behavioral Health | Behavioral health services and counseling for military and veteran populations | care@coastalbh.com
+Piedmont Language Services | Translation, interpretation, and linguistic support services | lang@piedmontlanguage.com
+Blue Ridge Janitorial | Custodial, sanitation, and facility cleaning services for federal buildings | clean@blueridgejanitorial.com
+Sandhills Food Services | Food service, dining facility operations, and catering for installations | dining@sandhillsfood.com
+Carolina Security Group | Physical security, access control, and guard services for federal sites | security@carolinasecuritygrp.com
+Tar Heel Grounds Management | Landscaping, grounds maintenance, and tree services for federal campuses | grounds@tarheelgrounds.com
+Piedmont Medical Supply | Medical supplies, durable medical equipment, and pharmaceuticals distribution | orders@piedmontmedsupply.com
+Coastal Records Management | Records management, scanning, and document destruction services | docs@coastalrecords.com
+Carolina Event Logistics | Event planning, conference support, and logistics for federal meetings | events@carolinaeventlog.com
+#
+# --- Engineering / A&E / energy ---
+Neuse Engineering Group | Civil, structural, and environmental engineering for federal projects | eng@neuseengineering.com
+Blue Ridge Architects | Architecture, planning, and design services for military construction | design@blueridgearch.com
+Carolina Surveying & Geomatics | Land surveying, geospatial data, and construction layout | survey@carolinasurvey.com
+Piedmont Energy Solutions | Solar, energy efficiency, and building automation for federal facilities | energy@piedmontenergy.com
+Coastal Water Resources | Water and wastewater treatment engineering and operations | water@coastalwater.com
+Tar Heel Environmental Testing | Environmental laboratory testing, air quality, and compliance sampling | lab@tarheeltesting.com
+Sandhills Geotechnical | Geotechnical engineering, soils testing, and foundation design | geo@sandhillsgeo.com
+Cape Fear Commissioning | Building commissioning, retro-commissioning, and energy audits | cx@capefearcx.com
+Carolina Fire Protection | Fire sprinkler, alarm, and life-safety systems installation | safety@carolinafire.com
+Piedmont Telecom Infrastructure | Fiber optic, telecom infrastructure, and 5G installation services | fiber@piedmonttelecom.com

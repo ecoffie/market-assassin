@@ -14,113 +14,20 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
-import { buildProfileFromText } from '@/lib/market/profile-from-text';
 import { clientNotificationEmail } from '@/lib/app/workspace';
 import {
   coachAtClientLimit,
   requireCoachAccess,
   resolveCoachAccess,
 } from '@/lib/mindy/coach-access';
-
-/**
- * Seed a new client workspace from pasted capability text. Uses the SHARED
- * buildProfileFromText engine (#64) — the SAME one onboarding uses — so a
- * consultant adding a client they don't deeply understand gets Mindy's expert
- * extraction: LLM picks the real INDUSTRY (not a company name / cert), grounds
- * codes in USASpending, detects states + set-aside certs, and finds who buys.
- * Then writes the workspace's notification profile + pre-loads target agencies.
- */
-async function seedClientProfile(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any, workspaceId: string, businessName: string, text: string, primaryEmail?: string | null,
-): Promise<{ naics: string[]; psc: string[]; keywords: string[]; states: string[]; setAsides: string[]; agencies: number }> {
-  const p = await buildProfileFromText(text);
-  const naics = p?.naics || [];
-  const psc = p?.topPsc ? [p.topPsc.code] : [];
-  const keywords = p?.keywords || [];
-  const states = p?.states || [];
-  const setAsides = p?.setAsides || [];
-
-  const clientEmail = `${workspaceId}@clients.getmindy.ai`;
-  // Route alerts to the client's REAL inbox when the coach provided one — the
-  // synthetic user_email has no MX and is guarded out of sendEmail(), so without
-  // this the client gets nothing. Falls back to null (no send) when absent.
-  const recipient = recipientFromPrimary(primaryEmail);
-  await supabase.from('user_notification_settings').upsert({
-    user_email: clientEmail,
-    alert_recipient_email: recipient,
-    naics_codes: naics,
-    psc_codes: psc,
-    keywords,
-    location_states: states,
-    set_aside_certifications: setAsides,
-    business_type: 'Small Business',
-    primary_industry: businessName,
-    alerts_enabled: true,
-    alert_frequency: 'weekly',     // gentle for a tracked client, not daily spam
-    is_active: true,
-  }, { onConflict: 'user_email' });
-
-  // Pre-load the top buying agencies into the client's Target List (who to talk to).
-  let agenciesSeeded = 0;
-  if (p?.agencies?.length) {
-    const targets = p.agencies.slice(0, 6).map(a => ({
-      workspace_id: workspaceId,
-      user_email: clientEmail,
-      agency_name: a.name,
-      set_aside_spending: a.amount,
-      status: 'targeting',
-      added_from: 'capability_text_seed',
-      source_naics: naics.join(','),
-    }));
-    const { error } = await supabase.from('user_target_list').insert(targets);
-    if (!error) agenciesSeeded = targets.length;
-  }
-
-  return { naics, psc, keywords, states, setAsides, agencies: agenciesSeeded };
-}
-
-/**
- * Guard for name-only clients: even with no capability text we write a minimal
- * (empty-targeting) notification row so the client ALWAYS exists in
- * user_notification_settings — the single source of truth alerts/feed/settings
- * read. Without this row, a client-mode read silently has nothing to return and
- * "set up profile" surfaces feel broken; worse, a write-path bug could fall back
- * to the coach's own row. The row is empty (no NAICS/keywords) so no alerts fire
- * until the coach fills it in, and onboarding/Start-Here still flags it as
- * needing setup. (Eric, Jun 23 2026 — companion to the header-drop fix.)
- */
-async function ensureClientProfileRow(
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  supabase: any, workspaceId: string, businessName: string, primaryEmail?: string | null,
-): Promise<void> {
-  const clientEmail = `${workspaceId}@clients.getmindy.ai`;
-  await supabase.from('user_notification_settings').upsert({
-    user_email: clientEmail,
-    alert_recipient_email: recipientFromPrimary(primaryEmail),  // stored now; alerts fire once codes are added
-    naics_codes: [],
-    psc_codes: [],
-    keywords: [],
-    location_states: [],
-    set_aside_certifications: [],
-    business_type: 'Small Business',
-    primary_industry: businessName,
-    alerts_enabled: false,        // nothing to alert on yet — don't email an empty profile
-    alert_frequency: 'weekly',
-    is_active: true,
-  }, { onConflict: 'user_email', ignoreDuplicates: true });
-}
-
-/** A coach-supplied client email → a deliverable recipient, or null. Rejects blanks
- *  and the synthetic namespace so we never echo an undeliverable address back. */
-function recipientFromPrimary(primaryEmail?: string | null): string | null {
-  const e = (primaryEmail || '').trim().toLowerCase();
-  if (!e || !e.includes('@') || e.endsWith('@clients.getmindy.ai')) return null;
-  return e;
-}
+// Shared provisioning — the SAME unit for single-add + bulk import (no drift).
+import { provisionClient } from '@/lib/mindy/coach-provision';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+// Bulk import runs LLM extractions per client; the UI chunks rows into small
+// batches, but give the route headroom for a batch that seeds several profiles.
+export const maxDuration = 120;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function sb(): any {
@@ -332,33 +239,83 @@ export async function POST(request: NextRequest) {
         { status: 403 },
       );
     }
-    // Each client gets its own workspace_id (stable, derived from org+name).
-    const workspaceId = `org-${membership.org_id.slice(0, 8)}-${businessName.toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40)}`;
-    const { data, error } = await supabase.from('org_clients').insert({
-      org_id: membership.org_id, workspace_id: workspaceId, business_name: businessName,
-      primary_email: body.primary_email || null, assigned_coach: email,
-    }).select().single();
-    if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    // Provision via the SHARED unit (identical to bulk import): insert org_clients,
+    // seed from capability text (grounded NAICS/keywords/agencies), or write the
+    // minimal guard row. Idempotent on (org_id, workspace_id).
+    const result = await provisionClient(supabase, membership.org_id, {
+      businessName,
+      primaryEmail: body.primary_email,
+      capabilityText: body.capability_text,
+      assignedCoach: email,
+    });
+    if (!result.ok) return NextResponse.json({ success: false, error: result.error || 'Could not add client' }, { status: 500 });
 
-    // SEED FROM CAPABILITY TEXT (Eric: "I paste their website/capability statement,
-    // you extract the keywords + NAICS/PSC + location → so I can track them + get
-    // their alerts"). Extract grounded codes (this session's keyword-first work) +
-    // a location, and write the workspace's notification profile so alerts flow.
-    let seeded: Awaited<ReturnType<typeof seedClientProfile>> | null = null;
-    const capabilityText = String(body.capability_text || '').trim();
-    if (capabilityText) {
-      seeded = await seedClientProfile(supabase, workspaceId, businessName, capabilityText, body.primary_email);
-    }
+    return NextResponse.json({
+      success: true,
+      client: { id: result.clientId, workspaceId: result.workspaceId, businessName: result.businessName },
+      seeded: result.seeded,
+    });
+  }
 
-    // GUARD: a name-only client (no capability text) — or one whose text yielded
-    // no codes — must still get a profile row so it exists in the source-of-truth
-    // table. The client UI routes the coach to Settings to fill it in.
-    const reallySeeded = !!seeded && (seeded.naics.length > 0 || seeded.keywords.length > 0);
-    if (!reallySeeded) {
-      await ensureClientProfileRow(supabase, workspaceId, businessName, body.primary_email);
-    }
+  // ---- BULK IMPORT — add many clients from a roster in one action -------------
+  // The enterprise "I have 200 clients" answer. Parses rows the client sent
+  // (already split: [{ business_name, capability_text?, primary_email? }]),
+  // provisions each via the SAME provisionClient unit with bounded concurrency,
+  // and returns a per-row result so the UI shows exactly what landed vs. skipped.
+  // Respects the org's client cap (unlimited for enterprise/staff).
+  if (body.action === 'bulk_import') {
+    const rowsIn = Array.isArray(body.clients) ? body.clients : [];
+    if (!rowsIn.length) return NextResponse.json({ success: false, error: 'No clients provided' }, { status: 400 });
+    const MAX_ROWS = 500;
+    const rows = rowsIn.slice(0, MAX_ROWS).map((r: Record<string, unknown>) => ({
+      businessName: String(r.business_name || r.name || '').trim(),
+      capabilityText: r.capability_text ? String(r.capability_text) : null,
+      primaryEmail: r.primary_email ? String(r.primary_email) : null,
+    })).filter((r: { businessName: string }) => r.businessName);
 
-    return NextResponse.json({ success: true, client: { id: data.id, workspaceId, businessName }, seeded });
+    // Cap check: how many we can still add. maxClients=null → unlimited (enterprise).
+    const { count: existing } = await supabase
+      .from('org_clients').select('id', { count: 'exact', head: true })
+      .eq('org_id', membership.org_id).eq('status', 'active');
+    const cap = coachAccess.maxClients;
+    const remaining = cap == null ? rows.length : Math.max(0, cap - (existing ?? 0));
+    const toProcess = rows.slice(0, remaining);
+    const rejectedForCap = rows.length - toProcess.length;
+
+    // Bounded concurrency — each row may run an LLM extraction (seedClientProfile),
+    // so cap parallelism to protect rate limits + the function budget.
+    const CONCURRENCY = 4;
+    const results: Array<{ business_name: string; ok: boolean; workspace_id?: string; seeded?: boolean; skipped?: string; error?: string }> = new Array(toProcess.length);
+    let cursor = 0;
+    await Promise.all(Array.from({ length: Math.min(CONCURRENCY, toProcess.length) }, async () => {
+      while (cursor < toProcess.length) {
+        const i = cursor++;
+        const r = toProcess[i];
+        const res = await provisionClient(supabase, membership!.org_id, {
+          businessName: r.businessName,
+          capabilityText: r.capabilityText,
+          primaryEmail: r.primaryEmail,
+          assignedCoach: email,
+        });
+        results[i] = {
+          business_name: r.businessName,
+          ok: res.ok,
+          workspace_id: res.ok ? res.workspaceId : undefined,
+          seeded: res.reallySeeded,
+          skipped: res.skipped,
+          error: res.ok ? undefined : res.error,
+        };
+      }
+    }));
+
+    const added = results.filter(r => r.ok && !r.skipped).length;
+    const duplicates = results.filter(r => r.skipped === 'duplicate').length;
+    const failed = results.filter(r => !r.ok).length;
+    return NextResponse.json({
+      success: true,
+      summary: { requested: rows.length, added, duplicates, failed, rejected_for_cap: rejectedForCap, cap },
+      results,
+    });
   }
 
   if (body.action === 'post_news' && membership.role === 'org_admin') {

@@ -79,7 +79,11 @@ export async function resolveCoachAccess(email: string): Promise<CoachAccessResu
     };
   }
 
-  // Grandfather: already provisioned as coach/org_admin (solo-consultant self-serve).
+  // Org member (coach/org_admin). Access + cap follow the ORG's tier, not just the
+  // user's personal MI tier — an NCMBC/SBDC counselor on an enterprise-tier org gets
+  // unlimited clients even though their personal login isn't "enterprise". This is
+  // what makes the organizations.tier column meaningful (the white-label enterprise
+  // deal). A consultant's auto-created solo org stays on the grandfather cap.
   const supabase = getSupabase();
   const { data: membership } = await supabase
     .from('org_members')
@@ -90,12 +94,20 @@ export async function resolveCoachAccess(email: string): Promise<CoachAccessResu
     .maybeSingle();
 
   if (membership) {
+    const { data: org } = await supabase
+      .from('organizations')
+      .select('tier')
+      .eq('id', membership.org_id)
+      .maybeSingle();
+    const orgTier = (org?.tier as string) || 'pro';
     const existingClientCount = await countActiveClients(membership.org_id);
+    // Enterprise org → unlimited; anything else → the grandfather/team cap.
+    const maxClients = orgTier === 'enterprise' ? null : COACH_CLIENT_LIMITS.grandfather;
     return {
       allowed: true,
-      reason: 'org_member',
+      reason: orgTier === 'enterprise' ? 'enterprise' : 'org_member',
       canAddClients: true,
-      maxClients: COACH_CLIENT_LIMITS.grandfather,
+      maxClients,
       existingClientCount,
     };
   }
