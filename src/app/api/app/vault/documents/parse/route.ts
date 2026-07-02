@@ -51,20 +51,42 @@ Return ONLY a JSON object with EXACTLY these keys:
 Rules:
 - Use ONLY information that is explicitly present in the document text. NEVER invent
   a contract, agency, dollar amount, date, or capability that is not written there.
+- BE EXHAUSTIVE. Capability statements pack many projects and competencies into dense
+  tables and bullet lists. Extract EVERY distinct one you can find — do NOT stop after
+  the first few, do NOT summarize, do NOT return a representative sample. If the
+  document details 14 projects, return 14 past_performance objects. Missing entries is
+  the #1 failure — scan the WHOLE document to the end before you answer.
+
 - overview.one_liner: a single crisp sentence describing what the company does (from
-  the "About"/"Overview"/"Core Competencies" area). "" if not present.
+  the "Company Profile"/"About"/"Overview" area). "" if not present.
 - overview.elevator_pitch: a 2-4 sentence company summary in third person, drawn from
   the document. "" if not present.
-- past_performance: one object per PAST/CURRENT CONTRACT or project the document names.
-  contract_title = the project/contract name; agency = the buying agency/customer;
-  contract_number, role, scope_description, period (e.g. "2021-2023"), contract_value
-  (e.g. "$2.4M") only if stated, else "". Empty array [] if the doc lists no past work.
-- capabilities: one object per distinct SERVICE/CAPABILITY or core competency listed.
-  capability_name = short label (e.g. "Cybersecurity Engineering"); description = the
-  supporting sentence(s) from the doc; keywords = 2-6 relevant terms. Empty array [] if
-  none are described.
-- Deduplicate. Do not repeat the same contract or capability.
-- Reply with ONLY the JSON object, no prose, no markdown fences.`;
+
+- past_performance: one object per CONTRACT/PROJECT the document details. These usually
+  appear as a table or repeated blocks, each with a project name, a "Prime Contract" or
+  "Subcontract" label, an agency/customer or a "Prime Contractor: X", a "Total Value:"
+  amount, and a scope paragraph. Create one object for EACH such block.
+    - contract_title = the project name (e.g. "Boott Cotton Mills, Lowell, MA - Historic Windows").
+    - agency = the buying agency/customer if named (e.g. "Department of Interior, National
+      Parks Service"); if the block instead names a "Prime Contractor:", use that as the
+      agency (they subcontracted to this company).
+    - role = "Prime Contract" or "Subcontract" if the block says so, else "".
+    - scope_description = the scope paragraph, verbatim or lightly trimmed.
+    - contract_value = the "Total Value" amount if stated (e.g. "$2,942,548"), else "".
+    - contract_number, period only if explicitly stated, else "".
+  A short bare bullet list of project NAMES with no detail (e.g. a "Past Performance"
+  summary column) can be skipped IF those same projects appear in detail elsewhere;
+  prefer the detailed blocks. Empty array [] only if the doc truly lists no past work.
+
+- capabilities: one object per distinct SERVICE / CORE COMPETENCY. Look especially at a
+  "Core Competencies", "Capabilities", "Services", or "Self-Perform" section — these are
+  usually bullet lists, and EACH bullet is one capability. Extract every bullet.
+    - capability_name = the bullet/label (e.g. "Historical Renovations", "Lead Paint Removal").
+    - description = supporting sentence(s) from the doc, or "" if the bullet stands alone.
+    - keywords = 2-6 relevant terms.
+  Empty array [] only if no competencies/services are listed.
+
+- Deduplicate exact repeats. Reply with ONLY the JSON object, no prose, no markdown fences.`;
 
 interface ParsedCap { capability_name: string; description: string; keywords: string[] }
 interface ParsedPP {
@@ -120,7 +142,9 @@ export async function POST(request: NextRequest) {
       user: text.slice(0, 40000),
       json: true,
       temperature: 0.1,
-      maxTokens: 2000,
+      // Cap statements can hold 10-20 detailed projects + a dozen competencies; a
+      // small cap truncates the JSON (and drops entries). Give room to be exhaustive.
+      maxTokens: 8000,
       job: 'reasoning',
     });
     const raw = JSON.parse(out.replace(/```json\n?|```\n?/g, '').trim());
