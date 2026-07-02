@@ -18,7 +18,11 @@ const DRY = process.argv.includes('--dry');
 const LIMIT_ARG = process.argv.find(a => a.startsWith('--limit='));
 const MAX = LIMIT_ARG ? parseInt(LIMIT_ARG.split('=')[1], 10) : Infinity;
 const BASE = 'https://getmindy.ai';
-const CONCURRENCY = 6;          // polite to find-agencies (each call scans USASpending)
+// GENTLE re-run (Eric 2026-07-02): the first pass at concurrency 6 tripped
+// USASpending rate limits — 794 users came back "empty" that a solo retry proved
+// were recoverable. Drop to 2 concurrent + a delay between each user's scans.
+const CONCURRENCY = 2;
+const DELAY_MS = 700;          // pause after each user to stay under the rate limit
 const AGENCIES_PER_USER = 10;
 
 // Target ONLY custom-NAICS users (Eric 2026-07-02): people who replaced the
@@ -36,28 +40,29 @@ const env = Object.fromEntries(
 );
 const sb = createClient(env.NEXT_PUBLIC_SUPABASE_URL, env.SUPABASE_SERVICE_ROLE_KEY);
 
-// Derive top agencies from a user's NAICS via the live find-agencies scan.
-async function derive(naics) {
-  const codes = naics.map(String).map(s => s.trim()).filter(Boolean).slice(0, 3);
+async function scan(body) {
+  try {
+    const r = await fetch(`${BASE}/api/usaspending/find-agencies`, {
+      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body),
+    });
+    if (!r.ok) return [];
+    const j = await r.json();
+    return (j.agencies || []).map(a => (a.subAgency || a.name || a.parentAgency || '').trim()).filter(Boolean);
+  } catch { return []; }
+}
+
+// KEYWORD-FIRST derivation (mirrors src/lib/app/derive-agencies-from-naics.ts):
+// keyword is more precise + better covered than NAICS. Scan by keyword when the
+// user has one, else fall back to NAICS.
+async function derive(naics, keywords) {
+  const keyword = (keywords || []).map(String).map(s => s.trim()).filter(Boolean)[0];
+  const codes = (naics || []).map(String).map(s => s.trim()).filter(Boolean).slice(0, 3);
   const seen = new Set(), out = [];
-  for (const code of codes) {
-    try {
-      const r = await fetch(`${BASE}/api/usaspending/find-agencies`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ naicsCode: code }),
-      });
-      if (!r.ok) continue;
-      const j = await r.json();
-      for (const a of (j.agencies || [])) {
-        const label = (a.subAgency || a.name || a.parentAgency || '').trim();
-        if (!label) continue;
-        const key = label.toLowerCase();
-        if (seen.has(key)) continue;
-        seen.add(key); out.push(label);
-        if (out.length >= AGENCIES_PER_USER) return out;
-      }
-    } catch { /* skip this code */ }
+  const add = (labels) => { for (const l of labels) { const k = l.toLowerCase(); if (!seen.has(k)) { seen.add(k); out.push(l); if (out.length >= AGENCIES_PER_USER) return true; } } return false; };
+  if (keyword) {
+    if (add(await scan({ marketFilter: { keywords: [keyword], mode: 'keyword', rankingLabel: `keyword "${keyword}"` } }))) return out;
   }
+  for (const code of codes) { if (add(await scan({ naicsCode: code }))) break; }
   return out;
 }
 
@@ -68,7 +73,7 @@ async function fetchAllTargets() {
   for (let from = 0; ; from += PAGE) {
     const { data, error } = await sb
       .from('user_notification_settings')
-      .select('user_email, naics_codes, agencies')
+      .select('user_email, naics_codes, agencies, keywords')
       .not('naics_codes', 'is', null)
       .range(from, from + PAGE - 1);
     if (error) throw new Error(error.message);
@@ -92,7 +97,7 @@ async function worker(queue) {
   while (queue.length) {
     const row = queue.shift();
     try {
-      const agencies = await derive(row.naics_codes);
+      const agencies = await derive(row.naics_codes, row.keywords);
       if (agencies.length === 0) { empty++; }
       else {
         seeded++;
@@ -104,6 +109,7 @@ async function worker(queue) {
       }
     } catch (e) { failed++; console.warn(`  derive fail ${row.user_email}: ${e.message}`); }
     if (++done % 25 === 0) console.log(`  ${done}/${targets.length} — seeded ${seeded}, empty ${empty}, failed ${failed}`);
+    await new Promise(r => setTimeout(r, DELAY_MS)); // gentle — stay under the rate limit
   }
 }
 
