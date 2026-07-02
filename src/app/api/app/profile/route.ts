@@ -178,7 +178,7 @@ export async function POST(request: NextRequest) {
 
     const { data: existingSettings } = await supabase
       .from('user_notification_settings')
-      .select('user_email, invitation_source, trial_source')
+      .select('user_email, invitation_source, trial_source, agencies')
       .eq('user_email', rowEmail)
       .maybeSingle();
 
@@ -187,6 +187,26 @@ export async function POST(request: NextRequest) {
         await applyPartnerReferralIfEligible(supabase, normalizedEmail, referralCode);
       } catch (partnerError) {
         console.warn('[Mindy Profile] Partner referral apply failed:', partnerError);
+      }
+    }
+
+    // AUTO-SEED target agencies from NAICS (Eric 2026-07-02) — the OTHER slurpee
+    // save path (this route == /api/mindy/profile). Mirror the same seed added to
+    // /api/alerts/preferences so agencies get populated no matter which onboarding
+    // branch a new user takes. Seed when: NAICS is being written non-empty, the
+    // caller didn't explicitly set agencies, and stored agencies are still empty.
+    // ALL tiers. Best-effort — a scan failure just leaves agencies empty.
+    const savingNaics = Array.isArray(updateData.naics_codes) && (updateData.naics_codes as string[]).length > 0;
+    const callerSetAgencies = Array.isArray(targetAgencies);
+    const existingAgencies = Array.isArray(existingSettings?.agencies) ? (existingSettings!.agencies as string[]) : [];
+    if (savingNaics && !callerSetAgencies && existingAgencies.length === 0) {
+      try {
+        const { deriveAgenciesFromNaics } = await import('@/lib/app/derive-agencies-from-naics');
+        const base = new URL(request.url).origin;
+        const seeded = await deriveAgenciesFromNaics(updateData.naics_codes as string[], base, 10);
+        if (seeded.length > 0) updateData.agencies = seeded;
+      } catch (e) {
+        console.warn('[app/profile] agency auto-seed skipped:', (e as Error).message);
       }
     }
 
