@@ -24,6 +24,13 @@ export interface LlmOpts {
   maxTokens?: number;
   temperature?: number;
   job?: LlmJob;          // picks the per-job provider chain (default 'extraction')
+  // Optional per-call model override for the OpenAI-compatible providers
+  // (openai/groq70b/groq8b/grok). Lets a specific high-value call opt UP to a
+  // stronger model (e.g. gpt-4o) without changing the global default for every
+  // other call. Ignored for Claude (which has its own model env) and for any
+  // provider it doesn't apply to. Only honored for the 'openai' provider unless
+  // it looks like that provider's model family.
+  openaiModel?: string;
 }
 
 type Provider = 'groq70b' | 'groq8b' | 'claude' | 'openai' | 'grok';

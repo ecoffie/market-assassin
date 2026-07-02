@@ -40,6 +40,14 @@ Return ONLY a JSON object with EXACTLY these keys:
 
 {
   "overview": {"one_liner": "", "elevator_pitch": ""},
+  "identity": {
+    "legal_name": "", "dba": "", "uei": "", "cage_code": "", "duns": "",
+    "year_founded": "", "certifications": [], "primary_naics": [],
+    "hq_city": "", "hq_state": "",
+    "contact_name": "", "contact_title": "", "contact_email": "", "contact_phone": "",
+    "website": "", "office_address": "",
+    "bonding_single": "", "bonding_aggregate": ""
+  },
   "past_performance": [
     {"contract_title": "", "agency": "", "contract_number": "", "role": "", "scope_description": "", "period": "", "contract_value": ""}
   ],
@@ -50,7 +58,8 @@ Return ONLY a JSON object with EXACTLY these keys:
 
 Rules:
 - Use ONLY information that is explicitly present in the document text. NEVER invent
-  a contract, agency, dollar amount, date, or capability that is not written there.
+  a contract, agency, dollar amount, date, capability, code, or identifier that is not
+  written there. An empty string / empty array is ALWAYS a valid answer.
 - BE EXHAUSTIVE. Capability statements pack many projects and competencies into dense
   tables and bullet lists. Extract EVERY distinct one you can find — do NOT stop after
   the first few, do NOT summarize, do NOT return a representative sample. If the
@@ -61,6 +70,29 @@ Rules:
   the "Company Profile"/"About"/"Overview" area). "" if not present.
 - overview.elevator_pitch: a 2-4 sentence company summary in third person, drawn from
   the document. "" if not present.
+
+- identity: the company's front-matter facts. These usually sit in a "Company
+  Information", "Contract Info", "Corporate POC", "Certifications", "NAICS Codes", or
+  "Bonding" block. Fill each field ONLY if it appears in the document, else "" (or []):
+    - legal_name = the company's legal name (e.g. "Excell Construction Corp.").
+    - dba = a "doing business as" / trade name if given, else "".
+    - uei = the 12-char SAM Unique Entity ID if present, else "".
+    - cage_code = the CAGE code (e.g. "6PY01"), else "".
+    - duns = the DUNS number if present, else "".
+    - year_founded = the 4-digit year the company was established (e.g. "2015"), else "".
+    - certifications = array of socioeconomic / quality certs stated (e.g. "8(a)",
+      "SDB", "MBE", "Tribally Owned 8(a)", "WOSB", "HUBZone", "ISO 9001"). [] if none.
+    - primary_naics = array of NAICS codes listed (6-digit strings only, e.g.
+      "236220"). Include primary AND secondary. [] if none.
+    - hq_city / hq_state = the headquarters/executive-office city and 2-letter state.
+    - contact_name / contact_title / contact_email / contact_phone = the main point of
+      contact (e.g. "Fernando Tavares" / "Sole Owner" / an email / a phone). Pick the
+      PRIMARY/main contact if several are listed.
+    - website = the company website ONLY if a URL is literally printed in the document.
+      Do NOT infer or construct a URL from an email domain or company name. "" otherwise.
+    - office_address = the main office street address (one line), else "".
+    - bonding_single = single-project bonding capacity if stated (e.g. "$25 Million"),
+      bonding_aggregate = aggregate capacity (e.g. "$100 Million"). "" if not stated.
 
 - past_performance: one object per CONTRACT/PROJECT the document details. These usually
   appear as a table or repeated blocks, each with a project name, a "Prime Contract" or
@@ -93,8 +125,17 @@ interface ParsedPP {
   contract_title: string; agency: string; contract_number: string;
   role: string; scope_description: string; period: string; contract_value: string;
 }
+interface ParsedIdentity {
+  legal_name: string; dba: string; uei: string; cage_code: string; duns: string;
+  year_founded: string; certifications: string[]; primary_naics: string[];
+  hq_city: string; hq_state: string;
+  contact_name: string; contact_title: string; contact_email: string; contact_phone: string;
+  website: string; office_address: string;
+  bonding_single: string; bonding_aggregate: string;
+}
 interface Parsed {
   overview: { one_liner: string; elevator_pitch: string };
+  identity: ParsedIdentity;
   past_performance: ParsedPP[];
   capabilities: ParsedCap[];
 }
@@ -102,6 +143,22 @@ interface Parsed {
 const str = (v: unknown) => String(v ?? '').trim();
 const strArr = (v: unknown) =>
   Array.isArray(v) ? v.map((x) => String(x).trim()).filter(Boolean).slice(0, 8) : [];
+// NAICS are 6-digit codes; keep only well-formed ones (never invent).
+const naicsArr = (v: unknown) =>
+  Array.isArray(v)
+    ? Array.from(new Set(v.map((x) => String(x).trim()).filter((c) => /^\d{6}$/.test(c)))).slice(0, 20)
+    : [];
+
+// Grounding guard: gpt-4o-mini tends to CONSTRUCT a website from an email domain
+// even when told not to. Only keep a website whose host string actually appears in
+// the source text — otherwise drop it (an invented URL is exactly the fabrication
+// we forbid). Source text is lowercased by the caller.
+const groundedWebsite = (v: unknown, sourceLower: string) => {
+  const url = str(v);
+  if (!url) return '';
+  const host = url.replace(/^https?:\/\//i, '').replace(/^www\./i, '').split(/[/?#]/)[0].toLowerCase();
+  return host && sourceLower.includes(host) ? url : '';
+};
 
 export async function POST(request: NextRequest) {
   const body = await request.json().catch(() => ({}));
@@ -148,10 +205,31 @@ export async function POST(request: NextRequest) {
       job: 'reasoning',
     });
     const raw = JSON.parse(out.replace(/```json\n?|```\n?/g, '').trim());
+    const rid = (raw?.identity ?? {}) as Record<string, unknown>;
     parsed = {
       overview: {
         one_liner: str(raw?.overview?.one_liner),
         elevator_pitch: str(raw?.overview?.elevator_pitch),
+      },
+      identity: {
+        legal_name: str(rid.legal_name),
+        dba: str(rid.dba),
+        uei: str(rid.uei),
+        cage_code: str(rid.cage_code),
+        duns: str(rid.duns),
+        year_founded: str(rid.year_founded),
+        certifications: strArr(rid.certifications),
+        primary_naics: naicsArr(rid.primary_naics),
+        hq_city: str(rid.hq_city),
+        hq_state: str(rid.hq_state),
+        contact_name: str(rid.contact_name),
+        contact_title: str(rid.contact_title),
+        contact_email: str(rid.contact_email),
+        contact_phone: str(rid.contact_phone),
+        website: groundedWebsite(rid.website, text.toLowerCase()),
+        office_address: str(rid.office_address),
+        bonding_single: str(rid.bonding_single),
+        bonding_aggregate: str(rid.bonding_aggregate),
       },
       past_performance: Array.isArray(raw?.past_performance)
         ? raw.past_performance
@@ -186,10 +264,17 @@ export async function POST(request: NextRequest) {
     );
   }
 
+  // Identity counts as "found" if any field carries a value.
+  const identityHasData = Object.values(parsed.identity).some((v) =>
+    Array.isArray(v) ? v.length > 0 : Boolean(v),
+  );
+  const overviewCount = parsed.overview.one_liner || parsed.overview.elevator_pitch ? 1 : 0;
+
   const total =
     parsed.past_performance.length +
     parsed.capabilities.length +
-    (parsed.overview.one_liner || parsed.overview.elevator_pitch ? 1 : 0);
+    overviewCount +
+    (identityHasData ? 1 : 0);
 
   return NextResponse.json({
     success: true,
@@ -197,7 +282,8 @@ export async function POST(request: NextRequest) {
     filename: doc.original_filename,
     parsed,
     counts: {
-      overview: parsed.overview.one_liner || parsed.overview.elevator_pitch ? 1 : 0,
+      overview: overviewCount,
+      identity: identityHasData ? 1 : 0,
       past_performance: parsed.past_performance.length,
       capabilities: parsed.capabilities.length,
       total,

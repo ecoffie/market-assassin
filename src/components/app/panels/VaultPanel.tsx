@@ -1041,14 +1041,45 @@ function TeamRow({ m, email, onChanged }: { m: TeamMember; email: string; onChan
 
 // ---- Documents (boilerplate / cap statements) -------------------------
 // Shape of the parsed cap-statement (mirrors /api/app/vault/documents/parse).
+interface ParsedIdentityFields {
+  legal_name: string; dba: string; uei: string; cage_code: string; duns: string;
+  year_founded: string; certifications: string[]; primary_naics: string[];
+  hq_city: string; hq_state: string;
+  contact_name: string; contact_title: string; contact_email: string; contact_phone: string;
+  website: string; office_address: string;
+  bonding_single: string; bonding_aggregate: string;
+}
 interface ParsedDoc {
   overview: { one_liner: string; elevator_pitch: string };
+  identity: ParsedIdentityFields;
   past_performance: {
     contract_title: string; agency: string; contract_number: string;
     role: string; scope_description: string; period: string; contract_value: string;
   }[];
   capabilities: { capability_name: string; description: string; keywords: string[] }[];
 }
+
+// Human labels for the identity fields we surface in the review modal.
+const IDENTITY_LABELS: { key: keyof ParsedIdentityFields; label: string }[] = [
+  { key: 'legal_name', label: 'Legal name' },
+  { key: 'dba', label: 'DBA' },
+  { key: 'uei', label: 'UEI' },
+  { key: 'cage_code', label: 'CAGE' },
+  { key: 'duns', label: 'DUNS' },
+  { key: 'year_founded', label: 'Founded' },
+  { key: 'certifications', label: 'Certifications' },
+  { key: 'primary_naics', label: 'NAICS' },
+  { key: 'hq_city', label: 'HQ city' },
+  { key: 'hq_state', label: 'HQ state' },
+  { key: 'contact_name', label: 'Contact' },
+  { key: 'contact_title', label: 'Contact title' },
+  { key: 'contact_email', label: 'Contact email' },
+  { key: 'contact_phone', label: 'Contact phone' },
+  { key: 'website', label: 'Website' },
+  { key: 'office_address', label: 'Office address' },
+  { key: 'bonding_single', label: 'Bonding (single)' },
+  { key: 'bonding_aggregate', label: 'Bonding (aggregate)' },
+];
 
 function DocumentsSection({ email, items, onChanged }: { email: string; items: BoilerplateDoc[]; onChanged: () => void }) {
   const [uploading, setUploading] = useState(false);
@@ -1204,11 +1235,20 @@ function ParsedDocReview({
   onSaved: () => void;
 }) {
   const hasOverview = Boolean(parsed.overview.one_liner || parsed.overview.elevator_pitch);
+  // Which identity fields actually carry a value (only these are shown / saved).
+  const identityFields = IDENTITY_LABELS.filter(({ key }) => {
+    const v = parsed.identity?.[key];
+    return Array.isArray(v) ? v.length > 0 : Boolean(v);
+  });
+  const hasIdentity = identityFields.length > 0;
   const [takeOverview, setTakeOverview] = useState(hasOverview);
+  const [takeIdentity, setTakeIdentity] = useState(hasIdentity);
   const [ppChecked, setPpChecked] = useState<boolean[]>(parsed.past_performance.map(() => true));
   const [capChecked, setCapChecked] = useState<boolean[]>(parsed.capabilities.map(() => true));
   const [saving, setSaving] = useState(false);
   const [result, setResult] = useState<string | null>(null);
+
+  const fmtIdentityValue = (v: string | string[]) => (Array.isArray(v) ? v.join(', ') : v);
 
   const toggle = (arr: boolean[], i: number, set: (v: boolean[]) => void) => {
     const next = [...arr];
@@ -1218,6 +1258,7 @@ function ParsedDocReview({
 
   const selectedCount =
     (takeOverview && hasOverview ? 1 : 0) +
+    (takeIdentity && hasIdentity ? 1 : 0) +
     ppChecked.filter(Boolean).length +
     capChecked.filter(Boolean).length;
 
@@ -1226,20 +1267,31 @@ function ParsedDocReview({
     let saved = 0;
     const errors: string[] = [];
     try {
-      // 1) Overview → identity (merge into one_liner / elevator_pitch).
+      // 1) Overview + Identity → the identity profile. Both write to the SAME
+      // identity PUT route, so build ONE merged payload (a second PUT would just
+      // overwrite the first's updated_at without conflict, but one call is cleaner
+      // and avoids a wasted round-trip). Only include fields the user kept + that
+      // carry a value — the route's upsert preserves any column we don't send.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const profile: Record<string, any> = {};
       if (takeOverview && hasOverview) {
+        if (parsed.overview.one_liner) profile.one_liner = parsed.overview.one_liner;
+        if (parsed.overview.elevator_pitch) profile.elevator_pitch = parsed.overview.elevator_pitch;
+      }
+      if (takeIdentity && hasIdentity) {
+        for (const { key } of identityFields) {
+          const v = parsed.identity[key];
+          if (Array.isArray(v) ? v.length > 0 : v) profile[key] = v;
+        }
+      }
+      if (Object.keys(profile).length > 0) {
         const res = await fetch('/api/app/vault/identity', {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
-          body: JSON.stringify({
-            email,
-            profile: {
-              ...(parsed.overview.one_liner ? { one_liner: parsed.overview.one_liner } : {}),
-              ...(parsed.overview.elevator_pitch ? { elevator_pitch: parsed.overview.elevator_pitch } : {}),
-            },
-          }),
+          body: JSON.stringify({ email, profile }),
         });
-        if (res.ok) saved += 1; else errors.push('overview');
+        if (res.ok) saved += (takeOverview && hasOverview ? 1 : 0) + (takeIdentity && hasIdentity ? 1 : 0);
+        else errors.push('company info');
       }
 
       // 2) Past performance rows.
@@ -1317,6 +1369,26 @@ function ParsedDocReview({
                   <p className="text-sm font-medium text-emerald-300 mb-1">Overview → Identity</p>
                   {parsed.overview.one_liner && <p className="text-sm text-white">{parsed.overview.one_liner}</p>}
                   {parsed.overview.elevator_pitch && <p className="text-xs text-slate-400 mt-1">{parsed.overview.elevator_pitch}</p>}
+                </div>
+              </label>
+            </section>
+          )}
+
+          {/* Company info → Identity (UEI, CAGE, NAICS, certs, POC, bonding…) */}
+          {hasIdentity && (
+            <section>
+              <label className="flex items-start gap-2 cursor-pointer">
+                <input type="checkbox" checked={takeIdentity} onChange={() => setTakeIdentity((v) => !v)} className="mt-1 accent-emerald-500" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-emerald-300 mb-2">Company Info → Identity ({identityFields.length})</p>
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
+                    {identityFields.map(({ key, label }) => (
+                      <div key={key} className="min-w-0">
+                        <span className="text-[11px] uppercase tracking-wide text-slate-500">{label}</span>
+                        <p className="text-sm text-white break-words">{fmtIdentityValue(parsed.identity[key])}</p>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </label>
             </section>

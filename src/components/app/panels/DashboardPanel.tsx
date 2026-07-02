@@ -750,6 +750,26 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
     }
   }, [email, tier, loadBriefings]);
 
+  // Re-fetch when the tab regains focus so a long-open tab picks up the NEW day's
+  // briefing. Without this the panel fetched once on mount, so a tab left open past
+  // the ~07:00 UTC generation kept showing yesterday's briefing labeled as today
+  // (Eric QC 2026-07-02: showed "July 1" on July 2). Only refetch if the newest
+  // local briefing is older than the current date — cheap, avoids needless calls.
+  useEffect(() => {
+    if (!email || tier === 'free') return;
+    const onFocus = () => {
+      const today = new Date().toISOString().split('T')[0];
+      const newest = briefings[0]?.briefing_date;
+      if (!newest || newest < today) void loadBriefings();
+    };
+    window.addEventListener('focus', onFocus);
+    document.addEventListener('visibilitychange', onFocus);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      document.removeEventListener('visibilitychange', onFocus);
+    };
+  }, [email, tier, briefings, loadBriefings]);
+
   useEffect(() => {
     if (!email || tier === 'free') return;
 
