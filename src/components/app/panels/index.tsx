@@ -75,19 +75,19 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
         return <MarketResearchPanel email={email} tier={tier} />;
       case 'forecasts':
         return email && tier === 'free'
-          ? <CatalogTeaserFree email={email} featureId="forecasts" />
+          ? <CatalogTeaserFree email={email} featureId="forecasts" onPanelChange={onPanelChange} />
           : <ForecastsPanel email={email} tier={tier} />;
       case 'recompetes':
         return email && tier === 'free'
-          ? <CatalogTeaserFree email={email} featureId="recompetes" />
+          ? <CatalogTeaserFree email={email} featureId="recompetes" onPanelChange={onPanelChange} />
           : <RecompetesPanel email={email} tier={tier} />;
       case 'contractors':
         return email && tier === 'free'
-          ? <CatalogTeaserFree email={email} featureId="contractors" />
+          ? <CatalogTeaserFree email={email} featureId="contractors" onPanelChange={onPanelChange} />
           : <ContractorsPanel email={email} tier={tier} />;
       case 'decision-makers':
         return email && tier === 'free'
-          ? <CatalogTeaserFree email={email} featureId="decision-makers" />
+          ? <CatalogTeaserFree email={email} featureId="decision-makers" onPanelChange={onPanelChange} />
           : <GovDecisionMakersPanel email={email} tier={tier} />;
       case 'pipeline':
         return email && tier === 'free'

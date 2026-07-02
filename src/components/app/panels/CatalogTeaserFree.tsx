@@ -19,6 +19,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import type { AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import LockedPreview from './LockedPreview';
 
@@ -27,6 +28,7 @@ type FeatureId = 'recompetes' | 'forecasts' | 'contractors' | 'decision-makers';
 interface Props {
   email: string;
   featureId: FeatureId;
+  onPanelChange?: (panel: AppPanel) => void;
 }
 
 type Profile = { naics: string[]; agencies: string[] };
@@ -37,6 +39,8 @@ type Profile = { naics: string[]; agencies: string[] };
 const CONFIG: Record<FeatureId, {
   title: string;
   noun: string;
+  // What the user must set in Settings for this surface to produce real results.
+  setupPrompt: string;
   // Returns { url, countKeys, labelKeys } or null if the profile can't scope it.
   // labelKeys are tried in order — the first non-empty real value wins (rows can
   // have a null primary field, so we fall back to another REAL field, never fake).
@@ -45,6 +49,7 @@ const CONFIG: Record<FeatureId, {
   recompetes: {
     title: 'Expiring Contracts',
     noun: 'expiring contracts',
+    setupPrompt: 'Set your NAICS codes, PSC codes, and keywords',
     build: (p) => {
       const naics = p.naics[0];
       if (!naics) return null;
@@ -58,6 +63,7 @@ const CONFIG: Record<FeatureId, {
   forecasts: {
     title: 'Upcoming Buys',
     noun: 'upcoming agency forecasts',
+    setupPrompt: 'Set your NAICS codes, PSC codes, and keywords',
     build: (p) => {
       const naics = p.naics[0];
       if (!naics) return null;
@@ -71,6 +77,7 @@ const CONFIG: Record<FeatureId, {
   contractors: {
     title: 'Contractors',
     noun: 'contractors',
+    setupPrompt: 'Set your NAICS codes, PSC codes, and keywords',
     build: (p) => {
       const naics = p.naics[0];
       if (!naics) return null;
@@ -84,14 +91,17 @@ const CONFIG: Record<FeatureId, {
   'decision-makers': {
     title: 'Decision Makers',
     noun: 'buying-office contacts',
+    setupPrompt: 'Add the agencies you sell to in your profile',
     // This directory is keyed by AGENCY, not NAICS. Scope to the user's first
-    // target agency; if they have none, we show a profile-scoped-by-agency count
-    // isn't possible — fall back to no filter (still their logged-in total view).
+    // target agency. If they have NONE, return null → we show the activation
+    // nudge instead of an unscoped vanity count ("153K match you" was dishonest:
+    // the whole directory, not their matches). The profile drives the result;
+    // no target agency = complete the profile first (Eric 2026-07-02).
     build: (p) => {
       const agency = p.agencies[0];
-      const agencyParam = agency ? `&agency=${encodeURIComponent(agency)}` : '';
+      if (!agency) return null;
       return {
-        url: `/api/app/federal-contacts?limit=5${agencyParam}`, // email header added at fetch time
+        url: `/api/app/federal-contacts?limit=5&agency=${encodeURIComponent(agency)}`, // email header added at fetch time
         countKeys: ['total'],
         labelKeys: ['contact_fullname', 'contact_title', 'department_ind_agency'],
       };
@@ -121,11 +131,15 @@ function extractRows(data: unknown): Record<string, unknown>[] {
   return [];
 }
 
-export default function CatalogTeaserFree({ email, featureId }: Props) {
+export default function CatalogTeaserFree({ email, featureId, onPanelChange }: Props) {
   const cfg = CONFIG[featureId];
   const [count, setCount] = useState<number | null>(null);
   const [rows, setRows] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
+  // Empty profile → the profile drives every result, so with no codes there's
+  // nothing to match. Show the activation nudge (→ onboarding slurpee) instead
+  // of a hollow unscoped count (Eric 2026-07-02).
+  const [profileEmpty, setProfileEmpty] = useState(false);
 
   const load = useCallback(async () => {
     if (!email) { setLoading(false); return; }
@@ -141,8 +155,12 @@ export default function CatalogTeaserFree({ email, featureId }: Props) {
         agencies: Array.isArray(s.agencies) ? s.agencies.map(String) : [],
       };
 
+      // build() returns null when the profile can't scope THIS surface (no NAICS
+      // for opp/contractor catalogs; no target agency for the contact directory).
+      // That's the activation state — the profile isn't complete enough to produce
+      // real, personalized results, so drive them to finish setup.
       const req = cfg.build(profile);
-      if (!req) { setLoading(false); return; }
+      if (!req) { setProfileEmpty(true); setLoading(false); return; }
 
       // 2) Real count + teaser rows from the SAME endpoint the paid panel uses.
       const res = await fetch(req.url, { headers: getMIApiHeaders(email) });
@@ -176,6 +194,40 @@ export default function CatalogTeaserFree({ email, featureId }: Props) {
   }, [email, cfg]);
 
   useEffect(() => { void load(); }, [load]);
+
+  // Empty profile → activation nudge. The profile drives every result, so with no
+  // codes there's nothing real to match. Route to Settings (a 2-min add of NAICS/
+  // PSC/keywords) — not a hollow unscoped count. Enterprise onboarding SaaS gates
+  // the payoff behind the setup step; the setup step IS the product loop.
+  if (!loading && profileEmpty) {
+    return (
+      <div className="mx-auto max-w-4xl px-4 py-6">
+        <div className="flex items-center gap-2">
+          <h1 className="text-lg font-semibold text-white">{cfg.title}</h1>
+          <span className="rounded-full border border-purple-500/40 bg-purple-500/10 px-2 py-0.5 text-[11px] font-medium text-purple-300">
+            🔒 Pro
+          </span>
+        </div>
+        <div className="mt-5 rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-950/30 to-slate-950/60 p-6">
+          <p className="text-base font-semibold text-amber-100">
+            {cfg.setupPrompt} to see the {cfg.noun} that match you.
+          </p>
+          <p className="mt-2 text-sm text-slate-300">
+            Mindy matches every result against your profile — your codes are what turn this into <em>your</em> market.
+            Add them once and your alerts, briefings, and this list all start working.
+          </p>
+          <button
+            type="button"
+            onClick={() => onPanelChange?.('settings')}
+            className="mt-4 rounded-lg bg-gradient-to-r from-purple-600 to-purple-500 px-4 py-2 text-sm font-semibold text-white shadow hover:from-purple-500 hover:to-purple-400"
+          >
+            Complete your profile →
+          </button>
+          <p className="mt-2 text-xs text-slate-500">Takes about two minutes.</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <LockedPreview
