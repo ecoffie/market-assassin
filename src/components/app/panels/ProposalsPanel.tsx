@@ -883,6 +883,10 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   const [draftAllProgressIdx, setDraftAllProgressIdx] = useState(0);
   const [draftAllElapsedSec, setDraftAllElapsedSec] = useState(0);
   const draftAllStartedAtRef = useRef<number | null>(null);
+  // Lets the user STOP a running "Draft all" — aborts the in-flight fetch so the
+  // request is genuinely cancelled (not just visually), and the button unlocks.
+  const draftAllAbortRef = useRef<AbortController | null>(null);
+  const [draftAllCancelled, setDraftAllCancelled] = useState(false);
   const reviewSectionRef = useRef<HTMLElement | null>(null);
 
   // Drive the drafting progress card (elapsed timer + cycling step) — same engine
@@ -969,11 +973,15 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     setDraftAllSummary(null);
     setDraftAllProgressIdx(0);
     setDraftAllElapsedSec(0);
+    setDraftAllCancelled(false);
     draftAllStartedAtRef.current = Date.now();
+    const controller = new AbortController();
+    draftAllAbortRef.current = controller;
     try {
       const res = await fetch(`/api/app/proposal/draft-all?email=${encodeURIComponent(email)}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        signal: controller.signal,
         body: JSON.stringify({
           text: uploadedRfp.text,
           fileName: uploadedRfp.fileName,
@@ -1019,12 +1027,25 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         reviewSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       });
     } catch (err) {
-      console.error('Draft-all failed:', err);
-      setDraftError('Request failed. Try again.');
+      // A user-initiated Stop shows a neutral notice, not a scary error.
+      if (err instanceof DOMException && err.name === 'AbortError') {
+        setDraftAllCancelled(true);
+      } else {
+        console.error('Draft-all failed:', err);
+        setDraftError('Request failed. Try again.');
+      }
     } finally {
+      draftAllAbortRef.current = null;
       setDraftAllLoading(false);
     }
   }, [email, uploadedRfp, getAuthHeaders, currentSectionTabs, compliance]);
+
+  // Stop a running "Draft all" — aborts the fetch so it's genuinely cancelled.
+  // Sections already returned before Stop stay in place (nothing to undo); the
+  // request in flight is dropped and the UI unlocks immediately.
+  const cancelDraftAll = useCallback(() => {
+    draftAllAbortRef.current?.abort();
+  }, []);
 
   const updateDraftText = useCallback((sectionType: SectionType, text: string) => {
     setDrafts(prev => {
@@ -2179,7 +2200,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           {/* Show the work while drafting — a believable step-by-step narration so
               the button doesn't just sit silent (Eric, Jun 26). */}
           {draftAllLoading && (
-            <div className="mt-4">
+            <div className="mt-4 space-y-3">
               <ComplianceMatrixProgress
                 charCount={uploadedRfp?.charCount || uploadedRfp?.text?.length || 0}
                 elapsedSec={draftAllElapsedSec}
@@ -2189,7 +2210,45 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 fullTitle="Mindy is writing your response"
                 messages={DRAFT_PROGRESS_MESSAGES}
               />
+              {/* Real per-section status + a working Stop. All sections write in
+                  one server pass, so they resolve together — the checklist shows
+                  what's queued and flips to ✓ as drafts land. */}
+              <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
+                <div className="flex items-center justify-between gap-3 mb-3">
+                  <p className="text-xs font-medium text-slate-300">
+                    Drafting {currentSectionTabs.length} section{currentSectionTabs.length === 1 ? '' : 's'} · {draftAllElapsedSec}s
+                  </p>
+                  <button
+                    type="button"
+                    onClick={cancelDraftAll}
+                    className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-rose-600/90 hover:bg-rose-500 text-white transition-colors"
+                  >
+                    ■ Stop
+                  </button>
+                </div>
+                <ul className="grid grid-cols-2 gap-x-6 gap-y-1.5 sm:grid-cols-3">
+                  {currentSectionTabs.map(tab => {
+                    const done = !!drafts[tab.id];
+                    return (
+                      <li key={tab.id} className="flex items-center gap-2 text-xs">
+                        {done ? (
+                          <span className="text-emerald-400">✓</span>
+                        ) : (
+                          <span className="inline-block w-3 h-3 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" />
+                        )}
+                        <span className={done ? 'text-emerald-200' : 'text-slate-400'}>{tab.label}</span>
+                      </li>
+                    );
+                  })}
+                </ul>
+              </div>
             </div>
+          )}
+
+          {draftAllCancelled && !draftAllLoading && (
+            <p className="mt-4 text-sm text-slate-300 bg-slate-500/10 border border-slate-500/30 rounded-lg px-4 py-3">
+              Drafting stopped. Any sections already written are kept below — press “Draft my response” to run the rest.
+            </p>
           )}
 
           {/* Surface draft errors HERE in the hero card — the other draftError
@@ -3002,8 +3061,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                     <button
                       type="button"
                       onClick={() => generateDraft(activeSection)}
-                      disabled={isLoading}
-                      className="px-4 py-1.5 text-xs rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-50 text-white flex items-center gap-2"
+                      disabled={isLoading || draftAllLoading}
+                      title={draftAllLoading ? 'Drafting all sections — please wait or Stop above' : undefined}
+                      className="px-4 py-1.5 text-xs rounded-lg bg-purple-600 hover:bg-purple-500 disabled:opacity-50 disabled:cursor-not-allowed text-white flex items-center gap-2"
                     >
                       {isLoading && (
                         <span className="inline-block w-3 h-3 border-2 border-white border-t-transparent rounded-full animate-spin" />

@@ -229,7 +229,22 @@ export function formatVaultForPrompt(ctx: VaultContext): string {
       if (pp.cpars_rating) parts.push(`   CPARS: ${pp.cpars_rating}`);
       return parts.join('\n');
     }).join('\n\n');
-    blocks.push(`### Bidder past performance (FACTUAL — cite these, not [placeholders])\n${lines}`);
+
+    // Aggregate total — so a draft can say "across N projects totaling $X" with a
+    // REAL number instead of bracketing "[amount]illion" when the per-contract
+    // values are all present. Only stated when enough contracts carry a value that
+    // the sum is meaningful (avoids a misleadingly small "total" from one priced
+    // row among many). The model still cites individual values per contract above.
+    let totalLine = '';
+    const valued = realPastPerf
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      .map((p) => Number((p as any).contract_value))
+      .filter((n) => Number.isFinite(n) && n > 0);
+    if (valued.length >= 2 && valued.length >= realPastPerf.length * 0.5) {
+      const sum = valued.reduce((a, b) => a + b, 0);
+      totalLine = `\n\nAggregate portfolio value across the ${valued.length} priced contract${valued.length === 1 ? '' : 's'} above: $${sum.toLocaleString('en-US')} (a REAL figure — use it instead of a [placeholder] when summarizing total experience; do not round it up).`;
+    }
+    blocks.push(`### Bidder past performance (FACTUAL — cite these, not [placeholders])\n${lines}${totalLine}`);
   }
 
   const realCaps = filterRealRows(ctx.capabilities);
