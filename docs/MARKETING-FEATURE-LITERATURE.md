@@ -2878,3 +2878,39 @@ code, activates sms_enabled+phone_verified). `src/lib/ghl/sms.ts` sends via GHL
 Conversations API (verified live: real code delivered to a test phone). pursuit-changes
 gates on phone_verified=true AND sms_opted_out=false. Typecheck 0 errors; production
 build passes.
+
+---
+
+## DIBBS — DLA small-buy RFQs, now searchable inside Mindy
+
+**What it does (plain English):** A new **DIBBS** tab in the sidebar lets you search
+the DLA Internet Bid Board — the ~3.3M small-buy solicitations (NSN/parts RFQs) the
+Defense Logistics Agency posts on its OWN board, which never show up on SAM.gov.
+Search by keyword, National Stock Number (NSN), or Federal Supply Classification
+(FSC); results sort soonest-deadline-first and hide already-closed RFQs by default.
+Each result shows the description, NSN/FSC, quantity, bid deadline, and a direct link
+to the RFQ page and solicitation PDF.
+
+**Why it matters:** SAM.gov shows maybe 20% of what the government actually buys.
+DLA's high-volume commodity purchases live on DIBBS behind a login/EULA wall that
+blocks normal search — so most small businesses never see them. For a supplier,
+manufacturer, or distributor, that's the entire addressable market hidden from view.
+Mindy now brings that board inside the same app where you already track SAM
+opportunities, so you can find part/commodity work without logging into a separate
+government portal. This is the kind of feed the up-market intelligence platforms
+(e.g. HigherGov) treat as a paid first-class source; Mindy makes it a native tab.
+
+**SEO angle:** *DLA DIBBS search, NSN opportunity search, FSC solicitations, DLA
+small-buy RFQs, federal parts contracts, DIBBS bid board, defense supplier
+opportunities.*
+
+**Proof:** Sourced via a maintained third-party scraper (Apify
+`parseforge/dibbs-rfq-scraper`, US residential proxy — the documented way past the
+DIBBS WAF) into the `dibbs_rfqs` table (solicitation #, NSN, FSC, description,
+quantity, deadline, PDF). `GET /api/app/dibbs` searches it (authed via
+requireMIAuthSession; keyword/NSN/FSC filters, soonest-deadline sort, expired hidden,
+paginated); `DibbsPanel.tsx` renders it in the sidebar (Pro tier). Steady-state refresh
+runs daily via the `sync-dibbs` dispatcher cron. **Verified live on production:**
+`sync-dibbs` returned `{"success":true,"fetched":5,"upserted":1}`, and real DLA Troop
+Support RFQs (e.g. SPE1C1-26-Q-0325, NSN 8415-01-534-8411, helmet liner) confirmed in
+the table. Ingest dedupes by solicitation_number (idempotent). Typecheck 0 errors.
