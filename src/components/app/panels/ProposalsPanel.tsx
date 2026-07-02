@@ -3018,6 +3018,20 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             if (!meta) return null;
             const current = drafts[activeSection];
             const isLoading = draftLoading === activeSection;
+            // How many compliance requirements map to THIS section. Tier 1 drafts a
+            // section in ONE pass (situation-aware length, capped ~5K words / ~10
+            // pages). Past ~20 requirements a section legitimately wants a true
+            // multi-volume, requirement-by-requirement expansion (Tier 2 engine —
+            // built but gated off; PROPOSAL_MULTIPASS). Rather than silently ship a
+            // 10-page draft where the RFP wanted 60, be honest about the ceiling and
+            // frame the expansion as the Pro feature it is (rule #10). This nudge is
+            // also the demand signal: heavy-requirement drafts are queryable from the
+            // persisted compliance matrix — if users hit this a lot, turn Tier 2 on.
+            const activeReqCount = compliance.filter(r =>
+              alignRequirement({ requirement: r.requirement, category: r.category, section: r.section }) === activeSection
+            ).length;
+            const TIER1_FULL_COVERAGE = 20;
+            const showVolumeNudge = activeReqCount > TIER1_FULL_COVERAGE;
 
             return (
               <div>
@@ -3072,6 +3086,23 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                     </button>
                   </div>
                 </div>
+
+                {/* Tier-1 coverage ceiling — honest nudge on requirement-heavy
+                    sections. Frames the full requirement-by-requirement expansion
+                    as a Pro feature (coming) instead of shipping a short draft
+                    silently. */}
+                {showVolumeNudge && (
+                  <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 flex items-start gap-3">
+                    <span className="text-lg leading-none mt-0.5">📚</span>
+                    <div className="text-xs leading-relaxed text-amber-100/90">
+                      <span className="font-semibold text-amber-200">This is a large volume — {activeReqCount} requirements map to {meta.label}.</span>{' '}
+                      Mindy drafts the core response with your real evidence woven in, but a full
+                      requirement-by-requirement volume (each shall as its own subsection — often
+                      50–100+ pages) is a <span className="font-semibold">Pro feature (coming)</span>.
+                      For now, draft the core here, then expand the heaviest requirements individually.
+                    </div>
+                  </div>
+                )}
 
                 {current ? (
                   <textarea
