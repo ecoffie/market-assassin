@@ -1222,8 +1222,11 @@ function DocumentsSection({ email, items, onChanged }: { email: string; items: B
                 </p>
               </div>
               <div className="ml-3 shrink-0 flex items-center gap-2">
-                {/* Re-parse an already-uploaded cap statement into sections. */}
-                {d.doc_type === 'cap_stmt' && d.parse_status === 'parsed' && (
+                {/* Pull ANY parsed doc into sections — not just cap_stmt. Users
+                    routinely upload a cap statement through the "Other" card;
+                    gating on doc_type left those docs stuck with no way to pull.
+                    The parser runs on the extracted text regardless of the tag. */}
+                {d.parse_status === 'parsed' && (
                   <button
                     onClick={() => parseDoc(d.id, d.original_filename)}
                     disabled={parsing}
