@@ -170,6 +170,7 @@ export default function VaultPanel({ email, tier, initialSection }: Props) {
         </div>
         <p className="text-sm text-slate-400">
           Everything Mindy uses to make outputs sound like <em>you</em>. The more you store, the more personalized your drafts, briefings, and proposals.
+          {' '}This is what Mindy <span className="text-slate-300">writes into proposals</span> — what it <span className="text-slate-300">watches for</span> (NAICS, keywords, agencies) lives in <span className="text-slate-300">Settings</span>.
         </p>
       </div>
 
@@ -507,6 +508,7 @@ function isPastPerfDraft(p: PastPerf): boolean {
 
 function PastPerfRow({ p, email, onChanged }: { p: PastPerf; email: string; onChanged: () => void }) {
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   const draft = isPastPerfDraft(p);
   const fmtPeriod = () => {
     const y = (d?: string | null) => (d ? new Date(d).getFullYear() : null);
@@ -534,35 +536,62 @@ function PastPerfRow({ p, email, onChanged }: { p: PastPerf; email: string; onCh
       </button>
       {/* Expanded detail */}
       {open && (
-        <div className="px-4 pb-4 pt-1 border-t border-slate-800/60 space-y-2">
-          {p.sub_agency && <p className="text-xs text-slate-500">{p.sub_agency}{p.contract_number ? ` · ${p.contract_number}` : ''}</p>}
-          {p.scope_description && <p className="text-sm text-slate-300">{p.scope_description}</p>}
-          {(p.reference_name || p.reference_email) && (
-            <p className="text-xs text-slate-400">Reference: {p.reference_name || ''}{p.reference_email ? ` · ${p.reference_email}` : ''}</p>
-          )}
-          <button
-            onClick={async () => {
-              if (!confirm('Archive this past performance?')) return;
-              await fetch(`/api/app/vault/past-performance?id=${p.id}&email=${encodeURIComponent(email)}`, {
-                method: 'DELETE', headers: getMIApiHeaders(email),
-              });
-              onChanged();
-            }}
-            className="text-xs text-slate-500 hover:text-rose-400"
-          >Archive</button>
-        </div>
+        editing ? (
+          <div className="px-4 pb-4 pt-1 border-t border-slate-800/60">
+            <PastPerfForm
+              email={email}
+              initial={p}
+              editId={p.id}
+              onSaved={() => { setEditing(false); onChanged(); }}
+              onCancel={() => setEditing(false)}
+            />
+          </div>
+        ) : (
+          <div className="px-4 pb-4 pt-1 border-t border-slate-800/60 space-y-2">
+            {p.sub_agency && <p className="text-xs text-slate-500">{p.sub_agency}{p.contract_number ? ` · ${p.contract_number}` : ''}</p>}
+            {p.scope_description && <p className="text-sm text-slate-300">{p.scope_description}</p>}
+            {(p.reference_name || p.reference_email) && (
+              <p className="text-xs text-slate-400">Reference: {p.reference_name || ''}{p.reference_email ? ` · ${p.reference_email}` : ''}</p>
+            )}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setEditing(true)}
+                className="text-xs text-slate-500 hover:text-emerald-400"
+              >Edit</button>
+              <button
+                onClick={async () => {
+                  if (!confirm('Archive this past performance?')) return;
+                  await fetch(`/api/app/vault/past-performance?id=${p.id}&email=${encodeURIComponent(email)}`, {
+                    method: 'DELETE', headers: getMIApiHeaders(email),
+                  });
+                  onChanged();
+                }}
+                className="text-xs text-slate-500 hover:text-rose-400"
+              >Archive</button>
+            </div>
+          </div>
+        )
       )}
     </div>
   );
 }
 
-function PastPerfForm({ email, onSaved, onCancel }: { email: string; onSaved: () => void; onCancel: () => void }) {
+function PastPerfForm({ email, initial, editId, onSaved, onCancel }: { email: string; initial?: PastPerf; editId?: string; onSaved: () => void; onCancel: () => void }) {
   const [form, setForm] = useState({
-    contract_title: '', contract_number: '', agency: '', sub_agency: '',
-    period_start: '', period_end: '', contract_value: '', role: 'prime',
-    scope_description: '', cpars_rating: '',
-    reference_name: '', reference_email: '',
-    relevance_keywords: '', naics_codes: '',
+    contract_title: initial?.contract_title || '',
+    contract_number: initial?.contract_number || '',
+    agency: initial?.agency || '',
+    sub_agency: initial?.sub_agency || '',
+    period_start: initial?.period_start || '',
+    period_end: initial?.period_end || '',
+    contract_value: initial?.contract_value != null ? String(initial.contract_value) : '',
+    role: initial?.role || 'prime',
+    scope_description: initial?.scope_description || '',
+    cpars_rating: initial?.cpars_rating || '',
+    reference_name: initial?.reference_name || '',
+    reference_email: initial?.reference_email || '',
+    relevance_keywords: (initial?.relevance_keywords || []).join(', '),
+    naics_codes: (initial?.naics_codes || []).join(', '),
   });
   const [saving, setSaving] = useState(false);
 
@@ -574,10 +603,11 @@ function PastPerfForm({ email, onSaved, onCancel }: { email: string; onSaved: ()
     setSaving(true);
     try {
       await fetch('/api/app/vault/past-performance', {
-        method: 'POST',
+        method: editId ? 'PATCH' : 'POST',
         headers: { ...Object.fromEntries(getMIApiHeaders(email).entries()), 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
+          ...(editId ? { id: editId } : {}),
           entry: {
             ...form,
             contract_value: form.contract_value ? Number(form.contract_value) : null,
@@ -594,7 +624,7 @@ function PastPerfForm({ email, onSaved, onCancel }: { email: string; onSaved: ()
 
   return (
     <div className="border border-emerald-900 rounded-lg p-5 mb-5 bg-emerald-950/20 space-y-3">
-      <h3 className="text-white font-medium">New past performance</h3>
+      <h3 className="text-white font-medium">{editId ? 'Edit past performance' : 'New past performance'}</h3>
       <Field label="Contract title *" value={form.contract_title} onChange={(v) => setForm(f => ({ ...f, contract_title: v }))} />
       <div className="grid grid-cols-2 gap-3">
         <Field label="Agency *" value={form.agency} onChange={(v) => setForm(f => ({ ...f, agency: v }))} placeholder="Department of the Navy" />
@@ -628,30 +658,6 @@ function PastPerfForm({ email, onSaved, onCancel }: { email: string; onSaved: ()
 // ---- Capabilities -----------------------------------------------------
 function CapabilitiesSection({ email, items, onChanged }: { email: string; items: Capability[]; onChanged: () => void }) {
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({ capability_name: '', description: '', related_naics: '', keywords: '', evidence: '' });
-  const [saving, setSaving] = useState(false);
-
-  const save = async () => {
-    if (!form.capability_name.trim() || !form.description.trim()) return;
-    setSaving(true);
-    try {
-      await fetch('/api/app/vault/capabilities', {
-        method: 'POST',
-        headers: { ...Object.fromEntries(getMIApiHeaders(email).entries()), 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          entry: {
-            ...form,
-            related_naics: form.related_naics.split(',').map(s => s.trim()).filter(Boolean),
-            keywords: form.keywords.split(',').map(s => s.trim()).filter(Boolean),
-          },
-        }),
-      });
-      setForm({ capability_name: '', description: '', related_naics: '', keywords: '', evidence: '' });
-      setAdding(false);
-      onChanged();
-    } finally { setSaving(false); }
-  };
 
   if (items.length === 0 && !adding) {
     return (
@@ -672,22 +678,59 @@ function CapabilitiesSection({ email, items, onChanged }: { email: string; items
         <button onClick={() => setAdding(true)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded">+ Add capability</button>
       </div>
       {adding && (
-        <div className="border border-emerald-900 rounded-lg p-5 mb-5 bg-emerald-950/20 space-y-3">
-          <Field label="Capability name *" value={form.capability_name} onChange={(v) => setForm(f => ({ ...f, capability_name: v }))} placeholder="Penetration Testing" />
-          <Field label="Description (1-3 sentences in your voice) *" value={form.description} onChange={(v) => setForm(f => ({ ...f, description: v }))} multiline />
-          <Field label="Related NAICS (comma-separated)" value={form.related_naics} onChange={(v) => setForm(f => ({ ...f, related_naics: v }))} placeholder="541512, 541519" />
-          <Field label="Keywords (comma-separated)" value={form.keywords} onChange={(v) => setForm(f => ({ ...f, keywords: v }))} placeholder="OWASP, pen test, vulnerability assessment" />
-          <Field label="Evidence" value={form.evidence} onChange={(v) => setForm(f => ({ ...f, evidence: v }))} placeholder="OSCP certified team, 50+ tests delivered" />
-          <div className="flex gap-2">
-            <button onClick={save} disabled={saving} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded disabled:opacity-50">{saving ? 'Saving…' : 'Save'}</button>
-            <button onClick={() => setAdding(false)} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded">Cancel</button>
-          </div>
-        </div>
+        <CapabilityForm email={email} onSaved={() => { setAdding(false); onChanged(); }} onCancel={() => setAdding(false)} />
       )}
       <div className="space-y-2">
         {[...items].sort((a, b) => Number(isCapabilityDraft(a)) - Number(isCapabilityDraft(b))).map((c) => (
           <CapabilityRow key={c.id} c={c} email={email} onChanged={onChanged} />
         ))}
+      </div>
+    </div>
+  );
+}
+
+function CapabilityForm({ email, initial, editId, onSaved, onCancel }: { email: string; initial?: Capability; editId?: string; onSaved: () => void; onCancel: () => void }) {
+  const [form, setForm] = useState({
+    capability_name: initial?.capability_name || '',
+    description: initial?.description || '',
+    related_naics: (initial?.related_naics || []).join(', '),
+    keywords: (initial?.keywords || []).join(', '),
+    evidence: initial?.evidence || '',
+  });
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (!form.capability_name.trim() || !form.description.trim()) return;
+    setSaving(true);
+    try {
+      await fetch('/api/app/vault/capabilities', {
+        method: editId ? 'PATCH' : 'POST',
+        headers: { ...Object.fromEntries(getMIApiHeaders(email).entries()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          ...(editId ? { id: editId } : {}),
+          entry: {
+            ...form,
+            related_naics: form.related_naics.split(',').map(s => s.trim()).filter(Boolean),
+            keywords: form.keywords.split(',').map(s => s.trim()).filter(Boolean),
+          },
+        }),
+      });
+      onSaved();
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="border border-emerald-900 rounded-lg p-5 mb-5 bg-emerald-950/20 space-y-3">
+      <h3 className="text-white font-medium">{editId ? 'Edit capability' : 'New capability'}</h3>
+      <Field label="Capability name *" value={form.capability_name} onChange={(v) => setForm(f => ({ ...f, capability_name: v }))} placeholder="Penetration Testing" />
+      <Field label="Description (1-3 sentences in your voice) *" value={form.description} onChange={(v) => setForm(f => ({ ...f, description: v }))} multiline />
+      <Field label="Related NAICS (comma-separated)" value={form.related_naics} onChange={(v) => setForm(f => ({ ...f, related_naics: v }))} placeholder="541512, 541519" />
+      <Field label="Keywords (comma-separated)" value={form.keywords} onChange={(v) => setForm(f => ({ ...f, keywords: v }))} placeholder="OWASP, pen test, vulnerability assessment" />
+      <Field label="Evidence" value={form.evidence} onChange={(v) => setForm(f => ({ ...f, evidence: v }))} placeholder="OSCP certified team, 50+ tests delivered" />
+      <div className="flex gap-2">
+        <button onClick={save} disabled={saving} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded disabled:opacity-50">{saving ? 'Saving…' : 'Save'}</button>
+        <button onClick={onCancel} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded">Cancel</button>
       </div>
     </div>
   );
@@ -703,6 +746,7 @@ function isCapabilityDraft(c: Capability): boolean {
 
 function CapabilityRow({ c, email, onChanged }: { c: Capability; email: string; onChanged: () => void }) {
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   const draft = isCapabilityDraft(c);
   return (
     <div className={`border rounded-lg bg-slate-900/40 ${draft ? 'border-amber-500/20' : 'border-slate-800'}`}>
@@ -722,20 +766,38 @@ function CapabilityRow({ c, email, onChanged }: { c: Capability; email: string; 
         </div>
       </button>
       {open && (
-        <div className="px-4 pb-4 pt-1 border-t border-slate-800/60 space-y-2">
-          <p className="text-sm text-slate-300">{c.description}</p>
-          {c.evidence && <p className="text-xs text-slate-400">Evidence: {c.evidence}</p>}
-          <button
-            onClick={async () => {
-              if (!confirm('Archive this capability?')) return;
-              await fetch(`/api/app/vault/capabilities?id=${c.id}&email=${encodeURIComponent(email)}`, {
-                method: 'DELETE', headers: getMIApiHeaders(email),
-              });
-              onChanged();
-            }}
-            className="text-xs text-slate-500 hover:text-rose-400"
-          >Archive</button>
-        </div>
+        editing ? (
+          <div className="px-4 pb-4 pt-1 border-t border-slate-800/60">
+            <CapabilityForm
+              email={email}
+              initial={c}
+              editId={c.id}
+              onSaved={() => { setEditing(false); onChanged(); }}
+              onCancel={() => setEditing(false)}
+            />
+          </div>
+        ) : (
+          <div className="px-4 pb-4 pt-1 border-t border-slate-800/60 space-y-2">
+            <p className="text-sm text-slate-300">{c.description}</p>
+            {c.evidence && <p className="text-xs text-slate-400">Evidence: {c.evidence}</p>}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setEditing(true)}
+                className="text-xs text-slate-500 hover:text-emerald-400"
+              >Edit</button>
+              <button
+                onClick={async () => {
+                  if (!confirm('Archive this capability?')) return;
+                  await fetch(`/api/app/vault/capabilities?id=${c.id}&email=${encodeURIComponent(email)}`, {
+                    method: 'DELETE', headers: getMIApiHeaders(email),
+                  });
+                  onChanged();
+                }}
+                className="text-xs text-slate-500 hover:text-rose-400"
+              >Archive</button>
+            </div>
+          </div>
+        )
       )}
     </div>
   );
@@ -744,33 +806,6 @@ function CapabilityRow({ c, email, onChanged }: { c: Capability; email: string; 
 // ---- Team -------------------------------------------------------------
 function TeamSection({ email, items, onChanged }: { email: string; items: TeamMember[]; onChanged: () => void }) {
   const [adding, setAdding] = useState(false);
-  const [form, setForm] = useState({
-    full_name: '', title: '', security_clearance: '', certifications: '',
-    years_experience: '', bio_short: '', is_key_personnel: true,
-  });
-  const [saving, setSaving] = useState(false);
-
-  const save = async () => {
-    if (!form.full_name.trim() || !form.title.trim()) return;
-    setSaving(true);
-    try {
-      await fetch('/api/app/vault/team', {
-        method: 'POST',
-        headers: { ...Object.fromEntries(getMIApiHeaders(email).entries()), 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          email,
-          entry: {
-            ...form,
-            years_experience: form.years_experience ? Number(form.years_experience) : null,
-            certifications: form.certifications.split(',').map(s => s.trim()).filter(Boolean),
-          },
-        }),
-      });
-      setForm({ full_name: '', title: '', security_clearance: '', certifications: '', years_experience: '', bio_short: '', is_key_personnel: true });
-      setAdding(false);
-      onChanged();
-    } finally { setSaving(false); }
-  };
 
   if (items.length === 0 && !adding) {
     return (
@@ -791,32 +826,71 @@ function TeamSection({ email, items, onChanged }: { email: string; items: TeamMe
         <button onClick={() => setAdding(true)} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded">+ Add key personnel</button>
       </div>
       {adding && (
-        <div className="border border-emerald-900 rounded-lg p-5 mb-5 bg-emerald-950/20 space-y-3">
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Full name *" value={form.full_name} onChange={(v) => setForm(f => ({ ...f, full_name: v }))} />
-            <Field label="Title *" value={form.title} onChange={(v) => setForm(f => ({ ...f, title: v }))} placeholder="Program Manager" />
-          </div>
-          <div className="grid grid-cols-2 gap-3">
-            <Field label="Security clearance" value={form.security_clearance} onChange={(v) => setForm(f => ({ ...f, security_clearance: v }))} placeholder="Secret" />
-            <Field label="Years experience" value={form.years_experience} onChange={(v) => setForm(f => ({ ...f, years_experience: v }))} placeholder="15" />
-          </div>
-          <Field label="Certifications (comma-separated)" value={form.certifications} onChange={(v) => setForm(f => ({ ...f, certifications: v }))} placeholder="PMP, CISSP" />
-          <Field label="Short bio (1-2 sentences)" value={form.bio_short} onChange={(v) => setForm(f => ({ ...f, bio_short: v }))} multiline />
-          <label className="flex items-center gap-2 text-sm text-slate-300">
-            <input type="checkbox" checked={form.is_key_personnel} onChange={(e) => setForm(f => ({ ...f, is_key_personnel: e.target.checked }))} />
-            Mark as Key Personnel (shows in proposal sections)
-          </label>
-          <div className="flex gap-2">
-            <button onClick={save} disabled={saving} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded disabled:opacity-50">{saving ? 'Saving…' : 'Save'}</button>
-            <button onClick={() => setAdding(false)} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded">Cancel</button>
-          </div>
-        </div>
+        <TeamForm email={email} onSaved={() => { setAdding(false); onChanged(); }} onCancel={() => setAdding(false)} />
       )}
       <div className="space-y-2">
         {/* Key personnel first, then the rest */}
         {[...items].sort((a, b) => Number(!!b.is_key_personnel) - Number(!!a.is_key_personnel)).map((m) => (
           <TeamRow key={m.id} m={m} email={email} onChanged={onChanged} />
         ))}
+      </div>
+    </div>
+  );
+}
+
+function TeamForm({ email, initial, editId, onSaved, onCancel }: { email: string; initial?: TeamMember; editId?: string; onSaved: () => void; onCancel: () => void }) {
+  const [form, setForm] = useState({
+    full_name: initial?.full_name || '',
+    title: initial?.title || '',
+    security_clearance: initial?.security_clearance || '',
+    certifications: (initial?.certifications || []).join(', '),
+    years_experience: initial?.years_experience != null ? String(initial.years_experience) : '',
+    bio_short: initial?.bio_short || '',
+    is_key_personnel: initial?.is_key_personnel ?? true,
+  });
+  const [saving, setSaving] = useState(false);
+
+  const save = async () => {
+    if (!form.full_name.trim() || !form.title.trim()) return;
+    setSaving(true);
+    try {
+      await fetch('/api/app/vault/team', {
+        method: editId ? 'PATCH' : 'POST',
+        headers: { ...Object.fromEntries(getMIApiHeaders(email).entries()), 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email,
+          ...(editId ? { id: editId } : {}),
+          entry: {
+            ...form,
+            years_experience: form.years_experience ? Number(form.years_experience) : null,
+            certifications: form.certifications.split(',').map(s => s.trim()).filter(Boolean),
+          },
+        }),
+      });
+      onSaved();
+    } finally { setSaving(false); }
+  };
+
+  return (
+    <div className="border border-emerald-900 rounded-lg p-5 mb-5 bg-emerald-950/20 space-y-3">
+      <h3 className="text-white font-medium">{editId ? 'Edit key personnel' : 'New key personnel'}</h3>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Full name *" value={form.full_name} onChange={(v) => setForm(f => ({ ...f, full_name: v }))} />
+        <Field label="Title *" value={form.title} onChange={(v) => setForm(f => ({ ...f, title: v }))} placeholder="Program Manager" />
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <Field label="Security clearance" value={form.security_clearance} onChange={(v) => setForm(f => ({ ...f, security_clearance: v }))} placeholder="Secret" />
+        <Field label="Years experience" value={form.years_experience} onChange={(v) => setForm(f => ({ ...f, years_experience: v }))} placeholder="15" />
+      </div>
+      <Field label="Certifications (comma-separated)" value={form.certifications} onChange={(v) => setForm(f => ({ ...f, certifications: v }))} placeholder="PMP, CISSP" />
+      <Field label="Short bio (1-2 sentences)" value={form.bio_short} onChange={(v) => setForm(f => ({ ...f, bio_short: v }))} multiline />
+      <label className="flex items-center gap-2 text-sm text-slate-300">
+        <input type="checkbox" checked={form.is_key_personnel} onChange={(e) => setForm(f => ({ ...f, is_key_personnel: e.target.checked }))} />
+        Mark as Key Personnel (shows in proposal sections)
+      </label>
+      <div className="flex gap-2">
+        <button onClick={save} disabled={saving} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded disabled:opacity-50">{saving ? 'Saving…' : 'Save'}</button>
+        <button onClick={onCancel} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded">Cancel</button>
       </div>
     </div>
   );
@@ -829,6 +903,7 @@ function isTeamDraft(m: TeamMember): boolean {
 
 function TeamRow({ m, email, onChanged }: { m: TeamMember; email: string; onChanged: () => void }) {
   const [open, setOpen] = useState(false);
+  const [editing, setEditing] = useState(false);
   const draft = isTeamDraft(m);
   return (
     <div className={`border rounded-lg bg-slate-900/40 ${draft ? 'border-amber-500/20' : 'border-slate-800'}`}>
@@ -849,19 +924,37 @@ function TeamRow({ m, email, onChanged }: { m: TeamMember; email: string; onChan
         </div>
       </button>
       {open && (
-        <div className="px-4 pb-4 pt-1 border-t border-slate-800/60 space-y-2">
-          {m.bio_short && <p className="text-sm text-slate-300">{m.bio_short}</p>}
-          <button
-            onClick={async () => {
-              if (!confirm('Archive this person?')) return;
-              await fetch(`/api/app/vault/team?id=${m.id}&email=${encodeURIComponent(email)}`, {
-                method: 'DELETE', headers: getMIApiHeaders(email),
-              });
-              onChanged();
-            }}
-            className="text-xs text-slate-500 hover:text-rose-400"
-          >Archive</button>
-        </div>
+        editing ? (
+          <div className="px-4 pb-4 pt-1 border-t border-slate-800/60">
+            <TeamForm
+              email={email}
+              initial={m}
+              editId={m.id}
+              onSaved={() => { setEditing(false); onChanged(); }}
+              onCancel={() => setEditing(false)}
+            />
+          </div>
+        ) : (
+          <div className="px-4 pb-4 pt-1 border-t border-slate-800/60 space-y-2">
+            {m.bio_short && <p className="text-sm text-slate-300">{m.bio_short}</p>}
+            <div className="flex items-center gap-3">
+              <button
+                onClick={() => setEditing(true)}
+                className="text-xs text-slate-500 hover:text-emerald-400"
+              >Edit</button>
+              <button
+                onClick={async () => {
+                  if (!confirm('Archive this person?')) return;
+                  await fetch(`/api/app/vault/team?id=${m.id}&email=${encodeURIComponent(email)}`, {
+                    method: 'DELETE', headers: getMIApiHeaders(email),
+                  });
+                  onChanged();
+                }}
+                className="text-xs text-slate-500 hover:text-rose-400"
+              >Archive</button>
+            </div>
+          </div>
+        )
       )}
     </div>
   );

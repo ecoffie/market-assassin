@@ -44,6 +44,21 @@ export async function POST(request: NextRequest) {
   return NextResponse.json({ success: true, entry: data });
 }
 
+export async function PATCH(request: NextRequest) {
+  const body = await request.json().catch(() => ({}));
+  const email = String(body.email || '').trim();
+  const id = String(body.id || '').trim();
+  const entry = body.entry || {};
+  if (!email || !id) return NextResponse.json({ success: false, error: 'Email and id required' }, { status: 400 });
+  const auth = await verifyUserOwnsEmail(request, email);
+  if (!auth.authenticated) return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
+  const update = { ...pick(entry), updated_at: new Date().toISOString() };
+  const { data, error } = await getSupabase().from('user_team_members')
+    .update(update).eq('id', id).eq('user_email', auth.email!).select().maybeSingle();
+  if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  return NextResponse.json({ success: true, entry: data });
+}
+
 export async function DELETE(request: NextRequest) {
   const email = String(request.nextUrl.searchParams.get('email') || '').trim();
   const id = String(request.nextUrl.searchParams.get('id') || '').trim();

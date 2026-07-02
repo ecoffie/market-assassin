@@ -700,8 +700,10 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
             <div>
               <SectionTitle title="Opportunity Matching" />
               <p className="mt-2 text-sm text-slate-400">
-                These preferences control what Mindy watches for in alerts, briefings, and forecasts.
-                Your company profile (legal name, UEI, certifications) lives in <span className="text-slate-300">My Vault → Identity</span>.
+                These preferences control what Mindy <span className="text-slate-300">watches for</span> in alerts,
+                briefings, and forecasts. The company identity Mindy <span className="text-slate-300">writes into proposals</span>
+                {' '}(legal name, UEI, certifications, past performance, point of contact) lives in
+                {' '}<span className="text-slate-300">My Vault → Identity</span>.
               </p>
             </div>
 
