@@ -201,41 +201,6 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
   // Collaboration signal — how many OTHER users are tracking each shown opp (anonymous).
   const [interestCounts, setInterestCounts] = useState<Record<string, number>>({});
 
-  // The user's OWN tracked opportunities (stage=tracking rows they created by
-  // clicking "Interested"). Free users had no way to SEE what they tracked — My
-  // Pursuits is Pro-locked, so "✓ Tracking" was a dead-end (Eric QC 2026-07-02).
-  // We read the same user_pipeline rows back (GET /api/pipeline, no tier gate) and
-  // show a lightweight read-only list here.
-  type TrackedItem = { id?: string; notice_id?: string; title?: string; agency?: string; external_url?: string; response_deadline?: string };
-  const [tracked, setTracked] = useState<TrackedItem[]>([]);
-  const [trackedOpen, setTrackedOpen] = useState(false);
-
-  const loadTracked = useCallback(async () => {
-    if (!email) return;
-    try {
-      const res = await fetch(`/api/pipeline?email=${encodeURIComponent(email)}&stage=tracking`, {
-        headers: getMIApiHeaders(email),
-      });
-      if (!res.ok) return;
-      const data = await res.json().catch(() => null);
-      const rows: TrackedItem[] = data?.pipeline || data?.items || data?.rows || (Array.isArray(data) ? data : []);
-      if (Array.isArray(rows)) {
-        setTracked(rows);
-        // Seed the interested set so already-tracked opps show "✓ Tracking" (not
-        // "➕ Interested") after a reload — the button state now survives refresh.
-        const ids = rows.map(r => r.notice_id).filter(Boolean) as string[];
-        if (ids.length) setInterestedAlertIds(prev => new Set([...prev, ...ids]));
-      }
-    } catch { /* best-effort — never block the panel */ }
-  }, [email]);
-
-  // Market coverage for the free Alerts page: "Tracking XX% of your market — N
-  // codes missing." This lived only in Settings/locked panels; free users never
-  // saw it where they work (Eric QC 2026-07-02). Reuses the SAME keyword-coverage
-  // source TargetingCard uses so the number matches everywhere.
-  type Coverage = { keyword: string; heldPct: number; coveragePct: number; sectorMarket: number; totalMarket: number; missing: { code: string }[] };
-  const [coverage, setCoverage] = useState<Coverage | null>(null);
-
   const trackAlertEvent = useCallback((eventType: 'link_click' | 'tool_use', alert: Alert, action: string) => {
     if (!email) return;
 
@@ -423,7 +388,66 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
       setInterestedAlertIds(prev => { const n = new Set(prev); n.delete(alert.id); return n; });
       showToast({ message: 'Could not track that — try again', variant: 'error' });
     }
+    // A new tracking row was created — refresh the free "tracked" list so it shows.
+    void loadTracked();
   };
+
+  // The user's OWN tracked opportunities (stage=tracking rows they created by
+  // clicking "Interested"). Free users had no way to SEE what they tracked — My
+  // Pursuits is Pro-locked, so "✓ Tracking" was a dead-end (Eric QC 2026-07-02).
+  // Read the same user_pipeline rows back (GET /api/pipeline, no tier gate) and
+  // show a lightweight read-only list here.
+  type TrackedItem = { id?: string; notice_id?: string; title?: string; agency?: string; external_url?: string; response_deadline?: string };
+  const [tracked, setTracked] = useState<TrackedItem[]>([]);
+  const [trackedOpen, setTrackedOpen] = useState(false);
+
+  const loadTracked = useCallback(async () => {
+    if (!email) return;
+    try {
+      const res = await fetch(`/api/pipeline?email=${encodeURIComponent(email)}&stage=tracking`, {
+        headers: getMIApiHeaders(email),
+      });
+      if (!res.ok) return;
+      const data = await res.json().catch(() => null);
+      // GET /api/pipeline returns { opportunities: [...] } (user_pipeline rows).
+      const rows: TrackedItem[] = data?.opportunities || (Array.isArray(data) ? data : []);
+      if (Array.isArray(rows)) {
+        setTracked(rows);
+        // Seed the interested set so already-tracked opps show "✓ Tracking" (not
+        // "➕ Interested") after a reload — button state now survives refresh.
+        const ids = rows.map(r => r.notice_id).filter(Boolean) as string[];
+        if (ids.length) setInterestedAlertIds(prev => new Set([...prev, ...ids]));
+      }
+    } catch { /* best-effort — never block the panel */ }
+  }, [email]);
+
+  // Load the user's tracked list once on mount (and whenever email changes).
+  useEffect(() => { void loadTracked(); }, [loadTracked]);
+
+  // Market coverage line for the free Alerts page: "Tracking XX% of your market —
+  // N codes missing." It lived only in Settings/locked panels, so free users never
+  // saw it where they work (Eric QC 2026-07-02). Reuse the SAME keyword-coverage
+  // source TargetingCard uses so the number matches everywhere.
+  type Coverage = { keyword: string; heldPct: number; coveragePct: number; sectorMarket: number; totalMarket: number; missing: { code: string }[] };
+  const [coverage, setCoverage] = useState<Coverage | null>(null);
+  useEffect(() => {
+    const primary = searchCriteria.keywords?.[0];
+    const have = searchCriteria.naicsCodes || [];
+    if (!primary) { setCoverage(null); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const haveParam = have.length ? `&have=${encodeURIComponent(have.join(','))}` : '';
+        const res = await fetch(`/api/app/keyword-coverage?keyword=${encodeURIComponent(primary)}${haveParam}`, {
+          headers: getMIApiHeaders(email),
+        });
+        if (!res.ok || cancelled) return;
+        const c = await res.json().catch(() => null);
+        if (!cancelled && c && typeof c.totalMarket === 'number') setCoverage(c);
+      } catch { /* coverage is non-blocking */ }
+    })();
+    return () => { cancelled = true; };
+  }, [searchCriteria.keywords, searchCriteria.naicsCodes, email]);
 
   const saveToPipeline = async (alert: Alert) => {
     if (!email) {
@@ -929,6 +953,81 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
           </div>
         )}
       </div>
+
+      {/* Market coverage line — shows free users how much of their line of work
+          they're tracking, and nudges the "add missing codes" action in Settings.
+          Reuses the same keyword-coverage number as the targeting card. */}
+      {coverage && coverage.totalMarket > 0 && (
+        <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm">
+          {coverage.missing.length === 0 ? (
+            <span className="text-slate-300">
+              ✓ Tracking{' '}
+              <span className="text-emerald-300 font-semibold">{Math.round((coverage.coveragePct || 0) * 100)}%</span>{' '}
+              of your &ldquo;{coverage.keyword}&rdquo; market — your codes capture the real spend.
+            </span>
+          ) : (
+            <span className="text-slate-300">
+              Tracking{' '}
+              <span className="text-amber-300 font-semibold">{Math.round(coverage.heldPct * 100)}%</span>{' '}
+              of your &ldquo;{coverage.keyword}&rdquo; market.{' '}
+              <button
+                onClick={() => onPanelChange?.('settings')}
+                className="text-purple-400 hover:text-purple-300 font-medium"
+              >
+                {coverage.missing.length} high-value code{coverage.missing.length > 1 ? 's' : ''} missing — add in Settings →
+              </button>
+            </span>
+          )}
+        </div>
+      )}
+
+      {/* The user's OWN tracked opportunities. Free users track opps but My Pursuits
+          is Pro-locked, so this read-only list is where they see what they saved. */}
+      {tracked.length > 0 && (
+        <div className="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden">
+          <button
+            type="button"
+            onClick={() => setTrackedOpen((o) => !o)}
+            className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-800/40 transition-colors"
+            aria-expanded={trackedOpen}
+          >
+            <span className="flex items-center gap-2 text-sm font-semibold text-white">
+              <span className="text-emerald-400">✓</span> You&rsquo;re tracking {tracked.length} opportunit{tracked.length === 1 ? 'y' : 'ies'}
+            </span>
+            <span className={`text-slate-500 transition-transform ${trackedOpen ? '' : '-rotate-90'}`}>▾</span>
+          </button>
+          {trackedOpen && (
+            <ul className="divide-y divide-slate-800 border-t border-slate-800">
+              {tracked.slice(0, 25).map((t, i) => (
+                <li key={t.id || t.notice_id || i} className="flex items-center justify-between gap-3 px-4 py-2.5 text-sm">
+                  <div className="min-w-0">
+                    <div className="truncate text-slate-200">{t.title || t.notice_id || 'Tracked opportunity'}</div>
+                    {(t.agency || t.response_deadline) && (
+                      <div className="truncate text-xs text-slate-500">
+                        {t.agency}{t.agency && t.response_deadline ? ' • ' : ''}
+                        {t.response_deadline ? `Due ${new Date(t.response_deadline).toLocaleDateString()}` : ''}
+                      </div>
+                    )}
+                  </div>
+                  {t.external_url && (
+                    <a
+                      href={t.external_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="shrink-0 text-xs text-purple-400 hover:text-purple-300"
+                    >
+                      SAM.gov →
+                    </a>
+                  )}
+                </li>
+              ))}
+              {tracked.length > 25 && (
+                <li className="px-4 py-2 text-xs text-slate-500">+{tracked.length - 25} more — {isFreeTier ? 'the full pipeline view is in Pro.' : 'see My Pursuits.'}</li>
+              )}
+            </ul>
+          )}
+        </div>
+      )}
 
       {!isFreeTier && (
         <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-4">
