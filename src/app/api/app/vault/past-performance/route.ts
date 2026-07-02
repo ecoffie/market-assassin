@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { invalidateCapabilityVector } from '@/lib/alerts/capability-vector';
+import { embedVaultRow } from '@/lib/vault/embed-evidence';
 
 export const dynamic = 'force-dynamic';
 
@@ -57,6 +58,9 @@ export async function POST(request: NextRequest) {
     .maybeSingle();
 
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  // Semantic weave: embed the new row into pgvector so it can match RFP
+  // requirements immediately (best-effort — never blocks the save).
+  if (data) await embedVaultRow(getSupabase(), 'past_performance', data, new Date().toISOString());
   void invalidateCapabilityVector(auth.email!); // past-perf added → re-embed
   return NextResponse.json({ success: true, entry: data });
 }
@@ -86,6 +90,8 @@ export async function PATCH(request: NextRequest) {
     .maybeSingle();
 
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  // Re-embed: scope/keywords may have changed, so the vector must be refreshed.
+  if (data) await embedVaultRow(getSupabase(), 'past_performance', data, new Date().toISOString());
   void invalidateCapabilityVector(auth.email!); // past-perf scope changed → re-embed
   return NextResponse.json({ success: true, entry: data });
 }

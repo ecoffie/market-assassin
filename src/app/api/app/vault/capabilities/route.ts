@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { invalidateCapabilityVector } from '@/lib/alerts/capability-vector';
+import { embedVaultRow } from '@/lib/vault/embed-evidence';
 
 export const dynamic = 'force-dynamic';
 
@@ -44,6 +45,7 @@ export async function POST(request: NextRequest) {
   const row = { ...pick(entry), user_email: auth.email! };
   const { data, error } = await getSupabase().from('user_capabilities_library').insert(row).select().maybeSingle();
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  if (data) await embedVaultRow(getSupabase(), 'capability', data, new Date().toISOString());
   void invalidateCapabilityVector(auth.email!); // capability text changed → re-embed
   return NextResponse.json({ success: true, entry: data });
 }
@@ -60,6 +62,7 @@ export async function PATCH(request: NextRequest) {
   const { data, error } = await getSupabase().from('user_capabilities_library')
     .update(update).eq('id', id).eq('user_email', auth.email!).select().maybeSingle();
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  if (data) await embedVaultRow(getSupabase(), 'capability', data, new Date().toISOString());
   void invalidateCapabilityVector(auth.email!); // capability text changed → re-embed
   return NextResponse.json({ success: true, entry: data });
 }

@@ -30,6 +30,7 @@ import {
   normalizePastPerf, normalizeCapability, normalizeIdentity,
   type ParsedPP, type ParsedCap, type ParsedIdentity,
 } from '@/lib/vault/normalize';
+import { embedVaultRow } from '@/lib/vault/embed-evidence';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -132,17 +133,22 @@ export async function POST(request: NextRequest) {
     if (!row) { skipped.push({ section: 'past_performance', item: String((p as { contract_title?: unknown }).contract_title || '(untitled)'), reason: skipReason || 'invalid' }); continue; }
     ppRows.push({ ...row, user_email: userEmail, source: 'manual' });
   }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const insertedPP: any[] = [];
   if (ppRows.length) {
-    const { data, error } = await sb.from('user_past_performance').insert(ppRows).select('id');
+    const { data, error } = await sb.from('user_past_performance').insert(ppRows)
+      .select('id, contract_title, agency, sub_agency, role, scope_description, outcomes, relevance_keywords, naics_codes');
     if (error) {
       // Batch failed as a unit — fall back to per-row so one bad row can't sink all.
       for (const r of ppRows) {
-        const { error: e2 } = await sb.from('user_past_performance').insert(r).select('id').maybeSingle();
+        const { data: one, error: e2 } = await sb.from('user_past_performance').insert(r)
+          .select('id, contract_title, agency, sub_agency, role, scope_description, outcomes, relevance_keywords, naics_codes').maybeSingle();
         if (e2) skipped.push({ section: 'past_performance', item: r.contract_title, reason: e2.message });
-        else saved.past_performance += 1;
+        else { saved.past_performance += 1; if (one) insertedPP.push(one); }
       }
     } else {
       saved.past_performance = data?.length ?? ppRows.length;
+      if (data) insertedPP.push(...data);
     }
   }
 
@@ -155,20 +161,36 @@ export async function POST(request: NextRequest) {
     if (!row) { skipped.push({ section: 'capabilities', item: String((c as { capability_name?: unknown }).capability_name || '(unnamed)'), reason: skipReason || 'invalid' }); continue; }
     capRows.push({ ...row, user_email: userEmail });
   }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const insertedCaps: any[] = [];
   if (capRows.length) {
-    const { data, error } = await sb.from('user_capabilities_library').insert(capRows).select('id');
+    const { data, error } = await sb.from('user_capabilities_library').insert(capRows)
+      .select('id, capability_name, description, evidence, keywords, related_naics, tools_methods');
     if (error) {
       for (const r of capRows) {
-        const { error: e2 } = await sb.from('user_capabilities_library').insert(r).select('id').maybeSingle();
+        const { data: one, error: e2 } = await sb.from('user_capabilities_library').insert(r)
+          .select('id, capability_name, description, evidence, keywords, related_naics, tools_methods').maybeSingle();
         if (e2) skipped.push({ section: 'capabilities', item: r.capability_name, reason: e2.message });
-        else saved.capabilities += 1;
+        else { saved.capabilities += 1; if (one) insertedCaps.push(one); }
       }
     } else {
       saved.capabilities = data?.length ?? capRows.length;
+      if (data) insertedCaps.push(...data);
     }
   }
 
-  // Past-perf + capabilities + identity all feed the capability vector — re-embed.
+  // Embed-on-write → pgvector (powers the proposal requirement→evidence matcher).
+  // Best-effort + inline: a Vault import is low-frequency and the user expects the
+  // save to "settle", so we embed the just-inserted rows now (each embedVaultRow is
+  // self-guarded and never throws). A failed embed just leaves embedding NULL — the
+  // backfill script / a later save picks it up.
+  const embedStamp = new Date().toISOString();
+  await Promise.all([
+    ...insertedPP.map((r) => embedVaultRow(sb, 'past_performance', r, embedStamp)),
+    ...insertedCaps.map((r) => embedVaultRow(sb, 'capability', r, embedStamp)),
+  ]);
+
+  // Past-perf + capabilities + identity all feed the (legacy) capability vector too.
   if (saved.past_performance || saved.capabilities || saved.identity) {
     void invalidateCapabilityVector(userEmail);
   }
