@@ -212,31 +212,59 @@ export default function SettingsPanel({ isOpen, onClose, email, onSaved, mode = 
         .map(k => k.trim())
         .filter(k => k.length > 0);
 
-      const res = await fetch('/api/alerts/preferences', {
+      const body = JSON.stringify({
+        email,
+        naicsCodes,
+        keywords,
+        businessDescription: businessDescription.trim() || null,
+        businessType: selectedSetAsides[0] || businessType || null,
+        setAsides: selectedSetAsides,
+        targetAgencies: getAllAgencies(),
+        locationStates: selectedStates,
+        locationState: selectedStates[0] || null,
+        frequency,
+        alertsEnabled: frequency !== 'paused',
+        briefingsEnabled: mode === 'alerts' ? false : briefingsEnabled,
+        isActive: frequency !== 'paused',
+      });
+
+      // Auth-resilient save: on a 401 (the 30-day MI session token expired), refresh
+      // the token and retry ONCE. Without this, a user at the token cliff silently
+      // can't persist — the save 401s, shows "Failed to save", and the two settings
+      // surfaces disagree ("I save but it never persists"). UnifiedSettingsPanel was
+      // hardened for this 2026-06-16; the drawer was missed (Eric QC 2026-07-02).
+      const postPrefs = () => fetch('/api/alerts/preferences', {
         method: 'POST',
         headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
-        body: JSON.stringify({
-          email,
-          naicsCodes,
-          keywords,
-          businessDescription: businessDescription.trim() || null,
-          businessType: selectedSetAsides[0] || businessType || null,
-          setAsides: selectedSetAsides,
-          targetAgencies: getAllAgencies(),
-          locationStates: selectedStates,
-          locationState: selectedStates[0] || null,
-          frequency,
-          alertsEnabled: frequency !== 'paused',
-          briefingsEnabled: mode === 'alerts' ? false : briefingsEnabled,
-          isActive: frequency !== 'paused',
-        }),
+        body,
       });
+      let res = await postPrefs();
+      if (res.status === 401) {
+        try {
+          const refresh = await fetch('/api/auth/refresh-mi-session', {
+            method: 'POST',
+            headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+          });
+          if (refresh.ok) {
+            const j = await refresh.json().catch(() => null);
+            if (j?.sessionToken && typeof window !== 'undefined') {
+              window.localStorage.setItem('mi_beta_auth_token', j.sessionToken);
+            }
+            res = await postPrefs();
+          }
+        } catch { /* fall through with the original 401 */ }
+      }
 
       const data = await res.json();
 
       if (data.success) {
         setSuccess('Settings saved');
         onSaved?.();
+        // Tell any other open surface (e.g. the dashboard TargetingCard) that
+        // targeting changed, so it re-fetches without needing a tab-away/back.
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('mindy:settings-saved'));
+        }
         setTimeout(() => setSuccess(''), 3000);
       } else {
         setError(data.error || 'Failed to save');

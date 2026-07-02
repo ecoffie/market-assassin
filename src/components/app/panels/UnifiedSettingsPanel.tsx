@@ -434,6 +434,12 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
 
       setForm(prev => ({ ...prev, onboarding_completed: markComplete }));
       setTargetingRefreshKey(prev => prev + 1);
+      // Notify any OTHER open surface (the dashboard TargetingCard, the top drawer)
+      // that targeting changed so it re-fetches without a tab-away/back — keeps all
+      // settings views in sync (Eric QC 2026-07-02).
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('mindy:settings-saved'));
+      }
       // profile_update is an activation signal — users tweaking their
       // profile are engaged. Capture which fields are non-empty so the
       // Launch Command Center can see what's being tuned.

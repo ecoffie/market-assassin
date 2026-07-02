@@ -77,6 +77,91 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
   const [coverage, setCoverage] = useState<Coverage | null>(null);
   const [loading, setLoading] = useState(true);
   const [collapsed, setCollapsed] = useState(false);
+  // Inline add/remove (Eric QC 2026-07-02): edit codes/keywords right on the card
+  // like the top-of-page settings, without going through the Suggest flow. Saves
+  // to the SAME source of truth (/api/alerts/preferences → user_notification_settings).
+  const [saving, setSaving] = useState(false);
+  const [addingField, setAddingField] = useState<null | 'naics' | 'psc' | 'keywords'>(null);
+  const [addValue, setAddValue] = useState('');
+
+  // Persist one targeting field with the 30-day-token-cliff retry, then broadcast
+  // so every other settings surface re-syncs. Optimistic: caller updates local
+  // state first; on failure we reload from the server to snap back to truth.
+  const persist = useCallback(async (patch: Partial<Targeting>) => {
+    if (!email) return;
+    setSaving(true);
+    const body = JSON.stringify({
+      email,
+      ...(patch.naics !== undefined ? { naicsCodes: patch.naics } : {}),
+      ...(patch.psc !== undefined ? { pscCodes: patch.psc } : {}),
+      ...(patch.keywords !== undefined ? { keywords: patch.keywords } : {}),
+    });
+    const post = () => fetch('/api/alerts/preferences', {
+      method: 'POST',
+      headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+      body,
+    });
+    try {
+      let res = await post();
+      if (res.status === 401) {
+        const refresh = await fetch('/api/auth/refresh-mi-session', {
+          method: 'POST',
+          headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+        });
+        if (refresh.ok) {
+          const j = await refresh.json().catch(() => null);
+          if (j?.sessionToken && typeof window !== 'undefined') {
+            window.localStorage.setItem('mi_beta_auth_token', j.sessionToken);
+          }
+          res = await post();
+        }
+      }
+      const j = await res.json().catch(() => null);
+      if (!res.ok || !j?.success) throw new Error(j?.error || 'save failed');
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('mindy:settings-saved'));
+      }
+    } catch {
+      // Snap back to server truth so the card never shows an unsaved edit.
+      load();
+    } finally {
+      setSaving(false);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [email]);
+
+  // Remove one code/keyword: update local state immediately, then persist.
+  const removeItem = (field: 'naics' | 'psc' | 'keywords', value: string) => {
+    setData((d) => {
+      if (!d) return d;
+      const next = { ...d, [field]: d[field].filter((v) => v !== value) };
+      persist({ [field]: next[field] } as Partial<Targeting>);
+      return next;
+    });
+  };
+
+  // Add one code/keyword from the inline "+ add" box.
+  const commitAdd = (field: 'naics' | 'psc' | 'keywords') => {
+    const raw = addValue.trim();
+    setAddValue('');
+    setAddingField(null);
+    if (!raw) return;
+    // Allow comma/space-separated multi-add; NAICS/PSC keep only valid tokens.
+    const tokens = raw.split(/[,\s]+/).map((t) => t.trim()).filter(Boolean);
+    const clean = field === 'naics'
+      ? tokens.filter((t) => /^\d{2,6}$/.test(t))
+      : field === 'psc'
+        ? tokens.map((t) => t.toUpperCase())
+        : tokens;
+    if (clean.length === 0) return;
+    setData((d) => {
+      if (!d) return d;
+      const merged = Array.from(new Set([...d[field], ...clean]));
+      const next = { ...d, [field]: merged };
+      persist({ [field]: merged } as Partial<Targeting>);
+      return next;
+    });
+  };
 
   const load = useCallback(async () => {
     if (!email) { setLoading(false); return; }
@@ -131,11 +216,19 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
   useEffect(() => { load(); }, [load]);
 
   // Re-fetch when the user returns to the dashboard after editing (tab focus) so
-  // the card reflects a fresh save without a full reload.
+  // the card reflects a fresh save without a full reload. ALSO re-fetch when any
+  // settings surface (the top drawer or UnifiedSettingsPanel) saves in the SAME
+  // tab — focus alone misses that, which is why edits in one surface didn't show
+  // in the other until you tabbed away and back (Eric QC 2026-07-02).
   useEffect(() => {
     const onFocus = () => load();
+    const onSaved = () => load();
     window.addEventListener('focus', onFocus);
-    return () => window.removeEventListener('focus', onFocus);
+    window.addEventListener('mindy:settings-saved', onSaved);
+    return () => {
+      window.removeEventListener('focus', onFocus);
+      window.removeEventListener('mindy:settings-saved', onSaved);
+    };
   }, [load]);
 
   if (loading || !data) return null;
@@ -192,25 +285,49 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
       {!collapsed && (
       <>
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {/* NAICS */}
+        {/* NAICS — inline add/remove (edit right here, like the top settings). */}
         <div>
           <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">
             NAICS codes ({naics.length})
           </div>
-          {naics.length > 0 ? (
-            <div className="flex flex-wrap gap-1">
-              {naics.slice(0, 8).map((c) => (
-                <span key={c} className="rounded bg-slate-800 px-2 py-0.5 text-xs text-slate-200">{c}</span>
-              ))}
-              {naics.length > 8 && (
-                <span className="rounded bg-slate-800 px-2 py-0.5 text-xs text-slate-400">+{naics.length - 8} more</span>
-              )}
-            </div>
-          ) : (
-            <button onClick={edit} className="text-xs text-purple-400 hover:text-purple-300">
-              No codes set — add yours →
-            </button>
-          )}
+          <div className="flex flex-wrap gap-1 items-center">
+            {naics.map((c) => (
+              <span key={c} className="group inline-flex items-center gap-1 rounded bg-slate-800 px-2 py-0.5 text-xs text-slate-200">
+                {c}
+                {canEdit && (
+                  <button
+                    onClick={() => removeItem('naics', c)}
+                    disabled={saving}
+                    className="text-slate-500 hover:text-red-400 disabled:opacity-40"
+                    title={`Remove ${c}`}
+                    aria-label={`Remove NAICS ${c}`}
+                  >×</button>
+                )}
+              </span>
+            ))}
+            {canEdit && (
+              addingField === 'naics' ? (
+                <input
+                  autoFocus
+                  value={addValue}
+                  onChange={(e) => setAddValue(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') commitAdd('naics'); if (e.key === 'Escape') { setAddingField(null); setAddValue(''); } }}
+                  onBlur={() => commitAdd('naics')}
+                  placeholder="e.g. 541512"
+                  className="w-24 rounded bg-slate-950 border border-slate-700 px-2 py-0.5 text-xs text-slate-100 outline-none focus:border-purple-500"
+                />
+              ) : (
+                <button
+                  onClick={() => { setAddingField('naics'); setAddValue(''); }}
+                  disabled={saving}
+                  className="rounded border border-dashed border-slate-600 px-2 py-0.5 text-xs text-slate-400 hover:text-purple-300 hover:border-purple-500 disabled:opacity-40"
+                >+ add</button>
+              )
+            )}
+            {naics.length === 0 && !canEdit && (
+              <span className="text-xs text-slate-500">No codes set</span>
+            )}
+          </div>
         </div>
 
         {/* Keywords — loudly flag the empty state (the half-onboarded profile). */}
@@ -218,23 +335,46 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
           <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">
             Keywords ({keywords.length})
           </div>
-          {noKeywords ? (
-            <button
-              onClick={edit}
-              className="rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-300 hover:bg-amber-500/20"
-            >
-              ⚠ No keywords yet — add them so alerts catch mislabeled opps →
-            </button>
-          ) : (
-            <div className="flex flex-wrap gap-1">
-              {keywords.slice(0, 10).map((k) => (
-                <span key={k} className="rounded bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-300">{k}</span>
-              ))}
-              {keywords.length > 10 && (
-                <span className="rounded bg-slate-800 px-2 py-0.5 text-xs text-slate-400">+{keywords.length - 10}</span>
-              )}
-            </div>
-          )}
+          <div className="flex flex-wrap gap-1 items-center">
+            {keywords.map((k) => (
+              <span key={k} className="inline-flex items-center gap-1 rounded bg-emerald-500/15 px-2 py-0.5 text-xs text-emerald-300">
+                {k}
+                {canEdit && (
+                  <button
+                    onClick={() => removeItem('keywords', k)}
+                    disabled={saving}
+                    className="text-emerald-500/70 hover:text-red-400 disabled:opacity-40"
+                    title={`Remove ${k}`}
+                    aria-label={`Remove keyword ${k}`}
+                  >×</button>
+                )}
+              </span>
+            ))}
+            {canEdit && (
+              addingField === 'keywords' ? (
+                <input
+                  autoFocus
+                  value={addValue}
+                  onChange={(e) => setAddValue(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') commitAdd('keywords'); if (e.key === 'Escape') { setAddingField(null); setAddValue(''); } }}
+                  onBlur={() => commitAdd('keywords')}
+                  placeholder="e.g. medical supplies"
+                  className="w-40 rounded bg-slate-950 border border-slate-700 px-2 py-0.5 text-xs text-slate-100 outline-none focus:border-emerald-500"
+                />
+              ) : (
+                <button
+                  onClick={() => { setAddingField('keywords'); setAddValue(''); }}
+                  disabled={saving}
+                  className={noKeywords
+                    ? 'rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-300 hover:bg-amber-500/20'
+                    : 'rounded border border-dashed border-slate-600 px-2 py-0.5 text-xs text-slate-400 hover:text-emerald-300 hover:border-emerald-500 disabled:opacity-40'}
+                >{noKeywords ? '⚠ Add keywords so alerts catch mislabeled opps' : '+ add'}</button>
+              )
+            )}
+            {noKeywords && !canEdit && (
+              <span className="text-xs text-amber-300">⚠ No keywords yet</span>
+            )}
+          </div>
         </div>
 
         {/* PSC codes — what's BOUGHT (the precise axis). Display-only here; edit in Settings. */}
@@ -242,19 +382,44 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
           <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">
             PSC codes ({psc.length})
           </div>
-          {psc.length > 0 ? (
-            <div className="flex flex-wrap gap-1">
-              {psc.slice(0, 10).map((c) => (
-                <span key={c} className="rounded bg-purple-500/15 px-2 py-0.5 text-xs text-purple-300">{c}</span>
-              ))}
-            </div>
-          ) : canEdit ? (
-            <button onClick={edit} className="text-xs text-purple-400 hover:text-purple-300">
-              Add PSC codes (what the gov buys) →
-            </button>
-          ) : (
-            <span className="text-xs text-slate-500">None set — add in the PSC field below</span>
-          )}
+          <div className="flex flex-wrap gap-1 items-center">
+            {psc.map((c) => (
+              <span key={c} className="inline-flex items-center gap-1 rounded bg-purple-500/15 px-2 py-0.5 text-xs text-purple-300">
+                {c}
+                {canEdit && (
+                  <button
+                    onClick={() => removeItem('psc', c)}
+                    disabled={saving}
+                    className="text-purple-400/70 hover:text-red-400 disabled:opacity-40"
+                    title={`Remove ${c}`}
+                    aria-label={`Remove PSC ${c}`}
+                  >×</button>
+                )}
+              </span>
+            ))}
+            {canEdit && (
+              addingField === 'psc' ? (
+                <input
+                  autoFocus
+                  value={addValue}
+                  onChange={(e) => setAddValue(e.target.value)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') commitAdd('psc'); if (e.key === 'Escape') { setAddingField(null); setAddValue(''); } }}
+                  onBlur={() => commitAdd('psc')}
+                  placeholder="e.g. 6515"
+                  className="w-24 rounded bg-slate-950 border border-slate-700 px-2 py-0.5 text-xs text-slate-100 outline-none focus:border-purple-500"
+                />
+              ) : (
+                <button
+                  onClick={() => { setAddingField('psc'); setAddValue(''); }}
+                  disabled={saving}
+                  className="rounded border border-dashed border-slate-600 px-2 py-0.5 text-xs text-slate-400 hover:text-purple-300 hover:border-purple-500 disabled:opacity-40"
+                >+ add</button>
+              )
+            )}
+            {psc.length === 0 && !canEdit && (
+              <span className="text-xs text-slate-500">None set</span>
+            )}
+          </div>
         </div>
 
         {/* Coverage area — the states alerts are scoped to. "Nationwide" when empty. */}
