@@ -442,7 +442,10 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
           headers: getMIApiHeaders(email),
         });
         if (!res.ok || cancelled) return;
-        const c = await res.json().catch(() => null);
+        const data = await res.json().catch(() => null);
+        // Endpoint returns { coverage: { keyword, heldPct, coveragePct,
+        // totalMarket, missing, ... } | null } — unwrap the nested object.
+        const c = data?.coverage;
         if (!cancelled && c && typeof c.totalMarket === 'number') setCoverage(c);
       } catch { /* coverage is non-blocking */ }
     })();
