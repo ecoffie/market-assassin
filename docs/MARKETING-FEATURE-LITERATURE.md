@@ -3032,3 +3032,15 @@ sync), and returns `{ saved, skipped:[{item,reason}] }`. The review modal now ma
 call and shows the server's summary; a partial/failed save raises an explicit alert
 listing each skipped item. The old client-side field mapping (30 POSTs) is gone.
 Verified against the real Tavares doc: 15 PP + 10 caps, 0 skipped. Typecheck 0, lint clean.
+
+---
+
+## Free-tier "data behind glass" previews (2026-07-02)
+
+**What:** Free users clicking a Pro-locked panel no longer hit a blank upgrade wall. They now see the feature — either their OWN data read-only, or a real match count + blurred sample rows — with one clear upgrade action. Shipped across My Pursuits, Expiring Contracts, Upcoming Buys, Contractors, and Decision Makers. A reusable `LockedPreview` shell + `PipelinePreviewFree` (their tracked pursuits, read-only) + `CatalogTeaserFree` (count + blurred rows).
+
+**Why:** Mature enterprise SaaS never walls a user off from their own data (HubSpot/Salesforce) or hides a valuable catalog behind a modal (Apollo/ZoomInfo "N results found, blurred"). Seeing the data — or the volume of matches — is the highest-converting free→paid moment. A blank "upgrade to unlock" modal converts far worse than "2,341 expiring contracts match you → unlock."
+
+**SEO / positioning:** Reinforces "Mindy shows you the market" — even free users feel the depth (real counts from 88K SAM opps, 317K contractors, 7,800+ forecasts, federal contact directory) before paying.
+
+**Proof:** Real counts pulled live from the same endpoints the paid panels use — verified on getmindy.ai: recompete NAICS 236220 → 440 expiring contracts; contractors NAICS 236220 → real totalCount + real company names (e.g. "BL HARBERT INTERNATIONAL LLC"). No fabricated numbers or rows — blurred rows are real records obscured with CSS, never invented (rule #1). Endpoints are auth-gated (not tier-gated), so a logged-in free user gets a genuine profile-scoped count.
