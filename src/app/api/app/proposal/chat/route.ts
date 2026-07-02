@@ -234,6 +234,12 @@ export async function POST(request: NextRequest) {
         // OpenAI stream format → same SSE parser, streaming UX kept. Groq is the
         // cheap fallback; callLLM('reasoning') the deep fallback (Claude last).
         const openaiKey = process.env.OPENAI_API_KEY;
+        // Proposal chat is the drafting assistant — it extracts exact clauses and
+        // writes sections, so quality pays (Eric, Jul 2). Lead with full gpt-4o.
+        // The per-user budget cap below already downgrades heavy users to Groq, so
+        // the margin is protected even at the higher model. CHAT_OPENAI_MODEL env
+        // can dial it back if needed.
+        const chatModel = process.env.CHAT_OPENAI_MODEL || 'gpt-4o';
         const streamFrom = (url: string, key: string, model: string) => fetch(url, {
           method: 'POST',
           headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
@@ -244,7 +250,7 @@ export async function POST(request: NextRequest) {
         // cheap Groq (never blocked — degraded, not denied). Protects $149 margin.
         const overBudget = await isUserOverBudget(email).catch(() => false);
         if (openaiKey && !overBudget) {
-          const r = await streamFrom('https://api.openai.com/v1/chat/completions', openaiKey, process.env.LLM_OPENAI_MODEL || 'gpt-4o-mini');
+          const r = await streamFrom('https://api.openai.com/v1/chat/completions', openaiKey, chatModel);
           if (r.ok && r.body) groqRes = r;
         }
         if (!groqRes) {

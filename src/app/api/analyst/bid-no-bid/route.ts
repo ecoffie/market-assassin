@@ -287,6 +287,9 @@ export async function POST(request: NextRequest) {
       maxTokens: 1200,
       temperature: 0.2,
       job: 'reasoning',
+      // Low volume (per pursuit), high stakes (a wrong call misleads a bid
+      // decision) → opt up to gpt-4o. Groq stays the cheap fallback.
+      openaiModel: 'gpt-4o',
     });
     content = result.text;
     usage = result.usage as { prompt_tokens?: number; completion_tokens?: number } | undefined;

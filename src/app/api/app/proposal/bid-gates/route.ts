@@ -101,10 +101,12 @@ export async function GET(request: NextRequest) {
         system: DERIVE_PROMPT,
         user: doc.extracted_text.slice(0, 40000),
         json: true, maxTokens: 1200, temperature: 0.1,
-        // reasoning = GPT-4o-mini first (Eric: Groq let "liability insurance"
-        // noise through, but Claude isn't scalable at $149). GPT-mini is
-        // near-Claude on this judgment at a fraction of the cost.
+        // reasoning chain (Eric: Groq let "liability insurance" noise through,
+        // Claude isn't scalable at $149). Low volume (per proposal) + high stakes
+        // (gates whether the user responds at all) → opt up to gpt-4o; Groq stays
+        // the cheap fallback.
         job: 'reasoning',
+        openaiModel: 'gpt-4o',
       });
       const parsed = JSON.parse(text.replace(/```json\n?|```\n?/g, '').trim());
       // Drop near-universal items that slip through — they're not eliminators

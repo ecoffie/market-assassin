@@ -201,6 +201,41 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
   // Collaboration signal — how many OTHER users are tracking each shown opp (anonymous).
   const [interestCounts, setInterestCounts] = useState<Record<string, number>>({});
 
+  // The user's OWN tracked opportunities (stage=tracking rows they created by
+  // clicking "Interested"). Free users had no way to SEE what they tracked — My
+  // Pursuits is Pro-locked, so "✓ Tracking" was a dead-end (Eric QC 2026-07-02).
+  // We read the same user_pipeline rows back (GET /api/pipeline, no tier gate) and
+  // show a lightweight read-only list here.
+  type TrackedItem = { id?: string; notice_id?: string; title?: string; agency?: string; external_url?: string; response_deadline?: string };
+  const [tracked, setTracked] = useState<TrackedItem[]>([]);
+  const [trackedOpen, setTrackedOpen] = useState(false);
+
+  const loadTracked = useCallback(async () => {
+    if (!email) return;
+    try {
+      const res = await fetch(`/api/pipeline?email=${encodeURIComponent(email)}&stage=tracking`, {
+        headers: getMIApiHeaders(email),
+      });
+      if (!res.ok) return;
+      const data = await res.json().catch(() => null);
+      const rows: TrackedItem[] = data?.pipeline || data?.items || data?.rows || (Array.isArray(data) ? data : []);
+      if (Array.isArray(rows)) {
+        setTracked(rows);
+        // Seed the interested set so already-tracked opps show "✓ Tracking" (not
+        // "➕ Interested") after a reload — the button state now survives refresh.
+        const ids = rows.map(r => r.notice_id).filter(Boolean) as string[];
+        if (ids.length) setInterestedAlertIds(prev => new Set([...prev, ...ids]));
+      }
+    } catch { /* best-effort — never block the panel */ }
+  }, [email]);
+
+  // Market coverage for the free Alerts page: "Tracking XX% of your market — N
+  // codes missing." This lived only in Settings/locked panels; free users never
+  // saw it where they work (Eric QC 2026-07-02). Reuses the SAME keyword-coverage
+  // source TargetingCard uses so the number matches everywhere.
+  type Coverage = { keyword: string; heldPct: number; coveragePct: number; sectorMarket: number; totalMarket: number; missing: { code: string }[] };
+  const [coverage, setCoverage] = useState<Coverage | null>(null);
+
   const trackAlertEvent = useCallback((eventType: 'link_click' | 'tool_use', alert: Alert, action: string) => {
     if (!email) return;
 

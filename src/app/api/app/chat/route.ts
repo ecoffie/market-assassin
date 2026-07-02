@@ -34,6 +34,7 @@ import { hasProAccess } from '@/lib/access/resolve-access';
 import { retrieveRagContext, type RagChunkResult } from '@/lib/rag/retrieve';
 import { retrievePodcastEpisodes, formatPodcastCardsForPrompt, type PodcastEpisodeCard } from '@/lib/rag/podcast-search';
 import { loadBidderProfile, formatProfileForPrompt } from '@/lib/proposal/loaders';
+import { isUserOverBudget } from '@/lib/llm/usage-cost';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -382,11 +383,21 @@ export async function POST(request: NextRequest) {
           : message;
         messages.push({ role: 'user', content: userTurn });
 
-        // GPT-4o-mini first, Groq fallback (Eric: Groq too weak for grounded
-        // Q&A, but Claude isn't scalable at $149 — gpt-4o-mini is the quality/
-        // cost sweet spot). Both speak the OpenAI streaming format, so the SSE
-        // parser below is unchanged and we keep streaming UX.
+        // Mindy Chat is the FLAGSHIP user-facing experience — every answer is read,
+        // so grounded-Q&A quality is worth the model spend here (Eric, Jul 2: "the
+        // mindy chat needs help"). Lead with full gpt-4o (not mini), Groq as fallback.
+        // Claude still isn't the default ($149/mo scalability), but chat is exactly
+        // the surface where the quality jump shows. Override via CHAT_OPENAI_MODEL if
+        // we ever need to dial it back per-env. Both speak the OpenAI streaming
+        // format, so the SSE parser below is unchanged and we keep streaming UX.
         const openaiKey = process.env.OPENAI_API_KEY;
+        // Margin guard (#37, mirrors proposal/chat): a user past their monthly LLM
+        // budget is downgraded from gpt-4o to gpt-4o-mini — never blocked, just a
+        // cheaper model. Protects the $149 margin now that chat leads with gpt-4o.
+        const overBudget = await isUserOverBudget(email).catch(() => false);
+        const chatModel = overBudget
+          ? (process.env.LLM_OPENAI_MODEL || 'gpt-4o-mini')
+          : (process.env.CHAT_OPENAI_MODEL || 'gpt-4o');
         const streamFrom = (url: string, key: string, model: string) => fetch(url, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
@@ -395,7 +406,7 @@ export async function POST(request: NextRequest) {
 
         let groqRes: Response | null = null;
         if (openaiKey) {
-          const r = await streamFrom('https://api.openai.com/v1/chat/completions', openaiKey, process.env.LLM_OPENAI_MODEL || 'gpt-4o-mini');
+          const r = await streamFrom('https://api.openai.com/v1/chat/completions', openaiKey, chatModel);
           if (r.ok && r.body) groqRes = r;
         }
         if (!groqRes) {
