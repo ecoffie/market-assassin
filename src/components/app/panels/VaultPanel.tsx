@@ -1081,6 +1081,40 @@ const IDENTITY_LABELS: { key: keyof ParsedIdentityFields; label: string }[] = [
   { key: 'bonding_aggregate', label: 'Bonding (aggregate)' },
 ];
 
+// The parser returns contract_value as a formatted string ("$10,900,000",
+// "$2.4M", "1,176,585.00"); the DB column is NUMERIC. Coerce to a number so the
+// value actually lands. Returns null if there's no parseable number (so we omit
+// the field rather than send NaN/"" to a numeric column).
+function parseCurrency(raw: string | null | undefined): number | null {
+  if (!raw) return null;
+  const s = String(raw).trim().toLowerCase();
+  // Support a trailing magnitude suffix (2.4m / 900k / 1.2b).
+  const m = s.match(/([\d,]+(?:\.\d+)?)\s*(k|m|b|million|billion|thousand)?/);
+  if (!m) return null;
+  const num = parseFloat(m[1].replace(/,/g, ''));
+  if (!isFinite(num)) return null;
+  const suffix = m[2];
+  const mult =
+    suffix === 'k' || suffix === 'thousand' ? 1e3
+    : suffix === 'm' || suffix === 'million' ? 1e6
+    : suffix === 'b' || suffix === 'billion' ? 1e9
+    : 1;
+  const val = Math.round(num * mult);
+  return val > 0 ? val : null;
+}
+
+// period is a single string like "2022-2025" / "2021 – 2023" / "FY2024". Split
+// into period_start / period_end as Jan-1 / Dec-31 dates for the two date cols.
+// Returns empty strings when no year is found (fields are then omitted).
+function splitPeriod(raw: string | null | undefined): { start: string; end: string } {
+  if (!raw) return { start: '', end: '' };
+  const years = String(raw).match(/(19|20)\d{2}/g);
+  if (!years || years.length === 0) return { start: '', end: '' };
+  const start = `${years[0]}-01-01`;
+  const end = years.length > 1 ? `${years[years.length - 1]}-12-31` : '';
+  return { start, end };
+}
+
 function DocumentsSection({ email, items, onChanged }: { email: string; items: BoilerplateDoc[]; onChanged: () => void }) {
   const [uploading, setUploading] = useState(false);
   const [parsing, setParsing] = useState(false);
@@ -1298,6 +1332,13 @@ function ParsedDocReview({
       for (let i = 0; i < parsed.past_performance.length; i++) {
         if (!ppChecked[i]) continue;
         const p = parsed.past_performance[i];
+        // contract_value is a NUMERIC column, but the parser returns a formatted
+        // string like "$10,900,000" — coerce to a number (strip $ , and spaces),
+        // else the value silently never lands (the bug: imported rows showed no $).
+        const numericValue = parseCurrency(p.contract_value);
+        // period is a single string like "2022-2025"; the schema stores
+        // period_start/period_end as dates — split it into year bounds.
+        const { start: periodStart, end: periodEnd } = splitPeriod(p.period);
         const res = await fetch('/api/app/vault/past-performance', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
@@ -1309,6 +1350,9 @@ function ParsedDocReview({
               contract_number: p.contract_number || '',
               role: p.role || '',
               scope_description: p.scope_description || '',
+              ...(numericValue != null ? { contract_value: numericValue } : {}),
+              ...(periodStart ? { period_start: periodStart } : {}),
+              ...(periodEnd ? { period_end: periodEnd } : {}),
             },
           }),
         });
