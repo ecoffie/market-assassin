@@ -64,25 +64,55 @@ export async function GET(request: NextRequest) {
 
   const { data: org } = await supabase.from('organizations').select('*').eq('id', membership.org_id).maybeSingle();
 
-  // The coach's assigned clients (org_admin sees all in the org).
-  let cq = supabase.from('org_clients').select('*').eq('org_id', membership.org_id).eq('status', 'active');
-  if (membership.role === 'coach') cq = cq.eq('assigned_coach', email);
-  const { data: clients } = await cq;
+  // ---- Scale: search + paginate the client list ----------------------------
+  // A flat "load every client" query is fine at 10 but not at 200+. Filter by name
+  // server-side, page the result, and only run the (heavier) per-client profile
+  // joins for the CURRENT page. org_admin sees all clients in the org; a coach sees
+  // only their assigned clients.
+  const search = (request.nextUrl.searchParams.get('search') || '').trim();
+  const page = Math.max(0, parseInt(request.nextUrl.searchParams.get('page') || '0', 10) || 0);
+  const pageSize = Math.min(100, Math.max(1, parseInt(request.nextUrl.searchParams.get('pageSize') || '25', 10) || 25));
+
+  const baseFilter = (q: ReturnType<typeof supabase.from>) => {
+    let f = q.eq('org_id', membership!.org_id).eq('status', 'active');
+    if (membership!.role === 'coach') f = f.eq('assigned_coach', email);
+    if (search) f = f.ilike('business_name', `%${search}%`);
+    return f;
+  };
+
+  // Total (for pagination) — head count, no rows.
+  const { count: totalClients } = await baseFilter(
+    supabase.from('org_clients').select('id', { count: 'exact', head: true }),
+  );
+
+  const from = page * pageSize;
+  const { data: clients } = await baseFilter(
+    supabase.from('org_clients').select('*'),
+  ).order('business_name', { ascending: true }).range(from, from + pageSize - 1);
   const clientList = clients || [];
 
-  // Org Tab: cross-client deadlines (next 30d) + recent pursuit changes + news.
+  // The per-card profile/pipeline/target joins are for the CURRENT PAGE only.
   const workspaceIds = clientList.map((c: { workspace_id: string }) => c.workspace_id);
+
+  // The Org Tab (cross-client deadlines/changes) must span ALL the coach's clients,
+  // not just this page — so pull the full assigned workspace-id + name set (light:
+  // two columns), capped so a 1000-client org doesn't build an unbounded IN().
+  const ORG_TAB_CLIENT_CAP = 500;
+  const { data: allClientRows } = await baseFilter(
+    supabase.from('org_clients').select('workspace_id, business_name'),
+  ).limit(ORG_TAB_CLIENT_CAP);
+  const allWorkspaceIds = (allClientRows || []).map((c: { workspace_id: string }) => c.workspace_id);
   const wsToName = new Map<string, string>();
-  for (const c of clientList) wsToName.set(c.workspace_id, c.business_name);
+  for (const c of allClientRows || []) wsToName.set(c.workspace_id, c.business_name);
 
   let deadlines: Array<Record<string, unknown>> = [];
   let changes: Array<Record<string, unknown>> = [];
-  if (workspaceIds.length) {
+  if (allWorkspaceIds.length) {
     const in30 = new Date(Date.now() + 30 * 86400000).toISOString();
     const { data: pl } = await supabase
       .from('user_pipeline')
       .select('id, workspace_id, title, response_deadline, stage')
-      .in('workspace_id', workspaceIds)
+      .in('workspace_id', allWorkspaceIds)
       .not('response_deadline', 'is', null)
       .lte('response_deadline', in30)
       .neq('is_archived', true)
@@ -178,6 +208,13 @@ export async function GET(request: NextRequest) {
         },
       };
     }),
+    pagination: {
+      total: totalClients ?? clientList.length,
+      page,
+      pageSize,
+      totalPages: Math.max(1, Math.ceil((totalClients ?? clientList.length) / pageSize)),
+      search: search || undefined,
+    },
     orgTab: { deadlines, changes, news: news || [] },
   });
 }

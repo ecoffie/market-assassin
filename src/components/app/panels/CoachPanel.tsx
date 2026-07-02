@@ -54,6 +54,10 @@ export default function CoachPanel({
   const [capabilityText, setCapabilityText] = useState('');
   const [seededNote, setSeededNote] = useState<string | null>(null);
   const [activeWs, setActiveWs] = useState<string>('');
+  // Search + pagination (scale)
+  const [search, setSearch] = useState('');
+  const [page, setPage] = useState(0);
+  const [pagination, setPagination] = useState<{ total: number; totalPages: number } | null>(null);
   // Bulk import
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkText, setBulkText] = useState('');
@@ -62,11 +66,15 @@ export default function CoachPanel({
   const [bulkSummary, setBulkSummary] = useState<{ added: number; duplicates: number; failed: number; rejectedForCap: number } | null>(null);
   const headers = useCallback(() => getMIApiHeaders(email), [email]);
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (opts?: { search?: string; page?: number }) => {
     if (!email) return;
     setLoading(true);
+    const s = opts?.search ?? search;
+    const p = opts?.page ?? page;
     try {
-      const res = await fetch(`/api/app/coach?email=${encodeURIComponent(email)}`, { headers: headers() });
+      const params = new URLSearchParams({ email, page: String(p), pageSize: '25' });
+      if (s.trim()) params.set('search', s.trim());
+      const res = await fetch(`/api/app/coach?${params.toString()}`, { headers: headers() });
       const d = await res.json();
       setCoachAccess(d.coachAccess || null);
       setIsCoach(!!d.isCoach);
@@ -74,10 +82,11 @@ export default function CoachPanel({
         setOrg(d.org || null);
         setClients(d.clients || []);
         setOrgTab(d.orgTab || { deadlines: [], changes: [], news: [] });
+        setPagination(d.pagination ? { total: d.pagination.total, totalPages: d.pagination.totalPages } : null);
       }
     } catch { /* ignore */ }
     setLoading(false);
-  }, [email, headers]);
+  }, [email, headers, search, page]);
 
   useEffect(() => { load(); }, [load]);
   useEffect(() => { setActiveWs(getActiveWorkspace() || ''); }, []);
@@ -262,7 +271,31 @@ export default function CoachPanel({
         </p>
       </header>
 
+      {/* Search + count — usable at hundreds of clients, not a flat card wall. */}
+      <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
+        <div className="relative flex-1 max-w-sm">
+          <input
+            value={search}
+            onChange={e => { setSearch(e.target.value); }}
+            onKeyDown={e => { if (e.key === 'Enter') { setPage(0); load({ search, page: 0 }); } }}
+            placeholder="Search clients by name…"
+            className="h-9 w-full pl-9 pr-3 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-purple-500 focus:outline-none"
+          />
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">🔍</span>
+        </div>
+        {pagination && (
+          <p className="text-xs text-slate-500">
+            {pagination.total} client{pagination.total === 1 ? '' : 's'}{search.trim() ? ' matching' : ' total'}
+          </p>
+        )}
+      </div>
+
       <div className="space-y-4">
+        {clients.length === 0 && (
+          <p className="rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-6 text-center text-sm text-slate-500">
+            {search.trim() ? `No clients matching “${search.trim()}”.` : 'No clients yet — add one or import a roster below.'}
+          </p>
+        )}
         {clients.map(c => {
           const isActive = activeWs === c.workspaceId;
           const stats = profileStats(c);
@@ -344,6 +377,29 @@ export default function CoachPanel({
           );
         })}
       </div>
+
+      {/* Pagination — only when there's more than one page. */}
+      {pagination && pagination.totalPages > 1 && (
+        <div className="mt-4 flex items-center justify-center gap-3 text-sm">
+          <button
+            type="button"
+            disabled={page <= 0}
+            onClick={() => { const np = page - 1; setPage(np); load({ page: np }); }}
+            className="h-8 px-3 rounded-lg border border-slate-700 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:border-slate-600"
+          >
+            ← Prev
+          </button>
+          <span className="text-slate-500 text-xs">Page {page + 1} of {pagination.totalPages}</span>
+          <button
+            type="button"
+            disabled={page >= pagination.totalPages - 1}
+            onClick={() => { const np = page + 1; setPage(np); load({ page: np }); }}
+            className="h-8 px-3 rounded-lg border border-slate-700 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:border-slate-600"
+          >
+            Next →
+          </button>
+        </div>
+      )}
 
       <div className="mt-8 grid gap-4 md:grid-cols-2">
         <AddClientCard
