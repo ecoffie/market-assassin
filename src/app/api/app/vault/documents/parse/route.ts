@@ -203,6 +203,10 @@ export async function POST(request: NextRequest) {
       // small cap truncates the JSON (and drops entries). Give room to be exhaustive.
       maxTokens: 8000,
       job: 'reasoning',
+      // One-time, user-triggered, high-value parse (the Vault is the product's
+      // moat) → opt UP from gpt-4o-mini to full gpt-4o for cleaner extraction of
+      // dense multi-column tables. Low volume, so the cost delta is negligible.
+      openaiModel: 'gpt-4o',
     });
     const raw = JSON.parse(out.replace(/```json\n?|```\n?/g, '').trim());
     const rid = (raw?.identity ?? {}) as Record<string, unknown>;

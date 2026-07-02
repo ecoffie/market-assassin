@@ -100,7 +100,7 @@ async function callProvider(p: Provider, opts: LlmOpts): Promise<CallResult | { 
     const cfg = {
       groq70b: { url: 'https://api.groq.com/openai/v1/chat/completions', key: process.env.GROQ_API_KEY, model: process.env.PROPOSAL_GROQ_MODEL || 'llama-3.3-70b-versatile' },
       groq8b: { url: 'https://api.groq.com/openai/v1/chat/completions', key: process.env.GROQ_API_KEY, model: 'llama-3.1-8b-instant' },
-      openai: { url: 'https://api.openai.com/v1/chat/completions', key: process.env.OPENAI_API_KEY, model: process.env.LLM_OPENAI_MODEL || 'gpt-4o-mini' },
+      openai: { url: 'https://api.openai.com/v1/chat/completions', key: process.env.OPENAI_API_KEY, model: opts.openaiModel || process.env.LLM_OPENAI_MODEL || 'gpt-4o-mini' },
       grok: { url: 'https://api.x.ai/v1/chat/completions', key: process.env.GROK_API_KEY, model: process.env.LLM_GROK_MODEL || 'grok-3' },
     }[p]!;
     const res = await fetch(cfg.url, {

@@ -2953,3 +2953,46 @@ each accepted item POSTs to the existing structured routes (`vault/identity`,
 `vault/past-performance`, `vault/capabilities`), reusing them with zero new tables.
 A "Pull into sections" button also re-parses any already-uploaded cap statement.
 Typecheck 0 errors, lint clean.
+
+---
+
+## Vault Cap-Statement Parser v2 — Identity fields + gpt-4o (July 2, 2026)
+
+**What:** The capability-statement parser now also pulls your **company front-matter**
+into the Vault's Identity tab — UEI, CAGE, DUNS, year founded, socioeconomic
+certifications (8(a), SDB, MBE, WOSB, HUBZone…), NAICS codes, headquarters, primary
+point of contact, website, office address, and bonding capacity — in addition to the
+Overview, Past Performance, and Capabilities it already extracted. One upload now
+populates the *whole* Vault, and the review screen shows every field so you confirm
+before saving.
+
+**Why:** A cap statement's top block IS the Identity tab — the exact facts proposals
+need to fill "Responsible Office / Contact Person," registration numbers, and set-aside
+eligibility. Leaving them as a flat PDF meant the user still hand-typed their UEI/CAGE/
+NAICS. Now the single most-reused document fills the single most-referenced Vault
+section. Bonus: extracted NAICS additively seed the user's daily-alert filter (never
+overwriting tuned picks), so uploading a cap statement can start matching opportunities.
+
+**Model:** This one user-triggered, high-value parse opts UP from gpt-4o-mini to full
+**gpt-4o** (via a new per-call `openaiModel` override on `callLLM` — the global default
+is unchanged, so every other call keeps cost discipline). On a real 2-page tribal-8(a)
+cap statement gpt-4o pulled 4 certifications where mini caught 2, plus all 8 NAICS,
+CAGE, DUNS, contact, and bonding — verified against the source.
+
+**Grounding guard:** gpt-4o-mini tended to CONSTRUCT a website URL from the contact's
+email domain. The route now only keeps a `website` whose host string literally appears
+in the extracted document text — an invented URL is dropped, a real printed one is kept.
+(Tested: the real `https://wiipica.mn-e.com` printed in the doc passes; a fabricated one
+would not.)
+
+**SEO angle:** *capability statement to SAM profile, extract UEI CAGE from cap statement,
+auto-fill company identity GovCon, NAICS from capability statement, federal contractor
+profile builder.*
+
+**Proof:** `/api/app/vault/documents/parse` schema extended with an `identity` object
+(18 fields mapping 1:1 to the Identity route's WRITABLE_FIELDS); code-level validators
+keep only 6-digit NAICS and grounded websites. The `ParsedDocReview` modal renders a
+"Company Info → Identity" block; on save, Overview + Identity merge into ONE
+`vault/identity` PUT (upsert preserves untouched columns). Verified end-to-end against a
+real cap statement: Identity 18-field extract accurate, 9 past-perf, 9-10 capabilities,
+no fabrication. Typecheck 0 errors, lint clean.
