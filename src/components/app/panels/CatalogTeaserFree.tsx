@@ -155,6 +155,19 @@ export default function CatalogTeaserFree({ email, featureId, onPanelChange }: P
         agencies: Array.isArray(s.agencies) ? s.agencies.map(String) : [],
       };
 
+      // Decision Makers is agency-scoped, but agencies are often empty on the
+      // profile (the slurpee never seeded them). Rather than dead-end on the
+      // "add agencies" nudge, DERIVE the top buying agencies from the user's NAICS
+      // on the fly — the same source that now seeds the profile on save. This makes
+      // the surface work the moment they have NAICS, no agency step required.
+      if (featureId === 'decision-makers' && profile.agencies.length === 0 && profile.naics.length > 0) {
+        try {
+          const { deriveAgenciesFromNaics } = await import('@/lib/app/derive-agencies-from-naics');
+          const derived = await deriveAgenciesFromNaics(profile.naics, window.location.origin, 10);
+          if (derived.length > 0) profile.agencies = derived;
+        } catch { /* fall through — build() will show the nudge if still empty */ }
+      }
+
       // build() returns null when the profile can't scope THIS surface (no NAICS
       // for opp/contractor catalogs; no target agency for the contact directory).
       // That's the activation state — the profile isn't complete enough to produce
@@ -191,7 +204,7 @@ export default function CatalogTeaserFree({ email, featureId, onPanelChange }: P
     } catch { /* teaser is best-effort — LockedPreview still shows the upgrade CTA */ } finally {
       setLoading(false);
     }
-  }, [email, cfg]);
+  }, [email, cfg, featureId]);
 
   useEffect(() => { void load(); }, [load]);
 

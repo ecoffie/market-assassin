@@ -201,10 +201,11 @@ export async function POST(request: NextRequest) {
     const { workspaceId, asClient } = await resolveActiveWorkspace(normalizedEmail, request);
     const rowEmail = asClient ? clientNotificationEmail(workspaceId) : normalizedEmail;
 
-    // Check if user exists
+    // Check if user exists. Also read existing agencies so we can auto-seed them
+    // from NAICS when they're still empty (the slurpee never populated this field).
     const { data: existing } = await getSupabase()
       .from('user_notification_settings')
-      .select('user_email')
+      .select('user_email, agencies')
       .eq('user_email', rowEmail)
       .single();
 
@@ -319,6 +320,27 @@ export async function POST(request: NextRequest) {
 
     if (targetAgencies !== undefined) {
       record.agencies = Array.isArray(targetAgencies) ? targetAgencies : [];
+    }
+
+    // AUTO-SEED target agencies from NAICS (Eric 2026-07-02). The slurpee/auto-setup
+    // scanned buying agencies but wrote them to user_target_list (Pro), never to
+    // notification.agencies — so this profile field was ALWAYS empty and Decision
+    // Makers / agency-scoped features had nothing to work with. Seed it here, for
+    // ALL tiers, when: NAICS is being saved non-empty, the caller didn't explicitly
+    // set agencies, and the stored agencies are still empty. Best-effort — a scan
+    // failure just leaves agencies empty (the feature degrades to its nudge).
+    const savingNaics = Array.isArray(record.naics_codes) && (record.naics_codes as string[]).length > 0;
+    const callerSetAgencies = targetAgencies !== undefined;
+    const existingAgencies = Array.isArray(existing?.agencies) ? (existing!.agencies as string[]) : [];
+    if (savingNaics && !callerSetAgencies && existingAgencies.length === 0) {
+      try {
+        const { deriveAgenciesFromNaics } = await import('@/lib/app/derive-agencies-from-naics');
+        const base = new URL(request.url).origin;
+        const seeded = await deriveAgenciesFromNaics(record.naics_codes as string[], base, 10);
+        if (seeded.length > 0) record.agencies = seeded;
+      } catch (e) {
+        console.warn('[preferences] agency auto-seed skipped:', (e as Error).message);
+      }
     }
 
     // Coach Mode: per-client alert recipient. Only included when explicitly provided
