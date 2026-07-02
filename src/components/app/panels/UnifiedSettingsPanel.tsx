@@ -121,9 +121,12 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
       } catch { /* non-fatal */ }
       try {
         const bj = briefingPrefsRes && briefingPrefsRes.ok ? await briefingPrefsRes.json() : null;
-        // Verified = SMS is actually on (double opt-in complete). phone_verified
-        // is the real gate; sms_enabled alone no longer activates texts.
-        setSmsVerified(Boolean(bj?.phone_verified) && Boolean(bj?.preferences?.sms_enabled));
+        // Verified = the number completed double opt-in. phone_verified is the
+        // durable flag (set by /sms/verify/check, never cleared by a toggle).
+        // Do NOT AND with sms_enabled: that's an independent on/off preference the
+        // preferences POST mutates without un-verifying, so AND-ing it made a
+        // genuinely-verified number show as unverified after a reload.
+        setSmsVerified(Boolean(bj?.phone_verified));
         setSmsPhone(bj?.preferences?.phone_number || '');
       } catch { /* non-fatal */ }
 

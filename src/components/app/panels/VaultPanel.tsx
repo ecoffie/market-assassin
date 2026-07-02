@@ -252,7 +252,22 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
   const [naicsSeededNote, setNaicsSeededNote] = useState<string | null>(null);
   const [showAutoFill, setShowAutoFill] = useState(false);
 
-  useEffect(() => { setForm(data); }, [data]);
+  // Comma-separated array fields are edited as RAW STRINGS while typing, so a
+  // comma or trailing space isn't stripped on every keystroke (the old
+  // array.join()/split()-per-keystroke round-trip ate them → "can't type").
+  // We split to arrays only at save time. Mirrors PastPerfForm's approach.
+  const [serviceStatesRaw, setServiceStatesRaw] = useState((data.service_states || []).join(', '));
+  const [contractVehiclesRaw, setContractVehiclesRaw] = useState((data.contract_vehicles || []).join(', '));
+  const [certificationsRaw, setCertificationsRaw] = useState((data.certifications || []).join(', '));
+
+  useEffect(() => {
+    setForm(data);
+    setServiceStatesRaw((data.service_states || []).join(', '));
+    setContractVehiclesRaw((data.contract_vehicles || []).join(', '));
+    setCertificationsRaw((data.certifications || []).join(', '));
+  }, [data]);
+
+  const splitCsv = (raw: string): string[] => raw.split(',').map((s) => s.trim()).filter(Boolean);
 
   // Show the auto-fill banner if identity is meaningfully empty.
   // "Meaningfully empty" = no legal_name AND no UEI saved yet.
@@ -262,18 +277,20 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
     setForm((f) => ({ ...f, [k]: v }));
   };
 
-  const onArrayField = (k: keyof IdentityProfile, raw: string) => {
-    const arr = raw.split(',').map((s) => s.trim()).filter(Boolean);
-    setForm((f) => ({ ...f, [k]: arr }));
-  };
-
   const save = async () => {
     setSaving(true);
     try {
+      // Fold the raw comma strings into arrays at save time.
+      const profile = {
+        ...form,
+        service_states: splitCsv(serviceStatesRaw),
+        contract_vehicles: splitCsv(contractVehiclesRaw),
+        certifications: splitCsv(certificationsRaw),
+      };
       const res = await fetch('/api/app/vault/identity', {
         method: 'PUT',
         headers: { ...Object.fromEntries(getMIApiHeaders(email).entries()), 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, profile: form }),
+        body: JSON.stringify({ email, profile }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const result = await res.json().catch(() => ({}));
@@ -362,8 +379,8 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
 
       <Field
         label="Certifications (comma-separated)"
-        value={(form.certifications || []).join(', ')}
-        onChange={(v) => onArrayField('certifications', v)}
+        value={certificationsRaw}
+        onChange={setCertificationsRaw}
         placeholder="Small Business, 8(a), SDVOSB, WOSB, HUBZone"
       />
 
@@ -387,15 +404,15 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
 
       <Field
         label="Service states (comma-separated, where you can perform)"
-        value={(form.service_states || []).join(', ')}
-        onChange={(v) => onArrayField('service_states', v)}
+        value={serviceStatesRaw}
+        onChange={setServiceStatesRaw}
         placeholder="FL, GA, AL, NC, SC"
       />
 
       <Field
         label="Contract vehicles (comma-separated)"
-        value={(form.contract_vehicles || []).join(', ')}
-        onChange={(v) => onArrayField('contract_vehicles', v)}
+        value={contractVehiclesRaw}
+        onChange={setContractVehiclesRaw}
         placeholder="GSA Schedule, OASIS, CIO-SP3"
       />
 
