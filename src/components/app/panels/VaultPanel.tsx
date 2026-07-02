@@ -1181,6 +1181,30 @@ function DocumentsSection({ email, items, onChanged }: { email: string; items: B
     if (doc?.id) await parseDoc(doc.id, doc.original_filename);
   };
 
+  // Remove an uploaded document (soft-delete via the route's archived_at). This
+  // does NOT touch any Past Performance / Capability rows already pulled from it —
+  // those live independently once saved.
+  const [removingId, setRemovingId] = useState<string | null>(null);
+  const removeDoc = async (documentId: string, filename: string) => {
+    if (!confirm(`Remove "${filename}" from your Vault?\n\nThis only removes the uploaded file — any sections you already saved to your Vault stay.`)) return;
+    setRemovingId(documentId);
+    try {
+      const res = await fetch(`/api/app/vault/documents?id=${encodeURIComponent(documentId)}&email=${encodeURIComponent(email)}`, {
+        method: 'DELETE',
+        headers: getMIApiHeaders(email),
+      });
+      if (!res.ok) {
+        const txt = await res.text();
+        throw new Error(txt || `HTTP ${res.status}`);
+      }
+      onChanged();
+    } catch (e) {
+      alert(`Couldn't remove the document: ${e instanceof Error ? e.message : String(e)}`);
+    } finally {
+      setRemovingId(null);
+    }
+  };
+
   return (
     <div>
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
@@ -1227,16 +1251,26 @@ function DocumentsSection({ email, items, onChanged }: { email: string; items: B
                   </span>
                 </p>
               </div>
-              {/* Re-parse an already-uploaded cap statement into sections. */}
-              {d.doc_type === 'cap_stmt' && d.parse_status === 'parsed' && (
+              <div className="ml-3 shrink-0 flex items-center gap-2">
+                {/* Re-parse an already-uploaded cap statement into sections. */}
+                {d.doc_type === 'cap_stmt' && d.parse_status === 'parsed' && (
+                  <button
+                    onClick={() => parseDoc(d.id, d.original_filename)}
+                    disabled={parsing}
+                    className="text-xs px-2.5 py-1 rounded border border-emerald-700/60 text-emerald-300 hover:bg-emerald-900/30 disabled:opacity-50"
+                  >
+                    Pull into sections
+                  </button>
+                )}
                 <button
-                  onClick={() => parseDoc(d.id, d.original_filename)}
-                  disabled={parsing}
-                  className="ml-3 shrink-0 text-xs px-2.5 py-1 rounded border border-emerald-700/60 text-emerald-300 hover:bg-emerald-900/30 disabled:opacity-50"
+                  onClick={() => removeDoc(d.id, d.original_filename)}
+                  disabled={removingId === d.id}
+                  title="Remove this document"
+                  className="text-xs px-2 py-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 disabled:opacity-50"
                 >
-                  Pull into sections
+                  {removingId === d.id ? 'Removing…' : 'Remove'}
                 </button>
-              )}
+              </div>
             </div>
           ))}
         </div>
