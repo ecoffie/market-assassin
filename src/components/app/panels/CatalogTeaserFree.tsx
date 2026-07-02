@@ -37,8 +37,10 @@ type Profile = { naics: string[]; agencies: string[] };
 const CONFIG: Record<FeatureId, {
   title: string;
   noun: string;
-  // Returns { url, countKey, labelKey } or null if the profile can't scope it.
-  build: (p: Profile) => { url: string; countKeys: string[]; labelKey: string } | null;
+  // Returns { url, countKeys, labelKeys } or null if the profile can't scope it.
+  // labelKeys are tried in order — the first non-empty real value wins (rows can
+  // have a null primary field, so we fall back to another REAL field, never fake).
+  build: (p: Profile) => { url: string; countKeys: string[]; labelKeys: string[] } | null;
 }> = {
   recompetes: {
     title: 'Expiring Contracts',
@@ -49,7 +51,7 @@ const CONFIG: Record<FeatureId, {
       return {
         url: `/api/recompete?naics=${encodeURIComponent(naics)}&months=18&limit=5&sort=value&order=desc`,
         countKeys: ['pagination.total', 'summary.vehicleCount'],
-        labelKey: 'description',
+        labelKeys: ['description', 'naics_description', 'incumbent_name', 'awarding_agency'],
       };
     },
   },
@@ -62,7 +64,7 @@ const CONFIG: Record<FeatureId, {
       return {
         url: `/api/forecasts?naics=${encodeURIComponent(naics)}&limit=5`,
         countKeys: ['pagination.total', 'summary.totalForecasts'],
-        labelKey: 'title',
+        labelKeys: ['title', 'agency', 'department'],
       };
     },
   },
@@ -75,7 +77,7 @@ const CONFIG: Record<FeatureId, {
       return {
         url: `/api/contractors/search-bq?naics=${encodeURIComponent(naics)}&limit=5&sortBy=contract_value`,
         countKeys: ['totalCount', 'filteredCount'],
-        labelKey: 'company',
+        labelKeys: ['company', 'city'],
       };
     },
   },
@@ -91,7 +93,7 @@ const CONFIG: Record<FeatureId, {
       return {
         url: `/api/app/federal-contacts?limit=5${agencyParam}`, // email header added at fetch time
         countKeys: ['total'],
-        labelKey: 'contact_fullname',
+        labelKeys: ['contact_fullname', 'contact_title', 'department_ind_agency'],
       };
     },
   },
@@ -155,9 +157,16 @@ export default function CatalogTeaserFree({ email, featureId }: Props) {
       }
       setCount(total);
 
-      // Teaser labels — real row values, blurred at render time.
+      // Teaser labels — real row values, blurred at render time. Try each label
+      // key in order so a null primary field falls back to another REAL field.
       const labels = extractRows(data)
-        .map((r) => (typeof r[req.labelKey] === 'string' ? (r[req.labelKey] as string) : ''))
+        .map((r) => {
+          for (const k of req.labelKeys) {
+            const v = r[k];
+            if (typeof v === 'string' && v.trim()) return v;
+          }
+          return '';
+        })
         .filter(Boolean)
         .slice(0, 5);
       setRows(labels);
