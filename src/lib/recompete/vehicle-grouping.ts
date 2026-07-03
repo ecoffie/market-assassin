@@ -45,10 +45,13 @@ export function recompeteVehicleKey(row: {
   let root = c;
   const dIdx = [7, 8].find((i) => c.charAt(i) === 'D');
   if (dIdx !== undefined && c.length >= dIdx + 6) {
-    // It's a multiple-award IDV. Awardees share the IDV identity and differ only
-    // by a trailing award serial — strip the LAST 4 chars to get the IDV root.
-    // VA11816D1005 → VA11816D ; 70B04C19D0000 → 70B04C19D . Keeps the full
-    // agency+FY+type so distinct IDVs (different FY) don't merge.
+    // It's a multiple-award IDV with a trailing task/order serial. Awardees share
+    // the IDV identity and differ only by that serial — strip the LAST 4 chars to
+    // get the IDV root. The length guard (>= dIdx+6) means this fires on the ~16-17
+    // char awardee/order PIIDs that USASpending recompete rows actually carry
+    // (e.g. 36C10B18D00010005 → 36C10B18D0001 ; 70B04C19D00000001 → 70B04C19D0000).
+    // A bare 12-13 char base-IDV PIID stays as-is (no order serial to strip). Keeps
+    // the full agency+FY+type so distinct IDVs (different FY) don't merge.
     root = c.slice(0, c.length - 4);
   }
   return `${root}|${agency}|${naics}`;
