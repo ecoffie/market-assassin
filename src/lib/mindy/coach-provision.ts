@@ -32,6 +32,50 @@ export function recipientFromPrimary(primaryEmail?: string | null): string | nul
   return e;
 }
 
+/** Max rows one bulk import will touch (protects the function budget / rate limits). */
+export const BULK_IMPORT_MAX_ROWS = 500;
+
+export interface ParsedBulkRow {
+  businessName: string;
+  capabilityText: string | null;
+  primaryEmail: string | null;
+}
+
+/**
+ * Normalize a raw bulk-import payload into clean rows: accepts business_name|name,
+ * caps at BULK_IMPORT_MAX_ROWS, drops rows with no business name. Pure — no I/O.
+ */
+export function parseBulkImportRows(clients: unknown): ParsedBulkRow[] {
+  const rowsIn = Array.isArray(clients) ? clients : [];
+  return rowsIn
+    .slice(0, BULK_IMPORT_MAX_ROWS)
+    .map((raw): ParsedBulkRow => {
+      const r = (raw ?? {}) as Record<string, unknown>;
+      return {
+        businessName: String(r.business_name || r.name || '').trim(),
+        capabilityText: r.capability_text ? String(r.capability_text) : null,
+        primaryEmail: r.primary_email ? String(r.primary_email) : null,
+      };
+    })
+    .filter((r) => r.businessName);
+}
+
+/**
+ * Cap math for a bulk import. `maxClients=null` means UNLIMITED (enterprise orgs) —
+ * the branch that, if wrong, would silently truncate an SBDC/APEX importing hundreds
+ * of clients. Returns how many to process now and how many are rejected for cap.
+ * Pure — the caller supplies the current active count.
+ */
+export function computeBulkImportCap(
+  rowCount: number,
+  maxClients: number | null | undefined,
+  existingActive: number,
+): { remaining: number; rejectedForCap: number } {
+  const remaining = maxClients == null ? rowCount : Math.max(0, maxClients - (existingActive || 0));
+  const toProcess = Math.min(rowCount, remaining);
+  return { remaining: toProcess, rejectedForCap: rowCount - toProcess };
+}
+
 export interface SeedResult {
   naics: string[];
   psc: string[];

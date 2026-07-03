@@ -21,7 +21,7 @@ import {
   resolveCoachAccess,
 } from '@/lib/mindy/coach-access';
 // Shared provisioning — the SAME unit for single-add + bulk import (no drift).
-import { provisionClient } from '@/lib/mindy/coach-provision';
+import { provisionClient, parseBulkImportRows, computeBulkImportCap } from '@/lib/mindy/coach-provision';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -301,23 +301,16 @@ export async function POST(request: NextRequest) {
   // and returns a per-row result so the UI shows exactly what landed vs. skipped.
   // Respects the org's client cap (unlimited for enterprise/staff).
   if (body.action === 'bulk_import') {
-    const rowsIn = Array.isArray(body.clients) ? body.clients : [];
-    if (!rowsIn.length) return NextResponse.json({ success: false, error: 'No clients provided' }, { status: 400 });
-    const MAX_ROWS = 500;
-    const rows = rowsIn.slice(0, MAX_ROWS).map((r: Record<string, unknown>) => ({
-      businessName: String(r.business_name || r.name || '').trim(),
-      capabilityText: r.capability_text ? String(r.capability_text) : null,
-      primaryEmail: r.primary_email ? String(r.primary_email) : null,
-    })).filter((r: { businessName: string }) => r.businessName);
+    const rows = parseBulkImportRows(body.clients);
+    if (!rows.length) return NextResponse.json({ success: false, error: 'No clients provided' }, { status: 400 });
 
     // Cap check: how many we can still add. maxClients=null → unlimited (enterprise).
     const { count: existing } = await supabase
       .from('org_clients').select('id', { count: 'exact', head: true })
       .eq('org_id', membership.org_id).eq('status', 'active');
     const cap = coachAccess.maxClients;
-    const remaining = cap == null ? rows.length : Math.max(0, cap - (existing ?? 0));
+    const { remaining, rejectedForCap } = computeBulkImportCap(rows.length, cap, existing ?? 0);
     const toProcess = rows.slice(0, remaining);
-    const rejectedForCap = rows.length - toProcess.length;
 
     // Bounded concurrency — each row may run an LLM extraction (seedClientProfile),
     // so cap parallelism to protect rate limits + the function budget.
