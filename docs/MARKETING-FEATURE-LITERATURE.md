@@ -3127,3 +3127,34 @@ the Market Dashboard. 9 unit tests lock the save/read round-trip, memory→KV fa
 order, KV-failure-never-throws, and the honest-timestamp envelope; full suite 126/126
 green, typecheck 0. Built in direct response to the 2026-06-30 Supabase multi-region
 compute incident, which had been turning data-backed routes into 500s / 25s timeouts.
+
+## Indexed keyword search on the opportunity feed — faster alerts, lighter load (2026-07-03)
+
+**What:** The keyword half of opportunity matching — how Mindy catches an opp that
+mentions "drone" or "environmental remediation" even when it's filed under a NAICS
+you don't track — now runs on a proper full-text search index instead of scanning
+every row. Same matches, far less work: the database finds keyword hits by index
+lookup rather than reading all ~88,000 cached opportunities top to bottom on every
+search. Users don't see a new button; they see alerts and dashboard searches that
+stay fast and reliable even when thousands of profiles refresh the same morning.
+
+**Why:** The old approach used a "contains this text anywhere" filter (a leading-
+wildcard match) that no database index can accelerate — so each keyword search read
+the entire opportunity table. Run once per user across daily alerts and the nightly
+snapshot jobs, that's thousands of full-table scans stacked on the same hours, which
+is exactly what saturates a database's disk-I/O budget and causes the slow-downs and
+timeouts we saw on 2026-06-30. Moving to an indexed full-text match is the structural
+fix: it collapses each scan into a targeted lookup, cutting both steady-state and
+spike load so the platform stays responsive as the user base grows.
+
+**SEO angle:** *federal opportunity keyword search, government contract full-text
+search, SAM.gov opportunity matching speed, scalable GovCon alert engine.*
+
+**Proof:** migration `20260703_sam_opportunities_fts.sql` adds a generated `search_tsv`
+tsvector column (title + description) + a GIN index to `sam_opportunities`;
+`applySamCacheFilters` in `src/lib/briefings/pipelines/sam-gov.ts` swaps the
+`title.ilike.%kw%` / `description.ilike.%kw%` pair for an indexed `search_tsv.fts`
+match, preserving the NAICS-OR-keyword semantics (the "drone problem" fix). Gated
+behind `SAM_FTS_KEYWORDS` (default off → identical ILIKE behavior) so it can ship
+before the migration runs and flip on the moment the column exists — a reversible,
+no-redeploy switch. Root cause surfaced by a cron DB-load audit; typecheck 0.
