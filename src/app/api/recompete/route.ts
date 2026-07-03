@@ -382,15 +382,19 @@ export async function GET(request: NextRequest) {
       }, { status: 500 });
     }
 
+    // The 500 is most often a transient Supabase connection timeout (Cloudflare 522
+    // on a heavier .select('*') paged read), NOT a code/data problem — the light
+    // stats + id queries still succeed. Classify it so the client can say "try again"
+    // instead of implying the data is broken.
+    const raw = error.message || '';
+    const isUpstreamTimeout = /522|timed out|connection|fetch failed|ECONNRESET|EAI_AGAIN/i.test(raw) || raw.trim().startsWith('<');
     return NextResponse.json(
       {
         success: false,
-        error: 'Database query failed',
-        // Temporary diagnostic (Eric, Jul 3): surface the real PostgREST error with
-        // ?debug=1 so we can see WHY the list query 500s (the generic message hid it).
-        ...(searchParams.get('debug') === '1' ? { detail: error.message, code: (error as { code?: string }).code } : {}),
+        error: isUpstreamTimeout ? 'The contracts database is temporarily unavailable. Please try again.' : 'Database query failed',
+        retryable: isUpstreamTimeout,
       },
-      { status: 500 }
+      { status: isUpstreamTimeout ? 503 : 500 }
     );
   }
 
