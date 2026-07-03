@@ -17,7 +17,7 @@
     "audit:api-auth": "node scripts/audit-api-auth.js",
     "launch:brief": "node scripts/generate-launch-manager-brief.js",
     "seo:contractor-candidates": "node scripts/generate-seo-contractor-candidates.js",
-    "predeploy": "npm run test:schema && npm run test:pre-deploy && npm run verify:data && npm run eval:cap-parse && npm run eval:evidence-match",
+    "predeploy": "npm run test:schema && npm run test:unit && npm run test:pre-deploy && npm run verify:data && npm run eval:cap-parse && npm run eval:evidence-match",
     "deploy": "npm run predeploy && vercel --prod",
     "experiment:dry-run": "DRY_RUN=true npx tsx scripts/assign-experiment-cohorts.ts",
     "experiment:execute": "DRY_RUN=false npx tsx scripts/assign-experiment-cohorts.ts",
@@ -28,7 +28,9 @@
     "hooks:install": "git config core.hooksPath .githooks",
     "prepush": "bash .githooks/pre-push",
     "audit:client-auth": "node scripts/audit-client-auth.mjs",
-    "prepare": "git config core.hooksPath .githooks || true"
+    "prepare": "git config core.hooksPath .githooks || true",
+    "test:unit": "vitest run",
+    "test:unit:watch": "vitest"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
@@ -72,6 +74,8 @@
     "tailwindcss": "^4",
     "ts-node": "^10.9.2",
     "typescript": "^5",
+    "vite-tsconfig-paths": "^5.1.4",
+    "vitest": "^3.2.6",
     "xlsx": "^0.18.5"
   },
   "overrides": {

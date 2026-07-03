@@ -19,7 +19,7 @@ fail=0
 echo -e "${BOLD}── pre-push gate ──${NC}"
 
 # 1) HARD BLOCK: TypeScript must compile. (Would have blocked today's Error deploy.)
-echo -e "  ${BOLD}1/3${NC} typecheck (tsc --noEmit)…"
+echo -e "  ${BOLD}1/4${NC} typecheck (tsc --noEmit)…"
 if npx tsc --noEmit > /tmp/mindy-prepush-tsc.log 2>&1; then
   echo -e "      ${GREEN}✓ typecheck clean${NC}"
 else
@@ -29,7 +29,7 @@ else
 fi
 
 # 2) HARD BLOCK: no NEW unauthenticated fetch to a 2FA-gated /api/app route.
-echo -e "  ${BOLD}2/3${NC} client auth-header audit…"
+echo -e "  ${BOLD}2/4${NC} client auth-header audit…"
 if node scripts/audit-client-auth.mjs > /tmp/mindy-prepush-auth.log 2>&1; then
   echo -e "      ${GREEN}✓ no new unauthenticated gated fetches${NC}"
 else
@@ -38,8 +38,19 @@ else
   fail=1
 fi
 
-# 3) WARN ONLY: schema-sync drift (slower, can lag DB; never blocks a hotfix).
-echo -e "  ${BOLD}3/3${NC} schema-sync (warn only)…"
+# 3) HARD BLOCK: unit tests (Vitest). Fast (<1s) + deterministic, so safe to gate.
+#    Locks the $674B NAICS-inflation fix, win-probability scoring, authedFetch retry.
+echo -e "  ${BOLD}3/4${NC} unit tests (vitest run)…"
+if npm run --silent test:unit > /tmp/mindy-prepush-unit.log 2>&1; then
+  echo -e "      ${GREEN}✓ unit tests pass${NC}"
+else
+  echo -e "      ${RED}✗ unit tests FAILED — push blocked${NC}"
+  grep -E "✗|FAIL|Error|expected|AssertionError" /tmp/mindy-prepush-unit.log | head -15 | sed 's/^/        /'
+  fail=1
+fi
+
+# 4) WARN ONLY: schema-sync drift (slower, can lag DB; never blocks a hotfix).
+echo -e "  ${BOLD}4/4${NC} schema-sync (warn only)…"
 if npm run --silent test:schema > /tmp/mindy-prepush-schema.log 2>&1; then
   echo -e "      ${GREEN}✓ schema in sync${NC}"
 else
