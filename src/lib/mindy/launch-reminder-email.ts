@@ -1,7 +1,8 @@
 import { sendEmail } from '@/lib/send-email';
+import { MINDY_DAY } from '@/lib/mindy/mindy-day';
 
 /**
- * Mindy Launch DAY-OF reminder emails — Saturday, June 27, 2026, 10 AM–1 PM ET.
+ * Mindy Launch DAY-OF reminder emails — see MINDY_DAY for the current date/time.
  *
  * Sent through the GUARDED sendEmail() FROM the Resend-verified mail.getmindy.ai
  * domain (same sender as the confirmation) so it lands in the inbox. The funnels
@@ -75,7 +76,7 @@ export async function sendMindyLaunchReminderEmail(params: {
       </td></tr>
       <tr><td style="padding: 0 32px;">
         <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f3ff; border: 2px solid #ddd6fe; border-radius: 12px;"><tr><td style="padding: 26px 24px; text-align: center;">
-          <p style="color: #1e293b; font-size: 18px; font-weight: 800; margin: 0 0 4px;">Saturday, June 27</p>
+          <p style="color: #1e293b; font-size: 18px; font-weight: 800; margin: 0 0 4px;">${MINDY_DAY.dateLabel.replace(', 2026', '')}</p>
           <p style="color: #475569; font-size: 14px; margin: 0 0 16px;">10:00 AM &ndash; 1:00 PM ET</p>
           <a href="${ZOOM_URL}" style="display: inline-block; background-color: #7c3aed; color: #ffffff; padding: 18px 40px; border-radius: 10px; text-decoration: none; font-weight: 800; font-size: 18px;">Join on Zoom</a>
           <p style="color: #64748b; font-size: 13px; margin: 18px 0 0; line-height: 1.6;">Meeting ID: <strong style="color:#0f172a;">${ZOOM_MEETING_ID}</strong> &nbsp;&middot;&nbsp; Passcode: <strong style="color:#0f172a;">${ZOOM_PASSCODE}</strong></p>

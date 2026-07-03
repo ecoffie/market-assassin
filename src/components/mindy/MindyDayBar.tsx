@@ -1,16 +1,18 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { MINDY_DAY } from '@/lib/mindy/mindy-day';
 
 /**
- * Top announcement bar for Mindy Day — the live product unveil (June 27).
+ * Top announcement bar for Mindy Day — the live product unveil.
  * Pinned above the hero on the homepage. Dismissible — the × stores a flag in
  * localStorage so a returning visitor who closed it doesn't see it again.
  *
- * Keyed by date (`mindy-bootcamp-2026-06-27`) so the NEXT event's bar shows even
- * if a user dismissed this one — change the key when the launch date changes.
+ * Date/label/dismiss-key all come from MINDY_DAY (src/lib/mindy/mindy-day.ts) —
+ * the dismiss key is per-event, so bumping the date there re-shows the bar to a
+ * visitor who dismissed the previous event's bar.
  */
-const DISMISS_KEY = 'mindy-bootcamp-2026-06-27';
+const DISMISS_KEY = MINDY_DAY.dismissKey;
 
 export function MindyDayBar() {
   // Start hidden; reveal after the mount check so SSR/first paint never flashes
@@ -41,7 +43,7 @@ export function MindyDayBar() {
         className="block text-white text-center px-10 py-2.5 text-sm font-semibold hover:opacity-95 transition-opacity"
       >
         <span className="inline-flex flex-wrap items-center justify-center gap-x-2 gap-y-1">
-          <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold uppercase tracking-wide">Free Live · June 27</span>
+          <span className="rounded-full bg-white/20 px-2 py-0.5 text-xs font-bold uppercase tracking-wide">Free Live · {MINDY_DAY.shortDate}</span>
           <span>🚀 Mindy Day — watch it find you federal contracts, live</span>
           <span className="underline underline-offset-2">Register free →</span>
         </span>

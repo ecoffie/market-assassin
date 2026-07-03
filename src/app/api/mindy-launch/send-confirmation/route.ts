@@ -1,7 +1,7 @@
 /**
  * POST /api/mindy-launch/send-confirmation
  *
- * Sends the June 27 Mindy Free Live Launch confirmation (save-the-date) through the
+ * Sends the July 25 Mindy Free Live Launch confirmation (save-the-date) through the
  * guarded Mindy sendEmail() path — Resend → Office365 as alerts@govcongiants.com,
  * with suppression + deliverability tracking. This is the SEND owner; govcongiants.com
  * funnels (/api/lead, source=mindy-launch) calls it after recording the signup.
