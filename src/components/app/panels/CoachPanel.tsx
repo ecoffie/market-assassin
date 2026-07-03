@@ -1,5 +1,5 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import type { AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import { setActiveWorkspace, clearActiveWorkspace, getActiveWorkspace } from '../activeWorkspace';
@@ -58,6 +58,8 @@ export default function CoachPanel({
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(0);
   const [pagination, setPagination] = useState<{ total: number; totalPages: number } | null>(null);
+  const [listLoading, setListLoading] = useState(false);  // inline spinner (not full-page)
+  const didMountRef = useRef(false);
   // Bulk import
   const [bulkOpen, setBulkOpen] = useState(false);
   const [bulkText, setBulkText] = useState('');
@@ -66,11 +68,15 @@ export default function CoachPanel({
   const [bulkSummary, setBulkSummary] = useState<{ added: number; duplicates: number; failed: number; rejectedForCap: number } | null>(null);
   const headers = useCallback(() => getMIApiHeaders(email), [email]);
 
-  const load = useCallback(async (opts?: { search?: string; page?: number }) => {
+  // `quiet` = a search/pagination refresh: refetch the list WITHOUT flipping the
+  // full-page loading state (which blanks the whole panel to "Loading clients…").
+  // Only the first mount uses the full-page loader. Search/page updates just show a
+  // small inline spinner so the list doesn't flash away on every keystroke.
+  const load = useCallback(async (opts?: { search?: string; page?: number; quiet?: boolean }) => {
     if (!email) return;
-    setLoading(true);
-    const s = opts?.search ?? search;
-    const p = opts?.page ?? page;
+    if (opts?.quiet) setListLoading(true); else setLoading(true);
+    const s = opts?.search ?? '';
+    const p = opts?.page ?? 0;
     try {
       const params = new URLSearchParams({ email, page: String(p), pageSize: '25' });
       if (s.trim()) params.set('search', s.trim());
@@ -85,11 +91,24 @@ export default function CoachPanel({
         setPagination(d.pagination ? { total: d.pagination.total, totalPages: d.pagination.totalPages } : null);
       }
     } catch { /* ignore */ }
-    setLoading(false);
-  }, [email, headers, search, page]);
+    if (opts?.quiet) setListLoading(false); else setLoading(false);
+  }, [email, headers]);
 
-  useEffect(() => { load(); }, [load]);
+  // Initial load — full-page loader, once.
+  useEffect(() => { load({ page: 0 }); }, [load]);
   useEffect(() => { setActiveWs(getActiveWorkspace() || ''); }, []);
+
+  // Debounced search: refetch 350ms after the user stops typing, resetting to page
+  // 0, WITHOUT the full-page loader (quiet). Skips the very first render so it
+  // doesn't double-fire alongside the initial load above.
+  useEffect(() => {
+    if (!didMountRef.current) { didMountRef.current = true; return; }
+    const t = setTimeout(() => {
+      setPage(0);
+      load({ search, page: 0, quiet: true });
+    }, 350);
+    return () => clearTimeout(t);
+  }, [search, load]);
 
   const goApp = (panel?: AppPanel) => {
     window.location.href = panel && panel !== 'dashboard' ? `/app?panel=${panel}` : '/app';
@@ -276,12 +295,13 @@ export default function CoachPanel({
         <div className="relative flex-1 max-w-sm">
           <input
             value={search}
-            onChange={e => { setSearch(e.target.value); }}
-            onKeyDown={e => { if (e.key === 'Enter') { setPage(0); load({ search, page: 0 }); } }}
+            onChange={e => setSearch(e.target.value)}
             placeholder="Search clients by name…"
             className="h-9 w-full pl-9 pr-3 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-purple-500 focus:outline-none"
           />
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">🔍</span>
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">
+            {listLoading ? <span className="inline-block w-3.5 h-3.5 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" /> : '🔍'}
+          </span>
         </div>
         {pagination && (
           <p className="text-xs text-slate-500">
@@ -383,8 +403,8 @@ export default function CoachPanel({
         <div className="mt-4 flex items-center justify-center gap-3 text-sm">
           <button
             type="button"
-            disabled={page <= 0}
-            onClick={() => { const np = page - 1; setPage(np); load({ page: np }); }}
+            disabled={page <= 0 || listLoading}
+            onClick={() => { const np = page - 1; setPage(np); load({ search, page: np, quiet: true }); }}
             className="h-8 px-3 rounded-lg border border-slate-700 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:border-slate-600"
           >
             ← Prev
@@ -392,8 +412,8 @@ export default function CoachPanel({
           <span className="text-slate-500 text-xs">Page {page + 1} of {pagination.totalPages}</span>
           <button
             type="button"
-            disabled={page >= pagination.totalPages - 1}
-            onClick={() => { const np = page + 1; setPage(np); load({ page: np }); }}
+            disabled={page >= pagination.totalPages - 1 || listLoading}
+            onClick={() => { const np = page + 1; setPage(np); load({ search, page: np, quiet: true }); }}
             className="h-8 px-3 rounded-lg border border-slate-700 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:border-slate-600"
           >
             Next →
