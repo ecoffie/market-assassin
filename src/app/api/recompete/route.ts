@@ -383,7 +383,13 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(
-      { success: false, error: 'Database query failed' },
+      {
+        success: false,
+        error: 'Database query failed',
+        // Temporary diagnostic (Eric, Jul 3): surface the real PostgREST error with
+        // ?debug=1 so we can see WHY the list query 500s (the generic message hid it).
+        ...(searchParams.get('debug') === '1' ? { detail: error.message, code: (error as { code?: string }).code } : {}),
+      },
       { status: 500 }
     );
   }
