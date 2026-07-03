@@ -289,6 +289,24 @@ function deriveAccessFromPurchase({
       tier = 'contractor_db';
     } else if (normalizedName.includes('recompete')) {
       tier = 'recompete';
+    } else if (normalizedName.includes('team monthly')) {
+      tier = 'team_monthly';
+    } else if (normalizedName.includes('team annual')) {
+      tier = 'team_annual';
+    }
+  }
+
+  // Mindy Team — this webhook previously had NO Team branch, so Team purchases
+  // routed here were dropped with zero access granted. Recognize by price ID
+  // (most reliable — the annual payment link ships with empty metadata) or, as a
+  // backstop, by the Team price points ($499/mo, $4,990/yr). updateAccessFlags
+  // sets access_team + access_briefings for these tiers.
+  if (!tier && !bundle) {
+    const priceId = typeof metadata.price_id === 'string' ? metadata.price_id : '';
+    if (priceId === 'price_1TZxaaK5zyiZ50PBzhQJ1Pk8' || amount === 49900) {
+      tier = 'team_monthly';
+    } else if (priceId === 'price_1TZxcAK5zyiZ50PBcBg0ZvoV' || amount === 499000) {
+      tier = 'team_annual';
     }
   }
 

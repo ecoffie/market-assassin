@@ -55,6 +55,28 @@ export async function resolveAccess(email: string): Promise<AccessResult> {
     console.warn(`[resolveAccess] paid check failed for ${normalized}; continuing`, err);
   }
 
+  // 1b) Team is a SUPERSET of Pro. Every Pro gate must light up for a Team member.
+  //     We can't rely on access_briefings being co-written with access_team — older
+  //     provisioning + admin grants set access_team alone, which silently bounced
+  //     paying Team users out of Pro-only surfaces (chat). So treat access_team=true
+  //     as Pro-level here, at the single source of truth. Fail OPEN like every other
+  //     path — an errored lookup drops to the trial/free check, never blocks.
+  try {
+    const sb = getSupabase();
+    if (sb) {
+      const { data } = await sb
+        .from('user_profiles')
+        .select('access_team')
+        .eq('email', normalized)
+        .maybeSingle();
+      if (data?.access_team) {
+        return { level: 'pro', source: 'stripe', trialEndsAt: null };
+      }
+    }
+  } catch (err) {
+    console.warn(`[resolveAccess] team check failed for ${normalized}; continuing`, err);
+  }
+
   // 2) Trial — per-user trial_ends_at, gated by the global switch.
   // The date can live on EITHER table: user_profiles (once a user logs in + creates a
   // profile) OR user_notification_settings (email-only beta users who haven't logged

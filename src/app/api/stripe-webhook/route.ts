@@ -124,7 +124,14 @@ export async function POST(request: NextRequest) {
     // the right access. Order matters: Team first, then lifetime (before
     // generic briefings/mindy match), then recurring briefings.
     if (!tier && !bundle) {
-      if (normalizedDescription.includes('team monthly') || normalizedDescription.includes('team annual')) {
+      // Team price IDs are the MOST reliable signal — they survive link edits and
+      // don't depend on payment-link metadata (the annual link ships with none) or
+      // an exact description. price.id here is lineItems.data[0].price.id (productId).
+      if (productId === 'price_1TZxaaK5zyiZ50PBzhQJ1Pk8') {
+        tier = 'team_monthly';
+      } else if (productId === 'price_1TZxcAK5zyiZ50PBcBg0ZvoV') {
+        tier = 'team_annual';
+      } else if (normalizedDescription.includes('team monthly') || normalizedDescription.includes('team annual')) {
         tier = normalizedDescription.includes('annual') ? 'team_annual' : 'team_monthly';
       } else if (
         normalizedDescription.includes('lifetime') &&
@@ -150,6 +157,15 @@ export async function POST(request: NextRequest) {
       }
       if (!tier && session.amount_total === 499700) {
         tier = 'briefings_lifetime';
+      }
+      // Team amount fallback — last-resort if a future link uses a new price ID at
+      // the same price point ($499/mo, $4,990/yr). Distinct from the lifetime
+      // amounts above, so no collision.
+      if (!tier && session.amount_total === 49900) {
+        tier = 'team_monthly';
+      }
+      if (!tier && session.amount_total === 499000) {
+        tier = 'team_annual';
       }
     }
 
