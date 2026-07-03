@@ -5,10 +5,25 @@ import { renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 import { sendEmail } from '@/lib/send-email';
 import { applyPartnerReferralIfEligible } from '@/lib/mindy/apply-partner-referral';
 import { getPartnerReferralByCode } from '@/lib/mindy/partner-referrals';
+import { enqueuePendingSignup } from '@/lib/resilience/signup-queue';
 
 export const runtime = 'nodejs';
 
 const SUCCESS_MESSAGE = 'Check your inbox for a link to set up your account.';
+// Shown when the DB is unreachable and we captured the email for later (see
+// the outage fallback below). Honest: they ARE signed up, the link is delayed.
+const QUEUED_MESSAGE = "You're on the list! We're finishing your setup and will email your link shortly.";
+// Cap the auth-link call so a DB outage fails FAST (was hanging the whole POST
+// for 30s on supabase.auth.admin.generateLink) instead of blocking the user.
+const SETUP_LINK_TIMEOUT_MS = 6000;
+
+// Reject a promise if it doesn't settle within ms — used to bound the auth call.
+function withTimeout<T>(p: Promise<T>, ms: number, label: string): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(`${label} timed out after ${ms}ms`)), ms)),
+  ]);
+}
 const SIGNUP_WINDOW_MS = 15 * 60 * 1000;
 const MAX_SIGNUP_ATTEMPTS = 5;
 const DISPOSABLE_EMAIL_DOMAINS = new Set([
@@ -228,15 +243,37 @@ export async function POST(request: NextRequest) {
     const partner = getPartnerReferralByCode(referralCode);
     if (referralCode && partner) {
       try {
-        await applyPartnerReferralIfEligible(getSupabaseAdmin(), email, referralCode);
+        // Bounded — this hits the DB; during an outage it must not hang the POST
+        // (the setup-link fallback below will still queue the email either way).
+        await withTimeout(applyPartnerReferralIfEligible(getSupabaseAdmin(), email, referralCode), SETUP_LINK_TIMEOUT_MS, 'applyPartnerReferral');
       } catch (partnerError) {
         console.warn('[Mindy Signup] Partner referral apply failed:', partnerError);
       }
     }
 
-    // Generate setup link
+    // Generate setup link. This calls supabase.auth.admin.generateLink, which
+    // needs the database — during a Supabase outage it hangs. Bound it, and if
+    // it fails, DON'T lose the prospect: capture the email to the KV queue (which
+    // survives the outage) and return a friendly "you're on the list" instead of
+    // an error. A recovery job (/api/admin/drain-signup-queue) completes it once
+    // the DB is back. Account creation genuinely needs the DB, so this is the
+    // most we can do offline — but it means zero lost free-alert signups.
     const setupUrl = getSupabaseAuthRedirectUrl('/app/setup-password');
-    const link = await generateSetupLink(email, setupUrl);
+    let link: { url: string; type: string };
+    try {
+      link = await withTimeout(generateSetupLink(email, setupUrl), SETUP_LINK_TIMEOUT_MS, 'generateSetupLink');
+    } catch (linkError) {
+      console.error('[Mindy Signup] setup-link failed (DB likely down) — queuing:', (linkError as Error)?.message);
+      const queued = await enqueuePendingSignup({ email, referralCode, source: typeof body.source === 'string' ? body.source : 'mindy_signup' });
+      if (queued) {
+        return NextResponse.json({ success: true, message: QUEUED_MESSAGE, queued: true });
+      }
+      // KV also unavailable — last resort, honest error rather than a silent drop.
+      return NextResponse.json(
+        { success: false, error: "Signups are briefly paused while we restore service. Please try again in a few minutes." },
+        { status: 503 }
+      );
+    }
 
     // Send welcome email
     await sendEmail({

@@ -3158,3 +3158,32 @@ match, preserving the NAICS-OR-keyword semantics (the "drone problem" fix). Gate
 behind `SAM_FTS_KEYWORDS` (default off → identical ILIKE behavior) so it can ship
 before the migration runs and flip on the moment the column exists — a reversible,
 no-redeploy switch. Root cause surfaced by a cron DB-load audit; typecheck 0.
+
+## Never lose a free-alert signup to an outage — capture-and-complete (2026-07-03)
+
+**What:** If someone signs up for Mindy's free alerts during a rare data-service
+outage, they no longer hit a broken form or a 30-second hang. Their email is
+captured instantly, they see an honest "You're on the list — we'll email your
+setup link shortly," and Mindy finishes creating the account automatically the
+moment service is restored. Zero lost signups, no "try again later" dead end.
+
+**Why:** A stale dashboard is an inconvenience; a broken signup is a customer you
+never get. Account creation genuinely needs the database (it mints an auth user +
+setup link), so during an outage it can't complete in real time — but the one thing
+you must not do is drop the prospect. The mature-SaaS pattern is capture-then-
+complete: take the email into a store that survives the outage, tell the person the
+truth, and finish the job on recovery. It turns the single most costly outage moment
+(a new user bouncing forever) into a short, honest delay.
+
+**SEO angle:** *reliable signup during outage, resilient SaaS onboarding, free
+federal contract alerts signup, no-lost-leads architecture.*
+
+**Proof:** `src/lib/resilience/signup-queue.ts` (Vercel KV buffer that survives a
+Supabase outage), wired into `src/app/api/auth/mi-signup/route.ts`: the
+`supabase.auth.admin.generateLink` call is bounded to 6s (was hanging 30s), and on
+failure the email is queued + a friendly "you're on the list" (`queued:true`) is
+returned instead of an error; the signup success screen renders honest "saved your
+spot" copy for queued signups. `src/app/api/admin/drain-signup-queue/route.ts`
+replays the queue through the real signup path on recovery (GET=preview count,
+POST=drain, re-queues on transient failure). 9 unit tests (enqueue→drain FIFO, cap,
+KV-failure-never-throws, bad-entry drop); full suite 135/135, typecheck 0.

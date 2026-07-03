@@ -26,6 +26,8 @@ function MindySignupContent() {
   const [email, setEmail] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitted, setSubmitted] = useState(false);
+  // True when signup was captured during a DB outage (link delayed, not sent yet).
+  const [queued, setQueued] = useState(false);
   const [error, setError] = useState('');
   const [oauthLoading, setOauthLoading] = useState<'google' | 'microsoft' | null>(null);
 
@@ -57,6 +59,7 @@ function MindySignupContent() {
       const data = await res.json();
 
       if (data.success) {
+        setQueued(data.queued === true);
         setSubmitted(true);
       } else {
         setError(data.error || 'Something went wrong');
@@ -232,13 +235,27 @@ function MindySignupContent() {
                   />
                 </svg>
               </div>
-              <h2 className="text-xl font-bold text-white mb-2">Check your inbox</h2>
-              <p className="text-slate-400 mb-4">
-                We sent a verification link to <span className="text-white">{email}</span>
-              </p>
-              <p className="text-slate-500 text-sm">
-                Click the link in the email to set up your password and complete signup.
-              </p>
+              {queued ? (
+                <>
+                  <h2 className="text-xl font-bold text-white mb-2">You&apos;re on the list</h2>
+                  <p className="text-slate-400 mb-4">
+                    We saved your spot for <span className="text-white">{email}</span>
+                  </p>
+                  <p className="text-slate-500 text-sm">
+                    We&apos;re finishing setup and will email your link shortly — no need to sign up again. Thanks for your patience.
+                  </p>
+                </>
+              ) : (
+                <>
+                  <h2 className="text-xl font-bold text-white mb-2">Check your inbox</h2>
+                  <p className="text-slate-400 mb-4">
+                    We sent a verification link to <span className="text-white">{email}</span>
+                  </p>
+                  <p className="text-slate-500 text-sm">
+                    Click the link in the email to set up your password and complete signup.
+                  </p>
+                </>
+              )}
             </div>
           )}
 
