@@ -1050,11 +1050,33 @@ function applySamCacheFilters(query: any, params: SAMSearchParams) {
   // SANITIZED keywords (#61) — drop short/ambiguous abbrevs that produce noise.
   const safeKeywords = sanitizeKeywords(keywords);
   if (safeKeywords.length > 0) {
-    // Escape commas/parens that would break PostgREST .or() syntax.
+    // Keyword matching: leading-wildcard ILIKE (`title.ilike.%kw%`) can't use an
+    // index → SEQ SCAN of the ~88k-row table on EVERY keyword search, per user,
+    // in daily-alerts + snapshots (the burst-IO exhaustion Supabase support
+    // flagged 2026-07-03). The fix is a full-text match against the generated
+    // `search_tsv` GIN index (migration 20260703_sam_opportunities_fts.sql).
+    //
+    // FLAG-GATED: SAM_FTS_KEYWORDS must be 'on' AND the migration must have run,
+    // or the .wfts on a missing column would 500 the shared query (this path
+    // feeds daily-alerts, snapshots, briefings, AND the live market dashboard).
+    // Default OFF = current ILIKE behavior; flip on only after the column exists.
+    const useFts = process.env.SAM_FTS_KEYWORDS === 'on';
     for (const kw of safeKeywords) {
       const safe = kw.trim().replace(/[(),]/g, ' ').replace(/\s+/g, ' ');
-      whatClauses.push(`title.ilike.%${safe}%`);
-      whatClauses.push(`description.ilike.%${safe}%`);
+      if (useFts) {
+        // fts(english) = to_tsquery full-text search on the tsvector GIN index.
+        // Multi-word keywords are joined with `&` (to_tsquery AND) so the phrase
+        // must co-occur ("cyber security" → cyber&security), matching the intent
+        // of the old title-ILIKE AND description-ILIKE pair. tsquery-special
+        // chars (& | ! : * ' & parens) are stripped to spaces first so a raw
+        // keyword can't break query parsing; the resulting lexemes are &-joined.
+        const term = safe.replace(/[:&|!*'()]/g, ' ').trim().split(/\s+/).filter(Boolean).join('&');
+        if (term) whatClauses.push(`search_tsv.fts(english).${term}`);
+      } else {
+        // Escape commas/parens that would break PostgREST .or() syntax.
+        whatClauses.push(`title.ilike.%${safe}%`);
+        whatClauses.push(`description.ilike.%${safe}%`);
+      }
     }
   }
   if (whatClauses.length > 0) {

@@ -3090,3 +3090,100 @@ rationale — while a FedRAMP cloud-hosting requirement was correctly returned a
 honest gap (no cloud evidence in a construction Vault). Automated grounding eval
 (`npm run eval:evidence-match`) gates predeploy: 4 requirements, 3 grounded matches,
 1 honest gap, 0 fabrications. Typecheck 0.
+
+## Stay-up-during-an-outage: last-good data on the market feeds (2026-07-03)
+
+**What:** When the underlying data service has a hiccup, Mindy's Expiring Contracts
+and Market Dashboard no longer go blank or throw an error. They keep showing your
+most recent results with an honest, timestamped notice — *"Showing saved data from
+2:14 PM today. Live updates are catching up."* — and a Retry button. The moment the
+service recovers, the next load quietly returns to live data and the notice clears.
+You're never staring at a spinner or a broken panel wondering if it's you or us.
+
+**Why:** BD work doesn't stop because a database provider is having a rough hour. A
+counselor mid-demo, or a contractor checking recompetes before a deadline, needs to
+keep moving — and they need to KNOW whether what they're looking at is live or a few
+minutes old, not guess. The mature-SaaS answer is "data behind glass, honestly
+labeled," never a blank wall: show the last good view, tell the truth about its age,
+and recover automatically. The alternative — a 500 error or an empty list — reads as
+"the product is broken" even when the fix is entirely on the infrastructure side.
+
+**How it works:** Every successful load of a market feed is cached as a "last-good"
+snapshot in a store that lives OUTSIDE the primary database (so it survives the exact
+outage it's meant to cover), keyed per filter and per user so no one ever sees another
+account's view. If a later request can't reach the database, the route serves that
+snapshot at a normal 200 with the real capture time attached; the panel renders it and
+shows the timestamped banner. First-ever outage for a brand-new filter (nothing cached
+yet) still fails honestly with a "temporarily unavailable, try again" — no fake data,
+ever. It's the same "be honest about state" discipline as the rest of Mindy.
+
+**SEO angle:** *government contracting software reliability, federal opportunity
+dashboard uptime, GovCon tool outage resilience, always-on contract intelligence.*
+
+**Proof:** `src/lib/resilience/last-good.ts` (Vercel KV + in-memory snapshot, KV
+failures degrade to null and never break the route), wired into `/api/recompete` and
+`/api/mi-dashboard` with a shared `StaleDataBanner` on the Expiring Contracts panel and
+the Market Dashboard. 9 unit tests lock the save/read round-trip, memory→KV fallback
+order, KV-failure-never-throws, and the honest-timestamp envelope; full suite 126/126
+green, typecheck 0. Built in direct response to the 2026-06-30 Supabase multi-region
+compute incident, which had been turning data-backed routes into 500s / 25s timeouts.
+
+## Indexed keyword search on the opportunity feed — faster alerts, lighter load (2026-07-03)
+
+**What:** The keyword half of opportunity matching — how Mindy catches an opp that
+mentions "drone" or "environmental remediation" even when it's filed under a NAICS
+you don't track — now runs on a proper full-text search index instead of scanning
+every row. Same matches, far less work: the database finds keyword hits by index
+lookup rather than reading all ~88,000 cached opportunities top to bottom on every
+search. Users don't see a new button; they see alerts and dashboard searches that
+stay fast and reliable even when thousands of profiles refresh the same morning.
+
+**Why:** The old approach used a "contains this text anywhere" filter (a leading-
+wildcard match) that no database index can accelerate — so each keyword search read
+the entire opportunity table. Run once per user across daily alerts and the nightly
+snapshot jobs, that's thousands of full-table scans stacked on the same hours, which
+is exactly what saturates a database's disk-I/O budget and causes the slow-downs and
+timeouts we saw on 2026-06-30. Moving to an indexed full-text match is the structural
+fix: it collapses each scan into a targeted lookup, cutting both steady-state and
+spike load so the platform stays responsive as the user base grows.
+
+**SEO angle:** *federal opportunity keyword search, government contract full-text
+search, SAM.gov opportunity matching speed, scalable GovCon alert engine.*
+
+**Proof:** migration `20260703_sam_opportunities_fts.sql` adds a generated `search_tsv`
+tsvector column (title + description) + a GIN index to `sam_opportunities`;
+`applySamCacheFilters` in `src/lib/briefings/pipelines/sam-gov.ts` swaps the
+`title.ilike.%kw%` / `description.ilike.%kw%` pair for an indexed `search_tsv.fts`
+match, preserving the NAICS-OR-keyword semantics (the "drone problem" fix). Gated
+behind `SAM_FTS_KEYWORDS` (default off → identical ILIKE behavior) so it can ship
+before the migration runs and flip on the moment the column exists — a reversible,
+no-redeploy switch. Root cause surfaced by a cron DB-load audit; typecheck 0.
+
+## Never lose a free-alert signup to an outage — capture-and-complete (2026-07-03)
+
+**What:** If someone signs up for Mindy's free alerts during a rare data-service
+outage, they no longer hit a broken form or a 30-second hang. Their email is
+captured instantly, they see an honest "You're on the list — we'll email your
+setup link shortly," and Mindy finishes creating the account automatically the
+moment service is restored. Zero lost signups, no "try again later" dead end.
+
+**Why:** A stale dashboard is an inconvenience; a broken signup is a customer you
+never get. Account creation genuinely needs the database (it mints an auth user +
+setup link), so during an outage it can't complete in real time — but the one thing
+you must not do is drop the prospect. The mature-SaaS pattern is capture-then-
+complete: take the email into a store that survives the outage, tell the person the
+truth, and finish the job on recovery. It turns the single most costly outage moment
+(a new user bouncing forever) into a short, honest delay.
+
+**SEO angle:** *reliable signup during outage, resilient SaaS onboarding, free
+federal contract alerts signup, no-lost-leads architecture.*
+
+**Proof:** `src/lib/resilience/signup-queue.ts` (Vercel KV buffer that survives a
+Supabase outage), wired into `src/app/api/auth/mi-signup/route.ts`: the
+`supabase.auth.admin.generateLink` call is bounded to 6s (was hanging 30s), and on
+failure the email is queued + a friendly "you're on the list" (`queued:true`) is
+returned instead of an error; the signup success screen renders honest "saved your
+spot" copy for queued signups. `src/app/api/admin/drain-signup-queue/route.ts`
+replays the queue through the real signup path on recovery (GET=preview count,
+POST=drain, re-queues on transient failure). 9 unit tests (enqueue→drain FIFO, cap,
+KV-failure-never-throws, bad-entry drop); full suite 135/135, typecheck 0.

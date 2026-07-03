@@ -12,6 +12,7 @@ import SaveContactButton from '../contacts/SaveContactButton';
 import { classifyLocation, MATCH_META, overseasRegionFromOffice, type LocationMatch } from '@/lib/geo/location-match';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 import { useDodaacNames } from '@/components/app/useDodaacNames';
+import StaleDataBanner from '@/components/app/StaleDataBanner';
 
 interface RecompetesPanelProps {
   email: string | null;
@@ -291,6 +292,8 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
   const [searching, setSearching] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [expandedContracts, setExpandedContracts] = useState<Set<string>>(new Set());
+  // Graceful degradation: set when the API served last-good data during an outage.
+  const [degraded, setDegraded] = useState<{ servedAt: string | null } | null>(null);
 
   // Search filters
   const [naicsFilter, setNaicsFilter] = useState('');
@@ -450,6 +453,10 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
       const data = await res.json();
 
       if (!data.success) throw new Error(data.error || 'Failed to search contracts');
+
+      // If the API degraded to last-good data during an outage, surface the honest
+      // "as of {time}" banner; otherwise clear it (we're back on live data).
+      setDegraded(data._degraded ? { servedAt: data._servedAt ?? null } : null);
 
       // Prefer the VEHICLE-grouped view (1 card per IDIQ, awardees listed) over
       // raw awardee rows, so a 196-winner vehicle isn't 196 duplicate cards
@@ -657,6 +664,11 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
 
   return (
     <div className="p-6 space-y-6">
+      <StaleDataBanner
+        degraded={!!degraded}
+        servedAt={degraded?.servedAt}
+        onRetry={() => searchContracts(naicsFilter, monthsFilter, competitionFilter)}
+      />
       {/* Header */}
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>

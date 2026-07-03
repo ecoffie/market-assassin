@@ -29,6 +29,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { groupRecompetesByVehicle } from '@/lib/recompete/vehicle-grouping';
+import { saveSnapshot, readSnapshot, freshMeta, degradedMeta } from '@/lib/resilience/last-good';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -172,6 +173,49 @@ async function computeRecompeteStatsFromTable(supabase: any) {
 }
 
 export async function GET(request: NextRequest) {
+  // Outer guard: a network-level failure during a DB outage (fetch failed /
+  // ECONNRESET) can THROW rather than return {error}, which would escape as an
+  // unhandled 500 and skip the last-good serve below. Catch it, and if we have a
+  // snapshot for this exact filter, serve it degraded instead of erroring.
+  try {
+    return await handleRecompeteGet(request);
+  } catch (err) {
+    const raw = (err as Error)?.message || '';
+    const isUpstreamTimeout = /522|timed out|connection|fetch failed|ECONNRESET|EAI_AGAIN|network/i.test(raw);
+    if (isUpstreamTimeout) {
+      try {
+        const key = recompeteSnapshotKey(new URL(request.url).searchParams);
+        const snap = await readSnapshot<Record<string, unknown>>(key);
+        if (snap) {
+          return NextResponse.json(
+            { ...snap.data, ...degradedMeta(snap.savedAt) },
+            { status: 200, headers: { 'x-mindy-degraded': '1' } }
+          );
+        }
+      } catch { /* fall through to 503 */ }
+      return NextResponse.json(
+        { success: false, error: 'The contracts database is temporarily unavailable. Please try again.', retryable: true },
+        { status: 503 }
+      );
+    }
+    console.error('[recompete] unhandled error:', raw);
+    return NextResponse.json({ success: false, error: 'Database query failed' }, { status: 500 });
+  }
+}
+
+// Build the last-good snapshot key from a filter's query params. Shared by the
+// happy path (save), the returned-error path, and the thrown-error guard above.
+function recompeteSnapshotKey(sp: URLSearchParams): string {
+  return `recompete:${new URLSearchParams({
+    naics: sp.get('naics') || '', agency: sp.get('agency') || '', state: sp.get('state') || '',
+    months: sp.get('months') || '18', minValue: sp.get('minValue') || '', maxValue: sp.get('maxValue') || '',
+    incumbent: sp.get('incumbent') || '', setAside: sp.get('setAside') || '',
+    likelihood: sp.get('likelihood') || '', limit: sp.get('limit') || '50', offset: sp.get('offset') || '0',
+    sort: sp.get('sort') || 'value', order: sp.get('order') || 'desc',
+  }).toString()}`;
+}
+
+async function handleRecompeteGet(request: NextRequest) {
   const { searchParams } = new URL(request.url);
 
   // Parse parameters
@@ -192,6 +236,12 @@ export async function GET(request: NextRequest) {
   const idParam = searchParams.get('id');
 
   const supabase = createClient(supabaseUrl, supabaseKey);
+
+  // Last-good snapshot key for THIS filtered view. The main paged list is the
+  // heavy read that times out during a Supabase outage; we key the snapshot by
+  // the query so a filtered panel serves its OWN last-good, not another filter's.
+  // (stats / id / single-contract branches return early and aren't snapshotted.)
+  const snapshotKey = recompeteSnapshotKey(searchParams);
 
   // Return stats if requested
   if (statsParam === 'true') {
@@ -388,6 +438,22 @@ export async function GET(request: NextRequest) {
     // instead of implying the data is broken.
     const raw = error.message || '';
     const isUpstreamTimeout = /522|timed out|connection|fetch failed|ECONNRESET|EAI_AGAIN/i.test(raw) || raw.trim().startsWith('<');
+
+    // GRACEFUL DEGRADATION: on an upstream/DB outage, serve the last SUCCESSFUL
+    // response for this exact filter (from KV, which survives a Supabase outage)
+    // rather than an empty "try again" panel. The client shows an honest
+    // "as of {time}" banner off `_degraded`/`_servedAt`. Only fall through to
+    // the 503 when we have NO snapshot yet (first-ever outage for this view).
+    if (isUpstreamTimeout) {
+      const snap = await readSnapshot<Record<string, unknown>>(snapshotKey);
+      if (snap) {
+        return NextResponse.json(
+          { ...snap.data, ...degradedMeta(snap.savedAt) },
+          { status: 200, headers: { 'x-mindy-degraded': '1' } }
+        );
+      }
+    }
+
     return NextResponse.json(
       {
         success: false,
@@ -452,7 +518,7 @@ export async function GET(request: NextRequest) {
   // The page of raw rows for back-compat consumers = the members of this page's vehicles.
   const pageContracts = pageGroups.flatMap((g) => g.members);
 
-  return NextResponse.json({
+  const payload = {
     success: true,
     query: {
       naics: naicsParam,
@@ -495,5 +561,11 @@ export async function GET(request: NextRequest) {
       highLikelihood: '/api/recompete?likelihood=high',
       syncData: '/api/admin/sync-recompete?password=...',
     },
-  });
+  };
+
+  // Store this successful response as the last-good snapshot for this filter,
+  // so a future outage can serve it. Fire-and-forget — never block the response.
+  saveSnapshot(snapshotKey, payload).catch(() => {});
+
+  return NextResponse.json({ ...payload, ...freshMeta() });
 }
