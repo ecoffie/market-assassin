@@ -13,7 +13,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
-import { getMIApiHeaders } from '../authHeaders';
+import { getMIApiHeaders, authedFetch } from '../authHeaders';
 import { useToast } from '../Toast';
 import { useAppTracker } from '../track';
 import SaveContactButton from '../contacts/SaveContactButton';
@@ -260,7 +260,7 @@ export default function MyTargetListPanel({
   useEffect(() => {
     if (!email || targets.length === 0) return;
     let cancelled = false;
-    fetch(`/api/app/target-events?email=${encodeURIComponent(email)}`)
+    authedFetch(`/api/app/target-events?email=${encodeURIComponent(email)}`, email)
       .then(r => r.json())
       .then(data => {
         if (cancelled || !data?.success) return;
@@ -1544,7 +1544,7 @@ function SavedContacts({ agency, email }: { agency: string; email: string }) {
   const load = useCallback(() => {
     setLoading(true);
     const p = new URLSearchParams({ email, mode: 'saved', agency });
-    fetch(`/api/app/relationships?${p.toString()}`)
+    authedFetch(`/api/app/relationships?${p.toString()}`, email)
       .then(r => r.json())
       .then(d => setRows(((d?.contacts || d?.saved || d?.results || []) as SavedContactRow[])))
       .catch(() => setRows([]))
@@ -1608,7 +1608,7 @@ function OutreachLog({
 
   useEffect(() => {
     let cancelled = false;
-    fetch(`/api/app/target-outreach?target_id=${encodeURIComponent(targetId)}&email=${encodeURIComponent(email)}`)
+    authedFetch(`/api/app/target-outreach?target_id=${encodeURIComponent(targetId)}&email=${encodeURIComponent(email)}`, email)
       .then(r => r.json())
       .then(data => {
         if (cancelled || !data?.success) return;

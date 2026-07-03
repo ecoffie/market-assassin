@@ -27,7 +27,7 @@
  */
 
 import { useEffect, useMemo, useState } from 'react';
-import { getMIApiHeaders } from '../authHeaders';
+import { authedFetch } from '../authHeaders';
 import type { ContractorSalesHistory } from '@/lib/contractor-sales-history';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
 
@@ -71,9 +71,9 @@ export default function ContractorProfileView({
         const params = new URLSearchParams({ company, slug });
         if (email) params.set('email', email);
 
-        const response = await fetch(
+        const response = await authedFetch(
           `/api/app/contractors/sales-history?${params.toString()}`,
-          { headers: getMIApiHeaders(email) }
+          email
         );
         const data = await response.json();
 

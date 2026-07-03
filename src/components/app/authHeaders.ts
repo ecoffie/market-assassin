@@ -73,3 +73,52 @@ export function getMIApiHeaders(email?: string | null, init?: HeadersInit) {
 
   return headers;
 }
+
+/**
+ * authedFetch — the standard fetch for any 2FA-gated `/api/app/*` route.
+ *
+ * Two failures used to hit users constantly and surface as the SAME confusing
+ * error ("Missing two-factor session" / "Failed to load …"):
+ *   1. A fetch that forgot to send the MI auth header  → instant 401.
+ *   2. A valid-but-EXPIRED token (30-day TTL)          → 401 with no recovery,
+ *      leaving the user stuck until a full re-sign-in.
+ *
+ * This wrapper closes BOTH: it always attaches `getMIApiHeaders(email)`, and on a
+ * 401 it transparently mints a fresh token via /api/auth/refresh-mi-session (from
+ * the still-decodable expiring token), stores it, and retries the request ONCE.
+ * Extracted from the inline version in UnifiedSettingsPanel (Eric QC 2026-06-16)
+ * so every panel gets the same recovery instead of re-implementing it per file.
+ *
+ * Usage mirrors fetch(): `await authedFetch(url, email, init?)`.
+ */
+export async function authedFetch(
+  url: string,
+  email?: string | null,
+  init: RequestInit = {}
+): Promise<Response> {
+  const withAuth = (): RequestInit => ({
+    ...init,
+    headers: getMIApiHeaders(email, (init.headers as HeadersInit) || undefined),
+  });
+
+  let res = await fetch(url, withAuth());
+  if (res.status !== 401) return res;
+
+  // Expired/stale token → try to re-mint once, then retry the original request.
+  try {
+    const refresh = await fetch('/api/auth/refresh-mi-session', {
+      method: 'POST',
+      headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+    });
+    if (refresh.ok) {
+      const j = await refresh.json().catch(() => null);
+      if (j?.sessionToken && typeof window !== 'undefined') {
+        window.localStorage.setItem('mi_beta_auth_token', j.sessionToken);
+      }
+      res = await fetch(url, withAuth());
+    }
+  } catch {
+    /* fall through with the original 401 */
+  }
+  return res;
+}

@@ -23,6 +23,7 @@ import { useCallback, useEffect, useState } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
 import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
+import { authedFetch } from '../authHeaders';
 
 interface LaborCategory {
   category: string;
@@ -86,7 +87,7 @@ export default function PricingIntelPanel({ email, tier }: Props) {
   // can run the report on their primary code with a single click.
   useEffect(() => {
     if (!email) return;
-    fetch(`/api/app/workspace?email=${encodeURIComponent(email)}`)
+    authedFetch(`/api/app/workspace?email=${encodeURIComponent(email)}`, email)
       .then(r => r.ok ? r.json() : null)
       .then(profile => {
         const first = profile?.user?.naics_codes?.[0] || profile?.profile?.naics_codes?.[0];

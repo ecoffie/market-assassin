@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { authedFetch } from '../authHeaders';
 
 /**
  * MarketCoverageBanner (#59) — teaches the user how big their market really is and
@@ -37,7 +38,7 @@ export default function MarketCoverageBanner({ coverage, email }: { coverage: Ma
     if (!email || keywords.length === 0) return;
     setAdding(true);
     try {
-      await fetch('/api/app/keywords/add', {
+      await authedFetch('/api/app/keywords/add', email, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, keywords }),

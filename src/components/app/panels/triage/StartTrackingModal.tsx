@@ -30,6 +30,7 @@
  */
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { authedFetch } from '../../authHeaders';
 
 // Mirrors the AgencyTableRow shape from MarketResearchPanel. We accept
 // a loose subset here so the modal stays decoupled from the parent's
@@ -114,7 +115,7 @@ export default function StartTrackingModal({
     setError(null);
 
     try {
-      const res = await fetch('/api/app/triage', {
+      const res = await authedFetch('/api/app/triage', email, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
