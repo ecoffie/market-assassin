@@ -1,16 +1,17 @@
 import { sendEmail } from '@/lib/send-email';
+import { MINDY_DAY, MINDY_DAY_EXTENSION_LABEL } from '@/lib/mindy/mindy-day';
 
 /**
- * Mindy Launch POST-WEBINAR Founders Lifetime offer — sent after the June 27
- * live launch wraps. This is the offer email (pricing lives HERE, never in the
- * pre-event reminders).
+ * Mindy Launch POST-WEBINAR Founders Lifetime offer — sent after the Mindy Day
+ * live launch wraps (see MINDY_DAY for the date). This is the offer email
+ * (pricing lives HERE, never in the pre-event reminders).
  *
  * Grounded in the launch close slide:
  *   - To do what Mindy does → $280,000+/yr (BD data sub + proposal writer +
  *     capture manager + market analyst).
  *   - PRO $149/mo · TEAM $499/mo.
  *   - Founders Lifetime $4,997 → $2,997 because you showed up for Mindy Day
- *     (save $2,000), only 100 seats, ends Saturday June 27. → getmindy.ai/lifetime
+ *     (save $2,000), only 100 seats, ends Saturday July 25. → getmindy.ai/lifetime
  *
  * Sent through the guarded sendEmail() FROM the verified mail.getmindy.ai domain
  * (inbox delivery). NOT transactional (it's promotional), so it respects the
@@ -59,7 +60,7 @@ const PHASE_COPY: Record<LifetimePhase, {
   deal: {
     subject: (n) => `${n}, your Mindy Founders Lifetime deal — ends tonight`,
     badge: 'Mindy Day Founders Deal · Ends tonight',
-    deadlineLine: 'Today only — through tonight, Saturday, June 27.',
+    deadlineLine: `Today only — through tonight, ${MINDY_DAY.dateLabel.replace(', 2026', '')}.`,
     intro: (n) =>
       P(`${n} — thanks for being there today.`) +
       P(`To do by hand what Mindy does &mdash; a market analyst, a capture manager, a proposal writer, a BD-data subscription &mdash; runs <strong style="color:#0f172a;">$280,000+ a year</strong>. Mindy is <strong style="color:#0f172a;">$149/month</strong>.`) +
@@ -70,7 +71,7 @@ const PHASE_COPY: Record<LifetimePhase, {
   lastcall: {
     subject: (n) => `${n}, one worry stopping you? (it's risk-free)`,
     badge: 'Risk-Free · Ends at midnight tonight',
-    deadlineLine: 'Founders price ends at midnight tonight, June 27.',
+    deadlineLine: `Founders price ends at midnight tonight, ${MINDY_DAY.shortDate}.`,
     intro: (n) =>
       P(`${n} &mdash; if you&rsquo;re on the fence about the Founders Lifetime, it&rsquo;s almost always the same worry: &ldquo;will it actually work for <em>my</em> business?&rdquo;`) +
       P(`So let&rsquo;s take the risk off the table completely:`) +
@@ -82,7 +83,7 @@ const PHASE_COPY: Record<LifetimePhase, {
   extension: {
     subject: (n) => `${n}, here are your Mindy Launch slides`,
     badge: 'Your Slides · Lifetime extended',
-    deadlineLine: 'Founders price extended — through tonight (Monday, June 29).',
+    deadlineLine: `Founders price extended — through tonight (${MINDY_DAY_EXTENSION_LABEL}).`,
     intro: (n) =>
       P(`${n} &mdash; thanks again for being part of Mindy Day. As promised, here&rsquo;s the full deck from Saturday &mdash; every slide, yours to keep:`) +
       slidesCardHtml +
@@ -94,7 +95,7 @@ const PHASE_COPY: Record<LifetimePhase, {
   finalclose: {
     subject: (n) => `Final hours, ${n} — lifetime closes tonight`,
     badge: 'Final hours · Closes at midnight',
-    deadlineLine: 'Closes for good at midnight tonight (Monday, June 29).',
+    deadlineLine: `Closes for good at midnight tonight (${MINDY_DAY_EXTENSION_LABEL}).`,
     intro: (n) =>
       P(`${n} &mdash; last call, for real this time.`) +
       P(`After tonight, lifetime goes away and Mindy is monthly only. At $149/mo you&rsquo;d pass $2,997 in about 20 months &mdash; and never stop paying. Lock it in once, tonight, and you&rsquo;re done:`),

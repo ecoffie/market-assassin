@@ -1,7 +1,8 @@
 import { sendEmail } from '@/lib/send-email';
+import { MINDY_DAY } from '@/lib/mindy/mindy-day';
 
 /**
- * Mindy Free Live Launch confirmation — Saturday, June 27, 2026, 10 AM–4 PM ET.
+ * Mindy Free Live Launch confirmation — see MINDY_DAY for the current date/time.
  *
  * Sent through the GUARDED sendEmail() (Resend → Office365 fallback) FROM the
  * Resend-verified mail.getmindy.ai domain so it actually lands in the inbox. NOTE:
@@ -36,11 +37,11 @@ export async function sendMindyLaunchConfirmationEmail(params: {
   const zoomMeetingId = '892 8050 6481';
   const zoomPasscode = '206225';
 
-  // Google Calendar add-event link (June 27, 2026, 10:00 AM–1:00 PM EDT = 14:00–17:00 UTC)
+  // Google Calendar add-event link (date/times from MINDY_DAY)
   const calendarUrl =
     'https://www.google.com/calendar/render?action=TEMPLATE' +
     '&text=' + encodeURIComponent('Mindy Free Live Launch — GovCon Giants') +
-    '&dates=20260627T140000Z/20260627T170000Z' +
+    '&dates=' + MINDY_DAY.calendarDates +
     '&details=' + encodeURIComponent(`Free live working session: build your own federal market map with Mindy on real government data. Demo + hands-on workshops + lifetime recording + free Mindy account.\n\nJoin Zoom: ${zoomUrl}\nMeeting ID: ${zoomMeetingId} · Passcode: ${zoomPasscode}\n\nDetails: ${eventUrl}`) +
     '&location=' + encodeURIComponent(zoomUrl);
 
@@ -77,7 +78,7 @@ export async function sendMindyLaunchConfirmationEmail(params: {
                 You&rsquo;re Registered
               </div>
               <h1 style="color: #ffffff; font-size: 30px; line-height: 1.2; font-weight: 800; margin: 0 0 12px;">
-                See You June 27, ${firstName}!
+                See You ${MINDY_DAY.shortDate}, ${firstName}!
               </h1>
               <p style="color: #ddd6fe; font-size: 16px; margin: 0;">
                 The <strong style="color: #ffffff;">Mindy</strong> Free Live Launch
@@ -95,7 +96,7 @@ export async function sendMindyLaunchConfirmationEmail(params: {
                       Save the Date
                     </p>
                     <p style="color: #1e293b; font-size: 22px; font-weight: 800; margin: 0 0 4px;">
-                      Saturday, June 27, 2026
+                      ${MINDY_DAY.dateLabel}
                     </p>
                     <p style="color: #475569; font-size: 16px; margin: 0 0 16px;">
                       10:00 AM &ndash; 1:00 PM ET <span style="color: #94a3b8; font-size: 14px;">(live working session)</span>
@@ -240,7 +241,7 @@ export async function sendMindyLaunchConfirmationEmail(params: {
 </body>
 </html>`;
 
-  const subject = `${firstName}, you're registered — Mindy Launch, Sat June 27 (10 AM ET)`;
+  const subject = `${firstName}, you're registered — Mindy Launch, Sat ${MINDY_DAY.shortDate} (10 AM ET)`;
 
   return sendEmail({
     to: params.to,

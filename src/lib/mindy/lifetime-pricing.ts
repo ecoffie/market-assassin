@@ -8,6 +8,7 @@
  *   - Founders Lifetime ($4,997) — public anchor, capped at 100 seats
  *   - Bootcamp alumni ($2,997) — private post-bootcamp email only, not homepage
  */
+import { MINDY_DAY } from '@/lib/mindy/mindy-day';
 
 export const PRO_MONTHLY = 149;
 export const PRO_ANNUAL = 1490;
@@ -20,7 +21,8 @@ export const FOUNDERS_LIFETIME_CAP = 100;
 /** Bootcamp alumni rate — email-only; do not hero on /lifetime or funnels. */
 export const BOOTCAMP_LIFETIME_PRICE = 2997;
 export const BOOTCAMP_LIFETIME_CENTS = 299700;
-export const BOOTCAMP_LIFETIME_DEADLINE_ISO = '2026-06-27';
+/** Founders-rate deadline = Mindy Day (offer ends the night of the event). */
+export const BOOTCAMP_LIFETIME_DEADLINE_ISO = MINDY_DAY.iso;
 
 export function bootcampDeadlineLabel(): string {
   const d = new Date(`${BOOTCAMP_LIFETIME_DEADLINE_ISO}T23:59:59-05:00`);

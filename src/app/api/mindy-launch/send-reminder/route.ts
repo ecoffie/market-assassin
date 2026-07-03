@@ -1,7 +1,7 @@
 /**
  * POST /api/mindy-launch/send-reminder
  *
- * Sends a single June 27 Mindy Launch DAY-OF reminder through the guarded Mindy
+ * Sends a single July 25 Mindy Launch DAY-OF reminder through the guarded Mindy
  * sendEmail() path — Resend from the VERIFIED mail.getmindy.ai domain (same sender
  * as the confirmation), so it lands in the inbox. The funnels reminder cron
  * (govcongiants.com /api/cron/mindy-day-reminders) calls this per recipient instead

@@ -13,7 +13,7 @@ import {
  *
  * Post-bootcamp lifetime-offer blast. Sends bootcamp alumni pricing ($2,997 vs
  * public $4,997 Founders) to bootcamp leads only — not advertised on site.
- * (deduped on email_type). One-time campaign — run it after June 27.
+ * (deduped on email_type). One-time campaign — run it after July 25.
  *
  * Skips anyone who already has briefings/Pro access (no point pitching lifetime
  * to a current subscriber/lifetime owner) and the comp/testimonial list.

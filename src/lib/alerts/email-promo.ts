@@ -1,6 +1,7 @@
 import type { AlertProfileFields } from '@/lib/alerts/profile-setup';
 import { userNeedsMindySetup } from '@/lib/alerts/profile-setup';
 import { MINDY_APP_URL } from '@/lib/mindy/email-branding';
+import { MINDY_DAY } from '@/lib/mindy/mindy-day';
 
 /**
  * Sales angles from docs/MARKETING-FEATURE-LITERATURE.md — §1, §11, §12, §20.
@@ -27,10 +28,11 @@ export const ALERT_MARKETING = {
   dataGrounded: 'Every match grounded in USASpending + SAM — not generic AI.',
 } as const;
 
-/** Live GovCon Giants bootcamp — §29 MARKETING-FEATURE-LITERATURE */
+/** Live GovCon Giants bootcamp — §29 MARKETING-FEATURE-LITERATURE.
+ *  Date fields come from MINDY_DAY (src/lib/mindy/mindy-day.ts). */
 export const ALERT_BOOTCAMP = {
-  dateLabel: 'Saturday, June 27, 2026',
-  shortDate: 'June 27',
+  dateLabel: MINDY_DAY.dateLabel,
+  shortDate: MINDY_DAY.shortDate,
   title: 'Mindy Day',
   tagline:
     'Watch Mindy find real federal contracts, live — the product unveil. See it work before you configure a thing.',
