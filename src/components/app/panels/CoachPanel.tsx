@@ -72,13 +72,17 @@ export default function CoachPanel({
   // full-page loading state (which blanks the whole panel to "Loading clients…").
   // Only the first mount uses the full-page loader. Search/page updates just show a
   // small inline spinner so the list doesn't flash away on every keystroke.
+  // Load a large page so a typical org's whole roster is in memory → search filters
+  // INSTANTLY client-side (no per-keystroke round-trip). Server search/pagination is
+  // the safety net for orgs bigger than this.
+  const PAGE_SIZE = 200;
   const load = useCallback(async (opts?: { search?: string; page?: number; quiet?: boolean }) => {
     if (!email) return;
     if (opts?.quiet) setListLoading(true); else setLoading(true);
     const s = opts?.search ?? '';
     const p = opts?.page ?? 0;
     try {
-      const params = new URLSearchParams({ email, page: String(p), pageSize: '25' });
+      const params = new URLSearchParams({ email, page: String(p), pageSize: String(PAGE_SIZE) });
       if (s.trim()) params.set('search', s.trim());
       const res = await fetch(`/api/app/coach?${params.toString()}`, { headers: headers() });
       const d = await res.json();
@@ -98,17 +102,20 @@ export default function CoachPanel({
   useEffect(() => { load({ page: 0 }); }, [load]);
   useEffect(() => { setActiveWs(getActiveWorkspace() || ''); }, []);
 
-  // Debounced search: refetch 350ms after the user stops typing, resetting to page
-  // 0, WITHOUT the full-page loader (quiet). Skips the very first render so it
-  // doesn't double-fire alongside the initial load above.
+  // Search behavior:
+  //  - When the whole roster is loaded (total <= PAGE_SIZE), filtering is CLIENT-SIDE
+  //    and instant (see visibleClients below) — no server call, no lag.
+  //  - Only when the org is bigger than one page do we debounce a SERVER search.
+  const serverSearchNeeded = !!pagination && pagination.total > PAGE_SIZE;
   useEffect(() => {
     if (!didMountRef.current) { didMountRef.current = true; return; }
+    if (!serverSearchNeeded) return;  // small org → instant client-side filter, skip server
     const t = setTimeout(() => {
       setPage(0);
       load({ search, page: 0, quiet: true });
-    }, 350);
+    }, 250);
     return () => clearTimeout(t);
-  }, [search, load]);
+  }, [search, load, serverSearchNeeded]);
 
   const goApp = (panel?: AppPanel) => {
     window.location.href = panel && panel !== 'dashboard' ? `/app?panel=${panel}` : '/app';
@@ -279,6 +286,15 @@ export default function CoachPanel({
 
   const activeClient = clients.find(c => c.workspaceId === activeWs);
 
+  // Client-side filter for the common (small-org) case → instant, no lag. For a
+  // big org the server already returned the matching page, so `clients` is already
+  // filtered and this is a no-op passthrough.
+  const q = search.trim().toLowerCase();
+  const visibleClients = (serverSearchNeeded || !q)
+    ? clients
+    : clients.filter(c => c.businessName.toLowerCase().includes(q));
+  const matchCount = serverSearchNeeded ? (pagination?.total ?? 0) : visibleClients.length;
+
   return (
     <div className="mx-auto max-w-5xl p-6 md:p-8">
       <header className="mb-8">
@@ -305,18 +321,18 @@ export default function CoachPanel({
         </div>
         {pagination && (
           <p className="text-xs text-slate-500">
-            {pagination.total} client{pagination.total === 1 ? '' : 's'}{search.trim() ? ' matching' : ' total'}
+            {matchCount} client{matchCount === 1 ? '' : 's'}{q ? ' matching' : ' total'}
           </p>
         )}
       </div>
 
       <div className="space-y-4">
-        {clients.length === 0 && (
+        {visibleClients.length === 0 && (
           <p className="rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-6 text-center text-sm text-slate-500">
-            {search.trim() ? `No clients matching “${search.trim()}”.` : 'No clients yet — add one or import a roster below.'}
+            {q ? `No clients matching “${search.trim()}”.` : 'No clients yet — add one or import a roster below.'}
           </p>
         )}
-        {clients.map(c => {
+        {visibleClients.map(c => {
           const isActive = activeWs === c.workspaceId;
           const stats = profileStats(c);
           return (
@@ -398,8 +414,9 @@ export default function CoachPanel({
         })}
       </div>
 
-      {/* Pagination — only when there's more than one page. */}
-      {pagination && pagination.totalPages > 1 && (
+      {/* Pagination — only for big orgs (server-paginated). Small orgs load the
+          whole roster and filter client-side, so paging doesn't apply. */}
+      {serverSearchNeeded && pagination && pagination.totalPages > 1 && (
         <div className="mt-4 flex items-center justify-center gap-3 text-sm">
           <button
             type="button"
