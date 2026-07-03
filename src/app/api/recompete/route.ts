@@ -137,9 +137,9 @@ async function computeRecompeteStatsFromTable(supabase: any) {
     // Same self-heal as the main path: try WITH the quality_flag filter, fall back
     // to WITHOUT it if the column is missing (else stats silently returned all-zeros).
     let { data, error } = await statsBase().is('quality_flag', null);
-    if (error && /quality_flag/.test(error.message || '') && /column|does not exist/i.test(error.message || '')) {
-      ({ data, error } = await statsBase());
-    }
+    // Non-essential filter — retry without it on ANY error (usually the missing
+    // quality_flag column pre-migration) so stats don't silently return all-zeros.
+    if (error) ({ data, error } = await statsBase());
     if (error || !data) return empty;
     const end6 = plusMonths(6);
     const end12 = plusMonths(12);
@@ -356,14 +356,16 @@ export async function GET(request: NextRequest) {
     return { rows, error: null };
   }
 
-  const isMissingQualityFlag = (e: { message?: string } | null) =>
-    !!e?.message && /quality_flag/.test(e.message) && /column|does not exist/i.test(e.message);
-
   let { rows: allFiltered, error } = await fetchAllFiltered(true);
-  // If quality_flag doesn't exist yet (migration 20260619 not run here), retry WITHOUT
-  // it instead of 500ing → live data still flows; the quarantine just isn't applied.
-  if (error && isMissingQualityFlag(error)) {
-    console.warn('[recompete] quality_flag column missing — serving unfiltered (run migration 20260619).');
+  // The quality_flag quarantine is NON-ESSENTIAL — if the filtered query errors for
+  // ANY reason (most commonly: migration 20260619 hasn't run so the column is
+  // missing), retry WITHOUT it rather than 500ing the whole panel into a silent
+  // static-file fallback. Losing the filter just means corrupt-value rows aren't
+  // hidden; the live data still flows. (Detecting the exact PostgREST message across
+  // versions is brittle, so we retry on any error and only surface a 500 if the
+  // unfiltered query ALSO fails — a genuine table/connection problem.)
+  if (error) {
+    console.warn('[recompete] filtered query failed — retrying without quality_flag:', error.message);
     ({ rows: allFiltered, error } = await fetchAllFiltered(false));
   }
   const contracts = allFiltered; // (kept name for the rest of the handler)
