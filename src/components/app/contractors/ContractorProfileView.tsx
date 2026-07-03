@@ -107,8 +107,16 @@ export default function ContractorProfileView({
     if (series.length === 0) return [];
     const byYear = new Map(series.map(y => [y.fiscalYear, y]));
     const maxYear = Math.max(...series.map(y => y.fiscalYear));
-    const minData = Math.min(...series.map(y => y.fiscalYear));
-    const startYear = Math.min(minData, maxYear - 9);
+    // Window = the first year with ACTUAL sales through maxYear, capped to a
+    // 10-year span. A single stray old award used to drag in a decade of dead
+    // $0 bars (Lockheed: one 2008 award → nine empty years) that made the chart
+    // look broken and buried the real recent ramp. Taking the LATER of
+    // first-real-year and (maxYear-9) both trims those leading zeros AND caps an
+    // over-long axis, while a genuinely recent contractor just shows its real
+    // (shorter) span rather than being padded back out with zeros.
+    const realYears = series.filter(y => y.totalObligations > 0).map(y => y.fiscalYear);
+    const firstRealYear = realYears.length ? Math.min(...realYears) : maxYear - 9;
+    const startYear = Math.max(firstRealYear, maxYear - 9);
     const out: typeof series = [];
     for (let y = startYear; y <= maxYear; y++) {
       out.push(byYear.get(y) ?? { fiscalYear: y, totalObligations: 0, awardCount: 0, agencyBreakdown: [] });
