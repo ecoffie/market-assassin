@@ -13,7 +13,7 @@
  * fetches the gaps).
  */
 import { useState, useEffect, useCallback } from 'react';
-import { getMIApiHeaders } from '@/components/app/authHeaders';
+import { authedFetch } from '@/components/app/authHeaders';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
 
 export interface AwardDetailData {
@@ -60,8 +60,8 @@ export default function AwardDetailDrawer({
     if (!q) { setState('error'); return; }
     setState('loading');
     try {
-      const res = await fetch(`/api/app/award-detail?${q}`, { headers: getMIApiHeaders(email) });
-      const data = await res.json();
+      const res = await authedFetch(`/api/app/award-detail?${q}`, email);
+      const data = await res.json().catch(() => null);
       setState(data?.success ? (data.detail as AwardDetailData) : 'error');
     } catch {
       setState('error');
@@ -76,8 +76,8 @@ export default function AwardDetailDrawer({
   if (state === 'error') {
     return (
       <div className={`rounded-lg border border-slate-700 bg-slate-950/50 p-3 text-xs text-slate-500 ${className}`}>
-        Live award detail isn’t available for this record.
-        {fallbackUrl && <> <a href={fallbackUrl} target="_blank" rel="noreferrer" className="text-amber-400 hover:text-amber-300">View on USASpending ↗</a></>}
+        Live spend detail isn’t on file for this award number.
+        {fallbackUrl && <> <a href={fallbackUrl} target="_blank" rel="noreferrer" className="text-amber-400 hover:text-amber-300" onClick={(e) => e.stopPropagation()}>Look it up on USASpending ↗</a></>}
       </div>
     );
   }

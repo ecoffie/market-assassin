@@ -127,13 +127,19 @@ async function computeRecompeteStatsFromTable(supabase: any) {
     const plusMonths = (n: number) => { const d = new Date(now); d.setMonth(d.getMonth() + n); return iso(d); };
     const today = iso(now);
     const end18 = plusMonths(18);
-    const { data, error } = await supabase
+    const statsCols = 'potential_total_value, recompete_likelihood, awarding_agency, incumbent_name, naics_code, period_of_performance_current_end';
+    const statsBase = () => supabase
       .from('recompete_opportunities')
-      .select('potential_total_value, recompete_likelihood, awarding_agency, incumbent_name, naics_code, period_of_performance_current_end')
+      .select(statsCols)
       .gt('period_of_performance_current_end', today)
       .lte('period_of_performance_current_end', end18)
-      .is('quality_flag', null)
       .limit(20000);
+    // Same self-heal as the main path: try WITH the quality_flag filter, fall back
+    // to WITHOUT it if the column is missing (else stats silently returned all-zeros).
+    let { data, error } = await statsBase().is('quality_flag', null);
+    if (error && /quality_flag/.test(error.message || '') && /column|does not exist/i.test(error.message || '')) {
+      ({ data, error } = await statsBase());
+    }
     if (error || !data) return empty;
     const end6 = plusMonths(6);
     const end12 = plusMonths(12);
@@ -237,7 +243,11 @@ export async function GET(request: NextRequest) {
   // Build a freshly-filtered query each call — lets us PAGE (PostgREST caps each
   // response at 1000) without reusing a consumed builder. All filters below are
   // applied inside; the caller adds .order()/.range().
-  function buildBaseQuery() {
+  // applyQualityFilter: apply the quality_flag quarantine only when the column
+  // exists. If migration 20260619 hasn't run in this environment, the filter would
+  // 500 the WHOLE query (column does not exist) → the panel silently falls back to
+  // stale static data. So we make it optional + self-healing (see the retry below).
+  function buildBaseQuery(applyQualityFilter = true) {
   let query = supabase
     .from('recompete_opportunities')
     .select('*');
@@ -245,11 +255,12 @@ export async function GET(request: NextRequest) {
   // Filter: contracts expiring in the future
   query = query
     .gt('period_of_performance_current_end', new Date().toISOString().split('T')[0])
-    .lte('period_of_performance_current_end', maxDate.toISOString().split('T')[0])
-    // Data-quality quarantine: hide rows flagged with corrupt values (implausible
-    // $2.8T / round-number placeholders) — they'd sort to the top of the value view
-    // and look fake on stage. Reversible; nothing deleted. (migration 20260619)
-    .is('quality_flag', null);
+    .lte('period_of_performance_current_end', maxDate.toISOString().split('T')[0]);
+
+  // Data-quality quarantine: hide rows flagged with corrupt values (implausible
+  // $2.8T / round-number placeholders) — they'd sort to the top of the value view
+  // and look fake on stage. Reversible; nothing deleted. (migration 20260619)
+  if (applyQualityFilter) query = query.is('quality_flag', null);
 
   // NAICS filter
   if (naicsParam) {
@@ -326,18 +337,34 @@ export async function GET(request: NextRequest) {
   // PAGE THROUGH the filtered set (up to a safe cap), then group + slice. The
   // filtered set (after NAICS/agency/value) is normally well under this cap.
   const GROUP_FETCH_CAP = 6000;
+
+  // Page through the filtered set with self-healing on a missing quality_flag column.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const allFiltered: any[] = [];
-  let error: { message?: string } | null = null;
-  // Page through (PostgREST caps each response at 1000). A fresh builder per page
-  // (buildBaseQuery) avoids reusing a consumed query object.
-  for (let from = 0; from < GROUP_FETCH_CAP; from += 1000) {
-    const pageQuery = buildBaseQuery().order(sortField, { ascending: orderParam === 'asc' }).range(from, from + 999);
-    const { data: chunk, error: chunkErr } = await pageQuery;
-    if (chunkErr) { error = chunkErr; break; }
-    if (!chunk || chunk.length === 0) break;
-    allFiltered.push(...chunk);
-    if (chunk.length < 1000) break;
+  async function fetchAllFiltered(applyQualityFilter: boolean): Promise<{ rows: any[]; error: { message?: string } | null }> {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const rows: any[] = [];
+    for (let from = 0; from < GROUP_FETCH_CAP; from += 1000) {
+      const pageQuery = buildBaseQuery(applyQualityFilter)
+        .order(sortField, { ascending: orderParam === 'asc' })
+        .range(from, from + 999);
+      const { data: chunk, error: chunkErr } = await pageQuery;
+      if (chunkErr) return { rows, error: chunkErr };
+      if (!chunk || chunk.length === 0) break;
+      rows.push(...chunk);
+      if (chunk.length < 1000) break;
+    }
+    return { rows, error: null };
+  }
+
+  const isMissingQualityFlag = (e: { message?: string } | null) =>
+    !!e?.message && /quality_flag/.test(e.message) && /column|does not exist/i.test(e.message);
+
+  let { rows: allFiltered, error } = await fetchAllFiltered(true);
+  // If quality_flag doesn't exist yet (migration 20260619 not run here), retry WITHOUT
+  // it instead of 500ing → live data still flows; the quarantine just isn't applied.
+  if (error && isMissingQualityFlag(error)) {
+    console.warn('[recompete] quality_flag column missing — serving unfiltered (run migration 20260619).');
+    ({ rows: allFiltered, error } = await fetchAllFiltered(false));
   }
   const contracts = allFiltered; // (kept name for the rest of the handler)
 

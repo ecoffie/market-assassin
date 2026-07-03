@@ -27,6 +27,8 @@ interface ExpiringContract {
   naics: string;
   value: number;
   potentialValue: number;
+  obligated: number;          // spent-to-date (total_obligation) — how much they've actually used
+  startDate: string;          // period_of_performance_start — when the incumbent's term began
   expirationDate: string;
   daysUntilExpiration: number;
   bidsReceived: number;
@@ -95,6 +97,7 @@ interface RecompeteApiContract {
   description?: string | null;
   total_obligation?: number | null;
   potential_total_value?: number | null;
+  period_of_performance_start?: string | null;
   period_of_performance_current_end?: string | null;
   place_of_performance_city?: string | null;
   place_of_performance_state?: string | null;
@@ -223,6 +226,8 @@ function mapStaticContract(contract: StaticRecompeteContract): ExpiringContract 
     naics,
     value,
     potentialValue: value,
+    obligated: value,           // static file only has one value; treat as obligated
+    startDate: parseStaticDate(contract['Start Date']),
     expirationDate,
     daysUntilExpiration: getDaysUntil(expirationDate),
     bidsReceived: 0,
@@ -256,6 +261,8 @@ function mapRecompeteContract(contract: RecompeteApiContract): ExpiringContract 
     naics: contract.naics_code || '',
     value: contract.total_obligation || 0,
     potentialValue: contract.potential_total_value || contract.total_obligation || 0,
+    obligated: contract.total_obligation || 0,
+    startDate: contract.period_of_performance_start || '',
     expirationDate,
     daysUntilExpiration: getDaysUntil(expirationDate),
     bidsReceived: contract.number_of_offers || 0,
@@ -1059,7 +1066,20 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
               const isExpanded = expandedContracts.has(contract.piid);
 
               return (
-                <div key={contract.piid} className={`p-5 hover:bg-slate-800/50 transition-colors ${contract.daysUntilExpiration <= 90 ? 'bg-red-500/5' : ''}`}>
+                // Whole card is the click target (Eric: "the box isn't clickable,
+                // only the words"). Interactive children (incumbent link, Track,
+                // the Details button) stopPropagation so they still act on their own.
+                <div
+                  key={contract.piid}
+                  role="button"
+                  tabIndex={0}
+                  aria-expanded={isExpanded}
+                  onClick={() => toggleExpandedContract(contract.piid)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpandedContract(contract.piid); }
+                  }}
+                  className={`cursor-pointer p-5 transition-colors hover:bg-slate-800/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 ${contract.daysUntilExpiration <= 90 ? 'bg-red-500/5' : ''}`}
+                >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       {/* Badges */}
@@ -1078,20 +1098,16 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                         )}
                       </div>
 
-                      {/* Title */}
-                      <button
-                        type="button"
-                        onClick={() => toggleExpandedContract(contract.piid)}
-                        className="group mb-1 flex w-full items-start gap-2 text-left"
-                        aria-expanded={isExpanded}
-                      >
+                      {/* Title — the whole card toggles now, so this is just the
+                          visual affordance (no nested button inside a clickable card). */}
+                      <div className="group mb-1 flex w-full items-start gap-2">
                         <h4 className="text-white font-medium line-clamp-2 group-hover:text-amber-200">
                           {contract.title || 'Contract'}
                         </h4>
                         <span className="mt-0.5 shrink-0 text-xs font-medium text-amber-300 group-hover:text-amber-200">
-                          {isExpanded ? 'Hide details' : 'Details'}
+                          {isExpanded ? 'Hide details ▲' : 'Details ▼'}
                         </span>
-                      </button>
+                      </div>
 
                       {/* Agency + decoded contracting office (DoDAAC, DoD only) */}
                       <p className="text-slate-400 text-sm mb-1">
@@ -1104,7 +1120,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
 
                       {/* Incumbent — clickable to open YoY award history */}
                       {contract.incumbent?.name && (
-                        <div className="flex items-center gap-1.5 mb-2">
+                        <div className="flex items-center gap-1.5 mb-2" onClick={(e) => e.stopPropagation()}>
                           <span className="text-xs text-amber-500">
                             {contract.isMultiAward ? 'Lead incumbent:' : 'Incumbent:'}
                           </span>
@@ -1167,17 +1183,33 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                       </div>
                     </div>
 
-                    {/* Value & Dates */}
-                    <div className="text-right shrink-0 min-w-[150px] flex flex-col items-end">
-                      <div className="text-lg font-bold text-emerald-400">{formatCurrency(contract.value)}</div>
-                      <div className="text-xs text-slate-500">Contract Value</div>
-                      <div className="text-sm font-medium text-white mt-2">
+                    {/* Value & Dates — headline ceiling, then spent-to-date and the
+                        FULL term (start → expiry) so you can judge how much of the
+                        contract the incumbent has actually used and for how long. */}
+                    <div className="text-right shrink-0 min-w-[168px] flex flex-col items-end">
+                      <div className="text-lg font-bold text-emerald-400">{formatCurrency(contract.potentialValue || contract.value)}</div>
+                      <div className="text-xs text-slate-500">Contract ceiling</div>
+                      {/* Spent-to-date: only show when we have a real, distinct obligated figure. */}
+                      {contract.obligated > 0 && contract.potentialValue > 0 && contract.obligated < contract.potentialValue && (
+                        <div className="mt-1 text-xs text-slate-400">
+                          <span className="text-slate-200 font-medium">{formatCurrency(contract.obligated)}</span> spent
+                          <span className="text-slate-600"> · {Math.round((contract.obligated / contract.potentialValue) * 100)}% used</span>
+                        </div>
+                      )}
+                      <div className="mt-2 text-sm font-medium text-white">
+                        {contract.startDate ? (
+                          <>Started {formatDate(contract.startDate)}</>
+                        ) : (
+                          <span className="text-slate-500">Start date —</span>
+                        )}
+                      </div>
+                      <div className="text-sm font-medium text-white">
                         Expires {formatDate(contract.expirationDate)}
                       </div>
                       <div className={`text-xs mt-1 ${urgency.text}`}>
                         {contract.daysUntilExpiration} days left
                       </div>
-                      <div className="mt-3 flex flex-col items-end gap-1">
+                      <div className="mt-3 flex flex-col items-end gap-1" onClick={(e) => e.stopPropagation()}>
                         <div className="text-[11px] uppercase tracking-wider text-slate-600">Add to My Pursuits</div>
                         <SaveToPipelineButton
                           opportunity={{
@@ -1198,7 +1230,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                   </div>
 
                   {isExpanded && (
-                    <div className="mt-5 rounded-xl border border-slate-700 bg-slate-950/50 p-4">
+                    <div className="mt-5 rounded-xl border border-slate-700 bg-slate-950/50 p-4" onClick={(e) => e.stopPropagation()}>
                       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
                         <div>
                           <h5 className="text-sm font-semibold text-white">Overview</h5>
