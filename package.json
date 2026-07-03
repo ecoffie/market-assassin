@@ -24,7 +24,11 @@
     "rag:repair:dry-run": "node scripts/repair-rag-corpus.js",
     "rag:repair:apply": "node scripts/repair-rag-corpus.js --apply",
     "rag:templates:dry-run": "node scripts/ingest-proposal-template-corpus.js",
-    "rag:templates:apply": "node scripts/ingest-proposal-template-corpus.js --apply"
+    "rag:templates:apply": "node scripts/ingest-proposal-template-corpus.js --apply",
+    "hooks:install": "git config core.hooksPath .githooks",
+    "prepush": "bash .githooks/pre-push",
+    "audit:client-auth": "node scripts/audit-client-auth.mjs",
+    "prepare": "git config core.hooksPath .githooks || true"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

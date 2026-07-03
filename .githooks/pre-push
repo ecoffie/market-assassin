@@ -1,0 +1,54 @@
+#!/usr/bin/env bash
+#
+# Pre-push safety gate. HARD-BLOCKS a push when the build would break or a new
+# unauthenticated gated fetch slips in — the two failure classes that reached
+# prod this week (a broken `getMIApiHeaders` deploy + the "Missing two-factor
+# session" auth-header class). Slower/flakier checks WARN but never block.
+#
+# Enabled via `core.hooksPath=.githooks` (set by `npm run hooks:install`, and
+# auto-run on `npm install` via the prepare script). Bypass in a real emergency
+# with `git push --no-verify` (use sparingly — it exists for genuine hotfixes).
+
+set -uo pipefail
+ROOT="$(cd "$(dirname "$0")/.." && pwd)"
+cd "$ROOT"
+
+BOLD='\033[1m'; RED='\033[0;31m'; GREEN='\033[0;32m'; YEL='\033[0;33m'; NC='\033[0m'
+fail=0
+
+echo -e "${BOLD}── pre-push gate ──${NC}"
+
+# 1) HARD BLOCK: TypeScript must compile. (Would have blocked today's Error deploy.)
+echo -e "  ${BOLD}1/3${NC} typecheck (tsc --noEmit)…"
+if npx tsc --noEmit > /tmp/mindy-prepush-tsc.log 2>&1; then
+  echo -e "      ${GREEN}✓ typecheck clean${NC}"
+else
+  echo -e "      ${RED}✗ typecheck FAILED — push blocked${NC}"
+  grep "error TS" /tmp/mindy-prepush-tsc.log | head -15 | sed 's/^/        /'
+  fail=1
+fi
+
+# 2) HARD BLOCK: no NEW unauthenticated fetch to a 2FA-gated /api/app route.
+echo -e "  ${BOLD}2/3${NC} client auth-header audit…"
+if node scripts/audit-client-auth.mjs > /tmp/mindy-prepush-auth.log 2>&1; then
+  echo -e "      ${GREEN}✓ no new unauthenticated gated fetches${NC}"
+else
+  echo -e "      ${RED}✗ new unauthenticated gated fetch — push blocked${NC}"
+  cat /tmp/mindy-prepush-auth.log | sed 's/^/        /'
+  fail=1
+fi
+
+# 3) WARN ONLY: schema-sync drift (slower, can lag DB; never blocks a hotfix).
+echo -e "  ${BOLD}3/3${NC} schema-sync (warn only)…"
+if npm run --silent test:schema > /tmp/mindy-prepush-schema.log 2>&1; then
+  echo -e "      ${GREEN}✓ schema in sync${NC}"
+else
+  echo -e "      ${YEL}⚠ schema-sync reported drift (not blocking — review /tmp/mindy-prepush-schema.log)${NC}"
+fi
+
+if [ "$fail" -ne 0 ]; then
+  echo -e "${RED}${BOLD}✗ push blocked by pre-push gate.${NC} Fix the above, or \`git push --no-verify\` for a genuine emergency."
+  exit 1
+fi
+echo -e "${GREEN}${BOLD}✓ pre-push gate passed.${NC}"
+exit 0
