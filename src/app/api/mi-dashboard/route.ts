@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { samHtmlToText, looksLikeHtml } from '@/lib/sam/description-text';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
+import { saveSnapshot, readSnapshot, freshMeta, degradedMeta } from '@/lib/resilience/last-good';
 
 // Lazy initialization to avoid build-time errors
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -202,6 +203,14 @@ export async function GET(request: NextRequest) {
   const limit = parseInt(searchParams.get('limit') || '50');
   const mode = searchParams.get('mode') || 'list'; // list | stats | export
   const email = searchParams.get('email')?.toLowerCase().trim() || '';
+
+  // Last-good snapshot key for THIS view. Include EVERY input that changes the
+  // result — crucially `email`, because a coach viewing a client scopes the feed
+  // to that client's profile; a shared key would leak one user's view to another.
+  const snapshotKey = `mi-dashboard:${new URLSearchParams({
+    search, noticeType, agency, urgency, setAside, naics, state, status,
+    page: String(page), limit: String(limit), mode, email,
+  }).toString()}`;
 
   try {
     const supabase = getSupabase();
@@ -651,7 +660,7 @@ export async function GET(request: NextRequest) {
       return true;
     });
 
-    return NextResponse.json({
+    const payload = {
       success: true,
       opportunities: dedupedOpps,
       pagination: {
@@ -661,13 +670,40 @@ export async function GET(request: NextRequest) {
         totalPages: Math.ceil((count || 0) / limit),
       },
       noticeTypeInfo: NOTICE_TYPE_INFO,
-    });
+    };
+
+    // Store this successful list response as the last-good snapshot so a future
+    // outage serves it (see catch). Fire-and-forget — never block the response.
+    saveSnapshot(snapshotKey, payload).catch(() => {});
+
+    return NextResponse.json({ ...payload, ...freshMeta() });
 
   } catch (err) {
     console.error('[mi-dashboard] Error:', err);
+
+    // GRACEFUL DEGRADATION: on a DB outage, serve this view's last SUCCESSFUL
+    // response (from KV, which survives a Supabase outage) with an honest
+    // "as of {time}" banner instead of a 500 + empty panel. Only fall through to
+    // the error when we have NO snapshot yet for this view.
+    const raw = err instanceof Error ? err.message : '';
+    const isUpstreamTimeout = /522|timed out|connection|fetch failed|ECONNRESET|EAI_AGAIN|network/i.test(raw) || raw.trim().startsWith('<');
+    if (isUpstreamTimeout) {
+      const snap = await readSnapshot<Record<string, unknown>>(snapshotKey);
+      if (snap) {
+        return NextResponse.json(
+          { ...snap.data, ...degradedMeta(snap.savedAt) },
+          { status: 200, headers: { 'x-mindy-degraded': '1' } }
+        );
+      }
+    }
+
     return NextResponse.json(
-      { success: false, error: err instanceof Error ? err.message : 'Unknown error' },
-      { status: 500 }
+      {
+        success: false,
+        error: isUpstreamTimeout ? 'The opportunities database is temporarily unavailable. Please try again.' : (err instanceof Error ? err.message : 'Unknown error'),
+        retryable: isUpstreamTimeout,
+      },
+      { status: isUpstreamTimeout ? 503 : 500 }
     );
   }
 }

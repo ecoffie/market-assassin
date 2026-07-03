@@ -7,6 +7,7 @@ import { useAppTracker } from '@/components/app/track';
 import { useToast, ToastHost } from '@/components/app/Toast';
 import { getMIApiHeaders } from '@/components/app/authHeaders';
 import SamAttachmentLinks from '@/components/app/SamAttachmentLinks';
+import StaleDataBanner from '@/components/app/StaleDataBanner';
 import CollapsibleOpportunityDescription from '@/components/app/CollapsibleOpportunityDescription';
 import OpportunityDetailStrip from '@/components/app/OpportunityDetailStrip';
 import TargetingCard from '@/components/app/panels/TargetingCard';
@@ -210,6 +211,8 @@ function MarketIntelDashboard() {
   const [stats, setStats] = useState<DashboardStats | null>(null);
   const [opportunities, setOpportunities] = useState<Opportunity[]>([]);
   const [pagination, setPagination] = useState<Pagination | null>(null);
+  // Graceful degradation: set when mi-dashboard served last-good data in an outage.
+  const [degraded, setDegraded] = useState<{ servedAt: string | null } | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadingOpps, setLoadingOpps] = useState(false);
 
@@ -482,6 +485,9 @@ function MarketIntelDashboard() {
       if (data.success) {
         setOpportunities(data.opportunities);
         setPagination(data.pagination);
+        // Surface the honest "saved data from {time}" banner when the API served
+        // last-good during an outage; clear it once we're back on live data.
+        setDegraded(data._degraded ? { servedAt: data._servedAt ?? null } : null);
       }
     } catch (err) {
       console.error('Failed to fetch opportunities:', err);
@@ -992,6 +998,12 @@ function MarketIntelDashboard() {
             )}
           </form>
         </div>
+
+        <StaleDataBanner
+          degraded={!!degraded}
+          servedAt={degraded?.servedAt}
+          onRetry={() => fetchOpportunities()}
+        />
 
         {/* Results count */}
         {pagination && (

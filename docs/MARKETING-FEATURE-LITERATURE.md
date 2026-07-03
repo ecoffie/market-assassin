@@ -3090,3 +3090,40 @@ rationale — while a FedRAMP cloud-hosting requirement was correctly returned a
 honest gap (no cloud evidence in a construction Vault). Automated grounding eval
 (`npm run eval:evidence-match`) gates predeploy: 4 requirements, 3 grounded matches,
 1 honest gap, 0 fabrications. Typecheck 0.
+
+## Stay-up-during-an-outage: last-good data on the market feeds (2026-07-03)
+
+**What:** When the underlying data service has a hiccup, Mindy's Expiring Contracts
+and Market Dashboard no longer go blank or throw an error. They keep showing your
+most recent results with an honest, timestamped notice — *"Showing saved data from
+2:14 PM today. Live updates are catching up."* — and a Retry button. The moment the
+service recovers, the next load quietly returns to live data and the notice clears.
+You're never staring at a spinner or a broken panel wondering if it's you or us.
+
+**Why:** BD work doesn't stop because a database provider is having a rough hour. A
+counselor mid-demo, or a contractor checking recompetes before a deadline, needs to
+keep moving — and they need to KNOW whether what they're looking at is live or a few
+minutes old, not guess. The mature-SaaS answer is "data behind glass, honestly
+labeled," never a blank wall: show the last good view, tell the truth about its age,
+and recover automatically. The alternative — a 500 error or an empty list — reads as
+"the product is broken" even when the fix is entirely on the infrastructure side.
+
+**How it works:** Every successful load of a market feed is cached as a "last-good"
+snapshot in a store that lives OUTSIDE the primary database (so it survives the exact
+outage it's meant to cover), keyed per filter and per user so no one ever sees another
+account's view. If a later request can't reach the database, the route serves that
+snapshot at a normal 200 with the real capture time attached; the panel renders it and
+shows the timestamped banner. First-ever outage for a brand-new filter (nothing cached
+yet) still fails honestly with a "temporarily unavailable, try again" — no fake data,
+ever. It's the same "be honest about state" discipline as the rest of Mindy.
+
+**SEO angle:** *government contracting software reliability, federal opportunity
+dashboard uptime, GovCon tool outage resilience, always-on contract intelligence.*
+
+**Proof:** `src/lib/resilience/last-good.ts` (Vercel KV + in-memory snapshot, KV
+failures degrade to null and never break the route), wired into `/api/recompete` and
+`/api/mi-dashboard` with a shared `StaleDataBanner` on the Expiring Contracts panel and
+the Market Dashboard. 9 unit tests lock the save/read round-trip, memory→KV fallback
+order, KV-failure-never-throws, and the honest-timestamp envelope; full suite 126/126
+green, typecheck 0. Built in direct response to the 2026-06-30 Supabase multi-region
+compute incident, which had been turning data-backed routes into 500s / 25s timeouts.
