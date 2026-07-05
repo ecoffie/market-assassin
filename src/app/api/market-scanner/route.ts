@@ -31,6 +31,8 @@ import {
   findTeamingPartners,
 } from '@/lib/sam/entity-api';
 
+import { saveSnapshot, readSnapshot, freshMeta, degradedMeta, isUpstreamOutage } from '@/lib/resilience/last-good';
+
 // Types
 interface MarketScannerInput {
   naics: string;
@@ -674,6 +676,15 @@ function getSupabase() {
   }
 }
 
+// Graceful-degradation snapshot key: the 6-question scan is keyed on the
+// NAICS + state that define its result, so an upstream outage (USASpending /
+// SAM / Supabase unreachable) serves the last-good scan (see
+// src/lib/resilience/last-good.ts) instead of an empty panel. Not per-user.
+function marketScannerSnapshotKey(sp: URLSearchParams): string {
+  const parts = ['naics', 'state'].map((k) => `${k}=${(sp.get(k) || '').toUpperCase()}`);
+  return `market-scanner:${parts.join('&')}`;
+}
+
 // Main Handler
 export async function GET(request: NextRequest) {
   const startTime = Date.now();
@@ -746,12 +757,25 @@ export async function GET(request: NextRequest) {
       processingTimeMs: Date.now() - startTime,
     };
 
-    return NextResponse.json({
+    const payload = {
       success: true,
       ...response,
-    });
+    };
+    // Snapshot the successful scan for graceful degradation on the next outage.
+    saveSnapshot(marketScannerSnapshotKey(searchParams), payload).catch(() => {});
+    return NextResponse.json({ ...payload, ...freshMeta() });
   } catch (error) {
     console.error('[Market Scanner Error]', error);
+
+    // If an upstream data source is unreachable (not an app bug), serve the
+    // last-good scan with an "as of {time}" banner instead of a dead panel.
+    if (isUpstreamOutage(error)) {
+      const snap = await readSnapshot<Record<string, unknown>>(marketScannerSnapshotKey(searchParams));
+      if (snap) {
+        return NextResponse.json({ ...snap.data, ...degradedMeta(snap.savedAt) });
+      }
+    }
+
     return NextResponse.json(
       {
         success: false,

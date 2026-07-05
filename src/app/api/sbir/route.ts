@@ -14,6 +14,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { saveSnapshot, readSnapshot, freshMeta, degradedMeta, isUpstreamOutage } from '@/lib/resilience/last-good';
 
 interface NihProject {
   project_num: string;
@@ -58,6 +59,15 @@ const SBIR_CODES = {
 };
 
 const NIH_API = 'https://api.reporter.nih.gov/v2/projects/search';
+
+// Graceful-degradation snapshot key: the main SBIR search result keyed by its
+// query params, so an NIH RePORTER / Supabase outage serves the last-good result
+// (see src/lib/resilience/last-good.ts) instead of an empty panel. Not per-user.
+function sbirSnapshotKey(sp: URLSearchParams): string {
+  const parts = ['keyword', 'agency', 'phase', 'source', 'limit']
+    .map((k) => `${k}=${sp.get(k) || ''}`);
+  return `sbir:${parts.join('&')}`;
+}
 
 function getSupabase() {
   return createClient(
@@ -127,6 +137,11 @@ export async function GET(request: NextRequest) {
     url?: string;
   }[] = [];
 
+  // Track infra outages hit by the inner catches (NIH fetch / Supabase). The
+  // inner handlers swallow errors and continue with partial results, so we
+  // remember whether an outage occurred to decide on last-good fallback below.
+  let upstreamOutage = false;
+
   // Fetch from NIH if requested
   if (source === 'nih' || source === 'all') {
     try {
@@ -191,6 +206,7 @@ export async function GET(request: NextRequest) {
       }
     } catch (error) {
       console.error('[SBIR API] NIH error:', error);
+      if (isUpstreamOutage(error)) upstreamOutage = true;
     }
   }
 
@@ -214,6 +230,7 @@ export async function GET(request: NextRequest) {
 
       const { data, error } = await query;
 
+      if (error && isUpstreamOutage(error)) upstreamOutage = true;
       if (!error && data) {
         for (const opp of data) {
           results.push({
@@ -232,6 +249,7 @@ export async function GET(request: NextRequest) {
       }
     } catch (error) {
       console.error('[SBIR API] Multisite error:', error);
+      if (isUpstreamOutage(error)) upstreamOutage = true;
     }
   }
 
@@ -244,10 +262,23 @@ export async function GET(request: NextRequest) {
     return true;
   });
 
-  return NextResponse.json({
+  const response = {
     success: true,
     count: dedupedResults.length,
     opportunities: dedupedResults.slice(0, limit),
     searchCriteria: { keyword, agency, phase, source, limit },
-  });
+  };
+
+  // If every requested upstream (NIH / Supabase) was down and we produced
+  // nothing, serve the last-good snapshot with an "as of {time}" banner instead
+  // of an empty panel. Otherwise snapshot this success as the new last-good.
+  if (upstreamOutage && dedupedResults.length === 0) {
+    const snap = await readSnapshot<Record<string, unknown>>(sbirSnapshotKey(searchParams));
+    if (snap) {
+      return NextResponse.json({ ...snap.data, ...degradedMeta(snap.savedAt) });
+    }
+  }
+
+  saveSnapshot(sbirSnapshotKey(searchParams), response as Record<string, unknown>).catch(() => {});
+  return NextResponse.json({ ...response, ...freshMeta() });
 }

@@ -3187,3 +3187,30 @@ spot" copy for queued signups. `src/app/api/admin/drain-signup-queue/route.ts`
 replays the queue through the real signup path on recovery (GET=preview count,
 POST=drain, re-queues on transient failure). 9 unit tests (enqueue→drain FIFO, cap,
 KV-failure-never-throws, bad-entry drop); full suite 135/135, typecheck 0.
+
+---
+
+## Infrastructure Resilience — Graceful Degradation + Early Warning (2026-07-05)
+
+**What:** When Mindy's database has a slow moment or an outage, the app now keeps
+working instead of showing a dead page. The eight busiest read screens (forecasts,
+your daily-intel dashboard card, market scanner, SBIR, grants, recompetes, market
+intel, pursuit-change alerts) serve their most recent good data with an honest
+"as of {time}" note, and a new database health-watch alerts the team the moment the
+DB starts to degrade — not hours later.
+
+**Why:** Reliability is a buying signal for a paid workflow tool. GovCon BD doesn't
+stop because a vendor's database hiccuped, and neither should Mindy. A June–July 2026
+platform incident showed the value: the signup-capture layer saved 17 real prospects
+mid-outage, and this work extends that same "never lose the user, never show a dead
+screen" principle across the app's core reads.
+
+**SEO / positioning:** "reliable federal contracting platform", "government
+contracting software uptime" — durability as a differentiator vs. brittle single-tool
+scrapers. Ports cleanly to AWS GovCloud (ElastiCache/RDS) for the FedRAMP path.
+
+**Proof:** 8 read routes serve last-good on an upstream outage (only infra failures
+are masked — real bugs still surface, locked by unit tests); an hourly db-health-watch
+cron alerts on any healthy→degraded→down transition (rate-limited, KV-backed so it
+survives the outage it watches). 153/153 unit tests pass, 0 type errors. Pattern
+mirrors how GovWin/HigherGov-class players run: separate data planes + a monitored DB.

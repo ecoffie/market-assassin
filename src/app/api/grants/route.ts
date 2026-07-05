@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { scoreGrant, type GrantOpportunity } from '@/lib/briefings/pipelines/grants-gov';
+import { saveSnapshot, readSnapshot, freshMeta, degradedMeta, isUpstreamOutage } from '@/lib/resilience/last-good';
 
 // Grants.gov REST API returns totalHits as array of opportunities
 interface GrantsGovOpp {
@@ -77,6 +78,16 @@ interface GrantsGovResponse {
 
 // Grants.gov public REST API
 const GRANTS_GOV_API = 'https://apply07.grants.gov/grantsws/rest/opportunities/search';
+
+// Graceful-degradation snapshot key: the main grants-search result keyed by its
+// query params (incl. email + sort, since relevance ranking is per-user), so a
+// Grants.gov outage serves the last-good result (see
+// src/lib/resilience/last-good.ts) instead of an empty panel.
+function grantsSnapshotKey(sp: URLSearchParams): string {
+  const parts = ['keyword', 'agency', 'category', 'status', 'limit', 'offset', 'email', 'sort']
+    .map((k) => `${k}=${sp.get(k) || ''}`);
+  return `grants:${parts.join('&')}`;
+}
 
 // Common agency codes
 const AGENCY_LIST = [
@@ -180,6 +191,12 @@ export async function GET(request: NextRequest) {
 
     if (!response.ok) {
       console.error('[Grants API] Grants.gov error:', response.status);
+      // Grants.gov itself is down/erroring (upstream outage) — serve the
+      // last-good snapshot with an "as of {time}" banner instead of a dead 502.
+      const snap = await readSnapshot<Record<string, unknown>>(grantsSnapshotKey(searchParams));
+      if (snap) {
+        return NextResponse.json({ ...snap.data, ...degradedMeta(snap.savedAt) });
+      }
       return NextResponse.json({
         success: false,
         error: `Grants.gov API returned ${response.status}`,
@@ -252,7 +269,7 @@ export async function GET(request: NextRequest) {
     const pageGrants = agencyFiltered ? grants.slice(0, limit) : grants;
     const reportedTotal = agencyFiltered ? grants.length : totalAvailable;
 
-    return NextResponse.json({
+    const responseBody = {
       success: true,
       total: reportedTotal,        // TRUE total matching grants (post agency filter)
       count: pageGrants.length,    // grants in THIS page
@@ -264,10 +281,27 @@ export async function GET(request: NextRequest) {
       agencyFiltered,
       grants: pageGrants,
       searchCriteria: { keyword, agency, category, status, limit, sort },
-    });
+    };
+
+    // Snapshot this successful search as the new last-good, then return it
+    // tagged fresh (see src/lib/resilience/last-good.ts).
+    saveSnapshot(grantsSnapshotKey(searchParams), responseBody as Record<string, unknown>).catch(() => {});
+    return NextResponse.json({ ...responseBody, ...freshMeta() });
 
   } catch (error) {
     console.error('[Grants API] Error:', error);
+
+    // If Grants.gov is unreachable/timed out (not an app bug), serve the
+    // last-good snapshot with an "as of {time}" banner instead of a dead 500.
+    if (isUpstreamOutage(error)) {
+      try {
+        const snap = await readSnapshot<Record<string, unknown>>(grantsSnapshotKey(searchParams));
+        if (snap) {
+          return NextResponse.json({ ...snap.data, ...degradedMeta(snap.savedAt) });
+        }
+      } catch { /* fall through to 500 */ }
+    }
+
     return NextResponse.json({
       success: false,
       error: 'Failed to search Grants.gov',
