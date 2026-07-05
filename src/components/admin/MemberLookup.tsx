@@ -123,7 +123,7 @@ export default function MemberLookup({ password }: { password: string }) {
             <p className="mt-1 text-lg font-bold">{result.offer.label}</p>
             <p className="mt-1 text-sm">{result.offer.action}</p>
             {(result.offer.tier === 'discount' || result.offer.tier === 'discount_zero') && (
-              <p className="mt-2 text-xs text-amber-300/90">Does not meet the Founders bar (no Ultimate Giant bundle and under $4,997 paid) → $2,997 discounted rate. If they may have paid under another email, verify first.</p>
+              <p className="mt-2 text-xs text-amber-300/90">Does not meet the Founders bar (no Ultimate Giant bundle and under $4,997 paid) → offer Founders Lifetime ($4,997). The $2,997 discount is discontinued. If they may have paid under another email, verify first.</p>
             )}
           </div>
 

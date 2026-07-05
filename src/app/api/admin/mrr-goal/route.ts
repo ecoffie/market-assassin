@@ -231,8 +231,8 @@ export async function GET(request: NextRequest) {
     // Lifetime offers — how many lifetime sales equal the $100K/mo goal if we
     // count lifetime cash amortized over 12 months (a common way to value LTV
     // against an MRR target). Tunable price points the team is using.
+    // The $2,997 bootcamp lifetime was discontinued 2026-07-05 — single price now.
     const LIFETIME_OFFERS = [
-      { name: 'Bootcamp Lifetime ($2,997)', price: 2997 },
       { name: 'Founders Lifetime ($4,997)', price: 4997 },
     ];
     const lifetimeScenarios = LIFETIME_OFFERS.map((o) => ({

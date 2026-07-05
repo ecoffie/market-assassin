@@ -23,10 +23,11 @@ import { isAdvocateAccount } from '@/lib/mindy/advocate-accounts';
 export const dynamic = 'force-dynamic';
 
 // Founders qualification is EITHER/OR (Eric, 2026-06-29): paid >= $4,997 OR owns
-// the Ultimate Giant bundle. $2,997 is the DISCOUNTED rate for everyone who does
-// not qualify — it is NOT the Founders rate.
+// the Ultimate Giant bundle. The $2,997 discounted rate was DISCONTINUED
+// 2026-07-05 — there is now a single lifetime price ($4,997), so anyone who does
+// not already qualify is offered the standard $4,997 Founders Lifetime.
 const FOUNDERS_AMOUNT = 4997;
-const DISCOUNT_RATE = 2997;
+const LIFETIME_RATE = 4997;
 const ENTITLED_TIERS = new Set(['lifetime', '1_year', '6_month', 'subscription', 'beta_preview']);
 // Owning the Ultimate Giant bundle is the MINIMUM requirement for permanent tool
 // access — past buyers still had to buy it regardless of other spend (Eric, 2026-06-29).
@@ -94,9 +95,10 @@ function recommendedOffer(paidUsd: number, ownsUltimate: boolean, flags: { advoc
     const why = ownsUltimate ? 'owns Ultimate Giant bundle' : `paid $${paidUsd.toLocaleString()} (≥ $${FOUNDERS_AMOUNT.toLocaleString()})`;
     return { tier: 'founders', label: `Founders-qualified — ${why}`, action: 'Grant Founders lifetime (permanent)' };
   }
-  // Everyone else → the discounted rate (NOT Founders).
-  if (paidUsd >= 1) return { tier: 'discount', label: `Paid $${paidUsd.toLocaleString()} — does not meet Founders bar`, action: `Offer the discounted rate ($${DISCOUNT_RATE.toLocaleString()})` };
-  return { tier: 'discount_zero', label: 'No payment + no Ultimate Giant bundle', action: `Offer the discounted rate ($${DISCOUNT_RATE.toLocaleString()}), or remove from Pro` };
+  // Everyone else → the standard single lifetime price ($2,997 discount discontinued).
+  // (tier keys 'discount'/'discount_zero' kept stable — the UI styles + notes key off them.)
+  if (paidUsd >= 1) return { tier: 'discount', label: `Paid $${paidUsd.toLocaleString()} — does not meet Founders bar`, action: `Offer Founders Lifetime ($${LIFETIME_RATE.toLocaleString()})` };
+  return { tier: 'discount_zero', label: 'No payment + no Ultimate Giant bundle', action: `Offer Founders Lifetime ($${LIFETIME_RATE.toLocaleString()}), or remove from Pro` };
 }
 
 export async function GET(request: NextRequest) {

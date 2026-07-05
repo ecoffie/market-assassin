@@ -10,8 +10,8 @@ import { MINDY_DAY, MINDY_DAY_EXTENSION_LABEL } from '@/lib/mindy/mindy-day';
  *   - To do what Mindy does → $280,000+/yr (BD data sub + proposal writer +
  *     capture manager + market analyst).
  *   - PRO $149/mo · TEAM $499/mo.
- *   - Founders Lifetime $4,997 → $2,997 because you showed up for Mindy Day
- *     (save $2,000), only 100 seats, ends Saturday July 25. → getmindy.ai/lifetime
+ *   - Founders Lifetime $4,997 (single price — the $2,997 bootcamp rate was
+ *     discontinued 2026-07-05), only 100 seats. → getmindy.ai/lifetime
  *
  * Sent through the guarded sendEmail() FROM the verified mail.getmindy.ai domain
  * (inbox delivery). NOT transactional (it's promotional), so it respects the
@@ -46,7 +46,7 @@ const P = (s: string) =>
  *   lastcall   — kill the risk objection (30-day money-back + try it free now)
  *   extension  — permission + "pays for itself in ~20 months, then free forever"
  *   finalclose — short loss-framing (after tonight it's monthly only)
- * Only verifiable facts: $149/mo, 2997÷149≈20 months, 30-day money-back, free trial.
+ * Only verifiable facts: $149/mo, 4997÷149≈34 months, 30-day money-back, free trial.
  */
 const PHASE_COPY: Record<LifetimePhase, {
   subject: (n: string) => string;
@@ -87,8 +87,8 @@ const PHASE_COPY: Record<LifetimePhase, {
     intro: (n) =>
       P(`${n} &mdash; thanks again for being part of Mindy Day. As promised, here&rsquo;s the full deck from Saturday &mdash; every slide, yours to keep:`) +
       slidesCardHtml +
-      P(`<br>And one more thing: a few of you asked for more time on the Founders Lifetime &mdash; $2,997 once is a real decision. So we extended it through tonight.`) +
-      P(`The math makes it easy: at <strong style="color:#0f172a;">$149/month</strong> you&rsquo;d cross $2,997 in about <strong style="color:#0f172a;">20 months</strong> &mdash; then keep paying. Pay once now and everything after is free, for life. It&rsquo;s also 30-day money-back, and Mindy&rsquo;s free to try at getmindy.ai if you want to kick the tires first.`),
+      P(`<br>And one more thing: a few of you asked for more time on the Founders Lifetime &mdash; $4,997 once is a real decision. So we extended it through tonight.`) +
+      P(`The math makes it easy: at <strong style="color:#0f172a;">$149/month</strong> you&rsquo;d cross $4,997 in about <strong style="color:#0f172a;">34 months</strong> &mdash; then keep paying, forever. Pay once now and everything after is free, for life. It&rsquo;s also 30-day money-back, and Mindy&rsquo;s free to try at getmindy.ai if you want to kick the tires first.`),
     outro:
       P(`This is a genuine extension &mdash; and the last one. When the final seats go, the lifetime price goes with them.`),
   },
@@ -98,7 +98,7 @@ const PHASE_COPY: Record<LifetimePhase, {
     deadlineLine: `Closes for good at midnight tonight (${MINDY_DAY_EXTENSION_LABEL}).`,
     intro: (n) =>
       P(`${n} &mdash; last call, for real this time.`) +
-      P(`After tonight, lifetime goes away and Mindy is monthly only. At $149/mo you&rsquo;d pass $2,997 in about 20 months &mdash; and never stop paying. Lock it in once, tonight, and you&rsquo;re done:`),
+      P(`After tonight, lifetime goes away and Mindy is monthly only. At $149/mo you&rsquo;d pass $4,997 in about 34 months &mdash; and never stop paying. Lock it in once, tonight, and you&rsquo;re done:`),
     outro:
       P(`Still 30-day money-back, so the only real risk is letting the price close. After midnight, it&rsquo;s gone.`),
   },
@@ -117,7 +117,7 @@ export async function sendMindyLaunchLifetimeEmail(params: {
 <html>
 <head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"><meta name="color-scheme" content="light only"><meta name="supported-color-schemes" content="light"><title>Mindy Founders Lifetime — today only</title></head>
 <body style="margin: 0; padding: 0; background-color: #f8fafc; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #1e293b;">
-  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">Lifetime access to Mindy for a one-time price — only through tonight. $4,997 → $2,997 because you showed up.</div>
+  <div style="display:none;max-height:0;overflow:hidden;opacity:0;">Lifetime access to Mindy for one payment of $4,997 — no subscription, ever. Only 100 founding seats.</div>
   <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f8fafc; padding: 40px 16px;"><tr><td align="center">
     <table width="600" cellpadding="0" cellspacing="0" style="background-color: #ffffff; border-radius: 16px; overflow: hidden; box-shadow: 0 4px 20px rgba(0,0,0,0.06);">
       <tr><td style="background: linear-gradient(135deg, #1e3a8a 0%, #6d28d9 55%, #7c3aed 100%); padding: 38px 32px; text-align: center;">
@@ -130,8 +130,8 @@ export async function sendMindyLaunchLifetimeEmail(params: {
       <tr><td style="padding: 8px 32px 0;">
         <table width="100%" cellpadding="0" cellspacing="0" style="background-color: #f5f3ff; border: 2px solid #ddd6fe; border-radius: 12px;"><tr><td style="padding: 28px 24px; text-align: center;">
           <p style="color: #5b21b6; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: 1.5px; margin: 0 0 10px;">Founders Lifetime &middot; only 100 seats</p>
-          <p style="margin: 0 0 4px;"><span style="color: #94a3b8; font-size: 20px; font-weight: 700; text-decoration: line-through;">$4,997</span> &nbsp; <span style="color: #0f172a; font-size: 38px; font-weight: 800;">$2,997</span></p>
-          <p style="color: #475569; font-size: 14px; margin: 0 0 18px;">once &mdash; Mindy is yours for life. <strong style="color:#0f172a;">You save $2,000.</strong></p>
+          <p style="margin: 0 0 4px;"><span style="color: #0f172a; font-size: 38px; font-weight: 800;">$4,997</span></p>
+          <p style="color: #475569; font-size: 14px; margin: 0 0 18px;">once &mdash; Mindy is yours for life. <strong style="color:#0f172a;">No subscription, ever.</strong></p>
           <a href="${LIFETIME_URL}" style="display: inline-block; background-color: #7c3aed; color: #ffffff; padding: 18px 44px; border-radius: 10px; text-decoration: none; font-weight: 800; font-size: 18px;">Claim Your Lifetime Seat</a>
           <p style="color: #64748b; font-size: 13px; margin: 16px 0 0; line-height: 1.6;">${copy.deadlineLine}<br><a href="${LIFETIME_URL}" style="color:#7c3aed;text-decoration:none;">getmindy.ai/lifetime</a></p>
         </td></tr></table>

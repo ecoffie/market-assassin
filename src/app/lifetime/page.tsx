@@ -1,8 +1,8 @@
 /**
  * /lifetime — Mindy Founders Lifetime ($4,997) sales page.
  *
- * Public anchor: $4,997 (100 seats) — same WTP as legacy course lifetime.
- * Bootcamp alumni $2,997 exists only in post-bootcamp email, not here.
+ * Single price: $4,997 (100 seats) — same WTP as legacy course lifetime.
+ * The $2,997 bootcamp-alumni discount was discontinued 2026-07-05.
  * Ultimate Giant Bundle ($1,497) is retired.
  */
 import type { Metadata } from 'next';
@@ -11,8 +11,6 @@ import FoundersSeats from '@/components/lifetime/FoundersSeats';
 import {
   FOUNDERS_LIFETIME_CAP,
   FOUNDERS_LIFETIME_PRICE,
-  BOOTCAMP_LIFETIME_PRICE,
-  BOOTCAMP_LIFETIME_DEADLINE_ISO,
   PRO_ANNUAL,
   PRO_MONTHLY,
   foundersBreakEvenMonths,
@@ -25,17 +23,6 @@ const FOUNDERS_CHECKOUT = '/checkout/founders-lifetime';
 const BOOTCAMP_CHECKOUT = '/checkout/bootcamp-lifetime';
 const MONTHLY_CHECKOUT = 'https://buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C';
 const ANNUAL_CHECKOUT = 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D';
-
-// Mindy Day special ($2,997) is live through the end of the deadline day (ET).
-// After that the page reverts to Founders Lifetime ($4,997).
-function isBootcampSpecialActive(): boolean {
-  return Date.now() <= new Date(`${BOOTCAMP_LIFETIME_DEADLINE_ISO}T23:59:59-04:00`).getTime();
-}
-
-// Display label for the deadline day, anchored at noon EDT to avoid the
-// EST/EDT midnight-rollover that makes the shared helper render the next day.
-const bootcampDeadlineLabel = new Date(`${BOOTCAMP_LIFETIME_DEADLINE_ISO}T12:00:00-04:00`)
-  .toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric', timeZone: 'America/New_York' });
 
 const breakEvenMonths = foundersBreakEvenMonths();
 
@@ -141,10 +128,12 @@ export default function LifetimePage() {
   const fiveYearMonthly = PRO_MONTHLY * 12 * 5;
   const fiveYearAnnual = PRO_ANNUAL * 5;
 
-  // Mindy Day special: same lifetime product, $2,997 instead of $4,997, until it expires.
-  const special = isBootcampSpecialActive();
-  const checkoutHref = special ? BOOTCAMP_CHECKOUT : FOUNDERS_CHECKOUT;
-  const livePrice = special ? BOOTCAMP_LIFETIME_PRICE : FOUNDERS_LIFETIME_PRICE;
+  // The $2,997 bootcamp "special" is DISCONTINUED (Eric, 2026-07-05) — the price
+  // is now a single $4,997 Founders Lifetime. Force special off so the whole page
+  // renders the Founders path; the dual-price branches below all fall through.
+  const special = false;
+  const checkoutHref = FOUNDERS_CHECKOUT;
+  const livePrice = FOUNDERS_LIFETIME_PRICE;
 
   return (
     <main className="min-h-screen bg-slate-950">
@@ -157,9 +146,7 @@ export default function LifetimePage() {
         <div className="max-w-4xl mx-auto text-center">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-amber-500/10 border border-amber-500/40 rounded-full mb-6">
             <span className="text-amber-200 text-sm font-semibold uppercase tracking-wide">
-              {special
-                ? `Mindy Day · $${fmt(BOOTCAMP_LIFETIME_PRICE)} lifetime — ends ${bootcampDeadlineLabel}`
-                : `Founders Lifetime · ${FOUNDERS_LIFETIME_CAP} seats`}
+              {`Founders Lifetime · ${FOUNDERS_LIFETIME_CAP} seats`}
             </span>
           </div>
 
@@ -309,9 +296,7 @@ export default function LifetimePage() {
       <section className="px-4 py-20">
         <div className="max-w-3xl mx-auto text-center rounded-3xl border border-purple-500/30 bg-gradient-to-br from-purple-900/40 to-slate-900 p-10">
           <h2 className="text-3xl font-bold text-white mb-4">
-            {special
-              ? `$${fmt(livePrice)} once. Mindy Day — ends ${bootcampDeadlineLabel}.`
-              : `$${fmt(FOUNDERS_LIFETIME_PRICE)} once. ${FOUNDERS_LIFETIME_CAP} seats.`}
+            {`$${fmt(FOUNDERS_LIFETIME_PRICE)} once. ${FOUNDERS_LIFETIME_CAP} seats.`}
           </h2>
           <Link
             href={checkoutHref}

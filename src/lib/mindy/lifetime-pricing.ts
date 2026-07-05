@@ -18,9 +18,15 @@ export const FOUNDERS_LIFETIME_PRICE = 4997;
 export const FOUNDERS_LIFETIME_CENTS = 499700;
 export const FOUNDERS_LIFETIME_CAP = 100;
 
-/** Bootcamp alumni rate — email-only; do not hero on /lifetime or funnels. */
-export const BOOTCAMP_LIFETIME_PRICE = 2997;
-export const BOOTCAMP_LIFETIME_CENTS = 299700;
+/**
+ * @deprecated The $2,997 bootcamp-alumni rate was DISCONTINUED 2026-07-05 —
+ * the single lifetime price is now $4,997 Founders. These constants are kept
+ * pointing at the Founders price so any lingering consumer renders $4,997.
+ * (Stripe webhooks still recognize the raw amount 299700 to keep honoring
+ * people who already PAID $2,997 — that's intentional, do not remove.)
+ */
+export const BOOTCAMP_LIFETIME_PRICE = FOUNDERS_LIFETIME_PRICE; // was 2997 — discontinued
+export const BOOTCAMP_LIFETIME_CENTS = FOUNDERS_LIFETIME_CENTS; // was 299700 — discontinued
 /** Founders-rate deadline = Mindy Day (offer ends the night of the event). */
 export const BOOTCAMP_LIFETIME_DEADLINE_ISO = MINDY_DAY.iso;
 
