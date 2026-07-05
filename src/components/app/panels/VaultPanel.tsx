@@ -119,6 +119,33 @@ export default function VaultPanel({ email, tier, initialSection }: Props) {
   const [docs, setDocs] = useState<BoilerplateDoc[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [exporting, setExporting] = useState(false);
+
+  // Download the user's full vault as a JSON file. Uses an authed fetch (the
+  // export route requires strong auth) → blob → triggers a browser download.
+  const handleExport = useCallback(async () => {
+    if (!email || exporting) return;
+    setExporting(true);
+    try {
+      const res = await fetch(`/api/app/vault/export?email=${encodeURIComponent(email)}`, {
+        headers: getMIApiHeaders(email),
+      });
+      if (!res.ok) throw new Error(`Export failed (${res.status})`);
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `mindy-vault-export-${new Date().toISOString().slice(0, 10)}.json`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Export failed');
+    } finally {
+      setExporting(false);
+    }
+  }, [email, exporting]);
 
   const load = useCallback(async () => {
     if (!email) return;
@@ -174,6 +201,30 @@ export default function VaultPanel({ email, tier, initialSection }: Props) {
           Everything Mindy uses to make outputs sound like <em>you</em>. The more you store, the more personalized your drafts, briefings, and proposals.
           {' '}This is what Mindy <span className="text-slate-300">writes into proposals</span> — what it <span className="text-slate-300">watches for</span> (NAICS, keywords, agencies) lives in <span className="text-slate-300">Settings</span>.
         </p>
+        {/* Trust cue — reassurance at the point of upload, where the anxiety lives. */}
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+          <span className="inline-flex items-center gap-1.5 text-emerald-400/90">
+            <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="h-3.5 w-3.5">
+              <path d="M6 10V8a6 6 0 1112 0v2M5 10h14v9a1 1 0 01-1 1H6a1 1 0 01-1-1v-9z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
+            Only you can see your vault
+          </span>
+          <span className="text-slate-700">·</span>
+          {email && (
+            <button
+              type="button"
+              onClick={handleExport}
+              disabled={exporting}
+              className="underline underline-offset-2 hover:text-slate-300 disabled:opacity-50"
+            >
+              {exporting ? 'Preparing…' : 'Export'}
+            </button>
+          )}
+          <span className="text-slate-700">·</span>
+          <a href="/app/trust" className="underline underline-offset-2 hover:text-slate-300">
+            How your data is protected
+          </a>
+        </div>
       </div>
 
       {/* Section tabs */}

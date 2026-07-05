@@ -50,8 +50,10 @@ The unglamorous, non-negotiable groundwork. No customer-facing surface until thi
 | 1.3 | ✅ **DONE (2026-07-05).** RLS enabled + FORCE'd on all 5 vault tables (`20260705_vault_rls_backstop.sql`), `service_role`-only policy. **Design note:** all 32 vault owners are email-only (no `auth.users` row → `auth.uid()` would match nobody), so the correct backstop is deny-anon/authenticated + service-role-passthrough, NOT `auth.uid()` scoping. **Proven:** pre-flight showed the anon/public key COULD read the vault (live leak); post-migration anon = BLOCKED on 5/5, service = OK on 5/5 (210 rows). | The `coach_mode_tenancy` decision ("RLS as the enforcement backstop") — now done. | M |
 | 1.4 | **Retire/​harden the weak auth surfaces for vault** — stop honoring the legacy `ma_access_email` cookie and the token-less domain staff-bypass on *vault* routes specifically. | Removes the weakest isolation paths from the highest-sensitivity data. | S |
 
-### Phase 2 — The Trust Layer (customer-facing) — **the thing you asked to start with**
-Now that the claims are true, surface them. Two pieces:
+### Phase 2 — The Trust Layer (customer-facing) — ✅ **DONE (2026-07-05)**
+Now that the claims are true, surface them. Two pieces — both shipped:
+- **2.1 `/app/trust`** — six promises, each paired with its enforcement mechanism + an honest "still building" note. `src/app/app/trust/page.tsx`.
+- **2.2 Vault trust cue** — "🔒 Only you can see your vault · Export · How your data is protected" in the vault header, with a working authed export. `VaultPanel.tsx`.
 
 - **2.1 A "Your data is yours" trust page** (`/app/trust` or a Vault section) — plain-language, HubSpot/Notion-style, NOT legalese. States exactly what's now true: workspace-isolated + DB-enforced (after 1.3), we don't train models on your vault, the AI only retrieves *your* rows, files are private, you can export or delete anytime (after 1.1–1.2). Links to the legal `/privacy`.
 - **2.2 Inline trust cues in the Vault UI** — a small "🔒 Only you can see this · Export · Delete" affordance on the vault itself, where the anxiety actually lives. Data-behind-glass done in reverse: reassurance at the point of upload.

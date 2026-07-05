@@ -3267,3 +3267,30 @@ key could read the vault pre-migration; post-migration it is BLOCKED on 5/5
 tables while the app reads all 210 rows normally. Isolation is now enforced by
 Postgres itself, the same defense-in-depth pattern used by GovWin/HigherGov-class
 platforms.
+
+---
+
+## Data Trust: "Your Data Is Yours" Page + Vault Trust Cues (Phase 2) — 2026-07-05
+
+**What:** A plain-language trust page (/app/trust) that tells customers exactly
+how Mindy protects their vault — and a lock cue right inside the vault ("Only you
+can see your vault · Export · How your data is protected") where the reassurance
+matters most. Every claim maps to a control we actually shipped: database-level
+isolation, no model training, permission-filtered AI retrieval, private files,
+one-click export, one-click delete.
+
+**Why:** Customers asked, in their words, "is my data safe in here?" A trust page
+that overclaims is a liability; this one only says what's enforced. Trust you can
+verify is a buying signal — and, for a company built to sell, provable data
+protection is direct valuation upside.
+
+**SEO / positioning:** "is my data safe", "data ownership", "export my data",
+"we don't train on your data" — trust as a feature, stated where the customer
+feels the risk (at upload), not buried in a legal policy.
+
+**Proof:** /app/trust lists six promises, each paired with its mechanism (RLS,
+no-training tiers, owner-scoped retrieval, private storage, export, delete) plus
+an honest "what we're still building" note (org workspaces, in-boundary gov
+deployment). The vault header links straight to a working export. Backed by the
+Phase 1 enforcement (delete gap closed, export shipped, RLS backstop proven,
+strong-auth on all vault routes). 162/162 tests, 0 type errors, 0 lint.
