@@ -3215,3 +3215,30 @@ cron alerts on any healthy→degraded→down transition (rate-limited, KV-backed
 survives the outage it watches). 153/153 unit tests pass, 0 type errors. Pattern
 mirrors how GovWin/HigherGov-class players run: separate data planes + a monitored DB.
 
+
+---
+
+## Data Trust: Vault Export + Delete (Phase 1.1/1.2) — 2026-07-05
+
+**What:** You can now export your entire Mindy vault as a single file, and
+permanently delete it — yourself, anytime. Every company, contract, capability,
+team member, and uploaded document you've stored is yours to take or remove, with
+one click, no support ticket.
+
+**Why:** Your vault holds your most sensitive information — EINs, CAGE codes,
+security clearances, real contract references, pricing. Customers asked, plainly,
+"is my data safe, and can I get it back out?" Ownership you can act on is the
+answer. It's also table-stakes for enterprise and a real fix: account deletion
+previously left vault data behind — now it's fully removed, files included.
+
+**SEO / positioning:** "export my data", "delete my data", "data ownership" —
+trust as a feature. Your data, your control; we're the application layer that
+protects it, not a place it gets stuck.
+
+**Proof:** GET /api/app/vault/export returns your complete vault as JSON (owner-
+scoped by authenticated identity). DELETE /api/app/vault?confirm=DELETE hard-
+deletes every vault row + private Storage file you own. One shared canonical
+definition (src/lib/vault/vault-data.ts) backs export, self-serve delete, AND
+admin account-deletion — so the "we delete everything" promise can't drift out of
+sync again. 9 unit tests lock owner-scoping (never an unscoped wipe) + completeness
++ resilience. 162/162 suite, 0 type errors.

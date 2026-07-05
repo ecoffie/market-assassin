@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
+import { deleteAllVaultData } from '@/lib/vault/vault-data';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,5 +48,48 @@ export async function GET(request: NextRequest) {
     capabilities: capsRes.data || [],
     team: teamRes.data || [],
     documents: docsRes.data || [],
+  });
+}
+
+// DELETE — Phase 1.1: self-serve vault deletion ("delete your data anytime").
+// Hard-deletes every vault row + Storage file the CALLER owns (owner-scoped by
+// the authenticated email). This deletes the VAULT only, not the whole account
+// (full-account deletion stays the admin route). Requires an explicit
+// ?confirm=DELETE guard so a stray DELETE can't wipe a vault by accident.
+export async function DELETE(request: NextRequest) {
+  const email = String(request.nextUrl.searchParams.get('email') || '').trim();
+  if (!email) {
+    return NextResponse.json({ success: false, error: 'Email is required' }, { status: 400 });
+  }
+
+  const auth = await verifyUserOwnsEmail(request, email);
+  if (!auth.authenticated) {
+    return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
+  }
+
+  // Explicit confirmation gate — a destructive, no-undo action.
+  if (request.nextUrl.searchParams.get('confirm') !== 'DELETE') {
+    return NextResponse.json(
+      { success: false, error: 'Add ?confirm=DELETE to permanently delete your vault. This cannot be undone.' },
+      { status: 400 },
+    );
+  }
+
+  const userEmail = auth.email!;
+  const supabase = getSupabase();
+  const result = await deleteAllVaultData(supabase, userEmail);
+  const errors = [
+    ...result.tables.filter((t) => t.error).map((t) => ({ table: t.table, error: t.error })),
+    ...(result.storage.error ? [{ storage: result.storage.error }] : []),
+  ];
+
+  return NextResponse.json({
+    success: errors.length === 0,
+    deleted: {
+      rows: result.totalRowsDeleted,
+      files: result.storage.files,
+      byTable: result.tables,
+    },
+    errors: errors.length > 0 ? errors : undefined,
   });
 }

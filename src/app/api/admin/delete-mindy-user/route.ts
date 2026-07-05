@@ -14,12 +14,21 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import {
+  VAULT_TABLES,
+  deleteAllVaultData,
+  listVaultStorageFiles,
+} from '@/lib/vault/vault-data';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 
-// Every table that's keyed by user_email. Add to this list when new
-// user-scoped tables are added.
+// Every NON-VAULT table that's keyed by user_email. Add to this list when new
+// user-scoped tables are added. The 5 VAULT tables + Storage files are handled
+// separately via the shared vault-data lib (VAULT_TABLES / deleteAllVaultData)
+// so this route and the self-serve delete can never diverge again — the audit
+// 2026-07-05 found these vault tables were silently omitted here, leaving a
+// deleted user's most sensitive PII (EIN, clearances, references) behind.
 const USER_EMAIL_TABLES = [
   'user_notification_settings',
   'user_business_profiles',
@@ -118,15 +127,22 @@ export async function GET(request: NextRequest) {
   }
 
   const supabase = getSupabase();
-  const tableCounts = await Promise.all(USER_EMAIL_TABLES.map(t => countRows(supabase, t, email)));
-  const totalRows = tableCounts.reduce((sum, r) => sum + r.rows, 0);
+  const [tableCounts, vaultCounts, vaultFiles] = await Promise.all([
+    Promise.all(USER_EMAIL_TABLES.map(t => countRows(supabase, t, email))),
+    Promise.all(VAULT_TABLES.map(t => countRows(supabase, t, email))),
+    listVaultStorageFiles(supabase, email),
+  ]);
+  const allCounts = [...tableCounts, ...vaultCounts];
+  const totalRows = allCounts.reduce((sum, r) => sum + r.rows, 0);
 
   return NextResponse.json({
     mode: 'dry-run',
     email,
     tableCounts,
+    vaultCounts,               // the 5 vault tables (previously silently skipped)
+    vaultStorageFiles: vaultFiles.paths.length,
     totalRows,
-    note: 'POST to this endpoint with the same email to actually delete.',
+    note: 'POST to this endpoint with the same email to actually delete. Vault tables + Storage files ARE now included.',
   });
 }
 
@@ -146,8 +162,15 @@ export async function POST(request: NextRequest) {
   // somehow fails halfway, we'd rather have the orphan auth row than
   // orphan profile data.
   const tableDeletes = await Promise.all(USER_EMAIL_TABLES.map(t => deleteRows(supabase, t, email)));
-  const totalRowsDeleted = tableDeletes.reduce((sum, r) => sum + r.rows, 0);
-  const tableErrors = tableDeletes.filter(r => r.error);
+  // Vault tables + Storage files via the shared lib (closes the audit gap).
+  const vaultResult = await deleteAllVaultData(supabase, email);
+  const totalRowsDeleted =
+    tableDeletes.reduce((sum, r) => sum + r.rows, 0) + vaultResult.totalRowsDeleted;
+  const tableErrors = [
+    ...tableDeletes.filter(r => r.error),
+    ...vaultResult.tables.filter(t => t.error).map(t => ({ table: t.table, rows: t.rows, error: t.error })),
+    ...(vaultResult.storage.error ? [{ table: 'vault-assets (storage)', rows: 0, error: vaultResult.storage.error }] : []),
+  ];
 
   const authResult = await deleteSupabaseAuthUser(supabase, email);
 
@@ -155,6 +178,8 @@ export async function POST(request: NextRequest) {
     mode: 'executed',
     email,
     tableDeletes,
+    vaultDeletes: vaultResult.tables,
+    vaultStorageFilesDeleted: vaultResult.storage.files,
     totalRowsDeleted,
     tableErrors: tableErrors.length > 0 ? tableErrors : undefined,
     supabaseAuth: authResult,
