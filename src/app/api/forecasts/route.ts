@@ -2,10 +2,21 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 import { loadDodaacNames } from '@/lib/gov-contacts/dodaac-directory';
+import { saveSnapshot, readSnapshot, freshMeta, degradedMeta, isUpstreamOutage } from '@/lib/resilience/last-good';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+
+// Graceful-degradation snapshot key: the default forecast-search view keyed by
+// its filters, so a Supabase outage serves the last-good result (see
+// src/lib/resilience/last-good.ts) instead of an empty panel. Admin/coverage
+// sub-modes are excluded — they're internal, not user-facing.
+function forecastsSnapshotKey(sp: URLSearchParams): string {
+  const parts = ['naics', 'agency', 'state', 'setAside', 'set_aside', 'fiscalYear', 'fy', 'search', 'q', 'limit', 'offset']
+    .map((k) => `${k}=${sp.get(k) || ''}`);
+  return `forecasts:${parts.join('&')}`;
+}
 
 function hasAdminAccess(request: NextRequest): boolean {
   const { searchParams } = new URL(request.url);
@@ -523,10 +534,28 @@ export async function GET(request: NextRequest) {
       });
     }
 
+    // Snapshot the default user-facing forecast view for graceful degradation.
+    // Only the main list mode (not admin/coverage/sources sub-modes) is cached.
+    if (mode !== 'coverage' && mode !== 'sources') {
+      saveSnapshot(forecastsSnapshotKey(searchParams), response as Record<string, unknown>).catch(() => {});
+      return NextResponse.json({ ...response, ...freshMeta() });
+    }
     return NextResponse.json(response);
 
   } catch (error) {
     console.error('Forecast API error:', error);
+
+    // If the DB is unreachable (not an app bug), serve the last-good snapshot
+    // with an "as of {time}" banner instead of a dead 500 panel.
+    if (isUpstreamOutage(error) && mode !== 'coverage' && mode !== 'sources') {
+      try {
+        const snap = await readSnapshot<Record<string, unknown>>(forecastsSnapshotKey(searchParams));
+        if (snap) {
+          return NextResponse.json({ ...snap.data, ...degradedMeta(snap.savedAt) });
+        }
+      } catch { /* fall through to 500 */ }
+    }
+
     return NextResponse.json(
       {
         success: false,

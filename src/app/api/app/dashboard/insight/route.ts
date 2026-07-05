@@ -21,6 +21,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
+import { saveSnapshot, readSnapshot, freshMeta, degradedMeta, isUpstreamOutage } from '@/lib/resilience/last-good';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
 import { dateSeed, isSimilarToRecent, selectInsightOpportunities } from '@/lib/dashboard/insight-selection';
 import { getPodcastInsightForProfile, podcastInsightFeatureEnabled } from '@/lib/rag/podcast-insights';
@@ -67,6 +68,15 @@ interface InsightResponse {
   selectionReason?: string;
 }
 
+// Graceful-degradation snapshot key: the daily insight is per-user and per
+// local-date, so a Supabase outage serves that user's last-good insight (see
+// src/lib/resilience/last-good.ts) instead of a dead hero card. Keyed on the
+// AUTHENTICATED email + local date; refresh=1 (on-demand new pick) is not
+// snapshotted so a forced refresh can't overwrite the stable daily snapshot.
+function insightSnapshotKey(userEmail: string, today: string): string {
+  return `dashboard-insight:${userEmail}:${today}`;
+}
+
 export async function GET(request: NextRequest) {
   const email = String(request.nextUrl.searchParams.get('email') || '').trim();
   if (!email) {
@@ -99,6 +109,9 @@ export async function GET(request: NextRequest) {
   const forceRefresh = request.nextUrl.searchParams.get('refresh') === '1';
   const refreshSeed = forceRefresh ? (new Date().getUTCMinutes() + 1) : 0;
 
+  const snapshotKey = insightSnapshotKey(userEmail, today);
+
+  try {
   // 1. Check cache (unless forcing a refresh)
   const { data: cached } = forceRefresh
     ? { data: null }
@@ -110,7 +123,7 @@ export async function GET(request: NextRequest) {
         .maybeSingle();
 
   if (cached) {
-    return NextResponse.json({
+    const cachedPayload = {
       success: true,
       insight: {
         quote: cached.quote,
@@ -121,7 +134,9 @@ export async function GET(request: NextRequest) {
         insightDate: cached.insight_date,
       } satisfies InsightResponse,
       cached: true,
-    });
+    };
+    saveSnapshot(snapshotKey, cachedPayload).catch(() => {});
+    return NextResponse.json({ ...cachedPayload, ...freshMeta() });
   }
 
   const recentQuotes = await loadRecentInsightQuotes(userEmail, today);
@@ -264,7 +279,28 @@ export async function GET(request: NextRequest) {
     // Non-fatal — return the insight anyway
   }
 
-  return NextResponse.json({ success: true, insight, cached: false });
+  const freshPayload = { success: true, insight, cached: false };
+  // Only snapshot the stable daily pick, not an on-demand forced refresh.
+  if (!forceRefresh) {
+    saveSnapshot(snapshotKey, freshPayload).catch(() => {});
+  }
+  return NextResponse.json({ ...freshPayload, ...freshMeta() });
+
+  } catch (error) {
+    console.error('[dashboard/insight] error:', error);
+    // If Supabase is unreachable (not an app bug), serve the user's last-good
+    // insight with an "as of {time}" banner instead of a dead hero card.
+    if (isUpstreamOutage(error)) {
+      const snap = await readSnapshot<Record<string, unknown>>(snapshotKey);
+      if (snap) {
+        return NextResponse.json({ ...snap.data, ...degradedMeta(snap.savedAt) });
+      }
+    }
+    return NextResponse.json(
+      { success: false, error: error instanceof Error ? error.message : 'Unknown error' },
+      { status: 500 }
+    );
+  }
 }
 
 // ---- AI extraction from briefing -----------------------------------

@@ -26,6 +26,8 @@ import {
   readSnapshot,
   freshMeta,
   degradedMeta,
+  isUpstreamOutage,
+  withLastGood,
 } from './last-good';
 
 beforeEach(() => {
@@ -105,5 +107,69 @@ describe('degradation envelope', () => {
     expect(m._fresh).toBe(false);
     expect(m._degraded).toBe(true);
     expect(m._servedAt).toBe(saved); // exact snapshot time, not "now"
+  });
+});
+
+describe('isUpstreamOutage — only mask INFRA failures, never app bugs', () => {
+  it.each([
+    'fetch failed',
+    'Connection terminated unexpectedly',
+    'ETIMEDOUT',
+    'ECONNREFUSED',
+    'statement timeout',
+    'too many clients already',
+    'Database unreachable',
+    'upstream connect error',
+    'supabase request failed',
+  ])('treats "%s" as an outage (serve stale)', (msg) => {
+    expect(isUpstreamOutage(new Error(msg))).toBe(true);
+  });
+
+  it.each([
+    'Cannot read properties of undefined',
+    'column foo does not exist',
+    'invalid input syntax for type integer',
+    'TypeError: x is not a function',
+  ])('treats "%s" as a real bug (do NOT mask)', (msg) => {
+    expect(isUpstreamOutage(new Error(msg))).toBe(false);
+  });
+
+  it('handles non-Error throwables without crashing', () => {
+    expect(isUpstreamOutage('connection reset')).toBe(true);
+    expect(isUpstreamOutage(null)).toBe(false);
+  });
+});
+
+describe('withLastGood — the one-call wrapper', () => {
+  it('success → saves a snapshot and returns fresh, not degraded', async () => {
+    const { data, meta, degraded } = await withLastGood('wlg:ok', async () => ({ n: 42 }));
+    expect(data).toEqual({ n: 42 });
+    expect(meta._fresh).toBe(true);
+    expect(degraded).toBe(false);
+    // snapshot persisted for a future outage
+    expect((await readSnapshot<{ n: number }>('wlg:ok'))!.data.n).toBe(42);
+  });
+
+  it('outage WITH a prior snapshot → serves stale at degraded, no throw', async () => {
+    await withLastGood('wlg:deg', async () => ({ n: 1 }));      // seed a good snapshot
+    const { data, meta, degraded } = await withLastGood('wlg:deg', async () => {
+      throw new Error('Connection terminated unexpectedly');     // now the DB is "down"
+    });
+    expect(data).toEqual({ n: 1 });      // last-good served
+    expect(degraded).toBe(true);
+    expect(meta._degraded).toBe(true);
+  });
+
+  it('outage with NO snapshot → rethrows (caller returns its own error)', async () => {
+    await expect(
+      withLastGood('wlg:cold', async () => { throw new Error('fetch failed'); }),
+    ).rejects.toThrow('fetch failed');
+  });
+
+  it('a REAL app bug is rethrown even if a snapshot exists (never masked)', async () => {
+    await withLastGood('wlg:bug', async () => ({ n: 1 }));       // seed a snapshot
+    await expect(
+      withLastGood('wlg:bug', async () => { throw new Error('column x does not exist'); }),
+    ).rejects.toThrow('column x does not exist');               // bug surfaces, not hidden
   });
 });
