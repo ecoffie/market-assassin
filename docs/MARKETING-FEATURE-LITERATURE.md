@@ -3242,3 +3242,28 @@ definition (src/lib/vault/vault-data.ts) backs export, self-serve delete, AND
 admin account-deletion — so the "we delete everything" promise can't drift out of
 sync again. 9 unit tests lock owner-scoping (never an unscoped wipe) + completeness
 + resilience. 162/162 suite, 0 type errors.
+
+---
+
+## Data Trust: Database-Level Vault Isolation (Phase 1.3) — 2026-07-05
+
+**What:** Your vault data is now isolated at the database level, not just in
+application code. A row-level security backstop means the tables holding your
+EINs, CAGE codes, security clearances, and contract references can only ever be
+read by Mindy's own authenticated server — never by any public or client-side
+key, even if application code had a bug.
+
+**Why:** Defense in depth. Application-code checks are the front door; database
+RLS is the vault door behind it. Enterprise buyers and regulated teams expect
+both. This closes the last of three data-trust gaps identified in a July 2026
+self-audit, so every claim on the trust page maps to an enforced control.
+
+**SEO / positioning:** "database-level data isolation", "row-level security",
+"your data can't leak across accounts" — provable isolation, not a promise.
+
+**Proof:** RLS enabled + FORCE'd on all 5 vault tables with a service-role-only
+policy (`20260705_vault_rls_backstop.sql`). Verified before/after: the public
+key could read the vault pre-migration; post-migration it is BLOCKED on 5/5
+tables while the app reads all 210 rows normally. Isolation is now enforced by
+Postgres itself, the same defense-in-depth pattern used by GovWin/HigherGov-class
+platforms.
