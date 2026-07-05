@@ -207,6 +207,8 @@ export async function POST(request: NextRequest) {
       // moat) → opt UP from gpt-4o-mini to full gpt-4o for cleaner extraction of
       // dense multi-column tables. Low volume, so the cost delta is negligible.
       openaiModel: 'gpt-4o',
+      // Cap statements are customer PII → no-training providers only (Trust 3.1).
+      dataClass: 'sensitive',
     });
     const raw = JSON.parse(out.replace(/```json\n?|```\n?/g, '').trim());
     const rid = (raw?.identity ?? {}) as Record<string, unknown>;

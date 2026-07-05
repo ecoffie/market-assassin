@@ -237,7 +237,9 @@ async function rerank(requirement: string, candidates: EvidenceItem[], keep: num
   const system = 'You match a bidder\'s real past work to ONE federal requirement. You may ONLY reference the numbered evidence given — never invent. Pick the items that genuinely help satisfy the requirement; drop items that merely share a word. If none fit, return an empty list.';
   const user = `REQUIREMENT:\n${requirement}\n\nCANDIDATE EVIDENCE (bidder's real vault):\n${list}\n\nReturn JSON {"picks":[{"id":<number>,"why":"<=15 words on how this evidence satisfies the requirement"}]}. At most ${keep}, best first. Omit any that don't genuinely fit.`;
   try {
-    const { text } = await callLLM({ system, user, json: true, job: 'reasoning', temperature: 0, maxTokens: 500 });
+    // dataClass 'sensitive' — the prompt embeds the bidder's real vault evidence
+    // (PII), so restrict to the vetted no-training providers (Data Trust 3.1).
+    const { text } = await callLLM({ system, user, json: true, job: 'reasoning', temperature: 0, maxTokens: 500, dataClass: 'sensitive' });
     const parsed = JSON.parse(text) as RerankOut;
     if (!parsed?.picks?.length) return [];
     const out: EvidenceItem[] = [];

@@ -31,6 +31,14 @@ export interface LlmOpts {
   // provider it doesn't apply to. Only honored for the 'openai' provider unless
   // it looks like that provider's model family.
   openaiModel?: string;
+  // Data Trust Phase 3.1 — data classification. When 'sensitive', the call
+  // carries customer vault PII (identity, past performance, resumes, uploaded
+  // docs), so the provider chain is RESTRICTED to the vetted no-training
+  // allow-list (SENSITIVE_PROVIDERS) — never the ad-hoc fallback that could send
+  // PII to whichever provider answers first. This is what lets us tell a customer
+  // exactly which providers ever see their data. Default 'standard' = today's
+  // behavior (non-PII: SAM notices, agency data, public RFP text).
+  dataClass?: 'standard' | 'sensitive';
 }
 
 type Provider = 'groq70b' | 'groq8b' | 'claude' | 'openai' | 'grok';
@@ -53,6 +61,21 @@ const JOB_CHAINS: Record<LlmJob, Provider[]> = {
   reasoning:  ['openai', 'groq70b', 'claude'],
 };
 const DEFAULT_CHAIN: Provider[] = JOB_CHAINS.extraction;
+
+// Data Trust Phase 3.1 — providers vetted as NO-TRAINING-on-API-data, allowed to
+// receive customer vault PII. OpenAI + Anthropic API tiers contractually don't
+// train on API inputs; Groq is inference-only. xAI/Grok is EXCLUDED (training
+// policy is not clearly a no-train guarantee) — we'd rather be conservative with
+// PII than send it somewhere we can't cleanly promise a customer about.
+// Env-overridable (SENSITIVE_LLM_PROVIDERS) so the allow-list can tighten to a
+// single provider (e.g. just 'openai') for a customer who wants one named vendor.
+const DEFAULT_SENSITIVE_PROVIDERS: Provider[] = ['openai', 'claude', 'groq70b', 'groq8b'];
+
+function sensitiveProviders(): Provider[] {
+  const raw = process.env.SENSITIVE_LLM_PROVIDERS;
+  if (!raw) return DEFAULT_SENSITIVE_PROVIDERS;
+  return raw.split(',').map(s => s.trim()).filter(Boolean) as Provider[];
+}
 
 function envChain(): Provider[] | null {
   const raw = process.env.LLM_CHAIN;
@@ -131,7 +154,21 @@ export async function callLLM(opts: LlmOpts): Promise<{ text: string; provider: 
   // env LLM_CHAIN overrides everything; otherwise pick the per-job chain so
   // Claude is only eligible for drafting/referee, never bulk extraction.
   const jobChain = JOB_CHAINS[opts.job ?? 'extraction'] ?? DEFAULT_CHAIN;
-  const chain = (envChain() || jobChain).filter(hasKey);
+  let chain = (envChain() || jobChain).filter(hasKey);
+
+  // Data Trust Phase 3.1 — a sensitive (vault-PII) call may ONLY use the vetted
+  // no-training allow-list, and IGNORES the LLM_CHAIN env override (which could
+  // otherwise route PII to an un-vetted provider). We keep the per-job ordering
+  // but drop any provider not on the allow-list. Result: customer PII is only
+  // ever sent to providers we can name and promise about.
+  if (opts.dataClass === 'sensitive') {
+    const allow = new Set(sensitiveProviders());
+    chain = (jobChain.filter(hasKey)).filter(p => allow.has(p));
+    if (chain.length === 0) {
+      throw new Error('No no-training LLM provider available for sensitive data');
+    }
+  }
+
   if (chain.length === 0) throw new Error('No LLM provider keys configured');
   let lastErr = '';
   for (const p of chain) {

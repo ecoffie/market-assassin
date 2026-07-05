@@ -351,6 +351,10 @@ export async function generateV2Draft(opts: {
     // falls back to the old 2200 cap when no matrix was provided.
     maxTokens: built.context.maxOutputTokens ?? 2200,
     job: 'drafting',
+    // The drafter prompt embeds the bidder's full vault (identity, real
+    // contracts, team) → no-training providers only (Data Trust 3.1). This also
+    // keeps PII off grok, which the drafting chain would otherwise fall back to.
+    dataClass: 'sensitive',
   });
   const rawDraft = (rawDraftRaw || '').trim();
   if (!rawDraft) throw new Error('AI returned empty draft (all providers)');

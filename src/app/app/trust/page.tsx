@@ -28,9 +28,9 @@ const PROMISES: Promise[] = [
   },
   {
     claim: 'We don’t train AI models on your data',
-    how: 'No-training provider tiers',
+    how: 'Vetted no-training providers only',
     detail:
-      'When Mindy uses AI to help draft a proposal or match your evidence, your data is sent only to business API tiers that contractually do not train their models on it. Your vault is never used to improve a model that another company could query.',
+      'When Mindy uses AI to help draft a proposal or match your evidence, that request is routed only to a vetted allow-list of business API providers that contractually do not train their models on it. Anything carrying your vault data is restricted to that list in code — it can’t fall back to an unvetted provider, even under load. Your vault is never used to improve a model another company could query.',
   },
   {
     claim: 'The AI only ever sees your own data',

@@ -3294,3 +3294,28 @@ an honest "what we're still building" note (org workspaces, in-boundary gov
 deployment). The vault header links straight to a working export. Backed by the
 Phase 1 enforcement (delete gap closed, export shipped, RLS backstop proven,
 strong-auth on all vault routes). 162/162 tests, 0 type errors, 0 lint.
+
+---
+
+## Data Trust: No-Training Provider Guarantee (Phase 3.1) — 2026-07-05
+
+**What:** Any AI request that carries your vault data is now locked, in code, to
+a vetted allow-list of providers that don't train on it — and it can't fall back
+to an unvetted one, even under heavy load. We can tell you exactly which AI
+providers ever see your data, because it's no longer "whoever answers first."
+
+**Why:** Customers asked whether their data could end up training someone else's
+AI. The honest answer needs to be specific: not just "we use no-training tiers,"
+but "your data is restricted to this named list, enforced, with no leak path."
+That specificity is the difference between a promise and a guarantee.
+
+**SEO / positioning:** "we don't train on your data", "no-training AI",
+"AI data governance" — a concrete, enforced control, not a policy paragraph.
+
+**Proof:** callLLM gained a dataClass: 'sensitive' flag; sensitive calls are
+intersected with SENSITIVE_LLM_PROVIDERS (default OpenAI/Anthropic/Groq — grok
+excluded) and ignore the LLM_CHAIN override. Applied to all six vault-PII call
+sites (evidence match, cap-statement + resume parse, proposal drafter, referee,
+chat). 5 unit tests prove a hostile env override can't route PII to an unvetted
+provider and that it throws rather than silently falling back. 167/167 tests, 0
+type errors.

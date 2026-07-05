@@ -61,8 +61,8 @@ Now that the claims are true, surface them. Two pieces — both shipped:
 *Design: navy→purple/emerald brand, matches `mindy-landing`. Copy in Mindy plain-language voice (`mindy_vocabulary_rule`) — no "tenant isolation" jargon; say "only you can see your vault."*
 
 ### Phase 3 — AI data-handling transparency
-- **3.1 Provider transparency + no-training statement** — document (and where cheap, enforce) that vault text goes only to no-training API tiers; make the provider deterministic per data-class instead of "whoever answers first" so we can *tell* a customer who saw their data.
-- **3.2 (Optional) PII-minimization before LLM calls** — for the highest-sensitivity fields (EIN, clearance, reference contacts), evaluate redacting/tokenizing before the model call where it doesn't break the workflow. Scope after 3.1; may not be worth the accuracy cost — decide with data.
+- **3.1 ✅ DONE (2026-07-05).** `callLLM` now takes `dataClass: 'sensitive'`. Sensitive (vault-PII) calls are restricted to a vetted no-training allow-list (`SENSITIVE_LLM_PROVIDERS`, default openai/claude/groq — grok EXCLUDED) and IGNORE the `LLM_CHAIN` env override, so PII can't be forced onto an unvetted provider. Tagged all 6 vault-PII call sites: evidence rerank, cap-statement parse, resume parse, proposal drafter, referee, proposal chat. Embeddings were already OpenAI-only. 5 unit tests lock the property (hostile env override can't route PII to grok; throws rather than silent-fallback). Trust-page copy sharpened accordingly.
+- **3.2 (Optional, NOT started) PII-minimization before LLM calls** — for the highest-sensitivity fields (EIN, clearance, reference contacts), evaluate redacting/tokenizing before the model call where it doesn't break the workflow. May not be worth the accuracy cost — decide with data.
 
 ### Phase 4 — Enterprise-grade (the Karp/ontology tier) — later, contract-driven
 - Per-workspace `org_id` on vault tables + the full ontology/permission-boundary model (ties to Coach Mode enterprise tenancy).

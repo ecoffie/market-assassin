@@ -260,7 +260,7 @@ export async function POST(request: NextRequest) {
         if (!groqRes.ok || !groqRes.body) {
           // Last resort: non-streaming callLLM (Claude/OpenAI) so chat never dies.
           try {
-            const { text } = await callLLM({ system: SYSTEM_PROMPT, user: messages[messages.length - 1].content, maxTokens: MAX_TOKENS, temperature: TEMPERATURE, job: 'reasoning' });
+            const { text } = await callLLM({ system: SYSTEM_PROMPT, user: messages[messages.length - 1].content, maxTokens: MAX_TOKENS, temperature: TEMPERATURE, job: 'reasoning', dataClass: 'sensitive' });
             if (text?.trim()) { send({ type: 'token', content: text }); send({ type: 'done' }); controller.close(); return; }
           } catch { /* fall to error */ }
           send({ type: 'error', message: 'AI is busy right now — try again in a moment.' });

@@ -73,6 +73,9 @@ export async function POST(request: NextRequest) {
         json: true,
         maxTokens: 2500,
         temperature: 0.1,
+        // The draft under review contains the bidder's vault facts (real
+        // contracts, team) → no-training providers only (Data Trust 3.1).
+        dataClass: 'sensitive',
         job: 'referee', // independent model (Claude) — different from the drafter
       });
       const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
