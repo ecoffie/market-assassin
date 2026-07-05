@@ -44,7 +44,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Email, contract_title, agency required' }, { status: 400 });
   }
 
-  const auth = await verifyUserOwnsEmail(request, email);
+  const auth = await verifyUserOwnsEmail(request, email, { requireStrongAuth: true });
   if (!auth.authenticated) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   }
@@ -74,7 +74,7 @@ export async function PATCH(request: NextRequest) {
   if (!email || !id) {
     return NextResponse.json({ success: false, error: 'Email and id required' }, { status: 400 });
   }
-  const auth = await verifyUserOwnsEmail(request, email);
+  const auth = await verifyUserOwnsEmail(request, email, { requireStrongAuth: true });
   if (!auth.authenticated) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   }
@@ -102,7 +102,7 @@ export async function DELETE(request: NextRequest) {
   if (!email || !id) {
     return NextResponse.json({ success: false, error: 'Email and id required' }, { status: 400 });
   }
-  const auth = await verifyUserOwnsEmail(request, email);
+  const auth = await verifyUserOwnsEmail(request, email, { requireStrongAuth: true });
   if (!auth.authenticated) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   }

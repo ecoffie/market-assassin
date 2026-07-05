@@ -86,7 +86,7 @@ export async function POST(request: NextRequest) {
   const selections: Selections = body.selections || {};
   if (!email) return NextResponse.json({ success: false, error: 'email is required' }, { status: 400 });
 
-  const auth = await verifyUserOwnsEmail(request, email);
+  const auth = await verifyUserOwnsEmail(request, email, { requireStrongAuth: true });
   if (!auth.authenticated) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   }

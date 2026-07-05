@@ -260,7 +260,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'email required' }, { status: 400 });
   }
 
-  const auth = await verifyUserOwnsEmail(request, email);
+  const auth = await verifyUserOwnsEmail(request, email, { requireStrongAuth: true });
   if (!auth.authenticated) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   }
@@ -351,7 +351,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'email and uei required' }, { status: 400 });
   }
 
-  const auth = await verifyUserOwnsEmail(request, email);
+  const auth = await verifyUserOwnsEmail(request, email, { requireStrongAuth: true });
   if (!auth.authenticated) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   }

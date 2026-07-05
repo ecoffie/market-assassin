@@ -38,7 +38,7 @@ export async function POST(request: NextRequest) {
   if (!email || !entry.full_name || !entry.title) {
     return NextResponse.json({ success: false, error: 'Email, full_name, title required' }, { status: 400 });
   }
-  const auth = await verifyUserOwnsEmail(request, email);
+  const auth = await verifyUserOwnsEmail(request, email, { requireStrongAuth: true });
   if (!auth.authenticated) return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   const row = { ...pick(entry), user_email: auth.email! };
   const { data, error } = await getSupabase().from('user_team_members').insert(row).select().maybeSingle();
@@ -54,7 +54,7 @@ export async function PATCH(request: NextRequest) {
   const id = String(body.id || '').trim();
   const entry = body.entry || {};
   if (!email || !id) return NextResponse.json({ success: false, error: 'Email and id required' }, { status: 400 });
-  const auth = await verifyUserOwnsEmail(request, email);
+  const auth = await verifyUserOwnsEmail(request, email, { requireStrongAuth: true });
   if (!auth.authenticated) return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   const update = { ...pick(entry), updated_at: new Date().toISOString() };
   const { data, error } = await getSupabase().from('user_team_members')
@@ -68,7 +68,7 @@ export async function DELETE(request: NextRequest) {
   const email = String(request.nextUrl.searchParams.get('email') || '').trim();
   const id = String(request.nextUrl.searchParams.get('id') || '').trim();
   if (!email || !id) return NextResponse.json({ success: false, error: 'Email and id required' }, { status: 400 });
-  const auth = await verifyUserOwnsEmail(request, email);
+  const auth = await verifyUserOwnsEmail(request, email, { requireStrongAuth: true });
   if (!auth.authenticated) return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   const { error } = await getSupabase().from('user_team_members')
     .update({ archived_at: new Date().toISOString() }).eq('id', id).eq('user_email', auth.email!);

@@ -372,9 +372,23 @@ export function generateEmailToken(email: string): { token: string; ts: number }
  *
  * The claimedEmail MUST match the authenticated email.
  */
+export interface VerifyOptions {
+  /**
+   * When true, ONLY cryptographically-strong methods are accepted: Supabase
+   * session, signed email token, or the Mindy 2FA session token. The legacy
+   * plaintext `ma_access_email` cookie and the token-less staff-domain bypass
+   * are REFUSED. Use this for the highest-sensitivity data (the vault), where a
+   * spoofable cookie or an unauthenticated staff-email claim is not acceptable
+   * (Data Trust Phase 1.4). Default false = existing behavior for all other
+   * routes, unchanged.
+   */
+  requireStrongAuth?: boolean;
+}
+
 export async function verifyUserOwnsEmail(
   request: NextRequest,
-  claimedEmail: string
+  claimedEmail: string,
+  options: VerifyOptions = {}
 ): Promise<AuthResult> {
   const normalized = claimedEmail?.toLowerCase();
 
@@ -423,6 +437,17 @@ export async function verifyUserOwnsEmail(
     } catch {
       // fall through to remaining methods
     }
+  }
+
+  // Methods 3 & 4 below are WEAK (a spoofable plaintext cookie; a token-less
+  // staff-email claim). Strong-auth callers (the vault) stop here — for the
+  // most sensitive PII, only a real session/token/2FA is acceptable.
+  if (options.requireStrongAuth) {
+    return {
+      authenticated: false,
+      email: null,
+      error: 'Strong authentication required — please sign in',
+    };
   }
 
   // Method 3: Check cookie (legacy, weak auth)

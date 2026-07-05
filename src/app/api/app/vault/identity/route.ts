@@ -40,7 +40,7 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'Email is required' }, { status: 400 });
   }
 
-  const auth = await verifyUserOwnsEmail(request, email);
+  const auth = await verifyUserOwnsEmail(request, email, { requireStrongAuth: true });
   if (!auth.authenticated) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   }
