@@ -171,7 +171,12 @@ export async function GET(request: NextRequest) {
       'attachments->0->>name.like.Document %,attachments->0->>name.like.Attachment %',
     );
   } else {
-    queryBuilder = queryBuilder.eq('attachments', '[]');
+    // Rows never resolved. Must catch BOTH shapes of "unresolved":
+    //   - attachments IS NULL  (the nightly sync inserts NULL — ~59% of active rows)
+    //   - attachments = '[]'   (older default)
+    // The previous `eq('[]')` alone matched ZERO of the NULL rows, so the backfill
+    // silently stopped covering ~17K opps once sync switched to NULL inserts.
+    queryBuilder = queryBuilder.or('attachments.is.null,attachments.eq.[]');
   }
 
   const { data: rows, error } = await queryBuilder;
@@ -237,7 +242,7 @@ export async function GET(request: NextRequest) {
   const { count: remaining } = await (supabase
     .from('sam_opportunities')
     .select('id', { count: 'exact', head: true }) as any)
-    .eq('attachments', '[]')
+    .or('attachments.is.null,attachments.eq.[]')
     .eq('active', true);
 
   return NextResponse.json({
