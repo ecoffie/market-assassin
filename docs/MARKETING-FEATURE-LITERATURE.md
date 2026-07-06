@@ -3394,3 +3394,29 @@ content-negotiation header that silently 406'd every request).
 **Honest scope:** The mechanism is fixed and live; the historical backlog (~16,900
 opportunities) drains on the daily cron. The Pursuit → Proposal Assist auto-ingest path
 uses the same discovery and is queued to move onto the working endpoint next.
+
+---
+
+## Market Dashboard — Deadline Sort Toggle (July 6, 2026)
+
+**What:** Added a sort control to the Market Dashboard so users can order opportunities
+by response deadline in either direction — "Due soonest first" (the default bid-now view)
+or "Due furthest first" (the plan-ahead / long-lead view). It sits next to the urgency
+filter and re-queries the full result set, so it sorts across all matches, not just the
+current page.
+
+**Why it matters:** Not every buyer works the same clock. A team scrambling this week
+wants what's closing next; a team building a capture pipeline wants the opportunities
+posted 6–18 months out — the recompetes and multi-year vehicles they can actually shape.
+Locking the list to "soonest first" hid the long-lead work that's often the most winnable.
+Giving both directions turns one list into two workflows: react vs. plan.
+
+**Proof:** Verified live in production — "soonest" returns deadlines closing today
+(2026-07-06); "furthest" surfaces multi-year opportunities dated out to 2031 (e.g. "Next
+Generation Undersea Security Initiative", "DCSA Innovation Gateway"). No-deadline rows
+stay at the bottom in both directions.
+
+**Honest scope:** The toggle applies to the Market Dashboard opportunity list
+(/app/market-intel). The default remains "soonest first" so nobody's habitual view
+changes unless they choose to flip it — the power-user control is additive, not a
+reshuffle of everyone's screen.
