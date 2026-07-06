@@ -3319,3 +3319,27 @@ sites (evidence match, cap-statement + resume parse, proposal drafter, referee,
 chat). 5 unit tests prove a hostile env override can't route PII to an unvetted
 provider and that it throws rather than silently falling back. 167/167 tests, 0
 type errors.
+
+---
+
+## Data Trust: Vault File Backup (2026-07-05)
+
+**What:** Every file a customer uploads to their vault — resumes, capability
+statements, pricing documents — is now backed up daily to a separate, private
+location. This closes the one gap in an otherwise fully-backed-up system.
+
+**Why:** Managed database backups (which Mindy has, daily) explicitly do NOT
+include uploaded files — only the records that point to them. So the files
+themselves had no backup. For documents a customer can't easily recreate, that's
+the gap worth closing. Now the database AND the files are both protected.
+
+**SEO / positioning:** "your documents are backed up", "data durability" —
+complete backup coverage, database plus files.
+
+**Proof:** A daily cron copies new/changed objects from vault-assets into a
+separate private vault-assets-backup bucket — incremental (only new/changed
+files each run), copy-only (never deletes from the live bucket), resumable. 6
+unit tests lock the safety properties (never deletes live, recurses per-user
+folders, skips unchanged, one failure doesn't abort). Pairs with Supabase's
+managed daily database backups + hourly DB health monitoring. 173/173 tests, 0
+type errors.
