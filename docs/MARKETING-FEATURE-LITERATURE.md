@@ -3420,3 +3420,31 @@ stay at the bottom in both directions.
 (/app/market-intel). The default remains "soonest first" so nobody's habitual view
 changes unless they choose to flip it — the power-user control is additive, not a
 reshuffle of everyone's screen.
+
+---
+
+## Coach Mode Add-On — My Clients for Solo Consultants (July 6, 2026)
+
+**What:** A $99/mo add-on that unlocks Coach Mode ("My Clients") on the Pro plan — manage
+up to 3 client businesses, each with its own pipeline, target agencies, and market
+research. Previously, managing clients required the full Teams tier ($499/mo); now a solo
+consultant can add just the client-management capability to their existing Pro plan.
+
+**Why it matters:** A huge slice of GovCon is fractional BD — one consultant running
+capture for a handful of small businesses. Forcing them to $499 Teams to manage 2–3
+clients was a cliff; many just wouldn't cross it. The $99 add-on meets them where they
+are: keep your Pro plan, add the clients you actually have. When they grow past 3 clients,
+Teams (now 5 workspaces) is the natural next step, and Enterprise beyond that. It turns a
+single price cliff into a smooth ladder — add-on → Teams → Enterprise.
+
+**Proof:** The pricing ladder is deliberately anchored so each rung is a better per-client
+deal only when you actually scale: add-on = 3 clients at $99, Teams = 5 clients at $499,
+Enterprise = unlimited. The entitlement grants coach access without changing the user's
+tier (they stay Pro), and the client cap is a hard, honest limit with a clear upgrade
+path — no surprise overage, no silent degradation.
+
+**Honest scope:** The Stripe payment link is being finalized; until it's live the upgrade
+button routes to the pricing page and nothing charges. Existing Teams and enterprise
+customers are unaffected — the Teams client cap moved to 5, and no current Teams
+organization has more than that (the one large org is an Enterprise white-label with
+unlimited workspaces).

@@ -246,23 +246,38 @@ export default function CoachPanel({
 
   if (!isCoach) {
     if (coachAccess && !coachAccess.allowed) {
+      const coachAddonUrl = process.env.NEXT_PUBLIC_COACH_ADDON_CHECKOUT_URL || '/market-intelligence#coach-addon';
       return (
         <div className="mx-auto max-w-2xl p-6 md:p-8">
           <h1 className="text-2xl font-bold text-white">My Clients</h1>
           <p className="mt-2 text-slate-400 text-sm leading-relaxed">
-            Manage multiple client businesses — each with its own pipeline, target agencies, and market research.
-            This capability is included with <span className="text-blue-300 font-medium">Mindy Teams</span> ($499/mo).
+            Manage other businesses&apos; BD — each client gets its own pipeline, target agencies, and market research.
+            Solopreneur covers one business; add Coach Mode to run a book of clients.
           </p>
-          <div className="mt-6 rounded-xl border border-blue-500/30 bg-blue-950/30 p-5">
-            <p className="text-sm text-slate-300">
-              Solopreneur covers one business. If you consult for multiple clients, upgrade to Teams for up to 10 client workspaces per seat.
+
+          {/* Primary: the $99 Coach Mode add-on — the cheapest way into My Clients. */}
+          <div className="mt-6 rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-5">
+            <div className="flex items-baseline justify-between">
+              <span className="text-sm font-semibold text-emerald-300">Coach Mode add-on</span>
+              <span className="text-sm text-slate-300"><span className="font-semibold text-white">$99</span>/mo</span>
+            </div>
+            <p className="mt-2 text-sm text-slate-300">
+              Adds My Clients to your Pro plan — up to <span className="font-medium text-white">3 client workspaces</span>. Perfect if you consult for a handful of businesses.
             </p>
             <a
-              href="/market-intelligence#teams"
-              className="mt-4 inline-flex h-10 items-center rounded-lg bg-blue-600 px-5 text-sm font-medium text-white hover:bg-blue-500"
+              href={coachAddonUrl}
+              className="mt-4 inline-flex h-10 items-center rounded-lg bg-emerald-600 px-5 text-sm font-medium text-white hover:bg-emerald-500"
             >
-              Upgrade to Teams →
+              Add Coach Mode →
             </a>
+          </div>
+
+          {/* Secondary: Teams, for scale. */}
+          <div className="mt-3 rounded-xl border border-slate-700 bg-slate-900/40 p-4">
+            <p className="text-sm text-slate-400">
+              Running more than 3 clients? <span className="text-slate-200 font-medium">Mindy Teams</span> ($499/mo) includes up to 5 client workspaces plus shared team seats.{' '}
+              <a href="/market-intelligence#teams" className="text-blue-300 hover:text-blue-200 underline underline-offset-2">Compare Teams →</a>
+            </p>
           </div>
         </div>
       );

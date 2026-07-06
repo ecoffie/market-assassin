@@ -267,10 +267,17 @@ export async function POST(request: NextRequest) {
       .eq('org_id', membership.org_id)
       .eq('status', 'active');
     if (coachAtClientLimit(coachAccess, clientCount ?? 0)) {
+      // Point the user at the RIGHT next tier for their path: add-on → Teams (5),
+      // Teams → Enterprise (unlimited). Hard block — no adding past the cap.
+      const nextStep =
+        coachAccess.reason === 'coach_addon'
+          ? 'Upgrade to Mindy Teams for up to 5 client workspaces.'
+          : 'Upgrade to Enterprise for unlimited client workspaces.';
       return NextResponse.json(
         {
           success: false,
-          error: `Client limit reached (${coachAccess.maxClients} active clients). Upgrade to Enterprise for more.`,
+          error: `Client limit reached (${coachAccess.maxClients} active clients). ${nextStep}`,
+          upgradeTo: coachAccess.reason === 'coach_addon' ? 'team' : 'enterprise',
           coachAccess,
         },
         { status: 403 },

@@ -169,6 +169,16 @@ export async function POST(request: NextRequest) {
       }
     }
 
+    // Coach Mode ADD-ON ($99/mo) — NOT a tier. It's a capability flag on top of Pro,
+    // so we detect it separately and set access_coach_addon below WITHOUT touching tier.
+    // Matched by description or the $99/mo ($9,900 cents) amount. If a user somehow buys
+    // this without Pro, coach-access still gates correctly (they only get the add-on
+    // path; the modal explains they need Pro first).
+    const isCoachAddon =
+      normalizedDescription.includes('coach mode') ||
+      normalizedDescription.includes('coach add') ||
+      (session.mode === 'subscription' && session.amount_total === 9900);
+
     // Check if already processed
     if (supabase) {
       const { data: existing } = await supabase
@@ -268,6 +278,22 @@ export async function POST(request: NextRequest) {
 
     // Auto-update access flags (always update, user_id is optional)
     const accessUpdates = await updateAccessFlags(email, tier, bundle);
+
+    // Coach Mode add-on ($99/mo): flip the standalone access_coach_addon flag. It's
+    // independent of tier (the user stays Pro), so we write it directly rather than
+    // through updateAccessFlags' tier→flag map. Non-fatal — a flag-write hiccup must
+    // not fail the webhook (Stripe would retry the whole event).
+    if (isCoachAddon && supabase) {
+      try {
+        await supabase
+          .from('user_profiles')
+          .update({ access_coach_addon: true })
+          .eq('email', email);
+        console.log(`[stripe-webhook] granted Coach Mode add-on to ${email}`);
+      } catch (e) {
+        console.error('[stripe-webhook] coach-addon flag write failed (non-fatal):', e);
+      }
+    }
 
     // Keep KV in sync with paid briefings entitlement so /briefings access works immediately.
     if (accessUpdates.access_briefings) {

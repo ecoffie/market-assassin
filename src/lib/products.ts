@@ -19,6 +19,20 @@ export const PRODUCTS = {
     },
     features: ['agency-search-full', 'daily-alerts', 'ai-briefings', 'market-research', 'forecasts', 'pipeline', 'crm', 'content-reaper', 'fhc-training'],
   },
+  // Coach Mode add-on ($99/mo) — for Pro users who want My Clients (manage other
+  // businesses' BD) without jumping to Teams. Caps at 3 client workspaces; upgrade to
+  // Teams (5) for more. Stripe product TBD — set NEXT_PUBLIC_COACH_ADDON_CHECKOUT_URL
+  // when the payment link exists. The placeholder intentionally fails safe (no charge).
+  COACH_ADDON: {
+    id: 'coach-addon',
+    name: 'Coach Mode Add-On',
+    price: 99,
+    billing: 'monthly',
+    requires: 'pro', // an add-on ON TOP of a Pro subscription, not a standalone tier
+    maxClients: 3,
+    stripeUrl: process.env.NEXT_PUBLIC_COACH_ADDON_CHECKOUT_URL || '',
+    features: ['my-clients', 'coach-mode'],
+  },
   // Legacy: $49/mo briefings (for grandfathered users, NOT promoted)
   LEGACY_BRIEFINGS: {
     id: 'legacy-briefings',

@@ -11,7 +11,13 @@
 import { createClient } from '@supabase/supabase-js';
 import { verifyMIAccess, type MIAccessTier } from '@/lib/api-auth';
 
-export type CoachAccessReason = 'team' | 'enterprise' | 'staff' | 'org_member' | 'denied';
+export type CoachAccessReason =
+  | 'team'
+  | 'enterprise'
+  | 'staff'
+  | 'org_member'
+  | 'coach_addon'
+  | 'denied';
 
 export interface CoachAccessResult {
   allowed: boolean;
@@ -20,14 +26,18 @@ export interface CoachAccessResult {
   /** null = no practical cap (staff / enterprise) */
   maxClients: number | null;
   existingClientCount?: number;
-  upgradeRequired?: 'team';
+  /** What the user should upgrade to when denied or at cap. */
+  upgradeRequired?: 'coach_addon' | 'team';
 }
 
-/** Client workspace caps — seat model for solo consultants on Teams. */
+/** Client workspace caps by access path. */
 export const COACH_CLIENT_LIMITS = {
-  team: 10,
-  /** Grandfathered Pro org members get the same cap as Teams solo consultants. */
+  /** Teams seat — the serious consultant tier. */
+  team: 5,
+  /** Grandfathered Pro org members keep the historical cap (predate the add-on). */
   grandfather: 10,
+  /** Pro + Coach Mode add-on ($99/mo) — a small book of clients; upgrade to Teams for more. */
+  coachAddon: 3,
 } as const;
 
 function getSupabase() {
@@ -79,6 +89,20 @@ export async function resolveCoachAccess(email: string): Promise<CoachAccessResu
     };
   }
 
+  // Pro + Coach Mode ADD-ON ($99/mo). Grants coach access WITHOUT upgrading the tier —
+  // the user stays 'pro', they've just bought the My Clients capability with a small
+  // 3-client cap. Need more clients → upgrade to Teams (5). Checked here (after team,
+  // before the org-member fallback) so a real Teams seat always wins.
+  if (await hasCoachAddon(normalized)) {
+    return {
+      allowed: true,
+      reason: 'coach_addon',
+      canAddClients: true,
+      maxClients: COACH_CLIENT_LIMITS.coachAddon,
+      upgradeRequired: 'team', // shown when they hit the 3-client cap
+    };
+  }
+
   // Org member (coach/org_admin). Access + cap follow the ORG's tier, not just the
   // user's personal MI tier — an NCMBC/SBDC counselor on an enterprise-tier org gets
   // unlimited clients even though their personal login isn't "enterprise". This is
@@ -112,13 +136,35 @@ export async function resolveCoachAccess(email: string): Promise<CoachAccessResu
     };
   }
 
+  // Denied. A Pro user's cheapest path in is the Coach Mode add-on ($99/mo, 3 clients);
+  // free users should get Pro first, but the add-on is the coach-specific unlock so we
+  // point everyone at it as the entry point (the modal explains Teams for scale).
   return {
     allowed: false,
     reason: 'denied',
     canAddClients: false,
     maxClients: null,
-    upgradeRequired: 'team',
+    upgradeRequired: 'coach_addon',
   };
+}
+
+/**
+ * True when this Pro user has bought the Coach Mode add-on. Direct Supabase check
+ * against user_profiles.access_coach_addon (mirrors hasMindyTeamAccess in api-auth).
+ * The Stripe webhook sets this flag on the $99/mo add-on purchase.
+ */
+async function hasCoachAddon(email: string): Promise<boolean> {
+  try {
+    const supabase = getSupabase();
+    const { data } = await supabase
+      .from('user_profiles')
+      .select('access_coach_addon')
+      .eq('email', email)
+      .maybeSingle();
+    return !!(data as { access_coach_addon?: boolean } | null)?.access_coach_addon;
+  } catch {
+    return false;
+  }
 }
 
 /** Returns the access result when allowed; null when denied (for route guards). */

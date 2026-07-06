@@ -76,14 +76,26 @@ Staff and grandfathered org members bypass the paywall.
 
 ## 5. Decisions & open questions
 
-### Approved (not yet built)
-- **Pro add-on** — `$49/mo` My Clients on Solopreneur, **3 client workspaces** cap.
-  Keeps Teams as the serious consultant path (10 clients + seats); captures
-  Pro users who only need 1–3 clients. Stripe product TBD.
+### Coach Mode add-on — BUILT July 6, 2026
+- **Price: `$99/mo`** (raised from the originally-approved $49 — $49 undercut Teams at
+  ~$16/client vs Teams' per-client; $99 anchors better and protects the Teams tier).
+- **Cap: 3 client workspaces, HARD BLOCK** at the cap (Eric's call — not a soft warning).
+  4th client → "Upgrade to Mindy Teams" CTA.
+- **Teams cap lowered 10 → 5** (Eric, same session) so the ladder is tight: add-on 3 →
+  Teams 5 → Enterprise unlimited. Verified no real Teams org has >5 active clients (only
+  NCMBC at 60, which is `enterprise` tier = unlimited, unaffected).
+- **Entitlement:** `user_profiles.access_coach_addon` (migration
+  `20260706_coach_addon_access.sql`). The user stays `pro` — the add-on grants coach
+  access WITHOUT a tier change. Set by the Stripe webhook on the $99 purchase (matched by
+  "Coach Mode" description or the $99/mo amount).
+- **Checkout:** `NEXT_PUBLIC_COACH_ADDON_CHECKOUT_URL` (Stripe payment link TBD — button
+  routes to `/market-intelligence#coach-addon` until set; fails safe, no charge).
+- **Files:** `coach-access.ts` (reason `coach_addon`, `COACH_CLIENT_LIMITS.coachAddon=3`,
+  `team=5`), `stripe-webhook/route.ts`, `products.ts` (`COACH_ADDON`),
+  `CoachPanel.tsx` (add-on-first upgrade UI), `coach/route.ts` (cap → Teams CTA).
 
-### Eric to decide
+### Eric to decide (still open)
 1. **USHCC Atlanta pilot** — see pricing options below (director-only vs 20-member license).
-2. **Client over cap** — Hard block at 10 or soft warning + sales CTA?
 
 ---
 
