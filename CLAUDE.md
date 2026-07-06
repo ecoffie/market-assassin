@@ -1608,3 +1608,43 @@ passes `liveBq: true`. Also: name-search now matches exact UEI too. Diagnostic: 
 ---
 
 *Last Updated: June 24, 2026 — SEO crawl health + dep security: robots.txt now allows /_next/static + /_next/image (was blocking all JS/CSS → ~1,140 "Blocked by robots.txt"); 1,683 sitemap 404s already fixed in main (BigQuery-sourced, re-crawl pending); meta templates already optimized (PIID-in-title on /awards/[id]). npm audit 47→24 vulns, 0 critical: jspdf 4.2.1 + next 16.2.9 + overrides (fast-xml-parser/axios/ws/form-data); xlsx upload is 2FA-gated; nodemailer v9 (breaking) deferred. See "SEO crawl health + dependency security" section. Prev Jun 11 (PM) — Full-text search overhaul: bodies were EMPTY cache-wide (SAM returns description as a link; sync stored it) → notice-description lib + backfill-descriptions crons (active+inactive). 4-corpus search (title+description+sow_text+department), word-boundary ("M7"≠"M776"), Active/Inactive/All archive toggle, active-search escapes profile-NAICS filter. Global lookup bar (/app header): contract#→award detail, company/UEI→/contractors/[slug]. FIXED contractor search returning 0 (queryCached cacheOnly default → searchRecipients now liveBq:true; restored Contractors panel). Launch ops: setup-invite-batch + zero-alert-nudge + snapshot-metrics dispatcher jobs; onboarding persists real keywords + ends at Vault; semantic-keywords-from-UEI; emails green→navy/purple; sidebar account menu (mobile sign-out fix); demo-driven homepage (/mindy-landing, Vimeo reels); 2FA toggle removed (decorative). See "Full-text search + global lookup" + "Launch ops + onboarding" sections. Prev: Free alert email phased messaging (30-day setup nudges → Welcome/FREE forever; `profile-setup.ts`). Opportunity detail CTAs: profile setup before Pro upsell. SAM attachment real filenames (`SamAttachmentLinks`, metadata API; sync cron preserves attachment metadata). Prev Jun 8: Keyword-first market research (NAICS is the wrong primary key; "drones"=70+ codes, obvious code=28%/miss 72%; keyword auto-derives 90%-coverage NAICS; PSC=what's-bought lesson; Market Coverage banner; phrase-resilient; onboarding grounds day-1 codes so alerts aren't broken). Email send guard (#58 — global per-recipient daily cap + suppression, fixes 12-emails/day churn; emailType audit). Award Intelligence spine (award-detail + incumbent intel woven through task orders / Expiring Contracts / bid-no-bid / My Pursuits / Today's Intel), office contact rosters (#16, DoDAAC-decoded), Vault POC fields, SOW export tables, active-first pursuit picker, pipeline next-action + dedup, LLM cost discipline (gpt-4o-mini reasoning + $15 cap), quarterly data-refresh cron (honest stamp). See "Keyword-first market research" + "Award Intelligence + Office Rosters" sections. Prev Jun 3: Daily alerts free-daily permanent (DAILY_ALERT_BETA). Jun 2: purchase attribution → unified sales dashboard. May 20: OAuth custom domain (auth.getmindy.ai), Proposal Assist V2, mi-beta → app rename, session TTL 30d*
+
+---
+
+## Verification Recipes — how to PROVE each surface works (rule #2)
+
+The concrete "it works" evidence, centralized so skills/agents stop re-deriving it.
+"It compiles" ≠ "it works." A 200 with 0 rows is a FAIL, not a pass.
+
+**Page is live:** `curl -s -o /dev/null -w "%{http_code}\n" "https://getmindy.ai<route>"` → 200 (3xx to login = OK for gated, note it; 404/500 = fail).
+
+**API returns real data (not just 200):**
+```bash
+curl -s -o /tmp/v.json -w "%{http_code}\n" "https://getmindy.ai/api/<route>?<params>"
+node -e 'const d=require("/tmp/v.json");const r=d.results||d.data||d.rows||d.items||d;console.log("rows:",Array.isArray(r)?r.length:JSON.stringify(r).slice(0,200))'
+```
+
+**Panel actually renders the data** (rendered rows == API rows): run `/verify-panel <name>`. Catches the facet-bug class (API 56, UI shows 3).
+
+**Migration landed** (never trust "Success. No rows returned" alone):
+```bash
+npx tsx -e "import dotenv from 'dotenv';dotenv.config({path:'.env.local'});import {createClient} from '@supabase/supabase-js';const sb=createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.SUPABASE_SERVICE_ROLE_KEY!);(async()=>{const {error}=await sb.from('<table>').select('<new_col>').limit(1);console.log(error?'❌ NOT applied: '+error.message:'✅ column exists');})();"
+```
+
+**Cron is registered** (it's a `cron_jobs` row, NOT vercel.json; dispatcher ticks HOURLY so `*/10` really fires ~once/hr):
+```bash
+npx tsx -e "import dotenv from 'dotenv';dotenv.config({path:'.env.local'});import {createClient} from '@supabase/supabase-js';const sb=createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.SUPABASE_SERVICE_ROLE_KEY!);(async()=>{const {data}=await sb.from('cron_jobs').select('name,cron_expression,last_run,active').eq('active',true);console.table(data);})();"
+```
+
+**Env var is in prod:** `vercel env ls production | grep -i <VAR>`.
+
+**Backfill/drainer progress:** run `/backfill-status` (drained vs stalled vs progressing).
+
+**Full deploy proof (all of the above for what a ship touched):** run `/verify-prod`.
+
+### The screenshot-debug decision tree (the 386-turn loop)
+A number/label on screen looks wrong → diagnose in THIS order before touching a component:
+1. **Wrong DATA?** Query the source table/API, compare to screen. A "No X found" when data exists, or a stale figure = a **query/wiring bug** → fix the backend, don't mask it in the UI. (Most "still shows X" loops are this.)
+2. **Stale CACHE?** DB is right but screen is old → fix the cache layer (KV / last-good / SWR), not the component.
+3. **UI RENDER?** Data is right, presentation wrong → the component. Apply standing UI standards (counts at top · names not codes · chips clickable · spinner on load · legible contrast · vertical bars · no dead empty-state · jargon defined).
+Then: `/ui-fix` (render) → `/verify-panel` (prove) → `/ship` → `/verify-prod`. Or hand the whole loop to the **fix-and-ship** agent.
