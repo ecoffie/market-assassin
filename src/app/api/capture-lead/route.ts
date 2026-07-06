@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getSupabase } from '@/lib/supabase/client';
 import { sendFreeResourceEmail } from '@/lib/send-email';
+import { normalizeAttribution, pushLeadToGhl } from '@/lib/mindy/lead-attribution';
 
 // Free resources that require email capture
 export const FREE_RESOURCES = {
@@ -71,7 +72,21 @@ export type ResourceId = keyof typeof FREE_RESOURCES;
 // Capture email and grant access to resource
 export async function POST(request: NextRequest) {
   try {
-    const { email, name, company, resourceId } = await request.json();
+    const { email, name, company, resourceId, attribution } = await request.json();
+    // Prefer attribution in the body; otherwise fall back to the gca_attr cookie
+    // that AttributionTracker sets (sent automatically), so every existing caller
+    // gets source attribution without changing its client code.
+    let attr = normalizeAttribution(attribution);
+    if (!attr.utm_source) {
+      const cookie = request.cookies.get('gca_attr')?.value;
+      if (cookie) {
+        try {
+          attr = normalizeAttribution(JSON.parse(decodeURIComponent(cookie)));
+        } catch {
+          /* malformed cookie — leave attr as-is */
+        }
+      }
+    }
 
     if (!email) {
       return NextResponse.json(
@@ -153,12 +168,35 @@ export async function POST(request: NextRequest) {
         company: company || null,
         source: resourceId,
         resources_accessed: [resourceId],
+        utm_source: attr.utm_source || null,
+        utm_medium: attr.utm_medium || null,
+        utm_campaign: attr.utm_campaign || null,
+        utm_content: attr.utm_content || null,
+        referrer: attr.referrer || null,
       });
 
       if (insertError) {
         console.error('Error creating lead:', insertError);
         // Don't fail - still grant access even if DB insert fails
       }
+    }
+
+    // Push the captured lead into GHL for nurture (list home = GHL). Non-fatal —
+    // a GHL hiccup must never block resource access. Tag with the resource + source
+    // so YouTube-driven magnet captures are segmentable in the nurture rails.
+    try {
+      const { ok } = await pushLeadToGhl({
+        email,
+        name,
+        company,
+        attr,
+        tags: [`magnet-${resourceId}`],
+      });
+      if (ok) {
+        await supabase.from('leads').update({ synced_to_ghl: true }).eq('email', email.toLowerCase());
+      }
+    } catch (ghlErr) {
+      console.warn('capture-lead GHL push failed (non-fatal):', ghlErr);
     }
 
     // Send confirmation email for new resource access

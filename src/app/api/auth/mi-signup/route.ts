@@ -6,6 +6,7 @@ import { sendEmail } from '@/lib/send-email';
 import { applyPartnerReferralIfEligible } from '@/lib/mindy/apply-partner-referral';
 import { getPartnerReferralByCode } from '@/lib/mindy/partner-referrals';
 import { enqueuePendingSignup } from '@/lib/resilience/signup-queue';
+import { normalizeAttribution, pushLeadToGhl, isYouTubeSource } from '@/lib/mindy/lead-attribution';
 
 export const runtime = 'nodejs';
 
@@ -226,6 +227,21 @@ export async function POST(request: NextRequest) {
     const body = await request.json().catch(() => ({}));
     const email = normalizeEmail(body.email);
     const referralCode = typeof body.referralCode === 'string' ? body.referralCode : '';
+    // Attribution forwarded by the signup form from the gca_attr cookie /
+    // gca_attribution localStorage that AttributionTracker maintains. Lets us
+    // count free signups by source (e.g. YouTube). Optional — never blocks signup.
+    // Fall back to the gca_attr cookie if the client didn't forward it.
+    let attribution = normalizeAttribution(body.attribution);
+    if (!attribution.utm_source) {
+      const cookie = request.cookies.get('gca_attr')?.value;
+      if (cookie) {
+        try {
+          attribution = normalizeAttribution(JSON.parse(decodeURIComponent(cookie)));
+        } catch {
+          /* malformed cookie — leave as-is */
+        }
+      }
+    }
 
     if (!email) {
       return NextResponse.json({ success: false, error: 'Email is required' }, { status: 400 });
@@ -293,6 +309,27 @@ export async function POST(request: NextRequest) {
         tier: 'free',
       },
     });
+
+    // Record source attribution (non-fatal) so free signups are countable by
+    // channel — e.g. "how many free signups came from YouTube this week?".
+    // Also push YouTube leads into GHL for the nurture rails (list home = GHL).
+    try {
+      const supabase = getSupabaseAdmin();
+      await supabase.from('signup_attribution').insert({
+        email,
+        source: typeof body.source === 'string' ? body.source : attribution.utm_source || null,
+        utm_source: attribution.utm_source || null,
+        utm_medium: attribution.utm_medium || null,
+        utm_campaign: attribution.utm_campaign || null,
+        utm_content: attribution.utm_content || null,
+        referrer: attribution.referrer || null,
+      });
+      if (isYouTubeSource(attribution)) {
+        await pushLeadToGhl({ email, attr: attribution, tags: ['mindy-free-signup'] });
+      }
+    } catch (attrErr) {
+      console.warn('[Mindy Signup] attribution record failed (non-fatal):', attrErr);
+    }
 
     return NextResponse.json({ success: true, message: SUCCESS_MESSAGE });
   } catch (error) {

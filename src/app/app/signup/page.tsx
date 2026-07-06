@@ -8,6 +8,20 @@ import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
 import { capturePartnerRefFromSearchParams, getStoredPartnerRef } from '@/lib/mindy/partner-referral-client';
 import { getPartnerReferralByCode } from '@/lib/mindy/partner-referrals';
 
+/**
+ * Read the attribution AttributionTracker stored (gca_attribution) so signup can
+ * forward it to the server for source counting (YouTube etc.). Best-effort — any
+ * failure returns undefined and signup proceeds normally.
+ */
+function readAttribution(): unknown {
+  try {
+    const raw = window.localStorage.getItem('gca_attribution');
+    return raw ? JSON.parse(raw) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
 export default function MindySignupPage() {
   return (
     <Suspense fallback={
@@ -53,6 +67,10 @@ function MindySignupContent() {
         body: JSON.stringify({
           email,
           referralCode: partnerRef || undefined,
+          // Forward the attribution AttributionTracker captured (gca_attribution)
+          // so the server can record which channel — e.g. YouTube — this signup
+          // came from. Best-effort; never blocks signup if storage is unavailable.
+          attribution: readAttribution(),
         }),
       });
 

@@ -234,6 +234,25 @@ const nextConfig: NextConfig = {
   // Redirects for legacy URLs and convenience
   async redirects() {
     return [
+      // YouTube funnel entry — put getmindy.ai/youtube in every video description.
+      // Redirects to the landing page with YouTube UTM baked in so AttributionTracker
+      // captures the source into gca_attr (read at signup for source attribution).
+      // Optional ?c=<video-slug> becomes utm_campaign so per-video conversion is
+      // measurable. 307 (temporary) so we can evolve the params without SEO baggage.
+      {
+        source: '/youtube',
+        has: [{ type: 'host', value: 'getmindy.ai' }],
+        destination:
+          '/?utm_source=youtube&utm_medium=video&utm_campaign=channel',
+        permanent: false,
+      },
+      {
+        source: '/youtube/:slug',
+        has: [{ type: 'host', value: 'getmindy.ai' }],
+        destination:
+          '/?utm_source=youtube&utm_medium=video&utm_campaign=:slug',
+        permanent: false,
+      },
       {
         source: '/:path*',
         has: [
