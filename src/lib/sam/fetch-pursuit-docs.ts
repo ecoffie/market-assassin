@@ -25,6 +25,7 @@ import { getRotatedSAMKey } from './utils';
 import { extractPdf, extractDocx, extractTxt, extractXlsx } from './pdf-extract';
 import { classifyDoc } from '@/lib/proposal/classify-doc';
 import { parseSamAttachment } from '@/lib/sam/attachment-metadata';
+import { fetchNoticeResources } from '@/lib/sam/fetch-notice-resources';
 
 const SAM_OPPS_URL = 'https://api.sam.gov/opportunities/v2/search';
 const SAM_FILE_URL_PREFIX = 'https://sam.gov/api/prod/opps/v3/opportunities/resources/files/';
@@ -230,6 +231,31 @@ async function discoverFiles(
   const fmt = (d: Date) =>
     `${String(d.getMonth() + 1).padStart(2, '0')}/${String(d.getDate()).padStart(2, '0')}/${d.getFullYear()}`;
 
+  const isUuidId = /^[a-f0-9]{32}$/i.test(noticeId.trim());
+  const preTrace: string[] = [];
+
+  // FAST PATH (2026-07-06): when we have a real UUID, try SAM's per-notice resources
+  // endpoint FIRST. It resolves attachments (with real filenames) for notices the
+  // /v2/search index can't find by noticeid — the exact class that left 16,976 opps
+  // unresolved. See src/lib/sam/fetch-notice-resources.ts. Only fall through to the
+  // solnum/title search probes below if this returns nothing (a genuinely-empty notice
+  // or a stale/wrong UUID that the search fallback can still recover via sol#).
+  if (isUuidId) {
+    const direct = await fetchNoticeResources(noticeId, apiKey);
+    if (direct && direct.length > 0) {
+      const refs: SamFileRef[] = direct.map((a, i) => ({
+        url: a.url,
+        fileId: a.fileId || `unknown-${i}`,
+        filename: a.name || `Document ${i + 1}`,
+      }));
+      return { refs, resolvedUuid: noticeId, foundNotice: true, trace: [`resources:found=${refs.length}`] };
+    }
+    // direct === null → fetch failed (retryable); direct === [] → genuinely none OR
+    // wrong UUID. Either way, let the search probes below take a shot (they can recover
+    // via solnum/title). Record what happened for the diagnostic trail.
+    preTrace.push(direct === null ? 'resources:fetch-failed' : 'resources:empty');
+  }
+
   // SAM API rejects cross-calendar-year date windows with the bogus
   // error 'Date range must be null year(s) apart'. Try current calendar
   // year first, then last year as fallback. This bit us hard — the
@@ -253,7 +279,10 @@ async function discoverFiles(
   if (title && title.length >= 6) probes.push({ param: 'title', value: title });
 
   // Diagnostic trail (surfaced via fetchPursuitDocs return → heal endpoint).
-  const trace: string[] = [`probes=[${probes.map((p) => p.param).join(',')}] titleLen=${title.length} sol=${sol ? 'y' : 'n'}`];
+  const trace: string[] = [
+    ...preTrace,
+    `probes=[${probes.map((p) => p.param).join(',')}] titleLen=${title.length} sol=${sol ? 'y' : 'n'}`,
+  ];
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   let opp: any = null;
