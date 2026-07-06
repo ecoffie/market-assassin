@@ -8,13 +8,19 @@
  * instead of hitting the API with rate limits.
  */
 
-import { createClient } from '@supabase/supabase-js';
+import { getReadClient } from '@/lib/supabase/server-clients';
 import { sanitizeKeywords } from '@/lib/market/keyword-sanitize';
 
-// Initialize Supabase client for cached opportunities
+// Initialize Supabase client for cached opportunities.
+// READ REPLICA (Resilience Phase 1): this module ONLY reads sam_opportunities
+// (verified: zero writes), and it's the single heaviest read in the app —
+// daily-alerts calls it for 150 users × 4/day. So it's the ideal first path to
+// route at the read replica: getReadClient() uses SUPABASE_REPLICA_URL when set,
+// else falls back to the primary (a no-op until a replica is provisioned). The
+// route's OWN client (alert_log reads + writes) stays on the primary, untouched.
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
-const supabase = supabaseUrl && supabaseKey ? createClient(supabaseUrl, supabaseKey) : null;
+const supabase = supabaseUrl && supabaseKey ? getReadClient() : null;
 
 interface SAMOpportunity {
   noticeId: string;
