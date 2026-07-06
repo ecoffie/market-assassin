@@ -3369,3 +3369,28 @@ Sources Sought) — opportunities that genuinely carry attachments.
 separate, deeper SAM-API retrieval issue (single-notice re-fetch returning empty) is
 tracked for a follow-up — labeled here so we don't overclaim the pipeline as fully
 resolved.
+
+---
+
+## SAM Attachment Fetch — Rebuilt on the Working Endpoint (July 6, 2026)
+
+**What:** Rebuilt how Mindy discovers a solicitation's attachments. The old path asked
+SAM's search endpoint to re-find each notice's files — but that endpoint returns nothing
+for most individual notices, so ~59% of active opportunities had their attachments left
+unresolved. The new path calls SAM's per-notice resources endpoint directly and resolves
+them reliably, with real filenames (e.g. "Solicitation - N6264926Q0430.pdf").
+
+**Why it matters:** The attachments ARE the opportunity — the RFP, SOW, pricing sheet,
+Q&A. A buyer who opens a pursuit and sees the actual documents can act; one who sees an
+empty list bounces. Getting attachment coverage right is what makes Mindy's Proposal
+Assist and pursuit tracking feel like a real workspace instead of a headline.
+
+**Proof:** Verified live in production — the fixed cron processed 15 opportunities and
+resolved 13 with named attachments, 2 genuinely none, 0 failures. The same notices that
+returned nothing under the old approach now return their full document set. Three distinct
+bugs were found and fixed along the way (a coverage filter, the wrong SAM endpoint, and a
+content-negotiation header that silently 406'd every request).
+
+**Honest scope:** The mechanism is fixed and live; the historical backlog (~16,900
+opportunities) drains on the daily cron. The Pursuit → Proposal Assist auto-ingest path
+uses the same discovery and is queued to move onto the working endpoint next.
