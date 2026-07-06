@@ -32,10 +32,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getRotatedSAMKey } from '@/lib/sam/utils';
-import {
-  extractSamFileId,
-  fetchSamAttachmentFilename,
-} from '@/lib/sam/attachment-metadata';
+import { fetchNoticeResources } from '@/lib/sam/fetch-notice-resources';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -43,7 +40,6 @@ export const maxDuration = 60;
 
 const MAX_PER_RUN = 50;
 const SAM_REQUEST_DELAY_MS = 200;
-const SAM_OPPS_URL = 'https://api.sam.gov/opportunities/v2/search';
 
 function getSupabase() {
   return createClient(
@@ -67,64 +63,12 @@ async function sleep(ms: number) {
   await new Promise((r) => setTimeout(r, ms));
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function fetchAttachments(noticeId: string, apiKey: string): Promise<any[] | null> {
-  // SAM requires postedFrom/postedTo on every opportunities search.
-  // Use a wide window so any active opp is in scope. We're scoping
-  // by noticeId so the window doesn't actually narrow results.
-  const today = new Date();
-  const posted_to = `${String(today.getMonth() + 1).padStart(2, '0')}/${String(today.getDate()).padStart(2, '0')}/${today.getFullYear()}`;
-  const past = new Date(today);
-  past.setFullYear(past.getFullYear() - 2);
-  const posted_from = `${String(past.getMonth() + 1).padStart(2, '0')}/${String(past.getDate()).padStart(2, '0')}/${past.getFullYear()}`;
-
-  const url = new URL(SAM_OPPS_URL);
-  url.searchParams.set('api_key', apiKey);
-  url.searchParams.set('noticeId', noticeId);
-  url.searchParams.set('postedFrom', posted_from);
-  url.searchParams.set('postedTo', posted_to);
-  url.searchParams.set('limit', '1');
-
-  let res: Response;
-  try {
-    res = await fetch(url.toString(), { headers: { Accept: 'application/json' } });
-  } catch {
-    return null;
-  }
-  if (!res.ok) return null;
-
-  const payload = await res.json().catch(() => null);
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const opp = (payload as any)?.opportunitiesData?.[0];
-  if (!opp) return null;
-
-  // SAM returns resourceLinks as an array of URL strings, or null when
-  // there are no attachments. Some notices instead use a nested
-  // attachments array — handle both shapes.
-  if (Array.isArray(opp.resourceLinks) && opp.resourceLinks.length > 0) {
-    // SAM URLs look like
-    //   https://sam.gov/api/prod/opps/v3/opportunities/resources/files/{fileId}/download
-    // and the bare URL doesn't include a filename. To get the real
-    // name (e.g. RFP_Parking_Lifts_v2.pdf) we do a HEAD on each file
-    // through SAM with the API key and parse Content-Disposition.
-    // We do these in parallel per opp; the outer for-loop in GET()
-    // still rate-limits between opps so we don't burst SAM's quota.
-    return await Promise.all(
-      opp.resourceLinks.map(async (url: string, i: number) => {
-        const fileId = extractSamFileId(url);
-        const realName = await fetchSamAttachmentFilename(url, apiKey);
-        const name = realName || `Attachment ${i + 1}`;
-        return { url, name, fileId: fileId || null };
-      })
-    );
-  }
-  if (Array.isArray(opp.attachments) && opp.attachments.length > 0) {
-    return opp.attachments;
-  }
-  // SAM returned the opp but no attachments — that's a real "no
-  // attachments" answer, distinct from "couldn't fetch". Returning [].
-  return [];
-}
+// Attachment discovery moved to src/lib/sam/fetch-notice-resources.ts, which hits SAM's
+// per-notice resources endpoint (/opps/v3/opportunities/{id}/resources). The OLD approach
+// here used /v2/search?noticeId=X to re-discover resourceLinks, but that search endpoint
+// returns NOTHING for most individual notices — verified 2026-07-06, 16,976 rows all failed
+// it. The resources endpoint returns the real files (with names) AND external links, and
+// resolves the same notices the search endpoint couldn't. See fetch-notice-resources.ts.
 
 export async function GET(request: NextRequest) {
   if (!authorized(request)) {
@@ -202,7 +146,7 @@ export async function GET(request: NextRequest) {
   const failures: Array<{ noticeId: string; reason: string }> = [];
 
   for (const row of rows) {
-    const attachments = await fetchAttachments(row.notice_id, apiKey);
+    const attachments = await fetchNoticeResources(row.notice_id, apiKey);
 
     if (attachments === null) {
       // Fetch failure (SAM down, rate limit, opp archived, etc).
