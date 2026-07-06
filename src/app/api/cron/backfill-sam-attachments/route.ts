@@ -85,7 +85,11 @@ export async function GET(request: NextRequest) {
     200
   );
 
-  const apiKey = getRotatedSAMKey();
+  // Prefer a DEDICATED drain key (SAM_ATTACHMENT_DRAIN_KEY) if set, so this backlog drain
+  // gets its own ~1,000/day SAM quota instead of eating into the shared rotation that
+  // alerts/sync/descriptions rely on. Falls back to the normal rotation if unset — so
+  // once the backlog is drained and the key is removed, this cron keeps working normally.
+  const apiKey = process.env.SAM_ATTACHMENT_DRAIN_KEY || getRotatedSAMKey();
   if (!apiKey) {
     return NextResponse.json(
       { success: false, error: 'SAM API key not configured' },
