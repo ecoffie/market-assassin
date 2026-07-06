@@ -45,6 +45,11 @@ export const FREE_RESOURCES = {
     description: '500+ Native American-owned federal contractors',
     file: '/resources/tribal-contractor-list.csv',
   },
+  'first-contract-guide': {
+    name: 'The No-B.S. Guide to Winning Your First Federal Contract',
+    description: 'The honest 7-step path to your first federal contract — free, no jargon',
+    file: '/resources/first-contract-guide.html',
+  },
   'capability-template': {
     name: 'Capability Statement Template',
     description: 'Professional capability statement template',

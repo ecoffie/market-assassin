@@ -1,0 +1,260 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>The No-B.S. Guide to Winning Your First Federal Contract | GovCon Giants</title>
+<style>
+  *{margin:0;padding:0;box-sizing:border-box}
+  :root{
+    --navy:#1e3a8a; --navy-d:#1e40af; --purple:#7c3aed; --green:#10b981;
+    --ink:#111827; --dim:#4b5563; --faint:#6b7280; --line:#e5e7eb; --bg:#f9fafb;
+    --amber:#f59e0b; --red:#dc2626; --paper:#ffffff;
+  }
+  body{font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif; color:var(--ink); background:var(--bg); line-height:1.65; -webkit-font-smoothing:antialiased}
+  .page{max-width:760px; margin:0 auto; background:var(--paper); box-shadow:0 1px 30px rgba(0,0,0,.06)}
+  .pad{padding:0 clamp(22px,6vw,56px)}
+
+  /* cover */
+  .cover{background:linear-gradient(135deg,var(--navy) 0%,var(--purple) 100%); color:#fff; padding:clamp(40px,8vw,72px) clamp(22px,6vw,56px) clamp(36px,7vw,60px)}
+  .kick{font-size:12px; font-weight:700; letter-spacing:.18em; text-transform:uppercase; color:rgba(255,255,255,.8)}
+  .cover h1{font-size:clamp(30px,6vw,46px); font-weight:800; line-height:1.08; margin:16px 0 0; letter-spacing:-.02em}
+  .cover .sub{font-size:clamp(16px,2.6vw,19px); color:rgba(255,255,255,.9); margin:18px 0 0; max-width:52ch}
+  .cover .by{margin:28px 0 0; font-size:14px; color:rgba(255,255,255,.75)}
+  .cover .by b{color:#fff}
+  .cover .stat{display:inline-flex; align-items:center; gap:8px; margin:24px 12px 0 0; background:rgba(255,255,255,.12); border:1px solid rgba(255,255,255,.22); padding:8px 14px; border-radius:999px; font-size:13.5px; font-weight:600}
+  .cover .stat b{color:var(--green); font-weight:800}
+
+  /* body */
+  .intro{padding:clamp(30px,5vw,42px) clamp(22px,6vw,56px) 0}
+  .intro p{font-size:16.5px; color:var(--dim); margin:0 0 16px}
+  .intro p b{color:var(--ink)}
+
+  h2{font-size:clamp(21px,3.6vw,27px); font-weight:800; letter-spacing:-.01em; margin:0; color:var(--navy)}
+  .step{padding:clamp(30px,5vw,44px) 0; border-bottom:1px solid var(--line)}
+  .step:last-of-type{border-bottom:none}
+  .stepnum{display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:10px; background:var(--navy); color:#fff; font-weight:800; font-size:18px; margin-bottom:14px}
+  .step h2 .t{display:block; font-size:13px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--purple); margin-bottom:6px}
+  .step p{font-size:16px; color:var(--dim); margin:14px 0 0}
+  .step p b{color:var(--ink)}
+  .step ul{margin:14px 0 0; padding-left:0; list-style:none}
+  .step li{position:relative; padding-left:28px; margin:10px 0; font-size:15.5px; color:var(--dim)}
+  .step li::before{content:"→"; position:absolute; left:0; top:0; color:var(--green); font-weight:800}
+  .step li b{color:var(--ink)}
+  .do{font-weight:700; color:var(--navy)}
+
+  .callout{border-radius:12px; padding:18px 20px; margin:20px 0 0; font-size:15px}
+  .callout.warn{background:#fef2f2; border:1px solid #fecaca}
+  .callout.warn .h{color:var(--red); font-weight:800; font-size:14px; letter-spacing:.02em; margin-bottom:6px}
+  .callout.warn p{color:#7f1d1d; margin:0}
+  .callout.tip{background:#ecfdf5; border:1px solid #a7f3d0}
+  .callout.tip .h{color:#047857; font-weight:800; font-size:14px; margin-bottom:6px}
+  .callout.tip p{color:#065f46; margin:0}
+  .callout b{font-weight:800}
+
+  .data{background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:20px 22px; margin:20px 0 0}
+  .data .h{font-size:13px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:var(--faint); margin-bottom:12px}
+  .data table{width:100%; border-collapse:collapse; font-size:15px}
+  .data td{padding:7px 4px; border-bottom:1px solid var(--line)}
+  .data td:last-child{text-align:right; font-weight:800; color:var(--navy); font-variant-numeric:tabular-nums}
+  .data tr:last-child td{border-bottom:none}
+  .data .src{font-size:12px; color:var(--faint); margin-top:10px}
+
+  /* checklist */
+  .check{background:var(--navy); color:#fff; border-radius:14px; padding:clamp(26px,5vw,36px); margin:clamp(30px,5vw,44px) 0 0}
+  .check h3{font-size:22px; font-weight:800; margin:0 0 4px}
+  .check .cs{color:rgba(255,255,255,.75); font-size:14.5px; margin:0 0 18px}
+  .check .item{display:flex; gap:12px; align-items:flex-start; padding:11px 0; border-bottom:1px solid rgba(255,255,255,.12); font-size:15.5px}
+  .check .item:last-child{border-bottom:none}
+  .check .box{flex:none; width:22px; height:22px; border:2px solid var(--green); border-radius:6px; margin-top:1px}
+  .check .item b{color:#fff}
+  .check .item span{color:rgba(255,255,255,.85)}
+
+  /* CTA */
+  .cta{background:linear-gradient(135deg,var(--navy) 0%,var(--purple) 100%); color:#fff; text-align:center; padding:clamp(36px,6vw,52px) clamp(22px,6vw,56px)}
+  .cta h3{font-size:clamp(22px,4vw,30px); font-weight:800; margin:0 0 14px; line-height:1.15}
+  .cta p{font-size:16.5px; color:rgba(255,255,255,.9); margin:0 auto 26px; max-width:48ch}
+  .cta a.btn{display:inline-block; background:var(--green); color:#04241a; font-weight:800; font-size:17px; text-decoration:none; padding:16px 34px; border-radius:12px; box-shadow:0 6px 20px rgba(16,185,129,.35)}
+  .cta a.btn:hover{filter:brightness(1.05)}
+  .cta .fine{font-size:13px; color:rgba(255,255,255,.65); margin:16px 0 0}
+
+  footer{text-align:center; padding:30px 24px 40px; color:var(--faint); font-size:13px}
+  footer b{color:var(--dim)}
+  a{color:var(--purple)}
+  @media print{.page{box-shadow:none} .cta a.btn{border:2px solid var(--green)}}
+</style>
+</head>
+<body>
+<div class="page">
+
+  <!-- COVER -->
+  <div class="cover">
+    <div class="kick">GovCon Giants · Free Field Guide</div>
+    <h1>The No-B.S. Guide to Winning Your First Federal Contract</h1>
+    <p class="sub">The government is the biggest customer on earth — it bought <b>$178 billion</b> from small businesses last year. Here's the honest, step-by-step path to becoming one of them. No fluff, no paid "shortcuts," no gatekeeping.</p>
+    <div>
+      <span class="stat"><b>$178.6B</b>&nbsp;to small business (FY2024)</span>
+      <span class="stat"><b>$0</b>&nbsp;cost to register</span>
+      <span class="stat"><b>7</b>&nbsp;steps</span>
+    </div>
+    <div class="by">Written by <b>Eric Coffie</b> — GovCon Giants. Built from real federal data, not theory.</div>
+  </div>
+
+  <!-- INTRO -->
+  <div class="intro">
+    <p><b>Let's be straight with each other.</b> Most "how to win government contracts" advice is either a sales pitch in disguise or a wall of jargon designed to make you feel like you need to pay someone. This isn't that.</p>
+    <p>Everything in this guide is <b>free to do yourself</b>. The registration is free. The data is public. The path is known. What stops most people isn't difficulty — it's that nobody laid out the steps in plain English. So here they are.</p>
+    <p>Follow these seven steps in order. Do them one at a time. You do not need all of it done this week — you need to <b>start</b>.</p>
+  </div>
+
+  <div class="pad">
+
+    <!-- STEP 1 -->
+    <div class="step">
+      <div class="stepnum">1</div>
+      <h2><span class="t">Foundation</span>Get your UEI and register in SAM.gov — for free</h2>
+      <p>Before the government can pay you a dollar, you have to exist in their system. That means two things, and <b>both are free</b>:</p>
+      <ul>
+        <li><b>Get a UEI</b> (Unique Entity ID). This replaced the old "DUNS number" in April 2022. You get it <b>directly inside SAM.gov</b> — you don't get it anywhere else.</li>
+        <li><b>Register in SAM.gov</b> (the System for Award Management). This is your business's official profile with the federal government. It's how agencies find you and how you get paid.</li>
+      </ul>
+      <p class="do">Do this now: Go to <b>SAM.gov</b>, create a Login.gov account, and start your Entity Registration. Budget a few days — the validation step takes time.</p>
+      <div class="callout warn">
+        <div class="h">⚠ NEVER PAY FOR THIS</div>
+        <p>SAM.gov registration is <b>100% free</b>. There are companies that will email or call you offering to "register you for a fee" — some charge hundreds or thousands of dollars for something the government does for free. That's the oldest scam in this business. If someone asks you to pay to register in SAM.gov, walk away.</p>
+      </div>
+    </div>
+
+    <!-- STEP 2 -->
+    <div class="step">
+      <div class="stepnum">2</div>
+      <h2><span class="t">Positioning</span>Pick your NAICS codes — what you actually sell</h2>
+      <p>A <b>NAICS code</b> is just a number that describes what your business does. Landscaping has one. IT services has one. Catering has one. The government uses these codes to organize what it buys, and you'll pick the ones that match your business during your SAM.gov registration.</p>
+      <ul>
+        <li><b>Pick the codes that describe what you already do.</b> Don't guess at glamorous ones — pick the ones true to your business.</li>
+        <li>You can have several. Most small businesses list a handful of related codes.</li>
+        <li>These codes become how you'll <b>search for opportunities</b> in the next steps.</li>
+      </ul>
+      <div class="callout tip">
+        <div class="h">✓ It's not just fighter jets</div>
+        <p>The government buys ordinary things at massive scale. These are all real FY2024 numbers — everyday businesses, not high-tech:</p>
+      </div>
+      <div class="data">
+        <div class="h">What the government spent on "boring" businesses (FY2024)</div>
+        <table>
+          <tr><td>Management consulting</td><td>$15.1B</td></tr>
+          <tr><td>Security guards & patrol</td><td>$5.8B</td></tr>
+          <tr><td>Janitorial / cleaning</td><td>$2.0B</td></tr>
+          <tr><td>Plumbing, heating & A/C</td><td>$1.2B</td></tr>
+          <tr><td>Landscaping</td><td>$0.57B</td></tr>
+        </table>
+        <div class="src">Source: USASpending.gov, FY2024 (Oct 2023–Sep 2024). Verified July 2026.</div>
+      </div>
+    </div>
+
+    <!-- STEP 3 -->
+    <div class="step">
+      <div class="stepnum">3</div>
+      <h2><span class="t">Advantage</span>Check if you qualify for a set-aside</h2>
+      <p>Here's a real advantage most beginners don't know about. The government sets aside a portion of its contracts specifically for certain small businesses — meaning <b>you're only competing against other businesses like yours</b>, not the giant primes.</p>
+      <ul>
+        <li><b>Small business</b> — the baseline. If you're small, you already qualify for set-asides aimed at small business.</li>
+        <li><b>Woman-Owned (WOSB)</b>, <b>Veteran-Owned & Service-Disabled Veteran-Owned (VOSB/SDVOSB)</b>, <b>HUBZone</b>, and <b>8(a)</b> for socially/economically disadvantaged businesses — each opens a lane with less competition.</li>
+      </ul>
+      <div class="callout warn">
+        <div class="h">⚠ Get the veteran path right (it changed)</div>
+        <p>If you're a veteran: certification for VOSB/SDVOSB <b>moved from the VA (the old "CVE") to the SBA in January 2023</b>. Apply through the SBA now, not the VA's old system. Getting this wrong costs people months.</p>
+      </div>
+      <p class="do">Do this: figure out which certification(s) fit you. Some are self-certified; others (like 8(a) and HUBZone) require an application. Even the baseline small-business status is worth a lot on its own.</p>
+    </div>
+
+    <!-- STEP 4 -->
+    <div class="step">
+      <div class="stepnum">4</div>
+      <h2><span class="t">The Hunt</span>Find opportunities that match you</h2>
+      <p>Now the fun part — seeing what's actually for sale. All of it is public. The catch is that the official sites are clunky and scattered, which is exactly why most people give up here.</p>
+      <ul>
+        <li><b>SAM.gov</b> lists open solicitations — active contracts agencies are trying to award right now.</li>
+        <li><b>USASpending.gov</b> shows what's <b>already been bought</b> — which tells you who's spending, how much, and who currently holds the work.</li>
+        <li>Search by <b>your NAICS codes</b> from Step 2. Start narrow (your exact service), then widen.</li>
+      </ul>
+      <div class="callout tip">
+        <div class="h">✓ The shortcut we built</div>
+        <p>Digging through government websites by hand is the #1 place beginners quit. That's why we built a <b>free tool</b> that pulls all this public data into one place — you type in what your business does and it shows you who's buying it. Link at the end of this guide.</p>
+      </div>
+    </div>
+
+    <!-- STEP 5 -->
+    <div class="step">
+      <div class="stepnum">5</div>
+      <h2><span class="t">The Homework</span>Study ONE target before you chase ten</h2>
+      <p>This is where beginners who win separate from beginners who spin their wheels. <b>Don't spray applications everywhere.</b> Pick one realistic opportunity and study it like it's the only one.</p>
+      <ul>
+        <li><b>Who's buying it?</b> Which agency, which office. Look up what they've bought before on USASpending.</li>
+        <li><b>Who has it now?</b> Most contracts are re-competed. Find the current holder — that's who you'll have to beat.</li>
+        <li><b>Read the whole solicitation.</b> The requirements, the deadline, the evaluation criteria. Every word.</li>
+      </ul>
+      <p>This is called <b>capture</b> — doing your homework before the bid opens. One well-researched pursuit beats ten blind applications every time.</p>
+    </div>
+
+    <!-- STEP 6 -->
+    <div class="step">
+      <div class="stepnum">6</div>
+      <h2><span class="t">The Relationship</span>Talk to a human before the bid drops</h2>
+      <p>Government contracting is not a lottery — it's a relationship business. The single highest-leverage move a beginner can make is <b>reaching out to the right person early</b>, before a contract is even posted.</p>
+      <ul>
+        <li><b>Small Business Liaison Officers (SBLOs)</b> and <b>small-business specialists</b> exist at every agency for exactly one reason: to help small businesses like you. Their contact info is public.</li>
+        <li>A short, respectful email introducing your business and asking about upcoming needs is normal and welcomed. This is how doors open.</li>
+        <li>Do this <b>before</b> the solicitation, not after — once it's posted, they often can't talk to you.</li>
+      </ul>
+      <div class="callout tip">
+        <div class="h">✓ You have permission</div>
+        <p>Beginners assume they're "not supposed to" contact the government. The opposite is true. These roles were created to help you. Use them.</p>
+      </div>
+    </div>
+
+    <!-- STEP 7 -->
+    <div class="step">
+      <div class="stepnum">7</div>
+      <h2><span class="t">Consistency</span>Turn on alerts and show up every week</h2>
+      <p>The people who win aren't smarter — they're <b>consistent</b>. Opportunities that match you appear all the time. The winners see them first and act while everyone else isn't looking.</p>
+      <ul>
+        <li><b>Set up alerts</b> for your NAICS codes so new opportunities come to you instead of you hunting daily.</li>
+        <li><b>Block one hour a week</b> to review what's new, advance your one target, and send one outreach email.</li>
+        <li>Your first contract may take a few tries. That's normal. Consistency is the whole game.</li>
+      </ul>
+      <p class="do">Do this: automate the search so you never miss a match — then just show up weekly. That's it.</p>
+    </div>
+
+  </div>
+
+  <!-- CHECKLIST -->
+  <div class="pad">
+    <div class="check">
+      <h3>Your first-contract checklist</h3>
+      <p class="cs">Print this. Work top to bottom. Every item is free.</p>
+      <div class="item"><div class="box"></div><span><b>Get your UEI + register in SAM.gov</b> — free, takes a few days</span></div>
+      <div class="item"><div class="box"></div><span><b>Pick your NAICS codes</b> — what you actually sell</span></div>
+      <div class="item"><div class="box"></div><span><b>Check your set-aside eligibility</b> — small business, WOSB, VOSB/SDVOSB, HUBZone, 8(a)</span></div>
+      <div class="item"><div class="box"></div><span><b>Search opportunities</b> by your NAICS on SAM.gov + USASpending</span></div>
+      <div class="item"><div class="box"></div><span><b>Pick ONE target</b> and study it — buyer, current holder, requirements</span></div>
+      <div class="item"><div class="box"></div><span><b>Email the SBLO / small-business specialist</b> before the bid posts</span></div>
+      <div class="item"><div class="box"></div><span><b>Turn on alerts</b> + block one hour a week</span></div>
+    </div>
+  </div>
+
+  <!-- CTA -->
+  <div class="cta">
+    <h3>See what the government is buying in your industry — free</h3>
+    <p>Step 4 is where most people quit, because the government's websites are a nightmare. So we built the tool that fixes it. Type in what your business does and see who's buying it, how much they're spending, and who has the contract now.</p>
+    <a class="btn" href="https://getmindy.ai/youtube/first-contract-guide">Open the free tool →</a>
+    <p class="fine">Free to use · no credit card · built by GovCon Giants</p>
+  </div>
+
+  <footer>
+    © GovCon Giants · <b>All figures are real FY2024 federal spending data (USASpending.gov).</b> The $178.6B small-business total is from the SBA Small Business Procurement Scorecard. This guide is educational and free — SAM.gov registration should never cost you a cent.
+  </footer>
+
+</div>
+</body>
+</html>
