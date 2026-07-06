@@ -3343,3 +3343,29 @@ unit tests lock the safety properties (never deletes live, recurses per-user
 folders, skips unchanged, one failure doesn't abort). Pairs with Supabase's
 managed daily database backups + hourly DB health monitoring. 173/173 tests, 0
 type errors.
+
+---
+
+## SAM Attachment Backfill — Coverage Filter Fix (July 6, 2026)
+
+**What:** Fixed a filter bug in the SAM attachment backfill cron that had silently
+stopped it covering ~59% of active opportunities. The nightly sync inserts
+`attachments = NULL`, but the backfill filtered only on the older `'[]'` default —
+so it reported "no rows left" while 16,976 active opportunities sat with their
+attachments never resolved.
+
+**Why it matters:** Attachments (RFPs, SOWs, Q&A) are what turn an alert into an
+actionable pursuit. A backfill that thinks it's done while 3 in 5 opportunities are
+uncovered is a silent coverage gap — exactly the kind that erodes trust when a user
+opens an opportunity expecting the documents.
+
+**Proof:** Verified live against production — the old filter returned `processed: 0`
+("No rows left to fetch") despite a measured 16,976 NULL rows; the corrected filter
+(`attachments IS NULL OR attachments = '[]'`) now surfaces them. Notice-type
+breakdown of the gap: 89% solicitation-family (Combined Synopsis, Solicitation,
+Sources Sought) — opportunities that genuinely carry attachments.
+
+**Honest scope:** This fix restores the cron's *visibility* of uncovered rows. A
+separate, deeper SAM-API retrieval issue (single-notice re-fetch returning empty) is
+tracked for a follow-up — labeled here so we don't overclaim the pipeline as fully
+resolved.
