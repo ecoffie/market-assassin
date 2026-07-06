@@ -224,6 +224,8 @@ function MarketIntelDashboard() {
   const [stateFilter, setStateFilter] = useState('');
   const [agencyFilter, setAgencyFilter] = useState('');
   const [hasSow, setHasSow] = useState(false);   // #66 "Has SOW/PWS" filter
+  // Deadline sort: 'soonest' (default — closing first) or 'furthest' (latest deadline first).
+  const [sort, setSort] = useState<'soonest' | 'furthest'>('soonest');
   // Active (biddable now) | Inactive (the archive — recompete intel, old SOW/PWS) |
   // All. Mirrors SAM.gov's status toggle; the inactive corpus (~59k) is already cached.
   const [status, setStatus] = useState<'active' | 'inactive' | 'all'>('active');
@@ -476,6 +478,7 @@ function MarketIntelDashboard() {
       if (stateFilter) params.set('state', stateFilter);
       if (agencyFilter) params.set('agency', agencyFilter);
       if (hasSow) params.set('hasSow', 'true');
+      if (sort === 'furthest') params.set('sort', 'furthest');
       if (status !== 'active') params.set('status', status); // active(default)|inactive|all
 
       // Coach Mode: forward x-active-workspace so opportunities scope to the
@@ -494,7 +497,7 @@ function MarketIntelDashboard() {
     } finally {
       setLoadingOpps(false);
     }
-  }, [page, search, noticeType, urgency, setAside, naicsFilter, stateFilter, agencyFilter, hasSow, status, email, isProfileFiltered]);
+  }, [page, search, noticeType, urgency, setAside, naicsFilter, stateFilter, agencyFilter, hasSow, sort, status, email, isProfileFiltered]);
 
   useEffect(() => {
     // Don't fetch while we're still resolving the email for a profile-filtered
@@ -937,6 +940,16 @@ function MarketIntelDashboard() {
               <option value="">All Urgency</option>
               <option value="critical">🔥 Critical (≤3 days)</option>
               <option value="urgent">⚡ Urgent (≤7 days)</option>
+            </select>
+
+            <select
+              value={sort}
+              onChange={(e) => { setSort(e.target.value as 'soonest' | 'furthest'); setPage(1); }}
+              className="px-3 py-2 bg-gray-800 border border-gray-700 rounded-lg text-sm text-white focus:border-purple-500 focus:outline-none"
+              title="Sort by response deadline"
+            >
+              <option value="soonest">⏱ Due soonest first</option>
+              <option value="furthest">📅 Due furthest first</option>
             </select>
 
             <select

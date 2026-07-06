@@ -203,6 +203,9 @@ export async function GET(request: NextRequest) {
   const limit = parseInt(searchParams.get('limit') || '50');
   const mode = searchParams.get('mode') || 'list'; // list | stats | export
   const email = searchParams.get('email')?.toLowerCase().trim() || '';
+  // Sort by deadline: 'soonest' (default — closing first, the bid-now view) or
+  // 'furthest' (latest deadline first — plan-ahead / triage the long-lead pursuits).
+  const sort = (searchParams.get('sort') || 'soonest').toLowerCase();
 
   // Last-good snapshot key for THIS view. Include EVERY input that changes the
   // result — crucially `email`, because a coach viewing a client scopes the feed
@@ -556,8 +559,13 @@ export async function GET(request: NextRequest) {
       query = query.lt('response_deadline', sevenDaysFromNow);
     }
 
-    // Order by deadline (soonest first)
-    query = query.order('response_deadline', { ascending: true });
+    // Order by deadline. Default 'soonest' = closing first (bid-now). 'furthest' =
+    // latest deadline first (plan-ahead). nullsFirst:false keeps no-deadline rows at
+    // the BOTTOM in both directions (Postgres DESC would otherwise float NULLs to top).
+    query = query.order('response_deadline', {
+      ascending: sort !== 'furthest',
+      nullsFirst: false,
+    });
 
     // Pagination
     const offset = (page - 1) * limit;
