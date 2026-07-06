@@ -38,7 +38,12 @@ export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
 export const maxDuration = 60;
 
-const MAX_PER_RUN = 50;
+// Bumped 50→150 (2026-07-06) to drain the ~17K attachment backlog faster now that the
+// fetch mechanism works. 150 × 200ms ≈ 30s + fetch time, safely within maxDuration=60.
+// Quota-aware: SAM allows 1,000/key/day × 2 working keys = 2,000/day shared across ALL
+// SAM crons (alerts, sync, descriptions…). Running this a few times/day via the
+// dispatcher drains ~600-900/day while leaving headroom. Don't crank this to the moon.
+const MAX_PER_RUN = 150;
 const SAM_REQUEST_DELAY_MS = 200;
 
 function getSupabase() {
