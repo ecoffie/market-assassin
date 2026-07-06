@@ -1,6 +1,63 @@
 # GovCon Giants - Tasks by Priority
 
-**Last Updated:** June 25, 2026
+**Last Updated:** July 5, 2026
+
+---
+
+## 🔧 RESILIENCE / INFRA — scoped, not yet done (don't lose these)
+
+Full detail: memory `resilience_open_items` + `docs/PRD-read-replica.md`. Shipped
+this session: graceful degradation (8 routes), db-health-watch (hourly), vault
+export/delete, RLS backstop, strong-auth, no-training AI guarantee, DB daily
+backups verified, **vault-file backup (daily, live)**, read-replica **factory**.
+
+- [ ] **READ REPLICA — activate** (factory already shipped as a no-op). ~$70/mo,
+      ~½ day. Steps: Supabase → Replication → add same-region replica → set
+      `SUPABASE_REPLICA_URL` in Vercel → migrate `daily-alerts` to `getReadClient()`
+      FIRST (audit read-after-write), then weekly-alerts/briefings/forecasts.
+      **Do AFTER the NCMBC demo.**
+- [ ] **PITR** — OFF on purpose (daily backups are the baseline). Enable only if a
+      contract needs sub-day recovery (~$100/mo, 30-sec toggle).
+- [ ] **Off-provider file backup** (S3/R2) — later tier; only if a contract needs
+      provider/geographic separation. Vault files already backed up in-provider.
+- [ ] Phase 3 (Redis cache tier) + Phase 4 (managed Postgres SLA, BYOK, in-boundary
+      GovCloud) — revenue/contract-gated, roadmap only.
+
+---
+
+## 🔴 TOP PRIORITY — NCMBC demo (Monday) + weekend prep
+
+**Demo:** NCMBC (North Carolina Military Business Center) — audience: SBA, GCAP
+(Government Contracting Assistance Program), APEX-type coaches. Coach Mode is the
+star of this demo (a coach/counselor managing many client small businesses).
+
+### This weekend (before Monday)
+- **ENTERPRISE COACH MODE — Phase 1 SHIPPED (Jul 2)** — the "big org runs it" scale layer:
+  - [x] Bulk client import (roster paste → N workspaces, chunked+progress, idempotent)
+  - [x] Tier-aware caps (enterprise org = unlimited; consultant = 10) — org.tier now honored
+  - [x] Searchable + paginated client list (usable at 200+, not a flat wall)
+  - [x] Shared provisioning lib (single-add + bulk = same unit, no drift)
+  - [x] NCMBC enterprise org provisioned (eric=org_admin, unlimited, test clients cleared)
+  - [x] 60-business NC sample roster (`scripts/demo-rosters/ncmbc-sample-clients.txt`)
+  - [x] RLS on org tables (anon backstop) + app-level isolation AUDITED (PRD Risk #1 clean)
+  - [ ] **RUN the RLS migration** `20260702_coach_org_rls.sql` in Supabase (on clipboard)
+  - [ ] **Smoke-test live**: /app → My Clients → import roster → search → switch → drill in
+  - Memory: `coach_mode_tenancy` (shared DB decision), `coach_mode_header_drop`.
+  - Phase 2 (after Monday / roadmap): org-admin counselor mgmt + assignment, Org Tab news
+    posting UI, analytics/funder reporting, white-label branding. Engine/schema ready.
+- [ ] **Tutorial videos** — record walkthrough(s) this weekend. (Same slot pattern as
+  the Getting Started Loom videos — memory `guided_journeys_loom_videos`: 60–90s,
+  Mindy-branded, Vimeo → player URLs. Confirm which flows: likely coach onboarding +
+  add-client + client switch.)
+
+### Backlog (NOT for Monday — USASpending covers it today)
+- [ ] **SAM.gov System Account ("higher access")** — apply via sam.gov → Workspace →
+  API Keys → "Add Role" (Contract Awards) or new "System Account". FSD (fsd.gov) is the
+  support/escalation desk, not where you apply. Justification drafted + approval is 1–4
+  wks. Unlocks Contract Awards + Subaward APIs (SAT $250K direct filter, set-aside-by-
+  NAICS, prime→sub). NEVER completed since ~Apr; USASpending is the live workaround so
+  do NOT block product work on it. Track the request URL when submitted so it doesn't
+  get abandoned again. Details: `docs/sam-contract-awards-api-investigation-2026-05-22.md`.
 
 ---
 
