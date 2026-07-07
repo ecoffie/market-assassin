@@ -15,6 +15,14 @@
   .page{max-width:760px; margin:0 auto; background:var(--paper); box-shadow:0 1px 30px rgba(0,0,0,.06)}
   .pad{padding:0 clamp(22px,6vw,56px)}
 
+  /* download bar (screen only) */
+  .dlbar{position:sticky; top:0; z-index:30; background:rgba(17,24,39,.92); backdrop-filter:blur(8px); -webkit-backdrop-filter:blur(8px); color:#fff; display:flex; align-items:center; justify-content:space-between; gap:14px; padding:11px clamp(16px,5vw,28px); border-bottom:1px solid rgba(255,255,255,.1)}
+  .dlbar .brand{font-size:13px; font-weight:700; letter-spacing:.02em; color:rgba(255,255,255,.9)}
+  .dlbar .brand span{color:var(--green)}
+  .dlbtn{display:inline-flex; align-items:center; gap:8px; background:var(--green); color:#04241a; font-weight:800; font-size:14px; border:none; cursor:pointer; text-decoration:none; padding:9px 18px; border-radius:9px; white-space:nowrap}
+  .dlbtn:hover{filter:brightness(1.06)}
+  .dlbtn svg{width:15px; height:15px}
+
   /* cover */
   .cover{background:linear-gradient(135deg,var(--navy) 0%,var(--purple) 100%); color:#fff; padding:clamp(40px,8vw,72px) clamp(22px,6vw,56px) clamp(36px,7vw,60px)}
   .kick{font-size:12px; font-weight:700; letter-spacing:.18em; text-transform:uppercase; color:rgba(255,255,255,.8)}
@@ -31,7 +39,7 @@
   .intro p b{color:var(--ink)}
 
   h2{font-size:clamp(21px,3.6vw,27px); font-weight:800; letter-spacing:-.01em; margin:0; color:var(--navy)}
-  .step{padding:clamp(30px,5vw,44px) 0; border-bottom:1px solid var(--line)}
+  .step{padding:clamp(30px,5vw,44px) 0; border-bottom:1px solid var(--line); break-inside:avoid}
   .step:last-of-type{border-bottom:none}
   .stepnum{display:inline-flex; align-items:center; justify-content:center; width:38px; height:38px; border-radius:10px; background:var(--navy); color:#fff; font-weight:800; font-size:18px; margin-bottom:14px}
   .step h2 .t{display:block; font-size:13px; font-weight:700; letter-spacing:.1em; text-transform:uppercase; color:var(--purple); margin-bottom:6px}
@@ -43,7 +51,7 @@
   .step li b{color:var(--ink)}
   .do{font-weight:700; color:var(--navy)}
 
-  .callout{border-radius:12px; padding:18px 20px; margin:20px 0 0; font-size:15px}
+  .callout{border-radius:12px; padding:18px 20px; margin:20px 0 0; font-size:15px; break-inside:avoid}
   .callout.warn{background:#fef2f2; border:1px solid #fecaca}
   .callout.warn .h{color:var(--red); font-weight:800; font-size:14px; letter-spacing:.02em; margin-bottom:6px}
   .callout.warn p{color:#7f1d1d; margin:0}
@@ -52,7 +60,7 @@
   .callout.tip p{color:#065f46; margin:0}
   .callout b{font-weight:800}
 
-  .data{background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:20px 22px; margin:20px 0 0}
+  .data{background:var(--bg); border:1px solid var(--line); border-radius:12px; padding:20px 22px; margin:20px 0 0; break-inside:avoid}
   .data .h{font-size:13px; font-weight:800; letter-spacing:.04em; text-transform:uppercase; color:var(--faint); margin-bottom:12px}
   .data table{width:100%; border-collapse:collapse; font-size:15px}
   .data td{padding:7px 4px; border-bottom:1px solid var(--line)}
@@ -61,7 +69,7 @@
   .data .src{font-size:12px; color:var(--faint); margin-top:10px}
 
   /* checklist */
-  .check{background:var(--navy); color:#fff; border-radius:14px; padding:clamp(26px,5vw,36px); margin:clamp(30px,5vw,44px) 0 0}
+  .check{background:var(--navy); color:#fff; border-radius:14px; padding:clamp(26px,5vw,36px); margin:clamp(30px,5vw,44px) 0 0; break-inside:avoid}
   .check h3{font-size:22px; font-weight:800; margin:0 0 4px}
   .check .cs{color:rgba(255,255,255,.75); font-size:14.5px; margin:0 0 18px}
   .check .item{display:flex; gap:12px; align-items:flex-start; padding:11px 0; border-bottom:1px solid rgba(255,255,255,.12); font-size:15.5px}
@@ -81,21 +89,39 @@
   footer{text-align:center; padding:30px 24px 40px; color:var(--faint); font-size:13px}
   footer b{color:var(--dim)}
   a{color:var(--purple)}
-  @media print{.page{box-shadow:none} .cta a.btn{border:2px solid var(--green)}}
+
+  @media print{
+    @page{margin:14mm}
+    body{background:#fff}
+    .page{box-shadow:none; max-width:none}
+    .dlbar{display:none !important}
+    .cover,.check,.cta{-webkit-print-color-adjust:exact; print-color-adjust:exact}
+    .cta a.btn{border:2px solid var(--green)}
+    .step{page-break-inside:avoid}
+  }
 </style>
 </head>
 <body>
 <div class="page">
 
+  <!-- DOWNLOAD BAR (screen only, hidden in print/PDF) -->
+  <div class="dlbar">
+    <div class="brand">GovCon <span>Giants</span> · Free Field Guide</div>
+    <button class="dlbtn" onclick="window.print()" aria-label="Save this guide as a PDF">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+      Save as PDF
+    </button>
+  </div>
+
   <!-- COVER -->
   <div class="cover">
     <div class="kick">GovCon Giants · Free Field Guide</div>
     <h1>The No-B.S. Guide to Winning Your First Federal Contract</h1>
-    <p class="sub">The government is the biggest customer on earth — it bought <b>$178 billion</b> from small businesses last year. Here's the honest, step-by-step path to becoming one of them. No fluff, no paid "shortcuts," no gatekeeping.</p>
+    <p class="sub">The government is the biggest customer on earth — in FY2024 it awarded <b>$183.5 billion</b> in prime contracts to small businesses. Here's the honest, step-by-step path to becoming one of them. No fluff, no paid "shortcuts," no gatekeeping.</p>
     <div>
-      <span class="stat"><b>$178.6B</b>&nbsp;to small business (FY2024)</span>
+      <span class="stat"><b>$183.5B</b>&nbsp;to small business (FY2024)</span>
       <span class="stat"><b>$0</b>&nbsp;cost to register</span>
-      <span class="stat"><b>7</b>&nbsp;steps</span>
+      <span class="stat"><b>8</b>&nbsp;steps</span>
     </div>
     <div class="by">Written by <b>Eric Coffie</b> — GovCon Giants. Built from real federal data, not theory.</div>
   </div>
@@ -103,8 +129,8 @@
   <!-- INTRO -->
   <div class="intro">
     <p><b>Let's be straight with each other.</b> Most "how to win government contracts" advice is either a sales pitch in disguise or a wall of jargon designed to make you feel like you need to pay someone. This isn't that.</p>
-    <p>Everything in this guide is <b>free to do yourself</b>. The registration is free. The data is public. The path is known. What stops most people isn't difficulty — it's that nobody laid out the steps in plain English. So here they are.</p>
-    <p>Follow these seven steps in order. Do them one at a time. You do not need all of it done this week — you need to <b>start</b>.</p>
+    <p>Everything in this guide is <b>free to do yourself</b>. The registration is free. The data is public. The path is known. What stops most people isn't difficulty — it's that nobody laid out the steps in plain English, all the way through actually <b>submitting a bid</b>. So here they are.</p>
+    <p>Follow these eight steps in order. Do them one at a time. You do not need all of it done this week — you need to <b>start</b>.</p>
   </div>
 
   <div class="pad">
@@ -142,13 +168,13 @@
       <div class="data">
         <div class="h">What the government spent on "boring" businesses (FY2024)</div>
         <table>
-          <tr><td>Management consulting</td><td>$15.1B</td></tr>
-          <tr><td>Security guards & patrol</td><td>$5.8B</td></tr>
-          <tr><td>Janitorial / cleaning</td><td>$2.0B</td></tr>
-          <tr><td>Plumbing, heating & A/C</td><td>$1.2B</td></tr>
-          <tr><td>Landscaping</td><td>$0.57B</td></tr>
+          <tr><td>Management consulting</td><td>$14.3B</td></tr>
+          <tr><td>Security guards &amp; patrol</td><td>$4.53B</td></tr>
+          <tr><td>Janitorial / cleaning</td><td>$1.62B</td></tr>
+          <tr><td>Plumbing, heating &amp; A/C</td><td>$1.09B</td></tr>
+          <tr><td>Landscaping</td><td>$0.52B</td></tr>
         </table>
-        <div class="src">Source: USASpending.gov, FY2024 (Oct 2023–Sep 2024). Verified July 2026.</div>
+        <div class="src">Source: USASpending.gov, FY2024 obligations (Oct 2023–Sep 2024), place of performance USA. Verified July 2026.</div>
       </div>
     </div>
 
@@ -159,7 +185,7 @@
       <p>Here's a real advantage most beginners don't know about. The government sets aside a portion of its contracts specifically for certain small businesses — meaning <b>you're only competing against other businesses like yours</b>, not the giant primes.</p>
       <ul>
         <li><b>Small business</b> — the baseline. If you're small, you already qualify for set-asides aimed at small business.</li>
-        <li><b>Woman-Owned (WOSB)</b>, <b>Veteran-Owned & Service-Disabled Veteran-Owned (VOSB/SDVOSB)</b>, <b>HUBZone</b>, and <b>8(a)</b> for socially/economically disadvantaged businesses — each opens a lane with less competition.</li>
+        <li><b>Woman-Owned (WOSB)</b>, <b>Veteran-Owned &amp; Service-Disabled Veteran-Owned (VOSB/SDVOSB)</b>, <b>HUBZone</b>, and <b>8(a)</b> for socially/economically disadvantaged businesses — each opens a lane with less competition.</li>
       </ul>
       <div class="callout warn">
         <div class="h">⚠ Get the veteran path right (it changed)</div>
@@ -216,6 +242,23 @@
     <!-- STEP 7 -->
     <div class="step">
       <div class="stepnum">7</div>
+      <h2><span class="t">The Bid</span>Write it, price it, and actually submit it</h2>
+      <p>This is the step everybody skips — and it's the one everybody's scared of. Two things freeze beginners cold: <b>"I don't know how to write a proposal"</b> and <b>"I have no idea what to charge."</b> Here's how you get past both.</p>
+      <ul>
+        <li><b>Writing it.</b> A proposal answers the solicitation section by section — technical approach, management, past performance — and proves you caught every requirement. The government buries "shall" and "must" statements throughout; miss one and you can be thrown out before they even read your bid. Build a <b>compliance matrix</b>: list every "shall/must," and check it off.</li>
+        <li><b>Pricing it.</b> Don't guess. The government publishes what it has actually paid for labor and services on past awards. Anchor your price to <b>real awarded rates</b>, then decide: aggressive (win on price), competitive (the safe market rate), or premium.</li>
+        <li><b>Submitting it.</b> Follow their instructions <b>exactly</b> — every required form, the right portal, before the deadline. On time. Then you're officially in the game.</li>
+      </ul>
+      <div class="callout tip">
+        <div class="h">✓ The two hardest parts, done faster</div>
+        <p>Inside our tool, <b>Proposal Assist</b> turns a solicitation into a starting draft of your proposal sections plus that compliance matrix, and <b>Pricing Intel</b> pulls real awarded labor rates and gives you three price-to-win targets. Straight talk: those two are <b>paid features</b> — but the free account is where you start, and everything up to this point lives there. Proposal Assist gives you a <b>strong starting draft, not a finished submission</b>: you still review it, add your own proof, and make it yours.</p>
+      </div>
+      <p class="do">Do this: build your compliance matrix, price off real data, and <b>submit</b>. The only bid that can win is the one you turn in. Most people research forever and never actually bid — don't be that person.</p>
+    </div>
+
+    <!-- STEP 8 -->
+    <div class="step">
+      <div class="stepnum">8</div>
       <h2><span class="t">Consistency</span>Turn on alerts and show up every week</h2>
       <p>The people who win aren't smarter — they're <b>consistent</b>. Opportunities that match you appear all the time. The winners see them first and act while everyone else isn't looking.</p>
       <ul>
@@ -232,13 +275,14 @@
   <div class="pad">
     <div class="check">
       <h3>Your first-contract checklist</h3>
-      <p class="cs">Print this. Work top to bottom. Every item is free.</p>
+      <p class="cs">Print this. Work top to bottom. Every step is free to do yourself.</p>
       <div class="item"><div class="box"></div><span><b>Get your UEI + register in SAM.gov</b> — free, takes a few days</span></div>
       <div class="item"><div class="box"></div><span><b>Pick your NAICS codes</b> — what you actually sell</span></div>
       <div class="item"><div class="box"></div><span><b>Check your set-aside eligibility</b> — small business, WOSB, VOSB/SDVOSB, HUBZone, 8(a)</span></div>
       <div class="item"><div class="box"></div><span><b>Search opportunities</b> by your NAICS on SAM.gov + USASpending</span></div>
       <div class="item"><div class="box"></div><span><b>Pick ONE target</b> and study it — buyer, current holder, requirements</span></div>
       <div class="item"><div class="box"></div><span><b>Email the SBLO / small-business specialist</b> before the bid posts</span></div>
+      <div class="item"><div class="box"></div><span><b>Write it, price it off real rates, and submit the bid</b> — compliance matrix, exact forms, on time</span></div>
       <div class="item"><div class="box"></div><span><b>Turn on alerts</b> + block one hour a week</span></div>
     </div>
   </div>
@@ -252,7 +296,7 @@
   </div>
 
   <footer>
-    © GovCon Giants · <b>All figures are real FY2024 federal spending data (USASpending.gov).</b> The $178.6B small-business total is from the SBA Small Business Procurement Scorecard. This guide is educational and free — SAM.gov registration should never cost you a cent.
+    © GovCon Giants · <b>Category figures are real FY2024 federal spending (USASpending.gov).</b> The $183.5B small-business total is FY2024 prime-contract dollars from the SBA Small Business Procurement Scorecard. This guide is educational and free — SAM.gov registration should never cost you a cent.
   </footer>
 
 </div>

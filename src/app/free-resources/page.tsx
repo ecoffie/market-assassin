@@ -16,7 +16,7 @@ const FREE_RESOURCES: Resource[] = [
   {
     id: 'first-contract-guide',
     name: 'The No-B.S. Guide to Winning Your First Federal Contract',
-    description: 'The honest 7-step path to your first federal contract — free, no jargon. Register, find one opportunity, price it, and actually submit the bid.',
+    description: 'The honest 8-step path to your first federal contract — free, no jargon. Register, find one opportunity, price it, and actually submit the bid.',
     icon: '🎯',
     file: '/resources/first-contract-guide.html',
     price: 'Free',

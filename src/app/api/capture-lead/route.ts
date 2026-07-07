@@ -47,7 +47,7 @@ export const FREE_RESOURCES = {
   },
   'first-contract-guide': {
     name: 'The No-B.S. Guide to Winning Your First Federal Contract',
-    description: 'The honest 7-step path to your first federal contract — free, no jargon',
+    description: 'The honest 8-step path to your first federal contract — free, no jargon',
     file: '/resources/first-contract-guide.html',
   },
   'capability-template': {
