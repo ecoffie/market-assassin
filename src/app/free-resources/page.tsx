@@ -14,6 +14,14 @@ interface Resource {
 
 const FREE_RESOURCES: Resource[] = [
   {
+    id: 'first-contract-guide',
+    name: 'The No-B.S. Guide to Winning Your First Federal Contract',
+    description: 'The honest 7-step path to your first federal contract — free, no jargon. Register, find one opportunity, price it, and actually submit the bid.',
+    icon: '🎯',
+    file: '/resources/first-contract-guide.html',
+    price: 'Free',
+  },
+  {
     id: 'sblo-list',
     name: 'SBLO Contact List',
     description: 'Directory of Small Business Liaison Officers across federal agencies. Direct contacts for small business outreach.',
@@ -142,6 +150,16 @@ export default function FreeResourcesPage() {
     };
 
     checkExistingAccess();
+  }, []);
+
+  // Deep-link: /free-resources?resource=<id> pre-opens that resource's capture modal
+  // (used by the YouTube CTA → getmindy.ai/youtube/first-contract-guide).
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const requested = params.get('resource');
+    if (!requested) return;
+    const match = FREE_RESOURCES.find((r) => r.id === requested);
+    if (match) setSelectedResource(match);
   }, []);
 
   const handleResourceClick = async (resource: Resource) => {

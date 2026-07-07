@@ -246,6 +246,16 @@ const nextConfig: NextConfig = {
           '/?utm_source=youtube&utm_medium=video&utm_campaign=channel',
         permanent: false,
       },
+      // Lead-magnet CTA: /youtube/first-contract-guide lands on the email-capture
+      // page (pre-opening the guide's modal) so the video CTA actually BUILDS THE
+      // LIST — not the homepage. Must precede the /youtube/:slug catch-all below.
+      {
+        source: '/youtube/first-contract-guide',
+        has: [{ type: 'host', value: 'getmindy.ai' }],
+        destination:
+          '/free-resources?resource=first-contract-guide&utm_source=youtube&utm_medium=video&utm_campaign=first-contract-guide',
+        permanent: false,
+      },
       {
         source: '/youtube/:slug',
         has: [{ type: 'host', value: 'getmindy.ai' }],
