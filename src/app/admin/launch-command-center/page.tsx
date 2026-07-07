@@ -29,6 +29,27 @@ type BetaConversion = {
   sendTrend: Array<{ date: string; count: number }>;
 };
 
+/** Alert → Action funnel: "📌 Track in Mindy" clicks in daily-alert emails,
+ *  and whether they landed a real opportunity in the user's pipeline. */
+type TrackAdoption = {
+  success: boolean;
+  window_days: number;
+  track_clicks: {
+    total: number;
+    unique_users: number;
+    by_affordance: { titleLink: number; trackButton: number; other: number };
+    share_of_all_link_clicks_pct: number;
+  };
+  conversion: {
+    users_who_clicked_track: number;
+    users_with_real_pipeline_row: number;
+    conversion_pct: number;
+    pipeline_rows_held_by_clickers: number;
+  };
+  context: { total_link_clicks: number; engaged_users_any_link: number };
+  note: string;
+};
+
 /** Percent of total, clamped 0–100 (for the conversion progress bar widths). */
 function pct(part: number, total: number): number {
   if (!total) return 0;
@@ -549,6 +570,9 @@ export default function LaunchCommandCenterPage() {
   const [betaConv, setBetaConv] = useState<BetaConversion | null>(null);
   const [betaConvLoading, setBetaConvLoading] = useState(false);
   const [betaConvError, setBetaConvError] = useState('');
+  const [trackAdoption, setTrackAdoption] = useState<TrackAdoption | null>(null);
+  const [trackAdoptionLoading, setTrackAdoptionLoading] = useState(false);
+  const [trackAdoptionError, setTrackAdoptionError] = useState('');
   const [mrrGoal, setMrrGoal] = useState<MrrGoal | null>(null);
   const [mrrGoalError, setMrrGoalError] = useState('');
   // On-demand "Refresh purchases": bumps a key to re-run the MRR loader, and
@@ -860,6 +884,39 @@ export default function LaunchCommandCenterPage() {
     }
 
     loadBetaConversion();
+    return () => { cancelled = true; };
+  }, [authenticated, password]);
+
+  useEffect(() => {
+    if (!authenticated || !password) return;
+    let cancelled = false;
+
+    async function loadTrackAdoption() {
+      setTrackAdoptionLoading(true);
+      setTrackAdoptionError('');
+      try {
+        const response = await fetch(`/api/admin/track-click-adoption?password=${encodeURIComponent(password)}&days=14`, {
+          cache: 'no-store',
+        });
+        const data = await response.json();
+        if (cancelled) return;
+        if (!response.ok || !data.success) {
+          setTrackAdoptionError(data.error || 'Could not load Track adoption');
+          setTrackAdoption(null);
+          return;
+        }
+        setTrackAdoption(data as TrackAdoption);
+      } catch {
+        if (!cancelled) {
+          setTrackAdoptionError('Could not load Track adoption');
+          setTrackAdoption(null);
+        }
+      } finally {
+        if (!cancelled) setTrackAdoptionLoading(false);
+      }
+    }
+
+    loadTrackAdoption();
     return () => { cancelled = true; };
   }, [authenticated, password]);
 
@@ -1585,6 +1642,72 @@ export default function LaunchCommandCenterPage() {
                     })}
                   </div>
                 </div>
+              )}
+            </>
+          )}
+        </section>
+
+        {/* ALERT → ACTION — do "📌 Track in Mindy" clicks in daily-alert emails
+            actually land opportunities in the user's pipeline? The alert→action
+            cliff, measured directly (was: 97% get alerts, ~2% act). */}
+        <section className="rounded-lg border border-teal-500/30 bg-gradient-to-br from-teal-900/20 to-slate-900 p-6">
+          <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-[0.2em] text-teal-300">Alert → Action</p>
+              <h2 className="mt-2 text-3xl font-bold">Do alert emails turn into tracked pipeline?</h2>
+              <p className="mt-2 text-sm text-slate-400">
+                &quot;📌 Track in Mindy&quot; clicks in the last 14 days, and how many clickers now hold a real pipeline row.
+              </p>
+            </div>
+          </div>
+
+          {trackAdoptionLoading && !trackAdoption && (
+            <p className="mt-6 text-sm text-slate-400">Loading Track funnel…</p>
+          )}
+          {trackAdoptionError && (
+            <p className="mt-6 text-sm text-red-300">{trackAdoptionError}</p>
+          )}
+
+          {trackAdoption && (
+            <>
+              <div className="mt-6 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-4">
+                  <div className="text-3xl font-bold text-white">{trackAdoption.track_clicks.total.toLocaleString()}</div>
+                  <div className="mt-1 text-sm text-slate-400">Track clicks (14d)</div>
+                </div>
+                <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-4">
+                  <div className="text-3xl font-bold text-white">{trackAdoption.track_clicks.unique_users.toLocaleString()}</div>
+                  <div className="mt-1 text-sm text-slate-400">Unique users clicking</div>
+                </div>
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
+                  <div className="text-3xl font-bold text-emerald-300">
+                    {trackAdoption.conversion.users_with_real_pipeline_row.toLocaleString()}
+                    <span className="ml-2 text-base font-semibold text-emerald-400/80">{trackAdoption.conversion.conversion_pct}%</span>
+                  </div>
+                  <div className="mt-1 text-sm text-slate-400">Landed in pipeline</div>
+                </div>
+                <div className="rounded-lg border border-blue-500/30 bg-blue-500/5 p-4">
+                  <div className="text-3xl font-bold text-blue-300">
+                    {trackAdoption.track_clicks.by_affordance.trackButton}
+                    <span className="mx-1 text-base text-slate-500">/</span>
+                    <span className="text-blue-200">{trackAdoption.track_clicks.by_affordance.titleLink}</span>
+                  </div>
+                  <div className="mt-1 text-sm text-slate-400">📌 Button / title link</div>
+                </div>
+              </div>
+
+              {trackAdoption.track_clicks.unique_users > 0 ? (
+                <div className="mt-5">
+                  <div className="flex h-3 overflow-hidden rounded-full bg-slate-800">
+                    <div className="bg-emerald-500" style={{ width: `${pct(trackAdoption.conversion.users_with_real_pipeline_row, trackAdoption.track_clicks.unique_users)}%` }} title={`Landed in pipeline: ${trackAdoption.conversion.users_with_real_pipeline_row}`} />
+                  </div>
+                  <div className="mt-2 flex flex-wrap gap-4 text-xs text-slate-500">
+                    <span><span className="mr-1 inline-block h-2 w-2 rounded-full bg-emerald-500" />Clicked Track → have a pipeline row</span>
+                    <span>{trackAdoption.track_clicks.share_of_all_link_clicks_pct}% of all email link clicks were Track</span>
+                  </div>
+                </div>
+              ) : (
+                <p className="mt-5 text-sm text-amber-300/90">{trackAdoption.note}</p>
               )}
             </>
           )}
