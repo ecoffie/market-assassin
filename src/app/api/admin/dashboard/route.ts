@@ -140,7 +140,8 @@ export async function GET(request: NextRequest) {
     sowCatalog,
     revenueMetrics,
     alerts,
-    profileReminderLastRun
+    profileReminderLastRun,
+    bootcampRollout
   ] = await Promise.all([
     safeMetric('email stats', () => getEmailStats(reportDate), emptyEmailStats(reportDate)),
     safeMetric('user health', getUserHealth, emptyUserHealth()),
@@ -157,16 +158,11 @@ export async function GET(request: NextRequest) {
     safeMetric('sow catalog', getSowCatalogStats, emptySowCatalog()),
     safeMetric('revenue metrics', getRevenueMetrics, { available: false, error: 'Unavailable' }),
     safeMetric('system alerts', () => getSystemAlerts(reportDate), []),
-    safeKvGet(PROFILE_REMINDER_LAST_RUN_KEY)
+    safeKvGet(PROFILE_REMINDER_LAST_RUN_KEY),
+    // bootcampRollout is a pure read — run it IN the parallel block so its ~4s
+    // overlaps with the other fetchers instead of adding serially on top.
+    safeMetric('bootcampRollout', getBootcampRollout, emptyBootcampRollout())
   ]);
-  const _parallelDoneAt = Date.now();
-
-  // getBootcampRollout runs SERIALLY after the Promise.all (its time adds directly
-  // to the total, unlike the parallel metrics). Time it separately.
-  const _bootcampT0 = Date.now();
-  const bootcampRollout = await getBootcampRollout();
-  _metricTimings['bootcampRollout (serial)'] = Date.now() - _bootcampT0;
-  _metricTimings['_parallel_block_total'] = _parallelDoneAt - _requestStart;
   _metricTimings['_grand_total'] = Date.now() - _requestStart;
 
   return NextResponse.json({
@@ -228,10 +224,8 @@ export async function GET(request: NextRequest) {
   });
 }
 
-async function getBootcampRollout() {
-  const DEFAULT_NAICS = ['541512', '541611', '541330', '541990', '561210'];
-
-  const rollout = {
+function emptyBootcampRollout() {
+  return {
     totalAttendees: 0,
     totalBootcampUsers: 0,
     invitationsSent: 0,
@@ -255,6 +249,12 @@ async function getBootcampRollout() {
     needsSetupReal: 0,       // empty profile — the true reignite audience
     labelStale: 0            // treatment_type=needs_setup but actually configured
   };
+}
+
+async function getBootcampRollout() {
+  const DEFAULT_NAICS = ['541512', '541611', '541330', '541990', '561210'];
+
+  const rollout = emptyBootcampRollout();
 
   try {
     const supabase = getSupabase();
@@ -1994,10 +1994,25 @@ async function getMatchingQuality() {
   return quality;
 }
 
-async function fetchWeeklyAlertBuyerEmails(): Promise<Set<string>> {
+// The pro-buyer list comes from a cross-site fetch to shop.govcongiants.com pulling
+// a FULL YEAR of purchases (~6.7s) — and it's called 3× per dashboard load (userHealth,
+// matchingQuality, revenue). It was the dominant dashboard bottleneck (instrumented
+// 2026-07-07). Three fixes so it stops costing ~6.7s×3:
+//   1) in-request memoization — the 3 calls in one load share ONE fetch
+//   2) KV cache (10-min TTL) — most loads skip the shop call entirely
+//   3) 8s timeout — a slow/hung shop can't block the dashboard indefinitely
+// The buyer list changes slowly, so a few minutes of staleness is fine here.
+const WEEKLY_BUYER_CACHE_KEY = 'dashboard:weekly-alert-buyers:v1';
+const WEEKLY_BUYER_TTL_SECONDS = 600; // 10 min
+let _weeklyBuyerInflight: Promise<Set<string>> | null = null;
+
+async function fetchWeeklyAlertBuyerEmailsUncached(): Promise<Set<string>> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), 8000);
   try {
     const res = await fetch('https://shop.govcongiants.com/api/admin/purchases-report?days=365', {
-      headers: { 'x-admin-password': 'admin123' },
+      headers: { 'x-admin-password': process.env.SHOP_ADMIN_PASSWORD || 'admin123' },
+      signal: controller.signal,
     });
 
     if (!res.ok) {
@@ -2022,6 +2037,35 @@ async function fetchWeeklyAlertBuyerEmails(): Promise<Set<string>> {
   } catch (error) {
     console.error('[Dashboard] Error fetching weekly-alert buyer list:', error);
     return new Set();
+  } finally {
+    clearTimeout(timeout);
+  }
+}
+
+async function fetchWeeklyAlertBuyerEmails(): Promise<Set<string>> {
+  // 1) share one fetch across the 3 concurrent callers in a single request.
+  if (_weeklyBuyerInflight) return _weeklyBuyerInflight;
+
+  _weeklyBuyerInflight = (async () => {
+    // 2) KV cache: a stored email array short-circuits the cross-site call.
+    try {
+      const cached = await kv.get<string[]>(WEEKLY_BUYER_CACHE_KEY);
+      if (Array.isArray(cached)) return new Set(cached);
+    } catch { /* KV miss/unavailable → fall through to live fetch */ }
+
+    const fresh = await fetchWeeklyAlertBuyerEmailsUncached();
+    // Only cache a non-empty result — an empty set usually means the shop call
+    // failed/timed out, and we don't want to pin "no pro buyers" for 10 min.
+    if (fresh.size > 0) {
+      try { await kv.set(WEEKLY_BUYER_CACHE_KEY, [...fresh], { ex: WEEKLY_BUYER_TTL_SECONDS }); } catch { /* non-fatal */ }
+    }
+    return fresh;
+  })();
+
+  try {
+    return await _weeklyBuyerInflight;
+  } finally {
+    _weeklyBuyerInflight = null; // reset so the next request re-checks cache
   }
 }
 
