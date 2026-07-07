@@ -35,7 +35,7 @@ function AddedContent() {
 
         <div className="space-y-3">
           <Link
-            href="/bd-assist?tab=pipeline"
+            href="/app?panel=pipeline"
             className="block w-full bg-violet-600 hover:bg-violet-700 text-white py-3 px-6 rounded-lg font-semibold transition"
           >
             View in Pipeline

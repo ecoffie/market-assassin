@@ -1289,6 +1289,23 @@ async function sendDailyAlertEmail(
 
   const encodedEmail = encodeURIComponent(email.toLowerCase().trim());
   const preferencesAuth = generateEmailToken(email);
+  // One-click "Track in Mindy" (the alert→action fix): a signed token so the
+  // add-to-pipeline GET link authenticates straight from the email. Reuses the
+  // same email-token scheme as the preferences link.
+  const actionAuth = generateEmailToken(email);
+  const trackUrl = (opp: { noticeId?: string; title: string; agency?: string; naicsCode?: string }) => {
+    const p = new URLSearchParams({
+      email: email.toLowerCase().trim(),
+      title: opp.title || '',
+      token: actionAuth.token,
+      ts: String(actionAuth.ts),
+      source: 'daily_alert',
+    });
+    if (opp.noticeId) p.set('notice_id', opp.noticeId);
+    if (opp.agency) p.set('agency', opp.agency);
+    if (opp.naicsCode) p.set('naics', opp.naicsCode);
+    return `${MINDY_SITE_URL}/api/actions/add-to-pipeline?${p.toString()}`;
+  };
   const unsubscribeUrl = `${MINDY_SITE_URL}/api/alerts/unsubscribe?email=${encodedEmail}`;
   const preferencesUrl = `${MINDY_SITE_URL}/alerts/preferences?email=${encodedEmail}&token=${encodeURIComponent(preferencesAuth.token)}&ts=${preferencesAuth.ts}`;
   const mindyDashboardUrl = MINDY_APP_URL;
@@ -1329,12 +1346,16 @@ async function sendDailyAlertEmail(
             ${urgencyBadge}
             ${scoreBadge}
           </div>
-          <a href="${trackedUrl(opp.uiLink, 'sam_gov_opportunity', `opportunity_${opp.noticeId || i + 1}`)}" style="color: #1e40af; font-weight: 600; text-decoration: none; font-size: 14px; line-height: 1.4;">
+          <a href="${trackedUrl(trackUrl(opp), 'track_in_mindy', `track_${opp.noticeId || i + 1}`)}" style="color: #1e40af; font-weight: 600; text-decoration: none; font-size: 14px; line-height: 1.4;">
             ${i + 1}. ${opp.title.slice(0, 90)}${opp.title.length > 90 ? '...' : ''}
           </a>
           <div style="color: #6b7280; font-size: 12px; margin-top: 5px;">
             ${opp.department || 'Federal'}${opp.subTier ? ` › ${opp.subTier}` : ''} &nbsp;•&nbsp;
             NAICS ${opp.naicsCode || 'N/A'}
+          </div>
+          <div style="margin-top: 8px;">
+            <a href="${trackedUrl(trackUrl(opp), 'track_in_mindy', `track_btn_${opp.noticeId || i + 1}`)}" style="display: inline-block; background: #1e40af; color: #ffffff; padding: 6px 14px; border-radius: 6px; font-size: 12px; font-weight: 700; text-decoration: none;">📌 Track in Mindy</a>
+            <a href="${trackedUrl(opp.uiLink, 'sam_gov_opportunity', `sam_${opp.noticeId || i + 1}`)}" style="color: #64748b; font-size: 12px; text-decoration: none; margin-left: 12px;">View on SAM.gov →</a>
           </div>
           <div style="color: #64748b; font-size: 11px; margin-top: 4px;">
             📅 Posted ${formatDate(opp.postedDate)} &nbsp;•&nbsp;
