@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import { getMIApiHeaders } from '@/components/app/authHeaders';
 
 interface ProfileStatsBarProps {
   email: string;
@@ -41,7 +42,10 @@ export default function ProfileStatsBar({ email, onTabChange, refreshKey = 0, on
   useEffect(() => {
     async function fetchStats() {
       try {
-        const res = await fetch(`/api/briefings/profile-stats?email=${encodeURIComponent(email)}`);
+        const res = await fetch(
+          `/api/briefings/profile-stats?email=${encodeURIComponent(email)}`,
+          { headers: getMIApiHeaders(email) },
+        );
         const data = await res.json();
         setStats(data);
       } catch {

@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
 export const dynamic = 'force-dynamic';
 
@@ -47,12 +48,19 @@ export async function GET(request: NextRequest) {
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
 
+  // Coach Mode: when acting as a client, the stats bar must reflect the CLIENT's
+  // profile (their NAICS/keywords), not the coach's own — else every client shows
+  // the coach's "N opportunities match" number. Mirrors mi-dashboard /
+  // app/opportunities. The client sends x-active-workspace via getMIApiHeaders.
+  const { workspaceId, asClient } = await resolveActiveWorkspace(email, request);
+  const profileEmail = asClient ? clientNotificationEmail(workspaceId) : email;
+
   try {
     // Get user's profile settings (case-insensitive email match)
     const { data: profile, error: profileError } = await supabase
       .from('user_notification_settings')
       .select('naics_codes, keywords, agencies, location_states')
-      .ilike('user_email', email)
+      .ilike('user_email', profileEmail)
       .maybeSingle();
 
     if (profileError || !profile) {
