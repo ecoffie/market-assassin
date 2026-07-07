@@ -210,6 +210,7 @@ type GrowthBrief = {
     totalUsers: number;
     miFree: number;
     miPro: number;
+    miTrial: number;
     miInternal: number;
     profileComplete: number;
     profileCompletionRate: string;
@@ -1772,7 +1773,7 @@ export default function LaunchCommandCenterPage() {
                 <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-5">
                   <p className="text-sm text-slate-400">Profiles Complete</p>
                   <p className="mt-2 text-4xl font-bold text-emerald-300">{formatNumber(growthBrief.audience.profileComplete)}</p>
-                  <p className="mt-1 text-sm text-slate-500">{growthBrief.audience.profileCompletionRate} of {formatNumber(growthBrief.audience.totalUsers)} users</p>
+                  <p className="mt-1 text-sm text-slate-500">{growthBrief.audience.profileCompletionRate} of {formatNumber(growthBrief.audience.activeAlertAudience)} active</p>
                 </div>
                 <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-5">
                   <p className="text-sm text-slate-400">Active In MI</p>
@@ -1788,6 +1789,27 @@ export default function LaunchCommandCenterPage() {
                   <p className="text-sm text-slate-400">Email Click Rate</p>
                   <p className="mt-2 text-4xl font-bold text-amber-300">{growthBrief.email.clickRate}</p>
                   <p className="mt-1 text-sm text-slate-500">{formatNumber(growthBrief.email.clicked)} clicks from {formatNumber(growthBrief.email.sent)} sent</p>
+                </div>
+              </div>
+
+              {/* Tier breakdown — the CORRECTED Pro number. Pro is a union across
+                  purchases + entitlement flags + paid classifications (no single flag
+                  captures it). Trial = beta_preview users who never paid (should expire). */}
+              <div className="grid gap-4 sm:grid-cols-3">
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-5">
+                  <p className="text-sm text-slate-400">Paying / Pro</p>
+                  <p className="mt-2 text-4xl font-bold text-emerald-300">{formatNumber(growthBrief.audience.miPro)}</p>
+                  <p className="mt-1 text-sm text-slate-500">purchases + grants + lifetime/founders</p>
+                </div>
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-5">
+                  <p className="text-sm text-slate-400">Beta Trial</p>
+                  <p className="mt-2 text-4xl font-bold text-amber-300">{formatNumber(growthBrief.audience.miTrial)}</p>
+                  <p className="mt-1 text-sm text-slate-500">free beta_preview — should expire → convert</p>
+                </div>
+                <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-5">
+                  <p className="text-sm text-slate-400">Free (alerts on)</p>
+                  <p className="mt-2 text-4xl font-bold text-blue-300">{formatNumber(growthBrief.audience.miFree)}</p>
+                  <p className="mt-1 text-sm text-slate-500">of {formatNumber(growthBrief.audience.activeAlertAudience)} active audience</p>
                 </div>
               </div>
 

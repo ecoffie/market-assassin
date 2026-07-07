@@ -57,6 +57,7 @@ type UserProfile = {
   access_contractor_db?: boolean | null;
   access_content_standard?: boolean | null;
   access_content_full_fix?: boolean | null;
+  access_team?: boolean | null;
 };
 
 type CustomerClassification = {
@@ -64,6 +65,10 @@ type CustomerClassification = {
   briefings_access?: string | null;
   classification_version?: number | null;
   briefings_expiry?: string | null;
+};
+
+type PurchaseRow = {
+  user_email?: string | null;
 };
 
 type EngagementRow = {
@@ -98,7 +103,8 @@ type UserState = {
   alertsEnabled: boolean;
   alertFrequency?: string | null;
   briefingsEnabled: boolean;
-  proEntitled: boolean;
+  proEntitled: boolean;      // real Pro: any purchase / entitlement grant (the union)
+  trialUser: boolean;        // beta_preview trial that is NOT already Pro (separable, should expire)
   internal: boolean;
   engagementEvents: number;
   appEvents: number;
@@ -248,6 +254,7 @@ function getOrCreateUser(users: Map<string, UserState>, email: string): UserStat
       alertsEnabled: false,
       briefingsEnabled: false,
       proEntitled: false,
+      trialUser: false,
       internal: isInternalOrTestEmail(normalized),
       engagementEvents: 0,
       appEvents: 0,
@@ -309,6 +316,7 @@ export async function GET(request: NextRequest) {
     settings,
     profiles,
     classifications,
+    purchases,
     engagements,
     emailSends,
     emailEvents,
@@ -324,7 +332,7 @@ export async function GET(request: NextRequest) {
       fetchAllRows((from, to) =>
         supabase
           .from('user_profiles')
-          .select('email, created_at, updated_at, naics_codes, company_name, access_briefings, access_hunter_pro, access_assassin_standard, access_assassin_premium, access_recompete, access_contractor_db, access_content_standard, access_content_full_fix')
+          .select('email, created_at, updated_at, naics_codes, company_name, access_briefings, access_hunter_pro, access_assassin_standard, access_assassin_premium, access_recompete, access_contractor_db, access_content_standard, access_content_full_fix, access_team')
           .range(from, to)
       ), statuses),
     safeSource<CustomerClassification>('customer_classifications', () =>
@@ -332,6 +340,13 @@ export async function GET(request: NextRequest) {
         supabase
           .from('customer_classifications')
           .select('email, briefings_access, classification_version, briefings_expiry')
+          .range(from, to)
+      ), statuses),
+    safeSource<PurchaseRow>('purchases', () =>
+      fetchAllRows((from, to) =>
+        supabase
+          .from('purchases')
+          .select('user_email')
           .range(from, to)
       ), statuses),
     safeSource<EngagementRow>('user_engagement', () =>
@@ -391,7 +406,8 @@ export async function GET(request: NextRequest) {
       row.access_recompete ||
       row.access_contractor_db ||
       row.access_content_standard ||
-      row.access_content_full_fix
+      row.access_content_full_fix ||
+      row.access_team
     );
   }
 
@@ -399,7 +415,10 @@ export async function GET(request: NextRequest) {
     (max, row) => Math.max(max, Number(row.classification_version || 0)),
     0
   );
-  const entitledAccess = new Set(['lifetime', '1_year', '6_month', 'subscription', 'beta_preview']);
+  // PAID classifications = real Pro. beta_preview = a free trial that should EXPIRE —
+  // NOT Pro. (Counting beta_preview as Pro was the miPro-inflation bug: 481 free trial
+  // users read as paying.) Split them: paid → proEntitled, beta_preview → trialUser.
+  const paidAccess = new Set(['lifetime', '1_year', '6_month', 'subscription']);
   const nowMs = now.getTime();
 
   for (const row of classifications) {
@@ -407,9 +426,24 @@ export async function GET(request: NextRequest) {
     if (!email) continue;
     const sameVersion = latestClassificationVersion === 0 || Number(row.classification_version || 0) === latestClassificationVersion;
     const notExpired = !row.briefings_expiry || new Date(row.briefings_expiry).getTime() > nowMs;
-    if (sameVersion && notExpired && entitledAccess.has(row.briefings_access || '')) {
+    if (!sameVersion || !notExpired) continue;
+    const access = row.briefings_access || '';
+    if (paidAccess.has(access)) {
       getOrCreateUser(users, email).proEntitled = true;
+    } else if (access === 'beta_preview') {
+      getOrCreateUser(users, email).trialUser = true;
     }
+  }
+
+  // Union source #4: the purchases table — every paying customer (bundles, lifetime,
+  // founders, spend-threshold grants). This is where the ~59 buyers who never got the
+  // access_briefings flag written live. Reconciled 2026-07-07: the DISTINCT union of
+  // purchases ∪ access_* ∪ paid-classifications ∪ access_team = the true Pro population
+  // (~118), which no single flag captures. (memory: pro_population_is_a_union)
+  for (const row of purchases) {
+    const email = normalizeEmail(row.user_email);
+    if (!email) continue;
+    getOrCreateUser(users, email).proEntitled = true;
   }
 
   const appEventTypes = new Set(['page_view', 'tool_use', 'report_generate', 'export', 'login', 'profile_update', 'onboarding_step']);
@@ -484,7 +518,11 @@ export async function GET(request: NextRequest) {
 
   const customerUsers = Array.from(users.values()).filter(user => !user.internal);
   const miPro = customerUsers.filter(user => user.proEntitled).length;
-  const miFree = customerUsers.filter(user => !user.proEntitled && user.alertsEnabled).length;
+  // Trial = a beta_preview user who is NOT already Pro (34 beta users had also purchased —
+  // they're Pro, not trial). This is the separable expiring-trial bucket.
+  const miTrial = customerUsers.filter(user => user.trialUser && !user.proEntitled).length;
+  // Free = alerts-on, and neither Pro nor trial.
+  const miFree = customerUsers.filter(user => !user.proEntitled && !user.trialUser && user.alertsEnabled).length;
   const profileComplete = customerUsers.filter(user => user.hasCustomProfile).length;
   const importedNoAccount = customerUsers.filter(user => user.hasSettings && !user.hasProfile && user.appEvents === 0).length;
   const accountCreatedNoProfile = customerUsers.filter(user => user.hasProfile && !user.hasCustomProfile).length;
@@ -618,11 +656,15 @@ export async function GET(request: NextRequest) {
       totalUsers: customerUsers.length,
       miFree,
       miPro,
+      miTrial,
       miInternal: Array.from(users.values()).filter(user => user.internal).length,
       importedNoAccount,
       accountCreatedNoProfile,
       profileComplete,
-      profileCompletionRate: percent(profileComplete, customerUsers.length),
+      // Rate is against the ACTIVE audience (alerts-on), not the dead-import total —
+      // 9,865 never-activated imports made this read a misleading 11% (memory:
+      // command-center measures the graveyard). Real active base is the honest denominator.
+      profileCompletionRate: percent(profileComplete, Math.max(1, customerUsers.filter(user => user.alertsEnabled).length)),
       activeAlertAudience: customerUsers.filter(user => user.alertsEnabled).length,
       briefingsEligible: customerUsers.filter(user => user.proEntitled && user.briefingsEnabled && user.hasCustomProfile).length,
       briefingsNeedProfile: customerUsers.filter(user => user.proEntitled && !user.hasCustomProfile).length,
