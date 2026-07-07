@@ -139,7 +139,6 @@ export async function GET(request: NextRequest) {
     forecastStats,
     sowCatalog,
     revenueMetrics,
-    alerts,
     profileReminderLastRun,
     bootcampRollout
   ] = await Promise.all([
@@ -157,13 +156,26 @@ export async function GET(request: NextRequest) {
     safeMetric('forecast stats', getForecastStats, emptyForecastStats()),
     safeMetric('sow catalog', getSowCatalogStats, emptySowCatalog()),
     safeMetric('revenue metrics', getRevenueMetrics, { available: false, error: 'Unavailable' }),
-    safeMetric('system alerts', () => getSystemAlerts(reportDate), []),
     safeKvGet(PROFILE_REMINDER_LAST_RUN_KEY),
     // bootcampRollout is a pure read — run it IN the parallel block so its ~4s
     // overlaps with the other fetchers instead of adding serially on top. Cached
     // (10-min TTL) so warm loads skip the ~8,800-row cohort scan entirely.
     safeMetric('bootcampRollout', getBootcampRolloutCached, emptyBootcampRollout())
   ]);
+
+  // System alerts derives from metrics ALREADY computed above — no extra queries
+  // (it used to re-run 4 of the heaviest fetchers itself; that was the ~4s long pole).
+  const _sysAlertsT0 = Date.now();
+  const alerts = getSystemAlerts(
+    emailStats,
+    userHealth,
+    weeklyAlertHealth,
+    deadLetterStats,
+    profileReminderLastRun as {
+      summary?: { eligibleToSend?: number; cursorSkipped?: number; processed?: number; remaining?: number };
+    } | null,
+  );
+  _metricTimings['system alerts (derived)'] = Date.now() - _sysAlertsT0;
   _metricTimings['_grand_total'] = Date.now() - _requestStart;
 
   return NextResponse.json({
@@ -913,6 +925,7 @@ function emptyUserHealth() {
   return {
     totalUsers: 0,
     naicsConfigured: 0,
+    profileConfigured: 0,
     naicsPercent: 'N/A',
     defaultNaicsOnly: 0,
     noNaics: 0,
@@ -2704,22 +2717,27 @@ async function getRevenueMetricsUncached() {
   return metrics;
 }
 
-async function getSystemAlerts(today: string) {
-  const alerts: Array<{ level: 'critical' | 'warning' | 'info'; message: string }> = [];
-
-  // Check for issues
-  const emailStats = await getEmailStats(today);
-  const userHealth = await getUserHealth();
-  const weeklyAlertHealth = await getWeeklyAlertHealth();
-  const deadLetter = await getDeadLetterStats();
-  const profileReminderLastRun = await safeKvGet<{
+// Derives alert conditions from metrics ALREADY computed in the main Promise.all.
+// Previously this re-ran getEmailStats + getUserHealth + getWeeklyAlertHealth +
+// getDeadLetterStats itself (~4s of DUPLICATE work — it was the dashboard's long
+// pole after the caching fixes). Now it takes them as params: zero extra queries.
+// Typed to only the fields actually read, so it accepts both the live results and
+// the emptyX() fallbacks (which omit some fields) without a shape mismatch.
+function getSystemAlerts(
+  emailStats: { alerts: { sent: number; failed: number }; briefings: { sent: number } },
+  userHealth: { totalUsers: number; profileConfigured: number },
+  weeklyAlertHealth: { scheduledAtUtc: string; eligibleTotal: number; processed: number; remaining: number; cycleDate: string },
+  deadLetter: { pending: number },
+  profileReminderLastRun: {
     summary?: {
       eligibleToSend?: number;
       cursorSkipped?: number;
       processed?: number;
       remaining?: number;
     };
-  }>(PROFILE_REMINDER_LAST_RUN_KEY);
+  } | null,
+) {
+  const alerts: Array<{ level: 'critical' | 'warning' | 'info'; message: string }> = [];
 
   // Critical: No sends yesterday (shown after 8 AM today)
   // Note: Dashboard shows yesterday's data since today isn't complete yet
