@@ -39,13 +39,16 @@ export async function GET(request: NextRequest) {
   const limit = Math.max(1, Math.min(200, Number(url.searchParams.get('limit') || 50)));
   const supabase = sb();
 
-  // Rows needing (re)embedding: capability_embedded_at IS NULL. Only consider active
-  // users (skip archived rows) so we don't spend embeddings on dead accounts.
+  // Rows needing (re)embedding: capability_embedded_at IS NULL. Only users who
+  // actually have alerts ON — that's the exact audience the daily-alerts consumer
+  // filters on (is_active AND alerts_enabled), so we never spend embeddings on the
+  // ~8k dormant bootcamp enrollees who have alerts OFF and can't receive a match.
   const { data, error } = await supabase
     .from('user_notification_settings')
     .select('user_email')
     .is('capability_embedded_at', null)
     .eq('is_active', true)
+    .eq('alerts_enabled', true)
     .limit(limit + 1);
 
   if (error) {

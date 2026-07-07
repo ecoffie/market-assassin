@@ -15,6 +15,7 @@ import { MindyInsightCard } from '../MindyInsightCard';
 import { CollabHotCard } from '../CollabHotCard';
 import TargetingCard from './TargetingCard';
 import StartHereCard from './StartHereCard';
+import HiddenWorkNudge from './HiddenWorkNudge';
 import { getNaics } from '@/lib/codes/lookup';
 import ShareButton from '@/components/briefings/ShareButton';
 import SamAttachmentLinks from '@/components/app/SamAttachmentLinks';
@@ -1171,6 +1172,10 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
       {/* Mindy Insight hero card — daily quote, theme rotates by day */}
       <div className="px-3 md:px-6 pt-4 md:pt-5">
         <StartHereCard email={email} onGo={onPanelChange} />
+        {/* "💡 Unlock Hidden Work" — shows only for users still on the placeholder
+            seed profile (who get ZERO semantic matches). Vanishes once they set a
+            real NAICS/keyword. Same gate as the capability vector. */}
+        <HiddenWorkNudge email={email} onGo={onPanelChange} />
         {/* "🔥 Hot right now" — the single most-tracked collab-ready opp across
             Mindy (social-proof spotlight; pairs with the inline Alerts badge). */}
         <CollabHotCard email={email} onPanelChange={onPanelChange} />

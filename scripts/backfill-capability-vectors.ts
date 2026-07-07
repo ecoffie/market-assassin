@@ -47,11 +47,14 @@ async function pool<T>(items: T[], n: number, fn: (t: T, i: number) => Promise<v
 (async () => {
   if (!process.env.OPENAI_API_KEY) { console.error('OPENAI_API_KEY not set'); process.exit(1); }
 
-  // Resumable: only active rows still needing a vector.
+  // Resumable: only users with alerts ON still needing a vector — the same audience
+  // the daily-alerts consumer filters on (is_active AND alerts_enabled). Skips the
+  // ~8k dormant bootcamp enrollees who can never receive a hidden match.
   let q = sb.from('user_notification_settings')
     .select('user_email')
     .is('capability_embedded_at', null)
-    .eq('is_active', true);
+    .eq('is_active', true)
+    .eq('alerts_enabled', true);
   if (ONLY_EMAIL) q = sb.from('user_notification_settings').select('user_email').eq('user_email', ONLY_EMAIL);
   if (LIMIT > 0) q = q.limit(LIMIT);
 

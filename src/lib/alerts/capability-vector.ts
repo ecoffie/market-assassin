@@ -16,7 +16,7 @@ import { createClient } from '@supabase/supabase-js';
 import { embedText, parseEmbedding } from '@/lib/market/embeddings';
 import { getNaics } from '@/lib/codes/lookup';
 import { fetchUSASpendingAwardsByUei } from '@/lib/usaspending/awards-by-uei';
-import { DEFAULT_NAICS_CODES } from '@/lib/config/defaults';
+import { isSeedNaicsOnly, hasRealKeyword, GENERIC_KEYWORDS_FOR_BLOB } from '@/lib/alerts/profile-setup';
 
 function admin() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
@@ -28,39 +28,9 @@ function admin() {
 const MIN_BLOB_CHARS = 120;        // a one-liner alone (~60 chars) is not enough
 const MIN_REAL_SIGNALS = 1;        // ≥1 real capability OR ≥1 imported past-perf scope
 
-// The known SEED SWEEPS we must NEVER treat as a real capability signal (memory:
-// prefilled_naics_not_real_signal). Two placeholder sets get written to profiles at
-// signup/onboarding; embedding them fires "matches your capabilities" noise at exactly
-// the users least able to judge it. `free-profile.ts` writes the 541-IT sweep;
-// `config/defaults.ts` DEFAULT_NAICS_CODES is the healthcare nudge default.
-const SEED_SWEEP_IT = ['541512', '541611', '541330', '541990', '561210'];
-const SEED_NAICS = new Set<string>([...SEED_SWEEP_IT, ...DEFAULT_NAICS_CODES]);
-
-// Generic keyword sets that ride along with the seed sweeps — real signal requires
-// something beyond these. (The 541-sweep onboarding seeds exactly these words.)
-const GENERIC_KEYWORDS = new Set<string>([
-  'computer', 'systems', 'design', 'administrative', 'management', 'engineering',
-  'professional', 'scientific', 'technical', 'facilities', 'services', 'support',
-]);
-
-/**
- * Is this notification-settings NAICS set the placeholder seed sweep (not a real
- * user choice)? True when EVERY code is a known seed code (an all-seed profile is a
- * default nobody edited). A user who kept the sweep but ADDED their own code is real.
- */
-function isSeedNaicsOnly(naics: string[]): boolean {
-  const real = naics.map((n) => String(n).trim()).filter(Boolean);
-  if (real.length === 0) return true;
-  return real.every((n) => SEED_NAICS.has(n));
-}
-
-/** Keywords count as real signal only if at least one is NOT in the generic seed set. */
-function hasRealKeyword(keywords: string[]): boolean {
-  return keywords.some((k) => {
-    const t = String(k).trim().toLowerCase();
-    return t.length > 2 && !GENERIC_KEYWORDS.has(t);
-  });
-}
+// Seed-sweep + generic-keyword detection now lives in profile-setup.ts as the single
+// source of truth (shared with the in-app Hidden Work nudge + email strip), so all
+// three agree on "did this user set a real profile?" (memory: prefilled_naics_not_real_signal).
 
 export interface CapabilityProfile {
   email: string;
@@ -159,7 +129,7 @@ export async function buildCapabilityProfile(email: string): Promise<CapabilityP
       if (realKw) {
         for (const k of nsKeywords) {
           const t = String(k).trim();
-          if (t.length > 2 && !GENERIC_KEYWORDS.has(t.toLowerCase())) extraKeywordTitles.push(t);
+          if (t.length > 2 && !GENERIC_KEYWORDS_FOR_BLOB.has(t.toLowerCase())) extraKeywordTitles.push(t);
         }
       }
       // Count this as one real signal so eligibility passes — it IS a real, user-chosen
