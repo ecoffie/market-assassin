@@ -121,7 +121,7 @@ export default function CoachPanel({
   };
 
   const switchTo = (c: Client, thenPanel?: AppPanel) => {
-    setActiveWorkspace(c.workspaceId, email);
+    setActiveWorkspace(c.workspaceId, email, c.businessName);
     if (thenPanel) {
       goApp(thenPanel);
       return;
@@ -148,7 +148,7 @@ export default function CoachPanel({
       if (res.ok) {
         const wsId = d?.client?.workspaceId;
         if (wsId) {
-          setActiveWorkspace(wsId, email);
+          setActiveWorkspace(wsId, email, name);
           // Setting up the client's market profile is the FIRST thing to do.
           // The POST returns `seeded` (the extraction result when a capability
           // statement was pasted). Only treat it as real if it actually produced
