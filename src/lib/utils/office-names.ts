@@ -252,30 +252,81 @@ export function translateOfficeName(officeName: string, officeId?: string): stri
   return toTitleCase(translated);
 }
 
+// Lowercase connector words (kept lowercase mid-name, Title-cased if first).
+const TITLE_STOPWORDS = new Set(['and', 'or', 'of', 'the', 'for', 'at', 'in', 'on', 'to', 'a', 'an']);
+// US state/territory postal codes — always uppercase (e.g. "Huntsville, AL").
+const STATE_CODES = new Set([
+  'AL','AK','AZ','AR','CA','CO','CT','DE','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD',
+  'MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC',
+  'SD','TN','TX','UT','VT','VA','WA','WV','WI','WY','DC','PR','VI','GU',
+]);
+
+// Vowel-bearing acronyms a "no vowels" test alone would miss: military branches,
+// agencies, and facility/base codes. Specific tokens (safe — not a broad heuristic).
+const KNOWN_ACRONYMS = new Set([
+  // Facilities / bases
+  'AFB', 'ANG', 'ARB', 'JBSA', 'NAS', 'MCAS', 'MCB', 'AAC', 'ALC',
+  // Service branches
+  'USA', 'USN', 'USAF', 'USMC', 'USCG', 'USSF',
+  // Agencies / commands
+  'DOD', 'DLA', 'DISA', 'DIA', 'DHA', 'NGA', 'NSA', 'USACE', 'NAVFAC', 'NAVSEA',
+  'NAVAIR', 'NAVSUP', 'MICC', 'DCMA', 'DFAS', 'DTRA', 'DARPA', 'USAID', 'FEMA',
+  'NASA', 'NOAA', 'USDA', 'USGS', 'USPS', 'TSA', 'CBP', 'ICE', 'IRS', 'EPA', 'FAA', 'VA',
+]);
+
+/** Should this single token stay UPPERCASE? Military/agency office codes are terse
+ *  acronyms (SMC, PKH, AFB, AAC, ALC, LKK) that a naive title-case mangles into
+ *  "Smc/pkh". Heuristic (no fragile whitelist): a short all-letter token with no
+ *  lowercase-friendly vowel pattern, one that already came in ALL-CAPS + short, a
+ *  known facility acronym, or a state code — reads as an acronym. */
+function looksLikeAcronym(token: string): boolean {
+  const t = token.replace(/[^A-Za-z0-9]/g, '');
+  if (!t) return false;
+  if (STATE_CODES.has(t.toUpperCase())) return true;
+  if (KNOWN_ACRONYMS.has(t.toUpperCase())) return true;
+  // Alphanumeric office codes like "CZ75" / "GM13" / "AH01" → uppercase.
+  if (/^[A-Z0-9]{2,6}$/.test(token) && /\d/.test(token) && /[A-Z]/i.test(token)) return true;
+  // Pure-letter short tokens (≤4) with no vowels read as acronyms (SMC, PKH, LKK).
+  // (A vowel-bearing short word like FORT/BASE/ARMY is NOT an acronym — SAM data
+  // arrives ALL-CAPS, so an all-caps test would wrongly catch those; the vowel
+  // test + KNOWN_ACRONYMS set are the reliable signals.)
+  if (t.length <= 4 && !/[aeiou]/i.test(t)) return true;
+  return false;
+}
+
+/** Title-case one whitespace token, splitting on internal delimiters (/ and -) and
+ *  applying the acronym rule per part so "SMC/PKH" → "SMC/PKH", "warner-robins" →
+ *  "Warner-Robins". Slash-delimited office codes come in code/code pairs (SMC/PKU),
+ *  so if ANY slash-part reads as an acronym, treat the whole group as codes — this
+ *  catches vowel-bearing sibling codes ("PKU") that the per-part rule alone misses. */
+function titleCaseWord(word: string, isFirst: boolean): string {
+  // Slash groups are office-code pairs — decide acronym-ness for the group as a whole.
+  const slashParts = word.split('/');
+  const slashGroupIsCode =
+    slashParts.length > 1 && slashParts.some((p) => looksLikeAcronym(p));
+  // Preserve internal delimiters while casing each part.
+  const parts = word.split(/([/\-])/); // keeps the delimiters as array entries
+  return parts
+    .map((part) => {
+      if (part === '/' || part === '-') return part;
+      if (!part) return part;
+      if (slashGroupIsCode && part.length <= 4) return part.toUpperCase();
+      if (looksLikeAcronym(part)) return part.toUpperCase();
+      const lower = part.toLowerCase();
+      if (!isFirst && TITLE_STOPWORDS.has(lower)) return lower;
+      return lower.charAt(0).toUpperCase() + lower.slice(1);
+    })
+    .join('');
+}
+
 /**
- * Convert string to title case, preserving acronyms
+ * Convert an office/agency string to title case with GovCon conventions:
+ * preserves acronyms (SMC, PKH, AFB…), splits slash/hyphen delimited codes,
+ * keeps connector words lowercase, and uppercases state codes.
  */
 function toTitleCase(str: string): string {
-  const acronymsToPreserve = ['MICC', 'NAVFAC', 'NAVSEA', 'NAVAIR', 'USACE', 'DLA', 'DISA', 'USA', 'USN', 'USAF', 'USMC'];
-
-  return str
-    .toLowerCase()
-    .split(' ')
-    .map(word => {
-      // Check if this word is a known acronym
-      const upperWord = word.toUpperCase();
-      if (acronymsToPreserve.includes(upperWord)) {
-        return upperWord;
-      }
-      // Handle hyphenated words
-      if (word.includes('-')) {
-        return word.split('-').map(part =>
-          part.charAt(0).toUpperCase() + part.slice(1)
-        ).join('-');
-      }
-      return word.charAt(0).toUpperCase() + word.slice(1);
-    })
-    .join(' ');
+  const words = str.split(/\s+/).filter(Boolean);
+  return words.map((w, i) => titleCaseWord(w, i === 0)).join(' ');
 }
 
 /**
@@ -312,4 +363,4 @@ export function getOfficeDescription(officeName: string, officeId?: string): str
   return 'DoD contracting activity';
 }
 
-export { stateAbbreviations, dodAcronyms, officeCodeMappings };
+export { stateAbbreviations, dodAcronyms, officeCodeMappings, toTitleCase };

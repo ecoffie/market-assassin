@@ -6,7 +6,7 @@
 // 2. Fallback: SAM.gov Contract Data API (api.sam.gov)
 // 3. Health monitoring to detect when FPDS goes down
 
-import { translateOfficeName } from './office-names';
+import { translateOfficeName, toTitleCase } from './office-names';
 
 // Track FPDS health status
 let fpdsHealthy = true;
@@ -459,25 +459,8 @@ function cleanOfficeName(name: string): string {
   cleaned = cleaned.replace(/\bFt\b/gi, 'Fort');
   cleaned = cleaned.replace(/\bJb\b/gi, 'Joint Base');
 
-  // Title case helper function
-  const toTitleCase = (str: string): string => {
-    return str
-      .toLowerCase()
-      .split(' ')
-      .map(word => {
-        if (word.length === 0) return word;
-        // Keep acronyms uppercase
-        if (['micc', 'usa', 'dod'].includes(word.toLowerCase())) {
-          return word.toUpperCase();
-        }
-        // Handle McXxx names
-        if (word.toLowerCase().startsWith('mc') && word.length > 2) {
-          return 'Mc' + word.charAt(2).toUpperCase() + word.slice(3).toLowerCase();
-        }
-        return word.charAt(0).toUpperCase() + word.slice(1);
-      })
-      .join(' ');
-  };
+  // Title case using the shared office-name caser (handles SMC/PKH-style office
+  // codes, base acronyms like AFB, stopwords, and state codes — see office-names.ts).
 
   // Title case if contains uppercase words (like FORT CARSON)
   // But preserve "Army Contracting Activity - " prefix
