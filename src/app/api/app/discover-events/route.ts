@@ -24,6 +24,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyMIAccess } from '@/lib/api-auth';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { logToolError, classifyError, ToolNames, AIProviders } from '@/lib/tool-errors';
 import { searchEventsViaAI, type DiscoveredEvent } from '@/lib/events/ai-event-discovery';
 
@@ -91,6 +92,10 @@ export async function POST(request: NextRequest) {
   }
 
   const supabase = getSupabase();
+  // Coach Mode: the target being discovered belongs to the ACTIVE CLIENT, so the
+  // ownership check must key on the client — else a client's target 404s.
+  const { workspaceId, asClient } = await resolveActiveWorkspace(email, request);
+  const scopedEmail = asClient ? clientNotificationEmail(workspaceId) : email.toLowerCase();
 
   // Resolve the agency: explicit `agency` wins; otherwise look up the
   // saved target by id. We prefer sub_agency_name (more specific) but
@@ -103,7 +108,7 @@ export async function POST(request: NextRequest) {
       .from('user_target_list')
       .select('agency_name, sub_agency_name')
       .eq('id', targetId)
-      .eq('user_email', email.toLowerCase())
+      .eq('user_email', scopedEmail)
       .maybeSingle();
     if (tErr) {
       return NextResponse.json({ error: tErr.message, code: tErr.code }, { status: 500 });

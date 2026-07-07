@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { invalidateCapabilityVector } from '@/lib/alerts/capability-vector';
 import { embedVaultRow } from '@/lib/vault/embed-evidence';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,11 +43,14 @@ export async function POST(request: NextRequest) {
   if (!auth.authenticated) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   }
-  const row = { ...pick(entry), user_email: auth.email! };
+  // Coach Mode: add the capability to the ACTIVE CLIENT's vault, not the coach's.
+  const { workspaceId, asClient } = await resolveActiveWorkspace(auth.email!, request);
+  const writeEmail = asClient ? clientNotificationEmail(workspaceId) : auth.email!;
+  const row = { ...pick(entry), user_email: writeEmail };
   const { data, error } = await getSupabase().from('user_capabilities_library').insert(row).select().maybeSingle();
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   if (data) await embedVaultRow(getSupabase(), 'capability', data, new Date().toISOString());
-  void invalidateCapabilityVector(auth.email!); // capability text changed → re-embed
+  void invalidateCapabilityVector(writeEmail); // capability text changed → re-embed
   return NextResponse.json({ success: true, entry: data });
 }
 
@@ -58,12 +62,14 @@ export async function PATCH(request: NextRequest) {
   if (!email || !id) return NextResponse.json({ success: false, error: 'Email and id required' }, { status: 400 });
   const auth = await verifyUserOwnsEmail(request, email, { requireStrongAuth: true });
   if (!auth.authenticated) return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
+  const { workspaceId, asClient } = await resolveActiveWorkspace(auth.email!, request);
+  const writeEmail = asClient ? clientNotificationEmail(workspaceId) : auth.email!;
   const update = { ...pick(entry), updated_at: new Date().toISOString() };
   const { data, error } = await getSupabase().from('user_capabilities_library')
-    .update(update).eq('id', id).eq('user_email', auth.email!).select().maybeSingle();
+    .update(update).eq('id', id).eq('user_email', writeEmail).select().maybeSingle();
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   if (data) await embedVaultRow(getSupabase(), 'capability', data, new Date().toISOString());
-  void invalidateCapabilityVector(auth.email!); // capability text changed → re-embed
+  void invalidateCapabilityVector(writeEmail); // capability text changed → re-embed
   return NextResponse.json({ success: true, entry: data });
 }
 
@@ -73,9 +79,11 @@ export async function DELETE(request: NextRequest) {
   if (!email || !id) return NextResponse.json({ success: false, error: 'Email and id required' }, { status: 400 });
   const auth = await verifyUserOwnsEmail(request, email, { requireStrongAuth: true });
   if (!auth.authenticated) return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
+  const { workspaceId, asClient } = await resolveActiveWorkspace(auth.email!, request);
+  const writeEmail = asClient ? clientNotificationEmail(workspaceId) : auth.email!;
   const { error } = await getSupabase().from('user_capabilities_library')
-    .update({ archived_at: new Date().toISOString() }).eq('id', id).eq('user_email', auth.email!);
+    .update({ archived_at: new Date().toISOString() }).eq('id', id).eq('user_email', writeEmail);
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  void invalidateCapabilityVector(auth.email!); // capability removed → re-embed
+  void invalidateCapabilityVector(writeEmail); // capability removed → re-embed
   return NextResponse.json({ success: true });
 }

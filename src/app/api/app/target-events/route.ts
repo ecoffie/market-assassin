@@ -30,6 +30,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyMIAccess } from '@/lib/api-auth';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import eventsStaticData from '@/data/federal-events-sources.json';
 import agencyAliasesData from '@/data/agency-aliases.json';
 
@@ -199,7 +200,9 @@ export async function GET(request: NextRequest) {
 
   try {
     const supabase = getSupabase();
-    const lowerEmail = email.toLowerCase();
+    // Coach Mode: surface events for the ACTIVE CLIENT's target list, not the coach's.
+    const { workspaceId, asClient } = await resolveActiveWorkspace(email, request);
+    const lowerEmail = asClient ? clientNotificationEmail(workspaceId) : email.toLowerCase();
 
     // Load the user's saved target list.
     const { data: targets, error: tErr } = await supabase

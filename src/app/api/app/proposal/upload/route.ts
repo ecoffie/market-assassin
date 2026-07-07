@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { createClient } from '@supabase/supabase-js';
 
 export const runtime = 'nodejs';
@@ -82,6 +83,11 @@ export async function POST(request: NextRequest) {
 
   const authSession = requireMIAuthSession(request, email);
   if (!authSession.ok) return authSession.response;
+  // Coach Mode: the pursuit + uploaded doc belong to the ACTIVE CLIENT, so the
+  // ownership check + document rows must key on the client (else the client's
+  // pursuit fails the ownership check and the doc never attaches).
+  const { workspaceId: upWs, asClient: upAsClient } = await resolveActiveWorkspace(email, request);
+  const scopedEmail = upAsClient ? clientNotificationEmail(upWs) : email.toLowerCase();
 
   let formData: FormData;
   try {
@@ -140,9 +146,9 @@ export async function POST(request: NextRequest) {
           .select('id, user_email, notice_id')
           .eq('id', pipelineId)
           .maybeSingle();
-        if (row && (row.user_email || '').toLowerCase() === email.toLowerCase()) {
+        if (row && (row.user_email || '').toLowerCase() === scopedEmail) {
           const fileId = `upload-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`.slice(0, 120);
-          const storagePath = `${email.toLowerCase()}/${pipelineId}/${fileId}`.slice(0, 500);
+          const storagePath = `${scopedEmail}/${pipelineId}/${fileId}`.slice(0, 500);
           let finalStoragePath: string | null = null;
           try {
             const { error: upErr } = await sb.storage.from(SUPABASE_BUCKET)
@@ -152,7 +158,7 @@ export async function POST(request: NextRequest) {
 
           const { error: insErr } = await sb.from('pursuit_documents').upsert({
             pipeline_id: pipelineId,
-            user_email: email.toLowerCase(),
+            user_email: scopedEmail,
             sam_file_id: fileId,
             sam_url: null,
             notice_id: row.notice_id,

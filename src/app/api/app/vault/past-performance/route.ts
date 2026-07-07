@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { invalidateCapabilityVector } from '@/lib/alerts/capability-vector';
 import { embedVaultRow } from '@/lib/vault/embed-evidence';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
 export const dynamic = 'force-dynamic';
 
@@ -49,7 +50,11 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   }
 
-  const row = { ...pick(entry), user_email: auth.email!, source: 'manual' };
+  // Coach Mode: add past-perf to the ACTIVE CLIENT's vault, not the coach's.
+  const { workspaceId, asClient } = await resolveActiveWorkspace(auth.email!, request);
+  const writeEmail = asClient ? clientNotificationEmail(workspaceId) : auth.email!;
+
+  const row = { ...pick(entry), user_email: writeEmail, source: 'manual' };
 
   const { data, error } = await getSupabase()
     .from('user_past_performance')
@@ -61,7 +66,7 @@ export async function POST(request: NextRequest) {
   // Semantic weave: embed the new row into pgvector so it can match RFP
   // requirements immediately (best-effort — never blocks the save).
   if (data) await embedVaultRow(getSupabase(), 'past_performance', data, new Date().toISOString());
-  void invalidateCapabilityVector(auth.email!); // past-perf added → re-embed
+  void invalidateCapabilityVector(writeEmail); // past-perf added → re-embed
   return NextResponse.json({ success: true, entry: data });
 }
 
@@ -79,20 +84,24 @@ export async function PATCH(request: NextRequest) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   }
 
+  // Coach Mode: mutate the ACTIVE CLIENT's past-perf, not the coach's.
+  const { workspaceId, asClient } = await resolveActiveWorkspace(auth.email!, request);
+  const writeEmail = asClient ? clientNotificationEmail(workspaceId) : auth.email!;
+
   const update = { ...pick(entry), updated_at: new Date().toISOString() };
 
   const { data, error } = await getSupabase()
     .from('user_past_performance')
     .update(update)
     .eq('id', id)
-    .eq('user_email', auth.email!)
+    .eq('user_email', writeEmail)
     .select()
     .maybeSingle();
 
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   // Re-embed: scope/keywords may have changed, so the vector must be refreshed.
   if (data) await embedVaultRow(getSupabase(), 'past_performance', data, new Date().toISOString());
-  void invalidateCapabilityVector(auth.email!); // past-perf scope changed → re-embed
+  void invalidateCapabilityVector(writeEmail); // past-perf scope changed → re-embed
   return NextResponse.json({ success: true, entry: data });
 }
 
@@ -107,13 +116,17 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   }
 
+  // Coach Mode: archive from the ACTIVE CLIENT's vault, not the coach's.
+  const { workspaceId, asClient } = await resolveActiveWorkspace(auth.email!, request);
+  const writeEmail = asClient ? clientNotificationEmail(workspaceId) : auth.email!;
+
   const { error } = await getSupabase()
     .from('user_past_performance')
     .update({ archived_at: new Date().toISOString() })
     .eq('id', id)
-    .eq('user_email', auth.email!);
+    .eq('user_email', writeEmail);
 
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
-  void invalidateCapabilityVector(auth.email!); // past-perf removed → re-embed
+  void invalidateCapabilityVector(writeEmail); // past-perf removed → re-embed
   return NextResponse.json({ success: true });
 }

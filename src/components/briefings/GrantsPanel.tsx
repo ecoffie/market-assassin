@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
+import { getMIApiHeaders } from '@/components/app/authHeaders';
 
 interface Grant {
   id: string;
@@ -135,7 +136,7 @@ export default function GrantsPanel({ email }: GrantsPanelProps) {
       params.append('limit', '50');
 
       const response = await fetch(`/api/grants?${params.toString()}`, {
-        headers: { 'X-User-Email': email },
+        headers: getMIApiHeaders(email, { 'X-User-Email': email }),
       });
 
       if (response.ok) {

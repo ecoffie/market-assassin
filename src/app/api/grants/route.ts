@@ -15,6 +15,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { scoreGrant, type GrantOpportunity } from '@/lib/briefings/pipelines/grants-gov';
 import { saveSnapshot, readSnapshot, freshMeta, degradedMeta, isUpstreamOutage } from '@/lib/resilience/last-good';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
 // Grants.gov REST API returns totalHits as array of opportunities
 interface GrantsGovOpp {
@@ -248,7 +249,9 @@ export async function GET(request: NextRequest) {
     let sortedByRelevance = false;
     let hasProfile = false;
     if (email) {
-      const profile = await loadUserProfile(email);
+      // Coach Mode: score grant relevance against the ACTIVE CLIENT's profile.
+      const { workspaceId, asClient } = await resolveActiveWorkspace(email, request);
+      const profile = await loadUserProfile(asClient ? clientNotificationEmail(workspaceId) : email);
       hasProfile = !!(profile && (profile.naics_codes.length || profile.keywords.length || profile.agencies.length));
       if (hasProfile && sort === 'relevance') {
         grants = grants.map((g) => ({

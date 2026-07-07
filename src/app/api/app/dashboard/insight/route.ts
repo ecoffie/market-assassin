@@ -21,6 +21,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { saveSnapshot, readSnapshot, freshMeta, degradedMeta, isUpstreamOutage } from '@/lib/resilience/last-good';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
 import { dateSeed, isSimilarToRecent, selectInsightOpportunities } from '@/lib/dashboard/insight-selection';
@@ -87,7 +88,11 @@ export async function GET(request: NextRequest) {
   if (!auth.authenticated) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   }
-  const userEmail = auth.email!;
+  // Coach Mode: the Today's-Intel insight card must reflect the ACTIVE CLIENT's
+  // profile/briefing, not the coach's. Every read/write + snapshot key below
+  // flows from userEmail.
+  const { workspaceId, asClient } = await resolveActiveWorkspace(auth.email!, request);
+  const userEmail = asClient ? clientNotificationEmail(workspaceId) : auth.email!;
   const supabase = getSupabase();
 
   // Key the daily insight on the USER's LOCAL date, not UTC. The client
