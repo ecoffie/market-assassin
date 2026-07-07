@@ -14,6 +14,7 @@
 import { useState, useEffect, useCallback } from 'react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
+import { getActiveWorkspace, getActiveWorkspaceName } from '../activeWorkspace';
 import { useToast } from '../Toast';
 import { useAppTracker } from '../track';
 import SaveContactButton from '../contacts/SaveContactButton';
@@ -133,6 +134,15 @@ export default function MyTargetListPanel({
   const { showToast } = useToast();
   const track = useAppTracker(email);
 
+  // Coach Mode: name the CLIENT in empty-state copy/CTA so "Set up my Mindy /
+  // your market" doesn't read as the coach's own setup. Resolved once on mount
+  // (localStorage is sync + client-only). Falls back to "this client" when the
+  // name wasn't stashed (e.g. arrived via a bookmarked client URL).
+  const [coachClient] = useState<{ isClient: boolean; name: string } | null>(() => {
+    if (typeof window === 'undefined' || !getActiveWorkspace()) return null;
+    return { isClient: true, name: getActiveWorkspaceName() || 'this client' };
+  });
+
   const runAutoSetup = useCallback(async () => {
     if (!email || autoRunning) return;
     setAutoRunning(true); setAutoError(null);
@@ -144,7 +154,7 @@ export default function MyTargetListPanel({
       });
       const d = await res.json();
       if (res.ok && d.success) {
-        showToast({ message: `Added ${d.added} ${d.added === 1 ? 'agency' : 'agencies'} to your Target List${d.skipped ? ` (${d.skipped} already there)` : ''}`, variant: 'success' });
+        showToast({ message: `Added ${d.added} ${d.added === 1 ? 'agency' : 'agencies'} to ${coachClient ? `${coachClient.name}'s` : 'your'} Target List${d.skipped ? ` (${d.skipped} already there)` : ''}`, variant: 'success' });
         await loadTargets();
       } else if (d.needsProfile) {
         setAutoError('Add NAICS codes or keywords to your profile first.');
@@ -580,9 +590,15 @@ export default function MyTargetListPanel({
 
       {targets.length === 0 && !isFree && !error && (
         <div className="rounded-lg border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 to-slate-900/40 p-8 text-center">
-          <p className="text-lg font-semibold text-white">Want Mindy to set this up for you?</p>
+          <p className="text-lg font-semibold text-white">
+            {coachClient
+              ? `Want Mindy to set up ${coachClient.name}'s target list?`
+              : 'Want Mindy to set this up for you?'}
+          </p>
           <p className="mx-auto mt-1 max-w-md text-sm text-slate-400">
-            We&apos;ll add the agencies buying in your market — each with its sources sought, events, and contacts attached. You can fine-tune anything after.
+            {coachClient
+              ? `We'll add the agencies buying in ${coachClient.name}'s market — each with its sources sought, events, and contacts attached. You can fine-tune anything after.`
+              : "We'll add the agencies buying in your market — each with its sources sought, events, and contacts attached. You can fine-tune anything after."}
           </p>
           {autoError && <p className="mt-2 text-xs text-red-300">{autoError}</p>}
           <button
@@ -590,7 +606,11 @@ export default function MyTargetListPanel({
             disabled={autoRunning}
             className="mt-4 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50"
           >
-            {autoRunning ? 'Setting up…' : '✨ Set up my Mindy'}
+            {autoRunning
+              ? 'Setting up…'
+              : coachClient
+                ? `✨ Set up ${coachClient.name}'s Mindy`
+                : '✨ Set up my Mindy'}
           </button>
           <p className="mt-4 text-xs text-slate-500">
             Or build it yourself — use the <span className="text-emerald-400">search box above</span> to add an agency,

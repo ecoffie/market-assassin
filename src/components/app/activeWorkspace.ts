@@ -14,28 +14,38 @@
  */
 export const ACTIVE_KEY = 'mindy_active_workspace';
 export const OWNER_KEY = 'mindy_active_workspace_owner';
+export const NAME_KEY = 'mindy_active_workspace_name';
 
 /** Match the server's normalizeEmail (lib/app/workspace.ts) so comparisons line up. */
 export function normalizeEmail(email: string): string {
   return email.toLowerCase().trim();
 }
 
-/** Switch into a client workspace, stamping the owner so it can't leak to another login. */
-export function setActiveWorkspace(workspaceId: string, ownerEmail: string | null | undefined): void {
+/** Switch into a client workspace, stamping the owner so it can't leak to another
+ *  login. Optionally stash the client's display name so UI copy (empty states,
+ *  CTAs) can name the client synchronously without an extra coach-API fetch. */
+export function setActiveWorkspace(
+  workspaceId: string,
+  ownerEmail: string | null | undefined,
+  clientName?: string | null,
+): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.setItem(ACTIVE_KEY, workspaceId);
     if (ownerEmail) localStorage.setItem(OWNER_KEY, normalizeEmail(ownerEmail));
     else localStorage.removeItem(OWNER_KEY);
+    if (clientName) localStorage.setItem(NAME_KEY, clientName);
+    else localStorage.removeItem(NAME_KEY);
   } catch { /* localStorage unavailable — non-fatal */ }
 }
 
-/** Exit Coach Mode: drop both the active workspace and its owner stamp. */
+/** Exit Coach Mode: drop the active workspace, its owner stamp, and client name. */
 export function clearActiveWorkspace(): void {
   if (typeof window === 'undefined') return;
   try {
     localStorage.removeItem(ACTIVE_KEY);
     localStorage.removeItem(OWNER_KEY);
+    localStorage.removeItem(NAME_KEY);
   } catch { /* */ }
 }
 
@@ -43,6 +53,12 @@ export function clearActiveWorkspace(): void {
 export function getActiveWorkspace(): string | null {
   if (typeof window === 'undefined') return null;
   try { return localStorage.getItem(ACTIVE_KEY); } catch { return null; }
+}
+
+/** The active client's display name, if one was stashed on switch (else null). */
+export function getActiveWorkspaceName(): string | null {
+  if (typeof window === 'undefined') return null;
+  try { return localStorage.getItem(NAME_KEY); } catch { return null; }
 }
 
 /**
