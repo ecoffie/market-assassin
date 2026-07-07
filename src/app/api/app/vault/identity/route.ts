@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
 export const dynamic = 'force-dynamic';
 
@@ -45,8 +46,15 @@ export async function PUT(request: NextRequest) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   }
 
+  // Coach Mode: write the Vault identity to the ACTIVE CLIENT, not the coach.
+  // Without this a coach editing a client's cap statement (UEI/CAGE/past perf)
+  // saved it onto the COACH's own Vault — and synced the CLIENT's NAICS into the
+  // COACH's alerts. This is the coach_mode_header_drop data-corruption class.
+  const { workspaceId, asClient } = await resolveActiveWorkspace(auth.email!, request);
+  const writeEmail = asClient ? clientNotificationEmail(workspaceId) : auth.email!;
+
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const row: Record<string, any> = { user_email: auth.email!, updated_at: new Date().toISOString() };
+  const row: Record<string, any> = { user_email: writeEmail, updated_at: new Date().toISOString() };
   for (const k of WRITABLE_FIELDS) {
     if (k in profile) row[k] = profile[k];
   }
@@ -85,7 +93,7 @@ export async function PUT(request: NextRequest) {
       const { data: ns } = await getSupabase()
         .from('user_notification_settings')
         .select('naics_codes')
-        .eq('user_email', auth.email!)
+        .eq('user_email', writeEmail)
         .maybeSingle();
       const current: string[] = Array.isArray(ns?.naics_codes) ? ns!.naics_codes.map(String) : [];
       const currentSet = new Set(current);
@@ -95,7 +103,7 @@ export async function PUT(request: NextRequest) {
         await getSupabase()
           .from('user_notification_settings')
           .upsert(
-            { user_email: auth.email!, naics_codes: merged, updated_at: new Date().toISOString() },
+            { user_email: writeEmail, naics_codes: merged, updated_at: new Date().toISOString() },
             { onConflict: 'user_email' },
           );
         alertNaicsAdded = missing.length;

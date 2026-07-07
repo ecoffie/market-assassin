@@ -25,6 +25,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { invalidateCapabilityVector } from '@/lib/alerts/capability-vector';
 import {
   normalizePastPerf, normalizeCapability, normalizeIdentity,
@@ -90,7 +91,11 @@ export async function POST(request: NextRequest) {
   if (!auth.authenticated) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   }
-  const userEmail = auth.email!;
+  // Coach Mode: commit parsed doc → the ACTIVE CLIENT's Vault, not the coach's.
+  // Every write below (identity / past-perf / capabilities / NAICS sync) keys off
+  // userEmail. Also scopes the source-doc read to the same owner.
+  const { workspaceId, asClient } = await resolveActiveWorkspace(auth.email!, request);
+  const userEmail = asClient ? clientNotificationEmail(workspaceId) : auth.email!;
   const sb = getSupabase();
 
   // Load the doc's source text (owner-scoped) — used to ground the website field.

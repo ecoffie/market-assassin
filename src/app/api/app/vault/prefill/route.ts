@@ -24,6 +24,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { getEntityByUEI } from '@/lib/sam/entity-api';
 import { retrieveRagContext, formatChunksForPrompt } from '@/lib/rag/retrieve';
 import { getNaics } from '@/lib/codes/lookup';
@@ -355,7 +356,10 @@ export async function POST(request: NextRequest) {
   if (!auth.authenticated) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   }
-  const userEmail = auth.email!;
+  // Coach Mode: prefill the ACTIVE CLIENT's Vault (identity / past-perf /
+  // capabilities), not the coach's own. Every write below keys off userEmail.
+  const { workspaceId, asClient } = await resolveActiveWorkspace(auth.email!, request);
+  const userEmail = asClient ? clientNotificationEmail(workspaceId) : auth.email!;
   const supabase = getSupabase();
 
   let identityWritten = false;

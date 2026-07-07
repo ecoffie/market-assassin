@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
-import { ensureWorkspaceMember, recordAppActivity } from '@/lib/app/workspace';
+import { resolveActiveWorkspace, recordAppActivity, clientNotificationEmail } from '@/lib/app/workspace';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -65,13 +65,17 @@ export async function GET(request: NextRequest) {
 
   const authSession = requireMIAuthSession(request, email);
   if (!authSession.ok) return authSession.response;
-  const { workspaceId } = await ensureWorkspaceMember(email);
+  // Coach Mode: list the ACTIVE CLIENT's teaming partners, not the coach's.
+  // resolveActiveWorkspace falls back to the caller's own workspace when not
+  // acting as a client, so this is a safe drop-in for ensureWorkspaceMember.
+  const { workspaceId, asClient } = await resolveActiveWorkspace(email, request);
+  const scopedEmail = asClient ? clientNotificationEmail(workspaceId) : email.toLowerCase();
 
   try {
     let query = getSupabase()
       .from('user_teaming_partners')
       .select('*')
-      .or(`workspace_id.eq.${workspaceId},user_email.eq.${email.toLowerCase()}`)
+      .or(`workspace_id.eq.${workspaceId},user_email.eq.${scopedEmail}`)
       .order('partner_name', { ascending: true });
 
     if (status) {
@@ -150,11 +154,16 @@ export async function POST(request: NextRequest) {
     if (!authSession.ok) return authSession.response;
 
     body.user_email = body.user_email.toLowerCase();
-    const { workspaceId } = await ensureWorkspaceMember(body.user_email);
+    // Coach Mode: file the partner under the ACTIVE CLIENT's workspace, not the
+    // coach's. owner_email/user_email follow the client so the partner shows in
+    // the client's list; created_by/updated_by record the acting coach.
+    const { workspaceId, asClient } = await resolveActiveWorkspace(body.user_email, request);
+    const ownerEmail = asClient ? clientNotificationEmail(workspaceId) : body.user_email;
     body.outreach_status = body.outreach_status || 'none';
     body.source = body.source || 'manual';
     body.workspace_id = workspaceId;
-    body.owner_email = body.owner_email || body.user_email;
+    body.owner_email = body.owner_email || ownerEmail;
+    body.user_email = ownerEmail;
     body.created_by = body.user_email;
     body.updated_by = body.user_email;
 
@@ -214,7 +223,9 @@ export async function PATCH(request: NextRequest) {
 
     const authSession = requireMIAuthSession(request, user_email);
     if (!authSession.ok) return authSession.response;
-    const { workspaceId } = await ensureWorkspaceMember(user_email);
+    // Coach Mode: mutate the ACTIVE CLIENT's partner, not the coach's.
+    const { workspaceId, asClient } = await resolveActiveWorkspace(user_email, request);
+    const scopedEmail = asClient ? clientNotificationEmail(workspaceId) : user_email.toLowerCase();
     updates.updated_by = user_email.toLowerCase();
     updates.workspace_id = updates.workspace_id || workspaceId;
 
@@ -227,7 +238,7 @@ export async function PATCH(request: NextRequest) {
       .from('user_teaming_partners')
       .update(updates)
       .eq('id', id)
-      .or(`workspace_id.eq.${workspaceId},user_email.eq.${user_email.toLowerCase()}`)
+      .or(`workspace_id.eq.${workspaceId},user_email.eq.${scopedEmail}`)
       .select()
       .single();
 
@@ -272,13 +283,15 @@ export async function DELETE(request: NextRequest) {
 
     const authSession = requireMIAuthSession(request, user_email);
     if (!authSession.ok) return authSession.response;
-    const { workspaceId } = await ensureWorkspaceMember(user_email);
+    // Coach Mode: delete from the ACTIVE CLIENT's partner list, not the coach's.
+    const { workspaceId, asClient } = await resolveActiveWorkspace(user_email, request);
+    const scopedEmail = asClient ? clientNotificationEmail(workspaceId) : user_email.toLowerCase();
 
     const { error } = await getSupabase()
       .from('user_teaming_partners')
       .delete()
       .eq('id', id)
-      .or(`workspace_id.eq.${workspaceId},user_email.eq.${user_email.toLowerCase()}`);
+      .or(`workspace_id.eq.${workspaceId},user_email.eq.${scopedEmail}`);
 
     if (error) throw error;
 

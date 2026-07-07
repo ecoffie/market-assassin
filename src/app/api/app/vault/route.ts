@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { deleteAllVaultData } from '@/lib/vault/vault-data';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
 export const dynamic = 'force-dynamic';
 
@@ -30,7 +31,9 @@ export async function GET(request: NextRequest) {
   if (!auth.authenticated) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   }
-  const userEmail = auth.email!;
+  // Coach Mode: return the ACTIVE CLIENT's vault, not the coach's own.
+  const { workspaceId, asClient } = await resolveActiveWorkspace(auth.email!, request);
+  const userEmail = asClient ? clientNotificationEmail(workspaceId) : auth.email!;
   const supabase = getSupabase();
 
   const [identityRes, ppRes, capsRes, teamRes, docsRes] = await Promise.all([
@@ -75,7 +78,10 @@ export async function DELETE(request: NextRequest) {
     );
   }
 
-  const userEmail = auth.email!;
+  // Coach Mode: wipe the ACTIVE CLIENT's vault, not the coach's own — a
+  // destructive no-undo action that must target the workspace being viewed.
+  const { workspaceId, asClient } = await resolveActiveWorkspace(auth.email!, request);
+  const userEmail = asClient ? clientNotificationEmail(workspaceId) : auth.email!;
   const supabase = getSupabase();
   const result = await deleteAllVaultData(supabase, userEmail);
   const errors = [

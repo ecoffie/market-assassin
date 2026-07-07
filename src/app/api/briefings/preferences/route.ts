@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
 interface BriefingPreferences {
   timezone: string;
@@ -47,10 +48,14 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
   }
 
+  // Coach Mode: show the ACTIVE CLIENT's delivery preferences, not the coach's.
+  const { workspaceId, asClient } = await resolveActiveWorkspace(auth.email!, request);
+  const prefsEmail = asClient ? clientNotificationEmail(workspaceId) : auth.email!;
+
   const { data, error } = await getSupabase()
     .from('user_notification_settings')
     .select('timezone, briefing_frequency, preferred_delivery_hour, sms_enabled, phone_number, phone_verified, sms_opted_out')
-    .eq('user_email', auth.email!)
+    .eq('user_email', prefsEmail)
     .single();
 
   if (error && error.code !== 'PGRST116') {
@@ -94,6 +99,10 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
   }
 
+  // Coach Mode: save the ACTIVE CLIENT's delivery preferences, not the coach's.
+  const { workspaceId, asClient } = await resolveActiveWorkspace(auth.email!, request);
+  const prefsEmail = asClient ? clientNotificationEmail(workspaceId) : auth.email!;
+
   // Validate phone number if provided and SMS is being enabled
   if (updates.sms_enabled && updates.phone_number) {
     const normalizedPhone = normalizePhoneNumber(updates.phone_number);
@@ -123,7 +132,7 @@ export async function POST(request: NextRequest) {
     .from('user_notification_settings')
     .upsert(
       {
-        user_email: auth.email!,
+        user_email: prefsEmail,
         briefings_enabled: true,
         ...mappedUpdates,
         updated_at: new Date().toISOString(),

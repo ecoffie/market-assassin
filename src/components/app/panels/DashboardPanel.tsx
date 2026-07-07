@@ -8,6 +8,7 @@ import { formatOpportunityLocation } from '@/lib/mindy/opportunity-location';
 import { getBuyerAgencyParts } from '@/lib/mindy/agency-display';
 import type { AppPanel, AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
+import { getActiveWorkspace } from '../activeWorkspace';
 import IncumbentIntel from '../awards/IncumbentIntel';
 import { useToast } from '../Toast';
 import ContractorLink from '../contractors/ContractorLink';
@@ -708,11 +709,27 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
   const loadBriefings = useCallback(async () => {
     if (!email) return;
 
+    // Coach Mode: the pre-generated briefing_log feed is COACH-ONLY (the daily
+    // cron runs per real user, never for synthetic client workspaces — clients
+    // have zero briefing_log rows). Reading it while acting as a client showed
+    // the COACH's briefing on every client. In client mode, skip this feed
+    // entirely — the client's Today's Intel is built LIVE from their profile via
+    // the workspace-aware /api/mi-dashboard + /api/app/opportunities calls.
+    if (getActiveWorkspace()) {
+      setBriefings([]);
+      setIsLoading(false);
+      setError(null);
+      return;
+    }
+
     setIsLoading(true);
     setError(null);
 
     try {
-      const res = await fetch(`/api/briefings/latest?email=${encodeURIComponent(email)}&days=30`);
+      const res = await fetch(
+        `/api/briefings/latest?email=${encodeURIComponent(email)}&days=30`,
+        { headers: getAuthHeaders() },
+      );
       const data = await res.json();
 
       if (!data.success) {
@@ -741,7 +758,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
     } finally {
       setIsLoading(false);
     }
-  }, [email]);
+  }, [email, getAuthHeaders]);
 
   useEffect(() => {
     if (email && tier !== 'free') {
