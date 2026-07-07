@@ -3,7 +3,7 @@
  * Internal QA — CTA tag counts by area + confidence.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getReadClient } from '@/lib/supabase/server-clients';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,7 +22,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 });
   }
 
-  const supabase = createClient(url, key, { auth: { persistSession: false } });
+  // Pure read-only analytics (GET, head-count queries, no writes) → read replica.
+  const supabase = getReadClient();
 
   const [
     { data: ctas },

@@ -13,7 +13,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getReadClient } from '@/lib/supabase/server-clients';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
 import {
   SEGMENT_DEFINITIONS,
@@ -87,16 +87,9 @@ interface QualifiedCustomer {
   lastActivity: string | null;
 }
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _supabase: any = null;
+// Pure read-only customer-qualification analytics (GET, no writes) → read replica.
 function getSupabase() {
-  if (!_supabase) {
-    _supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-  }
-  return _supabase;
+  return getReadClient();
 }
 
 // Default NAICS codes that indicate incomplete profile

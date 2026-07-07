@@ -15,7 +15,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getReadClient } from '@/lib/supabase/server-clients';
 import { bqQuery, BQ_TABLES } from '@/lib/bigquery/client';
 import { getRegistrySummary } from '@/lib/data-sources/registry';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -105,7 +105,8 @@ export async function GET(request: NextRequest) {
   if (!supabaseUrl || !supabaseKey) {
     return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 });
   }
-  const supabase = createClient(supabaseUrl, supabaseKey);
+  // Pure read-only inventory counts (GET, no writes) → read replica.
+  const supabase = getReadClient();
 
   const pp = painPointCounts();
 

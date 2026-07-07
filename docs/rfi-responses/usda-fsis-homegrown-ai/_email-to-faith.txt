@@ -1,0 +1,84 @@
+Hi Faith,
+
+Thanks — here are our answers to all seven, mapped one-to-one. Every capability
+below is in production today on our platform (~1,900 users since 2024). Teaming
+posture up front: Servexo carries the vehicle, cleared staffing, and the
+FedRAMP-authorized / FISMA-ATO Azure Gov Cloud environment; Mindy provides the
+AI/LLM/RAG capability that deploys INTO that authorized environment.
+
+1) ROBUST AI OVER STRUCTURED + UNSTRUCTURED DATA
+Production LLM + RAG over both structured records (317K+ contractors, 88K+ live
+federal solicitations, award/spending data — typed, filterable, tool-called as
+cited facts) and unstructured documents (solicitations, SOW/PWS, PDFs — NUL-safe
+normalized, semantically chunked with metadata, embedded for meaning-based
+retrieval). Every answer carries inline citations to source + as-of date;
+ungroundable answers abstain rather than fabricate (fabrication guard +
+LLM-as-judge fact-check). Supports both fine-tune and RAG against the agency's
+own docs, with a labeled eval set and regression testing on every change.
+
+2) OBSERVABILITY LAYER (SECURITY, USAGE, COST)
+Built in, three planes: COST — per-call and per-user cost accounting with an
+enforced budget cap and automatic model downgrade under load; USAGE — every AI
+call records success/failure, latency, model, provider, with tool-level health
+dashboards; SECURITY/AUDIT — full audit logging and traceability on every request
+and agentic action, least-privilege service accounts, upstream-provider health
+tracking. Maps directly to the SOO's SLA-availability and incident-resolution
+requirements.
+
+3) TRUE API-FIRST PLATFORM
+API-first by construction — 463 discrete API endpoints, with the UI as one
+consumer of those same services (not a monolith with an API bolted on). Every
+capability is an addressable service with typed contracts; auth, authorization,
+and rate-limiting enforced at the API layer. Integrable into PHIS/LIMS and other
+USDA systems as services.
+
+4) CONTENT APPLICATION DESIGN / DEV / DEPLOYMENT FRAMEWORK
+End-to-end: reusable content/component patterns and templated document/report
+generation (drafted regulatory responses, compliance matrices, cited briefings);
+new content apps assembled from existing grounded-AI services rather than rebuilt;
+CI/CD with hard pre-deploy gates (type check, authorization audit, automated test
+suite that blocks release on failure) plus graceful-degradation so apps stay
+usable during an upstream outage. Delivered into the prime's authorized environment.
+
+5) ROBUST SECURITY + PERMISSIONS (SERVICES, CONTENT, AI, RAG)
+Enforced at every layer, and — key point for a document-AI platform — the RAG
+retrieval boundary is itself access-controlled. Token-based sessions with 2FA;
+role- and workspace-scoped access with database row-level security so a caller
+only sees entitled data; metadata-filtered retrieval so the model can only draw
+from the corpus the requester is authorized to see (permissioning applies to what
+the AI can RETRIEVE, not just what the UI shows); agentic actions run under
+bounded, allow-listed, least-privilege scopes with full audit + rollback;
+defenses against prompt injection, data leakage, unauthorized tool calls;
+encryption in transit and at rest. Aligns with SOO §3.1 session-scoped processing.
+
+6) SELF-MANAGED DEPLOYMENT IN AZURE GOV CLOUD
+Mindy's application layer is provider-agnostic and containerizable, architected to
+deploy self-managed into Azure Government Cloud as part of the prime's authorized
+environment. Portable building blocks map one-to-one to Azure Gov equivalents
+(Azure Database for PostgreSQL, Azure OpenAI in Gov, Blob Storage); containerized
+components already exist in our pipeline. Because the model layer is
+provider-agnostic and config-driven, the government instance is configured to call
+ONLY in-boundary models (e.g. Azure OpenAI in Azure Gov), with NO FSIS data sent to
+any external or third-party LLM service — meeting SOO §3.1 directly (all work with
+FSIS data stays in the USDA-approved secure environment). Any external
+authorized-system connection is identified and submitted for FSIS OCIO approval
+before use, per §3.1; nothing connects out by default. Stated plainly: Mindy does
+NOT itself hold a FISMA ATO or FedRAMP, and we are not representing that it does —
+that authorization is carried by the prime / hosting partner whose Azure Gov Cloud
+boundary we deploy into. Mindy is the portable, in-boundary application layer; the
+prime owns the accredited boundary. That is the intended teaming structure here.
+
+7) ROBUST CONTENT + DATA PREPARATION SERVICES
+A core production competency (RAG quality = ingestion quality). Connectors to
+authoritative and legacy sources; NUL-safe, encoding-clean normalization;
+de-dup and structural cleanup of messy PDFs/HTML; semantic chunking with
+structured metadata; automated document classification and requirement/section
+extraction (e.g. every requirement pulled into a compliance matrix); embeddings
+to a vector store with hybrid semantic+keyword retrieval and re-ranking; and a
+labeled gold set with precision/recall + factuality scoring so the prepared
+corpus is measured, not assumed.
+
+Happy to jump on a quick call if any of these need tightening for the format.
+Thanks for turning this around fast.
+
+Eric

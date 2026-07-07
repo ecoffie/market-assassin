@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getReadClient } from '@/lib/supabase/server-clients';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
 import { fetchUpgradeEngagementRows } from '@/lib/mindy/upgrade-intent';
 
@@ -37,9 +37,8 @@ export async function GET(request: NextRequest) {
   }
 
   try {
-    const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-      auth: { autoRefreshToken: false, persistSession: false },
-    });
+    // Pure read-only MRR analytics (GET, no writes) → read replica to keep off primary.
+    const supabase = getReadClient();
 
     // Debug: dump status distribution + a sample row so we can see why active=0.
     if (request.nextUrl.searchParams.get('debug') === '1') {

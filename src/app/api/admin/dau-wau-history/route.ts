@@ -9,14 +9,15 @@
  * broken out per-day so we can see the trend instead of a single snapshot.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getReadClient } from '@/lib/supabase/server-clients';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
 function sb() {
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+  // Pure read-only analytics (GET, no writes) → read replica to keep off the primary.
+  return getReadClient();
 }
 
 function dayStr(d: Date): string {

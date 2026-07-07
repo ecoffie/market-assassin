@@ -1,0 +1,41 @@
+To: lepore@blakewillsongroup.com
+Subject: Teaming on a DLA audit-readiness pursuit — we're prime
+
+Hi Lepore,
+
+We recently had RJ on the GovCon Giants podcast, and the conversation about AI
+in federal oversight and getting agencies audit-ready is exactly why I'm coming
+to BWG on this. RJ can vouch for the connection — I wanted to bring the actual
+opportunity to your side since you run proposals.
+
+We're pursuing a DLA audit-readiness opportunity as prime, and BWG is the
+partner I want on it. Straight to the fit: our side (Mindy / getmindy.ai) is the
+market-intelligence and AI/RAG capability. Your side is the piece we genuinely
+don't have and don't pretend to — agency-side federal financial reporting:
+FIAR, FASAB, and specifically the SFFAS 47 economic-dependency / related-party
+criterion, in DLA's own audit-readiness language. This is the agency audit side
+— helping DLA get its own books audit-ready — not contractor-side DCAA/FAR work.
+It's squarely BWG's lane.
+
+Three specific things we'd want from BWG on the response:
+1. Define the economic-dependency / related-party criterion per SFFAS 47 — the
+   substantive technical position, in the terms an agency reviewer expects.
+2. Anchor the proposal in DLA's audit-readiness language — FIAR/FASAB framing
+   that reads as native to how DLA describes its remediation and assertion work.
+3. Co-author the compliance memo tying the SFFAS 47 criterion to DLA's posture.
+
+What we bring as prime: the vehicle and program lead, Mindy's production
+market-intelligence + AI/LLM/RAG over federal data (~1,900 users since 2024),
+and proposal management and delivery.
+
+Could we grab 20-30 minutes this week to walk the opportunity and confirm the
+split before we build the response? I'll send the details and our draft outline
+ahead of time so it's a working session, not an intro. Happy to send a couple of
+times or take one on your calendar — whatever's easiest on your end.
+
+Thanks,
+Eric
+
+Eric Coffie
+GovCon Giants / Mindy (getmindy.ai)
+eric@govcongiants.com · 786-208-2071

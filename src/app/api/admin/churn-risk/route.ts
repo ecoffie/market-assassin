@@ -13,7 +13,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getReadClient } from '@/lib/supabase/server-clients';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -43,10 +43,8 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
-  const supabase = createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!
-  );
+  // Pure read-only analytics (GET, no writes) → read replica to keep off the primary.
+  const supabase = getReadClient();
 
   try {
     const thirtyDaysAgo = new Date();

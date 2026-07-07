@@ -353,21 +353,23 @@ async function getEmailStats(today: string) {
   };
 
   try {
-    // Alert stats for today
-    const alertData = await fetchAllRows<{ delivery_status: string }>((from, to) =>
+    // Alert stats for today — grouped head-counts (transfer NO rows) instead of
+    // pulling every alert_log row for today just to tally by delivery_status.
+    const countAlerts = (status: string) =>
       getSupabase()
         .from('alert_log')
-        .select('delivery_status')
+        .select('*', { count: 'exact', head: true })
         .eq('alert_date', today)
-        .range(from, to)
-    );
-
-    if (alertData) {
-      for (const row of alertData) {
-        if (row.delivery_status === 'sent') stats.alerts.sent++;
-        else if (row.delivery_status === 'failed') stats.alerts.failed++;
-        else if (row.delivery_status === 'skipped') stats.alerts.skipped++;
-      }
+        .eq('delivery_status', status);
+    const [sentA, failedA, skippedA] = await Promise.all([
+      countAlerts('sent'),
+      countAlerts('failed'),
+      countAlerts('skipped'),
+    ]);
+    stats.alerts.sent = sentA.count ?? 0;
+    stats.alerts.failed = failedA.count ?? 0;
+    stats.alerts.skipped = skippedA.count ?? 0;
+    {
       const total = stats.alerts.sent + stats.alerts.failed;
       stats.alerts.successRate = total > 0
         ? `${Math.round((stats.alerts.sent / total) * 100)}%`
@@ -414,15 +416,19 @@ async function getEmailStats(today: string) {
       console.error('[Dashboard] Briefing query error:', briefingError);
     }
 
-    // Also get pending/failed/skipped for today by briefing_date (they don't have email_sent_at)
-    const pendingData = await fetchAllRows<{ delivery_status: string }>((from, to) =>
+    // Also get pending/failed/skipped for today by briefing_date (they don't have
+    // email_sent_at). Grouped head-counts — no row transfer.
+    const countBriefing = (status: string) =>
       getSupabase()
         .from('briefing_log')
-        .select('delivery_status')
+        .select('*', { count: 'exact', head: true })
         .eq('briefing_date', today)
-        .in('delivery_status', ['pending', 'failed', 'skipped'])
-        .range(from, to)
-    );
+        .eq('delivery_status', status);
+    const [pendingB, failedB, skippedB] = await Promise.all([
+      countBriefing('pending'),
+      countBriefing('failed'),
+      countBriefing('skipped'),
+    ]);
 
     // Count sent briefings (by email_sent_at)
     if (briefingData) {
@@ -452,13 +458,9 @@ async function getEmailStats(today: string) {
     }
 
     // Count pending/failed/skipped (by briefing_date)
-    if (pendingData) {
-      for (const row of pendingData) {
-        if (row.delivery_status === 'failed') stats.briefings.failed++;
-        else if (row.delivery_status === 'skipped') stats.briefings.skipped++;
-        else if (row.delivery_status === 'pending') stats.briefings.pending++;
-      }
-    }
+    stats.briefings.failed += failedB.count ?? 0;
+    stats.briefings.skipped += skippedB.count ?? 0;
+    stats.briefings.pending += pendingB.count ?? 0;
 
     const total = stats.briefings.sent + stats.briefings.failed;
     stats.briefings.successRate = total > 0

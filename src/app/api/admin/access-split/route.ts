@@ -8,7 +8,7 @@
  * PRD-trial-vs-paid-access.md §6.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getReadClient } from '@/lib/supabase/server-clients';
 import { verifyAdminPassword } from '@/lib/admin-auth';
 import { isTrialOpen } from '@/lib/access/resolve-access';
 
@@ -19,7 +19,8 @@ function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return null;
-  return createClient(url, key, { auth: { persistSession: false } });
+  // Pure read-only analytics (GET, head-count queries, no writes) → read replica.
+  return getReadClient();
 }
 
 export async function GET(request: NextRequest) {

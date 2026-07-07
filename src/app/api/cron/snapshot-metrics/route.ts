@@ -21,15 +21,21 @@
  * just-closed day captures a full day's alerts/engagement instead of zeros.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getReadClient, getWriteClient } from '@/lib/supabase/server-clients';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
-function sb() {
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+// Heavy analytics scans (engagement, settings, alert_log) → read replica when
+// configured. The single upsert at the end uses the primary write client. There
+// is no read-after-write here (reads all run BEFORE the write), so this split is safe.
+function sbRead() {
+  return getReadClient();
+}
+function sbWrite() {
+  return getWriteClient();
 }
 
 const DEFAULT_NAICS_SET = new Set(['541512', '541611', '541330', '541990', '561210']);
@@ -47,7 +53,7 @@ async function fetchAll<T>(q: (from: number, to: number) => PromiseLike<{ data: 
 }
 
 export async function GET(request: NextRequest) {
-  const supabase = sb();
+  const supabase = sbRead();
   const url = new URL(request.url);
 
   // No ?date → snapshot YESTERDAY (the just-closed UTC day). The cron fires at 00:00
@@ -128,17 +134,16 @@ export async function GET(request: NextRequest) {
     ).length;
 
     // --- setup/onboarding emails sent today ---
+    // Count-only: head+exact count transfers NO rows (was pulling every matching row
+    // just to read .length). Same number, a fraction of the memory/IO.
     try {
-      const setupSends = await fetchAll<{ id: string }>((from, to) =>
-        supabase
-          .from('email_provider_sends')
-          .select('id')
-          .in('email_type', ['mi_account_setup', 'market_intelligence_welcome', 'profile_reminder', 'bootcamp_profile_setup'])
-          .gte('sent_at', dayStart)
-          .lte('sent_at', dayEnd)
-          .range(from, to),
-      );
-      metrics.setup_emails_sent = setupSends.length;
+      const { count } = await supabase
+        .from('email_provider_sends')
+        .select('id', { count: 'exact', head: true })
+        .in('email_type', ['mi_account_setup', 'market_intelligence_welcome', 'profile_reminder', 'bootcamp_profile_setup'])
+        .gte('sent_at', dayStart)
+        .lte('sent_at', dayEnd);
+      metrics.setup_emails_sent = count ?? 0;
     } catch {
       metrics.setup_emails_sent = 0;
     }
@@ -150,7 +155,7 @@ export async function GET(request: NextRequest) {
       value,
       updated_at: new Date().toISOString(),
     }));
-    const { error } = await supabase
+    const { error } = await sbWrite()
       .from('daily_metric_snapshots')
       .upsert(rows, { onConflict: 'snapshot_date,metric_key' });
     if (error) {

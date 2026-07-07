@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getReadClient } from '@/lib/supabase/server-clients';
 import { getAffiliatePartnerTotals } from '@/lib/mindy/affiliate-commissions';
 import {
   DEFAULT_AFFILIATE_PERCENT,
@@ -13,11 +13,8 @@ import {
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
 function getSupabase() {
-  return createClient(
-    process.env.NEXT_PUBLIC_SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_ROLE_KEY!,
-    { auth: { persistSession: false } },
-  );
+  // Pure read-only analytics (GET, no writes) → read replica to keep off the primary.
+  return getReadClient();
 }
 
 export async function GET(request: NextRequest) {

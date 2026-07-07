@@ -98,6 +98,10 @@ function getSupabaseAdmin() {
     throw new Error('Supabase service role is not configured');
   }
 
+  // NOTE: kept on the PRIMARY (not getReadClient) because this route also calls
+  // supabase.auth.admin.listUsers — GoTrue admin against a read-replica client is
+  // unproven, so we don't risk it here. The Postgres analytics scans below are the
+  // heavy part; if a replica-safe auth path lands later, split this.
   return createClient(url, serviceRoleKey, {
     auth: {
       autoRefreshToken: false,

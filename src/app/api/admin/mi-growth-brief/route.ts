@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { getReadClient } from '@/lib/supabase/server-clients';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
 import { verifyAdminPassword } from '@/lib/admin-auth';
 
@@ -114,6 +114,8 @@ type UserState = {
   topAreas: Set<string>;
 };
 
+// Pure analytics read (GET-only, no writes, no auth.admin) → read replica, to keep
+// this multi-table full-scan off the primary (see getReadClient — replica when set).
 function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
@@ -122,7 +124,7 @@ function getSupabase() {
     return null;
   }
 
-  return createClient(url, key);
+  return getReadClient();
 }
 
 async function fetchAllRows<T>(
