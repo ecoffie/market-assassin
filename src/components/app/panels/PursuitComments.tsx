@@ -9,6 +9,7 @@
  * (same-workspace OR same-user); this component just renders + posts.
  */
 import { useCallback, useEffect, useState } from 'react';
+import { authedFetch } from '../authHeaders';
 
 interface Comment {
   id: string;
@@ -20,7 +21,6 @@ interface Comment {
 interface PursuitCommentsProps {
   pipelineId: string;
   email: string;
-  authHeaders: (init?: HeadersInit) => HeadersInit;
 }
 
 function initials(emailAddr: string): string {
@@ -40,7 +40,7 @@ function timeAgo(iso: string): string {
   return new Date(iso).toLocaleDateString();
 }
 
-export default function PursuitComments({ pipelineId, email, authHeaders }: PursuitCommentsProps) {
+export default function PursuitComments({ pipelineId, email }: PursuitCommentsProps) {
   const [comments, setComments] = useState<Comment[]>([]);
   const [draft, setDraft] = useState('');
   const [loading, setLoading] = useState(true);
@@ -49,16 +49,16 @@ export default function PursuitComments({ pipelineId, email, authHeaders }: Purs
   const load = useCallback(async () => {
     if (!pipelineId) return;
     try {
-      const res = await fetch(
+      const res = await authedFetch(
         `/api/app/comments?pipeline_id=${encodeURIComponent(pipelineId)}&email=${encodeURIComponent(email)}`,
-        { headers: authHeaders() },
+        email,
       );
       const data = await res.json().catch(() => null);
       if (data?.success) setComments(data.comments || []);
     } finally {
       setLoading(false);
     }
-  }, [pipelineId, email, authHeaders]);
+  }, [pipelineId, email]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -67,9 +67,9 @@ export default function PursuitComments({ pipelineId, email, authHeaders }: Purs
     if (!content || posting) return;
     setPosting(true);
     try {
-      const res = await fetch('/api/app/comments', {
+      const res = await authedFetch('/api/app/comments', email, {
         method: 'POST',
-        headers: authHeaders({ 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, pipeline_id: pipelineId, content }),
       });
       const data = await res.json().catch(() => null);
@@ -86,9 +86,9 @@ export default function PursuitComments({ pipelineId, email, authHeaders }: Purs
     // Optimistic; server enforces creator-or-admin.
     const prev = comments;
     setComments((c) => c.filter((x) => x.id !== id));
-    const res = await fetch('/api/app/comments', {
+    const res = await authedFetch('/api/app/comments', email, {
       method: 'DELETE',
-      headers: authHeaders({ 'Content-Type': 'application/json' }),
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, comment_id: id }),
     });
     const data = await res.json().catch(() => null);

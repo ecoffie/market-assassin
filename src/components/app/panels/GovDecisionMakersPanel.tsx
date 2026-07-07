@@ -9,7 +9,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
-import { getMIApiHeaders } from '../authHeaders';
+import { authedFetch } from '../authHeaders';
 
 interface Props {
   email: string | null;
@@ -63,7 +63,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
 
   useEffect(() => {
     if (!email) return;
-    fetch(`/api/app/target-list?email=${encodeURIComponent(email)}`, { headers: getMIApiHeaders(email) })
+    authedFetch(`/api/app/target-list?email=${encodeURIComponent(email)}`, email)
       .then(r => r.json())
       .then(d => {
         const ags = Array.from(new Set(((d?.targets || d?.targetList || []) as Array<{ agency_name?: string }>)
@@ -80,9 +80,9 @@ export default function GovDecisionMakersPanel({ email }: Props) {
   const trackOffice = async (c: Contact) => {
     if (!c.dodaac) return;
     try {
-      const res = await fetch('/api/app/target-list', {
+      const res = await authedFetch('/api/app/target-list', email, {
         method: 'POST',
-        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_email: email,
           agency_name: c.department_ind_agency || 'Department of Defense',
@@ -106,7 +106,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
   // Load agency facet list once.
   useEffect(() => {
     if (!email) return;
-    fetch(`/api/app/federal-contacts?facets=agencies&email=${encodeURIComponent(email)}`, { headers: getMIApiHeaders(email) })
+    authedFetch(`/api/app/federal-contacts?facets=agencies&email=${encodeURIComponent(email)}`, email)
       .then(r => r.json())
       .then(d => { if (d.success) setAgencies(d.agencies || []); })
       .catch(() => {});
@@ -123,20 +123,20 @@ export default function GovDecisionMakersPanel({ email }: Props) {
     setOfficeRosters([]);
     setOpenRoster(null);
     if (!email || !agency) return;
-    fetch(`/api/app/federal-contacts?facets=offices&agency=${encodeURIComponent(agency)}&email=${encodeURIComponent(email)}`, { headers: getMIApiHeaders(email) })
+    authedFetch(`/api/app/federal-contacts?facets=offices&agency=${encodeURIComponent(agency)}&email=${encodeURIComponent(email)}`, email)
       .then(r => r.json())
       .then(d => { if (d.success) setOfficeDetail(d.officeDetail || []); })
       .catch(() => {});
     // Derived sub-agencies present in this agency's contacts (DoD → AF/Navy/…),
     // so the dropdown narrows huge agencies.
-    fetch(`/api/app/federal-contacts?facets=subagencies&agency=${encodeURIComponent(agency)}&email=${encodeURIComponent(email)}`, { headers: getMIApiHeaders(email) })
+    authedFetch(`/api/app/federal-contacts?facets=subagencies&agency=${encodeURIComponent(agency)}&email=${encodeURIComponent(email)}`, email)
       .then(r => r.json())
       .then(d => { if (d.success) setSubAgencies(d.subAgencies || []); })
       .catch(() => {});
     // Office rosters (#16) — the buying offices with a COMPLETE contact list
     // (domestic). DoD/DLA/Navy group by the DoDAAC-decoded office; civilian
     // (GSA/VA/HHS) group by SAM's office column. Empty only when neither resolves.
-    fetch(`/api/app/federal-contacts?facets=office-roster&agency=${encodeURIComponent(agency)}&email=${encodeURIComponent(email)}`, { headers: getMIApiHeaders(email) })
+    authedFetch(`/api/app/federal-contacts?facets=office-roster&agency=${encodeURIComponent(agency)}&email=${encodeURIComponent(email)}`, email)
       .then(r => r.json())
       .then(d => { if (d.success) setOfficeRosters(d.offices || []); })
       .catch(() => {});
@@ -148,7 +148,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
     if (openRoster?.office === officeName) { setOpenRoster(null); return; }
     setRosterLoading(true);
     try {
-      const res = await fetch(`/api/app/federal-contacts?facets=office-roster&agency=${encodeURIComponent(agency)}&office=${encodeURIComponent(officeName)}&email=${encodeURIComponent(email)}`, { headers: getMIApiHeaders(email) });
+      const res = await authedFetch(`/api/app/federal-contacts?facets=office-roster&agency=${encodeURIComponent(agency)}&office=${encodeURIComponent(officeName)}&email=${encodeURIComponent(email)}`, email);
       const d = await res.json();
       setOpenRoster(d.success ? { office: officeName, people: d.roster || [] } : null);
     } catch {
@@ -169,7 +169,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
       // In 'targets' scope we filter client-side across the user's agencies, so
       // pull a wider window to ensure all targets are represented.
       p.set('limit', scope === 'targets' && !agency ? '400' : '100');
-      const res = await fetch(`/api/app/federal-contacts?${p}`, { headers: getMIApiHeaders(email) });
+      const res = await authedFetch(`/api/app/federal-contacts?${p}`, email);
       const d = await res.json();
       if (d.success) {
         setContacts(d.contacts || []);

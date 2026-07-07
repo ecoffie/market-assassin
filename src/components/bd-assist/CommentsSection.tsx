@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
-import { getMIApiHeaders } from '../app/authHeaders';
+import { authedFetch } from '@/components/app/authHeaders';
 
 interface Comment {
   id: string;
@@ -24,8 +24,9 @@ export default function CommentsSection({ pipelineId, email }: CommentsSectionPr
 
   const loadComments = useCallback(async () => {
     try {
-      const res = await fetch(
-        `/api/app/comments?pipeline_id=${pipelineId}&email=${encodeURIComponent(email)}`
+      const res = await authedFetch(
+        `/api/app/comments?pipeline_id=${pipelineId}&email=${encodeURIComponent(email)}`,
+        email
       );
       const data = await res.json();
       if (data.success) {
@@ -51,9 +52,9 @@ export default function CommentsSection({ pipelineId, email }: CommentsSectionPr
     setError(null);
 
     try {
-      const res = await fetch('/api/app/comments', {
+      const res = await authedFetch('/api/app/comments', email, {
         method: 'POST',
-        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
           pipeline_id: pipelineId,
@@ -79,9 +80,9 @@ export default function CommentsSection({ pipelineId, email }: CommentsSectionPr
     if (!confirm('Delete this comment?')) return;
 
     try {
-      const res = await fetch('/api/app/comments', {
+      const res = await authedFetch('/api/app/comments', email, {
         method: 'DELETE',
-        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, comment_id: commentId }),
       });
       const data = await res.json();

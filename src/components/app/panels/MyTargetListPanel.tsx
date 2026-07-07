@@ -13,7 +13,7 @@
  */
 import { useState, useEffect, useCallback } from 'react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
-import { getMIApiHeaders, authedFetch } from '../authHeaders';
+import { authedFetch } from '../authHeaders';
 import { useToast } from '../Toast';
 import { useAppTracker } from '../track';
 import SaveContactButton from '../contacts/SaveContactButton';
@@ -137,9 +137,9 @@ export default function MyTargetListPanel({
     if (!email || autoRunning) return;
     setAutoRunning(true); setAutoError(null);
     try {
-      const res = await fetch('/api/app/auto-setup', {
+      const res = await authedFetch('/api/app/auto-setup', email, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
       const d = await res.json();
@@ -168,9 +168,7 @@ export default function MyTargetListPanel({
       return;
     }
     try {
-      const res = await fetch(`/api/app/target-list?email=${encodeURIComponent(email)}`, {
-        headers: getMIApiHeaders(email),
-      });
+      const res = await authedFetch(`/api/app/target-list?email=${encodeURIComponent(email)}`, email);
       const data = await res.json();
       if (!data?.success) {
         setError(data?.error || 'Failed to load your target list');
@@ -222,9 +220,9 @@ export default function MyTargetListPanel({
     if (!email || addingAgency) return;
     setAddingAgency(name);
     try {
-      const res = await fetch('/api/app/target-list', {
+      const res = await authedFetch('/api/app/target-list', email, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_email: email,
           agency_name: parent || name,
@@ -282,9 +280,9 @@ export default function MyTargetListPanel({
     if (!email || discoveringId) return;
     setDiscoveringId(target.id);
     try {
-      const res = await fetch('/api/app/discover-events', {
+      const res = await authedFetch('/api/app/discover-events', email, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, target_id: target.id }),
       });
       const data = await res.json().catch(() => null);
@@ -344,9 +342,9 @@ export default function MyTargetListPanel({
     setTargets(prev => prev.map(t => t.id === id ? { ...t, ...changes } : t));
 
     try {
-      const res = await fetch('/api/app/target-list', {
+      const res = await authedFetch('/api/app/target-list', email, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, user_email: email, ...changes }),
       });
       const data = await res.json();
@@ -415,9 +413,9 @@ export default function MyTargetListPanel({
     setTargets(prev => prev.filter(t => t.id !== id));
 
     try {
-      const res = await fetch('/api/app/target-list', {
+      const res = await authedFetch('/api/app/target-list', email, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, user_email: email }),
       });
       if (!res.ok) {
@@ -444,9 +442,9 @@ export default function MyTargetListPanel({
               // below (TS complains if we let the spread overwrite).
               const { id: _omitId, user_email: _omitEmail, ...rest } = original;
               void _omitId; void _omitEmail;
-              const restore = await fetch('/api/app/target-list', {
+              const restore = await authedFetch('/api/app/target-list', email, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
+                headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({ ...rest, user_email: email }),
               });
               const r = await restore.json();
@@ -1362,7 +1360,7 @@ function TargetContacts({ agency, subAgency, office, officeCode, email }: { agen
     if (subA) p.set('subAgency', subA);
     if (officeParam) p.set('office', officeParam);
     if (validDodaac) p.set('dodaac', validDodaac);
-    fetch(`/api/app/federal-contacts?${p.toString()}`, { headers: getMIApiHeaders(email) })
+    authedFetch(`/api/app/federal-contacts?${p.toString()}`, email)
       .then(r => r.json())
       .then(d => {
         const list: TargetContact[] = d?.contacts || d?.results || [];
@@ -1632,9 +1630,9 @@ function OutreachLog({
     if (submitting) return;
     setSubmitting(true);
     try {
-      const res = await fetch('/api/app/target-outreach', {
+      const res = await authedFetch('/api/app/target-outreach', email, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           target_id: targetId,
           user_email: email,
@@ -1677,9 +1675,9 @@ function OutreachLog({
     if (!original) return;
     setActivities(prev => prev.filter(a => a.id !== id));
     try {
-      const res = await fetch('/api/app/target-outreach', {
+      const res = await authedFetch('/api/app/target-outreach', email, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, user_email: email }),
       });
       if (!res.ok) {

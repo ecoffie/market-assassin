@@ -1,6 +1,6 @@
 'use client';
-import { useState, useEffect, useCallback } from 'react';
-import { getMIApiHeaders } from '../authHeaders';
+import { useState, useEffect } from 'react';
+import { authedFetch } from '../authHeaders';
 
 /**
  * Doc Manifest — every attachment on a pursuit, CLASSIFIED + grouped by type, so
@@ -44,21 +44,20 @@ function fmtSize(b?: number | null) { if (!b) return ''; return b > 1e6 ? `${(b 
 export default function DocManifest({ email, pursuitId }: { email: string | null; pursuitId: string }) {
   const [docs, setDocs] = useState<PursuitDoc[]>([]);
   const [loading, setLoading] = useState(true);
-  const headers = useCallback(() => getMIApiHeaders(email), [email]);
 
   useEffect(() => {
     if (!email || !pursuitId) return;
     setLoading(true);
-    fetch(`/api/app/proposal/pursuit-docs?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(pursuitId)}`, { headers: headers() })
+    authedFetch(`/api/app/proposal/pursuit-docs?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(pursuitId)}`, email)
       .then(r => r.json())
       .then(d => { if (d.success) setDocs(d.documents || []); })
       .catch(() => {})
       .finally(() => setLoading(false));
-  }, [email, pursuitId, headers]);
+  }, [email, pursuitId]);
 
   const download = async (docId: string) => {
     try {
-      const res = await fetch(`/api/app/proposal/doc-download?email=${encodeURIComponent(email || '')}&doc_id=${docId}`, { headers: headers() });
+      const res = await authedFetch(`/api/app/proposal/doc-download?email=${encodeURIComponent(email || '')}&doc_id=${docId}`, email);
       const d = await res.json();
       if (d.url) window.open(d.url, '_blank');
     } catch { /* */ }

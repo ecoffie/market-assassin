@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
-import { getMIApiHeaders } from '../authHeaders';
+import { getMIApiHeaders, authedFetch } from '../authHeaders';
 import { NaicsAutocompleteInput } from '../../codes/NaicsAutocompleteInput';
 import { useAppTracker } from '../track';
 import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
@@ -218,9 +218,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
       try {
         const [prefsResponse, workspaceResponse] = await Promise.all([
           fetch(`/api/alerts/preferences?email=${encodeURIComponent(email as string)}`),
-          fetch(`/api/app/workspace?email=${encodeURIComponent(email as string)}`, {
-            headers: getForecastHeaders(),
-          }),
+          authedFetch(`/api/app/workspace?email=${encodeURIComponent(email as string)}`, email),
         ]);
         const [prefs, workspace] = await Promise.all([
           prefsResponse.json().catch(() => null),
@@ -308,9 +306,9 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
 
     setRequestSubmitting(true);
     try {
-      const res = await fetch('/api/app/forecast-request', {
+      const res = await authedFetch('/api/app/forecast-request', email, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getForecastHeaders() },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
           agency: requestAgency,

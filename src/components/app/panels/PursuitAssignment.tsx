@@ -12,6 +12,7 @@
  * the drawer's single Save writes them alongside the rest of the edit.
  */
 import { useEffect, useState } from 'react';
+import { authedFetch } from '../authHeaders';
 
 interface Member {
   user_email: string;
@@ -21,7 +22,6 @@ interface Member {
 
 interface PursuitAssignmentProps {
   email: string;
-  authHeaders: (init?: HeadersInit) => HeadersInit;
   owner: string;
   collaborators: string[];
   onOwnerChange: (email: string) => void;
@@ -29,7 +29,7 @@ interface PursuitAssignmentProps {
 }
 
 export default function PursuitAssignment({
-  email, authHeaders, owner, collaborators, onOwnerChange, onCollaboratorsChange,
+  email, owner, collaborators, onOwnerChange, onCollaboratorsChange,
 }: PursuitAssignmentProps) {
   const [members, setMembers] = useState<Member[]>([]);
 
@@ -37,7 +37,7 @@ export default function PursuitAssignment({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/app/workspace?email=${encodeURIComponent(email)}`, { headers: authHeaders() });
+        const res = await authedFetch(`/api/app/workspace?email=${encodeURIComponent(email)}`, email);
         const data = await res.json().catch(() => null);
         if (!cancelled && data?.success !== false) {
           const list: Member[] = (data?.members || [])
@@ -53,7 +53,7 @@ export default function PursuitAssignment({
       } catch { /* non-fatal — falls back to a solo owner select */ }
     })();
     return () => { cancelled = true; };
-  }, [email, authHeaders, owner]);
+  }, [email, owner]);
 
   const isTeam = members.length > 1;
   const label = (e: string) => e.split('@')[0];

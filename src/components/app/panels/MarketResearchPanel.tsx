@@ -9,7 +9,7 @@ import {
 } from 'recharts';
 import { Zap, Gauge, Loader2 } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
-import { getMIApiHeaders } from '../authHeaders';
+import { getMIApiHeaders, authedFetch } from '../authHeaders';
 import MarketCoverageBanner, { type MarketCoverage } from '../market/MarketCoverageBanner';
 import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
@@ -489,9 +489,7 @@ async function fetchRecommendedAgencyNames(
   limit = 50
 ): Promise<string[]> {
   try {
-    const res = await fetch(`/api/app/opportunities?email=${encodeURIComponent(email)}&limit=${limit}`, {
-      headers: getAuthHeaders(),
-    });
+    const res = await authedFetch(`/api/app/opportunities?email=${encodeURIComponent(email)}&limit=${limit}`, email);
     const data = await res.json();
     if (!data.success || !Array.isArray(data.opportunities)) return [];
 
@@ -825,9 +823,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     if (!email || tier === 'free') return;
 
     try {
-      const res = await fetch(`/api/app/market-focus?email=${encodeURIComponent(email)}`, {
-        headers: getAuthHeaders(),
-      });
+      const res = await authedFetch(`/api/app/market-focus?email=${encodeURIComponent(email)}`, email);
       const data = await res.json();
       if (data.success) setMarketFocuses(data.focuses || []);
     } catch (err) {
@@ -840,9 +836,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
 
     setRecommendationsLoading(true);
     try {
-      const res = await fetch(`/api/app/opportunities?email=${encodeURIComponent(email)}&limit=6`, {
-        headers: getAuthHeaders(),
-      });
+      const res = await authedFetch(`/api/app/opportunities?email=${encodeURIComponent(email)}&limit=6`, email);
       const data = await res.json();
       if (data.success) {
         const seen = new Set<string>();
@@ -1071,9 +1065,9 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       // clobbers). Their language is the strongest search signal — used to be
       // discarded after a single Sport report, leaving keyword-empty profiles.
       if (email) {
-        fetch('/api/app/keywords/add', {
+        authedFetch('/api/app/keywords/add', email, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, keywords: [sportKeyword.trim()] }),
         }).catch(() => { /* non-fatal */ });
       }
@@ -1097,9 +1091,9 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       const naicsCodes = naics.map((n) => n.code);
       const pscCodes = psc.map((p) => p.code);
       const keywords = keyword.trim() ? [keyword.trim()] : [];
-      const res = await fetch('/api/app/profile', {
+      const res = await authedFetch('/api/app/profile', email, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
           naicsCodes,        // REPLACES the profile's NAICS (the route sets, not appends)
@@ -1198,9 +1192,9 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     setValidationError(null);
 
     try {
-      const res = await fetch('/api/app/market-focus', {
+      const res = await authedFetch('/api/app/market-focus', email, {
         method: 'POST',
-        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
           name,
@@ -1230,9 +1224,9 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     if (!email) return;
 
     try {
-      const res = await fetch('/api/app/market-focus', {
+      const res = await authedFetch('/api/app/market-focus', email, {
         method: 'DELETE',
-        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, id: focusId }),
       });
       const data = await res.json();
@@ -1256,9 +1250,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     setProfileLoading(true);
 
     Promise.all([
-      fetch(`/api/app/workspace?email=${encodeURIComponent(email)}`, {
-        headers: getAuthHeaders(),
-      }).then((res) => res.ok ? res.json() : null).catch(() => null),
+      authedFetch(`/api/app/workspace?email=${encodeURIComponent(email)}`, email).then((res) => res.ok ? res.json() : null).catch(() => null),
       // Send the MI 2FA token here too — otherwise OAuth users on /app
       // get a 401 (no ma_access_email cookie) and the saved profile
       // loads as empty.
@@ -1370,9 +1362,9 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     // Debounce so a fast edit (clear → retype) doesn't fire one fetch per keystroke.
     let cancelled = false;
     const debounce = setTimeout(() => {
-    fetch('/api/app/target-market-research', {
+    authedFetch('/api/app/target-market-research', email, {
       method: 'POST',
-      headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email,
         // Pass the keyword whenever the user researched by keyword (#59) — the
@@ -1560,9 +1552,9 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
 
     setSavingContact(contactKey);
     try {
-      const res = await fetch('/api/app/relationships', {
+      const res = await authedFetch('/api/app/relationships', email, {
         method: 'POST',
-        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_email: email,
           contact_type: 'government_buyer',
@@ -1603,9 +1595,9 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
 
     setSavingContact(contactKey);
     try {
-      const res = await fetch('/api/app/relationships', {
+      const res = await authedFetch('/api/app/relationships', email, {
         method: 'POST',
-        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_email: email,
           contact_type: 'prime',
@@ -3269,7 +3261,7 @@ function TopPrimesChart({ primes, tier2 = [], tribal = [], email }: TopPrimesCha
       return;
     }
     let cancelled = false;
-    fetch(`/api/app/target-list?email=${encodeURIComponent(email)}`, { headers: getMIApiHeaders(email) })
+    authedFetch(`/api/app/target-list?email=${encodeURIComponent(email)}`, email)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (cancelled) return;
@@ -3775,9 +3767,9 @@ function MindyNarrative({
     setError(null);
     setUpgradeTeaser(null);
 
-    fetch('/api/app/market-narrative', {
+    authedFetch('/api/app/market-narrative', email, {
       method: 'POST',
-      headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email,
         naicsCode,
@@ -4120,7 +4112,7 @@ function AgencyTable({
     // only fetch when expanding (not when collapsing)
     if (expandedOffices[key]) return;
     try {
-      const res = await fetch(`/api/app/agency-offices?email=${encodeURIComponent(email || '')}&agency=${encodeURIComponent(ag)}&naics=${encodeURIComponent(naicsCode)}`, { headers: getMIApiHeaders(email) });
+      const res = await authedFetch(`/api/app/agency-offices?email=${encodeURIComponent(email || '')}&agency=${encodeURIComponent(ag)}&naics=${encodeURIComponent(naicsCode)}`, email);
       const d = await res.json();
       setExpandedOffices(prev => ({ ...prev, [key]: { loading: false, offices: d.offices || [] } }));
     } catch {
@@ -4161,9 +4153,9 @@ function AgencyTable({
     setError(null);
     setNaicsSuggestions([]);
 
-    fetch('/api/app/target-market-research', {
+    authedFetch('/api/app/target-market-research', email, {
       method: 'POST',
-      headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         email,
         keyword: sportKw || undefined,
@@ -4253,7 +4245,7 @@ function AgencyTable({
   useEffect(() => {
     if (!email) return;
     let cancelled = false;
-    fetch(`/api/app/target-list?email=${encodeURIComponent(email)}`, { headers: getMIApiHeaders(email) })
+    authedFetch(`/api/app/target-list?email=${encodeURIComponent(email)}`, email)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (cancelled || !data?.success) return;
@@ -4273,7 +4265,7 @@ function AgencyTable({
   useEffect(() => {
     if (!email || !naicsCode.trim()) return;
     let cancelled = false;
-    fetch(`/api/app/triage?email=${encodeURIComponent(email)}&naics=${encodeURIComponent(naicsCode)}`, { headers: getMIApiHeaders(email) })
+    authedFetch(`/api/app/triage?email=${encodeURIComponent(email)}&naics=${encodeURIComponent(naicsCode)}`, email)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (cancelled || !data?.success) return;
@@ -4303,9 +4295,9 @@ function AgencyTable({
     setSavedTargets(prev => ({ ...prev, [officeName]: tempId }));
 
     try {
-      const res = await fetch('/api/app/target-list', {
+      const res = await authedFetch('/api/app/target-list', email, {
         method: 'POST',
-        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_email: email,
           agency_name: row.parentAgency || row.subAgency || row.name,
@@ -4405,9 +4397,9 @@ function AgencyTable({
     });
 
     try {
-      const res = await fetch('/api/app/target-list', {
+      const res = await authedFetch('/api/app/target-list', email, {
         method: 'DELETE',
-        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id: targetId, user_email: email }),
       });
       if (!res.ok) {
@@ -5734,7 +5726,7 @@ function CompetitorAwardsExpander({ email, name }: { email: string | null; name:
     if (loaded || loading || !email) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/app/competitor-awards?email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}`);
+      const res = await authedFetch(`/api/app/competitor-awards?email=${encodeURIComponent(email)}&name=${encodeURIComponent(name)}`, email);
       const data = await res.json().catch(() => null);
       if (data?.success) {
         setFound(!!data.found);

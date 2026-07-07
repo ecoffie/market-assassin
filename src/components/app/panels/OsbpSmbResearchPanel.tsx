@@ -11,7 +11,7 @@
  * (GOVT-GTM Track 1 · memory: naics_vs_psc_search.)
  */
 import { useState, useCallback } from 'react';
-import { getMIApiHeaders } from '../authHeaders';
+import { authedFetch } from '../authHeaders';
 
 interface Props { email: string }
 
@@ -49,7 +49,7 @@ export default function OsbpSmbResearchPanel({ email }: Props) {
       if (naics.trim()) params.set('naics', naics.trim());
       if (maxM) params.set('maxObligated', String((parseFloat(maxM) || 25) * 1_000_000));
       if (setAsideOnly) params.set('setAsideOnly', '1');
-      const res = await fetch(`/api/app/osbp/smb-search?${params.toString()}`, { headers: getMIApiHeaders(email) });
+      const res = await authedFetch(`/api/app/osbp/smb-search?${params.toString()}`, email);
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Search failed');
       const next = (data.results || []) as Row[];

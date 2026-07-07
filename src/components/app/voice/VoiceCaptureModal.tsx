@@ -20,6 +20,7 @@
 
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { Mic, MicOff, Square, X, Loader2, Check, MessageCircle, HelpCircle } from 'lucide-react';
+import { authedFetch } from '../authHeaders';
 
 interface VoiceCaptureModalProps {
   email: string;
@@ -170,7 +171,7 @@ export default function VoiceCaptureModal({ email, isOpen, onClose, onSaved, onP
       fd.append('email', email);
       fd.append('audio', blob, `capture.${blob.type.includes('mp4') ? 'mp4' : 'webm'}`);
 
-      const tRes = await fetch('/api/app/voice/transcribe', {
+      const tRes = await authedFetch('/api/app/voice/transcribe', email, {
         method: 'POST',
         body: fd,
       });
@@ -181,7 +182,7 @@ export default function VoiceCaptureModal({ email, isOpen, onClose, onSaved, onP
       setTranscript(text);
 
       setPhase('extracting');
-      const eRes = await fetch('/api/app/voice/extract', {
+      const eRes = await authedFetch('/api/app/voice/extract', email, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, transcript: text }),

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useMemo, useEffect } from 'react';
 import { BID_GATES, BID_FACTORS, evaluateBidDecision } from '@/lib/proposal/bid-decision';
-import { getMIApiHeaders } from '../authHeaders';
+import { authedFetch } from '../authHeaders';
 
 interface DerivedGate { id: string; question: string; detail?: string; help?: string; source?: string }
 
@@ -30,9 +30,9 @@ export default function BidDecisionGate({ onProceed, email, pipelineId }: { onPr
   const saveDecision = (decision: 'pursue' | 'watch' | 'skip', score?: number) => {
     setSavedDecision(decision);
     if (!email || !pipelineId) return;
-    fetch(`/api/app/proposal/bid-gates?email=${encodeURIComponent(email)}`, {
+    authedFetch(`/api/app/proposal/bid-gates?email=${encodeURIComponent(email)}`, email, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ pipeline_id: pipelineId, decision, score }),
     }).catch(() => {});
   };
@@ -40,7 +40,7 @@ export default function BidDecisionGate({ onProceed, email, pipelineId }: { onPr
   useEffect(() => {
     if (!email || !pipelineId) return;
     setLoadingGates(true);
-    fetch(`/api/app/proposal/bid-gates?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(pipelineId)}`, { headers: getMIApiHeaders(email) })
+    authedFetch(`/api/app/proposal/bid-gates?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(pipelineId)}`, email)
       .then(r => r.json())
       .then(d => { if (d.success && d.gates?.length) setDerivedGates(d.gates); })
       .catch(() => {})

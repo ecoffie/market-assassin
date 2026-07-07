@@ -1,6 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { getMIApiHeaders } from '../authHeaders';
+import { authedFetch } from '../authHeaders';
 
 /**
  * Knowledge Base — searchable repository over Mindy's source corpus
@@ -28,7 +28,6 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
   const [docLoading, setDocLoading] = useState(false);
   // Playable URL (YT Live / podcast / webinar) so the doc isn't a dead end.
   const [play, setPlay] = useState<{ url: string; label: string } | null>(null);
-  const headers = useCallback(() => getMIApiHeaders(email), [email]);
   const didInitialDoc = useRef(false);
 
   const load = useCallback(async () => {
@@ -38,7 +37,7 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
     if (q.trim()) p.set('q', q.trim());
     if (docType) p.set('docType', docType);
     try {
-      const res = await fetch(`/api/app/knowledge-base?${p}`, { headers: headers() });
+      const res = await authedFetch(`/api/app/knowledge-base?${p}`, email);
       const d = await res.json();
       if (d.success) {
         setDocs(d.docs || []);
@@ -50,13 +49,13 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
     } catch { /* ignore */ }
     setLoading(false);
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [email, q, docType, headers]);
+  }, [email, q, docType]);
 
   const openDoc = useCallback(async (doc: KbDoc) => {
     setSelected(doc);
     setDocLoading(true); setDocText(''); setPlay(null);
     try {
-      const res = await fetch(`/api/app/rag-doc?id=${doc.id}&email=${encodeURIComponent(email || '')}`, { headers: headers() });
+      const res = await authedFetch(`/api/app/rag-doc?id=${doc.id}&email=${encodeURIComponent(email || '')}`, email);
       const d = await res.json();
       setDocText(d.full_text || d.text || 'No text available for this document.');
       if (d.play_url) setPlay({ url: d.play_url, label: d.play_label || '▶ Open source' });
@@ -64,7 +63,7 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
       setDocText('Could not load this document.');
     }
     setDocLoading(false);
-  }, [email, headers]);
+  }, [email]);
 
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [docType]);
 
@@ -75,7 +74,7 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
     (async () => {
       setDocLoading(true);
       try {
-        const res = await fetch(`/api/app/rag-doc?id=${initialDocId}&email=${encodeURIComponent(email)}`, { headers: headers() });
+        const res = await authedFetch(`/api/app/rag-doc?id=${initialDocId}&email=${encodeURIComponent(email)}`, email);
         const d = await res.json();
         setSelected({ id: initialDocId, title: d.title || 'Document', docType: d.doc_type || '', docTypeLabel: d.doc_type || '', summary: '', naics: null, words: d.word_count || 0, pages: null });
         setDocText(d.full_text || d.text || 'No text available.');
@@ -83,7 +82,7 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
       } catch { /* ignore */ }
       setDocLoading(false);
     })();
-  }, [initialDocId, email, headers]);
+  }, [initialDocId, email]);
 
   return (
     <div className="p-6">

@@ -20,7 +20,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { AppPanel } from '../UnifiedSidebar';
-import { getMIApiHeaders } from '../authHeaders';
+import { authedFetch } from '../authHeaders';
 import LockedPreview from './LockedPreview';
 
 type FeatureId = 'recompetes' | 'forecasts' | 'contractors' | 'decision-makers';
@@ -152,9 +152,7 @@ export default function CatalogTeaserFree({ email, featureId, onPanelChange }: P
     if (!email) { setLoading(false); return; }
     try {
       // 1) Profile → NAICS + agencies (the authoritative notification profile).
-      const wsRes = await fetch(`/api/app/workspace?email=${encodeURIComponent(email)}`, {
-        headers: getMIApiHeaders(email),
-      });
+      const wsRes = await authedFetch(`/api/app/workspace?email=${encodeURIComponent(email)}`, email);
       const ws = wsRes.ok ? await wsRes.json().catch(() => null) : null;
       const s = ws?.profile?.notification || {};
       const profile: Profile = {
@@ -186,7 +184,7 @@ export default function CatalogTeaserFree({ email, featureId, onPanelChange }: P
       if (!req) { setProfileEmpty(true); setLoading(false); return; }
 
       // 2) Real count + teaser rows from the SAME endpoint the paid panel uses.
-      const res = await fetch(req.url, { headers: getMIApiHeaders(email) });
+      const res = await authedFetch(req.url, email);
       if (!res.ok) { setLoading(false); return; }
       const data = await res.json().catch(() => null);
 

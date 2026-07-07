@@ -19,7 +19,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { AppPanel } from '../UnifiedSidebar';
-import { getMIApiHeaders } from '../authHeaders';
+import { getMIApiHeaders, authedFetch } from '../authHeaders';
 import { getActiveWorkspace } from '../activeWorkspace';
 
 interface StartHereCardProps {
@@ -60,10 +60,10 @@ export default function StartHereCard({ email, onGo }: StartHereCardProps) {
     // Fetch all signals in parallel; any failure degrades that step to "not done"
     // rather than breaking the card.
     const [ws, tl, pl, lib] = await Promise.all([
-      fetch(`/api/app/workspace?email=${e}`, { headers: h }).then((r) => r.ok ? r.json() : null).catch(() => null),
-      fetch(`/api/app/target-list?email=${e}`, { headers: h }).then((r) => r.ok ? r.json() : null).catch(() => null),
+      authedFetch(`/api/app/workspace?email=${e}`, email).then((r) => r.ok ? r.json() : null).catch(() => null),
+      authedFetch(`/api/app/target-list?email=${e}`, email).then((r) => r.ok ? r.json() : null).catch(() => null),
       fetch(`/api/pipeline?email=${e}`, { headers: h }).then((r) => r.ok ? r.json() : null).catch(() => null),
-      fetch(`/api/app/library?email=${e}`, { headers: h }).then((r) => r.ok ? r.json() : null).catch(() => null),
+      authedFetch(`/api/app/library?email=${e}`, email).then((r) => r.ok ? r.json() : null).catch(() => null),
     ]);
     const notif = ws?.profile?.notification || {};
     const hasNaics = Array.isArray(notif.naics_codes) && notif.naics_codes.length > 0;

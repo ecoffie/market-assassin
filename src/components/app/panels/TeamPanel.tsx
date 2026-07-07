@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
-import { getMIApiHeaders } from '../authHeaders';
+import { authedFetch } from '../authHeaders';
 
 interface TeamPanelProps {
   email: string | null;
@@ -60,7 +60,6 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
   const [showSettings, setShowSettings] = useState(false);
   const [workspaceSettings, setWorkspaceSettings] = useState<WorkspaceSettings>({});
   const [settingsForm, setSettingsForm] = useState<WorkspaceSettings>({});
-  const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
 
   const loadWorkspace = useCallback(async () => {
     if (!email) return;
@@ -68,9 +67,7 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
     setError(null);
 
     try {
-      const res = await fetch(`/api/app/workspace?email=${encodeURIComponent(email)}`, {
-        headers: getAuthHeaders(),
-      });
+      const res = await authedFetch(`/api/app/workspace?email=${encodeURIComponent(email)}`, email);
       const data = await res.json();
       if (!data.success) {
         setError(data.error || 'Failed to load team workspace');
@@ -99,7 +96,7 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
     } finally {
       setLoading(false);
     }
-  }, [email, getAuthHeaders]);
+  }, [email]);
 
   useEffect(() => {
     loadWorkspace();
@@ -111,9 +108,9 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
     setError(null);
 
     try {
-      const res = await fetch('/api/app/workspace', {
+      const res = await authedFetch('/api/app/workspace', email, {
         method: 'POST',
-        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
           invited_email: inviteEmail.trim(),
@@ -147,9 +144,9 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch('/api/app/workspace', {
+      const res = await authedFetch('/api/app/workspace', email, {
         method: 'PATCH',
-        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, action: 'set_role', member_id: memberId, role }),
       });
       const data = await res.json();
@@ -169,9 +166,10 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
     setSaving(true);
     setError(null);
     try {
-      const res = await fetch(
+      const res = await authedFetch(
         `/api/app/workspace?email=${encodeURIComponent(email)}&member_id=${encodeURIComponent(member.id)}`,
-        { method: 'DELETE', headers: getAuthHeaders() },
+        email,
+        { method: 'DELETE' },
       );
       const data = await res.json();
       if (!data.success) setError(data.error || 'Failed to remove member');
@@ -189,9 +187,9 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
     setError(null);
 
     try {
-      const res = await fetch('/api/app/workspace', {
+      const res = await authedFetch('/api/app/workspace', email, {
         method: 'PATCH',
-        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
           action: 'workspace_defaults',

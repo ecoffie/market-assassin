@@ -17,7 +17,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
-import { getMIApiHeaders } from '../authHeaders';
+import { authedFetch } from '../authHeaders';
 import { UpgradeModal } from '../UpgradeModal';
 
 interface MindyChatPanelProps {
@@ -140,11 +140,10 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
     abortRef.current = controller;
 
     try {
-      const res = await fetch('/api/app/chat', {
+      const res = await authedFetch('/api/app/chat', email, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          ...getMIApiHeaders(email),
         },
         body: JSON.stringify({
           email,
@@ -229,9 +228,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
   const loadSessions = useCallback(async () => {
     if (!email) return;
     try {
-      const res = await fetch(`/api/app/chat-sessions?email=${encodeURIComponent(email)}`, {
-        headers: getMIApiHeaders(email),
-      });
+      const res = await authedFetch(`/api/app/chat-sessions?email=${encodeURIComponent(email)}`, email);
       const data = await res.json().catch(() => null);
       if (data?.success) setSessions(data.sessions || []);
     } catch { /* non-fatal */ }
@@ -251,9 +248,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
     if (!email || loadingSession || sid === sessionId) return;
     setLoadingSession(true);
     try {
-      const res = await fetch(`/api/app/chat-sessions?email=${encodeURIComponent(email)}&sessionId=${encodeURIComponent(sid)}`, {
-        headers: getMIApiHeaders(email),
-      });
+      const res = await authedFetch(`/api/app/chat-sessions?email=${encodeURIComponent(email)}&sessionId=${encodeURIComponent(sid)}`, email);
       const data = await res.json().catch(() => null);
       if (data?.success) {
         setMessages((data.messages || []).map((m: { id: string; role: 'user' | 'assistant'; content: string; cited_sources?: CitedSource[] }) => ({
@@ -282,9 +277,9 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
     setSessions(prev => prev.filter(s => s.id !== sid));  // optimistic
     if (sid === sessionId) startNewChat();
     try {
-      await fetch('/api/app/chat-sessions', {
+      await authedFetch('/api/app/chat-sessions', email, {
         method: 'DELETE',
-        headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, sessionId: sid }),
       });
     } catch { loadSessions(); /* rollback by refetch */ }
@@ -661,9 +656,7 @@ function RagDocDrawer({ docId, email, onClose }: RagDocDrawerProps) {
     // Must send the MI auth headers — /api/app/rag-doc is gated by
     // verifyUserOwnsEmail. Without them the fetch 401'd and clicking a
     // citation chip "went nowhere".
-    fetch(`/api/app/rag-doc?email=${encodeURIComponent(email)}&id=${encodeURIComponent(docId)}`, {
-      headers: getMIApiHeaders(email),
-    })
+    authedFetch(`/api/app/rag-doc?email=${encodeURIComponent(email)}&id=${encodeURIComponent(docId)}`, email)
       .then(async res => {
         if (!res.ok) {
           const body = await res.json().catch(() => ({}));

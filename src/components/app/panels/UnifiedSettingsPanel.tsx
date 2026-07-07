@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
-import { getMIApiHeaders } from '../authHeaders';
+import { getMIApiHeaders, authedFetch } from '../authHeaders';
 import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
 import { NaicsPicker } from '@/components/codes/NaicsPicker';
@@ -100,16 +100,12 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
       // preferences endpoint — read it there too so the dropdown reflects
       // the value that actually controls the daily-alerts cron.
       const [workspaceRes, prefsRes, targetsRes, briefingPrefsRes] = await Promise.all([
-        fetch(`/api/app/workspace?email=${encodeURIComponent(email)}`, {
-          headers: getAuthHeaders(),
-        }),
+        authedFetch(`/api/app/workspace?email=${encodeURIComponent(email)}`, email),
         fetch(`/api/alerts/preferences?email=${encodeURIComponent(email)}`, {
           headers: getAuthHeaders(),
         }),
         // Saved BD targets (My Target List) — counts toward "Agencies selected".
-        fetch(`/api/app/target-list?email=${encodeURIComponent(email)}`, {
-          headers: getAuthHeaders(),
-        }).catch(() => null),
+        authedFetch(`/api/app/target-list?email=${encodeURIComponent(email)}`, email).catch(() => null),
         // SMS opt-in state (sms_enabled + phone_number).
         fetch(`/api/briefings/preferences?email=${encodeURIComponent(email)}`, {
           headers: getAuthHeaders(),
@@ -197,7 +193,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/app/keyword-coverage?keyword=${encodeURIComponent(primary)}`, { headers: getAuthHeaders() });
+        const res = await authedFetch(`/api/app/keyword-coverage?keyword=${encodeURIComponent(primary)}`, email);
         if (!res.ok) return;
         const j = await res.json();
         const psc = (j?.coverage?.topPsc || []) as Array<{ code: string; name: string }>;
@@ -255,9 +251,9 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
     setSmsBusy(true);
     setSmsMsg(null);
     try {
-      const res = await fetch('/api/app/sms/verify/send', {
+      const res = await authedFetch('/api/app/sms/verify/send', email, {
         method: 'POST',
-        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, phone }),
       });
       const data = await res.json().catch(() => ({}));
@@ -281,9 +277,9 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
     setSmsBusy(true);
     setSmsMsg(null);
     try {
-      const res = await fetch('/api/app/sms/verify/check', {
+      const res = await authedFetch('/api/app/sms/verify/check', email, {
         method: 'POST',
-        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, code }),
       });
       const data = await res.json().catch(() => ({}));
@@ -307,9 +303,9 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
     setSmsBusy(true);
     setSmsMsg(null);
     try {
-      const res = await fetch('/api/app/sms/disable', {
+      const res = await authedFetch('/api/app/sms/disable', email, {
         method: 'POST',
-        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
       if (res.ok) {
@@ -1004,9 +1000,7 @@ function BillingCard({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/app/billing?email=${encodeURIComponent(email)}`, {
-          headers: getAuthHeaders(),
-        });
+        const res = await authedFetch(`/api/app/billing?email=${encodeURIComponent(email)}`, email);
         const data = await res.json();
         if (!cancelled && data?.success) {
           setState({ hasSubscription: !!data.hasSubscription, subscription: data.subscription });
@@ -1022,9 +1016,9 @@ function BillingCard({
     setOpening(true);
     setErr(null);
     try {
-      const res = await fetch('/api/app/billing/portal', {
+      const res = await authedFetch('/api/app/billing/portal', email, {
         method: 'POST',
-        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, returnUrl: window.location.href }),
       });
       const data = await res.json();
@@ -1145,9 +1139,9 @@ function TeamUpgradeCard({
       if (params.get('team_upgraded') === '1') {
         setProvisioning(true);
         try {
-          const res = await fetch('/api/app/team/upgrade', {
+          const res = await authedFetch('/api/app/team/upgrade', email, {
             method: 'POST',
-            headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+            headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ email }),
           });
           const data = await res.json();
@@ -1164,9 +1158,7 @@ function TeamUpgradeCard({
 
       // Load upgrade availability + checkout URL.
       try {
-        const res = await fetch(`/api/app/team/upgrade?email=${encodeURIComponent(email)}`, {
-          headers: getAuthHeaders(),
-        });
+        const res = await authedFetch(`/api/app/team/upgrade?email=${encodeURIComponent(email)}`, email);
         const data = await res.json();
         if (!cancelled && data?.success) {
           setHasTeam(!!data.hasTeam);

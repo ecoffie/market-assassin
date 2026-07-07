@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { authedFetch } from '@/components/app/authHeaders';
 
 interface SaveToPipelineButtonProps {
   opportunity: {
@@ -32,7 +33,7 @@ export function SaveToPipelineButton({
   const trackNextAction = (nextAction: string) => {
     if (!email || !email.includes('@')) return;
 
-    fetch('/api/app/engagement', {
+    authedFetch('/api/app/engagement', email, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({

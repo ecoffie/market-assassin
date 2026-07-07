@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import Link from 'next/link';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
-import { getMIApiHeaders } from '../authHeaders';
+import { getMIApiHeaders, authedFetch } from '../authHeaders';
 import { useToast } from '../Toast';
 import { formatOpportunityLocation } from '@/lib/mindy/opportunity-location';
 import { getBuyerAgencyParts } from '@/lib/mindy/agency-display';
@@ -250,9 +250,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
       if (filter === 'solicitation') params.set('noticeType', 'solicitation');
       else if (filter === 'sources') params.set('noticeType', 'sources_sought');
 
-      const res = await fetch(`/api/app/opportunities?${params.toString()}`, {
-        headers: getAuthHeaders(),
-      });
+      const res = await authedFetch(`/api/app/opportunities?${params.toString()}`, email);
       const data = await res.json();
 
       if (data.success) {
@@ -280,7 +278,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
     } finally {
       setIsLoading(false);
     }
-  }, [email, getAuthHeaders, selectedCtaIds, searchQuery, filter]);
+  }, [email, selectedCtaIds, searchQuery, filter]);
 
   useEffect(() => {
     fetch('/api/cta/codes')
@@ -317,9 +315,9 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
     const noticeIds = alerts.map(a => a.id).filter(Boolean).slice(0, 200);
     const poll = async () => {
       try {
-        const res = await fetch('/api/app/opportunity-interest', {
+        const res = await authedFetch('/api/app/opportunity-interest', email, {
           method: 'POST',
-          headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, noticeIds }),
         });
         if (!res.ok || cancelled) return;
@@ -340,7 +338,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
     poll();
     const interval = setInterval(poll, 15000);
     return () => { cancelled = true; clearInterval(interval); };
-  }, [email, alerts, getAuthHeaders]);
+  }, [email, alerts]);
 
   // One-tap "Interested" — the collaboration network-effect lever. ALL tiers
   // (incl. free/alerts-only) can flag interest; it writes a lightweight
@@ -438,9 +436,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
     (async () => {
       try {
         const haveParam = have.length ? `&have=${encodeURIComponent(have.join(','))}` : '';
-        const res = await fetch(`/api/app/keyword-coverage?keyword=${encodeURIComponent(primary)}${haveParam}`, {
-          headers: getMIApiHeaders(email),
-        });
+        const res = await authedFetch(`/api/app/keyword-coverage?keyword=${encodeURIComponent(primary)}${haveParam}`, email);
         if (!res.ok || cancelled) return;
         const data = await res.json().catch(() => null);
         // Endpoint returns { coverage: { keyword, heldPct, coveragePct,

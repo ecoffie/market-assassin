@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Mic } from 'lucide-react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
-import { getMIApiHeaders } from '../authHeaders';
+import { getMIApiHeaders, authedFetch } from '../authHeaders';
 import IncumbentIntel from '../awards/IncumbentIntel';
 import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
@@ -230,7 +230,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
   const [pursuitChanges, setPursuitChanges] = useState<Record<string, Array<{ change_type: string; summary: string }>>>({});
   useEffect(() => {
     if (!email) return;
-    fetch(`/api/app/pursuit-changes?email=${encodeURIComponent(email)}`, { headers: getAuthHeaders() })
+    authedFetch(`/api/app/pursuit-changes?email=${encodeURIComponent(email)}`, email)
       .then(r => r.json())
       .then(d => { if (d.success) setPursuitChanges(d.byPursuit || {}); })
       .catch(() => {});
@@ -238,8 +238,8 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
   const ackChanges = useCallback(async (pursuitId: string) => {
     setPursuitChanges(prev => { const next = { ...prev }; delete next[pursuitId]; return next; });
     try {
-      await fetch('/api/app/pursuit-changes', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      await authedFetch('/api/app/pursuit-changes', email, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, pursuit_id: pursuitId }),
       });
     } catch { /* optimistic */ }
@@ -288,9 +288,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
         // We match library entries to pursuits by title containment since
         // we don't have a pursuit_id foreign-key on library rows yet.
         try {
-          const libRes = await fetch(`/api/app/library?email=${encodeURIComponent(email)}&type=proposal_section`, {
-            headers: getAuthHeaders(),
-          });
+          const libRes = await authedFetch(`/api/app/library?email=${encodeURIComponent(email)}&type=proposal_section`, email);
           const libData = libRes.ok ? await libRes.json() : null;
           if (libData?.success && Array.isArray(libData.entries)) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -1606,9 +1604,9 @@ function PipelineEditDrawer({
     if (!email || !opportunity.id) return;
     setDocsLoading(true);
     try {
-      const res = await fetch(
+      const res = await authedFetch(
         `/api/app/proposal/pursuit-docs?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(opportunity.id)}`,
-        { headers: authHeaders() },
+        email,
       );
       const data = await res.json().catch(() => null);
       if (data?.success) {
@@ -1648,9 +1646,9 @@ function PipelineEditDrawer({
     const timer = setInterval(async () => {
       attempts += 1;
       try {
-        const res = await fetch(
+        const res = await authedFetch(
           `/api/app/proposal/pursuit-docs?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(opportunity.id)}`,
-          { headers: authHeaders() },
+          email,
         );
         const data = await res.json().catch(() => null);
         const liveStatus = data?.pursuit?.docs_status;
@@ -1699,9 +1697,10 @@ function PipelineEditDrawer({
     setRefetching(true);
     setRefetchMsg(null);
     try {
-      const res = await fetch(
+      const res = await authedFetch(
         `/api/app/proposal/pursuit-docs?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(opportunity.id)}`,
-        { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }) },
+        email,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' } },
       );
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success) {
@@ -1735,9 +1734,10 @@ function PipelineEditDrawer({
     try {
       const fd = new FormData();
       fd.append('file', file);
-      const res = await fetch(
+      const res = await authedFetch(
         `/api/app/proposal/upload?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(opportunity.id)}`,
-        { method: 'POST', headers: authHeaders(), body: fd },
+        email,
+        { method: 'POST', body: fd },
       );
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success) {
@@ -2104,7 +2104,6 @@ function PipelineEditDrawer({
             <div className="mt-1">
               <PursuitAssignment
                 email={email}
-                authHeaders={authHeaders}
                 owner={ownerEmail || email}
                 collaborators={collaborators}
                 onOwnerChange={setOwnerEmail}
@@ -2218,7 +2217,7 @@ function PipelineEditDrawer({
           {/* Team discussion — threaded comments on this pursuit. Only for saved rows. */}
           {opportunity.id && (
             <div className="border-t border-slate-800 pt-3">
-              <PursuitComments pipelineId={opportunity.id} email={email} authHeaders={authHeaders} />
+              <PursuitComments pipelineId={opportunity.id} email={email} />
             </div>
           )}
 

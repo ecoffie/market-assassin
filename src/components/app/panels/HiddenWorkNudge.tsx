@@ -18,7 +18,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { AppPanel } from '../UnifiedSidebar';
-import { getMIApiHeaders } from '../authHeaders';
+import { authedFetch } from '../authHeaders';
 import { getActiveWorkspace } from '../activeWorkspace';
 import { hasRealProfile } from '@/lib/alerts/profile-setup';
 
@@ -43,9 +43,8 @@ export default function HiddenWorkNudge({ email, onGo }: HiddenWorkNudgeProps) {
 
   const load = useCallback(async () => {
     if (!email || inClientMode) return;
-    const h = getMIApiHeaders(email);
     const e = encodeURIComponent(email);
-    const ws = await fetch(`/api/app/workspace?email=${e}`, { headers: h })
+    const ws = await authedFetch(`/api/app/workspace?email=${e}`, email)
       .then((r) => (r.ok ? r.json() : null))
       .catch(() => null);
     const notif = ws?.profile?.notification || {};

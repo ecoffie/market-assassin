@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
-import { getMIApiHeaders } from '../authHeaders';
+import { authedFetch } from '../authHeaders';
 import { NaicsPicker } from '@/components/codes/NaicsPicker';
 import { NaicsBadgeList } from '@/components/codes/NaicsBadge';
 import LibraryPanel from './LibraryPanel';
@@ -127,9 +127,7 @@ export default function VaultPanel({ email, tier, initialSection }: Props) {
     if (!email || exporting) return;
     setExporting(true);
     try {
-      const res = await fetch(`/api/app/vault/export?email=${encodeURIComponent(email)}`, {
-        headers: getMIApiHeaders(email),
-      });
+      const res = await authedFetch(`/api/app/vault/export?email=${encodeURIComponent(email)}`, email);
       if (!res.ok) throw new Error(`Export failed (${res.status})`);
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);
@@ -152,9 +150,7 @@ export default function VaultPanel({ email, tier, initialSection }: Props) {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch(`/api/app/vault?email=${encodeURIComponent(email)}`, {
-        headers: getMIApiHeaders(email),
-      });
+      const res = await authedFetch(`/api/app/vault?email=${encodeURIComponent(email)}`, email);
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const data = await res.json();
       setIdentity(data.identity || {});
@@ -341,9 +337,9 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
         contract_vehicles: splitCsv(contractVehiclesRaw),
         certifications: splitCsv(certificationsRaw),
       };
-      const res = await fetch('/api/app/vault/identity', {
+      const res = await authedFetch('/api/app/vault/identity', email, {
         method: 'PUT',
-        headers: { ...Object.fromEntries(getMIApiHeaders(email).entries()), 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, profile }),
       });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
@@ -623,8 +619,8 @@ function PastPerfRow({ p, email, onChanged }: { p: PastPerf; email: string; onCh
               <button
                 onClick={async () => {
                   if (!confirm('Archive this past performance?')) return;
-                  await fetch(`/api/app/vault/past-performance?id=${p.id}&email=${encodeURIComponent(email)}`, {
-                    method: 'DELETE', headers: getMIApiHeaders(email),
+                  await authedFetch(`/api/app/vault/past-performance?id=${p.id}&email=${encodeURIComponent(email)}`, email, {
+                    method: 'DELETE',
                   });
                   onChanged();
                 }}
@@ -664,9 +660,9 @@ function PastPerfForm({ email, initial, editId, onSaved, onCancel }: { email: st
     }
     setSaving(true);
     try {
-      await fetch('/api/app/vault/past-performance', {
+      await authedFetch('/api/app/vault/past-performance', email, {
         method: editId ? 'PATCH' : 'POST',
-        headers: { ...Object.fromEntries(getMIApiHeaders(email).entries()), 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
           ...(editId ? { id: editId } : {}),
@@ -765,9 +761,9 @@ function CapabilityForm({ email, initial, editId, onSaved, onCancel }: { email: 
     if (!form.capability_name.trim() || !form.description.trim()) return;
     setSaving(true);
     try {
-      await fetch('/api/app/vault/capabilities', {
+      await authedFetch('/api/app/vault/capabilities', email, {
         method: editId ? 'PATCH' : 'POST',
-        headers: { ...Object.fromEntries(getMIApiHeaders(email).entries()), 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
           ...(editId ? { id: editId } : {}),
@@ -850,8 +846,8 @@ function CapabilityRow({ c, email, onChanged }: { c: Capability; email: string; 
               <button
                 onClick={async () => {
                   if (!confirm('Archive this capability?')) return;
-                  await fetch(`/api/app/vault/capabilities?id=${c.id}&email=${encodeURIComponent(email)}`, {
-                    method: 'DELETE', headers: getMIApiHeaders(email),
+                  await authedFetch(`/api/app/vault/capabilities?id=${c.id}&email=${encodeURIComponent(email)}`, email, {
+                    method: 'DELETE',
                   });
                   onChanged();
                 }}
@@ -925,9 +921,9 @@ function TeamForm({ email, initial, editId, onSaved, onCancel }: { email: string
       const fd = new FormData();
       fd.append('file', file);
       fd.append('email', email);
-      const res = await fetch('/api/app/vault/team/resume', {
+      const res = await authedFetch('/api/app/vault/team/resume', email, {
         method: 'POST',
-        headers: getMIApiHeaders(email), // NOTE: no Content-Type — browser sets multipart boundary
+        // NOTE: no Content-Type — browser sets multipart boundary
         body: fd,
       });
       const data = await res.json();
@@ -957,9 +953,9 @@ function TeamForm({ email, initial, editId, onSaved, onCancel }: { email: string
     if (!form.full_name.trim() || !form.title.trim()) return;
     setSaving(true);
     try {
-      await fetch('/api/app/vault/team', {
+      await authedFetch('/api/app/vault/team', email, {
         method: editId ? 'PATCH' : 'POST',
-        headers: { ...Object.fromEntries(getMIApiHeaders(email).entries()), 'Content-Type': 'application/json' },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           email,
           ...(editId ? { id: editId } : {}),
@@ -1075,8 +1071,8 @@ function TeamRow({ m, email, onChanged }: { m: TeamMember; email: string; onChan
               <button
                 onClick={async () => {
                   if (!confirm('Archive this person?')) return;
-                  await fetch(`/api/app/vault/team?id=${m.id}&email=${encodeURIComponent(email)}`, {
-                    method: 'DELETE', headers: getMIApiHeaders(email),
+                  await authedFetch(`/api/app/vault/team?id=${m.id}&email=${encodeURIComponent(email)}`, email, {
+                    method: 'DELETE',
                   });
                   onChanged();
                 }}
@@ -1151,9 +1147,8 @@ function DocumentsSection({ email, items, onChanged }: { email: string; items: B
       fd.append('file', file);
       fd.append('email', email);
       fd.append('doc_type', doc_type);
-      const res = await fetch('/api/app/vault/documents', {
+      const res = await authedFetch('/api/app/vault/documents', email, {
         method: 'POST',
-        headers: getMIApiHeaders(email),
         body: fd,
       });
       if (!res.ok) {
@@ -1176,9 +1171,9 @@ function DocumentsSection({ email, items, onChanged }: { email: string; items: B
   const parseDoc = async (documentId: string, filename: string) => {
     setParsing(true);
     try {
-      const res = await fetch('/api/app/vault/documents/parse', {
+      const res = await authedFetch('/api/app/vault/documents/parse', email, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, document_id: documentId }),
       });
       const data = await res.json();
@@ -1210,9 +1205,8 @@ function DocumentsSection({ email, items, onChanged }: { email: string; items: B
     if (!confirm(`Remove "${filename}" from your Vault?\n\nThis only removes the uploaded file — any sections you already saved to your Vault stay.`)) return;
     setRemovingId(documentId);
     try {
-      const res = await fetch(`/api/app/vault/documents?id=${encodeURIComponent(documentId)}&email=${encodeURIComponent(email)}`, {
+      const res = await authedFetch(`/api/app/vault/documents?id=${encodeURIComponent(documentId)}&email=${encodeURIComponent(email)}`, email, {
         method: 'DELETE',
-        headers: getMIApiHeaders(email),
       });
       if (!res.ok) {
         const txt = await res.text();
@@ -1388,9 +1382,9 @@ function ParsedDocReview({
       selections.past_performance = parsed.past_performance.filter((_, i) => ppChecked[i]);
       selections.capabilities = parsed.capabilities.filter((_, i) => capChecked[i]);
 
-      const res = await fetch('/api/app/vault/documents/commit', {
+      const res = await authedFetch('/api/app/vault/documents/commit', email, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, document_id: documentId, selections }),
       });
       const data = await res.json().catch(() => ({}));
@@ -1699,9 +1693,9 @@ function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: 
     setError(null);
     setStage('loading');
     try {
-      const res = await fetch(
+      const res = await authedFetch(
         `/api/app/vault/prefill?uei=${encodeURIComponent(clean)}&email=${encodeURIComponent(email)}`,
-        { headers: getMIApiHeaders(email) },
+        email,
       );
       const data: PrefillResponse = await res.json();
       if (!res.ok || !data.success) {
@@ -1721,10 +1715,9 @@ function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: 
     if (!preview) return;
     setStage('applying');
     try {
-      const res = await fetch('/api/app/vault/prefill', {
+      const res = await authedFetch('/api/app/vault/prefill', email, {
         method: 'POST',
         headers: {
-          ...Object.fromEntries(getMIApiHeaders(email).entries()),
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
