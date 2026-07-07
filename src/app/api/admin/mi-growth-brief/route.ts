@@ -48,7 +48,6 @@ type UserProfile = {
   created_at?: string | null;
   updated_at?: string | null;
   naics_codes?: string[] | null;
-  business_name?: string | null;
   company_name?: string | null;
   access_briefings?: boolean | null;
   access_hunter_pro?: boolean | null;
@@ -63,7 +62,6 @@ type UserProfile = {
 type CustomerClassification = {
   email: string | null;
   briefings_access?: string | null;
-  tier?: string | null;
   classification_version?: number | null;
   briefings_expiry?: string | null;
 };
@@ -166,6 +164,21 @@ async function safeSource<T>(
 
 function normalizeEmail(email?: string | null): string {
   return String(email || '').trim().toLowerCase();
+}
+
+/**
+ * Collapse per-notice email link labels into a single readable bucket for the
+ * Top Links list. The daily-alert "Track in Mindy" affordance carries a UNIQUE
+ * label per opportunity (`track_btn_<noticeId>` on the button, `track_<noticeId>`
+ * on the title link), which would otherwise scatter adoption across dozens of
+ * one-off rows and bury it. Fold them all into "📌 Track in Mindy". Other tracked
+ * CTAs (open_mindy, alert_keyword_setup, bootcamp_register) are already stable
+ * labels — leave them as-is. (See Alert→Action card on the command center.)
+ */
+function rollupLinkLabel(label: string): string {
+  const l = String(label || '').toLowerCase();
+  if (l.startsWith('track')) return '📌 Track in Mindy';
+  return label;
 }
 
 function isInternalOrTestEmail(email: string): boolean {
@@ -311,14 +324,14 @@ export async function GET(request: NextRequest) {
       fetchAllRows((from, to) =>
         supabase
           .from('user_profiles')
-          .select('email, created_at, updated_at, naics_codes, business_name, company_name, access_briefings, access_hunter_pro, access_assassin_standard, access_assassin_premium, access_recompete, access_contractor_db, access_content_standard, access_content_full_fix')
+          .select('email, created_at, updated_at, naics_codes, company_name, access_briefings, access_hunter_pro, access_assassin_standard, access_assassin_premium, access_recompete, access_contractor_db, access_content_standard, access_content_full_fix')
           .range(from, to)
       ), statuses),
     safeSource<CustomerClassification>('customer_classifications', () =>
       fetchAllRows((from, to) =>
         supabase
           .from('customer_classifications')
-          .select('email, briefings_access, tier, classification_version, briefings_expiry')
+          .select('email, briefings_access, classification_version, briefings_expiry')
           .range(from, to)
       ), statuses),
     safeSource<EngagementRow>('user_engagement', () =>
@@ -394,7 +407,7 @@ export async function GET(request: NextRequest) {
     if (!email) continue;
     const sameVersion = latestClassificationVersion === 0 || Number(row.classification_version || 0) === latestClassificationVersion;
     const notExpired = !row.briefings_expiry || new Date(row.briefings_expiry).getTime() > nowMs;
-    if (sameVersion && notExpired && (entitledAccess.has(row.briefings_access || '') || row.tier === 'pro')) {
+    if (sameVersion && notExpired && entitledAccess.has(row.briefings_access || '')) {
       getOrCreateUser(users, email).proEntitled = true;
     }
   }
@@ -417,12 +430,12 @@ export async function GET(request: NextRequest) {
     if (row.event_type === 'link_click') {
       user.emailClicks++;
       const metadata = row.metadata || {};
-      const label = typeof metadata.link_text === 'string'
+      const rawLabel = typeof metadata.link_text === 'string'
         ? metadata.link_text
         : typeof metadata.url === 'string'
           ? metadata.url
           : 'link_click';
-      trackedEmailLinks[label] = (trackedEmailLinks[label] || 0) + 1;
+      trackedEmailLinks[rollupLinkLabel(rawLabel)] = (trackedEmailLinks[rollupLinkLabel(rawLabel)] || 0) + 1;
     }
 
     if (row.event_type && appEventTypes.has(row.event_type)) {
