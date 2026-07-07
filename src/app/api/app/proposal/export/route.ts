@@ -16,6 +16,7 @@ import {
   TabStopType,
 } from 'docx';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { createClient } from '@supabase/supabase-js';
 import type { LoiFields } from '@/lib/proposal/loi-fields';
 import { assembleLoiTemplate } from '@/lib/proposal/loi-template';
@@ -654,6 +655,11 @@ export async function POST(request: NextRequest) {
   const authSession = requireMIAuthSession(request, email);
   if (!authSession.ok) return authSession.response;
 
+  // Coach Mode: pre-fill the export from the ACTIVE CLIENT's vault/identity, not
+  // the coach's — else the client's proposal exports the coach's cap statement.
+  const { workspaceId, asClient } = await resolveActiveWorkspace(email, request);
+  const profileEmail = asClient ? clientNotificationEmail(workspaceId) : email;
+
   let body: ExportBody;
   try {
     body = await request.json();
@@ -690,7 +696,7 @@ export async function POST(request: NextRequest) {
   // as all-blank placeholders. Best-effort — a lookup failure just falls back
   // to blanks.
   const companyProfile = isSimpleResponsePackage
-    ? await loadCompanyProfile(email).catch(() => ({} as CompanyProfile))
+    ? await loadCompanyProfile(profileEmail).catch(() => ({} as CompanyProfile))
     : {} as CompanyProfile;
 
   const orderedSections = sectionOrder.filter(id => drafts[id]?.draft);

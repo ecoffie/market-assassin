@@ -35,6 +35,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyMIAccess } from '@/lib/api-auth';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { logToolError, recordToolSuccess, ToolNames, classifyError, AIProviders } from '@/lib/tool-errors';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
 import { fiscalYearTimePeriod } from '@/lib/utils/fiscal-year';
@@ -209,6 +210,12 @@ export async function POST(request: NextRequest) {
 
   const supabase = getSupabase();
 
+  // Coach Mode: personalize + cache the analysis for the ACTIVE CLIENT, not the
+  // coach — else the bid/no-bid recommendation uses the coach's NAICS/set-asides
+  // and the cached verdict is misfiled under the coach.
+  const { workspaceId, asClient } = await resolveActiveWorkspace(email, request);
+  const scopedEmail = asClient ? clientNotificationEmail(workspaceId) : email;
+
   // Cache hit (unless force=true).
   if (!force) {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -216,7 +223,7 @@ export async function POST(request: NextRequest) {
       .from('analyst_bid_no_bid_cache')
       .select('*') as any)
       .eq('notice_id', noticeId)
-      .eq('user_email', email)
+      .eq('user_email', scopedEmail)
       .maybeSingle();
 
     if (cached?.recommendation) {
@@ -250,7 +257,7 @@ export async function POST(request: NextRequest) {
   const { data: profile } = await (supabase
     .from('user_notification_settings')
     .select('naics_codes, business_type, set_aside_preferences, target_agencies, agencies') as any)
-    .eq('user_email', email)
+    .eq('user_email', scopedEmail)
     .maybeSingle();
 
   // callLLM (job:'reasoning') picks from openai/groq/claude — just need one key.
@@ -342,7 +349,7 @@ export async function POST(request: NextRequest) {
   // Cache (upsert so force=true overwrites).
   const cacheRow = {
     notice_id: noticeId,
-    user_email: email,
+    user_email: scopedEmail,
     recommendation: analysis,
     score,
     recommendation_label: analysis.recommendation,

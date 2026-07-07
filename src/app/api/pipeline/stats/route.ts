@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -49,11 +50,15 @@ export async function GET(request: NextRequest) {
     );
   }
 
+  // Coach Mode: pipeline stats for the ACTIVE CLIENT, not the coach.
+  const { workspaceId, asClient } = await resolveActiveWorkspace(auth.email!, request);
+  const statsEmail = asClient ? clientNotificationEmail(workspaceId) : auth.email!;
+
   try {
     const { data: opportunities, error } = await getSupabase()
       .from('user_pipeline')
       .select('stage, priority, value_estimate, response_deadline')
-      .eq('user_email', auth.email!);
+      .eq('user_email', statsEmail);
 
     if (error) {
       // Table might not exist yet
