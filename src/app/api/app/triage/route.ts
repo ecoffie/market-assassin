@@ -25,6 +25,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'crypto';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -69,6 +70,9 @@ export async function GET(request: NextRequest) {
   // Reads the caller's private target list — require they own this email.
   const gate = requireMIAuthSession(request, email);
   if (!gate.ok) return gate.response;
+  // Coach Mode: read the ACTIVE CLIENT's target list / dismissals, not the coach's.
+  const { workspaceId: gWs, asClient: gAsClient } = await resolveActiveWorkspace(email, request);
+  const readEmail = gAsClient ? clientNotificationEmail(gWs) : email;
   const naicsCodes = parseNaicsParam(naicsRaw);
   if (naicsCodes.length === 0) {
     return NextResponse.json({ success: false, error: 'naics is required' }, { status: 400 });
@@ -82,7 +86,7 @@ export async function GET(request: NextRequest) {
   const { data: tracked, error: trackedErr } = await supabase
     .from('user_target_list')
     .select('office_name')
-    .eq('user_email', email);
+    .eq('user_email', readEmail);
   if (trackedErr) {
     console.warn('[triage GET] tracked query failed:', trackedErr);
   }
@@ -93,7 +97,7 @@ export async function GET(request: NextRequest) {
   const { data: dismissed, error: dismissedErr } = await supabase
     .from('user_dismissed_targets')
     .select('office_name, reason, defer_until')
-    .eq('user_email', email)
+    .eq('user_email', readEmail)
     .eq('naics_profile', naicsProfile);
   if (dismissedErr) {
     console.warn('[triage GET] dismissed query failed:', dismissedErr);
@@ -166,6 +170,9 @@ export async function POST(request: NextRequest) {
   // Writes to the caller's private target list — require they own this email.
   const gate = requireMIAuthSession(request, email);
   if (!gate.ok) return gate.response;
+  // Coach Mode: track/dismiss on behalf of the ACTIVE CLIENT, not the coach.
+  const { workspaceId: pWs, asClient: pAsClient } = await resolveActiveWorkspace(email, request);
+  const writeEmail = pAsClient ? clientNotificationEmail(pWs) : email;
   const naicsCodes = parseNaicsParam(naics || null);
   if (naicsCodes.length === 0) {
     return NextResponse.json({ success: false, error: 'naics is required' }, { status: 400 });
@@ -179,7 +186,7 @@ export async function POST(request: NextRequest) {
     // an extra round trip and keeps auth simple.
     const payload = body.track_payload || {};
     const insertPayload = {
-      user_email: email,
+      user_email: writeEmail,
       agency_name: agency_name || office_name,
       sub_agency_name: sub_agency_name || null,
       office_name,
@@ -219,7 +226,7 @@ export async function POST(request: NextRequest) {
     : null;
 
   const dismissalPayload = {
-    user_email: email,
+    user_email: writeEmail,
     office_name,
     agency_name: agency_name || null,
     sub_agency_name: sub_agency_name || null,

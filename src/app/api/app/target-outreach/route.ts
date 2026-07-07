@@ -23,6 +23,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyMIAccess } from '@/lib/api-auth';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -52,13 +53,16 @@ export async function GET(request: NextRequest) {
   }
   const gate = requireMIAuthSession(request, email);
   if (!gate.ok) return gate.response;
+  // Coach Mode: read the ACTIVE CLIENT's outreach log, not the coach's.
+  const { workspaceId: gWs, asClient: gAsClient } = await resolveActiveWorkspace(email, request);
+  const scopedEmail = gAsClient ? clientNotificationEmail(gWs) : email.toLowerCase();
 
   try {
     const { data, error } = await getSupabase()
       .from('user_target_outreach')
       .select('*')
       .eq('target_id', targetId)
-      .eq('user_email', email.toLowerCase())
+      .eq('user_email', scopedEmail)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -100,6 +104,9 @@ export async function POST(request: NextRequest) {
   // checks tier, not who is asking).
   const gate = requireMIAuthSession(request, email);
   if (!gate.ok) return gate.response;
+  // Coach Mode: log outreach against the ACTIVE CLIENT's target, not the coach's.
+  const { workspaceId: pWs, asClient: pAsClient } = await resolveActiveWorkspace(email, request);
+  const scopedEmail = pAsClient ? clientNotificationEmail(pWs) : email.toLowerCase();
 
   // Tier gate. Same as the target-list endpoint.
   const access = await verifyMIAccess(email);
@@ -121,7 +128,7 @@ export async function POST(request: NextRequest) {
     .from('user_target_list')
     .select('id, workspace_id, user_email')
     .eq('id', targetId)
-    .eq('user_email', email.toLowerCase())
+    .eq('user_email', scopedEmail)
     .maybeSingle();
 
   if (!target) {
@@ -137,7 +144,7 @@ export async function POST(request: NextRequest) {
 
   const insertPayload: Record<string, unknown> = {
     target_id: targetId,
-    user_email: email.toLowerCase(),
+    user_email: scopedEmail,
     workspace_id: target.workspace_id || null,
     activity_type: activityType,
     contact_name: body.contact_name || null,
@@ -180,13 +187,16 @@ export async function DELETE(request: NextRequest) {
   }
   const gate = requireMIAuthSession(request, email);
   if (!gate.ok) return gate.response;
+  // Coach Mode: delete from the ACTIVE CLIENT's outreach log, not the coach's.
+  const { workspaceId: dWs, asClient: dAsClient } = await resolveActiveWorkspace(email, request);
+  const scopedEmail = dAsClient ? clientNotificationEmail(dWs) : email.toLowerCase();
 
   try {
     const { error } = await getSupabase()
       .from('user_target_outreach')
       .delete()
       .eq('id', id)
-      .eq('user_email', email.toLowerCase());
+      .eq('user_email', scopedEmail);
 
     if (error) {
       console.error('[target-outreach] DELETE error:', error);
