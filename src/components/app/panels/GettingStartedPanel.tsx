@@ -9,7 +9,7 @@
  * (Plan: docs/PLAN-mindy-guided-journeys.md)
  */
 import { useEffect, useState, useCallback } from 'react';
-import { getMIApiHeaders } from '../authHeaders';
+import { authedFetch } from '../authHeaders';
 import { JOURNEYS, journeysCompletedCount, type JourneyKey, type JourneyProgress } from '@/lib/journeys/definitions';
 
 export default function GettingStartedPanel({
@@ -24,7 +24,7 @@ export default function GettingStartedPanel({
 
   useEffect(() => {
     if (!email) return;
-    fetch(`/api/app/journeys?email=${encodeURIComponent(email)}`, { headers: getMIApiHeaders(email) })
+    authedFetch(`/api/app/journeys?email=${encodeURIComponent(email)}`, email)
       .then((r) => (r.ok ? r.json() : null))
       .then((d) => { if (d?.success) setProgress(d.progress); })
       .catch(() => {});
@@ -33,9 +33,9 @@ export default function GettingStartedPanel({
   const markDone = useCallback((journey: JourneyKey) => {
     setProgress((p) => (p ? { ...p, [JOURNEYS.find(j => j.key === journey)!.doneField]: true } : p));
     if (!email) return;
-    fetch(`/api/app/journeys?email=${encodeURIComponent(email)}`, {
+    authedFetch(`/api/app/journeys?email=${encodeURIComponent(email)}`, email, {
       method: 'PATCH',
-      headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
+      headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ journey, done: true }),
     }).catch(() => {});
   }, [email]);

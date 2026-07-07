@@ -1,6 +1,6 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
-import { getMIApiHeaders } from '../authHeaders';
+import { authedFetch } from '../authHeaders';
 
 /**
  * Proposal Assist — Manual Drive (Perplexity Spaces format). Two columns:
@@ -49,9 +49,9 @@ export default function ProposalChat({
     setMessages(prev => [...prev, { role: 'user', content: msg }, { role: 'assistant', content: '' }]);
     setStreaming(true);
     try {
-      const res = await fetch('/api/app/proposal/chat', {
+      const res = await authedFetch('/api/app/proposal/chat', email, {
         method: 'POST',
-        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         // Send pipeline_id so the server reuses the already-extracted docs +
         // cached matrix (Eric) instead of us re-sending the full text.
         body: JSON.stringify({ email, message: fullMsg, rfpText, rfpFileName, history, pipeline_id: pipelineId || undefined }),

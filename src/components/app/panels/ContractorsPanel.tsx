@@ -5,7 +5,7 @@ import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import type { AppTier } from '../UnifiedSidebar';
 import { NaicsAutocompleteInput } from '../../codes/NaicsAutocompleteInput';
 import ContractorProfileView from '../contractors/ContractorProfileView';
-import { getMIApiHeaders } from '../authHeaders';
+import { authedFetch } from '../authHeaders';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
 
 const US_STATES = ['AL','AK','AZ','AR','CA','CO','CT','DE','DC','FL','GA','HI','ID','IL','IN','IA','KS','KY','LA','ME','MD','MA','MI','MN','MS','MO','MT','NE','NV','NH','NJ','NM','NY','NC','ND','OH','OK','OR','PA','RI','SC','SD','TN','TX','UT','VT','VA','WA','WV','WI','WY'];
@@ -205,9 +205,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
       try {
         const [prefsResponse, workspaceResponse] = await Promise.all([
           fetch(`/api/alerts/preferences?email=${encodeURIComponent(email as string)}`),
-          fetch(`/api/app/workspace?email=${encodeURIComponent(email as string)}`, {
-            headers: getMIApiHeaders(email),
-          }),
+          authedFetch(`/api/app/workspace?email=${encodeURIComponent(email as string)}`, email),
         ]);
         const [prefs, workspace] = await Promise.all([
           prefsResponse.json().catch(() => null),

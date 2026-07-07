@@ -67,6 +67,7 @@ export interface PipelineOpportunity {
   winner?: string;
   workspace_id?: string;
   owner_email?: string;
+  collaborators?: string[];
   created_by?: string;
   updated_by?: string;
 }
@@ -447,6 +448,14 @@ export async function PATCH(request: NextRequest) {
     updates.updated_by = user_email.toLowerCase();
     updates.workspace_id = updates.workspace_id || workspaceId;
 
+    // Collaborators (Phase 2): normalize to a clean lowercased email list. Kept
+    // separate so we can strip it if the column isn't migrated yet (below).
+    if (updates.collaborators !== undefined) {
+      updates.collaborators = Array.isArray(updates.collaborators)
+        ? Array.from(new Set(updates.collaborators.map((c: unknown) => String(c).toLowerCase().trim()).filter(Boolean)))
+        : [];
+    }
+
     // Verify ownership — caller must own the row by user_email OR the
     // workspace it belongs to (team members can edit each other's rows).
     const { data: existing } = await getSupabase()
@@ -467,13 +476,23 @@ export async function PATCH(request: NextRequest) {
     const oldStage = existing.stage;
     const newStage = updates.stage;
 
-    const { data, error } = await getSupabase()
-      .from('user_pipeline')
-      .update(updates)
-      .eq('id', id)
-      .or(`workspace_id.eq.${workspaceId},user_email.eq.${user_email.toLowerCase()}`)
-      .select()
-      .single();
+    const runUpdate = (payload: Record<string, unknown>) =>
+      getSupabase()
+        .from('user_pipeline')
+        .update(payload)
+        .eq('id', id)
+        .or(`workspace_id.eq.${workspaceId},user_email.eq.${user_email.toLowerCase()}`)
+        .select()
+        .single();
+
+    let { data, error } = await runUpdate(updates);
+
+    // Graceful degrade: if `collaborators` isn't migrated yet, strip it and retry
+    // so the rest of the edit still saves (mirrors the GET workspace_id fallback).
+    if (error && (error.code === '42703' || error.message?.includes('collaborators')) && 'collaborators' in updates) {
+      const { collaborators: _drop, ...rest } = updates;
+      ({ data, error } = await runUpdate(rest));
+    }
 
     if (error) {
       console.error('Pipeline PATCH Postgres error:', {

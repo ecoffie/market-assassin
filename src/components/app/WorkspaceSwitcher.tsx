@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState, useRef } from 'react';
-import { getMIApiHeaders } from './authHeaders';
+import { useEffect, useState, useRef } from 'react';
+import { authedFetch } from './authHeaders';
 
 interface Workspace {
   id: string;
@@ -29,7 +29,6 @@ export default function WorkspaceSwitcher({
   const [loading, setLoading] = useState(true);
   const [isOpen, setIsOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
-  const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
 
   // Fetch workspaces on mount
   useEffect(() => {
@@ -40,9 +39,7 @@ export default function WorkspaceSwitcher({
       }
 
       try {
-        const res = await fetch(`/api/app/workspaces?email=${encodeURIComponent(email)}`, {
-          headers: getAuthHeaders(),
-        });
+        const res = await authedFetch(`/api/app/workspaces?email=${encodeURIComponent(email)}`, email);
         const data = await res.json();
 
         if (data.success) {
@@ -61,7 +58,7 @@ export default function WorkspaceSwitcher({
     };
 
     fetchWorkspaces();
-  }, [email, currentWorkspaceId, onWorkspaceChange, getAuthHeaders]);
+  }, [email, currentWorkspaceId, onWorkspaceChange]);
 
   // Close dropdown when clicking outside
   useEffect(() => {

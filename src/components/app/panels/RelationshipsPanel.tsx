@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
-import { getMIApiHeaders } from '../authHeaders';
+import { authedFetch } from '../authHeaders';
 
 interface RelationshipsPanelProps {
   email: string | null;
@@ -128,11 +128,10 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
   // saving attaches to an agency, not a pursuit.
   const [targetAgencies, setTargetAgencies] = useState<string[]>([]);
   const [attachAgency, setAttachAgency] = useState('');
-  const getAuthHeaders = useCallback((init?: HeadersInit) => getMIApiHeaders(email, init), [email]);
 
   useEffect(() => {
     if (!email) return;
-    fetch(`/api/app/target-list?email=${encodeURIComponent(email)}`, { headers: getMIApiHeaders(email) })
+    authedFetch(`/api/app/target-list?email=${encodeURIComponent(email)}`, email)
       .then(r => r.json())
       .then(d => {
         const ags = Array.from(new Set(((d?.targets || []) as Array<{ agency_name?: string }>)
@@ -196,24 +195,20 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
 
     if (activeTab === 'network' && searchQuery.trim()) params.set('search', searchQuery.trim());
 
-    const response = await fetch(`/api/app/relationships?${params.toString()}`, {
-      headers: getAuthHeaders(),
-    });
+    const response = await authedFetch(`/api/app/relationships?${params.toString()}`, email);
     const data = await response.json();
     if (!data.success) throw new Error(data.error || 'Failed to load relationships');
     setSavedContacts(data.contacts || []);
     setLinks(data.links || []);
-  }, [activeTab, email, getAuthHeaders, searchQuery]);
+  }, [activeTab, email, searchQuery]);
 
   const loadPursuits = useCallback(async () => {
     if (!email) return;
     const params = new URLSearchParams({ email, mode: 'pursuits' });
-    const response = await fetch(`/api/app/relationships?${params.toString()}`, {
-      headers: getAuthHeaders(),
-    });
+    const response = await authedFetch(`/api/app/relationships?${params.toString()}`, email);
     const data = await response.json();
     if (data.success) setPursuits(data.pursuits || []);
-  }, [email, getAuthHeaders]);
+  }, [email]);
 
   const searchCandidates = useCallback(async () => {
     if (!email || activeTab === 'network') return;
@@ -231,9 +226,7 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
       if (naicsFilter.trim()) params.set('naics', naicsFilter.trim());
       if (agencyFilter.trim()) params.set('agency', agencyFilter.trim());
 
-      const response = await fetch(`/api/app/relationships?${params.toString()}`, {
-        headers: getAuthHeaders(),
-      });
+      const response = await authedFetch(`/api/app/relationships?${params.toString()}`, email);
       const data = await response.json();
       if (!data.success) throw new Error(data.error || 'Failed to search relationships');
       setCandidates(data.candidates || []);
@@ -247,7 +240,7 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
       setSearching(false);
       setLoading(false);
     }
-  }, [activeTab, agencyFilter, email, getAuthHeaders, naicsFilter, searchQuery]);
+  }, [activeTab, agencyFilter, email, naicsFilter, searchQuery]);
 
   useEffect(() => {
     async function load() {
@@ -292,9 +285,9 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
     if (!email) return;
     setSavedContacts(prev => prev.map(c => c.id === contactId ? { ...c, relationship_stage: stage } : c));
     try {
-      await fetch('/api/app/relationships', {
+      await authedFetch('/api/app/relationships', email, {
         method: 'PATCH',
-        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ user_email: email, id: contactId, relationship_stage: stage }),
       });
     } catch { /* optimistic — non-fatal */ }
@@ -307,9 +300,9 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
     setError(null);
 
     try {
-      const response = await fetch('/api/app/relationships', {
+      const response = await authedFetch('/api/app/relationships', email, {
         method: 'POST',
-        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           user_email: email,
           contact_type: contact.contact_type,
@@ -349,9 +342,9 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
         const pursuit = pursuits.find(p => p.id === selectedPursuit);
         if (linkId) {
           try {
-            await fetch('/api/app/relationships', {
+            await authedFetch('/api/app/relationships', email, {
               method: 'POST',
-              headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+              headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 action: 'link_contact',
                 user_email: email,
@@ -391,9 +384,9 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
     setError(null);
 
     try {
-      const response = await fetch('/api/app/relationships', {
+      const response = await authedFetch('/api/app/relationships', email, {
         method: 'POST',
-        headers: getAuthHeaders({ 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'link_contact',
           user_email: email,

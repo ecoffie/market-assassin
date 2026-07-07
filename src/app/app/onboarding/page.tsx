@@ -8,7 +8,7 @@ import OnboardingScan, { type RevealData } from '@/components/app/onboarding/Onb
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import { getSupabase } from '@/lib/supabase/client';
 import { useAppTracker } from '@/components/app/track';
-import { getMIApiHeaders } from '@/components/app/authHeaders';
+import { getMIApiHeaders, authedFetch } from '@/components/app/authHeaders';
 
 const INDUSTRY_PRESETS = [
   { label: 'Construction', codes: ['236', '237', '238'], description: 'Building, heavy civil, specialty trades' },
@@ -504,9 +504,9 @@ export default function OnboardingPage() {
     if (text.length < 4) { setError('Tell us what you do + where (e.g. "janitorial in Florida").'); return; }
     setAutoLoading(true); setError(''); setOverview(null); setScanPhase('scanning');
     try {
-      const res = await fetch('/api/app/profile-from-text', {
+      const res = await authedFetch('/api/app/profile-from-text', email, {
         method: 'POST',
-        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({ email, text }),
       });
       const d = await res.json();
@@ -572,8 +572,8 @@ export default function OnboardingPage() {
     setAutoLoading(true); setError(''); setOverview(null); setScanPhase('scanning');
     try {
       // Preview pull (identity + past performance + AI-drafted capabilities).
-      const res = await fetch(`/api/app/vault/prefill?uei=${encodeURIComponent(uei)}&email=${encodeURIComponent(email)}`, {
-        headers: getMIApiHeaders(email, { Authorization: `Bearer ${accessToken}` }),
+      const res = await authedFetch(`/api/app/vault/prefill?uei=${encodeURIComponent(uei)}&email=${encodeURIComponent(email)}`, email, {
+        headers: { Authorization: `Bearer ${accessToken}` },
       });
       const d = await res.json();
       if (!res.ok || !d.success) {
@@ -625,9 +625,9 @@ export default function OnboardingPage() {
       // vector on real award history. Failure here doesn't block the profile save.
       if (autoProfile.uei) {
         try {
-          await fetch('/api/app/vault/prefill', {
+          await authedFetch('/api/app/vault/prefill', email, {
             method: 'POST',
-            headers: getMIApiHeaders(email, { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` }),
+            headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
             body: JSON.stringify({ email, uei: autoProfile.uei, accept: { identity: true, past_performance: true } }),
           });
         } catch { /* non-fatal — alerts profile below still saves */ }
@@ -711,9 +711,10 @@ export default function OnboardingPage() {
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(
+        const res = await authedFetch(
           `/api/app/keyword-coverage?keyword=${encodeURIComponent(phrase)}&have=${encodeURIComponent(have.join(','))}`,
-          { headers: getMIApiHeaders(email, { Authorization: `Bearer ${accessToken}` }) },
+          email,
+          { headers: { Authorization: `Bearer ${accessToken}` } },
         );
         if (!res.ok) return;
         const j = await res.json();
@@ -753,9 +754,9 @@ export default function OnboardingPage() {
     if (!phrase) { setEditingIndustry(false); return; }
     setAutoLoading(true);
     try {
-      const res = await fetch('/api/app/profile-from-text', {
+      const res = await authedFetch('/api/app/profile-from-text', email, {
         method: 'POST',
-        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` }),
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
         body: JSON.stringify({ email, text: phrase }),
       });
       const d = await res.json();

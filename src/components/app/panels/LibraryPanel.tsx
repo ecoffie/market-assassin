@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
-import { getMIApiHeaders } from '../authHeaders';
+import { authedFetch } from '../authHeaders';
 
 interface Props {
   email: string | null;
@@ -214,7 +214,7 @@ export default function LibraryPanel({ email, tier }: Props) {
       const params = new URLSearchParams({ email, page: String(page) });
       if (type) params.set('type', type);
       if (debouncedQuery.length >= 2) params.set('q', debouncedQuery);
-      const res = await fetch(`/api/app/library?${params}`, { headers: getMIApiHeaders(email) });
+      const res = await authedFetch(`/api/app/library?${params}`, email);
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error || `HTTP ${res.status}`);
       setEntries(data.entries || []);
@@ -245,9 +245,7 @@ export default function LibraryPanel({ email, tier }: Props) {
     setSelectedLoading(true);
     setSelected(null);
     try {
-      const res = await fetch(`/api/app/library?email=${encodeURIComponent(email)}&id=${id}`, {
-        headers: getMIApiHeaders(email),
-      });
+      const res = await authedFetch(`/api/app/library?email=${encodeURIComponent(email)}&id=${id}`, email);
       const data = await res.json();
       if (!res.ok || !data.success) throw new Error(data.error);
       setSelected(data.entry);
@@ -261,9 +259,8 @@ export default function LibraryPanel({ email, tier }: Props) {
   const archive = async (id: string) => {
     if (!email) return;
     if (!confirm('Remove this from your library?')) return;
-    await fetch(`/api/app/library?email=${encodeURIComponent(email)}&id=${id}`, {
+    await authedFetch(`/api/app/library?email=${encodeURIComponent(email)}&id=${id}`, email, {
       method: 'DELETE',
-      headers: getMIApiHeaders(email),
     });
     if (selected?.id === id) setSelected(null);
     fetchList();

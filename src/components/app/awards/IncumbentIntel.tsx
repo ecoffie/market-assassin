@@ -8,7 +8,7 @@
  * the #52 findPredecessorAward engine via /api/app/incumbent.
  */
 import { useState, useCallback } from 'react';
-import { getMIApiHeaders } from '@/components/app/authHeaders';
+import { authedFetch } from '@/components/app/authHeaders';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
 
 interface Incumbent {
@@ -42,7 +42,7 @@ export default function IncumbentIntel({
       if (naics) qs.set('naics', naics);
       if (agency) qs.set('agency', agency);
       if (title) qs.set('title', title);
-      const res = await fetch(`/api/app/incumbent?${qs.toString()}`, { headers: getMIApiHeaders(email) });
+      const res = await authedFetch(`/api/app/incumbent?${qs.toString()}`, email);
       const data = await res.json();
       if (!data?.success) { setState('error'); return; }
       setState(data.found ? (data.incumbent as Incumbent) : 'none');

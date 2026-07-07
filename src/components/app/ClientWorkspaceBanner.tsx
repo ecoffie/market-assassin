@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import type { AppPanel } from './UnifiedSidebar';
-import { getMIApiHeaders } from './authHeaders';
+import { authedFetch } from './authHeaders';
 import { getActiveWorkspace, clearActiveWorkspace } from './activeWorkspace';
 
 type ActiveClient = {
@@ -48,9 +48,7 @@ export default function ClientWorkspaceBanner({
     let cancelled = false;
     (async () => {
       try {
-        const res = await fetch(`/api/app/coach?email=${encodeURIComponent(email)}`, {
-          headers: getMIApiHeaders(email),
-        });
+        const res = await authedFetch(`/api/app/coach?email=${encodeURIComponent(email)}`, email);
         const d = await res.json();
         if (cancelled || !d.isCoach) return;
         const match = (d.clients || []).find((c: { workspaceId: string }) => c.workspaceId === ws);

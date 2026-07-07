@@ -2,7 +2,7 @@
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
-import { getMIApiHeaders } from '../authHeaders';
+import { getMIApiHeaders, authedFetch } from '../authHeaders';
 import { classifyNoticeType, noticeTypeLabel, noticeTypeToDetected } from '@/lib/utils/notice-type';
 import type { LoiFields } from '@/lib/proposal/loi-fields';
 import { loiFieldsHaveContent } from '@/lib/proposal/loi-fields';
@@ -318,7 +318,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   } | null>(null);
   useEffect(() => {
     if (!email) return;
-    fetch(`/api/app/vault?email=${encodeURIComponent(email)}`, { headers: getMIApiHeaders(email) })
+    authedFetch(`/api/app/vault?email=${encodeURIComponent(email)}`, email)
       .then((r) => r.ok ? r.json() : null)
       .then((d) => {
         if (!d) return;
@@ -336,7 +336,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   // (the assignee field suggests them). Falls back to free-text for solo users.
   useEffect(() => {
     if (!email) return;
-    fetch(`/api/app/workspace?email=${encodeURIComponent(email)}`, { headers: getMIApiHeaders(email) })
+    authedFetch(`/api/app/workspace?email=${encodeURIComponent(email)}`, email)
       .then((r) => r.ok ? r.json() : null)
       .then((d) => {
         if (!d?.success || !Array.isArray(d.members)) return;
@@ -361,9 +361,8 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     try {
       const body = new FormData();
       body.append('file', file);
-      const res = await fetch(`/api/app/proposal/upload?email=${encodeURIComponent(email)}`, {
+      const res = await authedFetch(`/api/app/proposal/upload?email=${encodeURIComponent(email)}`, email, {
         method: 'POST',
-        headers: getAuthHeaders(),
         body,
       });
       const data = await res.json();
@@ -482,9 +481,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       complianceSectionRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
     });
     try {
-      const res = await fetch(`/api/app/proposal/compliance?email=${encodeURIComponent(email)}`, {
+      const res = await authedFetch(`/api/app/proposal/compliance?email=${encodeURIComponent(email)}`, email, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        headers: { 'Content-Type': 'application/json' },
         // Send pipeline_id so the matrix uses MULTI-DOC extraction with amendment
         // precedence (base + amendments + Q&A) when we have a tracked pursuit;
         // falls back to the uploaded text otherwise.
@@ -512,9 +511,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       // The route preserves any owner/status already set on unchanged rows, so a
       // re-extraction is non-destructive. Best-effort.
       if (activePursuitId && rows.length) {
-        fetch(`/api/app/proposal/compliance-state?email=${encodeURIComponent(email)}`, {
+        authedFetch(`/api/app/proposal/compliance-state?email=${encodeURIComponent(email)}`, email, {
           method: 'POST',
-          headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ pipeline_id: activePursuitId, requirements: rows.map(r => ({ req_key: r.id, requirement: r.requirement, category: r.category, section: r.section, source_quote: r.source_quote, source_doc: r.source_doc, revised: r.revised })) }),
         }).catch(() => {});
       }
@@ -533,7 +532,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   useEffect(() => {
     if (!email || !activePursuitId) return;
     let cancelled = false;
-    fetch(`/api/app/proposal/compliance-state?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(activePursuitId)}`, { headers: getAuthHeaders() })
+    authedFetch(`/api/app/proposal/compliance-state?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(activePursuitId)}`, email)
       .then(r => r.ok ? r.json() : null)
       .then(data => {
         if (cancelled || !data?.success || !data.saved) return;
@@ -613,9 +612,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     setLoiFieldsLoading(true);
     setLoiFieldsError(null);
     try {
-      const res = await fetch(`/api/app/proposal/extract-loi-fields?email=${encodeURIComponent(email)}`, {
+      const res = await authedFetch(`/api/app/proposal/extract-loi-fields?email=${encodeURIComponent(email)}`, email, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           text,
           fileName: fileName || activePursuit?.title || 'SAM.gov notice',
@@ -643,9 +642,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     // and are visible to teammates. Best-effort — a save failure doesn't block
     // the optimistic UI update. Only when working a saved pursuit.
     if (email && activePursuitId && ('owner' in patch || 'status' in patch)) {
-      fetch(`/api/app/proposal/compliance-state?email=${encodeURIComponent(email)}`, {
+      authedFetch(`/api/app/proposal/compliance-state?email=${encodeURIComponent(email)}`, email, {
         method: 'PATCH',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ pipeline_id: activePursuitId, req_key: id, owner: patch.owner, status: patch.status }),
       }).catch(() => {});
     }
@@ -659,9 +658,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     if (!email || !text) return;
     setSowBusy(true); setSowError(null);
     try {
-      const res = await fetch('/api/app/proposal/extract-sow', {
+      const res = await authedFetch('/api/app/proposal/extract-sow', email, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        headers: { 'Content-Type': 'application/json' },
         // Send pipeline_id so the export pulls the CLASSIFIED SOW doc, not the
         // combined 11-doc blob (Eric QC: was extracting a 507-page mashup).
         body: JSON.stringify({ email, text, fileName: uploadedRfp?.fileName || 'solicitation', pipeline_id: activePursuitId || undefined }),
@@ -825,9 +824,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         setScanning(false);
         return;
       }
-      const res = await fetch(`/api/app/proposal/scan?email=${encodeURIComponent(email)}`, {
+      const res = await authedFetch(`/api/app/proposal/scan?email=${encodeURIComponent(email)}`, email, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           requirements: compliance.map(c => ({ id: c.id, requirement: c.requirement, category: CATEGORY_LABELS[c.category]?.label || c.category, section: c.section })),
           draftText,
@@ -925,9 +924,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     setDraftLoading(sectionType);
     setDraftError(null);
     try {
-      const res = await fetch(`/api/app/proposal/draft?email=${encodeURIComponent(email)}`, {
+      const res = await authedFetch(`/api/app/proposal/draft?email=${encodeURIComponent(email)}`, email, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ text: uploadedRfp.text, fileName: uploadedRfp.fileName, sectionType, requirements: compliance.map(c => ({ id: c.id, requirement: c.requirement, category: CATEGORY_LABELS[c.category]?.label || c.category, section: c.section })) }),
       });
       const data = await res.json();
@@ -978,9 +977,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     const controller = new AbortController();
     draftAllAbortRef.current = controller;
     try {
-      const res = await fetch(`/api/app/proposal/draft-all?email=${encodeURIComponent(email)}`, {
+      const res = await authedFetch(`/api/app/proposal/draft-all?email=${encodeURIComponent(email)}`, email, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        headers: { 'Content-Type': 'application/json' },
         signal: controller.signal,
         body: JSON.stringify({
           text: uploadedRfp.text,
@@ -1126,9 +1125,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         .filter(Boolean).join('\n\n');
       if (!assembled) { setRefereeError('Draft at least one section first.'); setRefereeRunning(false); return; }
       if (compliance.length === 0) { setRefereeError('Generate the compliance matrix first.'); setRefereeRunning(false); return; }
-      const res = await fetch(`/api/app/proposal/referee?email=${encodeURIComponent(email)}`, {
+      const res = await authedFetch(`/api/app/proposal/referee?email=${encodeURIComponent(email)}`, email, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ requirements: compliance.map(r => ({ id: r.id, requirement: r.requirement, category: r.category, section: r.section })), draft: assembled }),
       });
       const data = await res.json();
@@ -1177,9 +1176,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         }
       }
 
-      const res = await fetch(`/api/app/proposal/export?email=${encodeURIComponent(email)}`, {
+      const res = await authedFetch(`/api/app/proposal/export?email=${encodeURIComponent(email)}`, email, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           fileName: (exportContextName.replace(/\.(pdf|docx|txt)$/i, '') || 'proposal') + '-package',
           rfpFileName: exportContextName,
@@ -1235,9 +1234,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     setPreviewing(true);
     setExportError(null);
     try {
-      const res = await fetch(`/api/app/proposal/export?email=${encodeURIComponent(email)}&format=text`, {
+      const res = await authedFetch(`/api/app/proposal/export?email=${encodeURIComponent(email)}&format=text`, email, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           packageType: 'sources_sought_loi',
           loiFields: loiFields || undefined,
@@ -1371,9 +1370,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     setAutoLoadStatus('loading');
     setSelectedId(pursuitId);
 
-    fetch(`/api/app/proposal/pursuit-docs?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(pursuitId)}`, {
-      headers: getAuthHeaders(),
-    })
+    authedFetch(`/api/app/proposal/pursuit-docs?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(pursuitId)}`, email)
       .then(async (r) => {
         const data = await r.json().catch(() => null);
         if (!r.ok || !data?.success) {

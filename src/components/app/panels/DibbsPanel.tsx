@@ -9,7 +9,7 @@
  * Authed /api/app route → MUST send getMIApiHeaders(email) or it 401s.
  */
 import { useState, useCallback, useEffect } from 'react';
-import { getMIApiHeaders } from '../authHeaders';
+import { authedFetch } from '../authHeaders';
 import type { AppTier } from '../UnifiedSidebar';
 
 interface Props {
@@ -81,7 +81,7 @@ export default function DibbsPanel({ email }: Props) {
         if (fsc.trim()) params.set('fsc', fsc.trim());
         if (includeExpired) params.set('includeExpired', '1');
 
-        const res = await fetch(`/api/app/dibbs?${params.toString()}`, { headers: getMIApiHeaders(email) });
+        const res = await authedFetch(`/api/app/dibbs?${params.toString()}`, email);
         const data = await res.json();
         if (!data.success) throw new Error(data.error || 'Search failed');
         setRfqs(prev => (offset === 0 ? data.rfqs : [...prev, ...data.rfqs]));

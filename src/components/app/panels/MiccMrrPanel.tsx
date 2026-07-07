@@ -10,7 +10,7 @@
  * research into a first draft. (ACC-ORLANDO-MRR-SPEC.md)
  */
 import { useState, useCallback } from 'react';
-import { getMIApiHeaders } from '../authHeaders';
+import { authedFetch } from '../authHeaders';
 
 interface Props { email: string }
 
@@ -39,7 +39,7 @@ export default function MiccMrrPanel({ email }: Props) {
     if (!psc.trim() && !naics.trim()) { setError('Enter a PSC and/or NAICS code.'); return; }
     setLoading(true); setError(null);
     try {
-      const res = await fetch(`/api/app/micc/mrr?${params().toString()}`, { headers: getMIApiHeaders(email) });
+      const res = await authedFetch(`/api/app/micc/mrr?${params().toString()}`, email);
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Failed');
       setMrr(data.mrr);
@@ -50,7 +50,7 @@ export default function MiccMrrPanel({ email }: Props) {
   const downloadDocx = useCallback(async () => {
     try {
       const p = params(); p.set('format', 'docx');
-      const res = await fetch(`/api/app/micc/mrr?${p.toString()}`, { headers: getMIApiHeaders(email) });
+      const res = await authedFetch(`/api/app/micc/mrr?${p.toString()}`, email);
       if (!res.ok) throw new Error('Could not generate .docx');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
 import type { AppTier } from '../UnifiedSidebar';
-import { getMIApiHeaders } from '../authHeaders';
+import { getMIApiHeaders, authedFetch } from '../authHeaders';
 import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
 import { formatMindyCurrency } from '@/lib/mindy/formatters';
 import ContractorLink from '../contractors/ContractorLink';
@@ -323,7 +323,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
       // have a PIID (generatedId empty), use ?piid= so the route runs
       // resolvePiidToId — otherwise the PIID is sent as id and 404s.
       const param = row.generatedId ? 'id' : 'piid';
-      const res = await fetch(`/api/app/award-detail?${param}=${encodeURIComponent(key)}`, { headers: getMIApiHeaders(email) });
+      const res = await authedFetch(`/api/app/award-detail?${param}=${encodeURIComponent(key)}`, email);
       const data = await res.json();
       setDrillDetail(d => ({ ...d, [key]: data?.success ? (data.detail as AwardDetail) : 'error' }));
     } catch {
@@ -481,7 +481,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
     try {
       const params = new URLSearchParams({ mode: 'task', limit: '100' });
       if (naics) params.set('naics', naics.split(/[, ]+/)[0]);
-      const res = await fetch(`/api/app/idv-contracts?${params.toString()}`, { headers: getMIApiHeaders(email) });
+      const res = await authedFetch(`/api/app/idv-contracts?${params.toString()}`, email);
       const data = await res.json();
       // Tag each with "in your area" vs the saved profile (Eric's tribe story:
       // a firm winning a task order IN YOUR AREA is the BD trigger), then sort
@@ -516,9 +516,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
       try {
         const [prefsResponse, workspaceResponse, contractsResponse] = await Promise.all([
           fetch(`/api/alerts/preferences?email=${encodeURIComponent(email as string)}`),
-          fetch(`/api/app/workspace?email=${encodeURIComponent(email as string)}`, {
-            headers: getMIApiHeaders(email),
-          }),
+          authedFetch(`/api/app/workspace?email=${encodeURIComponent(email as string)}`, email),
           fetch('/contracts-data.js'),
         ]);
 

@@ -1,7 +1,7 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
 import type { AppPanel } from '../UnifiedSidebar';
-import { getMIApiHeaders } from '../authHeaders';
+import { authedFetch } from '../authHeaders';
 import { setActiveWorkspace, clearActiveWorkspace, getActiveWorkspace } from '../activeWorkspace';
 
 interface ClientProfile {
@@ -66,7 +66,6 @@ export default function CoachPanel({
   const [bulkRunning, setBulkRunning] = useState(false);
   const [bulkProgress, setBulkProgress] = useState<{ done: number; total: number } | null>(null);
   const [bulkSummary, setBulkSummary] = useState<{ added: number; duplicates: number; failed: number; rejectedForCap: number } | null>(null);
-  const headers = useCallback(() => getMIApiHeaders(email), [email]);
 
   // `quiet` = a search/pagination refresh: refetch the list WITHOUT flipping the
   // full-page loading state (which blanks the whole panel to "Loading clients…").
@@ -84,7 +83,7 @@ export default function CoachPanel({
     try {
       const params = new URLSearchParams({ email, page: String(p), pageSize: String(PAGE_SIZE) });
       if (s.trim()) params.set('search', s.trim());
-      const res = await fetch(`/api/app/coach?${params.toString()}`, { headers: headers() });
+      const res = await authedFetch(`/api/app/coach?${params.toString()}`, email);
       const d = await res.json();
       setCoachAccess(d.coachAccess || null);
       setIsCoach(!!d.isCoach);
@@ -96,7 +95,7 @@ export default function CoachPanel({
       }
     } catch { /* ignore */ }
     if (opts?.quiet) setListLoading(false); else setLoading(false);
-  }, [email, headers]);
+  }, [email]);
 
   // Initial load — full-page loader, once.
   useEffect(() => { load({ page: 0 }); }, [load]);
@@ -141,8 +140,8 @@ export default function CoachPanel({
     setAdding(true);
     setSeededNote(null);
     try {
-      const res = await fetch('/api/app/coach', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', ...headers() },
+      const res = await authedFetch('/api/app/coach', email, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, action: 'add_client', business_name: name, capability_text: capabilityText.trim() || undefined }),
       });
       const d = await res.json().catch(() => null);
@@ -196,8 +195,8 @@ export default function CoachPanel({
     for (let i = 0; i < rows.length; i += BATCH) {
       const batch = rows.slice(i, i + BATCH);
       try {
-        const res = await fetch('/api/app/coach', {
-          method: 'POST', headers: { 'Content-Type': 'application/json', ...headers() },
+        const res = await authedFetch('/api/app/coach', email, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ email, action: 'bulk_import', clients: batch }),
         });
         const d = await res.json().catch(() => null);

@@ -11,7 +11,7 @@
  * the Target List agency. Decision Makers stays the discovery directory.
  */
 import { useState, useCallback } from 'react';
-import { getMIApiHeaders } from '@/components/app/authHeaders';
+import { authedFetch } from '@/components/app/authHeaders';
 
 export interface SaveableContact {
   full_name: string;
@@ -44,9 +44,9 @@ export default function SaveContactButton({
     if (!email || state === 'saving' || state === 'saved') return;
     setState('saving');
     try {
-      const res = await fetch('/api/app/relationships', {
+      const res = await authedFetch('/api/app/relationships', email, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           action: 'save_contact',
           user_email: email,

@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { Mic } from 'lucide-react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
-import { getMIApiHeaders } from '../authHeaders';
+import { getMIApiHeaders, authedFetch } from '../authHeaders';
 import IncumbentIntel from '../awards/IncumbentIntel';
 import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
@@ -12,6 +12,8 @@ import { classifyNoticeType } from '@/lib/utils/notice-type';
 import VoiceCaptureModal from '../voice/VoiceCaptureModal';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 import { useDodaacNames } from '@/components/app/useDodaacNames';
+import PursuitAssignment from './PursuitAssignment';
+import PursuitComments from './PursuitComments';
 
 interface PipelinePanelProps {
   email: string | null;
@@ -45,6 +47,7 @@ interface PipelineOpportunity {
   teaming_partners?: string[];
   external_url?: string;
   owner_email?: string;
+  collaborators?: string[];
   user_email?: string;   // creator — fallback owner for the Team/Mine filter
   created_at?: string;
   // Doc auto-ingest status (Pursuit Document Pipeline v1, 2026-05-25).
@@ -90,6 +93,66 @@ function suggestedNextAction(opp: PipelineOpportunity): string {
   }
 }
 type PipelinePriority = NonNullable<PipelineOpportunity['priority']>;
+
+// Built-in saved views (Deal Flow Board, Phase 2) — one-click filters over the active
+// board. Each `match` is a pure predicate; the bar sets `activeView` and the filter
+// chain applies it. These help solo AND team users (the empty-room problem: don't build
+// team-only features). Custom/shared views (pipeline_saved_views table) layer on later.
+function daysUntil(deadline?: string): number | null {
+  if (!deadline) return null;
+  const d = new Date(deadline).getTime();
+  if (Number.isNaN(d)) return null;
+  return Math.ceil((d - Date.now()) / 86400000);
+}
+function valueNum(val?: string): number {
+  if (!val) return 0;
+  const n = parseFloat(val.replace(/[^0-9.BMK]/gi, '')) || 0;
+  const u = val.toUpperCase();
+  if (u.includes('B')) return n * 1e9;
+  if (u.includes('M')) return n * 1e6;
+  if (u.includes('K')) return n * 1e3;
+  return n;
+}
+interface SavedView {
+  id: string;
+  label: string;
+  hint: string;
+  match: (o: PipelineOpportunity, me: string) => boolean;
+}
+const SAVED_VIEWS: SavedView[] = [
+  {
+    id: 'due_this_week',
+    label: '📅 Due this week',
+    hint: 'Response deadline within 7 days',
+    match: (o) => { const d = daysUntil(o.response_deadline); return d !== null && d >= 0 && d <= 7; },
+  },
+  {
+    id: 'needs_owner',
+    label: '👤 Needs an owner',
+    hint: 'No owner assigned yet',
+    match: (o) => !(o.owner_email || '').trim(),
+  },
+  {
+    id: 'no_next_action',
+    label: '⚠️ No next action',
+    hint: 'No next action set — at risk of stalling',
+    match: (o) => !(o.next_action || '').trim(),
+  },
+  {
+    id: 'high_value',
+    label: '💰 High value',
+    hint: '$1M+ estimated value',
+    match: (o) => valueNum(o.value_estimate) >= 1_000_000,
+  },
+  {
+    id: 'assigned_to_me',
+    label: '⭐ Assigned to me',
+    hint: 'I own it or I\'m a collaborator',
+    match: (o, me) =>
+      (o.owner_email || o.user_email || '').toLowerCase() === me ||
+      (o.collaborators || []).some((c) => c.toLowerCase() === me),
+  },
+];
 
 interface TeamingPartner {
   id: string;
@@ -151,6 +214,9 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
   // Team workspace filter: 'all' (everyone's), 'mine' (I own), 'others'
   // (teammates'). Only shown when the workspace actually has shared pursuits.
   const [ownerFilter, setOwnerFilter] = useState<'all' | 'mine' | 'others'>('all');
+  // Active saved view (one-click board filter). null = no view. Toggling a view off
+  // returns to the full board.
+  const [activeView, setActiveView] = useState<string | null>(null);
   const [voiceOpen, setVoiceOpen] = useState(false);          // Voice capture modal (#119)
   const [sortField, setSortField] = useState<'deadline' | 'value' | 'stage' | 'priority' | 'title'>('deadline');
   const [sortDirection, setSortDirection] = useState<'asc' | 'desc'>('asc');
@@ -164,7 +230,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
   const [pursuitChanges, setPursuitChanges] = useState<Record<string, Array<{ change_type: string; summary: string }>>>({});
   useEffect(() => {
     if (!email) return;
-    fetch(`/api/app/pursuit-changes?email=${encodeURIComponent(email)}`, { headers: getAuthHeaders() })
+    authedFetch(`/api/app/pursuit-changes?email=${encodeURIComponent(email)}`, email)
       .then(r => r.json())
       .then(d => { if (d.success) setPursuitChanges(d.byPursuit || {}); })
       .catch(() => {});
@@ -172,8 +238,8 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
   const ackChanges = useCallback(async (pursuitId: string) => {
     setPursuitChanges(prev => { const next = { ...prev }; delete next[pursuitId]; return next; });
     try {
-      await fetch('/api/app/pursuit-changes', {
-        method: 'POST', headers: { 'Content-Type': 'application/json', ...getAuthHeaders() },
+      await authedFetch('/api/app/pursuit-changes', email, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, pursuit_id: pursuitId }),
       });
     } catch { /* optimistic */ }
@@ -222,9 +288,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
         // We match library entries to pursuits by title containment since
         // we don't have a pursuit_id foreign-key on library rows yet.
         try {
-          const libRes = await fetch(`/api/app/library?email=${encodeURIComponent(email)}&type=proposal_section`, {
-            headers: getAuthHeaders(),
-          });
+          const libRes = await authedFetch(`/api/app/library?email=${encodeURIComponent(email)}&type=proposal_section`, email);
           const libData = libRes.ok ? await libRes.json() : null;
           if (libData?.success && Array.isArray(libData.entries)) {
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -369,6 +433,9 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
   // Owner of a pursuit = explicit owner_email, else the creator (user_email).
   const ownerOf = (o: PipelineOpportunity) => (o.owner_email || o.user_email || '').toLowerCase();
   const me = (email || '').toLowerCase();
+  // "Assigned to me" = I own it OR I'm a collaborator on it (Phase 2 multi-assign).
+  const assignedToMe = (o: PipelineOpportunity) =>
+    ownerOf(o) === me || (o.collaborators || []).some(c => c.toLowerCase() === me);
   // Whether this workspace has any teammate-owned pursuits — drives showing the
   // Team/Mine filter at all (solo users never see it).
   const hasSharedPursuits = stageScoped.some(o => ownerOf(o) && ownerOf(o) !== me);
@@ -377,11 +444,16 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
     ? stageScoped
     : stageScoped.filter(o => noticeBucket(o.notice_type) === noticeTypeFilter);
 
+  // Saved-view predicate (built-in views) applied on top of the owner/notice filters.
+  const viewFiltered = activeView
+    ? noticeFiltered.filter((o) => SAVED_VIEWS.find(v => v.id === activeView)?.match(o, me) ?? true)
+    : noticeFiltered;
+
   const filteredOpportunities = ownerFilter === 'all'
-    ? noticeFiltered
+    ? viewFiltered
     : ownerFilter === 'mine'
-      ? noticeFiltered.filter(o => ownerOf(o) === me)
-      : noticeFiltered.filter(o => ownerOf(o) !== me && !!ownerOf(o));
+      ? viewFiltered.filter(o => assignedToMe(o))
+      : viewFiltered.filter(o => ownerOf(o) !== me && !!ownerOf(o));
 
   // Sorted opportunities for list view
   const sortedOpportunities = [...filteredOpportunities].sort((a, b) => {
@@ -942,6 +1014,39 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
         )}
       </div>
 
+      {/* Saved views — one-click board filters (Deal Flow Board, Phase 2). Each chip
+          counts its matches so the user sees the size before applying. Toggling the
+          active chip clears back to the full board. */}
+      <div className="flex flex-wrap items-center gap-1.5 mb-4">
+        <span className="text-[11px] font-medium text-slate-500 mr-0.5">Views:</span>
+        {SAVED_VIEWS.map((v) => {
+          // Count over the current stage scope so the chip shows the view's size.
+          const count = stageScoped.filter((o) => v.match(o, me)).length;
+          const active = activeView === v.id;
+          if (count === 0 && !active) return null; // hide empty views to reduce clutter
+          return (
+            <button
+              key={v.id}
+              onClick={() => setActiveView(active ? null : v.id)}
+              title={v.hint}
+              className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                active ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+              }`}
+            >
+              {v.label} <span className={active ? 'text-purple-200' : 'text-slate-500'}>{count}</span>
+            </button>
+          );
+        })}
+        {activeView && (
+          <button
+            onClick={() => setActiveView(null)}
+            className="text-[11px] text-slate-500 hover:text-slate-300 ml-1"
+          >
+            Clear view ✕
+          </button>
+        )}
+      </div>
+
       {/* Board View - Only 4 active stages for wider columns.
           Mobile: stack columns vertically (1 column) so cards stay
           readable. Tablet: 2 columns. Desktop: 4 columns side-by-side.
@@ -1212,13 +1317,31 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                           so the column is hidden for free/pro tiers. */}
                       {showOwnerColumn && (
                         <td className="px-2 py-3 text-center">
-                          {opp.owner_email ? (
-                            <span
-                              className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-700 text-[10px] font-semibold uppercase text-slate-200"
-                              title={opp.owner_email}
-                            >
-                              {opp.owner_email.slice(0, 2)}
-                            </span>
+                          {opp.owner_email || (opp.collaborators && opp.collaborators.length > 0) ? (
+                            <div className="inline-flex items-center -space-x-1.5">
+                              {opp.owner_email && (
+                                <span
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-700 text-[10px] font-semibold uppercase text-slate-200 ring-1 ring-slate-900 z-10"
+                                  title={`Owner: ${opp.owner_email}`}
+                                >
+                                  {opp.owner_email.slice(0, 2)}
+                                </span>
+                              )}
+                              {(opp.collaborators || []).slice(0, 2).map((c) => (
+                                <span
+                                  key={c}
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-purple-700/60 text-[10px] font-semibold uppercase text-purple-100 ring-1 ring-slate-900"
+                                  title={`Collaborator: ${c}`}
+                                >
+                                  {c.slice(0, 2)}
+                                </span>
+                              ))}
+                              {(opp.collaborators || []).length > 2 && (
+                                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-800 text-[10px] font-medium text-slate-400 ring-1 ring-slate-900" title={(opp.collaborators || []).slice(2).join(', ')}>
+                                  +{(opp.collaborators || []).length - 2}
+                                </span>
+                              )}
+                            </div>
                           ) : (
                             <span className="text-[10px] text-slate-600" title="Unassigned">—</span>
                           )}
@@ -1481,9 +1604,9 @@ function PipelineEditDrawer({
     if (!email || !opportunity.id) return;
     setDocsLoading(true);
     try {
-      const res = await fetch(
+      const res = await authedFetch(
         `/api/app/proposal/pursuit-docs?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(opportunity.id)}`,
-        { headers: authHeaders() },
+        email,
       );
       const data = await res.json().catch(() => null);
       if (data?.success) {
@@ -1523,9 +1646,9 @@ function PipelineEditDrawer({
     const timer = setInterval(async () => {
       attempts += 1;
       try {
-        const res = await fetch(
+        const res = await authedFetch(
           `/api/app/proposal/pursuit-docs?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(opportunity.id)}`,
-          { headers: authHeaders() },
+          email,
         );
         const data = await res.json().catch(() => null);
         const liveStatus = data?.pursuit?.docs_status;
@@ -1574,9 +1697,10 @@ function PipelineEditDrawer({
     setRefetching(true);
     setRefetchMsg(null);
     try {
-      const res = await fetch(
+      const res = await authedFetch(
         `/api/app/proposal/pursuit-docs?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(opportunity.id)}`,
-        { method: 'POST', headers: authHeaders({ 'Content-Type': 'application/json' }) },
+        email,
+        { method: 'POST', headers: { 'Content-Type': 'application/json' } },
       );
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success) {
@@ -1610,9 +1734,10 @@ function PipelineEditDrawer({
     try {
       const fd = new FormData();
       fd.append('file', file);
-      const res = await fetch(
+      const res = await authedFetch(
         `/api/app/proposal/upload?email=${encodeURIComponent(email)}&pipeline_id=${encodeURIComponent(opportunity.id)}`,
-        { method: 'POST', headers: authHeaders(), body: fd },
+        email,
+        { method: 'POST', body: fd },
       );
       const data = await res.json().catch(() => null);
       if (!res.ok || !data?.success) {
@@ -1637,6 +1762,7 @@ function PipelineEditDrawer({
   const [nextAction, setNextAction] = useState(opportunity.next_action || '');
   const [nextActionDate, setNextActionDate] = useState(toDateInputValue(opportunity.next_action_date));
   const [ownerEmail, setOwnerEmail] = useState(opportunity.owner_email || '');
+  const [collaborators, setCollaborators] = useState<string[]>(opportunity.collaborators || []);
   const [notes, setNotes] = useState(opportunity.notes || '');
   const [partners, setPartners] = useState((opportunity.teaming_partners || []).join(', '));
   const [quickPartnerName, setQuickPartnerName] = useState('');
@@ -1688,6 +1814,7 @@ function PipelineEditDrawer({
       next_action: nextAction.trim() || undefined,
       next_action_date: nextActionDate || undefined,
       owner_email: ownerEmail.trim() || undefined,
+      collaborators,
       notes: notes.trim() || undefined,
       teaming_partners: partnerList,
     });
@@ -1972,16 +2099,18 @@ function PipelineEditDrawer({
             </label>
           </div>
 
-          <label className="block">
-            <span className="text-sm text-slate-300">Owner</span>
-            <input
-              type="email"
-              value={ownerEmail}
-              onChange={(event) => setOwnerEmail(event.target.value)}
-              placeholder="owner@company.com"
-              className="mt-1 w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 outline-none"
-            />
-          </label>
+          <div className="block">
+            <span className="text-sm text-slate-300">Assignment</span>
+            <div className="mt-1">
+              <PursuitAssignment
+                email={email}
+                owner={ownerEmail || email}
+                collaborators={collaborators}
+                onOwnerChange={setOwnerEmail}
+                onCollaboratorsChange={setCollaborators}
+              />
+            </div>
+          </div>
 
           <label className="block">
             <span className="text-sm text-slate-300">Next Action</span>
@@ -2084,6 +2213,13 @@ function PipelineEditDrawer({
               className="mt-1 w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 outline-none resize-none"
             />
           </label>
+
+          {/* Team discussion — threaded comments on this pursuit. Only for saved rows. */}
+          {opportunity.id && (
+            <div className="border-t border-slate-800 pt-3">
+              <PursuitComments pipelineId={opportunity.id} email={email} />
+            </div>
+          )}
 
           <div className="flex flex-col sm:flex-row gap-3">
             <button

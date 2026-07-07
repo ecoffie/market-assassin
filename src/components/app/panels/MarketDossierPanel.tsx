@@ -11,7 +11,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { AppPanel } from '../UnifiedSidebar';
-import { getMIApiHeaders } from '../authHeaders';
+import { authedFetch } from '../authHeaders';
 import MarketDataMap from '../market/MarketDataMap';
 
 interface DossierOpp {
@@ -79,9 +79,9 @@ export default function MarketDossierPanel({ email, onNavigate }: { email: strin
     if (!email || autoRunning) return;
     setAutoRunning(true); setAutoError(null); setReceipt(null);
     try {
-      const res = await fetch('/api/app/auto-setup', {
+      const res = await authedFetch('/api/app/auto-setup', email, {
         method: 'POST',
-        headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email }),
       });
       const d = await res.json();
@@ -101,7 +101,7 @@ export default function MarketDossierPanel({ email, onNavigate }: { email: strin
     if (!email) return;
     setLoading(true); setError(false);
     try {
-      const res = await fetch(`/api/app/market-dossier?email=${encodeURIComponent(email)}`, { headers: getMIApiHeaders(email) });
+      const res = await authedFetch(`/api/app/market-dossier?email=${encodeURIComponent(email)}`, email);
       const json = await res.json();
       if (json?.success) setData(json); else setError(true);
     } catch { setError(true); }

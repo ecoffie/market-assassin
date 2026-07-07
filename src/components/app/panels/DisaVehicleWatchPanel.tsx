@@ -9,7 +9,7 @@
  * emailed until DISA approves). Demo-first. (DISA-VEHICLE-WATCH-SPEC.md)
  */
 import { useState, useEffect, useCallback } from 'react';
-import { getMIApiHeaders } from '../authHeaders';
+import { authedFetch } from '../authHeaders';
 
 interface Props { email: string }
 
@@ -57,7 +57,7 @@ export default function DisaVehicleWatchPanel({ email }: Props) {
   const load = useCallback(async () => {
     setLoading(true); setError(null);
     try {
-      const res = await fetch(`/api/app/disa/vehicles?email=${encodeURIComponent(email)}`, { headers: getMIApiHeaders(email) });
+      const res = await authedFetch(`/api/app/disa/vehicles?email=${encodeURIComponent(email)}`, email);
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Failed to load');
       setVehicles(data.vehicles || []);
@@ -73,9 +73,9 @@ export default function DisaVehicleWatchPanel({ email }: Props) {
     setUploading(true); setUploadMsg(null); setError(null);
     try {
       const csv = await file.text();
-      const res = await fetch(`/api/app/disa/vehicles?email=${encodeURIComponent(email)}`, {
+      const res = await authedFetch(`/api/app/disa/vehicles?email=${encodeURIComponent(email)}`, email, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...getMIApiHeaders(email) },
+        headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ csv }),
       });
       const data = await res.json();
@@ -90,7 +90,7 @@ export default function DisaVehicleWatchPanel({ email }: Props) {
   const runPreview = useCallback(async () => {
     setPreviewLoading(true); setError(null);
     try {
-      const res = await fetch(`/api/app/disa/preview-notices?email=${encodeURIComponent(email)}`, { headers: getMIApiHeaders(email) });
+      const res = await authedFetch(`/api/app/disa/preview-notices?email=${encodeURIComponent(email)}`, email);
       const data = await res.json();
       if (!data.success) throw new Error(data.error || 'Preview failed');
       setNotices(data.notices || []);
@@ -100,7 +100,7 @@ export default function DisaVehicleWatchPanel({ email }: Props) {
   }, [email]);
 
   const removeVehicle = useCallback(async (id: string) => {
-    await fetch(`/api/app/disa/vehicles?email=${encodeURIComponent(email)}&id=${id}`, { method: 'DELETE', headers: getMIApiHeaders(email) });
+    await authedFetch(`/api/app/disa/vehicles?email=${encodeURIComponent(email)}&id=${id}`, email, { method: 'DELETE' });
     await load();
   }, [email, load]);
 
@@ -108,7 +108,7 @@ export default function DisaVehicleWatchPanel({ email }: Props) {
   // auth-gated, so fetch with headers + trigger the download from the blob.
   const downloadNotice = useCallback(async (vehicleId: string, piid: string) => {
     try {
-      const res = await fetch(`/api/app/disa/notice-docx?email=${encodeURIComponent(email)}&id=${vehicleId}`, { headers: getMIApiHeaders(email) });
+      const res = await authedFetch(`/api/app/disa/notice-docx?email=${encodeURIComponent(email)}&id=${vehicleId}`, email);
       if (!res.ok) throw new Error('Could not generate notice');
       const blob = await res.blob();
       const url = URL.createObjectURL(blob);

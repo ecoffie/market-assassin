@@ -5,7 +5,7 @@
  * Calls /api/app/recompete-sow on demand; labels matches honestly.
  */
 import { useState, useCallback } from 'react';
-import { getMIApiHeaders } from '@/components/app/authHeaders';
+import { authedFetch } from '@/components/app/authHeaders';
 
 interface SowMatch {
   title: string;
@@ -61,9 +61,7 @@ export default function RecompeteSowMatch({
       if (naics) qs.set('naics', naics);
       if (agency) qs.set('agency', agency);
       if (description) qs.set('description', description);
-      const res = await fetch(`/api/app/recompete-sow?${qs.toString()}`, {
-        headers: getMIApiHeaders(email),
-      });
+      const res = await authedFetch(`/api/app/recompete-sow?${qs.toString()}`, email);
       const data = (await res.json()) as MatchResponse;
       if (!data?.success) {
         setState('error');

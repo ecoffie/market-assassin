@@ -146,6 +146,9 @@ export function renderKeywordSetupNudgeHtml(
     <p style="color: #7f1d1d; margin: 0 0 12px 0; font-size: 12px; line-height: 1.5; font-style: italic;">
       Real FY2025 data: "drones" alone spans <strong>70+ buying NAICS codes</strong> — the obvious code is only <strong>${m.obviousCodePct}%</strong> of the market. Cybersecurity and medical supplies miss up to <strong>${m.missPctCyberMed}%</strong>.
     </p>
+    <p style="color: #7f1d1d; margin: 0 0 12px 0; font-size: 12px; line-height: 1.5;">
+      💡 <strong>Unlock Hidden Work:</strong> set your real codes + keywords and Mindy also matches contracts <em>by meaning</em> — the "building envelope" job that's really cybersecurity, hiding under a name you'd never search.
+    </p>
     <a href="${trackedUrl(preferencesUrl, 'alert_keyword_setup', 'setup_nudge')}" style="background: #dc2626; color: white; padding: 9px 16px; text-decoration: none; border-radius: 6px; font-weight: 700; font-size: 13px; display: inline-block;">
       Fix My Alert Filters →
     </a>

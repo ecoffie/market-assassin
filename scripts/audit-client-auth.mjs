@@ -47,13 +47,19 @@ for (const p of walk(API_ROOT, (f) => f.endsWith('route.ts'))) {
 }
 
 // 2) Scan component fetches for gated calls missing auth.
+//    findings      = HARD block: a gated fetch with NO auth header at all → instant 401.
+//    headerOnly    = WARN: a gated raw fetch that sends the token via getMIApiHeaders/
+//                    a wrapper but is NOT authedFetch → no 401 token-refresh recovery,
+//                    so an expired 30-day token strands the user ("Missing two-factor
+//                    session"). This is the recurring bug class; nudge toward authedFetch.
 const findings = [];
+const headerOnly = [];
 for (const p of walk(COMPONENT_ROOT, (f) => /\.(tsx|ts)$/.test(f))) {
   const lines = readFileSync(p, 'utf8').split('\n');
   for (let i = 0; i < lines.length; i++) {
     const m = lines[i].match(/(?:fetch|authedFetch)\(\s*[`'"]([^`'"]*\/api\/app\/[^`'"?]*)/);
     if (!m) continue;
-    // authedFetch always authenticates → never a finding.
+    // authedFetch always authenticates AND self-heals on 401 → never a finding.
     if (/authedFetch\(/.test(lines[i])) continue;
     const urlPath = m[1].split('?')[0].replace(/\$\{[^}]*\}/g, '').replace(/\/+$/, '');
     const enforced = [...enforcing].find(
@@ -62,7 +68,11 @@ for (const p of walk(COMPONENT_ROOT, (f) => /\.(tsx|ts)$/.test(f))) {
     if (!enforced) continue;
     // Look at the fetch call block (this line + next 7) for a header marker.
     const block = lines.slice(i, i + 8).join('\n');
-    if (HEADER_MARKERS.test(block)) continue;
+    if (HEADER_MARKERS.test(block)) {
+      // Sends the token but isn't authedFetch → no expired-token recovery.
+      headerOnly.push(`${p}:${i + 1} -> ${enforced}`);
+      continue;
+    }
     findings.push(`${p}:${i + 1} -> ${enforced}`);
   }
 }
@@ -81,8 +91,16 @@ if (args.includes('--update-baseline')) {
 const newViolations = findings.filter((f) => !baseline.has(f));
 
 if (args.includes('--list')) {
-  console.log(`[client-auth] ${enforcing.size} gated routes; ${findings.length} total finding(s):`);
+  console.log(`[client-auth] ${enforcing.size} gated routes; ${findings.length} no-auth finding(s), ${headerOnly.length} header-only (no 401-refresh):`);
   findings.forEach((f) => console.log('  ' + (baseline.has(f) ? '(known) ' : 'NEW ') + f));
+  headerOnly.forEach((f) => console.log('  (warn) ' + f));
+}
+
+// WARN (non-blocking): gated raw fetches that send the token but aren't authedFetch,
+// so they can't recover from an expired token. Surfaced so the count trends to zero
+// and nobody adds new ones by copy-paste, without hard-blocking existing code.
+if (headerOnly.length > 0) {
+  console.warn(`[client-auth] ⚠ ${headerOnly.length} gated fetch(es) send the token but aren't authedFetch → no expired-token (401) recovery. Prefer authedFetch(url, email, init). Run --list to see them.`);
 }
 
 if (newViolations.length === 0) {

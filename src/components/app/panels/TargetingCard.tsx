@@ -20,7 +20,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import type { AppPanel } from '../UnifiedSidebar';
-import { getMIApiHeaders } from '../authHeaders';
+import { getMIApiHeaders, authedFetch } from '../authHeaders';
 
 interface TargetingCardProps {
   email: string | null;
@@ -166,9 +166,7 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
   const load = useCallback(async () => {
     if (!email) { setLoading(false); return; }
     try {
-      const res = await fetch(`/api/app/workspace?email=${encodeURIComponent(email)}`, {
-        headers: getMIApiHeaders(email),
-      });
+      const res = await authedFetch(`/api/app/workspace?email=${encodeURIComponent(email)}`, email);
       if (!res.ok) { setLoading(false); return; }
       const j = await res.json();
       // Read ONLY the authoritative source: profile.notification =
@@ -195,9 +193,7 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
       if (primary) {
         try {
           const haveParam = naics.length ? `&have=${encodeURIComponent(naics.join(','))}` : '';
-          const cr = await fetch(`/api/app/keyword-coverage?keyword=${encodeURIComponent(primary)}${haveParam}`, {
-            headers: getMIApiHeaders(email),
-          });
+          const cr = await authedFetch(`/api/app/keyword-coverage?keyword=${encodeURIComponent(primary)}${haveParam}`, email);
           if (cr.ok) {
             const cj = await cr.json();
             setCoverage(cj.coverage || null);
