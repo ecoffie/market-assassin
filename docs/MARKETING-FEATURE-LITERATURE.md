@@ -3485,3 +3485,39 @@ capabilities" at someone who never told us their capabilities is noise, not sign
 the single biggest lever on coverage isn't the matcher — it's getting more users to
 spend 30 seconds setting their real NAICS and keywords. The matcher is ready and
 proven; it rewards a completed profile.
+
+---
+
+## Deal Flow Board — Team Execution on Your Pipeline (July 6, 2026)
+
+**What:** The pipeline is now a shared team board, not a solo tracker. Assign a pursuit
+to a teammate from a real member picker (not a typed email), add collaborators who are
+working the deal with you, discuss it in a threaded comment log right on the card, and
+filter the whole board with one-click saved views — Due this week, Needs an owner, No
+next action, High value, Assigned to me. Owner and collaborator avatars stack on each
+row so you see at a glance who owns what.
+
+**Why it matters:** Winning federal work is a team sport — owner, BD lead, capture
+manager, proposal writer, teaming partner all touch the same opportunity. Until now the
+pipeline tracked opportunities but couldn't coordinate the people working them: one
+owner, no collaborators, no discussion, and no way to slice "what needs attention this
+week" without hand-filtering. The Deal Flow Board turns Market Intelligence from "alerts
+and research" into "team execution" — the workflow layer between finding an opportunity
+and winning it. It's also the natural pull into the Teams plan and the Coach add-on:
+the moment two people work one board, the shared workspace pays for itself.
+
+**Proof:** Verified live in production. Collaborator assignment persists to the pipeline
+row and renders as stacked avatars; the threaded comment log is workspace-access-
+controlled (only teammates in the same workspace can read or post); saved views compute
+their match counts from the live board so the chip shows the size before you apply it.
+Workspace isolation was proven directly — a saved view created in one workspace is not
+visible to any other workspace or user. The internal team workspace already runs 67
+shared pursuits across 3 members on this exact board.
+
+**Honest scope:** The board is genuinely collaborative today, but most users are still
+solo — every feature was built to help the solo operator too (saved views, comments as
+a personal log, assignment to yourself), so there's no empty-room penalty. Custom
+shared saved views (beyond the five built-ins) are stored per workspace and visible to
+teammates; per-view privacy is on by request. Real-time co-editing (live cursors,
+instant push) is not included — the board refreshes on load and on save, which is the
+right fidelity for BD pace, not a chat app.
