@@ -160,8 +160,9 @@ export async function GET(request: NextRequest) {
     safeMetric('system alerts', () => getSystemAlerts(reportDate), []),
     safeKvGet(PROFILE_REMINDER_LAST_RUN_KEY),
     // bootcampRollout is a pure read — run it IN the parallel block so its ~4s
-    // overlaps with the other fetchers instead of adding serially on top.
-    safeMetric('bootcampRollout', getBootcampRollout, emptyBootcampRollout())
+    // overlaps with the other fetchers instead of adding serially on top. Cached
+    // (10-min TTL) so warm loads skip the ~8,800-row cohort scan entirely.
+    safeMetric('bootcampRollout', getBootcampRolloutCached, emptyBootcampRollout())
   ]);
   _metricTimings['_grand_total'] = Date.now() - _requestStart;
 
@@ -222,6 +223,25 @@ export async function GET(request: NextRequest) {
     // Section 9: Bootcamp Rollout Progress
     bootcampRollout
   });
+}
+
+// bootcampRollout is a pure DB read but scans the full bootcamp cohort (~8,800
+// attendees) — ~4s, now the dashboard's long pole. Attendee stats change slowly
+// (invitations trickle via a 50/day cron), so cache it (10-min TTL).
+const BOOTCAMP_CACHE_KEY = 'dashboard:bootcamp-rollout:v1';
+const BOOTCAMP_TTL_SECONDS = 600;
+
+async function getBootcampRolloutCached() {
+  try {
+    const cached = await kv.get<ReturnType<typeof emptyBootcampRollout>>(BOOTCAMP_CACHE_KEY);
+    if (cached) return cached;
+  } catch { /* KV miss → compute live */ }
+  const fresh = await getBootcampRollout();
+  // Only cache a real result (attendees found) — not an errored/empty fallback.
+  if (fresh && fresh.totalAttendees > 0) {
+    try { await kv.set(BOOTCAMP_CACHE_KEY, fresh, { ex: BOOTCAMP_TTL_SECONDS }); } catch { /* non-fatal */ }
+  }
+  return fresh;
 }
 
 function emptyBootcampRollout() {
