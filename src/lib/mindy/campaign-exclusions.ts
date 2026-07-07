@@ -3,7 +3,7 @@ import { isPartnerContactEmail } from '@/lib/mindy/partner-referrals';
 
 /** Comp / testimonial demo accounts — free access for marketing, not advocates. */
 export const COMP_TESTIMONIAL_EMAILS = new Set([
-  'aj@cypherintel.com',
+  // aj@cypherintel.com promoted to advocate (complimentary Pro) — see advocate-accounts.ts
   'pa.joof@pjaygroup.com',
   'dare2dreaminc615@gmail.com',
   'olga@olaexecutiveconsulting.com',
