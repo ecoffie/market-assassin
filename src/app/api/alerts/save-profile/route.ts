@@ -182,6 +182,9 @@ export async function POST(request: NextRequest) {
       alerts_enabled: true,
       alert_frequency: alertFrequency === 'weekly' ? 'weekly' : 'daily',
       updated_at: new Date().toISOString(),
+      // NAICS/keywords changed → capability vector is stale; null the stamp so the
+      // embed-user-capabilities cron re-embeds (hidden-match base-wide fallback).
+      capability_embedded_at: null,
     };
 
     const cleanBusinessDescription = typeof businessDescription === 'string'

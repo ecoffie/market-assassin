@@ -296,6 +296,12 @@ export async function POST(request: NextRequest) {
       record.keywords = Array.isArray(keywords) ? keywords : [];
     }
 
+    // NAICS or keywords changed → the capability vector (hidden-match base-wide
+    // fallback) is stale. Null the stamp so embed-user-capabilities re-embeds.
+    if (naicsCodes !== undefined || keywords !== undefined) {
+      record.capability_embedded_at = null;
+    }
+
     // PSC codes — "what was bought" (the precise product axis). Column exists
     // (20260612 migration). Uppercased + deduped; PSCs are alphanumeric (e.g.
     // R425, 1550, P500). Settings now edits these alongside NAICS.

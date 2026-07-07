@@ -5,10 +5,12 @@ import { embedAndStoreCapabilityVector } from '@/lib/alerts/capability-vector';
 /**
  * GET /api/cron/embed-user-capabilities
  *
- * Backfill/refresh the per-user capability vector (Phase 3 hidden-match alerts).
- * Drains user_identity_profile rows where capability_embedded_at IS NULL — i.e. new
- * or recently-changed profiles (the vault write routes null it on change). Batched +
- * resumable like setup-invite-batch; isolates ALL user-vector OpenAI cost here.
+ * Backfill/refresh the per-user capability vector (hidden-match alerts).
+ * Drains user_notification_settings rows where capability_embedded_at IS NULL — i.e.
+ * new or recently-changed profiles (vault/profile writes null it on change). This is
+ * the base-wide home (~10k rows) so hidden match reaches every active user, not just
+ * the ~32 with a Vault identity row. Batched + resumable like setup-invite-batch;
+ * isolates ALL user-vector OpenAI cost here.
  *
  * Modes: ?mode=preview (default, no embeds) | ?mode=execute. ?limit=N (default 50).
  * Auth: ?password=ADMIN_PASSWORD OR CRON_SECRET bearer OR x-cron-dispatch (dispatcher).
@@ -37,16 +39,18 @@ export async function GET(request: NextRequest) {
   const limit = Math.max(1, Math.min(200, Number(url.searchParams.get('limit') || 50)));
   const supabase = sb();
 
-  // Rows needing (re)embedding: capability_embedded_at IS NULL.
+  // Rows needing (re)embedding: capability_embedded_at IS NULL. Only consider active
+  // users (skip archived rows) so we don't spend embeddings on dead accounts.
   const { data, error } = await supabase
-    .from('user_identity_profile')
+    .from('user_notification_settings')
     .select('user_email')
     .is('capability_embedded_at', null)
+    .eq('is_active', true)
     .limit(limit + 1);
 
   if (error) {
     // Column missing → migration not run yet. Report honestly, don't crash the dispatcher.
-    return NextResponse.json({ success: false, error: error.message, hint: 'run 20260613_capability_embeddings migration' }, { status: 200 });
+    return NextResponse.json({ success: false, error: error.message, hint: 'run 20260706_capability_vector_notification_settings migration' }, { status: 200 });
   }
 
   const rows = (data || []) as Array<{ user_email: string }>;

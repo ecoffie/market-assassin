@@ -3448,3 +3448,40 @@ button routes to the pricing page and nothing charges. Existing Teams and enterp
 customers are unaffected — the Teams client cap moved to 5, and no current Teams
 organization has more than that (the one large org is an Enterprise white-label with
 unlimited workspaces).
+
+---
+
+## Hidden Work Discovery — Find Contracts Hiding Under Funny Names (July 6, 2026)
+
+**What:** Mindy now surfaces opportunities that match what you actually *do* — by
+meaning, not by keyword. The government routinely bundles scopes and gives them names
+nobody would search: a "Building Envelope Services" contract can contain real-estate
+leasing, cybersecurity, and construction all at once. A cyber firm searching "cyber"
+never finds it. Hidden Work Discovery embeds the full scope-of-work of every open
+opportunity and every user's capability profile, then matches them semantically — so
+you get "💡 your kind of work" alerts for contracts that never say your words.
+
+**Why it matters:** This is the worst discovery failure in GovCon — missing an
+opportunity entirely because it's coded as one thing and titled as another. Title
+keywords, description keywords, NAICS, and PSC all fail on multi-scope bundles, each
+for a structural reason (a contract gets ONE NAICS, ONE PSC, and a title written by a
+contracting officer, not by you). Matching on *meaning* is the only filter that catches
+"building envelope = cyber." Until now the engine was built but effectively dark: the
+capability vector it needs lived on a profile table only a few dozen power users had
+filled in. This release grounds a capability vector for every user who set a real
+NAICS or keyword profile — lighting the feature up across the active base.
+
+**Proof:** Verified live in production. The market-side pool holds ~995 open
+opportunities with embedded scopes; the user side now has ~1,300+ grounded capability
+vectors (up from a handful). Example: a user profiled as residential + commercial
+construction with "HVAC, cyber security, IT" keywords is matched to two real
+infrastructure-upgrade construction solicitations ("EHRM Infrastructure Upgrades") at
+0.58 semantic similarity — opportunities that never appeared in their keyword feed.
+
+**Honest scope:** The match only fires for users who set a REAL profile — a specific
+NAICS or a real keyword. We deliberately exclude the default placeholder profile new
+users start with (the generic IT/healthcare seed codes), because firing "matches your
+capabilities" at someone who never told us their capabilities is noise, not signal. So
+the single biggest lever on coverage isn't the matcher — it's getting more users to
+spend 30 seconds setting their real NAICS and keywords. The matcher is ready and
+proven; it rewards a completed profile.
