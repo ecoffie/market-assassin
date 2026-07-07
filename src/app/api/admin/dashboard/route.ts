@@ -2288,7 +2288,28 @@ async function getForecastStats() {
   return stats;
 }
 
+// Revenue is ~6s because it lists 30 days of Stripe charges/subs and retrieves the
+// product/price PER item (N+1 to the Stripe API). Revenue-over-30-days barely moves
+// intra-day, so cache the whole result in KV (10-min TTL). This is the dominant
+// remaining dashboard cost after the buyer-list + bootcamp fixes.
+const REVENUE_CACHE_KEY = 'dashboard:revenue-metrics:v1';
+const REVENUE_TTL_SECONDS = 600; // 10 min
+
 async function getRevenueMetrics() {
+  try {
+    const cached = await kv.get<Awaited<ReturnType<typeof getRevenueMetricsUncached>>>(REVENUE_CACHE_KEY);
+    if (cached) return cached;
+  } catch { /* KV miss/unavailable → compute live */ }
+
+  const fresh = await getRevenueMetricsUncached();
+  // Only cache a successful (available) result — don't pin a Stripe error for 10 min.
+  if (fresh && (fresh as { available?: boolean }).available) {
+    try { await kv.set(REVENUE_CACHE_KEY, fresh, { ex: REVENUE_TTL_SECONDS }); } catch { /* non-fatal */ }
+  }
+  return fresh;
+}
+
+async function getRevenueMetricsUncached() {
   const thirtyDaysAgo = Math.floor(Date.now() / 1000) - (30 * 24 * 60 * 60);
   const sevenDaysAgo = Math.floor(Date.now() / 1000) - (7 * 24 * 60 * 60);
 
