@@ -7,6 +7,7 @@
  */
 export const ADVOCATE_ACCOUNTS: ReadonlyArray<{ email: string; name?: string }> = [
   { email: 'westover105@gmail.com', name: 'Sue Kranes' },
+  { email: 'aj@cypherintel.com', name: 'Andre Jerry' },
 ];
 
 const ADVOCATE_EMAIL_SET = new Set(
