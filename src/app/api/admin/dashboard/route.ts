@@ -1700,6 +1700,9 @@ async function getBetaHealth() {
     activationRate7d: 'N/A',
     profileCompletionRate: '0%',
     firstClickUsers7d: 0,
+    // Duolingo-style habit signal: distinct engaged users per day, last 7 days.
+    // The return curve — is the same audience coming back day over day?
+    returnCurve: [] as Array<{ date: string; activeUsers: number }>,
   };
 
   try {
@@ -1722,10 +1725,11 @@ async function getBetaHealth() {
       fetchAllRows<{
         user_email: string | null;
         event_type: string;
+        created_at: string | null;
       }>((from, to) =>
         supabase
           .from('user_engagement')
-          .select('user_email, event_type')
+          .select('user_email, event_type, created_at')
           .in('event_type', ['email_open', 'link_click'])
           .gte('created_at', sevenDaysAgoIso)
           .range(from, to)
@@ -1762,6 +1766,21 @@ async function getBetaHealth() {
     health.firstClickUsers7d = firstClickEmails.size;
     health.queueSize = queueResult.error ? 0 : queueResult.count || 0;
     health.activationRate7d = percent(weeklyActiveEmails.size, activeSettings.length);
+
+    // Return curve: distinct engaged users per UTC day across the last 7 days.
+    // Built from the same engagement7d set (now carries created_at). Seed every
+    // day at 0 so gaps render as real zero-days, not missing bars.
+    const perDay = new Map<string, Set<string>>();
+    for (let i = 6; i >= 0; i--) {
+      const d = new Date(now.getTime() - i * 24 * 60 * 60 * 1000);
+      perDay.set(d.toISOString().split('T')[0], new Set<string>());
+    }
+    for (const row of engagement7d) {
+      if (!row.user_email || !row.created_at) continue;
+      const day = row.created_at.split('T')[0];
+      perDay.get(day)?.add(row.user_email);
+    }
+    health.returnCurve = [...perDay.entries()].map(([date, users]) => ({ date, activeUsers: users.size }));
   } catch (error) {
     console.error('Error fetching beta health:', error);
   }

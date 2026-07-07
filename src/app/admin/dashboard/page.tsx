@@ -67,6 +67,7 @@ interface DashboardData {
     activationRate7d: string;
     profileCompletionRate: string;
     firstClickUsers7d: number;
+    returnCurve?: Array<{ date: string; activeUsers: number }>;
   };
   providerEmailHealth: {
     sends7d: number;
@@ -1779,6 +1780,34 @@ export default function AdminDashboard() {
               <p className="text-xs text-gray-500 mt-1">{data.betaHealth.activationRate7d} active in 7d</p>
             </div>
           </div>
+
+          {/* Return curve — the Duolingo habit signal: are the same users coming
+              back day over day? Distinct engaged users per day, last 7 days. */}
+          {data.betaHealth.returnCurve && data.betaHealth.returnCurve.length > 0 && (() => {
+            const curve = data.betaHealth.returnCurve!;
+            const max = Math.max(...curve.map(d => d.activeUsers), 1);
+            return (
+              <div className="mt-5 border-t border-gray-700/60 pt-5">
+                <div className="flex items-baseline justify-between gap-3 mb-3">
+                  <p className="text-sm font-medium text-gray-300">Daily return curve — habit signal</p>
+                  <p className="text-xs text-gray-500">Distinct engaged users per day · <span className="text-purple-300 font-mono">{data.betaHealth.dauWauRatio}</span> DAU/WAU (habit ≈ 20%+)</p>
+                </div>
+                <div className="flex items-end gap-2 h-20">
+                  {curve.map((d) => (
+                    <div key={d.date} className="flex-1 flex flex-col items-center gap-1 min-w-0">
+                      <span className="text-[11px] font-mono text-gray-300 tabular-nums">{d.activeUsers}</span>
+                      <div
+                        className="w-full rounded-t bg-gradient-to-t from-purple-600/70 to-blue-400/80"
+                        style={{ height: `${Math.max(4, (d.activeUsers / max) * 56)}px` }}
+                        title={`${d.date}: ${d.activeUsers} active`}
+                      />
+                      <span className="text-[10px] text-gray-500 tabular-nums">{d.date.slice(5)}</span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            );
+          })()}
         </div>
 
         {/* Tool Access Snapshot */}
