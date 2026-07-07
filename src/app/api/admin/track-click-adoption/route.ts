@@ -13,16 +13,16 @@
  * a real user_pipeline row (a tracked opportunity). That is the alert→action funnel.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getReadClient } from '@/lib/supabase/server-clients';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
+// Pure analytics read (no writes) → route to the read replica to keep this
+// heavy full-scan off the primary. Falls back to primary if no replica is set.
 function sb() {
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  return getReadClient();
 }
 
 // Page past PostgREST's 1000-row cap so counts are truthful over the window.

@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@supabase/supabase-js';
+import { getReadClient } from '@/lib/supabase/server-clients';
 import { kv } from '@vercel/kv';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
 import { hasCustomProfile } from '@/lib/ghl/tag-sync';
@@ -42,16 +42,12 @@ const PRO_TIER_PRODUCTS = [
 const PROFILE_REMINDER_LAST_RUN_KEY = 'admin:profile-reminder:last-run';
 const BOOTCAMP_ATTENDEE_FILE = path.join(process.cwd(), 'data/bootcamp-attendees-to-enroll.txt');
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _supabase: any = null;
+// This whole dashboard route is a PURE READ (no inserts/updates) of already-synced
+// data → point it at the read replica so its heavy full-table scans don't compete
+// with live traffic on the memory-constrained primary. Falls back to primary when
+// no replica is configured (getReadClient handles that).
 function getSupabase() {
-  if (!_supabase) {
-    _supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-  }
-  return _supabase;
+  return getReadClient();
 }
 
 const SUPABASE_PAGE_SIZE = 1000;
@@ -1088,7 +1084,11 @@ function emptySowCatalog() {
 // crosses into the ~55K inactive corpus.
 async function getSowCatalogStats() {
   const sb = getSupabase();
-  const headCount = (q: ReturnType<typeof sb.from>) => q.then(({ count }: { count: number | null }) => count || 0);
+  // Accept any head:true count query (a PostgREST builder is awaitable/thenable and
+  // resolves to { count }). Typed loosely on purpose so all the .eq()/.not() variants
+  // below fit one helper.
+  const headCount = (q: PromiseLike<{ count: number | null }>) =>
+    q.then(({ count }) => count || 0);
 
   const [hasSow, checkedWithAttach, remaining, totalWithAttach, recompeteRemaining, embedded, embedRemaining] = await Promise.all([
     headCount(sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('has_sow_doc', true)),

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
+import { SupabaseClient } from '@supabase/supabase-js';
+import { getReadClient } from '@/lib/supabase/server-clients';
 import { isCampaignExcludedEmail } from '@/lib/mindy/campaign-exclusions';
 
 /**
@@ -23,10 +24,9 @@ export const dynamic = 'force-dynamic';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
+// Pure analytics read (no writes) → read replica, to keep this off the primary.
 function sb() {
-  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!, {
-    auth: { autoRefreshToken: false, persistSession: false },
-  });
+  return getReadClient();
 }
 
 function norm(e: unknown): string {
