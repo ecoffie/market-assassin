@@ -1,5 +1,9 @@
 # Mindy — Later Backlog (deferred work, save & pick up)
 
+> 📌 **Post-Mindy-Day priorities are consolidated in `tasks/AFTER-MINDY-DAY-TRACKER.md`**
+> (the single tracking doc — status per item, headline = RAG video-library ingestion).
+> This backlog remains the detailed source; the tracker is the map. Keep both in sync.
+
 > A standalone, prioritized list of everything queued for "later" as of
 > **2026-06-05**. Each item links its PRD/research doc. Pick top-down; the
 > P0/P1 items are the highest-leverage. Nothing here is in-flight — all current
