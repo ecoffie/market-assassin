@@ -61,8 +61,10 @@ async function safeKvGet<T>(key: string, fallback: T | null = null): Promise<T |
   }
 }
 
-// TEMP instrumentation: per-metric timing so we can find the dashboard's real
-// bottleneck (returned as `_timings` in the response, ms). Remove once diagnosed.
+// Per-metric timing (ms). Cheap (Date.now deltas). Surfaced as `_timings` in the
+// response ONLY with ?debug=1, so ops can spot a regression without cluttering the
+// normal payload. (Found the 10.5s→3.3s bottlenecks: cross-site buyer list, Stripe
+// N+1 revenue, bootcamp cohort scan, and system-alerts re-running 4 fetchers.)
 const _metricTimings: Record<string, number> = {};
 async function safeMetric<T>(label: string, getter: () => Promise<T>, fallback: T): Promise<T> {
   const t0 = Date.now();
@@ -181,8 +183,10 @@ export async function GET(request: NextRequest) {
   return NextResponse.json({
     timestamp: new Date().toISOString(),
     displayDate: reportDate,
-    // TEMP: per-section timing (ms) to locate the bottleneck. Remove once diagnosed.
-    _timings: Object.fromEntries(Object.entries(_metricTimings).sort((a, b) => b[1] - a[1])),
+    // Per-section timing (ms), only with ?debug=1 — for spotting a latency regression.
+    ...(request.nextUrl.searchParams.get('debug') === '1'
+      ? { _timings: Object.fromEntries(Object.entries(_metricTimings).sort((a, b) => b[1] - a[1])) }
+      : {}),
 
     // Section 1: Most Recent completed email operations for the current reporting date
     emailOperations: emailStats,
