@@ -61,12 +61,18 @@ async function safeKvGet<T>(key: string, fallback: T | null = null): Promise<T |
   }
 }
 
+// TEMP instrumentation: per-metric timing so we can find the dashboard's real
+// bottleneck (returned as `_timings` in the response, ms). Remove once diagnosed.
+const _metricTimings: Record<string, number> = {};
 async function safeMetric<T>(label: string, getter: () => Promise<T>, fallback: T): Promise<T> {
+  const t0 = Date.now();
   try {
     return await getter();
   } catch (error) {
     console.error(`[Dashboard] ${label} failed; using fallback`, error);
     return fallback;
+  } finally {
+    _metricTimings[label] = Date.now() - t0;
   }
 }
 
@@ -101,6 +107,7 @@ async function fetchAllRows<T>(
 }
 
 export async function GET(request: NextRequest) {
+  const _requestStart = Date.now();
   const password = request.nextUrl.searchParams.get('password');
 
   if (password !== ADMIN_PASSWORD) {
@@ -152,10 +159,21 @@ export async function GET(request: NextRequest) {
     safeMetric('system alerts', () => getSystemAlerts(reportDate), []),
     safeKvGet(PROFILE_REMINDER_LAST_RUN_KEY)
   ]);
+  const _parallelDoneAt = Date.now();
+
+  // getBootcampRollout runs SERIALLY after the Promise.all (its time adds directly
+  // to the total, unlike the parallel metrics). Time it separately.
+  const _bootcampT0 = Date.now();
+  const bootcampRollout = await getBootcampRollout();
+  _metricTimings['bootcampRollout (serial)'] = Date.now() - _bootcampT0;
+  _metricTimings['_parallel_block_total'] = _parallelDoneAt - _requestStart;
+  _metricTimings['_grand_total'] = Date.now() - _requestStart;
 
   return NextResponse.json({
     timestamp: new Date().toISOString(),
     displayDate: reportDate,
+    // TEMP: per-section timing (ms) to locate the bottleneck. Remove once diagnosed.
+    _timings: Object.fromEntries(Object.entries(_metricTimings).sort((a, b) => b[1] - a[1])),
 
     // Section 1: Most Recent completed email operations for the current reporting date
     emailOperations: emailStats,
@@ -206,7 +224,7 @@ export async function GET(request: NextRequest) {
     profileReminderLastRun,
 
     // Section 9: Bootcamp Rollout Progress
-    bootcampRollout: await getBootcampRollout()
+    bootcampRollout
   });
 }
 
