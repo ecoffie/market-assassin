@@ -21,6 +21,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders, authedFetch } from '../authHeaders';
+import { isDistinctiveKeyword } from '@/lib/market/keyword-sanitize';
 
 interface TargetingCardProps {
   email: string | null;
@@ -231,6 +232,17 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
 
   const { naics, keywords, psc, states } = data;
   const noKeywords = keywords.length === 0;
+  // PRECISION. A keyword like "management" matches ~everything (254 active notices
+  // vs 15 for the phrase "program management"); a profile of only generic single
+  // words floods matching and produces vague "hot" cards. Flag when the user HAS
+  // keywords but none are distinctive (a phrase or a specific term) so we can nudge
+  // toward precise phrases — the biggest lever on making matches tight (Eric, Jul 7).
+  const distinctiveCount = keywords.filter((k) => isDistinctiveKeyword(k)).length;
+  const keywordsTooBroad = keywords.length > 0 && distinctiveCount === 0;
+  // Also flag a wide code footprint: many NAICS across unrelated 3-digit subsectors
+  // is the other half of an over-broad profile (Blue Heron: 8 NAICS, 5 subsectors).
+  const naicsSubsectors = new Set(naics.map((c) => c.slice(0, 3))).size;
+  const naicsTooWide = naics.length >= 6 && naicsSubsectors >= 4;
   // Only expose Edit affordances when a navigation handler is wired. On the Settings
   // panel itself there's no target to send the user to (they're already editing), so
   // onEdit is omitted and the buttons hide — no dead clicks.
@@ -439,6 +451,36 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
           </div>
         </div>
       </div>
+
+      {/* PRECISION NUDGE — the over-broad profile (Blue Heron: 5 generic keywords +
+          8 NAICS → 443 matches). Only shows when there's a real breadth problem; it
+          teaches the fix (precise phrases) rather than just flagging. Not shown for
+          the empty-keywords state (that has its own ⚠ above). */}
+      {(keywordsTooBroad || naicsTooWide) && (
+        <div className="mt-3 rounded-lg border border-amber-500/30 bg-amber-500/5 p-2.5 text-xs">
+          <div className="font-medium text-amber-300 mb-0.5">
+            {keywordsTooBroad
+              ? 'Your keywords are broad — add specific phrases to sharpen matches'
+              : 'Your profile spans several industries — matches may be noisy'}
+          </div>
+          <div className="text-slate-400">
+            {keywordsTooBroad ? (
+              <>Single words like <span className="text-slate-300">&ldquo;management&rdquo;</span> or{' '}
+                <span className="text-slate-300">&ldquo;technical&rdquo;</span> match almost everything. Two-word
+                phrases like <span className="text-emerald-300">&ldquo;program management&rdquo;</span> or{' '}
+                <span className="text-emerald-300">&ldquo;technical writing&rdquo;</span> are far more precise.</>
+            ) : (
+              <>{naics.length} NAICS across {naicsSubsectors} different subsectors casts a wide net. Trimming to your
+                core line of work makes every match more relevant.</>
+            )}
+            {canEdit && (
+              <button onClick={edit} className="ml-1 font-medium text-amber-300 hover:text-amber-200">
+                Refine in Settings →
+              </button>
+            )}
+          </div>
+        </div>
+      )}
 
       {/* COMPACT (dashboards): one glanceable coverage line. No gap list, no
           "what's bought" — that's audit detail, it lives in Settings (Eric QC
