@@ -22,6 +22,7 @@ import { createClient } from '@supabase/supabase-js';
 import { verifyMIAccess } from '@/lib/api-auth';
 import { logToolError, classifyError, ToolNames, AIProviders } from '@/lib/tool-errors';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
+import { smallBizSharePct } from './share';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
@@ -58,10 +59,15 @@ interface NarrativeRequest {
   email?: string;
   totalSpending?: number;
   satTotal?: number;
+  // Denominator for the small-business SHARE %. MUST be the total over the same
+  // row set satTotal was summed over — NOT totalSpending (a different, often
+  // much smaller department-level scalar), which produced "13935% of total".
+  satBase?: number;
   agencyCount?: number;
   topAgencies?: AgencySummary[];
   topPrimes?: PrimeSummary[];
 }
+
 
 interface NarrativeResponse {
   summary: string;
@@ -122,6 +128,14 @@ function narrativeFiguresAreReal(narr: NarrativeResponse, req: NarrativeRequest)
     if (val === null) continue;
     if (!figureMatchesReal(val, real)) return false; // a $ figure not in the data → reject
   }
+  // Percentage sanity: a "share" can't exceed 100%. Catches the 13935%/432.7%
+  // class that the $-only check let through (Jul 8). Any %>110 (small rounding
+  // headroom) → reject so the deterministic path (clamped) is used instead.
+  const pctTokens = text.match(/\d[\d,]*(?:\.\d+)?\s*%/g) || [];
+  for (const tok of pctTokens) {
+    const val = parseFloat(tok.replace(/[,%\s]/g, ''));
+    if (Number.isFinite(val) && val > 110) return false;
+  }
   return true;
 }
 
@@ -131,9 +145,8 @@ function deterministicNarrative(req: NarrativeRequest): NarrativeResponse {
   const naics = req.naics || req.naicsCode || 'this market';
   const top = (req.topAgencies || []).filter((a) => (a.spending || 0) > 0).slice(0, 3);
   const total = req.totalSpending || top.reduce((s, a) => s + (a.spending || 0), 0);
-  const satPct = req.totalSpending && req.satTotal
-    ? Math.round((req.satTotal / req.totalSpending) * 100)
-    : null;
+  const sharePct = smallBizSharePct(req);
+  const satPct = sharePct !== null ? Math.round(sharePct) : null;
 
   const lead = top.length
     ? `${formatMoney(total)} in tracked spend for NAICS ${naics}, led by ${top
@@ -165,9 +178,8 @@ function buildPrompt(req: NarrativeRequest): string {
 
   const formatM = formatMoney;
 
-  const satPct = (req.totalSpending && req.satTotal)
-    ? ((req.satTotal / req.totalSpending) * 100).toFixed(1)
-    : null;
+  const sharePct = smallBizSharePct(req);
+  const satPct = sharePct !== null ? sharePct.toFixed(1) : null;
 
   return [
     `Analyze this federal market for a BD professional pursuing NAICS ${naics}${req.businessType ? ` as a ${req.businessType} firm` : ''}.`,
