@@ -567,15 +567,100 @@ export async function GET(request: NextRequest) {
       nullsFirst: false,
     });
 
-    // Pagination
-    const offset = (page - 1) * limit;
-    query = query.range(offset, offset + limit - 1);
-
-    const { data: opportunities, count, error } = await query;
-
-    if (error) {
-      throw error;
+    // DEDUP-BEFORE-PAGINATE (the Recompete vehicle-rollup pattern). SAM publishes
+    // the same solicitation as many notices (amendments, re-posts) — measured 9.9%
+    // of the active cache: 857 solicitations with >1 active row, 946 excess rows.
+    // The OLD dedup ran AFTER .range() so it only collapsed dupes that happened to
+    // share a page, and `count` still counted duplicates → "22 of 373" (page
+    // deduped, total not). Fix: pull the filtered set as LIGHT rows (id + the
+    // survivor-tiebreak columns), collapse by solicitation_number to ONE canonical
+    // row, THEN paginate the deduped list and hydrate only that page to full rows.
+    const SCAN_CAP = 6000; // guards a runaway no-filter scan; well above any real filtered set
+    const lightCols = 'id,notice_id,solicitation_number,title,department,sub_tier,response_deadline,posted_date,has_sow_doc,description';
+    const { data: lightRows, error: lightErr } = await query
+      .select(lightCols)
+      .range(0, SCAN_CAP - 1);
+    if (lightErr) {
+      throw lightErr;
     }
+
+    type LightRow = {
+      id: number | string;
+      notice_id: string;
+      solicitation_number: string | null;
+      title: string | null;
+      department: string | null;
+      sub_tier: string | null;
+      response_deadline: string | null;
+      posted_date: string | null;
+      has_sow_doc: boolean | null;
+      description: string | null;
+    };
+
+    // Collapse duplicates. Key by solicitation_number when present; fall back to a
+    // normalized title+department key for the ~1% of rows with a NULL sol# (still
+    // catches title-identical re-posts). Winner = richest + most current:
+    //   1) has a real scope doc (has_sow_doc) — the evaluable row
+    //   2) latest response_deadline — the current amendment window
+    //   3) latest posted_date — freshest posting
+    //   4) longest description — most body text
+    const dupeKey = (r: LightRow): string => {
+      const sol = String(r.solicitation_number || '').trim();
+      if (sol) return `sol:${sol.toLowerCase()}`;
+      const t = String(r.title || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+      const d = String(r.department || r.sub_tier || '').toLowerCase().trim();
+      return `td:${t}|${d}`;
+    };
+    const rowBeats = (a: LightRow, b: LightRow): boolean => {
+      const aSow = a.has_sow_doc ? 1 : 0;
+      const bSow = b.has_sow_doc ? 1 : 0;
+      if (aSow !== bSow) return aSow > bSow;
+      const aDl = a.response_deadline || '';
+      const bDl = b.response_deadline || '';
+      if (aDl !== bDl) return aDl > bDl;               // latest deadline wins
+      const aPost = a.posted_date || '';
+      const bPost = b.posted_date || '';
+      if (aPost !== bPost) return aPost > bPost;        // freshest posting
+      return (a.description?.length || 0) > (b.description?.length || 0);
+    };
+    const canonicalByKey = new Map<string, LightRow>();
+    for (const r of (lightRows || []) as LightRow[]) {
+      const key = dupeKey(r);
+      const prev = canonicalByKey.get(key);
+      if (!prev || rowBeats(r, prev)) canonicalByKey.set(key, r);
+    }
+    // Preserve the server-side deadline ordering: iterate lightRows (already sorted)
+    // and emit each key once, in first-seen order, using its canonical row.
+    const orderedCanonical: LightRow[] = [];
+    const emitted = new Set<string>();
+    for (const r of (lightRows || []) as LightRow[]) {
+      const key = dupeKey(r);
+      if (emitted.has(key)) continue;
+      emitted.add(key);
+      orderedCanonical.push(canonicalByKey.get(key)!);
+    }
+
+    const dedupedTotal = orderedCanonical.length;
+    // Paginate the DEDUPED list, then hydrate just this page's ids to full rows.
+    const offset = (page - 1) * limit;
+    const pageSlice = orderedCanonical.slice(offset, offset + limit);
+    const pageIds = pageSlice.map((r) => r.id);
+
+    let opportunities: RawOpportunity[] = [];
+    if (pageIds.length > 0) {
+      const { data: fullRows, error: hydrateErr } = await supabase
+        .from('sam_opportunities')
+        .select('*')
+        .in('id', pageIds);
+      if (hydrateErr) {
+        throw hydrateErr;
+      }
+      // Re-order the hydrated rows to match the paginated (deadline-sorted) slice.
+      const byId = new Map((fullRows || []).map((r: RawOpportunity) => [String(r.id), r]));
+      opportunities = pageSlice.map((r) => byId.get(String(r.id))).filter(Boolean) as RawOpportunity[];
+    }
+    // Deduped count drives pagination — NOT the raw DB count (which included dupes).
+    const count = dedupedTotal;
 
     // Transform to dashboard format
     const dashboardOpps: DashboardOpportunity[] = ((opportunities || []) as RawOpportunity[]).map((opp: RawOpportunity) => {
@@ -651,26 +736,11 @@ export async function GET(request: NextRequest) {
       };
     });
 
-    // SAM.gov regularly publishes the same procurement as two or more
-    // notices (amendments, re-posts, duplicate uploads). The notice_id
-    // differs but the title + department are identical. Dedupe by a
-    // normalized title+department key so users don't see the same opp
-    // listed twice in a row. Keep the first occurrence (highest in the
-    // server-side ordering, e.g. soonest response_deadline).
-    const seenOpportunityKeys = new Set<string>();
-    const dedupedOpps = dashboardOpps.filter((opp) => {
-      const key = [
-        String(opp.title || '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim(),
-        String(opp.department || opp.sub_tier || '').toLowerCase().trim(),
-      ].join('|');
-      if (seenOpportunityKeys.has(key)) return false;
-      seenOpportunityKeys.add(key);
-      return true;
-    });
-
+    // Dedup already happened upstream (by solicitation_number, BEFORE pagination),
+    // so this page's rows are already unique — no post-pagination filtering needed.
     const payload = {
       success: true,
-      opportunities: dedupedOpps,
+      opportunities: dashboardOpps,
       pagination: {
         page,
         limit,

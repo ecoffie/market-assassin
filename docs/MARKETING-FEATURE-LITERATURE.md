@@ -3761,3 +3761,40 @@ search-broadening signals — they just don't count as your strong, distinctive 
 and the profile card's precision nudge points you toward specific phrases. Multi-word
 phrases are always preserved, even an unusual one, because over-filtering phrases would
 reintroduce the original bug.
+
+---
+
+## No More Duplicate Opportunities in Search & Market Dashboard
+
+**What:** The Market Dashboard now shows each solicitation once. SAM.gov republishes
+the same procurement many times — an original notice, an amendment, a re-post — each
+as a separate record with its own ID but the same solicitation number. Measured across
+the live active cache, that was 9.9% of everything: 857 solicitations appearing more
+than once, 946 redundant rows. So a search for "concrete" or "paving" would list the
+same job two or three times. The dashboard now collapses those to one canonical
+record — and it keeps the *best* copy of each: the version that actually carries the
+scope document (the SOW/PWS you can evaluate), with the most current deadline and the
+fullest description, not whichever empty re-post happened to be newest.
+
+**Why:** Duplicates make a result list look padded and make it harder to tell how much
+real opportunity is in front of you — "22 of 373" when a tenth of those 373 are the
+same handful of jobs repeated. Worse, an older amendment sometimes had the full
+requirements document while a newer re-post was an empty stub; naive dedup could show
+you the empty one. Collapsing to the richest, most current copy means one clean row per
+opportunity, and it's always the copy you'd actually want to read. The counts you see
+now reflect distinct opportunities, so "showing X of Y" finally means Y real jobs.
+
+**Proof:** Verified against the live cache before shipping. A "concrete" search went
+from 373 rows to 327 distinct opportunities (46 duplicates removed); "paving" from 92
+to 80. A specific solicitation that existed as four active records — three carrying the
+40,000-character SOW, one an empty newer re-post — correctly resolved to the
+SOW-bearing record with the latest deadline, not the empty one. Deduplication runs
+before pagination, so duplicates can no longer hide on other pages, and the total count
+now counts distinct solicitations.
+
+**Honest scope:** Records are collapsed by solicitation number; the ~1% of notices SAM
+publishes with no solicitation number fall back to a title-plus-agency match, which
+still catches identical re-posts. This is a read-time fix — the underlying records are
+untouched, so nothing is lost and the change is fully reversible. A deeper fix at the
+sync layer (so re-posts update the existing record instead of inserting a new one) is a
+possible future follow-up.
