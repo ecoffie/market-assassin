@@ -3521,3 +3521,47 @@ shared saved views (beyond the five built-ins) are stored per workspace and visi
 teammates; per-view privacy is on by request. Real-time co-editing (live cursors,
 instant push) is not included — the board refreshes on load and on save, which is the
 right fidelity for BD pace, not a chat app.
+
+---
+
+## Client Data Isolation — What Happens in One Client's Workspace Stays There (July 7, 2026)
+
+**What:** When a coach or consultant switches into a client's workspace in Mindy, every
+surface now reads and writes *only that client's data* — their generated proposals,
+their Vault documents and key personnel, their pursuit-change alerts, their market
+profile. A coach can run ten clients from one login and never see one client's work
+bleed into another's, and never see their own work show up inside a client's account.
+This release closed every place where a client view could have surfaced the coach's own
+records instead of the client's, and made every "save" land in the workspace you're
+actually working in.
+
+**Why it matters:** Coach Mode and the Teams plan are only trustworthy if the walls
+between workspaces are real. A consultant managing multiple contractors cannot have
+Client A's capability statement, past performance, or draft proposals appear in Client
+B's account — that's a confidentiality breach, not a bug. The Vault holds a business's
+most sensitive material (resumes, pricing boilerplate, teaming relationships), and the
+Generated library holds their proposal drafts. Getting workspace isolation exactly right
+across the read path (what you see) *and* the write path (where a save goes) is the
+foundation the entire white-label coach offering stands on. Without it, "manage all your
+clients in one place" is a liability instead of a selling point.
+
+**Proof:** Verified end-to-end on live production with a real coach session. Acting as a
+coach with an active client workspace, the client's Generated library, Vault documents,
+key-personnel roster, and pursuit-change feed each returned that client's data only — the
+coach's own 49 archived proposals and 8 boilerplate documents stayed in the coach's
+personal library and were absent from every client view. A full round-trip was run: a
+record created while working as the client was stored under the client's workspace,
+appeared in the client's Vault, and did **not** appear in the coach's own Vault — the
+exact isolation guarantee, proven both directions. A full audit swept every workspace-
+aware endpoint; zero client-owned surfaces remain unscoped. Also fixed a cosmetic flash
+where switching clients briefly flashed "No profile yet" before the real profile loaded —
+it now shows a quiet "Loading…" until the client's actual profile resolves.
+
+**Honest scope:** This hardens *data isolation* — which records each workspace can read
+and write. It is not a new permissions/role system: a coach still has full access to
+every client they're assigned (that's the point of Coach Mode). Genuinely shared,
+content-level caches — e.g. the compliance matrix extracted from a *public* SAM
+solicitation, or anonymous "X others are tracking this" opportunity counts — are shared
+by design and intentionally not per-client, because they contain no client-private data.
+Account-level settings that belong to the logged-in person (SMS phone verification) stay
+with that person, as they should.
