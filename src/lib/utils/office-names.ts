@@ -282,6 +282,9 @@ const KNOWN_ACRONYMS = new Set([
 function looksLikeAcronym(token: string): boolean {
   const t = token.replace(/[^A-Za-z0-9]/g, '');
   if (!t) return false;
+  // Dotted initialism: single letters separated by periods (U.S., U.S.A., E.P.A.).
+  // These read as acronyms regardless of vowels ("U.S." must not become "U.s.").
+  if (/^([A-Za-z]\.){2,}$/.test(token)) return true;
   if (STATE_CODES.has(t.toUpperCase())) return true;
   if (KNOWN_ACRONYMS.has(t.toUpperCase())) return true;
   // Alphanumeric office codes like "CZ75" / "GM13" / "AH01" → uppercase.

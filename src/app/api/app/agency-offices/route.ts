@@ -8,6 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { getOfficesForAgencyNaics } from '@/lib/bigquery/agencies';
+import { toTitleCase } from '@/lib/utils/office-names';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -29,7 +30,9 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({
       success: true,
       offices: offices.map(o => ({
-        name: o.awarding_office,
+        // BigQuery stores awarding_office ALL-CAPS; case it the same way the
+        // All-Agencies table does so office codes (SMC/PKH, AFB) read consistently.
+        name: o.awarding_office ? toTitleCase(o.awarding_office) : o.awarding_office,
         code: o.awarding_office_code,
         total: o.total_amount,
         awards: o.award_count,
