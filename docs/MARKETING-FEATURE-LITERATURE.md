@@ -3607,3 +3607,42 @@ now" card draws from what contractors across Mindy are actively tracking, so on 
 quiet day for your specific niche it may show nothing at all; that's honest (no card
 beats a stale one), and a future release may add a purely personal best-fit card that
 doesn't depend on other users' activity.
+
+---
+
+## Best Fit For You — Your Single Strongest Open Opportunity, Every Day (July 7, 2026)
+
+**What:** The dashboard now opens with one card: ⭐ **Best fit for you** — the single
+open opportunity that most strongly matches what you actually do, with the reason it
+fits shown right on it ("✓ matches 'renovation' · PSC Z2BZ · NAICS 236220"). It's
+drawn from live, currently-open solicitations, ranked by how precisely they hit your
+distinctive keywords, product codes, and industry — not by how many other people
+happen to be looking at them. If nothing clears a genuine-strong-match bar, you see
+no card (and a nudge to sharpen your profile) rather than a weak guess.
+
+**Why it matters:** A daily tool earns its place by answering one question fast:
+"what's the one thing worth my attention today?" The previous version showed the
+most-*tracked* opportunity across all of Mindy — which sounds like social proof but
+in practice surfaced whatever the crowd had bookmarked, and most of those had already
+closed. A "hot" card pointing at an expired solicitation for work you don't do is
+worse than nothing: it teaches you to distrust the card. Best Fit flips the basis
+from "what's popular" to "what's *yours*, open, and strong" — a personal, current,
+explainable pick. And because it shows *why* it fits, you can trust it at a glance and
+act, instead of clicking through to figure out if it's relevant.
+
+**Proof:** Verified live in production against real profiles. A contractor profiled
+for renovation/remodeling work is matched to "Building 305 Office Renovations" — a
+match that hit all three axes (the keyword "renovation," the PSC facility-repair
+family, and NAICS 236220 building construction) with a response deadline still open.
+The strong-match bar is enforced on relevance alone: an opportunity that only shared a
+broad industry code with a generic keyword does **not** qualify, even if its deadline
+is soon — so a profile built on vague terms correctly shows no card and is pointed to
+the precision nudge instead of being handed a weak match.
+
+**Honest scope:** Best Fit rewards a precise profile — it draws on your distinctive
+keywords and product codes, so a profile of only generic words ("management,"
+"services") may show no card until you add specific phrases. That's deliberate: a
+blank is more honest than a bad pick, and the dashboard tells you exactly how to earn
+a strong match. The "how many others are tracking this" count is still shown when it
+exists, but now as a small secondary note on your best-fit pick — social proof as a
+garnish, never the reason the card was chosen.
