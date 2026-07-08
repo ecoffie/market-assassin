@@ -3565,3 +3565,45 @@ solicitation, or anonymous "X others are tracking this" opportunity counts — a
 by design and intentionally not per-client, because they contain no client-private data.
 Account-level settings that belong to the logged-in person (SMS phone verification) stay
 with that person, as they should.
+
+---
+
+## Sharper Matching — Precise Keywords Beat Broad Ones (July 7, 2026)
+
+**What:** Mindy now tells you when your profile is too broad to be useful, and the
+"🔥 Hot Right Now" card only surfaces opportunities that are actually *open* and a
+*strong* match to what you do. If your keywords are generic single words —
+"management," "technical," "services" — Mindy flags it right on your dashboard and
+coaches you toward precise phrases ("program management," "technical writing") that
+match far fewer, far more relevant contracts. The hot card no longer shows expired
+solicitations or a vague match that only shared a common word.
+
+**Why it matters:** The #1 failure of a market-intelligence tool isn't missing
+opportunities — it's drowning you in irrelevant ones. A single word like "management"
+appears in the title of 254 open federal notices; the phrase "program management"
+appears in 15. Same intent, ~18× the precision. A profile built on generic words
+produces hundreds of "matches" you'll never bid, which trains you to ignore the feed —
+the worst outcome for a tool you're supposed to check daily. Precision is what makes a
+short, trustworthy list you actually act on. And a "hot right now" card is only
+credible if it's genuinely current: showing a solicitation whose deadline already
+passed is worse than showing nothing.
+
+**Proof:** Verified live in production. Measured against the live opportunity cache:
+"program" matched 282 open notices and "management" 254, versus 15 for the phrase
+"program management" and 0–4 for other specific phrases — the precision gap the fix
+targets. The hot card now requires a future response deadline and a strong match
+(a specific phrase, a PSC product-family hit, or an industry-plus-keyword hit); a lone
+generic word no longer qualifies. Tested on a real over-broad profile (8 industry
+codes across 5 sectors, 5 generic keywords): the card correctly shows nothing instead
+of a wrong, expired "Worldwide Project Management" card, and the dashboard now displays
+a precision nudge explaining exactly how to tighten it.
+
+**Honest scope:** This sharpens *ranking and guidance* — it does not delete anyone's
+keywords or silently change what they search. The broad search still runs for coverage
+(you won't miss a mislabeled opportunity); precision is applied to the *highlighted*
+surfaces (the hot card, the nudge) where a wrong pick is most costly. The nudge is
+advice, not a wall — you can keep any keywords you want. Separately, the "hot right
+now" card draws from what contractors across Mindy are actively tracking, so on a
+quiet day for your specific niche it may show nothing at all; that's honest (no card
+beats a stale one), and a future release may add a purely personal best-fit card that
+doesn't depend on other users' activity.
