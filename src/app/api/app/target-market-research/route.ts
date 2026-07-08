@@ -977,11 +977,15 @@ export async function POST(request: NextRequest) {
         a.parentAgency,
         a.name,
       );
-      // Office row → its own spend. Agency/sub-agency rollup row → the accurate
-      // category total (so the real giants still rank correctly).
+      // Office row → its own spend. Agency/sub-agency rollup row → the AUTHORITATIVE
+      // category total whenever present (server-computed over ALL matching records),
+      // NOT max(accurate, sampled): the find-agencies sample over-counts (NPS wood
+      // showed $43M sampled vs $20M real — Jul 8), so taking the max kept the
+      // inflated number. Fall back to the sample only when the category pass had no
+      // match for this row.
       const totalSpending = isOfficeLevel
         ? officeOwnTotal
-        : ((accurateTotal && accurateTotal > officeOwnTotal) ? accurateTotal : officeOwnTotal);
+        : (accurateTotal > 0 ? accurateTotal : officeOwnTotal);
       // Set-Aside column: prefer the authoritative server figure for rollup rows;
       // fall back to the sampled number only for office rows / when the category
       // pass had no match. Never let it exceed the row's own total (a subset can't
