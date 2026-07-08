@@ -31,7 +31,43 @@
   --font-sans: var(--font-inter);
   --font-mono: var(--font-jetbrains-mono);
 
-  /* Custom colors for Tailwind */
+  /* ─────────────────────────────────────────────────────────────────────────
+     SEMANTIC DESIGN TOKENS (Phase 1 — de-vibe-coding, Jul 2026)
+     The single source of truth for the in-app palette. Use these utilities
+     (bg-surface, border-hairline, text-ink/muted, bg-navy, text-accent) instead
+     of raw slate/gray or arbitrary [#hex]. Values intentionally match today's
+     de-facto colors so wiring them in is a NO-OP visually; migration happens in
+     later phases. Guarded by scripts/audit-design-tokens.mjs.
+     Semantic status (ok/warn/critical) is SEPARATE from the single brand accent.
+     ───────────────────────────────────────────────────────────────────────── */
+
+  /* Grounds & surfaces — the navy stack, named by role not by number. */
+  --color-ground:      #0f172a;   /* app background */
+  --color-ground-deep: #020617;   /* deepest (behind cards, scrollbar track) */
+  --color-surface:     #1e293b;   /* card / panel background */
+  --color-surface-2:   #273449;   /* raised / hovered surface */
+  --color-hairline:    #334155;   /* borders, dividers */
+
+  /* Ink — text roles. */
+  --color-ink:       #f1f5f9;     /* primary text */
+  --color-muted:     #94a3b8;     /* secondary text */
+  --color-faint:     #64748b;     /* tertiary / disabled */
+
+  /* Brand — ONE navy, ONE accent. (Collapses the two interchangeable blues
+     [#1e40af] ×92 and [#1e3a8a] ×35 into a single token in a later phase.) */
+  --color-navy:       #1e3a8a;
+  --color-navy-hover: #1e40af;
+  --color-accent:       #7c3aed;  /* Mindy violet — the single interactive accent */
+  --color-accent-hover: #8b5cf6;
+
+  /* Semantic status — NOT the accent; used only to encode state. */
+  --color-ok:   #10b981;
+  --color-warn: #f59e0b;
+  --color-crit: #ef4444;
+  --color-info: #38bdf8;
+
+  /* Legacy aliases kept so existing bg-navy-800 / text-accent-blue usages (if
+     any appear) still resolve during migration. Prefer the semantic names above. */
   --color-navy-950: #020617;
   --color-navy-900: #0f172a;
   --color-navy-800: #1e293b;

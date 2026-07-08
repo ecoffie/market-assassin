@@ -19,7 +19,7 @@ fail=0
 echo -e "${BOLD}── pre-push gate ──${NC}"
 
 # 1) HARD BLOCK: TypeScript must compile. (Would have blocked today's Error deploy.)
-echo -e "  ${BOLD}1/4${NC} typecheck (tsc --noEmit)…"
+echo -e "  ${BOLD}1/5${NC} typecheck (tsc --noEmit)…"
 if npx tsc --noEmit > /tmp/mindy-prepush-tsc.log 2>&1; then
   echo -e "      ${GREEN}✓ typecheck clean${NC}"
 else
@@ -29,7 +29,7 @@ else
 fi
 
 # 2) HARD BLOCK: no NEW unauthenticated fetch to a 2FA-gated /api/app route.
-echo -e "  ${BOLD}2/4${NC} client auth-header audit…"
+echo -e "  ${BOLD}2/5${NC} client auth-header audit…"
 if node scripts/audit-client-auth.mjs > /tmp/mindy-prepush-auth.log 2>&1; then
   echo -e "      ${GREEN}✓ no new unauthenticated gated fetches${NC}"
 else
@@ -40,7 +40,7 @@ fi
 
 # 3) HARD BLOCK: unit tests (Vitest). Fast (<1s) + deterministic, so safe to gate.
 #    Locks the $674B NAICS-inflation fix, win-probability scoring, authedFetch retry.
-echo -e "  ${BOLD}3/4${NC} unit tests (vitest run)…"
+echo -e "  ${BOLD}3/5${NC} unit tests (vitest run)…"
 if npm run --silent test:unit > /tmp/mindy-prepush-unit.log 2>&1; then
   echo -e "      ${GREEN}✓ unit tests pass${NC}"
 else
@@ -50,11 +50,25 @@ else
 fi
 
 # 4) WARN ONLY: schema-sync drift (slower, can lag DB; never blocks a hotfix).
-echo -e "  ${BOLD}4/4${NC} schema-sync (warn only)…"
+echo -e "  ${BOLD}4/5${NC} schema-sync (warn only)…"
 if npm run --silent test:schema > /tmp/mindy-prepush-schema.log 2>&1; then
   echo -e "      ${GREEN}✓ schema in sync${NC}"
 else
   echo -e "      ${YEL}⚠ schema-sync reported drift (not blocking — review /tmp/mindy-prepush-schema.log)${NC}"
+fi
+
+# 5) WARN ONLY: design-token drift (new arbitrary [#hex] / raw slate-gray colors).
+#    Phase 1 of de-vibe-coding: freezes the baseline (135 hex + 10,563 raw-neutral)
+#    so the count can only trend DOWN as later phases migrate. Warn-only — never
+#    blocks a hotfix; a false positive shouldn't gate a genuine fix while the large
+#    baseline still exists. Accept an intentional change with --update-baseline.
+echo -e "  ${BOLD}5/5${NC} design-token drift (warn only)…"
+if node scripts/audit-design-tokens.mjs > /tmp/mindy-prepush-tokens.log 2>&1; then
+  echo -e "      ${GREEN}✓ no new color drift${NC}"
+else
+  echo -e "      ${YEL}⚠ new raw color(s) added — prefer semantic tokens (bg-surface/border-hairline/text-muted/bg-navy/text-accent):${NC}"
+  grep -E ": \+" /tmp/mindy-prepush-tokens.log | head -8 | sed 's/^/        /'
+  echo -e "      ${YEL}  (not blocking — see /tmp/mindy-prepush-tokens.log; accept with: node scripts/audit-design-tokens.mjs --update-baseline)${NC}"
 fi
 
 if [ "$fail" -ne 0 ]; then

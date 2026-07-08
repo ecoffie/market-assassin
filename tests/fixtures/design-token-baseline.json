@@ -1,0 +1,894 @@
+{
+  "files": {
+    "src/components/AccessGate.tsx": {
+      "hex": 0,
+      "neutral": 9
+    },
+    "src/components/BackToAppHeader.tsx": {
+      "hex": 0,
+      "neutral": 2
+    },
+    "src/components/BundleProductPage.tsx": {
+      "hex": 0,
+      "neutral": 46
+    },
+    "src/components/MeetMindyStrip.tsx": {
+      "hex": 0,
+      "neutral": 5
+    },
+    "src/components/MemberAwareCta.tsx": {
+      "hex": 0,
+      "neutral": 1
+    },
+    "src/components/ProductPageAppSumo.tsx": {
+      "hex": 0,
+      "neutral": 94
+    },
+    "src/components/PurchaseGate.tsx": {
+      "hex": 0,
+      "neutral": 25
+    },
+    "src/components/UnifiedSidebar.tsx": {
+      "hex": 0,
+      "neutral": 25
+    },
+    "src/components/admin/MemberAccessSection.tsx": {
+      "hex": 0,
+      "neutral": 77
+    },
+    "src/components/admin/MemberLookup.tsx": {
+      "hex": 0,
+      "neutral": 35
+    },
+    "src/components/admin/MetricTrends.tsx": {
+      "hex": 0,
+      "neutral": 14
+    },
+    "src/components/app/ClientWorkspaceBanner.tsx": {
+      "hex": 0,
+      "neutral": 6
+    },
+    "src/components/app/CollabHotCard.tsx": {
+      "hex": 0,
+      "neutral": 5
+    },
+    "src/components/app/CollapsibleOpportunityDescription.tsx": {
+      "hex": 0,
+      "neutral": 18
+    },
+    "src/components/app/GlobalLookup.tsx": {
+      "hex": 0,
+      "neutral": 38
+    },
+    "src/components/app/MindyInsightCard.tsx": {
+      "hex": 0,
+      "neutral": 7
+    },
+    "src/components/app/OpportunityDetailStrip.tsx": {
+      "hex": 0,
+      "neutral": 6
+    },
+    "src/components/app/SamAttachmentLinks.tsx": {
+      "hex": 0,
+      "neutral": 1
+    },
+    "src/components/app/Toast.tsx": {
+      "hex": 0,
+      "neutral": 7
+    },
+    "src/components/app/UnifiedSidebar.tsx": {
+      "hex": 0,
+      "neutral": 35
+    },
+    "src/components/app/UpgradeModal.tsx": {
+      "hex": 0,
+      "neutral": 9
+    },
+    "src/components/app/WorkspaceSwitcher.tsx": {
+      "hex": 0,
+      "neutral": 16
+    },
+    "src/components/app/awards/AwardDetailDrawer.tsx": {
+      "hex": 0,
+      "neutral": 16
+    },
+    "src/components/app/awards/IncumbentIntel.tsx": {
+      "hex": 0,
+      "neutral": 12
+    },
+    "src/components/app/awards/RecompeteSowMatch.tsx": {
+      "hex": 0,
+      "neutral": 11
+    },
+    "src/components/app/contractors/ContractorLink.tsx": {
+      "hex": 0,
+      "neutral": 1
+    },
+    "src/components/app/contractors/ContractorProfileView.tsx": {
+      "hex": 0,
+      "neutral": 61
+    },
+    "src/components/app/contractors/ContractorSalesHistoryDrawer.tsx": {
+      "hex": 0,
+      "neutral": 61
+    },
+    "src/components/app/market/MarketCoverageBanner.tsx": {
+      "hex": 0,
+      "neutral": 20
+    },
+    "src/components/app/market/MarketDataMap.tsx": {
+      "hex": 0,
+      "neutral": 12
+    },
+    "src/components/app/onboarding/OnboardingScan.tsx": {
+      "hex": 0,
+      "neutral": 9
+    },
+    "src/components/app/panels/AlertsPanel.tsx": {
+      "hex": 0,
+      "neutral": 180
+    },
+    "src/components/app/panels/BidDecisionGate.tsx": {
+      "hex": 0,
+      "neutral": 31
+    },
+    "src/components/app/panels/CatalogTeaserFree.tsx": {
+      "hex": 0,
+      "neutral": 3
+    },
+    "src/components/app/panels/CoachPanel.tsx": {
+      "hex": 0,
+      "neutral": 67
+    },
+    "src/components/app/panels/ContactsPanel.tsx": {
+      "hex": 0,
+      "neutral": 110
+    },
+    "src/components/app/panels/ContractorsPanel.tsx": {
+      "hex": 0,
+      "neutral": 66
+    },
+    "src/components/app/panels/DashboardPanel.tsx": {
+      "hex": 0,
+      "neutral": 91
+    },
+    "src/components/app/panels/DibbsPanel.tsx": {
+      "hex": 0,
+      "neutral": 31
+    },
+    "src/components/app/panels/DisaVehicleWatchPanel.tsx": {
+      "hex": 0,
+      "neutral": 44
+    },
+    "src/components/app/panels/DocManifest.tsx": {
+      "hex": 0,
+      "neutral": 11
+    },
+    "src/components/app/panels/EntryAccessibilityCard.tsx": {
+      "hex": 0,
+      "neutral": 51
+    },
+    "src/components/app/panels/ForecastsPanel.tsx": {
+      "hex": 0,
+      "neutral": 109
+    },
+    "src/components/app/panels/GettingStartedPanel.tsx": {
+      "hex": 0,
+      "neutral": 19
+    },
+    "src/components/app/panels/GovDecisionMakersPanel.tsx": {
+      "hex": 0,
+      "neutral": 55
+    },
+    "src/components/app/panels/GrantsPanel.tsx": {
+      "hex": 0,
+      "neutral": 48
+    },
+    "src/components/app/panels/HiddenWorkNudge.tsx": {
+      "hex": 0,
+      "neutral": 5
+    },
+    "src/components/app/panels/KnowledgeBasePanel.tsx": {
+      "hex": 0,
+      "neutral": 24
+    },
+    "src/components/app/panels/LibraryPanel.tsx": {
+      "hex": 0,
+      "neutral": 58
+    },
+    "src/components/app/panels/LockedPreview.tsx": {
+      "hex": 0,
+      "neutral": 10
+    },
+    "src/components/app/panels/MarketDossierPanel.tsx": {
+      "hex": 0,
+      "neutral": 22
+    },
+    "src/components/app/panels/MarketResearchPanel.tsx": {
+      "hex": 0,
+      "neutral": 393
+    },
+    "src/components/app/panels/MiccMrrPanel.tsx": {
+      "hex": 0,
+      "neutral": 40
+    },
+    "src/components/app/panels/MindyChatPanel.tsx": {
+      "hex": 0,
+      "neutral": 66
+    },
+    "src/components/app/panels/MyTargetListPanel.tsx": {
+      "hex": 0,
+      "neutral": 161
+    },
+    "src/components/app/panels/OsbpSmbResearchPanel.tsx": {
+      "hex": 0,
+      "neutral": 37
+    },
+    "src/components/app/panels/PipelinePanel.tsx": {
+      "hex": 0,
+      "neutral": 182
+    },
+    "src/components/app/panels/PipelinePreviewFree.tsx": {
+      "hex": 0,
+      "neutral": 16
+    },
+    "src/components/app/panels/PricingIntelPanel.tsx": {
+      "hex": 0,
+      "neutral": 57
+    },
+    "src/components/app/panels/ProposalChat.tsx": {
+      "hex": 0,
+      "neutral": 36
+    },
+    "src/components/app/panels/ProposalsPanel.tsx": {
+      "hex": 0,
+      "neutral": 288
+    },
+    "src/components/app/panels/PursuitAssignment.tsx": {
+      "hex": 0,
+      "neutral": 9
+    },
+    "src/components/app/panels/PursuitComments.tsx": {
+      "hex": 0,
+      "neutral": 11
+    },
+    "src/components/app/panels/RecompetesPanel.tsx": {
+      "hex": 0,
+      "neutral": 156
+    },
+    "src/components/app/panels/RelationshipsPanel.tsx": {
+      "hex": 0,
+      "neutral": 70
+    },
+    "src/components/app/panels/StartHereCard.tsx": {
+      "hex": 0,
+      "neutral": 9
+    },
+    "src/components/app/panels/TargetingCard.tsx": {
+      "hex": 0,
+      "neutral": 44
+    },
+    "src/components/app/panels/TeamPanel.tsx": {
+      "hex": 0,
+      "neutral": 62
+    },
+    "src/components/app/panels/UnifiedSettingsPanel.tsx": {
+      "hex": 0,
+      "neutral": 118
+    },
+    "src/components/app/panels/VaultPanel.tsx": {
+      "hex": 0,
+      "neutral": 154
+    },
+    "src/components/app/panels/index.tsx": {
+      "hex": 0,
+      "neutral": 1
+    },
+    "src/components/app/panels/triage/StartTrackingModal.tsx": {
+      "hex": 0,
+      "neutral": 38
+    },
+    "src/components/app/voice/VoiceCaptureModal.tsx": {
+      "hex": 0,
+      "neutral": 56
+    },
+    "src/components/auth/PasswordProtect.tsx": {
+      "hex": 0,
+      "neutral": 13
+    },
+    "src/components/bd-assist/CommentsSection.tsx": {
+      "hex": 0,
+      "neutral": 12
+    },
+    "src/components/bd-assist/ContactsPanel.tsx": {
+      "hex": 0,
+      "neutral": 59
+    },
+    "src/components/bd-assist/EXAMPLE_USAGE.tsx": {
+      "hex": 0,
+      "neutral": 19
+    },
+    "src/components/bd-assist/ForecastsPanel.tsx": {
+      "hex": 0,
+      "neutral": 64
+    },
+    "src/components/bd-assist/MarketScanner.tsx": {
+      "hex": 0,
+      "neutral": 52
+    },
+    "src/components/bd-assist/PipelineBoard.tsx": {
+      "hex": 0,
+      "neutral": 16
+    },
+    "src/components/bd-assist/PipelineCard.tsx": {
+      "hex": 0,
+      "neutral": 19
+    },
+    "src/components/bd-assist/PipelineModal.tsx": {
+      "hex": 0,
+      "neutral": 43
+    },
+    "src/components/blog/BlogPostLayout.tsx": {
+      "hex": 0,
+      "neutral": 26
+    },
+    "src/components/briefings/GrantsPanel.tsx": {
+      "hex": 0,
+      "neutral": 46
+    },
+    "src/components/briefings/MarketIntelligenceHeader.tsx": {
+      "hex": 0,
+      "neutral": 20
+    },
+    "src/components/briefings/OnboardingWizard.tsx": {
+      "hex": 0,
+      "neutral": 74
+    },
+    "src/components/briefings/ProfileStatsBar.tsx": {
+      "hex": 0,
+      "neutral": 7
+    },
+    "src/components/briefings/SampleOpportunitiesPicker.tsx": {
+      "hex": 0,
+      "neutral": 39
+    },
+    "src/components/briefings/SaveToPipelineButton.tsx": {
+      "hex": 0,
+      "neutral": 5
+    },
+    "src/components/briefings/SbirPanel.tsx": {
+      "hex": 0,
+      "neutral": 56
+    },
+    "src/components/briefings/SettingsPanel.tsx": {
+      "hex": 0,
+      "neutral": 95
+    },
+    "src/components/briefings/ShareButton.tsx": {
+      "hex": 0,
+      "neutral": 20
+    },
+    "src/components/codes/NaicsAutocompleteInput.tsx": {
+      "hex": 0,
+      "neutral": 6
+    },
+    "src/components/codes/NaicsBadge.tsx": {
+      "hex": 0,
+      "neutral": 9
+    },
+    "src/components/codes/NaicsPicker.tsx": {
+      "hex": 0,
+      "neutral": 11
+    },
+    "src/components/contractors/ContractorAnalytics.tsx": {
+      "hex": 0,
+      "neutral": 26
+    },
+    "src/components/contractors/SubpageLayout.tsx": {
+      "hex": 0,
+      "neutral": 8
+    },
+    "src/components/federal-market-assassin/charts/AgencySpendingChart.tsx": {
+      "hex": 0,
+      "neutral": 17
+    },
+    "src/components/federal-market-assassin/charts/BudgetComparisonChart.tsx": {
+      "hex": 0,
+      "neutral": 10
+    },
+    "src/components/federal-market-assassin/charts/GeographicDistributionChart.tsx": {
+      "hex": 0,
+      "neutral": 16
+    },
+    "src/components/federal-market-assassin/charts/SpendingTrendChart.tsx": {
+      "hex": 0,
+      "neutral": 23
+    },
+    "src/components/federal-market-assassin/forms/CoreInputForm.tsx": {
+      "hex": 0,
+      "neutral": 47
+    },
+    "src/components/federal-market-assassin/reports/PricingIntelTab.tsx": {
+      "hex": 0,
+      "neutral": 63
+    },
+    "src/components/federal-market-assassin/reports/ReportsDisplay.tsx": {
+      "hex": 0,
+      "neutral": 455
+    },
+    "src/components/federal-market-assassin/tables/AgencySelectionTable.tsx": {
+      "hex": 0,
+      "neutral": 100
+    },
+    "src/components/federal-market-assassin/ui/KittLoader.tsx": {
+      "hex": 0,
+      "neutral": 5
+    },
+    "src/components/lifetime/FoundersSeats.tsx": {
+      "hex": 0,
+      "neutral": 3
+    },
+    "src/components/mindy/DemoMedia.tsx": {
+      "hex": 0,
+      "neutral": 5
+    },
+    "src/components/mindy/MindySignupForm.tsx": {
+      "hex": 0,
+      "neutral": 14
+    },
+    "src/components/mindy/PartnerLandingPage.tsx": {
+      "hex": 0,
+      "neutral": 10
+    },
+    "src/components/planner/OnboardingFlow.tsx": {
+      "hex": 7,
+      "neutral": 19
+    },
+    "src/components/seo/FacetPage.tsx": {
+      "hex": 0,
+      "neutral": 10
+    },
+    "src/components/ui/LoadMoreButton.tsx": {
+      "hex": 0,
+      "neutral": 3
+    },
+    "src/app/about/page.tsx": {
+      "hex": 0,
+      "neutral": 32
+    },
+    "src/app/access/AccessClient.tsx": {
+      "hex": 0,
+      "neutral": 3
+    },
+    "src/app/access/[code]/page.tsx": {
+      "hex": 0,
+      "neutral": 28
+    },
+    "src/app/access/page.tsx": {
+      "hex": 0,
+      "neutral": 4
+    },
+    "src/app/activate/page.tsx": {
+      "hex": 0,
+      "neutral": 17
+    },
+    "src/app/admin/codes/page.tsx": {
+      "hex": 0,
+      "neutral": 31
+    },
+    "src/app/admin/competitive-positioning/page.tsx": {
+      "hex": 0,
+      "neutral": 33
+    },
+    "src/app/admin/dashboard/page.tsx": {
+      "hex": 0,
+      "neutral": 477
+    },
+    "src/app/admin/data-inventory/page.tsx": {
+      "hex": 0,
+      "neutral": 35
+    },
+    "src/app/admin/demo/page.tsx": {
+      "hex": 0,
+      "neutral": 11
+    },
+    "src/app/admin/emails/page.tsx": {
+      "hex": 0,
+      "neutral": 37
+    },
+    "src/app/admin/feedback/page.tsx": {
+      "hex": 0,
+      "neutral": 55
+    },
+    "src/app/admin/launch-command-center/page.tsx": {
+      "hex": 0,
+      "neutral": 349
+    },
+    "src/app/admin/members/page.tsx": {
+      "hex": 0,
+      "neutral": 7
+    },
+    "src/app/admin/mi-accounts/page.tsx": {
+      "hex": 0,
+      "neutral": 57
+    },
+    "src/app/admin/page.tsx": {
+      "hex": 0,
+      "neutral": 113
+    },
+    "src/app/admin/podcast-highlights/page.tsx": {
+      "hex": 0,
+      "neutral": 54
+    },
+    "src/app/admin/proposal-ab/page.tsx": {
+      "hex": 0,
+      "neutral": 51
+    },
+    "src/app/admin/purchases/page.tsx": {
+      "hex": 0,
+      "neutral": 86
+    },
+    "src/app/admin/rag-library/page.tsx": {
+      "hex": 0,
+      "neutral": 65
+    },
+    "src/app/admin/set-aside-impact/page.tsx": {
+      "hex": 0,
+      "neutral": 67
+    },
+    "src/app/admin/tool-health/page.tsx": {
+      "hex": 0,
+      "neutral": 59
+    },
+    "src/app/agencies/[slug]/page.tsx": {
+      "hex": 0,
+      "neutral": 82
+    },
+    "src/app/agencies/page.tsx": {
+      "hex": 0,
+      "neutral": 24
+    },
+    "src/app/alerts/preferences/page.tsx": {
+      "hex": 0,
+      "neutral": 73
+    },
+    "src/app/alerts/signup/page.tsx": {
+      "hex": 0,
+      "neutral": 113
+    },
+    "src/app/app/forgot-password/page.tsx": {
+      "hex": 0,
+      "neutral": 13
+    },
+    "src/app/app/market-intel/page.tsx": {
+      "hex": 0,
+      "neutral": 188
+    },
+    "src/app/app/onboarding/page.tsx": {
+      "hex": 0,
+      "neutral": 128
+    },
+    "src/app/app/page.tsx": {
+      "hex": 0,
+      "neutral": 81
+    },
+    "src/app/app/reset-password/page.tsx": {
+      "hex": 0,
+      "neutral": 16
+    },
+    "src/app/app/setup-account/page.tsx": {
+      "hex": 0,
+      "neutral": 13
+    },
+    "src/app/app/setup-password/page.tsx": {
+      "hex": 0,
+      "neutral": 14
+    },
+    "src/app/app/signup/page.tsx": {
+      "hex": 2,
+      "neutral": 29
+    },
+    "src/app/app/trust/page.tsx": {
+      "hex": 0,
+      "neutral": 17
+    },
+    "src/app/awards/[id]/page.tsx": {
+      "hex": 0,
+      "neutral": 20
+    },
+    "src/app/awards/page.tsx": {
+      "hex": 0,
+      "neutral": 48
+    },
+    "src/app/blog/page.tsx": {
+      "hex": 0,
+      "neutral": 22
+    },
+    "src/app/briefings/dashboard/page.tsx": {
+      "hex": 0,
+      "neutral": 140
+    },
+    "src/app/briefings/feedback/error/page.tsx": {
+      "hex": 0,
+      "neutral": 2
+    },
+    "src/app/briefings/feedback/thanks/page.tsx": {
+      "hex": 0,
+      "neutral": 18
+    },
+    "src/app/briefings/lindy-setup/page.tsx": {
+      "hex": 0,
+      "neutral": 20
+    },
+    "src/app/briefings/page.tsx": {
+      "hex": 0,
+      "neutral": 136
+    },
+    "src/app/compare/[competitor]/page.tsx": {
+      "hex": 0,
+      "neutral": 21
+    },
+    "src/app/compare/govwin/page.tsx": {
+      "hex": 0,
+      "neutral": 69
+    },
+    "src/app/compare/page.tsx": {
+      "hex": 0,
+      "neutral": 4
+    },
+    "src/app/compare/sam-gov/page.tsx": {
+      "hex": 0,
+      "neutral": 65
+    },
+    "src/app/contacts/page.tsx": {
+      "hex": 0,
+      "neutral": 1
+    },
+    "src/app/content-generator/success/page.tsx": {
+      "hex": 0,
+      "neutral": 9
+    },
+    "src/app/contractors/[slug]/agencies/page.tsx": {
+      "hex": 0,
+      "neutral": 12
+    },
+    "src/app/contractors/[slug]/contracts/[[...page]]/page.tsx": {
+      "hex": 0,
+      "neutral": 21
+    },
+    "src/app/contractors/[slug]/naics/page.tsx": {
+      "hex": 0,
+      "neutral": 13
+    },
+    "src/app/contractors/[slug]/page.tsx": {
+      "hex": 0,
+      "neutral": 73
+    },
+    "src/app/contractors/page.tsx": {
+      "hex": 0,
+      "neutral": 19
+    },
+    "src/app/database-locked/page.tsx": {
+      "hex": 0,
+      "neutral": 7
+    },
+    "src/app/dsbs-scorer/page.tsx": {
+      "hex": 0,
+      "neutral": 135
+    },
+    "src/app/federal-market-assassin/page.tsx": {
+      "hex": 0,
+      "neutral": 75
+    },
+    "src/app/federal-market-assassin/success/page.tsx": {
+      "hex": 0,
+      "neutral": 17
+    },
+    "src/app/feedback/error/page.tsx": {
+      "hex": 0,
+      "neutral": 7
+    },
+    "src/app/feedback/thanks/page.tsx": {
+      "hex": 0,
+      "neutral": 8
+    },
+    "src/app/free-resources/page.tsx": {
+      "hex": 0,
+      "neutral": 29
+    },
+    "src/app/glossary/[slug]/page.tsx": {
+      "hex": 0,
+      "neutral": 25
+    },
+    "src/app/glossary/page.tsx": {
+      "hex": 0,
+      "neutral": 17
+    },
+    "src/app/home-redesign/page.tsx": {
+      "hex": 0,
+      "neutral": 52
+    },
+    "src/app/layout.tsx": {
+      "hex": 0,
+      "neutral": 2
+    },
+    "src/app/lifetime/page.tsx": {
+      "hex": 0,
+      "neutral": 34
+    },
+    "src/app/market-assassin-locked/page.tsx": {
+      "hex": 0,
+      "neutral": 22
+    },
+    "src/app/market-intelligence/page.tsx": {
+      "hex": 0,
+      "neutral": 107
+    },
+    "src/app/mindy-intelligence/page.tsx": {
+      "hex": 0,
+      "neutral": 35
+    },
+    "src/app/mindy-landing/page.tsx": {
+      "hex": 0,
+      "neutral": 111
+    },
+    "src/app/naics/[code]/page.tsx": {
+      "hex": 0,
+      "neutral": 75
+    },
+    "src/app/naics/page.tsx": {
+      "hex": 0,
+      "neutral": 16
+    },
+    "src/app/opportunity/[slug]/page.tsx": {
+      "hex": 0,
+      "neutral": 25
+    },
+    "src/app/opportunity/mute/already-muted/page.tsx": {
+      "hex": 0,
+      "neutral": 6
+    },
+    "src/app/opportunity/mute/error/page.tsx": {
+      "hex": 0,
+      "neutral": 5
+    },
+    "src/app/opportunity/mute/success/page.tsx": {
+      "hex": 0,
+      "neutral": 6
+    },
+    "src/app/opportunity-hunter/page.tsx": {
+      "hex": 0,
+      "neutral": 127
+    },
+    "src/app/page.tsx": {
+      "hex": 0,
+      "neutral": 27
+    },
+    "src/app/pipeline/added/page.tsx": {
+      "hex": 0,
+      "neutral": 5
+    },
+    "src/app/pipeline/already-tracking/page.tsx": {
+      "hex": 0,
+      "neutral": 5
+    },
+    "src/app/pipeline/error/page.tsx": {
+      "hex": 0,
+      "neutral": 5
+    },
+    "src/app/pipeline/page.tsx": {
+      "hex": 0,
+      "neutral": 1
+    },
+    "src/app/planner/forgot-password/page.tsx": {
+      "hex": 5,
+      "neutral": 8
+    },
+    "src/app/planner/lessons/page.tsx": {
+      "hex": 11,
+      "neutral": 25
+    },
+    "src/app/planner/login/page.tsx": {
+      "hex": 7,
+      "neutral": 26
+    },
+    "src/app/planner/page.tsx": {
+      "hex": 17,
+      "neutral": 48
+    },
+    "src/app/planner/phase/[phaseId]/page.tsx": {
+      "hex": 26,
+      "neutral": 76
+    },
+    "src/app/planner/reset-password/page.tsx": {
+      "hex": 5,
+      "neutral": 10
+    },
+    "src/app/planner/resources/page.tsx": {
+      "hex": 12,
+      "neutral": 24
+    },
+    "src/app/pricing/page.tsx": {
+      "hex": 0,
+      "neutral": 50
+    },
+    "src/app/privacy/page.tsx": {
+      "hex": 0,
+      "neutral": 4
+    },
+    "src/app/profile/complete/page.tsx": {
+      "hex": 11,
+      "neutral": 17
+    },
+    "src/app/profile/setup/page.tsx": {
+      "hex": 32,
+      "neutral": 35
+    },
+    "src/app/purchase/success/page.tsx": {
+      "hex": 0,
+      "neutral": 29
+    },
+    "src/app/pursuit-brief/error/page.tsx": {
+      "hex": 0,
+      "neutral": 9
+    },
+    "src/app/pursuit-brief/requested/page.tsx": {
+      "hex": 0,
+      "neutral": 9
+    },
+    "src/app/recompete/page.tsx": {
+      "hex": 0,
+      "neutral": 16
+    },
+    "src/app/set-asides/8a/page.tsx": {
+      "hex": 0,
+      "neutral": 75
+    },
+    "src/app/set-asides/hubzone/page.tsx": {
+      "hex": 0,
+      "neutral": 69
+    },
+    "src/app/set-asides/page.tsx": {
+      "hex": 0,
+      "neutral": 47
+    },
+    "src/app/set-asides/sdvosb/page.tsx": {
+      "hex": 0,
+      "neutral": 72
+    },
+    "src/app/set-asides/wosb/page.tsx": {
+      "hex": 0,
+      "neutral": 79
+    },
+    "src/app/shared/opp/[shareId]/SharedOpportunityClient.tsx": {
+      "hex": 0,
+      "neutral": 24
+    },
+    "src/app/start/page.tsx": {
+      "hex": 0,
+      "neutral": 56
+    },
+    "src/app/store/page.tsx": {
+      "hex": 0,
+      "neutral": 218
+    },
+    "src/app/terms/page.tsx": {
+      "hex": 0,
+      "neutral": 4
+    },
+    "src/app/test-protocol/TestProtocolClient.tsx": {
+      "hex": 0,
+      "neutral": 57
+    },
+    "src/app/top/[slug]/page.tsx": {
+      "hex": 0,
+      "neutral": 32
+    },
+    "src/app/top/page.tsx": {
+      "hex": 0,
+      "neutral": 15
+    }
+  },
+  "totalHex": 135,
+  "totalNeutral": 10563
+}
