@@ -25,6 +25,7 @@ import { verifyMIAccess } from '@/lib/api-auth';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { internalBaseUrl } from '@/lib/utils/internal-base-url';
 import { normalizeOfficeName } from '@/lib/gov-contacts/office-name';
+import { distinctiveKeywords } from '@/lib/market/keyword-sanitize';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -101,28 +102,64 @@ export async function POST(request: NextRequest) {
   // target-market-research). find-agencies needs NO MI session auth and returns
   // the exact fields we map, so it avoids the server→server auth-forward + 308
   // body-drop fragility that made Auto silently return 0 agencies in Coach Mode.
-  // It takes ONE naicsCode, so scan the top 3 profile codes and merge/dedup.
+  // It takes ONE naicsCode, so scan the top 5 profile codes and merge/dedup —
+  // a richer pool of candidate buyers before the top-MAX_AGENCIES cut, so the
+  // seeded list is chosen from more of the profile, not just its first 3 codes.
   const base = internalBaseUrl(request);
-  const codesToScan = naicsCodes.slice(0, 3);
+  const stateFilter = states.length ? { locationStates: states } : {};
+
+  // Discovery is TWO axes, not one (memory: naics-vs-psc-search, keyword-first
+  // market research). NAICS finds buyers by who the SELLER is — a catch-all that
+  // misses buyers who classify the same work under a different code. Keywords
+  // find buyers by what was actually BOUGHT (matches the contract text), so they
+  // surface agencies NAICS alone would miss. We run both and merge before the cut.
+  const codesToScan = naicsCodes.slice(0, 5);
+  // Keyword axis: only DISTINCTIVE terms (phrases / real product words) — generic
+  // singles ("management", "services") would flood the scan with every big buyer,
+  // the exact over-width problem we just fixed. Cap at 3 to bound the fan-out.
+  const kwToScan = distinctiveKeywords(keywords).slice(0, 3);
+
+  // Each request is labelled so a keyword scan's failure is reported distinctly
+  // from a NAICS scan's, and so we never let one empty axis mask the other.
+  type ScanReq = { kind: 'naics' | 'keyword'; label: string; body: Record<string, unknown> };
+  const requests: ScanReq[] = [
+    ...codesToScan.map((code) => ({
+      kind: 'naics' as const,
+      label: `naics ${code}`,
+      body: { naicsCode: code, ...stateFilter },
+    })),
+    ...kwToScan.map((kw) => ({
+      kind: 'keyword' as const,
+      label: `keyword "${kw}"`,
+      // Keyword-primary discovery: marketFilter drives the buyer sampling, NAICS
+      // is left off so the term isn't trapped inside a single seller code.
+      body: {
+        marketFilter: { keywords: [kw], mode: 'keyword', rankingLabel: `keyword "${kw}"` },
+        searchKeywords: [kw],
+        ...stateFilter,
+      },
+    })),
+  ];
+
   const byKey = new Map<string, ScanAgency>();
   const scanErrors: string[] = [];
   try {
     const scans = await Promise.all(
-      codesToScan.map((code) =>
+      requests.map((req) =>
         fetch(`${base}/api/usaspending/find-agencies`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ naicsCode: code, ...(states.length ? { locationStates: states } : {}) }),
+          body: JSON.stringify(req.body),
         })
-          .then(async (r) => ({ ok: r.ok, status: r.status, body: await r.json().catch(() => null) }))
-          .catch((e) => ({ ok: false, status: 0, body: null as unknown, err: String(e) })),
+          .then(async (r) => ({ ok: r.ok, status: r.status, body: await r.json().catch(() => null), req }))
+          .catch((e) => ({ ok: false, status: 0, body: null as unknown, req, err: String(e) })),
       ),
     );
     for (const s of scans) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const sb = s as any;
       if (!s.ok || !sb.body?.success) {
-        scanErrors.push(sb.body?.error || `find-agencies ${s.status}`);
+        scanErrors.push(`${s.req.label}: ${sb.body?.error || `find-agencies ${s.status}`}`);
         continue;
       }
       for (const a of (Array.isArray(sb.body.agencies) ? sb.body.agencies : []) as ScanAgency[]) {
@@ -144,7 +181,7 @@ export async function POST(request: NextRequest) {
   if (agencies.length === 0) {
     // Surface the REAL reason instead of a generic "none found" (the silent
     // failure). If every scan errored, say so; otherwise it's genuinely empty.
-    const allFailed = scanErrors.length > 0 && scanErrors.length === codesToScan.length;
+    const allFailed = scanErrors.length > 0 && scanErrors.length === requests.length;
     return NextResponse.json(
       {
         success: false,
