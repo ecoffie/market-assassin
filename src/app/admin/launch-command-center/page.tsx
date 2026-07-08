@@ -50,6 +50,20 @@ type TrackAdoption = {
   note: string;
 };
 
+type InsightEngagement = {
+  success: boolean;
+  window_days: number;
+  impressions: { total: number; unique_viewers: number };
+  interactions: {
+    total: number;
+    unique_users: number;
+    by_action: { refresh: number; copy: number; dismiss: number };
+    interaction_rate_pct: number;
+  };
+  by_variant: Array<{ variant: string; impressions: number; interactions: number; interaction_rate_pct: number }>;
+  verdict: string;
+};
+
 /** Percent of total, clamped 0–100 (for the conversion progress bar widths). */
 function pct(part: number, total: number): number {
   if (!total) return 0;
@@ -574,6 +588,9 @@ export default function LaunchCommandCenterPage() {
   const [trackAdoption, setTrackAdoption] = useState<TrackAdoption | null>(null);
   const [trackAdoptionLoading, setTrackAdoptionLoading] = useState(false);
   const [trackAdoptionError, setTrackAdoptionError] = useState('');
+  const [insightEng, setInsightEng] = useState<InsightEngagement | null>(null);
+  const [insightEngLoading, setInsightEngLoading] = useState(false);
+  const [insightEngError, setInsightEngError] = useState('');
   const [mrrGoal, setMrrGoal] = useState<MrrGoal | null>(null);
   const [mrrGoalError, setMrrGoalError] = useState('');
   // On-demand "Refresh purchases": bumps a key to re-run the MRR loader, and
@@ -918,6 +935,39 @@ export default function LaunchCommandCenterPage() {
     }
 
     loadTrackAdoption();
+    return () => { cancelled = true; };
+  }, [authenticated, password]);
+
+  useEffect(() => {
+    if (!authenticated || !password) return;
+    let cancelled = false;
+
+    async function loadInsightEngagement() {
+      setInsightEngLoading(true);
+      setInsightEngError('');
+      try {
+        const response = await fetch(`/api/admin/insight-engagement?password=${encodeURIComponent(password)}&days=14`, {
+          cache: 'no-store',
+        });
+        const data = await response.json();
+        if (cancelled) return;
+        if (!response.ok || !data.success) {
+          setInsightEngError(data.error || 'Could not load Insight engagement');
+          setInsightEng(null);
+          return;
+        }
+        setInsightEng(data as InsightEngagement);
+      } catch {
+        if (!cancelled) {
+          setInsightEngError('Could not load Insight engagement');
+          setInsightEng(null);
+        }
+      } finally {
+        if (!cancelled) setInsightEngLoading(false);
+      }
+    }
+
+    loadInsightEngagement();
     return () => { cancelled = true; };
   }, [authenticated, password]);
 
@@ -1709,6 +1759,82 @@ export default function LaunchCommandCenterPage() {
                 </div>
               ) : (
                 <p className="mt-5 text-sm text-amber-300/90">{trackAdoption.note}</p>
+              )}
+            </>
+          )}
+        </section>
+
+        <section className="rounded-lg border border-slate-800 bg-slate-900 p-6">
+          <div className="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p className="text-sm uppercase tracking-[0.2em] text-fuchsia-300">Mindy Insight card</p>
+              <h2 className="mt-2 text-3xl font-bold">Does the daily insight card earn its place?</h2>
+              <p className="mt-2 text-sm text-slate-400">
+                Impressions are free (it just renders) — the number that matters is the INTERACTION rate
+                (refresh / copy / dismiss). Last 14 days. Generic fallback quotes are already suppressed.
+              </p>
+            </div>
+          </div>
+
+          {insightEngLoading && !insightEng && (
+            <p className="mt-6 text-sm text-slate-400">Loading Insight engagement…</p>
+          )}
+          {insightEngError && (
+            <p className="mt-6 text-sm text-red-300">{insightEngError}</p>
+          )}
+
+          {insightEng && (
+            <>
+              <div className="mt-4 rounded-lg border border-fuchsia-500/30 bg-fuchsia-500/5 px-4 py-3 text-sm font-medium text-fuchsia-200">
+                {insightEng.verdict}
+              </div>
+
+              <div className="mt-4 grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+                <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-4">
+                  <div className="text-3xl font-bold text-white">{insightEng.impressions.total.toLocaleString()}</div>
+                  <div className="mt-1 text-sm text-slate-400">Impressions ({insightEng.impressions.unique_viewers.toLocaleString()} users)</div>
+                </div>
+                <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/5 p-4">
+                  <div className="text-3xl font-bold text-emerald-300">
+                    {insightEng.interactions.total.toLocaleString()}
+                    <span className="ml-2 text-base font-semibold text-emerald-400/80">{insightEng.interactions.interaction_rate_pct}%</span>
+                  </div>
+                  <div className="mt-1 text-sm text-slate-400">Interactions ({insightEng.interactions.unique_users.toLocaleString()} users)</div>
+                </div>
+                <div className="rounded-lg border border-slate-800 bg-slate-950/40 p-4">
+                  <div className="text-3xl font-bold text-white">
+                    {insightEng.interactions.by_action.refresh}
+                    <span className="mx-1 text-base text-slate-500">·</span>
+                    <span className="text-blue-200">{insightEng.interactions.by_action.copy}</span>
+                  </div>
+                  <div className="mt-1 text-sm text-slate-400">↻ Refresh · ⎘ Copy</div>
+                </div>
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-4">
+                  <div className="text-3xl font-bold text-amber-300">{insightEng.interactions.by_action.dismiss}</div>
+                  <div className="mt-1 text-sm text-slate-400">× Dismissed</div>
+                </div>
+              </div>
+
+              {insightEng.by_variant.length > 0 && (
+                <div className="mt-5">
+                  <div className="mb-2 text-xs uppercase tracking-wide text-slate-500">Which variant lands (impressions · interaction rate)</div>
+                  <div className="space-y-1.5">
+                    {insightEng.by_variant.map((v) => (
+                      <div key={v.variant} className="flex items-center justify-between gap-3 rounded-md border border-slate-800 bg-slate-950/40 px-3 py-1.5 text-sm">
+                        <span className="text-slate-300">{v.variant}</span>
+                        <span className="text-slate-400">
+                          {v.impressions.toLocaleString()} seen
+                          <span className="mx-1.5 text-slate-600">·</span>
+                          <span className={v.interaction_rate_pct >= 5 ? 'text-emerald-300' : 'text-slate-400'}>{v.interaction_rate_pct}% acted</span>
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {insightEng.impressions.total === 0 && (
+                <p className="mt-5 text-sm text-amber-300/90">No insight events yet — the card ships telemetry as of this deploy; check back in a few days.</p>
               )}
             </>
           )}
