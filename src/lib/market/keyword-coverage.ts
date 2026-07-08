@@ -13,7 +13,7 @@
  */
 import { fiscalYearTimePeriod } from '@/lib/utils/fiscal-year';
 import { sectorSubTradeKeywords } from './sector-expansions';
-import { isDistinctiveKeyword } from './keyword-sanitize';
+import { isDistinctiveKeyword, keywordCandidates } from './keyword-sanitize';
 
 const BASE = 'https://api.usaspending.gov/api/v2/search/spending_by_category';
 
@@ -136,39 +136,8 @@ export interface KeywordCoverage {
   topPscList: { code: string; name: string; amount: number; pct: number }[];
 }
 
-/**
- * Resolve a keyword to its market coverage. coverageTarget = the spend fraction
- * the derived code set should capture (default 0.9 = 90%).
- */
-// Stopwords stripped when reducing a phrase/sentence to its core term.
-const STOP = new Set(['we', 'provide', 'offer', 'and', 'or', 'the', 'a', 'an', 'for', 'of', 'to', 'in', 'our', 'with', 'services', 'service', 'support', 'solutions', 'consulting', 'company', 'federal', 'government', 'agencies',
-  // Business-entity / generic nouns that aren't capabilities — "demolition firm"
-  // was leaking "firm" as a keyword. These describe the org, not what it does.
-  'firm', 'llc', 'inc', 'corp', 'corporation', 'business', 'group', 'enterprise', 'enterprises', 'contractor', 'contractors', 'provider', 'providers', 'specialist', 'specialists', 'professional', 'professionals']);
-
-/**
- * USASpending keyword search is EXACT-PHRASE (QA: "cybersecurity consulting"
- * returned nothing → LLM fallback). So build candidate keywords from most- to
- * least-specific: the full phrase, then significant bigrams, then the single
- * most-meaningful word. Return the first that yields real award data.
- */
-function keywordCandidates(input: string): string[] {
-  const kw = input.trim();
-  const out: string[] = [kw];
-  const words = kw.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 2 && !STOP.has(w));
-  // Order single-word fallbacks by DISTINCTIVENESS, not length. "longest ≈ most
-  // specific" was backwards: "video production" → the longer word "production" is
-  // a generic federal wildcard ($36B defense mfg) while the shorter "video" is the
-  // real industry term. Ranking longest-first + a "bigger market wins" rule locked
-  // onto "production" and told a video company to add engineering/R&D codes
-  // (Candice / Whitty-CAP, Jul 8 2026). Distinctive words (not in the generic-noise
-  // set) come first; among equally-distinctive, longer (more specific) first.
-  const rank = (w: string) => (isDistinctiveKeyword(w) ? 0 : 1);
-  for (const w of [...new Set(words)].sort((a, b) => rank(a) - rank(b) || b.length - a.length)) {
-    if (!out.includes(w)) out.push(w);
-  }
-  return out.slice(0, 4);
-}
+// keywordCandidates() moved to @/lib/market/keyword-sanitize (single source of
+// truth — it used to be copy-pasted here AND in suggest-codes and the two diverged).
 
 const DERIVE_KW_STOP = new Set([
   'and', 'or', 'the', 'of', 'for', 'all', 'other', 'nec', 'services', 'service',
@@ -227,6 +196,10 @@ export function buildSearchKeywords(opts: {
 const _covCache = new Map<string, { at: number; val: KeywordCoverage | null }>();
 const COV_TTL_MS = 10 * 60 * 1000;
 
+/**
+ * Resolve a keyword to its market coverage. coverageTarget = the spend fraction
+ * the derived code set should capture (default 0.9 = 90%).
+ */
 export async function keywordCoverage(keyword: string, coverageTarget = 0.9): Promise<KeywordCoverage | null> {
   const cacheKey = `${(keyword || '').trim().toLowerCase()}|${coverageTarget}`;
   const hit = _covCache.get(cacheKey);

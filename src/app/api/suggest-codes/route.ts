@@ -19,6 +19,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { logToolError, recordToolSuccess, ToolNames, classifyError, AIProviders } from '@/lib/tool-errors';
 import { fiscalYearTimePeriod, fiscalYearLabel } from '@/lib/utils/fiscal-year';
 import { sectorSubTradeKeywords } from '@/lib/market/sector-expansions';
+import { keywordCandidates, isDistinctiveKeyword } from '@/lib/market/keyword-sanitize';
 
 // Groq API configuration
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -223,17 +224,10 @@ interface SuggestCodesResponse {
  * (Eric's principle: suggest the codes that ACTUALLY have spending under the
  * term, not an LLM guess). Queries spending_by_category for the last FY.
  */
-// USASpending keyword search is EXACT-PHRASE (QA: onboarding sentences like
-// "cybersecurity consulting" returned nothing → silently fell to the LLM). Reduce
-// a phrase/sentence to candidates most→least specific so we stay grounded.
-const SUGGEST_STOP = new Set(['we', 'provide', 'offer', 'and', 'or', 'the', 'a', 'an', 'for', 'of', 'to', 'in', 'our', 'with', 'services', 'service', 'support', 'solutions', 'consulting', 'company', 'federal', 'government', 'agencies']);
-function suggestKeywordCandidates(input: string): string[] {
-  const kw = input.trim();
-  const out = [kw];
-  const words = kw.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 2 && !SUGGEST_STOP.has(w));
-  for (const w of [...new Set(words)].sort((a, b) => b.length - a.length)) if (!out.includes(w)) out.push(w);
-  return out.slice(0, 4);
-}
+// Phrase→candidate reduction (USASpending is EXACT-PHRASE) now uses the shared
+// keywordCandidates() from keyword-sanitize — a single source of truth. This used
+// to have its OWN longest-first copy that diverged from keyword-coverage's and
+// grounded a new video company onto defense codes (Candice, Jul 8 2026).
 
 /** Merge two grounded lists, dedupe by code (primary wins ordering), cap at limit. */
 function mergeDedupeCodes(primary: CodeSuggestion[], extra: CodeSuggestion[], limit: number): CodeSuggestion[] {
@@ -274,14 +268,18 @@ async function groundCodesFromUsaspending(keyword: string, maxResults: number): 
         }));
     } catch { return []; }
   };
-  // Try candidates until one yields real award data (phrase resilience).
+  // Try candidates for real award data (phrase resilience). Candidates arrive
+  // distinctive-first (keywordCandidates). A DISTINCTIVE candidate with data wins
+  // immediately; a GENERIC candidate ("production") only seeds a provisional result
+  // that a later distinctive one can still replace — so we never ground a video
+  // company on defense codes just because "production" returned first.
   let primary: { naicsSuggestions: CodeSuggestion[]; pscSuggestions: CodeSuggestion[] } | null = null;
-  for (const cand of suggestKeywordCandidates(keyword)) {
+  for (const cand of keywordCandidates(keyword)) {
     const [naicsSuggestions, pscSuggestions] = await Promise.all([fetchCat(cand, 'naics', maxResults), fetchCat(cand, 'psc', maxResults)]);
-    if (naicsSuggestions.length > 0 || pscSuggestions.length > 0) {
-      primary = { naicsSuggestions, pscSuggestions };
-      break;
-    }
+    if (naicsSuggestions.length === 0 && pscSuggestions.length === 0) continue;
+    const distinctive = cand.includes(' ') || isDistinctiveKeyword(cand);
+    if (distinctive) { primary = { naicsSuggestions, pscSuggestions }; break; }
+    if (!primary) primary = { naicsSuggestions, pscSuggestions }; // provisional; keep scanning for a distinctive hit
   }
   if (!primary) return null;
 

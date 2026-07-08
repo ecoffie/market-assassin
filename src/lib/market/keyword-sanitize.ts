@@ -28,6 +28,7 @@ const SAFE_ABBREVIATIONS = new Set([
 const STOPWORDS = new Set([
   'we', 'provide', 'offer', 'and', 'or', 'the', 'a', 'an', 'for', 'of', 'to', 'in',
   'on', 'our', 'with', 'services', 'service', 'support', 'solutions', 'company',
+  'consulting', // org/service descriptor, not a capability ("cybersecurity consulting" → "cybersecurity")
   'federal', 'government', 'agencies', 'inc', 'llc', 'corp', 'all', 'any', 'new',
   // Business-entity / generic nouns that describe the ORG, not the capability —
   // "demolition firm" was leaking "firm" as a keyword.
@@ -119,6 +120,36 @@ export function isDistinctiveKeyword(term: string): boolean {
 /** The distinctive subset of a keyword list (phrases + non-generic single words). */
 export function distinctiveKeywords(keywords: (string | null | undefined)[]): string[] {
   return sanitizeKeywords(keywords).filter((k) => isDistinctiveKeyword(k));
+}
+
+/**
+ * CANONICAL phrase→candidate reducer. USASpending keyword search is EXACT-PHRASE
+ * ("cybersecurity consulting" returns nothing), so to stay grounded we try the full
+ * phrase first, then fall back to single words most→least meaningful. Callers try
+ * each candidate against USASpending and take the first (or best) that returns data.
+ *
+ * Ordering is by DISTINCTIVENESS, not length. "longest ≈ most specific" is backwards:
+ * "video production" → the longer word "production" is a generic federal wildcard
+ * ($36B defense mfg) while the shorter "video" is the real industry term. Longest-first
+ * + a "bigger market wins" tiebreak told a video company to add engineering/R&D codes
+ * (Candice / Whitty-CAP, Jul 8 2026). So: distinctive words (not in the generic-noise
+ * set) first; among equally-distinctive, longer (≈ more specific) first.
+ *
+ * ONE source of truth — this logic used to be copy-pasted into keyword-coverage.ts
+ * AND suggest-codes/route.ts and the two diverged (only one got fixed). Both now import
+ * this. Guarded by keyword-sanitize.unit.test.ts so longest-first can't sneak back.
+ */
+export function keywordCandidates(input: string, max = 4): string[] {
+  const kw = (input || '').trim();
+  if (!kw) return [];
+  const out: string[] = [kw];
+  const words = kw.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+    .filter((w) => w.length > 2 && !STOPWORDS.has(w) && !GEO_TERMS.has(w));
+  const rank = (w: string) => (isDistinctiveKeyword(w) ? 0 : 1);
+  for (const w of [...new Set(words)].sort((a, b) => rank(a) - rank(b) || b.length - a.length)) {
+    if (!out.includes(w)) out.push(w);
+  }
+  return out.slice(0, max);
 }
 
 // A "word" with no vowels or absurd consonant runs is keyboard mash (zxcvbnm,
