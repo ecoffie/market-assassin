@@ -21,7 +21,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import type { AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders, authedFetch } from '../authHeaders';
-import { isDistinctiveKeyword } from '@/lib/market/keyword-sanitize';
+import { isDistinctiveKeyword, sanitizeKeywords } from '@/lib/market/keyword-sanitize';
 
 interface TargetingCardProps {
   email: string | null;
@@ -84,6 +84,10 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
   const [saving, setSaving] = useState(false);
   const [addingField, setAddingField] = useState<null | 'naics' | 'psc' | 'keywords'>(null);
   const [addValue, setAddValue] = useState('');
+  // Transient note shown after a keyword add when the sanitizer changed what the
+  // user typed (dropped a generic filler word / kept fewer than entered) — so the
+  // chip that appears is never a silent surprise ("suggests 2, saves 1").
+  const [addNote, setAddNote] = useState<string | null>(null);
 
   // Persist one targeting field with the 30-day-token-cliff retry, then broadcast
   // so every other settings surface re-syncs. Optimistic: caller updates local
@@ -146,14 +150,33 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
     const raw = addValue.trim();
     setAddValue('');
     setAddingField(null);
+    setAddNote(null);
     if (!raw) return;
-    // Allow comma/space-separated multi-add; NAICS/PSC keep only valid tokens.
-    const tokens = raw.split(/[,\s]+/).map((t) => t.trim()).filter(Boolean);
-    const clean = field === 'naics'
-      ? tokens.filter((t) => /^\d{2,6}$/.test(t))
-      : field === 'psc'
-        ? tokens.map((t) => t.toUpperCase())
-        : tokens;
+    let clean: string[];
+    if (field === 'keywords') {
+      // Keywords split on COMMAS ONLY — a space is part of the phrase. "medical
+      // supplies" is ONE precise keyword; splitting on space would shatter it into
+      // "medical" + generic "supplies" (the opposite of what we want — phrases are
+      // the precise signal). Then run the SAME sanitizer the save path uses, so a
+      // filler/generic word the profile would drop never shows as a chip that then
+      // vanishes on reload. What you see committed == what persists.
+      const entered = raw.split(',').map((t) => t.trim()).filter(Boolean);
+      clean = sanitizeKeywords(entered);
+      const dropped = entered.filter(
+        (e) => !clean.some((c) => c.toLowerCase() === e.toLowerCase()),
+      );
+      if (dropped.length > 0) {
+        setAddNote(
+          `Skipped ${dropped.map((d) => `“${d}”`).join(', ')} — too generic to match on. Try a specific phrase (e.g. “custom cabinetry”).`,
+        );
+      }
+    } else {
+      // NAICS/PSC are single tokens — keep comma/space splitting + validation.
+      const tokens = raw.split(/[,\s]+/).map((t) => t.trim()).filter(Boolean);
+      clean = field === 'naics'
+        ? tokens.filter((t) => /^\d{2,6}$/.test(t))
+        : tokens.map((t) => t.toUpperCase());
+    }
     if (clean.length === 0) return;
     setData((d) => {
       if (!d) return d;
@@ -388,6 +411,9 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
               <span className="text-xs text-amber-300">⚠ No keywords yet — add in Settings</span>
             )}
           </div>
+          {addNote && (
+            <div className="mt-1 text-[11px] text-amber-300/90">{addNote}</div>
+          )}
         </div>
 
         {/* PSC codes — what's BOUGHT (the precise axis). Display-only here; edit in Settings. */}

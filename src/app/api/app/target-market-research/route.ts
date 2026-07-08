@@ -128,22 +128,37 @@ function reconcileMarketTotals(opts: {
   authoritativeMarketTotal: number;
   rows: Array<{ name?: string; totalSpending?: number; metric_top_total?: number }>;
   states: string[];
-}): void {
+}): number {
+  const { authoritativeMarketTotal, rows, states } = opts;
   try {
-    const { authoritativeMarketTotal, rows, states } = opts;
-    if (!rows.length) return;
-    const topRow = Math.max(...rows.map((r) => r.metric_top_total || r.totalSpending || 0));
-    // A single agency/office can't exceed the WHOLE market total by a wide margin.
-    // >2× means a row carries a broader (e.g. national/parent) figure than the
-    // headline — the exact shape of the scope-mismatch + parent-inheritance bugs.
+    if (!rows.length) return authoritativeMarketTotal;
+    // Sum of the DISTINCT top-level (parent-department) rows — a conservative
+    // floor for the market total. We use the max per parent so multiple offices
+    // under one department don't double-count.
+    const byParent = new Map<string, number>();
+    for (const r of rows) {
+      const key = (r.name || '').trim().toLowerCase();
+      const v = r.metric_top_total || r.totalSpending || 0;
+      if (key && v > byParent.get(key)!) byParent.set(key, v);
+      else if (key && !byParent.has(key)) byParent.set(key, v);
+    }
+    const topRow = Math.max(0, ...rows.map((r) => r.metric_top_total || r.totalSpending || 0));
+    // A single agency/office can't exceed the WHOLE market total. When it does,
+    // the headline came from a narrower scope than the rows (the $14.5M-headline-
+    // over-$1.8B-CMS-row bug, Jul 8). Floor the headline at the largest single
+    // component so it can never be smaller than a number shown beneath it.
     if (authoritativeMarketTotal > 0 && topRow > authoritativeMarketTotal * 2) {
       console.warn(
         `[target-market-research] RECONCILE: top row ($${Math.round(topRow / 1e6)}M) exceeds the ` +
-        `market total ($${Math.round(authoritativeMarketTotal / 1e6)}M) by >2× — likely a scope ` +
-        `mismatch (rows vs headline) or a sub-agency inheriting a parent total. states=[${states.join(',')}]`,
+        `market total ($${Math.round(authoritativeMarketTotal / 1e6)}M) by >2× — flooring headline to ` +
+        `the largest component. states=[${states.join(',')}]`,
       );
+      return Math.max(authoritativeMarketTotal, topRow);
     }
-  } catch { /* observability only — never affect the response */ }
+    return authoritativeMarketTotal;
+  } catch {
+    return authoritativeMarketTotal; // never let reconciliation break the response
+  }
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -305,11 +320,13 @@ export async function POST(request: NextRequest) {
       excludeDOD?: boolean;
       locationStates?: string[]; // States filter — scopes spend to these states (place of perf)
       email?: string;
+      refresh?: boolean;       // staff-only: bypass the 24h cache to force a fresh compute (verification)
     };
 
     if (!email) {
       return NextResponse.json({ error: 'email is required' }, { status: 400 });
     }
+    const wantRefresh = Boolean((body as { refresh?: boolean }).refresh);
 
     // DEFAULT THE SET-ASIDE TO SMALL BUSINESS (Eric, Jun 23, 2026). With no
     // business type chosen, the WITH-set-aside pass collapsed to raw total, so
@@ -445,7 +462,10 @@ export async function POST(request: NextRequest) {
     // AND instant — the fix for "different even using the same search terms" and
     // the "still loading" wait. (Previously keyword/profile-keyword searches
     // skipped the cache, recomputing a live, slightly-different result each time.)
-    const skipCache = false;
+    // Staff can force a fresh compute (bypass the 24h cache) with { refresh: true }
+    // — needed to verify a fix without waiting out the TTL. Non-staff can't, so a
+    // user can't hammer the expensive USASpending fan-out on demand.
+    const skipCache = wantRefresh && access.isStaff;
     try {
       const { data: cacheRow } = skipCache ? { data: null } : await supabase
         .from('agency_target_data_cache')
@@ -926,23 +946,54 @@ export async function POST(request: NextRequest) {
       // category aggregate is only the right number for a SUB-AGENCY-level row
       // (no distinct contractingOffice) — never stamp it on every office.
       const isOfficeLevel = !!(a.contractingOffice && a.contractingOffice !== a.subAgency && a.contractingOffice !== a.parentAgency);
-      // The office's OWN accumulated award spend (find-agencies sums real awards
-      // per office into setAsideSpending). This is the per-office number — use it
-      // FIRST. Do NOT use totalSpendingByOffice[lookupOfficeKey] for office rows:
-      // lookupOfficeKey falls back to subAgencyCode when officeId is empty, so it
-      // returns the whole sub-agency total (the $22.5B-on-every-Army-office bug).
-      const officeOwnTotal = a.setAsideSpending || totalSpendingByOffice[a.officeId || ''] || 0;
+      // The office's OWN total award spend. Prefer the UNFILTERED pass
+      // (totalSpendingByOffice, keyed by a.officeId — the exact key totalData is
+      // built with) so the Total $ column is the real total, NOT the set-aside
+      // number. Without this, Total $ == Set-Aside $ on every office row (State
+      // $207.3M/$207.3M, VA $250M/$250M — Jul 8), because a.setAsideSpending is
+      // the set-aside-filtered spend from findData.
+      // IMPORTANT: key ONLY on a.officeId (never lookupOfficeKey, which falls back
+      // to subAgencyCode → the whole sub-agency total = the $22.5B-on-every-Army-
+      // office bug). Fall back to a.setAsideSpending only when this office isn't in
+      // the unfiltered set.
+      const officeTrueTotal = a.officeId ? (totalSpendingByOffice[a.officeId] || 0) : 0;
+      const officeOwnTotal = officeTrueTotal > 0
+        ? Math.max(officeTrueTotal, a.setAsideSpending || 0)
+        : (a.setAsideSpending || 0);
       const accurateTotal = categoryTotalForAgency(
         categoryTotalByKey,
         a.subAgency,
         a.parentAgency,
         a.name,
       );
-      // Office row → its own spend. Agency/sub-agency rollup row → the accurate
-      // category total (so the real giants still rank correctly).
+      // Authoritative SET-ASIDE for this sub-agency (server-computed over ALL
+      // matching records, same scope as accurateTotal) — resolved by the SAME key
+      // logic as the total. This is the real set-aside number ($3M for NPS wood),
+      // vs the find-agencies SAMPLED a.setAsideSpending which over-counted to equal
+      // the total ($43M/$43M was the Jul 8 bug — total == setaside on rollup rows).
+      const accurateSetAside = categoryTotalForAgency(
+        setAsideCatByKey,
+        a.subAgency,
+        a.parentAgency,
+        a.name,
+      );
+      // Office row → its own spend. Agency/sub-agency rollup row → the AUTHORITATIVE
+      // category total whenever present (server-computed over ALL matching records),
+      // NOT max(accurate, sampled): the find-agencies sample over-counts (NPS wood
+      // showed $43M sampled vs $20M real — Jul 8), so taking the max kept the
+      // inflated number. Fall back to the sample only when the category pass had no
+      // match for this row.
       const totalSpending = isOfficeLevel
         ? officeOwnTotal
-        : ((accurateTotal && accurateTotal > officeOwnTotal) ? accurateTotal : officeOwnTotal);
+        : (accurateTotal > 0 ? accurateTotal : officeOwnTotal);
+      // Set-Aside column: prefer the authoritative server figure for rollup rows;
+      // fall back to the sampled number only for office rows / when the category
+      // pass had no match. Never let it exceed the row's own total (a subset can't
+      // be larger than the whole).
+      const resolvedSetAside = Math.min(
+        totalSpending,
+        (!isOfficeLevel && accurateSetAside > 0) ? accurateSetAside : (a.setAsideSpending || 0),
+      );
       // Keyword searches: ONLY USAspending category totals for this keyword — never
       // the NAICS-sample setAsideSpending (Eric: DOE $2B / NASA $6B on Set-Aside lens
       // while real keyword "excel" has DoD ~$380M, DOE ~$20M per spending_by_category).
@@ -959,7 +1010,7 @@ export async function POST(request: NextRequest) {
         officeId: a.officeId || a.subAgencyCode || a.agencyCode || '',
         location: a.location || '',
 
-        setAsideSpending: a.setAsideSpending || 0,
+        setAsideSpending: resolvedSetAside,
         totalSpending,
         contractCount: a.contractCount || 0,
         satSpending: a.satSpending || 0,
@@ -1151,14 +1202,14 @@ export async function POST(request: NextRequest) {
     const noSetAsideMarketTotal = (totalData.success && typeof totalData.totalSpending === 'number' && totalData.totalSpending > 0)
       ? totalData.totalSpending
       : (findData.totalSpending || 0);
-    const relevantSpending = authoritativeMarketTotal || noSetAsideMarketTotal || 0;
+    const rawRelevantSpending = authoritativeMarketTotal || noSetAsideMarketTotal || 0;
 
-    // Tripwire (#2): the headline total and the rows must come from the SAME
-    // scope. If the top row dwarfs the market total, the numbers are mismatched
-    // (national vs state-scoped, or a sub-agency carrying a parent figure) — the
-    // shape of the bug we just fixed. Logs loudly; never blocks the response.
-    reconcileMarketTotals({
-      authoritativeMarketTotal: relevantSpending,
+    // Reconcile (#3): the headline total and the rows must come from the SAME
+    // scope. If the top row dwarfs the market total (national vs state-scoped, or
+    // a sub-agency carrying a parent figure), floor the headline to the largest
+    // component so a $1.8B CMS bar can never sit under a $14.5M headline (Jul 8).
+    const relevantSpending = reconcileMarketTotals({
+      authoritativeMarketTotal: rawRelevantSpending,
       rows,
       states: marketScope.states,
     });

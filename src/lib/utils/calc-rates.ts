@@ -308,15 +308,18 @@ async function runPricingIntel(searchTerms: string[], naicsCode: string, naicsDe
       .catch(err => ({ term, out: null as { records: CalcRateRecord[]; total: number; aggregations: CalcApiResponse['aggregations'] } | null, error: String(err) }))
   );
 
-  // Biz-size splits only need a representative median, not the full table —
-  // cap at 10 pages (200 records) to save API calls.
-  const sbQuery = queryCalcAPIAllPages({ keyword: searchTerms[0], businessSize: 'S', maxPages: 10 })
-    .then(r => ({ results: r.records, error: null as string | null }))
-    .catch(err => ({ results: [] as CalcRateRecord[], error: String(err) }));
+  // Biz-size splits: we only need the server-computed median + count per side.
+  // Keep the aggregations (CALC computes them over the FULL matching set) and the
+  // records only as a fallback. maxPages:2 is enough for that fallback — we do NOT
+  // median the paginated records anymore (they're cheapest-first, which overstated
+  // the gap: architect showed +23% when the true full-corpus gap is ~13%).
+  const sbQuery = queryCalcAPIAllPages({ keyword: searchTerms[0], businessSize: 'S', maxPages: 2 })
+    .then(r => ({ results: r.records, aggregations: r.aggregations, error: null as string | null }))
+    .catch(err => ({ results: [] as CalcRateRecord[], aggregations: undefined, error: String(err) }));
 
-  const lgQuery = queryCalcAPIAllPages({ keyword: searchTerms[0], businessSize: 'O', maxPages: 10 })
-    .then(r => ({ results: r.records, error: null as string | null }))
-    .catch(err => ({ results: [] as CalcRateRecord[], error: String(err) }));
+  const lgQuery = queryCalcAPIAllPages({ keyword: searchTerms[0], businessSize: 'O', maxPages: 2 })
+    .then(r => ({ results: r.records, aggregations: r.aggregations, error: null as string | null }))
+    .catch(err => ({ results: [] as CalcRateRecord[], aggregations: undefined, error: String(err) }));
 
   const [termResults, sbResult, lgResult] = await Promise.all([
     Promise.all(termQueries),
@@ -402,13 +405,26 @@ async function runPricingIntel(searchTerms: string[], naicsCode: string, naicsDe
     }
   }
 
-  // Business size comparison
+  // Business size comparison. PREFER the CALC server aggregations (median +
+  // count over the FULL matching set), exactly like the price-to-win block —
+  // NOT computePercentile over the cheapest-first paginated slice, which biased
+  // the medians low and overstated the gap (architect: +23% local vs ~13% true).
+  // Local prices are kept only as a fallback when aggregations are absent.
   const sbPrices = smallBizRecords.map(r => r.current_price).filter(p => p > 0).sort((a, b) => a - b);
   const lgPrices = largeBizRecords.map(r => r.current_price).filter(p => p > 0).sort((a, b) => a - b);
-  const sbMedian = sbPrices.length > 0 ? computePercentile(sbPrices, 50) : 0;
-  const lgMedian = lgPrices.length > 0 ? computePercentile(lgPrices, 50) : 0;
-  const sbAvg = sbPrices.length > 0 ? sbPrices.reduce((s, p) => s + p, 0) / sbPrices.length : 0;
-  const lgAvg = lgPrices.length > 0 ? lgPrices.reduce((s, p) => s + p, 0) / lgPrices.length : 0;
+  const sbAgg = sbResult.aggregations;
+  const lgAgg = lgResult.aggregations;
+  const sbMedian = sbAgg?.median_price?.values?.['50.0']
+    ?? (sbPrices.length > 0 ? computePercentile(sbPrices, 50) : 0);
+  const lgMedian = lgAgg?.median_price?.values?.['50.0']
+    ?? (lgPrices.length > 0 ? computePercentile(lgPrices, 50) : 0);
+  const sbAvg = sbAgg?.wage_stats?.avg
+    ?? (sbPrices.length > 0 ? sbPrices.reduce((s, p) => s + p, 0) / sbPrices.length : 0);
+  const lgAvg = lgAgg?.wage_stats?.avg
+    ?? (lgPrices.length > 0 ? lgPrices.reduce((s, p) => s + p, 0) / lgPrices.length : 0);
+  // True per-side counts (server), for the median denominators + any UI display.
+  const sbCount = sbAgg?.wage_stats?.count ?? sbPrices.length;
+  const lgCount = lgAgg?.wage_stats?.count ?? lgPrices.length;
 
   // Top vendors by average rate
   const vendorMap = new Map<string, { rates: number[]; size: string }>();
@@ -450,8 +466,8 @@ async function runPricingIntel(searchTerms: string[], naicsCode: string, naicsDe
   return {
     laborCategories: laborCategories.slice(0, 25),
     businessSizeComparison: {
-      smallBusiness: { median: sbMedian, count: sbPrices.length, avg: sbAvg },
-      largeBusiness: { median: lgMedian, count: lgPrices.length, avg: lgAvg },
+      smallBusiness: { median: sbMedian, count: sbCount, avg: sbAvg },
+      largeBusiness: { median: lgMedian, count: lgCount, avg: lgAvg },
       gapPercent: lgMedian > 0 ? ((lgMedian - sbMedian) / lgMedian) * 100 : 0,
     },
     rateDistribution,

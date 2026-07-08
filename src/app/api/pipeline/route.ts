@@ -12,7 +12,7 @@
 import { NextRequest, NextResponse, after } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
-import { ensureWorkspaceMember, recordAppActivity, resolveActiveWorkspace } from '@/lib/app/workspace';
+import { ensureWorkspaceMember, recordAppActivity, resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { fetchPursuitDocsAuto } from '@/lib/grants/fetch-grant-docs';
 import { isValidSamNoticeId } from '@/lib/sam/utils';
 import { isCleanValueEstimate } from '@/lib/pipeline/value-estimate';
@@ -244,7 +244,13 @@ export async function POST(request: NextRequest) {
 
     // Normalize email
     body.user_email = body.user_email.toLowerCase();
-    const { workspaceId } = await ensureWorkspaceMember(body.user_email);
+    // COACH MODE: use the ACTIVE workspace, not the caller's own. A coach tracking
+    // in a client workspace must write to the CLIENT's workspace_id — else the row
+    // lands in the coach's own pipeline and My Pursuits (which reads the client
+    // workspace via the same resolver) shows 0. resolveActiveWorkspace returns the
+    // client's workspaceId when the coach is authorized for that x-active-workspace,
+    // and falls back to the caller's own workspace otherwise. (Mirrors GET.)
+    const { workspaceId, asClient } = await resolveActiveWorkspace(body.user_email, request);
 
     // Set defaults
     body.stage = body.stage || 'tracking';
@@ -253,7 +259,10 @@ export async function POST(request: NextRequest) {
     body.is_prime = body.is_prime ?? true;
 
     body.workspace_id = workspaceId;
-    body.owner_email = body.owner_email || body.user_email;
+    // Attribute the row to the CLIENT profile in coach mode (so client-scoped
+    // surfaces — owner-attributed alerts, pursuit-change digests — key off the
+    // client, not the coach). In self mode, owner is the caller.
+    body.owner_email = body.owner_email || (asClient ? clientNotificationEmail(workspaceId) : body.user_email);
     body.created_by = body.user_email;
     body.updated_by = body.user_email;
 
@@ -559,7 +568,10 @@ export async function DELETE(request: NextRequest) {
 
     const authSession = requireMIAuthSession(request, user_email);
     if (!authSession.ok) return authSession.response;
-    const { workspaceId } = await ensureWorkspaceMember(user_email);
+    // Coach Mode: resolve the ACTIVE workspace so a coach can delete a row in the
+    // client's pipeline (ensureWorkspaceMember would return the coach's own → the
+    // ownership check below would 404 the client's row).
+    const { workspaceId } = await resolveActiveWorkspace(user_email, request);
 
     const { data: existing } = await getSupabase()
       .from('user_pipeline')

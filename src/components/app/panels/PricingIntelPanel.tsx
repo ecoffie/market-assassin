@@ -262,6 +262,20 @@ export default function PricingIntelPanel({ email, tier }: Props) {
         </div>
       )}
 
+      {/* Loading state — the query walks many live GSA CALC pages + a small/large
+          split, so it can take several seconds. Show what's happening instead of a
+          silent spinner-button so it never looks frozen. */}
+      {loading && (
+        <div className="rounded-lg border border-emerald-500/30 bg-emerald-950/20 p-8 text-center">
+          <div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-emerald-500/30 border-t-emerald-400" />
+          <p className="text-slate-200 mb-1">Pulling live labor rates from GSA CALC…</p>
+          <p className="text-xs text-slate-500">
+            Reading every awarded rate for your role and computing the market
+            25th / median / 75th percentiles. This can take a few seconds.
+          </p>
+        </div>
+      )}
+
       {/* Empty state when Pro user hasn't run anything yet */}
       {!data && !loading && !error && !upgradeTeaser && !isFree && (
         <div className="rounded-lg border border-slate-800 bg-slate-900/30 p-8 text-center">
@@ -290,8 +304,14 @@ export default function PricingIntelPanel({ email, tier }: Props) {
               />
               <StatCard
                 label="Small vs. Large gap"
-                value={`${data.businessSizeComparison.gapPercent > 0 ? '+' : ''}${data.businessSizeComparison.gapPercent.toFixed(1)}%`}
-                hint={data.businessSizeComparison.gapPercent > 0 ? 'small biz wins on rate' : 'large biz wins on rate'}
+                value={`${data.businessSizeComparison.gapPercent.toFixed(1)}%`}
+                hint={
+                  data.businessSizeComparison.gapPercent > 0
+                    ? 'small biz priced below large'
+                    : data.businessSizeComparison.gapPercent < 0
+                      ? 'small biz priced above large'
+                      : 'same median rate'
+                }
               />
               <StatCard
                 label="Top vendors found"

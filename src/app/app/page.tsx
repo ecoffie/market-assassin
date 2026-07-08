@@ -14,6 +14,7 @@ import SettingsPanel from '@/components/briefings/SettingsPanel';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import { ToastHost } from '@/components/app/Toast';
 import { getSupabase } from '@/lib/supabase/client';
+import { isGatedMindyApi, skipAuthRecovery } from '@/lib/app/auth-recovery';
 import { getStoredPartnerRef } from '@/lib/mindy/partner-referral-client';
 import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
 
@@ -138,7 +139,9 @@ function AppDashboard() {
   const activePanelRef = useRef<AppPanel>('dashboard');
   // Single-flight guards so a burst of concurrent 401s triggers ONE recovery,
   // and so the proactive refresh only runs once per app load.
-  const sessionRecoveryRef = useRef(false);
+  // Holds the in-flight token-refresh promise so concurrent 401s share ONE
+  // recovery (and all learn its success/failure to retry). null when idle.
+  const sessionRecoveryPromiseRef = useRef<Promise<boolean> | null>(null);
   const refreshAttemptedRef = useRef(false);
   const panelStartedAtRef = useRef<number>(Date.now());
   const sessionIdRef = useRef<string>(
@@ -210,10 +213,35 @@ function AppDashboard() {
   const loadUserProfile = useCallback(async (userEmail: string) => {
     setIsLoading(true);
     try {
-      // Fetch access level
-      const accessRes = await fetch(`/api/access/check?email=${encodeURIComponent(userEmail)}`, {
+      // Fetch access level. This is the FIRST gated call on load and runs before
+      // the global fetch-recovery wrapper is installed, so it does its OWN silent
+      // token-refresh-and-retry on a 401 — otherwise a recoverable (near-expiry)
+      // token here bounces the user straight to sign-in, the #1 "Invalid 2FA
+      // session" complaint. Only a refresh that genuinely fails signs them out.
+      let accessRes = await fetch(`/api/access/check?email=${encodeURIComponent(userEmail)}`, {
         headers: getTwoFactorHeaders(),
       });
+      if (accessRes.status === 401) {
+        const token = localStorage.getItem(MI_AUTH_TOKEN_KEY);
+        if (token) {
+          try {
+            const rf = await fetch('/api/auth/refresh-mi-session', {
+              method: 'POST',
+              headers: { 'x-mi-auth-token': token },
+            });
+            const rfData = await rf.json().catch(() => null);
+            if (rf.ok && rfData?.success && rfData.sessionToken) {
+              localStorage.setItem(MI_AUTH_TOKEN_KEY, rfData.sessionToken);
+              localStorage.setItem('mi_beta_authenticated_at', rfData.authenticatedAt || new Date().toISOString());
+              accessRes = await fetch(`/api/access/check?email=${encodeURIComponent(userEmail)}`, {
+                headers: getTwoFactorHeaders(),
+              });
+            }
+          } catch {
+            /* fall through — treated as unrecoverable below */
+          }
+        }
+      }
       const accessData = await accessRes.json().catch(() => null);
 
       if (!accessRes.ok || !accessData?.success) {
@@ -384,10 +412,15 @@ function AppDashboard() {
   // or no longer verifies). Try ONE silent refresh from the stored token; if it
   // can't be renewed, clear auth and show a clear "sign in again" prompt instead
   // of leaving the user on a blank, broken-looking panel. Single-flight guarded.
-  const handleAppSessionExpired = useCallback(async () => {
-    if (sessionRecoveryRef.current) return;
-    sessionRecoveryRef.current = true;
-    try {
+  // Returns true if the token was silently refreshed (caller can retry the
+  // original request), false if the user was genuinely signed out.
+  const handleAppSessionExpired = useCallback(async (): Promise<boolean> => {
+    // Single-flight: concurrent 401s share ONE in-flight refresh instead of
+    // firing a storm of refresh calls. Each caller awaits the same promise and
+    // learns whether recovery succeeded, so every one of them can retry.
+    if (sessionRecoveryPromiseRef.current) return sessionRecoveryPromiseRef.current;
+
+    const run = (async (): Promise<boolean> => {
       const token = typeof window !== 'undefined' ? localStorage.getItem(MI_AUTH_TOKEN_KEY) : null;
       if (token) {
         try {
@@ -399,9 +432,7 @@ function AppDashboard() {
           if (res.ok && data?.success && data.sessionToken) {
             localStorage.setItem(MI_AUTH_TOKEN_KEY, data.sessionToken);
             localStorage.setItem('mi_beta_authenticated_at', data.authenticatedAt || new Date().toISOString());
-            // Recovered — allow future 401s to retry recovery again.
-            sessionRecoveryRef.current = false;
-            return;
+            return true;
           }
         } catch {
           /* fall through to hard sign-out */
@@ -412,10 +443,16 @@ function AppDashboard() {
       setEmail(null);
       setAuthError('Your session expired. Sign in again to restore access.');
       setAuthStep('credentials');
+      return false;
+    })();
+
+    sessionRecoveryPromiseRef.current = run;
+    try {
+      return await run;
     } finally {
-      // Leave the guard set on a hard sign-out so we don't loop; it resets on
-      // next successful auth (component re-mounts / new token stored).
-      window.setTimeout(() => { sessionRecoveryRef.current = false; }, 5000);
+      // Release the single-flight guard shortly after so a genuinely-new later
+      // expiry can recover again, but a burst collapses into one refresh.
+      window.setTimeout(() => { sessionRecoveryPromiseRef.current = null; }, 3000);
     }
   }, []);
 
@@ -743,14 +780,36 @@ function AppDashboard() {
 
       const res = await originalFetch(input, { ...init, headers });
 
-      // Global session-recovery: a 401 from a Mindy app route means the MI token
-      // expired / is missing / no longer verifies. Without this, the panel just
-      // renders blank ("the feature is broken"). Instead, try ONE silent refresh
-      // from the still-stored token; if that fails, clear auth and surface a
-      // clear "sign in again" prompt rather than a dead screen. Guarded so a burst
-      // of concurrent 401s triggers a single recovery, not a storm.
-      if (res.status === 401 && url.includes('/api/app/')) {
-        handleAppSessionExpired();
+      // Global session-recovery: a 401 from ANY gated Mindy route means the MI
+      // token expired / is missing / no longer verifies. Without this, the panel
+      // renders blank ("the feature is broken") or the user is bounced to sign-in
+      // for a token that could have been silently renewed. So: try ONE silent
+      // refresh from the stored token and, on success, REPLAY the original
+      // request with the fresh token so the caller gets its data — recovery is
+      // transparent. If the refresh fails, auth is cleared and a clear "sign in
+      // again" prompt is shown instead of a dead screen. Single-flight guarded so
+      // a burst of concurrent 401s shares one refresh.
+      //
+      // Covers not just /api/app/* but the other MI-token-gated routes that fire
+      // early or often — /api/access/check (the FIRST call on load), /api/pipeline,
+      // /api/teaming, /api/pain-points, /api/mindy/*, /api/alerts/* — which were
+      // previously excluded and forced a hard re-sign-in on a recoverable token.
+      if (res.status === 401 && isGatedMindyApi(url) && !skipAuthRecovery(init)) {
+        const recovered = await handleAppSessionExpired();
+        if (recovered) {
+          const freshToken = localStorage.getItem(MI_AUTH_TOKEN_KEY);
+          const retryHeaders = new Headers(headers);
+          if (freshToken) retryHeaders.set('x-mi-auth-token', freshToken);
+          const freshTwoFactor = localStorage.getItem(TWO_FACTOR_TOKEN_KEY);
+          if (freshTwoFactor) retryHeaders.set('x-mi-2fa-token', freshTwoFactor);
+          // Mark the retry so a still-401 response doesn't loop back into recovery.
+          const retryInit: RequestInit & { __miAuthRetry?: boolean } = {
+            ...init,
+            headers: retryHeaders,
+            __miAuthRetry: true,
+          };
+          return originalFetch(input, retryInit);
+        }
       }
 
       return res;

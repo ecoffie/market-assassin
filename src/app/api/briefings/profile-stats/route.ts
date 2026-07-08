@@ -7,6 +7,10 @@
  * - Comparison to previous period (trending)
  * - Breakdown by type (solicitations, forecasts, grants)
  *
+ * SAM counts are NAICS AND keyword (when the profile has keywords) — a broad
+ * NAICS like 236220 alone over-reports work that isn't the contractor's.
+ * Forecasts stay NAICS-only (short structured rows; keyword ILIKE would zero them).
+ *
  * GET ?email=user@example.com - Get profile match stats
  */
 
@@ -130,16 +134,46 @@ export async function GET(request: NextRequest) {
     const naicsFilter = buildNaicsFilter();
     const hasNaicsFilter = naicsFilter.length > 0;
 
+    // Keyword precision filter (added Jul 2026). NAICS-only counts over-report:
+    // a paving contractor's 236220 (Commercial Building Construction) matches
+    // hundreds of hospital/office/barracks RFPs that aren't their work. Keywords
+    // are stored on every profile but were never used in the count. Applying them
+    // as a SECOND .or() ANDs with the NAICS filter in PostgREST — so an opp must
+    // match a profile NAICS AND mention a profile keyword in title/description.
+    // Carolina Concrete & Paving: 691 -> 185 (measured). Fallback: if the profile
+    // has no usable keywords, skip this filter (NAICS-only) so a keyword-less
+    // client never drops to zero.
+    const cleanKeywords = Array.from(
+      new Set(
+        (keywords as string[])
+          .map((k) => String(k).trim())
+          // Escape PostgREST reserved chars in the ILIKE pattern (commas/parens
+          // would break the .or() grammar). Drop 1-char noise tokens.
+          .filter((k) => k.length >= 2 && !/[(),]/.test(k)),
+      ),
+    );
+    const keywordFilter = cleanKeywords
+      .flatMap((k) => [`title.ilike.%${k}%`, `description.ilike.%${k}%`])
+      .join(',');
+    const hasKeywordFilter = keywordFilter.length > 0;
+
+    // Apply the keyword AND-filter to a SAM query when the profile has keywords.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const withKeywordFilter = (query: any) =>
+      hasKeywordFilter ? query.or(keywordFilter) : query;
+
     // Query SAM opportunities matching user's NAICS codes AND states (this week)
     // Logic: (NAICS match) AND (state match if specified)
     let samThisWeekCount = 0;
     if (hasNaicsFilter) {
-      let query = supabase
-        .from('sam_opportunities')
-        .select('id', { count: 'exact', head: true })
-        .or(naicsFilter)
-        .gte('posted_date', weekAgoStr)
-        .eq('active', true);
+      let query = withKeywordFilter(
+        supabase
+          .from('sam_opportunities')
+          .select('id', { count: 'exact', head: true })
+          .or(naicsFilter)
+          .gte('posted_date', weekAgoStr)
+          .eq('active', true),
+      );
       // State filter uses .in() for AND logic (not .or() which would be NAICS OR state)
       if (locationStates.length > 0) {
         query = query.in('pop_state', locationStates);
@@ -151,13 +185,15 @@ export async function GET(request: NextRequest) {
     // Last week (for comparison)
     let samLastWeekCount = 0;
     if (hasNaicsFilter) {
-      let query = supabase
-        .from('sam_opportunities')
-        .select('id', { count: 'exact', head: true })
-        .or(naicsFilter)
-        .gte('posted_date', twoWeeksAgoStr)
-        .lt('posted_date', weekAgoStr)
-        .eq('active', true);
+      let query = withKeywordFilter(
+        supabase
+          .from('sam_opportunities')
+          .select('id', { count: 'exact', head: true })
+          .or(naicsFilter)
+          .gte('posted_date', twoWeeksAgoStr)
+          .lt('posted_date', weekAgoStr)
+          .eq('active', true),
+      );
       if (locationStates.length > 0) {
         query = query.in('pop_state', locationStates);
       }
@@ -168,12 +204,14 @@ export async function GET(request: NextRequest) {
     // Today
     let samTodayCount = 0;
     if (hasNaicsFilter) {
-      let query = supabase
-        .from('sam_opportunities')
-        .select('id', { count: 'exact', head: true })
-        .or(naicsFilter)
-        .gte('posted_date', todayStr)
-        .eq('active', true);
+      let query = withKeywordFilter(
+        supabase
+          .from('sam_opportunities')
+          .select('id', { count: 'exact', head: true })
+          .or(naicsFilter)
+          .gte('posted_date', todayStr)
+          .eq('active', true),
+      );
       if (locationStates.length > 0) {
         query = query.in('pop_state', locationStates);
       }
@@ -216,12 +254,14 @@ export async function GET(request: NextRequest) {
     // Logic: (NAICS match) AND (state match if specified)
     let totalActiveMatching = 0;
     if (hasNaicsFilter) {
-      let query = supabase
-        .from('sam_opportunities')
-        .select('id', { count: 'exact', head: true })
-        .or(naicsFilter)
-        .eq('active', true)
-        .gt('response_deadline', today.toISOString());
+      let query = withKeywordFilter(
+        supabase
+          .from('sam_opportunities')
+          .select('id', { count: 'exact', head: true })
+          .or(naicsFilter)
+          .eq('active', true)
+          .gt('response_deadline', today.toISOString()),
+      );
       // State filter uses .in() for AND logic
       if (locationStates.length > 0) {
         query = query.in('pop_state', locationStates);

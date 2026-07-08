@@ -1761,18 +1761,30 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   //
   // Falls back to legacy SAT spend (always 0 for NAICS without SAT
   // data) when the SBA bulk fetch hasn't loaded yet.
-  const chartSatTotal = chartRows.length > 0 && Object.keys(parentSbShareMap).length > 0
-    ? chartRows.reduce((sum, row) => {
-        const sbShare =
-          parentSbShareMap[row.parentAgency] ??
-          parentSbShareMap[row.subAgency] ??
-          parentSbShareMap[row.name] ??
-          0;
-        return sum + (row.setAsideSpending || 0) * sbShare;
-      }, 0)
+  // The small-business numerator AND its matching denominator MUST be summed over
+  // the SAME row set, or the ratio is meaningless. Previously the numerator summed
+  // over chartRows (per-agency, authoritative sub-agency totals in the billions)
+  // while the donut divided by chartTotalSpending (the department-level scalar,
+  // e.g. $14.5M) — producing "13935% of $14.5M" (Jul 8). Fix: derive the base
+  // (sum of setAsideSpending over the exact rows the numerator uses) here, and
+  // feed THAT to the donut as the total. Guarantees 0 ≤ share ≤ 100%.
+  const sbShareForRow = (row: typeof chartRows[number]) =>
+    parentSbShareMap[row.parentAgency] ??
+    parentSbShareMap[row.subAgency] ??
+    parentSbShareMap[row.name] ??
+    0;
+  const hasSbShareData = Object.keys(parentSbShareMap).length > 0;
+  const chartSatTotal = chartRows.length > 0 && hasSbShareData
+    ? chartRows.reduce((sum, row) => sum + (row.setAsideSpending || 0) * sbShareForRow(row), 0)
     : chartRows.length > 0
       ? chartRows.reduce((sum, row) => sum + (row.satSpending || 0), 0)
       : 0;
+  // Matching denominator: total spend over the SAME rows (only when we applied the
+  // SB-share weighting above). Falls back to the authoritative market total so the
+  // donut still renders sanely before SBA data lands.
+  const chartSatBase = chartRows.length > 0 && hasSbShareData
+    ? chartRows.reduce((sum, row) => sum + (row.setAsideSpending || 0), 0)
+    : 0;
   const painSummary = reportData?.agencyPainPoints?.summary;
   const primeSummary = reportData?.primeContractor?.summary;
   const vehicleSummary = reportData?.idvContracts?.summary;
@@ -2300,7 +2312,16 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           {/* Headline stats — same 4 numbers as the reports view's
               MetricCards but with stronger visual hierarchy here. */}
           <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <MetricCard label={`Agencies to review${stateScopeLabel}`} value={(chartBuyers.length || buyerSummary?.totalAgencies || buyers.length).toLocaleString()} />
+            {/* Count from the AUTHORITATIVE rows only. While the bootstrap rows are
+                still being replaced by the deterministic tmrRows, show "…" instead
+                of a number that visibly flips (45 → 111 → 147 was the Jul 8 bug).
+                Once settled, chartBuyers is the distinct rolled-up agency count. */}
+            <MetricCard
+              label={`Agencies to review${stateScopeLabel}`}
+              value={agencySpendLoading
+                ? '…'
+                : (chartBuyers.length || buyerSummary?.totalAgencies || buyers.length).toLocaleString()}
+            />
             <MetricCard label={`Relevant spending${stateScopeLabel}`} value={formatCurrency(chartTotalSpending || buyerSummary?.totalSpending)} tone="green" hint={spendWindowLabel ? `Total federal contract obligations in this market${stateScopeLabel ? ` in ${formData.locationStates.join(', ')}` : ''}, ${spendWindowLabel}` : undefined} />
             <MetricCard label="Competitors in your space" value={(primeSummary?.totalPrimes || vehicleSummary?.totalContracts || 0).toLocaleString()} hint="Incumbent primes already winning this work — who you'd compete against or could team with" onClick={() => primesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
             <MetricCard label="Upcoming opportunities" value={(forecastSummary?.totalForecasts || painSummary?.highOpportunityMatches || 0).toLocaleString()} tone="amber" hint="Forecasted procurements + agency needs coming 6–18 months out" onClick={() => onNavigate?.('forecasts')} />
@@ -2322,7 +2343,10 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               <SetAsideMixChart
                 buyers={chartBuyers}
                 satTotal={chartSatTotal || (reportData?.simplifiedAcquisition?.summary?.totalSATSpending) || 0}
-                totalSpend={chartTotalSpending || buyerSummary?.totalSpending || 0}
+                // Denominator must match the satTotal row set — use chartSatBase
+                // (sum of the same rows' spend) so the share is a true 0–100%.
+                // Only fall back to the market total when the SB weighting didn't run.
+                totalSpend={chartSatBase || chartTotalSpending || buyerSummary?.totalSpending || 0}
               />
             )}
             {/* "Market Total" trend tile removed (Eric, Jun 23) — it duplicated
@@ -2407,6 +2431,10 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
             businessType={formData.businessType}
             totalSpending={chartTotalSpending || buyerSummary?.totalSpending || 0}
             satTotal={chartSatTotal || reportData?.simplifiedAcquisition?.summary?.totalSATSpending || 0}
+            // Base for the small-business SHARE % — the same row set as satTotal
+            // (see chartSatBase). Keeps the % ≤ 100 even though the headline
+            // "tracked spend" sentence still uses the market total above.
+            satBase={chartSatBase || undefined}
             agencyCount={chartBuyers.length}
             topAgencies={chartBuyers}
             topPrimes={reportData?.primeContractor?.suggestedPrimes || []}
@@ -2421,7 +2449,16 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       {showResults && viewMode === 'reports' && reportData && (
         <>
           <section className="grid grid-cols-1 gap-4 md:grid-cols-4">
-            <MetricCard label={`Agencies to review${stateScopeLabel}`} value={(chartBuyers.length || buyerSummary?.totalAgencies || buyers.length).toLocaleString()} />
+            {/* Count from the AUTHORITATIVE rows only. While the bootstrap rows are
+                still being replaced by the deterministic tmrRows, show "…" instead
+                of a number that visibly flips (45 → 111 → 147 was the Jul 8 bug).
+                Once settled, chartBuyers is the distinct rolled-up agency count. */}
+            <MetricCard
+              label={`Agencies to review${stateScopeLabel}`}
+              value={agencySpendLoading
+                ? '…'
+                : (chartBuyers.length || buyerSummary?.totalAgencies || buyers.length).toLocaleString()}
+            />
             <MetricCard label={`Relevant spending${stateScopeLabel}`} value={formatCurrency(chartTotalSpending || buyerSummary?.totalSpending)} tone="green" hint={spendWindowLabel ? `Total federal contract obligations in this market${stateScopeLabel ? ` in ${formData.locationStates.join(', ')}` : ''}, ${spendWindowLabel}` : undefined} />
             <MetricCard label="Competitors in your space" value={(primeSummary?.totalPrimes || vehicleSummary?.totalContracts || 0).toLocaleString()} hint="Incumbent primes already winning this work — who you'd compete against or could team with" onClick={() => primesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
             <MetricCard label="Upcoming opportunities" value={(forecastSummary?.totalForecasts || painSummary?.highOpportunityMatches || 0).toLocaleString()} tone="amber" hint="Forecasted procurements + agency needs coming 6–18 months out" onClick={() => onNavigate?.('forecasts')} />
@@ -3139,7 +3176,9 @@ function SetAsideMixChart({
     { name: 'Small Business', value: satTotal, color: CHART_PALETTE.emerald },
     { name: 'Non-Small Business', value: nonSb, color: CHART_PALETTE.slateDim },
   ];
-  const sbPct = total > 0 ? (satTotal / total) * 100 : 0;
+  // Clamp to 0–100: a share can never exceed the whole. Backstop against any
+  // future scope mismatch between satTotal and total (the "13935%" class of bug).
+  const sbPct = total > 0 ? Math.min(100, (satTotal / total) * 100) : 0;
 
   // Three honest footer states:
   //
@@ -3737,6 +3776,7 @@ function MindyNarrative({
   businessType,
   totalSpending,
   satTotal,
+  satBase,
   agencyCount,
   topAgencies,
   topPrimes,
@@ -3746,6 +3786,7 @@ function MindyNarrative({
   businessType: string;
   totalSpending: number;
   satTotal: number;
+  satBase?: number;
   agencyCount: number;
   topAgencies: BuyerLike[];
   topPrimes: PrimeLike[];
@@ -3776,6 +3817,7 @@ function MindyNarrative({
         businessType,
         totalSpending,
         satTotal,
+        satBase,
         agencyCount,
         // Trim down what we send. Don't blast the whole agency
         // list — top 10 is what the prompt actually uses.

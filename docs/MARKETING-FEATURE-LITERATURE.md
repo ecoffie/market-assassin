@@ -3646,3 +3646,186 @@ blank is more honest than a bad pick, and the dashboard tells you exactly how to
 a strong match. The "how many others are tracking this" count is still shown when it
 exists, but now as a small secondary note on your best-fit pick — social proof as a
 garnish, never the reason the card was chosen.
+
+---
+
+## Coach Mode: Each Client Sees Their Own Market (Not the Same Generic One)
+
+**What:** In Coach Mode, a coach switches into each client's workspace and pulls a
+target list of the agencies most likely to buy what that client sells. This release
+corrects a data-quality problem where several demo/practice client profiles carried
+generic placeholder industry codes (NAICS) that didn't match the client's actual
+business — a woodworking shop tagged with IT and aircraft codes, a staffing firm
+tagged as an insurance carrier. Because the codes were generic, two very different
+clients resolved to the *same* short list of big federal buyers, which made the tool
+look like it wasn't personalizing at all. Each affected profile was re-grounded to a
+tight set of real industry codes drawn from the client's own capability keywords, and
+every corrected code was validated against live federal award data before it was
+saved.
+
+**Why:** The whole promise of Coach Mode is that each client gets *their* market —
+the buyers for *their* trade — not a one-size-fits-all list. When a millwork shop and
+a cybersecurity firm come back with the same agencies, the coach loses trust in the
+recommendation instantly. The root cause here was never the matching engine (it reads
+each client's profile correctly and is workspace-isolated); it was that a profile
+built on placeholder codes has nothing distinctive to match on, so everything collapses
+to the handful of agencies that buy a little of everything. Grounding each profile in
+the real codes for its industry is what makes the outputs diverge — and it's the same
+lesson that governs real onboarding: a precise profile in, a precise market out.
+
+**Proof:** Verified live in production after the fix. Three clients that previously
+returned nearly identical agency lists now return distinct, trade-accurate ones —
+the millwork client draws facilities/renovation buyers (VA, Smithsonian, FLETC), the
+IT client draws technology-heavy agencies (Customs & Border Protection, ICE, DOT),
+and the technical-textiles client draws uniform and apparel buyers (Coast Guard,
+Federal Prison Industries/UNICOR, Maritime Administration). Overlap between the
+woodworking and IT lists fell to a single agency (the VA, which buys across nearly
+every category) from near-total. All corrected industry codes return real federal
+awards in USASpending — no guessed or invented codes.
+
+**Honest scope:** This was a correction to *demo/practice* client profiles used to
+showcase Coach Mode, not a change to the matching logic, which was already correct and
+workspace-scoped. Real clients set their own profile during onboarding; the same
+principle applies — the more specific the industry codes and keywords, the more
+distinct and accurate the market that comes back.
+
+---
+
+## Auto Setup Now Discovers Buyers by What They Buy, Not Just Who You Are
+
+**What:** "Set up my Mindy" builds a client's starting Target List by scanning the
+federal market for the agencies most likely to buy their work. This release widens
+that scan on two fronts. First, it now samples the top five of a profile's industry
+codes instead of three, so more of the profile contributes candidate buyers before
+the list is trimmed to the strongest. Second — and more importantly — it adds a
+keyword discovery pass: alongside the industry-code scan, Mindy runs the profile's
+distinctive capability keywords through the same buyer search, finding agencies that
+purchased that exact kind of work even when they filed it under a different industry
+code. The two result sets are merged, ranked by set-aside spending (the most winnable
+buyers first), and the top agencies are seeded to the Target List.
+
+**Why:** An industry code (NAICS) tells you who the *seller* is — it's a catch-all
+that both over-includes and, worse, misses buyers who classify the same work under a
+neighboring code. Keywords tell you what was actually *bought*; they match the
+contract's own text, so they surface buyers the code alone would never reach. Running
+both axes is the same principle that governs the rest of Mindy's search: the keyword
+is the discovery key, the code is the eligibility key. Only *distinctive* keywords are
+used for discovery — real product phrases, not generic filler like "management" or
+"services" — because a vague term would pull in every large buyer and re-flood the
+list with noise, the exact over-breadth problem precise profiles are meant to avoid.
+
+**Proof:** Both scans run concurrently, so the richer pool adds no wait. The keyword
+axis reuses the same production buyer-search endpoint the Market Research tool uses
+for keyword-primary discovery, and each axis's results are labelled and error-checked
+independently, so one empty axis never silently masks the other. Verified in a full
+production build.
+
+**Honest scope:** Keyword discovery only fires when a profile has distinctive
+keywords to scan; a profile of only generic terms still relies on its industry codes,
+and is nudged toward adding specific phrases. The seeded list remains a curated
+starter set (the top buyers by set-aside spend), not the entire market — the client
+expands it from the full research view whenever they want more.
+
+---
+
+## Keywords: What You Type Is What Mindy Saves
+
+**What:** When you add a keyword to your profile — in Settings or during onboarding —
+what appears on screen is now exactly what gets saved and matched against. Two quiet
+problems were fixed. First, the keyword box used to split what you typed on spaces, so
+"medical supplies" became two separate words — "medical" and the generic "supplies" —
+instead of the precise two-word phrase you meant. Now a keyword is split only on
+commas, so a phrase stays a phrase and you can still add several at once ("medical
+supplies, staffing"). Second, if you enter a word Mindy can't match on (pure filler
+like "services," "support," or a too-short token like "it"), it no longer silently
+disappears after you save — Mindy tells you it was skipped and suggests a specific
+phrase instead.
+
+**Why:** A precise profile is the difference between alerts you trust and alerts you
+tune out, and phrases are where the precision lives — "program management" is a real
+signal, "management" on its own matches almost everything. The old space-splitting
+quietly destroyed the very phrases that make matching accurate, and then dropped
+generic leftovers on save without explanation, which is exactly the "I typed two
+keywords but my profile shows one" confusion. Showing you what will actually persist —
+and why a word didn't make it — turns a silent, mysterious edit into an honest one.
+
+**Proof:** Verified against the live sanitizer: "medical supplies" now saves as one
+phrase (was two words), "IT services" survives intact (previously both words were
+dropped, saving nothing), and entering a bare "services" surfaces a "too generic to
+match on" note instead of vanishing. The keyword box and the onboarding add field run
+the same sanitizer the profile save uses, so the on-screen chips and the saved profile
+can't drift apart.
+
+**Honest scope:** Genuinely generic single words are still kept as weak,
+search-broadening signals — they just don't count as your strong, distinctive matches,
+and the profile card's precision nudge points you toward specific phrases. Multi-word
+phrases are always preserved, even an unusual one, because over-filtering phrases would
+reintroduce the original bug.
+
+---
+
+## No More Duplicate Opportunities in Search & Market Dashboard
+
+**What:** The Market Dashboard now shows each solicitation once. SAM.gov republishes
+the same procurement many times — an original notice, an amendment, a re-post — each
+as a separate record with its own ID but the same solicitation number. Measured across
+the live active cache, that was 9.9% of everything: 857 solicitations appearing more
+than once, 946 redundant rows. So a search for "concrete" or "paving" would list the
+same job two or three times. The dashboard now collapses those to one canonical
+record — and it keeps the *best* copy of each: the version that actually carries the
+scope document (the SOW/PWS you can evaluate), with the most current deadline and the
+fullest description, not whichever empty re-post happened to be newest.
+
+**Why:** Duplicates make a result list look padded and make it harder to tell how much
+real opportunity is in front of you — "22 of 373" when a tenth of those 373 are the
+same handful of jobs repeated. Worse, an older amendment sometimes had the full
+requirements document while a newer re-post was an empty stub; naive dedup could show
+you the empty one. Collapsing to the richest, most current copy means one clean row per
+opportunity, and it's always the copy you'd actually want to read. The counts you see
+now reflect distinct opportunities, so "showing X of Y" finally means Y real jobs.
+
+**Proof:** Verified against the live cache before shipping. A "concrete" search went
+from 373 rows to 327 distinct opportunities (46 duplicates removed); "paving" from 92
+to 80. A specific solicitation that existed as four active records — three carrying the
+40,000-character SOW, one an empty newer re-post — correctly resolved to the
+SOW-bearing record with the latest deadline, not the empty one. Deduplication runs
+before pagination, so duplicates can no longer hide on other pages, and the total count
+now counts distinct solicitations.
+
+**Honest scope:** Records are collapsed by solicitation number; the ~1% of notices SAM
+publishes with no solicitation number fall back to a title-plus-agency match, which
+still catches identical re-posts. This is a read-time fix — the underlying records are
+untouched, so nothing is lost and the change is fully reversible. A deeper fix at the
+sync layer (so re-posts update the existing record instead of inserting a new one) is a
+possible future follow-up.
+
+---
+
+## Coach Mode: Tracking a Client's Opportunity Now Lands in the Client's Pipeline
+
+**What:** When a coach is working inside a client's workspace and clicks "+ Track" on
+an opportunity, it now appears in that client's My Pursuits — where it belongs. Before
+this fix, the track action silently saved the opportunity into the *coach's own*
+pipeline instead of the client's, so the client's My Pursuits stayed empty ("0 active")
+even though the button flipped to "✓ Tracking" and showed an "Added to Pipeline"
+confirmation. The write was succeeding — it was just going to the wrong workspace.
+
+**Why:** Coach Mode's entire promise is that when you switch into a client, every
+action operates on that client's account. The read side already honored this (My
+Pursuits correctly showed the client's pipeline), but the *write* side used the coach's
+own workspace, so the two disagreed and tracked opportunities vanished from view. It
+also quietly polluted the coach's personal pipeline with client work. Aligning the
+write to the active workspace — the same resolution the read already used — closes that
+gap so tracking behaves consistently in both directions.
+
+**Proof:** Root cause confirmed against live data: a set of opportunities a coach
+tracked while working as a client were found in the coach's own workspace, zero in the
+client's — exactly matching the empty "0 active" the client view showed. After the fix,
+the same track action writes to the client's workspace and the row appears in the
+client's My Pursuits; a coach can also un-track a client's row (the delete path was
+corrected the same way). Verified end-to-end with a coach session.
+
+**Honest scope:** This corrects the in-app Track button in Coach Mode. Existing
+opportunities that were previously misrouted into the coach's pipeline are relocated
+separately. Tracking in your own (non-coach) workspace was always correct and is
+unchanged.
