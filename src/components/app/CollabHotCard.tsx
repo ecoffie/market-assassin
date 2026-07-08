@@ -1,17 +1,18 @@
 'use client';
 
 /**
- * CollabHotCard — the in-app "🔥 Hot right now" social-proof hero.
+ * CollabHotCard — the in-app "⭐ Best fit for you" hero.
  *
- * Surfaces the SINGLE most-tracked, collab-ready opportunity across Mindy
- * ("8 contractors are researching this Sources Sought — respond together").
- * This is the big-SaaS spotlight pattern (LinkedIn "12 connections work here",
- * Booking "3 others looking"): one focal moment at the top of the dashboard,
- * paired with the ambient per-opp badge in the Alerts list.
+ * Surfaces the SINGLE best-matched OPEN opportunity for the active profile
+ * (strongest distinctive-keyword / PSC / NAICS match, sooner deadline), with a
+ * concrete reason it fits ("matches 'program management' · PSC R408"). Replaced
+ * the old "most-tracked across Mindy" card (July 2026), which drew from other
+ * users' tracked opps whose deadlines were ~93% expired. Tracker count is kept as
+ * a secondary social-proof garnish when the opp happens to be tracked.
  *
- * Real interactive card (NOT a canvas image) so the "respond together →" CTA
- * is clickable. Renders only when a hot opp clears COLLAB_THRESHOLD; otherwise
- * nothing (best-effort, never blocks the dashboard). Anonymous counts only.
+ * Real interactive card (NOT a canvas image) so the CTA is clickable. Renders only
+ * when the profile has a strong open match; otherwise nothing (best-effort, never
+ * blocks the dashboard). Anonymous counts only.
  */
 
 import { useCallback, useEffect, useState } from 'react';
@@ -25,6 +26,7 @@ interface HotOpp {
   trackerCount: number;
   isSourcesSought: boolean;
   responseDeadline: string | null;
+  matchReason?: string;
   message: string;
 }
 
@@ -37,8 +39,9 @@ export function CollabHotCard({ email, onPanelChange }: CollabHotCardProps) {
   const [hot, setHot] = useState<HotOpp | null>(null);
   const [hidden, setHidden] = useState(false);
 
-  // Re-poll every 15s so the hero appears/updates LIVE as others track the same
-  // opp (no refresh needed — ideal for demos).
+  // Re-poll every 60s so the hero refreshes as the open pool / profile changes.
+  // (Best-fit is profile-driven, not crowd-driven, so it changes slowly — no need
+  // for the old 15s demo cadence.)
   useEffect(() => {
     if (!email) return;
     let cancelled = false;
@@ -56,7 +59,7 @@ export function CollabHotCard({ email, onPanelChange }: CollabHotCardProps) {
       }
     };
     poll();
-    const interval = setInterval(poll, 15000);
+    const interval = setInterval(poll, 60000);
     return () => { cancelled = true; clearInterval(interval); };
   }, [email]);
 
@@ -97,19 +100,21 @@ export function CollabHotCard({ email, onPanelChange }: CollabHotCardProps) {
       </button>
 
       <div className="p-4 md:p-5">
-        {/* Eyebrow row: HOT pill + count */}
+        {/* Eyebrow row: BEST FIT pill + optional Sources Sought tag + tracker garnish */}
         <div className="flex items-center gap-2 mb-2">
-          <span className="inline-flex items-center gap-1 rounded-full bg-orange-500/15 text-orange-300 text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 ring-1 ring-orange-400/30">
-            🔥 Hot right now
+          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 text-amber-300 text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 ring-1 ring-amber-400/30">
+            ⭐ Best fit for you
           </span>
           {hot.isSourcesSought && (
             <span className="inline-flex items-center rounded-full bg-purple-500/15 text-purple-300 text-[11px] font-semibold px-2 py-0.5 ring-1 ring-purple-400/30">
               Sources Sought
             </span>
           )}
-          <span className="ml-auto mr-7 inline-flex items-center gap-1 text-sm font-bold text-cyan-300">
-            👥 {hot.trackerCount} contractors
-          </span>
+          {hot.trackerCount > 0 && (
+            <span className="ml-auto mr-7 inline-flex items-center gap-1 text-xs font-semibold text-cyan-300">
+              👥 {hot.trackerCount} tracking
+            </span>
+          )}
         </div>
 
         {/* Title */}
@@ -123,11 +128,16 @@ export function CollabHotCard({ email, onPanelChange }: CollabHotCardProps) {
           {deadline && <span className="text-slate-500"> · responses due {deadline}</span>}
         </p>
 
-        {/* Social-proof line */}
+        {/* WHY it fits — the credibility line for "best fit". */}
+        {hot.matchReason && (
+          <p className="mt-2 inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs text-emerald-300 ring-1 ring-emerald-400/20">
+            ✓ {hot.matchReason}
+          </p>
+        )}
+
+        {/* Action line */}
         <p className="mt-2.5 text-sm text-slate-200">
-          {hot.isSourcesSought
-            ? "You're not the only one researching this. The more capable businesses that respond, the stronger the signal to the agency — make sure yours is one of them."
-            : "You're not the only one pursuing this. Sharpen your response before it closes."}
+          {hot.message}
         </p>
 
         {/* CTA */}

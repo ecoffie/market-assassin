@@ -1,25 +1,29 @@
 /**
- * Hot Opportunity — the single most-tracked collab-ready opp, for the in-app
- * "🔥 Hot right now" hero card (the social-proof "aha moment").
+ * Best Fit For You — the single best-matched OPEN opportunity for the active
+ * profile, for the in-app "⭐ Best fit for you" hero card.
  *
- * Reuses the Demand Heatmap engine (the same aggregated user-intent signal the
- * admin sees) and returns ONE opp: the most-tracked, collab-ready one, preferring
- * Sources Sought (the "respond together" sweet spot). Anonymous aggregate count
- * only — never names. Gated on COLLAB_THRESHOLD so a weak signal never surfaces.
- *
- * This is system-wide social proof ("N contractors across Mindy are researching
- * this"), so the count is NOT personalized — but the route is still user-authed
- * (it lives under /app and only members should see the signal).
+ * This replaced the old "most-tracked across Mindy" card (July 2026). That card
+ * drew from what OTHER users were tracking (getDemandHeatmap → user_pipeline),
+ * whose deadlines were ~93% expired — so it structurally showed stale/irrelevant
+ * opps and often nothing. The best-fit card instead draws from the SAME live,
+ * open, profile-matched pool the Source Feed uses (/api/app/opportunities), ranks
+ * by match STRENGTH (distinctive keyword / PSC / NAICS), and returns ONE opp with
+ * a concrete reason it fits. Tracker count (how many contractors track it) is kept
+ * as a secondary social-proof garnish when present — not the basis for selection.
  *
  *   GET ?email=<user> -> { hot: { noticeId, title, agency, trackerCount,
- *                                 isSourcesSought, message } | null }
+ *                                 isSourcesSought, responseDeadline, matchReason,
+ *                                 message } | null }
+ *
+ * Coach Mode: matches against the ACTIVE workspace's profile (client's synthetic
+ * notification email) so a coach working a client sees the CLIENT's best fit.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
-import { getDemandHeatmap } from '@/lib/admin/demand-heatmap';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { isDistinctiveKeyword } from '@/lib/market/keyword-sanitize';
+import { naicsSubsectorPrefixes } from '@/lib/utils/naics-expansion';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -28,16 +32,15 @@ function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 }
 
-/** The profile the hot card must match against (NAICS + keywords + PSC). The
- *  hot card is social proof for ENGAGED members — with NO market set up there's
- *  nothing to be relevant to. Empty NAICS → hide the card (Eric, Jun 25). On
- *  error → empty (better to hide than mislead).
- *
- *  Coach Mode: when the caller has switched to a client workspace, read the
- *  CLIENT's profile (its synthetic notification email), not the coach's own —
- *  else a coach working a woodworking client sees the coach's construction opps
- *  (the coach_mode_header_drop class of bug). */
-async function getViewerProfile(profileEmail: string): Promise<{ naics: string[]; keywords: string[]; psc: string[] }> {
+interface ViewerProfile {
+  naics: string[];
+  keywords: string[];
+  psc: string[];
+}
+
+/** The active profile (NAICS + keywords + PSC). Empty NAICS AND empty keywords →
+ *  no market yet → the card hides (nothing to be relevant to). */
+async function getViewerProfile(profileEmail: string): Promise<ViewerProfile> {
   try {
     const { data } = await sb()
       .from('user_notification_settings')
@@ -55,73 +58,54 @@ async function getViewerProfile(profileEmail: string): Promise<{ naics: string[]
   }
 }
 
-/** notice_id → {naics, psc, title} for a set of notices (from the opportunity
- *  cache). Lets us judge whether a hot opp is in the viewer's space across all
- *  three targeting axes. */
-type NoticeMeta = { naics?: string; psc?: string; title?: string; deadline?: string | null };
-async function metaForNotices(noticeIds: string[]): Promise<Map<string, NoticeMeta>> {
-  const map = new Map<string, NoticeMeta>();
-  if (!noticeIds.length) return map;
-  try {
-    const { data } = await sb()
-      .from('sam_opportunities')
-      .select('notice_id, naics_code, psc_code, title, response_deadline')
-      .in('notice_id', noticeIds);
-    for (const r of (data || []) as Array<{ notice_id?: string; naics_code?: string; psc_code?: string; title?: string; response_deadline?: string | null }>) {
-      if (r.notice_id) {
-        map.set(r.notice_id, {
-          naics: r.naics_code ? String(r.naics_code).trim() : undefined,
-          psc: r.psc_code ? String(r.psc_code).trim().toUpperCase() : undefined,
-          title: r.title || undefined,
-          deadline: r.response_deadline ?? null,
-        });
-      }
-    }
-  } catch { /* fall through — unknown meta treated as non-match */ }
-  return map;
-}
-
-/** Is the opp still OPEN — a future response deadline? A "hot right now" card
- *  showing an already-closed date (the May-4 bug) is worse than no card. A null
- *  deadline is treated as NOT open (can't prove it's live → don't surface it as
- *  hot). Compares on the date only (ignore intra-day tz). */
-function isOpen(meta: NoticeMeta | undefined): boolean {
-  if (!meta?.deadline) return false;
-  const today = new Date().toISOString().slice(0, 10);
-  return String(meta.deadline).slice(0, 10) >= today;
-}
+type OppRow = {
+  notice_id: string;
+  title: string | null;
+  naics_code: string | null;
+  psc_code: string | null;
+  department: string | null;
+  sub_tier: string | null;
+  office: string | null;
+  notice_type: string | null;
+  response_deadline: string | null;
+};
 
 /**
- * Score how STRONGLY an opp matches the viewer's profile. The "hot right now" card
- * is a precision surface, so a lone GENERIC keyword ("management") is NOT enough —
- * it floods the card with noise (Blue Heron's "Worldwide Project Management" card).
- * A match qualifies only via a strong signal:
- *   - a DISTINCTIVE keyword hit (a phrase or a non-generic term) — the precise axis
- *   - a PSC family hit (what was actually bought)
- *   - a NAICS hit BACKED BY any keyword hit (NAICS alone is a catch-all; pairing it
- *     with a keyword keeps a fiber-optic Electrical opp off a woodworking profile)
- * Returns a score (higher = better) or 0 for "not this viewer's opp".
+ * Score how STRONGLY an open opp matches the profile, and WHY. A lone GENERIC
+ * keyword ("management") is NOT a strong signal (it floods) — only a DISTINCTIVE
+ * keyword (phrase / specific term), a PSC family hit, or NAICS-backed-by-a-keyword
+ * qualifies. Returns { score, reason }; score 0 = not this viewer's opp.
  */
-function matchScore(
-  meta: NoticeMeta | undefined,
-  p: { naics: string[]; keywords: string[]; psc: string[] },
-): number {
-  if (!meta) return 0;
-  const title = (meta.title || '').toLowerCase();
+function scoreOpp(opp: OppRow, p: ViewerProfile): { score: number; reason: string } {
+  const title = (opp.title || '').toLowerCase();
+  const naics = opp.naics_code ? String(opp.naics_code).trim() : '';
+  const psc = opp.psc_code ? String(opp.psc_code).trim().toUpperCase() : '';
 
   const distinctiveHits = p.keywords.filter((k) => isDistinctiveKeyword(k) && title.includes(k));
-  const anyKwHit = p.keywords.some((k) => title.includes(k)); // incl. generic (weak)
-  const naicsHit = !!meta.naics && p.naics.some((c) => c === meta.naics || c.slice(0, 4) === meta.naics!.slice(0, 4));
-  const pscHit = !!meta.psc && p.psc.some((c) => c === meta.psc || c.slice(0, 2) === meta.psc!.slice(0, 2));
+  const anyKwHit = p.keywords.some((k) => title.includes(k));
+  const naicsHit = !!naics && p.naics.some((c) => c === naics || c.slice(0, 4) === naics.slice(0, 4));
+  const pscHit = !!psc && p.psc.some((c) => c === psc || c.slice(0, 2) === psc.slice(0, 2));
 
   let score = 0;
-  score += distinctiveHits.length * 40;              // strongest: a precise phrase/term
-  if (pscHit) score += 25;                            // bought this product family
-  if (naicsHit && anyKwHit) score += 20;              // industry + any keyword context
-  // NAICS-only or generic-keyword-only → deliberately NOT a strong match (0 from
-  // those alone). This is the whole point: don't surface "management"-only noise.
+  const reasons: string[] = [];
+  if (distinctiveHits.length) { score += distinctiveHits.length * 40; reasons.push(`matches "${distinctiveHits[0]}"`); }
+  if (pscHit) { score += 25; reasons.push(`PSC ${psc}`); }
+  if (naicsHit && anyKwHit) { score += 20; reasons.push(`NAICS ${naics}`); }
+  // Freshness nudge — a sooner (but still open) deadline is more actionable.
+  if (opp.response_deadline) {
+    const days = Math.ceil((new Date(opp.response_deadline).getTime() - Date.now()) / 86_400_000);
+    if (days >= 0 && days <= 30) score += 5;
+  }
+  return { score, reason: reasons.join(' · ') };
+}
 
-  return score;
+function isSourcesSought(noticeType?: string | null): boolean {
+  const t = (noticeType || '').toLowerCase();
+  return t.includes('sources sought') || t.includes('source sought') || t === 'ss' || t.includes('rfi') || t.includes('special notice');
+}
+
+function buyerAgency(opp: OppRow): string | null {
+  return opp.department || opp.sub_tier || opp.office || null;
 }
 
 export async function GET(request: NextRequest) {
@@ -131,25 +115,19 @@ export async function GET(request: NextRequest) {
   const auth = requireMIAuthSession(request, email);
   if (!auth.ok) return auth.response;
 
-  // Coach Mode: match against the ACTIVE workspace's profile. When the caller
-  // has switched to a client, use the client's synthetic notification email so
-  // the hot card reflects the CLIENT's market (woodworking), not the coach's own
-  // (construction). Falls back to the coach's own email in their own workspace.
+  // Coach Mode: match against the ACTIVE workspace's profile.
   const { workspaceId, asClient } = await resolveActiveWorkspace(email, request);
   const profileEmail = asClient ? clientNotificationEmail(workspaceId) : email;
 
-  // PROFILE GATE. No saved NAICS profile → no market yet → don't pretend a hot
-  // opportunity is relevant. Applies to the demo card too.
   const profile = await getViewerProfile(profileEmail);
+  // No market set up → nothing to be "best fit" for. (Applies to the demo too.)
   if (profile.naics.length === 0 && profile.keywords.length === 0) {
     return NextResponse.json({ hot: null }, { headers: { 'Cache-Control': 'no-store' } });
   }
 
   // --- DEMO SAFETY NET (YT Live) ----------------------------------------
-  // When COLLAB_DEMO_TITLE is set, force-return a synthetic hot opp so the
-  // "🔥 Hot right now" card is GUARANTEED on screen, independent of real
-  // tracking data. Turn OFF after the demo (unset the env). Real signal
-  // resumes automatically. Per-request override: ?demo=1 / ?demo=0.
+  // COLLAB_DEMO_TITLE forces a synthetic card so it's guaranteed on screen.
+  // Per-request override: ?demo=1 / ?demo=0. Turn OFF (unset env) after a demo.
   const demoParam = request.nextUrl.searchParams.get('demo');
   const demoOn = demoParam === '1' || (demoParam !== '0' && !!process.env.COLLAB_DEMO_TITLE);
   if (demoOn && process.env.COLLAB_DEMO_TITLE) {
@@ -166,9 +144,8 @@ export async function GET(request: NextRequest) {
           trackerCount: count,
           isSourcesSought: isSS,
           responseDeadline: process.env.COLLAB_DEMO_DEADLINE || null,
-          message: isSS
-            ? `${count} contractors are researching this Sources Sought. You're not the only one — respond together.`
-            : `${count} contractors are tracking this opportunity. You're not the only one pursuing it.`,
+          matchReason: 'matches your profile',
+          message: 'Your strongest open match right now — get ahead of it.',
           demo: true,
         },
       },
@@ -178,60 +155,93 @@ export async function GET(request: NextRequest) {
   // ----------------------------------------------------------------------
 
   try {
-    const heatmap = await getDemandHeatmap(40);
-    const ready = heatmap.opps.filter((o) => o.collabReady);
-    if (!ready.length) {
+    // Pull the OPEN, profile-matched pool — the same shape /api/app/opportunities
+    // uses: active + future deadline, filtered to the profile's NAICS subsectors
+    // (3-digit prefix) OR its distinctive keywords/PSC in the title.
+    const today = new Date().toISOString().split('T')[0];
+    const naicsPrefixes = naicsSubsectorPrefixes(profile.naics);
+    const naicsFilters = naicsPrefixes.map((c) => `naics_code.like.${c}%`);
+    const distinctive = profile.keywords.filter((k) => isDistinctiveKeyword(k));
+    const kwFilters = distinctive.map((k) => `title.ilike.%${k.replace(/[(),*]/g, ' ').trim()}%`);
+    const orFilter = [...naicsFilters, ...kwFilters].filter(Boolean).join(',');
+    if (!orFilter) {
+      // No NAICS and only generic keywords → nothing precise to match on.
       return NextResponse.json({ hot: null }, { headers: { 'Cache-Control': 'no-store' } });
     }
 
-    // PERSONALIZE + FRESHNESS + STRONG MATCH. Only surface a hot opp that is (a)
-    // still OPEN (future deadline — the May-4 expired-card bug), and (b) a STRONG
-    // match to the ACTIVE profile (distinctive keyword / PSC / NAICS+keyword — a
-    // lone generic word like "management" no longer qualifies, which is what put a
-    // "Worldwide Project Management" card on an 8-NAICS profile). Opps with unknown
-    // meta are excluded (can't prove relevance/freshness → don't mislead).
-    const metaMap = await metaForNotices(ready.map((o) => o.noticeId));
-    const scored = ready
-      .map((o) => {
-        const meta = metaMap.get(o.noticeId);
-        return { o, meta, open: isOpen(meta), score: matchScore(meta, profile) };
-      })
-      .filter((x) => x.open && x.score > 0);
+    const { data: rows } = await sb()
+      .from('sam_opportunities')
+      .select('notice_id, title, naics_code, psc_code, department, sub_tier, office, notice_type, response_deadline')
+      .eq('active', true)
+      .gte('response_deadline', today)
+      .or(orFilter)
+      .order('response_deadline', { ascending: true })
+      .limit(400);
+
+    // "Best fit" must mean a GENUINELY strong match, not merely the least-bad of a
+    // broad profile. Require a strong signal: a distinctive keyword (40) or a PSC
+    // family hit (25). A NAICS-only match (20, backed only by a generic keyword like
+    // "management") does NOT clear the bar — that's the weak, vague card the user
+    // disliked. Under-bar profiles (Blue Heron's all-generic keywords) get no card +
+    // the TargetingCard precision nudge telling them how to earn one.
+    const MIN_STRONG_SCORE = 25;
+    const pool = (rows || []) as OppRow[];
+    const scored = pool
+      .map((o) => ({ o, ...scoreOpp(o, profile) }))
+      .filter((x) => x.score >= MIN_STRONG_SCORE);
     if (!scored.length) {
       return NextResponse.json({ hot: null }, { headers: { 'Cache-Control': 'no-store' } });
     }
 
-    // Rank by MATCH QUALITY first, then Sources Sought (the "respond together"
-    // sweet spot), then tracker count — so the strongest, most-actionable open opp
-    // wins, not merely the first Sources Sought that happened to hit a stopword.
+    // Rank by match strength, then sooner deadline (more actionable), then SS.
     scored.sort((a, b) => {
       if (b.score !== a.score) return b.score - a.score;
-      const ss = Number(b.o.isSourcesSought) - Number(a.o.isSourcesSought);
-      if (ss !== 0) return ss;
-      return b.o.trackerCount - a.o.trackerCount;
+      const ad = a.o.response_deadline ? new Date(a.o.response_deadline).getTime() : Number.MAX_SAFE_INTEGER;
+      const bd = b.o.response_deadline ? new Date(b.o.response_deadline).getTime() : Number.MAX_SAFE_INTEGER;
+      if (ad !== bd) return ad - bd;
+      return Number(isSourcesSought(b.o.notice_type)) - Number(isSourcesSought(a.o.notice_type));
     });
-    const hot = scored[0].o;
+    const best = scored[0];
+    const opp = best.o;
 
-    const message = hot.isSourcesSought
-      ? `${hot.trackerCount} contractors are researching this Sources Sought. You're not the only one — respond together.`
-      : `${hot.trackerCount} contractors are tracking this opportunity. You're not the only one pursuing it.`;
+    // Social-proof GARNISH: how many contractors track this exact notice (anonymous,
+    // excludes the viewer). Secondary — the card leads with fit, not the crowd.
+    let trackerCount = 0;
+    try {
+      const { data: trackers } = await sb()
+        .from('user_pipeline')
+        .select('user_email')
+        .eq('notice_id', opp.notice_id)
+        .neq('is_archived', true);
+      const others = new Set(
+        (trackers || [])
+          .map((t: { user_email?: string }) => (t.user_email || '').toLowerCase())
+          .filter((u: string) => u && u !== profileEmail && u !== email)
+      );
+      trackerCount = others.size;
+    } catch { /* garnish only — never block the card */ }
+
+    const ss = isSourcesSought(opp.notice_type);
+    const message = ss
+      ? 'Your strongest open Sources Sought match — respond to get on the agency’s radar.'
+      : 'Your strongest open match right now — sharpen your response before it closes.';
 
     return NextResponse.json(
       {
         hot: {
-          noticeId: hot.noticeId,
-          title: hot.title,
-          agency: hot.agency,
-          trackerCount: hot.trackerCount,
-          isSourcesSought: hot.isSourcesSought,
-          responseDeadline: hot.responseDeadline,
+          noticeId: opp.notice_id,
+          title: opp.title,
+          agency: buyerAgency(opp),
+          trackerCount,
+          isSourcesSought: ss,
+          responseDeadline: opp.response_deadline,
+          matchReason: best.reason,
           message,
         },
       },
       { headers: { 'Cache-Control': 'no-store' } }
     );
   } catch {
-    // Never break the dashboard — just show no card.
     return NextResponse.json({ hot: null }, { headers: { 'Cache-Control': 'no-store' } });
   }
 }
