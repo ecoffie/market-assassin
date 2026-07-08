@@ -3725,3 +3725,39 @@ keywords to scan; a profile of only generic terms still relies on its industry c
 and is nudged toward adding specific phrases. The seeded list remains a curated
 starter set (the top buyers by set-aside spend), not the entire market — the client
 expands it from the full research view whenever they want more.
+
+---
+
+## Keywords: What You Type Is What Mindy Saves
+
+**What:** When you add a keyword to your profile — in Settings or during onboarding —
+what appears on screen is now exactly what gets saved and matched against. Two quiet
+problems were fixed. First, the keyword box used to split what you typed on spaces, so
+"medical supplies" became two separate words — "medical" and the generic "supplies" —
+instead of the precise two-word phrase you meant. Now a keyword is split only on
+commas, so a phrase stays a phrase and you can still add several at once ("medical
+supplies, staffing"). Second, if you enter a word Mindy can't match on (pure filler
+like "services," "support," or a too-short token like "it"), it no longer silently
+disappears after you save — Mindy tells you it was skipped and suggests a specific
+phrase instead.
+
+**Why:** A precise profile is the difference between alerts you trust and alerts you
+tune out, and phrases are where the precision lives — "program management" is a real
+signal, "management" on its own matches almost everything. The old space-splitting
+quietly destroyed the very phrases that make matching accurate, and then dropped
+generic leftovers on save without explanation, which is exactly the "I typed two
+keywords but my profile shows one" confusion. Showing you what will actually persist —
+and why a word didn't make it — turns a silent, mysterious edit into an honest one.
+
+**Proof:** Verified against the live sanitizer: "medical supplies" now saves as one
+phrase (was two words), "IT services" survives intact (previously both words were
+dropped, saving nothing), and entering a bare "services" surfaces a "too generic to
+match on" note instead of vanishing. The keyword box and the onboarding add field run
+the same sanitizer the profile save uses, so the on-screen chips and the saved profile
+can't drift apart.
+
+**Honest scope:** Genuinely generic single words are still kept as weak,
+search-broadening signals — they just don't count as your strong, distinctive matches,
+and the profile card's precision nudge points you toward specific phrases. Multi-word
+phrases are always preserved, even an unusual one, because over-filtering phrases would
+reintroduce the original bug.

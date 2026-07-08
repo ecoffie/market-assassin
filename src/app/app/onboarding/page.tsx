@@ -9,6 +9,7 @@ import { MindyLogo } from '@/components/mindy/MindyLogo';
 import { getSupabase } from '@/lib/supabase/client';
 import { useAppTracker } from '@/components/app/track';
 import { getMIApiHeaders, authedFetch } from '@/components/app/authHeaders';
+import { sanitizeKeywords } from '@/lib/market/keyword-sanitize';
 
 const INDUSTRY_PRESETS = [
   { label: 'Construction', codes: ['236', '237', '238'], description: 'Building, heavy civil, specialty trades' },
@@ -735,13 +736,24 @@ export default function OnboardingPage() {
   // ("demolition firm" → "firm"); let the user drop junk + add the capability
   // words that catch mislabeled titles. Keywords drive alert matching.
   const [keywordDraft, setKeywordDraft] = useState('');
+  const [keywordNote, setKeywordNote] = useState<string | null>(null);
   function removeAutoKeyword(kw: string) {
     setAutoProfile((p: { keywords?: string[] } | null) => p ? { ...p, keywords: (p.keywords || []).filter((k: string) => k !== kw) } : p);
   }
   function addAutoKeyword() {
     const kw = keywordDraft.trim().toLowerCase();
+    setKeywordNote(null);
     if (!kw) return;
-    setAutoProfile((p: { keywords?: string[] } | null) => p ? { ...p, keywords: [...new Set([...(p.keywords || []), kw])] } : p);
+    // Keep the whole entry as ONE keyword (a phrase like "medical supplies" is more
+    // precise than two loose words), then run the SAME sanitizer the profile save
+    // uses — so a too-generic word isn't added as a chip that silently disappears.
+    const [clean] = sanitizeKeywords([kw]);
+    if (!clean) {
+      setKeywordNote(`“${kw}” is too generic to match on — try a specific phrase (e.g. “technical writing”).`);
+      setKeywordDraft('');
+      return;
+    }
+    setAutoProfile((p: { keywords?: string[] } | null) => p ? { ...p, keywords: [...new Set([...(p.keywords || []), clean])] } : p);
     setKeywordDraft('');
   }
 
@@ -1155,6 +1167,9 @@ export default function OnboardingPage() {
                       className="w-32 bg-transparent border-b border-slate-700 text-xs text-white placeholder-slate-600 focus:border-purple-500 focus:outline-none px-1 py-0.5"
                     />
                   </div>
+                  {keywordNote && (
+                    <div className="mt-1 text-[11px] text-amber-300/90">{keywordNote}</div>
+                  )}
                 </div>
                 {autoProfile.setAsides?.length > 0 && (
                   <div><span className="text-slate-500">Set-asides detected: </span>{autoProfile.setAsides.map((s: string) => <span key={s} className="inline-block rounded bg-amber-500/20 px-2 py-0.5 text-xs text-amber-300 mr-1">{s}</span>)}</div>
