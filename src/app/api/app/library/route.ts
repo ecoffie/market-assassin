@@ -14,6 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
 export const dynamic = 'force-dynamic';
 
@@ -41,7 +42,11 @@ export async function GET(request: NextRequest) {
   if (!auth.authenticated) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   }
-  const userEmail = auth.email!;
+  // Coach Mode: when acting as a client, scope the library to the CLIENT's vault
+  // (synthetic clientNotificationEmail), NOT the coach's own generated archive —
+  // otherwise the coach's proposals leak into every client's Generated library.
+  const { workspaceId, asClient } = await resolveActiveWorkspace(auth.email!, request);
+  const userEmail = asClient ? clientNotificationEmail(workspaceId) : auth.email!;
   const supabase = getSupabase();
 
   const id = request.nextUrl.searchParams.get('id');
@@ -100,11 +105,15 @@ export async function DELETE(request: NextRequest) {
   if (!auth.authenticated) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   }
+  // Same workspace scoping as GET — a coach removing from a client's library
+  // must target the client's row, not one of their own.
+  const { workspaceId, asClient } = await resolveActiveWorkspace(auth.email!, request);
+  const ownerEmail = asClient ? clientNotificationEmail(workspaceId) : auth.email!;
   const { error } = await getSupabase()
     .from('user_generated_archive')
     .update({ archived_at: new Date().toISOString() })
     .eq('id', id)
-    .eq('user_email', auth.email!);
+    .eq('user_email', ownerEmail);
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
 }

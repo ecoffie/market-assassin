@@ -29,6 +29,7 @@ import { SECTION_META } from '@/lib/proposal/sections';
 import type { SectionType } from '@/lib/proposal/types';
 import { archiveContent } from '@/lib/archive/persist';
 import type { ComplianceReq } from '@/lib/proposal/section-alignment';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -57,6 +58,13 @@ export async function POST(request: NextRequest) {
 
   const authSession = requireMIAuthSession(request, email);
   if (!authSession.ok) return authSession.response;
+
+  // Coach Mode: when drafting as a client, the vault weave (RAG retrieval) and the
+  // archived output must both belong to the CLIENT — otherwise the draft is grounded
+  // in the coach's past performance and the output lands in the coach's library
+  // (leaking into every client's Generated tab).
+  const { workspaceId, asClient } = await resolveActiveWorkspace(email, request);
+  const scopedEmail = asClient ? clientNotificationEmail(workspaceId) : email;
 
   let body: RequestBody;
   try {
@@ -88,7 +96,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const draftArgs = {
-      email,
+      email: scopedEmail,
       sectionType,
       sourceText,
       fileName: body.fileName,
@@ -108,7 +116,7 @@ export async function POST(request: NextRequest) {
     // can recall it later via /app/library. Failure is non-blocking.
     const isCapStmt = ['company_overview', 'cap_past_performance', 'capabilities', 'differentiators', 'poc'].includes(sectionType);
     archiveContent({
-      userEmail: email,
+      userEmail: scopedEmail,
       contentType: isCapStmt ? 'cap_statement' : 'proposal_section',
       contentSubtype: sectionType,
       title: `${result.label} — ${body.fileName || 'untitled RFP'}`,

@@ -19,6 +19,7 @@ import { generateAllSections } from '@/lib/proposal/draft-all';
 import { archiveContent } from '@/lib/archive/persist';
 import type { SectionType } from '@/lib/proposal/types';
 import type { ComplianceReq } from '@/lib/proposal/section-alignment';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,6 +43,11 @@ export async function POST(request: NextRequest) {
   const authSession = requireMIAuthSession(request, email);
   if (!authSession.ok) return authSession.response;
 
+  // Coach Mode: draft as the CLIENT — vault weave + archived output belong to the
+  // client, not the coach (see draft/route.ts for the leak this prevents).
+  const { workspaceId, asClient } = await resolveActiveWorkspace(email, request);
+  const scopedEmail = asClient ? clientNotificationEmail(workspaceId) : email;
+
   let body: RequestBody;
   try {
     body = await request.json();
@@ -59,7 +65,7 @@ export async function POST(request: NextRequest) {
 
   try {
     const result = await generateAllSections({
-      email,
+      email: scopedEmail,
       sourceText,
       fileName: body.fileName,
       rfpAgency: body.rfpAgency,
@@ -75,7 +81,7 @@ export async function POST(request: NextRequest) {
     for (const section of result.sections) {
       const isCapStmt = ['company_overview', 'cap_past_performance', 'capabilities', 'differentiators', 'poc'].includes(section.section);
       archiveContent({
-        userEmail: email,
+        userEmail: scopedEmail,
         contentType: isCapStmt ? 'cap_statement' : 'proposal_section',
         contentSubtype: section.section,
         title: `${section.label} — ${body.fileName || 'untitled RFP'}`,

@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { extractPdf, extractDocx, extractTxt } from '@/lib/sam/pdf-extract';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -64,7 +65,11 @@ export async function POST(request: NextRequest) {
   if (!auth.authenticated) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   }
-  const userEmail = auth.email!;
+  // Coach Mode: a document uploaded while working as a client belongs to the
+  // CLIENT's vault (synthetic email), not the coach's — else it leaks into every
+  // client's Documents tab and the client never sees their own upload.
+  const { workspaceId, asClient } = await resolveActiveWorkspace(auth.email!, request);
+  const userEmail = asClient ? clientNotificationEmail(workspaceId) : auth.email!;
 
   const buffer = Buffer.from(await file.arrayBuffer());
   const { ext, mime } = detectDocType(file.name);
@@ -143,8 +148,10 @@ export async function DELETE(request: NextRequest) {
   if (!email || !id) return NextResponse.json({ success: false, error: 'Email and id required' }, { status: 400 });
   const auth = await verifyUserOwnsEmail(request, email, { requireStrongAuth: true });
   if (!auth.authenticated) return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
+  const { workspaceId, asClient } = await resolveActiveWorkspace(auth.email!, request);
+  const ownerEmail = asClient ? clientNotificationEmail(workspaceId) : auth.email!;
   const { error } = await getSupabase().from('user_boilerplate_docs')
-    .update({ archived_at: new Date().toISOString() }).eq('id', id).eq('user_email', auth.email!);
+    .update({ archived_at: new Date().toISOString() }).eq('id', id).eq('user_email', ownerEmail);
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
 }

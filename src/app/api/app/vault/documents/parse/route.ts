@@ -22,6 +22,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { callLLM } from '@/lib/llm/call-llm';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -171,7 +172,11 @@ export async function POST(request: NextRequest) {
   if (!auth.authenticated) {
     return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
   }
-  const userEmail = auth.email!;
+  // Coach Mode: parse the CLIENT's document (stored under the synthetic email),
+  // not the coach's — the owner-scoped lookup below must match the same email the
+  // upload wrote under (see vault/documents/route.ts).
+  const { workspaceId, asClient } = await resolveActiveWorkspace(auth.email!, request);
+  const userEmail = asClient ? clientNotificationEmail(workspaceId) : auth.email!;
 
   // Load the extracted text (owner-scoped).
   const { data: doc, error: docErr } = await getSupabase()
