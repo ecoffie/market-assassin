@@ -3798,3 +3798,34 @@ still catches identical re-posts. This is a read-time fix — the underlying rec
 untouched, so nothing is lost and the change is fully reversible. A deeper fix at the
 sync layer (so re-posts update the existing record instead of inserting a new one) is a
 possible future follow-up.
+
+---
+
+## Coach Mode: Tracking a Client's Opportunity Now Lands in the Client's Pipeline
+
+**What:** When a coach is working inside a client's workspace and clicks "+ Track" on
+an opportunity, it now appears in that client's My Pursuits — where it belongs. Before
+this fix, the track action silently saved the opportunity into the *coach's own*
+pipeline instead of the client's, so the client's My Pursuits stayed empty ("0 active")
+even though the button flipped to "✓ Tracking" and showed an "Added to Pipeline"
+confirmation. The write was succeeding — it was just going to the wrong workspace.
+
+**Why:** Coach Mode's entire promise is that when you switch into a client, every
+action operates on that client's account. The read side already honored this (My
+Pursuits correctly showed the client's pipeline), but the *write* side used the coach's
+own workspace, so the two disagreed and tracked opportunities vanished from view. It
+also quietly polluted the coach's personal pipeline with client work. Aligning the
+write to the active workspace — the same resolution the read already used — closes that
+gap so tracking behaves consistently in both directions.
+
+**Proof:** Root cause confirmed against live data: a set of opportunities a coach
+tracked while working as a client were found in the coach's own workspace, zero in the
+client's — exactly matching the empty "0 active" the client view showed. After the fix,
+the same track action writes to the client's workspace and the row appears in the
+client's My Pursuits; a coach can also un-track a client's row (the delete path was
+corrected the same way). Verified end-to-end with a coach session.
+
+**Honest scope:** This corrects the in-app Track button in Coach Mode. Existing
+opportunities that were previously misrouted into the coach's pipeline are relocated
+separately. Tracking in your own (non-coach) workspace was always correct and is
+unchanged.
