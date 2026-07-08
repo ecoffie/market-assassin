@@ -320,11 +320,13 @@ export async function POST(request: NextRequest) {
       excludeDOD?: boolean;
       locationStates?: string[]; // States filter — scopes spend to these states (place of perf)
       email?: string;
+      refresh?: boolean;       // staff-only: bypass the 24h cache to force a fresh compute (verification)
     };
 
     if (!email) {
       return NextResponse.json({ error: 'email is required' }, { status: 400 });
     }
+    const wantRefresh = Boolean((body as { refresh?: boolean }).refresh);
 
     // DEFAULT THE SET-ASIDE TO SMALL BUSINESS (Eric, Jun 23, 2026). With no
     // business type chosen, the WITH-set-aside pass collapsed to raw total, so
@@ -460,7 +462,10 @@ export async function POST(request: NextRequest) {
     // AND instant — the fix for "different even using the same search terms" and
     // the "still loading" wait. (Previously keyword/profile-keyword searches
     // skipped the cache, recomputing a live, slightly-different result each time.)
-    const skipCache = false;
+    // Staff can force a fresh compute (bypass the 24h cache) with { refresh: true }
+    // — needed to verify a fix without waiting out the TTL. Non-staff can't, so a
+    // user can't hammer the expensive USASpending fan-out on demand.
+    const skipCache = wantRefresh && access.isStaff;
     try {
       const { data: cacheRow } = skipCache ? { data: null } : await supabase
         .from('agency_target_data_cache')
