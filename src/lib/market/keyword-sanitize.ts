@@ -82,6 +82,12 @@ const GENERIC_SINGLE_WORDS = new Set([
   'strategy', 'integration', 'installation', 'construction', 'equipment', 'supplies',
   'supply', 'materials', 'products', 'testing', 'inspection', 'repair', 'facility',
   'facilities', 'security', 'personnel', 'staffing', 'labor', 'work', 'field',
+  // Descriptor adjectives that LOOK distinctive but are federal-search wildcards:
+  // "custom" alone matches 66 active notices (custom software / weapons / aircraft)
+  // vs "custom cabinetry" 0 — it dragged Navy/Missile-Defense buyers onto a millwork
+  // shop's Target List (measured Jul 7 2026). These belong in a PHRASE, never alone.
+  'custom', 'commercial', 'industrial', 'mobile', 'advanced', 'standard', 'modular',
+  'portable', 'specialized', 'comprehensive', 'integrated', 'automated',
 ]);
 
 /**
