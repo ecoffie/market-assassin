@@ -63,6 +63,50 @@ const GEO_TERMS = new Set([
   'rhode island', 'west virginia', 'new hampshire',
 ]);
 
+// GENERIC single words: real English, pass basic sanitization, but so common in
+// federal titles that a LONE one is not a precise signal — "management" matches
+// 254 active notices, "program" 282, while the phrase "program management" matches
+// 15 (measured Jul 7 2026). These are fine INSIDE a phrase ("program management")
+// but must NOT count as a strong keyword match on their own, or the profile floods
+// with noise (Blue Heron: 5 generic words → 443 matches → a "Worldwide PM" card).
+// A single generic word is allowed as a WEAK signal (kept in search) but never a
+// STRONG/distinctive match. See isDistinctiveKeyword.
+const GENERIC_SINGLE_WORDS = new Set([
+  'program', 'management', 'manage', 'managed', 'technical', 'technology', 'tech',
+  'acquisition', 'writing', 'services', 'service', 'support', 'solution', 'solutions',
+  'system', 'systems', 'engineering', 'engineer', 'operations', 'operational',
+  'analysis', 'analyst', 'analytics', 'consulting', 'consultant', 'development',
+  'design', 'planning', 'training', 'logistics', 'maintenance', 'administrative',
+  'administration', 'general', 'professional', 'research', 'data', 'information',
+  'project', 'projects', 'quality', 'assurance', 'assessment', 'strategic',
+  'strategy', 'integration', 'installation', 'construction', 'equipment', 'supplies',
+  'supply', 'materials', 'products', 'testing', 'inspection', 'repair', 'facility',
+  'facilities', 'security', 'personnel', 'staffing', 'labor', 'work', 'field',
+]);
+
+/**
+ * A "distinctive" keyword is precise enough to be a STRONG match signal: a
+ * multi-word phrase ("program management", "cyber threat hunting") or a single
+ * word that is NOT in the generic-federal-noise set. A lone generic word
+ * ("management") passes isSearchableKeyword (it's a real 4+ char word) but is
+ * NOT distinctive — matching on it alone floods the profile.
+ *
+ * Use this for precision surfaces (the "hot right now" card, top-ranked matches).
+ * Use isSearchableKeyword for the broad/inclusive search where volume is fine.
+ */
+export function isDistinctiveKeyword(term: string): boolean {
+  const t = (term || '').trim().toLowerCase();
+  if (!t || !isSearchableKeyword(t)) return false;
+  if (t.includes(' ')) return true;                 // phrase → always distinctive
+  if (SAFE_ABBREVIATIONS.has(t)) return true;       // known clean abbreviation
+  return !GENERIC_SINGLE_WORDS.has(t);              // lone word: distinctive iff not generic
+}
+
+/** The distinctive subset of a keyword list (phrases + non-generic single words). */
+export function distinctiveKeywords(keywords: (string | null | undefined)[]): string[] {
+  return sanitizeKeywords(keywords).filter((k) => isDistinctiveKeyword(k));
+}
+
 // A "word" with no vowels or absurd consonant runs is keyboard mash (zxcvbnm,
 // asdfqwer), not a real industry term. Cheap heuristic to keep gibberish out.
 function looksLikeRealWord(w: string): boolean {

@@ -19,6 +19,7 @@ import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { getDemandHeatmap } from '@/lib/admin/demand-heatmap';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
+import { isDistinctiveKeyword } from '@/lib/market/keyword-sanitize';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -57,21 +58,22 @@ async function getViewerProfile(profileEmail: string): Promise<{ naics: string[]
 /** notice_id → {naics, psc, title} for a set of notices (from the opportunity
  *  cache). Lets us judge whether a hot opp is in the viewer's space across all
  *  three targeting axes. */
-type NoticeMeta = { naics?: string; psc?: string; title?: string };
+type NoticeMeta = { naics?: string; psc?: string; title?: string; deadline?: string | null };
 async function metaForNotices(noticeIds: string[]): Promise<Map<string, NoticeMeta>> {
   const map = new Map<string, NoticeMeta>();
   if (!noticeIds.length) return map;
   try {
     const { data } = await sb()
       .from('sam_opportunities')
-      .select('notice_id, naics_code, psc_code, title')
+      .select('notice_id, naics_code, psc_code, title, response_deadline')
       .in('notice_id', noticeIds);
-    for (const r of (data || []) as Array<{ notice_id?: string; naics_code?: string; psc_code?: string; title?: string }>) {
+    for (const r of (data || []) as Array<{ notice_id?: string; naics_code?: string; psc_code?: string; title?: string; response_deadline?: string | null }>) {
       if (r.notice_id) {
         map.set(r.notice_id, {
           naics: r.naics_code ? String(r.naics_code).trim() : undefined,
           psc: r.psc_code ? String(r.psc_code).trim().toUpperCase() : undefined,
           title: r.title || undefined,
+          deadline: r.response_deadline ?? null,
         });
       }
     }
@@ -79,25 +81,47 @@ async function metaForNotices(noticeIds: string[]): Promise<Map<string, NoticeMe
   return map;
 }
 
-/** Does the opp match the viewer's space across NAICS / PSC / keyword? Keyword-first
- *  per Mindy's targeting model (the precise signal): if the viewer HAS keywords and
- *  the opp title matches NONE of them, EXCLUDE it — even if the (broad, catch-all)
- *  NAICS technically overlaps. Otherwise match on any of NAICS (4-digit industry),
- *  PSC (2-char family), or keyword. This is what keeps a fiber-optic opp (NAICS
- *  238210 Electrical) off a woodworking (millwork/cabinetry) profile. */
-function oppRelevant(
+/** Is the opp still OPEN — a future response deadline? A "hot right now" card
+ *  showing an already-closed date (the May-4 bug) is worse than no card. A null
+ *  deadline is treated as NOT open (can't prove it's live → don't surface it as
+ *  hot). Compares on the date only (ignore intra-day tz). */
+function isOpen(meta: NoticeMeta | undefined): boolean {
+  if (!meta?.deadline) return false;
+  const today = new Date().toISOString().slice(0, 10);
+  return String(meta.deadline).slice(0, 10) >= today;
+}
+
+/**
+ * Score how STRONGLY an opp matches the viewer's profile. The "hot right now" card
+ * is a precision surface, so a lone GENERIC keyword ("management") is NOT enough —
+ * it floods the card with noise (Blue Heron's "Worldwide Project Management" card).
+ * A match qualifies only via a strong signal:
+ *   - a DISTINCTIVE keyword hit (a phrase or a non-generic term) — the precise axis
+ *   - a PSC family hit (what was actually bought)
+ *   - a NAICS hit BACKED BY any keyword hit (NAICS alone is a catch-all; pairing it
+ *     with a keyword keeps a fiber-optic Electrical opp off a woodworking profile)
+ * Returns a score (higher = better) or 0 for "not this viewer's opp".
+ */
+function matchScore(
   meta: NoticeMeta | undefined,
   p: { naics: string[]; keywords: string[]; psc: string[] },
-): boolean {
-  if (!meta) return false;
+): number {
+  if (!meta) return 0;
   const title = (meta.title || '').toLowerCase();
-  const kwHit = p.keywords.length > 0 && p.keywords.some((k) => title.includes(k));
-  // Keyword veto: has keywords, opp text matches none → not this viewer's opp.
-  if (p.keywords.length > 0 && !kwHit) return false;
 
+  const distinctiveHits = p.keywords.filter((k) => isDistinctiveKeyword(k) && title.includes(k));
+  const anyKwHit = p.keywords.some((k) => title.includes(k)); // incl. generic (weak)
   const naicsHit = !!meta.naics && p.naics.some((c) => c === meta.naics || c.slice(0, 4) === meta.naics!.slice(0, 4));
   const pscHit = !!meta.psc && p.psc.some((c) => c === meta.psc || c.slice(0, 2) === meta.psc!.slice(0, 2));
-  return kwHit || naicsHit || pscHit;
+
+  let score = 0;
+  score += distinctiveHits.length * 40;              // strongest: a precise phrase/term
+  if (pscHit) score += 25;                            // bought this product family
+  if (naicsHit && anyKwHit) score += 20;              // industry + any keyword context
+  // NAICS-only or generic-keyword-only → deliberately NOT a strong match (0 from
+  // those alone). This is the whole point: don't surface "management"-only noise.
+
+  return score;
 }
 
 export async function GET(request: NextRequest) {
@@ -160,22 +184,33 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ hot: null }, { headers: { 'Cache-Control': 'no-store' } });
     }
 
-    // PERSONALIZE. Only surface a hot opp that's in the ACTIVE profile's space —
-    // match the opp (NAICS + PSC + keyword, keyword-first) to the profile. A global
-    // "most-tracked" opp shown to everyone regardless of industry was the nonsense
-    // Eric flagged; a NAICS-only match let a fiber-optic (Electrical) opp onto a
-    // woodworking profile. Opps with unknown meta are excluded (can't prove
-    // relevance → don't mislead).
+    // PERSONALIZE + FRESHNESS + STRONG MATCH. Only surface a hot opp that is (a)
+    // still OPEN (future deadline — the May-4 expired-card bug), and (b) a STRONG
+    // match to the ACTIVE profile (distinctive keyword / PSC / NAICS+keyword — a
+    // lone generic word like "management" no longer qualifies, which is what put a
+    // "Worldwide Project Management" card on an 8-NAICS profile). Opps with unknown
+    // meta are excluded (can't prove relevance/freshness → don't mislead).
     const metaMap = await metaForNotices(ready.map((o) => o.noticeId));
-    const relevant = ready.filter((o) => oppRelevant(metaMap.get(o.noticeId), profile));
-    if (!relevant.length) {
+    const scored = ready
+      .map((o) => {
+        const meta = metaMap.get(o.noticeId);
+        return { o, meta, open: isOpen(meta), score: matchScore(meta, profile) };
+      })
+      .filter((x) => x.open && x.score > 0);
+    if (!scored.length) {
       return NextResponse.json({ hot: null }, { headers: { 'Cache-Control': 'no-store' } });
     }
 
-    // Pick the hottest of the RELEVANT opps: prefer Sources Sought (the "respond
-    // together" sweet spot), then by tracker count (already sorted desc).
-    const hot =
-      relevant.find((o) => o.isSourcesSought) ?? relevant[0];
+    // Rank by MATCH QUALITY first, then Sources Sought (the "respond together"
+    // sweet spot), then tracker count — so the strongest, most-actionable open opp
+    // wins, not merely the first Sources Sought that happened to hit a stopword.
+    scored.sort((a, b) => {
+      if (b.score !== a.score) return b.score - a.score;
+      const ss = Number(b.o.isSourcesSought) - Number(a.o.isSourcesSought);
+      if (ss !== 0) return ss;
+      return b.o.trackerCount - a.o.trackerCount;
+    });
+    const hot = scored[0].o;
 
     const message = hot.isSourcesSought
       ? `${hot.trackerCount} contractors are researching this Sources Sought. You're not the only one — respond together.`
