@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { embedVaultRow } from '@/lib/vault/embed-evidence';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
 export const dynamic = 'force-dynamic';
 
@@ -40,7 +41,11 @@ export async function POST(request: NextRequest) {
   }
   const auth = await verifyUserOwnsEmail(request, email, { requireStrongAuth: true });
   if (!auth.authenticated) return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
-  const row = { ...pick(entry), user_email: auth.email! };
+  // Coach Mode: a team member added while working as a client belongs to the
+  // CLIENT's vault (synthetic email), not the coach's — matches vault/route.ts read.
+  const { workspaceId, asClient } = await resolveActiveWorkspace(auth.email!, request);
+  const ownerEmail = asClient ? clientNotificationEmail(workspaceId) : auth.email!;
+  const row = { ...pick(entry), user_email: ownerEmail };
   const { data, error } = await getSupabase().from('user_team_members').insert(row).select().maybeSingle();
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   // Semantic weave: key-personnel bios/certs become matchable evidence.
@@ -56,9 +61,11 @@ export async function PATCH(request: NextRequest) {
   if (!email || !id) return NextResponse.json({ success: false, error: 'Email and id required' }, { status: 400 });
   const auth = await verifyUserOwnsEmail(request, email, { requireStrongAuth: true });
   if (!auth.authenticated) return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
+  const { workspaceId, asClient } = await resolveActiveWorkspace(auth.email!, request);
+  const ownerEmail = asClient ? clientNotificationEmail(workspaceId) : auth.email!;
   const update = { ...pick(entry), updated_at: new Date().toISOString() };
   const { data, error } = await getSupabase().from('user_team_members')
-    .update(update).eq('id', id).eq('user_email', auth.email!).select().maybeSingle();
+    .update(update).eq('id', id).eq('user_email', ownerEmail).select().maybeSingle();
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   if (data) await embedVaultRow(getSupabase(), 'person', data, new Date().toISOString());
   return NextResponse.json({ success: true, entry: data });
@@ -70,8 +77,10 @@ export async function DELETE(request: NextRequest) {
   if (!email || !id) return NextResponse.json({ success: false, error: 'Email and id required' }, { status: 400 });
   const auth = await verifyUserOwnsEmail(request, email, { requireStrongAuth: true });
   if (!auth.authenticated) return NextResponse.json({ success: false, error: auth.error || 'Unauthorized' }, { status: 401 });
+  const { workspaceId, asClient } = await resolveActiveWorkspace(auth.email!, request);
+  const ownerEmail = asClient ? clientNotificationEmail(workspaceId) : auth.email!;
   const { error } = await getSupabase().from('user_team_members')
-    .update({ archived_at: new Date().toISOString() }).eq('id', id).eq('user_email', auth.email!);
+    .update({ archived_at: new Date().toISOString() }).eq('id', id).eq('user_email', ownerEmail);
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
   return NextResponse.json({ success: true });
 }

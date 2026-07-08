@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { saveSnapshot, readSnapshot, freshMeta, degradedMeta, isUpstreamOutage } from '@/lib/resilience/last-good';
+import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -32,11 +33,17 @@ export async function GET(request: NextRequest) {
   const auth = requireMIAuthSession(request, email);
   if (!auth.ok) return auth.response;
 
+  // Coach Mode: the change log is owner-attributed for tracked CLIENT pursuits, so
+  // read the client's feed (synthetic email) when acting as a client — else the
+  // coach sees their own changes and the client's badge never clears.
+  const { workspaceId, asClient } = await resolveActiveWorkspace(email || '', request);
+  const scopedEmail = asClient ? clientNotificationEmail(workspaceId) : email!;
+
   try {
     const { data, error } = await sb()
       .from('pursuit_change_log')
       .select('id, pursuit_id, notice_id, change_type, summary, old_value, new_value, detected_at')
-      .eq('user_email', email)
+      .eq('user_email', scopedEmail)
       .eq('acknowledged', false)
       .order('detected_at', { ascending: false });
 
@@ -44,7 +51,7 @@ export async function GET(request: NextRequest) {
       // A real infra outage (DB unreachable/timeout) → serve last-good with an
       // "as of {time}" banner instead of hiding the badge behind an empty feed.
       if (isUpstreamOutage(error)) {
-        const snap = await readSnapshot<Record<string, unknown>>(pursuitChangesSnapshotKey(email!));
+        const snap = await readSnapshot<Record<string, unknown>>(pursuitChangesSnapshotKey(scopedEmail));
         if (snap) return NextResponse.json({ ...snap.data, ...degradedMeta(snap.savedAt) });
       }
       // Otherwise (e.g. table may not exist pre-migration) → degrade to empty
@@ -58,12 +65,12 @@ export async function GET(request: NextRequest) {
       (byPursuit[row.pursuit_id] ||= []).push(row);
     }
     const response = { success: true, byPursuit, total: (data || []).length };
-    saveSnapshot(pursuitChangesSnapshotKey(email!), response as Record<string, unknown>).catch(() => {});
+    saveSnapshot(pursuitChangesSnapshotKey(scopedEmail), response as Record<string, unknown>).catch(() => {});
     return NextResponse.json({ ...response, ...freshMeta() });
   } catch (err) {
     // Thrown connection error (DB unreachable) → serve last-good if we have it.
     if (isUpstreamOutage(err)) {
-      const snap = await readSnapshot<Record<string, unknown>>(pursuitChangesSnapshotKey(email!));
+      const snap = await readSnapshot<Record<string, unknown>>(pursuitChangesSnapshotKey(scopedEmail));
       if (snap) return NextResponse.json({ ...snap.data, ...degradedMeta(snap.savedAt) });
     }
     // No snapshot / non-outage → preserve the original degrade-to-empty behavior.
@@ -77,7 +84,11 @@ export async function POST(request: NextRequest) {
   const auth = requireMIAuthSession(request, email);
   if (!auth.ok) return auth.response;
 
-  let q = sb().from('pursuit_change_log').update({ acknowledged: true }).eq('user_email', email).eq('acknowledged', false);
+  // Ack the CLIENT's changes when in Coach Mode (mirrors GET scoping).
+  const { workspaceId, asClient } = await resolveActiveWorkspace(email, request);
+  const scopedEmail = asClient ? clientNotificationEmail(workspaceId) : email;
+
+  let q = sb().from('pursuit_change_log').update({ acknowledged: true }).eq('user_email', scopedEmail).eq('acknowledged', false);
   if (body.pursuit_id) q = q.eq('pursuit_id', body.pursuit_id);
   const { error } = await q;
   if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
