@@ -21,8 +21,13 @@ export async function GET(request: NextRequest) {
   if (!url || !key) return NextResponse.json({ success: false, error: 'Supabase not configured' }, { status: 500 });
   const supabase = createClient(url, key, { auth: { persistSession: false } });
 
-  const maxItems = Math.min(parseInt(request.nextUrl.searchParams.get('maxItems') || '200', 10), 1000);
-  const daysBack = Math.min(parseInt(request.nextUrl.searchParams.get('daysBack') || '7', 10), 30);
+  // Accumulate pattern (like the SAM cache): pull wide, upsert into the durable
+  // table, dedupe by solicitation_number. Default to a big maxItems + ALL available
+  // files (daysBack omitted) so the table grows instead of tracking a rolling window.
+  // Pass ?daysBack=N to narrow; ?maxItems=N to cap.
+  const maxItems = Math.min(parseInt(request.nextUrl.searchParams.get('maxItems') || '1000', 10), 1000);
+  const daysBackParam = request.nextUrl.searchParams.get('daysBack');
+  const daysBack = daysBackParam == null ? null : Math.min(parseInt(daysBackParam, 10), 30);
   try {
     const result = await ingestDibbs(supabase, { maxItems, daysBack });
     return NextResponse.json({ success: true, ...result, message: `DIBBS: fetched ${result.fetched}, upserted ${result.upserted}` });
