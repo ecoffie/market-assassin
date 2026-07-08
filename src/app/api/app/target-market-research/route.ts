@@ -961,11 +961,30 @@ export async function POST(request: NextRequest) {
         a.parentAgency,
         a.name,
       );
+      // Authoritative SET-ASIDE for this sub-agency (server-computed over ALL
+      // matching records, same scope as accurateTotal) — resolved by the SAME key
+      // logic as the total. This is the real set-aside number ($3M for NPS wood),
+      // vs the find-agencies SAMPLED a.setAsideSpending which over-counted to equal
+      // the total ($43M/$43M was the Jul 8 bug — total == setaside on rollup rows).
+      const accurateSetAside = categoryTotalForAgency(
+        setAsideCatByKey,
+        a.subAgency,
+        a.parentAgency,
+        a.name,
+      );
       // Office row → its own spend. Agency/sub-agency rollup row → the accurate
       // category total (so the real giants still rank correctly).
       const totalSpending = isOfficeLevel
         ? officeOwnTotal
         : ((accurateTotal && accurateTotal > officeOwnTotal) ? accurateTotal : officeOwnTotal);
+      // Set-Aside column: prefer the authoritative server figure for rollup rows;
+      // fall back to the sampled number only for office rows / when the category
+      // pass had no match. Never let it exceed the row's own total (a subset can't
+      // be larger than the whole).
+      const resolvedSetAside = Math.min(
+        totalSpending,
+        (!isOfficeLevel && accurateSetAside > 0) ? accurateSetAside : (a.setAsideSpending || 0),
+      );
       // Keyword searches: ONLY USAspending category totals for this keyword — never
       // the NAICS-sample setAsideSpending (Eric: DOE $2B / NASA $6B on Set-Aside lens
       // while real keyword "excel" has DoD ~$380M, DOE ~$20M per spending_by_category).
@@ -982,7 +1001,7 @@ export async function POST(request: NextRequest) {
         officeId: a.officeId || a.subAgencyCode || a.agencyCode || '',
         location: a.location || '',
 
-        setAsideSpending: a.setAsideSpending || 0,
+        setAsideSpending: resolvedSetAside,
         totalSpending,
         contractCount: a.contractCount || 0,
         satSpending: a.satSpending || 0,
