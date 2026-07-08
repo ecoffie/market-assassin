@@ -76,7 +76,7 @@ type OppRow = {
  * keyword (phrase / specific term), a PSC family hit, or NAICS-backed-by-a-keyword
  * qualifies. Returns { score, reason }; score 0 = not this viewer's opp.
  */
-function scoreOpp(opp: OppRow, p: ViewerProfile): { score: number; reason: string } {
+function scoreOpp(opp: OppRow, p: ViewerProfile): { matchScore: number; rankScore: number; reason: string } {
   const title = (opp.title || '').toLowerCase();
   const naics = opp.naics_code ? String(opp.naics_code).trim() : '';
   const psc = opp.psc_code ? String(opp.psc_code).trim().toUpperCase() : '';
@@ -86,17 +86,22 @@ function scoreOpp(opp: OppRow, p: ViewerProfile): { score: number; reason: strin
   const naicsHit = !!naics && p.naics.some((c) => c === naics || c.slice(0, 4) === naics.slice(0, 4));
   const pscHit = !!psc && p.psc.some((c) => c === psc || c.slice(0, 2) === psc.slice(0, 2));
 
-  let score = 0;
+  // MATCH score = relevance strength ONLY. This is what the strong-match bar tests,
+  // so freshness can never push a weak match over it (a NAICS-only 20 stays 20).
+  let matchScore = 0;
   const reasons: string[] = [];
-  if (distinctiveHits.length) { score += distinctiveHits.length * 40; reasons.push(`matches "${distinctiveHits[0]}"`); }
-  if (pscHit) { score += 25; reasons.push(`PSC ${psc}`); }
-  if (naicsHit && anyKwHit) { score += 20; reasons.push(`NAICS ${naics}`); }
-  // Freshness nudge — a sooner (but still open) deadline is more actionable.
-  if (opp.response_deadline) {
+  if (distinctiveHits.length) { matchScore += distinctiveHits.length * 40; reasons.push(`matches "${distinctiveHits[0]}"`); }
+  if (pscHit) { matchScore += 25; reasons.push(`PSC ${psc}`); }
+  if (naicsHit && anyKwHit) { matchScore += 20; reasons.push(`NAICS ${naics}`); }
+
+  // RANK score = match + a small sooner-deadline nudge (tiebreaker among matches of
+  // equal strength). Never affects whether an opp qualifies — only the ordering.
+  let rankScore = matchScore;
+  if (matchScore > 0 && opp.response_deadline) {
     const days = Math.ceil((new Date(opp.response_deadline).getTime() - Date.now()) / 86_400_000);
-    if (days >= 0 && days <= 30) score += 5;
+    if (days >= 0 && days <= 30) rankScore += 5;
   }
-  return { score, reason: reasons.join(' · ') };
+  return { matchScore, rankScore, reason: reasons.join(' · ') };
 }
 
 function isSourcesSought(noticeType?: string | null): boolean {
@@ -184,18 +189,19 @@ export async function GET(request: NextRequest) {
     // "management") does NOT clear the bar — that's the weak, vague card the user
     // disliked. Under-bar profiles (Blue Heron's all-generic keywords) get no card +
     // the TargetingCard precision nudge telling them how to earn one.
+    // Bar tests MATCH strength only (freshness can't push a weak match over it).
     const MIN_STRONG_SCORE = 25;
     const pool = (rows || []) as OppRow[];
     const scored = pool
       .map((o) => ({ o, ...scoreOpp(o, profile) }))
-      .filter((x) => x.score >= MIN_STRONG_SCORE);
+      .filter((x) => x.matchScore >= MIN_STRONG_SCORE);
     if (!scored.length) {
       return NextResponse.json({ hot: null }, { headers: { 'Cache-Control': 'no-store' } });
     }
 
-    // Rank by match strength, then sooner deadline (more actionable), then SS.
+    // Rank by rankScore (match + freshness nudge), then sooner deadline, then SS.
     scored.sort((a, b) => {
-      if (b.score !== a.score) return b.score - a.score;
+      if (b.rankScore !== a.rankScore) return b.rankScore - a.rankScore;
       const ad = a.o.response_deadline ? new Date(a.o.response_deadline).getTime() : Number.MAX_SAFE_INTEGER;
       const bd = b.o.response_deadline ? new Date(b.o.response_deadline).getTime() : Number.MAX_SAFE_INTEGER;
       if (ad !== bd) return ad - bd;
