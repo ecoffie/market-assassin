@@ -387,9 +387,14 @@ export default function CoachPanel({
                     <button
                       type="button"
                       onClick={() => switchTo(c)}
+                      // The full client name is already the card title above — the
+                      // first-word label ("Work as Cape") was ambiguous across the
+                      // many "Cape Fear ..." clients. A plain action is unambiguous.
                       className="h-9 px-4 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-sm font-medium text-white"
+                      aria-label={`Work as ${c.businessName}`}
+                      title={`Work as ${c.businessName}`}
                     >
-                      Work as {c.businessName.split(' ')[0]}
+                      Work as client →
                     </button>
                   ) : (
                     <button

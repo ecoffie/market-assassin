@@ -14,6 +14,33 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { getMIApiHeaders } from './authHeaders';
 
+/** Fire-and-forget engagement event so we can measure whether anyone actually
+ *  values this card (is it signal or noise?). Reuses the existing pipeline
+ *  (/api/mindy/engagement → user engagement log) — no new event type / migration.
+ *  eventSource 'mindy_insight' isolates it; metadata.insight_source records WHICH
+ *  variant (guest lesson / market pulse / data / fallback) so we see which lands. */
+function trackInsight(
+  email: string | null,
+  eventType: 'page_view' | 'tool_use',
+  action: string,
+  insightSource?: string,
+) {
+  if (!email) return;
+  try {
+    fetch('/api/mindy/engagement', {
+      method: 'POST',
+      headers: getMIApiHeaders(email, { 'Content-Type': 'application/json' }),
+      body: JSON.stringify({
+        email,
+        eventType,
+        eventSource: 'mindy_insight',
+        metadata: { action, insight_source: insightSource || null },
+      }),
+      keepalive: true,
+    }).catch(() => {});
+  } catch { /* telemetry is best-effort — never affects the card */ }
+}
+
 interface InsightData {
   quote: string;
   format: string;
@@ -64,7 +91,21 @@ export function MindyInsightCard({ email }: MindyInsightCardProps) {
       const res = await fetch(url, { headers: getMIApiHeaders(email) });
       if (!res.ok) return;
       const data = await res.json();
-      if (data.success && data.insight) setInsight(data.insight);
+      if (data.success && data.insight) {
+        // Suppress the GENERIC fallback quote — a canned "federal contracting"
+        // line ("Networking at industry events is crucial…") is noise stacked on
+        // top of the best-fit card. Only show insights with real, personalized
+        // value: a NAICS-matched guest lesson, today's-market pulse, or your own
+        // data. (Eric, Jul 7 — "the generic is the noise".)
+        if (data.insight.source === 'fallback') {
+          setInsight(null);
+          return;
+        }
+        setInsight(data.insight);
+        // Impression — how often the (valuable) card is actually seen, tagged by
+        // which variant, so we can judge whether the card earns its place.
+        trackInsight(email, 'page_view', 'impression', data.insight.source);
+      }
     } catch {
       // silently fail — card just won't render
     }
@@ -81,10 +122,11 @@ export function MindyInsightCard({ email }: MindyInsightCardProps) {
   }, [fetchInsight]);
 
   const handleRefresh = useCallback(async () => {
+    trackInsight(email, 'tool_use', 'refresh', insight?.source);
     setRefreshing(true);
     await fetchInsight(true);
     setRefreshing(false);
-  }, [fetchInsight]);
+  }, [fetchInsight, email, insight?.source]);
 
   // Render the canvas whenever insight changes
   useEffect(() => {
@@ -109,7 +151,7 @@ export function MindyInsightCard({ email }: MindyInsightCardProps) {
       </button>
       {/* Dismiss */}
       <button
-        onClick={() => setHidden(true)}
+        onClick={() => { trackInsight(email, 'tool_use', 'dismiss', insight?.source); setHidden(true); }}
         className="absolute top-2 right-2 z-10 text-white/60 hover:text-white text-lg leading-none w-6 h-6 flex items-center justify-center rounded-full bg-black/30 hover:bg-black/50"
         aria-label="Hide insight"
         title="Hide for this session"
@@ -150,7 +192,7 @@ export function MindyInsightCard({ email }: MindyInsightCardProps) {
             {insight.attribution && <span className="text-slate-500"> · {insight.attribution}</span>}
           </span>
           <button
-            onClick={() => copyCardImage(canvasRef.current)}
+            onClick={() => { trackInsight(email, 'tool_use', 'copy', insight?.source); copyCardImage(canvasRef.current); }}
             className="text-slate-400 hover:text-emerald-300 transition"
             title="Copy as image"
           >
