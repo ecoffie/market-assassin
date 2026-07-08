@@ -1048,13 +1048,22 @@ function BillingCard({
 
       {loading ? (
         <div className="h-12 rounded-lg bg-slate-800/60 animate-pulse" />
-      ) : (tier === 'team' || tier === 'enterprise') ? (
-        // Already Pro+ via Team/Enterprise — NO upgrade CTA (Eric: on Team plan
-        // means you're already Pro). They may have no personal Stripe sub.
+      ) : (tier !== 'free' && !(state?.hasSubscription && sub)) ? (
+        // Already Pro+ but NO personal Stripe subscription — show the plan, NOT an
+        // "Upgrade to Pro" CTA. Pro access is a UNION (bundle / comp / team / access
+        // flag), so a real Pro user can have zero personal Stripe sub. The old code
+        // only special-cased team/enterprise and fell a bundle/comp Pro through to
+        // the free "Upgrade to Pro" button (Candice / Whitty-CAP: sidebar "Pro Plan"
+        // + green "Upgrade to Pro", Jul 8 2026). Manage-billing needs a Stripe sub,
+        // so we don't offer it here — there's nothing to manage.
         <div className="rounded-lg border border-emerald-700/40 bg-emerald-900/15 p-3">
           <span className="text-sm font-medium text-emerald-200">{tierLabel(tier)}</span>
           <p className="text-xs text-slate-400 mt-1">
-            {tier === 'team' ? 'You have full Pro access through your team.' : 'Enterprise — full access.'}
+            {tier === 'team'
+              ? 'You have full Pro access through your team.'
+              : tier === 'enterprise'
+                ? 'Enterprise — full access.'
+                : 'You have full Pro access. No personal subscription to manage — billing is handled through your plan.'}
           </p>
         </div>
       ) : state?.hasSubscription && sub ? (

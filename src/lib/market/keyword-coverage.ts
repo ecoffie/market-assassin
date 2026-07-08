@@ -13,6 +13,7 @@
  */
 import { fiscalYearTimePeriod } from '@/lib/utils/fiscal-year';
 import { sectorSubTradeKeywords } from './sector-expansions';
+import { isDistinctiveKeyword } from './keyword-sanitize';
 
 const BASE = 'https://api.usaspending.gov/api/v2/search/spending_by_category';
 
@@ -155,8 +156,15 @@ function keywordCandidates(input: string): string[] {
   const kw = input.trim();
   const out: string[] = [kw];
   const words = kw.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/).filter(w => w.length > 2 && !STOP.has(w));
-  // significant single words, longest first (longest ≈ most specific industry term)
-  for (const w of [...new Set(words)].sort((a, b) => b.length - a.length)) {
+  // Order single-word fallbacks by DISTINCTIVENESS, not length. "longest ≈ most
+  // specific" was backwards: "video production" → the longer word "production" is
+  // a generic federal wildcard ($36B defense mfg) while the shorter "video" is the
+  // real industry term. Ranking longest-first + a "bigger market wins" rule locked
+  // onto "production" and told a video company to add engineering/R&D codes
+  // (Candice / Whitty-CAP, Jul 8 2026). Distinctive words (not in the generic-noise
+  // set) come first; among equally-distinctive, longer (more specific) first.
+  const rank = (w: string) => (isDistinctiveKeyword(w) ? 0 : 1);
+  for (const w of [...new Set(words)].sort((a, b) => rank(a) - rank(b) || b.length - a.length)) {
     if (!out.includes(w)) out.push(w);
   }
   return out.slice(0, 4);
@@ -267,15 +275,24 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
     let pscRows: { code: string; name?: string; amount: number }[] = [];
     let kw = raw;
     let bestTotal = 0;
+    let bestDistinctive = false;
     const sumAmt = (rs: { amount: number }[]) => rs.reduce((s, r) => s + (r.amount || 0), 0);
     for (const cand of keywordCandidates(raw)) {
       const [n, p] = await Promise.all([fetchCat(cand, 'naics'), fetchCat(cand, 'psc')]);
       if (n.length === 0) continue;
       const candTotal = sumAmt(n);
+      const candDistinctive = cand.includes(' ') || isDistinctiveKeyword(cand);
       // First non-empty candidate seeds the result; a later (broader) candidate
-      // only wins if it captures ≥3× the market the current best does.
-      if (rows.length === 0 || candTotal >= bestTotal * 3) {
-        rows = n; pscRows = p; kw = cand; bestTotal = candTotal;
+      // only wins if it captures ≥3× the market the current best does — this
+      // unburies "demolition" from "demolition services" (×170 more market).
+      // BUT a GENERIC word (not distinctive: "production", "management") must NOT
+      // hijack a DISTINCTIVE one on size alone — "production" ($36B defense mfg)
+      // was overriding "video" ($1B, the real market) and dropping the user's own
+      // code (Candice / Whitty-CAP, Jul 8 2026). So the ≥3× override is only
+      // allowed when the challenger is at least as distinctive as the incumbent.
+      const canOverride = candTotal >= bestTotal * 3 && (candDistinctive || !bestDistinctive);
+      if (rows.length === 0 || canOverride) {
+        rows = n; pscRows = p; kw = cand; bestTotal = candTotal; bestDistinctive = candDistinctive;
       }
     }
     if (rows.length === 0) return null;

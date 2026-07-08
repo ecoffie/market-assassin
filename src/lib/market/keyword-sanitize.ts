@@ -88,6 +88,14 @@ const GENERIC_SINGLE_WORDS = new Set([
   // shop's Target List (measured Jul 7 2026). These belong in a PHRASE, never alone.
   'custom', 'commercial', 'industrial', 'mobile', 'advanced', 'standard', 'modular',
   'portable', 'specialized', 'comprehensive', 'integrated', 'automated',
+  // "production" alone is a federal-search wildcard that names a $36B defense-
+  // MANUFACTURING market (missiles/aircraft/ammunition). A video company's
+  // "video production" was reduced to lone "production" and matched to defense
+  // engineering/R&D codes (Candice / Whitty-CAP, Jul 8 2026). Belongs in a phrase
+  // ("video production", "production management"), never alone. Same for these
+  // process/output nouns that read distinctive but match everything.
+  'production', 'produce', 'operation', 'process', 'processing', 'delivery',
+  'performance', 'programs', 'consulting',
 ]);
 
 /**
