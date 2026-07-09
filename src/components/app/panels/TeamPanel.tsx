@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { X } from 'lucide-react';
+import Card from '@/components/ui/Card';
 import type { AppTier } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 
@@ -313,7 +314,7 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
         </div>
 
         <div className="space-y-6">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <Card>
             <h2 className="font-semibold text-white mb-4">Invite Seat</h2>
             <div className="space-y-3">
               <input
@@ -346,9 +347,9 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
                 <p className="text-xs text-amber-300">Mindy Team includes {TEAM_SEAT_LIMIT} seats. Upgrade to Enterprise for more users.</p>
               )}
             </div>
-          </div>
+          </Card>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <Card>
             <h2 className="font-semibold text-white mb-4">Due Soon</h2>
             <div className="space-y-3">
               {reminders.slice(0, 5).map(reminder => (
@@ -362,11 +363,11 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
               ))}
               {reminders.length === 0 && <p className="text-sm text-slate-500">No next actions due this week.</p>}
             </div>
-          </div>
+          </Card>
         </div>
       </div>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+      <Card>
         <h2 className="font-semibold text-white mb-4">Team Activity</h2>
         <div className="space-y-3">
           {activity.map(item => (
@@ -380,7 +381,7 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
           ))}
           {activity.length === 0 && <p className="text-sm text-slate-500">No team activity yet.</p>}
         </div>
-      </div>
+      </Card>
 
       {/* Workspace Settings - Admin/Owner only */}
       {canEditSettings && (

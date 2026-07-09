@@ -3855,3 +3855,30 @@ production build ✓ (551/551 pages), and a design-token drift guard
 color resolves through the semantic token system (`text-muted`/`text-faint`/`text-accent`
 + traffic-light status colors). Deliberate leaves (toast strings, `<option>` labels,
 compliance-state glyphs, code comments) were left untouched by design.
+
+---
+
+## Design polish — card/radius/shadow primitives (Phase 3, Jul 9 2026)
+
+**What:** Added the missing structural scales to the in-app design system — a named
+**radius** scale (`rounded-control`/`rounded-card`/`rounded-pill`), a restrained 3-step
+**elevation/shadow** scale (`shadow-raised`/`shadow-overlay`/`shadow-modal`), and a single
+reusable **`<Card>`** surface primitive (`src/components/ui/Card.tsx`) that owns the card
+shell copy-pasted ~100× across the app.
+
+**Why:** After color (P1) and icons (P2), the remaining "vibe-coded" tells were an ad-hoc
+corner-roundness mix (5 competing sizes, no rule) and a shadow scale that jumped straight
+to the heaviest `shadow-2xl`. Enterprise SaaS surfaces (Linear, Stripe, Ramp) are calm
+because these primitives are defined ONCE and reused. `<Card>` makes the dominant panel
+surface a single component so it can never drift again.
+
+**SEO/positioning:** Continues the "enterprise-grade federal BD platform" narrative for
+getmindy.ai — a consistent surface/elevation system is what makes screenshots and demo
+reels read as mature software rather than a prototype.
+
+**Proof:** Tokens generate real Tailwind v4 utilities (verified in built CSS:
+`.rounded-card{border-radius:.75rem}`, `.shadow-raised{…}`) with values matching today's
+de-facto styling → a visual NO-OP. Migrated 3 TeamPanel cards to `<Card>` as the reference
+adoption, which DROPPED raw-neutral color count (−6 in TeamPanel vs +5 in the sanctioned
+Card owner = net −1). Full build ✓, tsc clean, drift guard clean. Adoption is
+going-forward; the guard nudges the rest.
