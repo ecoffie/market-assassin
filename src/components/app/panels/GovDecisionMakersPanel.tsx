@@ -203,9 +203,9 @@ export default function GovDecisionMakersPanel({ email }: Props) {
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Government Decision Makers</h1>
-        <p className="text-slate-400 mt-1">
+        <p className="text-muted mt-1">
           Search {total ? total.toLocaleString() : ''} federal contacts from SAM{emailableTotal != null ? ` (${emailableTotal.toLocaleString()} with email on file)` : ''} — contracting officers and points of contact.
-          <span className="text-slate-500 ml-2 text-sm">Filter by agency &amp; office.</span>
+          <span className="text-faint ml-2 text-sm">Filter by agency &amp; office.</span>
         </p>
       </div>
 
@@ -217,7 +217,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
             onChange={e => setSearch(e.target.value)}
             onKeyDown={e => e.key === 'Enter' && load()}
             placeholder="Search by name or title (e.g., contracting officer, Smith)"
-            className="flex-1 px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+            className="flex-1 px-4 py-2.5 bg-surface border border-hairline rounded-lg text-white placeholder-faint focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
           />
           <button
             onClick={load}
@@ -231,17 +231,17 @@ export default function GovDecisionMakersPanel({ email }: Props) {
           {/* Scope to the user's Target List agencies (Eric QA: DM should
               default to my pre-selected agencies). Only when targets exist. */}
           {targetAgencies.length > 0 && (
-            <div className="inline-flex rounded-lg border border-slate-700 bg-slate-800 p-0.5 text-sm">
+            <div className="inline-flex rounded-lg border border-hairline bg-surface p-0.5 text-sm">
               <button
                 onClick={() => { setScope('targets'); setAgency(''); }}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${scope === 'targets' && !agency ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${scope === 'targets' && !agency ? 'bg-emerald-600 text-white' : 'text-muted hover:text-white'}`}
                 title={`Only your ${targetAgencies.length} target agencies`}
               >
                 <Star className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> My Targets ({targetAgencies.length})
               </button>
               <button
                 onClick={() => setScope('all')}
-                className={`px-3 py-1.5 rounded-md transition-colors ${scope === 'all' || agency ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                className={`px-3 py-1.5 rounded-md transition-colors ${scope === 'all' || agency ? 'bg-emerald-600 text-white' : 'text-muted hover:text-white'}`}
               >
                 All
               </button>
@@ -250,7 +250,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
           <select
             value={agency}
             onChange={e => { setAgency(e.target.value); if (e.target.value) setScope('all'); }}
-            className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:border-emerald-500 outline-none max-w-xs"
+            className="px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm focus:border-emerald-500 outline-none max-w-xs"
           >
             <option value="">All Agencies</option>
             {agencies.map(a => <option key={a} value={a}>{a}</option>)}
@@ -261,7 +261,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
             <select
               value={subAgency}
               onChange={e => setSubAgency(e.target.value)}
-              className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:border-emerald-500 outline-none max-w-xs"
+              className="px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm focus:border-emerald-500 outline-none max-w-xs"
             >
               <option value="">All sub-agencies</option>
               {subAgencies.map(s => <option key={s.name} value={s.name}>{s.name} ({s.count})</option>)}
@@ -274,14 +274,14 @@ export default function GovDecisionMakersPanel({ email }: Props) {
           drill-down, sourced from awards.awarding_office (SAM POC contacts
           don't carry office, so this is agency intelligence, not a row filter). */}
       {agency && officeDetail.length > 0 && (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+        <div className="bg-ground border border-surface rounded-xl p-4">
           <div className="flex items-baseline justify-between mb-2">
             <h3 className="text-sm font-semibold text-white">Top contracting offices in {agency}</h3>
-            <span className="text-xs text-slate-500">{officeDetail.length} offices · by spend</span>
+            <span className="text-xs text-faint">{officeDetail.length} offices · by spend</span>
           </div>
           <div className="flex flex-wrap gap-2">
             {officeDetail.slice(0, 12).map((o) => (
-              <span key={o.name} className="text-xs bg-slate-800 text-slate-300 rounded px-2 py-1" title={`${o.awards.toLocaleString()} awards`}>
+              <span key={o.name} className="text-xs bg-surface text-ink-soft rounded px-2 py-1" title={`${o.awards.toLocaleString()} awards`}>
                 {o.name} <span className="text-emerald-400 font-medium">${o.amount >= 1e9 ? (o.amount / 1e9).toFixed(0) + 'B' : (o.amount / 1e6).toFixed(0) + 'M'}</span>
               </span>
             ))}
@@ -294,34 +294,34 @@ export default function GovDecisionMakersPanel({ email }: Props) {
           OFFICE, not an agency slice. Available where solicitation numbers decode
           to a DoDAAC (DoD / DLA / Navy). Click an office → its full roster. */}
       {agency && officeRosters.length > 0 && (
-        <div className="bg-slate-900 border border-emerald-500/20 rounded-xl p-4">
+        <div className="bg-ground border border-emerald-500/20 rounded-xl p-4">
           <div className="flex items-baseline justify-between mb-1">
             <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-white"><Contact className="h-4 w-4 shrink-0" strokeWidth={2} /> Full contact rosters by buying office</h3>
-            <span className="text-xs text-slate-500">{officeRosters.length} offices · 100% list</span>
+            <span className="text-xs text-faint">{officeRosters.length} offices · 100% list</span>
           </div>
-          <p className="text-[11px] text-slate-500 mb-3">The complete people list for a specific contracting office — not an agency sample. Click an office to see everyone.</p>
+          <p className="text-[11px] text-faint mb-3">The complete people list for a specific contracting office — not an agency sample. Click an office to see everyone.</p>
           <div className="flex flex-wrap gap-2">
             {officeRosters.slice(0, 16).map((o) => (
               <button
                 key={o.name}
                 type="button"
                 onClick={() => openOfficeRoster(o.name)}
-                className={`text-xs rounded px-2.5 py-1.5 transition-colors ${openRoster?.office === o.name ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                className={`text-xs rounded px-2.5 py-1.5 transition-colors ${openRoster?.office === o.name ? 'bg-emerald-600 text-white' : 'bg-surface text-ink-soft hover:bg-input'}`}
               >
                 {o.name} <span className="text-emerald-400 font-medium">{o.count}</span>
               </button>
             ))}
           </div>
-          {rosterLoading && <div className="mt-3 text-xs text-slate-500">Loading roster…</div>}
+          {rosterLoading && <div className="mt-3 text-xs text-faint">Loading roster…</div>}
           {openRoster && (
-            <div className="mt-4 rounded-lg border border-slate-800 bg-slate-950/50 p-3">
+            <div className="mt-4 rounded-lg border border-surface bg-ground-deep/50 p-3">
               <div className="text-xs font-semibold text-emerald-300 mb-2">{openRoster.office} — {openRoster.people.length} contacts (complete)</div>
               <div className="grid sm:grid-cols-2 gap-x-6 gap-y-1.5 max-h-80 overflow-auto">
                 {openRoster.people.map((c, i) => (
                   <div key={i} className="flex items-start gap-2 text-xs">
                     <span className="min-w-0 flex-1">
                       <span className="block text-slate-200 truncate">{c.contact_fullname || '—'}</span>
-                      <span className="block text-slate-500 truncate">
+                      <span className="block text-faint truncate">
                         {c.roleCategory && <span className="text-emerald-400/80">{c.roleCategory} · </span>}
                         {c.contact_email || c.contact_phone || 'no contact info'}
                       </span>
@@ -342,21 +342,21 @@ export default function GovDecisionMakersPanel({ email }: Props) {
           under their target agencies before scrolling). Scope-aware. */}
       {!loading && visibleContacts.length > 0 && (
         <div className="flex items-center justify-between text-sm">
-          <span className="text-slate-300">
+          <span className="text-ink-soft">
             <b className="text-white">{scope === 'targets' && !agency ? visibleContacts.length.toLocaleString() : total.toLocaleString()}</b>
             {scope === 'targets' && !agency
               ? <> contacts across your <b className="text-emerald-400">{targetAgencies.length} target agencies</b></>
               : <> contacts{agency ? ` at ${agency}` : ' in the directory'}</>}
           </span>
-          {total > visibleContacts.length && <span className="text-xs text-slate-500">showing {visibleContacts.length}</span>}
+          {total > visibleContacts.length && <span className="text-xs text-faint">showing {visibleContacts.length}</span>}
         </div>
       )}
 
       {!loading && visibleContacts.length > 0 && (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+        <div className="bg-ground border border-surface rounded-xl overflow-hidden">
           <table className="w-full text-sm">
             <thead>
-              <tr className="bg-slate-800/60 text-left text-slate-400">
+              <tr className="bg-surface/60 text-left text-muted">
                 <th className="px-4 py-3 font-medium">Name</th>
                 <th className="px-4 py-3 font-medium">Role / POC</th>
                 <th className="px-4 py-3 font-medium">Agency</th>
@@ -366,7 +366,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
             </thead>
             <tbody>
               {visibleContacts.map(c => (
-                <tr key={c.id} className="border-t border-slate-800 hover:bg-slate-800/30">
+                <tr key={c.id} className="border-t border-surface hover:bg-surface/30">
                   <td className="px-4 py-3 text-white font-medium">{c.contact_fullname || '—'}</td>
                   <td className="px-4 py-3">
                     {c.role ? (
@@ -377,22 +377,22 @@ export default function GovDecisionMakersPanel({ email }: Props) {
                             c.roleCategory === 'Contracting Officer' ? 'bg-emerald-500/20 text-emerald-300'
                             : c.roleCategory === 'Small Business' ? 'bg-amber-500/20 text-amber-300'
                             : c.roleCategory === 'Program / Technical' ? 'bg-blue-500/20 text-blue-300'
-                            : 'bg-slate-700 text-slate-300'
+                            : 'bg-input text-ink-soft'
                           }`}>{c.roleCategory}</span>
                         )}
-                        <span className="text-slate-300 text-xs">{c.role}</span>
+                        <span className="text-ink-soft text-xs">{c.role}</span>
                       </div>
                     ) : c.pocLabel ? (
-                      <span className="text-slate-500 italic" title="SAM point-of-contact designation, not a job title">{c.pocLabel} POC</span>
+                      <span className="text-faint italic" title="SAM point-of-contact designation, not a job title">{c.pocLabel} POC</span>
                     ) : (
                       <span className="text-slate-600">—</span>
                     )}
                   </td>
-                  <td className="px-4 py-3 text-slate-300">
+                  <td className="px-4 py-3 text-ink-soft">
                     {c.department_ind_agency || '—'}
                     {c.subAgency && <span className="block text-xs text-emerald-400/80">{c.subAgency}</span>}
                   </td>
-                  <td className="px-4 py-3 text-slate-400">
+                  <td className="px-4 py-3 text-muted">
                     <div className="flex items-start gap-2">
                       <div className="min-w-0">
                         {/* derivedOffice is cleaned/validated server-side; the
@@ -407,7 +407,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
                         <button
                           onClick={() => trackOffice(c)}
                           disabled={trackedOffices.has(c.dodaac)}
-                          className="inline-flex shrink-0 items-center gap-1 text-[11px] px-1.5 py-0.5 rounded border border-slate-700 text-slate-400 hover:text-emerald-400 hover:border-emerald-600 disabled:opacity-50 disabled:cursor-default"
+                          className="inline-flex shrink-0 items-center gap-1 text-[11px] px-1.5 py-0.5 rounded border border-hairline text-muted hover:text-emerald-400 hover:border-emerald-600 disabled:opacity-50 disabled:cursor-default"
                           title="Add this office to My Target List"
                         >
                           {trackedOffices.has(c.dodaac) ? <><Check className="h-3 w-3 shrink-0" strokeWidth={2.5} /> Tracked</> : <><Plus className="h-3 w-3 shrink-0" strokeWidth={2.5} /> Track</>}
@@ -419,7 +419,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
                     {c.contact_email ? (
                       <a href={`mailto:${c.contact_email}`} className="text-emerald-400 hover:underline">{c.contact_email}</a>
                     ) : c.contact_phone ? (
-                      <span className="text-slate-400">{c.contact_phone}</span>
+                      <span className="text-muted">{c.contact_phone}</span>
                     ) : <span className="text-slate-600">—</span>}
                   </td>
                 </tr>
@@ -427,7 +427,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
             </tbody>
           </table>
           {total > visibleContacts.length && (
-            <div className="px-4 py-3 text-xs text-slate-500 border-t border-slate-800">
+            <div className="px-4 py-3 text-xs text-faint border-t border-surface">
               Showing {visibleContacts.length} of ~{total.toLocaleString()} — narrow with search, agency, or office.
             </div>
           )}
@@ -435,7 +435,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
       )}
 
       {!loading && visibleContacts.length === 0 && !error && (
-        <div className="text-center py-12 text-slate-400">
+        <div className="text-center py-12 text-muted">
           <div className="text-lg font-medium text-white mb-1">No contacts found</div>
           <div className="text-sm">Try a broader search or a different agency.</div>
         </div>
@@ -443,7 +443,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
 
       {loading && (
         <div className="space-y-2">
-          {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-12 bg-slate-800/40 rounded animate-pulse" />)}
+          {[1, 2, 3, 4, 5].map(i => <div key={i} className="h-12 bg-surface/40 rounded animate-pulse" />)}
         </div>
       )}
 

@@ -135,7 +135,7 @@ export default function GlobalLookup({ email }: { email: string | null }) {
   return (
     <>
       <form onSubmit={submit} className="relative w-full max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-500" strokeWidth={1.75} />
+        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-faint" strokeWidth={1.75} />
         <input
           type="text"
           value={value}
@@ -144,7 +144,7 @@ export default function GlobalLookup({ email }: { email: string | null }) {
           onBlur={() => setTimeout(() => { setFocused(false); }, 200)}
           placeholder="Contract #, company, UEI, or a market like “drones”…"
           aria-label="Look up a contract number, company, UEI, or research a market"
-          className="w-full rounded-lg border border-slate-700 bg-slate-900/80 pl-9 pr-9 py-2 text-sm text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:opacity-60"
+          className="w-full rounded-lg border border-hairline bg-ground/80 pl-9 pr-9 py-2 text-sm text-white placeholder-faint focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:opacity-60"
           disabled={resolving}
         />
         {resolving && (
@@ -152,24 +152,24 @@ export default function GlobalLookup({ email }: { email: string | null }) {
         )}
 
         {focused && !value && !hint && !disambig && (
-          <div className="absolute left-0 right-0 top-full mt-1 rounded-lg border border-slate-700 bg-slate-900 p-2 shadow-2xl shadow-black/40 z-50">
-            <p className="px-2 pb-1 text-[10px] uppercase tracking-wider text-slate-500">Look up by</p>
+          <div className="absolute left-0 right-0 top-full mt-1 rounded-lg border border-hairline bg-ground p-2 shadow-2xl shadow-black/40 z-50">
+            <p className="px-2 pb-1 text-[10px] uppercase tracking-wider text-faint">Look up by</p>
             <div className="space-y-0.5">
               <div className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-xs">
-                <span className="text-slate-300">Contract number</span>
-                <span className="font-mono text-slate-500">140F0822D0024</span>
+                <span className="text-ink-soft">Contract number</span>
+                <span className="font-mono text-faint">140F0822D0024</span>
               </div>
               <div className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-xs">
-                <span className="text-slate-300">Company name</span>
-                <span className="font-mono text-slate-500">Lockheed Martin</span>
+                <span className="text-ink-soft">Company name</span>
+                <span className="font-mono text-faint">Lockheed Martin</span>
               </div>
               <div className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-xs">
-                <span className="text-slate-300">UEI</span>
-                <span className="font-mono text-slate-500">E466BXU4KJH8</span>
+                <span className="text-ink-soft">UEI</span>
+                <span className="font-mono text-faint">E466BXU4KJH8</span>
               </div>
               <div className="flex items-center justify-between gap-3 rounded-md px-2 py-1.5 text-xs">
-                <span className="text-slate-300">A market / keyword</span>
-                <span className="text-slate-500">drones, demolition…</span>
+                <span className="text-ink-soft">A market / keyword</span>
+                <span className="text-faint">drones, demolition…</span>
               </div>
               <p className="px-2 pt-1 text-[10px] text-slate-600">Single words like &ldquo;Excel&rdquo; ask company vs market.</p>
             </div>
@@ -177,10 +177,10 @@ export default function GlobalLookup({ email }: { email: string | null }) {
         )}
 
         {disambig && (
-          <div className="absolute left-0 right-0 top-full mt-1 rounded-lg border border-slate-600 bg-slate-900 shadow-2xl shadow-black/50 z-50 overflow-hidden">
-            <div className="px-3 py-2 border-b border-slate-800">
+          <div className="absolute left-0 right-0 top-full mt-1 rounded-lg border border-slate-600 bg-ground shadow-2xl shadow-black/50 z-50 overflow-hidden">
+            <div className="px-3 py-2 border-b border-surface">
               <p className="text-xs font-semibold text-white">&ldquo;{disambig.query}&rdquo; — what did you mean?</p>
-              <p className="text-[10px] text-slate-500 mt-0.5">Company lookup and market research are different searches.</p>
+              <p className="text-[10px] text-faint mt-0.5">Company lookup and market research are different searches.</p>
             </div>
 
             {disambig.vendorHint && (
@@ -188,12 +188,12 @@ export default function GlobalLookup({ email }: { email: string | null }) {
                 type="button"
                 onMouseDown={(e) => e.preventDefault()}
                 onClick={() => resolveContractor(disambig.vendorHint!.searchQuery)}
-                className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-purple-500/10 border-b border-slate-800/80"
+                className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-purple-500/10 border-b border-surface/80"
               >
                 <Building2 className="w-4 h-4 text-purple-400 shrink-0" strokeWidth={1.75} />
                 <div className="min-w-0 flex-1">
                   <div className="text-xs font-medium text-purple-200">{disambig.vendorHint.label}</div>
-                  <div className="text-[10px] text-slate-500">Product name → federal vendor profile</div>
+                  <div className="text-[10px] text-faint">Product name → federal vendor profile</div>
                 </div>
                 <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />
               </button>
@@ -213,12 +213,12 @@ export default function GlobalLookup({ email }: { email: string | null }) {
                   });
                   window.location.href = `/app?${params.toString()}`;
                 }}
-                className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-emerald-500/10 border-b border-slate-800/60 last:border-0"
+                className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-emerald-500/10 border-b border-surface/60 last:border-0"
               >
                 <Building2 className="w-4 h-4 text-emerald-400 shrink-0" strokeWidth={1.75} />
                 <div className="min-w-0 flex-1">
                   <div className="text-xs text-white truncate">{c.company}</div>
-                  <div className="text-[10px] text-slate-500">
+                  <div className="text-[10px] text-faint">
                     {fmt$(c.total_contract_value)}{c.state ? ` · ${c.state}` : ''}
                   </div>
                 </div>
@@ -230,7 +230,7 @@ export default function GlobalLookup({ email }: { email: string | null }) {
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => goContractorsSearch(disambig.query)}
-              className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-slate-800 border-t border-slate-800 text-xs text-slate-400"
+              className="w-full flex items-center gap-2 px-3 py-2 text-left hover:bg-surface border-t border-surface text-xs text-muted"
             >
               <Search className="w-3.5 h-3.5 shrink-0" strokeWidth={1.75} />
               View all contractors matching &ldquo;{disambig.query}&rdquo;
@@ -240,12 +240,12 @@ export default function GlobalLookup({ email }: { email: string | null }) {
               type="button"
               onMouseDown={(e) => e.preventDefault()}
               onClick={() => goMarketResearch(disambig.query)}
-              className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-blue-500/10 border-t border-slate-700"
+              className="w-full flex items-center gap-2 px-3 py-2.5 text-left hover:bg-blue-500/10 border-t border-hairline"
             >
               <BarChart3 className="w-4 h-4 text-blue-400 shrink-0" strokeWidth={1.75} />
               <div className="min-w-0 flex-1">
                 <div className="text-xs font-medium text-blue-200">Research federal market for &ldquo;{disambig.query}&rdquo;</div>
-                <div className="text-[10px] text-slate-500">Which agencies buy this — award keyword search</div>
+                <div className="text-[10px] text-faint">Which agencies buy this — award keyword search</div>
               </div>
               <ChevronRight className="w-3.5 h-3.5 text-slate-600 shrink-0" />
             </button>
@@ -261,15 +261,15 @@ export default function GlobalLookup({ email }: { email: string | null }) {
 
       {openPiid && (
         <div className="fixed inset-0 z-[60] flex items-start justify-center overflow-y-auto bg-black/70 backdrop-blur-sm p-4">
-          <div className="relative my-12 w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl">
-            <div className="flex items-center justify-between border-b border-slate-800 px-5 py-4">
+          <div className="relative my-12 w-full max-w-2xl rounded-2xl border border-hairline bg-ground shadow-2xl">
+            <div className="flex items-center justify-between border-b border-surface px-5 py-4">
               <div>
                 <h2 className="text-base font-semibold text-white">Contract lookup</h2>
-                <p className="text-xs text-slate-400 font-mono">{openPiid}</p>
+                <p className="text-xs text-muted font-mono">{openPiid}</p>
               </div>
               <button
                 onClick={() => { setOpenPiid(null); setValue(''); }}
-                className="p-1.5 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                className="p-1.5 text-muted hover:text-white hover:bg-surface rounded-lg transition-colors"
                 aria-label="Close"
               >
                 <X className="w-5 h-5" strokeWidth={1.75} />

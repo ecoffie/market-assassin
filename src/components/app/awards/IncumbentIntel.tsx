@@ -64,23 +64,23 @@ export default function IncumbentIntel({
       </button>
       {open && (
         <div className="mt-1.5">
-          {state === 'loading' && <div className="text-[11px] text-slate-500">Looking up the likely incumbent on USASpending…</div>}
-          {state === 'error' && <div className="text-[11px] text-slate-500">Couldn’t look up the incumbent right now.</div>}
-          {state === 'none' && <div className="text-[11px] text-slate-500">No clear incumbent found — this may be new work, or the predecessor isn’t in recent USASpending data.</div>}
+          {state === 'loading' && <div className="text-[11px] text-faint">Looking up the likely incumbent on USASpending…</div>}
+          {state === 'error' && <div className="text-[11px] text-faint">Couldn’t look up the incumbent right now.</div>}
+          {state === 'none' && <div className="text-[11px] text-faint">No clear incumbent found — this may be new work, or the predecessor isn’t in recent USASpending data.</div>}
           {typeof state === 'object' && (
             <div className="rounded-lg border border-amber-500/20 bg-amber-500/[0.04] p-3 text-xs">
               <div className="flex items-center gap-2 flex-wrap">
                 <span className="font-semibold text-amber-200">{state.name}</span>
-                {state.state && <span className="text-slate-500">({state.state})</span>}
-                <span className={`rounded px-1.5 py-0.5 text-[10px] ${state.confidence === 'high' ? 'bg-emerald-500/20 text-emerald-300' : state.confidence === 'medium' ? 'bg-amber-500/20 text-amber-300' : 'bg-slate-700 text-slate-400'}`}>
+                {state.state && <span className="text-faint">({state.state})</span>}
+                <span className={`rounded px-1.5 py-0.5 text-[10px] ${state.confidence === 'high' ? 'bg-emerald-500/20 text-emerald-300' : state.confidence === 'medium' ? 'bg-amber-500/20 text-amber-300' : 'bg-input text-muted'}`}>
                   {state.confidence} match
                 </span>
               </div>
-              <div className="mt-1.5 grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-slate-300">
-                <div><span className="text-slate-500">Ceiling: </span>{formatMindyCurrency(state.ceiling)}</div>
-                {state.expires && <div><span className="text-slate-500">Expires: </span>{fmtDate(state.expires)}</div>}
-                {state.vehicle && <div className="truncate"><span className="text-slate-500">Vehicle: </span>{state.vehicle}</div>}
-                {state.fundingAccount && <div className="truncate"><span className="text-slate-500">Funded: </span>{state.fundingAccount.slice(0, 18)}</div>}
+              <div className="mt-1.5 grid grid-cols-2 sm:grid-cols-4 gap-x-4 gap-y-1 text-ink-soft">
+                <div><span className="text-faint">Ceiling: </span>{formatMindyCurrency(state.ceiling)}</div>
+                {state.expires && <div><span className="text-faint">Expires: </span>{fmtDate(state.expires)}</div>}
+                {state.vehicle && <div className="truncate"><span className="text-faint">Vehicle: </span>{state.vehicle}</div>}
+                {state.fundingAccount && <div className="truncate"><span className="text-faint">Funded: </span>{state.fundingAccount.slice(0, 18)}</div>}
               </div>
               <div className="mt-1 text-[10px] text-slate-600">Likely incumbent — best match by NAICS + agency. <a href={state.usaSpendingUrl} target="_blank" rel="noreferrer" className="text-amber-400">Verify ↗</a></div>
             </div>

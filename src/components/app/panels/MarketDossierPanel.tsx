@@ -123,7 +123,7 @@ export default function MarketDossierPanel({ email, onNavigate }: { email: strin
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Your Market Dossier</h1>
-        <p className="mt-0.5 flex items-center gap-2 text-xs text-slate-400">
+        <p className="mt-0.5 flex items-center gap-2 text-xs text-muted">
           <Satellite className="h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={2} /> Mindy ran 28 sources across 300+ agencies — your whole market, assembled.
           {data?.generatedAt && <span className="text-slate-600">· updated {timeAgo(data.generatedAt)}</span>}
         </p>
@@ -134,13 +134,13 @@ export default function MarketDossierPanel({ email, onNavigate }: { email: strin
       {receipt ? (
         <div className="rounded-xl border border-emerald-500/40 bg-emerald-500/10 p-5">
           <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-emerald-200"><CheckCircle2 className="h-4 w-4 shrink-0" strokeWidth={2} /> Your Mindy is set up</p>
-          <p className="mt-1 text-sm text-slate-300">
+          <p className="mt-1 text-sm text-ink-soft">
             Added <b className="text-white">{receipt.added}</b> buying {receipt.added === 1 ? 'agency' : 'agencies'} to your Target List
-            {receipt.skipped > 0 && <span className="text-slate-400"> · {receipt.skipped} already there</span>}.
+            {receipt.skipped > 0 && <span className="text-muted"> · {receipt.skipped} already there</span>}.
             Each one carries its sources sought, events, and contacts.
           </p>
           {receipt.addedNames.length > 0 && (
-            <p className="mt-1 text-xs text-slate-500 truncate">{receipt.addedNames.slice(0, 5).join(' · ')}</p>
+            <p className="mt-1 text-xs text-faint truncate">{receipt.addedNames.slice(0, 5).join(' · ')}</p>
           )}
           <button
             onClick={() => onNavigate?.('target-list')}
@@ -154,7 +154,7 @@ export default function MarketDossierPanel({ email, onNavigate }: { email: strin
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <div className="min-w-0">
               <p className="text-sm font-semibold text-white">Want Mindy to set this up for you?</p>
-              <p className="mt-0.5 text-sm text-slate-400">
+              <p className="mt-0.5 text-sm text-muted">
                 We&apos;ll add the agencies buying in your market to your Target List — with their sources sought, events, and contacts attached. You can fine-tune anything after.
               </p>
               {autoError && <p className="mt-1 text-xs text-red-300">{autoError}</p>}
@@ -173,10 +173,10 @@ export default function MarketDossierPanel({ email, onNavigate }: { email: strin
       {/* Market hero (reuses the aggregator) */}
       {naics && <MarketDataMap naics={naics} email={email || undefined} />}
 
-      {loading && <div className="text-sm text-slate-500">Assembling your market…</div>}
+      {loading && <div className="text-sm text-faint">Assembling your market…</div>}
       {error && <div className="text-sm text-red-400">Couldn&apos;t load your dossier. <button onClick={load} className="underline">Retry</button></div>}
       {data && !loading && data.opportunities.length === 0 && (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-5 text-sm text-slate-400">
+        <div className="rounded-xl border border-surface bg-ground/40 p-5 text-sm text-muted">
           {data.message || 'No opportunities matched your profile yet. Add your codes/keywords in Settings.'}
         </div>
       )}
@@ -203,7 +203,7 @@ function Section({ title, count, total, children }: { title: string; count: numb
   const label = total && total > count ? `${count} of ${total}` : `${count}`;
   return (
     <section>
-      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-slate-400">{title} <span className="text-slate-600">· {label}</span></h2>
+      <h2 className="mb-2 text-sm font-semibold uppercase tracking-wider text-muted">{title} <span className="text-slate-600">· {label}</span></h2>
       <div className="space-y-2">{children}</div>
     </section>
   );
@@ -221,7 +221,7 @@ function UpgradeCard({ lockedOpen, lockedRecompete }: { lockedOpen: number; lock
         <Lock className="h-5 w-5 shrink-0 text-emerald-300" strokeWidth={2} />
         <div className="min-w-0">
           <h3 className="font-semibold text-white">Unlock your full market</h3>
-          <p className="mt-0.5 text-sm text-slate-300">
+          <p className="mt-0.5 text-sm text-ink-soft">
             You&apos;re seeing a preview. <span className="font-semibold text-emerald-300">{parts.join(' + ')}</span> matched to your profile — plus draft-ready responses, tracking, and daily change alerts — are waiting in Mindy Pro.
           </p>
           <a
@@ -240,24 +240,24 @@ function OppCard({ opp, onNavigate }: { opp: DossierOpp; onNavigate?: (p: AppPan
   const dl = daysLeft(opp.deadline);
   const urgent = dl.endsWith('d left') || dl === 'today';
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4 transition-colors hover:border-emerald-500/40">
+    <div className="rounded-xl border border-surface bg-ground/70 p-4 transition-colors hover:border-emerald-500/40">
       <div className="flex flex-wrap items-start justify-between gap-2">
         <div className="min-w-0">
           <a href={opp.url} target="_blank" rel="noreferrer" className="font-semibold text-white hover:text-emerald-300">{opp.title}</a>
-          <div className="mt-0.5 text-xs text-slate-500">
+          <div className="mt-0.5 text-xs text-faint">
             {opp.agency || 'Federal'}{opp.naics ? ` · NAICS ${opp.naics}` : ''}{opp.incumbent ? ` · incumbent: ${opp.incumbent}` : ''}
           </div>
         </div>
         <div className="text-right">
           <div className="text-sm font-bold text-emerald-300">{money(opp.value)}</div>
-          {dl && <div className={`text-[11px] ${urgent ? 'text-amber-300 font-semibold' : 'text-slate-500'}`}>{opp.kind === 'recompete' ? `expires ${dl}` : dl}</div>}
+          {dl && <div className={`text-[11px] ${urgent ? 'text-amber-300 font-semibold' : 'text-faint'}`}>{opp.kind === 'recompete' ? `expires ${dl}` : dl}</div>}
         </div>
       </div>
       <div className="mt-3 flex flex-wrap items-center gap-2">
         {opp.setAside && <span className="inline-flex items-center gap-1 rounded-full border border-emerald-500/40 bg-emerald-500/10 px-2 py-0.5 text-[11px] text-emerald-200"><Target className="h-3 w-3 shrink-0" strokeWidth={2} /> {opp.setAside}</span>}
         <div className="ml-auto flex gap-2">
           <button onClick={() => onNavigate?.('proposals')} className="rounded-md bg-emerald-600 px-2.5 py-1 text-xs font-semibold text-white hover:bg-emerald-500">{opp.kind === 'recompete' ? 'Draft LOI' : 'Draft response'}</button>
-          <button onClick={() => onNavigate?.('pipeline')} className="rounded-md border border-slate-700 px-2.5 py-1 text-xs text-slate-300 hover:bg-slate-800">Track</button>
+          <button onClick={() => onNavigate?.('pipeline')} className="rounded-md border border-hairline px-2.5 py-1 text-xs text-ink-soft hover:bg-surface">Track</button>
         </div>
       </div>
     </div>

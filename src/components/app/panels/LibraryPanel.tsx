@@ -51,7 +51,7 @@ const TYPE_OPTIONS: Array<{ value: ContentType; label: string }> = [
 
 const TYPE_BADGE: Record<string, { label: string; color: string }> = {
   proposal_section: { label: 'Proposal', color: 'bg-purple-900/40 text-purple-300' },
-  proposal_wizard_brief: { label: 'Notice Brief', color: 'bg-slate-700/60 text-slate-300' },
+  proposal_wizard_brief: { label: 'Notice Brief', color: 'bg-input/60 text-ink-soft' },
   proposal_wizard_compliance: { label: 'Compliance', color: 'bg-blue-900/40 text-blue-300' },
   proposal_wizard_draft: { label: 'Draft', color: 'bg-purple-900/40 text-purple-300' },
   cap_statement: { label: 'Cap Stmt', color: 'bg-emerald-900/40 text-emerald-300' },
@@ -96,8 +96,8 @@ function LibraryBriefView({ content }: { content: Record<string, unknown> }) {
   return (
     <div className="space-y-4">
       {sections.map((section) => (
-        <section key={section.title} className="rounded-lg border border-slate-800 bg-slate-900 p-4">
-          <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">{section.title}</h3>
+        <section key={section.title} className="rounded-lg border border-surface bg-ground p-4">
+          <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">{section.title}</h3>
           {section.title === 'Summary' ? (
             <p className="mt-2 text-sm leading-relaxed text-slate-200">{section.items[0]}</p>
           ) : (
@@ -121,7 +121,7 @@ function LibraryBriefView({ content }: { content: Record<string, unknown> }) {
       )}
 
       {sections.length === 0 && !nextAction && (
-        <p className="rounded-lg border border-slate-800 bg-slate-900 p-4 text-sm text-slate-400">
+        <p className="rounded-lg border border-surface bg-ground p-4 text-sm text-muted">
           This archived item does not have a formatted preview.
         </p>
       )}
@@ -135,7 +135,7 @@ function LibraryDraftView({ content }: { content: Record<string, unknown> }) {
 
   if (draft) {
     return (
-      <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
+      <div className="bg-ground border border-surface rounded-lg p-4 text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
         {draft}
       </div>
     );
@@ -149,8 +149,8 @@ function LibraryDraftView({ content }: { content: Record<string, unknown> }) {
           const title = displaySubtype(String(section.section || `section_${index + 1}`));
           const body = String(section.draft || '').trim();
           return (
-            <section key={`${title}-${index}`} className="rounded-lg border border-slate-800 bg-slate-900 p-4">
-              <h3 className="text-xs font-semibold uppercase tracking-wider text-slate-400">{title}</h3>
+            <section key={`${title}-${index}`} className="rounded-lg border border-surface bg-ground p-4">
+              <h3 className="text-xs font-semibold uppercase tracking-wider text-muted">{title}</h3>
               <p className="mt-2 whitespace-pre-wrap text-sm leading-relaxed text-slate-200">{body || 'No text saved.'}</p>
             </section>
           );
@@ -175,14 +175,14 @@ function LibraryContentView({ selected }: { selected: DetailEntry }) {
   }
   if (selected.content_text) {
     return (
-      <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
+      <div className="bg-ground border border-surface rounded-lg p-4 text-sm text-slate-200 whitespace-pre-wrap leading-relaxed">
         {selected.content_text}
       </div>
     );
   }
 
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900 p-4 text-sm text-slate-400">
+    <div className="rounded-lg border border-surface bg-ground p-4 text-sm text-muted">
       No formatted preview is available for this item.
     </div>
   );
@@ -267,27 +267,27 @@ export default function LibraryPanel({ email, tier }: Props) {
     fetchList();
   };
 
-  if (!email) return <div className="p-8 text-center text-slate-400">Sign in to access your library.</div>;
+  if (!email) return <div className="p-8 text-center text-muted">Sign in to access your library.</div>;
 
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-6 py-5 border-b border-slate-800">
+      <div className="px-6 py-5 border-b border-surface">
         <div className="flex items-center gap-3 mb-1">
           <BookOpen className="h-6 w-6 shrink-0 text-muted" strokeWidth={2} />
           <h1 className="text-xl font-semibold text-white">My Library</h1>
         </div>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted">
           Every proposal draft, capability statement, and AI output Mindy has created for you. Searchable forever.
         </p>
       </div>
 
       {/* Filters */}
-      <div className="flex gap-2 px-6 py-3 border-b border-slate-800">
+      <div className="flex gap-2 px-6 py-3 border-b border-surface">
         <select
           value={type}
           onChange={(e) => setType(e.target.value as ContentType)}
-          className="px-3 py-2 bg-slate-900 border border-slate-700 rounded text-white text-sm focus:border-emerald-500 focus:outline-none"
+          className="px-3 py-2 bg-ground border border-hairline rounded text-white text-sm focus:border-emerald-500 focus:outline-none"
         >
           {TYPE_OPTIONS.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
         </select>
@@ -296,29 +296,29 @@ export default function LibraryPanel({ email, tier }: Props) {
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Search title, agency, body…"
-          className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded text-white text-sm focus:border-emerald-500 focus:outline-none"
+          className="flex-1 px-3 py-2 bg-ground border border-hairline rounded text-white text-sm focus:border-emerald-500 focus:outline-none"
         />
       </div>
 
       {/* Body — split list / detail */}
       <div className="flex-1 grid grid-cols-1 md:grid-cols-[1fr_1.5fr] overflow-hidden">
         {/* List */}
-        <div className="border-r border-slate-800 overflow-y-auto">
-          {loading && <div className="px-6 py-4 text-sm text-slate-500">Loading…</div>}
+        <div className="border-r border-surface overflow-y-auto">
+          {loading && <div className="px-6 py-4 text-sm text-faint">Loading…</div>}
           {error && <div className="px-6 py-4 text-sm text-rose-300">Error: {error}</div>}
           {!loading && !error && entries.length === 0 && (
-            <div className="p-12 text-center text-slate-500">
+            <div className="p-12 text-center text-faint">
               <Inbox className="h-9 w-9 mx-auto mb-3 text-faint" strokeWidth={1.5} />
               <p className="text-sm">Nothing here yet. Drafts and outputs you generate will appear automatically.</p>
             </div>
           )}
           {entries.map((entry) => {
-            const badge = TYPE_BADGE[entry.content_type] || { label: entry.content_type, color: 'bg-slate-700 text-slate-300' };
+            const badge = TYPE_BADGE[entry.content_type] || { label: entry.content_type, color: 'bg-input text-ink-soft' };
             return (
               <button
                 key={entry.id}
                 onClick={() => openDetail(entry.id)}
-                className={`block w-full text-left px-4 py-2.5 border-b border-slate-800 hover:bg-slate-900/40 transition ${selected?.id === entry.id ? 'bg-slate-900/60 border-l-2 border-l-emerald-500' : 'border-l-2 border-l-transparent'}`}
+                className={`block w-full text-left px-4 py-2.5 border-b border-surface hover:bg-ground/40 transition ${selected?.id === entry.id ? 'bg-ground/60 border-l-2 border-l-emerald-500' : 'border-l-2 border-l-transparent'}`}
               >
                 {/* Tightened to type · title · agency · date — full content is
                     in the preview pane (no per-row snippet). Scan many fast. */}
@@ -326,29 +326,29 @@ export default function LibraryPanel({ email, tier }: Props) {
                   <span className={`text-[10px] uppercase tracking-wider px-1.5 py-0.5 rounded shrink-0 ${badge.color}`}>
                     {badge.label}{entry.content_subtype ? ` · ${displaySubtype(entry.content_subtype)}` : ''}
                   </span>
-                  <span className="text-[10px] text-slate-500 whitespace-nowrap shrink-0">{new Date(entry.created_at).toLocaleDateString()}</span>
+                  <span className="text-[10px] text-faint whitespace-nowrap shrink-0">{new Date(entry.created_at).toLocaleDateString()}</span>
                 </div>
                 <div className="text-sm text-white truncate mt-1">{entry.title}</div>
-                {entry.agency && <div className="text-xs text-slate-400 truncate">{entry.agency}</div>}
+                {entry.agency && <div className="text-xs text-muted truncate">{entry.agency}</div>}
               </button>
             );
           })}
 
           {/* Pagination */}
           {total > 25 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-slate-800">
+            <div className="flex items-center justify-between px-4 py-3 border-t border-surface">
               <button
                 onClick={() => setPage((p) => Math.max(0, p - 1))}
                 disabled={page === 0}
-                className="text-xs text-slate-400 hover:text-white disabled:opacity-40"
+                className="text-xs text-muted hover:text-white disabled:opacity-40"
               >
                 ← Prev
               </button>
-              <span className="text-xs text-slate-500">{page * 25 + 1}-{Math.min((page + 1) * 25, total)} of {total}</span>
+              <span className="text-xs text-faint">{page * 25 + 1}-{Math.min((page + 1) * 25, total)} of {total}</span>
               <button
                 onClick={() => setPage((p) => p + 1)}
                 disabled={(page + 1) * 25 >= total}
-                className="text-xs text-slate-400 hover:text-white disabled:opacity-40"
+                className="text-xs text-muted hover:text-white disabled:opacity-40"
               >
                 Next →
               </button>
@@ -357,19 +357,19 @@ export default function LibraryPanel({ email, tier }: Props) {
         </div>
 
         {/* Detail */}
-        <div className="overflow-y-auto bg-slate-950/40">
+        <div className="overflow-y-auto bg-ground-deep/40">
           {!selected && !selectedLoading && (
-            <div className="p-12 text-center text-slate-500">
+            <div className="p-12 text-center text-faint">
               <p className="text-sm">Click any entry to preview its content.</p>
             </div>
           )}
-          {selectedLoading && <div className="p-12 text-center text-slate-500">Loading…</div>}
+          {selectedLoading && <div className="p-12 text-center text-faint">Loading…</div>}
           {selected && (
             <div className="p-6 space-y-4">
               <div className="flex items-start justify-between gap-3">
                 <div>
                   <h2 className="text-lg font-semibold text-white">{selected.title}</h2>
-                  <p className="text-xs text-slate-500 mt-1">
+                  <p className="text-xs text-faint mt-1">
                     {new Date(selected.created_at).toLocaleString()}
                     {selected.agency && <> · {selected.agency}</>}
                     {selected.ai_model && <> · {selected.ai_model}</>}
@@ -377,7 +377,7 @@ export default function LibraryPanel({ email, tier }: Props) {
                 </div>
                 <button
                   onClick={() => archive(selected.id)}
-                  className="text-xs text-slate-500 hover:text-rose-400 whitespace-nowrap"
+                  className="text-xs text-faint hover:text-rose-400 whitespace-nowrap"
                 >
                   Remove
                 </button>
@@ -385,11 +385,11 @@ export default function LibraryPanel({ email, tier }: Props) {
 
               <LibraryContentView selected={selected} />
 
-              <details className="rounded-lg border border-slate-800 bg-slate-950/40">
-                <summary className="cursor-pointer px-3 py-2 text-xs text-slate-500 hover:text-slate-300">
+              <details className="rounded-lg border border-surface bg-ground-deep/40">
+                <summary className="cursor-pointer px-3 py-2 text-xs text-faint hover:text-ink-soft">
                   Raw archive data
                 </summary>
-                <pre className="max-h-80 overflow-x-auto overflow-y-auto px-3 pb-3 pt-1 text-xs text-slate-500">
+                <pre className="max-h-80 overflow-x-auto overflow-y-auto px-3 pb-3 pt-1 text-xs text-faint">
                   {JSON.stringify(selected.content, null, 2).slice(0, 5000)}
                 </pre>
               </details>
@@ -401,7 +401,7 @@ export default function LibraryPanel({ email, tier }: Props) {
                     navigator.clipboard.writeText(draft);
                     alert('Copied to clipboard');
                   }}
-                  className="px-3 py-1.5 text-xs bg-slate-800 hover:bg-slate-700 text-white rounded"
+                  className="px-3 py-1.5 text-xs bg-surface hover:bg-input text-white rounded"
                 >
                   Copy
                 </button>

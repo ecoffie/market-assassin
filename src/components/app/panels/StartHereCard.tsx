@@ -128,13 +128,13 @@ export default function StartHereCard({ email, onGo }: StartHereCardProps) {
             <span className="text-sm font-bold text-white">First time? Start here</span>
             <span className="text-xs text-purple-300">{doneCount}/{steps.length} done</span>
           </div>
-          <div className="text-xs text-slate-400 mt-0.5">5 quick steps to get value from Mindy today.</div>
+          <div className="text-xs text-muted mt-0.5">5 quick steps to get value from Mindy today.</div>
         </div>
-        <button onClick={dismiss} className="shrink-0 text-xs text-slate-500 hover:text-slate-300" title="Hide">Hide</button>
+        <button onClick={dismiss} className="shrink-0 text-xs text-faint hover:text-ink-soft" title="Hide">Hide</button>
       </div>
 
       {/* progress bar */}
-      <div className="mt-3 h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
+      <div className="mt-3 h-1.5 w-full rounded-full bg-surface overflow-hidden">
         <div className="h-full bg-emerald-500 transition-all" style={{ width: `${(doneCount / steps.length) * 100}%` }} />
       </div>
 
@@ -143,14 +143,14 @@ export default function StartHereCard({ email, onGo }: StartHereCardProps) {
           <button
             key={s.key}
             onClick={() => !s.done && onGo?.(s.panel)}
-            className={`w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors ${s.done ? 'opacity-60' : 'hover:bg-slate-800/60'}`}
+            className={`w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors ${s.done ? 'opacity-60' : 'hover:bg-surface/60'}`}
           >
             <span className={`shrink-0 flex h-5 w-5 items-center justify-center rounded-full text-xs ${s.done ? 'bg-emerald-500 text-slate-950' : 'border border-purple-400/50 text-purple-300'}`}>
               {s.done ? <Check className="h-4 w-4" strokeWidth={3} /> : i + 1}
             </span>
             <span className="min-w-0">
-              <span className={`block text-xs font-medium ${s.done ? 'text-slate-400 line-through' : 'text-white'}`}>{s.label}</span>
-              {!s.done && <span className="block text-[11px] text-slate-500">{s.detail}</span>}
+              <span className={`block text-xs font-medium ${s.done ? 'text-muted line-through' : 'text-white'}`}>{s.label}</span>
+              {!s.done && <span className="block text-[11px] text-faint">{s.detail}</span>}
             </span>
             {!s.done && <span className="ml-auto shrink-0 text-xs text-purple-400">Start →</span>}
           </button>

@@ -116,32 +116,32 @@ export default function DibbsPanel({ email }: Props) {
         <h1 className="text-2xl font-bold text-white flex items-center gap-2">
           <Package className="h-5 w-5 shrink-0" strokeWidth={2} /> DIBBS — DLA Small-Buy RFQs
         </h1>
-        <p className="text-sm text-slate-400 mt-1">
+        <p className="text-sm text-muted mt-1">
           DLA Internet Bid Board solicitations (NSN / parts) — the small-buy market that
           isn&apos;t on SAM.gov. Search by keyword, NSN, or FSC.
         </p>
       </div>
 
       {/* Search / filters */}
-      <form onSubmit={onSubmit} className="bg-slate-900 border border-slate-800 rounded-xl p-4 space-y-3">
+      <form onSubmit={onSubmit} className="bg-ground border border-surface rounded-xl p-4 space-y-3">
         <div className="flex flex-col md:flex-row gap-3">
           <input
             value={q}
             onChange={e => setQ(e.target.value)}
             placeholder="Keyword or solicitation # (e.g. helmet, SPE1C1-26-Q-0325)"
-            className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-emerald-500 outline-none"
+            className="flex-1 px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-emerald-500 outline-none"
           />
           <input
             value={nsn}
             onChange={e => setNsn(e.target.value)}
             placeholder="NSN (e.g. 8415)"
-            className="w-full md:w-40 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-emerald-500 outline-none"
+            className="w-full md:w-40 px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-emerald-500 outline-none"
           />
           <input
             value={fsc}
             onChange={e => setFsc(e.target.value)}
             placeholder="FSC (e.g. 8415)"
-            className="w-full md:w-32 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-emerald-500 outline-none"
+            className="w-full md:w-32 px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-emerald-500 outline-none"
           />
           <button
             type="submit"
@@ -151,18 +151,18 @@ export default function DibbsPanel({ email }: Props) {
           </button>
         </div>
         <div className="flex flex-wrap items-center gap-4 text-sm">
-          <label className="flex items-center gap-2 text-slate-300">
+          <label className="flex items-center gap-2 text-ink-soft">
             Sort
             <select
               value={sort}
               onChange={e => setSort(e.target.value as 'deadline' | 'newest')}
-              className="px-2 py-1 bg-slate-800 border border-slate-700 rounded text-white text-sm focus:border-emerald-500 outline-none"
+              className="px-2 py-1 bg-surface border border-hairline rounded text-white text-sm focus:border-emerald-500 outline-none"
             >
               <option value="deadline">Soonest deadline</option>
               <option value="newest">Newest posted</option>
             </select>
           </label>
-          <label className="flex items-center gap-2 text-slate-300 cursor-pointer">
+          <label className="flex items-center gap-2 text-ink-soft cursor-pointer">
             <input
               type="checkbox"
               checked={includeExpired}
@@ -172,7 +172,7 @@ export default function DibbsPanel({ email }: Props) {
             Include expired
           </label>
           {!isLoading && (
-            <span className="text-slate-500 ml-auto">
+            <span className="text-faint ml-auto">
               {total.toLocaleString()} RFQ{total === 1 ? '' : 's'}
             </span>
           )}
@@ -188,16 +188,16 @@ export default function DibbsPanel({ email }: Props) {
       {isLoading && (
         <div className="space-y-3">
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-24 bg-slate-800 rounded-xl animate-pulse" />
+            <div key={i} className="h-24 bg-surface rounded-xl animate-pulse" />
           ))}
         </div>
       )}
 
       {/* Empty */}
       {!isLoading && !error && rfqs.length === 0 && (
-        <div className="text-center py-12 text-slate-400">
+        <div className="text-center py-12 text-muted">
           <p className="text-lg mb-1">No DIBBS RFQs match.</p>
-          <p className="text-sm text-slate-500">
+          <p className="text-sm text-faint">
             Try a broader keyword, or a shorter NSN/FSC prefix (e.g. just the 4-digit FSC). New
             RFQs sync daily.
           </p>
@@ -217,8 +217,8 @@ export default function DibbsPanel({ email }: Props) {
                 href={r.url || r.pdfUrl || '#'}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`block bg-slate-900 border rounded-xl p-4 hover:border-emerald-500/50 transition-colors ${
-                  isUrgent ? 'border-red-500/50 bg-red-500/5' : 'border-slate-800'
+                className={`block bg-ground border rounded-xl p-4 hover:border-emerald-500/50 transition-colors ${
+                  isUrgent ? 'border-red-500/50 bg-red-500/5' : 'border-surface'
                 }`}
               >
                 <div className="flex items-start justify-between gap-4">
@@ -230,7 +230,7 @@ export default function DibbsPanel({ email }: Props) {
                         </span>
                       )}
                       {r.nsn && (
-                        <span className="px-2 py-0.5 text-xs bg-slate-700 text-slate-300 rounded" title="National Stock Number">
+                        <span className="px-2 py-0.5 text-xs bg-input text-ink-soft rounded" title="National Stock Number">
                           NSN {r.nsn}
                         </span>
                       )}
@@ -248,7 +248,7 @@ export default function DibbsPanel({ email }: Props) {
                     <h3 className="font-medium text-white mb-1 line-clamp-2">
                       {r.description || r.solicitationNumber}
                     </h3>
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-faint mt-1">
                       #{r.solicitationNumber}
                       {r.quantity != null && (
                         <span className="ml-2">
@@ -268,7 +268,7 @@ export default function DibbsPanel({ email }: Props) {
                       <span className="text-xs text-emerald-400 hover:text-emerald-300">View on DIBBS →</span>
                       {r.pdfUrl && (
                         <span
-                          className="text-xs text-slate-500 hover:text-slate-300"
+                          className="text-xs text-faint hover:text-ink-soft"
                           onClick={e => {
                             e.preventDefault();
                             window.open(r.pdfUrl!, '_blank', 'noopener,noreferrer');
@@ -288,7 +288,7 @@ export default function DibbsPanel({ email }: Props) {
             <button
               onClick={() => search(rfqs.length)}
               disabled={loadingMore}
-              className="w-full py-3 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 font-medium rounded-lg border border-slate-700 transition-colors"
+              className="w-full py-3 bg-surface hover:bg-input disabled:opacity-50 text-slate-200 font-medium rounded-lg border border-hairline transition-colors"
             >
               {loadingMore ? 'Loading…' : `Load more (${(total - rfqs.length).toLocaleString()} more)`}
             </button>

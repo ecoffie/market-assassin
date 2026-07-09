@@ -195,12 +195,12 @@ export default function StartTrackingModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="w-full max-w-2xl rounded-2xl border border-slate-700 bg-slate-900 shadow-2xl">
+      <div className="w-full max-w-2xl rounded-2xl border border-hairline bg-ground shadow-2xl">
         {/* Header — progress + close */}
-        <div className="flex items-center justify-between border-b border-slate-800 px-6 py-4">
+        <div className="flex items-center justify-between border-b border-surface px-6 py-4">
           <div>
             <h2 className="text-lg font-bold text-white">Start Tracking Targets</h2>
-            <p className="mt-0.5 text-xs text-slate-500">
+            <p className="mt-0.5 text-xs text-faint">
               {isDone
                 ? `Done — ${trackedCount} tracked · ${deferredCount} deferred · ${skippedCount} skipped`
                 : `${index + 1} of ${agencies.length}  ·  ${trackedCount} tracked  ·  ${skippedCount} skipped  ·  ${deferredCount} deferred`}
@@ -209,7 +209,7 @@ export default function StartTrackingModal({
           <button
             type="button"
             onClick={onClose}
-            className="rounded-lg p-1.5 text-slate-500 hover:bg-slate-800 hover:text-slate-200"
+            className="rounded-lg p-1.5 text-faint hover:bg-surface hover:text-slate-200"
             aria-label="Close triage"
           >
             ✕
@@ -229,7 +229,7 @@ export default function StartTrackingModal({
           <div className="flex flex-col items-center px-6 py-12 text-center">
             <div className="mb-4 text-5xl">🎯</div>
             <h3 className="text-xl font-bold text-white">You&apos;re all caught up</h3>
-            <p className="mt-2 max-w-md text-sm text-slate-400">
+            <p className="mt-2 max-w-md text-sm text-muted">
               {trackedCount === 0
                 ? "You didn't track anything this round. Come back when you want to add starter targets."
                 : `${trackedCount} ${trackedCount === 1 ? 'agency' : 'agencies'} now in your target list. Open My Target List to start outreach.`}
@@ -250,25 +250,25 @@ export default function StartTrackingModal({
                 <div className="text-lg font-bold text-white">
                   {current.contractingOffice || current.name}
                 </div>
-                <div className="mt-1 text-xs text-slate-400">
+                <div className="mt-1 text-xs text-muted">
                   {[current.subAgency, current.parentAgency]
                     .filter(Boolean)
                     .filter((v, i, arr) => arr.indexOf(v) === i)
                     .join(' · ')}
                   {current.location && (
-                    <span className="ml-2 text-slate-500">📍 {current.location}</span>
+                    <span className="ml-2 text-faint">📍 {current.location}</span>
                   )}
                 </div>
                 {/* Incumbents line — top 3 primes who win at this
                     office. Tells the user the competitive landscape
                     before they commit. Added 2026-05-25 v1. */}
                 {current.topPrimes && current.topPrimes.length > 0 && (
-                  <div className="mt-2 text-[11px] text-slate-500">
-                    <span className="font-semibold text-slate-400">INCUMBENTS:</span>{' '}
+                  <div className="mt-2 text-[11px] text-faint">
+                    <span className="font-semibold text-muted">INCUMBENTS:</span>{' '}
                     {current.topPrimes.map((p, i) => (
                       <span key={p.name}>
                         {i > 0 && ' · '}
-                        <span className="text-slate-300">{p.name}</span>
+                        <span className="text-ink-soft">{p.name}</span>
                       </span>
                     ))}
                   </div>
@@ -277,8 +277,8 @@ export default function StartTrackingModal({
 
               {/* Money stats — Total $ + Set-Aside $ + Small Biz % */}
               <div className="grid grid-cols-3 gap-3">
-                <div className="rounded-lg border border-slate-800 bg-slate-950/50 p-3">
-                  <div className="text-[10px] uppercase tracking-wider text-slate-500">Total Spend</div>
+                <div className="rounded-lg border border-surface bg-ground-deep/50 p-3">
+                  <div className="text-[10px] uppercase tracking-wider text-faint">Total Spend</div>
                   <div className="mt-1 text-xl font-bold text-white">{moneyDisplay.total}</div>
                   <div className="mt-0.5 text-[10px] text-slate-600">All contracts in your NAICS</div>
                 </div>
@@ -295,15 +295,15 @@ export default function StartTrackingModal({
                     ? 'border-blue-500/30 bg-blue-500/5'
                     : (current.smallBizPercent ?? 0) > 0
                       ? 'border-amber-500/30 bg-amber-500/5'
-                      : 'border-slate-800 bg-slate-950/50'
+                      : 'border-surface bg-ground-deep/50'
                 }`}>
-                  <div className="text-[10px] uppercase tracking-wider text-slate-400">Small Biz Share</div>
+                  <div className="text-[10px] uppercase tracking-wider text-muted">Small Biz Share</div>
                   <div className={`mt-1 text-xl font-bold ${
                     (current.smallBizPercent ?? 0) >= 0.3
                       ? 'text-blue-400'
                       : (current.smallBizPercent ?? 0) > 0
                         ? 'text-amber-400'
-                        : 'text-slate-500'
+                        : 'text-faint'
                   }`}>
                     {current.smallBizPercent != null
                       ? `${Math.round(current.smallBizPercent * 100)}%`
@@ -319,11 +319,11 @@ export default function StartTrackingModal({
 
               {/* Signal chips */}
               <div className="flex flex-wrap gap-2 text-[11px]">
-                <span className="rounded bg-slate-800 px-2 py-1 text-slate-300">
+                <span className="rounded bg-surface px-2 py-1 text-ink-soft">
                   {(current.contractCount || 0).toLocaleString()} contracts
                 </span>
                 <span
-                  className="rounded bg-slate-800 px-2 py-1 text-slate-300"
+                  className="rounded bg-surface px-2 py-1 text-ink-soft"
                   title="Avg # of bidders per contract from USAspending Number of Offers Received. Lower = less competition."
                 >
                   {current.avgBidders != null && current.avgBidders > 0
@@ -332,13 +332,13 @@ export default function StartTrackingModal({
                 </span>
                 {(current.uniqueVendorCount || 0) > 0 && (
                   <span
-                    className="rounded bg-slate-800 px-2 py-1 text-slate-300"
+                    className="rounded bg-surface px-2 py-1 text-ink-soft"
                     title="Distinct primes who won contracts here. High = open door for new vendors."
                   >
                     {current.uniqueVendorCount} unique vendors
                   </span>
                 )}
-                <span className="rounded bg-slate-800 px-2 py-1 text-slate-300">
+                <span className="rounded bg-surface px-2 py-1 text-ink-soft">
                   {(current.satContractCount || 0) > 0
                     ? `${Math.round((current.satRatio || 0) * 100)}% SAT`
                     : 'SAT —'}
@@ -368,17 +368,17 @@ export default function StartTrackingModal({
             </div>
 
             {/* Action footer */}
-            <div className="border-t border-slate-800 px-6 py-4">
+            <div className="border-t border-surface px-6 py-4">
               <div className="grid grid-cols-3 gap-2">
                 <button
                   type="button"
                   onClick={() => submit('skip')}
                   disabled={!!submitting}
-                  className="rounded-lg border border-slate-700 bg-slate-800/40 px-3 py-2.5 text-sm font-medium text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+                  className="rounded-lg border border-hairline bg-surface/40 px-3 py-2.5 text-sm font-medium text-ink-soft hover:bg-surface disabled:opacity-50"
                   title="Skip forever — don't show this office again for your current NAICS profile (Press 3)"
                 >
                   {submitting === 'skip' ? '…' : (
-                    <>Skip <span className="ml-1 text-[10px] text-slate-500">(3)</span></>
+                    <>Skip <span className="ml-1 text-[10px] text-faint">(3)</span></>
                   )}
                 </button>
                 <button
@@ -410,7 +410,7 @@ export default function StartTrackingModal({
             </div>
           </>
         ) : (
-          <div className="px-6 py-12 text-center text-slate-500">No agencies to triage right now.</div>
+          <div className="px-6 py-12 text-center text-faint">No agencies to triage right now.</div>
         )}
       </div>
     </div>

@@ -290,15 +290,15 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
     return (
       <div className="p-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-slate-800 rounded w-48" />
+          <div className="h-8 bg-surface rounded w-48" />
           <div className="grid grid-cols-4 gap-4">
             {[1, 2, 3, 4].map(i => (
-              <div key={i} className="h-20 bg-slate-800 rounded-xl" />
+              <div key={i} className="h-20 bg-surface rounded-xl" />
             ))}
           </div>
           <div className="space-y-3">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-28 bg-slate-800 rounded-xl" />
+              <div key={i} className="h-28 bg-surface rounded-xl" />
             ))}
           </div>
         </div>
@@ -312,27 +312,27 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Contractors</h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-muted mt-1">
             {stats
               ? `${stats.totalContractors.toLocaleString()} award-winning federal contractors`
               : 'Federal contractor database'}
           </p>
-          <p className="text-sm text-slate-500 mt-1">
+          <p className="text-sm text-faint mt-1">
             Real award history from USASpending — search by name, or filter by NAICS for the top contractors in a code.
           </p>
           {profileDefaults && (
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-              <span className={`px-2 py-1 rounded ${usingProfileDefaults ? 'bg-emerald-500/15 text-emerald-300' : 'bg-slate-800 text-slate-400'}`}>
+              <span className={`px-2 py-1 rounded ${usingProfileDefaults ? 'bg-emerald-500/15 text-emerald-300' : 'bg-surface text-muted'}`}>
                 {usingProfileDefaults ? 'Using saved profile' : 'Custom search'}
               </span>
               {profileDefaults.naicsCodes.length > 0 && (
-                <span className="px-2 py-1 rounded bg-slate-800 text-slate-300">
+                <span className="px-2 py-1 rounded bg-surface text-ink-soft">
                   NAICS {profileDefaults.naicsCodes.slice(0, 4).join(', ')}
                   {profileDefaults.naicsCodes.length > 4 ? ` +${profileDefaults.naicsCodes.length - 4}` : ''}
                 </span>
               )}
               {profileDefaults.agencies.length > 0 && (
-                <span className="px-2 py-1 rounded bg-slate-800 text-slate-300">
+                <span className="px-2 py-1 rounded bg-surface text-ink-soft">
                   {profileDefaults.agencies.length} target agencies
                 </span>
               )}
@@ -350,43 +350,43 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
       </div>
 
       {/* Search & Filters */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+      <div className="bg-ground border border-surface rounded-xl p-5">
         {/* items-end so every field bottom-aligns regardless of label height —
             fixes the misaligned row Eric flagged. 12-col grid for clean spans. */}
         <div className="grid grid-cols-1 md:grid-cols-12 gap-3 items-end">
           {/* Search — widest */}
           <div className="md:col-span-4">
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">Company name</label>
+            <label className="block text-xs font-medium text-muted mb-1.5">Company name</label>
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               placeholder="Search by company…"
-              className="w-full h-10 px-3 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
+              className="w-full h-10 px-3 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-emerald-500 focus:outline-none"
             />
           </div>
 
           {/* NAICS Filter */}
           <div className="md:col-span-3">
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">NAICS code(s)</label>
+            <label className="block text-xs font-medium text-muted mb-1.5">NAICS code(s)</label>
             <NaicsAutocompleteInput
               value={naicsFilter}
               onChange={setNaicsFilter}
               placeholder="541512, 236…"
-              className="w-full h-10 px-3 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
+              className="w-full h-10 px-3 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-emerald-500 focus:outline-none"
             />
           </div>
 
           {/* State filter — name-search only (NAICS rollup has no location). */}
           <div className="md:col-span-3">
-            <label className="block text-xs font-medium text-slate-400 mb-1.5">State</label>
+            <label className="block text-xs font-medium text-muted mb-1.5">State</label>
             <select
               value={stateFilter}
               onChange={(e) => { setStateFilter(e.target.value); setPage(0); searchContractors(searchQuery, naicsFilter, profileAgencyFilter, contactFilter, sortBy, 0, e.target.value); }}
               disabled={!!naicsFilter.trim()}
               title={naicsFilter.trim() ? 'State filter applies to name search only — the NAICS path has no location data' : ''}
-              className="w-full h-10 px-3 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:border-emerald-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full h-10 px-3 bg-surface border border-hairline rounded-lg text-white text-sm focus:border-emerald-500 focus:outline-none disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <option value="">{naicsFilter.trim() ? 'All states (n/a with NAICS)' : 'All states'}</option>
               {US_STATES.map((s) => <option key={s} value={s}>{s}</option>)}
@@ -398,7 +398,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
             <button
               onClick={handleSearch}
               disabled={searching}
-              className="w-full h-10 px-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-medium text-sm rounded-lg transition-colors"
+              className="w-full h-10 px-4 bg-emerald-600 hover:bg-emerald-500 disabled:bg-input disabled:cursor-not-allowed text-white font-medium text-sm rounded-lg transition-colors"
             >
               {searching ? 'Searching…' : 'Search'}
             </button>
@@ -406,8 +406,8 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
         </div>
 
         {/* Sort Options */}
-        <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-slate-800">
-          <span className="text-xs text-slate-500 mr-1">Sort by:</span>
+        <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-surface">
+          <span className="text-xs text-faint mr-1">Sort by:</span>
           {[
             { key: 'contract_value', label: 'Contract Value' },
             { key: 'contract_count', label: 'Contract Count' },
@@ -423,7 +423,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
               className={`px-3 py-1 text-xs rounded-lg transition-colors ${
                 sortBy === key
                   ? 'bg-emerald-500/20 text-emerald-400'
-                  : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                  : 'bg-surface text-muted hover:bg-input'
               }`}
             >
               {label}
@@ -441,12 +441,12 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
 
       {/* Results Count */}
       {!searching && contractors.length > 0 && (
-        <div className="flex items-center justify-between text-sm text-slate-400">
+        <div className="flex items-center justify-between text-sm text-muted">
           <span>
             Showing {page * limit + 1}-{Math.min((page + 1) * limit, filteredCount)} of {filteredCount.toLocaleString()} contractors
           </span>
           {filteredCount !== totalCount && (
-            <span className="text-slate-500">(filtered from {totalCount.toLocaleString()})</span>
+            <span className="text-faint">(filtered from {totalCount.toLocaleString()})</span>
           )}
         </div>
       )}
@@ -466,7 +466,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
                   openProfile(contractor);
                 }
               }}
-              className="bg-slate-900 border border-slate-800 rounded-xl p-5 hover:border-emerald-500/50 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500/40 cursor-pointer"
+              className="bg-ground border border-surface rounded-xl p-5 hover:border-emerald-500/50 transition-colors focus:outline-none focus:ring-2 focus:ring-emerald-500/40 cursor-pointer"
             >
               <div className="flex items-start justify-between gap-4">
                 {/* Company Info */}
@@ -516,7 +516,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
 
                   {/* HQ location — disambiguates same-named firms (which Excell?) */}
                   {(contractor.city || contractor.state) && (
-                    <div className="inline-flex items-center gap-1 text-xs text-slate-400 -mt-0.5 mb-1">
+                    <div className="inline-flex items-center gap-1 text-xs text-muted -mt-0.5 mb-1">
                       <MapPin className="h-3 w-3 shrink-0" strokeWidth={2} /> {[contractor.city, contractor.state].filter(Boolean).join(', ')}
                     </div>
                   )}
@@ -526,7 +526,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
                     <div className="mb-2">
                       <span className="text-emerald-400 font-medium">{contractor.sblo_name}</span>
                       {contractor.title && contractor.title !== 'N/A' && (
-                        <span className="text-slate-500 text-sm"> — {contractor.title}</span>
+                        <span className="text-faint text-sm"> — {contractor.title}</span>
                       )}
                     </div>
                   )}
@@ -546,7 +546,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
                       <a
                         href={`tel:${contractor.phone}`}
                         onClick={(event) => event.stopPropagation()}
-                        className="inline-flex items-center gap-1 text-slate-400 hover:text-slate-300"
+                        className="inline-flex items-center gap-1 text-muted hover:text-ink-soft"
                       >
                         <Phone className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> {contractor.phone}
                       </a>
@@ -565,25 +565,25 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
                     return (
                       <div className="flex flex-wrap gap-2 mt-3 text-[11px]">
                         {avg > 0 && (
-                          <span className="rounded bg-slate-800 px-2 py-0.5 text-slate-300" title="Average obligated per contract">
+                          <span className="rounded bg-surface px-2 py-0.5 text-ink-soft" title="Average obligated per contract">
                             ~{formatCurrency(avg)}/contract avg
                           </span>
                         )}
                         {agencies > 0 && (
                           <span
-                            className={`rounded px-2 py-0.5 ${agencies >= 5 ? 'bg-blue-500/15 text-blue-300' : 'bg-slate-800 text-slate-300'}`}
+                            className={`rounded px-2 py-0.5 ${agencies >= 5 ? 'bg-blue-500/15 text-blue-300' : 'bg-surface text-ink-soft'}`}
                             title={agencies >= 5 ? 'Diversified — sells to many federal buyers' : 'Sells to few federal buyers'}
                           >
                             <span className="inline-flex items-center gap-1"><Landmark className="h-3 w-3 shrink-0" strokeWidth={2} /> {agencies} {agencies === 1 ? 'agency' : 'agencies'}</span>
                           </span>
                         )}
-                        <span className="rounded bg-slate-800 px-2 py-0.5 text-slate-300">{scale}</span>
+                        <span className="rounded bg-surface px-2 py-0.5 text-ink-soft">{scale}</span>
                         {count >= 50 && <span className="rounded bg-emerald-500/15 px-2 py-0.5 text-emerald-300" title="High volume of federal awards">Active performer</span>}
                       </div>
                     );
                   })()}
                   {/* NAICS & Agencies */}
-                  <div className="flex flex-wrap gap-3 mt-2 text-xs text-slate-500">
+                  <div className="flex flex-wrap gap-3 mt-2 text-xs text-faint">
                     {contractor.naics && contractor.naics !== 'N/A' && (
                       <span>NAICS: {contractor.naics.slice(0, 50)}{contractor.naics.length > 50 ? '...' : ''}</span>
                     )}
@@ -598,11 +598,11 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
                   <div className="text-xl font-bold text-emerald-400">
                     {formatCurrency(contractor.contract_value_num)}
                   </div>
-                  <div className="text-xs text-slate-500">Total Contract Value</div>
+                  <div className="text-xs text-faint">Total Contract Value</div>
                   <div className="text-lg font-semibold text-white mt-2">
                     {contractor.contract_count}
                   </div>
-                  <div className="text-xs text-slate-500">Contracts</div>
+                  <div className="text-xs text-faint">Contracts</div>
                   <div className="mt-3 text-xs font-medium text-emerald-400">
                     View award history →
                   </div>
@@ -619,7 +619,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
           <button
             onClick={() => handlePageChange(page - 1)}
             disabled={page === 0 || searching}
-            className="px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 bg-surface text-muted text-sm rounded-lg hover:bg-input disabled:opacity-50 disabled:cursor-not-allowed"
           >
             ← Previous
           </button>
@@ -644,7 +644,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
                   className={`w-8 h-8 text-sm rounded-lg transition-colors ${
                     page === pageNum
                       ? 'bg-emerald-500 text-white'
-                      : 'bg-slate-800 text-slate-400 hover:bg-slate-700'
+                      : 'bg-surface text-muted hover:bg-input'
                   }`}
                 >
                   {pageNum + 1}
@@ -655,7 +655,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
           <button
             onClick={() => handlePageChange(page + 1)}
             disabled={page >= totalPages - 1 || searching}
-            className="px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="px-3 py-1.5 bg-surface text-muted text-sm rounded-lg hover:bg-input disabled:opacity-50 disabled:cursor-not-allowed"
           >
             Next →
           </button>
@@ -664,10 +664,10 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
 
       {/* Empty State */}
       {!searching && contractors.length === 0 && !error && (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
+        <div className="bg-ground border border-surface rounded-xl p-8 text-center">
           <div className="mb-4 flex justify-center"><Building2 className="h-11 w-11 text-faint" strokeWidth={1.5} /></div>
           <h3 className="text-xl font-semibold text-white mb-2">No Contractors Found</h3>
-          <p className="text-slate-400 mb-4">
+          <p className="text-muted mb-4">
             Try adjusting your search criteria or filters.
           </p>
           <button
@@ -680,7 +680,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
               setPage(0);
               searchContractors('', '', '', 'all', 'contract_value', 0);
             }}
-            className="px-6 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm font-medium rounded-lg transition-colors"
+            className="px-6 py-2 bg-input hover:bg-slate-600 text-white text-sm font-medium rounded-lg transition-colors"
           >
             Clear Filters
           </button>
@@ -688,8 +688,8 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
       )}
 
       {/* Quick Filters */}
-      <div className="flex flex-wrap gap-2 pt-4 border-t border-slate-800">
-        <span className="text-xs text-slate-500 self-center mr-2">Quick searches:</span>
+      <div className="flex flex-wrap gap-2 pt-4 border-t border-surface">
+        <span className="text-xs text-faint self-center mr-2">Quick searches:</span>
         {[
           { label: 'Cybersecurity', naics: '541512', Icon: Lock },
           { label: 'Management Consulting', naics: '541611', Icon: BarChart3 },
@@ -706,7 +706,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
               setPage(0);
               searchContractors(searchQuery, naics, '', contactFilter, sortBy, 0);
             }}
-            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface text-muted text-sm rounded-lg hover:bg-input hover:text-white transition-colors"
           >
             <Icon className="h-4 w-4 shrink-0" strokeWidth={2} /> {label}
           </button>

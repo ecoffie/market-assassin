@@ -234,7 +234,7 @@ export default function CatalogTeaserFree({ email, featureId, onPanelChange }: P
           <p className="text-base font-semibold text-amber-100">
             {cfg.setupPrompt} to see the {cfg.noun} that match you.
           </p>
-          <p className="mt-2 text-sm text-slate-300">
+          <p className="mt-2 text-sm text-ink-soft">
             Mindy matches every result against your profile — your codes are what turn this into <em>your</em> market.
             Add them once and your alerts, briefings, and this list all start working.
           </p>
@@ -245,7 +245,7 @@ export default function CatalogTeaserFree({ email, featureId, onPanelChange }: P
           >
             Complete your profile →
           </button>
-          <p className="mt-2 text-xs text-slate-500">Takes about two minutes.</p>
+          <p className="mt-2 text-xs text-faint">Takes about two minutes.</p>
         </div>
       </div>
     );

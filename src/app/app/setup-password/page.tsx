@@ -106,11 +106,11 @@ export default function MISetupPasswordPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 flex items-center justify-center px-6 py-12">
-      <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/70 p-8 shadow-2xl">
+      <div className="w-full max-w-md rounded-2xl border border-surface bg-ground/70 p-8 shadow-2xl">
         <div className="mb-8 text-center">
           <MindyLogo size={56} className="mx-auto mb-5" />
           <h1 className="text-2xl font-bold text-white">Create your Mindy password</h1>
-          <p className="mt-2 text-sm text-slate-400">
+          <p className="mt-2 text-sm text-muted">
             After this, finish your profile so Mindy can tailor your opportunities.
           </p>
         </div>
@@ -142,7 +142,7 @@ export default function MISetupPasswordPage() {
               onChange={(event) => setPassword(event.target.value)}
               placeholder="Password"
               autoComplete="new-password"
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none transition-colors placeholder:text-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+              className="w-full rounded-lg border border-hairline bg-surface px-4 py-3 text-white outline-none transition-colors placeholder:text-faint focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
               disabled={isLoading}
             />
             <input
@@ -151,13 +151,13 @@ export default function MISetupPasswordPage() {
               onChange={(event) => setConfirmPassword(event.target.value)}
               placeholder="Confirm password"
               autoComplete="new-password"
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none transition-colors placeholder:text-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+              className="w-full rounded-lg border border-hairline bg-surface px-4 py-3 text-white outline-none transition-colors placeholder:text-faint focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
               disabled={isLoading}
             />
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full rounded-lg bg-emerald-600 px-4 py-3 font-medium text-white transition-colors hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-400"
+              className="w-full rounded-lg bg-emerald-600 px-4 py-3 font-medium text-white transition-colors hover:bg-emerald-500 disabled:bg-input disabled:text-muted"
             >
               {isLoading ? 'Creating password...' : 'Create password'}
             </button>

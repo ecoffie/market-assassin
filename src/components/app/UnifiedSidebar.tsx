@@ -515,7 +515,7 @@ export default function UnifiedSidebar({
       )}
       <aside
         className={`
-          bg-slate-900 border-r border-slate-800 flex flex-col
+          bg-ground border-r border-surface flex flex-col
           h-screen h-dvh
           transition-transform duration-300 ease-in-out
           z-50
@@ -526,7 +526,7 @@ export default function UnifiedSidebar({
         `}
       >
       {/* Header */}
-      <div className="p-4 border-b border-slate-800">
+      <div className="p-4 border-b border-surface">
         {isCollapsed ? (
           // Collapsed: the logo IS the expand control. Clicking it reopens the
           // sidebar — guarantees a reachable expand action in the narrow rail
@@ -534,12 +534,12 @@ export default function UnifiedSidebar({
           // to reopen). PanelLeftOpen hint shows on hover.
           <button
             onClick={onToggleCollapse}
-            className="group relative w-full flex items-center justify-center hover:bg-slate-800 rounded-lg py-1 transition-colors"
+            className="group relative w-full flex items-center justify-center hover:bg-surface rounded-lg py-1 transition-colors"
             title="Expand sidebar"
             aria-label="Expand sidebar"
           >
             <MindyLogo size={32} />
-            <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
+            <span className="pointer-events-none absolute left-full top-1/2 z-50 ml-3 -translate-y-1/2 whitespace-nowrap rounded-md border border-hairline bg-ground px-2.5 py-1.5 text-xs font-medium text-white shadow-lg opacity-0 group-hover:opacity-100 transition-opacity">
               Expand sidebar
             </span>
           </button>
@@ -554,7 +554,7 @@ export default function UnifiedSidebar({
             {onToggleCollapse && (
               <button
                 onClick={onToggleCollapse}
-                className="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white transition-colors"
+                className="p-1 hover:bg-surface rounded text-muted hover:text-white transition-colors"
                 title="Collapse sidebar"
                 aria-label="Collapse sidebar"
               >
@@ -605,7 +605,7 @@ export default function UnifiedSidebar({
           return (
           <div key={section.title} className="mb-6">
             {!isCollapsed && (
-              <div className="px-4 mb-2 text-xs font-medium text-slate-500 uppercase tracking-wider">
+              <div className="px-4 mb-2 text-xs font-medium text-faint uppercase tracking-wider">
                 {section.title}
               </div>
             )}
@@ -622,8 +622,8 @@ export default function UnifiedSidebar({
                   ${isActive
                     ? 'bg-emerald-500/20 text-emerald-400 border border-emerald-500/30'
                     : canAccess
-                      ? 'text-slate-300 hover:bg-slate-800 hover:text-white'
-                      : 'text-slate-500 hover:bg-purple-500/10 hover:text-purple-300 cursor-pointer'
+                      ? 'text-ink-soft hover:bg-surface hover:text-white'
+                      : 'text-faint hover:bg-purple-500/10 hover:text-purple-300 cursor-pointer'
                   }
                   ${isCollapsed ? 'justify-center' : ''}
                 `;
@@ -643,7 +643,7 @@ export default function UnifiedSidebar({
                             )}
                           </div>
                           {(isHovered || isActive) && (
-                            <div className="text-xs text-slate-500 mt-0.5">
+                            <div className="text-xs text-faint mt-0.5">
                               {display.description}
                             </div>
                           )}
@@ -718,7 +718,7 @@ export default function UnifiedSidebar({
 
       {/* Footer — shrink-0 so it never gets squeezed out by the scrolling nav;
           pb safe-area so the account menu clears the iOS home indicator. */}
-      <div className="shrink-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-slate-800 space-y-2">
+      <div className="shrink-0 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] border-t border-surface space-y-2">
         {!isCollapsed && userTier === 'free' && (
           <Link
             href="/market-intelligence"
@@ -734,7 +734,7 @@ export default function UnifiedSidebar({
         <button
           onClick={() => { onPanelChange('settings'); onMobileClose?.(); }}
           className={`w-full flex items-center rounded-lg px-3 py-2 text-sm transition-colors ${
-            activePanel === 'settings' ? 'bg-slate-800 text-white' : 'text-slate-400 hover:bg-slate-800 hover:text-white'
+            activePanel === 'settings' ? 'bg-surface text-white' : 'text-muted hover:bg-surface hover:text-white'
           } ${isCollapsed ? 'justify-center' : 'gap-2'}`}
           title="Settings — codes, keywords, profile"
           aria-label="Settings"
@@ -749,7 +749,7 @@ export default function UnifiedSidebar({
         {onToggleCollapse && (
           <button
             onClick={onToggleCollapse}
-            className={`w-full flex items-center rounded-lg px-3 py-2 text-sm text-slate-400 hover:bg-slate-800 hover:text-white transition-colors ${isCollapsed ? 'justify-center' : 'gap-2'}`}
+            className={`w-full flex items-center rounded-lg px-3 py-2 text-sm text-muted hover:bg-surface hover:text-white transition-colors ${isCollapsed ? 'justify-center' : 'gap-2'}`}
             title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
             aria-label={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
           >
@@ -768,17 +768,17 @@ export default function UnifiedSidebar({
               <>
                 {/* click-away */}
                 <div className="fixed inset-0 z-40" onClick={() => setAccountMenuOpen(false)} />
-                <div className="absolute bottom-full left-0 right-0 z-50 mb-2 rounded-lg border border-slate-700 bg-slate-900 p-1 shadow-2xl shadow-black/40">
+                <div className="absolute bottom-full left-0 right-0 z-50 mb-2 rounded-lg border border-hairline bg-ground p-1 shadow-2xl shadow-black/40">
                   <button
                     onClick={() => { onPanelChange('settings'); setAccountMenuOpen(false); onMobileClose?.(); }}
-                    className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+                    className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm text-ink-soft hover:bg-surface hover:text-white transition-colors"
                   >
                     <Settings className="w-4 h-4 shrink-0" strokeWidth={1.75} /> Settings
                   </button>
                   {onSwitchAccount && (
                     <button
                       onClick={() => { onSwitchAccount(); setAccountMenuOpen(false); onMobileClose?.(); }}
-                      className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm text-slate-300 hover:bg-slate-800 hover:text-white transition-colors"
+                      className="w-full flex items-center gap-2 rounded-md px-3 py-2 text-sm text-ink-soft hover:bg-surface hover:text-white transition-colors"
                     >
                       <RefreshCw className="w-4 h-4 shrink-0" strokeWidth={1.75} /> Switch account
                     </button>
@@ -796,15 +796,15 @@ export default function UnifiedSidebar({
             )}
             <button
               onClick={() => setAccountMenuOpen((v) => !v)}
-              className={`w-full flex items-center rounded-lg px-2 py-2 text-sm text-slate-300 hover:bg-slate-800 transition-colors ${isCollapsed ? 'justify-center' : 'gap-2'}`}
+              className={`w-full flex items-center rounded-lg px-2 py-2 text-sm text-ink-soft hover:bg-surface transition-colors ${isCollapsed ? 'justify-center' : 'gap-2'}`}
               title={userEmail || 'Account'}
               aria-label="Account menu"
             >
-              <CircleUser className="w-[22px] h-[22px] shrink-0 text-slate-400" strokeWidth={1.5} />
+              <CircleUser className="w-[22px] h-[22px] shrink-0 text-muted" strokeWidth={1.5} />
               {!isCollapsed && (
                 <>
-                  <span className="flex-1 truncate text-left text-xs text-slate-300">{userEmail || 'Account'}</span>
-                  <ChevronUp className={`w-4 h-4 shrink-0 text-slate-500 transition-transform ${accountMenuOpen ? '' : 'rotate-180'}`} strokeWidth={1.75} />
+                  <span className="flex-1 truncate text-left text-xs text-ink-soft">{userEmail || 'Account'}</span>
+                  <ChevronUp className={`w-4 h-4 shrink-0 text-faint transition-transform ${accountMenuOpen ? '' : 'rotate-180'}`} strokeWidth={1.75} />
                 </>
               )}
             </button>
@@ -819,12 +819,12 @@ export default function UnifiedSidebar({
       {isCollapsed && tooltip && (
         <div
           role="tooltip"
-          className="pointer-events-none fixed z-[60] -translate-y-1/2 whitespace-nowrap rounded-md border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs font-medium text-white shadow-lg shadow-black/40"
+          className="pointer-events-none fixed z-[60] -translate-y-1/2 whitespace-nowrap rounded-md border border-hairline bg-ground px-2.5 py-1.5 text-xs font-medium text-white shadow-lg shadow-black/40"
           style={{ top: tooltip.top, left: tooltip.left }}
         >
           {tooltip.label}
           {tooltip.badge && <span className="ml-1.5 text-[10px] text-purple-300">{tooltip.badge}</span>}
-          {tooltip.locked && <span className="ml-1.5 text-[10px] text-slate-400">🔒 Pro</span>}
+          {tooltip.locked && <span className="ml-1.5 text-[10px] text-muted">🔒 Pro</span>}
         </div>
       )}
       </aside>

@@ -265,9 +265,9 @@ export default function VoiceCaptureModal({ email, isOpen, onClose, onSaved, onP
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 backdrop-blur-sm p-4">
-      <div className="w-full max-w-lg rounded-2xl border border-slate-800 bg-slate-900 shadow-2xl shadow-purple-900/20 overflow-hidden">
+      <div className="w-full max-w-lg rounded-2xl border border-surface bg-ground shadow-2xl shadow-purple-900/20 overflow-hidden">
         {/* Header */}
-        <div className="px-5 py-3 border-b border-slate-800 flex items-center justify-between">
+        <div className="px-5 py-3 border-b border-surface flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Mic className="w-4 h-4 text-purple-400" strokeWidth={1.75} />
             <h2 className="text-sm font-semibold text-white">Add by voice</h2>
@@ -275,7 +275,7 @@ export default function VoiceCaptureModal({ email, isOpen, onClose, onSaved, onP
           <button
             onClick={onClose}
             disabled={phase === 'recording' || phase === 'transcribing' || phase === 'extracting' || phase === 'saving'}
-            className="text-slate-500 hover:text-white disabled:opacity-30"
+            className="text-faint hover:text-white disabled:opacity-30"
             aria-label="Close"
           >
             <X className="w-4 h-4" strokeWidth={1.75} />
@@ -293,8 +293,8 @@ export default function VoiceCaptureModal({ email, isOpen, onClose, onSaved, onP
               >
                 <Mic className="w-10 h-10 text-white" strokeWidth={1.5} />
               </button>
-              <p className="text-sm text-slate-300 font-medium">Tap to start recording</p>
-              <p className="text-xs text-slate-500 mt-1">Speak naturally about an opportunity — agency, contact, value, deadlines.</p>
+              <p className="text-sm text-ink-soft font-medium">Tap to start recording</p>
+              <p className="text-xs text-faint mt-1">Speak naturally about an opportunity — agency, contact, value, deadlines.</p>
               <p className="text-xs text-slate-600 mt-4">Mindy will transcribe + extract a pursuit for you to confirm.</p>
             </div>
           )}
@@ -314,17 +314,17 @@ export default function VoiceCaptureModal({ email, isOpen, onClose, onSaved, onP
               <p className="text-3xl font-mono text-purple-300 mt-2 tabular-nums">
                 {formatDuration(recordingMs)}
               </p>
-              <p className="text-xs text-slate-500 mt-3">Tap the square to stop. Max 2:00.</p>
+              <p className="text-xs text-faint mt-3">Tap the square to stop. Max 2:00.</p>
             </div>
           )}
 
           {(phase === 'transcribing' || phase === 'extracting') && (
             <div className="flex flex-col items-center justify-center py-12">
               <Loader2 className="w-10 h-10 text-purple-400 animate-spin mb-4" strokeWidth={1.5} />
-              <p className="text-sm text-slate-300 font-medium">
+              <p className="text-sm text-ink-soft font-medium">
                 {phase === 'transcribing' ? 'Transcribing…' : 'Extracting opportunity…'}
               </p>
-              <p className="text-xs text-slate-500 mt-2">
+              <p className="text-xs text-faint mt-2">
                 {phase === 'transcribing' ? 'Whisper is converting your audio.' : 'Mindy is structuring the details.'}
               </p>
             </div>
@@ -333,13 +333,13 @@ export default function VoiceCaptureModal({ email, isOpen, onClose, onSaved, onP
           {phase === 'confirm' && extracted && (
             <div className="space-y-3 max-h-[60vh] overflow-y-auto">
               <div>
-                <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Title</label>
+                <label className="text-[11px] font-medium text-muted uppercase tracking-wider">Title</label>
                 <input
                   type="text"
                   value={editedTitle}
                   onChange={(e) => setEditedTitle(e.target.value)}
                   placeholder="Opportunity title"
-                  className="mt-1 w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-md text-sm text-white placeholder-slate-600 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none"
+                  className="mt-1 w-full px-3 py-2 bg-ground-deep border border-hairline rounded-md text-sm text-white placeholder-slate-600 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none"
                 />
               </div>
               <div className="grid grid-cols-2 gap-3">
@@ -353,8 +353,8 @@ export default function VoiceCaptureModal({ email, isOpen, onClose, onSaved, onP
                 <CapturedField label="PSC" value={extracted.psc_code} mono />
               </div>
               {(extracted.contact_name || extracted.contact_phone || extracted.contact_email) && (
-                <div className="rounded-lg bg-slate-950/50 border border-slate-800 p-3">
-                  <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-2">Contact</div>
+                <div className="rounded-lg bg-ground-deep/50 border border-surface p-3">
+                  <div className="text-[11px] font-medium text-muted uppercase tracking-wider mb-2">Contact</div>
                   <div className="grid grid-cols-2 gap-2 text-sm text-slate-200">
                     {extracted.contact_name && <div>👤 {extracted.contact_name}</div>}
                     {extracted.contact_phone && <div>📞 {extracted.contact_phone}</div>}
@@ -363,19 +363,19 @@ export default function VoiceCaptureModal({ email, isOpen, onClose, onSaved, onP
                 </div>
               )}
               <div>
-                <label className="text-[11px] font-medium text-slate-400 uppercase tracking-wider">Notes</label>
+                <label className="text-[11px] font-medium text-muted uppercase tracking-wider">Notes</label>
                 <textarea
                   value={editedNotes}
                   onChange={(e) => setEditedNotes(e.target.value)}
                   placeholder="Anything else worth remembering"
                   rows={3}
-                  className="mt-1 w-full px-3 py-2 bg-slate-950 border border-slate-700 rounded-md text-sm text-white placeholder-slate-600 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none resize-none"
+                  className="mt-1 w-full px-3 py-2 bg-ground-deep border border-hairline rounded-md text-sm text-white placeholder-slate-600 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none resize-none"
                 />
               </div>
               {transcript && (
-                <details className="text-xs text-slate-500">
-                  <summary className="cursor-pointer hover:text-slate-400">Transcript</summary>
-                  <div className="mt-2 p-3 rounded bg-slate-950/60 border border-slate-800/60 text-slate-400 whitespace-pre-wrap font-mono">
+                <details className="text-xs text-faint">
+                  <summary className="cursor-pointer hover:text-muted">Transcript</summary>
+                  <div className="mt-2 p-3 rounded bg-ground-deep/60 border border-surface/60 text-muted whitespace-pre-wrap font-mono">
                     {transcript}
                   </div>
                 </details>
@@ -403,14 +403,14 @@ export default function VoiceCaptureModal({ email, isOpen, onClose, onSaved, onP
               </div>
 
               <div>
-                <div className="text-[11px] font-medium text-slate-400 uppercase tracking-wider mb-1">What I heard</div>
-                <div className="rounded-md bg-slate-950/60 border border-slate-800 p-3 text-sm text-slate-200 whitespace-pre-wrap max-h-40 overflow-y-auto">
+                <div className="text-[11px] font-medium text-muted uppercase tracking-wider mb-1">What I heard</div>
+                <div className="rounded-md bg-ground-deep/60 border border-surface p-3 text-sm text-slate-200 whitespace-pre-wrap max-h-40 overflow-y-auto">
                   {transcript}
                 </div>
               </div>
 
               {extracted?.notes && (
-                <div className="text-xs text-slate-500 italic">{extracted.notes}</div>
+                <div className="text-xs text-faint italic">{extracted.notes}</div>
               )}
             </div>
           )}
@@ -418,7 +418,7 @@ export default function VoiceCaptureModal({ email, isOpen, onClose, onSaved, onP
           {phase === 'saving' && (
             <div className="flex flex-col items-center justify-center py-12">
               <Loader2 className="w-10 h-10 text-emerald-400 animate-spin mb-4" strokeWidth={1.5} />
-              <p className="text-sm text-slate-300">Saving to pipeline…</p>
+              <p className="text-sm text-ink-soft">Saving to pipeline…</p>
             </div>
           )}
 
@@ -428,7 +428,7 @@ export default function VoiceCaptureModal({ email, isOpen, onClose, onSaved, onP
               <p className="text-sm text-red-300 max-w-sm">{error || 'Something went wrong.'}</p>
               <button
                 onClick={() => { setError(null); setPhase('idle'); }}
-                className="mt-4 px-4 py-2 text-xs rounded bg-slate-800 hover:bg-slate-700 text-white"
+                className="mt-4 px-4 py-2 text-xs rounded bg-surface hover:bg-input text-white"
               >
                 Try again
               </button>
@@ -438,24 +438,24 @@ export default function VoiceCaptureModal({ email, isOpen, onClose, onSaved, onP
 
         {/* Footer actions — pivot phase */}
         {phase === 'pivot' && (
-          <div className="px-5 py-3 border-t border-slate-800 bg-slate-950/50 flex items-center justify-between gap-3">
+          <div className="px-5 py-3 border-t border-surface bg-ground-deep/50 flex items-center justify-between gap-3">
             <button
               onClick={() => { setPhase('idle'); setExtracted(null); setTranscript(''); }}
-              className="text-xs text-slate-400 hover:text-slate-200"
+              className="text-xs text-muted hover:text-slate-200"
             >
               ← Re-record
             </button>
             <div className="flex items-center gap-2">
               <button
                 onClick={handleSaveAnyway}
-                className="px-3 py-2 text-xs rounded-md bg-slate-800 hover:bg-slate-700 text-slate-200"
+                className="px-3 py-2 text-xs rounded-md bg-surface hover:bg-input text-slate-200"
               >
                 Save anyway
               </button>
               <button
                 onClick={handlePivotToChat}
                 disabled={!onPivotToChat || !transcript.trim()}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md bg-purple-600 hover:bg-purple-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-medium"
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md bg-purple-600 hover:bg-purple-500 disabled:bg-surface disabled:text-slate-600 text-white font-medium"
               >
                 <MessageCircle className="w-4 h-4" strokeWidth={2} />
                 Send to Mindy Chat
@@ -466,17 +466,17 @@ export default function VoiceCaptureModal({ email, isOpen, onClose, onSaved, onP
 
         {/* Footer actions — only on confirm */}
         {phase === 'confirm' && (
-          <div className="px-5 py-3 border-t border-slate-800 bg-slate-950/50 flex items-center justify-between gap-3">
+          <div className="px-5 py-3 border-t border-surface bg-ground-deep/50 flex items-center justify-between gap-3">
             <button
               onClick={() => { setPhase('idle'); setExtracted(null); setTranscript(''); }}
-              className="text-xs text-slate-400 hover:text-slate-200"
+              className="text-xs text-muted hover:text-slate-200"
             >
               ← Re-record
             </button>
             <button
               onClick={handleSave}
               disabled={!editedTitle.trim()}
-              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-medium"
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-sm rounded-md bg-emerald-600 hover:bg-emerald-500 disabled:bg-surface disabled:text-slate-600 text-white font-medium"
             >
               <Check className="w-4 h-4" strokeWidth={2} />
               Add to pipeline
@@ -490,8 +490,8 @@ export default function VoiceCaptureModal({ email, isOpen, onClose, onSaved, onP
 
 function CapturedField({ label, value, mono = false }: { label: string; value: string | null; mono?: boolean }) {
   return (
-    <div className="rounded-lg bg-slate-950/50 border border-slate-800 p-2.5">
-      <div className="text-[10px] font-medium text-slate-500 uppercase tracking-wider">{label}</div>
+    <div className="rounded-lg bg-ground-deep/50 border border-surface p-2.5">
+      <div className="text-[10px] font-medium text-faint uppercase tracking-wider">{label}</div>
       <div className={`text-sm mt-0.5 ${value ? 'text-slate-200' : 'text-slate-600'} ${mono ? 'font-mono' : ''}`}>
         {value || '—'}
       </div>

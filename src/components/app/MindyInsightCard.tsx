@@ -137,7 +137,7 @@ export function MindyInsightCard({ email }: MindyInsightCardProps) {
   if (hidden || (!loading && !insight)) return null;
 
   return (
-    <div className="relative rounded-2xl overflow-hidden shadow-lg shadow-purple-900/20 border border-white/5 mb-6 bg-slate-900">
+    <div className="relative rounded-2xl overflow-hidden shadow-lg shadow-purple-900/20 border border-white/5 mb-6 bg-ground">
       {/* Refresh — force a new insight on demand (bypasses the daily
           cache). The card is otherwise pinned per-day by design. */}
       <button
@@ -177,10 +177,10 @@ export function MindyInsightCard({ email }: MindyInsightCardProps) {
 
       {/* Source attribution + share button (small footer below the canvas) */}
       {insight && (
-        <div className="flex items-center justify-between px-4 py-2 text-xs text-slate-400">
+        <div className="flex items-center justify-between px-4 py-2 text-xs text-muted">
           <span>
             💡 Mindy Insight ·{' '}
-            <span className="text-slate-500">
+            <span className="text-faint">
               {insight.mode === 'lesson' || insight.source === 'podcast_guest'
                 ? 'guest lesson'
                 : insight.mode === 'pulse' || insight.source === 'ai_briefing'
@@ -189,11 +189,11 @@ export function MindyInsightCard({ email }: MindyInsightCardProps) {
                     ? 'your data today'
                     : 'federal contracting'}
             </span>
-            {insight.attribution && <span className="text-slate-500"> · {insight.attribution}</span>}
+            {insight.attribution && <span className="text-faint"> · {insight.attribution}</span>}
           </span>
           <button
             onClick={() => { trackInsight(email, 'tool_use', 'copy', insight?.source); copyCardImage(canvasRef.current); }}
-            className="text-slate-400 hover:text-emerald-300 transition"
+            className="text-muted hover:text-emerald-300 transition"
             title="Copy as image"
           >
             ⎘ Copy

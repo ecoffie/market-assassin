@@ -326,16 +326,16 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
   if (!email) {
     return (
       <div className="flex items-center justify-center h-64">
-        <div className="text-slate-400 text-sm">Sign in to chat with Mindy.</div>
+        <div className="text-muted text-sm">Sign in to chat with Mindy.</div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-[calc(100vh-73px)] bg-slate-950 text-white">
+    <div className="flex h-[calc(100vh-73px)] bg-ground-deep text-white">
       {/* Conversation history sidebar */}
       {sidebarOpen && (
-        <aside className="w-60 shrink-0 border-r border-slate-800 bg-slate-900/40 flex flex-col">
+        <aside className="w-60 shrink-0 border-r border-surface bg-ground/40 flex flex-col">
           <div className="p-3 shrink-0">
             <button
               onClick={startNewChat}
@@ -353,7 +353,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                 <div
                   key={s.id}
                   className={`group flex items-center gap-1 rounded-md px-2 py-1.5 text-sm cursor-pointer transition-colors ${
-                    s.id === sessionId ? 'bg-slate-800 text-white' : 'text-slate-300 hover:bg-slate-800/60'
+                    s.id === sessionId ? 'bg-surface text-white' : 'text-ink-soft hover:bg-surface/60'
                   }`}
                   onClick={() => openSession(s.id)}
                 >
@@ -362,7 +362,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                   </span>
                   <button
                     onClick={(e) => { e.stopPropagation(); deleteSession(s.id); }}
-                    className="shrink-0 opacity-0 group-hover:opacity-100 text-slate-500 hover:text-red-400 text-xs px-1"
+                    className="shrink-0 opacity-0 group-hover:opacity-100 text-faint hover:text-red-400 text-xs px-1"
                     title="Delete conversation"
                     aria-label="Delete conversation"
                   >
@@ -378,12 +378,12 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
       {/* Main chat column */}
       <div className="flex flex-col flex-1 min-w-0">
       {/* Header */}
-      <header className="px-6 py-3 border-b border-slate-800 bg-slate-950/95 backdrop-blur shrink-0">
+      <header className="px-6 py-3 border-b border-surface bg-ground-deep/95 backdrop-blur shrink-0">
         <div className="flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(o => !o)}
-              className="inline-flex items-center text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition-colors"
+              className="inline-flex items-center text-muted hover:text-white p-1 rounded hover:bg-surface transition-colors"
               title={sidebarOpen ? 'Hide history' : 'Show history'}
               aria-label="Toggle conversation history"
             >
@@ -394,7 +394,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                 <h1 className="inline-flex items-center gap-1.5 text-lg font-semibold"><MessageCircle className="h-5 w-5 shrink-0 text-accent" strokeWidth={2} /> Mindy Chat</h1>
                 <span className="text-[10px] font-semibold tracking-wider px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">BETA</span>
               </div>
-              <p className="text-xs text-slate-500 mt-0.5">
+              <p className="text-xs text-faint mt-0.5">
                 Ask anything about federal contracting. Mindy cites her sources from your 8-year knowledge base.
               </p>
             </div>
@@ -405,7 +405,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
             {onPanelChange && (
               <button
                 onClick={() => onPanelChange('knowledge-base')}
-                className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded border border-slate-700 hover:border-slate-600 transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs text-muted hover:text-slate-200 px-3 py-1.5 rounded border border-hairline hover:border-slate-600 transition-colors"
                 title="Browse the documents Mindy cites"
               >
                 <BookOpen className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> Browse sources
@@ -414,7 +414,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
             {messages.length > 0 && !isStreaming && (
               <button
                 onClick={startNewChat}
-                className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded border border-slate-700 hover:border-slate-600 transition-colors"
+                className="text-xs text-muted hover:text-slate-200 px-3 py-1.5 rounded border border-hairline hover:border-slate-600 transition-colors"
               >
                 New chat
               </button>
@@ -435,7 +435,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                 <Lock className="absolute -bottom-1 -right-1 h-5 w-5 text-accent" strokeWidth={2} />
               </div>
               <h2 className="text-xl font-semibold text-white mb-1">Mindy Chat is a Pro feature</h2>
-              <p className="text-sm text-slate-400 max-w-lg mx-auto">
+              <p className="text-sm text-muted max-w-lg mx-auto">
                 Ask Mindy anything about federal contracting and get a straight answer,
                 grounded in 743 podcast interviews, real proposal templates, and 8 years
                 of teaching — with her sources cited.
@@ -453,9 +453,9 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
               {STARTER_PROMPTS.map((prompt) => (
                 <div
                   key={prompt}
-                  className="text-left rounded-lg border border-slate-800 bg-slate-900/50 p-4"
+                  className="text-left rounded-lg border border-surface bg-ground/50 p-4"
                 >
-                  <div className="text-sm text-slate-300">{prompt}</div>
+                  <div className="text-sm text-ink-soft">{prompt}</div>
                 </div>
               ))}
             </div>
@@ -465,7 +465,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
             <div className="text-center mb-8">
               <MessageCircle className="h-10 w-10 mx-auto mb-3 text-accent" strokeWidth={1.5} />
               <h2 className="text-xl font-semibold text-white mb-1">What do you want to know?</h2>
-              <p className="text-sm text-slate-400">
+              <p className="text-sm text-muted">
                 Mindy draws on 743 podcast interviews, real proposal templates, and 8 years of federal contracting teaching.
               </p>
             </div>
@@ -475,7 +475,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                   key={prompt}
                   onClick={() => sendMessage(prompt)}
                   disabled={isStreaming}
-                  className="text-left rounded-lg border border-slate-800 bg-slate-900/50 hover:border-purple-500/40 hover:bg-purple-500/5 transition-colors p-4 group disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="text-left rounded-lg border border-surface bg-ground/50 hover:border-purple-500/40 hover:bg-purple-500/5 transition-colors p-4 group disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <div className="text-sm text-slate-200 group-hover:text-white">{prompt}</div>
                 </button>
@@ -487,7 +487,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
             {messages.map(msg => (
               <div key={msg.id} className={msg.role === 'user' ? 'flex justify-end' : 'flex justify-start'}>
                 <div className={msg.role === 'user'
-                  ? 'max-w-[80%] rounded-2xl rounded-tr-md bg-slate-800 border border-slate-700 px-4 py-3'
+                  ? 'max-w-[80%] rounded-2xl rounded-tr-md bg-surface border border-hairline px-4 py-3'
                   : 'max-w-[85%]'
                 }>
                   {msg.role === 'assistant' && (
@@ -502,12 +502,12 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                     {msg.content
                       ? renderMessageContent(msg.content)
                       : msg.isStreaming
-                        ? <span className="text-slate-500 italic">Thinking…</span>
+                        ? <span className="text-faint italic">Thinking…</span>
                         : null}
                   </div>
                   {msg.role === 'assistant' && !!msg.citations?.length && !msg.isStreaming && (
-                    <div className="mt-3 pt-3 border-t border-slate-800/50">
-                      <div className="text-[10px] font-semibold tracking-wider text-slate-500 mb-1.5">DOCUMENTS REFERENCED</div>
+                    <div className="mt-3 pt-3 border-t border-surface/50">
+                      <div className="text-[10px] font-semibold tracking-wider text-faint mb-1.5">DOCUMENTS REFERENCED</div>
                       <div className="flex flex-wrap gap-1.5">
                         {msg.citations.slice(0, 6).map((c, i) => {
                           const label = c.title.slice(0, 50) + (c.title.length > 50 ? '…' : '');
@@ -523,7 +523,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                                 onClick={() => onPanelChange
                                   ? onPanelChange('knowledge-base', { doc: c.document_id })
                                   : setDrawerDocId(c.document_id)}
-                                className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-slate-800/60 border border-slate-700/60 text-slate-300 hover:border-purple-500/40 hover:text-purple-200 transition-colors cursor-pointer text-left"
+                                className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-surface/60 border border-hairline/60 text-ink-soft hover:border-purple-500/40 hover:text-purple-200 transition-colors cursor-pointer text-left"
                                 title={`Open in Knowledge Base · ${c.doc_type || ''}`}
                               >
                                 <FileText className="h-3 w-3 shrink-0" strokeWidth={2} /> {label}
@@ -538,7 +538,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                                 href={c.url}
                                 target="_blank"
                                 rel="noopener noreferrer"
-                                className="text-[11px] px-2 py-1 rounded bg-slate-800/60 border border-slate-700/60 text-slate-300 hover:border-purple-500/40 hover:text-purple-200 transition-colors"
+                                className="text-[11px] px-2 py-1 rounded bg-surface/60 border border-hairline/60 text-ink-soft hover:border-purple-500/40 hover:text-purple-200 transition-colors"
                               >
                                 {label}
                               </a>
@@ -549,7 +549,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                           return (
                             <span
                               key={i}
-                              className="text-[11px] px-2 py-1 rounded bg-slate-800/60 border border-slate-700/60 text-slate-400"
+                              className="text-[11px] px-2 py-1 rounded bg-surface/60 border border-hairline/60 text-muted"
                               title={c.doc_type}
                             >
                               {label}
@@ -567,7 +567,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
       </div>
 
       {/* Input */}
-      <div className="px-6 py-4 border-t border-slate-800 bg-slate-950 shrink-0">
+      <div className="px-6 py-4 border-t border-surface bg-ground-deep shrink-0">
         <div className="max-w-3xl mx-auto">
           <div className="relative">
             <textarea
@@ -579,13 +579,13 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
               disabled={isStreaming}
               rows={2}
               maxLength={2000}
-              className="w-full resize-none rounded-xl border border-slate-700 bg-slate-900 px-4 py-3 pr-24 text-sm text-white placeholder-slate-500 focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none disabled:opacity-60"
+              className="w-full resize-none rounded-xl border border-hairline bg-ground px-4 py-3 pr-24 text-sm text-white placeholder-faint focus:border-purple-500 focus:ring-1 focus:ring-purple-500 outline-none disabled:opacity-60"
             />
             <div className="absolute right-2 bottom-2 flex items-center gap-2">
               {isStreaming ? (
                 <button
                   onClick={handleStop}
-                  className="px-3 py-1.5 text-xs rounded-md bg-slate-700 hover:bg-slate-600 text-white"
+                  className="px-3 py-1.5 text-xs rounded-md bg-input hover:bg-slate-600 text-white"
                 >
                   Stop
                 </button>
@@ -593,15 +593,15 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                 <button
                   onClick={() => sendMessage(input)}
                   disabled={!input.trim()}
-                  className="px-3 py-1.5 text-xs rounded-md bg-purple-600 hover:bg-purple-500 disabled:bg-slate-800 disabled:text-slate-600 text-white font-medium transition-colors"
+                  className="px-3 py-1.5 text-xs rounded-md bg-purple-600 hover:bg-purple-500 disabled:bg-surface disabled:text-slate-600 text-white font-medium transition-colors"
                 >
                   Send <span className="text-[10px] text-purple-200">⌘↵</span>
                 </button>
               )}
             </div>
           </div>
-          <div className="mt-2 flex items-center justify-between text-[11px] text-slate-500">
-            <span>Press <span className="text-slate-400 font-mono">⌘ Enter</span> to send</span>
+          <div className="mt-2 flex items-center justify-between text-[11px] text-faint">
+            <span>Press <span className="text-muted font-mono">⌘ Enter</span> to send</span>
             <span>{input.length} / 2000</span>
           </div>
         </div>
@@ -688,10 +688,10 @@ function RagDocDrawer({ docId, email, onClose }: RagDocDrawerProps) {
         aria-label="Close drawer"
       />
       {/* Drawer */}
-      <div className="w-full max-w-xl bg-slate-900 border-l border-slate-800 flex flex-col shadow-2xl">
-        <div className="px-5 py-3 border-b border-slate-800 flex items-center justify-between shrink-0">
+      <div className="w-full max-w-xl bg-ground border-l border-surface flex flex-col shadow-2xl">
+        <div className="px-5 py-3 border-b border-surface flex items-center justify-between shrink-0">
           <div className="min-w-0 pr-3">
-            <div className="text-[10px] uppercase tracking-wider text-slate-500">
+            <div className="text-[10px] uppercase tracking-wider text-faint">
               {doc?.folder || doc?.doc_type || 'Document'}
             </div>
             <div className="text-sm font-semibold text-white truncate">
@@ -700,7 +700,7 @@ function RagDocDrawer({ docId, email, onClose }: RagDocDrawerProps) {
           </div>
           <button
             onClick={onClose}
-            className="text-slate-500 hover:text-white text-xl leading-none px-2"
+            className="text-faint hover:text-white text-xl leading-none px-2"
             aria-label="Close"
           >
             ×
@@ -708,7 +708,7 @@ function RagDocDrawer({ docId, email, onClose }: RagDocDrawerProps) {
         </div>
         <div className="flex-1 overflow-y-auto p-5">
           {loading && (
-            <div className="text-sm text-slate-400">Loading document…</div>
+            <div className="text-sm text-muted">Loading document…</div>
           )}
           {error && (
             <div className="rounded border border-red-900/60 bg-red-950/30 text-red-200 text-sm p-3">
@@ -718,7 +718,7 @@ function RagDocDrawer({ docId, email, onClose }: RagDocDrawerProps) {
           {doc && !loading && (
             <>
               {doc.word_count && (
-                <div className="text-[11px] text-slate-500 mb-3">
+                <div className="text-[11px] text-faint mb-3">
                   {doc.word_count.toLocaleString()} words
                 </div>
               )}

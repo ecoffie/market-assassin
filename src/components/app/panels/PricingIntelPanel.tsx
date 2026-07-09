@@ -152,7 +152,7 @@ export default function PricingIntelPanel({ email, tier }: Props) {
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Pricing Intel</h1>
-        <p className="text-sm text-slate-400 mt-1">
+        <p className="text-sm text-muted mt-1">
           What the government actually pays for labor in your industry — so you can price a bid to win.
         </p>
       </div>
@@ -160,7 +160,7 @@ export default function PricingIntelPanel({ email, tier }: Props) {
       {/* Plain-language "what is this / how to use it" panel. Users said
           the tool was confusing — it jumped straight to a NAICS box with
           no explanation of what it does or what the numbers mean. */}
-      <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-4 text-sm text-slate-300 space-y-2">
+      <div className="rounded-lg border border-surface bg-ground/40 p-4 text-sm text-ink-soft space-y-2">
         <p>
           <span className="font-semibold text-white">What it does:</span> enter your industry
           code (NAICS) and Mindy pulls real hourly labor rates the government has paid — by job
@@ -171,7 +171,7 @@ export default function PricingIntelPanel({ email, tier }: Props) {
           bid, check the rate for each role you&apos;ll staff. The three targets below tell you where
           to land:
         </p>
-        <ul className="list-disc list-inside text-slate-400 ml-1">
+        <ul className="list-disc list-inside text-muted ml-1">
           <li><span className="text-amber-300 font-medium">Aggressive</span> — price low to win on cost (thin margin).</li>
           <li><span className="text-emerald-300 font-medium">Competitive</span> — the market median; a safe, defensible rate.</li>
           <li><span className="text-purple-300 font-medium">Premium</span> — charge more when you bring differentiated value.</li>
@@ -180,15 +180,15 @@ export default function PricingIntelPanel({ email, tier }: Props) {
 
       {/* Query bar — NAICS in, "Run" out. Defaults to user's primary
           NAICS from their profile (fetched on mount). */}
-      <div className="bg-slate-900/60 border border-slate-800 rounded-lg p-3 space-y-3">
+      <div className="bg-ground/60 border border-surface rounded-lg p-3 space-y-3">
         {/* Mode toggle: NAICS (industry) vs Labor Category (the native CALC way). */}
-        <div className="inline-flex rounded-md border border-slate-700 overflow-hidden text-xs">
+        <div className="inline-flex rounded-md border border-hairline overflow-hidden text-xs">
           <button type="button" onClick={() => setMode('naics')}
-            className={`px-3 py-1.5 ${mode === 'naics' ? 'bg-emerald-600 text-white' : 'bg-slate-950 text-slate-400 hover:text-white'}`}>
+            className={`px-3 py-1.5 ${mode === 'naics' ? 'bg-emerald-600 text-white' : 'bg-ground-deep text-muted hover:text-white'}`}>
             By NAICS
           </button>
           <button type="button" onClick={() => setMode('role')}
-            className={`px-3 py-1.5 ${mode === 'role' ? 'bg-emerald-600 text-white' : 'bg-slate-950 text-slate-400 hover:text-white'}`}>
+            className={`px-3 py-1.5 ${mode === 'role' ? 'bg-emerald-600 text-white' : 'bg-ground-deep text-muted hover:text-white'}`}>
             By Labor Category
           </button>
         </div>
@@ -196,26 +196,26 @@ export default function PricingIntelPanel({ email, tier }: Props) {
         <div className="flex items-center gap-3">
           {mode === 'naics' ? (
             <>
-              <label className="text-sm text-slate-400 whitespace-nowrap">NAICS Code:</label>
+              <label className="text-sm text-muted whitespace-nowrap">NAICS Code:</label>
               <input
                 type="text"
                 value={naicsInput}
                 onChange={(e) => setNaicsInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') runQuery(); }}
                 placeholder="541512"
-                className="flex-1 max-w-xs rounded bg-slate-950 border border-slate-700 px-3 py-1.5 text-sm text-white outline-none focus:border-emerald-500"
+                className="flex-1 max-w-xs rounded bg-ground-deep border border-hairline px-3 py-1.5 text-sm text-white outline-none focus:border-emerald-500"
               />
             </>
           ) : (
             <>
-              <label className="text-sm text-slate-400 whitespace-nowrap">Role(s):</label>
+              <label className="text-sm text-muted whitespace-nowrap">Role(s):</label>
               <input
                 type="text"
                 value={roleInput}
                 onChange={(e) => setRoleInput(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') runQuery(); }}
                 placeholder="Software Engineer, Project Manager"
-                className="flex-1 rounded bg-slate-950 border border-slate-700 px-3 py-1.5 text-sm text-white outline-none focus:border-emerald-500"
+                className="flex-1 rounded bg-ground-deep border border-hairline px-3 py-1.5 text-sm text-white outline-none focus:border-emerald-500"
               />
             </>
           )}
@@ -223,14 +223,14 @@ export default function PricingIntelPanel({ email, tier }: Props) {
             type="button"
             onClick={runQuery}
             disabled={loading}
-            className="px-4 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-sm font-medium text-white whitespace-nowrap"
+            className="px-4 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 disabled:bg-input disabled:cursor-not-allowed text-sm font-medium text-white whitespace-nowrap"
           >
             {loading ? 'Running…' : 'Run Pricing Intel'}
           </button>
         </div>
 
         {mode === 'role' && (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-faint">
             CALC is keyed by job title — search the exact roles you&apos;re staffing for the most accurate rates. Separate multiple with commas.
           </p>
         )}
@@ -241,10 +241,10 @@ export default function PricingIntelPanel({ email, tier }: Props) {
       {upgradeTeaser && (
         <div className="bg-gradient-to-br from-purple-900/40 to-purple-800/20 border border-purple-500/40 rounded-lg p-5">
           <h3 className="inline-flex items-center gap-2 text-lg font-bold text-white mb-2"><DollarSign className="h-5 w-5 shrink-0 text-accent" strokeWidth={2} /> Pricing Intel is a Mindy Pro feature</h3>
-          <p className="text-sm text-slate-300 mb-3">{upgradeTeaser.note}</p>
-          <div className="text-xs text-slate-400 mb-4">
+          <p className="text-sm text-ink-soft mb-3">{upgradeTeaser.note}</p>
+          <div className="text-xs text-muted mb-4">
             Sample categories Pro would show:
-            <ul className="mt-1 list-disc list-inside text-slate-300">
+            <ul className="mt-1 list-disc list-inside text-ink-soft">
               {upgradeTeaser.sample_categories.map(c => <li key={c}>{c}</li>)}
             </ul>
           </div>
@@ -270,7 +270,7 @@ export default function PricingIntelPanel({ email, tier }: Props) {
         <div className="rounded-lg border border-emerald-500/30 bg-emerald-950/20 p-8 text-center">
           <div className="mx-auto mb-3 h-6 w-6 animate-spin rounded-full border-2 border-emerald-500/30 border-t-emerald-400" />
           <p className="text-slate-200 mb-1">Pulling live labor rates from GSA CALC…</p>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-faint">
             Reading every awarded rate for your role and computing the market
             25th / median / 75th percentiles. This can take a few seconds.
           </p>
@@ -279,9 +279,9 @@ export default function PricingIntelPanel({ email, tier }: Props) {
 
       {/* Empty state when Pro user hasn't run anything yet */}
       {!data && !loading && !error && !upgradeTeaser && !isFree && (
-        <div className="rounded-lg border border-slate-800 bg-slate-900/30 p-8 text-center">
-          <p className="text-slate-300 mb-1">Enter a NAICS code and click Run to see pricing data.</p>
-          <p className="text-xs text-slate-500">Examples: 541512 (Computer Systems Design), 541611 (Management Consulting), 541330 (Engineering Services)</p>
+        <div className="rounded-lg border border-surface bg-ground/30 p-8 text-center">
+          <p className="text-ink-soft mb-1">Enter a NAICS code and click Run to see pricing data.</p>
+          <p className="text-xs text-faint">Examples: 541512 (Computer Systems Design), 541611 (Management Consulting), 541330 (Engineering Services)</p>
         </div>
       )}
 
@@ -325,7 +325,7 @@ export default function PricingIntelPanel({ email, tier }: Props) {
           {/* Price-to-win row — 3 target rates side by side */}
           <div>
           <h3 className="text-sm font-semibold text-white mb-2">
-            Your price-to-win targets <span className="font-normal text-slate-500">— blended hourly labor rate</span>
+            Your price-to-win targets <span className="font-normal text-faint">— blended hourly labor rate</span>
           </h3>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             <RateTile
@@ -350,14 +350,14 @@ export default function PricingIntelPanel({ email, tier }: Props) {
           </div>
 
           {/* Labor categories — the meat of the report. Sortable later. */}
-          <div className="rounded-lg border border-slate-800 bg-slate-900/40 overflow-hidden">
-            <div className="px-4 py-3 border-b border-slate-800 flex items-center justify-between">
+          <div className="rounded-lg border border-surface bg-ground/40 overflow-hidden">
+            <div className="px-4 py-3 border-b border-surface flex items-center justify-between">
               <h3 className="text-sm font-semibold text-white">Labor Categories</h3>
-              <span className="text-xs text-slate-500">{data.laborCategories.length} shown · sorted by record count</span>
+              <span className="text-xs text-faint">{data.laborCategories.length} shown · sorted by record count</span>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
-                <thead className="bg-slate-900/60 text-xs text-slate-500 uppercase">
+                <thead className="bg-ground/60 text-xs text-faint uppercase">
                   <tr>
                     <th className="text-left px-4 py-2 font-medium">Category</th>
                     <th className="text-right px-4 py-2 font-medium">Records</th>
@@ -366,11 +366,11 @@ export default function PricingIntelPanel({ email, tier }: Props) {
                     <th className="text-right px-4 py-2 font-medium">75th %ile</th>
                   </tr>
                 </thead>
-                <tbody className="text-slate-300">
+                <tbody className="text-ink-soft">
                   {data.laborCategories.map(cat => (
-                    <tr key={cat.category} className="border-t border-slate-800/60 hover:bg-slate-800/30">
+                    <tr key={cat.category} className="border-t border-surface/60 hover:bg-surface/30">
                       <td className="px-4 py-2 font-medium text-slate-200">{cat.category}</td>
-                      <td className="text-right px-4 py-2 text-slate-400">{cat.recordCount.toLocaleString()}</td>
+                      <td className="text-right px-4 py-2 text-muted">{cat.recordCount.toLocaleString()}</td>
                       <td className="text-right px-4 py-2">{fmtMoney(cat.percentile25)}</td>
                       <td className="text-right px-4 py-2 text-emerald-400 font-semibold">{fmtMoney(cat.median)}</td>
                       <td className="text-right px-4 py-2">{fmtMoney(cat.percentile75)}</td>
@@ -383,13 +383,13 @@ export default function PricingIntelPanel({ email, tier }: Props) {
 
           {/* Top vendors — quick view of who's competing in this NAICS */}
           {data.topVendors.length > 0 && (
-            <div className="rounded-lg border border-slate-800 bg-slate-900/40 overflow-hidden">
-              <div className="px-4 py-3 border-b border-slate-800">
+            <div className="rounded-lg border border-surface bg-ground/40 overflow-hidden">
+              <div className="px-4 py-3 border-b border-surface">
                 <h3 className="text-sm font-semibold text-white">Top Vendors</h3>
               </div>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
-                  <thead className="bg-slate-900/60 text-xs text-slate-500 uppercase">
+                  <thead className="bg-ground/60 text-xs text-faint uppercase">
                     <tr>
                       <th className="text-left px-4 py-2 font-medium">Vendor</th>
                       <th className="text-left px-4 py-2 font-medium">Size</th>
@@ -397,13 +397,13 @@ export default function PricingIntelPanel({ email, tier }: Props) {
                       <th className="text-right px-4 py-2 font-medium">Records</th>
                     </tr>
                   </thead>
-                  <tbody className="text-slate-300">
+                  <tbody className="text-ink-soft">
                     {data.topVendors.map(v => (
-                      <tr key={v.name} className="border-t border-slate-800/60">
+                      <tr key={v.name} className="border-t border-surface/60">
                         <td className="px-4 py-2 font-medium text-slate-200">{v.name}</td>
-                        <td className="px-4 py-2 text-slate-400">{v.businessSize}</td>
+                        <td className="px-4 py-2 text-muted">{v.businessSize}</td>
                         <td className="text-right px-4 py-2">{fmtMoney(v.avgRate)}</td>
-                        <td className="text-right px-4 py-2 text-slate-400">{v.recordCount}</td>
+                        <td className="text-right px-4 py-2 text-muted">{v.recordCount}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -419,10 +419,10 @@ export default function PricingIntelPanel({ email, tier }: Props) {
 
 function StatCard({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900/40 p-4">
-      <div className="text-xs uppercase tracking-wider text-slate-500">{label}</div>
+    <div className="rounded-lg border border-surface bg-ground/40 p-4">
+      <div className="text-xs uppercase tracking-wider text-faint">{label}</div>
       <div className="mt-1 text-2xl font-bold text-white">{value}</div>
-      {hint && <div className="mt-1 text-xs text-slate-500">{hint}</div>}
+      {hint && <div className="mt-1 text-xs text-faint">{hint}</div>}
     </div>
   );
 }
@@ -444,10 +444,10 @@ function RateTile({
     : tone === 'emerald' ? 'border-emerald-500/40 text-emerald-400'
     : 'border-purple-500/40 text-purple-400';
   return (
-    <div className={`rounded-lg border bg-slate-900/40 p-4 ${accent.split(' ')[0]}`}>
+    <div className={`rounded-lg border bg-ground/40 p-4 ${accent.split(' ')[0]}`}>
       <div className={`text-xs font-semibold uppercase tracking-wider ${accent.split(' ')[1]}`}>{label}</div>
       <div className="mt-1 text-3xl font-bold text-white">{fmtMoney(rate)}</div>
-      <div className="mt-1 text-xs text-slate-500">{hint}/hr · {hint}</div>
+      <div className="mt-1 text-xs text-faint">{hint}/hr · {hint}</div>
     </div>
   );
 }

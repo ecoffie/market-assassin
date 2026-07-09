@@ -52,16 +52,16 @@ export default function GettingStartedPanel({
       <div className="mb-5">
         <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Getting Started</p>
         <h1 className="text-xl font-semibold text-white">Win your first contract with Mindy</h1>
-        <p className="text-sm text-slate-400 mt-1">
+        <p className="text-sm text-muted mt-1">
           Three short steps — set up your market, find who buys your work, and build your first bid.
           Each one ends with something real you can use.
         </p>
         {/* Progress bar */}
         <div className="mt-3 flex items-center gap-3">
-          <div className="h-1.5 flex-1 rounded-full bg-slate-800 overflow-hidden">
+          <div className="h-1.5 flex-1 rounded-full bg-surface overflow-hidden">
             <div className="h-full bg-emerald-500 transition-all" style={{ width: `${(completed / JOURNEYS.length) * 100}%` }} />
           </div>
-          <span className="text-xs text-slate-400 shrink-0">{completed} of {JOURNEYS.length} done</span>
+          <span className="text-xs text-muted shrink-0">{completed} of {JOURNEYS.length} done</span>
         </div>
       </div>
 
@@ -70,41 +70,41 @@ export default function GettingStartedPanel({
           const done = isDone(j.key);
           const expanded = open === j.key;
           return (
-            <div key={j.key} className={`rounded-xl border ${done ? 'border-emerald-500/30 bg-emerald-500/[0.03]' : 'border-slate-800 bg-slate-900'}`}>
+            <div key={j.key} className={`rounded-xl border ${done ? 'border-emerald-500/30 bg-emerald-500/[0.03]' : 'border-surface bg-ground'}`}>
               <button
                 type="button"
                 onClick={() => setOpen(expanded ? null : j.key)}
                 className="w-full flex items-start gap-3 p-4 text-left"
               >
-                <span className={`shrink-0 mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${done ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300'}`}>
+                <span className={`shrink-0 mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${done ? 'bg-emerald-600 text-white' : 'bg-surface text-ink-soft'}`}>
                   {done ? <Check className="h-4 w-4" strokeWidth={3} /> : j.num}
                 </span>
                 <span className="flex-1">
                   <span className="text-white font-medium">{j.title}</span>
-                  <span className="block text-xs text-slate-400 mt-0.5">{j.why}</span>
+                  <span className="block text-xs text-muted mt-0.5">{j.why}</span>
                 </span>
-                <span className="text-slate-500 text-sm shrink-0">{expanded ? '▲' : '▼'}</span>
+                <span className="text-faint text-sm shrink-0">{expanded ? '▲' : '▼'}</span>
               </button>
 
               {expanded && (
                 <div className="px-4 pb-4 pt-0 pl-14">
                   {/* Vimeo walkthrough (empty until recorded) */}
                   {j.vimeoUrl ? (
-                    <div className="mb-3 aspect-video w-full overflow-hidden rounded-lg border border-slate-800">
+                    <div className="mb-3 aspect-video w-full overflow-hidden rounded-lg border border-surface">
                       <iframe src={j.vimeoUrl} className="h-full w-full" allow="autoplay; fullscreen; picture-in-picture" allowFullScreen title={j.title} />
                     </div>
                   ) : (
-                    <div className="mb-3 flex aspect-video w-full items-center justify-center rounded-lg border border-dashed border-slate-700 bg-slate-950/50 text-xs text-slate-500">
+                    <div className="mb-3 flex aspect-video w-full items-center justify-center rounded-lg border border-dashed border-hairline bg-ground-deep/50 text-xs text-faint">
                       Walkthrough video coming soon
                     </div>
                   )}
 
                   <ol className="space-y-1.5 mb-3">
                     {j.steps.map((s, i) => (
-                      <li key={i} className="text-sm text-slate-300">
-                        <span className="text-slate-500 mr-1.5">{i + 1}.</span>
+                      <li key={i} className="text-sm text-ink-soft">
+                        <span className="text-faint mr-1.5">{i + 1}.</span>
                         <span className="font-medium">{s.label}</span>
-                        <span className="block text-xs text-slate-400 ml-5">{s.detail}</span>
+                        <span className="block text-xs text-muted ml-5">{s.detail}</span>
                       </li>
                     ))}
                   </ol>
@@ -123,7 +123,7 @@ export default function GettingStartedPanel({
                       <button
                         type="button"
                         onClick={() => markDone(j.key)}
-                        className="rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-xs text-slate-300 hover:text-white"
+                        className="rounded-lg border border-hairline bg-surface px-3 py-2 text-xs text-ink-soft hover:text-white"
                       >
                         Mark done
                       </button>

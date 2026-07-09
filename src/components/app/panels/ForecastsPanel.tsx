@@ -299,7 +299,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
   };
 
   const getAgencyColors = (agency: string) => {
-    return AGENCY_COLORS[agency] || { bg: 'bg-slate-500/20', text: 'text-slate-400' };
+    return AGENCY_COLORS[agency] || { bg: 'bg-slate-500/20', text: 'text-muted' };
   };
 
   const handleRequestForecast = async () => {
@@ -375,10 +375,10 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
     return (
       <div className="p-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-slate-800 rounded w-48" />
+          <div className="h-8 bg-surface rounded w-48" />
           <div className="grid grid-cols-3 gap-4">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-24 bg-slate-800 rounded-xl" />
+              <div key={i} className="h-24 bg-surface rounded-xl" />
             ))}
           </div>
         </div>
@@ -392,27 +392,27 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Upcoming Buys</h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-muted mt-1">
             Planned agency purchases that have not hit SAM.gov yet. Use this to get in early before the solicitation drops.
           </p>
           {profileDefaults && (
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-              <span className={`px-2 py-1 rounded ${usingProfileDefaults ? 'bg-emerald-500/15 text-emerald-300' : 'bg-slate-800 text-slate-400'}`}>
+              <span className={`px-2 py-1 rounded ${usingProfileDefaults ? 'bg-emerald-500/15 text-emerald-300' : 'bg-surface text-muted'}`}>
                 {usingProfileDefaults ? 'Using saved profile' : 'Custom search'}
               </span>
               {profileDefaults.naicsCodes.length > 0 && (
-                <span className="px-2 py-1 rounded bg-slate-800 text-slate-300">
+                <span className="px-2 py-1 rounded bg-surface text-ink-soft">
                   NAICS {profileDefaults.naicsCodes.slice(0, 4).join(', ')}
                   {profileDefaults.naicsCodes.length > 4 ? ` +${profileDefaults.naicsCodes.length - 4}` : ''}
                 </span>
               )}
               {profileDefaults.agencies.length > 0 && (
-                <span className="px-2 py-1 rounded bg-slate-800 text-slate-300">
+                <span className="px-2 py-1 rounded bg-surface text-ink-soft">
                   {profileDefaults.agencies.length} target agencies
                 </span>
               )}
               {profileDefaults.states.length > 0 && (
-                <span className="px-2 py-1 rounded bg-slate-800 text-slate-300">
+                <span className="px-2 py-1 rounded bg-surface text-ink-soft">
                   {profileDefaults.states.slice(0, 6).join(', ')}
                   {profileDefaults.states.length > 6 ? ` +${profileDefaults.states.length - 6}` : ''}
                 </span>
@@ -433,36 +433,36 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
       {/* Summary Cards */}
       {summary && (
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <div className="bg-ground border border-surface rounded-xl p-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
                 <BarChart3 className="h-5 w-5 text-amber-300" strokeWidth={2} />
               </div>
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wider">Upcoming Buys</p>
+                <p className="text-xs text-faint uppercase tracking-wider">Upcoming Buys</p>
                 <p className="text-2xl font-bold text-white">{summary.totalForecasts.toLocaleString()}</p>
               </div>
             </div>
           </div>
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <div className="bg-ground border border-surface rounded-xl p-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
                 <Landmark className="h-5 w-5 text-blue-300" strokeWidth={2} />
               </div>
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wider">Agencies Covered</p>
+                <p className="text-xs text-faint uppercase tracking-wider">Agencies Covered</p>
                 <p className="text-2xl font-bold text-white">{agencyCoverageLabel}</p>
                 <p className="text-[11px] text-slate-600 mt-1">Forecast sources with upcoming-buy data</p>
               </div>
             </div>
           </div>
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <div className="bg-ground border border-surface rounded-xl p-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
                 <DollarSign className="h-5 w-5 text-emerald-300" strokeWidth={2} />
               </div>
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wider">Estimated Spend Coverage</p>
+                <p className="text-xs text-faint uppercase tracking-wider">Estimated Spend Coverage</p>
                 <p className="text-2xl font-bold text-white">{summary.estimatedSpendCoverage}</p>
                 <p className="text-[11px] text-slate-600 mt-1">Share of forecast records with value data</p>
               </div>
@@ -472,24 +472,24 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
       )}
 
       {/* Search Form */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-        <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Explore Upcoming Buys</h3>
+      <div className="bg-ground border border-surface rounded-xl p-5">
+        <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Explore Upcoming Buys</h3>
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
           <div>
-            <label className="block text-xs text-slate-500 mb-1">NAICS Code(s)</label>
+            <label className="block text-xs text-faint mb-1">NAICS Code(s)</label>
             <NaicsAutocompleteInput
               value={naicsFilter}
               onChange={setNaicsFilter}
               placeholder="541512, 236, 238"
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-amber-500 focus:outline-none"
+              className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-amber-500 focus:outline-none"
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Agency Override</label>
+            <label className="block text-xs text-faint mb-1">Agency Override</label>
             <select
               value={agencyFilter}
               onChange={(e) => setAgencyFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:border-amber-500 focus:outline-none"
+              className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm focus:border-amber-500 focus:outline-none"
             >
               <option value="">All Agencies</option>
               {stats?.byAgency.map((a) => (
@@ -500,33 +500,33 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
             </select>
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Keyword</label>
+            <label className="block text-xs text-faint mb-1">Keyword</label>
             <input
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               placeholder="cybersecurity"
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-amber-500 focus:outline-none"
+              className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-amber-500 focus:outline-none"
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">State</label>
+            <label className="block text-xs text-faint mb-1">State</label>
             <input
               type="text"
               value={stateFilter}
               onChange={(e) => setStateFilter(e.target.value.toUpperCase())}
               onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
               placeholder="FL, GA"
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-amber-500 focus:outline-none uppercase"
+              className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-amber-500 focus:outline-none uppercase"
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Set-Aside</label>
+            <label className="block text-xs text-faint mb-1">Set-Aside</label>
             <select
               value={setAsideFilter}
               onChange={(e) => setSetAsideFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:border-amber-500 focus:outline-none"
+              className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm focus:border-amber-500 focus:outline-none"
             >
               {/* Values match real set_aside_type strings in agency_forecasts. */}
               <option value="">Any Set-Aside</option>
@@ -540,13 +540,13 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
             <button
               onClick={handleSearch}
               disabled={searching || (!naicsFilter && !agencyFilter && !searchQuery && !stateFilter && !setAsideFilter)}
-              className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+              className="flex-1 px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-input disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
             >
               {searching ? 'Searching...' : 'Search'}
             </button>
           </div>
         </div>
-        <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-slate-800">
+        <div className="flex flex-wrap items-center gap-3 pt-3 border-t border-surface">
           {(naicsFilter || agencyFilter || searchQuery) && (
             <button
               onClick={() => {
@@ -555,7 +555,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
                 setSearchQuery('');
                 setForecasts([]);
               }}
-              className="text-sm text-slate-400 hover:text-white"
+              className="text-sm text-muted hover:text-white"
             >
               Clear Filters
             </button>
@@ -573,7 +573,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
             View All Forecasts →
           </button>
           {usingProfileDefaults && (
-            <span className="text-xs text-slate-500">Using saved profile NAICS</span>
+            <span className="text-xs text-faint">Using saved profile NAICS</span>
           )}
         </div>
       </div>
@@ -593,9 +593,9 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
         </div>
       )}
       {forecasts.length > 0 && (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-800">
-            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
+        <div className="bg-ground border border-surface rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-surface">
+            <h3 className="text-sm font-semibold text-muted uppercase tracking-wider">
               {forecasts.length} Upcoming Buys Found
             </h3>
           </div>
@@ -615,7 +615,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
               const expanded = expandedForecastIds.has(forecast.id);
 
               return (
-                <div key={forecast.id} className="p-5 hover:bg-slate-800/50 transition-colors">
+                <div key={forecast.id} className="p-5 hover:bg-surface/50 transition-colors">
                   <div className="flex items-start justify-between gap-4">
                     <button
                       type="button"
@@ -639,12 +639,12 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
                           </span>
                         )}
                         {naicsCode && (
-                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-700 text-slate-300" title={naicsDesc}>
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-input text-ink-soft" title={naicsDesc}>
                             NAICS {naicsCode}
                           </span>
                         )}
                         {forecast.psc && (
-                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-700 text-slate-300">
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-input text-ink-soft">
                             PSC {forecast.psc}
                           </span>
                         )}
@@ -677,19 +677,19 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
                       {/* Title */}
                       <div className="flex items-start gap-2">
                         <h4 className="text-white font-medium mb-1 line-clamp-2">{forecast.title}</h4>
-                        <span className="mt-0.5 text-xs text-slate-500">{expanded ? 'Hide' : 'Details'}</span>
+                        <span className="mt-0.5 text-xs text-faint">{expanded ? 'Hide' : 'Details'}</span>
                       </div>
 
                       {/* Department/Office */}
                       {(forecast.department || forecast.office) && (
-                        <p className="text-slate-400 text-sm mb-1">
+                        <p className="text-muted text-sm mb-1">
                           {forecast.department}{forecast.office ? ` • ${forecast.office}` : ''}
                         </p>
                       )}
 
                       {/* Description */}
                       {forecast.description && (
-                        <p className={`text-slate-500 text-sm mb-2 ${expanded ? '' : 'line-clamp-2'}`}>
+                        <p className={`text-faint text-sm mb-2 ${expanded ? '' : 'line-clamp-2'}`}>
                           {forecast.description}
                         </p>
                       )}
@@ -702,7 +702,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
                         </div>
                       )}
 
-                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                      <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-faint">
                         {fiscalYear && (
                           <span>FY {fiscalYear}{forecast.quarter ? ` ${forecast.quarter}` : ''}</span>
                         )}
@@ -718,7 +718,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
                       </div>
 
                       {expanded && (
-                        <div className="mt-4 grid gap-3 rounded-lg border border-slate-800 bg-slate-950/50 p-4 text-sm md:grid-cols-2">
+                        <div className="mt-4 grid gap-3 rounded-lg border border-surface bg-ground-deep/50 p-4 text-sm md:grid-cols-2">
                           <DetailItem label="Agency" value={forecast.department || agencyCode} />
                           <DetailItem label="Office" value={forecast.office} />
                           <DetailItem label="NAICS" value={naicsCode ? `${naicsCode}${naicsDesc ? ` - ${naicsDesc}` : ''}` : naicsDesc} />
@@ -743,11 +743,11 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
                               : `${formatCurrency(valueMin)} - ${formatCurrency(valueMax)}`
                             )}
                           </div>
-                          <div className="text-xs text-slate-500">Est. Value</div>
+                          <div className="text-xs text-faint">Est. Value</div>
                         </>
                       )}
                       {awardDate && (
-                        <div className="text-xs text-slate-500 mt-2">
+                        <div className="text-xs text-faint mt-2">
                           Award: {formatDate(awardDate)}
                         </div>
                       )}
@@ -778,8 +778,8 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
 
       {/* Agency Breakdown - shown when no search results */}
       {stats && stats.byAgency.length > 0 && forecasts.length === 0 && !error && (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Browse by Agency</h3>
+        <div className="bg-ground border border-surface rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Browse by Agency</h3>
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {stats.byAgency.slice(0, 8).map((item) => {
               const colors = getAgencyColors(item.agency);
@@ -790,10 +790,10 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
                     setAgencyFilter(item.agency);
                     handleSearchWithParams('', item.agency, '');
                   }}
-                  className={`p-3 rounded-lg border border-slate-700 hover:border-amber-500/50 transition-colors text-left ${colors.bg}`}
+                  className={`p-3 rounded-lg border border-hairline hover:border-amber-500/50 transition-colors text-left ${colors.bg}`}
                 >
                   <div className={`text-lg font-bold ${colors.text}`}>{item.count.toLocaleString()}</div>
-                  <div className="text-xs text-slate-400">{item.agency}</div>
+                  <div className="text-xs text-muted">{item.agency}</div>
                 </button>
               );
             })}
@@ -803,8 +803,8 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
 
       {/* Top NAICS */}
       {stats && stats.topNaics.length > 0 && forecasts.length === 0 && !error && (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-          <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-4">Top NAICS Codes</h3>
+        <div className="bg-ground border border-surface rounded-xl p-5">
+          <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-4">Top NAICS Codes</h3>
           <div className="space-y-2">
             {stats.topNaics.slice(0, 6).map((item) => (
               <button
@@ -813,12 +813,12 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
                   setNaicsFilter(item.naics_code);
                   handleSearchWithParams(item.naics_code, '', '');
                 }}
-                className="w-full flex items-center justify-between p-3 rounded-lg bg-slate-800 hover:bg-slate-700 transition-colors"
+                className="w-full flex items-center justify-between p-3 rounded-lg bg-surface hover:bg-input transition-colors"
               >
                 <div>
                   <span className="text-white font-medium">{item.naics_code}</span>
                   {item.naics_title && (
-                    <span className="text-slate-400 text-sm ml-2">{item.naics_title}</span>
+                    <span className="text-muted text-sm ml-2">{item.naics_title}</span>
                   )}
                 </div>
                 <span className="text-amber-400 font-medium">{item.record_count}</span>
@@ -832,10 +832,10 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
       {forecasts.length === 0 && !error && !stats?.byAgency.length && (
         <div className="bg-gradient-to-br from-amber-900/30 to-slate-900 border border-amber-500/30 rounded-xl p-6 text-center">
           <div className="mb-4 flex justify-center"><Sparkles className="h-11 w-11 text-amber-300" strokeWidth={1.5} /></div>
-          <p className="text-slate-300 mb-2">
+          <p className="text-ink-soft mb-2">
             <strong className="text-white">Get ahead of the competition!</strong>
           </p>
-          <p className="text-slate-400 text-sm">
+          <p className="text-muted text-sm">
             Search forecasts to find upcoming opportunities 6-18 months before they hit SAM.gov.
           </p>
         </div>
@@ -843,14 +843,14 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
 
       {/* Request Missing Forecast Card - shown when search returns no/few results */}
       {forecasts.length < 5 && (naicsFilter || agencyFilter) && !loading && !searching && (
-        <div className="bg-slate-900 border border-purple-500/30 rounded-xl p-5">
+        <div className="bg-ground border border-purple-500/30 rounded-xl p-5">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-lg bg-purple-500/20 flex items-center justify-center shrink-0">
               <ClipboardList className="h-6 w-6 text-purple-300" strokeWidth={1.75} />
             </div>
             <div className="flex-1">
               <h4 className="text-white font-medium mb-1">Missing forecast data?</h4>
-              <p className="text-slate-400 text-sm mb-3">
+              <p className="text-muted text-sm mb-3">
                 {forecasts.length === 0
                   ? `We do not have forecast data matching your search yet.`
                   : `Only ${forecasts.length} forecasts found for this search.`
@@ -870,13 +870,13 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
       {/* Forecast Request Modal */}
       {showRequestModal && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4">
-          <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-md p-6">
+          <div className="bg-ground border border-hairline rounded-xl w-full max-w-md p-6">
             <div className="flex items-center justify-between mb-4">
               <h3 className="text-lg font-semibold text-white">Request Forecast Data</h3>
               <button
                 onClick={() => setShowRequestModal(false)}
                 aria-label="Close"
-                className="text-slate-400 hover:text-white"
+                className="text-muted hover:text-white"
               >
                 <X className="h-4 w-4" />
               </button>
@@ -886,53 +886,53 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
               <div className="text-center py-8">
                 <div className="mb-4 flex justify-center"><CheckCircle2 className="h-11 w-11 text-emerald-400" strokeWidth={1.5} /></div>
                 <p className="text-emerald-400 font-medium">Request submitted!</p>
-                <p className="text-slate-400 text-sm mt-2">We will notify you when this data is available.</p>
+                <p className="text-muted text-sm mt-2">We will notify you when this data is available.</p>
               </div>
             ) : (
               <>
-                <p className="text-slate-400 text-sm mb-4">
+                <p className="text-muted text-sm mb-4">
                   Tell us what forecast data you need. Our team will research and add it to the database.
                 </p>
 
                 <div className="space-y-4">
                   <div>
-                    <label className="block text-xs text-slate-500 mb-1">Agency *</label>
+                    <label className="block text-xs text-faint mb-1">Agency *</label>
                     <input
                       type="text"
                       value={requestAgency}
                       onChange={(e) => setRequestAgency(e.target.value)}
                       placeholder="e.g., Department of Defense, VA, HHS"
-                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-purple-500 focus:outline-none"
+                      className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-purple-500 focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-500 mb-1">Office (optional)</label>
+                    <label className="block text-xs text-faint mb-1">Office (optional)</label>
                     <input
                       type="text"
                       value={requestOffice}
                       onChange={(e) => setRequestOffice(e.target.value)}
                       placeholder="e.g., AFMC, VA Office of Acquisition"
-                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-purple-500 focus:outline-none"
+                      className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-purple-500 focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-500 mb-1">NAICS Code (optional)</label>
+                    <label className="block text-xs text-faint mb-1">NAICS Code (optional)</label>
                     <input
                       type="text"
                       value={requestNaics}
                       onChange={(e) => setRequestNaics(e.target.value)}
                       placeholder="e.g., 541512"
-                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-purple-500 focus:outline-none"
+                      className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-purple-500 focus:outline-none"
                     />
                   </div>
                   <div>
-                    <label className="block text-xs text-slate-500 mb-1">What are you looking for?</label>
+                    <label className="block text-xs text-faint mb-1">What are you looking for?</label>
                     <textarea
                       value={requestDescription}
                       onChange={(e) => setRequestDescription(e.target.value)}
                       placeholder="Describe the type of opportunities you're trying to find..."
                       rows={3}
-                      className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-purple-500 focus:outline-none resize-none"
+                      className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-purple-500 focus:outline-none resize-none"
                     />
                   </div>
                 </div>
@@ -940,14 +940,14 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
                 <div className="flex justify-end gap-3 mt-6">
                   <button
                     onClick={() => setShowRequestModal(false)}
-                    className="px-4 py-2 text-slate-400 hover:text-white text-sm transition-colors"
+                    className="px-4 py-2 text-muted hover:text-white text-sm transition-colors"
                   >
                     Cancel
                   </button>
                   <button
                     onClick={handleRequestForecast}
                     disabled={!requestAgency || requestSubmitting}
-                    className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
+                    className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-input disabled:cursor-not-allowed text-white text-sm font-medium rounded-lg transition-colors"
                   >
                     {requestSubmitting ? 'Submitting...' : 'Submit Request'}
                   </button>
@@ -967,7 +967,7 @@ function DetailItem({ label, value }: { label: string; value?: string | null }) 
   return (
     <div>
       <div className="text-xs uppercase tracking-wider text-slate-600">{label}</div>
-      <div className="mt-0.5 text-slate-300">{value}</div>
+      <div className="mt-0.5 text-ink-soft">{value}</div>
     </div>
   );
 }

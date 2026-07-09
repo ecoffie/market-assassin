@@ -53,11 +53,11 @@ function dueLabel(iso?: string): { text: string; tone: string } | null {
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const day = new Date(d); day.setHours(0, 0, 0, 0);
   const days = Math.round((day.getTime() - today.getTime()) / 86_400_000);
-  if (days < 0) return { text: 'Closed', tone: 'text-slate-500' };
+  if (days < 0) return { text: 'Closed', tone: 'text-faint' };
   if (days === 0) return { text: 'Due today', tone: 'text-red-400' };
   if (days === 1) return { text: 'Due tomorrow', tone: 'text-red-400' };
   if (days <= 7) return { text: `Due in ${days} days`, tone: 'text-amber-400' };
-  return { text: `Due in ${days} days`, tone: 'text-slate-400' };
+  return { text: `Due in ${days} days`, tone: 'text-muted' };
 }
 
 export default function PipelinePreviewFree({ email }: Props) {
@@ -89,17 +89,17 @@ export default function PipelinePreviewFree({ email }: Props) {
       ctaLabel="Upgrade to manage"
     >
       {loading ? (
-        <div className="text-sm text-slate-500">Loading your tracked opportunities…</div>
+        <div className="text-sm text-faint">Loading your tracked opportunities…</div>
       ) : pursuits.length === 0 ? (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-6 text-center">
-          <p className="text-sm text-slate-300">You haven&rsquo;t tracked anything yet.</p>
-          <p className="mt-1 text-xs text-slate-500">
+        <div className="rounded-xl border border-surface bg-ground/60 p-6 text-center">
+          <p className="text-sm text-ink-soft">You haven&rsquo;t tracked anything yet.</p>
+          <p className="mt-1 text-xs text-faint">
             Click <span className="text-emerald-300">Track</span> on any opportunity in your Source Feed or Market Dashboard — it&rsquo;ll show up here.
           </p>
         </div>
       ) : (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden">
-          <div className="border-b border-slate-800 px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-slate-500">
+        <div className="rounded-xl border border-surface bg-ground/60 overflow-hidden">
+          <div className="border-b border-surface px-4 py-2.5 text-xs font-medium uppercase tracking-wide text-faint">
             {pursuits.length} tracked
           </div>
           <ul className="divide-y divide-slate-800">
@@ -112,9 +112,9 @@ export default function PipelinePreviewFree({ email }: Props) {
                     <div className="min-w-0">
                       <div className="truncate text-sm text-slate-200">{p.title || p.notice_id || 'Tracked opportunity'}</div>
                       <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-                        {p.agency && <span className="truncate text-slate-500">{p.agency}</span>}
+                        {p.agency && <span className="truncate text-faint">{p.agency}</span>}
                         {p.stage && (
-                          <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[11px] text-slate-300">
+                          <span className="rounded bg-surface px-1.5 py-0.5 text-[11px] text-ink-soft">
                             {STAGE_LABEL[p.stage] || p.stage}
                           </span>
                         )}

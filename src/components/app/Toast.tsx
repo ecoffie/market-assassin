@@ -111,12 +111,12 @@ function ToastItem({ toast, onDismiss }: { toast: ActiveToast; onDismiss: () => 
       ? { ring: 'border-emerald-500/40', accent: 'text-emerald-400', dot: 'bg-emerald-500' }
       : variant === 'error'
       ? { ring: 'border-red-500/40', accent: 'text-red-400', dot: 'bg-red-500' }
-      : { ring: 'border-slate-600/40', accent: 'text-slate-300', dot: 'bg-slate-500' };
+      : { ring: 'border-slate-600/40', accent: 'text-ink-soft', dot: 'bg-slate-500' };
 
   return (
     <div
       role="status"
-      className={`pointer-events-auto flex items-center gap-3 rounded-lg border ${tone.ring} bg-slate-900/95 px-4 py-3 shadow-lg backdrop-blur min-w-[260px] max-w-md`}
+      className={`pointer-events-auto flex items-center gap-3 rounded-lg border ${tone.ring} bg-ground/95 px-4 py-3 shadow-lg backdrop-blur min-w-[260px] max-w-md`}
     >
       <span className={`h-2 w-2 shrink-0 rounded-full ${tone.dot}`} />
       <span className="flex-1 text-sm text-slate-100">{toast.message}</span>
@@ -143,7 +143,7 @@ function ToastItem({ toast, onDismiss }: { toast: ActiveToast; onDismiss: () => 
         type="button"
         onClick={onDismiss}
         aria-label="Dismiss notification"
-        className="shrink-0 text-slate-500 hover:text-slate-300 text-xs"
+        className="shrink-0 text-faint hover:text-ink-soft text-xs"
       >
         ✕
       </button>
