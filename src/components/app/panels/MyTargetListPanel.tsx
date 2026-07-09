@@ -106,6 +106,11 @@ export default function MyTargetListPanel({
   // fetch covers every target (the endpoint loops server-side so the
   // client makes a single round trip regardless of list size).
   const [eventsByTarget, setEventsByTarget] = useState<Record<string, TargetEvent[]>>({});
+  // LIVE enrichment (2026-07-09) — pain-point + open-opp counts computed fresh
+  // per load, so the badges no longer depend on the save-time snapshot (which
+  // 4 of 5 save paths left at 0). One batch call covers every target.
+  // open_opp_count is null for non-office-anchored targets (keep stored value).
+  const [enrichmentByTarget, setEnrichmentByTarget] = useState<Record<string, { pain_point_count: number; open_opp_count: number | null }>>({});
   // Slice 5 — AI event discovery. Tracks which target is mid-discovery
   // (spinner on its button) so the user gets feedback during the
   // ~3-5s Serper + Groq round trip.
@@ -281,6 +286,23 @@ export default function MyTargetListPanel({
   // status / notes update — only when the list actually grows or
   // shrinks. The endpoint reads from saved targets anyway, so this
   // is the right granularity.
+  }, [email, targets.length]);
+
+  // LIVE enrichment counts — pain points + open opps, computed fresh (not the
+  // save-time snapshot). Same single-round-trip pattern as events. Fail-soft:
+  // a hiccup leaves enrichmentByTarget empty and the card falls back to its
+  // stored counts, so a network blip never blanks the badges.
+  useEffect(() => {
+    if (!email || targets.length === 0) return;
+    let cancelled = false;
+    authedFetch(`/api/app/target-enrichment?email=${encodeURIComponent(email)}`, email)
+      .then(r => r.json())
+      .then(data => {
+        if (cancelled || !data?.success) return;
+        setEnrichmentByTarget(data.enrichment_by_target || {});
+      })
+      .catch(err => console.warn('[MyTargetList] enrichment load failed:', err));
+    return () => { cancelled = true; };
   }, [email, targets.length]);
 
   // Slice 5 — AI event discovery. Fires the open-web search agent for
@@ -645,7 +667,16 @@ export default function MyTargetListPanel({
                 No targets with status &quot;{statusFilter}&quot;.
               </p>
             ) : (
-              visibleTargets.map(t => (
+              visibleTargets.map(t => {
+                // Prefer LIVE enrichment (computed this load) over the save-time
+                // snapshot on the row. open_opp_count is null for non-anchored
+                // targets → keep the stored value. Events count comes straight
+                // from the live eventsByTarget map.
+                const live = enrichmentByTarget[t.id];
+                const painCount = live ? live.pain_point_count : t.pain_point_count;
+                const oppCount = live && live.open_opp_count !== null ? live.open_opp_count : t.open_opp_count;
+                const eventCount = eventsByTarget[t.id]?.length ?? t.upcoming_event_count;
+                return (
                 <div key={t.id} className="rounded-xl border border-surface bg-ground/40 p-4 hover:border-hairline transition-colors">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
@@ -678,24 +709,24 @@ export default function MyTargetListPanel({
                         >
                           {(t.sat_ratio || 0) > 0 ? `${Math.round(t.sat_ratio * 100)}% SAT` : 'SAT —'}
                         </span>
-                        {t.pain_point_count > 0 && (
+                        {painCount > 0 && (
                           <button
                             type="button"
                             onClick={() => togglePainExpanded(t)}
                             className={`px-2 py-0.5 rounded bg-amber-500/10 text-amber-300 hover:bg-amber-500/20 hover:text-amber-200 transition-colors cursor-pointer ${painExpandedId === t.id ? 'ring-1 ring-amber-400/50' : ''}`}
                             title="Click to see the documented pain points + priorities for this agency"
                           >
-                            {t.pain_point_count} pain pts {painExpandedId === t.id ? '▼' : '▸'}
+                            {painCount} pain pts {painExpandedId === t.id ? '▼' : '▸'}
                           </button>
                         )}
-                        {t.open_opp_count > 0 && (
+                        {oppCount > 0 && (
                           <span className="px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-300">
-                            {t.open_opp_count} open opps
+                            {oppCount} open opps
                           </span>
                         )}
-                        {t.upcoming_event_count > 0 && (
+                        {eventCount > 0 && (
                           <span className="px-2 py-0.5 rounded bg-purple-500/10 text-purple-300">
-                            {t.upcoming_event_count} events
+                            {eventCount} events
                           </span>
                         )}
                         {/* Provenance (roadmap Slice 5b) — which code
@@ -918,7 +949,8 @@ export default function MyTargetListPanel({
                     />
                   )}
                 </div>
-              ))
+                );
+              })
             )}
           </div>
         </>
