@@ -69,7 +69,7 @@ interface LogEntry {
 }
 
 const tierBadge: Record<Tier, { label: string; cls: string }> = {
-  free: { label: 'Free', cls: 'bg-slate-700/60 text-slate-300' },
+  free: { label: 'Free', cls: 'bg-input/60 text-ink-soft' },
   pro: { label: 'Pro', cls: 'bg-emerald-500/15 text-emerald-300 border border-emerald-500/30' },
   team: { label: 'Team', cls: 'bg-indigo-500/15 text-indigo-300 border border-indigo-500/30' },
 };
@@ -78,7 +78,7 @@ const verdictStyle: Record<Verdict['level'], { ring: string; text: string; icon:
   ok: { ring: 'border-emerald-500/40 bg-emerald-500/10', text: 'text-emerald-200', icon: '✅' },
   warn: { ring: 'border-amber-500/40 bg-amber-500/10', text: 'text-amber-200', icon: '⚠️' },
   block: { ring: 'border-red-500/40 bg-red-500/10', text: 'text-red-200', icon: '🚫' },
-  info: { ring: 'border-slate-600 bg-slate-700/20', text: 'text-slate-300', icon: 'ℹ️' },
+  info: { ring: 'border-slate-600 bg-input/20', text: 'text-ink-soft', icon: 'ℹ️' },
 };
 
 const SOURCES: { value: GrantSource; label: string }[] = [
@@ -231,14 +231,14 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
   }, [email, verdict, grantSource, note, sendWelcome, customerName, adminPassword, authHeaders, loadLog, fullMode, loadList, tab]);
 
   const busy = (k: string) => actionLoading === k;
-  const inputCls = 'w-full rounded-lg border border-slate-700 bg-slate-950/60 px-3 py-2.5 text-sm text-slate-100 placeholder-slate-500 focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500';
+  const inputCls = 'w-full rounded-lg border border-hairline bg-ground-deep/60 px-3 py-2.5 text-sm text-slate-100 placeholder-faint focus:border-emerald-500 focus:outline-none focus:ring-1 focus:ring-emerald-500';
 
   return (
     <section className="rounded-2xl border border-emerald-500/30 bg-gradient-to-br from-emerald-900/20 via-slate-900 to-slate-900 p-6">
       <div className="flex flex-col gap-1">
         <p className="text-sm uppercase tracking-[0.2em] text-emerald-300">Member Access</p>
         <h2 className="text-3xl font-bold">Grant Pro / Team — verified</h2>
-        <p className="mt-1 max-w-2xl text-sm text-slate-400">
+        <p className="mt-1 max-w-2xl text-sm text-muted">
           For purchases made outside the checkout link. Look someone up to see their current access next to their
           real Stripe record, then grant with a verified source. Behaves like a real purchase (access flags, KV gate,
           team workspace, welcome email) and every change is audited.
@@ -254,7 +254,7 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
                 key={t}
                 onClick={() => setTab(t)}
                 className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors ${
-                  tab === t ? 'bg-emerald-600 text-white' : 'border border-slate-700 text-slate-300 hover:bg-slate-800'
+                  tab === t ? 'bg-emerald-600 text-white' : 'border border-hairline text-ink-soft hover:bg-surface'
                 }`}
               >
                 {t === 'all' ? 'All' : t === 'pro' ? 'Pro' : t === 'team' ? 'Team' : 'Free'}
@@ -263,20 +263,20 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
             ))}
             <button
               onClick={() => setListOpen((o) => !o)}
-              className="ml-auto rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800"
+              className="ml-auto rounded-lg border border-hairline px-3 py-1.5 text-xs text-ink-soft hover:bg-surface"
               aria-expanded={listOpen}
             >
               {listOpen ? 'Hide' : 'Show'}{counts ? ` ${counts[tab].toLocaleString()}` : ''} members {listOpen ? '▲' : '▼'}
             </button>
-            <button onClick={() => loadList(tab)} className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-400 hover:bg-slate-800">
+            <button onClick={() => loadList(tab)} className="rounded-lg border border-hairline px-3 py-1.5 text-xs text-muted hover:bg-surface">
               Refresh
             </button>
           </div>
 
           {listOpen && (
-          <div className="mt-3 overflow-x-auto rounded-xl border border-slate-800">
+          <div className="mt-3 overflow-x-auto rounded-xl border border-surface">
             <table className="w-full text-left text-sm">
-              <thead className="bg-slate-900/80 text-xs uppercase tracking-wide text-slate-500">
+              <thead className="bg-ground/80 text-xs uppercase tracking-wide text-faint">
                 <tr>
                   <th className="px-4 py-2.5 font-medium">Email</th>
                   <th className="px-4 py-2.5 font-medium">Tier</th>
@@ -287,22 +287,22 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
               </thead>
               <tbody className="divide-y divide-slate-800">
                 {listLoading ? (
-                  <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-500">Loading…</td></tr>
+                  <tr><td colSpan={5} className="px-4 py-6 text-center text-faint">Loading…</td></tr>
                 ) : members.length === 0 ? (
-                  <tr><td colSpan={5} className="px-4 py-6 text-center text-slate-500">No members in this tier.</td></tr>
+                  <tr><td colSpan={5} className="px-4 py-6 text-center text-faint">No members in this tier.</td></tr>
                 ) : members.map((m) => (
-                  <tr key={m.email} className="hover:bg-slate-800/40">
+                  <tr key={m.email} className="hover:bg-surface/40">
                     <td className="px-4 py-2.5">
                       <div className="font-medium text-slate-200">{m.email}</div>
-                      {m.name && <div className="text-xs text-slate-500">{m.name}</div>}
+                      {m.name && <div className="text-xs text-faint">{m.name}</div>}
                     </td>
                     <td className="px-4 py-2.5">
                       <span className={`rounded-full px-2.5 py-0.5 text-xs font-semibold ${tierBadge[m.tier].cls}`}>{tierBadge[m.tier].label}</span>
                     </td>
-                    <td className="hidden px-4 py-2.5 text-xs text-slate-500 sm:table-cell">{m.accessSource || '—'}</td>
-                    <td className="hidden px-4 py-2.5 text-xs text-slate-500 md:table-cell">{m.created_at ? new Date(m.created_at).toLocaleDateString() : '—'}</td>
+                    <td className="hidden px-4 py-2.5 text-xs text-faint sm:table-cell">{m.accessSource || '—'}</td>
+                    <td className="hidden px-4 py-2.5 text-xs text-faint md:table-cell">{m.created_at ? new Date(m.created_at).toLocaleDateString() : '—'}</td>
                     <td className="px-4 py-2.5 text-right">
-                      <button onClick={() => lookup(m.email)} className="rounded-md border border-slate-700 px-2.5 py-1 text-xs text-emerald-300 hover:bg-slate-800">
+                      <button onClick={() => lookup(m.email)} className="rounded-md border border-hairline px-2.5 py-1 text-xs text-emerald-300 hover:bg-surface">
                         Manage →
                       </button>
                     </td>
@@ -313,7 +313,7 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
           </div>
           )}
           {listOpen && (
-            <p className="mt-1.5 text-[11px] text-slate-500">Showing up to 100 per tier. Use look-up below for a specific email.</p>
+            <p className="mt-1.5 text-[11px] text-faint">Showing up to 100 per tier. Use look-up below for a specific email.</p>
           )}
         </div>
       )}
@@ -321,7 +321,7 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
       {/* Lookup */}
       <form onSubmit={(e) => { e.preventDefault(); lookup(); }} className="mt-6 flex flex-col gap-3 sm:flex-row sm:items-end">
         <div className="flex-1">
-          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Look up a user</label>
+          <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-faint">Look up a user</label>
           <input type="email" value={email} onChange={(e) => setEmail(e.target.value)} placeholder="user@example.com" className={inputCls} />
         </div>
         <button type="submit" disabled={lookupLoading || !email.trim()} className="rounded-lg bg-slate-100 px-5 py-2.5 text-sm font-semibold text-slate-900 hover:bg-white disabled:opacity-40">
@@ -331,11 +331,11 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
 
       {/* Verification + actions */}
       {status && (
-        <div className="mt-6 rounded-xl border border-slate-800 bg-slate-950/50 p-5">
+        <div className="mt-6 rounded-xl border border-surface bg-ground-deep/50 p-5">
           <div className="flex items-center justify-between">
             <div>
               <p className="text-sm font-medium text-slate-100">{status.email}</p>
-              <p className="text-xs text-slate-500">{status.found ? 'Profile exists' : 'No profile yet — granting creates one'}</p>
+              <p className="text-xs text-faint">{status.found ? 'Profile exists' : 'No profile yet — granting creates one'}</p>
             </div>
             <div className="flex items-center gap-2">
               {special?.isSpecial && (
@@ -349,21 +349,21 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
 
           {/* Stripe verification + verdict — the proof of purchase */}
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wide text-slate-500">Stripe record</p>
+            <div className="rounded-lg border border-surface bg-ground/60 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wide text-faint">Stripe record</p>
               {stripe?.found ? (
-                <div className="mt-1.5 text-sm text-slate-300">
+                <div className="mt-1.5 text-sm text-ink-soft">
                   <div>${(stripe.totalPaid || 0).toLocaleString()} paid · {stripe.activeSubscriptions || 0} active sub{(stripe.activeSubscriptions || 0) === 1 ? '' : 's'}</div>
                   {stripe.hasRefunds && <div className="mt-0.5 text-xs text-red-300">⚠️ has refund(s)</div>}
                 </div>
               ) : (
-                <div className="mt-1.5 text-sm text-slate-400">{stripe?.error ? `Unavailable: ${stripe.error}` : 'No Stripe customer found'}</div>
+                <div className="mt-1.5 text-sm text-muted">{stripe?.error ? `Unavailable: ${stripe.error}` : 'No Stripe customer found'}</div>
               )}
             </div>
             {verdict && (
               <div className={`rounded-lg border p-3 ${verdictStyle[verdict.level].ring}`}>
                 <p className={`text-sm font-semibold ${verdictStyle[verdict.level].text}`}>{verdictStyle[verdict.level].icon} {verdict.headline}</p>
-                <p className="mt-1 text-xs text-slate-400">{verdict.detail}</p>
+                <p className="mt-1 text-xs text-muted">{verdict.detail}</p>
               </div>
             )}
           </div>
@@ -371,7 +371,7 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
           {/* Verified-source capture (required when the verdict says so) */}
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-faint">
                 How was this verified?{verdict?.requiresReason && <span className="text-amber-400"> *</span>}
               </label>
               <select value={grantSource} onChange={(e) => setGrantSource(e.target.value as GrantSource | '')} className={inputCls}>
@@ -380,38 +380,38 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
               </select>
             </div>
             <div>
-              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-slate-500">Note (invoice #, ref)</label>
+              <label className="mb-1 block text-xs font-semibold uppercase tracking-wide text-faint">Note (invoice #, ref)</label>
               <input type="text" value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. invoice 1042, paid by wire 6/20" className={inputCls} />
             </div>
           </div>
 
           <div className="mt-3 grid gap-3 sm:grid-cols-2">
-            <label className="block text-xs font-semibold uppercase tracking-wide text-slate-500 sm:col-span-2">Name (optional, for welcome email)</label>
+            <label className="block text-xs font-semibold uppercase tracking-wide text-faint sm:col-span-2">Name (optional, for welcome email)</label>
             <input type="text" value={customerName} onChange={(e) => setCustomerName(e.target.value)} placeholder="Jane Doe" className={inputCls} />
-            <label className="flex items-center gap-2 text-sm text-slate-300">
-              <input type="checkbox" checked={sendWelcome} onChange={(e) => setSendWelcome(e.target.checked)} className="rounded border-slate-600 bg-slate-900" />
+            <label className="flex items-center gap-2 text-sm text-ink-soft">
+              <input type="checkbox" checked={sendWelcome} onChange={(e) => setSendWelcome(e.target.checked)} className="rounded border-slate-600 bg-ground" />
               Email them a welcome message when I grant access
             </label>
           </div>
 
           {/* Grant / revoke */}
           <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
-              <p className="mb-2 text-xs font-semibold text-slate-300">Pro {status.accessBriefings && <span className="text-emerald-400">· active</span>}</p>
+            <div className="rounded-lg border border-surface bg-ground/60 p-3">
+              <p className="mb-2 text-xs font-semibold text-ink-soft">Pro {status.accessBriefings && <span className="text-emerald-400">· active</span>}</p>
               <div className="flex gap-2">
                 <button onClick={() => apply('pro', 'grant')} disabled={!!actionLoading || status.accessBriefings} className="flex-1 rounded-md bg-emerald-600 px-3 py-2 text-xs font-semibold text-white hover:bg-emerald-500 disabled:opacity-40">{busy('grant:pro') ? '…' : 'Grant'}</button>
-                <button onClick={() => apply('pro', 'revoke')} disabled={!!actionLoading || !status.accessBriefings} className="flex-1 rounded-md border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 disabled:opacity-40">{busy('revoke:pro') ? '…' : 'Revoke'}</button>
+                <button onClick={() => apply('pro', 'revoke')} disabled={!!actionLoading || !status.accessBriefings} className="flex-1 rounded-md border border-hairline px-3 py-2 text-xs font-semibold text-ink-soft hover:bg-surface disabled:opacity-40">{busy('revoke:pro') ? '…' : 'Revoke'}</button>
               </div>
             </div>
-            <div className="rounded-lg border border-slate-800 bg-slate-900/60 p-3">
-              <p className="mb-2 text-xs font-semibold text-slate-300">Team {status.accessTeam && <span className="text-indigo-400">· active</span>}</p>
+            <div className="rounded-lg border border-surface bg-ground/60 p-3">
+              <p className="mb-2 text-xs font-semibold text-ink-soft">Team {status.accessTeam && <span className="text-indigo-400">· active</span>}</p>
               <div className="flex gap-2">
                 <button onClick={() => apply('team', 'grant')} disabled={!!actionLoading || status.accessTeam} className="flex-1 rounded-md bg-indigo-600 px-3 py-2 text-xs font-semibold text-white hover:bg-indigo-500 disabled:opacity-40">{busy('grant:team') ? '…' : 'Grant'}</button>
-                <button onClick={() => apply('team', 'revoke')} disabled={!!actionLoading || !status.accessTeam} className="flex-1 rounded-md border border-slate-700 px-3 py-2 text-xs font-semibold text-slate-300 hover:bg-slate-800 disabled:opacity-40">{busy('revoke:team') ? '…' : 'Revoke'}</button>
+                <button onClick={() => apply('team', 'revoke')} disabled={!!actionLoading || !status.accessTeam} className="flex-1 rounded-md border border-hairline px-3 py-2 text-xs font-semibold text-ink-soft hover:bg-surface disabled:opacity-40">{busy('revoke:team') ? '…' : 'Revoke'}</button>
               </div>
             </div>
           </div>
-          <p className="mt-2 text-[11px] text-slate-500">Team includes all Pro features and provisions a shared workspace. Revoking Team leaves any Pro access intact.</p>
+          <p className="mt-2 text-[11px] text-faint">Team includes all Pro features and provisions a shared workspace. Revoking Team leaves any Pro access intact.</p>
         </div>
       )}
 
@@ -422,13 +422,13 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
       )}
 
       {/* Audit log */}
-      <div className="mt-6 border-t border-slate-800 pt-5">
+      <div className="mt-6 border-t border-surface pt-5">
         <div className="mb-3 flex items-center justify-between">
           <h3 className="text-sm font-bold text-slate-200">Recent activity</h3>
           <button onClick={loadLog} className="text-xs text-emerald-400 hover:text-emerald-300">Refresh</button>
         </div>
         {log.length === 0 ? (
-          <p className="text-sm text-slate-500">No grants recorded yet.</p>
+          <p className="text-sm text-faint">No grants recorded yet.</p>
         ) : (
           <ul className="divide-y divide-slate-800">
             {log.map((e, i) => (
@@ -437,11 +437,11 @@ export default function MemberAccessSection({ adminPassword, callerEmail, fullMo
                   <span className={`font-semibold ${e.action === 'grant' ? 'text-emerald-300' : 'text-red-300'}`}>{e.action}</span>{' '}
                   <span className="font-medium text-indigo-300">{e.tier}</span>{' → '}
                   <span className="text-slate-200">{e.target_email}</span>
-                  {e.grant_source && <span className="ml-1 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] text-slate-400">{e.grant_source}</span>}
-                  {e.note && <span className="ml-1 text-[11px] text-slate-500">“{e.note}”</span>}
-                  {e.sent_welcome && <span className="ml-1 text-[11px] text-slate-500">(emailed)</span>}
+                  {e.grant_source && <span className="ml-1 rounded bg-surface px-1.5 py-0.5 text-[10px] text-muted">{e.grant_source}</span>}
+                  {e.note && <span className="ml-1 text-[11px] text-faint">“{e.note}”</span>}
+                  {e.sent_welcome && <span className="ml-1 text-[11px] text-faint">(emailed)</span>}
                 </span>
-                <span className="shrink-0 text-[11px] text-slate-500">{e.actor_email} · {new Date(e.created_at).toLocaleString()}</span>
+                <span className="shrink-0 text-[11px] text-faint">{e.actor_email} · {new Date(e.created_at).toLocaleString()}</span>
               </li>
             ))}
           </ul>

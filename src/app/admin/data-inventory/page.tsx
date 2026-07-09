@@ -80,15 +80,15 @@ export default function DataInventoryPage() {
 
   if (!authed) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-6">
-        <div className="w-full max-w-sm rounded-xl border border-slate-800 bg-slate-900 p-6">
+      <div className="min-h-screen bg-ground-deep flex items-center justify-center p-6">
+        <div className="w-full max-w-sm rounded-xl border border-surface bg-ground p-6">
           <h1 className="text-lg font-bold text-white mb-1">Mindy Data Core</h1>
-          <p className="text-xs text-slate-400 mb-4">Admin password required.</p>
+          <p className="text-xs text-muted mb-4">Admin password required.</p>
           <input
             type="password" value={password} onChange={(e) => setPassword(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && load()}
             placeholder="Admin password"
-            className="w-full rounded-lg bg-slate-800 border border-slate-700 px-3 py-2 text-sm text-white mb-3"
+            className="w-full rounded-lg bg-surface border border-hairline px-3 py-2 text-sm text-white mb-3"
           />
           <button onClick={load} disabled={loading} className="w-full rounded-lg bg-emerald-600 px-3 py-2 text-sm font-semibold text-white hover:bg-emerald-500 disabled:opacity-50">
             {loading ? 'Loading…' : 'Open'}
@@ -99,7 +99,7 @@ export default function DataInventoryPage() {
     );
   }
 
-  if (!data) return <div className="min-h-screen bg-slate-950 p-6 text-slate-400">Loading…</div>;
+  if (!data) return <div className="min-h-screen bg-ground-deep p-6 text-muted">Loading…</div>;
 
   const measured = data.datasets.filter((d) => typeof d.count === 'number' && (d.count as number) > 0);
   const datasetPie = measured.map((d, i) => ({ name: d.label, value: d.count as number, color: DATASET_COLORS[i % DATASET_COLORS.length] }));
@@ -108,14 +108,14 @@ export default function DataInventoryPage() {
     .filter((x) => x.value > 0);
 
   return (
-    <div className="min-h-screen bg-slate-950 p-6 text-slate-200">
+    <div className="min-h-screen bg-ground-deep p-6 text-slate-200">
       <div className="max-w-6xl mx-auto">
         <div className="flex items-end justify-between mb-6">
           <div>
             <h1 className="text-2xl font-bold text-white">🧠 Mindy Data Core</h1>
-            <p className="text-sm text-slate-400">The moat, quantified — {fmt(data.totals.allMeasured)} records across {measured.length} datasets.</p>
+            <p className="text-sm text-muted">The moat, quantified — {fmt(data.totals.allMeasured)} records across {measured.length} datasets.</p>
           </div>
-          <button onClick={load} className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 hover:bg-slate-800">Refresh</button>
+          <button onClick={load} className="rounded-lg border border-hairline px-3 py-1.5 text-xs text-ink-soft hover:bg-surface">Refresh</button>
         </div>
 
         {/* Totals strip */}
@@ -141,7 +141,7 @@ export default function DataInventoryPage() {
               />
               <BuildStat value={`${data.recreateCost.commits.toLocaleString()}`} label="commits" />
             </div>
-            <p className="mt-3 text-xs text-slate-400">
+            <p className="mt-3 text-xs text-muted">
               ~{fmt(data.totals.allMeasured)} records pulled from {data.recreateCost.distinctSources} sources in {data.recreateCost.formats} formats across {data.recreateCost.agencies} agencies — then normalized, scored, embedded, and joined to one market.
             </p>
           </div>
@@ -174,9 +174,9 @@ export default function DataInventoryPage() {
         </div>
 
         {/* Table */}
-        <div className="rounded-xl border border-slate-800 bg-slate-900 overflow-hidden">
+        <div className="rounded-xl border border-surface bg-ground overflow-hidden">
           <table className="w-full text-sm">
-            <thead className="bg-slate-800/60 text-slate-400 text-xs uppercase">
+            <thead className="bg-surface/60 text-muted text-xs uppercase">
               <tr>
                 <th className="text-left px-4 py-2">Dataset</th>
                 <th className="text-right px-4 py-2">Count</th>
@@ -187,8 +187,8 @@ export default function DataInventoryPage() {
             </thead>
             <tbody>
               {data.datasets.map((d) => (
-                <tr key={d.key} className="border-t border-slate-800 align-top">
-                  <td className="px-4 py-2 text-white">{d.label}{d.note && <span className="block text-[11px] text-slate-500">{d.note}</span>}</td>
+                <tr key={d.key} className="border-t border-surface align-top">
+                  <td className="px-4 py-2 text-white">{d.label}{d.note && <span className="block text-[11px] text-faint">{d.note}</span>}</td>
                   <td className="px-4 py-2 text-right font-mono text-emerald-300">{typeof d.count === 'number' ? fmt(d.count) : 'live'}</td>
                   <td className="px-4 py-2 text-center font-mono text-amber-300">{d.sources?.length ?? '—'}</td>
                   <td className="px-4 py-2">
@@ -196,11 +196,11 @@ export default function DataInventoryPage() {
                       {PROVENANCE_META[d.provenance].label}
                     </span>
                   </td>
-                  <td className="px-4 py-2 text-slate-400 text-xs">
+                  <td className="px-4 py-2 text-muted text-xs">
                     {d.sources?.length ? (
                       <div className="flex flex-wrap gap-1">
                         {d.sources.map((s) => (
-                          <span key={s} className="rounded border border-slate-700 bg-slate-800/50 px-1.5 py-0.5 text-[11px] text-slate-300">{s}</span>
+                          <span key={s} className="rounded border border-hairline bg-surface/50 px-1.5 py-0.5 text-[11px] text-ink-soft">{s}</span>
                         ))}
                       </div>
                     ) : d.source}
@@ -219,9 +219,9 @@ export default function DataInventoryPage() {
 
 function Stat({ label, value, color }: { label: string; value: string; color: string }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+    <div className="rounded-xl border border-surface bg-ground p-4">
       <div className={`text-2xl font-bold ${color}`}>{value}</div>
-      <div className="text-xs text-slate-500 mt-0.5">{label}</div>
+      <div className="text-xs text-faint mt-0.5">{label}</div>
     </div>
   );
 }
@@ -230,7 +230,7 @@ function BuildStat({ value, label, title }: { value: string; label: string; titl
   return (
     <div className="text-center" title={title}>
       <div className="text-3xl font-bold text-emerald-300">{value}</div>
-      <div className="text-[11px] uppercase tracking-wider text-slate-400 mt-1">{label}</div>
+      <div className="text-[11px] uppercase tracking-wider text-muted mt-1">{label}</div>
     </div>
   );
 }
@@ -241,8 +241,8 @@ function ChartLegend({ items }: { items: { name: string; value: number; color: s
       {items.map((it) => (
         <div key={it.name} className="flex items-center gap-2 text-xs min-w-0">
           <span className="h-2.5 w-2.5 shrink-0 rounded-sm" style={{ background: it.color }} />
-          <span className="truncate text-slate-300">{it.name}</span>
-          <span className="ml-auto shrink-0 font-mono text-slate-400">{it.value.toLocaleString()}</span>
+          <span className="truncate text-ink-soft">{it.name}</span>
+          <span className="ml-auto shrink-0 font-mono text-muted">{it.value.toLocaleString()}</span>
         </div>
       ))}
     </div>
@@ -251,7 +251,7 @@ function ChartLegend({ items }: { items: { name: string; value: number; color: s
 
 function ChartCard({ title, children }: { title: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+    <div className="rounded-xl border border-surface bg-ground p-4">
       <h3 className="text-sm font-semibold text-white mb-2">{title}</h3>
       {children}
     </div>

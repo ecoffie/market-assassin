@@ -139,7 +139,7 @@ export default function PipelineCard({ item, currentUserEmail, onStageChange, on
 
       {/* Owner (for team items) */}
       {isTeamItem && item.owner_email && (
-        <div className="text-xs text-slate-500 mb-2 flex items-center gap-1">
+        <div className="text-xs text-faint mb-2 flex items-center gap-1">
           <span className="bg-blue-100 text-blue-700 px-2 py-0.5 rounded">
             👤 {item.owner_email.split('@')[0]}
           </span>

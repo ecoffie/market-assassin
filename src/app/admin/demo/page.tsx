@@ -34,13 +34,13 @@ const SCREENS = [
 
 export default function DemoHubPage() {
   return (
-    <div className="min-h-dvh bg-slate-950 px-6 py-10 text-slate-100">
+    <div className="min-h-dvh bg-ground-deep px-6 py-10 text-slate-100">
       <div className="mx-auto max-w-3xl">
         <header className="mb-8 text-center">
-          <p className="text-xs uppercase tracking-wider text-slate-500">Mindy — demo run</p>
+          <p className="text-xs uppercase tracking-wider text-faint">Mindy — demo run</p>
           <h1 className="mt-1 text-2xl font-black">In the AI era, anyone can replicate the software.</h1>
           <p className="mt-1 text-xl font-black text-emerald-300">The moat is Brand · Attention · Distribution.</p>
-          <p className="mt-2 text-sm text-slate-400">…and that&rsquo;s exactly what GovCon Giants is. Click through the three screens in order. </p>
+          <p className="mt-2 text-sm text-muted">…and that&rsquo;s exactly what GovCon Giants is. Click through the three screens in order. </p>
         </header>
 
         <div className="space-y-4">
@@ -48,16 +48,16 @@ export default function DemoHubPage() {
             <Link
               key={s.n}
               href={s.href}
-              className="group flex items-start gap-4 rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-5 transition-colors hover:border-emerald-500/40"
+              className="group flex items-start gap-4 rounded-2xl border border-surface bg-gradient-to-br from-slate-900 to-slate-950 p-5 transition-colors hover:border-emerald-500/40"
             >
               <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-emerald-500/15 text-lg font-black text-emerald-300">
                 {s.n}
               </div>
               <div className="min-w-0 flex-1">
                 <h2 className="text-lg font-bold text-white group-hover:text-emerald-200">{s.title}</h2>
-                <p className="mt-1 text-sm text-slate-400">{s.desc}</p>
+                <p className="mt-1 text-sm text-muted">{s.desc}</p>
                 <p className="mt-2 text-xs font-semibold text-emerald-300">{s.stat}</p>
-                <p className="mt-0.5 text-[12px] italic text-slate-500">{s.line}</p>
+                <p className="mt-0.5 text-[12px] italic text-faint">{s.line}</p>
               </div>
               <span className="self-center text-slate-600 transition-transform group-hover:translate-x-1 group-hover:text-emerald-300">→</span>
             </Link>

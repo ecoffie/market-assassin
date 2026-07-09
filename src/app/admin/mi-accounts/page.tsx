@@ -82,7 +82,7 @@ function formatDate(value: string | null): string {
 
 function LoadingBar() {
   return (
-    <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+    <div className="h-2 overflow-hidden rounded-full bg-surface">
       <div className="mi-account-loader h-full w-1/3 rounded-full bg-gradient-to-r from-emerald-400 via-blue-400 to-purple-400" />
       <style jsx>{`
         .mi-account-loader {
@@ -223,8 +223,8 @@ export default function MIAccountsAdminPage() {
 
   if (checking) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-white">
-        <section className="w-full max-w-md rounded-lg border border-slate-800 bg-slate-900 p-8 shadow-2xl">
+      <main className="flex min-h-screen items-center justify-center bg-ground-deep px-6 text-white">
+        <section className="w-full max-w-md rounded-lg border border-surface bg-ground p-8 shadow-2xl">
           <p className="text-sm uppercase tracking-[0.2em] text-emerald-300">Checking access</p>
           <h1 className="mt-3 text-3xl font-bold">MI Accounts</h1>
           <div className="mt-8">
@@ -237,11 +237,11 @@ export default function MIAccountsAdminPage() {
 
   if (!authenticated) {
     return (
-      <main className="flex min-h-screen items-center justify-center bg-slate-950 px-6 text-white">
-        <section className="w-full max-w-md rounded-lg border border-slate-800 bg-slate-900 p-8 shadow-2xl">
+      <main className="flex min-h-screen items-center justify-center bg-ground-deep px-6 text-white">
+        <section className="w-full max-w-md rounded-lg border border-surface bg-ground p-8 shadow-2xl">
           <p className="text-sm uppercase tracking-[0.2em] text-emerald-300">Private workspace</p>
           <h1 className="mt-3 text-3xl font-bold">MI Account Status</h1>
-          <p className="mt-3 text-slate-400">Review entitlement, login identity, profile setup, and setup-email state.</p>
+          <p className="mt-3 text-muted">Review entitlement, login identity, profile setup, and setup-email state.</p>
           <form className="mt-8 space-y-4" onSubmit={handleLogin}>
             <div className="relative">
               <input
@@ -249,13 +249,13 @@ export default function MIAccountsAdminPage() {
                 value={password}
                 onChange={(event) => setPassword(event.target.value)}
                 placeholder="Admin password"
-                className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-3 pr-24 text-white outline-none transition focus:border-emerald-400"
+                className="w-full rounded-lg border border-hairline bg-ground-deep px-4 py-3 pr-24 text-white outline-none transition focus:border-emerald-400"
                 autoFocus
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((current) => !current)}
-                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md px-3 py-1.5 text-sm font-semibold text-emerald-300 transition hover:bg-slate-800"
+                className="absolute right-2 top-1/2 -translate-y-1/2 rounded-md px-3 py-1.5 text-sm font-semibold text-emerald-300 transition hover:bg-surface"
               >
                 {showPassword ? 'Hide' : 'Show'}
               </button>
@@ -271,8 +271,8 @@ export default function MIAccountsAdminPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-white">
-      <header className="border-b border-slate-800 bg-slate-950/95">
+    <main className="min-h-screen bg-ground-deep text-white">
+      <header className="border-b border-surface bg-ground-deep/95">
         <div className="mx-auto flex max-w-7xl flex-col gap-5 px-6 py-8 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <div className="flex flex-wrap items-center gap-3">
@@ -282,15 +282,15 @@ export default function MIAccountsAdminPage() {
               </span>
             </div>
             <h1 className="mt-5 text-4xl font-bold tracking-tight md:text-5xl">MI Account Status</h1>
-            <p className="mt-3 max-w-3xl text-lg text-slate-300">
+            <p className="mt-3 max-w-3xl text-lg text-ink-soft">
               Entitlement, Supabase Auth identity, profile setup, notification settings, and setup-email state in one place.
             </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Link href="/admin/launch-command-center" className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:border-slate-500">
+            <Link href="/admin/launch-command-center" className="rounded-lg border border-hairline px-4 py-2 text-sm text-ink-soft hover:border-slate-500">
               Command Center
             </Link>
-            <Link href="/admin/dashboard" className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:border-slate-500">
+            <Link href="/admin/dashboard" className="rounded-lg border border-hairline px-4 py-2 text-sm text-ink-soft hover:border-slate-500">
               Dashboard
             </Link>
             <button
@@ -306,19 +306,19 @@ export default function MIAccountsAdminPage() {
 
       <div className="mx-auto max-w-7xl space-y-6 px-6 py-8">
         {loading ? (
-          <section className="rounded-lg border border-slate-800 bg-slate-900 p-6">
+          <section className="rounded-lg border border-surface bg-ground p-6">
             <LoadingBar />
-            <p className="mt-3 text-sm text-slate-400">Loading account status...</p>
+            <p className="mt-3 text-sm text-muted">Loading account status...</p>
           </section>
         ) : error ? (
           <section className="rounded-lg border border-red-500/40 bg-red-500/10 p-6 text-red-100">{error}</section>
         ) : report ? (
           <>
             <section className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-              <div className="rounded-lg border border-slate-800 bg-slate-900 p-5">
-                <p className="text-sm text-slate-400">Entitled Users</p>
+              <div className="rounded-lg border border-surface bg-ground p-5">
+                <p className="text-sm text-muted">Entitled Users</p>
                 <p className="mt-2 text-4xl font-bold text-white">{report.summary.entitledCandidates.toLocaleString()}</p>
-                <p className="mt-1 text-sm text-slate-500">{report.summary.internalUsers.toLocaleString()} internal</p>
+                <p className="mt-1 text-sm text-faint">{report.summary.internalUsers.toLocaleString()} internal</p>
               </div>
               <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-5">
                 <p className="text-sm text-amber-100/80">Needs Account Setup</p>
@@ -343,10 +343,10 @@ export default function MIAccountsAdminPage() {
               </section>
             ) : null}
 
-            <section className="rounded-lg border border-slate-800 bg-slate-900 p-6">
+            <section className="rounded-lg border border-surface bg-ground p-6">
               <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
                 <div>
-                  <p className="text-sm uppercase tracking-[0.18em] text-slate-500">Account Queue</p>
+                  <p className="text-sm uppercase tracking-[0.18em] text-faint">Account Queue</p>
                   <h2 className="mt-2 text-2xl font-bold">Who needs action</h2>
                 </div>
                 <div className="flex flex-col gap-3 sm:flex-row">
@@ -354,12 +354,12 @@ export default function MIAccountsAdminPage() {
                     value={query}
                     onChange={(event) => setQuery(event.target.value)}
                     placeholder="Search email or source"
-                    className="w-full rounded-lg border border-slate-700 bg-slate-950 px-4 py-2 text-sm text-white outline-none focus:border-emerald-400 sm:w-72"
+                    className="w-full rounded-lg border border-hairline bg-ground-deep px-4 py-2 text-sm text-white outline-none focus:border-emerald-400 sm:w-72"
                   />
                   <select
                     value={filter}
                     onChange={(event) => setFilter(event.target.value as 'all' | AccountStatus)}
-                    className="rounded-lg border border-slate-700 bg-slate-950 px-4 py-2 text-sm text-white outline-none focus:border-emerald-400"
+                    className="rounded-lg border border-hairline bg-ground-deep px-4 py-2 text-sm text-white outline-none focus:border-emerald-400"
                   >
                     <option value="all">All statuses</option>
                     <option value="needs_setup">Needs setup</option>
@@ -370,9 +370,9 @@ export default function MIAccountsAdminPage() {
                 </div>
               </div>
 
-              <div className="mt-6 overflow-x-auto rounded-lg border border-slate-800">
+              <div className="mt-6 overflow-x-auto rounded-lg border border-surface">
                 <table className="w-full min-w-[1180px] border-collapse text-left text-sm">
-                  <thead className="bg-slate-950 text-xs uppercase tracking-[0.14em] text-slate-500">
+                  <thead className="bg-ground-deep text-xs uppercase tracking-[0.14em] text-faint">
                     <tr>
                       <th className="px-4 py-3">User</th>
                       <th className="px-4 py-3">Status</th>
@@ -384,7 +384,7 @@ export default function MIAccountsAdminPage() {
                   </thead>
                   <tbody className="divide-y divide-slate-800">
                     {filteredAccounts.map((account) => (
-                      <tr key={account.email} className="bg-slate-900/80 align-top">
+                      <tr key={account.email} className="bg-ground/80 align-top">
                         <td className="px-4 py-4">
                           <p className="font-semibold text-white">{account.email}</p>
                           <div className="mt-2 flex flex-wrap gap-1">
@@ -392,7 +392,7 @@ export default function MIAccountsAdminPage() {
                               <span className="rounded-full border border-purple-500/40 bg-purple-500/10 px-2 py-0.5 text-xs text-purple-200">internal</span>
                             ) : null}
                             {account.sources.slice(0, 2).map((source) => (
-                              <span key={source} className="rounded-full border border-slate-700 px-2 py-0.5 text-xs text-slate-400">{source}</span>
+                              <span key={source} className="rounded-full border border-hairline px-2 py-0.5 text-xs text-muted">{source}</span>
                             ))}
                           </div>
                         </td>
@@ -401,22 +401,22 @@ export default function MIAccountsAdminPage() {
                             {statusLabels[account.status]}
                           </span>
                         </td>
-                        <td className="px-4 py-4 text-slate-300">
+                        <td className="px-4 py-4 text-ink-soft">
                           <p>{account.auth.hasAccount ? 'Account exists' : 'No auth account'}</p>
-                          <p className="mt-1 text-xs text-slate-500">Last login: {formatDate(account.auth.lastSignInAt)}</p>
-                          <p className="mt-1 text-xs text-slate-500">Confirmed: {formatDate(account.auth.emailConfirmedAt)}</p>
+                          <p className="mt-1 text-xs text-faint">Last login: {formatDate(account.auth.lastSignInAt)}</p>
+                          <p className="mt-1 text-xs text-faint">Confirmed: {formatDate(account.auth.emailConfirmedAt)}</p>
                         </td>
-                        <td className="px-4 py-4 text-slate-300">
+                        <td className="px-4 py-4 text-ink-soft">
                           <p>{account.settings.briefingsEnabled ? 'Briefings on' : 'Briefings off'}</p>
-                          <p className="mt-1 text-xs text-slate-500">{account.settings.hasProfileSignals ? 'Profile signals present' : 'No NAICS/keyword/agency signals'}</p>
-                          <p className="mt-1 text-xs text-slate-500">{account.profile.accessBriefings ? 'Profile entitlement on' : 'Profile entitlement missing'}</p>
+                          <p className="mt-1 text-xs text-faint">{account.settings.hasProfileSignals ? 'Profile signals present' : 'No NAICS/keyword/agency signals'}</p>
+                          <p className="mt-1 text-xs text-faint">{account.profile.accessBriefings ? 'Profile entitlement on' : 'Profile entitlement missing'}</p>
                         </td>
-                        <td className="px-4 py-4 text-slate-300">
+                        <td className="px-4 py-4 text-ink-soft">
                           <p>{account.setupEmail.sent ? account.setupEmail.type || 'sent' : 'Not sent'}</p>
-                          <p className="mt-1 text-xs text-slate-500">{formatDate(account.setupEmail.sentAt)}</p>
-                          <p className="mt-1 text-xs text-slate-500">{account.setupEmail.status || ''}</p>
+                          <p className="mt-1 text-xs text-faint">{formatDate(account.setupEmail.sentAt)}</p>
+                          <p className="mt-1 text-xs text-faint">{account.setupEmail.status || ''}</p>
                         </td>
-                        <td className="px-4 py-4 text-slate-300 min-w-[260px]">
+                        <td className="px-4 py-4 text-ink-soft min-w-[260px]">
                           <p className="min-w-[240px] whitespace-normal leading-relaxed">{account.recommendedAction}</p>
                         </td>
                       </tr>
@@ -427,7 +427,7 @@ export default function MIAccountsAdminPage() {
             </section>
           </>
         ) : (
-          <section className="rounded-lg border border-slate-800 bg-slate-900 p-6 text-slate-400">
+          <section className="rounded-lg border border-surface bg-ground p-6 text-muted">
             Account status will load after admin authentication.
           </section>
         )}

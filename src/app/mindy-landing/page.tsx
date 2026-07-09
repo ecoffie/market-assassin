@@ -85,7 +85,7 @@ export default function MindyLandingPage() {
   };
 
   return (
-    <main className="min-h-screen bg-slate-950">
+    <main className="min-h-screen bg-ground-deep">
       <script
         type="application/ld+json"
         dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }}
@@ -114,7 +114,7 @@ export default function MindyLandingPage() {
           <h2 className="text-xl md:text-2xl text-purple-200 mb-4">
             Your 24/7 Federal Market Intelligence Analyst.
           </h2>
-          <p className="text-lg text-slate-300 max-w-2xl mx-auto mb-6">
+          <p className="text-lg text-ink-soft max-w-2xl mx-auto mb-6">
             While you sleep, Mindy scans 88,000+ federal opportunities, tracks your competitors,
             and delivers a personalized briefing before your first coffee.
           </p>
@@ -125,7 +125,7 @@ export default function MindyLandingPage() {
           <div className="max-w-md mx-auto mb-6 rounded-2xl border-2 border-purple-500/50 bg-gradient-to-br from-blue-950/60 to-purple-950/60 p-5 text-left">
             <span className="text-xs font-bold uppercase tracking-wider text-purple-300 bg-purple-500/20 px-2 py-1 rounded-full">Beta user?</span>
             <h3 className="text-lg font-bold text-white mt-2 mb-1">Already getting Mindy alerts? Set up your account.</h3>
-            <p className="text-sm text-slate-300 mb-3">
+            <p className="text-sm text-ink-soft mb-3">
               If you&apos;ve been getting our daily emails, you just need to set a password once.
             </p>
             <Link
@@ -145,7 +145,7 @@ export default function MindyLandingPage() {
             >
               Go Pro — $149/mo
             </Link>
-            <span className="text-slate-500 hidden sm:inline">or</span>
+            <span className="text-faint hidden sm:inline">or</span>
             <Link
               href={CHECKOUT_ANNUAL}
               className="text-purple-400 hover:text-purple-300 font-semibold"
@@ -165,11 +165,11 @@ export default function MindyLandingPage() {
             ].map((s) => (
               <div key={s.l} className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-4">
                 <div className="text-xl md:text-2xl font-extrabold text-white">{s.n}</div>
-                <div className="mt-1 text-xs text-slate-400 leading-snug">{s.l}</div>
+                <div className="mt-1 text-xs text-muted leading-snug">{s.l}</div>
               </div>
             ))}
           </div>
-          <p className="mt-4 text-slate-500 text-xs">
+          <p className="mt-4 text-faint text-xs">
             Built by <a href="https://govcongiants.com" className="text-purple-400 hover:text-purple-300">GovCon Giants</a> — trusted by thousands of small federal contractors.
           </p>
 
@@ -188,7 +188,7 @@ export default function MindyLandingPage() {
       {/* WATCH MINDY WORK — full product demo. Show, don't tell. */}
       <section className="max-w-4xl mx-auto px-4 py-16">
         <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-3">See Mindy in action</h2>
-        <p className="text-slate-400 text-center max-w-2xl mx-auto mb-10">
+        <p className="text-muted text-center max-w-2xl mx-auto mb-10">
           Not screenshots of a pitch deck — the actual product, working on real federal data.
         </p>
         <div className="relative aspect-video overflow-hidden rounded-2xl border border-purple-500/30 shadow-2xl shadow-purple-500/20">
@@ -205,10 +205,10 @@ export default function MindyLandingPage() {
       {/* EXPLORE FREE, NO LOGIN — surface the LIVE public pages (top boards,
           contractor directory, NAICS) as real, browsable proof + SEO entry points.
           A new brand earns trust by letting people USE the data before signing up. */}
-      <section className="bg-slate-900/40 border-y border-slate-800">
+      <section className="bg-ground/40 border-y border-surface">
         <div className="max-w-6xl mx-auto px-4 py-16">
           <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-3">Explore the data — free, no login</h2>
-          <p className="text-slate-400 text-center max-w-2xl mx-auto mb-6">
+          <p className="text-muted text-center max-w-2xl mx-auto mb-6">
             Real federal market intelligence you can browse right now. No account needed.
           </p>
 
@@ -227,7 +227,7 @@ export default function MindyLandingPage() {
               <Link
                 key={b.slug}
                 href={`/top/${b.slug}`}
-                className="rounded-full border border-slate-700 bg-slate-800/60 px-3 py-1.5 text-xs font-medium text-slate-300 hover:border-purple-500/60 hover:text-purple-300 transition-colors"
+                className="rounded-full border border-hairline bg-surface/60 px-3 py-1.5 text-xs font-medium text-ink-soft hover:border-purple-500/60 hover:text-purple-300 transition-colors"
               >
                 {b.label}
               </Link>
@@ -235,22 +235,22 @@ export default function MindyLandingPage() {
           </div>
 
           <div className="grid md:grid-cols-3 gap-6">
-            <Link href="/top" className="group rounded-2xl border border-slate-700 bg-slate-800/40 p-6 hover:border-purple-500/60 transition-colors">
+            <Link href="/top" className="group rounded-2xl border border-hairline bg-surface/40 p-6 hover:border-purple-500/60 transition-colors">
               <div className="text-2xl mb-3">🏆</div>
               <h3 className="text-lg font-bold text-white group-hover:text-purple-300">Top Contractor Boards</h3>
-              <p className="mt-2 text-sm text-slate-400">61 leaderboards — top contractors by agency, NAICS, set-aside, and state. See who&apos;s winning.</p>
+              <p className="mt-2 text-sm text-muted">61 leaderboards — top contractors by agency, NAICS, set-aside, and state. See who&apos;s winning.</p>
               <span className="mt-3 inline-block text-sm font-semibold text-purple-400">Browse the boards →</span>
             </Link>
-            <Link href="/contractors" className="group rounded-2xl border border-slate-700 bg-slate-800/40 p-6 hover:border-purple-500/60 transition-colors">
+            <Link href="/contractors" className="group rounded-2xl border border-hairline bg-surface/40 p-6 hover:border-purple-500/60 transition-colors">
               <div className="text-2xl mb-3">🏢</div>
               <h3 className="text-lg font-bold text-white group-hover:text-purple-300">Contractor Directory</h3>
-              <p className="mt-2 text-sm text-slate-400">Look up any federal contractor — award history, top agencies, NAICS, and 5-year spend.</p>
+              <p className="mt-2 text-sm text-muted">Look up any federal contractor — award history, top agencies, NAICS, and 5-year spend.</p>
               <span className="mt-3 inline-block text-sm font-semibold text-purple-400">Search contractors →</span>
             </Link>
-            <Link href="/naics" className="group rounded-2xl border border-slate-700 bg-slate-800/40 p-6 hover:border-purple-500/60 transition-colors">
+            <Link href="/naics" className="group rounded-2xl border border-hairline bg-surface/40 p-6 hover:border-purple-500/60 transition-colors">
               <div className="text-2xl mb-3">📊</div>
               <h3 className="text-lg font-bold text-white group-hover:text-purple-300">NAICS Market Pages</h3>
-              <p className="mt-2 text-sm text-slate-400">Market data for your industry code — spend, buyers, and competition at a glance.</p>
+              <p className="mt-2 text-sm text-muted">Market data for your industry code — spend, buyers, and competition at a glance.</p>
               <span className="mt-3 inline-block text-sm font-semibold text-purple-400">Explore your market →</span>
             </Link>
           </div>
@@ -265,23 +265,23 @@ export default function MindyLandingPage() {
         </h2>
 
         <div className="grid md:grid-cols-3 gap-6 mt-10">
-          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 text-center">
+          <div className="bg-surface/50 border border-hairline rounded-xl p-6 text-center">
             <div className="text-4xl font-bold text-purple-400 mb-2">47</div>
-            <p className="text-slate-300">People in Lockheed&apos;s BD department</p>
+            <p className="text-ink-soft">People in Lockheed&apos;s BD department</p>
           </div>
-          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 text-center">
+          <div className="bg-surface/50 border border-hairline rounded-xl p-6 text-center">
             <div className="text-4xl font-bold text-purple-400 mb-2">$2M</div>
-            <p className="text-slate-300">Booz Allen spends on market intel tools</p>
+            <p className="text-ink-soft">Booz Allen spends on market intel tools</p>
           </div>
-          <div className="bg-slate-800/50 border border-slate-700 rounded-xl p-6 text-center">
+          <div className="bg-surface/50 border border-hairline rounded-xl p-6 text-center">
             <div className="text-4xl font-bold text-purple-400 mb-2">You?</div>
-            <p className="text-slate-300">Scrolling SAM.gov on Sunday nights</p>
+            <p className="text-ink-soft">Scrolling SAM.gov on Sunday nights</p>
           </div>
         </div>
 
-        <div className="mt-10 bg-slate-800/30 border border-slate-700 rounded-xl p-8">
+        <div className="mt-10 bg-surface/30 border border-hairline rounded-xl p-8">
           <h3 className="text-xl font-bold text-white mb-4">The math doesn&apos;t work:</h3>
-          <ul className="space-y-3 text-slate-300">
+          <ul className="space-y-3 text-ink-soft">
             <li className="flex items-center gap-3">
               <span className="text-red-400">•</span>
               <span><strong>1,500+</strong> new opportunities posted daily</span>
@@ -302,7 +302,7 @@ export default function MindyLandingPage() {
       </section>
 
       {/* What Mindy Does */}
-      <section className="bg-slate-900/50 py-20 px-4">
+      <section className="bg-ground/50 py-20 px-4">
         <div className="max-w-4xl mx-auto">
           <h2 className="text-3xl md:text-4xl font-bold text-white text-center mb-4">
             Everything a $150K Capture Manager Does.
@@ -312,52 +312,52 @@ export default function MindyLandingPage() {
           </p>
 
           <div className="grid md:grid-cols-2 gap-6">
-            <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+            <div className="bg-surface border border-hairline rounded-xl p-6">
               <div className="flex items-center gap-3 mb-3">
                 <span className="text-2xl">🔍</span>
                 <h3 className="text-lg font-bold text-white">Find Opportunities</h3>
               </div>
-              <p className="text-slate-300">
+              <p className="text-ink-soft">
                 Scans SAM.gov, Grants.gov, agency forecasts, and 10+ sources — every single day.
               </p>
             </div>
 
-            <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+            <div className="bg-surface border border-hairline rounded-xl p-6">
               <div className="flex items-center gap-3 mb-3">
                 <span className="text-2xl">📅</span>
                 <h3 className="text-lg font-bold text-white">Know What&apos;s Coming</h3>
               </div>
-              <p className="text-slate-300">
+              <p className="text-ink-soft">
                 Tracks 7,600+ forecasts so you&apos;re ready before it posts.
               </p>
             </div>
 
-            <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+            <div className="bg-surface border border-hairline rounded-xl p-6">
               <div className="flex items-center gap-3 mb-3">
                 <span className="text-2xl">🏆</span>
                 <h3 className="text-lg font-bold text-white">Track Competitors</h3>
               </div>
-              <p className="text-slate-300">
+              <p className="text-ink-soft">
                 Shows who&apos;s winning in your space and when their contracts expire.
               </p>
             </div>
 
-            <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+            <div className="bg-surface border border-hairline rounded-xl p-6">
               <div className="flex items-center gap-3 mb-3">
                 <span className="text-2xl">🎯</span>
                 <h3 className="text-lg font-bold text-white">Never Miss Deadlines</h3>
               </div>
-              <p className="text-slate-300">
+              <p className="text-ink-soft">
                 Personalized alerts based on YOUR NAICS codes and capabilities.
               </p>
             </div>
 
-            <div className="bg-slate-800 border border-slate-700 rounded-xl p-6 md:col-span-2">
+            <div className="bg-surface border border-hairline rounded-xl p-6 md:col-span-2">
               <div className="flex items-center gap-3 mb-3">
                 <span className="text-2xl">📊</span>
                 <h3 className="text-lg font-bold text-white">Understand the Market</h3>
               </div>
-              <p className="text-slate-300">
+              <p className="text-ink-soft">
                 Weekly deep dives on spending patterns, set-asides, and trends in your space.
               </p>
             </div>
@@ -375,53 +375,53 @@ export default function MindyLandingPage() {
           <div className="text-center">
             <div className="w-16 h-16 rounded-full bg-purple-600 flex items-center justify-center mx-auto mb-4 text-2xl font-bold text-white">1</div>
             <h3 className="text-lg font-bold text-white mb-2">Tell Mindy About Your Business</h3>
-            <p className="text-slate-400">Your NAICS codes, target agencies, set-aside status. Takes 2 minutes.</p>
+            <p className="text-muted">Your NAICS codes, target agencies, set-aside status. Takes 2 minutes.</p>
           </div>
 
           <div className="text-center">
             <div className="w-16 h-16 rounded-full bg-purple-600 flex items-center justify-center mx-auto mb-4 text-2xl font-bold text-white">2</div>
             <h3 className="text-lg font-bold text-white mb-2">Wake Up to Intelligence</h3>
-            <p className="text-slate-400">Every morning, Mindy delivers opportunities matched to YOUR profile.</p>
+            <p className="text-muted">Every morning, Mindy delivers opportunities matched to YOUR profile.</p>
           </div>
 
           <div className="text-center">
             <div className="w-16 h-16 rounded-full bg-purple-600 flex items-center justify-center mx-auto mb-4 text-2xl font-bold text-white">3</div>
             <h3 className="text-lg font-bold text-white mb-2">Go Win Contracts</h3>
-            <p className="text-slate-400">Spend your time on proposals, not searching. Mindy handles the hunting.</p>
+            <p className="text-muted">Spend your time on proposals, not searching. Mindy handles the hunting.</p>
           </div>
         </div>
       </section>
 
       {/* Pricing Section */}
-      <section className="bg-slate-900/50 py-20 px-4">
+      <section className="bg-ground/50 py-20 px-4">
         <div className="max-w-5xl mx-auto">
           <h2 className="text-3xl font-bold text-white text-center mb-4">
             Finally, Enterprise Intelligence at Small Business Prices
           </h2>
-          <p className="text-slate-400 text-center mb-12">
+          <p className="text-muted text-center mb-12">
             The tagline says it all: The big contractors have armies. You have Mindy.
           </p>
 
           <div className="grid md:grid-cols-3 gap-6">
             {/* Free */}
-            <div className="bg-slate-800 border border-slate-700 rounded-2xl p-8">
+            <div className="bg-surface border border-hairline rounded-2xl p-8">
               <h3 className="text-xl font-bold text-white mb-2">Free</h3>
               <div className="flex items-baseline gap-1 mb-4">
                 <span className="text-4xl font-bold text-white">$0</span>
-                <span className="text-slate-400">/mo</span>
+                <span className="text-muted">/mo</span>
               </div>
-              <p className="text-slate-400 text-sm mb-6">Start finding opportunities today</p>
+              <p className="text-muted text-sm mb-6">Start finding opportunities today</p>
 
               <ul className="space-y-3 mb-8">
-                <li className="flex items-start gap-2 text-slate-300 text-sm">
+                <li className="flex items-start gap-2 text-ink-soft text-sm">
                   <span className="text-emerald-400 mt-0.5">✓</span>
                   <span>Daily opportunity digest</span>
                 </li>
-                <li className="flex items-start gap-2 text-slate-300 text-sm">
+                <li className="flex items-start gap-2 text-ink-soft text-sm">
                   <span className="text-emerald-400 mt-0.5">✓</span>
                   <span>5 NAICS codes</span>
                 </li>
-                <li className="flex items-start gap-2 text-slate-500 text-sm">
+                <li className="flex items-start gap-2 text-faint text-sm">
                   <span className="mt-0.5">—</span>
                   <span>No AI analysis</span>
                 </li>
@@ -429,7 +429,7 @@ export default function MindyLandingPage() {
 
               <Link
                 href={FREE_SIGNUP_URL}
-                className="block w-full py-3 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-xl text-center transition-colors"
+                className="block w-full py-3 bg-input hover:bg-slate-600 text-white font-semibold rounded-xl text-center transition-colors"
               >
                 Start Free
               </Link>
@@ -443,32 +443,32 @@ export default function MindyLandingPage() {
               <h3 className="text-xl font-bold text-white mb-2">Pro</h3>
               <div className="flex items-baseline gap-1 mb-4">
                 <span className="text-4xl font-bold text-white">$149</span>
-                <span className="text-slate-400">/mo</span>
+                <span className="text-muted">/mo</span>
               </div>
               <p className="text-purple-300 text-sm mb-6">The $150K capture manager in your pocket</p>
 
               <ul className="space-y-3 mb-8">
-                <li className="flex items-start gap-2 text-slate-300 text-sm">
+                <li className="flex items-start gap-2 text-ink-soft text-sm">
                   <span className="text-emerald-400 mt-0.5">✓</span>
                   <span>Full daily briefings with AI analysis</span>
                 </li>
-                <li className="flex items-start gap-2 text-slate-300 text-sm">
+                <li className="flex items-start gap-2 text-ink-soft text-sm">
                   <span className="text-emerald-400 mt-0.5">✓</span>
                   <span>Unlimited NAICS codes</span>
                 </li>
-                <li className="flex items-start gap-2 text-slate-300 text-sm">
+                <li className="flex items-start gap-2 text-ink-soft text-sm">
                   <span className="text-emerald-400 mt-0.5">✓</span>
                   <span>Competitor tracking</span>
                 </li>
-                <li className="flex items-start gap-2 text-slate-300 text-sm">
+                <li className="flex items-start gap-2 text-ink-soft text-sm">
                   <span className="text-emerald-400 mt-0.5">✓</span>
                   <span>Recompete alerts</span>
                 </li>
-                <li className="flex items-start gap-2 text-slate-300 text-sm">
+                <li className="flex items-start gap-2 text-ink-soft text-sm">
                   <span className="text-emerald-400 mt-0.5">✓</span>
                   <span>Weekly deep dives</span>
                 </li>
-                <li className="flex items-start gap-2 text-slate-300 text-sm">
+                <li className="flex items-start gap-2 text-ink-soft text-sm">
                   <span className="text-emerald-400 mt-0.5">✓</span>
                   <span>Pursuit briefs</span>
                 </li>
@@ -483,28 +483,28 @@ export default function MindyLandingPage() {
             </div>
 
             {/* Teams */}
-            <div className="bg-slate-800 border border-slate-700 rounded-2xl p-8">
+            <div className="bg-surface border border-hairline rounded-2xl p-8">
               <h3 className="text-xl font-bold text-white mb-2">Teams</h3>
               <div className="flex items-baseline gap-1 mb-4">
                 <span className="text-4xl font-bold text-white">$499</span>
-                <span className="text-slate-400">/mo</span>
+                <span className="text-muted">/mo</span>
               </div>
-              <p className="text-slate-400 text-sm mb-6">For growing contractors with BD teams</p>
+              <p className="text-muted text-sm mb-6">For growing contractors with BD teams</p>
 
               <ul className="space-y-3 mb-8">
-                <li className="flex items-start gap-2 text-slate-300 text-sm">
+                <li className="flex items-start gap-2 text-ink-soft text-sm">
                   <span className="text-emerald-400 mt-0.5">✓</span>
                   <span>Everything in Pro</span>
                 </li>
-                <li className="flex items-start gap-2 text-slate-300 text-sm">
+                <li className="flex items-start gap-2 text-ink-soft text-sm">
                   <span className="text-emerald-400 mt-0.5">✓</span>
                   <span>Multiple users</span>
                 </li>
-                <li className="flex items-start gap-2 text-slate-300 text-sm">
+                <li className="flex items-start gap-2 text-ink-soft text-sm">
                   <span className="text-emerald-400 mt-0.5">✓</span>
                   <span>Shared pipeline</span>
                 </li>
-                <li className="flex items-start gap-2 text-slate-300 text-sm">
+                <li className="flex items-start gap-2 text-ink-soft text-sm">
                   <span className="text-emerald-400 mt-0.5">✓</span>
                   <span>Team dashboard</span>
                 </li>
@@ -512,7 +512,7 @@ export default function MindyLandingPage() {
 
               <Link
                 href="mailto:hello@getmindy.ai?subject=Mindy%20Teams%20Inquiry"
-                className="block w-full py-3 bg-slate-700 hover:bg-slate-600 text-white font-semibold rounded-xl text-center transition-colors"
+                className="block w-full py-3 bg-input hover:bg-slate-600 text-white font-semibold rounded-xl text-center transition-colors"
               >
                 Contact Sales
               </Link>
@@ -520,11 +520,11 @@ export default function MindyLandingPage() {
           </div>
 
           {/* Annual Option */}
-          <div className="mt-8 bg-slate-800/50 border border-purple-500/30 rounded-xl p-6 text-center">
+          <div className="mt-8 bg-surface/50 border border-purple-500/30 rounded-xl p-6 text-center">
             <p className="text-white font-medium mb-2">
               <span className="text-purple-400">Save $298</span> with annual billing
             </p>
-            <p className="text-slate-400 text-sm mb-4">
+            <p className="text-muted text-sm mb-4">
               Pay $1,490/year instead of $1,788 (2 months free)
             </p>
             <Link
@@ -544,33 +544,33 @@ export default function MindyLandingPage() {
         </h2>
 
         <div className="space-y-6">
-          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+          <div className="bg-surface border border-hairline rounded-xl p-6">
             <h3 className="text-lg font-bold text-white mb-2">How is this different from SAM.gov alerts?</h3>
-            <p className="text-slate-300">
+            <p className="text-ink-soft">
               SAM.gov sends you everything that matches a keyword. Mindy learns your business and sends you
               what actually matters — with context on competition, incumbents, and why this opportunity fits you.
             </p>
           </div>
 
-          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+          <div className="bg-surface border border-hairline rounded-xl p-6">
             <h3 className="text-lg font-bold text-white mb-2">I already have a BD person. Why do I need Mindy?</h3>
-            <p className="text-slate-300">
+            <p className="text-ink-soft">
               Mindy doesn&apos;t replace your BD team — she supercharges them. She handles the 20 hours/week
               of searching so your people can focus on relationships and proposals.
             </p>
           </div>
 
-          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+          <div className="bg-surface border border-hairline rounded-xl p-6">
             <h3 className="text-lg font-bold text-white mb-2">What if I&apos;m brand new to federal contracting?</h3>
-            <p className="text-slate-300">
+            <p className="text-ink-soft">
               Perfect. Mindy explains opportunities in plain English and tells you exactly what you
               need to compete. She&apos;s like having a mentor who never sleeps.
             </p>
           </div>
 
-          <div className="bg-slate-800 border border-slate-700 rounded-xl p-6">
+          <div className="bg-surface border border-hairline rounded-xl p-6">
             <h3 className="text-lg font-bold text-white mb-2">Can Mindy help me write proposals?</h3>
-            <p className="text-slate-300">
+            <p className="text-ink-soft">
               Not yet — but she&apos;ll tell you which opportunities are worth writing proposals for.
               That&apos;s half the battle.
             </p>
@@ -585,7 +585,7 @@ export default function MindyLandingPage() {
             The Big Contractors Won&apos;t Share Their Secrets.
             <span className="text-purple-400 block mt-2">Mindy Will.</span>
           </h2>
-          <p className="text-xl text-slate-300 mb-8">
+          <p className="text-xl text-ink-soft mb-8">
             Every day you&apos;re searching manually is a day you&apos;re falling behind.
             The contractors winning federal work aren&apos;t smarter than you — they just have better intelligence.
           </p>
@@ -603,7 +603,7 @@ export default function MindyLandingPage() {
       </section>
 
       {/* Footer - Clean Mindy branding */}
-      <footer className="border-t border-slate-800 py-8">
+      <footer className="border-t border-surface py-8">
         <div className="max-w-4xl mx-auto px-4 text-center">
           <div className="flex items-center justify-center gap-3 mb-4">
             <div className="w-8 h-8 rounded-lg bg-purple-600 flex items-center justify-center">
@@ -611,14 +611,14 @@ export default function MindyLandingPage() {
             </div>
             <span className="text-white font-semibold">Mindy</span>
           </div>
-          <p className="text-slate-500 text-sm mb-4">
-            <a href="tel:5082906692" className="text-slate-400 hover:text-white transition">508-290-6692</a>
+          <p className="text-faint text-sm mb-4">
+            <a href="tel:5082906692" className="text-muted hover:text-white transition">508-290-6692</a>
             <span className="mx-4">•</span>
-            <a href="mailto:hello@getmindy.ai" className="text-slate-400 hover:text-white transition">hello@getmindy.ai</a>
+            <a href="mailto:hello@getmindy.ai" className="text-muted hover:text-white transition">hello@getmindy.ai</a>
             <span className="mx-4">•</span>
-            <Link href="/privacy-policy" className="text-slate-400 hover:text-white transition">Privacy</Link>
+            <Link href="/privacy-policy" className="text-muted hover:text-white transition">Privacy</Link>
             <span className="mx-4">•</span>
-            <Link href="/terms" className="text-slate-400 hover:text-white transition">Terms</Link>
+            <Link href="/terms" className="text-muted hover:text-white transition">Terms</Link>
           </p>
           <p className="text-slate-600 text-xs">
             © 2026 Mindy AI
