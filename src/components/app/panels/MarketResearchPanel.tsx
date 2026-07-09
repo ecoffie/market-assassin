@@ -4232,6 +4232,10 @@ function AgencyTable({
           if (data?.error === 'invalid_naics') {
             setError(data.message || data.naicsValidationError || `The NAICS code "${naicsCode}" isn't valid. Update your profile with a real code.`);
             setNaicsSuggestions(Array.isArray(data.suggestedNaicsCodes) ? data.suggestedNaicsCodes : []);
+          } else if (data?.error === 'market_too_large') {
+            // The route returns this (with a full message) when the upstream
+            // agency breakdown timed out on a market too big for the budget.
+            setError(data.message || 'This market is too large to break down all at once. Narrow it down — pick a state, add a set-aside, or use a more specific NAICS/PSC — then try again.');
           } else {
             setError(data?.error || 'Could not load research data');
           }

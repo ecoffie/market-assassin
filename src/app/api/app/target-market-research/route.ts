@@ -553,9 +553,37 @@ export async function POST(request: NextRequest) {
         body: findAgenciesBody(false),
       }),
     ]);
-    const findData = (await findRes.json()) as FindAgenciesPayload;
-    const totalData = (await totalRes.json().catch(() => ({ success: false }))) as FindAgenciesPayload;
+    // find-agencies fans out to USASpending and, on a giant national market (e.g.
+    // NAICS 561720 with no state), can itself hit its function budget → Vercel
+    // returns a 504 HTML page, NOT JSON. A bare .json() there throws and the whole
+    // route 500s with an unparseable-JSON error. Parse defensively: a non-JSON
+    // primary response means the upstream timed out → return a clean, actionable
+    // "narrow it down" result the panel already knows how to render, instead of a
+    // 500. (Bug fix 2026-07-09 — reported as Market Research "Network error".)
+    const safeJson = async (res: Response): Promise<FindAgenciesPayload> => {
+      const ct = res.headers.get('content-type') || '';
+      if (!res.ok || !ct.includes('application/json')) {
+        return { success: false, error: res.status >= 500 ? 'upstream_timeout' : 'upstream_error' } as FindAgenciesPayload;
+      }
+      return (await res.json().catch(() => ({ success: false, error: 'upstream_error' }))) as FindAgenciesPayload;
+    };
+    const findData = await safeJson(findRes);
+    const totalData = await safeJson(totalRes);
     const findAgenciesMs = Date.now() - findAgenciesStart;
+
+    // Upstream (find-agencies) timed out on a market too big to break down in the
+    // budget. Tell the user how to make it succeed rather than dead-ending. The
+    // panel keys on error==='market_too_large' to show the "narrow it down" copy.
+    if (findData.error === 'upstream_timeout') {
+      return NextResponse.json({
+        success: false,
+        error: 'market_too_large',
+        message:
+          'This market is large enough that the full breakdown timed out. Narrow it down — pick a state, add a set-aside, or use a more specific NAICS/PSC — then try again.',
+        agencies: [],
+        total_count: 0,
+      });
+    }
 
     if (!findData.success || !findData.agencies || findData.agencies.length === 0) {
       // If find-agencies rejected the NAICS itself (invalid_naics), surface the
