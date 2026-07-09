@@ -18,6 +18,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { Award, Check } from 'lucide-react';
 import type { AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders, authedFetch } from '../authHeaders';
 import { getActiveWorkspace } from '../activeWorkspace';
@@ -123,7 +124,7 @@ export default function StartHereCard({ email, onGo }: StartHereCardProps) {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <span className="text-base">🏅</span>
+            <Award className="h-4 w-4 shrink-0 text-amber-400" strokeWidth={2} />
             <span className="text-sm font-bold text-white">First time? Start here</span>
             <span className="text-xs text-purple-300">{doneCount}/{steps.length} done</span>
           </div>
@@ -145,7 +146,7 @@ export default function StartHereCard({ email, onGo }: StartHereCardProps) {
             className={`w-full flex items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors ${s.done ? 'opacity-60' : 'hover:bg-slate-800/60'}`}
           >
             <span className={`shrink-0 flex h-5 w-5 items-center justify-center rounded-full text-xs ${s.done ? 'bg-emerald-500 text-slate-950' : 'border border-purple-400/50 text-purple-300'}`}>
-              {s.done ? '✓' : i + 1}
+              {s.done ? <Check className="h-4 w-4" strokeWidth={3} /> : i + 1}
             </span>
             <span className="min-w-0">
               <span className={`block text-xs font-medium ${s.done ? 'text-slate-400 line-through' : 'text-white'}`}>{s.label}</span>

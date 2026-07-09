@@ -20,6 +20,7 @@
  * v1 just shows tables. Phase 2 will add Recharts histograms.
  */
 import { useCallback, useEffect, useState } from 'react';
+import { DollarSign } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
 import { useAppTracker } from '../track';
 import { useToast } from '../Toast';
@@ -239,7 +240,7 @@ export default function PricingIntelPanel({ email, tier }: Props) {
           402, never breaks the page. */}
       {upgradeTeaser && (
         <div className="bg-gradient-to-br from-purple-900/40 to-purple-800/20 border border-purple-500/40 rounded-lg p-5">
-          <h3 className="text-lg font-bold text-white mb-2">💵 Pricing Intel is a Mindy Pro feature</h3>
+          <h3 className="inline-flex items-center gap-2 text-lg font-bold text-white mb-2"><DollarSign className="h-5 w-5 shrink-0 text-accent" strokeWidth={2} /> Pricing Intel is a Mindy Pro feature</h3>
           <p className="text-sm text-slate-300 mb-3">{upgradeTeaser.note}</p>
           <div className="text-xs text-slate-400 mb-4">
             Sample categories Pro would show:

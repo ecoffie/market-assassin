@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
+import { Search, Pin, CheckCircle2 } from 'lucide-react';
 import type { AppPanel } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 import { setActiveWorkspace, clearActiveWorkspace, getActiveWorkspace } from '../activeWorkspace';
@@ -329,8 +330,8 @@ export default function CoachPanel({
             placeholder="Search clients by name…"
             className="h-9 w-full pl-9 pr-3 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-purple-500 focus:outline-none"
           />
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-slate-500 text-sm">
-            {listLoading ? <span className="inline-block w-3.5 h-3.5 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" /> : '🔍'}
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 inline-flex items-center text-slate-500 text-sm">
+            {listLoading ? <span className="inline-block w-3.5 h-3.5 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" /> : <Search className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />}
           </span>
         </div>
         {pagination && (
@@ -497,7 +498,7 @@ export default function CoachPanel({
               <h3 className="text-sm font-semibold text-white mb-3">{org?.name || 'Org'} news</h3>
               <div className="space-y-2">
                 {orgTab.news.map(n => (
-                  <div key={n.id} className="text-sm text-slate-300">{n.pinned ? '📌 ' : ''}{n.title}</div>
+                  <div key={n.id} className="text-sm text-slate-300">{n.pinned && <Pin className="inline h-3 w-3 mr-1 shrink-0 text-muted" strokeWidth={2} />}{n.title}</div>
                 ))}
               </div>
             </section>
@@ -620,12 +621,15 @@ function BulkImportCard({
       )}
 
       {summary && !running && (
-        <div className="mt-3 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-200">
-          ✅ Imported {summary.added} client{summary.added === 1 ? '' : 's'}
-          {summary.duplicates > 0 && ` · ${summary.duplicates} already existed`}
-          {summary.failed > 0 && ` · ${summary.failed} failed`}
-          {summary.rejectedForCap > 0 && ` · ${summary.rejectedForCap} over your plan limit`}
-          . They're in your client list now.
+        <div className="mt-3 inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-200">
+          <CheckCircle2 className="h-4 w-4 shrink-0" strokeWidth={2} />
+          <span>
+            Imported {summary.added} client{summary.added === 1 ? '' : 's'}
+            {summary.duplicates > 0 && ` · ${summary.duplicates} already existed`}
+            {summary.failed > 0 && ` · ${summary.failed} failed`}
+            {summary.rejectedForCap > 0 && ` · ${summary.rejectedForCap} over your plan limit`}
+            . They're in your client list now.
+          </span>
         </div>
       )}
     </div>

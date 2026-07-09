@@ -8,6 +8,7 @@
  */
 
 import { useState, useEffect, useCallback } from 'react';
+import { Star, Contact, Check, Plus } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 
@@ -233,10 +234,10 @@ export default function GovDecisionMakersPanel({ email }: Props) {
             <div className="inline-flex rounded-lg border border-slate-700 bg-slate-800 p-0.5 text-sm">
               <button
                 onClick={() => { setScope('targets'); setAgency(''); }}
-                className={`px-3 py-1.5 rounded-md transition-colors ${scope === 'targets' && !agency ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md transition-colors ${scope === 'targets' && !agency ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
                 title={`Only your ${targetAgencies.length} target agencies`}
               >
-                ⭐ My Targets ({targetAgencies.length})
+                <Star className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> My Targets ({targetAgencies.length})
               </button>
               <button
                 onClick={() => setScope('all')}
@@ -295,7 +296,7 @@ export default function GovDecisionMakersPanel({ email }: Props) {
       {agency && officeRosters.length > 0 && (
         <div className="bg-slate-900 border border-emerald-500/20 rounded-xl p-4">
           <div className="flex items-baseline justify-between mb-1">
-            <h3 className="text-sm font-semibold text-white">📇 Full contact rosters by buying office</h3>
+            <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-white"><Contact className="h-4 w-4 shrink-0" strokeWidth={2} /> Full contact rosters by buying office</h3>
             <span className="text-xs text-slate-500">{officeRosters.length} offices · 100% list</span>
           </div>
           <p className="text-[11px] text-slate-500 mb-3">The complete people list for a specific contracting office — not an agency sample. Click an office to see everyone.</p>
@@ -406,10 +407,10 @@ export default function GovDecisionMakersPanel({ email }: Props) {
                         <button
                           onClick={() => trackOffice(c)}
                           disabled={trackedOffices.has(c.dodaac)}
-                          className="shrink-0 text-[11px] px-1.5 py-0.5 rounded border border-slate-700 text-slate-400 hover:text-emerald-400 hover:border-emerald-600 disabled:opacity-50 disabled:cursor-default"
+                          className="inline-flex shrink-0 items-center gap-1 text-[11px] px-1.5 py-0.5 rounded border border-slate-700 text-slate-400 hover:text-emerald-400 hover:border-emerald-600 disabled:opacity-50 disabled:cursor-default"
                           title="Add this office to My Target List"
                         >
-                          {trackedOffices.has(c.dodaac) ? '✓ Tracked' : '+ Track'}
+                          {trackedOffices.has(c.dodaac) ? <><Check className="h-3 w-3 shrink-0" strokeWidth={2.5} /> Tracked</> : <><Plus className="h-3 w-3 shrink-0" strokeWidth={2.5} /> Track</>}
                         </button>
                       )}
                     </div>

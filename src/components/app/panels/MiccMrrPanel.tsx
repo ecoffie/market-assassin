@@ -10,6 +10,7 @@
  * research into a first draft. (ACC-ORLANDO-MRR-SPEC.md)
  */
 import { useState, useCallback } from 'react';
+import { Download } from 'lucide-react';
 import { authedFetch } from '../authHeaders';
 
 interface Props { email: string }
@@ -111,7 +112,7 @@ export default function MiccMrrPanel({ email }: Props) {
               <h3 className="text-sm font-semibold text-white">MRR draft ready</h3>
               <p className="text-xs text-slate-500 mt-1">Data sections auto-filled from USASpending. Download the official Army template and complete the bracketed sections.</p>
             </div>
-            <button onClick={downloadDocx} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg">⬇ Download MRR (.docx)</button>
+            <button onClick={downloadDocx} className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg"><Download className="h-4 w-4 shrink-0" strokeWidth={2} /> Download MRR (.docx)</button>
           </div>
 
           {/* Quick stats */}
