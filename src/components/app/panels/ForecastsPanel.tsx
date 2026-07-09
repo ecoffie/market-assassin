@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { BarChart3, Landmark, DollarSign, Zap, Check, Sparkles, ClipboardList, X, CheckCircle2 } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders, authedFetch } from '../authHeaders';
 import { NaicsAutocompleteInput } from '../../codes/NaicsAutocompleteInput';
@@ -435,7 +436,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-amber-500/20 flex items-center justify-center">
-                <span className="text-xl">📊</span>
+                <BarChart3 className="h-5 w-5 text-amber-300" strokeWidth={2} />
               </div>
               <div>
                 <p className="text-xs text-slate-500 uppercase tracking-wider">Upcoming Buys</p>
@@ -446,7 +447,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-blue-500/20 flex items-center justify-center">
-                <span className="text-xl">🏛️</span>
+                <Landmark className="h-5 w-5 text-blue-300" strokeWidth={2} />
               </div>
               <div>
                 <p className="text-xs text-slate-500 uppercase tracking-wider">Agencies Covered</p>
@@ -458,7 +459,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
           <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
             <div className="flex items-center gap-3">
               <div className="w-10 h-10 rounded-lg bg-emerald-500/20 flex items-center justify-center">
-                <span className="text-xl">💰</span>
+                <DollarSign className="h-5 w-5 text-emerald-300" strokeWidth={2} />
               </div>
               <div>
                 <p className="text-xs text-slate-500 uppercase tracking-wider">Estimated Spend Coverage</p>
@@ -586,8 +587,9 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
 
       {/* Search Results */}
       {forecasts.some(f => f.signalType === 'dod_early_signal') && (
-        <div className="bg-amber-500/8 border border-amber-500/25 rounded-lg px-4 py-2.5 text-xs text-amber-300/90">
-          ⚡ DoD doesn&apos;t publish a formal forecast feed — its <strong>⚡ Early signal</strong> items are SAM Sources Sought / RFIs (6–12 months pre-RFP), the earliest forward signal we can surface for the largest buyer.
+        <div className="flex items-start gap-2 bg-amber-500/8 border border-amber-500/25 rounded-lg px-4 py-2.5 text-xs text-amber-300/90">
+          <Zap className="h-3.5 w-3.5 shrink-0 mt-0.5" strokeWidth={2.5} />
+          <span>DoD doesn&apos;t publish a formal forecast feed — its <strong>Early signal</strong> items are SAM Sources Sought / RFIs (6–12 months pre-RFP), the earliest forward signal we can surface for the largest buyer.</span>
         </div>
       )}
       {forecasts.length > 0 && (
@@ -650,14 +652,14 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
                             distinctly from a formal LRAF forecast. */}
                         {forecast.signalType === 'dod_early_signal' ? (
                           <>
-                            <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-500/20 text-amber-300" title="Early signal from SAM (Sources Sought / RFI) — 6-12 months pre-RFP. DoD doesn't publish a formal forecast feed.">
-                              ⚡ Early signal{forecast.noticeType ? ` · ${forecast.noticeType}` : ''}
+                            <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-amber-500/20 text-amber-300" title="Early signal from SAM (Sources Sought / RFI) — 6-12 months pre-RFP. DoD doesn't publish a formal forecast feed.">
+                              <Zap className="h-3 w-3 shrink-0" strokeWidth={2.5} /> Early signal{forecast.noticeType ? ` · ${forecast.noticeType}` : ''}
                             </span>
                             {/* Stage: still pre-RFP (shape it) vs RFP already
                                 dropped (go bid) — detected via matching sol #. */}
                             {forecast.rfpReleased ? (
-                              <span className="px-2 py-0.5 rounded text-xs font-medium bg-rose-500/20 text-rose-300" title="The solicitation/RFP for this has already been released — time to bid, not shape.">
-                                ✓ RFP released
+                              <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium bg-rose-500/20 text-rose-300" title="The solicitation/RFP for this has already been released — time to bid, not shape.">
+                                <Check className="h-3 w-3 shrink-0" strokeWidth={3} /> RFP released
                               </span>
                             ) : (
                               <span className="px-2 py-0.5 rounded text-xs font-medium bg-emerald-500/15 text-emerald-300" title="No solicitation released yet — still time to engage the office and shape the requirement.">
@@ -829,7 +831,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
       {/* Empty State CTA */}
       {forecasts.length === 0 && !error && !stats?.byAgency.length && (
         <div className="bg-gradient-to-br from-amber-900/30 to-slate-900 border border-amber-500/30 rounded-xl p-6 text-center">
-          <div className="text-5xl mb-4">🔮</div>
+          <div className="mb-4 flex justify-center"><Sparkles className="h-11 w-11 text-amber-300" strokeWidth={1.5} /></div>
           <p className="text-slate-300 mb-2">
             <strong className="text-white">Get ahead of the competition!</strong>
           </p>
@@ -844,7 +846,7 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
         <div className="bg-slate-900 border border-purple-500/30 rounded-xl p-5">
           <div className="flex items-start gap-4">
             <div className="w-12 h-12 rounded-lg bg-purple-500/20 flex items-center justify-center shrink-0">
-              <span className="text-2xl">📋</span>
+              <ClipboardList className="h-6 w-6 text-purple-300" strokeWidth={1.75} />
             </div>
             <div className="flex-1">
               <h4 className="text-white font-medium mb-1">Missing forecast data?</h4>
@@ -873,15 +875,16 @@ export default function ForecastsPanel({ email, tier }: ForecastsPanelProps) {
               <h3 className="text-lg font-semibold text-white">Request Forecast Data</h3>
               <button
                 onClick={() => setShowRequestModal(false)}
+                aria-label="Close"
                 className="text-slate-400 hover:text-white"
               >
-                ✕
+                <X className="h-4 w-4" />
               </button>
             </div>
 
             {requestSuccess ? (
               <div className="text-center py-8">
-                <div className="text-5xl mb-4">✅</div>
+                <div className="mb-4 flex justify-center"><CheckCircle2 className="h-11 w-11 text-emerald-400" strokeWidth={1.5} /></div>
                 <p className="text-emerald-400 font-medium">Request submitted!</p>
                 <p className="text-slate-400 text-sm mt-2">We will notify you when this data is available.</p>
               </div>

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Contact, Search } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 
@@ -490,7 +491,7 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
                 : 'text-slate-400 hover:text-white hover:bg-slate-800 border border-transparent'
             }`}
           >
-            📇 My Saved Contacts
+            <span className="inline-flex items-center gap-1.5"><Contact className="h-4 w-4 shrink-0" strokeWidth={2} /> My Saved Contacts</span>
             <span className="ml-2 text-xs text-slate-500">({stats.total})</span>
           </button>
         </div>
@@ -508,7 +509,7 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
                   : 'text-slate-400 hover:text-white hover:bg-slate-800 border border-transparent'
               }`}
             >
-              🔍 {tab.label}
+              <span className="inline-flex items-center gap-1.5"><Search className="h-4 w-4 shrink-0" strokeWidth={2} /> {tab.label}</span>
             </button>
           ))}
         </div>
@@ -626,8 +627,10 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
       <div className="rounded-xl border border-slate-800 bg-slate-900 overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
           <div>
-            <h2 className="font-semibold text-white">
-              {activeTab === 'network' ? '📇 My Saved Contacts' : `🔍 Search results · ${activeTabConfig.label}`}
+            <h2 className="inline-flex items-center gap-1.5 font-semibold text-white">
+              {activeTab === 'network'
+                ? <><Contact className="h-4 w-4 shrink-0" strokeWidth={2} /> My Saved Contacts</>
+                : <><Search className="h-4 w-4 shrink-0" strokeWidth={2} /> Search results · {activeTabConfig.label}</>}
             </h2>
             <p className="text-xs text-slate-500 mt-1">
               {activeTab === 'network'

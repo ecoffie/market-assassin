@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { MapPin, Mail, Phone, Landmark, Building2, Lock, BarChart3, HardHat, Laptop, FileText } from 'lucide-react';
 import { useSearchParams, useRouter, usePathname } from 'next/navigation';
 import type { AppTier } from '../UnifiedSidebar';
 import { NaicsAutocompleteInput } from '../../codes/NaicsAutocompleteInput';
@@ -515,8 +516,8 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
 
                   {/* HQ location — disambiguates same-named firms (which Excell?) */}
                   {(contractor.city || contractor.state) && (
-                    <div className="text-xs text-slate-400 -mt-0.5 mb-1">
-                      📍 {[contractor.city, contractor.state].filter(Boolean).join(', ')}
+                    <div className="inline-flex items-center gap-1 text-xs text-slate-400 -mt-0.5 mb-1">
+                      <MapPin className="h-3 w-3 shrink-0" strokeWidth={2} /> {[contractor.city, contractor.state].filter(Boolean).join(', ')}
                     </div>
                   )}
 
@@ -536,18 +537,18 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
                       <a
                         href={`mailto:${contractor.email}`}
                         onClick={(event) => event.stopPropagation()}
-                        className="text-blue-400 hover:text-blue-300"
+                        className="inline-flex items-center gap-1 text-blue-400 hover:text-blue-300"
                       >
-                        ✉️ {contractor.email}
+                        <Mail className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> {contractor.email}
                       </a>
                     )}
                     {contractor.phone && contractor.phone !== 'N/A' && (
                       <a
                         href={`tel:${contractor.phone}`}
                         onClick={(event) => event.stopPropagation()}
-                        className="text-slate-400 hover:text-slate-300"
+                        className="inline-flex items-center gap-1 text-slate-400 hover:text-slate-300"
                       >
-                        📞 {contractor.phone}
+                        <Phone className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> {contractor.phone}
                       </a>
                     )}
                   </div>
@@ -573,7 +574,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
                             className={`rounded px-2 py-0.5 ${agencies >= 5 ? 'bg-blue-500/15 text-blue-300' : 'bg-slate-800 text-slate-300'}`}
                             title={agencies >= 5 ? 'Diversified — sells to many federal buyers' : 'Sells to few federal buyers'}
                           >
-                            🏛 {agencies} {agencies === 1 ? 'agency' : 'agencies'}
+                            <span className="inline-flex items-center gap-1"><Landmark className="h-3 w-3 shrink-0" strokeWidth={2} /> {agencies} {agencies === 1 ? 'agency' : 'agencies'}</span>
                           </span>
                         )}
                         <span className="rounded bg-slate-800 px-2 py-0.5 text-slate-300">{scale}</span>
@@ -664,7 +665,7 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
       {/* Empty State */}
       {!searching && contractors.length === 0 && !error && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
-          <div className="text-5xl mb-4">🏢</div>
+          <div className="mb-4 flex justify-center"><Building2 className="h-11 w-11 text-faint" strokeWidth={1.5} /></div>
           <h3 className="text-xl font-semibold text-white mb-2">No Contractors Found</h3>
           <p className="text-slate-400 mb-4">
             Try adjusting your search criteria or filters.
@@ -690,12 +691,12 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
       <div className="flex flex-wrap gap-2 pt-4 border-t border-slate-800">
         <span className="text-xs text-slate-500 self-center mr-2">Quick searches:</span>
         {[
-          { label: '🔒 Cybersecurity', naics: '541512' },
-          { label: '📊 Management Consulting', naics: '541611' },
-          { label: '🏗️ Engineering', naics: '541330' },
-          { label: '💻 IT Services', naics: '541519' },
-          { label: '📝 Professional Services', naics: '541990' },
-        ].map(({ label, naics }) => (
+          { label: 'Cybersecurity', naics: '541512', Icon: Lock },
+          { label: 'Management Consulting', naics: '541611', Icon: BarChart3 },
+          { label: 'Engineering', naics: '541330', Icon: HardHat },
+          { label: 'IT Services', naics: '541519', Icon: Laptop },
+          { label: 'Professional Services', naics: '541990', Icon: FileText },
+        ].map(({ label, naics, Icon }) => (
           <button
             key={naics}
             onClick={() => {
@@ -705,9 +706,9 @@ export default function ContractorsPanel({ email, tier }: ContractorsPanelProps)
               setPage(0);
               searchContractors(searchQuery, naics, '', contactFilter, sortBy, 0);
             }}
-            className="px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
+            className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
           >
-            {label}
+            <Icon className="h-4 w-4 shrink-0" strokeWidth={2} /> {label}
           </button>
         ))}
       </div>

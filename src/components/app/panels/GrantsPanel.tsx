@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { Star, Flame, Zap, Search, FlaskConical, ShieldCheck, BarChart3, Medal, HeartPulse } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
 import { useAppTracker } from '../track';
 
@@ -176,9 +177,9 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
           <div className="inline-flex rounded-lg border border-slate-700 bg-slate-800 p-0.5 text-sm">
             <button
               onClick={() => { setSort('relevance'); searchGrants(searchKeyword, selectedAgency, selectedCategory, selectedStatus, 'relevance', 0); }}
-              className={`px-3 py-1.5 rounded-md transition-colors ${sort === 'relevance' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md transition-colors ${sort === 'relevance' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
             >
-              ★ For me
+              <Star className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> For me
             </button>
             <button
               onClick={() => { setSort('newest'); searchGrants(searchKeyword, selectedAgency, selectedCategory, selectedStatus, 'newest', 0); }}
@@ -291,13 +292,13 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
                       {sortedByRelevance && typeof grant.score === 'number' && grant.score > 0 && (
                         <span
                           title="How well this grant matches your NAICS, keywords, and target agencies"
-                          className={`px-2 py-0.5 text-xs rounded font-semibold ${
+                          className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded font-semibold ${
                             grant.score >= 50 ? 'bg-emerald-500/20 text-emerald-300'
                             : grant.score >= 30 ? 'bg-blue-500/20 text-blue-300'
                             : 'bg-slate-700 text-slate-400'
                           }`}
                         >
-                          {grant.score >= 50 ? '★ Strong match' : grant.score >= 30 ? 'Good match' : 'Weak match'}
+                          {grant.score >= 50 ? <><Star className="h-3 w-3 shrink-0" strokeWidth={2.5} /> Strong match</> : grant.score >= 30 ? 'Good match' : 'Weak match'}
                         </span>
                       )}
                       {grant.agencyCode && (
@@ -315,13 +316,13 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
                         </span>
                       )}
                       {isUrgent && (
-                        <span className="px-2 py-0.5 text-xs bg-red-500/20 text-red-400 rounded font-medium">
-                          🔥 {daysLeft} days left
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-red-500/20 text-red-400 rounded font-medium">
+                          <Flame className="h-3 w-3 shrink-0" strokeWidth={2.5} /> {daysLeft} days left
                         </span>
                       )}
                       {isClosingSoon && (
-                        <span className="px-2 py-0.5 text-xs bg-amber-500/20 text-amber-400 rounded">
-                          ⚡ {daysLeft} days left
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-amber-500/20 text-amber-400 rounded">
+                          <Zap className="h-3 w-3 shrink-0" strokeWidth={2.5} /> {daysLeft} days left
                         </span>
                       )}
                     </div>
@@ -376,7 +377,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
       {/* Empty State */}
       {!isLoading && grants.length === 0 && !error && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
-          <div className="text-4xl mb-4">🔍</div>
+          <div className="mb-4 flex justify-center"><Search className="h-9 w-9 text-faint" strokeWidth={1.5} /></div>
           <h3 className="text-lg font-medium text-white mb-2">No Grants Found</h3>
           <p className="text-slate-400 text-sm">
             No grants matched this search. Try a broader keyword, a different agency, or forecasted status.
@@ -391,27 +392,27 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
             setSearchKeyword('SBIR');
             searchGrants('SBIR', '', '', 'posted', sort, 0);
           }}
-          className="px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
         >
-          🔬 SBIR/STTR
+          <FlaskConical className="h-4 w-4 shrink-0" strokeWidth={2} /> SBIR/STTR
         </button>
         <button
           onClick={() => {
             setSearchKeyword('cybersecurity');
             searchGrants('cybersecurity', '', '', 'posted', sort, 0);
           }}
-          className="px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
         >
-          🔐 Cybersecurity
+          <ShieldCheck className="h-4 w-4 shrink-0" strokeWidth={2} /> Cybersecurity
         </button>
         <button
           onClick={() => {
             setSearchKeyword('research');
             searchGrants('research', '', '', 'posted', sort, 0);
           }}
-          className="px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
         >
-          📊 Research
+          <BarChart3 className="h-4 w-4 shrink-0" strokeWidth={2} /> Research
         </button>
         <button
           onClick={() => {
@@ -419,9 +420,9 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
             setSelectedAgency('DOD');
             searchGrants('', 'DOD', '', 'posted', sort, 0);
           }}
-          className="px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
         >
-          🎖️ DOD Grants
+          <Medal className="h-4 w-4 shrink-0" strokeWidth={2} /> DOD Grants
         </button>
         <button
           onClick={() => {
@@ -429,9 +430,9 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
             setSelectedAgency('HHS');
             searchGrants('', 'HHS', '', 'posted', sort, 0);
           }}
-          className="px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
         >
-          🏥 HHS Grants
+          <HeartPulse className="h-4 w-4 shrink-0" strokeWidth={2} /> HHS Grants
         </button>
       </div>
     </div>

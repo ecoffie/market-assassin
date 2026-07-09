@@ -1,5 +1,6 @@
 'use client';
 import { useState, useEffect } from 'react';
+import { ClipboardList, DollarSign, Scale, HelpCircle, PenLine, FileStack, Target, FileText, Award, CheckCircle2, Paperclip, FolderOpen, Download, AlertTriangle, type LucideIcon } from 'lucide-react';
 import { authedFetch } from '../authHeaders';
 
 /**
@@ -32,9 +33,9 @@ const KIND_HINT: Record<string, string> = {
   wage_det: 'Send to estimators', past_perf_form: 'For your past-performance lead',
   rep_certs: 'For contracts/admin', qa: 'Read for clarifications',
 };
-const KIND_ICON: Record<string, string> = {
-  sow_pws: '📋', pricing: '💲', wage_det: '⚖️', qa: '❓', amendment: '📝',
-  instructions: '📑', eval_factors: '🎯', solicitation: '📄', past_perf_form: '🏅', rep_certs: '✅', attachment_other: '📎',
+const KIND_ICON: Record<string, LucideIcon> = {
+  sow_pws: ClipboardList, pricing: DollarSign, wage_det: Scale, qa: HelpCircle, amendment: PenLine,
+  instructions: FileStack, eval_factors: Target, solicitation: FileText, past_perf_form: Award, rep_certs: CheckCircle2, attachment_other: Paperclip,
 };
 // Display order — most actionable first.
 const ORDER = ['sow_pws', 'instructions', 'eval_factors', 'pricing', 'wage_det', 'qa', 'amendment', 'solicitation', 'past_perf_form', 'rep_certs', 'attachment_other'];
@@ -86,14 +87,14 @@ export default function DocManifest({ email, pursuitId }: { email: string | null
   return (
     <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-sm font-semibold text-white">📂 Documents — {readable.length} readable{skipped.length ? ` · ${skipped.length} need manual download` : ''}</h3>
+        <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-white"><FolderOpen className="h-4 w-4 shrink-0" strokeWidth={2} /> Documents — {readable.length} readable{skipped.length ? ` · ${skipped.length} need manual download` : ''}</h3>
         <span className="text-[11px] text-slate-500">Hand the right file to the right person</span>
       </div>
       <div className="space-y-3">
         {orderedKinds.map(kind => (
           <div key={kind}>
             <div className="flex items-center gap-2 mb-1">
-              <span className="text-sm">{KIND_ICON[kind] || '📎'}</span>
+              {(() => { const Icon = KIND_ICON[kind] || Paperclip; return <Icon className="h-4 w-4 shrink-0 text-muted" strokeWidth={2} />; })()}
               <span className="text-xs font-semibold text-slate-300">{KIND_LABEL[kind] || kind}</span>
               <span className="text-[10px] text-slate-600">({groups[kind].length})</span>
               {KIND_HINT[kind] && <span className="text-[10px] text-emerald-400/80">· {KIND_HINT[kind]}</span>}
@@ -107,7 +108,7 @@ export default function DocManifest({ email, pursuitId }: { email: string | null
                   </span>
                   <div className="flex items-center gap-2 shrink-0">
                     <span className="text-slate-600">{fmtSize(d.size_bytes)}{d.page_count ? ` · ${d.page_count}p` : ''}</span>
-                    <button onClick={() => download(d.id)} className="text-purple-400 hover:text-purple-300">⬇ Download</button>
+                    <button onClick={() => download(d.id)} className="inline-flex items-center gap-1 text-purple-400 hover:text-purple-300"><Download className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> Download</button>
                   </div>
                 </div>
               ))}
@@ -121,7 +122,7 @@ export default function DocManifest({ email, pursuitId }: { email: string | null
       {skipped.length > 0 && (
         <div className="mt-3 pt-3 border-t border-slate-800">
           <div className="flex items-center gap-2 mb-1">
-            <span className="text-sm">⚠️</span>
+            <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" strokeWidth={2} />
             <span className="text-xs font-semibold text-amber-300/90">Not auto-loaded ({skipped.length}) — download from SAM.gov</span>
           </div>
           <div className="space-y-1 pl-6">
@@ -135,7 +136,7 @@ export default function DocManifest({ email, pursuitId }: { email: string | null
                   <span className="text-slate-600">{fmtSize(d.size_bytes)}</span>
                   {d.sam_url
                     ? <a href={d.sam_url} target="_blank" rel="noreferrer" className="text-purple-400 hover:text-purple-300">↗ SAM.gov</a>
-                    : <button onClick={() => download(d.id)} className="text-purple-400 hover:text-purple-300">⬇ Try</button>}
+                    : <button onClick={() => download(d.id)} className="inline-flex items-center gap-1 text-purple-400 hover:text-purple-300"><Download className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> Try</button>}
                 </div>
               </div>
             ))}
