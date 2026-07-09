@@ -175,7 +175,7 @@ function noticeTypeBadge(noticeType?: string): { label: string; cls: string } | 
   if (t.includes('special')) return { label: 'Special Notice', cls: 'bg-amber-500/15 text-amber-300 border-amber-500/30' };
   if (t.includes('solicitation') || t.includes('rfp')) return { label: 'Solicitation', cls: 'bg-green-500/15 text-green-300 border-green-500/30' };
   // Fall back to the raw type, trimmed.
-  return { label: noticeType.length > 24 ? noticeType.slice(0, 24) + '…' : noticeType, cls: 'bg-slate-700/40 text-slate-300 border-slate-600/40' };
+  return { label: noticeType.length > 24 ? noticeType.slice(0, 24) + '…' : noticeType, cls: 'bg-input/40 text-ink-soft border-slate-600/40' };
 }
 
 function getStableNoticeId(item: BriefingItem): string {
@@ -1140,7 +1140,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
         <div className="border border-purple-500/30 bg-purple-950/20 p-8 text-center">
           <div className="mb-4 flex justify-center"><BarChart3 className="h-9 w-9 text-purple-400" strokeWidth={1.5} /></div>
           <h2 className="text-2xl font-bold text-white mb-3">Today&apos;s Intel</h2>
-          <p className="text-slate-400 mb-6 max-w-md mx-auto">
+          <p className="text-muted mb-6 max-w-md mx-auto">
             Upgrade to unlock AI-prioritized opportunities, weekly deep dives, amendment alerts on your pursuits, and full intelligence.
           </p>
           <a
@@ -1163,11 +1163,11 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
         onOpenOpportunities={() => router.push(marketIntelHref)}
       />
 
-      <div className="px-4 md:px-6 py-4 md:py-5 border-b border-slate-800 bg-slate-950">
+      <div className="px-4 md:px-6 py-4 md:py-5 border-b border-surface bg-ground-deep">
         <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 md:gap-4">
           <div>
             <h1 className="text-xl md:text-2xl font-bold">Today&apos;s Intel</h1>
-            <p className="text-xs md:text-sm text-slate-400 mt-1">Best-fit opportunities, summaries, and next actions from your saved profile.</p>
+            <p className="text-xs md:text-sm text-muted mt-1">Best-fit opportunities, summaries, and next actions from your saved profile.</p>
           </div>
           <div className="flex items-center gap-2 shrink-0">
             <Link
@@ -1178,7 +1178,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
             </Link>
             <button
               onClick={loadBriefings}
-              className="px-3 md:px-4 py-2 bg-slate-800 text-slate-300 rounded-lg hover:bg-slate-700 transition-colors text-sm md:text-base"
+              className="px-3 md:px-4 py-2 bg-surface text-ink-soft rounded-lg hover:bg-input transition-colors text-sm md:text-base"
               aria-label="Refresh briefings"
             >
               Refresh
@@ -1207,45 +1207,45 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
       {isLoading ? (
         <div className="p-8">
           <div className="animate-pulse grid grid-cols-1 lg:grid-cols-[260px_1fr] gap-6">
-            <div className="h-96 bg-slate-900 border border-slate-800" />
+            <div className="h-96 bg-ground border border-surface" />
             <div className="space-y-4">
-              <div className="h-10 bg-slate-900 border border-slate-800" />
-              <div className="h-48 bg-slate-900 border border-slate-800" />
-              <div className="h-48 bg-slate-900 border border-slate-800" />
+              <div className="h-10 bg-ground border border-surface" />
+              <div className="h-48 bg-ground border border-surface" />
+              <div className="h-48 bg-ground border border-surface" />
             </div>
           </div>
         </div>
       ) : briefings.length === 0 ? (
         <div className="p-8">
-          <div className="border border-slate-800 bg-slate-900 p-8 text-center">
+          <div className="border border-surface bg-ground p-8 text-center">
             <h2 className="text-xl font-semibold mb-2">No briefings yet</h2>
-            <p className="text-slate-400">{error || 'Your first briefing will appear after the next delivery.'}</p>
+            <p className="text-muted">{error || 'Your first briefing will appear after the next delivery.'}</p>
           </div>
         </div>
       ) : (
         <div className={`grid grid-cols-1 ${briefingsCollapsed ? 'lg:grid-cols-[44px_1fr]' : 'lg:grid-cols-[280px_1fr]'}`}>
           {briefingsCollapsed ? (
             // Collapsed: a slim rail with a button to bring the list back.
-            <aside className="hidden lg:flex flex-col items-center border-r border-slate-800 bg-slate-950/80 lg:min-h-[calc(100vh-202px)] py-4">
+            <aside className="hidden lg:flex flex-col items-center border-r border-surface bg-ground-deep/80 lg:min-h-[calc(100vh-202px)] py-4">
               <button
                 onClick={() => setBriefingsCollapsed(false)}
                 title="Show past briefings"
                 aria-label="Show past briefings"
-                className="p-2 rounded-lg text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+                className="p-2 rounded-lg text-muted hover:bg-surface hover:text-white transition-colors"
               >
                 <span className="block text-lg leading-none">»</span>
               </button>
             </aside>
           ) : (
-          <aside className="border-b lg:border-b-0 lg:border-r border-slate-800 bg-slate-950/80 lg:min-h-[calc(100vh-202px)]">
+          <aside className="border-b lg:border-b-0 lg:border-r border-surface bg-ground-deep/80 lg:min-h-[calc(100vh-202px)]">
             <div className="p-4">
               <div className="flex items-center justify-between mb-3">
-                <p className="text-xs text-slate-500 uppercase tracking-wider">Past Briefings</p>
+                <p className="text-xs text-faint uppercase tracking-wider">Past Briefings</p>
                 <button
                   onClick={() => setBriefingsCollapsed(true)}
                   title="Collapse past briefings"
                   aria-label="Collapse past briefings"
-                  className="hidden lg:block p-1 rounded text-slate-500 hover:bg-slate-800 hover:text-white transition-colors"
+                  className="hidden lg:block p-1 rounded text-faint hover:bg-surface hover:text-white transition-colors"
                 >
                   <span className="block text-sm leading-none">«</span>
                 </button>
@@ -1264,11 +1264,11 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                       className={`w-full min-w-48 lg:min-w-0 text-left px-3 py-2.5 mb-1 rounded-lg transition-colors ${
                         isSelected
                           ? 'bg-purple-500/15 text-purple-300'
-                          : 'text-slate-400 hover:bg-slate-900 hover:text-slate-200'
+                          : 'text-muted hover:bg-ground hover:text-slate-200'
                       }`}
                     >
                       <span className="font-medium text-sm">{formatDate(entry.briefing_date)}</span>
-                      <span className="ml-2 rounded bg-slate-800 px-1.5 py-0.5 text-[10px] uppercase tracking-wide opacity-70">
+                      <span className="ml-2 rounded bg-surface px-1.5 py-0.5 text-[10px] uppercase tracking-wide opacity-70">
                         {formatBriefingType(entry.briefing_type)}
                       </span>
                       <span className="float-right text-xs opacity-60">{entry.items_count || getBriefingItems(entry).length} items</span>
@@ -1282,14 +1282,14 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
 
           <main className="p-4 lg:p-8 max-w-6xl">
             <div className="mb-5">
-              <p className="text-slate-500 text-sm">
+              <p className="text-faint text-sm">
                 {formatDateLong(selectedBriefing?.briefing_date)}
                 <span className="ml-2 rounded bg-purple-500/15 px-2 py-0.5 text-xs uppercase tracking-wide text-purple-300">
                   {formatBriefingType(selectedBriefing?.briefing_type)}
                 </span>
               </p>
               <h2 className="text-3xl font-bold mt-4">{summary.headline}</h2>
-              <p className="text-slate-400 mt-2">{summary.subheadline}</p>
+              <p className="text-muted mt-2">{summary.subheadline}</p>
             </div>
 
             <div className="mb-6 space-y-3">
@@ -1298,7 +1298,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                 value={searchTerm}
                 onChange={(event) => setSearchTerm(event.target.value)}
                 placeholder="Search opportunities, agencies, keywords..."
-                className="w-full px-4 py-3 bg-slate-900 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
+                className="w-full px-4 py-3 bg-ground border border-surface rounded-lg text-white placeholder-faint focus:border-purple-500 focus:outline-none"
               />
 
 
@@ -1309,7 +1309,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                   <FilterButton label="Opportunities" count={counts.opportunity} active={activeFilter === 'opportunity'} onClick={() => filterTo('opportunity')} />
                   <FilterButton label="Teaming" count={counts.teaming} active={activeFilter === 'teaming'} onClick={() => filterTo('teaming')} />
                 </div>
-                <div className="text-sm text-slate-500">{filteredItems.length} shown</div>
+                <div className="text-sm text-faint">{filteredItems.length} shown</div>
               </div>
             </div>
 
@@ -1341,7 +1341,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
             <section ref={resultsRef} className="scroll-mt-4">
               <h3 className="text-xl font-semibold mb-4">
                 Top Opportunities to Review
-                {activeFilter !== 'all' && <span className="ml-2 text-sm font-normal text-slate-400">· filtered: {activeFilter} ({filteredItems.length})</span>}
+                {activeFilter !== 'all' && <span className="ml-2 text-sm font-normal text-muted">· filtered: {activeFilter} ({filteredItems.length})</span>}
               </h3>
               <div className="space-y-3">
                 {filteredItems.map(item => {
@@ -1368,7 +1368,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                           toggleItem(item.id);
                         }
                       }}
-                      className="cursor-pointer overflow-hidden border-l-4 border-purple-500 bg-slate-900 border-y border-r border-slate-800 p-4 transition-colors hover:border-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-500/50"
+                      className="cursor-pointer overflow-hidden border-l-4 border-purple-500 bg-ground border-y border-r border-surface p-4 transition-colors hover:border-hairline focus:outline-none focus:ring-2 focus:ring-purple-500/50"
                     >
                       <div className="grid gap-4 md:grid-cols-[minmax(0,1fr)_auto] md:items-start">
                         <div className="min-w-0 flex-1">
@@ -1382,14 +1382,14 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                           })()}
                           <h4 className="font-semibold text-white leading-snug break-words">{item.title}</h4>
                           {itemBuyer.primary && itemBuyer.primary !== 'Unknown agency' && (
-                            <p className="text-sm text-slate-400 mt-1 leading-relaxed break-words">
+                            <p className="text-sm text-muted mt-1 leading-relaxed break-words">
                               {itemBuyer.primary}
-                              {itemBuyer.secondary && <span className="text-slate-500"> • {itemBuyer.secondary}</span>}
+                              {itemBuyer.secondary && <span className="text-faint"> • {itemBuyer.secondary}</span>}
                               {itemBuyer.parent && <span className="text-slate-600"> • {itemBuyer.parent}</span>}
                             </p>
                           )}
                           {item.incumbent && (
-                            <p className="text-xs text-slate-500 mt-1">
+                            <p className="text-xs text-faint mt-1">
                               Incumbent:{' '}
                               <ContractorLink name={item.incumbent} email={email} variant="inline">
                                 {item.incumbent}
@@ -1397,7 +1397,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                             </p>
                           )}
                           {item.targetPrimes && item.targetPrimes.length > 0 && (
-                            <p className="text-xs text-slate-500 mt-1">
+                            <p className="text-xs text-faint mt-1">
                               Suggested primes:{' '}
                               {item.targetPrimes.map((prime, idx) => (
                                 <span key={`${prime}-${idx}`}>
@@ -1409,18 +1409,18 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                               ))}
                             </p>
                           )}
-                          {itemMetaLine && <p className="text-sm text-slate-500 mt-1">{itemMetaLine}</p>}
+                          {itemMetaLine && <p className="text-sm text-faint mt-1">{itemMetaLine}</p>}
                           {itemLocation && (
                             <p className="mt-2 inline-flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-300">
                               <MapPin className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> Place of performance: {itemLocation}
                             </p>
                           )}
-                          {itemDetailLine && <p className="text-sm text-slate-400 mt-2 leading-relaxed break-words">{itemDetailLine}</p>}
+                          {itemDetailLine && <p className="text-sm text-muted mt-2 leading-relaxed break-words">{itemDetailLine}</p>}
                         </div>
                         <div className="w-full min-w-0 md:w-auto md:max-w-md md:text-right">
                           <div className="text-right">
                             {item.amount && <p className="text-sm font-semibold text-emerald-400 break-words">{item.amount}</p>}
-                            {item.deadline && <p className="text-sm text-slate-500 mt-1 break-words">{item.deadline}</p>}
+                            {item.deadline && <p className="text-sm text-faint mt-1 break-words">{item.deadline}</p>}
                           </div>
                           <div className="mt-3 flex flex-wrap gap-2 sm:justify-end">
                             <button
@@ -1459,7 +1459,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                                   isSaved
                                     ? 'bg-emerald-500/20 text-emerald-400 cursor-default'
                                     : isSaving
-                                      ? 'bg-slate-800 text-slate-400 cursor-wait'
+                                      ? 'bg-surface text-muted cursor-wait'
                                       : 'bg-purple-600 text-white hover:bg-purple-500'
                                 }`}
                               >
@@ -1480,7 +1480,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                                 <ShareButton
                                   variant="small"
                                   email={email}
-                                  className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded bg-slate-800 px-2.5 py-2 text-sm font-medium text-slate-300 transition-colors hover:bg-slate-700 hover:text-white sm:px-3 md:min-h-0 md:py-1.5"
+                                  className="inline-flex min-h-[44px] items-center justify-center gap-1.5 rounded bg-surface px-2.5 py-2 text-sm font-medium text-ink-soft transition-colors hover:bg-input hover:text-white sm:px-3 md:min-h-0 md:py-1.5"
                                   opportunity={{
                                     id: getStableNoticeId(item),
                                     title: item.title,
@@ -1499,7 +1499,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                                 event.stopPropagation();
                                 dismissItem(item);
                               }}
-                              className="inline-flex min-h-[44px] items-center justify-center rounded bg-slate-800 px-2.5 py-2 text-sm font-medium text-slate-400 transition-colors hover:bg-slate-700 hover:text-slate-200 sm:px-3 md:min-h-0 md:py-1.5"
+                              className="inline-flex min-h-[44px] items-center justify-center rounded bg-surface px-2.5 py-2 text-sm font-medium text-muted transition-colors hover:bg-input hover:text-slate-200 sm:px-3 md:min-h-0 md:py-1.5"
                             >
                               Dismiss
                             </button>
@@ -1512,11 +1512,11 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                           ? `${itemAttachments.length > 0 ? 'max-h-[40rem] overflow-y-auto' : 'max-h-96'} opacity-100 mt-4`
                           : 'max-h-0 opacity-0'
                       }`}>
-                        {itemDescription && <p className="text-sm leading-relaxed text-slate-300">{itemDescription}</p>}
+                        {itemDescription && <p className="text-sm leading-relaxed text-ink-soft">{itemDescription}</p>}
                         <div className="mt-3 flex flex-wrap items-center gap-2">
-                          <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">{item.category}</span>
+                          <span className="rounded bg-surface px-2 py-1 text-xs text-ink-soft">{item.category}</span>
                           {itemBuyer.primary && itemBuyer.primary !== 'Unknown agency' && (
-                            <span className="rounded bg-slate-800/80 px-2 py-1 text-xs text-slate-300">
+                            <span className="rounded bg-surface/80 px-2 py-1 text-xs text-ink-soft">
                               Buyer: {itemBuyer.primary}
                             </span>
                           )}
@@ -1524,14 +1524,14 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                             <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-1 text-xs text-emerald-300"><MapPin className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> {itemLocation}</span>
                           )}
                           {item.signals.slice(0, 4).map(signal => (
-                            <span key={signal} className="rounded bg-slate-800/80 px-2 py-1 text-xs text-slate-400">{signal}</span>
+                            <span key={signal} className="rounded bg-surface/80 px-2 py-1 text-xs text-muted">{signal}</span>
                           ))}
                         </div>
                         {/* Action row inside Review Fit: was the only home
                             for Track in Pipeline, now duplicated. Track
                             promoted to the always-visible row above, so
                             only "View on SAM.gov" remains here. */}
-                        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-800 pt-4">
+                        <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-surface pt-4">
                           {item.actionUrl && (
                             <a
                               href={item.actionUrl}
@@ -1541,7 +1541,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                                 event.stopPropagation();
                                 trackItemEvent('link_click', item, 'open_source');
                               }}
-                              className="px-4 py-2 text-sm font-medium text-slate-300 bg-slate-800 hover:bg-slate-700 rounded-lg transition-colors"
+                              className="px-4 py-2 text-sm font-medium text-ink-soft bg-surface hover:bg-input rounded-lg transition-colors"
                             >
                               {item.actionLabel || 'View on SAM.gov'} →
                             </a>
@@ -1552,7 +1552,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                             holds this work NOW (real ceiling/expiry/vehicle),
                             fetched on click. Grounds "is this worth pursuing?" the
                             moment the user reviews fit. */}
-                        <div className="mt-3 border-t border-slate-800 pt-3" onClick={(e) => e.stopPropagation()}>
+                        <div className="mt-3 border-t border-surface pt-3" onClick={(e) => e.stopPropagation()}>
                           <IncumbentIntel
                             agency={text(item.parentAgency, text(item.buyerName)) || undefined}
                             title={text(item.title) || undefined}
@@ -1565,13 +1565,13 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                             the /api/sam-attachment proxy (raw SAM URLs need
                             our API key). Only shows when the item has them. */}
                         {itemAttachments.length > 0 && (
-                          <div className="mt-4 border-t border-slate-800 pt-4" onClick={(e) => e.stopPropagation()}>
+                          <div className="mt-4 border-t border-surface pt-4" onClick={(e) => e.stopPropagation()}>
                             <SamAttachmentLinks attachments={itemAttachments} />
                           </div>
                         )}
 
-                        <div className="mt-4 border-t border-slate-800 pt-4">
-                          <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">Tune Mindy</p>
+                        <div className="mt-4 border-t border-surface pt-4">
+                          <p className="text-xs uppercase tracking-wider text-faint mb-2">Tune Mindy</p>
                           <div className="flex flex-wrap gap-2">
                             {FEEDBACK_OPTIONS.map(option => {
                               const selected = feedbackByItem[item.id] === option.type;
@@ -1588,7 +1588,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                                   className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition-colors ${
                                     selected
                                       ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
-                                      : 'border-slate-700 bg-slate-900 text-slate-400 hover:border-slate-500 hover:text-slate-200'
+                                      : 'border-hairline bg-ground text-muted hover:border-slate-500 hover:text-slate-200'
                                   }`}
                                 >
                                   {selected && <Check className="h-3 w-3 shrink-0" strokeWidth={2.5} />}{option.label}
@@ -1603,7 +1603,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                 })}
 
                 {filteredItems.length === 0 && (
-                  <div className="border border-slate-800 bg-slate-900 p-8 text-center text-slate-400">
+                  <div className="border border-surface bg-ground p-8 text-center text-muted">
                     No briefing items match this filter.
                   </div>
                 )}
@@ -1623,7 +1623,7 @@ function FilterButton({ label, count, active, onClick }: { label: string; count:
       className={`px-3 py-1.5 text-sm font-medium rounded-lg transition-colors ${
         active
           ? 'bg-purple-500/20 text-purple-300 border border-purple-500/40'
-          : 'bg-slate-900 text-slate-400 border border-slate-800 hover:border-slate-700'
+          : 'bg-ground text-muted border border-surface hover:border-hairline'
       }`}
     >
       {label} <span className="ml-1 opacity-60">{count}</span>
@@ -1634,13 +1634,13 @@ function FilterButton({ label, count, active, onClick }: { label: string; count:
 function SummaryStat({ label, value, urgent = false, onClick, active = false }: { label: string; value: string | number; urgent?: boolean; onClick?: () => void; active?: boolean }) {
   // Clickable stats act as filter shortcuts (Eric: the stat cards looked
   // interactive but weren't). A ring marks the active filter; hover affords it.
-  const base = `rounded-lg border p-5 text-center transition-colors ${urgent ? 'bg-red-950/30 border-red-500/30' : 'bg-slate-900 border-slate-800'}`;
+  const base = `rounded-lg border p-5 text-center transition-colors ${urgent ? 'bg-red-950/30 border-red-500/30' : 'bg-ground border-surface'}`;
   const interactive = onClick ? 'cursor-pointer hover:border-purple-500/50' : '';
   const ring = active ? (urgent ? 'ring-2 ring-red-500/60' : 'ring-2 ring-purple-500/60') : '';
   const content = (
     <>
       <div className={urgent ? 'text-2xl font-bold text-red-300' : 'text-2xl font-bold text-purple-300'}>{value}</div>
-      <div className={urgent ? 'text-xs uppercase tracking-wider text-red-300 mt-2' : 'text-xs uppercase tracking-wider text-slate-500 mt-2'}>{label}</div>
+      <div className={urgent ? 'text-xs uppercase tracking-wider text-red-300 mt-2' : 'text-xs uppercase tracking-wider text-faint mt-2'}>{label}</div>
     </>
   );
   if (onClick) {
