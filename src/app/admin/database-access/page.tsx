@@ -58,7 +58,7 @@ export default function AdminDatabaseAccessPage() {
         padding: '30px',
         boxShadow: '0 4px 6px rgba(0,0,0,0.1)',
       }}>
-        <h1 style={{ color: '#1e3a8a', marginTop: 0 }}>Database Access Admin</h1>
+        <h1 style={{ color: 'var(--color-navy)', marginTop: 0 }}>Database Access Admin</h1>
 
         {/* Quick Owner Access Section */}
         <div style={{

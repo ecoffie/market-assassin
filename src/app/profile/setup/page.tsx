@@ -225,7 +225,7 @@ function ProfileSetupContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1e3a8a] to-[#7c3aed]">
+    <div className="min-h-screen bg-gradient-to-br from-navy to-[#7c3aed]">
       {/* Header */}
       <header className="bg-white/10 backdrop-blur-sm border-b border-white/20">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center justify-between">
@@ -250,7 +250,7 @@ function ProfileSetupContent() {
                     step.id < currentStep
                       ? 'bg-green-500 text-white'
                       : step.id === currentStep
-                      ? 'bg-white text-[#1e3a8a]'
+                      ? 'bg-white text-navy'
                       : 'bg-white/30 text-white/60'
                   }`}
                 >
@@ -291,7 +291,7 @@ function ProfileSetupContent() {
                   type="email"
                   value={email}
                   onChange={(e) => setEmail(e.target.value)}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e3a8a] focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy focus:border-transparent"
                   placeholder="you@company.com"
                 />
               </div>
@@ -303,7 +303,7 @@ function ProfileSetupContent() {
                   type="text"
                   value={formData.companyName || ''}
                   onChange={(e) => setFormData({ ...formData, companyName: e.target.value })}
-                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e3a8a] focus:border-transparent"
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy focus:border-transparent"
                   placeholder="Your Company LLC"
                 />
               </div>
@@ -316,7 +316,7 @@ function ProfileSetupContent() {
                     type="text"
                     value={formData.cageCode || ''}
                     onChange={(e) => setFormData({ ...formData, cageCode: e.target.value.toUpperCase() })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e3a8a] focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy focus:border-transparent"
                     placeholder="5 characters"
                     maxLength={5}
                   />
@@ -328,7 +328,7 @@ function ProfileSetupContent() {
                   <select
                     value={formData.companySize || ''}
                     onChange={(e) => setFormData({ ...formData, companySize: e.target.value as ProfileUpdatePayload['companySize'] })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e3a8a] focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy focus:border-transparent"
                   >
                     <option value="">Select size...</option>
                     {COMPANY_SIZE_OPTIONS.map(opt => (
@@ -353,14 +353,14 @@ function ProfileSetupContent() {
                     value={naicsInput}
                     onChange={(e) => setNaicsInput(e.target.value.replace(/\D/g, ''))}
                     onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addNaics())}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e3a8a] focus:border-transparent"
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy focus:border-transparent"
                     placeholder="e.g., 541511"
                     maxLength={6}
                   />
                   <button
                     type="button"
                     onClick={addNaics}
-                    className="px-4 py-2 bg-[#1e3a8a] text-white rounded-lg hover:bg-[#1e40af]"
+                    className="px-4 py-2 bg-navy text-white rounded-lg hover:bg-navy"
                   >
                     Add
                   </button>
@@ -374,7 +374,7 @@ function ProfileSetupContent() {
                   {formData.naicsCodes.map(code => (
                     <span
                       key={code}
-                      className="inline-flex items-center gap-1 px-3 py-1 bg-[#1e3a8a]/10 text-[#1e3a8a] rounded-full text-sm"
+                      className="inline-flex items-center gap-1 px-3 py-1 bg-navy/10 text-navy rounded-full text-sm"
                     >
                       {code}
                       <button
@@ -399,13 +399,13 @@ function ProfileSetupContent() {
                     value={keywordInput}
                     onChange={(e) => setKeywordInput(e.target.value)}
                     onKeyDown={(e) => e.key === 'Enter' && (e.preventDefault(), addKeyword())}
-                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e3a8a] focus:border-transparent"
+                    className="flex-1 px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy focus:border-transparent"
                     placeholder="e.g., cybersecurity, cloud migration"
                   />
                   <button
                     type="button"
                     onClick={addKeyword}
-                    className="px-4 py-2 bg-[#1e3a8a] text-white rounded-lg hover:bg-[#1e40af]"
+                    className="px-4 py-2 bg-navy text-white rounded-lg hover:bg-navy"
                   >
                     Add
                   </button>
@@ -447,8 +447,8 @@ function ProfileSetupContent() {
                     onClick={() => toggleAgency(agency)}
                     className={`px-3 py-2 rounded-lg border text-sm font-medium transition-colors ${
                       formData.targetAgencies?.includes(agency)
-                        ? 'bg-[#1e3a8a] text-white border-[#1e3a8a]'
-                        : 'bg-white text-gray-700 border-gray-300 hover:border-[#1e3a8a]'
+                        ? 'bg-navy text-white border-navy'
+                        : 'bg-white text-gray-700 border-gray-300 hover:border-navy'
                     }`}
                   >
                     {agency}
@@ -476,15 +476,15 @@ function ProfileSetupContent() {
                       key={cert.value}
                       className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                         formData.certifications?.includes(cert.value)
-                          ? 'bg-[#1e3a8a]/10 border-[#1e3a8a]'
-                          : 'border-gray-300 hover:border-[#1e3a8a]'
+                          ? 'bg-navy/10 border-navy'
+                          : 'border-gray-300 hover:border-navy'
                       }`}
                     >
                       <input
                         type="checkbox"
                         checked={formData.certifications?.includes(cert.value) || false}
                         onChange={() => toggleCert(cert.value)}
-                        className="w-5 h-5 text-[#1e3a8a] rounded"
+                        className="w-5 h-5 text-navy rounded"
                       />
                       <span className="text-gray-700">{cert.label}</span>
                     </label>
@@ -527,7 +527,7 @@ function ProfileSetupContent() {
                   <select
                     value={formData.state || ''}
                     onChange={(e) => setFormData({ ...formData, state: e.target.value })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e3a8a] focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy focus:border-transparent"
                   >
                     <option value="">Select state...</option>
                     {US_STATES.map(s => (
@@ -543,7 +543,7 @@ function ProfileSetupContent() {
                     type="text"
                     value={formData.zipCode || ''}
                     onChange={(e) => setFormData({ ...formData, zipCode: e.target.value.replace(/\D/g, '').slice(0, 5) })}
-                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e3a8a] focus:border-transparent"
+                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy focus:border-transparent"
                     placeholder="12345"
                     maxLength={5}
                   />
@@ -560,8 +560,8 @@ function ProfileSetupContent() {
                       key={opt.value}
                       className={`flex items-center gap-3 p-3 rounded-lg border cursor-pointer transition-colors ${
                         formData.geographicPreference === opt.value
-                          ? 'bg-[#1e3a8a]/10 border-[#1e3a8a]'
-                          : 'border-gray-300 hover:border-[#1e3a8a]'
+                          ? 'bg-navy/10 border-navy'
+                          : 'border-gray-300 hover:border-navy'
                       }`}
                     >
                       <input
@@ -569,7 +569,7 @@ function ProfileSetupContent() {
                         name="geographicPreference"
                         checked={formData.geographicPreference === opt.value}
                         onChange={() => setFormData({ ...formData, geographicPreference: opt.value })}
-                        className="w-5 h-5 text-[#1e3a8a]"
+                        className="w-5 h-5 text-navy"
                       />
                       <span className="text-gray-700">{opt.label}</span>
                     </label>
@@ -597,7 +597,7 @@ function ProfileSetupContent() {
               type="button"
               onClick={handleNext}
               disabled={loading}
-              className="px-6 py-2 bg-gradient-to-r from-[#1e3a8a] to-[#7c3aed] text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50"
+              className="px-6 py-2 bg-gradient-to-r from-navy to-[#7c3aed] text-white rounded-lg font-medium hover:opacity-90 disabled:opacity-50"
             >
               {loading ? 'Saving...' : currentStep === STEPS.length ? 'Complete Setup' : 'Next'}
             </button>
@@ -626,7 +626,7 @@ function ProfileSetupContent() {
 
 function LoadingFallback() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1e3a8a] to-[#7c3aed] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-navy to-[#7c3aed] flex items-center justify-center p-4">
       <div className="max-w-2xl w-full">
         <div className="bg-white rounded-xl shadow-xl p-8 text-center">
           <div className="animate-pulse space-y-4">

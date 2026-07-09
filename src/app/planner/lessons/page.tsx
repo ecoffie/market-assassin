@@ -54,7 +54,7 @@ export default function LessonsPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link href="/planner" className="flex items-center gap-2">
-              <span className="text-xl font-bold text-[#1e40af]">GovCon Giants</span>
+              <span className="text-xl font-bold text-navy">GovCon Giants</span>
               <span className="text-xl font-bold text-gray-700">Planner</span>
             </Link>
           </div>
@@ -67,7 +67,7 @@ export default function LessonsPage() {
         <nav className="mb-6" aria-label="Breadcrumb">
           <ol className="flex items-center space-x-2 text-sm text-gray-600">
             <li>
-              <Link href="/planner" className="hover:text-[#1e40af] transition-colors">
+              <Link href="/planner" className="hover:text-navy transition-colors">
                 Home
               </Link>
             </li>
@@ -94,7 +94,7 @@ export default function LessonsPage() {
             onClick={() => setSelectedPhase('all')}
             className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
               selectedPhase === 'all'
-                ? 'bg-[#1e40af] text-white'
+                ? 'bg-navy text-white'
                 : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
             }`}
           >
@@ -106,7 +106,7 @@ export default function LessonsPage() {
               onClick={() => setSelectedPhase(phase.id)}
               className={`px-4 py-2 rounded-full text-sm font-medium transition-colors flex items-center gap-2 ${
                 selectedPhase === phase.id
-                  ? 'bg-[#1e40af] text-white'
+                  ? 'bg-navy text-white'
                   : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
               }`}
             >
@@ -121,7 +121,7 @@ export default function LessonsPage() {
           {filteredLessons.map((taskGroup, idx) => (
             <div key={idx} className="bg-white rounded-lg shadow-md border border-gray-200 overflow-hidden">
               {/* Task Header */}
-              <div className="bg-gradient-to-r from-[#1e40af] to-blue-600 px-6 py-4">
+              <div className="bg-gradient-to-r from-navy to-blue-600 px-6 py-4">
                 <div className="flex items-center gap-3">
                   <span className="text-2xl">{taskGroup.phaseIcon}</span>
                   <div>
@@ -142,10 +142,10 @@ export default function LessonsPage() {
                       className="bg-gray-50 rounded-lg p-4 hover:bg-gray-100 transition-colors border border-gray-100"
                     >
                       {/* Video Thumbnail Placeholder */}
-                      <div className="aspect-video bg-gradient-to-br from-[#1e40af]/10 to-purple-100 rounded-lg mb-3 flex items-center justify-center relative overflow-hidden">
+                      <div className="aspect-video bg-gradient-to-br from-navy/10 to-purple-100 rounded-lg mb-3 flex items-center justify-center relative overflow-hidden">
                         <div className="absolute inset-0 flex items-center justify-center">
                           <div className="w-14 h-14 rounded-full bg-white/90 flex items-center justify-center shadow-lg">
-                            <svg className="w-6 h-6 text-[#1e40af] ml-1" fill="currentColor" viewBox="0 0 24 24">
+                            <svg className="w-6 h-6 text-navy ml-1" fill="currentColor" viewBox="0 0 24 24">
                               <path d="M8 5v14l11-7z" />
                             </svg>
                           </div>
@@ -153,7 +153,7 @@ export default function LessonsPage() {
                         <div className="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-2 py-1 rounded">
                           {lesson.duration}
                         </div>
-                        <div className="absolute top-2 left-2 bg-[#1e40af] text-white text-xs font-bold px-2 py-1 rounded">
+                        <div className="absolute top-2 left-2 bg-navy text-white text-xs font-bold px-2 py-1 rounded">
                           Part {lessonIdx + 1}
                         </div>
                       </div>
@@ -167,7 +167,7 @@ export default function LessonsPage() {
                             href={`https://vimeo.com/${lesson.vimeoId}`}
                             target="_blank"
                             rel="noopener noreferrer"
-                            className="px-3 py-1.5 bg-[#1e40af] text-white text-xs font-medium rounded-md hover:bg-blue-700 transition-colors"
+                            className="px-3 py-1.5 bg-navy text-white text-xs font-medium rounded-md hover:bg-blue-700 transition-colors"
                           >
                             Watch Now
                           </a>
@@ -192,14 +192,14 @@ export default function LessonsPage() {
         )}
 
         {/* Call to Action */}
-        <div className="mt-8 bg-gradient-to-r from-[#1e40af] to-purple-600 rounded-lg p-8 text-center text-white">
+        <div className="mt-8 bg-gradient-to-r from-navy to-purple-600 rounded-lg p-8 text-center text-white">
           <h2 className="text-2xl font-bold mb-2">Ready to Put This Knowledge to Work?</h2>
           <p className="mb-6 text-white/90">
             Track your progress and complete tasks in your Action Plan
           </p>
           <Link
             href="/planner"
-            className="inline-block px-6 py-3 bg-white text-[#1e40af] rounded-lg hover:bg-gray-100 transition-colors font-semibold"
+            className="inline-block px-6 py-3 bg-white text-navy rounded-lg hover:bg-gray-100 transition-colors font-semibold"
           >
             Go to Dashboard
           </Link>

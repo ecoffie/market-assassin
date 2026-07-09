@@ -172,7 +172,7 @@ export default function ResourcesPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link href="/planner" className="flex items-center gap-2">
-              <span className="text-xl font-bold text-[#1e40af]">GovCon Giants</span>
+              <span className="text-xl font-bold text-navy">GovCon Giants</span>
               <span className="text-xl font-bold text-gray-700">Planner</span>
             </Link>
           </div>
@@ -185,7 +185,7 @@ export default function ResourcesPage() {
         <nav className="mb-6" aria-label="Breadcrumb">
           <ol className="flex items-center space-x-2 text-sm text-gray-600">
             <li>
-              <Link href="/planner" className="hover:text-[#1e40af] transition-colors">
+              <Link href="/planner" className="hover:text-navy transition-colors">
                 Home
               </Link>
             </li>
@@ -207,7 +207,7 @@ export default function ResourcesPage() {
         </div>
 
         {/* Motivational Quote Section */}
-        <div className="bg-gradient-to-r from-[#1e40af] to-blue-600 rounded-lg shadow-md p-6 mb-8 text-white">
+        <div className="bg-gradient-to-r from-navy to-blue-600 rounded-lg shadow-md p-6 mb-8 text-white">
           <div className="flex items-center gap-4">
             <div className="text-4xl">💪</div>
             <div className="flex-1">
@@ -233,7 +233,7 @@ export default function ResourcesPage() {
 
         {/* Phase Training Videos Section */}
         <section className="mb-12">
-          <h2 className="text-2xl font-bold text-[#1e40af] mb-6 flex items-center gap-2">
+          <h2 className="text-2xl font-bold text-navy mb-6 flex items-center gap-2">
             <span>📹</span>
             Phase Training Videos
           </h2>
@@ -255,8 +255,8 @@ export default function ResourcesPage() {
                   </div>
                 ) : (
                   <div className="aspect-video bg-gradient-to-br from-gray-100 to-gray-200 flex flex-col items-center justify-center">
-                    <div className="w-16 h-16 rounded-full bg-[#1e40af]/10 flex items-center justify-center mb-3">
-                      <svg className="w-8 h-8 text-[#1e40af]" fill="currentColor" viewBox="0 0 24 24">
+                    <div className="w-16 h-16 rounded-full bg-navy/10 flex items-center justify-center mb-3">
+                      <svg className="w-8 h-8 text-navy" fill="currentColor" viewBox="0 0 24 24">
                         <path d="M8 5v14l11-7z" />
                       </svg>
                     </div>
@@ -265,7 +265,7 @@ export default function ResourcesPage() {
                 )}
                 <div className="p-4">
                   <div className="flex items-center gap-2 mb-2">
-                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-[#1e40af]/10 text-[#1e40af]">
+                    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-navy/10 text-navy">
                       Phase {video.phase}
                     </span>
                   </div>
@@ -279,7 +279,7 @@ export default function ResourcesPage() {
 
         {/* Downloadable Templates Section */}
         <section className="mb-12">
-          <h2 className="text-2xl font-bold text-[#1e40af] mb-6 flex items-center gap-2">
+          <h2 className="text-2xl font-bold text-navy mb-6 flex items-center gap-2">
             <span>📥</span>
             Downloadable Templates
           </h2>
@@ -298,7 +298,7 @@ export default function ResourcesPage() {
                       href={template.file}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="inline-flex items-center gap-2 px-4 py-2 bg-[#1e40af] text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
+                      className="inline-flex items-center gap-2 px-4 py-2 bg-navy text-white rounded-md hover:bg-blue-700 transition-colors text-sm font-medium"
                     >
                       <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -314,7 +314,7 @@ export default function ResourcesPage() {
 
         {/* Quick Tips Section */}
         <section className="mb-12">
-          <h2 className="text-2xl font-bold text-[#1e40af] mb-6 flex items-center gap-2">
+          <h2 className="text-2xl font-bold text-navy mb-6 flex items-center gap-2">
             <span>💡</span>
             Quick Tips from Bootcamp
           </h2>
@@ -344,7 +344,7 @@ export default function ResourcesPage() {
           </p>
           <Link
             href="/planner"
-            className="inline-block px-6 py-3 bg-[#1e40af] text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
+            className="inline-block px-6 py-3 bg-navy text-white rounded-lg hover:bg-blue-700 transition-colors font-medium"
           >
             Return to Dashboard
           </Link>

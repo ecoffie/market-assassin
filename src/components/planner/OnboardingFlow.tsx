@@ -49,7 +49,7 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
             <div
               key={i}
               className={`h-2 rounded-full transition-all duration-300 ${
-                i === screen ? 'w-8 bg-[#1e40af]' : 'w-2 bg-gray-300'
+                i === screen ? 'w-8 bg-navy' : 'w-2 bg-gray-300'
               }`}
             />
           ))}
@@ -59,7 +59,7 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
           {/* Screen 1: Welcome */}
           {screen === 0 && (
             <div>
-              <div className="bg-gradient-to-r from-[#1e40af] to-blue-600 px-8 py-10 text-center">
+              <div className="bg-gradient-to-r from-navy to-blue-600 px-8 py-10 text-center">
                 <h1 className="text-2xl font-bold text-white mb-2">
                   Welcome to your GovCon Action Plan!
                 </h1>
@@ -74,7 +74,7 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
                 </p>
                 <button
                   onClick={() => setScreen(1)}
-                  className="w-full bg-[#1e40af] text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                  className="w-full bg-navy text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
                 >
                   Next
                 </button>
@@ -85,7 +85,7 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
           {/* Screen 2: Your 5 Phases */}
           {screen === 1 && (
             <div>
-              <div className="bg-gradient-to-r from-[#1e40af] to-blue-600 px-8 py-6 text-center">
+              <div className="bg-gradient-to-r from-navy to-blue-600 px-8 py-6 text-center">
                 <h2 className="text-xl font-bold text-white">Your 5 Phases</h2>
               </div>
               <div className="px-8 py-6">
@@ -114,7 +114,7 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
                   </button>
                   <button
                     onClick={() => setScreen(2)}
-                    className="flex-1 bg-[#1e40af] text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
+                    className="flex-1 bg-navy text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors"
                   >
                     Next
                   </button>
@@ -126,7 +126,7 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
           {/* Screen 3: Track Your Progress */}
           {screen === 2 && (
             <div>
-              <div className="bg-gradient-to-r from-[#1e40af] to-blue-600 px-8 py-6 text-center">
+              <div className="bg-gradient-to-r from-navy to-blue-600 px-8 py-6 text-center">
                 <h2 className="text-xl font-bold text-white">Track Your Progress</h2>
               </div>
               <div className="px-8 py-6">
@@ -166,7 +166,7 @@ export default function OnboardingFlow({ userId, onComplete }: OnboardingFlowPro
                   <button
                     onClick={handleGetStarted}
                     disabled={isCompleting}
-                    className="flex-1 bg-[#1e40af] text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                    className="flex-1 bg-navy text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                   >
                     {isCompleting ? (
                       <span className="flex items-center justify-center gap-2">

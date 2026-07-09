@@ -45,7 +45,7 @@ function CircularProgress({ percentage, size = 200 }: { percentage: number; size
           cx={size / 2}
           cy={size / 2}
           r={radius}
-          stroke={percentage === 100 ? '#10b981' : '#1e40af'}
+          stroke={percentage === 100 ? 'var(--color-ok)' : 'var(--color-navy)'}
           strokeWidth="12"
           fill="none"
           strokeDasharray={circumference}
@@ -56,7 +56,7 @@ function CircularProgress({ percentage, size = 200 }: { percentage: number; size
       </svg>
       <div className="absolute inset-0 flex items-center justify-center">
         <div className="text-center">
-          <div className={`text-4xl font-bold ${percentage === 100 ? 'text-green-600' : 'text-[#1e40af]'}`}>{percentage}%</div>
+          <div className={`text-4xl font-bold ${percentage === 100 ? 'text-green-600' : 'text-navy'}`}>{percentage}%</div>
         </div>
       </div>
     </div>
@@ -82,7 +82,7 @@ function UserDropdown({ email }: { email?: string }) {
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 rounded-full bg-gray-100 hover:bg-gray-200 p-2 transition-colors"
       >
-        <div className="h-8 w-8 rounded-full bg-[#1e40af] flex items-center justify-center text-white font-semibold">
+        <div className="h-8 w-8 rounded-full bg-navy flex items-center justify-center text-white font-semibold">
           {initials}
         </div>
         <svg
@@ -162,7 +162,7 @@ function PhaseCard({ phase }: { phase: PhaseDisplay }) {
         </div>
         <div className="w-full bg-gray-200 rounded-full h-2.5">
           <div
-            className={`h-2.5 rounded-full transition-all duration-500 ${phase.progress === 100 ? 'bg-green-500' : 'bg-[#1e40af]'}`}
+            className={`h-2.5 rounded-full transition-all duration-500 ${phase.progress === 100 ? 'bg-green-500' : 'bg-navy'}`}
             style={{ width: `${phase.progress}%` }}
           />
         </div>
@@ -170,7 +170,7 @@ function PhaseCard({ phase }: { phase: PhaseDisplay }) {
 
       <Link
         href={`/planner/phase/${phase.id}`}
-        className="block w-full text-center px-4 py-2 bg-[#1e40af] text-white rounded-md hover:bg-blue-700 transition-colors font-medium text-sm"
+        className="block w-full text-center px-4 py-2 bg-navy text-white rounded-md hover:bg-blue-700 transition-colors font-medium text-sm"
       >
         View Phase
       </Link>
@@ -191,7 +191,7 @@ function GamificationCard({ data }: { data: GamificationData }) {
         <div className="flex items-center gap-3">
           <div className="text-3xl">🔥</div>
           <div>
-            <div className="text-2xl font-bold text-[#1e40af]">{data.currentStreak}</div>
+            <div className="text-2xl font-bold text-navy">{data.currentStreak}</div>
             <div className="text-sm text-gray-500">day streak</div>
           </div>
         </div>
@@ -200,7 +200,7 @@ function GamificationCard({ data }: { data: GamificationData }) {
         <div className="flex items-center gap-3">
           <div className="text-3xl">⭐</div>
           <div>
-            <div className="text-2xl font-bold text-[#1e40af]">{data.longestStreak}</div>
+            <div className="text-2xl font-bold text-navy">{data.longestStreak}</div>
             <div className="text-sm text-gray-500">best streak</div>
           </div>
         </div>
@@ -209,7 +209,7 @@ function GamificationCard({ data }: { data: GamificationData }) {
         <div className="flex items-center gap-3">
           <div className="text-3xl">🏆</div>
           <div>
-            <div className="text-2xl font-bold text-[#1e40af]">{data.badges.length}</div>
+            <div className="text-2xl font-bold text-navy">{data.badges.length}</div>
             <div className="text-sm text-gray-500">badges earned</div>
           </div>
         </div>
@@ -225,7 +225,7 @@ function GamificationCard({ data }: { data: GamificationData }) {
                 key={badge.id}
                 className={`flex items-center gap-1.5 px-3 py-1.5 rounded-full text-sm ${
                   earned
-                    ? 'bg-[#1e40af] text-white'
+                    ? 'bg-navy text-white'
                     : 'bg-gray-100 text-gray-400'
                 }`}
                 title={earned ? `${badge.name}: ${badge.description}` : `Locked: ${badge.description}`}
@@ -282,7 +282,7 @@ function Sidebar({ isOpen, onClose, phases }: { isOpen: boolean; onClose: () => 
               >
                 <span className="text-2xl">{phase.icon}</span>
                 <div className="flex-1">
-                  <div className="font-medium text-gray-900 group-hover:text-[#1e40af] transition-colors">
+                  <div className="font-medium text-gray-900 group-hover:text-navy transition-colors">
                     {phase.name}
                   </div>
                   <div className="text-xs text-gray-500">
@@ -294,7 +294,7 @@ function Sidebar({ isOpen, onClose, phases }: { isOpen: boolean; onClose: () => 
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
                   </svg>
                 ) : (
-                  <div className="w-2 h-2 rounded-full bg-[#1e40af] opacity-60" />
+                  <div className="w-2 h-2 rounded-full bg-navy opacity-60" />
                 )}
               </Link>
             ))}
@@ -308,14 +308,14 @@ function Sidebar({ isOpen, onClose, phases }: { isOpen: boolean; onClose: () => 
               >
                 <span className="text-2xl">🎬</span>
                 <div className="flex-1">
-                  <div className="font-medium text-gray-900 group-hover:text-[#1e40af] transition-colors">
+                  <div className="font-medium text-gray-900 group-hover:text-navy transition-colors">
                     Training Videos
                   </div>
                   <div className="text-xs text-gray-500">
                     Micro-lessons library
                   </div>
                 </div>
-                <svg className="h-4 w-4 text-gray-400 group-hover:text-[#1e40af] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-4 w-4 text-gray-400 group-hover:text-navy transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </Link>
@@ -327,14 +327,14 @@ function Sidebar({ isOpen, onClose, phases }: { isOpen: boolean; onClose: () => 
               >
                 <span className="text-2xl">📚</span>
                 <div className="flex-1">
-                  <div className="font-medium text-gray-900 group-hover:text-[#1e40af] transition-colors">
+                  <div className="font-medium text-gray-900 group-hover:text-navy transition-colors">
                     Resources
                   </div>
                   <div className="text-xs text-gray-500">
                     Templates & tips
                   </div>
                 </div>
-                <svg className="h-4 w-4 text-gray-400 group-hover:text-[#1e40af] transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <svg className="h-4 w-4 text-gray-400 group-hover:text-navy transition-colors" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                 </svg>
               </Link>
@@ -432,7 +432,7 @@ export default function PlannerPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1e40af] mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy mx-auto mb-4"></div>
           <p className="text-gray-600">Loading your action plan...</p>
         </div>
       </div>
@@ -470,7 +470,7 @@ export default function PlannerPage() {
                 </svg>
               </button>
               <Link href="/planner" className="flex items-center gap-2">
-                <span className="text-xl font-bold text-[#1e40af]">GovCon Giants</span>
+                <span className="text-xl font-bold text-navy">GovCon Giants</span>
                 <span className="text-xl font-bold text-gray-700">Planner</span>
               </Link>
             </div>
@@ -512,7 +512,7 @@ export default function PlannerPage() {
                   </p>
 
                   {/* Motivational Quote Card */}
-                  <div className="bg-gradient-to-r from-[#1e40af] to-blue-600 rounded-lg p-4 text-white shadow-md">
+                  <div className="bg-gradient-to-r from-navy to-blue-600 rounded-lg p-4 text-white shadow-md">
                     <p className="text-lg font-semibold italic mb-1">
                       &quot;{quotes[currentQuote].text}&quot;
                     </p>

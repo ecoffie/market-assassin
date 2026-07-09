@@ -43,7 +43,7 @@ export default function ForgotPasswordPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link href="/" className="flex items-center gap-2">
-              <span className="text-xl font-bold text-[#1e40af]">GovCon Giants</span>
+              <span className="text-xl font-bold text-navy">GovCon Giants</span>
               <span className="text-xl font-bold text-gray-700">Planner</span>
             </Link>
           </div>
@@ -74,7 +74,7 @@ export default function ForgotPasswordPage() {
                 </div>
                 <Link
                   href="/planner/login"
-                  className="text-[#1e40af] hover:underline font-medium"
+                  className="text-navy hover:underline font-medium"
                 >
                   Back to Sign In
                 </Link>
@@ -90,7 +90,7 @@ export default function ForgotPasswordPage() {
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-[#1e40af] focus:border-transparent outline-none transition-all"
+                    className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-navy focus:border-transparent outline-none transition-all"
                     placeholder="you@example.com"
                     disabled={isLoading}
                   />
@@ -99,7 +99,7 @@ export default function ForgotPasswordPage() {
                 <button
                   type="submit"
                   disabled={isLoading}
-                  className="w-full bg-[#1e40af] text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full bg-navy text-white py-3 px-4 rounded-lg font-semibold hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   {isLoading ? (
                     <span className="flex items-center justify-center gap-2">
@@ -117,7 +117,7 @@ export default function ForgotPasswordPage() {
                 <div className="text-center">
                   <Link
                     href="/planner/login"
-                    className="text-[#1e40af] hover:underline font-medium"
+                    className="text-navy hover:underline font-medium"
                   >
                     Back to Sign In
                   </Link>

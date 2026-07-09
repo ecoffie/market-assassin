@@ -6,8 +6,8 @@ export default function ProBundlePage() {
       title="Pro Giant Bundle"
       tagline="The complete toolkit for serious government contractors"
       description="Ready to take your GovCon business to the next level? The Pro Giant Bundle combines powerful market intelligence, daily bid targets, and content creation tools to help you find, analyze, and win more contracts."
-      primaryColor="#1e40af"
-      gradientFrom="#1e40af"
+      primaryColor="#1e3a8a"
+      gradientFrom="#1e3a8a"
       gradientTo="#7c3aed"
       price={997}
       originalPrice={1976}

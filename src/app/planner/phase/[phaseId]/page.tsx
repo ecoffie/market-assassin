@@ -292,7 +292,7 @@ function AccordionItem({
       onDragOver={onDragOver}
       onDrop={onDrop}
       className={`border rounded-lg mb-2 bg-white shadow-sm transition-all ${
-        isDragTarget ? 'border-[#1e40af] border-2 shadow-md' : 'border-gray-200'
+        isDragTarget ? 'border-navy border-2 shadow-md' : 'border-gray-200'
       }`}
     >
       <div
@@ -314,7 +314,7 @@ function AccordionItem({
               e.stopPropagation();
               handleCheckboxChange(e.target.checked);
             }}
-            className="w-5 h-5 rounded border-gray-300 text-[#1e40af] focus:ring-[#1e40af] cursor-pointer"
+            className="w-5 h-5 rounded border-gray-300 text-navy focus:ring-navy cursor-pointer"
             disabled={isSaving}
           />
         </div>
@@ -381,8 +381,8 @@ function AccordionItem({
 
             {/* Video Lessons Section */}
             {localTask.videoLessons && localTask.videoLessons.length > 0 && (
-              <div className="bg-gradient-to-r from-[#1e40af]/5 to-purple-50 rounded-lg p-4">
-                <h4 className="text-sm font-semibold text-[#1e40af] mb-3 flex items-center gap-2">
+              <div className="bg-gradient-to-r from-navy/5 to-purple-50 rounded-lg p-4">
+                <h4 className="text-sm font-semibold text-navy mb-3 flex items-center gap-2">
                   <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
                     <path d="M8 5v14l11-7z" />
                   </svg>
@@ -392,11 +392,11 @@ function AccordionItem({
                   {localTask.videoLessons.map((video, idx) => (
                     <div
                       key={video.id}
-                      className="flex items-center justify-between bg-white rounded-lg p-3 shadow-sm border border-gray-100 hover:border-[#1e40af]/30 transition-colors"
+                      className="flex items-center justify-between bg-white rounded-lg p-3 shadow-sm border border-gray-100 hover:border-navy/30 transition-colors"
                       onClick={(e) => e.stopPropagation()}
                     >
                       <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-[#1e40af]/10 flex items-center justify-center text-[#1e40af] font-semibold text-sm">
+                        <div className="w-8 h-8 rounded-full bg-navy/10 flex items-center justify-center text-navy font-semibold text-sm">
                           {idx + 1}
                         </div>
                         <div>
@@ -410,7 +410,7 @@ function AccordionItem({
                             e.stopPropagation();
                             setActiveVideo({ vimeoId: video.vimeoId!, title: video.title });
                           }}
-                          className="px-3 py-1.5 bg-[#1e40af] text-white text-xs font-medium rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1"
+                          className="px-3 py-1.5 bg-navy text-white text-xs font-medium rounded-md hover:bg-blue-700 transition-colors flex items-center gap-1"
                         >
                           <svg className="h-3 w-3" fill="currentColor" viewBox="0 0 24 24">
                             <path d="M8 5v14l11-7z" />
@@ -444,7 +444,7 @@ function AccordionItem({
                   value={localTask.dueDate || ''}
                   onChange={(e) => handleFieldUpdate('dueDate', e.target.value)}
                   onClick={(e) => e.stopPropagation()}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1e40af] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-navy focus:border-transparent"
                 />
               </div>
 
@@ -458,7 +458,7 @@ function AccordionItem({
                   onChange={(e) => handleFieldUpdate('link', e.target.value)}
                   onClick={(e) => e.stopPropagation()}
                   placeholder="https://..."
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1e40af] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-navy focus:border-transparent"
                 />
                 {localTask.link && (
                   <a
@@ -466,7 +466,7 @@ function AccordionItem({
                     target="_blank"
                     rel="noopener noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="inline-flex items-center gap-1 mt-1 text-sm text-[#1e40af] hover:underline"
+                    className="inline-flex items-center gap-1 mt-1 text-sm text-navy hover:underline"
                   >
                     <svg className="h-3 w-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
@@ -487,7 +487,7 @@ function AccordionItem({
                 onClick={(e) => e.stopPropagation()}
                 placeholder="Add your notes here..."
                 rows={3}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1e40af] focus:border-transparent resize-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-navy focus:border-transparent resize-none"
               />
             </div>
           </div>
@@ -567,7 +567,7 @@ function AddTaskModal({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 required
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1e40af] focus:border-transparent"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-navy focus:border-transparent"
                 placeholder="Enter task title"
               />
             </div>
@@ -580,7 +580,7 @@ function AddTaskModal({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={4}
-                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1e40af] focus:border-transparent resize-none"
+                className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-navy focus:border-transparent resize-none"
                 placeholder="Enter task description"
               />
             </div>
@@ -594,7 +594,7 @@ function AddTaskModal({
                   type="date"
                   value={dueDate}
                   onChange={(e) => setDueDate(e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-[#1e40af] focus:border-transparent"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-navy focus:border-transparent"
                 />
               </div>
 
@@ -609,7 +609,7 @@ function AddTaskModal({
             <div className="flex gap-3 pt-4">
               <button
                 type="submit"
-                className="flex-1 px-4 py-2 bg-[#1e40af] text-white rounded-md hover:bg-blue-700 transition-colors font-medium"
+                className="flex-1 px-4 py-2 bg-navy text-white rounded-md hover:bg-blue-700 transition-colors font-medium"
               >
                 Add Task
               </button>
@@ -693,7 +693,7 @@ function Toast({ message, onClose }: { message: string; onClose: () => void }) {
   }, [onClose]);
 
   return (
-    <div className="fixed bottom-6 right-6 z-50 bg-[#1e40af] text-white px-6 py-3 rounded-lg shadow-xl flex items-center gap-3 animate-[slideUp_0.3s_ease-out]">
+    <div className="fixed bottom-6 right-6 z-50 bg-navy text-white px-6 py-3 rounded-lg shadow-xl flex items-center gap-3 animate-[slideUp_0.3s_ease-out]">
       <span className="text-xl">🏆</span>
       <span className="font-medium">{message}</span>
       <button onClick={onClose} className="ml-2 text-white/70 hover:text-white">
@@ -988,7 +988,7 @@ export default function PhaseDetailPage() {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[#1e40af] mx-auto mb-4"></div>
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-navy mx-auto mb-4"></div>
           <p className="text-gray-600">Loading phase tasks...</p>
         </div>
       </div>
@@ -1018,7 +1018,7 @@ export default function PhaseDetailPage() {
         <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex items-center justify-between h-16">
             <Link href="/planner" className="flex items-center gap-2">
-              <span className="text-xl font-bold text-[#1e40af]">GovCon Giants</span>
+              <span className="text-xl font-bold text-navy">GovCon Giants</span>
               <span className="text-xl font-bold text-gray-700">Planner</span>
             </Link>
           </div>
@@ -1038,7 +1038,7 @@ export default function PhaseDetailPage() {
         <nav className="mb-6" aria-label="Breadcrumb">
           <ol className="flex items-center space-x-2 text-sm text-gray-600">
             <li>
-              <Link href="/planner" className="hover:text-[#1e40af] transition-colors">
+              <Link href="/planner" className="hover:text-navy transition-colors">
                 Home
               </Link>
             </li>
@@ -1072,7 +1072,7 @@ export default function PhaseDetailPage() {
           {/* Progress Bar */}
           <div className="w-full bg-gray-200 rounded-full h-3">
             <div
-              className={`h-3 rounded-full transition-all duration-500 ${progress === 100 ? 'bg-green-500' : 'bg-[#1e40af]'}`}
+              className={`h-3 rounded-full transition-all duration-500 ${progress === 100 ? 'bg-green-500' : 'bg-navy'}`}
               style={{ width: `${progress}%` }}
             />
           </div>
@@ -1086,7 +1086,7 @@ export default function PhaseDetailPage() {
               onClick={() => setFilter(f.key)}
               className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
                 filter === f.key
-                  ? 'bg-[#1e40af] text-white'
+                  ? 'bg-navy text-white'
                   : 'bg-white text-gray-600 border border-gray-200 hover:bg-gray-50'
               }`}
             >
@@ -1135,7 +1135,7 @@ export default function PhaseDetailPage() {
         <div className="flex flex-col sm:flex-row gap-4">
           <button
             onClick={() => setShowAddModal(true)}
-            className="flex-1 px-6 py-3 bg-[#1e40af] text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md flex items-center justify-center gap-2"
+            className="flex-1 px-6 py-3 bg-navy text-white rounded-lg hover:bg-blue-700 transition-colors font-medium shadow-md flex items-center justify-center gap-2"
           >
             <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -1146,7 +1146,7 @@ export default function PhaseDetailPage() {
           <button
             onClick={handleExportPDF}
             disabled={isExporting}
-            className="flex-1 px-6 py-3 border-2 border-[#1e40af] text-[#1e40af] rounded-lg hover:bg-blue-50 transition-colors font-medium shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex-1 px-6 py-3 border-2 border-navy text-navy rounded-lg hover:bg-blue-50 transition-colors font-medium shadow-md flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isExporting ? (
               <>

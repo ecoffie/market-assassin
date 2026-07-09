@@ -51,7 +51,7 @@ function ProfileCompleteContent() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1e3a8a] to-[#7c3aed] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-navy to-[#7c3aed] flex items-center justify-center p-4">
       <div className="max-w-lg w-full">
         {/* Success card */}
         <div className="bg-white rounded-xl shadow-xl p-8 text-center">
@@ -116,12 +116,12 @@ function ProfileCompleteContent() {
           <div className="mb-6">
             <div className="flex items-center justify-between mb-2">
               <span className="text-sm text-gray-500">Profile Completeness</span>
-              <span className="text-sm font-bold text-[#1e3a8a]">{completeness}%</span>
+              <span className="text-sm font-bold text-navy">{completeness}%</span>
             </div>
             <div className="h-3 bg-gray-200 rounded-full overflow-hidden">
               <div
                 className={`h-full rounded-full transition-all duration-1000 ${
-                  completeness >= 80 ? 'bg-green-500' : completeness >= 50 ? 'bg-yellow-500' : 'bg-[#1e3a8a]'
+                  completeness >= 80 ? 'bg-green-500' : completeness >= 50 ? 'bg-yellow-500' : 'bg-navy'
                 }`}
                 style={{ width: `${completeness}%` }}
               />
@@ -139,13 +139,13 @@ function ProfileCompleteContent() {
             <div className="grid grid-cols-1 gap-3">
               <Link
                 href="/app"
-                className="block px-4 py-3 bg-gradient-to-r from-[#1e3a8a] to-[#7c3aed] text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
+                className="block px-4 py-3 bg-gradient-to-r from-navy to-[#7c3aed] text-white rounded-lg font-medium hover:opacity-90 transition-opacity"
               >
                 Open Mindy Dashboard
               </Link>
               <Link
                 href="/opportunity-hunter"
-                className="block px-4 py-3 bg-white border-2 border-[#1e3a8a] text-[#1e3a8a] rounded-lg font-medium hover:bg-[#1e3a8a]/5 transition-colors"
+                className="block px-4 py-3 bg-white border-2 border-navy text-navy rounded-lg font-medium hover:bg-navy/5 transition-colors"
               >
                 Find Opportunities
               </Link>
@@ -173,7 +173,7 @@ function ProfileCompleteContent() {
 
 function LoadingFallback() {
   return (
-    <div className="min-h-screen bg-gradient-to-br from-[#1e3a8a] to-[#7c3aed] flex items-center justify-center p-4">
+    <div className="min-h-screen bg-gradient-to-br from-navy to-[#7c3aed] flex items-center justify-center p-4">
       <div className="max-w-lg w-full">
         <div className="bg-white rounded-xl shadow-xl p-8 text-center">
           <div className="animate-pulse">

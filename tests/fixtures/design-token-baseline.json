@@ -441,7 +441,7 @@
       "neutral": 10
     },
     "src/components/planner/OnboardingFlow.tsx": {
-      "hex": 7,
+      "hex": 0,
       "neutral": 19
     },
     "src/components/seo/FacetPage.tsx": {
@@ -781,31 +781,31 @@
       "neutral": 1
     },
     "src/app/planner/forgot-password/page.tsx": {
-      "hex": 5,
+      "hex": 0,
       "neutral": 8
     },
     "src/app/planner/lessons/page.tsx": {
-      "hex": 11,
+      "hex": 0,
       "neutral": 25
     },
     "src/app/planner/login/page.tsx": {
-      "hex": 7,
+      "hex": 0,
       "neutral": 26
     },
     "src/app/planner/page.tsx": {
-      "hex": 17,
+      "hex": 0,
       "neutral": 48
     },
     "src/app/planner/phase/[phaseId]/page.tsx": {
-      "hex": 26,
+      "hex": 0,
       "neutral": 76
     },
     "src/app/planner/reset-password/page.tsx": {
-      "hex": 5,
+      "hex": 0,
       "neutral": 10
     },
     "src/app/planner/resources/page.tsx": {
-      "hex": 12,
+      "hex": 0,
       "neutral": 24
     },
     "src/app/pricing/page.tsx": {
@@ -817,11 +817,11 @@
       "neutral": 4
     },
     "src/app/profile/complete/page.tsx": {
-      "hex": 11,
+      "hex": 3,
       "neutral": 17
     },
     "src/app/profile/setup/page.tsx": {
-      "hex": 32,
+      "hex": 3,
       "neutral": 35
     },
     "src/app/purchase/success/page.tsx": {
@@ -889,6 +889,6 @@
       "neutral": 15
     }
   },
-  "totalHex": 135,
+  "totalHex": 8,
   "totalNeutral": 10563
 }
