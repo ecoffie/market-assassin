@@ -716,7 +716,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
   };
 
   const getNoticeTypeBadge = (type?: string) => {
-    if (!type) return 'bg-slate-500/20 text-slate-400';
+    if (!type) return 'bg-slate-500/20 text-muted';
     const lowerType = type.toLowerCase();
     if (lowerType.includes('solicitation') && !lowerType.includes('presolicitation')) {
       return 'bg-green-500/20 text-green-400';
@@ -733,7 +733,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
     if (lowerType.includes('rfq')) {
       return 'bg-blue-500/20 text-blue-400';
     }
-    return 'bg-slate-500/20 text-slate-400';
+    return 'bg-slate-500/20 text-muted';
   };
 
   const formatDate = (dateStr?: string) => {
@@ -866,7 +866,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
           their inbox: title, date, match count, profile filter summary.
           Mobile: stack title above buttons, tighter padding so the
           title doesn't word-wrap to one-word-per-line. */}
-      <div className="rounded-xl overflow-hidden border border-slate-800">
+      <div className="rounded-xl overflow-hidden border border-surface">
         <div className="bg-gradient-to-br from-slate-950 to-slate-900 px-4 md:px-6 py-4 md:py-5">
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 md:gap-4">
             <div className="min-w-0">
@@ -876,10 +876,10 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                   {isFreeTier ? 'Mindy Daily Alerts' : 'Mindy Saved Search Alert'}
                 </h1>
                 {isFreeTier && (
-                  <span className="px-2 py-0.5 text-xs bg-slate-800 text-slate-300 rounded shrink-0">Free</span>
+                  <span className="px-2 py-0.5 text-xs bg-surface text-ink-soft rounded shrink-0">Free</span>
                 )}
               </div>
-              <p className="text-sm text-slate-400 mt-1">
+              <p className="text-sm text-muted mt-1">
                 {todayFormatted}
                 {totalCount > 0 && <span className="text-emerald-400 ml-2">• {totalCount} matches found</span>}
               </p>
@@ -888,7 +888,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
               <button
                 onClick={loadAlerts}
                 disabled={isLoading}
-                className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm rounded-lg transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-surface hover:bg-input text-ink-soft text-sm rounded-lg transition-colors disabled:opacity-50"
               >
                 {isLoading ? 'Refreshing…' : <><RefreshCw className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> Refresh</>}
               </button>
@@ -922,12 +922,12 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
             Mobile: stack as wrapping flex rows so NAICS badges don't
             squeeze into a 30px column. */}
         {(searchCriteria.naicsCodes.length > 0 || searchCriteria.businessType || searchCriteria.setAsidePreferences.length > 0 || searchCriteria.locationStates.length > 0) && (
-          <div className="bg-slate-900 border-t border-slate-800 px-4 md:px-6 py-3 text-xs text-slate-400">
+          <div className="bg-ground border-t border-surface px-4 md:px-6 py-3 text-xs text-muted">
             <div className="flex flex-wrap items-center gap-x-3 gap-y-2">
-              <span className="font-semibold text-slate-300">Filters:</span>
+              <span className="font-semibold text-ink-soft">Filters:</span>
               {searchCriteria.naicsCodes.length > 0 && (
                 <span className="inline-flex items-center gap-1.5 align-middle flex-wrap">
-                  <span className="text-slate-300">NAICS</span>
+                  <span className="text-ink-soft">NAICS</span>
                   <NaicsBadgeList codes={searchCriteria.naicsCodes} max={3} size="sm" />
                 </span>
               )}
@@ -947,7 +947,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                 </span>
               )}
               {searchCriteria.locationStates.length === 0 && (
-                <span className="text-slate-500">• States: all (national)</span>
+                <span className="text-faint">• States: all (national)</span>
               )}
             </div>
           </div>
@@ -958,15 +958,15 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
           they're tracking, and nudges the "add missing codes" action in Settings.
           Reuses the same keyword-coverage number as the targeting card. */}
       {coverage && coverage.totalMarket > 0 && (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm">
+        <div className="rounded-xl border border-surface bg-ground/60 px-4 py-3 text-sm">
           {coverage.missing.length === 0 ? (
-            <span className="inline-flex items-center gap-1 text-slate-300">
+            <span className="inline-flex items-center gap-1 text-ink-soft">
               <Check className="h-3.5 w-3.5 shrink-0 text-emerald-300" strokeWidth={2.5} /> Tracking{' '}
               <span className="text-emerald-300 font-semibold">{Math.round((coverage.coveragePct || 0) * 100)}%</span>{' '}
               of your &ldquo;{coverage.keyword}&rdquo; market — your codes capture the real spend.
             </span>
           ) : (
-            <span className="text-slate-300">
+            <span className="text-ink-soft">
               Tracking{' '}
               <span className="text-amber-300 font-semibold">{Math.round(coverage.heldPct * 100)}%</span>{' '}
               of your &ldquo;{coverage.keyword}&rdquo; market.{' '}
@@ -999,21 +999,21 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
           const today = new Date(); today.setHours(0, 0, 0, 0);
           const day = new Date(d); day.setHours(0, 0, 0, 0);
           const days = Math.round((day.getTime() - today.getTime()) / 86_400_000);
-          if (days < 0) return { text: 'Closed', tone: 'text-slate-500' };
+          if (days < 0) return { text: 'Closed', tone: 'text-faint' };
           if (days === 0) return { text: 'Due today', tone: 'text-red-400' };
           if (days === 1) return { text: 'Due tomorrow', tone: 'text-red-400' };
           if (days <= 7) return { text: `Due in ${days} days`, tone: 'text-amber-400' };
-          return { text: `Due in ${days} days`, tone: 'text-slate-400' };
+          return { text: `Due in ${days} days`, tone: 'text-muted' };
         };
         const VIEW_CAP = 5;
         const shown = tracked.slice(0, VIEW_CAP);
         const overflow = tracked.length - shown.length;
         return (
-        <div className="rounded-xl border border-slate-800 bg-slate-900/60 overflow-hidden">
+        <div className="rounded-xl border border-surface bg-ground/60 overflow-hidden">
           <button
             type="button"
             onClick={() => setTrackedOpen((o) => !o)}
-            className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-slate-800/40 transition-colors"
+            className="w-full flex items-center justify-between gap-3 px-4 py-3 text-left hover:bg-surface/40 transition-colors"
             aria-expanded={trackedOpen}
           >
             <span className="flex items-center gap-2 text-sm font-semibold text-white">
@@ -1033,11 +1033,11 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                   open My Pursuits →
                 </span>
               )}
-              <span className={`text-slate-500 transition-transform ${trackedOpen ? '' : '-rotate-90'}`}>▾</span>
+              <span className={`text-faint transition-transform ${trackedOpen ? '' : '-rotate-90'}`}>▾</span>
             </span>
           </button>
           {trackedOpen && (
-            <ul className="divide-y divide-slate-800 border-t border-slate-800">
+            <ul className="divide-y divide-slate-800 border-t border-surface">
               {shown.map((t, i) => {
                 const due = dueLabel(t.response_deadline);
                 const badge = t.notice_type || t.set_aside || null;
@@ -1047,9 +1047,9 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                     <div className="min-w-0">
                       <div className="truncate text-slate-200">{t.title || t.notice_id || 'Tracked opportunity'}</div>
                       <div className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-xs">
-                        {t.agency && <span className="truncate text-slate-500">{t.agency}</span>}
+                        {t.agency && <span className="truncate text-faint">{t.agency}</span>}
                         {badge && (
-                          <span className="rounded bg-slate-800 px-1.5 py-0.5 text-[11px] text-slate-300">{badge}</span>
+                          <span className="rounded bg-surface px-1.5 py-0.5 text-[11px] text-ink-soft">{badge}</span>
                         )}
                         {t.set_aside && t.notice_type && (
                           <span className="rounded bg-purple-500/15 px-1.5 py-0.5 text-[11px] text-purple-300">{t.set_aside}</span>
@@ -1075,7 +1075,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                     <button
                       type="button"
                       onClick={() => onPanelChange?.('pipeline')}
-                      className="mt-2 flex w-full items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/50 px-2.5 py-1.5 text-[11px] text-slate-500 hover:border-purple-500/40 hover:text-slate-400 transition-colors"
+                      className="mt-2 flex w-full items-center gap-2 rounded-lg border border-surface bg-ground-deep/50 px-2.5 py-1.5 text-[11px] text-faint hover:border-purple-500/40 hover:text-muted transition-colors"
                       title="Unlock the full pursuit view in Pro"
                     >
                       <Lock className="h-3.5 w-3.5 shrink-0 text-slate-600" strokeWidth={2} />
@@ -1155,7 +1155,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                       className={`px-2.5 py-1 text-xs rounded-full border transition-colors ${
                         active
                           ? 'bg-gradient-to-r from-blue-900 to-violet-700 text-white border-violet-400/50'
-                          : 'bg-slate-900/80 text-violet-200/90 border-slate-700 hover:border-violet-500/40'
+                          : 'bg-ground/80 text-violet-200/90 border-hairline hover:border-violet-500/40'
                       }`}
                     >
                       {cta.short_name}
@@ -1191,10 +1191,10 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
             className={`px-3 py-1.5 text-sm rounded-lg border transition-colors ${
               filter === key
                 ? 'bg-emerald-500/20 text-emerald-300 border-emerald-500/40'
-                : 'bg-slate-800 text-slate-400 border-transparent hover:bg-slate-700 hover:text-white'
+                : 'bg-surface text-muted border-transparent hover:bg-input hover:text-white'
             }`}
           >
-            {label} <span className={filter === key ? 'text-emerald-200' : 'text-slate-500'}>({filterCounts[key]})</span>
+            {label} <span className={filter === key ? 'text-emerald-200' : 'text-faint'}>({filterCounts[key]})</span>
           </button>
         ))}
       </div>
@@ -1206,12 +1206,12 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
           value={searchQuery}
           onChange={(event) => setSearchQuery(event.target.value)}
           placeholder="Search title, agency, NAICS, solicitation..."
-          className="flex-1 px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-lg text-sm text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+          className="flex-1 px-4 py-2.5 bg-ground border border-surface rounded-lg text-sm text-white placeholder-faint focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
         />
         <select
           value={stateFilter}
           onChange={(event) => setStateFilter(event.target.value)}
-          className="px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-lg text-sm text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+          className="px-4 py-2.5 bg-ground border border-surface rounded-lg text-sm text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
           aria-label="Filter by state"
         >
           <option value="">All states</option>
@@ -1222,7 +1222,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
         <select
           value={sortMode}
           onChange={(event) => setSortMode(event.target.value as SortMode)}
-          className="px-4 py-2.5 bg-slate-900 border border-slate-800 rounded-lg text-sm text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+          className="px-4 py-2.5 bg-ground border border-surface rounded-lg text-sm text-white focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
         >
           <option value="recommendation">Best match (recommended)</option>
           <option value="deadline">Sort by response due</option>
@@ -1237,7 +1237,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
               setStateFilter('');
               setSelectedCtaIds([]);
             }}
-            className="px-4 py-2.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm rounded-lg transition-colors"
+            className="px-4 py-2.5 bg-surface hover:bg-input text-ink-soft text-sm rounded-lg transition-colors"
           >
             Clear
           </button>
@@ -1246,8 +1246,8 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
 
 
       {!isLoading && alerts.length > 0 && (
-        <div className="text-sm text-slate-500">
-          Showing <span className="text-slate-300">{filteredAlerts.length}</span> of <span className="text-slate-300">{alerts.length}</span> opportunities
+        <div className="text-sm text-faint">
+          Showing <span className="text-ink-soft">{filteredAlerts.length}</span> of <span className="text-ink-soft">{alerts.length}</span> opportunities
         </div>
       )}
 
@@ -1276,7 +1276,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
       {isLoading && (
         <div className="space-y-3">
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-24 bg-slate-800 rounded-xl animate-pulse" />
+            <div key={i} className="h-24 bg-surface rounded-xl animate-pulse" />
           ))}
         </div>
       )}
@@ -1292,12 +1292,12 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
           {([
             { key: 'urgent', label: 'Urgent — Closing this week', items: sectionedAlerts.urgent, accent: 'text-red-300' },
             { key: 'recent', label: 'Recently posted', items: sectionedAlerts.recentlyPosted, accent: 'text-emerald-300' },
-            { key: 'all', label: 'All matching opportunities', items: sectionedAlerts.allOther, accent: 'text-slate-300' },
+            { key: 'all', label: 'All matching opportunities', items: sectionedAlerts.allOther, accent: 'text-ink-soft' },
           ] as const).filter(s => s.items.length > 0).map(section => (
             <section key={section.key}>
               <h2 className={`text-sm font-semibold uppercase tracking-wider mb-3 ${section.accent}`}>
                 {section.label}
-                <span className="text-slate-500 font-normal normal-case ml-2">({section.items.length})</span>
+                <span className="text-faint font-normal normal-case ml-2">({section.items.length})</span>
               </h2>
               <div className="space-y-3">
                 {section.items.map((alert) => (
@@ -1316,8 +1316,8 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                   setSelectedAlert(alert);
                 }
               }}
-              className={`block text-left bg-slate-900 border rounded-xl p-4 hover:border-emerald-500/50 transition-colors cursor-pointer ${
-                alert.isUrgent ? 'border-red-500/50 bg-red-500/5' : 'border-slate-800'
+              className={`block text-left bg-ground border rounded-xl p-4 hover:border-emerald-500/50 transition-colors cursor-pointer ${
+                alert.isUrgent ? 'border-red-500/50 bg-red-500/5' : 'border-surface'
               }`}
             >
               <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 md:gap-4">
@@ -1377,7 +1377,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                             ? 'bg-emerald-500/20 text-emerald-300'
                             : alert.recommendationScore >= 25
                             ? 'bg-emerald-500/10 text-emerald-400'
-                            : 'bg-slate-700/40 text-slate-300'
+                            : 'bg-input/40 text-ink-soft'
                         }`}
                         title={
                           alert.feedbackReasons?.length
@@ -1403,20 +1403,20 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                   )}
 
                   {/* Buyer */}
-                  <p className="text-sm text-slate-400">
+                  <p className="text-sm text-muted">
                     {getAlertBuyer(alert).primary}
-                    {getAlertBuyer(alert).secondary && <span className="text-slate-500"> • {getAlertBuyer(alert).secondary}</span>}
+                    {getAlertBuyer(alert).secondary && <span className="text-faint"> • {getAlertBuyer(alert).secondary}</span>}
                     {getAlertBuyer(alert).parent && <span className="text-slate-600"> • {getAlertBuyer(alert).parent}</span>}
                   </p>
 
                   {/* Office (more granular than the buyer line) */}
                   {alert.office && alert.office !== getAlertBuyer(alert).secondary && (
-                    <p className="text-xs text-slate-500 mt-0.5">{alert.office}</p>
+                    <p className="text-xs text-faint mt-0.5">{alert.office}</p>
                   )}
 
                   {/* Description preview */}
                   {alert.description && (
-                    <p className="text-xs text-slate-400 mt-2 line-clamp-2">
+                    <p className="text-xs text-muted mt-2 line-clamp-2">
                       {alert.description.length > 220
                         ? `${alert.description.slice(0, 220).trim()}…`
                         : alert.description}
@@ -1424,7 +1424,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                   )}
 
                   {/* Meta — keep tight; tooltip via title attr if user wants the description */}
-                  <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-slate-500">
+                  <div className="flex flex-wrap items-center gap-3 mt-2 text-xs text-faint">
                     {alert.naicsCode && (() => {
                       const naicsEntry = getNaics(alert.naicsCode);
                       return (
@@ -1466,15 +1466,15 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                 {/* Dates + actions. On mobile: full-width footer bar
                     with date left, actions right (44pt tap targets).
                     On md+: right-aligned column as before. */}
-                <div className="flex flex-row md:flex-col md:text-right md:shrink-0 items-center md:items-end justify-between gap-3 md:gap-0 pt-3 md:pt-0 border-t md:border-t-0 border-slate-800/60 md:border-none">
+                <div className="flex flex-row md:flex-col md:text-right md:shrink-0 items-center md:items-end justify-between gap-3 md:gap-0 pt-3 md:pt-0 border-t md:border-t-0 border-surface/60 md:border-none">
                   <div className="md:order-1">
-                    <div className="text-xs text-slate-500">Response Due</div>
+                    <div className="text-xs text-faint">Response Due</div>
                     <div className={`text-sm font-medium ${
                       alert.isUrgent ? 'text-red-400' : alert.isClosingSoon ? 'text-amber-400' : 'text-white'
                     }`}>
                       {formatDate(alert.responseDeadline)}
                     </div>
-                    <div className="hidden md:block text-xs text-slate-500 mt-2">
+                    <div className="hidden md:block text-xs text-faint mt-2">
                       Posted {formatDate(alert.postedDate)}
                     </div>
                   </div>
@@ -1492,7 +1492,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                           saveToPipeline(alert);
                         }}
                         disabled={savingAlertIds.has(alert.id) || savedAlertIds.has(alert.id)}
-                        className="text-xs text-blue-300 hover:text-blue-200 disabled:text-slate-500 disabled:cursor-default px-3 py-2 md:px-2 md:py-1 hover:bg-blue-500/10 rounded min-h-[44px] md:min-h-0 inline-flex items-center"
+                        className="text-xs text-blue-300 hover:text-blue-200 disabled:text-faint disabled:cursor-default px-3 py-2 md:px-2 md:py-1 hover:bg-blue-500/10 rounded min-h-[44px] md:min-h-0 inline-flex items-center"
                       >
                         {savedAlertIds.has(alert.id)
                           ? 'Saved'
@@ -1535,7 +1535,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                         event.stopPropagation();
                         dismissAlert(alert);
                       }}
-                      className="text-xs text-slate-500 hover:text-slate-300 px-3 py-2 md:px-2 md:py-1 hover:bg-slate-800 rounded min-h-[44px] md:min-h-0 inline-flex items-center"
+                      className="text-xs text-faint hover:text-ink-soft px-3 py-2 md:px-2 md:py-1 hover:bg-surface rounded min-h-[44px] md:min-h-0 inline-flex items-center"
                     >
                       Dismiss
                     </button>
@@ -1552,10 +1552,10 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
 
       {/* Empty State */}
       {!isLoading && filteredAlerts.length === 0 && !error && (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
+        <div className="bg-ground border border-surface rounded-xl p-8 text-center">
           <div className="mb-4 flex justify-center"><ClipboardList className="h-9 w-9 text-faint" strokeWidth={1.5} /></div>
           <h3 className="text-lg font-medium text-white mb-2">No Opportunities Found</h3>
-          <p className="text-slate-400 text-sm">
+          <p className="text-muted text-sm">
             {selectedCtaIds.length > 0
               ? 'No opportunities match the selected Critical Tech Areas. Try fewer CTAs or expand your NAICS profile.'
               : filter !== 'all'
@@ -1575,28 +1575,28 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
 
       {/* Summary Stats */}
       {!isLoading && alerts.length > 0 && (
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-slate-800">
-          <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 pt-4 border-t border-surface">
+          <div className="bg-ground/50 rounded-lg p-3 text-center">
             <div className="text-2xl font-bold text-white">{alerts.length}</div>
-            <div className="text-xs text-slate-500">Total</div>
+            <div className="text-xs text-faint">Total</div>
           </div>
-          <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+          <div className="bg-ground/50 rounded-lg p-3 text-center">
             <div className="text-2xl font-bold text-red-400">
               {alerts.filter(a => a.isUrgent).length}
             </div>
-            <div className="text-xs text-slate-500">Urgent</div>
+            <div className="text-xs text-faint">Urgent</div>
           </div>
-          <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+          <div className="bg-ground/50 rounded-lg p-3 text-center">
             <div className="text-2xl font-bold text-purple-400">
               {alerts.filter(a => a.setAside).length}
             </div>
-            <div className="text-xs text-slate-500">Set-Asides</div>
+            <div className="text-xs text-faint">Set-Asides</div>
           </div>
-          <div className="bg-slate-900/50 rounded-lg p-3 text-center">
+          <div className="bg-ground/50 rounded-lg p-3 text-center">
             <div className="text-2xl font-bold text-green-400">
               {alerts.filter(a => a.noticeType?.toLowerCase().includes('solicitation')).length}
             </div>
-            <div className="text-xs text-slate-500">Solicitations</div>
+            <div className="text-xs text-faint">Solicitations</div>
           </div>
         </div>
       )}
@@ -1608,15 +1608,15 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
             className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
             onClick={() => setSelectedAlert(null)}
           />
-          <aside className="fixed right-0 top-0 h-full w-full max-w-2xl bg-slate-950 border-l border-slate-800 z-50 overflow-y-auto shadow-2xl">
-            <div className="sticky top-0 bg-slate-950/95 backdrop-blur border-b border-slate-800 p-5 flex items-start justify-between gap-4">
+          <aside className="fixed right-0 top-0 h-full w-full max-w-2xl bg-ground-deep border-l border-surface z-50 overflow-y-auto shadow-2xl">
+            <div className="sticky top-0 bg-ground-deep/95 backdrop-blur border-b border-surface p-5 flex items-start justify-between gap-4">
               <div>
-                <p className="text-xs text-slate-500 uppercase tracking-wider">Opportunity Details</p>
+                <p className="text-xs text-faint uppercase tracking-wider">Opportunity Details</p>
                 <h2 className="text-lg font-semibold text-white mt-1 line-clamp-2">{selectedAlert.title}</h2>
               </div>
               <button
                 onClick={() => setSelectedAlert(null)}
-                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                className="p-2 text-muted hover:text-white hover:bg-surface rounded-lg transition-colors"
                 aria-label="Close details"
               >
                 X
@@ -1643,12 +1643,12 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
               </div>
 
               <div className="grid grid-cols-2 gap-3">
-                <div className="bg-slate-900 border border-slate-800 rounded-lg p-3">
-                  <div className="text-xs text-slate-500">Response Due</div>
+                <div className="bg-ground border border-surface rounded-lg p-3">
+                  <div className="text-xs text-faint">Response Due</div>
                   <div className="text-white font-medium mt-1">{formatDate(selectedAlert.responseDeadline)}</div>
                 </div>
-                <div className="bg-slate-900 border border-slate-800 rounded-lg p-3">
-                  <div className="text-xs text-slate-500">Posted</div>
+                <div className="bg-ground border border-surface rounded-lg p-3">
+                  <div className="text-xs text-faint">Posted</div>
                   <div className="text-white font-medium mt-1">{formatDate(selectedAlert.postedDate)}</div>
                 </div>
               </div>
@@ -1671,8 +1671,8 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
               />
 
               {selectedAlert.pointsOfContact && selectedAlert.pointsOfContact.length > 0 && (
-                <div id={`alert-poc-${selectedAlert.id}`} className="bg-slate-900 border border-slate-800 rounded-lg p-4 scroll-mt-4">
-                  <div className="text-xs text-slate-500 uppercase tracking-wider mb-3">
+                <div id={`alert-poc-${selectedAlert.id}`} className="bg-ground border border-surface rounded-lg p-4 scroll-mt-4">
+                  <div className="text-xs text-faint uppercase tracking-wider mb-3">
                     Points of Contact
                   </div>
                   <div className="space-y-3">
@@ -1683,16 +1683,16 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                       const phone = (poc?.phone || poc?.phoneNumber) as string | undefined;
                       if (!fullName && !pocEmail && !phone) return null;
                       return (
-                        <div key={idx} className="border border-slate-800 rounded-lg p-3 text-sm">
+                        <div key={idx} className="border border-surface rounded-lg p-3 text-sm">
                           {fullName && <p className="text-slate-200 font-medium line-clamp-2">{fullName}</p>}
-                          {title && <p className="text-xs text-slate-500">{title}</p>}
+                          {title && <p className="text-xs text-faint">{title}</p>}
                           {pocEmail && (
                             <a href={`mailto:${pocEmail}`} className="block mt-1 text-purple-300 hover:text-purple-200 text-xs break-all">
                               {pocEmail}
                             </a>
                           )}
                           {phone && (
-                            <a href={`tel:${phone}`} className="block text-slate-400 hover:text-slate-200 text-xs">
+                            <a href={`tel:${phone}`} className="block text-muted hover:text-slate-200 text-xs">
                               {phone}
                             </a>
                           )}
@@ -1704,7 +1704,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
               )}
 
               {(selectedAlert.description || lazyDescriptions[selectedAlert.id] || selectedAlert.descriptionUrl || selectedAlert.id) && (
-                <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+                <div className="bg-ground border border-surface rounded-lg p-4">
                   <CollapsibleOpportunityDescription
                     text={selectedAlert.description || lazyDescriptions[selectedAlert.id]}
                     loading={loadingDescription === selectedAlert.id}
@@ -1719,42 +1719,42 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                 </div>
               )}
 
-              <div className="bg-slate-900 border border-slate-800 rounded-lg p-4 space-y-3">
+              <div className="bg-ground border border-surface rounded-lg p-4 space-y-3">
                 <div>
-                  <div className="text-xs text-slate-500">Buyer</div>
+                  <div className="text-xs text-faint">Buyer</div>
                   <div className="text-slate-200">{getAlertBuyer(selectedAlert).primary}</div>
                 </div>
                 {getAlertBuyer(selectedAlert).secondary && (
                   <div>
-                    <div className="text-xs text-slate-500">Office</div>
+                    <div className="text-xs text-faint">Office</div>
                     <div className="text-slate-200">{getAlertBuyer(selectedAlert).secondary}</div>
                   </div>
                 )}
                 {getAlertBuyer(selectedAlert).parent && (
                   <div>
-                    <div className="text-xs text-slate-500">Parent Agency</div>
+                    <div className="text-xs text-faint">Parent Agency</div>
                     <div className="text-slate-200">{getAlertBuyer(selectedAlert).parent}</div>
                   </div>
                 )}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <div className="text-xs text-slate-500">NAICS</div>
+                    <div className="text-xs text-faint">NAICS</div>
                     <div className="text-slate-200">{selectedAlert.naicsCode || '-'}</div>
                   </div>
                   <div>
-                    <div className="text-xs text-slate-500">PSC</div>
+                    <div className="text-xs text-faint">PSC</div>
                     <div className="text-slate-200">{selectedAlert.pscCode || '-'}</div>
                   </div>
                 </div>
                 {selectedAlert.solicitationNumber && (
                   <div>
-                    <div className="text-xs text-slate-500">Solicitation Number</div>
+                    <div className="text-xs text-faint">Solicitation Number</div>
                     <div className="text-slate-200">{selectedAlert.solicitationNumber}</div>
                   </div>
                 )}
                 {getAlertLocation(selectedAlert) && (
                   <div>
-                    <div className="text-xs text-slate-500">Place of Performance</div>
+                    <div className="text-xs text-faint">Place of Performance</div>
                     <div className="text-slate-200">{getAlertLocation(selectedAlert)}</div>
                   </div>
                 )}
@@ -1774,7 +1774,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                       ? { ring: 'border-emerald-500/40', bg: 'bg-emerald-500/10', text: 'text-emerald-300' }
                       : analysis.recommendation === 'watch'
                       ? { ring: 'border-amber-500/40', bg: 'bg-amber-500/10', text: 'text-amber-300' }
-                      : { ring: 'border-slate-600/40', bg: 'bg-slate-700/30', text: 'text-slate-400' };
+                      : { ring: 'border-slate-600/40', bg: 'bg-input/30', text: 'text-muted' };
                   const label = analysis.recommendation === 'pursue'
                     ? 'PURSUE'
                     : analysis.recommendation === 'watch'
@@ -1786,10 +1786,10 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                         <div className="flex items-center gap-3">
                           <Star className="h-6 w-6 shrink-0 text-amber-300" strokeWidth={1.75} />
                           <div>
-                            <p className="text-xs text-slate-500 uppercase tracking-wider">Mindy Analyst</p>
+                            <p className="text-xs text-faint uppercase tracking-wider">Mindy Analyst</p>
                             <p className={`text-lg font-bold ${recColor.text}`}>
                               {label}
-                              <span className="text-sm font-medium text-slate-400 ml-2">
+                              <span className="text-sm font-medium text-muted ml-2">
                                 Score: {analysis.score}/100
                               </span>
                             </p>
@@ -1827,18 +1827,18 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
 
                       {analysis.competitors_likely.length > 0 && (
                         <div>
-                          <p className="text-xs text-slate-400 font-semibold mb-1">COMPETITORS LIKELY</p>
-                          <p className="text-sm text-slate-300">{analysis.competitors_likely.join(' • ')}</p>
+                          <p className="text-xs text-muted font-semibold mb-1">COMPETITORS LIKELY</p>
+                          <p className="text-sm text-ink-soft">{analysis.competitors_likely.join(' • ')}</p>
                         </div>
                       )}
 
-                      <div className="pt-2 border-t border-slate-800/50 space-y-1.5">
-                        <p className="text-sm text-slate-300">
-                          <span className="text-xs text-slate-500 uppercase tracking-wider mr-2">Effort</span>
+                      <div className="pt-2 border-t border-surface/50 space-y-1.5">
+                        <p className="text-sm text-ink-soft">
+                          <span className="text-xs text-faint uppercase tracking-wider mr-2">Effort</span>
                           {analysis.effort_estimate}
                         </p>
                         <p className="text-sm text-slate-200 font-medium">
-                          <span className="text-xs text-slate-500 uppercase tracking-wider mr-2">Next step</span>
+                          <span className="text-xs text-faint uppercase tracking-wider mr-2">Next step</span>
                           {analysis.next_step}
                         </p>
                       </div>
@@ -1848,7 +1848,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
 
                 if (isLoading) {
                   return (
-                    <div className="rounded-xl border border-slate-800 bg-slate-900 p-4 flex items-center gap-3 text-sm text-slate-400">
+                    <div className="rounded-xl border border-surface bg-ground p-4 flex items-center gap-3 text-sm text-muted">
                       <span className="inline-block w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
                       Mindy Analyst is reading the RFP…
                     </div>
@@ -1912,8 +1912,8 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
 
               {/* Contracting office address */}
               {selectedAlert.officeAddress && Object.values(selectedAlert.officeAddress).some(Boolean) && (
-                <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-                  <div className="text-xs text-slate-500 uppercase tracking-wider mb-2">
+                <div className="bg-ground border border-surface rounded-lg p-4">
+                  <div className="text-xs text-faint uppercase tracking-wider mb-2">
                     Contracting Office Address
                   </div>
                   <p className="text-sm text-slate-200">
@@ -1931,8 +1931,8 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
 
               {/* Additional info — inline text or external link */}
               {(selectedAlert.additionalInfoText || selectedAlert.additionalInfoLink) && (
-                <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-                  <div className="text-xs text-slate-500 uppercase tracking-wider mb-2">
+                <div className="bg-ground border border-surface rounded-lg p-4">
+                  <div className="text-xs text-faint uppercase tracking-wider mb-2">
                     Additional Info
                   </div>
                   {selectedAlert.additionalInfoText && (
@@ -1969,7 +1969,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                 <button
                   onClick={() => saveToPipeline(selectedAlert)}
                   disabled={savingAlertIds.has(selectedAlert.id) || savedAlertIds.has(selectedAlert.id)}
-                  className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-center font-medium rounded-lg transition-colors"
+                  className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-surface disabled:text-faint text-white text-center font-medium rounded-lg transition-colors"
                 >
                   {savedAlertIds.has(selectedAlert.id)
                     ? 'Saved to Pipeline'
@@ -1992,20 +1992,20 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                 </a>
                 <button
                   onClick={() => dismissAlert(selectedAlert)}
-                  className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors"
+                  className="px-4 py-3 bg-surface hover:bg-input text-ink-soft rounded-lg transition-colors"
                 >
                   Dismiss
                 </button>
                 <button
                   onClick={() => setSelectedAlert(null)}
-                  className="px-4 py-3 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg transition-colors"
+                  className="px-4 py-3 bg-surface hover:bg-input text-ink-soft rounded-lg transition-colors"
                 >
                   Close
                 </button>
               </div>
 
-              <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-                <div className="text-xs text-slate-500 uppercase tracking-wider mb-3">Tune Mindy</div>
+              <div className="bg-ground border border-surface rounded-lg p-4">
+                <div className="text-xs text-faint uppercase tracking-wider mb-3">Tune Mindy</div>
                 <div className="flex flex-wrap gap-2">
                   {FEEDBACK_OPTIONS.map(option => {
                     const selected = feedbackByAlert[selectedAlert.id] === option.type;
@@ -2019,7 +2019,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                         className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs transition-colors ${
                           selected
                             ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
-                            : 'border-slate-700 bg-slate-950 text-slate-400 hover:border-slate-500 hover:text-slate-200'
+                            : 'border-hairline bg-ground-deep text-muted hover:border-slate-500 hover:text-slate-200'
                         }`}
                       >
                         {selected && <Check className="h-3 w-3 shrink-0" strokeWidth={2.5} />}{option.label}

@@ -65,10 +65,10 @@ interface TargetEvent {
 }
 
 const STATUS_OPTIONS: Array<{ id: TargetRow['status']; label: string; color: string }> = [
-  { id: 'targeting', label: 'Targeting', color: 'bg-slate-500/20 text-slate-300 border-slate-500/30' },
+  { id: 'targeting', label: 'Targeting', color: 'bg-slate-500/20 text-ink-soft border-slate-500/30' },
   { id: 'contacted', label: 'Contacted', color: 'bg-blue-500/20 text-blue-300 border-blue-500/30' },
   { id: 'qualified', label: 'Qualified', color: 'bg-amber-500/20 text-amber-300 border-amber-500/30' },
-  { id: 'passed', label: 'Passed', color: 'bg-slate-600/20 text-slate-400 border-slate-700' },
+  { id: 'passed', label: 'Passed', color: 'bg-slate-600/20 text-muted border-hairline' },
   { id: 'won', label: 'Won', color: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' },
 ];
 
@@ -493,7 +493,7 @@ export default function MyTargetListPanel({
             loading"). */}
         <div>
           <h1 className="text-2xl font-bold text-white">My Target List</h1>
-          <div className="flex items-center gap-2 mt-2 text-sm text-slate-400">
+          <div className="flex items-center gap-2 mt-2 text-sm text-muted">
             <span className="inline-block w-4 h-4 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
             Loading your target list…
           </div>
@@ -502,13 +502,13 @@ export default function MyTargetListPanel({
             structure is visible and it clearly reads as "working." */}
         <div className="space-y-3">
           {[0, 1, 2, 3].map((i) => (
-            <div key={i} className="border border-slate-800 rounded-lg p-4 bg-slate-900/40 animate-pulse">
+            <div key={i} className="border border-surface rounded-lg p-4 bg-ground/40 animate-pulse">
               <div className="flex items-center justify-between gap-4">
                 <div className="flex-1 space-y-2">
-                  <div className="h-4 w-1/3 bg-slate-800 rounded" />
-                  <div className="h-3 w-1/2 bg-slate-800/70 rounded" />
+                  <div className="h-4 w-1/3 bg-surface rounded" />
+                  <div className="h-3 w-1/2 bg-surface/70 rounded" />
                 </div>
-                <div className="h-8 w-20 bg-slate-800 rounded" />
+                <div className="h-8 w-20 bg-surface rounded" />
               </div>
             </div>
           ))}
@@ -521,7 +521,7 @@ export default function MyTargetListPanel({
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">My Target List</h1>
-        <p className="text-sm text-slate-400 mt-1">
+        <p className="text-sm text-muted mt-1">
           Agencies and offices you&apos;re working for multi-month BD outreach.
         </p>
       </div>
@@ -530,31 +530,31 @@ export default function MyTargetListPanel({
           through Market Research. Type an agency name → click to add. */}
       {!isFree && (
         <div className="relative">
-          <div data-tour="target-add" className="flex items-center gap-2 bg-slate-900/60 border border-slate-800 rounded-lg p-3">
+          <div data-tour="target-add" className="flex items-center gap-2 bg-ground/60 border border-surface rounded-lg p-3">
             <Search className="h-4 w-4 shrink-0 text-faint" strokeWidth={2} />
             <input
               type="text"
               value={agencyQuery}
               onChange={(e) => setAgencyQuery(e.target.value)}
               placeholder="Add an agency — type a name (e.g. Air Force, VA, FEMA, NASA)"
-              className="flex-1 bg-transparent text-sm text-white placeholder-slate-500 outline-none"
+              className="flex-1 bg-transparent text-sm text-white placeholder-faint outline-none"
             />
-            {searchingAgencies && <span className="text-xs text-slate-500">searching…</span>}
+            {searchingAgencies && <span className="text-xs text-faint">searching…</span>}
           </div>
           {agencyResults.length > 0 && (
-            <div className="absolute z-20 mt-1 w-full rounded-lg border border-slate-700 bg-slate-900 shadow-xl max-h-72 overflow-y-auto">
+            <div className="absolute z-20 mt-1 w-full rounded-lg border border-hairline bg-ground shadow-xl max-h-72 overflow-y-auto">
               {agencyResults.map((r, i) => (
                 <button
                   key={`${r.name}-${i}`}
                   type="button"
                   onClick={() => addAgencyTarget(r.name, r.parent)}
                   disabled={addingAgency === r.name}
-                  className="w-full text-left px-4 py-2.5 hover:bg-slate-800 border-b border-slate-800/60 last:border-0 flex items-center justify-between gap-3 disabled:opacity-50"
+                  className="w-full text-left px-4 py-2.5 hover:bg-surface border-b border-surface/60 last:border-0 flex items-center justify-between gap-3 disabled:opacity-50"
                 >
                   <span className="min-w-0">
                     <span className="block text-sm text-white truncate">{r.name}</span>
                     {r.parent && r.parent !== r.name && (
-                      <span className="block text-xs text-slate-500 truncate">{r.parent}</span>
+                      <span className="block text-xs text-faint truncate">{r.parent}</span>
                     )}
                   </span>
                   <span className="shrink-0 text-xs text-emerald-400">
@@ -576,7 +576,7 @@ export default function MyTargetListPanel({
       {isFree && targets.length === 0 && (
         <div className="bg-gradient-to-br from-purple-900/40 to-purple-800/20 border border-purple-500/40 rounded-lg p-5">
           <h3 className="inline-flex items-center gap-2 text-lg font-bold text-white mb-2"><Target className="h-5 w-5 shrink-0" strokeWidth={2} /> Target lists are a Mindy Pro feature</h3>
-          <p className="text-sm text-slate-300 mb-3">
+          <p className="text-sm text-ink-soft mb-3">
             Save offices from Market Research, track status from Targeting → Contacted → Qualified,
             and (soon) log every email, call, and event you attend toward each target.
           </p>
@@ -596,7 +596,7 @@ export default function MyTargetListPanel({
               ? `Want Mindy to set up ${coachClient.name}'s target list?`
               : 'Want Mindy to set this up for you?'}
           </p>
-          <p className="mx-auto mt-1 max-w-md text-sm text-slate-400">
+          <p className="mx-auto mt-1 max-w-md text-sm text-muted">
             {coachClient
               ? `We'll add the agencies buying in ${coachClient.name}'s market — each with its sources sought, events, and contacts attached. You can fine-tune anything after.`
               : "We'll add the agencies buying in your market — each with its sources sought, events, and contacts attached. You can fine-tune anything after."}
@@ -614,7 +614,7 @@ export default function MyTargetListPanel({
                 ? `Set up ${coachClient.name}'s Mindy`
                 : 'Set up my Mindy'}
           </button>
-          <p className="mt-4 text-xs text-slate-500">
+          <p className="mt-4 text-xs text-faint">
             Or build it yourself — use the <span className="text-emerald-400">search box above</span> to add an agency,
             or open <span className="text-purple-300">Market Research</span> for a specific office.
           </p>
@@ -641,35 +641,35 @@ export default function MyTargetListPanel({
               detail panels in Slice 3D when outreach logs ship. */}
           <div className="space-y-3">
             {visibleTargets.length === 0 ? (
-              <p className="text-sm text-slate-500 italic text-center py-6">
+              <p className="text-sm text-faint italic text-center py-6">
                 No targets with status &quot;{statusFilter}&quot;.
               </p>
             ) : (
               visibleTargets.map(t => (
-                <div key={t.id} className="rounded-xl border border-slate-800 bg-slate-900/40 p-4 hover:border-slate-700 transition-colors">
+                <div key={t.id} className="rounded-xl border border-surface bg-ground/40 p-4 hover:border-hairline transition-colors">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1">
                       <div className="flex items-center gap-2 mb-1">
                         <h3 className="text-base font-semibold text-white truncate">{normalizeOfficeName(t.office_name, { mode: 'clean' })}</h3>
                         {t.office_code && (
-                          <span className="text-[10px] font-mono text-slate-500">{t.office_code}</span>
+                          <span className="text-[10px] font-mono text-faint">{t.office_code}</span>
                         )}
                       </div>
-                      <p className="text-xs text-slate-500 mb-2">
+                      <p className="text-xs text-faint mb-2">
                         {t.sub_agency_name || t.agency_name}
                         {t.location && <> · {t.location}</>}
                       </p>
 
                       {/* Signal pills */}
                       <div className="flex flex-wrap gap-2 text-[10px]">
-                        <span className="px-2 py-0.5 rounded bg-slate-800 text-emerald-400">
+                        <span className="px-2 py-0.5 rounded bg-surface text-emerald-400">
                           {fmtMoney(t.set_aside_spending)} spend
                         </span>
-                        <span className="px-2 py-0.5 rounded bg-slate-800 text-slate-300">
+                        <span className="px-2 py-0.5 rounded bg-surface text-ink-soft">
                           {t.contract_count} contracts
                         </span>
                         <span
-                          className="px-2 py-0.5 rounded bg-slate-800 text-slate-300"
+                          className="px-2 py-0.5 rounded bg-surface text-ink-soft"
                           title={
                             (t.sat_ratio || 0) > 0
                               ? `${Math.round(t.sat_ratio * 100)}% of this office's sampled contracts are under the $350K Simplified Acquisition Threshold — easier-entry territory.`
@@ -711,7 +711,7 @@ export default function MyTargetListPanel({
                         )}
                         {t.source_naics && !t.source_psc && (
                           <span
-                            className="px-2 py-0.5 rounded bg-slate-700/40 text-slate-300"
+                            className="px-2 py-0.5 rounded bg-input/40 text-ink-soft"
                             title="The NAICS code you were searching when you saved this office."
                           >
                             from NAICS {t.source_naics}
@@ -813,7 +813,7 @@ export default function MyTargetListPanel({
                       <button
                         type="button"
                         onClick={() => removeTarget(t.id)}
-                        className="text-[10px] text-slate-500 hover:text-red-400 transition-colors"
+                        className="text-[10px] text-faint hover:text-red-400 transition-colors"
                       >
                         Remove
                       </button>
@@ -825,7 +825,7 @@ export default function MyTargetListPanel({
                       once. Data is pre-fetched in batch via
                       /api/app/target-events. */}
                   {scheduledExpandedId === t.id && (
-                    <div className="mt-4 pt-4 border-t border-slate-800">
+                    <div className="mt-4 pt-4 border-t border-surface">
                       <EventSection
                         title="Scheduled Events"
                         subtitle="Industry days, webinars, conferences — show up and meet people"
@@ -876,7 +876,7 @@ export default function MyTargetListPanel({
                     </div>
                   )}
                   {sourcesSoughtExpandedId === t.id && (
-                    <div className="mt-4 pt-4 border-t border-slate-800">
+                    <div className="mt-4 pt-4 border-t border-surface">
                       <EventSection
                         title="Sources Sought & Market Research"
                         subtitle="Response-deadline notices — early signal of upcoming buys"
@@ -945,10 +945,10 @@ function StatTile({
       className={`rounded-lg border p-3 text-left transition-colors ${
         active
           ? 'border-emerald-500/50 bg-emerald-500/5'
-          : 'border-slate-800 bg-slate-900/40 hover:border-slate-700'
+          : 'border-surface bg-ground/40 hover:border-hairline'
       }`}
     >
-      <div className="text-[10px] uppercase tracking-wider text-slate-500">{label}</div>
+      <div className="text-[10px] uppercase tracking-wider text-faint">{label}</div>
       <div className="text-xl font-bold text-white mt-1">{value}</div>
     </button>
   );
@@ -974,7 +974,7 @@ function NotesEditor({
       <button
         type="button"
         onClick={() => setEditing(true)}
-        className="text-left text-xs text-slate-400 hover:text-slate-200 italic"
+        className="text-left text-xs text-muted hover:text-slate-200 italic"
       >
         {value || 'Add note…'}
       </button>
@@ -997,7 +997,7 @@ function NotesEditor({
         }
       }}
       rows={2}
-      className="w-full text-xs bg-slate-950 border border-slate-700 rounded px-2 py-1.5 text-slate-200 outline-none focus:border-emerald-500/50"
+      className="w-full text-xs bg-ground-deep border border-hairline rounded px-2 py-1.5 text-slate-200 outline-none focus:border-emerald-500/50"
       placeholder="Notes (Esc to cancel, blur to save)"
     />
   );
@@ -1083,9 +1083,9 @@ function EventSection({
       <div className="mb-2">
         <h4 className={`text-xs font-bold uppercase tracking-wider ${headerColor}`}>
           {title}
-          <span className="ml-2 text-slate-500 font-normal normal-case">({events.length})</span>
+          <span className="ml-2 text-faint font-normal normal-case">({events.length})</span>
         </h4>
-        <p className="text-[10px] text-slate-500 mt-0.5">{subtitle}</p>
+        <p className="text-[10px] text-faint mt-0.5">{subtitle}</p>
       </div>
       <ul className="space-y-2">
         {events.map((ev, idx) => {
@@ -1111,7 +1111,7 @@ function EventSection({
           return (
             <li
               key={`${ev.source}-${ev.title}-${idx}`}
-              className="bg-slate-950/40 border border-slate-800 rounded-lg p-3"
+              className="bg-ground-deep/40 border border-surface rounded-lg p-3"
             >
               <div className="flex items-start gap-3">
                 <EventIcon className="h-5 w-5 shrink-0 text-muted" strokeWidth={1.75} aria-hidden />
@@ -1121,14 +1121,14 @@ function EventSection({
                       {sourceLabel}
                     </span>
                     {ev.event_date && (
-                      <span className="text-[10px] text-slate-400">{formatEventDate(ev.event_date)}</span>
+                      <span className="text-[10px] text-muted">{formatEventDate(ev.event_date)}</span>
                     )}
                     {!ev.event_date && (
-                      <span className="text-[10px] text-slate-500 italic">recurring</span>
+                      <span className="text-[10px] text-faint italic">recurring</span>
                     )}
                     {ev.matched_agency && (
-                      <span className="text-[10px] text-slate-500">
-                        matched: <span className="text-slate-400">{ev.matched_agency}</span>
+                      <span className="text-[10px] text-faint">
+                        matched: <span className="text-muted">{ev.matched_agency}</span>
                       </span>
                     )}
                     {showVerify && (
@@ -1146,10 +1146,10 @@ function EventSection({
                   </div>
                   <p className="text-sm font-medium text-slate-200 mb-1">{ev.title}</p>
                   {ev.location && (
-                    <p className="inline-flex items-center gap-1 text-xs text-slate-500"><MapPin className="h-3 w-3 shrink-0" strokeWidth={2} /> {ev.location}</p>
+                    <p className="inline-flex items-center gap-1 text-xs text-faint"><MapPin className="h-3 w-3 shrink-0" strokeWidth={2} /> {ev.location}</p>
                   )}
                   {ev.description && (
-                    <p className="text-xs text-slate-500 mt-1 line-clamp-2">{ev.description}</p>
+                    <p className="text-xs text-faint mt-1 line-clamp-2">{ev.description}</p>
                   )}
                   {ev.url && (
                     <a
@@ -1189,7 +1189,7 @@ function PainPointsList({
 }) {
   if (!data || data.loading) {
     return (
-      <div className="mt-4 pt-4 border-t border-slate-800">
+      <div className="mt-4 pt-4 border-t border-surface">
         <p className="text-xs text-amber-400/70 italic animate-pulse">Loading pain points for {agencyName}…</p>
       </div>
     );
@@ -1197,7 +1197,7 @@ function PainPointsList({
 
   if (data.error) {
     return (
-      <div className="mt-4 pt-4 border-t border-slate-800">
+      <div className="mt-4 pt-4 border-t border-surface">
         <p className="text-xs text-red-400 italic">Could not load pain points: {data.error}</p>
       </div>
     );
@@ -1206,8 +1206,8 @@ function PainPointsList({
   const { painPoints, priorities } = data;
   if (painPoints.length === 0 && priorities.length === 0) {
     return (
-      <div className="mt-4 pt-4 border-t border-slate-800">
-        <p className="text-xs text-slate-500 italic">
+      <div className="mt-4 pt-4 border-t border-surface">
+        <p className="text-xs text-faint italic">
           No documented pain points or priorities for {agencyName} yet. Our intel database is growing — check back as GAO and budget cycles release.
         </p>
       </div>
@@ -1215,19 +1215,19 @@ function PainPointsList({
   }
 
   return (
-    <div className="mt-4 pt-4 border-t border-slate-800 space-y-4">
+    <div className="mt-4 pt-4 border-t border-surface space-y-4">
       {painPoints.length > 0 && (
         <div>
           <h4 className="text-xs font-bold uppercase tracking-wider text-amber-400">
             Documented Pain Points
-            <span className="ml-2 text-slate-500 font-normal normal-case">({painPoints.length})</span>
+            <span className="ml-2 text-faint font-normal normal-case">({painPoints.length})</span>
           </h4>
-          <p className="text-[10px] text-slate-500 mt-0.5">
+          <p className="text-[10px] text-faint mt-0.5">
             Stated problems & unmet needs. Cite these in your capability statement and Sources Sought responses.
           </p>
           <ul className="mt-2 space-y-1.5">
             {painPoints.map((pp, i) => (
-              <li key={i} className="flex gap-2 text-xs text-slate-300">
+              <li key={i} className="flex gap-2 text-xs text-ink-soft">
                 <span className="text-amber-400/60 shrink-0">▸</span>
                 <span className="leading-snug">{pp}</span>
               </li>
@@ -1240,14 +1240,14 @@ function PainPointsList({
         <div>
           <h4 className="text-xs font-bold uppercase tracking-wider text-purple-300">
             Agency Priorities
-            <span className="ml-2 text-slate-500 font-normal normal-case">({priorities.length})</span>
+            <span className="ml-2 text-faint font-normal normal-case">({priorities.length})</span>
           </h4>
-          <p className="text-[10px] text-slate-500 mt-0.5">
+          <p className="text-[10px] text-faint mt-0.5">
             What this agency says it wants to fund next. Align your pitch with these themes.
           </p>
           <ul className="mt-2 space-y-1.5">
             {priorities.map((p, i) => (
-              <li key={i} className="flex gap-2 text-xs text-slate-300">
+              <li key={i} className="flex gap-2 text-xs text-ink-soft">
                 <span className="text-purple-300/60 shrink-0">▸</span>
                 <span className="leading-snug">{p}</span>
               </li>
@@ -1302,8 +1302,8 @@ const ACTIVITY_TYPES: Array<{ id: OutreachActivity['activity_type']; label: stri
 const OUTCOME_OPTIONS: Array<{ id: string; label: string; color: string }> = [
   { id: 'replied',      label: 'Replied',       color: 'text-emerald-300' },
   { id: 'meeting_set',  label: 'Meeting set',   color: 'text-emerald-400' },
-  { id: 'no_response',  label: 'No response',   color: 'text-slate-500' },
-  { id: 'pass',         label: 'Passed',        color: 'text-slate-400' },
+  { id: 'no_response',  label: 'No response',   color: 'text-faint' },
+  { id: 'pass',         label: 'Passed',        color: 'text-muted' },
   { id: 'success',      label: 'Success',       color: 'text-emerald-400' },
 ];
 
@@ -1399,22 +1399,22 @@ function TargetContacts({ agency, subAgency, office, officeCode, email }: { agen
 
   // Directory | Saved tab header — shared across both views.
   const tabHeader = (
-    <div className="flex items-center gap-1 mb-2.5 border-b border-slate-700/50 pb-2">
+    <div className="flex items-center gap-1 mb-2.5 border-b border-hairline/50 pb-2">
       <button
         type="button"
         onClick={() => setTab('directory')}
-        className={`text-xs font-semibold px-2 py-1 rounded transition-colors ${tab === 'directory' ? 'bg-purple-500/20 text-purple-200' : 'text-slate-400 hover:text-slate-200'}`}
+        className={`text-xs font-semibold px-2 py-1 rounded transition-colors ${tab === 'directory' ? 'bg-purple-500/20 text-purple-200' : 'text-muted hover:text-slate-200'}`}
       >
         Directory
       </button>
       <button
         type="button"
         onClick={() => setTab('saved')}
-        className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded transition-colors ${tab === 'saved' ? 'bg-amber-500/20 text-amber-200' : 'text-slate-400 hover:text-slate-200'}`}
+        className={`inline-flex items-center gap-1 text-xs font-semibold px-2 py-1 rounded transition-colors ${tab === 'saved' ? 'bg-amber-500/20 text-amber-200' : 'text-muted hover:text-slate-200'}`}
       >
         <Star className="h-3 w-3 shrink-0" strokeWidth={2} /> Saved
       </button>
-      <span className="ml-auto text-[10px] text-slate-500">
+      <span className="ml-auto text-[10px] text-faint">
         {tab === 'directory' ? 'gov POCs from SAM' : 'contacts you’ve pinned'}
       </span>
     </div>
@@ -1433,13 +1433,13 @@ function TargetContacts({ agency, subAgency, office, officeCode, email }: { agen
   if (loading) return (
     <div className="mt-3 rounded-lg border border-purple-500/20 bg-purple-500/[0.04] p-3">
       {tabHeader}
-      <div className="text-xs text-slate-500">Loading contacts…</div>
+      <div className="text-xs text-faint">Loading contacts…</div>
     </div>
   );
   if (contacts.length === 0) return (
     <div className="mt-3 rounded-lg border border-purple-500/20 bg-purple-500/[0.04] p-3">
       {tabHeader}
-      <div className="text-xs text-slate-500">No SAM contacts found for this agency yet.</div>
+      <div className="text-xs text-faint">No SAM contacts found for this agency yet.</div>
     </div>
   );
 
@@ -1448,7 +1448,7 @@ function TargetContacts({ agency, subAgency, office, officeCode, email }: { agen
       {tabHeader}
       <div className="flex items-center justify-between mb-2">
         <span className="text-xs font-semibold text-purple-300">Gov contacts at {subA || agency}</span>
-        <span className="text-[10px] text-slate-500">{contacts.length} contacts · from SAM notices</span>
+        <span className="text-[10px] text-faint">{contacts.length} contacts · from SAM notices</span>
       </div>
       {parentFallback && subA && (
         <div className="mb-2 rounded-md bg-amber-500/10 border border-amber-500/20 px-2 py-1 text-[11px] text-amber-200">
@@ -1461,14 +1461,14 @@ function TargetContacts({ agency, subAgency, office, officeCode, email }: { agen
           Grounds the user on the right people to build relationships with. */}
       <div className="mb-2.5 rounded-md bg-purple-500/[0.06] border border-purple-500/15 p-2">
         <div className="inline-flex items-center gap-1 text-[11px] font-semibold text-purple-200/90 mb-1"><Lightbulb className="h-3 w-3 shrink-0" strokeWidth={2} /> Mindy: the 5 people to find</div>
-        <ul className="text-[10px] text-slate-400 space-y-0.5">
-          <li><span className="text-slate-300">Contracting Officer (KO)</span> — signs the award; your formal channel.</li>
-          <li><span className="text-slate-300">Small Business Specialist / OSBP</span> — ask the agency directly; gets you on the set-aside radar.</li>
-          <li><span className="text-slate-300">Program Manager / COR</span> — owns the requirement; shape it before the RFP.</li>
-          <li><span className="text-slate-300">End user</span> — who actually uses what’s bought; reveals the real need.</li>
-          <li><span className="text-slate-300">Technical lead / Engineer</span> — defines the specs you’ll be evaluated on.</li>
+        <ul className="text-[10px] text-muted space-y-0.5">
+          <li><span className="text-ink-soft">Contracting Officer (KO)</span> — signs the award; your formal channel.</li>
+          <li><span className="text-ink-soft">Small Business Specialist / OSBP</span> — ask the agency directly; gets you on the set-aside radar.</li>
+          <li><span className="text-ink-soft">Program Manager / COR</span> — owns the requirement; shape it before the RFP.</li>
+          <li><span className="text-ink-soft">End user</span> — who actually uses what’s bought; reveals the real need.</li>
+          <li><span className="text-ink-soft">Technical lead / Engineer</span> — defines the specs you’ll be evaluated on.</li>
         </ul>
-        <p className="text-[9px] text-slate-500 mt-1">SAM only names the people below (mostly contracting). For OSBP/program, call the agency’s small-business office and ask.</p>
+        <p className="text-[9px] text-faint mt-1">SAM only names the people below (mostly contracting). For OSBP/program, call the agency’s small-business office and ask.</p>
       </div>
 
       {/* OSBP / Small-Business office first (separate source). Then a curated
@@ -1506,7 +1506,7 @@ function TargetContacts({ agency, subAgency, office, officeCode, email }: { agen
                   }}
                 />
               </div>
-              {!isJunkTitle(c.contact_title) && <div className="text-[10px] text-slate-500">{c.contact_title}</div>}
+              {!isJunkTitle(c.contact_title) && <div className="text-[10px] text-faint">{c.contact_title}</div>}
               {office && <div className="text-[10px] text-slate-600">{office}</div>}
               {c.contact_email && <div className="text-[11px] text-purple-300/80 select-all break-all">{c.contact_email}</div>}
               {!isJunkPhone(c.contact_phone) && <div className="text-[11px] text-emerald-300/80 select-all">{c.contact_phone}</div>}
@@ -1523,21 +1523,21 @@ function TargetContacts({ agency, subAgency, office, officeCode, email }: { agen
             )}
             {/* Search the agency's full contact set (find a specific person). */}
             <div className="flex items-center justify-between gap-2 mb-1.5">
-              <p className="text-[10px] text-slate-500">Contracting POCs on this agency’s solicitations:</p>
+              <p className="text-[10px] text-faint">Contracting POCs on this agency’s solicitations:</p>
               <input
                 value={search}
                 onChange={e => setSearch(e.target.value)}
                 placeholder={`🔍 Search ${rest.length}…`}
-                className="w-36 px-2 py-1 bg-slate-800 border border-slate-700 rounded text-[11px] text-white outline-none focus:border-purple-500"
+                className="w-36 px-2 py-1 bg-surface border border-hairline rounded text-[11px] text-white outline-none focus:border-purple-500"
               />
             </div>
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">{filtered.map(c => renderContact(c))}</div>
             {!q && rest.length > PREVIEW_COUNT && (
-              <p className="text-[10px] text-slate-500 mt-2">
+              <p className="text-[10px] text-faint mt-2">
                 Showing {PREVIEW_COUNT} of {total > rest.length ? total : rest.length}. Search above to find anyone — or use <span className="text-purple-300">Decision Makers</span> to browse all agencies.
               </p>
             )}
-            {q && filtered.length === 0 && <p className="text-[10px] text-slate-500 mt-1">No match for “{search}”.</p>}
+            {q && filtered.length === 0 && <p className="text-[10px] text-faint mt-1">No match for “{search}”.</p>}
           </>
         );
       })()}
@@ -1577,18 +1577,18 @@ function SavedContacts({ agency, email }: { agency: string; email: string }) {
     <div>
       <div className="flex items-center justify-between mb-2">
         <span className="inline-flex items-center gap-1 text-xs font-semibold text-amber-300"><Star className="h-3 w-3 shrink-0" strokeWidth={2} /> Saved contacts at {agency}</span>
-        <span className="text-[10px] text-slate-500">{rows.length} saved</span>
+        <span className="text-[10px] text-faint">{rows.length} saved</span>
       </div>
       {loading ? (
-        <div className="text-[11px] text-slate-500">Loading…</div>
+        <div className="text-[11px] text-faint">Loading…</div>
       ) : rows.length === 0 ? (
-        <p className="text-[11px] text-slate-500">No saved contacts yet. On the <span className="text-purple-300">Directory</span> tab (or Decision Makers / task orders), hit <span className="text-purple-300">+ Save contact</span> to pin people here.</p>
+        <p className="text-[11px] text-faint">No saved contacts yet. On the <span className="text-purple-300">Directory</span> tab (or Decision Makers / task orders), hit <span className="text-purple-300">+ Save contact</span> to pin people here.</p>
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
           {rows.map(c => (
             <div key={c.id} className="text-xs leading-tight">
               <div className="text-slate-200 font-medium">{c.full_name}</div>
-              {c.title && <div className="text-[10px] text-slate-500">{c.title}</div>}
+              {c.title && <div className="text-[10px] text-faint">{c.title}</div>}
               {c.organization && <div className="text-[10px] text-slate-600">{c.organization}</div>}
               {c.email && <div className="text-[11px] text-purple-300/80 select-all break-all">{c.email}</div>}
               {c.phone && <div className="text-[11px] text-emerald-300/80 select-all">{c.phone}</div>}
@@ -1713,12 +1713,12 @@ function OutreachLog({
   };
 
   return (
-    <div className="mt-4 pt-4 border-t border-slate-800">
+    <div className="mt-4 pt-4 border-t border-surface">
       <div className="flex items-center justify-between mb-3">
-        <h4 className="text-xs font-bold uppercase tracking-wider text-slate-400">
+        <h4 className="text-xs font-bold uppercase tracking-wider text-muted">
           Outreach Log
           {activities.length > 0 && (
-            <span className="ml-2 text-slate-500 font-normal normal-case">
+            <span className="ml-2 text-faint font-normal normal-case">
               ({activities.length} {activities.length === 1 ? 'entry' : 'entries'})
             </span>
           )}
@@ -1737,14 +1737,14 @@ function OutreachLog({
       {/* The form — only renders when toggled on. Fields are
           all optional except activity_type. Submit clears + collapses. */}
       {showForm && (
-        <div className="bg-slate-950/60 border border-slate-800 rounded-lg p-4 mb-3 space-y-3">
+        <div className="bg-ground-deep/60 border border-surface rounded-lg p-4 mb-3 space-y-3">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
             <label className="block">
-              <span className="text-[10px] uppercase tracking-wider text-slate-500">Type</span>
+              <span className="text-[10px] uppercase tracking-wider text-faint">Type</span>
               <select
                 value={formType}
                 onChange={(e) => setFormType(e.target.value as OutreachActivity['activity_type'])}
-                className="mt-1 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200"
+                className="mt-1 w-full bg-ground border border-hairline rounded px-2 py-1.5 text-xs text-slate-200"
               >
                 {ACTIVITY_TYPES.map(at => (
                   <option key={at.id} value={at.id}>{at.icon} {at.label}</option>
@@ -1752,11 +1752,11 @@ function OutreachLog({
               </select>
             </label>
             <label className="block">
-              <span className="text-[10px] uppercase tracking-wider text-slate-500">Outcome</span>
+              <span className="text-[10px] uppercase tracking-wider text-faint">Outcome</span>
               <select
                 value={formOutcome}
                 onChange={(e) => setFormOutcome(e.target.value)}
-                className="mt-1 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200"
+                className="mt-1 w-full bg-ground border border-hairline rounded px-2 py-1.5 text-xs text-slate-200"
               >
                 <option value="">— None yet —</option>
                 {OUTCOME_OPTIONS.map(o => (
@@ -1765,52 +1765,52 @@ function OutreachLog({
               </select>
             </label>
             <label className="block">
-              <span className="text-[10px] uppercase tracking-wider text-slate-500">Contact Name</span>
+              <span className="text-[10px] uppercase tracking-wider text-faint">Contact Name</span>
               <input
                 type="text"
                 value={formContact}
                 onChange={(e) => setFormContact(e.target.value)}
                 placeholder="Lt Col Smith"
-                className="mt-1 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-emerald-500/50"
+                className="mt-1 w-full bg-ground border border-hairline rounded px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-emerald-500/50"
               />
             </label>
             <label className="block">
-              <span className="text-[10px] uppercase tracking-wider text-slate-500">Contact Role</span>
+              <span className="text-[10px] uppercase tracking-wider text-faint">Contact Role</span>
               <input
                 type="text"
                 value={formRole}
                 onChange={(e) => setFormRole(e.target.value)}
                 placeholder="OSBP / Contracting Officer / SBA Liaison"
-                className="mt-1 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-emerald-500/50"
+                className="mt-1 w-full bg-ground border border-hairline rounded px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-emerald-500/50"
               />
             </label>
             <label className="block md:col-span-2">
-              <span className="text-[10px] uppercase tracking-wider text-slate-500">Subject</span>
+              <span className="text-[10px] uppercase tracking-wider text-faint">Subject</span>
               <input
                 type="text"
                 value={formSubject}
                 onChange={(e) => setFormSubject(e.target.value)}
                 placeholder="Intro email re: AFRL cybersecurity recompete"
-                className="mt-1 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-emerald-500/50"
+                className="mt-1 w-full bg-ground border border-hairline rounded px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-emerald-500/50"
               />
             </label>
             <label className="block md:col-span-2">
-              <span className="text-[10px] uppercase tracking-wider text-slate-500">Notes</span>
+              <span className="text-[10px] uppercase tracking-wider text-faint">Notes</span>
               <textarea
                 value={formBody}
                 onChange={(e) => setFormBody(e.target.value)}
                 rows={2}
                 placeholder="Mentioned upcoming SBIR Phase II, asked about teaming requirements"
-                className="mt-1 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-emerald-500/50"
+                className="mt-1 w-full bg-ground border border-hairline rounded px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-emerald-500/50"
               />
             </label>
             <label className="block">
-              <span className="text-[10px] uppercase tracking-wider text-slate-500">Follow-up Date</span>
+              <span className="text-[10px] uppercase tracking-wider text-faint">Follow-up Date</span>
               <input
                 type="date"
                 value={formFollowUp}
                 onChange={(e) => setFormFollowUp(e.target.value)}
-                className="mt-1 w-full bg-slate-900 border border-slate-700 rounded px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-emerald-500/50"
+                className="mt-1 w-full bg-ground border border-hairline rounded px-2 py-1.5 text-xs text-slate-200 outline-none focus:border-emerald-500/50"
               />
             </label>
           </div>
@@ -1819,14 +1819,14 @@ function OutreachLog({
               type="button"
               onClick={submitActivity}
               disabled={submitting}
-              className="px-4 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white text-xs font-semibold"
+              className="px-4 py-1.5 rounded bg-emerald-600 hover:bg-emerald-500 disabled:bg-input disabled:cursor-not-allowed text-white text-xs font-semibold"
             >
               {submitting ? 'Saving…' : 'Save'}
             </button>
             <button
               type="button"
               onClick={() => { setShowForm(false); resetForm(); }}
-              className="px-3 py-1.5 rounded bg-slate-800 hover:bg-slate-700 text-slate-300 text-xs"
+              className="px-3 py-1.5 rounded bg-surface hover:bg-input text-ink-soft text-xs"
             >
               Cancel
             </button>
@@ -1836,9 +1836,9 @@ function OutreachLog({
 
       {/* Timeline */}
       {loading ? (
-        <p className="text-xs text-slate-500 italic">Loading outreach...</p>
+        <p className="text-xs text-faint italic">Loading outreach...</p>
       ) : activities.length === 0 ? (
-        <p className="text-xs text-slate-500 italic">
+        <p className="text-xs text-faint italic">
           No outreach logged yet. Use &quot;+ Log Activity&quot; to record your first touchpoint.
         </p>
       ) : (
@@ -1849,7 +1849,7 @@ function OutreachLog({
             return (
               <li
                 key={a.id}
-                className="bg-slate-950/40 border border-slate-800 rounded-lg p-3"
+                className="bg-ground-deep/40 border border-surface rounded-lg p-3"
               >
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
@@ -1857,18 +1857,18 @@ function OutreachLog({
                       <span>{typeMeta?.icon}</span>
                       <span className="font-semibold text-slate-200">{typeMeta?.label}</span>
                       {a.contact_name && (
-                        <span className="text-slate-400">
+                        <span className="text-muted">
                           · {a.contact_name}
-                          {a.contact_role && <span className="text-slate-500"> ({a.contact_role})</span>}
+                          {a.contact_role && <span className="text-faint"> ({a.contact_role})</span>}
                         </span>
                       )}
                       <span className="text-slate-600 ml-auto">{fmtRelative(a.created_at)}</span>
                     </div>
                     {a.subject && (
-                      <p className="text-xs text-slate-300 font-medium">{a.subject}</p>
+                      <p className="text-xs text-ink-soft font-medium">{a.subject}</p>
                     )}
                     {a.body && (
-                      <p className="text-xs text-slate-400 mt-1 whitespace-pre-wrap">{a.body}</p>
+                      <p className="text-xs text-muted mt-1 whitespace-pre-wrap">{a.body}</p>
                     )}
                     <div className="flex items-center gap-3 mt-2 text-[10px]">
                       {outcomeMeta && (

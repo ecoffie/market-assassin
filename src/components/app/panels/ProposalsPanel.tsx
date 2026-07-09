@@ -89,8 +89,8 @@ const CATEGORY_LABELS: Record<ComplianceCategory, { label: string; color: string
   technical: { label: 'Technical', color: 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' },
   past_performance: { label: 'Past Perf', color: 'bg-amber-500/15 text-amber-300 border-amber-500/30' },
   pricing: { label: 'Pricing', color: 'bg-pink-500/15 text-pink-300 border-pink-500/30' },
-  admin: { label: 'Admin', color: 'bg-slate-500/15 text-slate-300 border-slate-500/30' },
-  other: { label: 'Other', color: 'bg-slate-700/30 text-slate-400 border-slate-600/40' },
+  admin: { label: 'Admin', color: 'bg-slate-500/15 text-ink-soft border-slate-500/30' },
+  other: { label: 'Other', color: 'bg-input/30 text-muted border-slate-600/40' },
 };
 
 const STATUS_LABELS: Record<ComplianceStatus, string> = {
@@ -1475,7 +1475,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         <div className="border border-purple-500/30 bg-purple-950/20 p-8 text-center">
           <div className="mb-4 flex justify-center"><PenLine className="h-9 w-9 text-purple-400" strokeWidth={1.5} /></div>
           <h1 className="text-2xl font-bold text-white mb-3">Proposal Assist</h1>
-          <p className="text-slate-400 mb-6 max-w-md mx-auto">
+          <p className="text-muted mb-6 max-w-md mx-auto">
             Upgrade to turn saved pursuits into bid/no-bid risks, win themes, compliance prompts, and a first proposal outline.
           </p>
           <a
@@ -1501,7 +1501,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               BETA
             </span>
           </div>
-          <p className="text-slate-400 mt-1">
+          <p className="text-muted mt-1">
             {activePursuitId
               ? `${proposalFlowName} workspace for ${activePursuit?.title || 'this pursuit'}.`
               : 'Start from a saved pursuit or upload a source document to prepare the response.'}
@@ -1523,7 +1523,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           <button
             onClick={loadPipeline}
             disabled={loading}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 text-sm rounded-lg transition-colors"
+            className="px-4 py-2 bg-surface hover:bg-input disabled:opacity-50 text-ink-soft text-sm rounded-lg transition-colors"
           >
             {loading ? 'Refreshing...' : 'Refresh Pursuits'}
           </button>
@@ -1541,12 +1541,12 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       )}
 
       {activePursuit && (
-        <section className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+        <section className="rounded-xl border border-surface bg-ground/70 p-4">
           <div className="flex flex-wrap items-start justify-between gap-3">
             <div className="min-w-0">
-              <p className="text-[11px] uppercase tracking-wider text-slate-500 mb-1">Current pursuit</p>
+              <p className="text-[11px] uppercase tracking-wider text-faint mb-1">Current pursuit</p>
               <h2 className="text-base font-semibold text-white truncate">{activePursuit.title}</h2>
-              <p className="text-xs text-slate-400 mt-1">
+              <p className="text-xs text-muted mt-1">
                 {[
                   activePursuit.agency,
                   formatDodaacOffice(activePursuit.notice_id || null),
@@ -1577,7 +1577,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                   setAutoLoadMessage(null);
                   clearRfp();
                 }}
-                className="px-3 py-1.5 rounded-lg bg-slate-800 hover:bg-slate-700 text-xs text-slate-300"
+                className="px-3 py-1.5 rounded-lg bg-surface hover:bg-input text-xs text-ink-soft"
               >
                 Switch pursuit
               </button>
@@ -1596,10 +1596,10 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           Proposal Assist directly (no Pipeline click). Pick a saved
           pursuit and the workbench will extract available SAM docs. */}
       {email && !activePursuitId && opportunities.length > 0 && (
-        <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+        <section className="bg-ground border border-surface rounded-xl p-5">
           <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">① Start here</p>
           <h2 className="text-lg font-semibold text-white mb-1">Start from a saved pursuit</h2>
-          <p className="text-sm text-slate-400 mb-3">
+          <p className="text-sm text-muted mb-3">
             Pick one of your live pursuits and click <span className="text-purple-300 font-medium">Open workbench</span> — Mindy pulls the cached SAM documents and opens your workbench below. (No pursuit? Skip to ② and upload a document directly.)
           </p>
           <div className="flex flex-wrap items-center gap-3">
@@ -1612,12 +1612,12 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 onChange={(e) => { setPursuitSearch(e.target.value); setPickerOpen(true); }}
                 onFocus={() => { setPickerOpen(true); setPursuitSearch(''); }}
                 placeholder={`Search ${opportunities.length} saved pursuits…`}
-                className="w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
+                className="w-full rounded-lg border border-hairline bg-surface px-3 py-2 text-sm text-white outline-none focus:border-purple-500"
               />
               {pickerOpen && (
                 <>
                   <div className="fixed inset-0 z-10" onClick={() => setPickerOpen(false)} />
-                  <div className="absolute z-20 mt-1 w-full max-h-72 overflow-auto rounded-lg border border-slate-700 bg-slate-900 shadow-xl">
+                  <div className="absolute z-20 mt-1 w-full max-h-72 overflow-auto rounded-lg border border-hairline bg-ground shadow-xl">
                     {(() => {
                       const q = pursuitSearch.trim().toLowerCase();
                       const matches = (o: PipelineOpportunity) =>
@@ -1639,12 +1639,12 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                             key={opp.id}
                             type="button"
                             onClick={() => { setSelectedId(opp.id); setPickerOpen(false); setPursuitSearch(''); }}
-                            className={`flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-slate-800 ${selectedId === opp.id ? 'bg-purple-500/10' : ''}`}
+                            className={`flex w-full items-start gap-2 px-3 py-2 text-left hover:bg-surface ${selectedId === opp.id ? 'bg-purple-500/10' : ''}`}
                           >
-                            {nt && <span className="mt-0.5 shrink-0 rounded bg-slate-700 px-1.5 py-0.5 text-[10px] font-medium text-slate-300">{nt}</span>}
+                            {nt && <span className="mt-0.5 shrink-0 rounded bg-input px-1.5 py-0.5 text-[10px] font-medium text-ink-soft">{nt}</span>}
                             <span className="min-w-0 flex-1">
                               <span className="block truncate text-sm text-slate-200">{opp.title}</span>
-                              {opp.agency && <span className="block truncate text-[11px] text-slate-500">{opp.agency}</span>}
+                              {opp.agency && <span className="block truncate text-[11px] text-faint">{opp.agency}</span>}
                             </span>
                             {active && <span className="mt-0.5 shrink-0 rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-300 capitalize">{opp.stage}</span>}
                           </button>
@@ -1663,14 +1663,14 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                             )}
                             {active.map(renderRow)}
                             {active.length > 0 && rest.length > 0 && (
-                              <div className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider text-slate-600 border-t border-slate-800">All saved ({rest.length}) — type to search</div>
+                              <div className="px-3 pt-2 pb-1 text-[10px] uppercase tracking-wider text-slate-600 border-t border-surface">All saved ({rest.length}) — type to search</div>
                             )}
                             {rest.map(renderRow)}
                           </>
                         );
                       }
                       const filtered = sorted.filter(matches);
-                      if (filtered.length === 0) return <div className="px-3 py-3 text-xs text-slate-500">No pursuit matches “{pursuitSearch}”.</div>;
+                      if (filtered.length === 0) return <div className="px-3 py-3 text-xs text-faint">No pursuit matches “{pursuitSearch}”.</div>;
                       return filtered.map(renderRow);
                     })()}
                   </div>
@@ -1686,7 +1686,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                   onClick={() => { if (selectedId && respondable) setLocalPursuitId(selectedId); }}
                   disabled={!selectedId || !respondable}
                   title={!respondable ? 'This notice type has nothing to submit — you cannot draft a response.' : undefined}
-                  className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 disabled:text-slate-400 disabled:cursor-not-allowed text-sm font-semibold text-white"
+                  className="px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 disabled:bg-input disabled:text-muted disabled:cursor-not-allowed text-sm font-semibold text-white"
                 >
                   Open workbench →
                 </button>
@@ -1706,7 +1706,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
                 : respondability === 'response'
                 ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                : 'bg-slate-600/20 text-slate-300 border-slate-500/40';
+                : 'bg-slate-600/20 text-ink-soft border-slate-500/40';
             const hint =
               respondability === 'bid'
                 ? 'Biddable solicitation — Mindy drafts a full proposal. Check the matching RFP briefing.'
@@ -1722,11 +1722,11 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 <span className={`inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider border ${styles}`}>
                   {label}
                 </span>
-                <span className="ml-2 text-[11px] text-slate-400">{hint}</span>
+                <span className="ml-2 text-[11px] text-muted">{hint}</span>
               </div>
             );
           })()}
-          <p className="text-[11px] text-slate-500 mt-2">
+          <p className="text-[11px] text-faint mt-2">
             Or upload documents below for an opportunity that isn&apos;t saved yet.
           </p>
         </section>
@@ -1743,10 +1743,10 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         const isAward = /award/i.test(label);
         const isPresol = /presol/i.test(label);
         return (
-          <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <section className="bg-ground border border-surface rounded-xl p-5">
             <div className="rounded-lg border border-slate-600/40 bg-slate-600/15 p-4">
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider border bg-slate-600/20 text-slate-300 border-slate-500/40">
+                <span className="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider border bg-slate-600/20 text-ink-soft border-slate-500/40">
                   {label}
                 </span>
                 <span className="text-sm font-medium text-slate-200">
@@ -1754,19 +1754,19 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 </span>
               </div>
               {isAward ? (
-                <p className="mt-2 text-sm text-slate-400">
+                <p className="mt-2 text-sm text-muted">
                   This contract has already been awarded — there&apos;s no bid to write. But it&apos;s a
                   strong <span className="text-slate-200">subcontracting lead</span>: add the awardee to
                   Relationships and reach out about teaming on the work, or track the recompete.
                 </p>
               ) : isPresol ? (
-                <p className="mt-2 text-sm text-slate-400">
+                <p className="mt-2 text-sm text-muted">
                   A pre-solicitation is a heads-up that a solicitation is coming — you don&apos;t respond yet.
                   Keep <span className="text-slate-200">tracking this pursuit</span> so you&apos;re notified the
                   moment the solicitation posts, then come back here to draft your bid.
                 </p>
               ) : (
-                <p className="mt-2 text-sm text-slate-400">
+                <p className="mt-2 text-sm text-muted">
                   This is an informational <span className="text-slate-200">{label}</span> —
                   nothing to submit, so Mindy can&apos;t draft a bid. Use it for market intelligence
                   (incumbent, agency, timing).
@@ -1786,7 +1786,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 <button
                   type="button"
                   onClick={() => { setLocalPursuitId(null); }}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-md bg-slate-700 hover:bg-slate-600 text-slate-200"
+                  className="inline-flex items-center gap-1 px-3 py-1.5 text-xs rounded-md bg-input hover:bg-slate-600 text-slate-200"
                 >
                   ← Pick a different pursuit
                 </button>
@@ -1797,7 +1797,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       })()}
 
       {/* Document Workbench */}
-      <section id="proposal-source-document" className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+      <section id="proposal-source-document" className="bg-ground border border-surface rounded-xl p-5">
         {/* Step cue (#55 — Eric: the start screen looked like Open workbench did
             nothing because the docs section sat below it with no relationship).
             Make it an explicit numbered step that reflects whether a pursuit is
@@ -1813,29 +1813,29 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             <h2 className="text-lg font-semibold text-white">
               Upload or extract everything for this response
             </h2>
-            <p className="text-sm text-slate-400 mt-1">
+            <p className="text-sm text-muted mt-1">
               Add the notice, RFP/RFQ, PWS/SOW, amendments, Q&A, pricing schedule, or attachments. Mindy extracts the text, classifies the response type, then unlocks the outputs below.
             </p>
             {/* Auto ↔ Manual choice — at the TOP / Start Here (Eric QA: it was
                 buried at the bottom; users decide their style up front). */}
-            <div data-tour="proposals-mode" className="mt-3 inline-flex items-center gap-2 rounded-lg border border-slate-700 bg-slate-800/60 p-1 text-sm">
-              <span className="pl-2 text-xs text-slate-500">Mode:</span>
+            <div data-tour="proposals-mode" className="mt-3 inline-flex items-center gap-2 rounded-lg border border-hairline bg-surface/60 p-1 text-sm">
+              <span className="pl-2 text-xs text-faint">Mode:</span>
               <button
                 onClick={() => setDriveMode('auto')}
-                className={`px-3 py-1.5 rounded-md transition-colors ${driveMode === 'auto' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                className={`px-3 py-1.5 rounded-md transition-colors ${driveMode === 'auto' ? 'bg-emerald-600 text-white' : 'text-muted hover:text-white'}`}
                 title="Mindy drafts a first pass of each section — you review, fill placeholders, and finalize"
               >
                 <Zap className="w-3.5 h-3.5 inline" strokeWidth={2} /> Auto
               </button>
               <button
                 onClick={() => setDriveMode('manual')}
-                className={`px-3 py-1.5 rounded-md transition-colors ${driveMode === 'manual' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                className={`px-3 py-1.5 rounded-md transition-colors ${driveMode === 'manual' ? 'bg-purple-600 text-white' : 'text-muted hover:text-white'}`}
                 title="You drive — upload files + chat to write the proposal yourself"
               >
                 <Gauge className="w-3.5 h-3.5 inline" strokeWidth={2} /> Manual · Sport
               </button>
             </div>
-            <p className="mt-1.5 text-xs text-slate-500">
+            <p className="mt-1.5 text-xs text-faint">
               {driveMode === 'auto' ? 'Auto: Mindy drafts it for you (safe mode).' : 'Sport: you direct Mindy with your own files.'}
             </p>
           </div>
@@ -1957,9 +1957,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               <p className="text-sm font-semibold text-purple-200">
                 <span className="inline-flex items-center gap-1.5"><ClipboardList className="h-4 w-4 shrink-0" strokeWidth={2} /> Paste the SAM.gov notice text</span>
               </p>
-              <span className="text-[11px] text-slate-500">no upload needed</span>
+              <span className="text-[11px] text-faint">no upload needed</span>
             </div>
-            <p className="text-xs text-slate-400 mb-3">
+            <p className="text-xs text-muted mb-3">
               Copy the notice body from SAM.gov (Description + Contact Information)
               and paste it here. Mindy reads the agency, solicitation number,
               deadline, submission email, and required content — then pre-fills your
@@ -1970,10 +1970,10 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               onChange={(e) => setPastedNotice(e.target.value)}
               placeholder="Paste the SAM.gov notice text here…"
               rows={5}
-              className="w-full rounded-lg bg-slate-950/60 border border-slate-700 px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:border-purple-500/60 focus:outline-none resize-y"
+              className="w-full rounded-lg bg-ground-deep/60 border border-hairline px-3 py-2 text-sm text-slate-200 placeholder-slate-600 focus:border-purple-500/60 focus:outline-none resize-y"
             />
             <div className="flex items-center justify-between gap-3 mt-2">
-              <span className="text-[11px] text-slate-500">
+              <span className="text-[11px] text-faint">
                 {pastedNotice.trim().length > 0
                   ? `${pastedNotice.trim().length.toLocaleString()} chars`
                   : 'Tip: include the Description and Contact Information sections'}
@@ -1994,7 +1994,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           <div
             onDrop={onDrop}
             onDragOver={onDragOver}
-            className="border border-dashed border-slate-700 rounded-lg p-8 text-center hover:border-purple-500/60 transition-colors"
+            className="border border-dashed border-hairline rounded-lg p-8 text-center hover:border-purple-500/60 transition-colors"
           >
             <input
               ref={fileInputRef}
@@ -2004,7 +2004,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               onChange={onFileInputChange}
               className="hidden"
             />
-            <p className="text-slate-300">
+            <p className="text-ink-soft">
               Drop files here, or{' '}
               <button
                 type="button"
@@ -2015,7 +2015,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 browse
               </button>
             </p>
-            <p className="text-xs text-slate-500 mt-2">PDF · DOCX · TXT · max 10 MB each</p>
+            <p className="text-xs text-faint mt-2">PDF · DOCX · TXT · max 10 MB each</p>
             {uploading && (
               <p className="text-xs text-purple-300 mt-3 flex items-center justify-center gap-2">
                 <span className="inline-block w-3 h-3 border-2 border-purple-400 border-t-transparent rounded-full animate-spin" />
@@ -2025,12 +2025,12 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           </div>
         ) : (
           <div className="space-y-3">
-            <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-950/50 border border-slate-800 rounded-lg p-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 bg-ground-deep/50 border border-surface rounded-lg p-3">
               <div className="flex items-center gap-3 min-w-0">
                 <FileText className="h-6 w-6 shrink-0 text-muted" strokeWidth={1.75} />
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-white truncate">{uploadedRfp.fileName}</p>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-faint">
                     {sourceDocuments.length} document{sourceDocuments.length === 1 ? '' : 's'} · {(uploadedRfp.fileSize / 1024).toFixed(1)} KB · {uploadedRfp.charCount.toLocaleString()} chars
                     {uploadedRfp.pageCount ? ` · ${uploadedRfp.pageCount} page${uploadedRfp.pageCount === 1 ? '' : 's'}` : ''}
                   </p>
@@ -2041,7 +2041,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   disabled={uploading}
-                  className="px-3 py-1.5 text-xs rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 disabled:opacity-50"
+                  className="px-3 py-1.5 text-xs rounded-lg bg-surface text-ink-soft hover:bg-input disabled:opacity-50"
                 >
                   Add / replace
                 </button>
@@ -2049,7 +2049,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                   type="button"
                   onClick={clearRfp}
                   disabled={uploading}
-                  className="px-3 py-1.5 text-xs rounded-lg bg-slate-800 text-slate-400 hover:text-red-300 hover:bg-slate-700 disabled:opacity-50"
+                  className="px-3 py-1.5 text-xs rounded-lg bg-surface text-muted hover:text-red-300 hover:bg-input disabled:opacity-50"
                 >
                   Remove
                 </button>
@@ -2059,9 +2059,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             {sourceDocuments.length > 1 && (
               <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
                 {sourceDocuments.map((doc) => (
-                  <div key={`${doc.fileName}-${doc.charCount}`} className="rounded-lg border border-slate-800 bg-slate-950/40 px-3 py-2">
+                  <div key={`${doc.fileName}-${doc.charCount}`} className="rounded-lg border border-surface bg-ground-deep/40 px-3 py-2">
                     <p className="truncate text-xs font-medium text-slate-200">{doc.fileName}</p>
-                    <p className="mt-0.5 text-[11px] text-slate-500">
+                    <p className="mt-0.5 text-[11px] text-faint">
                       {(doc.fileSize / 1024).toFixed(1)} KB · {doc.charCount.toLocaleString()} chars
                     </p>
                   </div>
@@ -2069,17 +2069,17 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               </div>
             )}
 
-            <details className="bg-slate-950/40 border border-slate-800 rounded-lg">
-              <summary className="cursor-pointer px-3 py-2 text-sm text-slate-300 hover:text-white">
+            <details className="bg-ground-deep/40 border border-surface rounded-lg">
+              <summary className="cursor-pointer px-3 py-2 text-sm text-ink-soft hover:text-white">
                 Preview extracted text ({uploadedRfp.text.length.toLocaleString()} chars)
               </summary>
-              <pre className="px-3 pb-3 pt-1 text-xs text-slate-400 whitespace-pre-wrap break-words max-h-96 overflow-y-auto">
+              <pre className="px-3 pb-3 pt-1 text-xs text-muted whitespace-pre-wrap break-words max-h-96 overflow-y-auto">
                 {uploadedRfp.text.slice(0, 5000)}
                 {uploadedRfp.text.length > 5000 ? '\n\n…' : ''}
               </pre>
             </details>
 
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-faint">
               Extracted text is held in this session and used by each output you run below.
             </p>
 
@@ -2127,15 +2127,15 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           ONE obvious action: "Draft my response". Export + blank template +
           per-section editing are tucked behind "More options" below. */}
       {responseOutputsReady && isSimpleResponseMode && driveMode === 'auto' && (
-        <section className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+        <section className="bg-ground border border-surface rounded-xl p-6">
           <div className="flex items-center justify-between gap-3 mb-1">
             <p className="text-xs uppercase tracking-wider text-purple-300">Your response</p>
-            <span className="rounded-full border border-slate-700 bg-slate-800/70 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-300">
+            <span className="rounded-full border border-hairline bg-surface/70 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-ink-soft">
               {noticeTypeLabel(activePursuitNoticeType) || (effectiveNoticeType === 'sources_sought' ? 'Sources Sought' : effectiveNoticeType.toUpperCase())}
             </span>
           </div>
           <h2 className="text-xl font-semibold text-white">Let Mindy write your response</h2>
-          <p className="text-sm text-slate-400 mt-1 mb-4">
+          <p className="text-sm text-muted mt-1 mb-4">
             Mindy reads {uploadedRfp ? 'the notice' : 'this opportunity'} and your saved profile, then drafts the full {isRfqMode ? 'response' : 'letter of intent / response'} — opening, relevant experience, capability fit, and point of contact. One click.
           </p>
 
@@ -2184,7 +2184,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 type="button"
                 onClick={generateCompliance}
                 disabled={complianceLoading}
-                className="w-full sm:w-auto px-5 py-3 rounded-xl border border-slate-700 bg-slate-800/60 text-sm font-semibold text-slate-200 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
+                className="w-full sm:w-auto px-5 py-3 rounded-xl border border-hairline bg-surface/60 text-sm font-semibold text-slate-200 hover:bg-input disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
               >
                 <ClipboardList className="h-4 w-4 shrink-0" strokeWidth={2} />
                 {complianceLoading
@@ -2212,9 +2212,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               {/* Real per-section status + a working Stop. All sections write in
                   one server pass, so they resolve together — the checklist shows
                   what's queued and flips to ✓ as drafts land. */}
-              <div className="rounded-xl border border-slate-700 bg-slate-900/60 p-4">
+              <div className="rounded-xl border border-hairline bg-ground/60 p-4">
                 <div className="flex items-center justify-between gap-3 mb-3">
-                  <p className="text-xs font-medium text-slate-300">
+                  <p className="text-xs font-medium text-ink-soft">
                     Drafting {currentSectionTabs.length} section{currentSectionTabs.length === 1 ? '' : 's'} · {draftAllElapsedSec}s
                   </p>
                   <button
@@ -2235,7 +2235,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                         ) : (
                           <span className="inline-block w-3 h-3 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" />
                         )}
-                        <span className={done ? 'text-emerald-200' : 'text-slate-400'}>{tab.label}</span>
+                        <span className={done ? 'text-emerald-200' : 'text-muted'}>{tab.label}</span>
                       </li>
                     );
                   })}
@@ -2245,7 +2245,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           )}
 
           {draftAllCancelled && !draftAllLoading && (
-            <p className="mt-4 text-sm text-slate-300 bg-slate-500/10 border border-slate-500/30 rounded-lg px-4 py-3">
+            <p className="mt-4 text-sm text-ink-soft bg-slate-500/10 border border-slate-500/30 rounded-lg px-4 py-3">
               Drafting stopped. Any sections already written are kept below — press “Draft my response” to run the rest.
             </p>
           )}
@@ -2294,7 +2294,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           <button
             type="button"
             onClick={() => setShowAdvancedOutputs(v => !v)}
-            className="mt-4 text-sm text-slate-400 hover:text-slate-200 inline-flex items-center gap-1.5"
+            className="mt-4 text-sm text-muted hover:text-slate-200 inline-flex items-center gap-1.5"
           >
             <span className={`transition-transform ${showAdvancedOutputs ? 'rotate-90' : ''}`}>▸</span>
             More options {showAdvancedOutputs ? '' : '(export .docx, blank template, edit sections)'}
@@ -2305,24 +2305,24 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       {/* Step 1 — Bid/No-Bid gate (Eric: decide before the matrix). Shown until
           the user makes a decision, then the outputs unlock. */}
       {responseOutputsReady && !isSimpleResponseMode && driveMode === 'auto' && !bidProceeded && (
-        <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+        <section className="bg-ground border border-surface rounded-xl p-5">
           <BidDecisionGate onProceed={() => setBidProceeded(true)} email={email || undefined} pipelineId={activePursuitId} />
         </section>
       )}
 
       {responseOutputsReady && !isSimpleResponseMode && driveMode === 'auto' && bidProceeded && (
-        <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+        <section className="bg-ground border border-surface rounded-xl p-5">
           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
               <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Available Outputs</p>
               <h2 className="text-lg font-semibold text-white">Choose what Mindy should produce</h2>
-              <p className="text-sm text-slate-400 mt-1">
+              <p className="text-sm text-muted mt-1">
                 {uploadedRfp
                   ? 'No forced order. Generate the artifact you need, review it below, then export.'
                   : 'The built-in response template is ready now. Upload the notice only if you want custom AI-drafted sections.'}
               </p>
             </div>
-            <span className="rounded-full border border-slate-700 bg-slate-800/70 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-300">
+            <span className="rounded-full border border-hairline bg-surface/70 px-2.5 py-1 text-[11px] font-semibold uppercase tracking-wider text-ink-soft">
               {noticeTypeLabel(activePursuitNoticeType) || effectiveNoticeType.toUpperCase()}
             </span>
           </div>
@@ -2470,22 +2470,22 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
 
           {/* LOI on-screen preview (review before .docx). Same text the export renders. */}
           {loiPreview && (
-            <div className="mt-4 rounded-xl border border-purple-500/30 bg-slate-950/60 p-4">
+            <div className="mt-4 rounded-xl border border-purple-500/30 bg-ground-deep/60 p-4">
               <div className="flex items-center justify-between gap-3 mb-3">
                 <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-purple-200"><FileText className="h-4 w-4 shrink-0" strokeWidth={2} /> LOI preview — review before you export</p>
                 <button
                   type="button"
                   onClick={() => setLoiPreview(null)}
-                  className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200"
+                  className="inline-flex items-center gap-1 text-xs text-muted hover:text-slate-200"
                 >
                   Close <X className="h-3 w-3 shrink-0" strokeWidth={2.5} />
                 </button>
               </div>
-              <pre className="max-h-[28rem] overflow-auto whitespace-pre-wrap rounded-lg bg-slate-900 p-4 font-mono text-[13px] leading-relaxed text-slate-200">
+              <pre className="max-h-[28rem] overflow-auto whitespace-pre-wrap rounded-lg bg-ground p-4 font-mono text-[13px] leading-relaxed text-slate-200">
 {loiPreview}
               </pre>
-              <p className="mt-2 text-xs text-slate-500">
-                Text in <span className="text-slate-300">[brackets]</span> is a placeholder for you to fill in. Happy with it? Use “Export LOI .docx” above.
+              <p className="mt-2 text-xs text-faint">
+                Text in <span className="text-ink-soft">[brackets]</span> is a placeholder for you to fill in. Happy with it? Use “Export LOI .docx” above.
               </p>
             </div>
           )}
@@ -2495,19 +2495,19 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             <p className="mt-3 text-sm text-amber-300">{scanError}</p>
           )}
           {scanResult && (
-            <div className="mt-4 rounded-xl border border-slate-800 bg-slate-950/60 p-4">
+            <div className="mt-4 rounded-xl border border-surface bg-ground-deep/60 p-4">
               <div className="flex items-center gap-3 mb-3">
                 <span className={`text-sm font-semibold ${scanResult.atRisk ? 'text-red-400' : 'text-emerald-400'}`}>
                   {scanResult.atRisk
                     ? `⚠️ ${scanResult.counts.dq} disqualifying issue${scanResult.counts.dq === 1 ? '' : 's'} found`
                     : '✓ No disqualifying issues found'}
                 </span>
-                <span className="text-xs text-slate-400">
+                <span className="text-xs text-muted">
                   {scanResult.counts.warning} warning{scanResult.counts.warning === 1 ? '' : 's'} · {scanResult.counts.info} note{scanResult.counts.info === 1 ? '' : 's'}
                 </span>
               </div>
               {scanResult.findings.length === 0 ? (
-                <p className="text-sm text-slate-400">Nothing flagged. Still verify the submission deadline and method before you send.</p>
+                <p className="text-sm text-muted">Nothing flagged. Still verify the submission deadline and method before you send.</p>
               ) : (
                 <ul className="space-y-2">
                   {scanResult.findings.map((f, i) => (
@@ -2515,14 +2515,14 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                       <span className={
                         f.severity === 'dq' ? 'text-red-400 font-semibold shrink-0'
                         : f.severity === 'warning' ? 'text-amber-300 shrink-0'
-                        : 'text-slate-400 shrink-0'
+                        : 'text-muted shrink-0'
                       }>
                         {f.severity === 'dq' ? 'DQ' : f.severity === 'warning' ? '!' : 'i'}
                       </span>
                       <span>
                         <span className="text-white font-medium">{f.title}</span>
-                        {f.section ? <span className="text-slate-500"> ({f.section})</span> : null}
-                        <span className="block text-slate-400">{f.detail}</span>
+                        {f.section ? <span className="text-faint"> ({f.section})</span> : null}
+                        <span className="block text-muted">{f.detail}</span>
                       </span>
                     </li>
                   ))}
@@ -2541,7 +2541,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         <section
           id={showComplianceMatrix ? 'proposal-compliance-section' : 'proposal-response-template'}
           ref={complianceSectionRef}
-          className="bg-slate-900 border border-slate-800 rounded-xl p-5"
+          className="bg-ground border border-surface rounded-xl p-5"
         >
           {!showComplianceMatrix ? (
             <>
@@ -2551,7 +2551,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                   <h2 className="text-lg font-semibold text-white">
                     {isRfqMode ? 'Create response template' : 'Create LOI response template'}
                   </h2>
-                  <p className="text-sm text-slate-400 mt-1">
+                  <p className="text-sm text-muted mt-1">
                     {isRfqMode
                       ? 'RFQs usually need a clean quote/response document with blanks for pricing, submission details, and attachments — not a full compliance matrix.'
                       : 'Sources Sought and RFI responses use Mindy\'s curated LOI response structure. Mindy leaves user-specific details blank and reminds the user to attach an existing capability statement only when requested.'}
@@ -2570,7 +2570,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 </button>
               </div>
 
-              <div className="rounded-lg border border-slate-700/60 bg-slate-950/40 p-3 text-sm text-slate-400">
+              <div className="rounded-lg border border-hairline/60 bg-ground-deep/40 p-3 text-sm text-muted">
                 <p className="text-slate-200 font-medium mb-2">Template includes blanks for:</p>
                 <ul className="space-y-1">
                   <li>• Date, attention line, agency address, reference / solicitation number</li>
@@ -2602,7 +2602,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 <div>
                   <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Output · Compliance Matrix</p>
                   <h2 className="text-lg font-semibold text-white">Extract every shall / must / required</h2>
-                  <p className="text-sm text-slate-400 mt-1">
+                  <p className="text-sm text-muted mt-1">
                     Mindy reads the source doc and lists each obligation so you can assign owners and track status before drafting.
                   </p>
                 </div>
@@ -2611,7 +2611,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                     <button
                       type="button"
                       onClick={exportComplianceExcel}
-                      className="px-3 py-2 text-xs rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition-colors"
+                      className="px-3 py-2 text-xs rounded-lg bg-surface text-ink-soft hover:bg-input transition-colors"
                     >
                       Export Excel
                     </button>
@@ -2664,22 +2664,22 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                     const fin = compliance.filter(r => priorityOf({ requirement: r.requirement, category: r.category, section: r.section }) === 'final').length;
                     const std = compliance.length - crit - fin;
                     return (
-                      <div className="rounded-xl border border-slate-700/60 bg-slate-950/40 p-4 mb-4">
+                      <div className="rounded-xl border border-hairline/60 bg-ground-deep/40 p-4 mb-4">
                         <p className="text-sm text-slate-200 mb-3">
                           Mindy pulled <span className="font-semibold text-white">{compliance.length}</span> requirements from this solicitation. Don&apos;t let the number scare you — here&apos;s the order to tackle them:
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
                           <button onClick={() => setPriorityFilter('critical')} className={`text-left rounded-lg border p-2.5 transition-colors ${priorityFilter === 'critical' ? 'border-red-500/60 bg-red-500/10' : 'border-red-500/25 bg-red-500/[0.04] hover:bg-red-500/10'}`}>
                             <div className="inline-flex items-center gap-1.5 font-semibold text-red-300"><Circle className="h-2.5 w-2.5 shrink-0 fill-current" strokeWidth={0} /> {crit} Critical</div>
-                            <div className="text-slate-400 mt-0.5">Do these first — deadlines, required plans, certs. Miss one and you&apos;re out.</div>
+                            <div className="text-muted mt-0.5">Do these first — deadlines, required plans, certs. Miss one and you&apos;re out.</div>
                           </button>
                           <button onClick={() => setPriorityFilter('standard')} className={`text-left rounded-lg border p-2.5 transition-colors ${priorityFilter === 'standard' ? 'border-amber-500/60 bg-amber-500/10' : 'border-amber-500/25 bg-amber-500/[0.04] hover:bg-amber-500/10'}`}>
                             <div className="inline-flex items-center gap-1.5 font-semibold text-amber-300"><Circle className="h-2.5 w-2.5 shrink-0 fill-current" strokeWidth={0} /> {std} Standard</div>
-                            <div className="text-slate-400 mt-0.5">The real content — your technical, management, past performance.</div>
+                            <div className="text-muted mt-0.5">The real content — your technical, management, past performance.</div>
                           </button>
                           <button onClick={() => setPriorityFilter('final')} className={`text-left rounded-lg border p-2.5 transition-colors ${priorityFilter === 'final' ? 'border-emerald-500/60 bg-emerald-500/10' : 'border-emerald-500/25 bg-emerald-500/[0.04] hover:bg-emerald-500/10'}`}>
                             <div className="inline-flex items-center gap-1.5 font-semibold text-emerald-300"><Circle className="h-2.5 w-2.5 shrink-0 fill-current" strokeWidth={0} /> {fin} Final polish</div>
-                            <div className="text-slate-400 mt-0.5">Save for last — page limits, fonts, formatting. After the draft is done.</div>
+                            <div className="text-muted mt-0.5">Save for last — page limits, fonts, formatting. After the draft is done.</div>
                           </button>
                         </div>
                         {priorityFilter !== 'all' && (
@@ -2691,15 +2691,15 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                   {/* Team progress roll-up — done / in-progress / open across the
                       whole matrix, with a completion bar and an unassigned nudge. */}
                   {compliance.length > 0 && (
-                    <div className="mb-3 rounded-lg border border-slate-800 bg-slate-950/50 p-3">
+                    <div className="mb-3 rounded-lg border border-surface bg-ground-deep/50 p-3">
                       <div className="flex items-center justify-between text-xs mb-1.5">
-                        <span className="text-slate-300 font-medium">{complianceProgress.pct}% complete</span>
-                        <span className="text-slate-500">
+                        <span className="text-ink-soft font-medium">{complianceProgress.pct}% complete</span>
+                        <span className="text-faint">
                           {complianceProgress.done} done · {complianceProgress.inProgress} in progress · {complianceProgress.open} open
                           {complianceProgress.na ? ` · ${complianceProgress.na} N/A` : ''}
                         </span>
                       </div>
-                      <div className="h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
+                      <div className="h-1.5 w-full rounded-full bg-surface overflow-hidden">
                         <div className="h-full bg-emerald-500 transition-all" style={{ width: `${complianceProgress.pct}%` }} />
                       </div>
                       {complianceProgress.unassigned > 0 && (
@@ -2710,12 +2710,12 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                     </div>
                   )}
                   <div className="flex flex-wrap items-center gap-2 mb-3 text-xs">
-                    <span className="text-slate-500">{compliance.length} requirement{compliance.length === 1 ? '' : 's'}</span>
+                    <span className="text-faint">{compliance.length} requirement{compliance.length === 1 ? '' : 's'}</span>
                 <span className="text-slate-700">·</span>
                 <select
                   value={categoryFilter}
                   onChange={e => setCategoryFilter(e.target.value as 'all' | ComplianceCategory)}
-                  className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-300"
+                  className="bg-surface border border-hairline rounded px-2 py-1 text-ink-soft"
                 >
                   <option value="all">All categories</option>
                   {(Object.keys(CATEGORY_LABELS) as ComplianceCategory[]).map(c => (
@@ -2725,7 +2725,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 <select
                   value={statusFilter}
                   onChange={e => setStatusFilter(e.target.value as 'all' | ComplianceStatus)}
-                  className="bg-slate-800 border border-slate-700 rounded px-2 py-1 text-slate-300"
+                  className="bg-surface border border-hairline rounded px-2 py-1 text-ink-soft"
                 >
                   <option value="all">All statuses</option>
                   {(Object.keys(STATUS_LABELS) as ComplianceStatus[]).map(s => (
@@ -2735,12 +2735,12 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 <button
                   type="button"
                   onClick={() => setMyItemsOnly(v => !v)}
-                  className={`rounded px-2 py-1 border transition-colors ${myItemsOnly ? 'border-purple-500 bg-purple-500/15 text-purple-200' : 'border-slate-700 bg-slate-800 text-slate-300 hover:text-white'}`}
+                  className={`rounded px-2 py-1 border transition-colors ${myItemsOnly ? 'border-purple-500 bg-purple-500/15 text-purple-200' : 'border-hairline bg-surface text-ink-soft hover:text-white'}`}
                   title="Show only requirements assigned to you"
                 >
                   My items
                 </button>
-                <span className="text-slate-500 ml-auto">
+                <span className="text-faint ml-auto">
                   Showing {filteredCompliance.length} of {compliance.length}
                 </span>
               </div>
@@ -2756,9 +2756,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                   below sm so the columns that matter — Requirement, Owner, Status
                   — fit the viewport. Min-width only kicks in at sm+. CSS only,
                   no change to the data or the owner/status edit logic. */}
-              <div className="overflow-x-auto border border-slate-800 rounded-lg">
+              <div className="overflow-x-auto border border-surface rounded-lg">
                 <table className="w-full text-sm sm:min-w-[820px]">
-                  <thead className="bg-slate-950/60 text-slate-400 text-xs uppercase tracking-wider">
+                  <thead className="bg-ground-deep/60 text-muted text-xs uppercase tracking-wider">
                     <tr>
                       <th className="hidden sm:table-cell text-left px-3 py-2 font-medium w-20">ID</th>
                       <th className="text-left px-3 py-2 font-medium min-w-[160px] sm:min-w-[280px]">Requirement</th>
@@ -2779,12 +2779,12 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                       return (
                         <Fragment key={r.id}>
                         {showGroup && (
-                          <tr className="bg-slate-900/70">
-                            <td colSpan={7} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-purple-300 border-t border-slate-700">{grp}</td>
+                          <tr className="bg-ground/70">
+                            <td colSpan={7} className="px-3 py-1.5 text-[11px] font-semibold uppercase tracking-wider text-purple-300 border-t border-hairline">{grp}</td>
                           </tr>
                         )}
-                        <tr className="border-t border-slate-800 hover:bg-slate-800/30 align-top">
-                          <td className="hidden sm:table-cell px-3 py-2 font-mono text-xs text-slate-500">{r.id}</td>
+                        <tr className="border-t border-surface hover:bg-surface/30 align-top">
+                          <td className="hidden sm:table-cell px-3 py-2 font-mono text-xs text-faint">{r.id}</td>
                           <td className="px-3 py-2 text-slate-200">
                             {r.requirement}
                             {r.revised && (
@@ -2797,8 +2797,8 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                             )}
                             {r.source_quote && (
                               <details className="mt-1">
-                                <summary className="text-xs text-slate-500 cursor-pointer hover:text-slate-300">Source quote</summary>
-                                <p className="text-xs text-slate-400 mt-1 italic border-l-2 border-slate-700 pl-2">{r.source_quote}</p>
+                                <summary className="text-xs text-faint cursor-pointer hover:text-ink-soft">Source quote</summary>
+                                <p className="text-xs text-muted mt-1 italic border-l-2 border-hairline pl-2">{r.source_quote}</p>
                               </details>
                             )}
                           </td>
@@ -2807,7 +2807,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                               {cat.label}
                             </span>
                           </td>
-                          <td className="hidden sm:table-cell px-3 py-2 text-xs text-slate-400 font-mono">{r.section || '—'}</td>
+                          <td className="hidden sm:table-cell px-3 py-2 text-xs text-muted font-mono">{r.section || '—'}</td>
                           <td className="hidden sm:table-cell px-3 py-2 text-xs">
                             {(() => {
                               // Section alignment: which draft section answers
@@ -2830,14 +2830,14 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                               value={r.owner}
                               onChange={e => updateRequirement(r.id, { owner: e.target.value })}
                               placeholder="Assign…"
-                              className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
+                              className="w-full bg-surface border border-hairline rounded px-2 py-1 text-xs text-white placeholder-faint focus:border-purple-500 focus:outline-none"
                             />
                           </td>
                           <td className="px-3 py-2">
                             <select
                               value={r.status}
                               onChange={e => updateRequirement(r.id, { status: e.target.value as ComplianceStatus })}
-                              className="w-full bg-slate-800 border border-slate-700 rounded px-2 py-1 text-xs text-white focus:border-purple-500 focus:outline-none"
+                              className="w-full bg-surface border border-hairline rounded px-2 py-1 text-xs text-white focus:border-purple-500 focus:outline-none"
                             >
                               {(Object.keys(STATUS_LABELS) as ComplianceStatus[]).map(s => (
                                 <option key={s} value={s}>{STATUS_LABELS[s]}</option>
@@ -2855,7 +2855,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               {/* Pager — only when the filtered matrix exceeds one page. */}
               {complianceTotalPages > 1 && (
                 <div className="flex items-center justify-between gap-2 mt-3 text-xs">
-                  <span className="text-slate-500">
+                  <span className="text-faint">
                     Rows {safePage * COMPLIANCE_PAGE_SIZE + 1}–{Math.min((safePage + 1) * COMPLIANCE_PAGE_SIZE, filteredCompliance.length)} of {filteredCompliance.length}
                   </span>
                   <div className="flex items-center gap-1">
@@ -2863,20 +2863,20 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                       type="button"
                       onClick={() => setCompliancePage(p => Math.max(0, p - 1))}
                       disabled={safePage === 0}
-                      className="rounded px-2 py-1 border border-slate-700 bg-slate-800 text-slate-300 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="rounded px-2 py-1 border border-hairline bg-surface text-ink-soft hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
                     >← Prev</button>
-                    <span className="text-slate-400 px-2">Page {safePage + 1} of {complianceTotalPages}</span>
+                    <span className="text-muted px-2">Page {safePage + 1} of {complianceTotalPages}</span>
                     <button
                       type="button"
                       onClick={() => setCompliancePage(p => Math.min(complianceTotalPages - 1, p + 1))}
                       disabled={safePage >= complianceTotalPages - 1}
-                      className="rounded px-2 py-1 border border-slate-700 bg-slate-800 text-slate-300 hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
+                      className="rounded px-2 py-1 border border-hairline bg-surface text-ink-soft hover:text-white disabled:opacity-40 disabled:cursor-not-allowed"
                     >Next →</button>
                   </div>
                 </div>
               )}
 
-                  <p className="text-xs text-slate-500 mt-3">
+                  <p className="text-xs text-faint mt-3">
                     {activePursuitId
                       ? 'Owner and status are saved to this pursuit and shared with your workspace. CSV export captures the full table.'
                       : 'Open this from a saved pursuit to share owner/status with your team. CSV export captures the full table.'}
@@ -2885,8 +2885,8 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               )}
 
               {!complianceLoading && compliance.length === 0 && !complianceError && (
-                <p className="text-sm text-slate-500">
-                  Click <strong className="text-slate-300">Generate Compliance Matrix</strong> to pull every shall / must / required from the uploaded document.
+                <p className="text-sm text-faint">
+                  Click <strong className="text-ink-soft">Generate Compliance Matrix</strong> to pull every shall / must / required from the uploaded document.
                 </p>
               )}
             </>
@@ -2901,7 +2901,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
         <section
           ref={reviewSectionRef}
           id="proposal-review-section"
-          className="bg-slate-900 border border-slate-800 rounded-xl p-5"
+          className="bg-ground border border-surface rounded-xl p-5"
         >
           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
@@ -2913,7 +2913,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                   ? 'LOI drafts grounded in the notice + your profile'
                   : 'First drafts grounded in the RFP + your profile'}
               </h2>
-              <p className="text-sm text-slate-400 mt-1">
+              <p className="text-sm text-muted mt-1">
                 {isLoiResponseMode
                   ? 'Pick a section. Mindy uses the Sources Sought / RFI text and your saved profile to draft the letter of intent / response narrative. Attach your existing capability statement separately when the notice asks for one.'
                   : 'Pick a section. Mindy uses the source doc and your saved profile (NAICS, set-asides, target agencies) to write a first pass with [placeholders] for facts it shouldn\'t invent.'}
@@ -2972,7 +2972,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
 
           {/* Section tabs — RFP set OR LOI/response set
               based on detected notice type. */}
-          <div className="flex flex-wrap items-center gap-1 border-b border-slate-800 mb-2 -mx-1 px-1">
+          <div className="flex flex-wrap items-center gap-1 border-b border-surface mb-2 -mx-1 px-1">
             {currentSectionTabs.map(tab => {
               const hasDraft = !!drafts[tab.id];
               const isActive = activeSection === tab.id;
@@ -2988,7 +2988,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                   className={`px-3 py-2 text-sm font-medium border-b-2 transition-colors ${
                     isActive
                       ? 'border-purple-500 text-white'
-                      : 'border-transparent text-slate-400 hover:text-slate-200'
+                      : 'border-transparent text-muted hover:text-slate-200'
                   }`}
                   title={reqCount > 0 ? `Covers ${reqCount} compliance requirement${reqCount === 1 ? '' : 's'}` : undefined}
                 >
@@ -3002,7 +3002,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
 
           {/* Legend — explains the tab badges (only meaningful once a matrix exists). */}
           {compliance.length > 0 && (
-            <p className="mb-4 text-[11px] leading-snug text-slate-500">
+            <p className="mb-4 text-[11px] leading-snug text-faint">
               <span className="font-semibold text-amber-300/80">amber number</span> = compliance requirements mapped to that section
               <span className="mx-1.5 text-slate-700">·</span>
               <span className="inline-block w-1.5 h-1.5 rounded-full bg-emerald-400 align-middle" /> = section drafted
@@ -3035,12 +3035,12 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             return (
               <div>
                 <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                  <div className="text-xs text-slate-500">
+                  <div className="text-xs text-faint">
                     Target ≈ {meta.targetWords} words
                     {current && (
                       <>
                         <span className="mx-2 text-slate-700">·</span>
-                        <span className={current.wordCount > meta.targetWords * 1.5 ? 'text-amber-400' : 'text-slate-400'}>
+                        <span className={current.wordCount > meta.targetWords * 1.5 ? 'text-amber-400' : 'text-muted'}>
                           {current.wordCount} words written
                         </span>
                         {current.profileGrounded === false && (
@@ -3058,14 +3058,14 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                         <button
                           type="button"
                           onClick={() => copyDraftToClipboard(activeSection)}
-                          className="px-3 py-1.5 text-xs rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
+                          className="px-3 py-1.5 text-xs rounded-lg bg-surface text-ink-soft hover:bg-input"
                         >
                           Copy
                         </button>
                         <button
                           type="button"
                           onClick={() => downloadDraft(activeSection)}
-                          className="px-3 py-1.5 text-xs rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700"
+                          className="px-3 py-1.5 text-xs rounded-lg bg-surface text-ink-soft hover:bg-input"
                         >
                           Download Word
                         </button>
@@ -3108,18 +3108,18 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                     value={current.draft}
                     onChange={e => updateDraftText(activeSection, e.target.value)}
                     spellCheck
-                    className="w-full min-h-[400px] bg-slate-950 border border-slate-800 rounded-lg p-4 text-sm text-slate-200 font-mono leading-relaxed focus:border-purple-500 focus:outline-none whitespace-pre-wrap"
+                    className="w-full min-h-[400px] bg-ground-deep border border-surface rounded-lg p-4 text-sm text-slate-200 font-mono leading-relaxed focus:border-purple-500 focus:outline-none whitespace-pre-wrap"
                   />
                 ) : (
-                  <div className="bg-slate-950/40 border border-dashed border-slate-700 rounded-lg p-8 text-center text-sm text-slate-400">
-                    No draft yet. Click <strong className="text-slate-300">Draft {meta.label}</strong> to generate a first pass.
+                  <div className="bg-ground-deep/40 border border-dashed border-hairline rounded-lg p-8 text-center text-sm text-muted">
+                    No draft yet. Click <strong className="text-ink-soft">Draft {meta.label}</strong> to generate a first pass.
                   </div>
                 )}
               </div>
             );
           })()}
 
-          <p className="text-xs text-slate-500 mt-3">
+          <p className="text-xs text-faint mt-3">
             Edits live in this session only. Use Export Package below to bundle the package as a Word doc.
           </p>
         </section>
@@ -3127,7 +3127,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
 
       {/* Output · Review Checklist + Export */}
       {responseOutputsReady && !isRfqMode && driveMode === 'auto' && (
-        <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+        <section className="bg-ground border border-surface rounded-xl p-5">
           <div className="flex flex-wrap items-start justify-between gap-3 mb-4">
             <div>
               <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">Output · Review &amp; Export</p>
@@ -3136,7 +3136,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                   ? 'Export LOI response package'
                   : 'Final compliance review + Word export'}
               </h2>
-              <p className="text-sm text-slate-400 mt-1">
+              <p className="text-sm text-muted mt-1">
                 {isLoiResponseMode
                   ? 'Export the LOI / Sources Sought response draft. If the notice asks for a capability statement, attach your existing capability statement as a separate document.'
                   : 'Walk the checklist before you ship. Then export a single .docx containing the compliance matrix, drafted sections, and the checklist appendix.'}
@@ -3144,8 +3144,8 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             </div>
             {!isLoiResponseMode && (
               <div className="text-right">
-                <div className="text-2xl font-bold text-white">{checklistChecked}<span className="text-slate-500 text-base font-normal">/{checklist.length}</span></div>
-                <div className="text-xs text-slate-500">items confirmed</div>
+                <div className="text-2xl font-bold text-white">{checklistChecked}<span className="text-faint text-base font-normal">/{checklist.length}</span></div>
+                <div className="text-xs text-faint">items confirmed</div>
               </div>
             )}
           </div>
@@ -3156,7 +3156,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               <div className="flex items-center justify-between gap-3 mb-2">
                 <div>
                   <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-white"><Scale className="h-4 w-4 shrink-0" strokeWidth={2} /> Independent Compliance Check</h3>
-                  <p className="text-xs text-slate-400 mt-0.5">A separate AI reviewer checks your draft against every requirement — catches gaps before a Contracting Officer does.</p>
+                  <p className="text-xs text-muted mt-0.5">A separate AI reviewer checks your draft against every requirement — catches gaps before a Contracting Officer does.</p>
                 </div>
                 <button
                   onClick={runReferee}
@@ -3170,7 +3170,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
               {refereeResult && (
                 <div className="mt-3">
                   <div className="flex items-center gap-4 mb-3">
-                    <div className="text-2xl font-bold text-white">{refereeResult.summary.score}%<span className="text-xs font-normal text-slate-500 ml-1">compliant</span></div>
+                    <div className="text-2xl font-bold text-white">{refereeResult.summary.score}%<span className="text-xs font-normal text-faint ml-1">compliant</span></div>
                     <div className="flex gap-3 text-xs">
                       <span className="text-emerald-400">✓ {refereeResult.summary.met} met</span>
                       <span className="text-amber-400">◐ {refereeResult.summary.partial} partial</span>
@@ -3187,8 +3187,8 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                             {v.status === 'met' ? '✓' : v.status === 'partial' ? '◐' : '✗'}
                           </span>
                           <div>
-                            <span className="text-slate-300">{v.requirement}</span>
-                            {v.evidence && <span className="text-slate-500"> — {v.evidence}</span>}
+                            <span className="text-ink-soft">{v.requirement}</span>
+                            {v.evidence && <span className="text-faint"> — {v.evidence}</span>}
                           </div>
                         </div>
                       ))}
@@ -3199,9 +3199,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           )}
 
           {isLoiResponseMode ? (
-            <div className="rounded-lg border border-slate-700/60 bg-slate-950/40 p-3 mb-4">
+            <div className="rounded-lg border border-hairline/60 bg-ground-deep/40 p-3 mb-4">
               <p className="text-sm font-medium text-slate-200 mb-2">Before submitting:</p>
-              <ul className="space-y-1 text-sm text-slate-400">
+              <ul className="space-y-1 text-sm text-muted">
                 {SS_RFI_PACKAGE_NOTES.map(note => (
                   <li key={note}>• {note}</li>
                 ))}
@@ -3216,9 +3216,9 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                       type="checkbox"
                       checked={item.checked}
                       onChange={() => toggleChecklistItem(item.id)}
-                      className="mt-1 w-4 h-4 rounded border-slate-700 bg-slate-900 accent-purple-500 cursor-pointer"
+                      className="mt-1 w-4 h-4 rounded border-hairline bg-ground accent-purple-500 cursor-pointer"
                     />
-                    <span className={`text-sm leading-relaxed ${item.checked ? 'text-slate-500 line-through' : 'text-slate-200 group-hover:text-white'}`}>
+                    <span className={`text-sm leading-relaxed ${item.checked ? 'text-faint line-through' : 'text-slate-200 group-hover:text-white'}`}>
                       {item.label}
                     </span>
                   </label>
@@ -3227,10 +3227,10 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             </ul>
           )}
 
-          <div className="border-t border-slate-800 pt-4 mt-4">
+          <div className="border-t border-surface pt-4 mt-4">
             <div className="flex flex-wrap items-start justify-between gap-3 mb-3">
-              <div className="text-sm text-slate-400">
-                <p className="text-slate-300 font-medium mb-1">Package will include:</p>
+              <div className="text-sm text-muted">
+                <p className="text-ink-soft font-medium mb-1">Package will include:</p>
                 <ul className="space-y-0.5 text-xs">
                   <li>• Title page + table of contents</li>
                   {!isLoiResponseMode && (
@@ -3247,7 +3247,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                     );
                   })}
                   {isLoiResponseMode ? (
-                    <li className="text-slate-400">• Attach existing capability statement separately if required</li>
+                    <li className="text-muted">• Attach existing capability statement separately if required</li>
                   ) : (
                     <li className="text-emerald-400">
                       ✓ Review Checklist ({checklistChecked}/{checklist.length} complete)
@@ -3275,8 +3275,8 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             )}
 
             {!hasAnyDraft && !exporting && (
-              <p className="text-xs text-slate-500">
-                Exports a fill-in template now — or click <span className="font-semibold text-slate-300">&ldquo;Draft my response&rdquo;</span> first to have Mindy write the sections for you.
+              <p className="text-xs text-faint">
+                Exports a fill-in template now — or click <span className="font-semibold text-ink-soft">&ldquo;Draft my response&rdquo;</span> first to have Mindy write the sections for you.
               </p>
             )}
           </div>
@@ -3290,23 +3290,23 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
       )}
 
       {!activePursuitId && !uploadedRfp && (opportunities.length === 0 ? (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
+        <div className="bg-ground border border-surface rounded-xl p-8 text-center">
           <h2 className="text-xl font-semibold text-white mb-2">Save a pursuit first</h2>
-          <p className="text-slate-400">
+          <p className="text-muted">
             Use Today&apos;s Intel, Source Feed, Market Research, or Upcoming Buys to track an opportunity. Then Mindy can build a prep pack from it.
           </p>
         </div>
       ) : (
         <div className="grid grid-cols-1 xl:grid-cols-[360px_1fr] gap-6">
-          <aside className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+          <aside className="bg-ground border border-surface rounded-xl p-5 space-y-4">
             <div>
-              <label className="block text-xs uppercase tracking-wider text-slate-500 mb-2">
+              <label className="block text-xs uppercase tracking-wider text-faint mb-2">
                 Saved Pursuit
               </label>
               <select
                 value={selectedOpportunity?.id || ''}
                 onChange={(event) => setSelectedId(event.target.value)}
-                className="w-full bg-slate-800 border border-slate-700 rounded-lg px-3 py-2 text-white outline-none focus:border-purple-500"
+                className="w-full bg-surface border border-hairline rounded-lg px-3 py-2 text-white outline-none focus:border-purple-500"
               >
                 {opportunities.map(opp => (
                   <option key={opp.id} value={opp.id}>{opp.title}</option>
@@ -3327,19 +3327,19 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
 
           {pack && (
             <main className="space-y-5">
-              <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+              <section className="bg-ground border border-surface rounded-xl p-5">
                 <div className="flex flex-wrap items-start justify-between gap-3">
                   <div>
                     <p className="text-xs uppercase tracking-wider text-purple-300 mb-2">Proposal Prep Pack V1</p>
                     <h2 className="text-xl font-semibold text-white">{pack.title}</h2>
-                    <p className="text-slate-400 mt-2">{pack.summary}</p>
+                    <p className="text-muted mt-2">{pack.summary}</p>
                   </div>
                   {selectedOpportunity?.external_url && (
                     <a
                       href={selectedOpportunity.external_url}
                       target="_blank"
                       rel="noopener noreferrer"
-                      className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm rounded-lg"
+                      className="px-3 py-2 bg-surface hover:bg-input text-ink-soft text-sm rounded-lg"
                     >
                       View Source
                     </a>
@@ -3354,12 +3354,12 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 <PrepSection title="Questions To Ask" items={pack.questions} tone="blue" />
               </div>
 
-              <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+              <section className="bg-ground border border-surface rounded-xl p-5">
                 <h3 className="font-semibold text-white mb-3">Draft Outline</h3>
                 <ol className="space-y-2">
                   {pack.outline.map(item => (
-                    <li key={item} className="text-sm text-slate-300">
-                      <span className="text-slate-500 mr-2">-</span>{item}
+                    <li key={item} className="text-sm text-ink-soft">
+                      <span className="text-faint mr-2">-</span>{item}
                     </li>
                   ))}
                 </ol>
@@ -3421,12 +3421,12 @@ function PrepSection({ title, items, tone }: { title: string; items: string[]; t
   };
 
   return (
-    <section className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+    <section className="bg-ground border border-surface rounded-xl p-5">
       <h3 className={`font-semibold mb-3 ${colors[tone]}`}>{title}</h3>
       <ul className="space-y-2">
         {items.map(item => (
-          <li key={item} className="text-sm leading-relaxed text-slate-300">
-            <span className="text-slate-500 mr-2">-</span>{item}
+          <li key={item} className="text-sm leading-relaxed text-ink-soft">
+            <span className="text-faint mr-2">-</span>{item}
           </li>
         ))}
       </ul>
@@ -3473,7 +3473,7 @@ function ComplianceMatrixProgress({
             </p>
           </div>
         </div>
-        <div className="mt-2 h-1 overflow-hidden rounded-full bg-slate-800">
+        <div className="mt-2 h-1 overflow-hidden rounded-full bg-surface">
           <div className="h-full w-1/3 animate-[complianceBar_1.8s_ease-in-out_infinite] rounded-full bg-gradient-to-r from-purple-500 via-indigo-400 to-purple-500" />
         </div>
         <style jsx>{`
@@ -3502,7 +3502,7 @@ function ComplianceMatrixProgress({
           <p key={messageIdx} className="mt-1 text-sm text-slate-200 animate-[complianceFadeIn_0.3s_ease-out]">
             {message}
           </p>
-          <p className="mt-2 text-xs text-slate-400">
+          <p className="mt-2 text-xs text-muted">
             {timeHint}
             {hasPursuit && estSections > 1
               ? ` Checking pursuit documents and amendments (${estSections}+ sections).`
@@ -3514,7 +3514,7 @@ function ComplianceMatrixProgress({
           </p>
         </div>
       </div>
-      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-slate-800">
+      <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-surface">
         <div className="h-full w-1/3 animate-[complianceBar_1.8s_ease-in-out_infinite] rounded-full bg-gradient-to-r from-purple-500 via-indigo-400 to-purple-500" />
       </div>
       <style jsx>{`
@@ -3556,16 +3556,16 @@ function OutputActionCard({
   secondaryDisabled?: boolean;
 }) {
   return (
-    <div className="flex min-h-52 flex-col justify-between rounded-lg border border-slate-800 bg-slate-950/40 p-4">
+    <div className="flex min-h-52 flex-col justify-between rounded-lg border border-surface bg-ground-deep/40 p-4">
       <div>
         <div className="flex items-center justify-between gap-3">
           <p className="text-[10px] font-semibold uppercase tracking-wider text-purple-300">{eyebrow}</p>
-          <span className="shrink-0 rounded-full bg-slate-800 px-2 py-0.5 text-[10px] text-slate-400">
+          <span className="shrink-0 rounded-full bg-surface px-2 py-0.5 text-[10px] text-muted">
             {status}
           </span>
         </div>
         <h3 className="mt-2 text-base font-semibold text-white">{title}</h3>
-        <p className="mt-2 text-sm leading-relaxed text-slate-400">{description}</p>
+        <p className="mt-2 text-sm leading-relaxed text-muted">{description}</p>
       </div>
       <div className="mt-4 space-y-2">
         {secondaryLabel && onSecondary && (
@@ -3582,7 +3582,7 @@ function OutputActionCard({
           type="button"
           onClick={onClick}
           disabled={disabled}
-          className="w-full rounded-lg bg-purple-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-400"
+          className="w-full rounded-lg bg-purple-600 px-3 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-500 disabled:cursor-not-allowed disabled:bg-input disabled:text-muted"
         >
           {buttonLabel}
         </button>
@@ -3593,8 +3593,8 @@ function OutputActionCard({
 
 function Meta({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg bg-slate-800/70 p-3">
-      <div className="text-xs text-slate-500">{label}</div>
+    <div className="rounded-lg bg-surface/70 p-3">
+      <div className="text-xs text-faint">{label}</div>
       <div className="text-slate-200 mt-1">{value}</div>
     </div>
   );

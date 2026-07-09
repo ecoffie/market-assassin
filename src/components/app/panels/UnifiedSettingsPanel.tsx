@@ -512,8 +512,8 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
     return (
       <div className="p-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-slate-800 rounded w-64" />
-          <div className="h-96 bg-slate-800 rounded-xl" />
+          <div className="h-8 bg-surface rounded w-64" />
+          <div className="h-96 bg-surface rounded-xl" />
         </div>
       </div>
     );
@@ -529,18 +529,18 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
           onClick={() => setShowResetConfirm(false)}
         >
           <div
-            className="w-full max-w-md rounded-2xl border border-slate-700 bg-slate-900 p-6 shadow-2xl"
+            className="w-full max-w-md rounded-2xl border border-hairline bg-ground p-6 shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <h3 className="text-lg font-bold text-white">Start over?</h3>
-            <p className="mt-2 text-sm text-slate-400">
+            <p className="mt-2 text-sm text-muted">
               This clears your codes, keywords, and agencies, then walks you back through guided setup to rebuild your
               profile. Your saved pursuits and target list aren&apos;t touched.
             </p>
             <div className="mt-5 flex justify-end gap-3">
               <button
                 onClick={() => setShowResetConfirm(false)}
-                className="rounded-lg border border-slate-700 px-4 py-2 text-sm font-medium text-slate-300 hover:bg-slate-800"
+                className="rounded-lg border border-hairline px-4 py-2 text-sm font-medium text-ink-soft hover:bg-surface"
               >
                 Cancel
               </button>
@@ -557,7 +557,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
 
       <div>
         <h1 className="text-2xl font-bold text-white">Settings</h1>
-        <p className="text-slate-400 mt-1">{workspaceName} • {tierLabel(tier)}</p>
+        <p className="text-muted mt-1">{workspaceName} • {tierLabel(tier)}</p>
       </div>
 
       {message && <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-4 text-emerald-300">{message}</div>}
@@ -570,18 +570,18 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
 
       <div className="grid grid-cols-1 lg:grid-cols-[1fr_320px] gap-6">
         <div className="space-y-5">
-          <section className="bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5">
+          <section className="bg-ground border border-surface rounded-xl p-6 space-y-5">
             <SectionTitle title="Profile" />
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Field label="Display Name" value={form.display_name} onChange={(value) => setForm({ ...form, display_name: value })} placeholder="John Doe" />
               <Field label="Role / Title" value={form.role_title} onChange={(value) => setForm({ ...form, role_title: value })} placeholder="Founder, BD Lead..." />
               <Field label="Company" value={form.company_name} onChange={(value) => setForm({ ...form, company_name: value })} placeholder="Company name" />
               <label className="block">
-                <span className="block text-sm text-slate-400 mb-1">Email Frequency</span>
+                <span className="block text-sm text-muted mb-1">Email Frequency</span>
                 <select
                   value={form.email_frequency}
                   onChange={(e) => setForm({ ...form, email_frequency: e.target.value })}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white outline-none focus:border-emerald-500"
+                  className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white outline-none focus:border-emerald-500"
                 >
                   <option value="daily">Daily</option>
                   <option value="mwf">Mon / Wed / Fri</option>
@@ -594,7 +594,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
               {/* SMS alerts — time-sensitive pursuit changes (amendments,
                   deadline moves, cancels). Double opt-in: verify the number by
                   code before it's ever texted (TCPA/CTIA + carrier A2P). */}
-              <div className="md:col-span-2 rounded-lg border border-slate-700 bg-slate-800/40 p-4">
+              <div className="md:col-span-2 rounded-lg border border-hairline bg-surface/40 p-4">
                 <div className="flex items-start gap-3">
                   <MessageSquare className="mt-0.5 h-5 w-5 shrink-0 text-muted" strokeWidth={2} />
                   <div className="min-w-0 flex-1">
@@ -604,7 +604,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                         <span className="ml-2 inline-flex items-center gap-1 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300 align-middle"><Check className="h-3 w-3 shrink-0" strokeWidth={2.5} /> VERIFIED</span>
                       )}
                     </span>
-                    <span className="block text-xs text-slate-400 mt-0.5">
+                    <span className="block text-xs text-muted mt-0.5">
                       Amendments, deadline moves, cancellations — the time-sensitive stuff. You still get the full email digest.
                     </span>
 
@@ -616,7 +616,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                           type="button"
                           onClick={disableSms}
                           disabled={smsBusy}
-                          className="px-3 py-1.5 text-xs rounded-lg border border-slate-600 text-slate-300 hover:bg-slate-800 disabled:opacity-50"
+                          className="px-3 py-1.5 text-xs rounded-lg border border-slate-600 text-ink-soft hover:bg-surface disabled:opacity-50"
                         >
                           {smsBusy ? '…' : 'Turn off'}
                         </button>
@@ -631,7 +631,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                             onChange={(e) => { setSmsPhone(e.target.value); setSmsMsg(null); }}
                             placeholder="(555) 123-4567"
                             disabled={smsStage === 'code_sent'}
-                            className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white outline-none focus:border-emerald-500 disabled:opacity-60"
+                            className="flex-1 px-3 py-2 bg-ground border border-hairline rounded-lg text-white outline-none focus:border-emerald-500 disabled:opacity-60"
                           />
                           <button
                             type="button"
@@ -651,7 +651,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                               value={smsCode}
                               onChange={(e) => { setSmsCode(e.target.value.replace(/\D/g, '')); setSmsMsg(null); }}
                               placeholder="6-digit code"
-                              className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded-lg text-white tracking-widest outline-none focus:border-emerald-500"
+                              className="flex-1 px-3 py-2 bg-ground border border-hairline rounded-lg text-white tracking-widest outline-none focus:border-emerald-500"
                             />
                             <button
                               type="button"
@@ -666,16 +666,16 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                       </div>
                     )}
 
-                    {smsMsg && <p className="mt-2 text-xs text-slate-300">{smsMsg}</p>}
+                    {smsMsg && <p className="mt-2 text-xs text-ink-soft">{smsMsg}</p>}
 
                     {/* TCPA / CTIA consent + carrier disclosure. Required for A2P. */}
-                    <p className="mt-3 text-[11px] leading-4 text-slate-500">
+                    <p className="mt-3 text-[11px] leading-4 text-faint">
                       By verifying your number you agree to receive automated alert texts from Mindy about
                       pursuits you track. Message frequency varies. Msg &amp; data rates may apply. Reply STOP
                       to cancel, HELP for help. Consent is not a condition of purchase. See our{' '}
-                      <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-slate-400 underline">Terms</a>{' '}
+                      <a href="/terms" target="_blank" rel="noopener noreferrer" className="text-muted underline">Terms</a>{' '}
                       and{' '}
-                      <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-slate-400 underline">Privacy Policy</a>.
+                      <a href="/privacy" target="_blank" rel="noopener noreferrer" className="text-muted underline">Privacy Policy</a>.
                     </p>
                   </div>
                 </div>
@@ -683,15 +683,15 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
 
               {isClientProfile && (
                 <label className="block md:col-span-2">
-                  <span className="block text-sm text-slate-400 mb-1">Client Alert Email</span>
+                  <span className="block text-sm text-muted mb-1">Client Alert Email</span>
                   <input
                     type="email"
                     value={form.alert_recipient_email}
                     onChange={(e) => setForm({ ...form, alert_recipient_email: e.target.value })}
                     placeholder="client@company.com"
-                    className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white outline-none focus:border-emerald-500"
+                    className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white outline-none focus:border-emerald-500"
                   />
-                  <span className="block text-xs text-slate-500 mt-1">
+                  <span className="block text-xs text-faint mt-1">
                     Daily/weekly alerts for this client go here. Leave blank and they fall back to your inbox.
                   </span>
                 </label>
@@ -699,14 +699,14 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
             </div>
           </section>
 
-          <section ref={matchingSectionRef} className="scroll-mt-24 bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-5">
+          <section ref={matchingSectionRef} className="scroll-mt-24 bg-ground border border-surface rounded-xl p-6 space-y-5">
             <div>
               <SectionTitle title="Opportunity Matching" />
-              <p className="mt-2 text-sm text-slate-400">
-                These preferences control what Mindy <span className="text-slate-300">watches for</span> in alerts,
-                briefings, and forecasts. The company identity Mindy <span className="text-slate-300">writes into proposals</span>
+              <p className="mt-2 text-sm text-muted">
+                These preferences control what Mindy <span className="text-ink-soft">watches for</span> in alerts,
+                briefings, and forecasts. The company identity Mindy <span className="text-ink-soft">writes into proposals</span>
                 {' '}(legal name, UEI, certifications, past performance, point of contact) lives in
-                {' '}<span className="text-slate-300">My Vault → Identity</span>.
+                {' '}<span className="text-ink-soft">My Vault → Identity</span>.
               </p>
             </div>
 
@@ -721,7 +721,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                   onChange={(e) => setDescribeText(e.target.value)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); runDescribeSuggest(); } }}
                   placeholder='e.g. "drone repair", "demolition", "IT cybersecurity"'
-                  className="h-10 flex-1 rounded-lg border border-slate-700 bg-slate-900 px-3 text-sm text-white placeholder-slate-500 focus:border-purple-500 focus:outline-none"
+                  className="h-10 flex-1 rounded-lg border border-hairline bg-ground px-3 text-sm text-white placeholder-faint focus:border-purple-500 focus:outline-none"
                 />
                 <button
                   onClick={runDescribeSuggest}
@@ -735,13 +735,13 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                 <div className="mt-3 space-y-2">
                   {describeNaics.length > 0 && (
                     <div>
-                      <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">NAICS — tap to add</div>
+                      <div className="text-[11px] uppercase tracking-wide text-faint mb-1">NAICS — tap to add</div>
                       <div className="flex flex-wrap gap-1.5">
                         {describeNaics.map((s) => {
                           const added = parseList(form.naics_codes).includes(s.code);
                           return (
                             <button key={s.code} onClick={() => toggleNaicsCode(s.code)} title={s.name}
-                              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors ${added ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-200' : 'border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700'}`}>
+                              className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors ${added ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-200' : 'border-slate-600 bg-surface text-slate-200 hover:bg-input'}`}>
                               {added ? <Check className="h-3 w-3 shrink-0" strokeWidth={2.5} /> : <Plus className="h-3 w-3 shrink-0" strokeWidth={2.5} />} {s.code} <span className="max-w-[150px] truncate opacity-70">{s.name}</span>
                             </button>
                           );
@@ -751,7 +751,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                   )}
                   {describePsc.length > 0 && (
                     <div>
-                      <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">PSC — what the gov actually buys — tap to add</div>
+                      <div className="text-[11px] uppercase tracking-wide text-faint mb-1">PSC — what the gov actually buys — tap to add</div>
                       <div className="flex flex-wrap gap-1.5">
                         {describePsc.map((s) => {
                           const added = parseList(form.psc_codes).includes(s.code);
@@ -780,7 +780,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                   <b>Sharpen your matches with PSC codes.</b> NAICS is your industry; PSC is
                   exactly <i>what the government buys</i> — the most precise signal Mindy can match on.
                 </p>
-                <div className="mt-2 text-[11px] uppercase tracking-wide text-slate-500">Top codes for your market — tap to add:</div>
+                <div className="mt-2 text-[11px] uppercase tracking-wide text-faint">Top codes for your market — tap to add:</div>
                 <div className="mt-1 flex flex-wrap gap-1.5">
                   {pscSuggestions.slice(0, 6).map((p) => (
                     <button
@@ -800,19 +800,19 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                 describe box above. Power users expand to paste/edit codes directly. */}
             <button
               onClick={() => setShowManualCodes((v) => !v)}
-              className="flex items-center gap-1.5 text-sm text-slate-400 hover:text-slate-200"
+              className="flex items-center gap-1.5 text-sm text-muted hover:text-slate-200"
             >
               <span className={`transition-transform ${showManualCodes ? 'rotate-90' : ''}`}>▸</span>
               Fine-tune codes manually
               {(parseList(form.naics_codes).length > 0 || parseList(form.psc_codes).length > 0) && (
-                <span className="text-xs text-slate-500">({parseList(form.naics_codes).length} NAICS · {parseList(form.psc_codes).length} PSC)</span>
+                <span className="text-xs text-faint">({parseList(form.naics_codes).length} NAICS · {parseList(form.psc_codes).length} PSC)</span>
               )}
             </button>
 
             {showManualCodes && (
-            <div className="space-y-5 rounded-xl border border-slate-800 bg-slate-950/30 p-4">
+            <div className="space-y-5 rounded-xl border border-surface bg-ground-deep/30 p-4">
             <div>
-              <label className="block text-sm font-medium text-slate-300 mb-1">NAICS Codes</label>
+              <label className="block text-sm font-medium text-ink-soft mb-1">NAICS Codes</label>
               <NaicsPicker
                 value={parseList(form.naics_codes)}
                 onChange={(codes) => setForm({ ...form, naics_codes: codes.join(', ') })}
@@ -826,7 +826,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                 onChange={(value) => setForm({ ...form, psc_codes: value })}
                 placeholder="e.g. R425, 1550, P500"
               />
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-faint">
                 Product/Service codes — <b>what the government actually buys</b> (more precise than NAICS). Comma-separated.
               </p>
               {/* Labeled chips for the codes already entered — hover shows the full
@@ -852,7 +852,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
               )}
               {pscSuggestions.length > 0 && (
                 <div className="mt-2">
-                  <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">Top codes for your market — tap to add or remove:</div>
+                  <div className="text-[11px] uppercase tracking-wide text-faint mb-1">Top codes for your market — tap to add or remove:</div>
                   <div className="flex flex-wrap gap-1.5">
                     {pscSuggestions.map((p) => {
                       const added = parseList(form.psc_codes).includes(p.code);
@@ -878,7 +878,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                 onChange={(value) => setForm({ ...form, keywords: value })}
                 placeholder="e.g. drone repair, cybersecurity, base operations"
               />
-              <p className="mt-1 text-xs text-slate-500">
+              <p className="mt-1 text-xs text-faint">
                 What Mindy searches for in the opportunity TEXT — catches the work your NAICS codes miss.
                 Comma-separated. Tip: run a <span className="text-purple-300">Market Research</span> and click
                 &ldquo;Save this market to my profile&rdquo; to fill these automatically.
@@ -900,7 +900,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
             <button
               onClick={() => saveSettings(false)}
               disabled={saving}
-              className="px-5 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-60 text-slate-200 rounded-lg transition-colors"
+              className="px-5 py-2 bg-surface hover:bg-input disabled:opacity-60 text-slate-200 rounded-lg transition-colors"
             >
               {saving ? 'Saving...' : 'Save Settings'}
             </button>
@@ -921,7 +921,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
               upgrade to Pro first via the Billing card above. */}
           {tier === 'pro' && <TeamUpgradeCard email={email} getAuthHeaders={getAuthHeaders} />}
 
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <div className="bg-ground border border-surface rounded-xl p-5">
             <h2 className="font-semibold text-white">Getting started</h2>
             {/* The guided product tour is NEW-USER onboarding — hide it in Coach
                 Mode (a coach operating inside a client workspace). Eric, Jun 23
@@ -929,7 +929,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                 progress below still helps a coach finish the client's profile. */}
             {!isClientProfile && (
               <>
-                <p className="text-sm text-slate-400 mt-1">New to Mindy? Take the 2-minute guided tour of the core workflow.</p>
+                <p className="text-sm text-muted mt-1">New to Mindy? Take the 2-minute guided tour of the core workflow.</p>
                 {/* PRIMARY action: launch the tour (Eric: this card should let you
                     TAKE the tour, not mark it complete). */}
                 <button
@@ -941,17 +941,17 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
               </>
             )}
             {/* Quiet setup-progress underneath (informational, not the CTA). */}
-            <div className="mt-4 pt-4 border-t border-slate-800 space-y-2">
-              <p className="text-[11px] uppercase tracking-wider text-slate-500">Setup progress</p>
+            <div className="mt-4 pt-4 border-t border-surface space-y-2">
+              <p className="text-[11px] uppercase tracking-wider text-faint">Setup progress</p>
               <ChecklistItem label="Profile saved" done={Boolean(form.display_name || form.company_name)} />
               <ChecklistItem label="NAICS selected" done={parseList(form.naics_codes).length > 0} />
               <ChecklistItem label="Agencies selected" done={parseList(form.target_agencies).length > 0 || targetListCount > 0} />
             </div>
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <div className="bg-ground border border-surface rounded-xl p-5">
             <h2 className="font-semibold text-white mb-2">Session</h2>
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-muted">
               Your session is protected by a signed two-factor token and expires after 30 days.
             </p>
           </div>
@@ -962,7 +962,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
 }
 
 function SectionTitle({ title }: { title: string }) {
-  return <h2 className="text-sm font-semibold uppercase tracking-wider text-slate-500">{title}</h2>;
+  return <h2 className="text-sm font-semibold uppercase tracking-wider text-faint">{title}</h2>;
 }
 
 interface BillingState {
@@ -1044,11 +1044,11 @@ function BillingCard({
     : null;
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+    <div className="bg-ground border border-surface rounded-xl p-5">
       <h2 className="font-semibold text-white mb-3">Billing</h2>
 
       {loading ? (
-        <div className="h-12 rounded-lg bg-slate-800/60 animate-pulse" />
+        <div className="h-12 rounded-lg bg-surface/60 animate-pulse" />
       ) : (tier !== 'free' && !(state?.hasSubscription && sub)) ? (
         // Already Pro+ but NO personal Stripe subscription — show the plan, NOT an
         // "Upgrade to Pro" CTA. Pro access is a UNION (bundle / comp / team / access
@@ -1059,7 +1059,7 @@ function BillingCard({
         // so we don't offer it here — there's nothing to manage.
         <div className="rounded-lg border border-emerald-700/40 bg-emerald-900/15 p-3">
           <span className="text-sm font-medium text-emerald-200">{tierLabel(tier)}</span>
-          <p className="text-xs text-slate-400 mt-1">
+          <p className="text-xs text-muted mt-1">
             {tier === 'team'
               ? 'You have full Pro access through your team.'
               : tier === 'enterprise'
@@ -1069,10 +1069,10 @@ function BillingCard({
         </div>
       ) : state?.hasSubscription && sub ? (
         <div className="space-y-3">
-          <div className="rounded-lg border border-slate-800 bg-slate-800/40 p-3">
+          <div className="rounded-lg border border-surface bg-surface/40 p-3">
             <div className="flex items-center justify-between gap-2">
               <span className="text-sm font-medium text-white">{sub.planName}</span>
-              {priceLabel && <span className="text-sm text-slate-300">{priceLabel}</span>}
+              {priceLabel && <span className="text-sm text-ink-soft">{priceLabel}</span>}
             </div>
             <div className="mt-1 flex items-center gap-2 text-xs">
               <span className={`inline-flex items-center rounded-full px-2 py-0.5 font-medium ${
@@ -1083,7 +1083,7 @@ function BillingCard({
                 {sub.status === 'trialing' ? 'Trial' : sub.status === 'past_due' ? 'Past due' : sub.status === 'active' ? 'Active' : sub.status}
               </span>
               {renews && (
-                <span className="text-slate-500">
+                <span className="text-faint">
                   {sub.cancelAtPeriodEnd ? `Cancels ${renews}` : `Renews ${renews}`}
                 </span>
               )}
@@ -1093,20 +1093,20 @@ function BillingCard({
             type="button"
             onClick={openPortal}
             disabled={opening}
-            className="w-full px-3 py-2 text-sm font-medium text-white bg-slate-800 hover:bg-slate-700 border border-slate-700 rounded-lg transition-colors disabled:opacity-50"
+            className="w-full px-3 py-2 text-sm font-medium text-white bg-surface hover:bg-input border border-hairline rounded-lg transition-colors disabled:opacity-50"
           >
             {opening ? 'Opening…' : 'Manage billing'}
           </button>
-          <p className="text-[11px] text-slate-500">
+          <p className="text-[11px] text-faint">
             Change plan, update your card, cancel, or download invoices — handled securely by Stripe.
           </p>
         </div>
       ) : (
         // No active subscription — free user. Show plan + upgrade CTA.
         <div className="space-y-3">
-          <div className="rounded-lg border border-slate-800 bg-slate-800/40 p-3">
+          <div className="rounded-lg border border-surface bg-surface/40 p-3">
             <span className="text-sm font-medium text-white">{tierLabel(tier)}</span>
-            <p className="text-xs text-slate-500 mt-1">No active paid subscription.</p>
+            <p className="text-xs text-faint mt-1">No active paid subscription.</p>
           </div>
           <a
             href="/market-intelligence"
@@ -1185,9 +1185,9 @@ function TeamUpgradeCard({
   if (hasTeam || done) {
     if (!done) return null;
     return (
-      <div className="bg-slate-900 border border-emerald-500/30 rounded-xl p-5">
+      <div className="bg-ground border border-emerald-500/30 rounded-xl p-5">
         <h2 className="font-semibold text-white mb-1">You&apos;re on a team 🎉</h2>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted">
           Your team workspace is ready and your pursuits moved over. Invite teammates from Team Access.
         </p>
       </div>
@@ -1195,20 +1195,20 @@ function TeamUpgradeCard({
   }
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+    <div className="bg-ground border border-surface rounded-xl p-5">
       <h2 className="font-semibold text-white mb-1">Work as a team</h2>
-      <p className="text-sm text-slate-400 mb-3">
+      <p className="text-sm text-muted mb-3">
         Add teammates, share your pipeline and contacts, and manage pursuits together.
         Your existing work comes with you.
       </p>
-      <ul className="text-xs text-slate-500 space-y-1 mb-4">
+      <ul className="text-xs text-faint space-y-1 mb-4">
         <li>• Up to 5 seats</li>
         <li>• Shared pipeline, contacts &amp; target list</li>
         <li>• Roles: owner, admin, member, viewer</li>
       </ul>
 
       {provisioning ? (
-        <div className="w-full px-3 py-2 text-center text-sm text-slate-300 bg-slate-800 rounded-lg">
+        <div className="w-full px-3 py-2 text-center text-sm text-ink-soft bg-surface rounded-lg">
           Setting up your team…
         </div>
       ) : checkoutUrl ? (
@@ -1219,7 +1219,7 @@ function TeamUpgradeCard({
           Upgrade to Team
         </a>
       ) : (
-        <div className="w-full px-3 py-2 text-center text-sm text-slate-400 bg-slate-800 rounded-lg">
+        <div className="w-full px-3 py-2 text-center text-sm text-muted bg-surface rounded-lg">
           {configured ? 'Team upgrade unavailable right now.' : 'Team plan coming soon — contact us to get set up.'}
         </div>
       )}
@@ -1232,12 +1232,12 @@ function TeamUpgradeCard({
 function Field({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (value: string) => void; placeholder?: string }) {
   return (
     <label className="block">
-      <span className="block text-sm text-slate-400 mb-1">{label}</span>
+      <span className="block text-sm text-muted mb-1">{label}</span>
       <input
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
-        className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 outline-none focus:border-emerald-500"
+        className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white placeholder-faint outline-none focus:border-emerald-500"
       />
     </label>
   );
@@ -1280,9 +1280,9 @@ function StatesField({ value, onChange }: { value: string[]; onChange: (states: 
   return (
     <div>
       <div className="flex items-center justify-between mb-2">
-        <span className="block text-sm text-slate-400">
+        <span className="block text-sm text-muted">
           States{' '}
-          <span className="text-xs text-slate-500">
+          <span className="text-xs text-faint">
             ({selected.size === 0 ? 'all states / national' : `${selected.size} selected`})
           </span>
         </span>
@@ -1290,7 +1290,7 @@ function StatesField({ value, onChange }: { value: string[]; onChange: (states: 
           <button
             type="button"
             onClick={clearAll}
-            className="text-xs text-slate-500 hover:text-slate-300 underline"
+            className="text-xs text-faint hover:text-ink-soft underline"
           >
             Clear (national)
           </button>
@@ -1305,16 +1305,16 @@ function StatesField({ value, onChange }: { value: string[]; onChange: (states: 
             key={region.label}
             type="button"
             onClick={() => applyRegion(region.states)}
-            className="px-2.5 py-1 text-xs rounded-md border border-slate-700 bg-slate-800/60 text-slate-300 hover:border-emerald-500 hover:text-emerald-300 transition-colors"
+            className="px-2.5 py-1 text-xs rounded-md border border-hairline bg-surface/60 text-ink-soft hover:border-emerald-500 hover:text-emerald-300 transition-colors"
           >
             + {region.label}
-            <span className="text-slate-500 ml-1">({region.states.length})</span>
+            <span className="text-faint ml-1">({region.states.length})</span>
           </button>
         ))}
       </div>
 
       {/* Per-state toggle grid */}
-      <div className="grid grid-cols-8 sm:grid-cols-10 md:grid-cols-13 gap-1 rounded-lg border border-slate-800 bg-slate-900/60 p-2 max-h-48 overflow-y-auto">
+      <div className="grid grid-cols-8 sm:grid-cols-10 md:grid-cols-13 gap-1 rounded-lg border border-surface bg-ground/60 p-2 max-h-48 overflow-y-auto">
         {ALL_STATES.map((state) => {
           const on = selected.has(state);
           return (
@@ -1325,7 +1325,7 @@ function StatesField({ value, onChange }: { value: string[]; onChange: (states: 
               className={`px-1.5 py-1 text-xs rounded font-medium transition-colors ${
                 on
                   ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/40'
-                  : 'bg-slate-800/40 text-slate-400 hover:bg-slate-800 hover:text-slate-200'
+                  : 'bg-surface/40 text-muted hover:bg-surface hover:text-slate-200'
               }`}
             >
               {state}
@@ -1333,7 +1333,7 @@ function StatesField({ value, onChange }: { value: string[]; onChange: (states: 
           );
         })}
       </div>
-      <p className="text-xs text-slate-500 mt-2">
+      <p className="text-xs text-faint mt-2">
         Opportunities will be scoped to selected states only. Leave empty for a national feed.
       </p>
     </div>
@@ -1343,10 +1343,10 @@ function StatesField({ value, onChange }: { value: string[]; onChange: (states: 
 function ChecklistItem({ label, done }: { label: string; done: boolean }) {
   return (
     <div className="flex items-center gap-3 text-sm">
-      <span className={`h-5 w-5 rounded-full flex items-center justify-center ${done ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-500'}`}>
+      <span className={`h-5 w-5 rounded-full flex items-center justify-center ${done ? 'bg-emerald-500 text-white' : 'bg-surface text-faint'}`}>
         {done && <Check className="h-3 w-3" strokeWidth={3} />}
       </span>
-      <span className={done ? 'text-slate-200' : 'text-slate-500'}>{label}</span>
+      <span className={done ? 'text-slate-200' : 'text-faint'}>{label}</span>
     </div>
   );
 }

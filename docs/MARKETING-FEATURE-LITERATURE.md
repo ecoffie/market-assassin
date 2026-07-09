@@ -3930,3 +3930,22 @@ shade it replaces (confirmed in built CSS, e.g. `.bg-input\/40{#33415566}`,
 `.text-ink-soft{#cbd5e1}`, `.border-surface{#1e293b}`). Shades with no exact-hex token were
 deliberately LEFT (migrating them would change the color). Drift-guard baseline dropped
 10,557→10,472; the guard blocks any regression. tsc clean, production build ✓.
+
+---
+
+## Design polish — P5 raw-neutral migration, top-8 panels (Jul 9 2026)
+
+**What:** Continued the token migration across the 8 highest-traffic panels — Market Research,
+Proposals, Pipeline, Alerts, My Target List, Recompetes, Vault, Settings. Raw slate/gray color
+classes routed through the semantic token system: **1,628 → 204 raw-neutral (−1,424)** in one
+verified pass.
+
+**Why:** Consistency at scale. After Dashboard proved the pattern, these 8 panels are where
+users spend the most time, so bringing them onto the token system is the highest-leverage
+consistency win — and it's what lets the whole app be re-themed or audited in one place.
+
+**Proof:** Every swap uses the exact-hex no-op map (token color == the slate shade replaced),
+so the change is invisible; shades with no exact token were left untouched (migrating them
+would change the color). Verified: tsc clean, production build ✓, opacity suffixes preserved
+(bg-ground-deep/40, bg-input/30, …), no malformed tokens. Drift-guard baseline dropped
+10,472 → 9,048 (−14% of the total debt in one batch); the guard blocks any regression.
