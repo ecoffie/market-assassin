@@ -4212,7 +4212,18 @@ function AgencyTable({
         excludeDOD,
       }),
     })
-      .then(r => r.json())
+      .then(async r => {
+        // A big national market (e.g. janitorial 561720, no state) can exceed the
+        // function's 120s budget → Vercel returns a 504 HTML page, NOT JSON. Calling
+        // .json() on that throws and lands in the generic "network error" catch. Detect
+        // the timeout / non-JSON case here and surface an ACTIONABLE message instead.
+        const ct = r.headers.get('content-type') || '';
+        if (!ct.includes('application/json')) {
+          const timedOut = r.status === 504 || r.status === 502 || r.status === 408;
+          throw new Error(timedOut ? '__TIMEOUT__' : `__NONJSON__:${r.status}`);
+        }
+        return r.json();
+      })
       .then(data => {
         if (cancelled) return;
         if (!data?.success) {
@@ -4271,7 +4282,18 @@ function AgencyTable({
       .catch(err => {
         if (cancelled) return;
         console.error('[AgencyTable] fetch failed:', err);
-        setError('Network error loading research data');
+        const msg = err instanceof Error ? err.message : '';
+        if (msg === '__TIMEOUT__') {
+          setError(
+            'This market is large enough that the full breakdown timed out. Narrow it down — pick a state, add a set-aside, or use a more specific NAICS/PSC — then try again.',
+          );
+        } else if (msg.startsWith('__NONJSON__')) {
+          setError('The research service returned an unexpected response. Please try again in a moment.');
+        } else {
+          setError('Network error loading research data');
+        }
+        setRows([]);
+        onRowsChange?.([]);
       })
       .finally(() => {
         if (!cancelled) setLoading(false);

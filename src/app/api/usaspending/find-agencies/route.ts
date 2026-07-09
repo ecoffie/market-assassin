@@ -26,6 +26,12 @@ import {
   sortAgenciesForSmallBusiness,
 } from '@/lib/utils/agency-priority';
 
+// This route fans out to USASpending (30s/call). Its parent
+// (target-market-research) awaits it, so it must not be killed by a low default
+// duration on a big national market. Explicit config.
+export const runtime = 'nodejs';
+export const maxDuration = 60;
+
 export async function POST(request: NextRequest) {
   try {
     const body: CoreInputs = await request.json();

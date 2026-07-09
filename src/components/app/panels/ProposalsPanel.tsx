@@ -879,6 +879,58 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
   const [draftError, setDraftError] = useState<string | null>(null);
   const [draftAllLoading, setDraftAllLoading] = useState(false);
   const [draftAllSummary, setDraftAllSummary] = useState<{ count: number; ms: number; errors: number } | null>(null);
+  // Set when we rehydrate a previously-drafted proposal on mount (below) so the
+  // review panel can note "restored from your last session" instead of looking
+  // like a fresh draft the user didn't just run.
+  const [restoredDraftFile, setRestoredDraftFile] = useState<string | null>(null);
+  const restoredOnceRef = useRef(false);
+
+  // Rehydrate the most-recent drafted proposal on mount. draft-all persists every
+  // section to user_generated_archive, but the panel used to hold drafts ONLY in
+  // React state — so a reload / navigate-away lost them and the "Export .docx"
+  // button (gated on that state) went disabled with no way to recover the work.
+  // Now we read the latest draft-all batch back and repopulate `drafts` +
+  // `draftAllSummary` so export keeps working across reloads. (Reported bug:
+  // "I can't find the draft to export.") We only restore into an EMPTY session so
+  // a live drafting run is never clobbered.
+  useEffect(() => {
+    if (!email || restoredOnceRef.current) return;
+    restoredOnceRef.current = true;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await authedFetch(`/api/app/proposal/drafts?email=${encodeURIComponent(email)}`, email);
+        if (!res.ok) return;
+        const data = await res.json();
+        const sections = (data?.sections || []) as Array<{
+          section: SectionType; draft: string; wordCount: number; targetWords: number; profileGrounded?: boolean;
+        }>;
+        if (cancelled || sections.length === 0) return;
+        setDrafts(prev => {
+          // Never overwrite drafts the user generated this session.
+          const hasLive = Object.values(prev).some(d => !!d?.draft);
+          if (hasLive) return prev;
+          const next = { ...prev };
+          for (const s of sections) {
+            if (!s.section || !s.draft) continue;
+            next[s.section] = {
+              draft: s.draft,
+              wordCount: s.wordCount,
+              targetWords: s.targetWords,
+              profileGrounded: s.profileGrounded,
+              generatedAt: Date.now(),
+            };
+          }
+          return next;
+        });
+        setDraftAllSummary(prev => prev || { count: sections.length, ms: 0, errors: 0 });
+        setRestoredDraftFile(data?.fileName || null);
+      } catch {
+        /* best-effort — a failed restore just leaves the user to redraft */
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [email]);
   const [draftAllProgressIdx, setDraftAllProgressIdx] = useState(0);
   const [draftAllElapsedSec, setDraftAllElapsedSec] = useState(0);
   const draftAllStartedAtRef = useRef<number | null>(null);
@@ -2266,6 +2318,11 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 {draftAllSummary.errors > 0 && ` (${draftAllSummary.errors} failed — retry those individually below)`}
                 . Review each section, edit if needed, then export.
               </p>
+              {restoredDraftFile && (
+                <p className="text-xs text-emerald-300/80">
+                  Restored from your last session{restoredDraftFile !== 'untitled RFP' ? ` — ${restoredDraftFile}` : ''}. Your draft was saved automatically.
+                </p>
+              )}
               <div className="flex flex-wrap gap-3">
                 <button
                   type="button"

@@ -892,13 +892,32 @@ export async function POST(request: NextRequest) {
     // Pre-resolve each agency's DoDAAC office codes (async) so the row map below
     // can look up the DoDAAC-anchored opp count synchronously. Only sub-agencies
     // in dodaac_directory resolve; others stay on the department count.
+    //
+    // TIME BUDGET (Bug fix 2026-07-09 — big national markets 504'd): on a cache
+    // miss the DoDAAC directory cold-loads (pages up to 60k rows once) and then
+    // this fans out one resolve per unique sub-agency. On a large market (e.g.
+    // NAICS 561720, hundreds of agencies) that pushed the whole request past the
+    // 120s function limit → HTTP 504 + a useless "Network error" for the user.
+    // This enrichment is a NICE-TO-HAVE (office-anchored opp counts); the core
+    // deliverable is the spend + agency table. So we skip it when we're already
+    // past a soft budget, letting rows fall back to the department-wide opp count.
+    // Partial (department-level) data beats a 504.
+    const DODAAC_BUDGET_MS = 75_000; // leave ~45s headroom under the 120s cap
     const dodaacByAgency = new Map<string, string[]>();
-    await Promise.all(
-      Array.from(new Set(findAgencies.map((a) => a.subAgency || a.name).filter(Boolean) as string[]))
-        .map(async (nm) => {
-          try { dodaacByAgency.set(nm, await dodaacCodesForAgency(nm)); } catch { /* skip */ }
-        }),
-    );
+    let dodaacEnrichmentSkipped = false;
+    if (Date.now() - startedAt > DODAAC_BUDGET_MS) {
+      dodaacEnrichmentSkipped = true;
+      console.warn(
+        `[target-market-research] skipping DoDAAC enrichment — already ${Math.round((Date.now() - startedAt) / 1000)}s in (budget ${DODAAC_BUDGET_MS / 1000}s)`,
+      );
+    } else {
+      await Promise.all(
+        Array.from(new Set(findAgencies.map((a) => a.subAgency || a.name).filter(Boolean) as string[]))
+          .map(async (nm) => {
+            try { dodaacByAgency.set(nm, await dodaacCodesForAgency(nm)); } catch { /* skip */ }
+          }),
+      );
+    }
 
     // Build the merged research rows. Each row gets all 4 sort
     // metrics pre-computed so the UI can sort without re-fetching.
