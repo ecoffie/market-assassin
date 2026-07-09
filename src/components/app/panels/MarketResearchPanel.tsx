@@ -7,7 +7,7 @@ import {
   PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { Zap, Gauge, Loader2 } from 'lucide-react';
+import { Zap, Gauge, Loader2, BarChart3, Wallet, TrendingUp, User, Handshake, Target, LineChart, Building2, X, type LucideIcon } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders, authedFetch } from '../authHeaders';
 import MarketCoverageBanner, { type MarketCoverage } from '../market/MarketCoverageBanner';
@@ -158,7 +158,7 @@ interface Report {
   id: string;
   title: string;
   description: string;
-  icon: string;
+  icon: LucideIcon;
   tier: 'free' | 'pro';
   reportKey: keyof ReportData;
 }
@@ -302,18 +302,18 @@ interface ReportData {
 // PricingIntelPanel under the new Estimating sidebar section).
 const REPORTS: Report[] = [
   // Market Map theme — "where do I focus?"
-  { id: 'analytics', title: 'Market Analytics', description: 'Spending patterns and trends', icon: '📊', tier: 'free', reportKey: 'simplifiedAcquisition' },
-  { id: 'budget', title: 'Budget Authority', description: 'Agency budget analysis', icon: '💰', tier: 'free', reportKey: 'budgetCheckup' },
-  { id: 'forecast', title: 'Market Forecast', description: 'Future opportunity pipeline', icon: '🔮', tier: 'pro', reportKey: 'forecastList' },
+  { id: 'analytics', title: 'Market Analytics', description: 'Spending patterns and trends', icon: BarChart3, tier: 'free', reportKey: 'simplifiedAcquisition' },
+  { id: 'budget', title: 'Budget Authority', description: 'Agency budget analysis', icon: Wallet, tier: 'free', reportKey: 'budgetCheckup' },
+  { id: 'forecast', title: 'Market Forecast', description: 'Future opportunity pipeline', icon: TrendingUp, tier: 'pro', reportKey: 'forecastList' },
 
   // Agency Intel theme — "who is the buyer?"
-  { id: 'buyers', title: 'Gov Buyers', description: 'Decision maker identification', icon: '👤', tier: 'free', reportKey: 'governmentBuyers' },
-  { id: 'osbp', title: 'OSBP Contacts', description: 'Small business office contacts', icon: '🤝', tier: 'free', reportKey: 'governmentBuyers' },
-  { id: 'pain', title: 'Pain Points', description: 'Agency challenges and needs', icon: '🎯', tier: 'pro', reportKey: 'agencyPainPoints' },
-  { id: 'positioning', title: 'Agency Needs', description: 'Strategic positioning intel', icon: '📈', tier: 'pro', reportKey: 'agencyNeeds' },
+  { id: 'buyers', title: 'Gov Buyers', description: 'Decision maker identification', icon: User, tier: 'free', reportKey: 'governmentBuyers' },
+  { id: 'osbp', title: 'OSBP Contacts', description: 'Small business office contacts', icon: Handshake, tier: 'free', reportKey: 'governmentBuyers' },
+  { id: 'pain', title: 'Pain Points', description: 'Agency challenges and needs', icon: Target, tier: 'pro', reportKey: 'agencyPainPoints' },
+  { id: 'positioning', title: 'Agency Needs', description: 'Strategic positioning intel', icon: LineChart, tier: 'pro', reportKey: 'agencyNeeds' },
 
   // Competitor Intel theme — "who am I up against?"
-  { id: 'primes', title: 'Prime Analysis', description: 'Incumbent contractor intel', icon: '🏢', tier: 'pro', reportKey: 'primeContractor' },
+  { id: 'primes', title: 'Prime Analysis', description: 'Incumbent contractor intel', icon: Building2, tier: 'pro', reportKey: 'primeContractor' },
 ];
 
 const RESEARCH_LENSES = [
@@ -2519,7 +2519,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                   className="rounded-lg border border-slate-800 bg-slate-950/50 p-4 text-left hover:border-emerald-500/50"
                 >
                   <div className="flex items-center gap-3">
-                    <span className="text-2xl">{report.icon}</span>
+                    <report.icon className="h-6 w-6 shrink-0 text-emerald-400" strokeWidth={1.75} />
                     <div>
                       <div className="font-medium text-white">{report.title}</div>
                       <div className="text-sm text-slate-500">{report.description}</div>
@@ -2965,7 +2965,7 @@ function ChartPlaceholder({ title, subtitle, slice }: { title: string; subtitle:
       </div>
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
-          <div className="text-3xl mb-2 opacity-30">📊</div>
+          <div className="mb-2 flex justify-center opacity-30"><BarChart3 className="h-8 w-8" strokeWidth={1.5} /></div>
           <p className="text-xs text-slate-600 uppercase tracking-wider">Chart ships in Slice {slice}</p>
         </div>
       </div>
@@ -5902,10 +5902,10 @@ function ReportViewer({
     <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-white flex items-center gap-2">
-          <span className="text-xl">{report?.icon}</span>
+          {report?.icon && <report.icon className="h-5 w-5 shrink-0 text-emerald-400" strokeWidth={1.75} />}
           {report?.title}
         </h3>
-        <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
+        <button onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-white"><X className="h-4 w-4" /></button>
       </div>
 
       {/* Government Buyers */}

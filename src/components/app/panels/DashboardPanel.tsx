@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react';
+import { BarChart3, MapPin, Check, Plus } from 'lucide-react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import ProfileStatsBar from '@/components/briefings/ProfileStatsBar';
@@ -1137,7 +1138,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
             renders ABOVE the upgrade wall, not behind it. */}
         <CollabHotCard email={email} onPanelChange={onPanelChange} />
         <div className="border border-purple-500/30 bg-purple-950/20 p-8 text-center">
-          <div className="text-4xl mb-4">📊</div>
+          <div className="mb-4 flex justify-center"><BarChart3 className="h-9 w-9 text-purple-400" strokeWidth={1.5} /></div>
           <h2 className="text-2xl font-bold text-white mb-3">Today&apos;s Intel</h2>
           <p className="text-slate-400 mb-6 max-w-md mx-auto">
             Upgrade to unlock AI-prioritized opportunities, weekly deep dives, amendment alerts on your pursuits, and full intelligence.
@@ -1410,8 +1411,8 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                           )}
                           {itemMetaLine && <p className="text-sm text-slate-500 mt-1">{itemMetaLine}</p>}
                           {itemLocation && (
-                            <p className="mt-2 inline-flex items-center rounded bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-300">
-                              📍 Place of performance: {itemLocation}
+                            <p className="mt-2 inline-flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-1 text-xs font-medium text-emerald-300">
+                              <MapPin className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> Place of performance: {itemLocation}
                             </p>
                           )}
                           {itemDetailLine && <p className="text-sm text-slate-400 mt-2 leading-relaxed break-words">{itemDetailLine}</p>}
@@ -1454,7 +1455,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                                   handleTrackInPipeline(item);
                                 }}
                                 disabled={isSaving || isSaved}
-                                className={`inline-flex min-h-[44px] items-center justify-center whitespace-nowrap rounded px-2.5 py-2 text-sm font-medium transition-colors sm:px-3 md:min-h-0 md:py-1.5 ${
+                                className={`inline-flex min-h-[44px] items-center justify-center gap-1 whitespace-nowrap rounded px-2.5 py-2 text-sm font-medium transition-colors sm:px-3 md:min-h-0 md:py-1.5 ${
                                   isSaved
                                     ? 'bg-emerald-500/20 text-emerald-400 cursor-default'
                                     : isSaving
@@ -1462,7 +1463,11 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                                       : 'bg-purple-600 text-white hover:bg-purple-500'
                                 }`}
                               >
-                                {isSaved ? '✓ Tracking' : isSaving ? 'Adding…' : '+ Track'}
+                                {isSaved ? (
+                                  <><Check className="h-4 w-4 shrink-0" strokeWidth={2.5} /> Tracking</>
+                                ) : isSaving ? 'Adding…' : (
+                                  <><Plus className="h-4 w-4 shrink-0" strokeWidth={2.5} /> Track</>
+                                )}
                               </button>
                             );
                           })()}
@@ -1516,7 +1521,7 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                             </span>
                           )}
                           {itemLocation && (
-                            <span className="rounded bg-emerald-500/10 px-2 py-1 text-xs text-emerald-300">📍 {itemLocation}</span>
+                            <span className="inline-flex items-center gap-1 rounded bg-emerald-500/10 px-2 py-1 text-xs text-emerald-300"><MapPin className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> {itemLocation}</span>
                           )}
                           {item.signals.slice(0, 4).map(signal => (
                             <span key={signal} className="rounded bg-slate-800/80 px-2 py-1 text-xs text-slate-400">{signal}</span>
@@ -1580,13 +1585,13 @@ export default function DashboardPanel({ email, tier, onPanelChange }: Dashboard
                                     handleOpportunityFeedback(item, option.type);
                                   }}
                                   disabled={saving}
-                                  className={`rounded-full border px-3 py-1 text-xs transition-colors ${
+                                  className={`inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs transition-colors ${
                                     selected
                                       ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
                                       : 'border-slate-700 bg-slate-900 text-slate-400 hover:border-slate-500 hover:text-slate-200'
                                   }`}
                                 >
-                                  {selected ? '✓ ' : ''}{option.label}
+                                  {selected && <Check className="h-3 w-3 shrink-0" strokeWidth={2.5} />}{option.label}
                                 </button>
                               );
                             })}
