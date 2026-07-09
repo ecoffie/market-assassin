@@ -611,7 +611,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
       case 'low':
         return 'bg-amber-500/20 text-amber-400';
       default:
-        return 'bg-slate-500/20 text-slate-400';
+        return 'bg-slate-500/20 text-muted';
     }
   };
 
@@ -619,7 +619,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
     if (days <= 30) return { bg: 'bg-red-500/20 border-red-500/30', text: 'text-red-400', label: 'Urgent', icon: Flame };
     if (days <= 90) return { bg: 'bg-amber-500/20', text: 'text-amber-400', label: 'Soon', icon: Zap };
     if (days <= 180) return { bg: 'bg-blue-500/20', text: 'text-blue-400', label: '6 mo', icon: CalendarClock };
-    return { bg: 'bg-slate-500/20', text: 'text-slate-400', label: `${Math.round(days / 30)} mo`, icon: null };
+    return { bg: 'bg-slate-500/20', text: 'text-muted', label: `${Math.round(days / 30)} mo`, icon: null };
   };
   // "My states only" view. classifyLocation already tagged each row vs. the user's
   // hq/service states, so in-state = hq | service (the states you actually selected;
@@ -650,10 +650,10 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
     return (
       <div className="p-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-slate-800 rounded w-48" />
+          <div className="h-8 bg-surface rounded w-48" />
           <div className="grid grid-cols-3 gap-4">
             {[1, 2, 3].map(i => (
-              <div key={i} className="h-24 bg-slate-800 rounded-xl" />
+              <div key={i} className="h-24 bg-surface rounded-xl" />
             ))}
           </div>
         </div>
@@ -672,27 +672,27 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Expiring Contracts</h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-muted mt-1">
             Existing awards ending soon that may be rebid. Use this to spot recompete targets before the next solicitation.
           </p>
           {profileDefaults && (
             <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
-              <span className={`px-2 py-1 rounded ${usingProfileDefaults ? 'bg-emerald-500/15 text-emerald-300' : 'bg-slate-800 text-slate-400'}`}>
+              <span className={`px-2 py-1 rounded ${usingProfileDefaults ? 'bg-emerald-500/15 text-emerald-300' : 'bg-surface text-muted'}`}>
                 {usingProfileDefaults ? 'Using saved profile' : 'Custom search'}
               </span>
               {profileDefaults.naicsCodes.length > 0 && (
-                <span className="px-2 py-1 rounded bg-slate-800 text-slate-300">
+                <span className="px-2 py-1 rounded bg-surface text-ink-soft">
                   NAICS {profileDefaults.naicsCodes.slice(0, 4).join(', ')}
                   {profileDefaults.naicsCodes.length > 4 ? ` +${profileDefaults.naicsCodes.length - 4}` : ''}
                 </span>
               )}
               {profileDefaults.agencies.length > 0 && (
-                <span className="px-2 py-1 rounded bg-slate-800 text-slate-300">
+                <span className="px-2 py-1 rounded bg-surface text-ink-soft">
                   {profileDefaults.agencies.length} target agencies
                 </span>
               )}
               {profileDefaults.states.length > 0 && (
-                <span className="px-2 py-1 rounded bg-slate-800 text-slate-300">
+                <span className="px-2 py-1 rounded bg-surface text-ink-soft">
                   {profileDefaults.states.join(', ')}
                 </span>
               )}
@@ -704,7 +704,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
             type="button"
             onClick={viewAllContracts}
             disabled={allContracts.length === 0}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-300 text-sm rounded-lg transition-colors"
+            className="px-4 py-2 bg-surface hover:bg-input disabled:opacity-50 text-ink-soft text-sm rounded-lg transition-colors"
           >
             View all {allContracts.length.toLocaleString()}
           </button>
@@ -715,27 +715,27 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
           expiring numbers when switched to Subcontracting). */}
       {awardType === 'definitive' && visibleSummary && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+          <div className="bg-ground border border-surface rounded-xl p-4">
             <div className="text-2xl font-bold text-white">{visibleSummary.totalContracts}</div>
-            <div className="text-xs text-slate-500">{myStatesOnly ? 'In Your States' : usingProfileDefaults ? 'Profile Matches' : 'Expiring Awards Shown'}</div>
+            <div className="text-xs text-faint">{myStatesOnly ? 'In Your States' : usingProfileDefaults ? 'Profile Matches' : 'Expiring Awards Shown'}</div>
             {/* The static recompete dataset has no place-of-performance state, so the
                 "in your service area" count was always 0. Show the honest DB total. */}
             <div className="text-[11px] text-slate-600 mt-1">{allContracts.length.toLocaleString()} total in database</div>
           </div>
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+          <div className="bg-ground border border-surface rounded-xl p-4">
             <div className="text-2xl font-bold text-emerald-400">{formatCurrency(visibleSummary.totalValue)}</div>
-            <div className="text-xs text-slate-500">Potential Rebid Value</div>
+            <div className="text-xs text-faint">Potential Rebid Value</div>
           </div>
           {/* Was "Sole Source" — always 0 (static data has no competition_type).
               Replaced with average rebid value, which the dataset DOES carry. */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+          <div className="bg-ground border border-surface rounded-xl p-4">
             <div className="text-2xl font-bold text-green-400">{formatCurrency(visibleSummary.totalContracts ? visibleSummary.totalValue / visibleSummary.totalContracts : 0)}</div>
-            <div className="text-xs text-slate-500">Avg Rebid Value</div>
+            <div className="text-xs text-faint">Avg Rebid Value</div>
             <div className="text-[11px] text-slate-600 mt-1">Per expiring award</div>
           </div>
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+          <div className="bg-ground border border-surface rounded-xl p-4">
             <div className="text-2xl font-bold text-red-400">{visibleSummary.urgentContracts}</div>
-            <div className="text-xs text-slate-500">Ending Soon</div>
+            <div className="text-xs text-faint">Ending Soon</div>
             <div className="text-[11px] text-slate-600 mt-1">Within 90 days</div>
           </div>
         </div>
@@ -743,32 +743,32 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
       {/* Subcontracting view gets its OWN summary so the count reflects reality. */}
       {awardType === 'task' && (
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+          <div className="bg-ground border border-surface rounded-xl p-4">
             <div className="text-2xl font-bold text-white">{idvLoading ? '…' : idvContracts.length.toLocaleString()}</div>
-            <div className="text-xs text-slate-500">Subcontracting Targets</div>
+            <div className="text-xs text-faint">Subcontracting Targets</div>
             <div className="text-[11px] text-slate-600 mt-1">Primes winning task orders</div>
           </div>
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+          <div className="bg-ground border border-surface rounded-xl p-4">
             <div className="text-2xl font-bold text-emerald-400">{formatCurrency(idvContracts.reduce((s, c) => s + (c.awardAmount || 0), 0))}</div>
-            <div className="text-xs text-slate-500">Combined Task-Order $</div>
+            <div className="text-xs text-faint">Combined Task-Order $</div>
           </div>
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+          <div className="bg-ground border border-surface rounded-xl p-4">
             <div className="text-2xl font-bold text-blue-400">{idvContracts.filter(c => c.locationMatch === 'hq' || c.locationMatch === 'service' || c.locationMatch === 'neighbor').length}</div>
-            <div className="text-xs text-slate-500">In or near your area</div>
+            <div className="text-xs text-faint">In or near your area</div>
           </div>
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+          <div className="bg-ground border border-surface rounded-xl p-4">
             <div className="text-2xl font-bold text-amber-400">{new Set(idvContracts.map(c => c.recipientName)).size}</div>
-            <div className="text-xs text-slate-500">Distinct primes</div>
+            <div className="text-xs text-faint">Distinct primes</div>
           </div>
         </div>
       )}
 
       {/* Search Form */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+      <div className="bg-ground border border-surface rounded-xl p-5">
         <div className="flex flex-wrap items-center justify-between gap-3 mb-4">
           <div>
-            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">Profile-Aware Search</h3>
-            <p className="text-xs text-slate-500 mt-1">
+            <h3 className="text-sm font-semibold text-muted uppercase tracking-wider">Profile-Aware Search</h3>
+            <p className="text-xs text-faint mt-1">
               Defaults come from settings. Change fields here only to explore a different slice.
             </p>
           </div>
@@ -796,34 +796,34 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
               onClick={() => switchAwardType(t.id)}
               title={t.hint}
               className={`px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ${
-                awardType === t.id ? 'bg-amber-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white hover:bg-slate-700'
+                awardType === t.id ? 'bg-amber-600 text-white' : 'bg-surface text-muted hover:text-white hover:bg-input'
               }`}
             >
               {t.label}
             </button>
           ))}
-          <span className="self-center ml-1 text-[11px] text-slate-500">
+          <span className="self-center ml-1 text-[11px] text-faint">
             {awardType === 'definitive' ? 'Definitive contracts ending soon' : 'Primes winning task orders — approach them to sub'}
           </span>
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-4">
           <div>
-            <label className="block text-xs text-slate-500 mb-1">NAICS Code(s)</label>
+            <label className="block text-xs text-faint mb-1">NAICS Code(s)</label>
             <input
               type="text"
               value={naicsFilter}
               onChange={(e) => setNaicsFilter(e.target.value)}
               placeholder="541512, 236, 238"
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-amber-500 focus:outline-none"
+              className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-amber-500 focus:outline-none"
             />
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Expiring Within</label>
+            <label className="block text-xs text-faint mb-1">Expiring Within</label>
             <select
               value={monthsFilter}
               onChange={(e) => setMonthsFilter(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:border-amber-500 focus:outline-none"
+              className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm focus:border-amber-500 focus:outline-none"
             >
               <option value="all">All Dates</option>
               <option value="6">6 Months</option>
@@ -840,28 +840,28 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
             <button
               onClick={handleSearch}
               disabled={searching}
-              className="w-full px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-slate-700 disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
+              className="w-full px-4 py-2 bg-amber-600 hover:bg-amber-500 disabled:bg-input disabled:cursor-not-allowed text-white font-medium rounded-lg transition-colors"
             >
               {searching ? 'Searching...' : 'Search'}
             </button>
           </div>
         </div>
         {awardType === 'definitive' && hasStateProfile && (
-          <label className="mt-3 flex items-center gap-2 text-sm text-slate-300 cursor-pointer select-none">
+          <label className="mt-3 flex items-center gap-2 text-sm text-ink-soft cursor-pointer select-none">
             <input
               type="checkbox"
               checked={myStatesOnly}
               onChange={(e) => setMyStatesOnly(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-600 bg-slate-800 text-amber-500 focus:ring-amber-500"
+              className="h-4 w-4 rounded border-slate-600 bg-surface text-amber-500 focus:ring-amber-500"
             />
             <span className="font-medium">My states only</span>
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-faint">
               {profileDefaults?.states?.join(', ')} — hides out-of-area &amp; overseas work
             </span>
           </label>
         )}
         {awardType === 'definitive' && usingProfileDefaults && allContracts.length > shownContractsCount && (
-          <div className="rounded-lg border border-slate-700 bg-slate-950/50 p-3 text-sm text-slate-400">
+          <div className="rounded-lg border border-hairline bg-ground-deep/50 p-3 text-sm text-muted">
             Showing {shownContractsCount.toLocaleString()} matches{myStatesOnly ? ' in your states' : ' from your saved profile'}. The full database has {allContracts.length.toLocaleString()} expiring awards.
             <button
               type="button"
@@ -884,12 +884,12 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
       {/* Task orders = subcontracting targets (USASpending). Stays in-app per
           Eric: no external links; show $ with formatMindyCurrency (B/M/commas). */}
       {awardType === 'task' && (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
-            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
+        <div className="bg-ground border border-surface rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-surface flex items-center justify-between">
+            <h3 className="text-sm font-semibold text-muted uppercase tracking-wider">
               {idvLoading ? 'Loading…' : `${idvContracts.length.toLocaleString()} Subcontracting Targets`}
             </h3>
-            <span className="text-[11px] text-slate-500">Primes winning task orders — approach to sub</span>
+            <span className="text-[11px] text-faint">Primes winning task orders — approach to sub</span>
           </div>
           {/* Mirrors the Expiring row format (Eric: copy that — it's distinct +
               useful). Project + location prominent, prime clickable, area badge. */}
@@ -897,14 +897,14 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
             {idvContracts.map((c) => {
               const inArea = c.locationMatch === 'hq' || c.locationMatch === 'service' || c.locationMatch === 'neighbor';
               return (
-                <div key={c.awardId} className={`p-5 hover:bg-slate-800/50 transition-colors ${inArea ? 'bg-emerald-500/5' : ''}`}>
+                <div key={c.awardId} className={`p-5 hover:bg-surface/50 transition-colors ${inArea ? 'bg-emerald-500/5' : ''}`}>
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
                       {/* Badges */}
                       <div className="flex items-center gap-2 mb-2 flex-wrap">
                         <span className="px-2 py-0.5 rounded text-xs font-medium bg-amber-500/20 text-amber-300">Task order</span>
-                        {c.naicsCode && <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-700 text-slate-300">NAICS {c.naicsCode}</span>}
-                        {c.pscCode && <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-700 text-slate-300">PSC {c.pscCode}</span>}
+                        {c.naicsCode && <span className="px-2 py-0.5 rounded text-xs font-medium bg-input text-ink-soft">NAICS {c.naicsCode}</span>}
+                        {c.pscCode && <span className="px-2 py-0.5 rounded text-xs font-medium bg-input text-ink-soft">PSC {c.pscCode}</span>}
                       </div>
 
                       {/* PROJECT (description) — the "what project" Eric wanted up front */}
@@ -913,8 +913,8 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                       </h4>
 
                       {/* Agency */}
-                      <p className="text-slate-400 text-sm mb-1">
-                        {c.agency}{c.subAgency && c.subAgency !== c.agency && <span className="text-slate-500"> • {c.subAgency}</span>}
+                      <p className="text-muted text-sm mb-1">
+                        {c.agency}{c.subAgency && c.subAgency !== c.agency && <span className="text-faint"> • {c.subAgency}</span>}
                       </p>
 
                       {/* Prime = the subcontracting contact. These task-order
@@ -950,7 +950,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                       </div>
 
                       {/* WHERE — project location + "in your area" badge (the tribe-story trigger) */}
-                      <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500 mt-0.5">
+                      <div className="flex items-center gap-2 flex-wrap text-xs text-faint mt-0.5">
                         <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3 shrink-0 text-faint" strokeWidth={2} /> {c.popState || 'Location not specified'}</span>
                         {inArea && (
                           <span title={MATCH_META[c.locationMatch!].hint} className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
@@ -979,7 +979,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                     {/* Value & period */}
                     <div className="text-right shrink-0 min-w-[150px] flex flex-col items-end">
                       <div className="text-lg font-bold text-emerald-400">{formatCurrency(c.awardAmount)}</div>
-                      <div className="text-xs text-slate-500">Task-order value</div>
+                      <div className="text-xs text-faint">Task-order value</div>
                       {c.endDate && <div className="text-sm font-medium text-white mt-2">Ends {formatDate(c.endDate)}</div>}
                       <div className="text-[10px] text-slate-600 mt-1">UEI {c.recipientUei || '—'}</div>
                       <div className="mt-3 flex flex-col items-end gap-1">
@@ -1007,35 +1007,35 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                   {drillAwardId === c.awardId && (() => {
                     const key = c.generatedId || c.awardId;
                     const det = drillDetail[key];
-                    if (det === 'loading' || !det) return <div className="mt-3 rounded-lg border border-slate-700 bg-slate-950/50 p-3 text-xs text-slate-500">Loading award detail from USASpending…</div>;
-                    if (det === 'error') return <div className="mt-3 rounded-lg border border-slate-700 bg-slate-950/50 p-3 text-xs text-slate-500">Couldn’t load the award detail. <a href={c.usaSpendingUrl} target="_blank" rel="noreferrer" className="text-amber-400">View on USASpending ↗</a></div>;
+                    if (det === 'loading' || !det) return <div className="mt-3 rounded-lg border border-hairline bg-ground-deep/50 p-3 text-xs text-faint">Loading award detail from USASpending…</div>;
+                    if (det === 'error') return <div className="mt-3 rounded-lg border border-hairline bg-ground-deep/50 p-3 text-xs text-faint">Couldn’t load the award detail. <a href={c.usaSpendingUrl} target="_blank" rel="noreferrer" className="text-amber-400">View on USASpending ↗</a></div>;
                     const d = det as AwardDetail;
                     return (
                       <div className="mt-3 rounded-lg border border-amber-500/20 bg-amber-500/[0.04] p-4">
                         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
                           <div>
-                            <div className="text-[10px] uppercase tracking-wider text-slate-500">Obligated → Ceiling</div>
+                            <div className="text-[10px] uppercase tracking-wider text-faint">Obligated → Ceiling</div>
                             <div className="text-sm font-semibold text-emerald-300">{formatCurrency(d.obligated)} → {formatCurrency(d.ceiling)}</div>
                             <div className="text-[10px] text-slate-600">the real prize size</div>
                           </div>
                           <div>
-                            <div className="text-[10px] uppercase tracking-wider text-slate-500">Parent vehicle (IDV)</div>
+                            <div className="text-[10px] uppercase tracking-wider text-faint">Parent vehicle (IDV)</div>
                             <div className="text-sm font-medium text-white truncate">{d.parentIdvPiid || d.parentIdvId || '—'}</div>
                             <div className="text-[10px] text-slate-600">{d.parentIdvId ? 'get on this to compete' : 'standalone award'}</div>
                           </div>
                           <div>
-                            <div className="text-[10px] uppercase tracking-wider text-slate-500">Period of performance</div>
+                            <div className="text-[10px] uppercase tracking-wider text-faint">Period of performance</div>
                             <div className="text-sm font-medium text-white">{d.popStart ? formatDate(d.popStart) : '?'} → {d.popPotentialEnd ? formatDate(d.popPotentialEnd) : (d.popEnd ? formatDate(d.popEnd) : '?')}</div>
                             <div className="text-[10px] text-slate-600">recompete window</div>
                           </div>
                           <div>
-                            <div className="text-[10px] uppercase tracking-wider text-slate-500">Incumbent</div>
+                            <div className="text-[10px] uppercase tracking-wider text-faint">Incumbent</div>
                             <div className="text-sm font-medium text-white truncate">{[d.recipientCity, d.recipientState].filter(Boolean).join(', ') || '—'}</div>
                             <div className="text-[10px] text-slate-600">{d.recipientCongressionalDistrict ? `CD ${d.recipientState}-${d.recipientCongressionalDistrict}` : ''}{d.fundingAccount ? ` · ${d.fundingAccount.slice(0, 22)}` : ''}</div>
                           </div>
                         </div>
                         {(d.naicsDescription || d.pscDescription) && (
-                          <div className="mt-2 text-[11px] text-slate-500">
+                          <div className="mt-2 text-[11px] text-faint">
                             {d.naicsDescription && <span>NAICS: {d.naicsDescription}</span>}
                             {d.naicsDescription && d.pscDescription && <span className="text-slate-700"> · </span>}
                             {d.pscDescription && <span>PSC: {d.pscDescription}</span>}
@@ -1049,7 +1049,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
               );
             })}
             {!idvLoading && idvContracts.length === 0 && (
-              <div className="px-5 py-6 text-center text-sm text-slate-500">No task orders for this NAICS. Try a NAICS in the search above.</div>
+              <div className="px-5 py-6 text-center text-sm text-faint">No task orders for this NAICS. Try a NAICS in the search above.</div>
             )}
           </div>
         </div>
@@ -1057,14 +1057,14 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
 
       {/* Contract List */}
       {awardType === 'definitive' && contracts.length > 0 && (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-800">
-            <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
+        <div className="bg-ground border border-surface rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-surface">
+            <h3 className="text-sm font-semibold text-muted uppercase tracking-wider">
               {visibleContracts.length.toLocaleString()} Expiring Awards{myStatesOnly ? ' · in your states' : ''}
             </h3>
           </div>
           {myStatesOnly && visibleContracts.length === 0 ? (
-            <div className="px-5 py-8 text-center text-sm text-slate-500">
+            <div className="px-5 py-8 text-center text-sm text-faint">
               No expiring awards with a place of performance in {profileDefaults?.states?.join(', ')}.
               <button type="button" onClick={() => setMyStatesOnly(false)} className="ml-1 font-medium text-amber-300 hover:text-amber-200">
                 Show all areas
@@ -1089,7 +1089,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                   onKeyDown={(e) => {
                     if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); toggleExpandedContract(contract.piid); }
                   }}
-                  className={`cursor-pointer p-5 transition-colors hover:bg-slate-800/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 ${contract.daysUntilExpiration <= 90 ? 'bg-red-500/5' : ''}`}
+                  className={`cursor-pointer p-5 transition-colors hover:bg-surface/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-amber-500/60 ${contract.daysUntilExpiration <= 90 ? 'bg-red-500/5' : ''}`}
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1 min-w-0">
@@ -1104,7 +1104,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                            contract.competitionLevel === 'low' ? `${contract.bidsReceived} bids` : contract.competitionType}
                         </span>
                         {contract.naics && (
-                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-slate-700 text-slate-300">
+                          <span className="px-2 py-0.5 rounded text-xs font-medium bg-input text-ink-soft">
                             NAICS {contract.naics}
                           </span>
                         )}
@@ -1122,9 +1122,9 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                       </div>
 
                       {/* Agency + decoded contracting office (DoDAAC, DoD only) */}
-                      <p className="text-slate-400 text-sm mb-1">
+                      <p className="text-muted text-sm mb-1">
                         {contract.agency}
-                        {contract.subAgency && <span className="text-slate-500"> • {contract.subAgency}</span>}
+                        {contract.subAgency && <span className="text-faint"> • {contract.subAgency}</span>}
                         {formatDodaacOffice(contract.piid || null, dodaacNames) && (
                           <span className="inline-flex items-center gap-1 text-emerald-400/80"> • <Landmark className="h-3 w-3 shrink-0" strokeWidth={2} /> {formatDodaacOffice(contract.piid || null, dodaacNames)}</span>
                         )}
@@ -1159,12 +1159,12 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                           {contract.awardees && contract.awardees.length > 0 && (
                             <div className="mt-1.5 flex flex-wrap gap-1">
                               {contract.awardees.slice(0, 12).map((name) => (
-                                <span key={name} className="rounded bg-slate-800 px-1.5 py-0.5 text-[11px] text-slate-300">
+                                <span key={name} className="rounded bg-surface px-1.5 py-0.5 text-[11px] text-ink-soft">
                                   {name}
                                 </span>
                               ))}
                               {contract.awardees.length > 12 && (
-                                <span className="px-1 py-0.5 text-[11px] text-slate-500">+{contract.awardees.length - 12} more</span>
+                                <span className="px-1 py-0.5 text-[11px] text-faint">+{contract.awardees.length - 12} more</span>
                               )}
                             </div>
                           )}
@@ -1174,7 +1174,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                       {/* Location — always shown, with a match badge vs. the
                           user's service area so geography is visible, not a
                           silent filter. */}
-                      <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500 mt-0.5">
+                      <div className="flex items-center gap-2 flex-wrap text-xs text-faint mt-0.5">
                         <span className="inline-flex items-center gap-1">
                           <MapPin className="h-3 w-3 shrink-0 text-faint" strokeWidth={2} /> {contract.location?.state
                             ? `${contract.location.city ? `${contract.location.city}, ` : ''}${contract.location.state}${contract.location.zip ? ` ${contract.location.zip}` : ''}`
@@ -1187,7 +1187,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                               contract.locationMatch === 'hq' ? 'bg-emerald-500/20 text-emerald-300'
                               : contract.locationMatch === 'service' ? 'bg-blue-500/20 text-blue-300'
                               : contract.locationMatch === 'neighbor' ? 'bg-amber-500/20 text-amber-300'
-                              : 'bg-slate-600/40 text-slate-400'
+                              : 'bg-slate-600/40 text-muted'
                             }`}
                           >
                             {MATCH_META[contract.locationMatch].label}
@@ -1201,10 +1201,10 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                         contract the incumbent has actually used and for how long. */}
                     <div className="text-right shrink-0 min-w-[168px] flex flex-col items-end">
                       <div className="text-lg font-bold text-emerald-400">{formatCurrency(contract.potentialValue || contract.value)}</div>
-                      <div className="text-xs text-slate-500">Contract ceiling</div>
+                      <div className="text-xs text-faint">Contract ceiling</div>
                       {/* Spent-to-date: only show when we have a real, distinct obligated figure. */}
                       {contract.obligated > 0 && contract.potentialValue > 0 && contract.obligated < contract.potentialValue && (
-                        <div className="mt-1 text-xs text-slate-400">
+                        <div className="mt-1 text-xs text-muted">
                           <span className="text-slate-200 font-medium">{formatCurrency(contract.obligated)}</span> spent
                           <span className="text-slate-600"> · {Math.round((contract.obligated / contract.potentialValue) * 100)}% used</span>
                         </div>
@@ -1213,7 +1213,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                         {contract.startDate ? (
                           <>Started {formatDate(contract.startDate)}</>
                         ) : (
-                          <span className="text-slate-500">Start date —</span>
+                          <span className="text-faint">Start date —</span>
                         )}
                       </div>
                       <div className="text-sm font-medium text-white">
@@ -1243,11 +1243,11 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                   </div>
 
                   {isExpanded && (
-                    <div className="mt-5 rounded-xl border border-slate-700 bg-slate-950/50 p-4" onClick={(e) => e.stopPropagation()}>
+                    <div className="mt-5 rounded-xl border border-hairline bg-ground-deep/50 p-4" onClick={(e) => e.stopPropagation()}>
                       <div className="grid gap-4 lg:grid-cols-[1.4fr_1fr]">
                         <div>
                           <h5 className="text-sm font-semibold text-white">Overview</h5>
-                          <p className="mt-2 text-sm leading-6 text-slate-300">
+                          <p className="mt-2 text-sm leading-6 text-ink-soft">
                             {getRecompeteOverview(contract)}
                           </p>
                           {/* Live Contract Summary (#53) — the real obligated→
@@ -1271,33 +1271,33 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                           />
                           <div className="mt-4 flex flex-wrap gap-2">
                             {contract.piid && (
-                              <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">
+                              <span className="rounded bg-surface px-2 py-1 text-xs text-ink-soft">
                                 Award {contract.piid}
                               </span>
                             )}
                             {contract.incumbent?.uei && (
-                              <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">
+                              <span className="rounded bg-surface px-2 py-1 text-xs text-ink-soft">
                                 UEI {contract.incumbent.uei}
                               </span>
                             )}
                             {contract.naics && (
-                              <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">
+                              <span className="rounded bg-surface px-2 py-1 text-xs text-ink-soft">
                                 NAICS {contract.naics}
                               </span>
                             )}
                             {contract.location?.state && (
-                              <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">
+                              <span className="rounded bg-surface px-2 py-1 text-xs text-ink-soft">
                                 {contract.location.city ? `${contract.location.city}, ` : ''}{contract.location.state}
                               </span>
                             )}
                           </div>
                         </div>
 
-                        <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
+                        <div className="rounded-lg border border-surface bg-ground p-4">
                           <h5 className="text-sm font-semibold text-white">Capture Notes</h5>
                           <dl className="mt-3 space-y-3 text-sm">
                             <div className="flex justify-between gap-3">
-                              <dt className="text-slate-500">Incumbent</dt>
+                              <dt className="text-faint">Incumbent</dt>
                               <dd className="text-right">
                                 {contract.incumbent?.name ? (
                                   <ContractorLink
@@ -1314,26 +1314,26 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                               </dd>
                             </div>
                             <div className="flex justify-between gap-3">
-                              <dt className="text-slate-500">Potential value</dt>
+                              <dt className="text-faint">Potential value</dt>
                               <dd className="text-right text-emerald-300">{formatCurrency(contract.potentialValue || contract.value)}</dd>
                             </div>
                             <div className="flex justify-between gap-3">
-                              <dt className="text-slate-500">Competition</dt>
+                              <dt className="text-faint">Competition</dt>
                               <dd className="text-right text-slate-200">{contract.competitionType || 'Unknown'}</dd>
                             </div>
                             <div className="flex justify-between gap-3">
-                              <dt className="text-slate-500">Offers</dt>
+                              <dt className="text-faint">Offers</dt>
                               <dd className="text-right text-slate-200">{contract.bidsReceived || 'Unknown'}</dd>
                             </div>
                             <div className="flex justify-between gap-3">
-                              <dt className="text-slate-500">Expires</dt>
+                              <dt className="text-faint">Expires</dt>
                               <dd className="text-right text-slate-200">{formatDate(contract.expirationDate)}</dd>
                             </div>
                           </dl>
                         </div>
                       </div>
 
-                      <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-slate-800 pt-4">
+                      <div className="mt-4 flex flex-wrap items-center gap-3 border-t border-surface pt-4">
                         <SaveToPipelineButton
                           opportunity={{
                             title: contract.title || `${contract.incumbent?.name || 'Incumbent'} recompete`,
@@ -1347,7 +1347,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                           }}
                           email={email || ''}
                         />
-                        <span className="text-xs text-slate-500">
+                        <span className="text-xs text-faint">
                           After tracking, open My Pursuits to move it from Tracking to Pursuing, Bidding, Submitted, Won, or Lost.
                         </span>
                       </div>
@@ -1357,7 +1357,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
               );
             })}
             {visibleContracts.length > 1000 && (
-              <div className="p-5 text-center text-sm text-slate-400">
+              <div className="p-5 text-center text-sm text-muted">
                 Showing first 1,000 by value. Narrow the filters or open the full tool for export.
               </div>
             )}
@@ -1370,10 +1370,10 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
       {!loading && contracts.length === 0 && !error && (
         <div className="bg-gradient-to-br from-amber-900/30 to-slate-900 border border-amber-500/30 rounded-xl p-6 text-center">
           <div className="text-5xl mb-4">⏰</div>
-          <p className="text-slate-300 mb-2">
+          <p className="text-ink-soft mb-2">
             <strong className="text-white">No recompetes found for these filters</strong>
           </p>
-          <p className="text-slate-400 text-sm mb-4">
+          <p className="text-muted text-sm mb-4">
             Try a broader NAICS prefix, a longer expiration window, or all competition types.
           </p>
           <button

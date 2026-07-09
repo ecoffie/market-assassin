@@ -173,7 +173,7 @@ export default function VaultPanel({ email, tier, initialSection }: Props) {
 
   if (!email) {
     return (
-      <div className="p-8 text-center text-slate-400">
+      <div className="p-8 text-center text-muted">
         Sign in to access your vault.
       </div>
     );
@@ -189,17 +189,17 @@ export default function VaultPanel({ email, tier, initialSection }: Props) {
   return (
     <div className="flex flex-col h-full">
       {/* Header */}
-      <div className="px-6 py-5 border-b border-slate-800">
+      <div className="px-6 py-5 border-b border-surface">
         <div className="flex items-center gap-3 mb-1">
           <FolderArchive className="h-6 w-6 shrink-0 text-emerald-300" strokeWidth={1.75} />
           <h1 className="text-xl font-semibold text-white">My Vault</h1>
         </div>
-        <p className="text-sm text-slate-400">
+        <p className="text-sm text-muted">
           Everything Mindy uses to make outputs sound like <em>you</em>. The more you store, the more personalized your drafts, briefings, and proposals.
-          {' '}This is what Mindy <span className="text-slate-300">writes into proposals</span> — what it <span className="text-slate-300">watches for</span> (NAICS, keywords, agencies) lives in <span className="text-slate-300">Settings</span>.
+          {' '}This is what Mindy <span className="text-ink-soft">writes into proposals</span> — what it <span className="text-ink-soft">watches for</span> (NAICS, keywords, agencies) lives in <span className="text-ink-soft">Settings</span>.
         </p>
         {/* Trust cue — reassurance at the point of upload, where the anxiety lives. */}
-        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-slate-500">
+        <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-faint">
           <span className="inline-flex items-center gap-1.5 text-emerald-400/90">
             <svg viewBox="0 0 24 24" fill="none" aria-hidden="true" className="h-3.5 w-3.5">
               <path d="M6 10V8a6 6 0 1112 0v2M5 10h14v9a1 1 0 01-1 1H6a1 1 0 01-1-1v-9z" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
@@ -212,20 +212,20 @@ export default function VaultPanel({ email, tier, initialSection }: Props) {
               type="button"
               onClick={handleExport}
               disabled={exporting}
-              className="underline underline-offset-2 hover:text-slate-300 disabled:opacity-50"
+              className="underline underline-offset-2 hover:text-ink-soft disabled:opacity-50"
             >
               {exporting ? 'Preparing…' : 'Export'}
             </button>
           )}
           <span className="text-slate-700">·</span>
-          <a href="/app/trust" className="underline underline-offset-2 hover:text-slate-300">
+          <a href="/app/trust" className="underline underline-offset-2 hover:text-ink-soft">
             How your data is protected
           </a>
         </div>
       </div>
 
       {/* Section tabs */}
-      <div data-tour="vault-tabs" className="flex gap-1 px-4 pt-3 border-b border-slate-800 overflow-x-auto">
+      <div data-tour="vault-tabs" className="flex gap-1 px-4 pt-3 border-b border-surface overflow-x-auto">
         {SECTIONS.filter((s) => !s.proOnly || tier !== 'free').map((s) => {
           // 'identity' has no count; 'generated' (folded-in Library) isn't in the
           // vault counts map — guard both so the lookup never breaks.
@@ -240,15 +240,15 @@ export default function VaultPanel({ email, tier, initialSection }: Props) {
               onClick={() => setSection(s.id)}
               className={`flex items-center gap-2 px-4 py-2 text-sm rounded-t-md transition whitespace-nowrap ${
                 active
-                  ? 'bg-slate-800 text-white border-b-2 border-emerald-500'
-                  : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
+                  ? 'bg-surface text-white border-b-2 border-emerald-500'
+                  : 'text-muted hover:text-slate-200 hover:bg-surface/40'
               }`}
             >
               <SectionIcon className="h-4 w-4 shrink-0" strokeWidth={2} />
               <span>{s.label}</span>
               {count !== null && (
                 <span className={`text-xs px-1.5 py-0.5 rounded ${
-                  count > 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-slate-700 text-slate-400'
+                  count > 0 ? 'bg-emerald-500/20 text-emerald-300' : 'bg-input text-muted'
                 }`}>{count}</span>
               )}
             </button>
@@ -258,7 +258,7 @@ export default function VaultPanel({ email, tier, initialSection }: Props) {
 
       {/* Status row */}
       {loading && (
-        <div className="px-6 py-2 text-xs text-slate-400 bg-slate-900/40">Loading vault…</div>
+        <div className="px-6 py-2 text-xs text-muted bg-ground/40">Loading vault…</div>
       )}
       {error && (
         <div className="px-6 py-2 text-xs text-rose-300 bg-rose-950/40 border-b border-rose-900">
@@ -377,11 +377,11 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
               <h3 className="text-white font-semibold mb-1">
                 Auto-fill from your SAM.gov registration
               </h3>
-              <p className="text-sm text-slate-300 mb-3">
+              <p className="text-sm text-ink-soft mb-3">
                 Enter your <strong>UEI</strong> (the 12-character SAM.gov ID) and Mindy will pull
                 your legal name, NAICS, certifications, HQ — plus draft a one-liner, capabilities,
                 and starter past-performance entries grounded in the GovCon Giants curriculum.
-                <span className="block text-xs text-slate-400 mt-1">
+                <span className="block text-xs text-muted mt-1">
                   Takes ~10 seconds. You review everything before it saves.
                 </span>
               </p>
@@ -411,7 +411,7 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
         <div className="flex justify-end -mb-2">
           <button
             onClick={() => setShowAutoFill(true)}
-            className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-emerald-300 transition"
+            className="inline-flex items-center gap-1 text-xs text-muted hover:text-emerald-300 transition"
           >
             <Zap className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> Re-fetch from SAM.gov
           </button>
@@ -437,15 +437,15 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
       />
 
       <div>
-        <label className="block text-sm text-slate-300 mb-1">Primary NAICS codes</label>
+        <label className="block text-sm text-ink-soft mb-1">Primary NAICS codes</label>
         <NaicsPicker
           value={form.primary_naics || []}
           onChange={(codes) => onField('primary_naics', codes)}
           placeholder='Search NAICS by description (e.g. "consulting") or paste code'
         />
-        <p className="text-xs text-slate-500 mt-1">
-          The NAICS codes you bid on — your company identity. Saving here also <b className="text-slate-300">adds them to your alerts</b>.
-          The codes Mindy actively watches live in <b className="text-slate-300">Settings → Opportunity Matching</b> (you can fine-tune there).
+        <p className="text-xs text-faint mt-1">
+          The NAICS codes you bid on — your company identity. Saving here also <b className="text-ink-soft">adds them to your alerts</b>.
+          The codes Mindy actively watches live in <b className="text-ink-soft">Settings → Opportunity Matching</b> (you can fine-tune there).
         </p>
       </div>
 
@@ -470,7 +470,7 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
 
       {/* Point of contact (#41) — proposals fill "Responsible Office / Contact
           Person" + Point-of-Contact sections from these instead of [placeholders]. */}
-      <div className="pt-4 mt-4 border-t border-slate-700">
+      <div className="pt-4 mt-4 border-t border-hairline">
         <div className="flex items-center gap-2 mb-1">
           <span className="h-4 w-1 rounded-full bg-emerald-500" />
           <h3 className="text-sm font-semibold text-white uppercase tracking-wider">Point of Contact</h3>
@@ -478,7 +478,7 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
             Used in proposals
           </span>
         </div>
-        <p className="text-xs text-slate-500 mb-3">
+        <p className="text-xs text-faint mb-3">
           Mindy drops these into the point-of-contact &amp; cap-statement sections of your proposals — so drafts show your real details, not [placeholders].
         </p>
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -576,28 +576,28 @@ function PastPerfRow({ p, email, onChanged }: { p: PastPerf; email: string; onCh
     return s || e ? `${s ?? '?'}–${e ?? 'present'}` : null;
   };
   return (
-    <div className={`border rounded-lg bg-slate-900/40 ${draft ? 'border-amber-500/20' : 'border-slate-800'}`}>
+    <div className={`border rounded-lg bg-ground/40 ${draft ? 'border-amber-500/20' : 'border-surface'}`}>
       {/* Collapsed row — scannable key fields */}
       <button onClick={() => setOpen(o => !o)} className="w-full text-left px-4 py-3 flex items-center gap-3">
-        <span className={`shrink-0 transition-transform text-slate-500 ${open ? 'rotate-90' : ''}`}>▸</span>
+        <span className={`shrink-0 transition-transform text-faint ${open ? 'rotate-90' : ''}`}>▸</span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-white font-medium truncate">{p.contract_title || '(untitled)'}</span>
             {draft && <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300">DRAFT — ADD DETAILS</span>}
           </div>
-          <div className="flex items-center gap-x-3 gap-y-0.5 flex-wrap text-xs text-slate-400 mt-0.5">
+          <div className="flex items-center gap-x-3 gap-y-0.5 flex-wrap text-xs text-muted mt-0.5">
             <span>{p.agency || '—'}</span>
             {p.contract_value ? <span className="text-emerald-400 font-medium">${p.contract_value.toLocaleString()}</span> : null}
             {p.role ? <span className="capitalize">{p.role}</span> : null}
             {fmtPeriod() ? <span>{fmtPeriod()}</span> : null}
-            {p.cpars_rating ? <span className="text-slate-300">CPARS: {p.cpars_rating}</span> : null}
+            {p.cpars_rating ? <span className="text-ink-soft">CPARS: {p.cpars_rating}</span> : null}
           </div>
         </div>
       </button>
       {/* Expanded detail */}
       {open && (
         editing ? (
-          <div className="px-4 pb-4 pt-1 border-t border-slate-800/60">
+          <div className="px-4 pb-4 pt-1 border-t border-surface/60">
             <PastPerfForm
               email={email}
               initial={p}
@@ -607,16 +607,16 @@ function PastPerfRow({ p, email, onChanged }: { p: PastPerf; email: string; onCh
             />
           </div>
         ) : (
-          <div className="px-4 pb-4 pt-1 border-t border-slate-800/60 space-y-2">
-            {p.sub_agency && <p className="text-xs text-slate-500">{p.sub_agency}{p.contract_number ? ` · ${p.contract_number}` : ''}</p>}
-            {p.scope_description && <p className="text-sm text-slate-300">{p.scope_description}</p>}
+          <div className="px-4 pb-4 pt-1 border-t border-surface/60 space-y-2">
+            {p.sub_agency && <p className="text-xs text-faint">{p.sub_agency}{p.contract_number ? ` · ${p.contract_number}` : ''}</p>}
+            {p.scope_description && <p className="text-sm text-ink-soft">{p.scope_description}</p>}
             {(p.reference_name || p.reference_email) && (
-              <p className="text-xs text-slate-400">Reference: {p.reference_name || ''}{p.reference_email ? ` · ${p.reference_email}` : ''}</p>
+              <p className="text-xs text-muted">Reference: {p.reference_name || ''}{p.reference_email ? ` · ${p.reference_email}` : ''}</p>
             )}
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setEditing(true)}
-                className="text-xs text-slate-500 hover:text-emerald-400"
+                className="text-xs text-faint hover:text-emerald-400"
               >Edit</button>
               <button
                 onClick={async () => {
@@ -626,7 +626,7 @@ function PastPerfRow({ p, email, onChanged }: { p: PastPerf; email: string; onCh
                   });
                   onChanged();
                 }}
-                className="text-xs text-slate-500 hover:text-rose-400"
+                className="text-xs text-faint hover:text-rose-400"
               >Archive</button>
             </div>
           </div>
@@ -709,7 +709,7 @@ function PastPerfForm({ email, initial, editId, onSaved, onCancel }: { email: st
         <button onClick={save} disabled={saving} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded disabled:opacity-50">
           {saving ? 'Saving…' : 'Save'}
         </button>
-        <button onClick={onCancel} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded">Cancel</button>
+        <button onClick={onCancel} className="px-3 py-1.5 bg-input hover:bg-slate-600 text-white text-sm rounded">Cancel</button>
       </div>
     </div>
   );
@@ -790,7 +790,7 @@ function CapabilityForm({ email, initial, editId, onSaved, onCancel }: { email: 
       <Field label="Evidence" value={form.evidence} onChange={(v) => setForm(f => ({ ...f, evidence: v }))} placeholder="OSCP certified team, 50+ tests delivered" />
       <div className="flex gap-2">
         <button onClick={save} disabled={saving} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded disabled:opacity-50">{saving ? 'Saving…' : 'Save'}</button>
-        <button onClick={onCancel} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded">Cancel</button>
+        <button onClick={onCancel} className="px-3 py-1.5 bg-input hover:bg-slate-600 text-white text-sm rounded">Cancel</button>
       </div>
     </div>
   );
@@ -809,9 +809,9 @@ function CapabilityRow({ c, email, onChanged }: { c: Capability; email: string; 
   const [editing, setEditing] = useState(false);
   const draft = isCapabilityDraft(c);
   return (
-    <div className={`border rounded-lg bg-slate-900/40 ${draft ? 'border-amber-500/20' : 'border-slate-800'}`}>
+    <div className={`border rounded-lg bg-ground/40 ${draft ? 'border-amber-500/20' : 'border-surface'}`}>
       <button onClick={() => setOpen(o => !o)} className="w-full text-left px-4 py-3 flex items-center gap-3">
-        <span className={`shrink-0 transition-transform text-slate-500 ${open ? 'rotate-90' : ''}`}>▸</span>
+        <span className={`shrink-0 transition-transform text-faint ${open ? 'rotate-90' : ''}`}>▸</span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-white font-medium truncate">{c.capability_name || '(unnamed)'}</span>
@@ -819,15 +819,15 @@ function CapabilityRow({ c, email, onChanged }: { c: Capability; email: string; 
           </div>
           <div className="flex items-center gap-x-2 gap-y-0.5 flex-wrap mt-0.5">
             {(c.related_naics || []).slice(0, 4).map(n => (
-              <span key={n} className="text-[11px] bg-slate-800 text-slate-400 px-1.5 py-0.5 rounded">{n}</span>
+              <span key={n} className="text-[11px] bg-surface text-muted px-1.5 py-0.5 rounded">{n}</span>
             ))}
-            {(c.keywords || []).length > 0 && <span className="text-xs text-slate-500 truncate">{c.keywords!.slice(0, 3).join(' · ')}</span>}
+            {(c.keywords || []).length > 0 && <span className="text-xs text-faint truncate">{c.keywords!.slice(0, 3).join(' · ')}</span>}
           </div>
         </div>
       </button>
       {open && (
         editing ? (
-          <div className="px-4 pb-4 pt-1 border-t border-slate-800/60">
+          <div className="px-4 pb-4 pt-1 border-t border-surface/60">
             <CapabilityForm
               email={email}
               initial={c}
@@ -837,13 +837,13 @@ function CapabilityRow({ c, email, onChanged }: { c: Capability; email: string; 
             />
           </div>
         ) : (
-          <div className="px-4 pb-4 pt-1 border-t border-slate-800/60 space-y-2">
-            <p className="text-sm text-slate-300">{c.description}</p>
-            {c.evidence && <p className="text-xs text-slate-400">Evidence: {c.evidence}</p>}
+          <div className="px-4 pb-4 pt-1 border-t border-surface/60 space-y-2">
+            <p className="text-sm text-ink-soft">{c.description}</p>
+            {c.evidence && <p className="text-xs text-muted">Evidence: {c.evidence}</p>}
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setEditing(true)}
-                className="text-xs text-slate-500 hover:text-emerald-400"
+                className="text-xs text-faint hover:text-emerald-400"
               >Edit</button>
               <button
                 onClick={async () => {
@@ -853,7 +853,7 @@ function CapabilityRow({ c, email, onChanged }: { c: Capability; email: string; 
                   });
                   onChanged();
                 }}
-                className="text-xs text-slate-500 hover:text-rose-400"
+                className="text-xs text-faint hover:text-rose-400"
               >Archive</button>
             </div>
           </div>
@@ -981,11 +981,11 @@ function TeamForm({ email, initial, editId, onSaved, onCancel }: { email: string
       {/* Resume auto-fill — the 10x shortcut. Parse → review → save. */}
       <div className="rounded-lg border border-dashed border-emerald-700/50 bg-emerald-950/30 p-3">
         <div className="flex items-center justify-between gap-3 flex-wrap">
-          <div className="text-sm text-slate-300">
+          <div className="text-sm text-ink-soft">
             <span className="inline-flex items-center gap-1.5 font-medium text-white"><FileText className="h-4 w-4 shrink-0" strokeWidth={2} /> Auto-fill from a resume</span>
-            <span className="text-slate-400"> — upload a PDF or DOCX and Mindy fills the fields for you to review.</span>
+            <span className="text-muted"> — upload a PDF or DOCX and Mindy fills the fields for you to review.</span>
           </div>
-          <label className={`shrink-0 px-3 py-1.5 rounded text-sm cursor-pointer ${parsing ? 'bg-slate-700 text-slate-400' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}>
+          <label className={`shrink-0 px-3 py-1.5 rounded text-sm cursor-pointer ${parsing ? 'bg-input text-muted' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}>
             {parsing ? 'Reading…' : (resumeFilename ? 'Replace resume' : 'Upload resume')}
             <input
               type="file"
@@ -999,7 +999,7 @@ function TeamForm({ email, initial, editId, onSaved, onCancel }: { email: string
         {resumeFilename && !parsing && (
           <p className="text-xs text-emerald-300/90 mt-2">Attached: {resumeFilename}</p>
         )}
-        {resumeMsg && <p className="text-xs text-slate-400 mt-2">{resumeMsg}</p>}
+        {resumeMsg && <p className="text-xs text-muted mt-2">{resumeMsg}</p>}
       </div>
 
       <div className="grid grid-cols-2 gap-3">
@@ -1012,13 +1012,13 @@ function TeamForm({ email, initial, editId, onSaved, onCancel }: { email: string
       </div>
       <Field label="Certifications (comma-separated)" value={form.certifications} onChange={(v) => setForm(f => ({ ...f, certifications: v }))} placeholder="PMP, CISSP" />
       <Field label="Short bio (1-2 sentences)" value={form.bio_short} onChange={(v) => setForm(f => ({ ...f, bio_short: v }))} multiline />
-      <label className="flex items-center gap-2 text-sm text-slate-300">
+      <label className="flex items-center gap-2 text-sm text-ink-soft">
         <input type="checkbox" checked={form.is_key_personnel} onChange={(e) => setForm(f => ({ ...f, is_key_personnel: e.target.checked }))} />
         Mark as Key Personnel (shows in proposal sections)
       </label>
       <div className="flex gap-2">
         <button onClick={save} disabled={saving} className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded disabled:opacity-50">{saving ? 'Saving…' : 'Save'}</button>
-        <button onClick={onCancel} className="px-3 py-1.5 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded">Cancel</button>
+        <button onClick={onCancel} className="px-3 py-1.5 bg-input hover:bg-slate-600 text-white text-sm rounded">Cancel</button>
       </div>
     </div>
   );
@@ -1034,26 +1034,26 @@ function TeamRow({ m, email, onChanged }: { m: TeamMember; email: string; onChan
   const [editing, setEditing] = useState(false);
   const draft = isTeamDraft(m);
   return (
-    <div className={`border rounded-lg bg-slate-900/40 ${draft ? 'border-amber-500/20' : 'border-slate-800'}`}>
+    <div className={`border rounded-lg bg-ground/40 ${draft ? 'border-amber-500/20' : 'border-surface'}`}>
       <button onClick={() => setOpen(o => !o)} className="w-full text-left px-4 py-3 flex items-center gap-3">
-        <span className={`shrink-0 transition-transform text-slate-500 ${open ? 'rotate-90' : ''}`}>▸</span>
+        <span className={`shrink-0 transition-transform text-faint ${open ? 'rotate-90' : ''}`}>▸</span>
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 flex-wrap">
             <span className="text-white font-medium truncate">{m.full_name || '(unnamed)'}</span>
             {m.is_key_personnel && <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-900 text-emerald-300">KEY PERSONNEL</span>}
             {draft && <span className="shrink-0 text-[10px] font-semibold px-1.5 py-0.5 rounded bg-amber-500/15 text-amber-300">DRAFT — ADD DETAILS</span>}
           </div>
-          <div className="flex items-center gap-x-3 gap-y-0.5 flex-wrap text-xs text-slate-400 mt-0.5">
+          <div className="flex items-center gap-x-3 gap-y-0.5 flex-wrap text-xs text-muted mt-0.5">
             <span>{m.title || '—'}</span>
             {m.years_experience ? <span>{m.years_experience} yrs</span> : null}
-            {m.security_clearance ? <span className="text-slate-300">{m.security_clearance} cleared</span> : null}
+            {m.security_clearance ? <span className="text-ink-soft">{m.security_clearance} cleared</span> : null}
             {(m.certifications || []).length > 0 ? <span>{m.certifications!.slice(0, 3).join(', ')}</span> : null}
           </div>
         </div>
       </button>
       {open && (
         editing ? (
-          <div className="px-4 pb-4 pt-1 border-t border-slate-800/60">
+          <div className="px-4 pb-4 pt-1 border-t border-surface/60">
             <TeamForm
               email={email}
               initial={m}
@@ -1063,12 +1063,12 @@ function TeamRow({ m, email, onChanged }: { m: TeamMember; email: string; onChan
             />
           </div>
         ) : (
-          <div className="px-4 pb-4 pt-1 border-t border-slate-800/60 space-y-2">
-            {m.bio_short && <p className="text-sm text-slate-300">{m.bio_short}</p>}
+          <div className="px-4 pb-4 pt-1 border-t border-surface/60 space-y-2">
+            {m.bio_short && <p className="text-sm text-ink-soft">{m.bio_short}</p>}
             <div className="flex items-center gap-3">
               <button
                 onClick={() => setEditing(true)}
-                className="text-xs text-slate-500 hover:text-emerald-400"
+                className="text-xs text-faint hover:text-emerald-400"
               >Edit</button>
               <button
                 onClick={async () => {
@@ -1078,7 +1078,7 @@ function TeamRow({ m, email, onChanged }: { m: TeamMember; email: string; onChan
                   });
                   onChanged();
                 }}
-                className="text-xs text-slate-500 hover:text-rose-400"
+                className="text-xs text-faint hover:text-rose-400"
               >Archive</button>
             </div>
           </div>
@@ -1256,12 +1256,12 @@ function DocumentsSection({ email, items, onChanged }: { email: string; items: B
         />
       ) : (
         <div className="space-y-2">
-          <h2 className="text-sm font-medium text-slate-300 mb-3">Uploaded documents</h2>
+          <h2 className="text-sm font-medium text-ink-soft mb-3">Uploaded documents</h2>
           {items.map((d) => (
-            <div key={d.id} className="flex justify-between items-center border border-slate-800 rounded-lg p-3 bg-slate-900/40">
+            <div key={d.id} className="flex justify-between items-center border border-surface rounded-lg p-3 bg-ground/40">
               <div className="flex-1 min-w-0">
                 <p className="text-white text-sm truncate">{d.original_filename}</p>
-                <p className="text-xs text-slate-400">
+                <p className="text-xs text-muted">
                   {d.doc_type} · {d.page_count ? `${d.page_count} pages · ` : ''}{d.size_bytes ? `${Math.round(d.size_bytes / 1024)} KB · ` : ''}
                   <span className={d.parse_status === 'parsed' ? 'text-emerald-400' : d.parse_status === 'failed' ? 'text-rose-400' : 'text-amber-400'}>
                     {d.parse_status}
@@ -1286,7 +1286,7 @@ function DocumentsSection({ email, items, onChanged }: { email: string; items: B
                   onClick={() => removeDoc(d.id, d.original_filename)}
                   disabled={removingId === d.id}
                   title="Remove this document"
-                  className="text-xs px-2 py-1 rounded text-slate-500 hover:text-rose-400 hover:bg-rose-950/30 disabled:opacity-50"
+                  className="text-xs px-2 py-1 rounded text-faint hover:text-rose-400 hover:bg-rose-950/30 disabled:opacity-50"
                 >
                   {removingId === d.id ? 'Removing…' : 'Remove'}
                 </button>
@@ -1420,15 +1420,15 @@ function ParsedDocReview({
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
       <div
-        className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-xl border border-slate-700 bg-slate-950 shadow-2xl"
+        className="w-full max-w-2xl max-h-[85vh] overflow-y-auto rounded-xl border border-hairline bg-ground-deep shadow-2xl"
         onClick={(e) => e.stopPropagation()}
       >
-        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-slate-800 bg-slate-950 px-5 py-4">
+        <div className="sticky top-0 z-10 flex items-center justify-between border-b border-surface bg-ground-deep px-5 py-4">
           <div>
             <h3 className="text-white font-semibold">Review what Mindy found</h3>
-            <p className="text-xs text-slate-400 truncate max-w-md">From <span className="text-slate-300">{filename}</span> · uncheck anything wrong before saving</p>
+            <p className="text-xs text-muted truncate max-w-md">From <span className="text-ink-soft">{filename}</span> · uncheck anything wrong before saving</p>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white text-xl leading-none">×</button>
+          <button onClick={onClose} className="text-muted hover:text-white text-xl leading-none">×</button>
         </div>
 
         <div className="p-5 space-y-6">
@@ -1440,7 +1440,7 @@ function ParsedDocReview({
                 <div className="flex-1">
                   <p className="text-sm font-medium text-emerald-300 mb-1">Overview → Identity</p>
                   {parsed.overview.one_liner && <p className="text-sm text-white">{parsed.overview.one_liner}</p>}
-                  {parsed.overview.elevator_pitch && <p className="text-xs text-slate-400 mt-1">{parsed.overview.elevator_pitch}</p>}
+                  {parsed.overview.elevator_pitch && <p className="text-xs text-muted mt-1">{parsed.overview.elevator_pitch}</p>}
                 </div>
               </label>
             </section>
@@ -1456,7 +1456,7 @@ function ParsedDocReview({
                   <div className="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-1.5">
                     {identityFields.map(({ key, label }) => (
                       <div key={key} className="min-w-0">
-                        <span className="text-[11px] uppercase tracking-wide text-slate-500">{label}</span>
+                        <span className="text-[11px] uppercase tracking-wide text-faint">{label}</span>
                         <p className="text-sm text-white break-words">{fmtIdentityValue(parsed.identity[key])}</p>
                       </div>
                     ))}
@@ -1472,17 +1472,17 @@ function ParsedDocReview({
               <p className="text-sm font-medium text-emerald-300 mb-2">Past Performance ({ppChecked.filter(Boolean).length}/{parsed.past_performance.length})</p>
               <div className="space-y-2">
                 {parsed.past_performance.map((p, i) => (
-                  <label key={i} className="flex items-start gap-2 cursor-pointer border border-slate-800 rounded-lg p-3 bg-slate-900/40">
+                  <label key={i} className="flex items-start gap-2 cursor-pointer border border-surface rounded-lg p-3 bg-ground/40">
                     <input type="checkbox" checked={ppChecked[i]} onChange={() => toggle(ppChecked, i, setPpChecked)} className="mt-1 accent-emerald-500" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-white">{p.contract_title}</p>
-                      <p className="text-xs text-slate-400">
+                      <p className="text-xs text-muted">
                         {p.agency}
                         {p.contract_number ? ` · ${p.contract_number}` : ''}
                         {p.period ? ` · ${p.period}` : ''}
                         {p.contract_value ? ` · ${p.contract_value}` : ''}
                       </p>
-                      {p.scope_description && <p className="text-xs text-slate-500 mt-1 line-clamp-2">{p.scope_description}</p>}
+                      {p.scope_description && <p className="text-xs text-faint mt-1 line-clamp-2">{p.scope_description}</p>}
                     </div>
                   </label>
                 ))}
@@ -1496,12 +1496,12 @@ function ParsedDocReview({
               <p className="text-sm font-medium text-emerald-300 mb-2">Capabilities ({capChecked.filter(Boolean).length}/{parsed.capabilities.length})</p>
               <div className="space-y-2">
                 {parsed.capabilities.map((c, i) => (
-                  <label key={i} className="flex items-start gap-2 cursor-pointer border border-slate-800 rounded-lg p-3 bg-slate-900/40">
+                  <label key={i} className="flex items-start gap-2 cursor-pointer border border-surface rounded-lg p-3 bg-ground/40">
                     <input type="checkbox" checked={capChecked[i]} onChange={() => toggle(capChecked, i, setCapChecked)} className="mt-1 accent-emerald-500" />
                     <div className="flex-1 min-w-0">
                       <p className="text-sm text-white">{c.capability_name}</p>
-                      {c.description && <p className="text-xs text-slate-400 mt-0.5 line-clamp-2">{c.description}</p>}
-                      {c.keywords.length > 0 && <p className="text-[11px] text-slate-500 mt-1">{c.keywords.join(' · ')}</p>}
+                      {c.description && <p className="text-xs text-muted mt-0.5 line-clamp-2">{c.description}</p>}
+                      {c.keywords.length > 0 && <p className="text-[11px] text-faint mt-1">{c.keywords.join(' · ')}</p>}
                     </div>
                   </label>
                 ))}
@@ -1512,10 +1512,10 @@ function ParsedDocReview({
           {result && <p className="text-sm text-amber-400">{result}</p>}
         </div>
 
-        <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-slate-800 bg-slate-950 px-5 py-4">
-          <p className="text-xs text-slate-500">Mindy only pulls text that&apos;s in your document. Nothing saves until you click below.</p>
+        <div className="sticky bottom-0 flex items-center justify-between gap-3 border-t border-surface bg-ground-deep px-5 py-4">
+          <p className="text-xs text-faint">Mindy only pulls text that&apos;s in your document. Nothing saves until you click below.</p>
           <div className="flex gap-2 shrink-0">
-            <button onClick={onClose} className="text-sm px-3 py-2 text-slate-300 hover:text-white">Cancel</button>
+            <button onClick={onClose} className="text-sm px-3 py-2 text-ink-soft hover:text-white">Cancel</button>
             <button
               onClick={save}
               disabled={saving || selectedCount === 0}
@@ -1543,14 +1543,14 @@ function Field({
 }) {
   return (
     <label className="block">
-      <span className="block text-sm text-slate-300 mb-1">{label}</span>
+      <span className="block text-sm text-ink-soft mb-1">{label}</span>
       {multiline ? (
         <textarea
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
           rows={3}
-          className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded text-white text-sm focus:border-emerald-500 focus:outline-none"
+          className="w-full px-3 py-2 bg-ground border border-hairline rounded text-white text-sm focus:border-emerald-500 focus:outline-none"
         />
       ) : (
         <input
@@ -1558,10 +1558,10 @@ function Field({
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded text-white text-sm focus:border-emerald-500 focus:outline-none"
+          className="w-full px-3 py-2 bg-ground border border-hairline rounded text-white text-sm focus:border-emerald-500 focus:outline-none"
         />
       )}
-      {hint && <span className="block text-xs text-slate-500 mt-1">{hint}</span>}
+      {hint && <span className="block text-xs text-faint mt-1">{hint}</span>}
     </label>
   );
 }
@@ -1573,7 +1573,7 @@ function EmptyState({
     <div className="text-center py-16 max-w-md mx-auto">
       <div className="mb-4 flex justify-center"><Icon className="h-11 w-11 text-faint" strokeWidth={1.5} /></div>
       <h3 className="text-lg font-medium text-white mb-2">{title}</h3>
-      <p className="text-sm text-slate-400 mb-5">{body}</p>
+      <p className="text-sm text-muted mb-5">{body}</p>
       {action && onAction && (
         <button onClick={onAction} className="px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm rounded">
           {action}
@@ -1588,10 +1588,10 @@ function UploadCard({
 }: { title: string; body: string; accept: string; disabled?: boolean; onFile: (f: File) => void }) {
   return (
     <label className={`block border-2 border-dashed rounded-lg p-5 transition cursor-pointer ${
-      disabled ? 'border-slate-800 opacity-50' : 'border-slate-700 hover:border-emerald-700 hover:bg-emerald-950/10'
+      disabled ? 'border-surface opacity-50' : 'border-hairline hover:border-emerald-700 hover:bg-emerald-950/10'
     }`}>
       <h3 className="text-white text-sm font-medium mb-1">{title}</h3>
-      <p className="text-xs text-slate-400 mb-3">{body}</p>
+      <p className="text-xs text-muted mb-3">{body}</p>
       <div className="text-xs text-emerald-400">{disabled ? 'Uploading…' : 'Click to upload'}</div>
       <input
         type="file"
@@ -1756,23 +1756,23 @@ function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: 
 
   return (
     <div className="fixed inset-0 z-50 bg-black/70 backdrop-blur-sm flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-3xl my-8 shadow-2xl shadow-emerald-500/10">
+      <div className="bg-ground border border-hairline rounded-2xl w-full max-w-3xl my-8 shadow-2xl shadow-emerald-500/10">
         {/* Header */}
-        <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
+        <div className="px-6 py-4 border-b border-surface flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Zap className="h-5 w-5 shrink-0" strokeWidth={2} />
             <h2 className="text-white font-semibold">Auto-fill from SAM.gov</h2>
           </div>
-          <button onClick={onClose} className="text-slate-400 hover:text-white text-xl leading-none" aria-label="Close">×</button>
+          <button onClick={onClose} className="text-muted hover:text-white text-xl leading-none" aria-label="Close">×</button>
         </div>
 
         {/* INPUT */}
         {stage === 'input' && (
           <form onSubmit={handleLookup} className="p-6">
-            <p className="text-sm text-slate-300 mb-4">
+            <p className="text-sm text-ink-soft mb-4">
               Enter your <strong>SAM.gov UEI</strong> (12 characters). Mindy will fetch your registration, draft a one-liner, capabilities, and starter past performance entries — grounded in the GovCon Giants curriculum.
             </p>
-            <p className="text-xs text-slate-500 mb-4">
+            <p className="text-xs text-faint mb-4">
               Don&apos;t know your UEI? Look it up at <a href="https://sam.gov/content/entity-information" target="_blank" rel="noreferrer" className="text-emerald-400 hover:text-emerald-300">sam.gov</a>.
             </p>
             <input
@@ -1782,11 +1782,11 @@ function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: 
               placeholder="e.g. W7BEELSVFR91"
               maxLength={12}
               autoFocus
-              className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded text-white text-lg font-mono tracking-wider focus:border-emerald-500 focus:outline-none uppercase mb-3"
+              className="w-full px-4 py-3 bg-surface border border-hairline rounded text-white text-lg font-mono tracking-wider focus:border-emerald-500 focus:outline-none uppercase mb-3"
             />
             {error && <p className="text-sm text-rose-400 mb-3">{error}</p>}
             <div className="flex justify-end gap-2">
-              <button type="button" onClick={onClose} className="px-4 py-2 bg-slate-700 hover:bg-slate-600 text-white text-sm rounded">
+              <button type="button" onClick={onClose} className="px-4 py-2 bg-input hover:bg-slate-600 text-white text-sm rounded">
                 Cancel
               </button>
               <button
@@ -1805,7 +1805,7 @@ function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: 
           <div className="p-12 text-center">
             <div className="inline-block w-10 h-10 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin mb-4" />
             <p className="text-white font-medium mb-1">Looking up {uei}…</p>
-            <p className="text-sm text-slate-400">
+            <p className="text-sm text-muted">
               Fetching SAM.gov registration · checking USASpending · drafting capability profile
             </p>
           </div>
@@ -1819,10 +1819,10 @@ function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: 
               <span className={`px-2 py-1 rounded ${summary?.sam_active ? 'bg-emerald-900/60 text-emerald-300' : 'bg-amber-900/60 text-amber-300'}`}>
                 SAM: {summary?.sam_registration_status || 'unknown'}
               </span>
-              <span className="px-2 py-1 rounded bg-slate-800 text-slate-300">
+              <span className="px-2 py-1 rounded bg-surface text-ink-soft">
                 Capabilities: {summary?.capabilities_drafted || 0}
               </span>
-              <span className="px-2 py-1 rounded bg-slate-800 text-slate-300">
+              <span className="px-2 py-1 rounded bg-surface text-ink-soft">
                 Sample PP: {summary?.sample_pp_drafted || 0}
               </span>
               {(summary?.contracts_found ?? 0) > 0 && (
@@ -1834,7 +1834,7 @@ function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: 
 
             {/* Identity */}
             {preview.identity && (
-              <section className="border border-slate-800 rounded-lg p-4 bg-slate-950/50">
+              <section className="border border-surface rounded-lg p-4 bg-ground-deep/50">
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input
                     type="checkbox"
@@ -1844,27 +1844,27 @@ function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: 
                   />
                   <div className="flex-1 min-w-0">
                     <h3 className="inline-flex items-center gap-1.5 text-white font-medium mb-2"><IdCard className="h-4 w-4 shrink-0" strokeWidth={2} /> Identity</h3>
-                    <div className="text-sm text-slate-300 space-y-1">
-                      <div><span className="text-slate-500">Legal:</span> {preview.identity.legal_name || '—'}</div>
+                    <div className="text-sm text-ink-soft space-y-1">
+                      <div><span className="text-faint">Legal:</span> {preview.identity.legal_name || '—'}</div>
                       <div className="flex gap-4 flex-wrap">
-                        <span><span className="text-slate-500">UEI:</span> <span className="font-mono">{preview.identity.uei || '—'}</span></span>
-                        <span><span className="text-slate-500">CAGE:</span> <span className="font-mono">{preview.identity.cage_code || '—'}</span></span>
-                        <span><span className="text-slate-500">HQ:</span> {[preview.identity.hq_city, preview.identity.hq_state].filter(Boolean).join(', ') || '—'}</span>
+                        <span><span className="text-faint">UEI:</span> <span className="font-mono">{preview.identity.uei || '—'}</span></span>
+                        <span><span className="text-faint">CAGE:</span> <span className="font-mono">{preview.identity.cage_code || '—'}</span></span>
+                        <span><span className="text-faint">HQ:</span> {[preview.identity.hq_city, preview.identity.hq_state].filter(Boolean).join(', ') || '—'}</span>
                       </div>
                       {(preview.identity.certifications || []).length > 0 && (
-                        <div><span className="text-slate-500">Certifications:</span> {preview.identity.certifications!.join(', ')}</div>
+                        <div><span className="text-faint">Certifications:</span> {preview.identity.certifications!.join(', ')}</div>
                       )}
                       {(preview.identity.primary_naics || []).length > 0 && (
                         <div className="space-y-1">
-                          <span className="text-slate-500">NAICS:</span>
+                          <span className="text-faint">NAICS:</span>
                           <NaicsBadgeList codes={preview.identity.primary_naics!} max={8} inline inlineTruncate={40} size="sm" />
                         </div>
                       )}
                       {preview.identity.one_liner && (
-                        <div className="pt-2 border-t border-slate-800 mt-2"><span className="text-slate-500">One-liner:</span> <em className="text-emerald-300">&ldquo;{preview.identity.one_liner}&rdquo;</em></div>
+                        <div className="pt-2 border-t border-surface mt-2"><span className="text-faint">One-liner:</span> <em className="text-emerald-300">&ldquo;{preview.identity.one_liner}&rdquo;</em></div>
                       )}
                       {preview.identity.elevator_pitch && (
-                        <div><span className="text-slate-500">Elevator pitch:</span> <span className="text-slate-300">{preview.identity.elevator_pitch}</span></div>
+                        <div><span className="text-faint">Elevator pitch:</span> <span className="text-ink-soft">{preview.identity.elevator_pitch}</span></div>
                       )}
                     </div>
                   </div>
@@ -1874,7 +1874,7 @@ function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: 
 
             {/* Capabilities */}
             {(preview.capabilities || []).length > 0 && (
-              <section className="border border-slate-800 rounded-lg p-4 bg-slate-950/50">
+              <section className="border border-surface rounded-lg p-4 bg-ground-deep/50">
                 <label className="flex items-start gap-3 cursor-pointer">
                   <input
                     type="checkbox"
@@ -1888,7 +1888,7 @@ function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: 
                       {preview.capabilities!.map((c, i) => (
                         <div key={i} className="text-sm">
                           <span className="text-white font-medium">{c.capability_name}</span>
-                          <span className="text-slate-400"> — {c.description}</span>
+                          <span className="text-muted"> — {c.description}</span>
                         </div>
                       ))}
                     </div>
@@ -1912,13 +1912,13 @@ function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: 
                     <p className="text-xs text-purple-300/80 mb-2">Real contracts on file for your UEI.</p>
                     <div className="space-y-1.5 text-sm">
                       {preview.past_performance!.slice(0, 8).map((p, i) => (
-                        <div key={i} className="text-slate-300">
+                        <div key={i} className="text-ink-soft">
                           <span className="text-white">{p.contract_title.slice(0, 80)}</span>
-                          <span className="text-slate-500"> · {p.agency} · ${(p.contract_value || 0).toLocaleString()}</span>
+                          <span className="text-faint"> · {p.agency} · ${(p.contract_value || 0).toLocaleString()}</span>
                         </div>
                       ))}
                       {preview.past_performance!.length > 8 && (
-                        <div className="text-xs text-slate-500">+ {preview.past_performance!.length - 8} more</div>
+                        <div className="text-xs text-faint">+ {preview.past_performance!.length - 8} more</div>
                       )}
                     </div>
                   </div>
@@ -1945,8 +1945,8 @@ function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: 
                       {preview.sample_past_performance!.map((p, i) => (
                         <div key={i} className="text-sm border-l-2 border-amber-800/60 pl-3">
                           <div className="text-white">{p.contract_title}</div>
-                          <div className="text-slate-400 text-xs">{p.agency} · {p.contract_value}</div>
-                          <div className="text-slate-300 text-xs mt-1">{p.scope_description}</div>
+                          <div className="text-muted text-xs">{p.agency} · {p.contract_value}</div>
+                          <div className="text-ink-soft text-xs mt-1">{p.scope_description}</div>
                           {p.coaching_note && (
                             <div className="inline-flex items-start gap-1 text-amber-300/70 text-xs mt-1 italic"><PenLine className="h-3 w-3 shrink-0 mt-0.5" strokeWidth={2} /> {p.coaching_note}</div>
                           )}
@@ -1977,14 +1977,14 @@ function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: 
             <div className="rounded-xl border border-purple-500/40 bg-gradient-to-br from-blue-950/40 to-purple-950/40 p-5 mb-5">
               <span className="text-xs font-bold uppercase tracking-wider text-purple-300">One more thing</span>
               <h3 className="text-lg font-bold text-white mt-1 mb-2">We found the words buyers use for your work</h3>
-              <p className="text-sm text-slate-300">
+              <p className="text-sm text-ink-soft">
                 Your NAICS codes say <strong>who you are</strong>. These keywords say
                 <strong> what you sell</strong> — and they catch opportunities your codes
                 alone would miss, because the title rarely matches the work.
               </p>
             </div>
 
-            <p className="text-xs uppercase tracking-wider text-slate-500 mb-2">Added to your alerts</p>
+            <p className="text-xs uppercase tracking-wider text-faint mb-2">Added to your alerts</p>
             <div className="flex flex-wrap gap-2 mb-5">
               {derivedKeywords.map((kw) => (
                 <span key={kw} className="rounded-full border border-purple-400/30 bg-purple-500/10 px-3 py-1.5 text-sm text-purple-100">
@@ -1993,10 +1993,10 @@ function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: 
               ))}
             </div>
 
-            <p className="text-sm text-slate-400 mb-5">
+            <p className="text-sm text-muted mb-5">
               Mindy will now match opportunities on these words too — including ones buried
               in the body of a solicitation that a keyword like your NAICS would never surface.
-              You can fine-tune them anytime in <strong className="text-slate-300">Settings → Keywords</strong>.
+              You can fine-tune them anytime in <strong className="text-ink-soft">Settings → Keywords</strong>.
             </p>
 
             <button
@@ -2010,8 +2010,8 @@ function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: 
 
         {/* Footer */}
         {stage === 'preview' && (
-          <div className="px-6 py-4 border-t border-slate-800 flex justify-between items-center bg-slate-950/50 rounded-b-2xl">
-            <button onClick={onClose} className="text-sm text-slate-400 hover:text-white">
+          <div className="px-6 py-4 border-t border-surface flex justify-between items-center bg-ground-deep/50 rounded-b-2xl">
+            <button onClick={onClose} className="text-sm text-muted hover:text-white">
               Cancel
             </button>
             <button

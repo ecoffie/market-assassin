@@ -1811,7 +1811,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
             </span>
           )}
           {/* Auto / Sport mode toggle — Mindy colors (purple/emerald). */}
-          <div className="inline-flex rounded-lg bg-slate-800/60 p-0.5 text-xs">
+          <div className="inline-flex rounded-lg bg-surface/60 p-0.5 text-xs">
             <button
               type="button"
               onClick={() => {
@@ -1820,7 +1820,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                 // Restore the saved profile into the inputs.
                 if (savedProfile) applySavedProfile(savedProfile);
               }}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-colors ${researchMode === 'auto' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-colors ${researchMode === 'auto' ? 'bg-emerald-600 text-white' : 'text-muted hover:text-white'}`}
               title="Use your saved profile"
             >
               <Zap className="w-3.5 h-3.5" strokeWidth={2} /> Auto
@@ -1843,7 +1843,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                 setSportKeyword('');
                 setSportSuggestions(null);
               }}
-              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-colors ${researchMode === 'sport' ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md font-medium transition-colors ${researchMode === 'sport' ? 'bg-purple-600 text-white' : 'text-muted hover:text-white'}`}
               title="Research any industry — manual inputs, doesn't change your saved settings"
             >
               <Gauge className="w-3.5 h-3.5" strokeWidth={2} /> Sport
@@ -1862,7 +1862,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                   className={`rounded px-2 py-1 text-xs transition-colors ${
                     activeFocusId === focus.id
                       ? 'bg-emerald-500/20 text-emerald-300'
-                      : 'bg-slate-800 text-slate-400 hover:text-slate-200'
+                      : 'bg-surface text-muted hover:text-slate-200'
                   }`}
                 >
                   {focus.name}
@@ -1874,14 +1874,14 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               (legacy raw data). Only meaningful once reports have
               been generated. */}
           {reportData && (
-            <div className="inline-flex rounded-lg bg-slate-800/60 p-0.5 mr-2 text-xs">
+            <div className="inline-flex rounded-lg bg-surface/60 p-0.5 mr-2 text-xs">
               <button
                 type="button"
                 onClick={() => setViewMode('map')}
                 className={`px-3 py-1.5 rounded-md transition-colors ${
                   viewMode === 'map'
                     ? 'bg-emerald-600 text-white'
-                    : 'text-slate-400 hover:text-slate-200'
+                    : 'text-muted hover:text-slate-200'
                 }`}
               >
                 Market Map
@@ -1891,8 +1891,8 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                 onClick={() => setViewMode('reports')}
                 className={`px-3 py-1.5 rounded-md transition-colors ${
                   viewMode === 'reports'
-                    ? 'bg-slate-700 text-white'
-                    : 'text-slate-400 hover:text-slate-200'
+                    ? 'bg-input text-white'
+                    : 'text-muted hover:text-slate-200'
                 }`}
               >
                 Reports →
@@ -1905,7 +1905,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               else { handleGenerateAll(undefined, { notifySuccess: true }); loadRecommendedOpportunities(); }
             }}
             disabled={isGenerating || profileLoading || sportSuggesting}
-            className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-700"
+            className="rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-input"
           >
             {isGenerating || sportSuggesting ? 'Building...' : reportData ? 'Refresh' : 'Build Market Map'}
           </button>
@@ -1919,22 +1919,22 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           <div className="flex items-center justify-between mb-3">
             <div>
               <h3 className="text-sm font-semibold text-white flex items-center gap-1.5"><Gauge className="w-4 h-4" strokeWidth={2} /> Research any industry</h3>
-              <p className="text-xs text-slate-400 mt-0.5">Explore a new lane, cross industries, or run a report for someone else. This won&apos;t change your saved profile.</p>
+              <p className="text-xs text-muted mt-0.5">Explore a new lane, cross industries, or run a report for someone else. This won&apos;t change your saved profile.</p>
             </div>
           </div>
 
           {/* Keyword → code lookup (Eric: "if I want medical supplies, which
               codes?"). Type plain English, get NAICS/PSC to click into the
               fields. No need to memorize codes. */}
-          <div className="mb-3 rounded-lg border border-slate-700/60 bg-slate-950/40 p-3">
-            <label className="text-xs text-slate-300 font-medium">Not sure of the codes? Describe what you want to research</label>
+          <div className="mb-3 rounded-lg border border-hairline/60 bg-ground-deep/40 p-3">
+            <label className="text-xs text-ink-soft font-medium">Not sure of the codes? Describe what you want to research</label>
             <div className="flex gap-2 mt-1.5">
               <input
                 value={sportKeyword}
                 onChange={(e) => setSportKeyword(e.target.value)}
                 onKeyDown={(e) => { if (e.key === 'Enter') suggestSportCodes(); }}
                 placeholder="e.g. medical supplies, drone services, IT cybersecurity, janitorial…"
-                className="flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm outline-none focus:border-purple-500"
+                className="flex-1 px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm outline-none focus:border-purple-500"
               />
               <button
                 type="button"
@@ -1956,7 +1956,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               <div className="mt-2.5 space-y-2">
                 {sportSuggestions.naics.length > 0 && (
                   <div>
-                    <span className="text-[11px] text-slate-500 uppercase tracking-wider">NAICS — click to add</span>
+                    <span className="text-[11px] text-faint uppercase tracking-wider">NAICS — click to add</span>
                     <div className="flex flex-wrap gap-1.5 mt-1">
                       {sportSuggestions.naics.map(s => (
                         <button key={s.code} type="button"
@@ -1971,7 +1971,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                 )}
                 {sportSuggestions.psc.length > 0 && (
                   <div>
-                    <span className="text-[11px] text-slate-500 uppercase tracking-wider">PSC — click to add</span>
+                    <span className="text-[11px] text-faint uppercase tracking-wider">PSC — click to add</span>
                     <div className="flex flex-wrap gap-1.5 mt-1">
                       {sportSuggestions.psc.map(s => (
                         <button key={s.code} type="button"
@@ -1992,7 +1992,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                   const pscToApply = sportSuggestions.psc.slice(0, 2);
                   return (
                     <div className="mt-1 rounded-lg border border-emerald-600/30 bg-emerald-500/[0.06] p-2.5">
-                      <div className="text-[11px] text-slate-400 mb-1.5">These codes will be applied — verify they fit:</div>
+                      <div className="text-[11px] text-muted mb-1.5">These codes will be applied — verify they fit:</div>
                       <div className="flex flex-wrap gap-1 mb-2">
                         {naicsToApply.map(s => (
                           <span key={s.code} className="rounded bg-emerald-500/15 px-1.5 py-0.5 text-[10px] text-emerald-300" title={s.name}>
@@ -2052,30 +2052,30 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           ) : null}
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
-            <label className="text-xs text-slate-400">
+            <label className="text-xs text-muted">
               NAICS code(s)
               <input
                 value={formData.naicsCode}
                 onChange={(e) => setFormData({ ...formData, naicsCode: e.target.value })}
                 placeholder="e.g. 236220, 541512"
-                className="mt-1 w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm outline-none focus:border-purple-500"
+                className="mt-1 w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm outline-none focus:border-purple-500"
               />
             </label>
-            <label className="text-xs text-slate-400">
+            <label className="text-xs text-muted">
               PSC code (optional)
               <input
                 value={formData.pscCode}
                 onChange={(e) => setFormData({ ...formData, pscCode: e.target.value })}
                 placeholder="e.g. D310, 7030"
-                className="mt-1 w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm outline-none focus:border-purple-500"
+                className="mt-1 w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm outline-none focus:border-purple-500"
               />
             </label>
-            <label className="text-xs text-slate-400">
+            <label className="text-xs text-muted">
               Set-aside / business type
               <select
                 value={formData.businessType}
                 onChange={(e) => setFormData({ ...formData, businessType: e.target.value as BusinessType })}
-                className="mt-1 w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm outline-none focus:border-purple-500"
+                className="mt-1 w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm outline-none focus:border-purple-500"
               >
                 <option value="Small Business">Small Business (default)</option>
                 <option value="">Any business type</option>
@@ -2086,29 +2086,29 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                 <option value="Full and Open">Full & Open</option>
               </select>
             </label>
-            <label className="text-xs text-slate-400">
+            <label className="text-xs text-muted">
               Zip (optional)
               <input
                 value={formData.zipCode}
                 onChange={(e) => setFormData({ ...formData, zipCode: e.target.value })}
                 placeholder="e.g. 20001"
-                className="mt-1 w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm outline-none focus:border-purple-500"
+                className="mt-1 w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm outline-none focus:border-purple-500"
               />
             </label>
           </div>
-          <p className="text-[11px] text-slate-500 mt-2">Enter a NAICS/PSC, or just type what you research above and hit <span className="text-purple-300">Build Market Map</span> — Mindy finds the codes for you.</p>
+          <p className="text-[11px] text-faint mt-2">Enter a NAICS/PSC, or just type what you research above and hit <span className="text-purple-300">Build Market Map</span> — Mindy finds the codes for you.</p>
         </div>
       )}
 
       {/* Filter context strip — mirrors Source Feed so free users see their
           scope. Hidden in Sport mode (Eric: fully on-demand, no saved profile). */}
       {researchMode === 'sport' ? null : profileLoading ? (
-        <div className="rounded-lg border border-slate-800 bg-slate-900/60 px-4 py-2 text-xs text-slate-500">
+        <div className="rounded-lg border border-surface bg-ground/60 px-4 py-2 text-xs text-faint">
           Loading profile...
         </div>
       ) : savedProfile ? (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-slate-800 bg-slate-900/60 px-4 py-2 text-xs text-slate-400">
-          <span className="font-semibold text-slate-300">Filters:</span>
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-1 rounded-lg border border-surface bg-ground/60 px-4 py-2 text-xs text-muted">
+          <span className="font-semibold text-ink-soft">Filters:</span>
           {savedProfile.naicsCodes.length > 0 && (
             <span>
               NAICS {savedProfile.naicsCodes.slice(0, 3).join(', ')}
@@ -2128,12 +2128,12 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                 : `${savedProfile.locationStates.slice(0, 3).join(', ')} +${savedProfile.locationStates.length - 3}`}
             </span>
           ) : (
-            <span className="text-slate-500">• States: all (national)</span>
+            <span className="text-faint">• States: all (national)</span>
           )}
           <button
             type="button"
             onClick={() => setShowAdvancedProfile((v) => !v)}
-            className="ml-auto inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300"
+            className="ml-auto inline-flex items-center gap-1 text-xs text-faint hover:text-ink-soft"
           >
             {showAdvancedProfile ? <><X className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} /> Close</> : 'Edit'}
           </button>
@@ -2169,14 +2169,14 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
 
       {/* Collapsible Profile Editor */}
       {showAdvancedProfile && (
-        <section className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+        <section className="rounded-xl border border-surface bg-ground p-4">
           <div className="flex items-center justify-between mb-4">
             <h3 className="font-medium text-white">Explore a Different Market</h3>
             <button
               type="button"
               onClick={() => setShowAdvancedProfile(false)}
               aria-label="Close"
-              className="inline-flex items-center text-muted hover:text-slate-300"
+              className="inline-flex items-center text-muted hover:text-ink-soft"
             >
               <X className="h-4 w-4" strokeWidth={2} />
             </button>
@@ -2184,11 +2184,11 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
 
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
             <label className="block">
-              <span className="text-sm text-slate-400">Business type</span>
+              <span className="text-sm text-muted">Business type</span>
               <select
                 value={formData.businessType}
                 onChange={(e) => setFormData({ ...formData, businessType: e.target.value as BusinessType })}
-                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white outline-none focus:border-emerald-500"
+                className="mt-1 w-full rounded-lg border border-hairline bg-surface px-3 py-2 text-white outline-none focus:border-emerald-500"
               >
                 <option value="">Use saved/default</option>
                 {BUSINESS_TYPES.map((type) => (
@@ -2197,35 +2197,35 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               </select>
             </label>
             <label className="block">
-              <span className="text-sm text-slate-400">NAICS codes</span>
+              <span className="text-sm text-muted">NAICS codes</span>
               <NaicsAutocompleteInput
                 value={formData.naicsCode}
                 onChange={(v) => setFormData({ ...formData, naicsCode: v })}
                 placeholder="236, 541512"
-                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white placeholder-slate-500 outline-none focus:border-emerald-500"
+                className="mt-1 w-full rounded-lg border border-hairline bg-surface px-3 py-2 text-white placeholder-faint outline-none focus:border-emerald-500"
               />
             </label>
             <label className="block">
-              <span className="text-sm text-slate-400">
+              <span className="text-sm text-muted">
                 PSC codes
-                <span className="ml-1 text-[11px] text-slate-500">(more precise)</span>
+                <span className="ml-1 text-[11px] text-faint">(more precise)</span>
               </span>
               <input
                 type="text"
                 value={formData.pscCode}
                 onChange={(e) => setFormData({ ...formData, pscCode: e.target.value })}
                 placeholder="D316, R425"
-                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white placeholder-slate-500 outline-none focus:border-emerald-500"
+                className="mt-1 w-full rounded-lg border border-hairline bg-surface px-3 py-2 text-white placeholder-faint outline-none focus:border-emerald-500"
               />
             </label>
             <label className="block">
-              <span className="text-sm text-slate-400">Target agency</span>
+              <span className="text-sm text-muted">Target agency</span>
               <input
                 type="text"
                 value={selectedAgency}
                 onChange={(e) => setSelectedAgency(e.target.value)}
                 placeholder="VA, GSA, DOD"
-                className="mt-1 w-full rounded-lg border border-slate-700 bg-slate-800 px-3 py-2 text-white placeholder-slate-500 outline-none focus:border-emerald-500"
+                className="mt-1 w-full rounded-lg border border-hairline bg-surface px-3 py-2 text-white placeholder-faint outline-none focus:border-emerald-500"
               />
             </label>
           </div>
@@ -2238,7 +2238,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                   applySavedProfile(savedProfile);
                   setShowAdvancedProfile(false);
                 }}
-                className="rounded-lg border border-slate-700 px-4 py-2 text-sm text-slate-300 hover:bg-slate-800"
+                className="rounded-lg border border-hairline px-4 py-2 text-sm text-ink-soft hover:bg-surface"
               >
                 Reset to profile
               </button>
@@ -2250,26 +2250,26 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                 setShowAdvancedProfile(false);
               }}
               disabled={isGenerating}
-              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:bg-slate-700"
+              className="rounded-lg bg-emerald-600 px-4 py-2 text-sm font-medium text-white hover:bg-emerald-500 disabled:bg-input"
             >
               Apply & Refresh
             </button>
             {tier !== 'free' && (
               <>
-                <div className="h-5 w-px bg-slate-700" />
+                <div className="h-5 w-px bg-input" />
                 {showSaveFocus ? (
                   <div className="flex items-center gap-2">
                     <input
                       value={newFocusName}
                       onChange={(event) => setNewFocusName(event.target.value)}
                       placeholder="Name this focus..."
-                      className="w-40 rounded border border-slate-700 bg-slate-800 px-2 py-1.5 text-sm text-white placeholder-slate-500 outline-none focus:border-emerald-500"
+                      className="w-40 rounded border border-hairline bg-surface px-2 py-1.5 text-sm text-white placeholder-faint outline-none focus:border-emerald-500"
                     />
                     <button
                       type="button"
                       onClick={handleSaveMarketFocus}
                       disabled={focusSaving}
-                      className="rounded bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-500 disabled:bg-slate-700"
+                      className="rounded bg-emerald-600 px-3 py-1.5 text-sm text-white hover:bg-emerald-500 disabled:bg-input"
                     >
                       {focusSaving ? '...' : 'Save'}
                     </button>
@@ -2277,7 +2277,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                       type="button"
                       onClick={() => setShowSaveFocus(false)}
                       aria-label="Close"
-                      className="inline-flex items-center text-muted hover:text-slate-300"
+                      className="inline-flex items-center text-muted hover:text-ink-soft"
                     >
                       <X className="h-4 w-4" strokeWidth={2} />
                     </button>
@@ -2442,7 +2442,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
             topPrimes={reportData?.primeContractor?.suggestedPrimes || []}
           />
 
-          <p className="text-xs text-slate-500 text-center">
+          <p className="text-xs text-faint text-center">
             Want the raw report data? <button onClick={() => setViewMode('reports')} className="text-emerald-400 hover:text-emerald-300 underline">View Reports →</button>
           </p>
         </div>
@@ -2492,7 +2492,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               See tasks/target-accounts-crm-roadmap.md for the v2
               vision (TAL builder) this carves space for. */}
 
-          <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+          <section className="rounded-xl border border-surface bg-ground p-5">
             <h2 className="mb-4 text-xl font-semibold text-white">Choose What You Need</h2>
             <div className="grid gap-3 md:grid-cols-5">
               {RESEARCH_LENSES.map((lens) => (
@@ -2503,11 +2503,11 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                   className={`rounded-lg border p-4 text-left transition-colors ${
                     activeLens === lens.id
                       ? 'border-emerald-500 bg-emerald-500/10'
-                      : 'border-slate-800 bg-slate-950/40 hover:border-slate-700'
+                      : 'border-surface bg-ground-deep/40 hover:border-hairline'
                   }`}
                 >
                   <div className="font-medium text-white">{lens.label}</div>
-                  <div className="mt-1 text-sm text-slate-500">{lens.description}</div>
+                  <div className="mt-1 text-sm text-faint">{lens.description}</div>
                 </button>
               ))}
             </div>
@@ -2518,13 +2518,13 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                   key={report.id}
                   type="button"
                   onClick={() => handleReportClick(report)}
-                  className="rounded-lg border border-slate-800 bg-slate-950/50 p-4 text-left hover:border-emerald-500/50"
+                  className="rounded-lg border border-surface bg-ground-deep/50 p-4 text-left hover:border-emerald-500/50"
                 >
                   <div className="flex items-center gap-3">
                     <report.icon className="h-6 w-6 shrink-0 text-emerald-400" strokeWidth={1.75} />
                     <div>
                       <div className="font-medium text-white">{report.title}</div>
-                      <div className="text-sm text-slate-500">{report.description}</div>
+                      <div className="text-sm text-faint">{report.description}</div>
                     </div>
                   </div>
                 </button>
@@ -2540,16 +2540,16 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       )}
 
       {!reportData && !isGenerating && (
-        <section className="rounded-xl border border-slate-800 bg-slate-900 p-8 text-center">
+        <section className="rounded-xl border border-surface bg-ground p-8 text-center">
           <h2 className="text-xl font-semibold text-white">Your market map is ready to build</h2>
-          <p className="mx-auto mt-2 max-w-xl text-slate-400">
+          <p className="mx-auto mt-2 max-w-xl text-muted">
             Mindy will use your saved profile to find target agencies, buyers, budgets, competition, vehicles, and partner signals.
           </p>
           <button
             type="button"
             onClick={() => researchMode === 'sport' ? handleSportBuild({ notifySuccess: true }) : handleGenerateAll(undefined, { notifySuccess: true })}
             disabled={sportSuggesting}
-            className="mt-5 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:bg-slate-700"
+            className="mt-5 rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500 disabled:bg-input"
           >
             {sportSuggesting ? 'Looking up codes…' : 'Build My Market Map'}
           </button>
@@ -2592,7 +2592,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       {tier === 'free' && (
         <div className="bg-gradient-to-r from-purple-900/30 to-slate-900 border border-purple-500/30 rounded-xl p-6 text-center">
           <h3 className="font-semibold text-white mb-2">Unlock deeper market research</h3>
-          <p className="text-slate-400 text-sm mb-4">
+          <p className="text-muted text-sm mb-4">
             Upgrade to see pain points, prime targets, teaming partners, and forecast detail.
           </p>
           <a
@@ -2628,7 +2628,7 @@ function RecommendedOpportunityCard({
   const mindyScore = opportunity.recommendationScore ?? opportunity.feedbackScoreAdjustment ?? 0;
 
   return (
-    <article className="flex min-h-[260px] flex-col rounded-lg border border-slate-800 bg-slate-950/60 p-4">
+    <article className="flex min-h-[260px] flex-col rounded-lg border border-surface bg-ground-deep/60 p-4">
       <div className="mb-3 flex items-start justify-between gap-3">
         <span className={`rounded px-2 py-1 text-xs font-medium ${
           opportunity.isUrgent ? 'bg-red-500/15 text-red-200' : 'bg-emerald-500/15 text-emerald-200'
@@ -2645,12 +2645,12 @@ function RecommendedOpportunityCard({
       <button type="button" onClick={() => onOpen(opportunity)} className="text-left">
         <h3 className="line-clamp-3 text-base font-semibold text-white hover:text-emerald-200">{opportunity.title}</h3>
       </button>
-      <p className="mt-2 line-clamp-2 text-sm text-slate-400">{agency}</p>
+      <p className="mt-2 line-clamp-2 text-sm text-muted">{agency}</p>
 
-      <div className="mt-3 flex flex-wrap gap-2 text-xs text-slate-500">
-        {opportunity.naicsCode && <span className="rounded bg-slate-900 px-2 py-1">NAICS {opportunity.naicsCode}</span>}
-        {opportunity.noticeType && <span className="rounded bg-slate-900 px-2 py-1">{opportunity.noticeType}</span>}
-        <span className="rounded bg-slate-900 px-2 py-1">Due {deadline}</span>
+      <div className="mt-3 flex flex-wrap gap-2 text-xs text-faint">
+        {opportunity.naicsCode && <span className="rounded bg-ground px-2 py-1">NAICS {opportunity.naicsCode}</span>}
+        {opportunity.noticeType && <span className="rounded bg-ground px-2 py-1">{opportunity.noticeType}</span>}
+        <span className="rounded bg-ground px-2 py-1">Due {deadline}</span>
       </div>
 
       {reasons.length > 0 && (
@@ -2674,7 +2674,7 @@ function RecommendedOpportunityCard({
             className={`rounded border px-3 py-1.5 text-xs ${
               selectedFeedback === 'want_more_like_this'
                 ? 'border-emerald-400 bg-emerald-500/20 text-emerald-100'
-                : 'border-slate-700 text-slate-300 hover:border-emerald-500/60'
+                : 'border-hairline text-ink-soft hover:border-emerald-500/60'
             }`}
           >
             More like this
@@ -2686,7 +2686,7 @@ function RecommendedOpportunityCard({
             className={`rounded border px-3 py-1.5 text-xs ${
               selectedFeedback === 'bad_match'
                 ? 'border-red-400 bg-red-500/20 text-red-100'
-                : 'border-slate-700 text-slate-300 hover:border-red-500/60'
+                : 'border-hairline text-ink-soft hover:border-red-500/60'
             }`}
           >
             Bad match
@@ -2696,7 +2696,7 @@ function RecommendedOpportunityCard({
           <button
             type="button"
             onClick={() => onOpen(opportunity)}
-            className="flex-1 rounded bg-slate-800 px-3 py-2 text-center text-sm font-medium text-slate-100 hover:bg-slate-700"
+            className="flex-1 rounded bg-surface px-3 py-2 text-center text-sm font-medium text-slate-100 hover:bg-input"
           >
             Details
           </button>
@@ -2743,9 +2743,9 @@ function RecommendedOpportunityDrawer({
   ].filter((link): link is { label: string; href: string } => Boolean(link && isHttpUrl(link.href)));
 
   return (
-    <div className="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-sm">
-      <aside className="ml-auto flex h-full w-full max-w-xl flex-col border-l border-slate-800 bg-slate-950 shadow-2xl">
-        <div className="border-b border-slate-800 p-5">
+    <div className="fixed inset-0 z-50 bg-ground-deep/80 backdrop-blur-sm">
+      <aside className="ml-auto flex h-full w-full max-w-xl flex-col border-l border-surface bg-ground-deep shadow-2xl">
+        <div className="border-b border-surface p-5">
           <div className="flex items-start justify-between gap-4">
             <div>
               <div className="text-xs uppercase tracking-wider text-purple-300">Recommended opportunity</div>
@@ -2754,7 +2754,7 @@ function RecommendedOpportunityDrawer({
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-slate-800 px-3 py-2 text-slate-300 hover:bg-slate-900"
+              className="rounded-lg border border-surface px-3 py-2 text-ink-soft hover:bg-ground"
             >
               Close
             </button>
@@ -2786,14 +2786,14 @@ function RecommendedOpportunityDrawer({
           )}
 
           {summary && (
-            <section className="rounded-lg border border-slate-800 bg-slate-900 p-4">
+            <section className="rounded-lg border border-surface bg-ground p-4">
               <h3 className="text-sm font-semibold text-white">Summary</h3>
-              <p className="mt-2 whitespace-pre-line text-sm leading-6 text-slate-300">{summary}</p>
+              <p className="mt-2 whitespace-pre-line text-sm leading-6 text-ink-soft">{summary}</p>
             </section>
           )}
 
           {sourceLinks.length > 0 && (
-            <section className="rounded-lg border border-slate-800 bg-slate-900 p-4">
+            <section className="rounded-lg border border-surface bg-ground p-4">
               <h3 className="text-sm font-semibold text-white">Links</h3>
               <div className="mt-3 flex flex-wrap gap-2">
                 {sourceLinks.map((link) => (
@@ -2812,9 +2812,9 @@ function RecommendedOpportunityDrawer({
           )}
 
           {opportunity.setAsideDescription && (
-            <section className="rounded-lg border border-slate-800 bg-slate-900 p-4">
+            <section className="rounded-lg border border-surface bg-ground p-4">
               <h3 className="text-sm font-semibold text-white">Set-aside</h3>
-              <p className="mt-2 text-sm text-slate-300">{opportunity.setAsideDescription}</p>
+              <p className="mt-2 text-sm text-ink-soft">{opportunity.setAsideDescription}</p>
               {opportunity.setAsideEligible === false && opportunity.setAsideMismatchReason && (
                 <p className="mt-3 rounded border border-amber-500/20 bg-amber-500/10 px-3 py-2 text-xs text-amber-100">
                   Mindy down-ranked this because it {opportunity.setAsideMismatchReason}.
@@ -2823,7 +2823,7 @@ function RecommendedOpportunityDrawer({
             </section>
           )}
 
-          <section className="rounded-lg border border-slate-800 bg-slate-900 p-4">
+          <section className="rounded-lg border border-surface bg-ground p-4">
             <h3 className="text-sm font-semibold text-white">Tune Mindy</h3>
             <div className="mt-3 flex flex-wrap gap-2">
               {[
@@ -2842,7 +2842,7 @@ function RecommendedOpportunityDrawer({
                   className={`rounded-full border px-3 py-1.5 text-xs ${
                     selectedFeedback === type
                       ? 'border-emerald-400 bg-emerald-500/20 text-emerald-100'
-                      : 'border-slate-700 text-slate-300 hover:border-emerald-500/60'
+                      : 'border-hairline text-ink-soft hover:border-emerald-500/60'
                   }`}
                 >
                   {label}
@@ -2852,7 +2852,7 @@ function RecommendedOpportunityDrawer({
           </section>
         </div>
 
-        <div className="border-t border-slate-800 p-5">
+        <div className="border-t border-surface p-5">
           {opportunity.url && (
             <a
               href={opportunity.url}
@@ -2871,8 +2871,8 @@ function RecommendedOpportunityDrawer({
 
 function DetailTile({ label, value }: { label: string; value: string }) {
   return (
-    <div className="rounded-lg border border-slate-800 bg-slate-900 p-3">
-      <div className="text-xs uppercase tracking-wider text-slate-500">{label}</div>
+    <div className="rounded-lg border border-surface bg-ground p-3">
+      <div className="text-xs uppercase tracking-wider text-faint">{label}</div>
       <div className="mt-1 text-sm font-medium text-slate-100">{value}</div>
     </div>
   );
@@ -2883,7 +2883,7 @@ function MetricCard({ label, value, tone = 'default', hint, onClick }: { label: 
   const clickable = !!onClick;
   return (
     <div
-      className={`rounded-xl border border-slate-800 bg-slate-900 p-5 ${clickable ? 'cursor-pointer transition-colors hover:border-emerald-500/50 hover:bg-slate-800/60' : ''}`}
+      className={`rounded-xl border border-surface bg-ground p-5 ${clickable ? 'cursor-pointer transition-colors hover:border-emerald-500/50 hover:bg-surface/60' : ''}`}
       title={hint || undefined}
       onClick={onClick}
       role={clickable ? 'button' : undefined}
@@ -2891,7 +2891,7 @@ function MetricCard({ label, value, tone = 'default', hint, onClick }: { label: 
       onKeyDown={clickable ? (e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); onClick!(); } } : undefined}
     >
       <div className={`text-2xl font-bold ${color}`}>{value}</div>
-      <div className="mt-1 flex items-center gap-1 text-sm text-slate-500">
+      <div className="mt-1 flex items-center gap-1 text-sm text-faint">
         {label}
         {clickable && <span className="text-emerald-400" aria-hidden="true">→</span>}
       </div>
@@ -2931,13 +2931,13 @@ function MarketMapLoadingBanner() {
         </span>
         <div className="flex-1">
           <div className="text-sm font-semibold text-emerald-200">Building your market map</div>
-          <div key={messageIdx} className="mt-0.5 animate-fadeIn text-xs text-slate-300">
+          <div key={messageIdx} className="mt-0.5 animate-fadeIn text-xs text-ink-soft">
             {messages[messageIdx]}
           </div>
         </div>
       </div>
       {/* Indeterminate progress bar — pure CSS, slides left-to-right */}
-      <div className="mt-3 h-1 overflow-hidden rounded-full bg-slate-800">
+      <div className="mt-3 h-1 overflow-hidden rounded-full bg-surface">
         <div className="h-full w-1/3 animate-[marketMapProgress_1.8s_ease-in-out_infinite] rounded-full bg-gradient-to-r from-emerald-500 via-blue-400 to-emerald-500" />
       </div>
       <style jsx>{`
@@ -2960,10 +2960,10 @@ function MarketMapLoadingBanner() {
 // USAspending FY-broken data in reportData).
 function ChartPlaceholder({ title, subtitle, slice }: { title: string; subtitle: string; slice: string }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 min-h-[280px] flex flex-col">
+    <div className="rounded-xl border border-surface bg-ground/60 p-5 min-h-[280px] flex flex-col">
       <div className="mb-3">
         <h3 className="text-sm font-semibold text-white">{title}</h3>
-        <p className="text-xs text-slate-500">{subtitle}</p>
+        <p className="text-xs text-faint">{subtitle}</p>
       </div>
       <div className="flex-1 flex items-center justify-center">
         <div className="text-center">
@@ -3020,15 +3020,15 @@ function ChartShell({
   footer?: React.ReactNode;
 }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5 min-h-[280px] flex flex-col">
+    <div className="rounded-xl border border-surface bg-ground/60 p-5 min-h-[280px] flex flex-col">
       <div className="mb-3">
         <h3 className="text-sm font-semibold text-white">{title}</h3>
-        <p className="text-xs text-slate-500">{subtitle}</p>
+        <p className="text-xs text-faint">{subtitle}</p>
       </div>
       <div className="flex-1 min-h-[200px]">
         {children}
       </div>
-      {footer && <div className="mt-2 pt-2 border-t border-slate-800/60">{footer}</div>}
+      {footer && <div className="mt-2 pt-2 border-t border-surface/60">{footer}</div>}
     </div>
   );
 }
@@ -3067,12 +3067,12 @@ function SpendingByAgencyChart({ buyers, loading }: { buyers: BuyerLike[]; loadi
   if (loading) {
     return (
       <ChartShell title="Spending by Agency" subtitle="Searching federal spend for this market…">
-        <div className="flex flex-col items-center justify-center h-full gap-3 text-xs text-slate-400">
+        <div className="flex flex-col items-center justify-center h-full gap-3 text-xs text-muted">
           <div className="flex items-center gap-2">
             <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-emerald-400/30 border-t-emerald-400" />
-            <span className="text-slate-300 font-medium">Searching agency spend…</span>
+            <span className="text-ink-soft font-medium">Searching agency spend…</span>
           </div>
-          <span className="text-[11px] text-slate-500">Pulling the full agency breakdown — this can take a few seconds. Numbers stay put once it lands.</span>
+          <span className="text-[11px] text-faint">Pulling the full agency breakdown — this can take a few seconds. Numbers stay put once it lands.</span>
         </div>
       </ChartShell>
     );
@@ -3081,7 +3081,7 @@ function SpendingByAgencyChart({ buyers, loading }: { buyers: BuyerLike[]; loadi
   if (data.length === 0) {
     return (
       <ChartShell title="Spending by Agency" subtitle="Top 10 by tracked spend">
-        <div className="flex items-center justify-center h-full text-xs text-slate-500">
+        <div className="flex items-center justify-center h-full text-xs text-faint">
           No agency spending data yet. Build the report to populate.
         </div>
       </ChartShell>
@@ -3167,7 +3167,7 @@ function SetAsideMixChart({
   if (total === 0) {
     return (
       <ChartShell title="Small Business Mix" subtitle="% of NAICS spend going to small businesses">
-        <div className="flex items-center justify-center h-full text-xs text-slate-500">
+        <div className="flex items-center justify-center h-full text-xs text-faint">
           No spending data yet to chart.
         </div>
       </ChartShell>
@@ -3195,7 +3195,7 @@ function SetAsideMixChart({
   let footerMessage;
   if (satTotal === 0 && total > 0) {
     footerMessage = (
-      <p className="text-[11px] text-slate-500">
+      <p className="text-[11px] text-faint">
         Calculating small-business share from SBA Goaling Report...
         If this stays empty, the agencies in this NAICS aren&apos;t in the
         FY23 SBA dataset (small/independent agencies often aren&apos;t).
@@ -3212,7 +3212,7 @@ function SetAsideMixChart({
     );
   } else {
     footerMessage = (
-      <p className="text-[11px] text-slate-400">
+      <p className="text-[11px] text-muted">
         <span className="text-emerald-400 font-semibold">{sbPct.toFixed(1)}%</span> of
         {' '}{chartMoney(total)} goes to small businesses
         ({chartMoney(satTotal)} addressable). Source: SBA Goaling Report FY23.
@@ -3399,7 +3399,7 @@ function TopPrimesChart({ primes, tier2 = [], tribal = [], email }: TopPrimesCha
   if (!targetsLoaded || merged.length === 0) {
     return (
       <ChartShell title="Teaming Candidates" subtitle="Tribal + Tier 2 partners you can pursue first">
-        <div className="flex items-center justify-center h-full text-xs text-slate-500">
+        <div className="flex items-center justify-center h-full text-xs text-faint">
           {!targetsLoaded ? 'Loading…' : 'No teaming data yet. Build the report to populate.'}
         </div>
       </ChartShell>
@@ -3409,7 +3409,7 @@ function TopPrimesChart({ primes, tier2 = [], tribal = [], email }: TopPrimesCha
   const subtitle = `${tribalCount > 0 || tier2Count > 0 ? `${tribalCount} tribal · ${tier2Count} Tier 2 · ` : ''}${hasContextualTier1 ? `${contextualTier1.length} contextual Tier 1` : 'plus Tier 1 backup'} — click for sales history`;
 
   const footer = (
-    <p className="text-[11px] text-slate-400">
+    <p className="text-[11px] text-muted">
       <span className="text-emerald-400">Tribal + Tier 2 first</span> — realistic teaming partners for emerging small businesses. Tier 1 primes shown below as backup.
     </p>
   );
@@ -3441,10 +3441,10 @@ function TopPrimesChart({ primes, tier2 = [], tribal = [], email }: TopPrimesCha
           ) : (
             <span className="text-xs font-medium text-slate-200 block break-words leading-snug">{p.name}</span>
           )}
-          {p.reason && <div className="text-[10px] text-slate-500 break-words leading-snug">{p.reason}</div>}
+          {p.reason && <div className="text-[10px] text-faint break-words leading-snug">{p.reason}</div>}
           {/* POC contact (Eric: POC is sufficient, skip history). */}
           {hasPoc ? (
-            <div className="text-[10px] text-slate-500">
+            <div className="text-[10px] text-faint">
               {p.email && <span className="text-purple-300/80 select-all break-all">{p.email}</span>}
               {p.email && p.phone && <span className="text-slate-700"> · </span>}
               {p.phone && <span className="text-emerald-300/80 select-all">{p.phone}</span>}
@@ -3460,10 +3460,10 @@ function TopPrimesChart({ primes, tier2 = [], tribal = [], email }: TopPrimesCha
   // Each tier as its OWN FPDS-Top-10-style card (Eric: "good idea poor design —
   // put them in the FPDS top 10 format, separate each, not a run-on list").
   const tierCard = (title: string, hint: string, items: PrimeLike[]) => items.length === 0 ? null : (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-3">
+    <div className="rounded-xl border border-surface bg-ground/50 p-3">
       <div className="mb-2">
         <h4 className="text-xs font-bold text-white uppercase tracking-wider">{title}</h4>
-        <p className="text-[10px] text-slate-500">{hint}</p>
+        <p className="text-[10px] text-faint">{hint}</p>
       </div>
       <ul className="space-y-1.5">{items.map(renderRow)}</ul>
     </div>
@@ -3488,7 +3488,7 @@ function TopPrimesChart({ primes, tier2 = [], tribal = [], email }: TopPrimesCha
     <div className="w-full">
       <div className="mb-2">
         <h3 className="text-sm font-semibold text-white">Teaming Candidates</h3>
-        <p className="text-[11px] text-slate-500">{subtitle}</p>
+        <p className="text-[11px] text-faint">{subtitle}</p>
       </div>
       <div className={`grid grid-cols-1 ${colClass} gap-3`}>
         {tierCards}
@@ -3625,7 +3625,7 @@ function FpdsLeaderboards({
       <header className="flex items-baseline justify-between">
         <div>
           <h3 className="text-base font-bold text-white">FPDS Leaderboards</h3>
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-faint">
             Top 10 by award $ · {subtitle}
             {data?.spend_window_label ? ` · ${data.spend_window_label}` : ''}
             {data?.cached ? ' · cached' : ''}
@@ -3633,7 +3633,7 @@ function FpdsLeaderboards({
         </div>
         {data?.total_obligation !== undefined && data.total_obligation > 0 && (
           <div className="text-right">
-            <div className="text-xs text-slate-500">Tracked total · {primaryNaics}{multiCode ? ' only' : ''}</div>
+            <div className="text-xs text-faint">Tracked total · {primaryNaics}{multiCode ? ' only' : ''}</div>
             <div className="text-sm font-bold text-emerald-400">{chartMoney(data.total_obligation)}</div>
           </div>
         )}
@@ -3700,22 +3700,22 @@ function FpdsLeaderboardCard({
   onAgencyClick?: (agencyName: string) => void;
 }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/50 p-3">
+    <div className="rounded-xl border border-surface bg-ground/50 p-3">
       <div className="mb-2">
         <h4 className="text-xs font-bold text-white uppercase tracking-wider">{title}</h4>
-        <p className="text-[10px] text-slate-500">{subtitle}</p>
+        <p className="text-[10px] text-faint">{subtitle}</p>
       </div>
 
       {loading && rows.length === 0 && (
         <div className="space-y-1.5 animate-pulse">
           {Array.from({ length: 5 }).map((_, i) => (
-            <div key={i} className="h-4 bg-slate-800 rounded" />
+            <div key={i} className="h-4 bg-surface rounded" />
           ))}
         </div>
       )}
 
       {!loading && rows.length === 0 && (
-        <p className="text-xs text-slate-500 italic">No data for this NAICS + filter.</p>
+        <p className="text-xs text-faint italic">No data for this NAICS + filter.</p>
       )}
 
       {rows.length > 0 && (
@@ -3723,7 +3723,7 @@ function FpdsLeaderboardCard({
           {rows.slice(0, 10).map((row) => (
             <li key={`${row.rank}-${row.name}`} className="flex items-center justify-between gap-2 text-xs">
               <span className="flex items-center gap-2 min-w-0 flex-1">
-                <span className="shrink-0 inline-flex w-5 h-5 rounded-full bg-slate-800 text-slate-400 text-[10px] items-center justify-center font-semibold">
+                <span className="shrink-0 inline-flex w-5 h-5 rounded-full bg-surface text-muted text-[10px] items-center justify-center font-semibold">
                   {row.rank}
                 </span>
                 {linkVendor && email ? (
@@ -3875,7 +3875,7 @@ function MindyNarrative({
           <h3 className="text-sm font-bold uppercase tracking-wider text-purple-300">Mindy Says</h3>
           <span className="ml-auto text-[10px] uppercase tracking-wider text-purple-400/70">Pro feature</span>
         </div>
-        <p className="text-sm text-slate-300 mb-3">{upgradeTeaser}</p>
+        <p className="text-sm text-ink-soft mb-3">{upgradeTeaser}</p>
         <a
           href="/market-intelligence"
           className="inline-block px-4 py-2 rounded-lg bg-purple-600 hover:bg-purple-500 text-white text-sm font-semibold"
@@ -3898,18 +3898,18 @@ function MindyNarrative({
 
       {loading && (
         <div className="space-y-2 animate-pulse">
-          <div className="h-3 bg-slate-700/60 rounded w-full" />
-          <div className="h-3 bg-slate-700/60 rounded w-11/12" />
-          <div className="h-3 bg-slate-700/60 rounded w-4/5" />
+          <div className="h-3 bg-input/60 rounded w-full" />
+          <div className="h-3 bg-input/60 rounded w-11/12" />
+          <div className="h-3 bg-input/60 rounded w-4/5" />
         </div>
       )}
 
       {error && (
-        <p className="text-sm text-slate-400 italic">{error}</p>
+        <p className="text-sm text-muted italic">{error}</p>
       )}
 
       {!loading && !error && !narrative && (
-        <p className="text-sm text-slate-500 italic">
+        <p className="text-sm text-faint italic">
           Build the report to load the AI market analysis.
         </p>
       )}
@@ -3926,7 +3926,7 @@ function MindyNarrative({
               </p>
               <ul className="space-y-1.5">
                 {narrative.actions.map((action, idx) => (
-                  <li key={idx} className="flex items-start gap-2 text-sm text-slate-300">
+                  <li key={idx} className="flex items-start gap-2 text-sm text-ink-soft">
                     <span className="text-purple-400 text-xs mt-0.5 shrink-0">{idx + 1}.</span>
                     {action.link ? (
                       <a
@@ -4677,8 +4677,8 @@ function AgencyTable({
 
   if (!naicsCode.trim() && !keyword?.trim()) {
     return (
-      <section className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
-        <p className="text-sm text-slate-400">
+      <section className="rounded-xl border border-surface bg-ground/40 p-5">
+        <p className="text-sm text-muted">
           Enter a keyword or NAICS/PSC code, then click Build Market Map to load agencies.
         </p>
       </section>
@@ -4687,8 +4687,8 @@ function AgencyTable({
 
   if (loading) {
     return (
-      <section className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
-        <p className="flex items-center gap-2 text-sm text-slate-400">
+      <section className="rounded-xl border border-surface bg-ground/40 p-5">
+        <p className="flex items-center gap-2 text-sm text-muted">
           <Loader2 className="w-4 h-4 animate-spin text-emerald-400" strokeWidth={2.5} />
           Loading agency data…
         </p>
@@ -4704,9 +4704,9 @@ function AgencyTable({
   const isEmptyResult = !!error && !naicsSuggestions.length && /no matching agencies|no agencies/i.test(error);
   if (isEmptyResult) {
     return (
-      <section className="rounded-xl border border-slate-800 bg-slate-900/40 p-5 text-sm text-slate-400">
-        <p className="text-slate-300 font-medium">No agencies matched these exact filters.</p>
-        <p className="mt-1 text-slate-500">
+      <section className="rounded-xl border border-surface bg-ground/40 p-5 text-sm text-muted">
+        <p className="text-ink-soft font-medium">No agencies matched these exact filters.</p>
+        <p className="mt-1 text-faint">
           The leaderboards above show this market exists — your <strong>state</strong> or
           <strong> set-aside</strong> filter is likely too narrow. Try clearing the state filter or
           switching set-aside to “Small Business” / “Any”.
@@ -4741,8 +4741,8 @@ function AgencyTable({
 
   if (rows.length === 0) {
     return (
-      <section className="rounded-xl border border-slate-800 bg-slate-900/40 p-5">
-        <p className="text-sm text-slate-400">No agencies found for this profile.</p>
+      <section className="rounded-xl border border-surface bg-ground/40 p-5">
+        <p className="text-sm text-muted">No agencies found for this profile.</p>
       </section>
     );
   }
@@ -4838,15 +4838,15 @@ function AgencyTable({
       </div>
 
       {/* The agency table itself. Sort lens chips drive the order. */}
-      <div className="rounded-xl border border-slate-800 bg-slate-900/40 overflow-hidden">
-        <div className="border-b border-slate-800 p-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+      <div className="rounded-xl border border-surface bg-ground/40 overflow-hidden">
+        <div className="border-b border-surface p-4 flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
           <div>
             <h3 className="text-lg font-semibold text-white">
               {hasSelection && !showAll
                 ? `Your Selected Agencies (${selectedRows.length})`
                 : `All Agencies (${filteredRows.length}${parentAgencyFilter ? ` of ${rows.length}` : ''} found)`}
             </h3>
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-faint">
               Sort lenses re-rank the same data — no re-fetch.
               {cached && <span className="ml-1 text-emerald-400">· cached</span>}
               {freeTierLimited && <span className="ml-1 text-amber-400">· Free tier shows top 10; upgrade for the full list</span>}
@@ -4876,7 +4876,7 @@ function AgencyTable({
               type="button"
               onClick={() => setTriageOpen(true)}
               disabled={triageCandidates.length === 0}
-              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-slate-700 disabled:text-slate-500"
+              className="rounded-lg bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-emerald-500 disabled:cursor-not-allowed disabled:bg-input disabled:text-faint"
               title={triageCandidates.length === 0
                 ? 'No offices left to triage — refresh the report or unskip dismissed targets.'
                 : `Triage ${triageCandidates.length} offices — Track / Defer / Skip one at a time`}
@@ -4906,10 +4906,10 @@ function AgencyTable({
                   title={inertReason || lens.hint}
                   className={`px-3 py-1.5 rounded-md text-xs transition-colors ${
                     inert
-                      ? 'bg-slate-900 text-slate-600 cursor-not-allowed border border-slate-800'
+                      ? 'bg-ground text-slate-600 cursor-not-allowed border border-surface'
                       : activeLens === lens.id
                         ? 'bg-emerald-600 text-white'
-                        : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                        : 'bg-surface text-ink-soft hover:bg-input'
                   }`}
                 >
                   {lens.label}
@@ -4921,7 +4921,7 @@ function AgencyTable({
 
         <div className="overflow-x-auto">
           <table className="w-full text-sm">
-            <thead className="bg-slate-900/60 text-xs text-slate-500 uppercase">
+            <thead className="bg-ground/60 text-xs text-faint uppercase">
               <tr>
                 <th className="text-left px-4 py-2 font-medium">Agency / Office</th>
                 <th
@@ -4942,19 +4942,19 @@ function AgencyTable({
                 <th className="text-left px-4 py-2 font-medium">Location</th>
               </tr>
             </thead>
-            <tbody className="text-slate-300">
+            <tbody className="text-ink-soft">
               {visibleRows.map(row => (
                 <Fragment key={row.id}>
                 <tr
                   onClick={() => setSelectedRow(row)}
-                  className="border-t border-slate-800/60 hover:bg-slate-800/30 cursor-pointer"
+                  className="border-t border-surface/60 hover:bg-surface/30 cursor-pointer"
                 >
                   <td className="px-4 py-2">
                     <div className="flex items-center gap-1.5">
                       {/* Office drill-down toggle — surfaces NAVFAC/USACE etc. */}
                       <button
                         onClick={(e) => { e.stopPropagation(); toggleOffices(row); }}
-                        className="text-slate-500 hover:text-emerald-400 text-xs w-4 shrink-0"
+                        className="text-faint hover:text-emerald-400 text-xs w-4 shrink-0"
                         title="Show contracting offices in your NAICS"
                       >
                         {expandedOffices[row.id] ? '▾' : '▸'}
@@ -4965,7 +4965,7 @@ function AgencyTable({
                       <div className="font-medium text-slate-200">{row.contractingOffice || row.name}</div>
                     </div>
                     {row.subAgency && (
-                      <div className="text-[10px] text-slate-500 mt-0.5">
+                      <div className="text-[10px] text-faint mt-0.5">
                         {row.subAgency}
                         {row.parentAgency && row.parentAgency !== row.subAgency && (
                           <> · <span className="text-slate-600">{row.parentAgency}</span></>
@@ -5006,23 +5006,23 @@ function AgencyTable({
                       <span className="text-purple-300">{row.upcomingEventCount}</span>
                     ) : <span className="text-slate-600">0</span>}
                   </td>
-                  <td className="px-4 py-2 text-slate-400 text-xs">{row.location}</td>
+                  <td className="px-4 py-2 text-muted text-xs">{row.location}</td>
                 </tr>
                 {/* Office drill-down rows — NAVFAC/USACE etc. for this NAICS. */}
                 {expandedOffices[row.id] && (
-                  <tr className="bg-slate-950/40">
+                  <tr className="bg-ground-deep/40">
                     <td colSpan={20} className="px-4 py-2">
                       {expandedOffices[row.id].loading ? (
-                        <span className="text-xs text-slate-500">Loading contracting offices…</span>
+                        <span className="text-xs text-faint">Loading contracting offices…</span>
                       ) : expandedOffices[row.id].offices.length === 0 ? (
-                        <span className="text-xs text-slate-500">No office-level data for this NAICS.</span>
+                        <span className="text-xs text-faint">No office-level data for this NAICS.</span>
                       ) : (
                         <div className="space-y-1 pl-6">
-                          <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Contracting offices in NAICS {naicsCode}</div>
+                          <div className="text-[10px] uppercase tracking-wider text-faint mb-1">Contracting offices in NAICS {naicsCode}</div>
                           {expandedOffices[row.id].offices.map((o, i) => (
                             <div key={i} className="flex items-center justify-between gap-3 text-xs">
-                              <span className="inline-flex items-center gap-1 truncate text-slate-300"><Landmark className="h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={2} /> {o.name}</span>
-                              <span className="text-slate-400 shrink-0">{formatRowCurrency(o.total)} · {o.awards.toLocaleString()} awards</span>
+                              <span className="inline-flex items-center gap-1 truncate text-ink-soft"><Landmark className="h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={2} /> {o.name}</span>
+                              <span className="text-muted shrink-0">{formatRowCurrency(o.total)} · {o.awards.toLocaleString()} awards</span>
                             </div>
                           ))}
                         </div>
@@ -5037,7 +5037,7 @@ function AgencyTable({
         </div>
 
         {!showAll && (hasSelection ? unselectedRows.length > 0 : sortedRows.length > 10) && (
-          <div className="border-t border-slate-800 p-4 text-center">
+          <div className="border-t border-surface p-4 text-center">
             <button
               type="button"
               onClick={() => setShowAll(true)}
@@ -5047,18 +5047,18 @@ function AgencyTable({
               <span aria-hidden="true">↓</span>
             </button>
             {hasSelection && (
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-2 text-xs text-faint">
                 Showing your {selectedRows.length} selected of {filteredRows.length}
               </p>
             )}
           </div>
         )}
         {showAll && hasSelection && (
-          <div className="border-t border-slate-800 p-3 text-center">
+          <div className="border-t border-surface p-3 text-center">
             <button
               type="button"
               onClick={() => setShowAll(false)}
-              className="text-xs text-slate-400 hover:text-slate-200 underline"
+              className="text-xs text-muted hover:text-slate-200 underline"
             >
               Show only my {selectedRows.length} selected
             </button>
@@ -5146,7 +5146,7 @@ const SBA_CATEGORY_COLORS: Record<string, string> = {
   'Subcontinent Asian American Owned Small Business': 'bg-pink-500',
   'Other Minority Owned Small Business': 'bg-fuchsia-500',
   'Other Small Business': 'bg-emerald-500',
-  'Not a Small Business': 'bg-slate-700',
+  'Not a Small Business': 'bg-input',
 };
 
 function sbaCategoryShortLabel(category: string): string {
@@ -5203,18 +5203,18 @@ function SbaMixSection({ agencyName }: { agencyName: string }) {
   if (notFound && !loading) return null;
 
   return (
-    <div className="bg-slate-950/50 border border-slate-800 rounded-lg p-5">
+    <div className="bg-ground-deep/50 border border-surface rounded-lg p-5">
       <div className="flex items-baseline justify-between mb-3">
-        <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400">Small Business Mix</h3>
+        <h3 className="text-sm font-bold uppercase tracking-wider text-muted">Small Business Mix</h3>
         {data?.fiscal_year && (
-          <span className="text-[10px] text-slate-500">FY{data.fiscal_year} · SBA Goaling Report</span>
+          <span className="text-[10px] text-faint">FY{data.fiscal_year} · SBA Goaling Report</span>
         )}
       </div>
 
       {loading && (
         <div className="space-y-2 animate-pulse">
-          <div className="h-3 bg-slate-800 rounded w-1/3" />
-          <div className="h-8 bg-slate-800 rounded" />
+          <div className="h-3 bg-surface rounded w-1/3" />
+          <div className="h-8 bg-surface rounded" />
         </div>
       )}
 
@@ -5225,7 +5225,7 @@ function SbaMixSection({ agencyName }: { agencyName: string }) {
             <div className="text-3xl font-bold text-emerald-400">
               {((data.small_business_share || 0) * 100).toFixed(1)}%
             </div>
-            <div className="text-xs text-slate-500 mt-1">
+            <div className="text-xs text-faint mt-1">
               of {(data.funding_department || agencyName).toLowerCase().replace(/(^|\s)\S/g, (s) => s.toUpperCase())}&apos;s
               {' '}${(data.total || 0 / 1e9).toFixed(2)}B FY{data.fiscal_year} spend went to small businesses
             </div>
@@ -5252,9 +5252,9 @@ function SbaMixSection({ agencyName }: { agencyName: string }) {
               <li key={c.category} className="flex items-center justify-between text-xs">
                 <span className="flex items-center gap-2 min-w-0 flex-1">
                   <span className={`shrink-0 w-3 h-3 rounded ${SBA_CATEGORY_COLORS[c.category] || 'bg-slate-600'}`} />
-                  <span className="truncate text-slate-300">{sbaCategoryShortLabel(c.category)}</span>
+                  <span className="truncate text-ink-soft">{sbaCategoryShortLabel(c.category)}</span>
                 </span>
-                <span className="shrink-0 text-slate-400 tabular-nums">
+                <span className="shrink-0 text-muted tabular-nums">
                   {(c.pct * 100).toFixed(1)}%
                   <span className="text-slate-600 ml-2">${(c.dollars / 1e6).toFixed(0)}M</span>
                 </span>
@@ -5262,7 +5262,7 @@ function SbaMixSection({ agencyName }: { agencyName: string }) {
             ))}
           </ul>
 
-          <p className="text-[10px] text-slate-500 mt-4 italic">
+          <p className="text-[10px] text-faint mt-4 italic">
             Source: SBA Small Business Goaling Report via data.sba.gov. Categories from SBA verbatim — race/ethnicity-based socioeconomic classifications.
           </p>
         </>
@@ -5312,15 +5312,15 @@ function AgencyDrawer({
       onClick={onClose}
     >
       <div
-        className="bg-slate-900 border border-slate-700 rounded-xl shadow-2xl max-w-4xl w-full my-8"
+        className="bg-ground border border-hairline rounded-xl shadow-2xl max-w-4xl w-full my-8"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header — sticky so the close button is always reachable */}
-        <div className="sticky top-0 bg-slate-900 border-b border-slate-800 px-6 py-4 flex justify-between items-start gap-4 rounded-t-xl">
+        <div className="sticky top-0 bg-ground border-b border-surface px-6 py-4 flex justify-between items-start gap-4 rounded-t-xl">
           <div className="min-w-0">
             <h2 className="text-xl font-bold text-white truncate">{row.contractingOffice || row.name}</h2>
             {row.subAgency && (
-              <p className="text-xs text-slate-500 mt-0.5 truncate">
+              <p className="text-xs text-faint mt-0.5 truncate">
                 {row.subAgency}
                 {row.parentAgency && row.parentAgency !== row.subAgency && (
                   <> · {row.parentAgency}</>
@@ -5330,7 +5330,7 @@ function AgencyDrawer({
           </div>
           <button
             onClick={onClose}
-            className="text-slate-400 hover:text-slate-200 text-2xl leading-none shrink-0"
+            className="text-muted hover:text-slate-200 text-2xl leading-none shrink-0"
             aria-label="Close drawer"
           >
             ×
@@ -5381,8 +5381,8 @@ function AgencyDrawer({
           </div>
 
           {/* Office Information block — full hierarchy + location */}
-          <div className="bg-slate-950/50 border border-slate-800 rounded-lg p-5">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">Office Information</h3>
+          <div className="bg-ground-deep/50 border border-surface rounded-lg p-5">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-muted mb-4">Office Information</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
               <DrawerField label="Contracting Office" value={row.contractingOffice || row.name} />
               <DrawerField label="Sub-Agency" value={row.subAgency || '—'} />
@@ -5395,8 +5395,8 @@ function AgencyDrawer({
               This is where Mindy adds value vs. raw USAspending data.
               The numbers came from the merged endpoint; we just give
               them a human-readable home. */}
-          <div className="bg-slate-950/50 border border-slate-800 rounded-lg p-5">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">Engagement Signals</h3>
+          <div className="bg-ground-deep/50 border border-surface rounded-lg p-5">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-muted mb-4">Engagement Signals</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <SignalCard
                 label="Pain Points Logged"
@@ -5428,32 +5428,32 @@ function AgencyDrawer({
           <SbaMixSection agencyName={row.parentAgency || row.subAgency || row.contractingOffice || row.name} />
 
           {/* Market Research Links — deep-link out to the source */}
-          <div className="bg-slate-950/50 border border-slate-800 rounded-lg p-5">
-            <h3 className="text-sm font-bold uppercase tracking-wider text-slate-400 mb-4">Market Research Links</h3>
+          <div className="bg-ground-deep/50 border border-surface rounded-lg p-5">
+            <h3 className="text-sm font-bold uppercase tracking-wider text-muted mb-4">Market Research Links</h3>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <a
                 href={samSearchUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-between bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg p-3 transition-colors"
+                className="flex items-center justify-between bg-ground hover:bg-surface border border-hairline rounded-lg p-3 transition-colors"
               >
                 <div>
                   <div className="text-sm font-semibold text-white">SAM.gov Opportunities</div>
-                  <div className="text-xs text-slate-500">Search active contracts at this office</div>
+                  <div className="text-xs text-faint">Search active contracts at this office</div>
                 </div>
-                <span className="text-slate-500">↗</span>
+                <span className="text-faint">↗</span>
               </a>
               <a
                 href={usaSpendingUrl}
                 target="_blank"
                 rel="noopener noreferrer"
-                className="flex items-center justify-between bg-slate-900 hover:bg-slate-800 border border-slate-700 rounded-lg p-3 transition-colors"
+                className="flex items-center justify-between bg-ground hover:bg-surface border border-hairline rounded-lg p-3 transition-colors"
               >
                 <div>
                   <div className="text-sm font-semibold text-white">USAspending.gov</div>
-                  <div className="text-xs text-slate-500">View historical spending</div>
+                  <div className="text-xs text-faint">View historical spending</div>
                 </div>
-                <span className="text-slate-500">↗</span>
+                <span className="text-faint">↗</span>
               </a>
             </div>
           </div>
@@ -5469,20 +5469,20 @@ function AgencyDrawer({
               Outreach log (Slice 3D) will sit below this once it
               ships — designed-in placement so we don't have to
               re-architect the drawer. */}
-          <div className="bg-slate-950/50 border border-slate-800 rounded-lg p-5">
+          <div className="bg-ground-deep/50 border border-surface rounded-lg p-5">
             {savedTargetId ? (
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <Star className="h-4 w-4 shrink-0 text-emerald-400" strokeWidth={2} fill="currentColor" />
                   <div>
                     <div className="text-sm font-semibold text-emerald-400">In your target list</div>
-                    <p className="text-xs text-slate-500">Open My Target List to log outreach and track status.</p>
+                    <p className="text-xs text-faint">Open My Target List to log outreach and track status.</p>
                   </div>
                 </div>
                 <button
                   type="button"
                   onClick={() => onRemove(savedTargetId)}
-                  className="text-xs text-slate-400 hover:text-red-400 hover:underline transition-colors"
+                  className="text-xs text-muted hover:text-red-400 hover:underline transition-colors"
                 >
                   Remove
                 </button>
@@ -5491,7 +5491,7 @@ function AgencyDrawer({
               <div className="flex items-center justify-between gap-3">
                 <div>
                   <div className="text-sm font-semibold text-white">Add to my target list</div>
-                  <p className="text-xs text-slate-500">
+                  <p className="text-xs text-faint">
                     Save this office to a persistent list you can work over months.
                   </p>
                 </div>
@@ -5526,12 +5526,12 @@ function DrawerStat({
     tone === 'emerald' ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-400'
     : tone === 'blue' ? 'border-blue-500/30 bg-blue-500/10 text-blue-400'
     : tone === 'purple' ? 'border-purple-500/30 bg-purple-500/10 text-purple-400'
-    : 'border-slate-700 bg-slate-800/40 text-slate-200';
+    : 'border-hairline bg-surface/40 text-slate-200';
   return (
     <div className={`rounded-lg border p-3 ${toneClass.split(' ')[0]} ${toneClass.split(' ')[1]}`}>
-      <div className="text-[10px] uppercase tracking-wider text-slate-400">{label}</div>
+      <div className="text-[10px] uppercase tracking-wider text-muted">{label}</div>
       <div className={`text-xl font-bold mt-1 ${toneClass.split(' ').slice(2).join(' ')}`}>{value}</div>
-      {hint && <div className="text-[10px] text-slate-500 mt-1">{hint}</div>}
+      {hint && <div className="text-[10px] text-faint mt-1">{hint}</div>}
     </div>
   );
 }
@@ -5539,7 +5539,7 @@ function DrawerStat({
 function DrawerField({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <div className="text-[10px] uppercase tracking-wider text-slate-500">{label}</div>
+      <div className="text-[10px] uppercase tracking-wider text-faint">{label}</div>
       <div className="text-sm text-slate-200 mt-0.5 break-words">{value}</div>
     </div>
   );
@@ -5561,10 +5561,10 @@ function SignalCard({
     : tone === 'emerald' ? 'text-emerald-400'
     : 'text-purple-300';
   return (
-    <div className="bg-slate-900/60 border border-slate-800 rounded-lg p-3">
-      <div className="text-[10px] uppercase tracking-wider text-slate-500">{label}</div>
+    <div className="bg-ground/60 border border-surface rounded-lg p-3">
+      <div className="text-[10px] uppercase tracking-wider text-faint">{label}</div>
       <div className={`text-2xl font-bold mt-1 ${numColor}`}>{value.toLocaleString()}</div>
-      {hint && <div className="text-[10px] text-slate-500 mt-1.5">{hint}</div>}
+      {hint && <div className="text-[10px] text-faint mt-1.5">{hint}</div>}
     </div>
   );
 }
@@ -5589,47 +5589,47 @@ function QuickPickCard({
 }) {
   const [showWhy, setShowWhy] = useState(false);
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/40 p-4">
+    <div className="rounded-xl border border-surface bg-ground/40 p-4">
       <div className="flex items-center justify-between mb-1">
-        <h4 className="text-[10px] font-bold uppercase tracking-wider text-slate-500">{title}</h4>
+        <h4 className="text-[10px] font-bold uppercase tracking-wider text-faint">{title}</h4>
         <button
           type="button"
           onClick={() => setShowWhy(v => !v)}
-          className="text-[10px] text-slate-500 hover:text-slate-300"
+          className="text-[10px] text-faint hover:text-ink-soft"
         >
           Why?
         </button>
       </div>
       {showWhy && (
-        <p className="text-[10px] text-slate-400 italic border-l-2 border-slate-700 pl-2 mb-2">{rule}</p>
+        <p className="text-[10px] text-muted italic border-l-2 border-hairline pl-2 mb-2">{rule}</p>
       )}
       {winner ? (
         <>
           <div className="text-sm font-bold text-white truncate" title={winner.contractingOffice || winner.name}>
             {winner.contractingOffice || winner.name}
           </div>
-          <div className="text-xs text-slate-500 truncate mb-2">
+          <div className="text-xs text-faint truncate mb-2">
             {winner.subAgency || winner.parentAgency}
           </div>
           <div className="flex items-baseline justify-between">
-            <span className="text-[10px] text-slate-500">{metricLabel}</span>
+            <span className="text-[10px] text-faint">{metricLabel}</span>
             <span className="text-base font-semibold text-emerald-400">{metricValue}</span>
           </div>
         </>
       ) : (
-        <p className="text-xs text-slate-500">No data yet.</p>
+        <p className="text-xs text-faint">No data yet.</p>
       )}
       {/* Methodology dropdown — only shown for the card that supports
           swapping its rule. Strongest Signal + Low Competition are
           fixed in v1 (pain points / fewest opps); BIGGEST SPENDER
           can swap between any of the 4 lenses. */}
       {onLensChange && selectedLens && (
-        <div className="mt-3 pt-3 border-t border-slate-800">
-          <label className="text-[10px] uppercase tracking-wider text-slate-500">Rank by</label>
+        <div className="mt-3 pt-3 border-t border-surface">
+          <label className="text-[10px] uppercase tracking-wider text-faint">Rank by</label>
           <select
             value={selectedLens}
             onChange={(e) => onLensChange(e.target.value as SortLens)}
-            className="mt-1 w-full bg-slate-950 border border-slate-700 rounded px-2 py-1 text-xs text-slate-200"
+            className="mt-1 w-full bg-ground-deep border border-hairline rounded px-2 py-1 text-xs text-slate-200"
           >
             {SORT_LENSES.map(l => (
               <option key={l.id} value={l.id}>{l.label}</option>
@@ -5718,19 +5718,19 @@ function LiveOpportunityFallback({
         const place = getOpportunityPlace(opportunity);
         const samUrl = isHttpUrl(opportunity.url) ? opportunity.url : null;
         return (
-          <div key={opportunity.id} className="rounded-lg bg-slate-800/50 p-3">
+          <div key={opportunity.id} className="rounded-lg bg-surface/50 p-3">
             <div className="flex items-start justify-between gap-3">
               <div className="min-w-0 flex-1">
                 <div className="font-medium text-white">{opportunity.title}</div>
-                <div className="mt-1 text-xs uppercase tracking-wide text-slate-500">
+                <div className="mt-1 text-xs uppercase tracking-wide text-faint">
                   {opportunity.buyerDisplay || opportunity.office || opportunity.subTier || opportunity.department || 'Agency not provided'}
                 </div>
-                <div className="mt-2 flex flex-wrap gap-2 text-xs text-slate-400">
-                  {opportunity.naicsCode && <span className="rounded bg-slate-700/70 px-2 py-1">NAICS {opportunity.naicsCode}</span>}
-                  {opportunity.noticeType && <span className="rounded bg-slate-700/70 px-2 py-1">{opportunity.noticeType}</span>}
-                  {opportunity.setAsideDescription && <span className="rounded bg-slate-700/70 px-2 py-1">{opportunity.setAsideDescription}</span>}
-                  {place && <span className="rounded bg-slate-700/70 px-2 py-1">{place}</span>}
-                  {dueDate && <span className="rounded bg-slate-700/70 px-2 py-1">Due {dueDate}</span>}
+                <div className="mt-2 flex flex-wrap gap-2 text-xs text-muted">
+                  {opportunity.naicsCode && <span className="rounded bg-input/70 px-2 py-1">NAICS {opportunity.naicsCode}</span>}
+                  {opportunity.noticeType && <span className="rounded bg-input/70 px-2 py-1">{opportunity.noticeType}</span>}
+                  {opportunity.setAsideDescription && <span className="rounded bg-input/70 px-2 py-1">{opportunity.setAsideDescription}</span>}
+                  {place && <span className="rounded bg-input/70 px-2 py-1">{place}</span>}
+                  {dueDate && <span className="rounded bg-input/70 px-2 py-1">Due {dueDate}</span>}
                 </div>
               </div>
               {samUrl && (
@@ -5795,25 +5795,25 @@ function CompetitorAwardsExpander({ email, name }: { email: string | null; name:
         {open ? 'Hide recent awards' : <><BarChart3 className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> See what they’ve won</>}
       </button>
       {open && (
-        <div className="mt-2 rounded-lg border border-slate-700 bg-slate-950/40 p-3">
-          {loading && <div className="text-[11px] text-slate-500">Loading award history…</div>}
+        <div className="mt-2 rounded-lg border border-hairline bg-ground-deep/40 p-3">
+          {loading && <div className="text-[11px] text-faint">Loading award history…</div>}
           {!loading && loaded && !found && (
-            <div className="text-[11px] text-slate-500">No federal award history found for this name.</div>
+            <div className="text-[11px] text-faint">No federal award history found for this name.</div>
           )}
           {!loading && found && recipient && (
             <div className="flex flex-wrap gap-3 mb-2 text-[11px]">
               <span className="text-emerald-300">{fmt(recipient.totalObligated)} total obligated</span>
-              <span className="text-slate-400">{recipient.awardCount.toLocaleString()} awards</span>
-              <span className="text-slate-400">{recipient.distinctAgencyCount} agencies</span>
+              <span className="text-muted">{recipient.awardCount.toLocaleString()} awards</span>
+              <span className="text-muted">{recipient.distinctAgencyCount} agencies</span>
             </div>
           )}
           {!loading && awards.length > 0 && (
             <ul className="space-y-1.5">
               {awards.map((a, i) => (
-                <li key={`${a.awardId}-${i}`} className="text-xs flex items-start justify-between gap-3 border-b border-slate-800/60 pb-1.5 last:border-0">
+                <li key={`${a.awardId}-${i}`} className="text-xs flex items-start justify-between gap-3 border-b border-surface/60 pb-1.5 last:border-0">
                   <span className="min-w-0">
                     <span className="text-slate-200 line-clamp-1">{a.description || a.awardId}</span>
-                    <span className="text-slate-500 text-[10px]">
+                    <span className="text-faint text-[10px]">
                       {a.agency}{a.naicsCode ? ` · NAICS ${a.naicsCode}` : ''}{a.actionDate ? ` · ${a.actionDate.slice(0, 10)}` : ''}
                     </span>
                   </span>
@@ -5848,7 +5848,7 @@ function ReportViewer({
 }: ReportViewerProps) {
   if (!reportData) {
     return (
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+      <div className="bg-ground border border-surface rounded-xl p-6">
         <div className="flex items-center justify-between mb-4">
           <h3 className="font-semibold text-white">
             {isGenerating ? 'Building your market map…' : 'Report not ready'}
@@ -5856,12 +5856,12 @@ function ReportViewer({
           <button onClick={onClose} aria-label="Close" className="inline-flex items-center text-muted hover:text-white"><X className="h-4 w-4" strokeWidth={2} /></button>
         </div>
         {isGenerating ? (
-          <div className="flex items-center gap-3 text-slate-400">
+          <div className="flex items-center gap-3 text-muted">
             <span className="inline-block w-4 h-4 border-2 border-emerald-500 border-t-transparent rounded-full animate-spin" />
             <p>Pulling agencies, buyers, partners, and forecasts for your profile. This takes 10–30 seconds.</p>
           </div>
         ) : (
-          <p className="text-slate-400">
+          <p className="text-muted">
             Click <strong className="text-emerald-300">Build Market Map</strong> at the top to generate this report
             from your saved profile.
           </p>
@@ -5901,30 +5901,30 @@ function ReportViewer({
   const analyticsReport = reportData as ReportData['simplifiedAcquisition'];
 
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-6">
+    <div className="bg-ground border border-surface rounded-xl p-6">
       <div className="flex items-center justify-between mb-4">
         <h3 className="font-semibold text-white flex items-center gap-2">
           {report?.icon && <report.icon className="h-5 w-5 shrink-0 text-emerald-400" strokeWidth={1.75} />}
           {report?.title}
         </h3>
-        <button onClick={onClose} aria-label="Close" className="text-slate-400 hover:text-white"><X className="h-4 w-4" /></button>
+        <button onClick={onClose} aria-label="Close" className="text-muted hover:text-white"><X className="h-4 w-4" /></button>
       </div>
 
       {/* Government Buyers */}
       {reportId === 'buyers' && 'agencies' in reportData && (
         <div className="space-y-3">
           <div className="grid grid-cols-3 gap-4 mb-4">
-            <div className="bg-slate-800/50 rounded-lg p-3">
+            <div className="bg-surface/50 rounded-lg p-3">
               <div className="text-lg font-bold text-white">{(reportData as ReportData['governmentBuyers'])?.summary?.totalAgencies || 0}</div>
-              <div className="text-xs text-slate-500">Agencies</div>
+              <div className="text-xs text-faint">Agencies</div>
             </div>
-            <div className="bg-slate-800/50 rounded-lg p-3">
+            <div className="bg-surface/50 rounded-lg p-3">
               <div className="text-lg font-bold text-emerald-400">{formatCurrency((reportData as ReportData['governmentBuyers'])?.summary?.totalSpending)}</div>
-              <div className="text-xs text-slate-500">Total Spending</div>
+              <div className="text-xs text-faint">Total Spending</div>
             </div>
-            <div className="bg-slate-800/50 rounded-lg p-3">
+            <div className="bg-surface/50 rounded-lg p-3">
               <div className="text-lg font-bold text-white">{formatCount((reportData as ReportData['governmentBuyers'])?.summary?.totalContracts)}</div>
-              <div className="text-xs text-slate-500">Contracts</div>
+              <div className="text-xs text-faint">Contracts</div>
             </div>
           </div>
           {(reportData as ReportData['governmentBuyers'])?.agencies?.slice(0, 10).map((agency, idx) => {
@@ -5932,14 +5932,14 @@ function ReportViewer({
             const isSaved = savedContacts.has(buyerKey);
             const isSaving = savingContact === buyerKey;
             return (
-              <div key={idx} className="p-3 bg-slate-800/50 rounded-lg">
+              <div key={idx} className="p-3 bg-surface/50 rounded-lg">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-white">{agency.contractingOffice}</div>
-                    {agency.parentAgency && <div className="text-xs text-slate-500">{agency.parentAgency}</div>}
+                    {agency.parentAgency && <div className="text-xs text-faint">{agency.parentAgency}</div>}
                     <div className="flex gap-4 mt-2 text-sm">
                       <span className="text-emerald-400">{formatCurrency(agency.spending)}</span>
-                      <span className="text-slate-400">{formatCount(agency.contractCount)} contracts</span>
+                      <span className="text-muted">{formatCount(agency.contractCount)} contracts</span>
                     </div>
                   </div>
                   {tier !== 'free' && (
@@ -5951,7 +5951,7 @@ function ReportViewer({
                         isSaved
                           ? 'bg-emerald-500/20 text-emerald-300 cursor-default'
                           : isSaving
-                            ? 'bg-slate-700 text-slate-400 cursor-wait'
+                            ? 'bg-input text-muted cursor-wait'
                             : 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30'
                       }`}
                     >
@@ -5980,15 +5980,15 @@ function ReportViewer({
             const isSaved = savedContacts.has(buyerKey);
             const isSaving = savingContact === buyerKey;
             return (
-              <div key={idx} className="p-3 bg-slate-800/50 rounded-lg">
+              <div key={idx} className="p-3 bg-surface/50 rounded-lg">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-white">{agency.contractingOffice}</div>
                     {agency.osbp && (
                       <div className="mt-2 text-sm">
-                        {agency.osbp.director && <div className="flex items-center gap-1 text-slate-300"><User className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> {agency.osbp.director} <span className="text-[10px] text-slate-500">(as of Dec 2025 — verify)</span></div>}
+                        {agency.osbp.director && <div className="flex items-center gap-1 text-ink-soft"><User className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> {agency.osbp.director} <span className="text-[10px] text-faint">(as of Dec 2025 — verify)</span></div>}
                         {agency.osbp.email && <div className="flex items-center gap-1 text-blue-400"><Mail className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> {agency.osbp.email}</div>}
-                        {agency.osbp.phone && <div className="flex items-center gap-1 text-slate-400"><Phone className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> {agency.osbp.phone}</div>}
+                        {agency.osbp.phone && <div className="flex items-center gap-1 text-muted"><Phone className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> {agency.osbp.phone}</div>}
                       </div>
                     )}
                   </div>
@@ -6001,7 +6001,7 @@ function ReportViewer({
                         isSaved
                           ? 'bg-emerald-500/20 text-emerald-300 cursor-default'
                           : isSaving
-                            ? 'bg-slate-700 text-slate-400 cursor-wait'
+                            ? 'bg-input text-muted cursor-wait'
                             : 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30'
                       }`}
                     >
@@ -6026,26 +6026,26 @@ function ReportViewer({
       {reportId === 'pain' && 'painPoints' in reportData && (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="bg-slate-800/50 rounded-lg p-3">
+            <div className="bg-surface/50 rounded-lg p-3">
               <div className="text-lg font-bold text-white">{(reportData as ReportData['agencyPainPoints'])?.summary?.totalPainPoints || 0}</div>
-              <div className="text-xs text-slate-500">Pain Points</div>
+              <div className="text-xs text-faint">Pain Points</div>
             </div>
-            <div className="bg-slate-800/50 rounded-lg p-3">
+            <div className="bg-surface/50 rounded-lg p-3">
               <div className="text-lg font-bold text-amber-400">{(reportData as ReportData['agencyPainPoints'])?.summary?.highOpportunityMatches || 0}</div>
-              <div className="text-xs text-slate-500">High-Value Matches</div>
+              <div className="text-xs text-faint">High-Value Matches</div>
             </div>
           </div>
           {(reportData as ReportData['agencyPainPoints'])?.highOpportunityMatches?.slice(0, 5).map((match, idx) => (
             <div key={idx} className="p-3 bg-amber-500/10 border border-amber-500/30 rounded-lg">
               <div className="font-medium text-white">{match.agency}</div>
               <div className="text-sm text-amber-400 mt-1">{match.area}</div>
-              <div className="text-sm text-slate-400 mt-1">{match.painPoint}</div>
+              <div className="text-sm text-muted mt-1">{match.painPoint}</div>
             </div>
           ))}
           {(reportData as ReportData['agencyPainPoints'])?.painPoints?.slice(0, 10).map((pp, idx) => (
-            <div key={idx} className="p-3 bg-slate-800/50 rounded-lg">
+            <div key={idx} className="p-3 bg-surface/50 rounded-lg">
               <div className="font-medium text-white">{pp.agency}</div>
-              <div className="text-sm text-slate-400 mt-1">{pp.painPoint}</div>
+              <div className="text-sm text-muted mt-1">{pp.painPoint}</div>
             </div>
           ))}
           {((reportData as ReportData['agencyPainPoints'])?.painPoints?.length || 0) === 0 && hasLiveOpportunities && (
@@ -6066,14 +6066,14 @@ function ReportViewer({
             const isSaved = savedContacts.has(partnerKey);
             const isSaving = savingContact === partnerKey;
             return (
-              <div key={idx} className="p-3 bg-slate-800/50 rounded-lg">
+              <div key={idx} className="p-3 bg-surface/50 rounded-lg">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-white">{prime.name}</div>
-                    {prime.reason && <div className="text-sm text-slate-400 mt-1">{prime.reason}</div>}
+                    {prime.reason && <div className="text-sm text-muted mt-1">{prime.reason}</div>}
                     {prime.email && <div className="flex items-center gap-1 text-sm text-blue-400 mt-1"><Mail className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> {prime.email}</div>}
                     {prime.naicsCategories && prime.naicsCategories.length > 0 && (
-                      <div className="text-xs text-slate-500 mt-1">NAICS: {prime.naicsCategories.slice(0, 3).join(', ')}</div>
+                      <div className="text-xs text-faint mt-1">NAICS: {prime.naicsCategories.slice(0, 3).join(', ')}</div>
                     )}
                     {/* Real competitor intel — what they've won recently */}
                     <CompetitorAwardsExpander email={email} name={prime.name} />
@@ -6087,7 +6087,7 @@ function ReportViewer({
                         isSaved
                           ? 'bg-emerald-500/20 text-emerald-300 cursor-default'
                           : isSaving
-                            ? 'bg-slate-700 text-slate-400 cursor-wait'
+                            ? 'bg-input text-muted cursor-wait'
                             : 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30'
                       }`}
                     >
@@ -6111,24 +6111,24 @@ function ReportViewer({
       {/* Forecasts */}
       {reportId === 'forecast' && 'forecasts' in reportData && (
         <div className="space-y-3">
-          <div className="bg-slate-800/50 rounded-lg p-3 mb-4">
+          <div className="bg-surface/50 rounded-lg p-3 mb-4">
             <div className="text-lg font-bold text-white">{(reportData as ReportData['forecastList'])?.summary?.totalForecasts || 0}</div>
-            <div className="text-xs text-slate-500">Upcoming Forecasts</div>
+            <div className="text-xs text-faint">Upcoming Forecasts</div>
           </div>
           {(reportData as ReportData['forecastList'])?.forecasts?.slice(0, 10).map((forecast, idx) => {
             const oppKey = `forecast:${forecast.agency}:${forecast.description?.slice(0, 50)}`;
             const isTracked = savedOpportunities.has(oppKey);
             const isTracking = savingOpportunity === oppKey;
             return (
-              <div key={idx} className="p-3 bg-slate-800/50 rounded-lg">
+              <div key={idx} className="p-3 bg-surface/50 rounded-lg">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-white">{forecast.agency}</div>
-                    <div className="text-sm text-slate-400 mt-1 line-clamp-2">{forecast.description}</div>
+                    <div className="text-sm text-muted mt-1 line-clamp-2">{forecast.description}</div>
                     <div className="flex gap-4 mt-2 text-xs">
                       {forecast.estimatedValue && <span className="text-emerald-400">{forecast.estimatedValue}</span>}
-                      {forecast.quarter && <span className="text-slate-500">{forecast.quarter}</span>}
-                      {forecast.naicsCode && <span className="text-slate-500">NAICS {forecast.naicsCode}</span>}
+                      {forecast.quarter && <span className="text-faint">{forecast.quarter}</span>}
+                      {forecast.naicsCode && <span className="text-faint">NAICS {forecast.naicsCode}</span>}
                     </div>
                   </div>
                   {tier !== 'free' && (
@@ -6140,7 +6140,7 @@ function ReportViewer({
                         isTracked
                           ? 'bg-emerald-500/20 text-emerald-300 cursor-default'
                           : isTracking
-                            ? 'bg-slate-700 text-slate-400 cursor-wait'
+                            ? 'bg-input text-muted cursor-wait'
                             : 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30'
                       }`}
                     >
@@ -6165,22 +6165,22 @@ function ReportViewer({
       {reportId === 'vehicles' && 'contracts' in reportData && (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="bg-slate-800/50 rounded-lg p-3">
+            <div className="bg-surface/50 rounded-lg p-3">
               <div className="text-lg font-bold text-white">{formatCount((reportData as ReportData['idvContracts'])?.summary?.totalContracts)}</div>
-              <div className="text-xs text-slate-500">IDV Contracts</div>
+              <div className="text-xs text-faint">IDV Contracts</div>
             </div>
-            <div className="bg-slate-800/50 rounded-lg p-3">
+            <div className="bg-surface/50 rounded-lg p-3">
               <div className="text-lg font-bold text-emerald-400">{formatCurrency((reportData as ReportData['idvContracts'])?.summary?.totalValue)}</div>
-              <div className="text-xs text-slate-500">Total Value</div>
+              <div className="text-xs text-faint">Total Value</div>
             </div>
           </div>
           {(reportData as ReportData['idvContracts'])?.contracts?.slice(0, 10).map((contract, idx) => (
-            <div key={idx} className="p-3 bg-slate-800/50 rounded-lg">
+            <div key={idx} className="p-3 bg-surface/50 rounded-lg">
               <div className="font-medium text-white">{contract.recipientName}</div>
-              {contract.awardingAgencyName && <div className="text-xs text-slate-500">{contract.awardingAgencyName}</div>}
+              {contract.awardingAgencyName && <div className="text-xs text-faint">{contract.awardingAgencyName}</div>}
               <div className="flex gap-4 mt-2 text-sm">
                 <span className="text-emerald-400">{formatCurrency(contract.awardAmount)}</span>
-                {contract.naicsCode && <span className="text-slate-400">NAICS {contract.naicsCode}</span>}
+                {contract.naicsCode && <span className="text-muted">NAICS {contract.naicsCode}</span>}
               </div>
             </div>
           ))}
@@ -6199,23 +6199,23 @@ function ReportViewer({
         <div className="space-y-3">
           {budgetReport?.summary && (
             <div className="grid grid-cols-2 gap-4 mb-4">
-              <div className="bg-slate-800/50 rounded-lg p-3">
+              <div className="bg-surface/50 rounded-lg p-3">
                 <div className="text-lg font-bold text-white">{formatCurrency(budgetReport.summary.totalFY2026)}</div>
-                <div className="text-xs text-slate-500">FY26 Budget Authority</div>
+                <div className="text-xs text-faint">FY26 Budget Authority</div>
               </div>
-              <div className="bg-slate-800/50 rounded-lg p-3">
+              <div className="bg-surface/50 rounded-lg p-3">
                 <div className="text-lg font-bold text-emerald-400">{budgetReport.summary.agenciesGrowing || 0}</div>
-                <div className="text-xs text-slate-500">Agencies Growing</div>
+                <div className="text-xs text-faint">Agencies Growing</div>
               </div>
             </div>
           )}
           {budgetRows.slice(0, 10).map((agency, idx) => {
             const isGrowing = agency.changePercent >= 0;
             return (
-              <div key={`${agency.name}-${idx}`} className="p-3 bg-slate-800/50 rounded-lg">
+              <div key={`${agency.name}-${idx}`} className="p-3 bg-surface/50 rounded-lg">
                 <div className="font-medium text-white">{agency.name}</div>
                 <div className="flex flex-wrap gap-4 mt-2 text-sm">
-                  <span className="text-slate-400">FY25: {formatCurrency(agency.fy2025)}</span>
+                  <span className="text-muted">FY25: {formatCurrency(agency.fy2025)}</span>
                   <span className="text-white">FY26: {formatCurrency(agency.fy2026)}</span>
                   <span className={isGrowing ? 'text-emerald-400' : 'text-red-400'}>
                     {isGrowing ? '↑' : '↓'} {Math.abs(agency.changePercent).toFixed(1)}%
@@ -6226,7 +6226,7 @@ function ReportViewer({
             );
           })}
           {budgetRows.length === 0 && (
-            <p className="rounded-lg border border-slate-800 bg-slate-800/40 p-3 text-sm text-slate-400">
+            <p className="rounded-lg border border-surface bg-surface/40 p-3 text-sm text-muted">
               No cached budget-authority matches were found for this agency set. Try a parent agency name such as Department of Defense, Department of Veterans Affairs, or General Services Administration.
             </p>
           )}
@@ -6248,11 +6248,11 @@ function ReportViewer({
             const isSaved = savedContacts.has(partnerKey);
             const isSaving = savingContact === partnerKey;
             return (
-              <div key={idx} className="p-3 bg-slate-800/50 rounded-lg">
+              <div key={idx} className="p-3 bg-surface/50 rounded-lg">
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-white">{partner.name}</div>
-                    {partner.reason && <div className="text-sm text-slate-400 mt-1">{partner.reason}</div>}
+                    {partner.reason && <div className="text-sm text-muted mt-1">{partner.reason}</div>}
                     {partner.email && <div className="flex items-center gap-1 text-sm text-blue-400 mt-1"><Mail className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> {partner.email}</div>}
                     {partner.certifications && partner.certifications.length > 0 && (
                       <div className="flex gap-1 mt-2">
@@ -6273,7 +6273,7 @@ function ReportViewer({
                         isSaved
                           ? 'bg-emerald-500/20 text-emerald-300 cursor-default'
                           : isSaving
-                            ? 'bg-slate-700 text-slate-400 cursor-wait'
+                            ? 'bg-input text-muted cursor-wait'
                             : 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30'
                       }`}
                     >
@@ -6291,19 +6291,19 @@ function ReportViewer({
       {reportId === 'positioning' && 'needs' in reportData && (
         <div className="space-y-3">
           <div className="grid grid-cols-2 gap-4 mb-4">
-            <div className="bg-slate-800/50 rounded-lg p-3">
+            <div className="bg-surface/50 rounded-lg p-3">
               <div className="text-lg font-bold text-white">{(reportData as ReportData['agencyNeeds'])?.summary?.totalNeeds || 0}</div>
-              <div className="text-xs text-slate-500">Agency Needs</div>
+              <div className="text-xs text-faint">Agency Needs</div>
             </div>
-            <div className="bg-slate-800/50 rounded-lg p-3">
+            <div className="bg-surface/50 rounded-lg p-3">
               <div className="text-lg font-bold text-emerald-400">{(reportData as ReportData['agencyNeeds'])?.summary?.matchRate || 0}%</div>
-              <div className="text-xs text-slate-500">Match Rate</div>
+              <div className="text-xs text-faint">Match Rate</div>
             </div>
           </div>
           {(reportData as ReportData['agencyNeeds'])?.needs?.slice(0, 10).map((need, idx) => (
-            <div key={idx} className="p-3 bg-slate-800/50 rounded-lg">
+            <div key={idx} className="p-3 bg-surface/50 rounded-lg">
               <div className="font-medium text-white">{need.agency}</div>
-              <div className="text-sm text-slate-400 mt-1">{need.need}</div>
+              <div className="text-sm text-muted mt-1">{need.need}</div>
               {need.capabilityMatch && (
                 <div className="text-sm text-emerald-400 mt-1">{need.capabilityMatch}</div>
               )}

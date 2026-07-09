@@ -126,7 +126,7 @@
     },
     "src/components/app/panels/AlertsPanel.tsx": {
       "hex": 0,
-      "neutral": 180
+      "neutral": 34
     },
     "src/components/app/panels/BidDecisionGate.tsx": {
       "hex": 0,
@@ -206,7 +206,7 @@
     },
     "src/components/app/panels/MarketResearchPanel.tsx": {
       "hex": 0,
-      "neutral": 390
+      "neutral": 31
     },
     "src/components/app/panels/MiccMrrPanel.tsx": {
       "hex": 0,
@@ -218,7 +218,7 @@
     },
     "src/components/app/panels/MyTargetListPanel.tsx": {
       "hex": 0,
-      "neutral": 160
+      "neutral": 30
     },
     "src/components/app/panels/OsbpSmbResearchPanel.tsx": {
       "hex": 0,
@@ -226,7 +226,7 @@
     },
     "src/components/app/panels/PipelinePanel.tsx": {
       "hex": 0,
-      "neutral": 182
+      "neutral": 24
     },
     "src/components/app/panels/PipelinePreviewFree.tsx": {
       "hex": 0,
@@ -242,7 +242,7 @@
     },
     "src/components/app/panels/ProposalsPanel.tsx": {
       "hex": 0,
-      "neutral": 288
+      "neutral": 43
     },
     "src/components/app/panels/PursuitAssignment.tsx": {
       "hex": 0,
@@ -254,7 +254,7 @@
     },
     "src/components/app/panels/RecompetesPanel.tsx": {
       "hex": 0,
-      "neutral": 156
+      "neutral": 27
     },
     "src/components/app/panels/RelationshipsPanel.tsx": {
       "hex": 0,
@@ -274,11 +274,11 @@
     },
     "src/components/app/panels/UnifiedSettingsPanel.tsx": {
       "hex": 0,
-      "neutral": 118
+      "neutral": 8
     },
     "src/components/app/panels/VaultPanel.tsx": {
       "hex": 0,
-      "neutral": 154
+      "neutral": 7
     },
     "src/components/app/panels/index.tsx": {
       "hex": 0,
@@ -894,5 +894,5 @@
     }
   },
   "totalHex": 8,
-  "totalNeutral": 10472
+  "totalNeutral": 9048
 }

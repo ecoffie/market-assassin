@@ -496,7 +496,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
   const SortHeader = ({ field, children }: { field: typeof sortField; children: React.ReactNode }) => (
     <th
       onClick={() => handleSort(field)}
-      className="text-left px-4 py-3 text-xs text-slate-500 font-medium cursor-pointer hover:text-slate-300 transition-colors select-none"
+      className="text-left px-4 py-3 text-xs text-faint font-medium cursor-pointer hover:text-ink-soft transition-colors select-none"
     >
       <div className="flex items-center gap-1">
         {children}
@@ -791,7 +791,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
       case 'critical': return 'text-red-400 bg-red-500/20';
       case 'high': return 'text-amber-400 bg-amber-500/20';
       case 'medium': return 'text-blue-400 bg-blue-500/20';
-      default: return 'text-slate-400 bg-slate-500/20';
+      default: return 'text-muted bg-slate-500/20';
     }
   };
 
@@ -799,10 +799,10 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
     return (
       <div className="p-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-slate-800 rounded w-48" />
+          <div className="h-8 bg-surface rounded w-48" />
           <div className="grid grid-cols-6 gap-4">
             {[1, 2, 3, 4, 5, 6].map(i => (
-              <div key={i} className="h-64 bg-slate-800 rounded-xl" />
+              <div key={i} className="h-64 bg-surface rounded-xl" />
             ))}
           </div>
         </div>
@@ -840,11 +840,11 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                 lifetime history. Completed (won/lost/no-bid) and archived
                 pursuits are shown as a separate, muted count so the
                 headline number reflects the actual live workload. */}
-            <span className="rounded bg-slate-800 px-2 py-1 text-sm text-slate-300">
+            <span className="rounded bg-surface px-2 py-1 text-sm text-ink-soft">
               {activeOpportunities.length} active
             </span>
             {completedOpportunities.length > 0 && (
-              <span className="rounded bg-slate-800/60 px-2 py-1 text-sm text-slate-500">
+              <span className="rounded bg-surface/60 px-2 py-1 text-sm text-faint">
                 {completedOpportunities.length} completed
               </span>
             )}
@@ -861,11 +861,11 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <div className="flex bg-slate-800 rounded-lg p-1">
+          <div className="flex bg-surface rounded-lg p-1">
             <button
               onClick={() => setViewMode('board')}
               className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                viewMode === 'board' ? 'bg-slate-700 text-white' : 'text-slate-400'
+                viewMode === 'board' ? 'bg-input text-white' : 'text-muted'
               }`}
             >
               Board
@@ -873,7 +873,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
             <button
               onClick={() => setViewMode('list')}
               className={`px-3 py-1 text-sm rounded-md transition-colors ${
-                viewMode === 'list' ? 'bg-slate-700 text-white' : 'text-slate-400'
+                viewMode === 'list' ? 'bg-input text-white' : 'text-muted'
               }`}
             >
               List
@@ -889,7 +889,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
           </button>
           <button
             onClick={loadPipeline}
-            className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-400 text-sm rounded-lg transition-colors"
+            className="px-3 py-2 bg-surface hover:bg-input text-muted text-sm rounded-lg transition-colors"
           >
             ↻
           </button>
@@ -937,10 +937,10 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
         {ACTIVE_STAGES.map(stage => (
           <div
             key={stage.id}
-            className="flex items-center gap-2 px-4 py-2 bg-slate-900 border border-slate-800 rounded-lg shrink-0"
+            className="flex items-center gap-2 px-4 py-2 bg-ground border border-surface rounded-lg shrink-0"
           >
             <span>{stage.icon}</span>
-            <span className="text-slate-400 text-sm">{stage.label}:</span>
+            <span className="text-muted text-sm">{stage.label}:</span>
             {/* Use the SAME archive-aware client count as the board
                 columns. The server stats.byStage counts archived rows
                 too, so an archived 'tracking' pursuit showed Tracking: 1
@@ -954,7 +954,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
           <select
             value={noticeTypeFilter}
             onChange={(e) => setNoticeTypeFilter(e.target.value)}
-            className="px-3 py-2 rounded-lg border border-slate-800 bg-slate-900 text-sm text-slate-300 shrink-0 outline-none focus:border-purple-500"
+            className="px-3 py-2 rounded-lg border border-surface bg-ground text-sm text-ink-soft shrink-0 outline-none focus:border-purple-500"
             title="Filter by solicitation type"
           >
             <option value="all">All types</option>
@@ -967,7 +967,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
             pursuits (solo users never see it). Lets you see everyone's,
             just yours, or just your teammates'. */}
         {hasSharedPursuits && (
-          <div className="inline-flex rounded-lg border border-slate-800 bg-slate-900 p-0.5 shrink-0 text-sm">
+          <div className="inline-flex rounded-lg border border-surface bg-ground p-0.5 shrink-0 text-sm">
             {([
               { id: 'all', label: 'All' },
               { id: 'mine', label: 'Mine' },
@@ -976,7 +976,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
               <button
                 key={opt.id}
                 onClick={() => setOwnerFilter(opt.id)}
-                className={`px-3 py-1.5 rounded-md transition-colors ${ownerFilter === opt.id ? 'bg-purple-600 text-white' : 'text-slate-400 hover:text-white'}`}
+                className={`px-3 py-1.5 rounded-md transition-colors ${ownerFilter === opt.id ? 'bg-purple-600 text-white' : 'text-muted hover:text-white'}`}
                 title={opt.id === 'mine' ? 'Pursuits you own' : opt.id === 'others' ? "Teammates' pursuits" : 'Everyone on the team'}
               >
                 {opt.label}
@@ -991,7 +991,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
             className={`flex items-center gap-2 px-4 py-2 border rounded-lg shrink-0 transition-colors ${
               showCompleted
                 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-300'
-                : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                : 'bg-ground border-surface text-muted hover:border-hairline'
             }`}
           >
             <Flag className="h-4 w-4 shrink-0" strokeWidth={2} />
@@ -1008,8 +1008,8 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
             onClick={() => setShowArchived(!showArchived)}
             className={`flex items-center gap-2 px-4 py-2 border rounded-lg shrink-0 transition-colors ${
               showArchived
-                ? 'bg-slate-700/40 border-slate-500 text-slate-200'
-                : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
+                ? 'bg-input/40 border-slate-500 text-slate-200'
+                : 'bg-ground border-surface text-muted hover:border-hairline'
             }`}
           >
             <Archive className="h-4 w-4 shrink-0" strokeWidth={2} />
@@ -1024,7 +1024,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
           counts its matches so the user sees the size before applying. Toggling the
           active chip clears back to the full board. */}
       <div className="flex flex-wrap items-center gap-1.5 mb-4">
-        <span className="text-[11px] font-medium text-slate-500 mr-0.5">Views:</span>
+        <span className="text-[11px] font-medium text-faint mr-0.5">Views:</span>
         {SAVED_VIEWS.map((v) => {
           // Count over the current stage scope so the chip shows the view's size.
           const count = stageScoped.filter((o) => v.match(o, me)).length;
@@ -1036,17 +1036,17 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
               onClick={() => setActiveView(active ? null : v.id)}
               title={v.hint}
               className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
-                active ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
+                active ? 'bg-purple-600 text-white' : 'bg-surface text-ink-soft hover:bg-input'
               }`}
             >
-              <v.Icon className="h-3 w-3 shrink-0" strokeWidth={2} /> {v.label} <span className={active ? 'text-purple-200' : 'text-slate-500'}>{count}</span>
+              <v.Icon className="h-3 w-3 shrink-0" strokeWidth={2} /> {v.label} <span className={active ? 'text-purple-200' : 'text-faint'}>{count}</span>
             </button>
           );
         })}
         {activeView && (
           <button
             onClick={() => setActiveView(null)}
-            className="inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-300 ml-1"
+            className="inline-flex items-center gap-1 text-[11px] text-faint hover:text-ink-soft ml-1"
           >
             Clear view <X className="h-3 w-3 shrink-0" strokeWidth={2.5} />
           </button>
@@ -1060,11 +1060,11 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
       {viewMode === 'board' && (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
           {ACTIVE_STAGES.map(stage => (
-            <div key={stage.id} className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-              <div className={`px-4 py-3 ${stage.color} bg-opacity-20 border-b border-slate-800`}>
+            <div key={stage.id} className="bg-ground border border-surface rounded-xl overflow-hidden">
+              <div className={`px-4 py-3 ${stage.color} bg-opacity-20 border-b border-surface`}>
                 <div className="flex items-center justify-between">
                   <span className="text-sm font-medium text-white">{stage.icon} {stage.label}</span>
-                  <span className="text-xs bg-slate-800 px-2 py-0.5 rounded-full text-slate-400">
+                  <span className="text-xs bg-surface px-2 py-0.5 rounded-full text-muted">
                     {getOpportunitiesByStage(stage.id).length}
                   </span>
                 </div>
@@ -1082,7 +1082,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                         openOpportunity(opp);
                       }
                     }}
-                    className="p-3 bg-slate-800/50 hover:bg-slate-800 rounded-lg cursor-pointer transition-colors"
+                    className="p-3 bg-surface/50 hover:bg-surface rounded-lg cursor-pointer transition-colors"
                   >
                     <div className="text-sm text-white font-medium line-clamp-2 mb-2">
                       {opp.title}
@@ -1097,7 +1097,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                       </button>
                     )}
                     {opp.agency && (
-                      <div className="text-xs text-slate-500 mb-1">
+                      <div className="text-xs text-faint mb-1">
                         {opp.agency}
                         {formatDodaacOffice(opp.notice_id || null, dodaacNames) && (
                           <span className="inline-flex items-center gap-1 text-emerald-400/80"> · <Landmark className="h-3 w-3 shrink-0" strokeWidth={2} /> {formatDodaacOffice(opp.notice_id || null, dodaacNames)}</span>
@@ -1108,7 +1108,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                       <div className="mb-2 text-xs font-medium text-emerald-400">{opp.value_estimate}</div>
                     )}
                     <div className="flex items-center justify-between">
-                      <span className="text-xs text-slate-500">{formatDate(opp.response_deadline)}</span>
+                      <span className="text-xs text-faint">{formatDate(opp.response_deadline)}</span>
                       {opp.priority && (
                         <span className={`text-xs px-1.5 py-0.5 rounded ${getPriorityColor(opp.priority)}`}>
                           {opp.priority}
@@ -1116,7 +1116,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                       )}
                     </div>
                     {opp.next_action && (
-                      <div className="mt-2 text-xs text-slate-400 line-clamp-1">
+                      <div className="mt-2 text-xs text-muted line-clamp-1">
                         Next: {opp.next_action}
                       </div>
                     )}
@@ -1210,7 +1210,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                           event.stopPropagation();
                           moveOpportunityToStage(opp, event.target.value as PipelineStage);
                         }}
-                        className="w-full rounded-md border border-slate-700 bg-slate-900 px-2 py-1.5 text-xs text-slate-200 outline-none transition-colors hover:border-slate-500 focus:border-blue-500"
+                        className="w-full rounded-md border border-hairline bg-ground px-2 py-1.5 text-xs text-slate-200 outline-none transition-colors hover:border-slate-500 focus:border-blue-500"
                       >
                         {STAGES.map(item => (
                           <option key={item.id} value={item.id}>Move to {item.label}</option>
@@ -1218,7 +1218,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                       </select>
                     </label>
                     {opp.owner_email && (
-                      <div className="mt-1 text-[10px] text-slate-500">
+                      <div className="mt-1 text-[10px] text-faint">
                         Owner: {opp.owner_email}
                       </div>
                     )}
@@ -1230,7 +1230,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                           </span>
                         ))}
                         {opp.teaming_partners.length > 2 && (
-                          <span className="text-[10px] px-1.5 py-0.5 bg-slate-700 text-slate-400 rounded">
+                          <span className="text-[10px] px-1.5 py-0.5 bg-input text-muted rounded">
                             +{opp.teaming_partners.length - 2}
                           </span>
                         )}
@@ -1251,21 +1251,21 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
 
       {/* List View - Improved Table */}
       {viewMode === 'list' && opportunities.length > 0 && (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+        <div className="bg-ground border border-surface rounded-xl overflow-hidden">
           <div className="overflow-x-auto">
             <table className="w-full min-w-[980px]">
               <thead>
-                <tr className="border-b border-slate-800 bg-slate-900/50">
+                <tr className="border-b border-surface bg-ground/50">
                   <SortHeader field="title">Opportunity</SortHeader>
                   {showOwnerColumn && (
-                    <th className="text-center px-2 py-3 text-xs text-slate-500 font-medium w-16">Owner</th>
+                    <th className="text-center px-2 py-3 text-xs text-faint font-medium w-16">Owner</th>
                   )}
-                  <th className="text-left px-4 py-3 text-xs text-slate-500 font-medium">Notice Type</th>
+                  <th className="text-left px-4 py-3 text-xs text-faint font-medium">Notice Type</th>
                   <SortHeader field="stage">Stage</SortHeader>
                   <SortHeader field="deadline">Deadline</SortHeader>
                   <SortHeader field="priority">Priority</SortHeader>
-                  <th className="text-left px-4 py-3 text-xs text-slate-500 font-medium">Next Action</th>
-                  <th className="text-center px-2 py-3 text-xs text-slate-500 font-medium w-24">Actions</th>
+                  <th className="text-left px-4 py-3 text-xs text-faint font-medium">Next Action</th>
+                  <th className="text-center px-2 py-3 text-xs text-faint font-medium w-24">Actions</th>
                 </tr>
               </thead>
               <tbody>
@@ -1276,7 +1276,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                     <tr
                       key={opp.id}
                       onClick={() => openOpportunity(opp)}
-                      className={`border-b border-slate-800/50 hover:bg-slate-800/50 cursor-pointer transition-colors ${
+                      className={`border-b border-surface/50 hover:bg-surface/50 cursor-pointer transition-colors ${
                         urgency?.label === 'OVERDUE' ? 'bg-red-500/5' : ''
                       }`}
                     >
@@ -1296,11 +1296,11 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                         )}
                         <div className="flex items-center gap-2 mt-0.5">
                           {opp.notice_type && (
-                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-slate-700/50 text-slate-300 shrink-0" title={opp.notice_type}>
+                            <span className="text-[10px] px-1.5 py-0.5 rounded bg-input/50 text-ink-soft shrink-0" title={opp.notice_type}>
                               {noticeBucket(opp.notice_type)}
                             </span>
                           )}
-                          <span className="text-xs text-slate-500 line-clamp-1">{opp.agency || 'Unknown Agency'}</span>
+                          <span className="text-xs text-faint line-clamp-1">{opp.agency || 'Unknown Agency'}</span>
                         </div>
                         {opp.teaming_partners && opp.teaming_partners.length > 0 && (
                           <div className="mt-1.5 flex flex-wrap gap-1">
@@ -1310,7 +1310,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                               </span>
                             ))}
                             {opp.teaming_partners.length > 2 && (
-                              <span className="text-[10px] px-1.5 py-0.5 bg-slate-700 text-slate-400 rounded">
+                              <span className="text-[10px] px-1.5 py-0.5 bg-input text-muted rounded">
                                 +{opp.teaming_partners.length - 2}
                               </span>
                             )}
@@ -1327,7 +1327,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                             <div className="inline-flex items-center -space-x-1.5">
                               {opp.owner_email && (
                                 <span
-                                  className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-700 text-[10px] font-semibold uppercase text-slate-200 ring-1 ring-slate-900 z-10"
+                                  className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-input text-[10px] font-semibold uppercase text-slate-200 ring-1 ring-slate-900 z-10"
                                   title={`Owner: ${opp.owner_email}`}
                                 >
                                   {opp.owner_email.slice(0, 2)}
@@ -1343,7 +1343,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                                 </span>
                               ))}
                               {(opp.collaborators || []).length > 2 && (
-                                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-slate-800 text-[10px] font-medium text-slate-400 ring-1 ring-slate-900" title={(opp.collaborators || []).slice(2).join(', ')}>
+                                <span className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-surface text-[10px] font-medium text-muted ring-1 ring-slate-900" title={(opp.collaborators || []).slice(2).join(', ')}>
                                   +{(opp.collaborators || []).length - 2}
                                 </span>
                               )}
@@ -1369,7 +1369,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                               ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30'
                               : respondability === 'response'
                               ? 'bg-amber-500/15 text-amber-300 border-amber-500/30'
-                              : 'bg-slate-600/20 text-slate-300 border-slate-500/40';
+                              : 'bg-slate-600/20 text-ink-soft border-slate-500/40';
                           return (
                             <span
                               className={`inline-flex items-center rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide border line-clamp-1 ${styles}`}
@@ -1393,7 +1393,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                               event.stopPropagation();
                               moveOpportunityToStage(opp, event.target.value as PipelineStage);
                             }}
-                            className={`rounded-lg border border-slate-700 ${stageInfo?.color || 'bg-slate-800'} bg-opacity-20 px-3 py-1.5 text-xs text-white font-medium outline-none transition-colors hover:border-slate-500 focus:border-blue-500 cursor-pointer`}
+                            className={`rounded-lg border border-hairline ${stageInfo?.color || 'bg-surface'} bg-opacity-20 px-3 py-1.5 text-xs text-white font-medium outline-none transition-colors hover:border-slate-500 focus:border-blue-500 cursor-pointer`}
                           >
                             {STAGES.map(item => (
                               <option key={item.id} value={item.id}>{item.icon} {item.label}</option>
@@ -1405,7 +1405,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                       {/* Deadline with Urgency Badge */}
                       <td className="px-4 py-3">
                         <div className="flex items-center gap-2">
-                          <span className="text-sm text-slate-300">{formatDate(opp.response_deadline)}</span>
+                          <span className="text-sm text-ink-soft">{formatDate(opp.response_deadline)}</span>
                           {urgency && (
                             <span className={`text-[10px] px-1.5 py-0.5 rounded font-semibold ${urgency.color}`}>
                               {urgency.label}
@@ -1428,11 +1428,11 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                       {/* Next Action — computed when the user hasn't set one (#54). */}
                       <td className="px-4 py-3 max-w-[200px]">
                         <div>
-                          <div className={`text-xs line-clamp-1 ${opp.next_action ? 'text-slate-300' : 'text-slate-400 italic'}`}>
+                          <div className={`text-xs line-clamp-1 ${opp.next_action ? 'text-ink-soft' : 'text-muted italic'}`}>
                             {suggestedNextAction(opp)}
                           </div>
                           {opp.next_action_date && (
-                            <div className="text-[10px] text-slate-500 mt-0.5">
+                            <div className="text-[10px] text-faint mt-0.5">
                               Due: {formatDate(opp.next_action_date)}
                             </div>
                           )}
@@ -1501,7 +1501,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                               archiveOpportunity(opp);
                             }}
                             title="Archive (hide from active view)"
-                            className="inline-flex items-center text-slate-500 hover:text-slate-200 px-1.5 py-1 rounded hover:bg-slate-800 transition-colors"
+                            className="inline-flex items-center text-faint hover:text-slate-200 px-1.5 py-1 rounded hover:bg-surface transition-colors"
                           >
                             {opp.is_archived ? <Undo2 className="h-3.5 w-3.5" strokeWidth={2} /> : <Archive className="h-3.5 w-3.5" strokeWidth={2} />}
                           </button>
@@ -1518,30 +1518,30 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
 
       {/* Empty State */}
       {!loading && opportunities.length === 0 && !error && (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-8">
+        <div className="bg-ground border border-surface rounded-xl p-8">
           <div className="text-center mb-8">
             <div className="mb-4 flex justify-center"><TrendingUp className="h-11 w-11 text-faint" strokeWidth={1.5} /></div>
             <h3 className="text-xl font-semibold text-white mb-2">Start Your Pipeline</h3>
-            <p className="text-slate-400 max-w-lg mx-auto">
+            <p className="text-muted max-w-lg mx-auto">
               Track opportunities through your pursuit process. Add from Market Research, alerts, or forecasts.
             </p>
           </div>
 
           <div className="grid md:grid-cols-3 gap-4 max-w-2xl mx-auto">
-            <div className="bg-slate-800/50 rounded-lg p-4">
+            <div className="bg-surface/50 rounded-lg p-4">
               <BarChart3 className="h-5 w-5 mb-2 text-muted" strokeWidth={1.75} />
               <h4 className="text-sm font-medium text-white mb-1">Market Research</h4>
-              <p className="text-xs text-slate-500">Click &quot;Track in Pipeline&quot; on any forecast opportunity</p>
+              <p className="text-xs text-faint">Click &quot;Track in Pipeline&quot; on any forecast opportunity</p>
             </div>
-            <div className="bg-slate-800/50 rounded-lg p-4">
+            <div className="bg-surface/50 rounded-lg p-4">
               <Bell className="h-5 w-5 mb-2 text-muted" strokeWidth={1.75} />
               <h4 className="text-sm font-medium text-white mb-1">Daily Alerts</h4>
-              <p className="text-xs text-slate-500">Track opportunities from your personalized alerts</p>
+              <p className="text-xs text-faint">Track opportunities from your personalized alerts</p>
             </div>
-            <div className="bg-slate-800/50 rounded-lg p-4">
+            <div className="bg-surface/50 rounded-lg p-4">
               <Sparkles className="h-5 w-5 mb-2 text-muted" strokeWidth={1.75} />
               <h4 className="text-sm font-medium text-white mb-1">Forecasts</h4>
-              <p className="text-xs text-slate-500">Add upcoming procurements to track early</p>
+              <p className="text-xs text-faint">Add upcoming procurements to track early</p>
             </div>
           </div>
         </div>
@@ -1832,12 +1832,12 @@ function PipelineEditDrawer({
         className="fixed inset-0 bg-black/50 backdrop-blur-sm z-40"
         onClick={onClose}
       />
-      <aside className="fixed right-0 top-0 h-full w-full max-w-xl bg-slate-950 border-l border-slate-800 z-50 overflow-y-auto shadow-2xl">
-        <div className="sticky top-0 bg-slate-950/95 backdrop-blur border-b border-slate-800 p-5 flex items-start justify-between gap-4">
+      <aside className="fixed right-0 top-0 h-full w-full max-w-xl bg-ground-deep border-l border-surface z-50 overflow-y-auto shadow-2xl">
+        <div className="sticky top-0 bg-ground-deep/95 backdrop-blur border-b border-surface p-5 flex items-start justify-between gap-4">
           <div>
-            <p className="text-xs text-slate-500 uppercase tracking-wider">Pipeline Pursuit</p>
+            <p className="text-xs text-faint uppercase tracking-wider">Pipeline Pursuit</p>
             <h2 className="text-lg font-semibold text-white mt-1 line-clamp-2">{opportunity.title}</h2>
-            <p className="text-sm text-slate-500 mt-1">{opportunity.agency || 'Unknown Agency'}</p>
+            <p className="text-sm text-faint mt-1">{opportunity.agency || 'Unknown Agency'}</p>
             {/* On-demand incumbent intel (#57) — who holds this work now (real
                 ceiling/expiry/vehicle), fetched on click. Grounds "is this worth
                 pursuing?" without bulk API cost. */}
@@ -1851,7 +1851,7 @@ function PipelineEditDrawer({
           </div>
           <button
             onClick={onClose}
-            className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+            className="p-2 text-muted hover:text-white hover:bg-surface rounded-lg transition-colors"
             aria-label="Close pipeline editor"
           >
             X
@@ -1863,9 +1863,9 @@ function PipelineEditDrawer({
               whether RFP docs are attached BEFORE entering the proposal
               wizard. Previously the drawer showed neither, so users
               walked into "no attachments" blind. */}
-          <div className="bg-slate-900 border border-slate-800 rounded-lg p-3 space-y-2">
+          <div className="bg-ground border border-surface rounded-lg p-3 space-y-2">
             <div className="flex items-center justify-between gap-3">
-              <div className="text-xs text-slate-500">Source</div>
+              <div className="text-xs text-faint">Source</div>
               {(() => {
                 const samUrl = opportunity.external_url
                   || (opportunity.notice_id ? `https://sam.gov/opp/${opportunity.notice_id}/view` : null);
@@ -1884,7 +1884,7 @@ function PipelineEditDrawer({
               })()}
             </div>
             {opportunity.notice_id && (
-              <div className="text-[11px] font-mono text-slate-500 break-all">
+              <div className="text-[11px] font-mono text-faint break-all">
                 Notice: {opportunity.notice_id}
               </div>
             )}
@@ -1941,7 +1941,7 @@ function PipelineEditDrawer({
                 );
               } else {
                 body = (
-                  <span className="inline-flex items-center gap-1 text-slate-400">
+                  <span className="inline-flex items-center gap-1 text-muted">
                     <Inbox className="h-3 w-3 shrink-0" strokeWidth={2} /> No attachments on this notice — that&apos;s normal for many notice types. The wizard works from the metadata.{RetryLink}
                   </span>
                 );
@@ -1959,8 +1959,8 @@ function PipelineEditDrawer({
                     onChange={onManualUpload}
                     className="hidden"
                   />
-                  {uploadMsg && <div className="mt-1 text-[11px] text-slate-500">{uploadMsg}</div>}
-                  {refetchMsg && <div className="mt-1 text-[11px] text-slate-500">{refetchMsg}</div>}
+                  {uploadMsg && <div className="mt-1 text-[11px] text-faint">{uploadMsg}</div>}
+                  {refetchMsg && <div className="mt-1 text-[11px] text-faint">{refetchMsg}</div>}
                 </div>
               );
             })()}
@@ -1968,7 +1968,7 @@ function PipelineEditDrawer({
             {/* The actual files. Each row: filename + size, link to view
                 on SAM. This is what users expect to "see the documents". */}
             {docList.length > 0 && (
-              <ul className="mt-2 space-y-1.5 border-t border-slate-800 pt-2">
+              <ul className="mt-2 space-y-1.5 border-t border-surface pt-2">
                 {docList.map((d) => (
                   <li key={d.id} className="flex items-center justify-between gap-3 text-xs">
                     <span className="flex items-center gap-1.5 min-w-0">
@@ -1978,7 +1978,7 @@ function PipelineEditDrawer({
                         <span className="shrink-0" title={d.extraction_error}><AlertTriangle className="h-3.5 w-3.5 text-amber-400" strokeWidth={2} /></span>
                       )}
                     </span>
-                    <span className="flex items-center gap-2 shrink-0 text-slate-500">
+                    <span className="flex items-center gap-2 shrink-0 text-faint">
                       {typeof d.size_bytes === 'number' && d.size_bytes > 0 && (
                         <span>{(d.size_bytes / 1024).toFixed(0)} KB</span>
                       )}
@@ -2005,7 +2005,7 @@ function PipelineEditDrawer({
                 it can be long. This is the working surface, so the full
                 description belongs here. */}
             {opportunity.notice_id && (
-              <div className="mt-2 border-t border-slate-800 pt-2">
+              <div className="mt-2 border-t border-surface pt-2">
                 {!fullDescription && !descLoading && (
                   <button
                     type="button"
@@ -2018,7 +2018,7 @@ function PipelineEditDrawer({
                 {descLoading && <div className="text-[11px] text-slate-600">Loading description…</div>}
                 {descError && <div className="text-[11px] text-amber-400">{descError}</div>}
                 {fullDescription && (
-                  <div className="max-h-64 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-slate-300">
+                  <div className="max-h-64 overflow-y-auto whitespace-pre-wrap text-xs leading-relaxed text-ink-soft">
                     {fullDescription}
                   </div>
                 )}
@@ -2027,14 +2027,14 @@ function PipelineEditDrawer({
           </div>
 
           <div className="grid grid-cols-2 gap-3">
-            <div className="bg-slate-900 border border-slate-800 rounded-lg p-3">
-              <div className="text-xs text-slate-500">Response Due</div>
+            <div className="bg-ground border border-surface rounded-lg p-3">
+              <div className="text-xs text-faint">Response Due</div>
               <div className="text-white font-medium mt-1">
                 {opportunity.response_deadline ? new Date(opportunity.response_deadline).toLocaleDateString() : 'No deadline'}
               </div>
             </div>
-            <div className="bg-slate-900 border border-slate-800 rounded-lg p-3">
-              <div className="text-xs text-slate-500">NAICS</div>
+            <div className="bg-ground border border-surface rounded-lg p-3">
+              <div className="text-xs text-faint">NAICS</div>
               {(() => {
                 if (!opportunity.naics_code) return <div className="text-white font-medium mt-1">-</div>;
                 const naicsEntry = getNaics(opportunity.naics_code);
@@ -2042,7 +2042,7 @@ function PipelineEditDrawer({
                   <div className="mt-1">
                     <div className="text-white font-medium font-mono text-sm">{opportunity.naics_code}</div>
                     {naicsEntry && (
-                      <div className="text-xs text-slate-400 mt-0.5" title={naicsEntry.title}>
+                      <div className="text-xs text-muted mt-0.5" title={naicsEntry.title}>
                         {naicsEntry.title}
                       </div>
                     )}
@@ -2054,11 +2054,11 @@ function PipelineEditDrawer({
 
           <div className="grid md:grid-cols-2 gap-4">
             <label className="block">
-              <span className="text-sm text-slate-300">Stage</span>
+              <span className="text-sm text-ink-soft">Stage</span>
               <select
                 value={stage}
                 onChange={(event) => setStage(event.target.value as PipelineStage)}
-                className="mt-1 w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-white focus:border-blue-500 outline-none"
+                className="mt-1 w-full px-3 py-2 bg-ground border border-surface rounded-lg text-white focus:border-blue-500 outline-none"
               >
                 {STAGES.map(item => (
                   <option key={item.id} value={item.id}>{item.label}</option>
@@ -2067,11 +2067,11 @@ function PipelineEditDrawer({
             </label>
 
             <label className="block">
-              <span className="text-sm text-slate-300">Priority</span>
+              <span className="text-sm text-ink-soft">Priority</span>
               <select
                 value={priority}
                 onChange={(event) => setPriority(event.target.value as PipelinePriority)}
-                className="mt-1 w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-white focus:border-blue-500 outline-none"
+                className="mt-1 w-full px-3 py-2 bg-ground border border-surface rounded-lg text-white focus:border-blue-500 outline-none"
               >
                 {PRIORITIES.map(item => (
                   <option key={item.id} value={item.id}>{item.label}</option>
@@ -2082,7 +2082,7 @@ function PipelineEditDrawer({
 
           <div className="grid md:grid-cols-2 gap-4">
             <label className="block">
-              <span className="text-sm text-slate-300">Win Probability</span>
+              <span className="text-sm text-ink-soft">Win Probability</span>
               <input
                 type="number"
                 min="0"
@@ -2090,23 +2090,23 @@ function PipelineEditDrawer({
                 value={winProbability}
                 onChange={(event) => setWinProbability(event.target.value)}
                 placeholder="0-100"
-                className="mt-1 w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 outline-none"
+                className="mt-1 w-full px-3 py-2 bg-ground border border-surface rounded-lg text-white placeholder-faint focus:border-blue-500 outline-none"
               />
             </label>
 
             <label className="block">
-              <span className="text-sm text-slate-300">Next Action Date</span>
+              <span className="text-sm text-ink-soft">Next Action Date</span>
               <input
                 type="date"
                 value={nextActionDate}
                 onChange={(event) => setNextActionDate(event.target.value)}
-                className="mt-1 w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-white focus:border-blue-500 outline-none"
+                className="mt-1 w-full px-3 py-2 bg-ground border border-surface rounded-lg text-white focus:border-blue-500 outline-none"
               />
             </label>
           </div>
 
           <div className="block">
-            <span className="text-sm text-slate-300">Assignment</span>
+            <span className="text-sm text-ink-soft">Assignment</span>
             <div className="mt-1">
               <PursuitAssignment
                 email={email}
@@ -2119,19 +2119,19 @@ function PipelineEditDrawer({
           </div>
 
           <label className="block">
-            <span className="text-sm text-slate-300">Next Action</span>
+            <span className="text-sm text-ink-soft">Next Action</span>
             <input
               value={nextAction}
               onChange={(event) => setNextAction(event.target.value)}
               placeholder="Call CO, qualify set-aside, identify teaming partner..."
-              className="mt-1 w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 outline-none"
+              className="mt-1 w-full px-3 py-2 bg-ground border border-surface rounded-lg text-white placeholder-faint focus:border-blue-500 outline-none"
             />
           </label>
 
           <div className="space-y-3">
             <div>
-              <span className="text-sm text-slate-300">Teaming Partners</span>
-              <p className="text-xs text-slate-500 mt-0.5">Attach saved CRM partners to this pursuit.</p>
+              <span className="text-sm text-ink-soft">Teaming Partners</span>
+              <p className="text-xs text-faint mt-0.5">Attach saved CRM partners to this pursuit.</p>
             </div>
 
             {savedPartners.length > 0 ? (
@@ -2144,7 +2144,7 @@ function PipelineEditDrawer({
                       className={`flex items-start gap-2 p-3 rounded-lg border cursor-pointer transition-colors ${
                         checked
                           ? 'bg-blue-500/10 border-blue-500/40'
-                          : 'bg-slate-900 border-slate-800 hover:border-slate-700'
+                          : 'bg-ground border-surface hover:border-hairline'
                       }`}
                     >
                       <input
@@ -2155,7 +2155,7 @@ function PipelineEditDrawer({
                       />
                       <span>
                         <span className="block text-sm text-white">{partner.partner_name}</span>
-                        <span className="block text-xs text-slate-500">
+                        <span className="block text-xs text-faint">
                           {[partner.partner_type, partner.contact_name].filter(Boolean).join(' • ') || 'Saved partner'}
                         </span>
                       </span>
@@ -2164,7 +2164,7 @@ function PipelineEditDrawer({
                 })}
               </div>
             ) : (
-              <div className="p-3 bg-slate-900 border border-slate-800 rounded-lg text-sm text-slate-500">
+              <div className="p-3 bg-ground border border-surface rounded-lg text-sm text-faint">
                 No saved teaming partners yet.
               </div>
             )}
@@ -2180,13 +2180,13 @@ function PipelineEditDrawer({
                   }
                 }}
                 placeholder="Quick-add partner company"
-                className="flex-1 px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 outline-none"
+                className="flex-1 px-3 py-2 bg-ground border border-surface rounded-lg text-white placeholder-faint focus:border-blue-500 outline-none"
               />
               <button
                 type="button"
                 onClick={addQuickPartner}
                 disabled={isCreatingPartner || !quickPartnerName.trim()}
-                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 rounded-lg transition-colors"
+                className="px-3 py-2 bg-surface hover:bg-input disabled:opacity-50 text-slate-200 rounded-lg transition-colors"
               >
                 {isCreatingPartner ? 'Adding...' : 'Add'}
               </button>
@@ -2210,19 +2210,19 @@ function PipelineEditDrawer({
           </div>
 
           <label className="block">
-            <span className="text-sm text-slate-300">Notes</span>
+            <span className="text-sm text-ink-soft">Notes</span>
             <textarea
               value={notes}
               onChange={(event) => setNotes(event.target.value)}
               rows={6}
               placeholder="Capture strategy, customer fit, requirements, blockers..."
-              className="mt-1 w-full px-3 py-2 bg-slate-900 border border-slate-800 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 outline-none resize-none"
+              className="mt-1 w-full px-3 py-2 bg-ground border border-surface rounded-lg text-white placeholder-faint focus:border-blue-500 outline-none resize-none"
             />
           </label>
 
           {/* Team discussion — threaded comments on this pursuit. Only for saved rows. */}
           {opportunity.id && (
-            <div className="border-t border-slate-800 pt-3">
+            <div className="border-t border-surface pt-3">
               <PursuitComments pipelineId={opportunity.id} email={email} />
             </div>
           )}
@@ -2231,7 +2231,7 @@ function PipelineEditDrawer({
             <button
               onClick={submitUpdates}
               disabled={isSaving}
-              className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 text-white font-medium rounded-lg transition-colors"
+              className="flex-1 px-4 py-3 bg-blue-600 hover:bg-blue-500 disabled:bg-surface disabled:text-faint text-white font-medium rounded-lg transition-colors"
             >
               {isSaving ? 'Saving...' : 'Save Changes'}
             </button>
