@@ -3882,3 +3882,29 @@ de-facto styling → a visual NO-OP. Migrated 3 TeamPanel cards to `<Card>` as t
 adoption, which DROPPED raw-neutral color count (−6 in TeamPanel vs +5 in the sanctioned
 Card owner = net −1). Full build ✓, tsc clean, drift guard clean. Adoption is
 going-forward; the guard nudges the rest.
+
+---
+
+## Design polish — type scale + dead-motion cleanup (Phase 4, Jul 9 2026)
+
+**What:** Added a named **type scale** to the in-app design system — `text-page` (24/700),
+`text-title` (17/600), `text-eyebrow` (11/600 tracked), `text-micro` (10) — each bundling
+size + line-height + weight so a single class is a complete heading/label style. Wired
+`text-title` into the shared `CardHeader`. Also removed 7 truly-dead decorative CSS classes
+(glow-cyan, text-gradient, status-dot, animate-connector-pulse, animate-fade-in/slide-up +
+their orphaned keyframes).
+
+**Why:** The app had NO heading step — 942 `text-xs` / 898 `text-sm` and a pile of arbitrary
+px sizes (`text-[10px]`×187, `text-[11px]`×154), with headings picked ad-hoc from
+lg/xl/2xl. A real, named heading step is what makes a UI read as designed rather than
+assembled. Verified (not assumed) which motion was dead before deleting — live marketing
+motion was left untouched to avoid a regression.
+
+**SEO/positioning:** Completes the visible layer of the "enterprise-grade" system for
+getmindy.ai (color → icons → surface → type). A consistent type hierarchy is the last
+big tell that separates polished SaaS from a prototype.
+
+**Proof:** Type utilities generate real Tailwind v4 rules (verified in built CSS:
+`.text-title{font-size:1.0625rem;line-height:1.5rem;font-weight:600}`). Dead-motion removal
+verified 0-use across all source (tsx/ts/html, incl. dynamic refs) before deletion; CSS
+brace balance checked. Full build ✓, tsc clean, drift guard clean. Adopt going forward.

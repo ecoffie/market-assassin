@@ -42,6 +42,32 @@ A restrained 3-step scale — stop jumping straight to `shadow-2xl`:
 | `shadow-overlay` | popovers, drawers, sticky bars |
 | `shadow-modal` | dialogs / command palette |
 
+## Type scale (Phase 4)
+
+The app had **no heading step** — 942 `text-xs` / 898 `text-sm` and a pile of arbitrary
+px sizes (`text-[10px]`×187, `text-[11px]`×154), with headings picked ad-hoc from
+`text-lg`/`xl`/`2xl`. These named roles give new headings/labels a system to use. Each
+utility bundles size + line-height + weight, so the class alone is a complete style:
+
+| Utility | Size | Use for |
+|---------|------|---------|
+| `text-page` | 24px / 700 | panel or page H1 |
+| `text-title` | 17px / 600 | card / section heading (a real step above body) |
+| `text-eyebrow` | 11px / 600, tracked | uppercase labels |
+| `text-micro` | 10px | dense meta / caption (unifies `text-[10px]`/`[11px]`) |
+
+Body stays `text-sm`, secondary `text-xs` — unchanged. Adopt going forward (e.g.
+`CardHeader` already uses `text-title`); migrate ad-hoc heading sizes opportunistically.
+
+## Motion (Phase 4 cleanup)
+
+Dead decorative CSS was removed (0 usages anywhere): `glow-cyan`, `text-gradient`,
+`status-dot`, `animate-connector-pulse`, `animate-fade-in`, `animate-slide-up` (+ their
+orphaned `@keyframes`). Motion still in use elsewhere (`glow-blue`, `glow-amber`,
+`glow-emerald`, `animate-kitt`, `animate-shimmer`, `animate-glow-pulse`,
+`premium/standard-gradient`) was LEFT — it's referenced by live (mostly marketing) surfaces;
+removing it would be a regression, not cleanup.
+
 ## The `<Card>` primitive (Phase 3)
 
 `src/components/ui/Card.tsx` is the ONE owner of the card shell
@@ -74,4 +100,5 @@ for the shell's raw classes — it's recorded in the drift baseline, exactly lik
 - **P1** ✅ semantic color tokens + drift guard (no visual change)
 - **P2** ✅ collapse two blues → one `bg-navy`; emoji→lucide across all panels
 - **P3** ✅ radius/shadow tokens + `<Card>` primitive (this doc), adopt going forward
-- **P4** (next) type scale (no heading step today: 853 `text-xs` / 772 `text-sm`) + delete dead marketing motion (glow/shimmer/KITT) + finish the raw-neutral → token migration by screen traffic.
+- **P4** ✅ type scale (`text-page`/`title`/`eyebrow`/`micro`, wired into `CardHeader`) + deleted 7 truly-dead motion classes. Adopt going forward.
+- **P5** (remaining) the raw-neutral → token migration (~10,557 usages) by screen traffic; adopt `<Card>` + type roles across panels as screens are touched.
