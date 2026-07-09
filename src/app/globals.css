@@ -104,6 +104,36 @@
   --shadow-raised:  0 1px 2px 0 rgb(2 6 23 / 0.4), 0 1px 3px 0 rgb(2 6 23 / 0.3);
   --shadow-overlay: 0 4px 12px -2px rgb(2 6 23 / 0.5), 0 2px 6px -2px rgb(2 6 23 / 0.4);
   --shadow-modal:   0 16px 40px -8px rgb(2 6 23 / 0.65), 0 6px 16px -6px rgb(2 6 23 / 0.5);
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     TYPE SCALE (Phase 4 — de-vibe-coding, Jul 2026)
+     The app had NO heading step — 942 text-xs / 898 text-sm and a pile of
+     arbitrary px sizes (text-[10px]×187, text-[11px]×154) with headings picked
+     ad-hoc from text-lg/xl/2xl. These add a NAMED heading + micro scale by ROLE so
+     new headings/labels stop being one-off sizes. Each utility carries size +
+     line-height + weight, so `text-title` alone is a complete heading style.
+     Roles (use `text-<role>`):
+       page   = panel/page H1        (was ~text-2xl bold)
+       title  = card/section heading (was ~text-lg/base semibold)
+       eyebrow= uppercase label      (was text-[11px]/text-xs tracked)
+       micro  = dense meta/caption    (unifies text-[10px]/[11px])
+     Body stays text-sm; secondary text-xs — unchanged.
+     ───────────────────────────────────────────────────────────────────────── */
+  --text-page:    1.5rem;      /* 24px */
+  --text-page--line-height: 2rem;
+  --text-page--font-weight: 700;
+
+  --text-title:   1.0625rem;   /* 17px — a real step above body, below page */
+  --text-title--line-height: 1.5rem;
+  --text-title--font-weight: 600;
+
+  --text-eyebrow: 0.6875rem;   /* 11px — unifies the tracked-label one-offs */
+  --text-eyebrow--line-height: 1rem;
+  --text-eyebrow--font-weight: 600;
+  --text-eyebrow--letter-spacing: 0.06em;
+
+  --text-micro:   0.625rem;    /* 10px — unifies text-[10px]/[11px] meta/caption */
+  --text-micro--line-height: 0.875rem;
 }
 
 body {
@@ -144,31 +174,6 @@ body {
 /* Glow effects for accents */
 .glow-blue {
   box-shadow: 0 0 20px rgba(59, 130, 246, 0.3);
-}
-
-.glow-cyan {
-  box-shadow: 0 0 20px rgba(34, 211, 238, 0.3);
-}
-
-/* Gradient text */
-.text-gradient {
-  background: linear-gradient(135deg, var(--accent-blue) 0%, var(--accent-cyan) 100%);
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  background-clip: text;
-}
-
-/* Status indicators */
-.status-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  animation: pulse 2s infinite;
-}
-
-@keyframes pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
 }
 
 /* KITT-style scanning animation */
@@ -246,16 +251,6 @@ body {
   animation: shimmer 3s ease-in-out infinite;
 }
 
-/* Step connector animation */
-@keyframes connector-pulse {
-  0%, 100% { opacity: 0.3; }
-  50% { opacity: 0.8; }
-}
-
-.animate-connector-pulse {
-  animation: connector-pulse 2s ease-in-out infinite;
-}
-
 /* Premium badge gradient */
 .premium-gradient {
   background: linear-gradient(135deg, #f59e0b 0%, #f97316 50%, #eab308 100%);
@@ -264,25 +259,6 @@ body {
 /* Standard tier gradient */
 .standard-gradient {
   background: linear-gradient(135deg, #3b82f6 0%, #22d3ee 100%);
-}
-
-/* Modal animations */
-@keyframes fadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-@keyframes slideUp {
-  from { transform: translateY(20px); opacity: 0; }
-  to { transform: translateY(0); opacity: 1; }
-}
-
-.animate-fade-in {
-  animation: fadeIn 0.2s ease-out;
-}
-
-.animate-slide-up {
-  animation: slideUp 0.3s ease-out;
 }
 
 /* Hide scrollbar utility */
