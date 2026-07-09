@@ -3908,3 +3908,25 @@ big tell that separates polished SaaS from a prototype.
 `.text-title{font-size:1.0625rem;line-height:1.5rem;font-weight:600}`). Dead-motion removal
 verified 0-use across all source (tsx/ts/html, incl. dynamic refs) before deletion; CSS
 brace balance checked. Full build ✓, tsc clean, drift guard clean. Adopt going forward.
+
+---
+
+## Design polish — P5 raw-neutral → token migration begins (Dashboard, Jul 9 2026)
+
+**What:** Started the final de-vibe-coding phase — migrating raw `slate/gray` color classes
+to the semantic token system, by screen traffic. **DashboardPanel** (the most-seen screen)
+is the reference pass: 91 raw-neutral usages → 6 (−85, a 93% reduction). Added two tokens for
+the highest-frequency shades that lacked one: `bg-input` (slate-700, input/chip fill, 145×
+app-wide) and `text-ink-soft` (slate-300, bright secondary text, 309× app-wide).
+
+**Why:** After color tokens, icons, surface, and type (P1–P4), the last inconsistency was that
+0/295 files actually USED the tokens — 207 hard-coded raw slate/gray. Routing every color
+through named tokens is what lets the whole app be re-themed or audited in one place, and stops
+the per-component drift that reads as "vibe-coded." Migrating by screen traffic means the
+busiest surfaces get consistent first.
+
+**Proof:** Every swap is a verified visual NO-OP — each token's hex is identical to the slate
+shade it replaces (confirmed in built CSS, e.g. `.bg-input\/40{#33415566}`,
+`.text-ink-soft{#cbd5e1}`, `.border-surface{#1e293b}`). Shades with no exact-hex token were
+deliberately LEFT (migrating them would change the color). Drift-guard baseline dropped
+10,557→10,472; the guard blocks any regression. tsc clean, production build ✓.

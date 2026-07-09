@@ -17,10 +17,18 @@ pre-push gate). The number of raw-color / arbitrary-hex usages can only trend DO
 
 Use these utilities, **never** raw `slate/gray/zinc` or arbitrary `[#hex]`:
 
-- Grounds/surfaces: `bg-ground` `bg-ground-deep` `bg-surface` `bg-surface-2` · borders `border-hairline`
-- Text: `text-ink` (primary) · `text-muted` (secondary) · `text-faint` (tertiary/disabled)
+- Grounds/surfaces: `bg-ground` (slate-900) · `bg-ground-deep` (950) · `bg-surface` (800) · `bg-surface-2` (raised) · `bg-input` (slate-700 — input/chip fill, most-raised) · borders `border-hairline` (700), `border-surface` (800)
+- Text: `text-ink` (primary, slate-50) · `text-ink-soft` (bright secondary, slate-300) · `text-muted` (secondary, slate-400) · `text-faint` (tertiary/disabled, slate-500) · `placeholder-faint`
 - Brand: `bg-navy`/`text-navy` (one navy) · `text-accent`/`bg-accent` (Mindy violet — the single interactive accent)
 - Status (SEPARATE from the accent, encodes state only): `ok` / `warn` / `crit` / `info`
+
+**Exact slate→token no-op map** (used by the P5 migration — same hex, so swapping is invisible):
+`bg-slate-900`→`bg-ground` · `bg-slate-950`→`bg-ground-deep` · `bg-slate-800`→`bg-surface` ·
+`bg-slate-700`→`bg-input` · `border-slate-800`→`border-surface` · `border-slate-700`→`border-hairline` ·
+`text-slate-300`→`text-ink-soft` · `text-slate-400`→`text-muted` · `text-slate-500`→`text-faint` ·
+`placeholder-slate-500`→`placeholder-faint`. Opacity suffixes (`/40`, `/80`) carry over unchanged.
+Shades with NO exact token (`text-slate-200`/`-600`, `border-slate-600`/`-500`) are LEFT — migrating
+them would change the color (a regression), not clean it.
 
 ## Radius scale (Phase 3)
 
@@ -101,4 +109,4 @@ for the shell's raw classes — it's recorded in the drift baseline, exactly lik
 - **P2** ✅ collapse two blues → one `bg-navy`; emoji→lucide across all panels
 - **P3** ✅ radius/shadow tokens + `<Card>` primitive (this doc), adopt going forward
 - **P4** ✅ type scale (`text-page`/`title`/`eyebrow`/`micro`, wired into `CardHeader`) + deleted 7 truly-dead motion classes. Adopt going forward.
-- **P5** (remaining) the raw-neutral → token migration (~10,557 usages) by screen traffic; adopt `<Card>` + type roles across panels as screens are touched.
+- **P5** (in progress) the raw-neutral → token migration by screen traffic. **DashboardPanel done** as the reference pass (91→6 raw-neutral, −85; added `bg-input` + `text-ink-soft` tokens for the common slate-700/300 shades). Baseline 10,557→10,472. Remaining panels migrate the same way — apply the exact no-op map above, leave shades with no exact token.

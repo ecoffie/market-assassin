@@ -150,7 +150,7 @@
     },
     "src/components/app/panels/DashboardPanel.tsx": {
       "hex": 0,
-      "neutral": 91
+      "neutral": 6
     },
     "src/components/app/panels/DibbsPanel.tsx": {
       "hex": 0,
@@ -894,5 +894,5 @@
     }
   },
   "totalHex": 8,
-  "totalNeutral": 10557
+  "totalNeutral": 10472
 }

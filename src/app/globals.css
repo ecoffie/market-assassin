@@ -46,10 +46,12 @@
   --color-ground-deep: #020617;   /* deepest (behind cards, scrollbar track) */
   --color-surface:     #1e293b;   /* card / panel background */
   --color-surface-2:   #273449;   /* raised / hovered surface */
+  --color-input:       #334155;   /* input/chip fill, most-raised surface (= slate-700, 145× as bg) */
   --color-hairline:    #334155;   /* borders, dividers */
 
   /* Ink — text roles. */
   --color-ink:       #f1f5f9;     /* primary text */
+  --color-ink-soft:  #cbd5e1;     /* bright secondary text (= slate-300, 309×) */
   --color-muted:     #94a3b8;     /* secondary text */
   --color-faint:     #64748b;     /* tertiary / disabled */
 
