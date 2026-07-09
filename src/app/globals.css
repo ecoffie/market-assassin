@@ -78,6 +78,32 @@
   --color-accent-cyan: #22d3ee;
   --color-accent-emerald: #10b981;
   --color-accent-amber: #f59e0b;
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     RADIUS SCALE (Phase 3 — de-vibe-coding, Jul 2026)
+     A named corner scale by ROLE, so the 5 competing sizes (bare rounded / md /
+     lg / xl / 2xl) collapse to intent. Values match today's de-facto usage → the
+     <Card> primitive + `rounded-card`/`rounded-control` utilities are a NO-OP.
+       control = buttons, inputs, chips-with-corners   (was rounded-lg, 641×)
+       card    = panels / cards                         (was rounded-xl, 258×)
+       pill    = fully-round chips/avatars              (rounded-full, 145×)
+     ───────────────────────────────────────────────────────────────────────── */
+  --radius-control: 0.5rem;   /* = Tailwind rounded-lg */
+  --radius-card:    0.75rem;  /* = Tailwind rounded-xl */
+  --radius-pill:    9999px;   /* = Tailwind rounded-full */
+
+  /* ─────────────────────────────────────────────────────────────────────────
+     ELEVATION SCALE (Phase 3)
+     A restrained 3-step scale so the app stops jumping straight to shadow-2xl
+     (21×). Named by role. Tuned for the dark navy stack (soft, low-alpha).
+       raised  = hover/lifted cards, dropdowns
+       overlay = popovers, drawers, sticky bars
+       modal   = dialogs / command palette
+     Use shadow-raised / shadow-overlay / shadow-modal.
+     ───────────────────────────────────────────────────────────────────────── */
+  --shadow-raised:  0 1px 2px 0 rgb(2 6 23 / 0.4), 0 1px 3px 0 rgb(2 6 23 / 0.3);
+  --shadow-overlay: 0 4px 12px -2px rgb(2 6 23 / 0.5), 0 2px 6px -2px rgb(2 6 23 / 0.4);
+  --shadow-modal:   0 16px 40px -8px rgb(2 6 23 / 0.65), 0 6px 16px -6px rgb(2 6 23 / 0.5);
 }
 
 body {

@@ -198,7 +198,7 @@
     },
     "src/components/app/panels/LockedPreview.tsx": {
       "hex": 0,
-      "neutral": 10
+      "neutral": 9
     },
     "src/components/app/panels/MarketDossierPanel.tsx": {
       "hex": 0,
@@ -206,7 +206,7 @@
     },
     "src/components/app/panels/MarketResearchPanel.tsx": {
       "hex": 0,
-      "neutral": 393
+      "neutral": 390
     },
     "src/components/app/panels/MiccMrrPanel.tsx": {
       "hex": 0,
@@ -218,7 +218,7 @@
     },
     "src/components/app/panels/MyTargetListPanel.tsx": {
       "hex": 0,
-      "neutral": 161
+      "neutral": 160
     },
     "src/components/app/panels/OsbpSmbResearchPanel.tsx": {
       "hex": 0,
@@ -270,7 +270,7 @@
     },
     "src/components/app/panels/TeamPanel.tsx": {
       "hex": 0,
-      "neutral": 62
+      "neutral": 56
     },
     "src/components/app/panels/UnifiedSettingsPanel.tsx": {
       "hex": 0,
@@ -447,6 +447,10 @@
     "src/components/seo/FacetPage.tsx": {
       "hex": 0,
       "neutral": 10
+    },
+    "src/components/ui/Card.tsx": {
+      "hex": 0,
+      "neutral": 5
     },
     "src/components/ui/LoadMoreButton.tsx": {
       "hex": 0,
@@ -890,5 +894,5 @@
     }
   },
   "totalHex": 8,
-  "totalNeutral": 10563
+  "totalNeutral": 10557
 }
