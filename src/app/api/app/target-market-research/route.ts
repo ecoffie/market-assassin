@@ -668,6 +668,10 @@ export async function POST(request: NextRequest) {
           const catRes = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_category', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
+            // Bound each USASpending aggregation so a slow upstream call can't
+            // hang the whole 120s request (was unbounded → contributed to the
+            // scoped-market 504). AbortError is caught by the surrounding try.
+            signal: AbortSignal.timeout(20_000),
             body: JSON.stringify({
               category,
               filters: catFilterBase,
@@ -715,6 +719,7 @@ export async function POST(request: NextRequest) {
             const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_category', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
+              signal: AbortSignal.timeout(20_000),
               body: JSON.stringify({ category: 'awarding_subagency', filters, subawards: false, limit: 100, page: 1 }),
             });
             if (!res.ok) return;
@@ -1209,7 +1214,15 @@ export async function POST(request: NextRequest) {
     // show) and run in small parallel batches so it stays inside maxDuration. Only
     // the recovered rows (id 'cat:') need it; sampled rows already counted real
     // awards. Runs only on a cache MISS (cache hits already carry the counts).
-    if (catScopeUsable) {
+    // COST BUDGET (Bug fix 2026-07-09): this contract-count enrichment is the last
+    // — and, on a scoped-but-large market, most expensive — step: up to 20 per-
+    // agency USASpending calls after the whole request has already spent time on
+    // find-agencies + category aggregates + opp/event scans. It's cosmetic (fills
+    // the "contracts" column on recovered rows; they show "—" without it). If
+    // we're already past the budget, SKIP it and ship the spend + agency table
+    // we've built — a complete table beats a 504 with no data at all.
+    const COUNT_BUDGET_MS = 90_000; // ~30s headroom under the 120s cap for the upsert + response
+    if (catScopeUsable && Date.now() - startedAt < COUNT_BUDGET_MS) {
       const ANCHORED_COUNT_CAP = 20;
       const CONC = 6;
       const needCount = rows
@@ -1217,12 +1230,16 @@ export async function POST(request: NextRequest) {
         .sort((a, b) => b.totalSpending - a.totalSpending)
         .slice(0, ANCHORED_COUNT_CAP);
       for (let i = 0; i < needCount.length; i += CONC) {
+        // Re-check the budget between batches so a slow first round doesn't drag
+        // the request to the cliff.
+        if (Date.now() - startedAt >= COUNT_BUDGET_MS) break;
         const batch = needCount.slice(i, i + CONC);
         await Promise.all(batch.map(async (r) => {
           try {
             const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_award_count/', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
+              signal: AbortSignal.timeout(15_000),
               body: JSON.stringify({
                 filters: { ...catFilterBase, agencies: [{ type: 'awarding', tier: 'subtier', name: r.name }] },
               }),
