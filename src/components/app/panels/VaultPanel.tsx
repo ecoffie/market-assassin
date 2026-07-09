@@ -1,6 +1,7 @@
 'use client';
 
 import { useEffect, useState, useCallback } from 'react';
+import { IdCard, Trophy, Wrench, User, FileText, BookOpen, FolderArchive, Zap, Check, PenLine, type LucideIcon } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 import { NaicsPicker } from '@/components/codes/NaicsPicker';
@@ -98,16 +99,16 @@ interface BoilerplateDoc {
   created_at: string;
 }
 
-const SECTIONS: { id: VaultSection; label: string; icon: string; blurb: string; proOnly?: boolean }[] = [
-  { id: 'identity', label: 'Identity', icon: '🪪', blurb: 'UEI, CAGE, certifications, one-liner' },
-  { id: 'past_performance', label: 'Past Performance', icon: '🏆', blurb: 'Real contracts you have won' },
-  { id: 'capabilities', label: 'Capabilities', icon: '🛠️', blurb: 'What you can do, tagged by NAICS' },
-  { id: 'team', label: 'Key Personnel', icon: '👤', blurb: 'People you put in proposals — bios, clearances' },
-  { id: 'documents', label: 'Documents', icon: '📄', blurb: 'Capability statements + boilerplate' },
+const SECTIONS: { id: VaultSection; label: string; icon: LucideIcon; blurb: string; proOnly?: boolean }[] = [
+  { id: 'identity', label: 'Identity', icon: IdCard, blurb: 'UEI, CAGE, certifications, one-liner' },
+  { id: 'past_performance', label: 'Past Performance', icon: Trophy, blurb: 'Real contracts you have won' },
+  { id: 'capabilities', label: 'Capabilities', icon: Wrench, blurb: 'What you can do, tagged by NAICS' },
+  { id: 'team', label: 'Key Personnel', icon: User, blurb: 'People you put in proposals — bios, clearances' },
+  { id: 'documents', label: 'Documents', icon: FileText, blurb: 'Capability statements + boilerplate' },
   // Folded in from the old top-level "My Library" tab (Eric, Jun 25): Mindy's
   // generated outputs (drafts, briefings, capability statements) live with the
   // rest of "your stuff" instead of a separate nav item. Pro+ (as Library was).
-  { id: 'generated', label: 'Generated', icon: '📚', blurb: 'Everything Mindy has drafted for you', proOnly: true },
+  { id: 'generated', label: 'Generated', icon: BookOpen, blurb: 'Everything Mindy has drafted for you', proOnly: true },
 ];
 
 export default function VaultPanel({ email, tier, initialSection }: Props) {
@@ -190,7 +191,7 @@ export default function VaultPanel({ email, tier, initialSection }: Props) {
       {/* Header */}
       <div className="px-6 py-5 border-b border-slate-800">
         <div className="flex items-center gap-3 mb-1">
-          <span className="text-2xl">🗂️</span>
+          <FolderArchive className="h-6 w-6 shrink-0 text-emerald-300" strokeWidth={1.75} />
           <h1 className="text-xl font-semibold text-white">My Vault</h1>
         </div>
         <p className="text-sm text-slate-400">
@@ -232,6 +233,7 @@ export default function VaultPanel({ email, tier, initialSection }: Props) {
             ? null
             : counts[s.id as keyof typeof counts];
           const active = section === s.id;
+          const SectionIcon = s.icon;
           return (
             <button
               key={s.id}
@@ -242,7 +244,7 @@ export default function VaultPanel({ email, tier, initialSection }: Props) {
                   : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800/40'
               }`}
             >
-              <span>{s.icon}</span>
+              <SectionIcon className="h-4 w-4 shrink-0" strokeWidth={2} />
               <span>{s.label}</span>
               {count !== null && (
                 <span className={`text-xs px-1.5 py-0.5 rounded ${
@@ -370,7 +372,7 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
       {isEmpty && (
         <div className="rounded-xl border border-emerald-500/40 bg-gradient-to-br from-emerald-500/15 via-emerald-500/5 to-purple-500/10 p-5">
           <div className="flex items-start gap-4">
-            <div className="text-3xl">⚡</div>
+            <Zap className="h-7 w-7 shrink-0 text-emerald-300" strokeWidth={1.75} />
             <div className="flex-1 min-w-0">
               <h3 className="text-white font-semibold mb-1">
                 Auto-fill from your SAM.gov registration
@@ -409,9 +411,9 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
         <div className="flex justify-end -mb-2">
           <button
             onClick={() => setShowAutoFill(true)}
-            className="text-xs text-slate-400 hover:text-emerald-300 transition"
+            className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-emerald-300 transition"
           >
-            ⚡ Re-fetch from SAM.gov
+            <Zap className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> Re-fetch from SAM.gov
           </button>
         </div>
       )}
@@ -502,8 +504,8 @@ function IdentitySection({ email, data, onSaved }: { email: string; data: Identi
         {savedAt && <span className="text-xs text-emerald-400">Saved at {savedAt}</span>}
       </div>
       {naicsSeededNote && (
-        <div className="mt-2 text-xs text-blue-300 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2">
-          ✓ {naicsSeededNote}
+        <div className="mt-2 inline-flex items-center gap-1 text-xs text-blue-300 bg-blue-500/10 border border-blue-500/20 rounded-lg px-3 py-2">
+          <Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} /> {naicsSeededNote}
         </div>
       )}
     </div>
@@ -516,7 +518,7 @@ function PastPerfSection({ email, items, onChanged }: { email: string; items: Pa
   if (items.length === 0 && !adding) {
     return (
       <EmptyState
-        icon="🏆"
+        icon={Trophy}
         title="No past performance yet"
         body="Add real contracts you have won. Mindy will cite them in your proposal drafts and cap statements instead of using [bracketed placeholders]. Even 3-5 entries make a visible quality difference."
         action="+ Add past performance"
@@ -720,7 +722,7 @@ function CapabilitiesSection({ email, items, onChanged }: { email: string; items
   if (items.length === 0 && !adding) {
     return (
       <EmptyState
-        icon="🛠️"
+        icon={Wrench}
         title="No capabilities catalogued yet"
         body="Add what your business actually does, in your own words. Mindy weaves these into Capability Statement sections + Capabilities sections of proposals automatically."
         action="+ Add capability"
@@ -868,7 +870,7 @@ function TeamSection({ email, items, onChanged }: { email: string; items: TeamMe
   if (items.length === 0 && !adding) {
     return (
       <EmptyState
-        icon="👤"
+        icon={User}
         title="No key personnel yet"
         body="Add the people you put in proposals — PMs, technical leads, key staff. Mindy uses these to draft Management Plan + Key Personnel sections automatically. Resume PDFs can be attached later. (To invite teammates to your Mindy account, use Settings.)"
         action="+ Add key personnel"
@@ -980,7 +982,7 @@ function TeamForm({ email, initial, editId, onSaved, onCancel }: { email: string
       <div className="rounded-lg border border-dashed border-emerald-700/50 bg-emerald-950/30 p-3">
         <div className="flex items-center justify-between gap-3 flex-wrap">
           <div className="text-sm text-slate-300">
-            <span className="font-medium text-white">📄 Auto-fill from a resume</span>
+            <span className="inline-flex items-center gap-1.5 font-medium text-white"><FileText className="h-4 w-4 shrink-0" strokeWidth={2} /> Auto-fill from a resume</span>
             <span className="text-slate-400"> — upload a PDF or DOCX and Mindy fills the fields for you to review.</span>
           </div>
           <label className={`shrink-0 px-3 py-1.5 rounded text-sm cursor-pointer ${parsing ? 'bg-slate-700 text-slate-400' : 'bg-emerald-600 hover:bg-emerald-500 text-white'}`}>
@@ -1248,7 +1250,7 @@ function DocumentsSection({ email, items, onChanged }: { email: string; items: B
 
       {items.length === 0 ? (
         <EmptyState
-          icon="📄"
+          icon={FileText}
           title="No documents uploaded yet"
           body="Upload your existing capability statement to get started. Mindy pulls it apart into structured sections you can review, edit, and reuse."
         />
@@ -1565,11 +1567,11 @@ function Field({
 }
 
 function EmptyState({
-  icon, title, body, action, onAction,
-}: { icon: string; title: string; body: string; action?: string; onAction?: () => void }) {
+  icon: Icon, title, body, action, onAction,
+}: { icon: LucideIcon; title: string; body: string; action?: string; onAction?: () => void }) {
   return (
     <div className="text-center py-16 max-w-md mx-auto">
-      <div className="text-5xl mb-4">{icon}</div>
+      <div className="mb-4 flex justify-center"><Icon className="h-11 w-11 text-faint" strokeWidth={1.5} /></div>
       <h3 className="text-lg font-medium text-white mb-2">{title}</h3>
       <p className="text-sm text-slate-400 mb-5">{body}</p>
       {action && onAction && (
@@ -1758,7 +1760,7 @@ function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: 
         {/* Header */}
         <div className="px-6 py-4 border-b border-slate-800 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <span className="text-xl">⚡</span>
+            <Zap className="h-5 w-5 shrink-0" strokeWidth={2} />
             <h2 className="text-white font-semibold">Auto-fill from SAM.gov</h2>
           </div>
           <button onClick={onClose} className="text-slate-400 hover:text-white text-xl leading-none" aria-label="Close">×</button>
@@ -1841,7 +1843,7 @@ function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: 
                     className="mt-1 accent-emerald-500"
                   />
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-white font-medium mb-2">🪪 Identity</h3>
+                    <h3 className="inline-flex items-center gap-1.5 text-white font-medium mb-2"><IdCard className="h-4 w-4 shrink-0" strokeWidth={2} /> Identity</h3>
                     <div className="text-sm text-slate-300 space-y-1">
                       <div><span className="text-slate-500">Legal:</span> {preview.identity.legal_name || '—'}</div>
                       <div className="flex gap-4 flex-wrap">
@@ -1881,7 +1883,7 @@ function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: 
                     className="mt-1 accent-emerald-500"
                   />
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-white font-medium mb-2">🛠️ Capabilities ({preview.capabilities!.length})</h3>
+                    <h3 className="inline-flex items-center gap-1.5 text-white font-medium mb-2"><Wrench className="h-4 w-4 shrink-0" strokeWidth={2} /> Capabilities ({preview.capabilities!.length})</h3>
                     <div className="space-y-2">
                       {preview.capabilities!.map((c, i) => (
                         <div key={i} className="text-sm">
@@ -1906,7 +1908,7 @@ function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: 
                     className="mt-1 accent-purple-500"
                   />
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-white font-medium mb-2">🏆 Past Performance from USASpending ({preview.past_performance!.length})</h3>
+                    <h3 className="inline-flex items-center gap-1.5 text-white font-medium mb-2"><Trophy className="h-4 w-4 shrink-0" strokeWidth={2} /> Past Performance from USASpending ({preview.past_performance!.length})</h3>
                     <p className="text-xs text-purple-300/80 mb-2">Real contracts on file for your UEI.</p>
                     <div className="space-y-1.5 text-sm">
                       {preview.past_performance!.slice(0, 8).map((p, i) => (
@@ -1935,7 +1937,7 @@ function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: 
                     className="mt-1 accent-amber-500"
                   />
                   <div className="flex-1 min-w-0">
-                    <h3 className="text-white font-medium mb-2">📝 Sample Past Performance — Starter Templates ({preview.sample_past_performance!.length})</h3>
+                    <h3 className="inline-flex items-center gap-1.5 text-white font-medium mb-2"><PenLine className="h-4 w-4 shrink-0" strokeWidth={2} /> Sample Past Performance — Starter Templates ({preview.sample_past_performance!.length})</h3>
                     <p className="text-xs text-amber-300/80 mb-3">
                       Templates with [bracketed placeholders] so you can see what strong past perf looks like in your NAICS. You edit in your real contracts later.
                     </p>
@@ -1946,7 +1948,7 @@ function AutoFillModal({ email, onClose, onApplied }: { email: string; onClose: 
                           <div className="text-slate-400 text-xs">{p.agency} · {p.contract_value}</div>
                           <div className="text-slate-300 text-xs mt-1">{p.scope_description}</div>
                           {p.coaching_note && (
-                            <div className="text-amber-300/70 text-xs mt-1 italic">📝 {p.coaching_note}</div>
+                            <div className="inline-flex items-start gap-1 text-amber-300/70 text-xs mt-1 italic"><PenLine className="h-3 w-3 shrink-0 mt-0.5" strokeWidth={2} /> {p.coaching_note}</div>
                           )}
                         </div>
                       ))}

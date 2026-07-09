@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { Target, RefreshCw, Check, Lock, Flame, Zap, Star, Users, MapPin, Landmark, Plus, ClipboardList, AlertTriangle } from 'lucide-react';
 import Link from 'next/link';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders, authedFetch } from '../authHeaders';
@@ -870,7 +871,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
           <div className="flex flex-col md:flex-row md:items-start md:justify-between gap-3 md:gap-4">
             <div className="min-w-0">
               <div className="flex items-center gap-2 md:gap-3">
-                <span className="text-2xl shrink-0">🎯</span>
+                <Target className="h-6 w-6 shrink-0 text-purple-300" strokeWidth={1.75} />
                 <h1 className="text-lg md:text-xl font-bold text-white leading-tight">
                   {isFreeTier ? 'Mindy Daily Alerts' : 'Mindy Saved Search Alert'}
                 </h1>
@@ -887,9 +888,9 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
               <button
                 onClick={loadAlerts}
                 disabled={isLoading}
-                className="px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm rounded-lg transition-colors disabled:opacity-50"
+                className="inline-flex items-center gap-1.5 px-3 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm rounded-lg transition-colors disabled:opacity-50"
               >
-                {isLoading ? 'Refreshing…' : '🔄 Refresh'}
+                {isLoading ? 'Refreshing…' : <><RefreshCw className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> Refresh</>}
               </button>
               {isFreeTier && needsProfileSetup && (
                 // Open the Settings panel (where keywords are editable) rather than
@@ -959,8 +960,8 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
       {coverage && coverage.totalMarket > 0 && (
         <div className="rounded-xl border border-slate-800 bg-slate-900/60 px-4 py-3 text-sm">
           {coverage.missing.length === 0 ? (
-            <span className="text-slate-300">
-              ✓ Tracking{' '}
+            <span className="inline-flex items-center gap-1 text-slate-300">
+              <Check className="h-3.5 w-3.5 shrink-0 text-emerald-300" strokeWidth={2.5} /> Tracking{' '}
               <span className="text-emerald-300 font-semibold">{Math.round((coverage.coveragePct || 0) * 100)}%</span>{' '}
               of your &ldquo;{coverage.keyword}&rdquo; market — your codes capture the real spend.
             </span>
@@ -1016,7 +1017,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
             aria-expanded={trackedOpen}
           >
             <span className="flex items-center gap-2 text-sm font-semibold text-white">
-              <span className="text-emerald-400">✓</span> You&rsquo;re tracking {tracked.length} opportunit{tracked.length === 1 ? 'y' : 'ies'}
+              <Check className="inline h-3.5 w-3.5 text-emerald-400" strokeWidth={2.5} /> You&rsquo;re tracking {tracked.length} opportunit{tracked.length === 1 ? 'y' : 'ies'}
             </span>
             <span className="flex items-center gap-3">
               {/* The receipt's headline doubles as the door to My Pursuits — the
@@ -1077,7 +1078,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                       className="mt-2 flex w-full items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/50 px-2.5 py-1.5 text-[11px] text-slate-500 hover:border-purple-500/40 hover:text-slate-400 transition-colors"
                       title="Unlock the full pursuit view in Pro"
                     >
-                      <span className="text-slate-600">🔒</span>
+                      <Lock className="h-3.5 w-3.5 shrink-0 text-slate-600" strokeWidth={2} />
                       <span>Contact · Documents · AI synopsis</span>
                       <span className="ml-auto text-purple-400 font-medium">Unlock in Pro →</span>
                     </button>
@@ -1334,13 +1335,13 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                       </span>
                     )}
                     {alert.isUrgent && (
-                      <span className="px-2 py-0.5 text-xs bg-red-500/20 text-red-400 rounded font-medium">
-                        🔥 {alert.daysLeft} days left
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-red-500/20 text-red-400 rounded font-medium">
+                        <Flame className="h-3 w-3 shrink-0" strokeWidth={2.5} /> {alert.daysLeft} days left
                       </span>
                     )}
                     {alert.isClosingSoon && !alert.isUrgent && (
-                      <span className="px-2 py-0.5 text-xs bg-amber-500/20 text-amber-400 rounded">
-                        ⚡ {alert.daysLeft} days left
+                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-amber-500/20 text-amber-400 rounded">
+                        <Zap className="h-3 w-3 shrink-0" strokeWidth={2.5} /> {alert.daysLeft} days left
                       </span>
                     )}
                     {(alert.ctaTags || []).slice(0, 2).map((tag) => (
@@ -1371,7 +1372,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                         which opps are best fits. */}
                     {typeof alert.recommendationScore === 'number' && alert.recommendationScore > 0 && (
                       <span
-                        className={`px-2 py-0.5 text-xs rounded font-semibold ${
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded font-semibold ${
                           alert.recommendationScore >= 50
                             ? 'bg-emerald-500/20 text-emerald-300'
                             : alert.recommendationScore >= 25
@@ -1384,7 +1385,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                             : 'Match quality based on set-aside fit, agency fit, and your feedback'
                         }
                       >
-                        ★ {alert.recommendationScore >= 50 ? 'Top match' : alert.recommendationScore >= 25 ? 'Good fit' : 'Possible'}
+                        <Star className="h-3 w-3 shrink-0" strokeWidth={2} /> {alert.recommendationScore >= 50 ? 'Top match' : alert.recommendationScore >= 25 ? 'Good fit' : 'Possible'}
                       </span>
                     )}
                   </div>
@@ -1395,7 +1396,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                   {/* Collaboration signal — "X others are tracking this" (anonymous FOMO) */}
                   {interestCounts[alert.id] >= 2 && (
                     <p className="text-xs font-medium text-cyan-300 mb-1.5 flex items-center gap-1">
-                      <span aria-hidden>👥</span>
+                      <Users className="h-3.5 w-3.5 shrink-0" strokeWidth={2} aria-hidden />
                       {interestCounts[alert.id]} others {alert.noticeType?.toLowerCase().includes('sources') ? 'researching this Sources Sought' : 'tracking this'}
                       {alert.noticeType?.toLowerCase().includes('sources') && <span className="text-cyan-400/70"> — respond together</span>}
                     </p>
@@ -1449,7 +1450,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                       })()
                     )}
                     {getAlertLocation(alert) && (
-                      <span>📍 {getAlertLocation(alert)}</span>
+                      <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3 shrink-0" strokeWidth={2} /> {getAlertLocation(alert)}</span>
                     )}
                     {alert.solicitationNumber && (
                       <span>#{alert.solicitationNumber}</span>
@@ -1457,7 +1458,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                     {/* Decoded contracting office from the DoDAAC (DoD only) —
                         office-level intel, not just the broad agency. */}
                     {formatDodaacOffice(alert.solicitationNumber || null, dodaacNames) && (
-                      <span className="text-emerald-400/80">🏛 {formatDodaacOffice(alert.solicitationNumber || null, dodaacNames)}</span>
+                      <span className="inline-flex items-center gap-1 text-emerald-400/80"><Landmark className="h-3 w-3 shrink-0" strokeWidth={2} /> {formatDodaacOffice(alert.solicitationNumber || null, dodaacNames)}</span>
                     )}
                   </div>
                 </div>
@@ -1513,7 +1514,9 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                         disabled={interestedAlertIds.has(alert.id)}
                         className="text-xs text-cyan-300 hover:text-cyan-200 disabled:text-cyan-500/60 disabled:cursor-default px-3 py-2 md:px-2 md:py-1 hover:bg-cyan-500/10 rounded min-h-[44px] md:min-h-0 inline-flex items-center"
                       >
-                        {interestedAlertIds.has(alert.id) ? '✓ Tracking' : '➕ Interested'}
+                        {interestedAlertIds.has(alert.id)
+                          ? <span className="inline-flex items-center gap-1"><Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} /> Tracking</span>
+                          : <span className="inline-flex items-center gap-1"><Plus className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} /> Interested</span>}
                       </button>
                     )}
                     <a
@@ -1550,7 +1553,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
       {/* Empty State */}
       {!isLoading && filteredAlerts.length === 0 && !error && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
-          <div className="text-4xl mb-4">📋</div>
+          <div className="mb-4 flex justify-center"><ClipboardList className="h-9 w-9 text-faint" strokeWidth={1.5} /></div>
           <h3 className="text-lg font-medium text-white mb-2">No Opportunities Found</h3>
           <p className="text-slate-400 text-sm">
             {selectedCtaIds.length > 0
@@ -1781,7 +1784,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                     <div className={`rounded-xl border ${recColor.ring} ${recColor.bg} p-4 space-y-3`}>
                       <div className="flex items-center justify-between gap-3">
                         <div className="flex items-center gap-3">
-                          <span className="text-2xl">★</span>
+                          <Star className="h-6 w-6 shrink-0 text-amber-300" strokeWidth={1.75} />
                           <div>
                             <p className="text-xs text-slate-500 uppercase tracking-wider">Mindy Analyst</p>
                             <p className={`text-lg font-bold ${recColor.text}`}>
@@ -1800,7 +1803,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                           <ul className="text-sm text-slate-200 space-y-1">
                             {analysis.why_pursue.slice(0, 5).map((reason, idx) => (
                               <li key={idx} className="flex items-start gap-2">
-                                <span className="text-emerald-400 mt-0.5">✓</span>
+                                <Check className="h-4 w-4 shrink-0 text-emerald-400 mt-0.5" strokeWidth={2.5} />
                                 <span>{reason}</span>
                               </li>
                             ))}
@@ -1814,7 +1817,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                           <ul className="text-sm text-slate-200 space-y-1">
                             {analysis.concerns.slice(0, 4).map((concern, idx) => (
                               <li key={idx} className="flex items-start gap-2">
-                                <span className="text-amber-400 mt-0.5">⚠</span>
+                                <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400 mt-0.5" strokeWidth={2} />
                                 <span>{concern}</span>
                               </li>
                             ))}
@@ -2013,13 +2016,13 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                         type="button"
                         onClick={() => saveFeedback(selectedAlert, option.type)}
                         disabled={saving}
-                        className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
+                        className={`inline-flex items-center gap-1 rounded-full border px-3 py-1.5 text-xs transition-colors ${
                           selected
                             ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-300'
                             : 'border-slate-700 bg-slate-950 text-slate-400 hover:border-slate-500 hover:text-slate-200'
                         }`}
                       >
-                        {selected ? '✓ ' : ''}{option.label}
+                        {selected && <Check className="h-3 w-3 shrink-0" strokeWidth={2.5} />}{option.label}
                       </button>
                     );
                   })}
