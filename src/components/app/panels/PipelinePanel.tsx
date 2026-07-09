@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Mic } from 'lucide-react';
+import { Mic, CalendarClock, UserPlus, AlertTriangle, DollarSign, Star, Zap, Flame, Flag, Archive, Check, X, Landmark, Paperclip, PenLine, TrendingUp, BarChart3, Bell, Sparkles, FileText, Undo2, Inbox, type LucideIcon } from 'lucide-react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders, authedFetch } from '../authHeaders';
 import IncumbentIntel from '../awards/IncumbentIntel';
@@ -116,37 +116,43 @@ function valueNum(val?: string): number {
 interface SavedView {
   id: string;
   label: string;
+  Icon: LucideIcon;
   hint: string;
   match: (o: PipelineOpportunity, me: string) => boolean;
 }
 const SAVED_VIEWS: SavedView[] = [
   {
     id: 'due_this_week',
-    label: '📅 Due this week',
+    label: 'Due this week',
+    Icon: CalendarClock,
     hint: 'Response deadline within 7 days',
     match: (o) => { const d = daysUntil(o.response_deadline); return d !== null && d >= 0 && d <= 7; },
   },
   {
     id: 'needs_owner',
-    label: '👤 Needs an owner',
+    label: 'Needs an owner',
+    Icon: UserPlus,
     hint: 'No owner assigned yet',
     match: (o) => !(o.owner_email || '').trim(),
   },
   {
     id: 'no_next_action',
-    label: '⚠️ No next action',
+    label: 'No next action',
+    Icon: AlertTriangle,
     hint: 'No next action set — at risk of stalling',
     match: (o) => !(o.next_action || '').trim(),
   },
   {
     id: 'high_value',
-    label: '💰 High value',
+    label: 'High value',
+    Icon: DollarSign,
     hint: '$1M+ estimated value',
     match: (o) => valueNum(o.value_estimate) >= 1_000_000,
   },
   {
     id: 'assigned_to_me',
-    label: '⭐ Assigned to me',
+    label: 'Assigned to me',
+    Icon: Star,
     hint: 'I own it or I\'m a collaborator',
     match: (o, me) =>
       (o.owner_email || o.user_email || '').toLowerCase() === me ||
@@ -843,13 +849,13 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
               </span>
             )}
             {urgentOpportunities.length > 0 && (
-              <span className="rounded bg-amber-500/20 px-2 py-1 text-sm text-amber-300">
-                ⚡ {urgentOpportunities.length} due soon
+              <span className="inline-flex items-center gap-1 rounded bg-amber-500/20 px-2 py-1 text-sm text-amber-300">
+                <Zap className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} /> {urgentOpportunities.length} due soon
               </span>
             )}
             {overdueOpportunities.length > 0 && (
-              <span className="rounded bg-red-500/20 px-2 py-1 text-sm text-red-300">
-                🔥 {overdueOpportunities.length} overdue
+              <span className="inline-flex items-center gap-1 rounded bg-red-500/20 px-2 py-1 text-sm text-red-300">
+                <Flame className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} /> {overdueOpportunities.length} overdue
               </span>
             )}
           </div>
@@ -988,10 +994,10 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                 : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
             }`}
           >
-            <span>🏁</span>
+            <Flag className="h-4 w-4 shrink-0" strokeWidth={2} />
             <span className="text-sm">Completed:</span>
             <span className="font-semibold">{completedOpportunities.length}</span>
-            {showCompleted && <span className="text-xs ml-1">✓</span>}
+            {showCompleted && <Check className="h-3.5 w-3.5 ml-1 shrink-0" strokeWidth={2.5} />}
           </button>
         )}
         {/* Archived toggle. Only shows the chip when there's actually
@@ -1006,10 +1012,10 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                 : 'bg-slate-900 border-slate-800 text-slate-400 hover:border-slate-700'
             }`}
           >
-            <span>🗄</span>
+            <Archive className="h-4 w-4 shrink-0" strokeWidth={2} />
             <span className="text-sm">Archived:</span>
             <span className="font-semibold">{opportunities.filter(opp => opp.is_archived).length}</span>
-            {showArchived && <span className="text-xs ml-1">✓</span>}
+            {showArchived && <Check className="h-3.5 w-3.5 ml-1 shrink-0" strokeWidth={2.5} />}
           </button>
         )}
       </div>
@@ -1029,20 +1035,20 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
               key={v.id}
               onClick={() => setActiveView(active ? null : v.id)}
               title={v.hint}
-              className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+              className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
                 active ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'
               }`}
             >
-              {v.label} <span className={active ? 'text-purple-200' : 'text-slate-500'}>{count}</span>
+              <v.Icon className="h-3 w-3 shrink-0" strokeWidth={2} /> {v.label} <span className={active ? 'text-purple-200' : 'text-slate-500'}>{count}</span>
             </button>
           );
         })}
         {activeView && (
           <button
             onClick={() => setActiveView(null)}
-            className="text-[11px] text-slate-500 hover:text-slate-300 ml-1"
+            className="inline-flex items-center gap-1 text-[11px] text-slate-500 hover:text-slate-300 ml-1"
           >
-            Clear view ✕
+            Clear view <X className="h-3 w-3 shrink-0" strokeWidth={2.5} />
           </button>
         )}
       </div>
@@ -1087,14 +1093,14 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                         className="mb-2 inline-flex items-center gap-1 rounded bg-amber-500/15 border border-amber-500/40 px-2 py-0.5 text-[11px] font-medium text-amber-300 hover:bg-amber-500/25"
                         title={pursuitChanges[opp.id].map(c => c.summary).join('\n')}
                       >
-                        ⚠️ {pursuitChanges[opp.id].length} change{pursuitChanges[opp.id].length === 1 ? '' : 's'}
+                        <AlertTriangle className="h-3 w-3 shrink-0" strokeWidth={2} /> {pursuitChanges[opp.id].length} change{pursuitChanges[opp.id].length === 1 ? '' : 's'}
                       </button>
                     )}
                     {opp.agency && (
                       <div className="text-xs text-slate-500 mb-1">
                         {opp.agency}
                         {formatDodaacOffice(opp.notice_id || null, dodaacNames) && (
-                          <span className="text-emerald-400/80"> · 🏛 {formatDodaacOffice(opp.notice_id || null, dodaacNames)}</span>
+                          <span className="inline-flex items-center gap-1 text-emerald-400/80"> · <Landmark className="h-3 w-3 shrink-0" strokeWidth={2} /> {formatDodaacOffice(opp.notice_id || null, dodaacNames)}</span>
                         )}
                       </div>
                     )}
@@ -1176,8 +1182,8 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                         >
                           {opp.has_drafts ? 'Continue Draft →' : 'Draft Proposal →'}
                           {opp.has_drafts && (
-                            <span className="ml-1 text-[10px] font-normal text-emerald-200">
-                              ✓ {opp.draft_count} {opp.draft_count === 1 ? 'section' : 'sections'}
+                            <span className="ml-1 inline-flex items-center gap-0.5 text-[10px] font-normal text-emerald-200">
+                              <Check className="h-2.5 w-2.5 shrink-0" strokeWidth={3} /> {opp.draft_count} {opp.draft_count === 1 ? 'section' : 'sections'}
                             </span>
                           )}
                           {!opp.has_drafts && opp.docs_status === 'ready' && (opp.docs_count || 0) > 0 && (
@@ -1285,7 +1291,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                             className="mt-1 inline-flex items-center gap-1 rounded bg-amber-500/15 border border-amber-500/40 px-2 py-0.5 text-[11px] font-medium text-amber-300 hover:bg-amber-500/25"
                             title={pursuitChanges[opp.id].map(c => c.summary).join('\n')}
                           >
-                            ⚠️ {pursuitChanges[opp.id].length} change{pursuitChanges[opp.id].length === 1 ? '' : 's'} — {pursuitChanges[opp.id][0].summary.slice(0, 40)}
+                            <AlertTriangle className="h-3 w-3 shrink-0" strokeWidth={2} /> {pursuitChanges[opp.id].length} change{pursuitChanges[opp.id].length === 1 ? '' : 's'} — {pursuitChanges[opp.id][0].summary.slice(0, 40)}
                           </button>
                         )}
                         <div className="flex items-center gap-2 mt-0.5">
@@ -1462,9 +1468,9 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                                     onPanelChange('proposals', { pursuit_id: opp.id });
                                   }}
                                   title="No SAM attachments — open Proposal Assist to upload an RFP"
-                                  className="rounded border border-amber-700/60 bg-amber-950/40 px-1.5 py-0.5 text-[10px] font-medium text-amber-200 hover:bg-amber-900/50"
+                                  className="inline-flex items-center rounded border border-amber-700/60 bg-amber-950/40 px-1.5 py-1 font-medium text-amber-200 hover:bg-amber-900/50"
                                 >
-                                  📎
+                                  <Paperclip className="h-3.5 w-3.5" strokeWidth={2} />
                                 </button>
                               );
                             }
@@ -1482,9 +1488,9 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                                       ? 'Draft Proposal — SAM docs still downloading'
                                       : 'Draft Proposal'
                                 }
-                                className="rounded bg-emerald-600/80 px-1.5 py-0.5 text-[10px] font-semibold text-white hover:bg-emerald-500"
+                                className="inline-flex items-center rounded bg-emerald-600/80 px-1.5 py-1 font-semibold text-white hover:bg-emerald-500"
                               >
-                                📝
+                                <PenLine className="h-3.5 w-3.5" strokeWidth={2} />
                               </button>
                             );
                           })()}
@@ -1495,9 +1501,9 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
                               archiveOpportunity(opp);
                             }}
                             title="Archive (hide from active view)"
-                            className="text-slate-500 hover:text-slate-200 text-xs px-1.5 py-0.5 rounded hover:bg-slate-800 transition-colors"
+                            className="inline-flex items-center text-slate-500 hover:text-slate-200 px-1.5 py-1 rounded hover:bg-slate-800 transition-colors"
                           >
-                            {opp.is_archived ? '↩' : '🗄'}
+                            {opp.is_archived ? <Undo2 className="h-3.5 w-3.5" strokeWidth={2} /> : <Archive className="h-3.5 w-3.5" strokeWidth={2} />}
                           </button>
                         </div>
                       </td>
@@ -1514,7 +1520,7 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
       {!loading && opportunities.length === 0 && !error && (
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-8">
           <div className="text-center mb-8">
-            <div className="text-5xl mb-4">📈</div>
+            <div className="mb-4 flex justify-center"><TrendingUp className="h-11 w-11 text-faint" strokeWidth={1.5} /></div>
             <h3 className="text-xl font-semibold text-white mb-2">Start Your Pipeline</h3>
             <p className="text-slate-400 max-w-lg mx-auto">
               Track opportunities through your pursuit process. Add from Market Research, alerts, or forecasts.
@@ -1523,17 +1529,17 @@ export default function PipelinePanel({ email, tier, onPanelChange }: PipelinePa
 
           <div className="grid md:grid-cols-3 gap-4 max-w-2xl mx-auto">
             <div className="bg-slate-800/50 rounded-lg p-4">
-              <div className="text-lg mb-2">📊</div>
+              <BarChart3 className="h-5 w-5 mb-2 text-muted" strokeWidth={1.75} />
               <h4 className="text-sm font-medium text-white mb-1">Market Research</h4>
               <p className="text-xs text-slate-500">Click &quot;Track in Pipeline&quot; on any forecast opportunity</p>
             </div>
             <div className="bg-slate-800/50 rounded-lg p-4">
-              <div className="text-lg mb-2">🔔</div>
+              <Bell className="h-5 w-5 mb-2 text-muted" strokeWidth={1.75} />
               <h4 className="text-sm font-medium text-white mb-1">Daily Alerts</h4>
               <p className="text-xs text-slate-500">Track opportunities from your personalized alerts</p>
             </div>
             <div className="bg-slate-800/50 rounded-lg p-4">
-              <div className="text-lg mb-2">🔮</div>
+              <Sparkles className="h-5 w-5 mb-2 text-muted" strokeWidth={1.75} />
               <h4 className="text-sm font-medium text-white mb-1">Forecasts</h4>
               <p className="text-xs text-slate-500">Add upcoming procurements to track early</p>
             </div>
@@ -1919,7 +1925,7 @@ function PipelineEditDrawer({
 
               let body: React.ReactNode;
               if (count > 0) {
-                body = <span className="text-emerald-300">📎 {count} document{count === 1 ? '' : 's'} attached — ready to draft</span>;
+                body = <span className="inline-flex items-center gap-1 text-emerald-300"><Paperclip className="h-3 w-3 shrink-0" strokeWidth={2} /> {count} document{count === 1 ? '' : 's'} attached — ready to draft</span>;
               } else if (isFetching) {
                 body = (
                   <span className="text-amber-300 inline-flex items-center gap-1">
@@ -1929,14 +1935,14 @@ function PipelineEditDrawer({
                 );
               } else if (status === 'failed') {
                 body = (
-                  <span className="text-red-300">
-                    ⚠ Couldn&apos;t pull attachments automatically.{RetryLink}
+                  <span className="inline-flex items-center gap-1 text-red-300">
+                    <AlertTriangle className="h-3 w-3 shrink-0" strokeWidth={2} /> Couldn&apos;t pull attachments automatically.{RetryLink}
                   </span>
                 );
               } else {
                 body = (
-                  <span className="text-slate-400">
-                    📭 No attachments on this notice — that&apos;s normal for many notice types. The wizard works from the metadata.{RetryLink}
+                  <span className="inline-flex items-center gap-1 text-slate-400">
+                    <Inbox className="h-3 w-3 shrink-0" strokeWidth={2} /> No attachments on this notice — that&apos;s normal for many notice types. The wizard works from the metadata.{RetryLink}
                   </span>
                 );
               }
@@ -1966,10 +1972,10 @@ function PipelineEditDrawer({
                 {docList.map((d) => (
                   <li key={d.id} className="flex items-center justify-between gap-3 text-xs">
                     <span className="flex items-center gap-1.5 min-w-0">
-                      <span className="shrink-0">📄</span>
+                      <FileText className="h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={2} />
                       <span className="truncate text-slate-200" title={d.filename}>{d.filename}</span>
                       {d.extraction_error && (
-                        <span className="shrink-0 text-amber-400" title={d.extraction_error}>⚠</span>
+                        <span className="shrink-0" title={d.extraction_error}><AlertTriangle className="h-3.5 w-3.5 text-amber-400" strokeWidth={2} /></span>
                       )}
                     </span>
                     <span className="flex items-center gap-2 shrink-0 text-slate-500">

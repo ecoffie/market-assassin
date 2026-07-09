@@ -11,7 +11,7 @@ import ProposalChat from './ProposalChat';
 import DocManifest from './DocManifest';
 import BidDecisionGate from './BidDecisionGate';
 import { alignRequirement, priorityOf, type ReqPriority } from '@/lib/proposal/section-alignment';
-import { Zap, Gauge } from 'lucide-react';
+import { Zap, Gauge, PenLine, Search, FileText, ClipboardList, AlertTriangle, Sparkles, CheckCircle2, X, FolderArchive, BookOpen, Scale, Check, Circle } from 'lucide-react';
 
 interface ProposalsPanelProps {
   email: string | null;
@@ -1473,7 +1473,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
     return (
       <div className="p-6">
         <div className="border border-purple-500/30 bg-purple-950/20 p-8 text-center">
-          <div className="text-4xl mb-4">📝</div>
+          <div className="mb-4 flex justify-center"><PenLine className="h-9 w-9 text-purple-400" strokeWidth={1.5} /></div>
           <h1 className="text-2xl font-bold text-white mb-3">Proposal Assist</h1>
           <p className="text-slate-400 mb-6 max-w-md mx-auto">
             Upgrade to turn saved pursuits into bid/no-bid risks, win themes, compliance prompts, and a first proposal outline.
@@ -1563,10 +1563,10 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                   href={`https://sam.gov/opp/${activePursuit.notice_id}/view`}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-3 py-1.5 rounded-lg border border-blue-500/40 bg-blue-500/10 text-xs font-medium text-blue-300 hover:bg-blue-500/20"
+                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg border border-blue-500/40 bg-blue-500/10 text-xs font-medium text-blue-300 hover:bg-blue-500/20"
                   title="Verify all documents + notice text on the official SAM.gov listing"
                 >
-                  🔎 Verify on SAM.gov ↗
+                  <Search className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> Verify on SAM.gov ↗
                 </a>
               )}
               <button
@@ -1852,7 +1852,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 className="inline-flex items-center gap-1.5 rounded-lg border border-amber-500/40 bg-amber-500/10 px-4 py-2 text-sm font-medium text-amber-300 hover:bg-amber-500/20 transition-colors disabled:opacity-60"
                 title="Pull the Statement of Work / PWS into its own Word doc to send subcontractors for pricing"
               >
-                {sowBusy ? 'Extracting…' : '📄 SOW for subs (.docx)'}
+                {sowBusy ? 'Extracting…' : <span className="inline-flex items-center gap-1.5"><FileText className="h-4 w-4 shrink-0" strokeWidth={2} /> SOW for subs (.docx)</span>}
               </button>
             )}
             {activePursuit?.notice_id && (
@@ -1863,7 +1863,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 className="inline-flex items-center gap-1.5 rounded-lg border border-blue-500/40 bg-blue-500/10 px-4 py-2 text-sm font-medium text-blue-300 hover:bg-blue-500/20 transition-colors"
                 title="Open the official SAM.gov notice to verify all documents + text"
               >
-                🔎 Verify on SAM.gov ↗
+                <Search className="h-4 w-4 shrink-0" strokeWidth={2} /> Verify on SAM.gov ↗
               </a>
             )}
           </div>
@@ -1937,8 +1937,8 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             statement separately if the notice requests one. */}
         {uploadedRfp && isLoiResponseMode && (
           <div className="mb-4 rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-200">
-            <div className="font-semibold mb-1">
-              ⚠ This looks like a {effectiveNoticeType === 'sources_sought' ? 'Sources Sought' : 'Request for Information'}, not an RFP.
+            <div className="inline-flex items-start gap-1.5 font-semibold mb-1">
+              <AlertTriangle className="h-4 w-4 shrink-0 mt-0.5" strokeWidth={2} /><span>This looks like a {effectiveNoticeType === 'sources_sought' ? 'Sources Sought' : 'Request for Information'}, not an RFP.</span>
             </div>
             <div className="text-xs text-amber-200/90">
               {effectiveNoticeType === 'sources_sought'
@@ -1955,7 +1955,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           <div className="mb-3 rounded-lg border border-purple-500/30 bg-purple-500/5 p-4">
             <div className="flex items-center justify-between gap-2 mb-2">
               <p className="text-sm font-semibold text-purple-200">
-                📋 Paste the SAM.gov notice text
+                <span className="inline-flex items-center gap-1.5"><ClipboardList className="h-4 w-4 shrink-0" strokeWidth={2} /> Paste the SAM.gov notice text</span>
               </p>
               <span className="text-[11px] text-slate-500">no upload needed</span>
             </div>
@@ -2027,7 +2027,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-3 bg-slate-950/50 border border-slate-800 rounded-lg p-3">
               <div className="flex items-center gap-3 min-w-0">
-                <span className="text-2xl">📄</span>
+                <FileText className="h-6 w-6 shrink-0 text-muted" strokeWidth={1.75} />
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-white truncate">{uploadedRfp.fileName}</p>
                   <p className="text-xs text-slate-500">
@@ -2169,9 +2169,11 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             <button
               onClick={generateAllDrafts}
               disabled={draftAllLoading || !!draftLoading}
-              className="w-full sm:w-auto px-6 py-3 bg-gradient-to-br from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white text-base font-semibold rounded-xl shadow-lg shadow-purple-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
+              className="inline-flex items-center justify-center gap-2 w-full sm:w-auto px-6 py-3 bg-gradient-to-br from-purple-600 to-purple-700 hover:from-purple-500 hover:to-purple-600 text-white text-base font-semibold rounded-xl shadow-lg shadow-purple-600/20 disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              {draftAllLoading ? '⏳ Drafting your response…' : draftAllSummary ? '✨ Redraft my response' : '✨ Draft my response'}
+              {draftAllLoading
+                ? <><Sparkles className="h-4 w-4 shrink-0 animate-pulse" strokeWidth={2} /> Drafting your response…</>
+                : <><Sparkles className="h-4 w-4 shrink-0" strokeWidth={2} /> {draftAllSummary ? 'Redraft my response' : 'Draft my response'}</>}
             </button>
 
             {/* Compliance matrix — an ALIGNED secondary action (same height as the
@@ -2184,7 +2186,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                 disabled={complianceLoading}
                 className="w-full sm:w-auto px-5 py-3 rounded-xl border border-slate-700 bg-slate-800/60 text-sm font-semibold text-slate-200 hover:bg-slate-700 disabled:opacity-50 disabled:cursor-not-allowed inline-flex items-center justify-center gap-1.5"
               >
-                <span>📋</span>
+                <ClipboardList className="h-4 w-4 shrink-0" strokeWidth={2} />
                 {complianceLoading
                   ? 'Building compliance matrix…'
                   : compliance.length > 0
@@ -2260,7 +2262,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           {draftAllSummary && !draftAllLoading && !isRfqMode && (
             <div className="mt-4 rounded-xl border border-emerald-500/30 bg-emerald-500/10 p-4 space-y-3">
               <p className="text-sm text-emerald-200">
-                ✅ Drafted {draftAllSummary.count} section{draftAllSummary.count === 1 ? '' : 's'}
+                <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 shrink-0" strokeWidth={2} /> Drafted {draftAllSummary.count} section{draftAllSummary.count === 1 ? '' : 's'}</span>
                 {draftAllSummary.errors > 0 && ` (${draftAllSummary.errors} failed — retry those individually below)`}
                 . Review each section, edit if needed, then export.
               </p>
@@ -2470,13 +2472,13 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
           {loiPreview && (
             <div className="mt-4 rounded-xl border border-purple-500/30 bg-slate-950/60 p-4">
               <div className="flex items-center justify-between gap-3 mb-3">
-                <p className="text-sm font-semibold text-purple-200">📄 LOI preview — review before you export</p>
+                <p className="inline-flex items-center gap-1.5 text-sm font-semibold text-purple-200"><FileText className="h-4 w-4 shrink-0" strokeWidth={2} /> LOI preview — review before you export</p>
                 <button
                   type="button"
                   onClick={() => setLoiPreview(null)}
-                  className="text-xs text-slate-400 hover:text-slate-200"
+                  className="inline-flex items-center gap-1 text-xs text-slate-400 hover:text-slate-200"
                 >
-                  Close ✕
+                  Close <X className="h-3 w-3 shrink-0" strokeWidth={2.5} />
                 </button>
               </div>
               <pre className="max-h-[28rem] overflow-auto whitespace-pre-wrap rounded-lg bg-slate-900 p-4 font-mono text-[13px] leading-relaxed text-slate-200">
@@ -2668,15 +2670,15 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                         </p>
                         <div className="grid grid-cols-1 sm:grid-cols-3 gap-2 text-xs">
                           <button onClick={() => setPriorityFilter('critical')} className={`text-left rounded-lg border p-2.5 transition-colors ${priorityFilter === 'critical' ? 'border-red-500/60 bg-red-500/10' : 'border-red-500/25 bg-red-500/[0.04] hover:bg-red-500/10'}`}>
-                            <div className="font-semibold text-red-300">🔴 {crit} Critical</div>
+                            <div className="inline-flex items-center gap-1.5 font-semibold text-red-300"><Circle className="h-2.5 w-2.5 shrink-0 fill-current" strokeWidth={0} /> {crit} Critical</div>
                             <div className="text-slate-400 mt-0.5">Do these first — deadlines, required plans, certs. Miss one and you&apos;re out.</div>
                           </button>
                           <button onClick={() => setPriorityFilter('standard')} className={`text-left rounded-lg border p-2.5 transition-colors ${priorityFilter === 'standard' ? 'border-amber-500/60 bg-amber-500/10' : 'border-amber-500/25 bg-amber-500/[0.04] hover:bg-amber-500/10'}`}>
-                            <div className="font-semibold text-amber-300">🟡 {std} Standard</div>
+                            <div className="inline-flex items-center gap-1.5 font-semibold text-amber-300"><Circle className="h-2.5 w-2.5 shrink-0 fill-current" strokeWidth={0} /> {std} Standard</div>
                             <div className="text-slate-400 mt-0.5">The real content — your technical, management, past performance.</div>
                           </button>
                           <button onClick={() => setPriorityFilter('final')} className={`text-left rounded-lg border p-2.5 transition-colors ${priorityFilter === 'final' ? 'border-emerald-500/60 bg-emerald-500/10' : 'border-emerald-500/25 bg-emerald-500/[0.04] hover:bg-emerald-500/10'}`}>
-                            <div className="font-semibold text-emerald-300">🟢 {fin} Final polish</div>
+                            <div className="inline-flex items-center gap-1.5 font-semibold text-emerald-300"><Circle className="h-2.5 w-2.5 shrink-0 fill-current" strokeWidth={0} /> {fin} Final polish</div>
                             <div className="text-slate-400 mt-0.5">Save for last — page limits, fonts, formatting. After the draft is done.</div>
                           </button>
                         </div>
@@ -2928,14 +2930,14 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             >
               {draftAllLoading
                 ? <>⏳ Drafting all sections…</>
-                : <>✨ Draft Entire {isLoiResponseMode ? 'LOI Response' : 'Proposal'}</>}
+                : <><Sparkles className="h-4 w-4 shrink-0" strokeWidth={2} /> Draft Entire {isLoiResponseMode ? 'LOI Response' : 'Proposal'}</>}
             </button>
           </div>
 
           {draftAllSummary && !draftAllLoading && (
             <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 mb-3 text-sm">
               <span className="text-emerald-200">
-                ✅ Drafted {draftAllSummary.count} section{draftAllSummary.count === 1 ? '' : 's'} in {Math.round(draftAllSummary.ms / 1000)}s
+                <span className="inline-flex items-center gap-1.5"><CheckCircle2 className="h-4 w-4 shrink-0" strokeWidth={2} /> Drafted {draftAllSummary.count} section{draftAllSummary.count === 1 ? '' : 's'} in {Math.round(draftAllSummary.ms / 1000)}s</span>
                 {draftAllSummary.errors > 0 && ` (${draftAllSummary.errors} section${draftAllSummary.errors === 1 ? '' : 's'} failed — try those individually)`}
               </span>
             </div>
@@ -2955,7 +2957,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             vaultSummary.past_performance === 0 &&
             vaultSummary.capabilities === 0 && (
               <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 mb-3 flex items-start gap-3">
-                <span className="text-2xl">🗂️</span>
+                <FolderArchive className="h-6 w-6 shrink-0 text-amber-300" strokeWidth={1.75} />
                 <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium text-amber-200">
                     Want drafts that cite YOUR real past performance + capabilities?
@@ -3090,7 +3092,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
                     silently. */}
                 {showVolumeNudge && (
                   <div className="mb-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3 flex items-start gap-3">
-                    <span className="text-lg leading-none mt-0.5">📚</span>
+                    <BookOpen className="h-5 w-5 shrink-0 mt-0.5 text-amber-300" strokeWidth={1.75} />
                     <div className="text-xs leading-relaxed text-amber-100/90">
                       <span className="font-semibold text-amber-200">This is a large volume — {activeReqCount} requirements map to {meta.label}.</span>{' '}
                       Mindy drafts the core response with your real evidence woven in, but a full
@@ -3153,7 +3155,7 @@ export default function ProposalsPanel({ email, tier, panelContext }: ProposalsP
             <div className="rounded-xl border border-indigo-500/30 bg-indigo-500/5 p-4 mb-4">
               <div className="flex items-center justify-between gap-3 mb-2">
                 <div>
-                  <h3 className="text-sm font-semibold text-white">⚖️ Independent Compliance Check</h3>
+                  <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-white"><Scale className="h-4 w-4 shrink-0" strokeWidth={2} /> Independent Compliance Check</h3>
                   <p className="text-xs text-slate-400 mt-0.5">A separate AI reviewer checks your draft against every requirement — catches gaps before a Contracting Officer does.</p>
                 </div>
                 <button
