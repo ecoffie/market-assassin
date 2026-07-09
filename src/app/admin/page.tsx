@@ -275,7 +275,7 @@ export default function AdminDashboard() {
           <div className="text-center mb-6">
             <div className="text-4xl mb-3">🔐</div>
             <h1 className="text-2xl font-bold text-slate-900">Admin Access</h1>
-            <p className="text-slate-500 text-sm mt-2">Enter your admin password to continue</p>
+            <p className="text-faint text-sm mt-2">Enter your admin password to continue</p>
           </div>
 
           <form onSubmit={handleLogin}>
@@ -320,7 +320,7 @@ export default function AdminDashboard() {
       <div className="bg-white border-b border-slate-200">
         <div className="container mx-auto px-4">
           <div className="flex items-center gap-1 py-2">
-            <span className="text-slate-500 text-sm mr-4">Admin:</span>
+            <span className="text-faint text-sm mr-4">Admin:</span>
             {adminTabs.map((tab) => {
               const isActive = tab.href === '/admin';
               return (
@@ -537,7 +537,7 @@ export default function AdminDashboard() {
               <tbody className="divide-y divide-slate-100">
                 {maRecords.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                    <td colSpan={5} className="px-6 py-8 text-center text-faint">
                       No Market Assassin access records found
                     </td>
                   </tr>
@@ -596,7 +596,7 @@ export default function AdminDashboard() {
               <tbody className="divide-y divide-slate-100">
                 {osProRecords.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
+                    <td colSpan={4} className="px-6 py-8 text-center text-faint">
                       No Opportunity Hunter Pro access records found
                     </td>
                   </tr>
@@ -637,7 +637,7 @@ export default function AdminDashboard() {
               <tbody className="divide-y divide-slate-100">
                 {cgRecords.length === 0 ? (
                   <tr>
-                    <td colSpan={5} className="px-6 py-8 text-center text-slate-500">
+                    <td colSpan={5} className="px-6 py-8 text-center text-faint">
                       No Content Reaper access records found
                     </td>
                   </tr>
@@ -696,7 +696,7 @@ export default function AdminDashboard() {
               <tbody className="divide-y divide-slate-100">
                 {recompeteRecords.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
+                    <td colSpan={4} className="px-6 py-8 text-center text-faint">
                       No Recompete Tracker access records found
                     </td>
                   </tr>
@@ -736,7 +736,7 @@ export default function AdminDashboard() {
               <tbody className="divide-y divide-slate-100">
                 {databaseRecords.length === 0 ? (
                   <tr>
-                    <td colSpan={4} className="px-6 py-8 text-center text-slate-500">
+                    <td colSpan={4} className="px-6 py-8 text-center text-faint">
                       No Federal Contractor Database access records found
                     </td>
                   </tr>

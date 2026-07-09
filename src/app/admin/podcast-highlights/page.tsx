@@ -71,7 +71,7 @@ const MATCH_STYLES: Record<string, string> = {
   primary: 'bg-emerald-900/50 text-emerald-200 border-emerald-600',
   sector: 'bg-blue-900/40 text-blue-200 border-blue-700',
   tangential: 'bg-amber-900/40 text-amber-200 border-amber-600',
-  unrelated: 'bg-slate-800 text-slate-400 border-slate-600',
+  unrelated: 'bg-surface text-muted border-slate-600',
 };
 
 export default function PodcastHighlightsAdminPage() {
@@ -160,19 +160,19 @@ export default function PodcastHighlightsAdminPage() {
 
   if (!authenticated) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-        <form onSubmit={handleLogin} className="bg-slate-900 border border-slate-800 rounded-lg p-6 w-full max-w-md">
+      <div className="min-h-screen bg-ground-deep flex items-center justify-center p-4">
+        <form onSubmit={handleLogin} className="bg-ground border border-surface rounded-lg p-6 w-full max-w-md">
           <h1 className="text-xl font-semibold text-white mb-1">Podcast Highlight QA</h1>
-          <p className="text-sm text-slate-400 mb-5">
+          <p className="text-sm text-muted mb-5">
             Review <code className="text-purple-300">key_lessons</code> quality before enabling guest quotes on Today&apos;s Intel.
-            Production is <strong className="text-amber-300">OFF</strong> until you set <code className="text-slate-300">ENABLE_PODCAST_INSIGHTS=true</code>.
+            Production is <strong className="text-amber-300">OFF</strong> until you set <code className="text-ink-soft">ENABLE_PODCAST_INSIGHTS=true</code>.
           </p>
-          <label className="block text-sm text-slate-300 mb-1">Admin password</label>
+          <label className="block text-sm text-ink-soft mb-1">Admin password</label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white text-sm focus:border-emerald-500 focus:outline-none mb-3"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded text-white text-sm focus:border-emerald-500 focus:outline-none mb-3"
             autoFocus
           />
           {authError && <p className="text-rose-400 text-sm mb-3">{authError}</p>}
@@ -187,10 +187,10 @@ export default function PodcastHighlightsAdminPage() {
   const q = stats?.quality;
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-100 p-4 md:p-8 max-w-6xl mx-auto">
+    <div className="min-h-screen bg-ground-deep text-slate-100 p-4 md:p-8 max-w-6xl mx-auto">
       <header className="mb-6">
         <h1 className="text-2xl font-bold text-white">Podcast Highlight Notes — Quality Review</h1>
-        <p className="text-slate-400 text-sm mt-1">
+        <p className="text-muted text-sm mt-1">
           Founders-style guest takeaways from <code className="text-purple-300">podcast_episode_metadata.key_lessons</code>.
           Today&apos;s Intel integration is gated off until you approve quality here.
         </p>
@@ -209,12 +209,12 @@ export default function PodcastHighlightsAdminPage() {
             key={t}
             type="button"
             onClick={() => setTab(t)}
-            className={`px-4 py-2 rounded text-sm font-medium ${tab === t ? 'bg-purple-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+            className={`px-4 py-2 rounded text-sm font-medium ${tab === t ? 'bg-purple-600 text-white' : 'bg-surface text-ink-soft hover:bg-input'}`}
           >
             {t === 'overview' ? 'Overview' : t === 'browse' ? 'Browse episodes' : 'Mindy preview'}
           </button>
         ))}
-        <button type="button" onClick={() => void loadStats()} className="px-3 py-2 text-sm text-slate-400 hover:text-white ml-auto">
+        <button type="button" onClick={() => void loadStats()} className="px-3 py-2 text-sm text-muted hover:text-white ml-auto">
           Refresh stats
         </button>
       </div>
@@ -228,32 +228,32 @@ export default function PodcastHighlightsAdminPage() {
               ['Has lessons', stats.totals.withLessons],
               ['Pending extract', stats.totals.pending],
             ].map(([label, val]) => (
-              <div key={String(label)} className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+              <div key={String(label)} className="bg-ground border border-surface rounded-lg p-4">
                 <div className="text-2xl font-bold text-white">{val}</div>
-                <div className="text-xs text-slate-400">{label}</div>
+                <div className="text-xs text-muted">{label}</div>
               </div>
             ))}
           </div>
 
-          <div className="bg-slate-900 border border-slate-800 rounded-lg p-5">
+          <div className="bg-ground border border-surface rounded-lg p-5">
             <h2 className="text-lg font-semibold mb-3">Lesson quality (all extracted episodes)</h2>
             <div className="flex gap-4 flex-wrap mb-4">
               <span className={`px-3 py-1 rounded border text-sm ${TIER_STYLES.good}`}>Good: {q.lessonTiers.good}</span>
               <span className={`px-3 py-1 rounded border text-sm ${TIER_STYLES.weak}`}>Weak: {q.lessonTiers.weak}</span>
               <span className={`px-3 py-1 rounded border text-sm ${TIER_STYLES.reject}`}>Reject: {q.lessonTiers.reject}</span>
-              <span className="text-slate-300 text-sm self-center">
+              <span className="text-ink-soft text-sm self-center">
                 <strong className="text-white">{q.goodPercent}%</strong> of {q.totalLessons} lessons rated good
               </span>
             </div>
-            <p className="text-sm text-slate-300 leading-relaxed border-l-2 border-purple-500 pl-4">
+            <p className="text-sm text-ink-soft leading-relaxed border-l-2 border-purple-500 pl-4">
               {stats.quality.recommendation}
             </p>
-            <p className="text-xs text-slate-500 mt-3">
+            <p className="text-xs text-faint mt-3">
               Episodes with at least one &quot;good&quot; lesson: {q.episodesWithGood} · only weak: {q.episodesWithOnlyWeak}
             </p>
           </div>
 
-          <div className="bg-slate-900/50 border border-dashed border-slate-700 rounded-lg p-4 text-sm text-slate-400">
+          <div className="bg-ground/50 border border-dashed border-hairline rounded-lg p-4 text-sm text-muted">
             <strong className="text-slate-200">Ship checklist:</strong>
             <ol className="list-decimal ml-5 mt-2 space-y-1">
               <li>Browse tab — load your NAICS; list is sorted by <strong>industry fit</strong> (tangential CMMC-in-construction drops)</li>
@@ -269,15 +269,15 @@ export default function PodcastHighlightsAdminPage() {
         <div>
           <div className="flex flex-wrap gap-2 mb-4 items-end">
             <div>
-              <label className="text-xs text-slate-400 block mb-1">Filter NAICS (comma-separated)</label>
+              <label className="text-xs text-muted block mb-1">Filter NAICS (comma-separated)</label>
               <input
                 value={naics}
                 onChange={(e) => setNaics(e.target.value)}
-                className="px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white text-sm w-64"
+                className="px-3 py-2 bg-surface border border-hairline rounded text-white text-sm w-64"
                 placeholder="236220, 237310"
               />
             </div>
-            <label className="flex items-center gap-2 text-xs text-slate-400 pb-2">
+            <label className="flex items-center gap-2 text-xs text-muted pb-2">
               <input
                 type="checkbox"
                 checked={showTangential}
@@ -298,7 +298,7 @@ export default function PodcastHighlightsAdminPage() {
               type="button"
               onClick={() => void loadSample(true)}
               disabled={loadingSample}
-              className="px-4 py-2 bg-slate-700 hover:bg-slate-600 rounded text-sm disabled:opacity-50"
+              className="px-4 py-2 bg-input hover:bg-slate-600 rounded text-sm disabled:opacity-50"
             >
               Random 30
             </button>
@@ -309,7 +309,7 @@ export default function PodcastHighlightsAdminPage() {
 
           <div className="space-y-4">
             {episodes.map((ep) => (
-              <article key={`${ep.episodeNumber}-${ep.episodeTitle}`} className="bg-slate-900 border border-slate-800 rounded-lg p-4">
+              <article key={`${ep.episodeNumber}-${ep.episodeTitle}`} className="bg-ground border border-surface rounded-lg p-4">
                 <div className="flex flex-wrap justify-between gap-2 mb-2">
                   <div>
                     {ep.relevanceScore != null && (
@@ -331,15 +331,15 @@ export default function PodcastHighlightsAdminPage() {
                     </a>
                   )}
                 </div>
-                {ep.summary && <p className="text-sm text-slate-400 mb-3">{ep.summary}</p>}
+                {ep.summary && <p className="text-sm text-muted mb-3">{ep.summary}</p>}
                 {ep.matchedNaics?.length > 0 && (
                   <p className="text-xs text-emerald-500/90 mb-1">Matches your profile: {ep.matchedNaics.join(', ')}</p>
                 )}
                 {ep.naicsMentioned?.length > 0 && (
-                  <p className="text-xs text-slate-500 mb-2">All NAICS in episode: {ep.naicsMentioned.join(', ')}</p>
+                  <p className="text-xs text-faint mb-2">All NAICS in episode: {ep.naicsMentioned.join(', ')}</p>
                 )}
                 {ep.relevanceReasons?.length > 0 && (
-                  <p className="text-xs text-slate-500 mb-2">{ep.relevanceReasons.join(' · ')}</p>
+                  <p className="text-xs text-faint mb-2">{ep.relevanceReasons.join(' · ')}</p>
                 )}
                 {ep.wouldShowOnCard && (
                   <div className="mb-3 p-3 rounded bg-gradient-to-r from-slate-800 to-purple-950 border border-purple-800/50">
@@ -349,11 +349,11 @@ export default function PodcastHighlightsAdminPage() {
                 )}
                 <ul className="space-y-2">
                   {ep.lessons.map((l, i) => (
-                    <li key={i} className="text-sm border-l-2 border-slate-700 pl-3">
+                    <li key={i} className="text-sm border-l-2 border-hairline pl-3">
                       <span className={`text-xs px-1.5 py-0.5 rounded border mr-2 ${TIER_STYLES[l.tier]}`}>{l.tier}</span>
                       <span className="text-slate-200">{l.text}</span>
                       {l.reasons.length > 0 && (
-                        <span className="block text-xs text-slate-500 mt-0.5">{l.reasons.join(' · ')}</span>
+                        <span className="block text-xs text-faint mt-0.5">{l.reasons.join(' · ')}</span>
                       )}
                     </li>
                   ))}
@@ -361,7 +361,7 @@ export default function PodcastHighlightsAdminPage() {
               </article>
             ))}
             {!loadingSample && episodes.length === 0 && (
-              <p className="text-slate-500">No episodes — try another NAICS or Random 30.</p>
+              <p className="text-faint">No episodes — try another NAICS or Random 30.</p>
             )}
           </div>
         </div>
@@ -371,11 +371,11 @@ export default function PodcastHighlightsAdminPage() {
         <div>
           <div className="flex flex-wrap gap-2 mb-4 items-end">
             <div>
-              <label className="text-xs text-slate-400 block mb-1">Your NAICS profile (simulated)</label>
+              <label className="text-xs text-muted block mb-1">Your NAICS profile (simulated)</label>
               <input
                 value={naics}
                 onChange={(e) => setNaics(e.target.value)}
-                className="px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white text-sm w-64"
+                className="px-3 py-2 bg-surface border border-hairline rounded text-white text-sm w-64"
               />
             </div>
             <button
@@ -387,16 +387,16 @@ export default function PodcastHighlightsAdminPage() {
               {loadingPreview ? 'Running…' : 'Simulate 5 daily picks'}
             </button>
           </div>
-          <p className="text-xs text-slate-500 mb-4">
+          <p className="text-xs text-faint mb-4">
             Compare <strong>ungated</strong> (fit score only) vs <strong>production</strong> (≥36% industry fit + targeted lesson gate).
           </p>
           <div className="grid md:grid-cols-2 gap-3">
             {previews.map((p, i) => (
               <div
                 key={i}
-                className={`p-4 rounded-lg border ${p.withQualityGate ? 'border-emerald-800 bg-emerald-950/30' : 'border-slate-700 bg-slate-900'}`}
+                className={`p-4 rounded-lg border ${p.withQualityGate ? 'border-emerald-800 bg-emerald-950/30' : 'border-hairline bg-ground'}`}
               >
-                <div className="text-xs text-slate-400 mb-2">
+                <div className="text-xs text-muted mb-2">
                   seed {p.seed} · {p.withQualityGate ? 'production (quality gate)' : 'no gate'}
                 </div>
                 {p.insight ? (
@@ -405,7 +405,7 @@ export default function PodcastHighlightsAdminPage() {
                     <p className="text-xs text-purple-300 mt-2">{p.insight.attribution}</p>
                   </>
                 ) : (
-                  <p className="text-slate-500 text-sm">No match — quality gate may have filtered everything.</p>
+                  <p className="text-faint text-sm">No match — quality gate may have filtered everything.</p>
                 )}
               </div>
             ))}

@@ -99,19 +99,19 @@ export default function ProposalAbPage() {
 
   if (!authed) {
     return (
-      <main className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+      <main className="min-h-screen bg-ground-deep flex items-center justify-center p-4">
         <form
           onSubmit={(e) => { e.preventDefault(); if (password) setAuthed(true); }}
-          className="w-full max-w-sm bg-slate-900 border border-slate-800 rounded-xl p-6 space-y-4"
+          className="w-full max-w-sm bg-ground border border-surface rounded-xl p-6 space-y-4"
         >
           <h1 className="text-xl font-semibold text-white">Proposal A/B</h1>
-          <p className="text-sm text-slate-400">Admin password to compare v1 vs v2 Proposal Assist outputs.</p>
+          <p className="text-sm text-muted">Admin password to compare v1 vs v2 Proposal Assist outputs.</p>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
             placeholder="Admin password"
-            className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded text-white"
             autoFocus
           />
           <button type="submit" className="w-full px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white rounded">
@@ -123,36 +123,36 @@ export default function ProposalAbPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-200">
-      <header className="border-b border-slate-800 px-6 py-4 flex items-center justify-between">
+    <main className="min-h-screen bg-ground-deep text-slate-200">
+      <header className="border-b border-surface px-6 py-4 flex items-center justify-between">
         <div>
           <h1 className="text-xl font-semibold text-white">Proposal Assist · v1 vs v2</h1>
-          <p className="text-sm text-slate-400">
+          <p className="text-sm text-muted">
             Compare current production prompt to the layered v2 architecture (agency pain points + lenses + section voices + humanization).
           </p>
         </div>
-        <Link href="/admin" className="text-sm text-slate-400 hover:text-white">← Admin</Link>
+        <Link href="/admin" className="text-sm text-muted hover:text-white">← Admin</Link>
       </header>
 
       <div className="p-6 grid grid-cols-1 xl:grid-cols-[1fr_2fr] gap-6">
         {/* Inputs */}
         <section className="space-y-4">
           <div>
-            <label className="block text-sm text-slate-300 mb-1">User email (for vault context)</label>
+            <label className="block text-sm text-ink-soft mb-1">User email (for vault context)</label>
             <input
               type="email"
               value={email}
               onChange={(e) => setEmail(e.target.value)}
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded text-white text-sm"
+              className="w-full px-3 py-2 bg-ground border border-hairline rounded text-white text-sm"
             />
           </div>
 
           <div>
-            <label className="block text-sm text-slate-300 mb-1">Section to draft</label>
+            <label className="block text-sm text-ink-soft mb-1">Section to draft</label>
             <select
               value={sectionType}
               onChange={(e) => setSectionType(e.target.value as SectionType)}
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded text-white text-sm"
+              className="w-full px-3 py-2 bg-ground border border-hairline rounded text-white text-sm"
             >
               <optgroup label="RFP">
                 {SECTION_OPTIONS.filter(s => s.group === 'RFP').map(s => (
@@ -168,26 +168,26 @@ export default function ProposalAbPage() {
           </div>
 
           <div>
-            <label className="block text-sm text-slate-300 mb-1">RFP agency (optional — overrides detection)</label>
+            <label className="block text-sm text-ink-soft mb-1">RFP agency (optional — overrides detection)</label>
             <input
               type="text"
               value={rfpAgency}
               onChange={(e) => setRfpAgency(e.target.value)}
               placeholder='e.g. "Department of the Navy" (leave blank to auto-detect)'
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded text-white text-sm"
+              className="w-full px-3 py-2 bg-ground border border-hairline rounded text-white text-sm"
             />
           </div>
 
           <div>
-            <label className="block text-sm text-slate-300 mb-1">Source RFP text</label>
+            <label className="block text-sm text-ink-soft mb-1">Source RFP text</label>
             <textarea
               value={sourceText}
               onChange={(e) => setSourceText(e.target.value)}
               placeholder="Paste RFP, Sources Sought, or any solicitation text here..."
               rows={20}
-              className="w-full px-3 py-2 bg-slate-900 border border-slate-700 rounded text-white text-xs font-mono"
+              className="w-full px-3 py-2 bg-ground border border-hairline rounded text-white text-xs font-mono"
             />
-            <p className="text-xs text-slate-500 mt-1">{sourceText.length.toLocaleString()} chars</p>
+            <p className="text-xs text-faint mt-1">{sourceText.length.toLocaleString()} chars</p>
           </div>
 
           <button
@@ -199,14 +199,14 @@ export default function ProposalAbPage() {
           </button>
 
           {result?.elapsedMs && (
-            <p className="text-xs text-slate-500 text-center">Total time: {result.elapsedMs.toLocaleString()}ms</p>
+            <p className="text-xs text-faint text-center">Total time: {result.elapsedMs.toLocaleString()}ms</p>
           )}
         </section>
 
         {/* Output */}
         <section>
           {!result && (
-            <div className="text-center text-slate-500 py-20 border-2 border-dashed border-slate-800 rounded-xl">
+            <div className="text-center text-faint py-20 border-2 border-dashed border-surface rounded-xl">
               Paste an RFP + click Compare. Both pipelines run in parallel.
             </div>
           )}
@@ -234,7 +234,7 @@ export default function ProposalAbPage() {
               <div className="flex items-center gap-3">
                 <button
                   onClick={() => setShowPrompts(s => !s)}
-                  className="text-sm text-slate-400 hover:text-white"
+                  className="text-sm text-muted hover:text-white"
                 >
                   {showPrompts ? 'Hide' : 'Show'} system + user prompts
                 </button>
@@ -258,16 +258,16 @@ function MetaPanel({ label, data, accent }: { label: string; data?: VersionResul
   const borderColor = accent === 'rose' ? 'border-rose-900' : 'border-emerald-900';
   if (!data || data.error) {
     return (
-      <div className={`border ${borderColor} rounded-lg p-3 bg-slate-900`}>
-        <p className="text-xs uppercase tracking-wider text-slate-400 mb-2">{label}</p>
+      <div className={`border ${borderColor} rounded-lg p-3 bg-ground`}>
+        <p className="text-xs uppercase tracking-wider text-muted mb-2">{label}</p>
         <p className="text-rose-300 text-sm">Error: {data?.error || 'No result'}</p>
       </div>
     );
   }
   const m = data.meta || { pipeline: 'v1' as const };
   return (
-    <div className={`border ${borderColor} rounded-lg p-3 bg-slate-900 text-xs space-y-1`}>
-      <p className="text-xs uppercase tracking-wider text-slate-400 mb-2">{label}</p>
+    <div className={`border ${borderColor} rounded-lg p-3 bg-ground text-xs space-y-1`}>
+      <p className="text-xs uppercase tracking-wider text-muted mb-2">{label}</p>
       <Stat k="Pipeline" v={m.pipeline} />
       <Stat k="Words" v={String(data.wordCount || 0)} />
       <Stat k="Agency detected" v={m.agencyDetected || '—'} />
@@ -283,7 +283,7 @@ function MetaPanel({ label, data, accent }: { label: string; data?: VersionResul
 function Stat({ k, v }: { k: string; v: string }) {
   return (
     <div className="flex justify-between gap-3">
-      <span className="text-slate-500">{k}</span>
+      <span className="text-faint">{k}</span>
       <span className="text-slate-200 truncate">{v}</span>
     </div>
   );
@@ -293,15 +293,15 @@ function DraftPanel({ label, data, accent }: { label: string; data?: VersionResu
   const borderColor = accent === 'rose' ? 'border-rose-900' : 'border-emerald-900';
   if (!data || data.error || !data.draft) {
     return (
-      <div className={`border ${borderColor} rounded-lg p-4 bg-slate-900`}>
-        <p className="text-xs uppercase tracking-wider text-slate-400 mb-2">{label}</p>
-        <p className="text-slate-500 text-sm">{data?.error || 'No draft'}</p>
+      <div className={`border ${borderColor} rounded-lg p-4 bg-ground`}>
+        <p className="text-xs uppercase tracking-wider text-muted mb-2">{label}</p>
+        <p className="text-faint text-sm">{data?.error || 'No draft'}</p>
       </div>
     );
   }
   return (
-    <div className={`border ${borderColor} rounded-lg p-4 bg-slate-900 max-h-[600px] overflow-y-auto`}>
-      <p className="text-xs uppercase tracking-wider text-slate-400 mb-3">{label}</p>
+    <div className={`border ${borderColor} rounded-lg p-4 bg-ground max-h-[600px] overflow-y-auto`}>
+      <p className="text-xs uppercase tracking-wider text-muted mb-3">{label}</p>
       <div className="prose prose-sm prose-invert whitespace-pre-wrap text-slate-200 text-sm">{data.draft}</div>
     </div>
   );
@@ -310,22 +310,22 @@ function DraftPanel({ label, data, accent }: { label: string; data?: VersionResu
 function PromptPanel({ label, data }: { label: string; data?: VersionResult }) {
   if (!data?.prompt) {
     return (
-      <div className="border border-slate-800 rounded-lg p-3 bg-slate-950">
-        <p className="text-xs uppercase tracking-wider text-slate-400 mb-2">{label}</p>
-        <p className="text-slate-500 text-sm">No prompt available</p>
+      <div className="border border-surface rounded-lg p-3 bg-ground-deep">
+        <p className="text-xs uppercase tracking-wider text-muted mb-2">{label}</p>
+        <p className="text-faint text-sm">No prompt available</p>
       </div>
     );
   }
   return (
-    <div className="border border-slate-800 rounded-lg p-3 bg-slate-950 max-h-[400px] overflow-y-auto">
-      <p className="text-xs uppercase tracking-wider text-slate-400 mb-2">{label}</p>
+    <div className="border border-surface rounded-lg p-3 bg-ground-deep max-h-[400px] overflow-y-auto">
+      <p className="text-xs uppercase tracking-wider text-muted mb-2">{label}</p>
       <details className="mb-2">
-        <summary className="text-xs text-slate-400 cursor-pointer hover:text-white">System prompt</summary>
-        <pre className="text-xs text-slate-300 font-mono whitespace-pre-wrap mt-2">{data.prompt.system}</pre>
+        <summary className="text-xs text-muted cursor-pointer hover:text-white">System prompt</summary>
+        <pre className="text-xs text-ink-soft font-mono whitespace-pre-wrap mt-2">{data.prompt.system}</pre>
       </details>
       <details>
-        <summary className="text-xs text-slate-400 cursor-pointer hover:text-white">User prompt</summary>
-        <pre className="text-xs text-slate-300 font-mono whitespace-pre-wrap mt-2">{data.prompt.user}</pre>
+        <summary className="text-xs text-muted cursor-pointer hover:text-white">User prompt</summary>
+        <pre className="text-xs text-ink-soft font-mono whitespace-pre-wrap mt-2">{data.prompt.user}</pre>
       </details>
     </div>
   );

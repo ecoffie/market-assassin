@@ -30,10 +30,10 @@ export default function AdminMembersPage() {
   // Not signed in → tell them to log into /app first (that's where the session token lives).
   if (authChecked && !callerEmail) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-slate-950 p-6 text-white">
-        <div className="w-full max-w-md rounded-xl border border-slate-800 bg-slate-900 p-8 text-center shadow">
+      <div className="flex min-h-screen items-center justify-center bg-ground-deep p-6 text-white">
+        <div className="w-full max-w-md rounded-xl border border-surface bg-ground p-8 text-center shadow">
           <h1 className="text-xl font-bold">Members Admin</h1>
-          <p className="mt-3 text-sm text-slate-400">Sign in with your team account first, then come back here.</p>
+          <p className="mt-3 text-sm text-muted">Sign in with your team account first, then come back here.</p>
           <a
             href="/app"
             className="mt-5 inline-block rounded-lg bg-emerald-600 px-5 py-2.5 text-sm font-semibold text-white hover:bg-emerald-500"
@@ -46,11 +46,11 @@ export default function AdminMembersPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-10 text-white">
+    <main className="min-h-screen bg-ground-deep px-4 py-10 text-white">
       <div className="mx-auto max-w-5xl">
         <div className="mb-6">
           <h1 className="text-2xl font-bold">Members — Grant Pro / Team Access</h1>
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-sm text-muted">
             Signed in as <span className="font-medium text-slate-200">{callerEmail}</span>. Grants apply instantly; the
             user sees the change on their next sign-in or refresh.
           </p>

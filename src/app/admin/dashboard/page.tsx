@@ -1390,7 +1390,7 @@ export default function AdminDashboard() {
           </div>
 
           {commandLevers.length > 0 && (
-            <div className="mt-5 rounded-lg border border-slate-700 bg-slate-950/40 p-4">
+            <div className="mt-5 rounded-lg border border-hairline bg-ground-deep/40 p-4">
               <h3 className="text-sm font-semibold text-white mb-3">What To Do Next</h3>
               <div className="grid grid-cols-1 gap-3 lg:grid-cols-4">
                 {commandLevers.map((lever) => (
@@ -1560,7 +1560,7 @@ export default function AdminDashboard() {
             </div>
 
             {data.miGrowth.levers.length > 0 && (
-              <div className="mt-5 rounded-lg border border-slate-700 bg-slate-950/40 p-4">
+              <div className="mt-5 rounded-lg border border-hairline bg-ground-deep/40 p-4">
                 <h3 className="text-sm font-semibold text-white mb-3">Levers To Pull</h3>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
                   {data.miGrowth.levers.slice(0, 3).map((lever) => (
@@ -1728,7 +1728,7 @@ export default function AdminDashboard() {
             </div>
 
             {data.outcomeMetrics.levers.length > 0 && (
-              <div className="rounded-lg border border-slate-700 bg-slate-950/40 p-4">
+              <div className="rounded-lg border border-hairline bg-ground-deep/40 p-4">
                 <h3 className="text-sm font-semibold text-white mb-3">Outcome Levers</h3>
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-3">
                   {data.outcomeMetrics.levers.slice(0, 3).map(lever => (
@@ -1820,7 +1820,7 @@ export default function AdminDashboard() {
                   Entitlement, login identity, profile readiness, and setup-email status for Mindy users.
                 </p>
               </div>
-              <a href="/admin/mi-accounts" className="rounded bg-slate-700 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-600">
+              <a href="/admin/mi-accounts" className="rounded bg-input px-3 py-2 text-sm font-semibold text-white hover:bg-slate-600">
                 Open Accounts
               </a>
             </div>
@@ -1862,7 +1862,7 @@ export default function AdminDashboard() {
                   Access Control counts by GovCon tool. AI Tools/mo is tracked separately in Stripe revenue.
                 </p>
               </div>
-              <a href="/admin" className="rounded bg-slate-700 px-3 py-2 text-sm font-semibold text-white hover:bg-slate-600">
+              <a href="/admin" className="rounded bg-input px-3 py-2 text-sm font-semibold text-white hover:bg-slate-600">
                 Open Access Control
               </a>
             </div>
@@ -2732,7 +2732,7 @@ export default function AdminDashboard() {
               </p>
             )}
             {profileReminderRun && (
-              <div className="mt-4 rounded-lg border border-slate-600 bg-slate-950/60 p-4">
+              <div className="mt-4 rounded-lg border border-slate-600 bg-ground-deep/60 p-4">
                 <div className="mb-3 flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
                   <div>
                     <p className="text-sm font-semibold text-white">

@@ -75,12 +75,12 @@ export default function SetAsideImpactPage() {
   const baseSmallWidth = (SMALL_B / TOTAL_B) * 100;
 
   return (
-    <div className="min-h-dvh bg-slate-950 px-6 py-8 text-slate-100">
+    <div className="min-h-dvh bg-ground-deep px-6 py-8 text-slate-100">
       <div className="mx-auto max-w-4xl">
         <header className="mb-6">
           <h1 className="text-2xl font-black">The Mission — reversing the shrinking industrial base</h1>
-          <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Macro figures: FY2024 federal prime-contract data (static). Live set-aside gap cards update from the DB.</p>
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-faint">Macro figures: FY2024 federal prime-contract data (static). Live set-aside gap cards update from the DB.</p>
+          <p className="mt-1 text-sm text-muted">
             Free agentic tools put more small businesses in the game. Once two are capable and bidding, the <span className="font-semibold text-emerald-300">FAR 19.502-2 &ldquo;Rule of Two&rdquo;</span> <span className="italic">forces</span> the contract to be set aside for small business. At scale, free tools turn Full-and-Open dollars into set-asides.
           </p>
         </header>
@@ -89,7 +89,7 @@ export default function SetAsideImpactPage() {
         <div className="mb-6 rounded-2xl border border-emerald-500/25 bg-gradient-to-br from-emerald-950/30 to-slate-950 p-5">
           <div className="flex items-center justify-between gap-3">
             <h2 className="text-sm font-bold uppercase tracking-wider text-emerald-300">The gap — measured live, right now</h2>
-            <span className="inline-flex items-center gap-1.5 text-[11px] text-slate-400">
+            <span className="inline-flex items-center gap-1.5 text-[11px] text-muted">
               <span className="inline-block h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
               {live ? `${live.biddable.total.toLocaleString()} live solicitations · ${fmtDate(live.window.oldestPosted)}–${fmtDate(live.window.newestPosted)}` : 'loading…'}
             </span>
@@ -97,38 +97,38 @@ export default function SetAsideImpactPage() {
           {live ? (
             <>
               <div className="mt-3 grid gap-3 sm:grid-cols-3">
-                <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+                <div className="rounded-xl border border-surface bg-ground/70 p-4">
                   <div className="text-3xl font-black text-emerald-300">{live.biddable.setAsidePct}%</div>
-                  <p className="mt-1 text-[12px] text-slate-400">of biddable solicitations are set aside for small business</p>
+                  <p className="mt-1 text-[12px] text-muted">of biddable solicitations are set aside for small business</p>
                 </div>
                 <div className="rounded-xl border border-rose-500/25 bg-rose-500/5 p-4">
                   <div className="text-3xl font-black text-rose-300">{live.biddable.fullAndOpenPct}%</div>
-                  <p className="mt-1 text-[12px] text-slate-300">are still <span className="font-semibold">full-and-open</span> — and they carry the bigger dollars</p>
+                  <p className="mt-1 text-[12px] text-ink-soft">are still <span className="font-semibold">full-and-open</span> — and they carry the bigger dollars</p>
                 </div>
-                <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+                <div className="rounded-xl border border-surface bg-ground/70 p-4">
                   <div className="text-3xl font-black text-white">{live.dollarShareSmallBusinessPct}%</div>
-                  <p className="mt-1 text-[12px] text-slate-400">of all federal <span className="font-semibold">dollars</span> reach small business (SBA FY2024)</p>
+                  <p className="mt-1 text-[12px] text-muted">of all federal <span className="font-semibold">dollars</span> reach small business (SBA FY2024)</p>
                 </div>
               </div>
-              <p className="mt-3 text-[12px] text-slate-400">
+              <p className="mt-3 text-[12px] text-muted">
                 The real discrepancy: small businesses win <span className="font-semibold text-slate-200">~half the solicitations but only ~{live.dollarShareSmallBusinessPct}% of the money</span> — because the set-asides are the <span className="font-semibold">small</span> contracts and the big ones stay open. Measured from our own SAM cache (true biddable solicitations only; DLA parts-buy award notices excluded), refreshed daily.
               </p>
             </>
           ) : (
-            <p className="mt-3 text-sm text-slate-500">Measuring live from our SAM opportunity cache…</p>
+            <p className="mt-3 text-sm text-faint">Measuring live from our SAM opportunity cache…</p>
           )}
         </div>
 
         {/* ── per-category: goal met by $, but barely solicited ───────────── */}
         {live?.categories && (
-          <div className="mb-6 rounded-2xl border border-slate-800 bg-slate-900/50 p-5">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-300">&ldquo;Goal met&rdquo; ≠ actually set aside</h2>
-            <p className="mt-1 text-[12px] text-slate-400">
+          <div className="mb-6 rounded-2xl border border-surface bg-ground/50 p-5">
+            <h2 className="text-sm font-bold uppercase tracking-wider text-ink-soft">&ldquo;Goal met&rdquo; ≠ actually set aside</h2>
+            <p className="mt-1 text-[12px] text-muted">
               Agencies hit the dollar goals partly by <span className="font-semibold text-slate-200">crediting firms that win in full-and-open</span> (HUBZone alone gets a 10% price preference). But the share of solicitations actually <span className="italic">issued</span> as that set-aside is a fraction of the goal. SDVOSB is the proof: solicit it, and the category wins.
             </p>
             <div className="mt-4 space-y-2.5">
               {/* header */}
-              <div className="grid grid-cols-[1.4fr_repeat(3,1fr)] gap-2 text-[10px] font-semibold uppercase tracking-wider text-slate-500">
+              <div className="grid grid-cols-[1.4fr_repeat(3,1fr)] gap-2 text-[10px] font-semibold uppercase tracking-wider text-faint">
                 <span>Category</span>
                 <span className="text-right">Goal ($)</span>
                 <span className="text-right">Achieved ($)</span>
@@ -138,9 +138,9 @@ export default function SetAsideImpactPage() {
                 const met = c.achievedPct >= c.goalPct;
                 const solicitWins = c.solicitedPct >= c.goalPct;
                 return (
-                  <div key={c.key} className="grid grid-cols-[1.4fr_repeat(3,1fr)] items-center gap-2 rounded-lg bg-slate-900/70 px-3 py-2 text-sm">
+                  <div key={c.key} className="grid grid-cols-[1.4fr_repeat(3,1fr)] items-center gap-2 rounded-lg bg-ground/70 px-3 py-2 text-sm">
                     <span className="font-semibold text-slate-200">{c.label}</span>
-                    <span className="text-right tabular-nums text-slate-400">{c.goalPct}%</span>
+                    <span className="text-right tabular-nums text-muted">{c.goalPct}%</span>
                     <span className={`text-right tabular-nums font-semibold ${met ? 'text-emerald-300' : 'text-amber-300'}`}>
                       {c.achievedPct}% {met ? '✓' : '✕'}
                     </span>
@@ -151,11 +151,11 @@ export default function SetAsideImpactPage() {
                 );
               })}
             </div>
-            <p className="mt-3 text-[11px] text-slate-500">
+            <p className="mt-3 text-[11px] text-faint">
               Goal &amp; Achieved = % of eligible federal <span className="font-semibold">dollars</span> (SBA FY2024 scorecard). &ldquo;Solicited as set-aside&rdquo; = share of {live.biddable.total.toLocaleString()} live biddable solicitations actually issued under that category&rsquo;s set-aside (our SAM cache, refreshed daily).
             </p>
-            <p className="mt-2 rounded-lg border border-slate-800 bg-slate-900/60 px-3 py-2 text-[11px] text-slate-400">
-              <span className="font-semibold text-slate-300">Why the dollar % outruns the solicitation %:</span> two reasons — (1) <span className="font-semibold">IDV / IDIQ leverage</span>: one set-aside vehicle (esp. 8(a)) spawns many task orders and big obligations off a single solicitation that never re-posts on SAM; and (2) firms <span className="font-semibold">credited for full-and-open wins</span> (HUBZone&rsquo;s 10% price preference; SBA admits ~$60B is won in full-and-open). Neither fully explains it: <span className="font-semibold text-emerald-300">SDVOSB uses IDVs too, yet is both well-solicited (6.1%) and the one category that truly hits its goal</span> — so the under-solicitation in HUBZone / 8(a) / WOSB is real on top of the IDV effect. That&rsquo;s the needle.
+            <p className="mt-2 rounded-lg border border-surface bg-ground/60 px-3 py-2 text-[11px] text-muted">
+              <span className="font-semibold text-ink-soft">Why the dollar % outruns the solicitation %:</span> two reasons — (1) <span className="font-semibold">IDV / IDIQ leverage</span>: one set-aside vehicle (esp. 8(a)) spawns many task orders and big obligations off a single solicitation that never re-posts on SAM; and (2) firms <span className="font-semibold">credited for full-and-open wins</span> (HUBZone&rsquo;s 10% price preference; SBA admits ~$60B is won in full-and-open). Neither fully explains it: <span className="font-semibold text-emerald-300">SDVOSB uses IDVs too, yet is both well-solicited (6.1%) and the one category that truly hits its goal</span> — so the under-solicitation in HUBZone / 8(a) / WOSB is real on top of the IDV effect. That&rsquo;s the needle.
             </p>
           </div>
         )}
@@ -165,8 +165,8 @@ export default function SetAsideImpactPage() {
           {PROBLEM.map((p) => (
             <div key={p.stat} className="rounded-xl border border-rose-500/25 bg-rose-500/5 p-4">
               <div className="text-2xl font-black text-rose-300">{p.stat}</div>
-              <p className="mt-1 text-[12px] leading-snug text-slate-300">{p.label}</p>
-              <p className="mt-1 text-[10px] text-slate-500">{p.src}</p>
+              <p className="mt-1 text-[12px] leading-snug text-ink-soft">{p.label}</p>
+              <p className="mt-1 text-[10px] text-faint">{p.src}</p>
             </div>
           ))}
         </div>
@@ -178,12 +178,12 @@ export default function SetAsideImpactPage() {
               <p className="text-xs uppercase tracking-wider text-emerald-300">Even a fraction of a percent moves billions. Convert</p>
               <div className="flex items-baseline gap-2">
                 <span className="text-5xl font-black text-white tabular-nums">{pct < 1 ? pct.toFixed(2).replace(/\.?0+$/, '') : pct}%</span>
-                <span className="text-sm text-slate-400">of the $571.5B Full-and-Open pool into set-asides…</span>
+                <span className="text-sm text-muted">of the $571.5B Full-and-Open pool into set-asides…</span>
               </div>
             </div>
             <div className="text-right">
-              <p className="text-xs uppercase tracking-wider text-slate-400">→ redirected to small business</p>
-              <div className="text-4xl font-black text-emerald-300 tabular-nums">{fmtMoney(redirected * 1e9)}<span className="text-base font-semibold text-slate-400">/yr</span></div>
+              <p className="text-xs uppercase tracking-wider text-muted">→ redirected to small business</p>
+              <div className="text-4xl font-black text-emerald-300 tabular-nums">{fmtMoney(redirected * 1e9)}<span className="text-base font-semibold text-muted">/yr</span></div>
             </div>
           </div>
 
@@ -193,7 +193,7 @@ export default function SetAsideImpactPage() {
               <button
                 key={m}
                 onClick={() => setPct(m)}
-                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${pct === m ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                className={`rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors ${pct === m ? 'bg-emerald-500 text-white' : 'bg-surface text-ink-soft hover:bg-input'}`}
               >
                 {m < 1 ? `${m}%` : `${m}%`} → {fmtMoney(OTSB_B * (m / 100) * 1e9)}
               </button>
@@ -206,62 +206,62 @@ export default function SetAsideImpactPage() {
             onChange={(e) => setPct(Number(e.target.value))}
             className="mt-4 w-full accent-emerald-400"
           />
-          <div className="mt-1 flex justify-between text-[10px] text-slate-500">
+          <div className="mt-1 flex justify-between text-[10px] text-faint">
             {['0.01%', '1%', '2%', '3%', '4%', '5%'].map((m) => <span key={m}>{m}</span>)}
           </div>
 
           {/* stacked bar: small business share grows */}
           <div className="mt-5">
-            <div className="relative h-9 w-full overflow-hidden rounded-lg bg-slate-800">
+            <div className="relative h-9 w-full overflow-hidden rounded-lg bg-surface">
               {/* new (grown) small-business share */}
               <div className="absolute inset-y-0 left-0 bg-emerald-500/80 transition-all duration-200" style={{ width: `${smallWidth}%` }} />
               {/* the converted slice (lighter) sits at the leading edge */}
               <div className="absolute inset-y-0 bg-emerald-300/40 transition-all duration-200" style={{ left: `${baseSmallWidth}%`, width: `${smallWidth - baseSmallWidth}%` }} />
               <div className="absolute inset-0 flex items-center justify-between px-3 text-[11px] font-semibold">
                 <span className="text-white">Small business {newSharePct.toFixed(1)}%</span>
-                <span className="text-slate-400">Other-than-small {(100 - newSharePct).toFixed(1)}%</span>
+                <span className="text-muted">Other-than-small {(100 - newSharePct).toFixed(1)}%</span>
               </div>
             </div>
-            <p className="mt-1 text-[11px] text-slate-500">FY2024 baseline: small business 28.8% (${SMALL_B}B) · other-than-small 71.2% (${OTSB_B.toFixed(1)}B) of ${TOTAL_B}B total.</p>
+            <p className="mt-1 text-[11px] text-faint">FY2024 baseline: small business 28.8% (${SMALL_B}B) · other-than-small 71.2% (${OTSB_B.toFixed(1)}B) of ${TOTAL_B}B total.</p>
           </div>
 
           {/* context cards */}
           <div className="mt-5 grid gap-3 sm:grid-cols-3">
-            <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+            <div className="rounded-xl border border-surface bg-ground/70 p-4">
               <div className="text-2xl font-black text-white">{fmtMoney(perBusiness)}</div>
-              <p className="mt-1 text-[11px] text-slate-400">more, on average, for each of today&rsquo;s {SMALL_PRIMES.toLocaleString()} small-business primes</p>
+              <p className="mt-1 text-[11px] text-muted">more, on average, for each of today&rsquo;s {SMALL_PRIMES.toLocaleString()} small-business primes</p>
             </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+            <div className="rounded-xl border border-surface bg-ground/70 p-4">
               <div className="text-2xl font-black text-white">{Math.round(sustained).toLocaleString()}</div>
-              <p className="mt-1 text-[11px] text-slate-400">more small businesses sustained at the current avg award (~{fmtMoney(AVG_AWARD)}) — toward rebuilding the base</p>
+              <p className="mt-1 text-[11px] text-muted">more small businesses sustained at the current avg award (~{fmtMoney(AVG_AWARD)}) — toward rebuilding the base</p>
             </div>
-            <div className="rounded-xl border border-slate-800 bg-slate-900/70 p-4">
+            <div className="rounded-xl border border-surface bg-ground/70 p-4">
               <div className="text-2xl font-black text-emerald-300">{fmtB(newSmall)}</div>
-              <p className="mt-1 text-[11px] text-slate-400">new small-business total ({newSharePct.toFixed(1)}% of all federal contracting)</p>
+              <p className="mt-1 text-[11px] text-muted">new small-business total ({newSharePct.toFixed(1)}% of all federal contracting)</p>
             </div>
           </div>
         </div>
 
         {/* ── the mechanism ───────────────────────────────────────────────── */}
-        <div className="mt-6 rounded-xl border border-slate-800 bg-slate-900/50 p-5">
-          <h2 className="text-sm font-bold uppercase tracking-wider text-slate-300">How free tools trigger it — the Rule of Two</h2>
-          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-slate-300">
+        <div className="mt-6 rounded-xl border border-surface bg-ground/50 p-5">
+          <h2 className="text-sm font-bold uppercase tracking-wider text-ink-soft">How free tools trigger it — the Rule of Two</h2>
+          <div className="mt-3 flex flex-wrap items-center gap-2 text-sm text-ink-soft">
             <span className="rounded-lg bg-emerald-500/15 px-3 py-1.5 font-semibold text-emerald-200">Free agentic tools</span>
             <span className="text-slate-600">→</span>
-            <span className="rounded-lg bg-slate-800 px-3 py-1.5">more small businesses capable &amp; bidding</span>
+            <span className="rounded-lg bg-surface px-3 py-1.5">more small businesses capable &amp; bidding</span>
             <span className="text-slate-600">→</span>
-            <span className="rounded-lg bg-slate-800 px-3 py-1.5">two qualified small bids on an opp</span>
+            <span className="rounded-lg bg-surface px-3 py-1.5">two qualified small bids on an opp</span>
             <span className="text-slate-600">→</span>
-            <span className="rounded-lg bg-slate-800 px-3 py-1.5">Rule of Two forces a set-aside</span>
+            <span className="rounded-lg bg-surface px-3 py-1.5">Rule of Two forces a set-aside</span>
             <span className="text-slate-600">→</span>
             <span className="rounded-lg bg-emerald-500/15 px-3 py-1.5 font-semibold text-emerald-200">the base grows back</span>
           </div>
-          <p className="mt-3 text-[12px] text-slate-400">
+          <p className="mt-3 text-[12px] text-muted">
             FAR 19.502-2: when a contracting officer reasonably expects offers from at least <span className="font-semibold text-slate-200">two responsible small businesses</span> at fair market prices, the acquisition <span className="font-semibold text-slate-200">must</span> be set aside for small business. Mindy&rsquo;s free tier is the lever that creates those two qualified bidders — at population scale.
           </p>
         </div>
 
-        <p className="mt-4 text-[10px] leading-relaxed text-slate-500">
+        <p className="mt-4 text-[10px] leading-relaxed text-faint">
           Sources: FY2024 federal prime-contract obligations ≈ $755B (CRS / FPDS); small-business prime dollars $183.5B = 28.76% (SBA FY2024 Procurement Scorecard); other-than-small ≈ $571.5B by subtraction. Decline figures: HigherGov/FPDS (58,681 in FY2022, &lt;½ of 2010), U.S. Senate Small Business Committee (−32% FY09→FY18), DoD Section 809 Panel (−70% since 2011). &ldquo;Sustained&rdquo; / per-business figures are illustrative at the current average award size, not a forecast.
         </p>
       </div>

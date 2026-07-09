@@ -63,30 +63,30 @@ const SOLVES = [
 
 export default function CompetitivePositioningPage() {
   return (
-    <div className="min-h-dvh bg-slate-950 px-6 py-8 text-slate-100">
+    <div className="min-h-dvh bg-ground-deep px-6 py-8 text-slate-100">
       <div className="mx-auto max-w-5xl">
         <header className="mb-6">
           <h1 className="text-2xl font-black">Why Mindy — the GovCon tool landscape</h1>
-          <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-slate-500">Static positioning deck · competitor figures as of Jun 2026 (verify before citing externally)</p>
-          <p className="mt-1 text-sm text-slate-400">
+          <p className="mt-1 text-xs font-semibold uppercase tracking-wide text-faint">Static positioning deck · competitor figures as of Jun 2026 (verify before citing externally)</p>
+          <p className="mt-1 text-sm text-muted">
             Everyone else forces a trade-off: powerful but complicated, or simple but single-purpose. Mindy is the only one in the winning corner — <span className="font-semibold text-emerald-300">all-in-one AND simple</span>.
           </p>
         </header>
 
         {/* ── 2×2 ─────────────────────────────────────────────────────────── */}
-        <div className="relative mx-auto aspect-square w-full max-w-3xl rounded-2xl border border-slate-800 bg-gradient-to-br from-slate-900 to-slate-950 p-4">
+        <div className="relative mx-auto aspect-square w-full max-w-3xl rounded-2xl border border-surface bg-gradient-to-br from-slate-900 to-slate-950 p-4">
           {/* winning-quadrant glow (top-right) */}
           <div className="pointer-events-none absolute right-4 top-4 h-1/2 w-1/2 rounded-tr-2xl bg-emerald-500/5" />
 
           {/* axes */}
-          <div className="pointer-events-none absolute inset-x-4 top-1/2 h-px -translate-y-1/2 bg-slate-700/70" />
-          <div className="pointer-events-none absolute inset-y-4 left-1/2 w-px -translate-x-1/2 bg-slate-700/70" />
+          <div className="pointer-events-none absolute inset-x-4 top-1/2 h-px -translate-y-1/2 bg-input/70" />
+          <div className="pointer-events-none absolute inset-y-4 left-1/2 w-px -translate-x-1/2 bg-input/70" />
 
           {/* axis labels */}
-          <span className="absolute left-1/2 top-2 -translate-x-1/2 text-xs font-semibold uppercase tracking-wider text-slate-400">Easy to use</span>
-          <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-xs font-semibold uppercase tracking-wider text-slate-400">Complicated</span>
-          <span className="absolute left-2 top-1/2 -translate-y-1/2 -rotate-90 text-xs font-semibold uppercase tracking-wider text-slate-400">Single-purpose</span>
-          <span className="absolute right-2 top-1/2 -translate-y-1/2 rotate-90 text-xs font-semibold uppercase tracking-wider text-slate-400">All-in-one</span>
+          <span className="absolute left-1/2 top-2 -translate-x-1/2 text-xs font-semibold uppercase tracking-wider text-muted">Easy to use</span>
+          <span className="absolute bottom-2 left-1/2 -translate-x-1/2 text-xs font-semibold uppercase tracking-wider text-muted">Complicated</span>
+          <span className="absolute left-2 top-1/2 -translate-y-1/2 -rotate-90 text-xs font-semibold uppercase tracking-wider text-muted">Single-purpose</span>
+          <span className="absolute right-2 top-1/2 -translate-y-1/2 rotate-90 text-xs font-semibold uppercase tracking-wider text-muted">All-in-one</span>
 
           {/* players */}
           {PLAYERS.map((p) => {
@@ -103,7 +103,7 @@ export default function CompetitivePositioningPage() {
                 >
                   {p.name}
                 </div>
-                <div className={`mt-1 max-w-[150px] text-center text-[10px] leading-tight ${p.tone === 'mindy' ? 'text-emerald-200' : 'text-slate-400'}`}>
+                <div className={`mt-1 max-w-[150px] text-center text-[10px] leading-tight ${p.tone === 'mindy' ? 'text-emerald-200' : 'text-muted'}`}>
                   {p.weakness}
                 </div>
               </div>
@@ -113,17 +113,17 @@ export default function CompetitivePositioningPage() {
 
         {/* ── how Mindy solves each gap ───────────────────────────────────── */}
         <div className="mt-8">
-          <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-slate-400">How Mindy solves each gap</h2>
+          <h2 className="mb-3 text-sm font-bold uppercase tracking-wider text-muted">How Mindy solves each gap</h2>
           <div className="grid gap-3 sm:grid-cols-3">
             {SOLVES.map((s) => (
-              <div key={s.gap} className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+              <div key={s.gap} className="rounded-xl border border-surface bg-ground/60 p-4">
                 <p className="text-xs font-semibold uppercase tracking-wider text-rose-300/80">{s.gap}</p>
-                <p className="mt-0.5 text-[11px] text-slate-500">{s.who}</p>
+                <p className="mt-0.5 text-[11px] text-faint">{s.who}</p>
                 <p className="mt-2 text-sm text-slate-200"><span className="font-semibold text-emerald-300">Mindy →</span> {s.mindy}</p>
               </div>
             ))}
           </div>
-          <p className="mt-4 text-[11px] text-slate-500">
+          <p className="mt-4 text-[11px] text-faint">
             Note: Govology is training/education, not an operating platform — different category, intentionally off the map.
           </p>
         </div>
@@ -131,10 +131,10 @@ export default function CompetitivePositioningPage() {
         {/* ── vs GovDash — the only real contractor-side AI competitor ─────── */}
         <div className="mt-8 rounded-xl border border-rose-500/20 bg-gradient-to-br from-slate-900 to-slate-950 p-5">
           <div className="flex flex-wrap items-baseline justify-between gap-2">
-            <h2 className="text-sm font-bold uppercase tracking-wider text-slate-300">The one to know: GovDash</h2>
-            <span className="text-[11px] text-slate-500">YC · ~$42M raised · enterprise / sales-gated</span>
+            <h2 className="text-sm font-bold uppercase tracking-wider text-ink-soft">The one to know: GovDash</h2>
+            <span className="text-[11px] text-faint">YC · ~$42M raised · enterprise / sales-gated</span>
           </div>
-          <p className="mt-2 text-sm text-slate-400">
+          <p className="mt-2 text-sm text-muted">
             The closest AI-native competitor — strong, funded, built for proposal shops and primes. We don&rsquo;t out-enterprise a $42M company; we win the lane they price out of, on things they can&rsquo;t copy.
           </p>
 
@@ -142,7 +142,7 @@ export default function CompetitivePositioningPage() {
           <div className="mt-4 rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-center">
             <p className="text-[11px] uppercase tracking-wider text-emerald-300/80">In the AI era, anyone can replicate the software</p>
             <p className="mt-0.5 text-lg font-black text-white">The moat is <span className="text-emerald-300">Brand · Attention · Distribution</span></p>
-            <p className="text-[12px] text-slate-400">…and that&rsquo;s exactly what GovCon Giants is. A $42M feature factory can&rsquo;t buy it.</p>
+            <p className="text-[12px] text-muted">…and that&rsquo;s exactly what GovCon Giants is. A $42M feature factory can&rsquo;t buy it.</p>
           </div>
 
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
@@ -154,9 +154,9 @@ export default function CompetitivePositioningPage() {
                 <li>• The coach brand, not just a workflow tool</li>
               </ul>
             </div>
-            <div className="rounded-lg border border-slate-700/50 bg-slate-800/30 p-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-slate-400">Live demo contrast (true today)</p>
-              <ul className="mt-1.5 space-y-1 text-[13px] text-slate-300">
+            <div className="rounded-lg border border-hairline/50 bg-surface/30 p-3">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted">Live demo contrast (true today)</p>
+              <ul className="mt-1.5 space-y-1 text-[13px] text-ink-soft">
                 <li>• <span className="font-semibold">Arrives full</span> — GovDash makes you upload your company first; Mindy already knows your market at login</li>
                 <li>• <span className="font-semibold">Self-serve</span> — sign up &amp; go vs &ldquo;submit a form&rdquo; + onboarding</li>
               </ul>

@@ -111,8 +111,8 @@ for the shell's raw classes — it's recorded in the drift baseline, exactly lik
 - **P4** ✅ type scale (`text-page`/`title`/`eyebrow`/`micro`, wired into `CardHeader`) + deleted 7 truly-dead motion classes. Adopt going forward.
 - **P5** (in progress) the raw-neutral → token migration via the exact no-op map above.
   **Batches shipped:** (1) Dashboard reference pass; (2) top-8 panels; (3) full `/app` sweep
-  (`src/components/app` + `src/app/app`, 58 files incl. market-intel & onboarding pages).
-  Baseline 10,557 → **7,377** (−3,180, ~30% of the total debt). The whole `/app` surface is now
-  largely token-driven; leftovers are the no-exact-token shades (`text-slate-200`/`-600`,
-  `border-slate-600`/`-500`) plus non-`/app` areas (marketing/admin), which migrate the same way
-  when touched (python `\b`-anchored regex over the map; leave shades with no exact token).
+  (58 files); (4) admin + briefings + bd-assist + mindy-landing + market-intelligence.
+  Baseline 10,557 → **6,417** (−4,140, ~39% of the total debt). The `/app` surface, the admin
+  dashboards, and the briefings/BD tooling are now token-driven. Leftovers are the no-exact-token
+  shades (`text-slate-200`/`-600`, `border-slate-600`/`-500`) plus lower-traffic public pages,
+  which migrate the same way when touched (python `\b`-anchored regex over the map).

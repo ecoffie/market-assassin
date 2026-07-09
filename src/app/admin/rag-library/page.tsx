@@ -158,16 +158,16 @@ export default function RagLibraryAdminPage() {
   // ---- Login gate ----
   if (!authenticated) {
     return (
-      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
-        <form onSubmit={handleLogin} className="bg-slate-900 border border-slate-800 rounded-lg p-6 w-full max-w-sm">
+      <div className="min-h-screen bg-ground-deep flex items-center justify-center p-4">
+        <form onSubmit={handleLogin} className="bg-ground border border-surface rounded-lg p-6 w-full max-w-sm">
           <h1 className="text-xl font-semibold text-white mb-1">RAG Library Admin</h1>
-          <p className="text-sm text-slate-400 mb-5">Mindy teaching corpus + retrieval probe</p>
-          <label className="block text-sm text-slate-300 mb-1">Admin password</label>
+          <p className="text-sm text-muted mb-5">Mindy teaching corpus + retrieval probe</p>
+          <label className="block text-sm text-ink-soft mb-1">Admin password</label>
           <input
             type="password"
             value={password}
             onChange={(e) => setPassword(e.target.value)}
-            className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded text-white text-sm focus:border-emerald-500 focus:outline-none mb-3"
+            className="w-full px-3 py-2 bg-surface border border-hairline rounded text-white text-sm focus:border-emerald-500 focus:outline-none mb-3"
             autoFocus
           />
           {authError && <p className="text-rose-400 text-sm mb-3">{authError}</p>}
@@ -180,19 +180,19 @@ export default function RagLibraryAdminPage() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-950 text-slate-200">
-      <header className="border-b border-slate-800 px-6 py-4">
+    <div className="min-h-screen bg-ground-deep text-slate-200">
+      <header className="border-b border-surface px-6 py-4">
         <h1 className="text-xl font-semibold text-white">🗂️ Mindy RAG Library</h1>
-        <p className="text-sm text-slate-400">Eric Coffie 8-year teaching corpus + retrieval debugger</p>
+        <p className="text-sm text-muted">Eric Coffie 8-year teaching corpus + retrieval debugger</p>
       </header>
 
-      <nav className="border-b border-slate-800 px-6">
+      <nav className="border-b border-surface px-6">
         {(['stats', 'search', 'docs'] as Tab[]).map((t) => (
           <button
             key={t}
             onClick={() => setTab(t)}
             className={`px-4 py-3 text-sm font-medium border-b-2 transition ${
-              tab === t ? 'border-emerald-500 text-white' : 'border-transparent text-slate-400 hover:text-slate-200'
+              tab === t ? 'border-emerald-500 text-white' : 'border-transparent text-muted hover:text-slate-200'
             }`}
           >
             {t === 'stats' && '📊 Stats'}
@@ -213,10 +213,10 @@ export default function RagLibraryAdminPage() {
             </section>
 
             {/* By doc_type */}
-            <section className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-              <h2 className="text-sm font-medium text-slate-300 mb-3">By document type</h2>
+            <section className="bg-ground border border-surface rounded-lg p-4">
+              <h2 className="text-sm font-medium text-ink-soft mb-3">By document type</h2>
               <table className="w-full text-sm">
-                <thead className="text-xs text-slate-500 uppercase tracking-wider">
+                <thead className="text-xs text-faint uppercase tracking-wider">
                   <tr>
                     <th className="text-left py-2">Type</th>
                     <th className="text-right py-2">Documents</th>
@@ -226,15 +226,15 @@ export default function RagLibraryAdminPage() {
                 </thead>
                 <tbody>
                   {stats.byType.map((row) => (
-                    <tr key={row.type} className="border-t border-slate-800">
+                    <tr key={row.type} className="border-t border-surface">
                       <td className="py-2">
                         <span className={`px-2 py-0.5 rounded text-xs ${docTypeColor(row.type)}`}>
                           {row.type}
                         </span>
                       </td>
                       <td className="text-right py-2 text-white">{row.docs.toLocaleString()}</td>
-                      <td className="text-right py-2 text-slate-400">{Math.round(row.chars / row.docs).toLocaleString()}</td>
-                      <td className="text-right py-2 text-slate-400">{(row.chars / 1000).toFixed(0)}K</td>
+                      <td className="text-right py-2 text-muted">{Math.round(row.chars / row.docs).toLocaleString()}</td>
+                      <td className="text-right py-2 text-muted">{(row.chars / 1000).toFixed(0)}K</td>
                     </tr>
                   ))}
                 </tbody>
@@ -243,23 +243,23 @@ export default function RagLibraryAdminPage() {
 
             {/* Status + Folder side by side */}
             <section className="grid grid-cols-2 gap-4">
-              <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-                <h2 className="text-sm font-medium text-slate-300 mb-3">Ingestion status</h2>
+              <div className="bg-ground border border-surface rounded-lg p-4">
+                <h2 className="text-sm font-medium text-ink-soft mb-3">Ingestion status</h2>
                 <ul className="text-sm space-y-1">
                   {Object.entries(stats.byStatus).map(([s, c]) => (
                     <li key={s} className="flex justify-between">
-                      <span className={s === 'extracted' ? 'text-emerald-400' : s === 'failed' ? 'text-rose-400' : 'text-slate-400'}>{s}</span>
+                      <span className={s === 'extracted' ? 'text-emerald-400' : s === 'failed' ? 'text-rose-400' : 'text-muted'}>{s}</span>
                       <span className="text-white">{c}</span>
                     </li>
                   ))}
                 </ul>
               </div>
-              <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-                <h2 className="text-sm font-medium text-slate-300 mb-3">By top-level folder</h2>
+              <div className="bg-ground border border-surface rounded-lg p-4">
+                <h2 className="text-sm font-medium text-ink-soft mb-3">By top-level folder</h2>
                 <ul className="text-sm space-y-1 max-h-64 overflow-auto">
                   {stats.byFolder.slice(0, 20).map((f) => (
                     <li key={f.folder} className="flex justify-between">
-                      <span className="text-slate-400 truncate mr-2">{f.folder}</span>
+                      <span className="text-muted truncate mr-2">{f.folder}</span>
                       <span className="text-white">{f.docs}</span>
                     </li>
                   ))}
@@ -277,12 +277,12 @@ export default function RagLibraryAdminPage() {
                 value={query}
                 onChange={(e) => setQuery(e.target.value)}
                 placeholder='Try: "capability statement past performance" or "NAVFAC construction MACC"'
-                className="flex-1 px-3 py-2 bg-slate-900 border border-slate-700 rounded text-white text-sm focus:border-emerald-500 focus:outline-none"
+                className="flex-1 px-3 py-2 bg-ground border border-hairline rounded text-white text-sm focus:border-emerald-500 focus:outline-none"
               />
               <select
                 value={docTypeFilter}
                 onChange={(e) => setDocTypeFilter(e.target.value)}
-                className="px-3 py-2 bg-slate-900 border border-slate-700 rounded text-white text-sm focus:border-emerald-500 focus:outline-none"
+                className="px-3 py-2 bg-ground border border-hairline rounded text-white text-sm focus:border-emerald-500 focus:outline-none"
               >
                 <option value="">All doc types</option>
                 {DOC_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
@@ -296,23 +296,23 @@ export default function RagLibraryAdminPage() {
               </button>
             </form>
 
-            <p className="text-xs text-slate-500">
+            <p className="text-xs text-faint">
               Runs the same RPC <code className="text-emerald-400">get_rag_chunks()</code> that Proposal Assist uses. Doc-type boosts applied. Meta-docs (BENCHMARK, CONTENT-MAPPING) excluded.
             </p>
 
             {results !== null && (
               <div className="space-y-2">
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-muted">
                   {results.length === 0 ? 'No matches.' : `${results.length} chunk${results.length === 1 ? '' : 's'} returned, sorted by rank.`}
                 </p>
                 {results.map((r, i) => {
                   const key = `${r.document_id}-${r.chunk_index}`;
                   const isExpanded = expandedChunk === key;
                   return (
-                    <div key={key} className="bg-slate-900 border border-slate-800 rounded-lg p-3 hover:border-slate-700 transition">
+                    <div key={key} className="bg-ground border border-surface rounded-lg p-3 hover:border-hairline transition">
                       <div className="flex items-center justify-between mb-2 gap-2 flex-wrap">
                         <div className="flex items-center gap-2 flex-wrap min-w-0">
-                          <span className="text-xs text-slate-500 font-mono">#{i + 1}</span>
+                          <span className="text-xs text-faint font-mono">#{i + 1}</span>
                           <span className="text-xs text-emerald-400 font-mono">rank {r.rank.toFixed(3)}</span>
                           <span className={`px-2 py-0.5 rounded text-xs ${docTypeColor(r.doc_type)}`}>
                             {r.doc_type}
@@ -321,12 +321,12 @@ export default function RagLibraryAdminPage() {
                         </div>
                         <button
                           onClick={() => setExpandedChunk(isExpanded ? null : key)}
-                          className="text-xs text-slate-400 hover:text-white whitespace-nowrap"
+                          className="text-xs text-muted hover:text-white whitespace-nowrap"
                         >
                           {isExpanded ? 'Collapse' : 'Show full chunk'}
                         </button>
                       </div>
-                      <p className="text-sm text-slate-300 whitespace-pre-wrap break-words">
+                      <p className="text-sm text-ink-soft whitespace-pre-wrap break-words">
                         {isExpanded ? r.chunk_text : r.chunk_preview + (r.chunk_text.length > 300 ? '…' : '')}
                       </p>
                       <p className="text-xs text-slate-600 mt-2 truncate" title={r.source_path}>
@@ -346,35 +346,35 @@ export default function RagLibraryAdminPage() {
               <select
                 value={docsType}
                 onChange={(e) => { setDocsType(e.target.value); setDocsPage(0); }}
-                className="px-3 py-2 bg-slate-900 border border-slate-700 rounded text-white text-sm"
+                className="px-3 py-2 bg-ground border border-hairline rounded text-white text-sm"
               >
                 <option value="">All doc types</option>
                 {DOC_TYPES.map((t) => <option key={t} value={t}>{t}</option>)}
               </select>
-              <span className="text-sm text-slate-400">
+              <span className="text-sm text-muted">
                 {docsLoading ? 'Loading…' : `${docsTotal.toLocaleString()} docs · page ${docsPage + 1} of ${Math.ceil(docsTotal / 50)}`}
               </span>
               <div className="ml-auto flex gap-1">
                 <button
                   onClick={() => setDocsPage((p) => Math.max(0, p - 1))}
                   disabled={docsPage === 0}
-                  className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-white text-sm rounded disabled:opacity-50"
+                  className="px-3 py-1 bg-surface hover:bg-input text-white text-sm rounded disabled:opacity-50"
                 >
                   ← Prev
                 </button>
                 <button
                   onClick={() => setDocsPage((p) => p + 1)}
                   disabled={(docsPage + 1) * 50 >= docsTotal}
-                  className="px-3 py-1 bg-slate-800 hover:bg-slate-700 text-white text-sm rounded disabled:opacity-50"
+                  className="px-3 py-1 bg-surface hover:bg-input text-white text-sm rounded disabled:opacity-50"
                 >
                   Next →
                 </button>
               </div>
             </div>
 
-            <div className="bg-slate-900 border border-slate-800 rounded-lg overflow-hidden">
+            <div className="bg-ground border border-surface rounded-lg overflow-hidden">
               <table className="w-full text-sm">
-                <thead className="text-xs text-slate-500 uppercase tracking-wider bg-slate-950">
+                <thead className="text-xs text-faint uppercase tracking-wider bg-ground-deep">
                   <tr>
                     <th className="text-left px-3 py-2">Title / filename</th>
                     <th className="text-left px-3 py-2">Type</th>
@@ -386,21 +386,21 @@ export default function RagLibraryAdminPage() {
                 </thead>
                 <tbody>
                   {docs.map((d) => (
-                    <tr key={d.id} className="border-t border-slate-800 hover:bg-slate-800/30">
+                    <tr key={d.id} className="border-t border-surface hover:bg-surface/30">
                       <td className="px-3 py-2 max-w-md">
                         <div className="text-white truncate" title={d.filename}>{d.title || d.filename}</div>
-                        <div className="text-xs text-slate-500 truncate">{d.filename}</div>
+                        <div className="text-xs text-faint truncate">{d.filename}</div>
                       </td>
                       <td className="px-3 py-2">
                         <span className={`px-2 py-0.5 rounded text-xs ${docTypeColor(d.doc_type)}`}>
                           {d.doc_type}
                         </span>
                       </td>
-                      <td className="px-3 py-2 text-slate-400 max-w-[180px] truncate">{d.top_level_folder}</td>
-                      <td className="px-3 py-2 text-right text-slate-400">{(d.text_length || 0).toLocaleString()}</td>
-                      <td className="px-3 py-2 text-right text-slate-400">{(d.word_count || 0).toLocaleString()}</td>
+                      <td className="px-3 py-2 text-muted max-w-[180px] truncate">{d.top_level_folder}</td>
+                      <td className="px-3 py-2 text-right text-muted">{(d.text_length || 0).toLocaleString()}</td>
+                      <td className="px-3 py-2 text-right text-muted">{(d.word_count || 0).toLocaleString()}</td>
                       <td className="px-3 py-2">
-                        <span className={d.ingestion_status === 'extracted' ? 'text-emerald-400' : d.ingestion_status === 'failed' ? 'text-rose-400' : 'text-slate-400'}>
+                        <span className={d.ingestion_status === 'extracted' ? 'text-emerald-400' : d.ingestion_status === 'failed' ? 'text-rose-400' : 'text-muted'}>
                           {d.ingestion_status}
                         </span>
                       </td>
@@ -419,8 +419,8 @@ export default function RagLibraryAdminPage() {
 // ---- Helpers --------------------------------------------------------
 function Card({ label, value }: { label: string; value: string }) {
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-lg p-4">
-      <div className="text-xs uppercase tracking-wider text-slate-500 mb-1">{label}</div>
+    <div className="bg-ground border border-surface rounded-lg p-4">
+      <div className="text-xs uppercase tracking-wider text-faint mb-1">{label}</div>
       <div className="text-2xl font-semibold text-white">{value}</div>
     </div>
   );
@@ -444,6 +444,6 @@ function docTypeColor(t: string): string {
     case 'meta_doc':
       return 'bg-rose-900/40 text-rose-300';
     default:
-      return 'bg-slate-800 text-slate-400';
+      return 'bg-surface text-muted';
   }
 }

@@ -34,11 +34,11 @@
     },
     "src/components/admin/MemberAccessSection.tsx": {
       "hex": 0,
-      "neutral": 77
+      "neutral": 13
     },
     "src/components/admin/MemberLookup.tsx": {
       "hex": 0,
-      "neutral": 35
+      "neutral": 3
     },
     "src/components/admin/MetricTrends.tsx": {
       "hex": 0,
@@ -298,7 +298,7 @@
     },
     "src/components/bd-assist/PipelineCard.tsx": {
       "hex": 0,
-      "neutral": 19
+      "neutral": 18
     },
     "src/components/bd-assist/PipelineModal.tsx": {
       "hex": 0,
@@ -334,7 +334,7 @@
     },
     "src/components/briefings/SbirPanel.tsx": {
       "hex": 0,
-      "neutral": 56
+      "neutral": 55
     },
     "src/components/briefings/SettingsPanel.tsx": {
       "hex": 0,
@@ -454,23 +454,23 @@
     },
     "src/app/admin/codes/page.tsx": {
       "hex": 0,
-      "neutral": 31
+      "neutral": 29
     },
     "src/app/admin/competitive-positioning/page.tsx": {
       "hex": 0,
-      "neutral": 33
+      "neutral": 9
     },
     "src/app/admin/dashboard/page.tsx": {
       "hex": 0,
-      "neutral": 477
+      "neutral": 468
     },
     "src/app/admin/data-inventory/page.tsx": {
       "hex": 0,
-      "neutral": 35
+      "neutral": 3
     },
     "src/app/admin/demo/page.tsx": {
       "hex": 0,
-      "neutral": 11
+      "neutral": 5
     },
     "src/app/admin/emails/page.tsx": {
       "hex": 0,
@@ -482,27 +482,27 @@
     },
     "src/app/admin/launch-command-center/page.tsx": {
       "hex": 0,
-      "neutral": 349
+      "neutral": 28
     },
     "src/app/admin/members/page.tsx": {
       "hex": 0,
-      "neutral": 7
+      "neutral": 1
     },
     "src/app/admin/mi-accounts/page.tsx": {
       "hex": 0,
-      "neutral": 57
+      "neutral": 5
     },
     "src/app/admin/page.tsx": {
       "hex": 0,
-      "neutral": 113
+      "neutral": 106
     },
     "src/app/admin/podcast-highlights/page.tsx": {
       "hex": 0,
-      "neutral": 54
+      "neutral": 6
     },
     "src/app/admin/proposal-ab/page.tsx": {
       "hex": 0,
-      "neutral": 51
+      "neutral": 3
     },
     "src/app/admin/purchases/page.tsx": {
       "hex": 0,
@@ -510,11 +510,11 @@
     },
     "src/app/admin/rag-library/page.tsx": {
       "hex": 0,
-      "neutral": 65
+      "neutral": 3
     },
     "src/app/admin/set-aside-impact/page.tsx": {
       "hex": 0,
-      "neutral": 67
+      "neutral": 12
     },
     "src/app/admin/tool-health/page.tsx": {
       "hex": 0,
@@ -702,7 +702,7 @@
     },
     "src/app/market-intelligence/page.tsx": {
       "hex": 0,
-      "neutral": 107
+      "neutral": 17
     },
     "src/app/mindy-intelligence/page.tsx": {
       "hex": 0,
@@ -710,7 +710,7 @@
     },
     "src/app/mindy-landing/page.tsx": {
       "hex": 0,
-      "neutral": 111
+      "neutral": 11
     },
     "src/app/naics/[code]/page.tsx": {
       "hex": 0,
@@ -870,5 +870,5 @@
     }
   },
   "totalHex": 8,
-  "totalNeutral": 7377
+  "totalNeutral": 6417
 }

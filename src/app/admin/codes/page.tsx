@@ -236,7 +236,7 @@ export default function AdminCodesPage() {
           </div>
 
           {codes.length === 0 ? (
-            <p className="text-slate-500 text-center py-8">No access codes generated yet.</p>
+            <p className="text-faint text-center py-8">No access codes generated yet.</p>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full">
@@ -269,7 +269,7 @@ export default function AdminCodesPage() {
                           </span>
                         )}
                       </td>
-                      <td className="py-3 px-4 text-slate-500 text-sm">
+                      <td className="py-3 px-4 text-faint text-sm">
                         {new Date(code.createdAt).toLocaleDateString()}
                       </td>
                       <td className="py-3 px-4">

@@ -52,7 +52,7 @@ const AGENCY_COLORS: Record<string, { bg: string; text: string }> = {
   NIMH: { bg: 'bg-purple-500/20', text: 'text-purple-400' },
   NIH: { bg: 'bg-blue-500/20', text: 'text-blue-400' },
   NSF: { bg: 'bg-violet-500/20', text: 'text-violet-400' },
-  DOD: { bg: 'bg-slate-500/20', text: 'text-slate-400' },
+  DOD: { bg: 'bg-slate-500/20', text: 'text-muted' },
   DOE: { bg: 'bg-amber-500/20', text: 'text-amber-400' },
   NASA: { bg: 'bg-orange-500/20', text: 'text-orange-400' },
 };

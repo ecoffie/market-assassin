@@ -3967,3 +3967,21 @@ tightened in one place, and the last structural "vibe-coded" tell to fall.
 so it's visually invisible; shades with no exact token were left (migrating would change the
 color). Verified: tsc clean, production build ✓, no malformed tokens across 58 files, opacity
 suffixes preserved. Drift-guard baseline 9,048 → 7,377; the guard blocks any regression.
+
+---
+
+## Design polish — P5 admin + marketing token sweep (Jul 9 2026)
+
+**What:** Extended the token migration beyond `/app` into the internal admin dashboards and the
+briefings / BD-assist / market-intelligence / landing surfaces — 19 files, **1,755 → 795
+raw-neutral (−960)**. Cumulative P5: 10,557 → 6,417 (~39% of the total color debt cleared).
+
+**Why:** Consistency shouldn't stop at the customer-facing app — the internal launch/ops
+dashboards and the intelligence tooling are used daily by the team, and bringing them onto the
+same token system means the whole product (customer + operator) is themeable and auditable from
+one place.
+
+**Proof:** Same exact-hex no-op map (token color == the slate shade replaced); shades with no
+exact token left untouched. Verified: tsc clean, production build ✓, 0 malformed tokens across
+19 files, opacity suffixes preserved. Drift-guard baseline 7,377 → 6,417; the guard blocks any
+regression.
