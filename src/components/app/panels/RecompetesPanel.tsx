@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
+import { MapPin, Landmark, Building2, Flame, Zap, CalendarClock, type LucideIcon } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders, authedFetch } from '../authHeaders';
 import { SaveToPipelineButton } from '@/components/briefings/SaveToPipelineButton';
@@ -614,11 +615,11 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
     }
   };
 
-  const getUrgencyBadge = (days: number) => {
-    if (days <= 30) return { bg: 'bg-red-500/20 border-red-500/30', text: 'text-red-400', label: '🔥 Urgent' };
-    if (days <= 90) return { bg: 'bg-amber-500/20', text: 'text-amber-400', label: '⚡ Soon' };
-    if (days <= 180) return { bg: 'bg-blue-500/20', text: 'text-blue-400', label: '📅 6 mo' };
-    return { bg: 'bg-slate-500/20', text: 'text-slate-400', label: `${Math.round(days / 30)} mo` };
+  const getUrgencyBadge = (days: number): { bg: string; text: string; label: string; icon: LucideIcon | null } => {
+    if (days <= 30) return { bg: 'bg-red-500/20 border-red-500/30', text: 'text-red-400', label: 'Urgent', icon: Flame };
+    if (days <= 90) return { bg: 'bg-amber-500/20', text: 'text-amber-400', label: 'Soon', icon: Zap };
+    if (days <= 180) return { bg: 'bg-blue-500/20', text: 'text-blue-400', label: '6 mo', icon: CalendarClock };
+    return { bg: 'bg-slate-500/20', text: 'text-slate-400', label: `${Math.round(days / 30)} mo`, icon: null };
   };
   // "My states only" view. classifyLocation already tagged each row vs. the user's
   // hq/service states, so in-state = hq | service (the states you actually selected;
@@ -950,7 +951,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
 
                       {/* WHERE — project location + "in your area" badge (the tribe-story trigger) */}
                       <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500 mt-0.5">
-                        <span>📍 {c.popState || 'Location not specified'}</span>
+                        <span className="inline-flex items-center gap-1"><MapPin className="h-3 w-3 shrink-0 text-faint" strokeWidth={2} /> {c.popState || 'Location not specified'}</span>
                         {inArea && (
                           <span title={MATCH_META[c.locationMatch!].hint} className={`px-1.5 py-0.5 rounded text-[10px] font-semibold ${
                             c.locationMatch === 'hq' ? 'bg-emerald-500/20 text-emerald-300'
@@ -1094,7 +1095,8 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                     <div className="flex-1 min-w-0">
                       {/* Badges */}
                       <div className="flex items-center gap-2 mb-2 flex-wrap">
-                        <span className={`px-2 py-0.5 rounded text-xs font-medium ${urgency.bg} ${urgency.text}`}>
+                        <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-medium ${urgency.bg} ${urgency.text}`}>
+                          {urgency.icon && <urgency.icon className="h-3 w-3 shrink-0" strokeWidth={2} />}
                           {urgency.label}
                         </span>
                         <span className={`px-2 py-0.5 rounded text-xs font-medium ${getCompetitionBadge(contract.competitionLevel)}`}>
@@ -1124,7 +1126,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                         {contract.agency}
                         {contract.subAgency && <span className="text-slate-500"> • {contract.subAgency}</span>}
                         {formatDodaacOffice(contract.piid || null, dodaacNames) && (
-                          <span className="text-emerald-400/80"> • 🏛 {formatDodaacOffice(contract.piid || null, dodaacNames)}</span>
+                          <span className="inline-flex items-center gap-1 text-emerald-400/80"> • <Landmark className="h-3 w-3 shrink-0" strokeWidth={2} /> {formatDodaacOffice(contract.piid || null, dodaacNames)}</span>
                         )}
                       </p>
 
@@ -1151,7 +1153,8 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                       {contract.isMultiAward && (contract.awardeeCount || 0) > 1 && (
                         <div className="mb-2 rounded-lg border border-indigo-500/30 bg-indigo-500/10 px-2.5 py-2">
                           <div className="flex items-center gap-1.5 text-xs font-semibold text-indigo-200">
-                            <span>🏢 Multiple-award IDIQ · {contract.awardeeCount} awardees</span>
+                            <Building2 className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />
+                            <span>Multiple-award IDIQ · {contract.awardeeCount} awardees</span>
                           </div>
                           {contract.awardees && contract.awardees.length > 0 && (
                             <div className="mt-1.5 flex flex-wrap gap-1">
@@ -1172,8 +1175,8 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                           user's service area so geography is visible, not a
                           silent filter. */}
                       <div className="flex items-center gap-2 flex-wrap text-xs text-slate-500 mt-0.5">
-                        <span>
-                          📍 {contract.location?.state
+                        <span className="inline-flex items-center gap-1">
+                          <MapPin className="h-3 w-3 shrink-0 text-faint" strokeWidth={2} /> {contract.location?.state
                             ? `${contract.location.city ? `${contract.location.city}, ` : ''}${contract.location.state}${contract.location.zip ? ` ${contract.location.zip}` : ''}`
                             : 'Location not specified'}
                         </span>

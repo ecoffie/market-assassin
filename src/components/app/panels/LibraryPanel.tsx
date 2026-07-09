@@ -10,6 +10,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { BookOpen, Inbox } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 
@@ -273,7 +274,7 @@ export default function LibraryPanel({ email, tier }: Props) {
       {/* Header */}
       <div className="px-6 py-5 border-b border-slate-800">
         <div className="flex items-center gap-3 mb-1">
-          <span className="text-2xl">📚</span>
+          <BookOpen className="h-6 w-6 shrink-0 text-muted" strokeWidth={2} />
           <h1 className="text-xl font-semibold text-white">My Library</h1>
         </div>
         <p className="text-sm text-slate-400">
@@ -307,7 +308,7 @@ export default function LibraryPanel({ email, tier }: Props) {
           {error && <div className="px-6 py-4 text-sm text-rose-300">Error: {error}</div>}
           {!loading && !error && entries.length === 0 && (
             <div className="p-12 text-center text-slate-500">
-              <div className="text-4xl mb-3">📭</div>
+              <Inbox className="h-9 w-9 mx-auto mb-3 text-faint" strokeWidth={1.5} />
               <p className="text-sm">Nothing here yet. Drafts and outputs you generate will appear automatically.</p>
             </div>
           )}

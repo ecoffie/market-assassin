@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
+import { X } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 
@@ -300,9 +301,9 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
                       disabled={saving}
                       title={member.status === 'invited' ? 'Revoke invite' : 'Remove member'}
                       aria-label={member.status === 'invited' ? 'Revoke invite' : 'Remove member'}
-                      className="p-1 rounded text-slate-500 hover:text-red-300 hover:bg-red-500/10 disabled:opacity-50 transition-colors"
+                      className="inline-flex items-center p-1 rounded text-slate-500 hover:text-red-300 hover:bg-red-500/10 disabled:opacity-50 transition-colors"
                     >
-                      ✕
+                      <X className="h-3.5 w-3.5" strokeWidth={2.5} />
                     </button>
                   )}
                 </div>

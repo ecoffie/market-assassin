@@ -23,6 +23,7 @@
  */
 
 import { useState, type ReactNode } from 'react';
+import { Lock } from 'lucide-react';
 import { UpgradeModal } from '../UpgradeModal';
 
 export interface LockedPreviewProps {
@@ -77,8 +78,8 @@ export default function LockedPreview({
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <h1 className="text-lg font-semibold text-white">{title}</h1>
-            <span className="rounded-full border border-purple-500/40 bg-purple-500/10 px-2 py-0.5 text-[11px] font-medium text-purple-300">
-              🔒 Pro
+            <span className="inline-flex items-center gap-1 rounded-full border border-purple-500/40 bg-purple-500/10 px-2 py-0.5 text-[11px] font-medium text-purple-300">
+              <Lock className="h-3 w-3 shrink-0" strokeWidth={2} /> Pro
             </span>
           </div>
           {subtitle && <p className="mt-1 text-sm text-slate-400">{subtitle}</p>}
@@ -116,7 +117,7 @@ export default function LockedPreview({
                       <span className="min-w-0 flex-1 truncate text-sm text-slate-300 select-none blur-sm" aria-hidden>
                         {row}
                       </span>
-                      <span className="shrink-0 text-slate-600">🔒</span>
+                      <Lock className="h-3.5 w-3.5 shrink-0 text-faint" strokeWidth={2} />
                     </li>
                   ))}
                 </ul>

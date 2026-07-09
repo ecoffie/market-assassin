@@ -1,5 +1,6 @@
 'use client';
 import { useState, useMemo, useEffect } from 'react';
+import { Ban, Check } from 'lucide-react';
 import { BID_GATES, BID_FACTORS, evaluateBidDecision } from '@/lib/proposal/bid-decision';
 import { authedFetch } from '../authHeaders';
 
@@ -94,7 +95,7 @@ export default function BidDecisionGate({ onProceed, email, pipelineId }: { onPr
       {/* Gate failure → No-Bid */}
       {failedGate && (
         <div className="rounded-lg border border-red-500/40 bg-red-500/10 p-3 text-sm">
-          <div className="font-semibold text-red-300">🛑 No-Bid recommended</div>
+          <div className="inline-flex items-center gap-1.5 font-semibold text-red-300"><Ban className="h-4 w-4 shrink-0" strokeWidth={2} /> No-Bid recommended</div>
           <div className="text-slate-300 mt-1">Deal-breaker: <span className="text-red-200">{failedGate.question.replace(/\?$/, '')}</span> — this disqualifies you regardless of how good the fit is. Don&apos;t spend time on the matrix. (You can still proceed to track it or subcontract.)</div>
           <button onClick={onProceed} className="text-[11px] text-slate-400 hover:text-slate-200 mt-2 underline">Proceed anyway →</button>
         </div>
@@ -104,8 +105,8 @@ export default function BidDecisionGate({ onProceed, email, pipelineId }: { onPr
       {gateAnswered && !failedGate && (
         <div className="mt-3">
           {!showScorecard ? (
-            <button onClick={() => setShowScorecard(true)} className="w-full rounded-lg bg-amber-600 hover:bg-amber-500 px-4 py-2 text-sm font-semibold text-white">
-              ✓ Clears the deal-breakers — score the fit →
+            <button onClick={() => setShowScorecard(true)} className="inline-flex w-full items-center justify-center gap-1.5 rounded-lg bg-amber-600 hover:bg-amber-500 px-4 py-2 text-sm font-semibold text-white">
+              <Check className="h-4 w-4 shrink-0" strokeWidth={2.5} /> Clears the deal-breakers — score the fit →
             </button>
           ) : (
             <div>
@@ -141,10 +142,10 @@ export default function BidDecisionGate({ onProceed, email, pipelineId }: { onPr
                   <div className="flex items-center gap-2 shrink-0">
                     <button
                       onClick={() => saveDecision('skip', result.score)}
-                      className={`rounded-lg px-3 py-2 text-sm font-medium ${savedDecision === 'skip' ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
+                      className={`inline-flex items-center justify-center gap-1.5 rounded-lg px-3 py-2 text-sm font-medium ${savedDecision === 'skip' ? 'bg-red-600 text-white' : 'bg-slate-800 text-slate-300 hover:bg-slate-700'}`}
                       title="Record a No-Bid on this pursuit"
                     >
-                      {savedDecision === 'skip' ? '✓ No-Bid recorded' : 'Record No-Bid'}
+                      {savedDecision === 'skip' ? <><Check className="h-4 w-4 shrink-0" strokeWidth={2.5} /> No-Bid recorded</> : 'Record No-Bid'}
                     </button>
                     <button
                       onClick={() => { saveDecision(result.recommendation === 'no-bid' ? 'watch' : result.recommendation, result.score); onProceed(); }}

@@ -1,5 +1,6 @@
 'use client';
 import { useState, useRef, useEffect } from 'react';
+import { Gauge, FileText, X, FolderArchive, BookOpen } from 'lucide-react';
 import { authedFetch } from '../authHeaders';
 
 /**
@@ -111,7 +112,7 @@ export default function ProposalChat({
       {/* CENTER — chat */}
       <div className="flex flex-col p-5" style={{ minHeight: 480 }}>
         <div className="flex items-center justify-between mb-2">
-          <h2 className="text-base font-semibold text-white">🏎 Manual Drive — chat your proposal</h2>
+          <h2 className="inline-flex items-center gap-1.5 text-base font-semibold text-white"><Gauge className="h-4 w-4 shrink-0 text-accent" strokeWidth={2} /> Manual Drive — chat your proposal</h2>
           {sources.length > 0 && <span className="text-[11px] text-slate-500">drafting from {sources.length} source{sources.length === 1 ? '' : 's'}</span>}
         </div>
 
@@ -175,17 +176,17 @@ export default function ProposalChat({
             )}
             {files.map(f => (
               <div key={f.fileName} className="group flex items-center justify-between gap-2 rounded bg-slate-800/60 px-2 py-1.5 text-xs">
-                <span className="truncate text-slate-300" title={f.fileName}>📄 {f.fileName}</span>
-                <button onClick={() => onRemoveFile(f.fileName)} className="text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100" title="Remove from context">✕</button>
+                <span className="inline-flex min-w-0 items-center gap-1 truncate text-slate-300" title={f.fileName}><FileText className="h-3 w-3 shrink-0" strokeWidth={2} /> {f.fileName}</span>
+                <button onClick={() => onRemoveFile(f.fileName)} className="inline-flex shrink-0 items-center text-slate-600 hover:text-red-400 opacity-0 group-hover:opacity-100" title="Remove from context"><X className="h-3.5 w-3.5" strokeWidth={2.5} /></button>
               </div>
             ))}
             {hasVault && (
               <div className="flex items-center gap-2 rounded bg-slate-800/40 px-2 py-1.5 text-xs text-slate-400">
-                🗂 Your Vault <span className="text-[10px] text-slate-600">(always on)</span>
+                <FolderArchive className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> Your Vault <span className="text-[10px] text-slate-600">(always on)</span>
               </div>
             )}
             <div className="flex items-center gap-2 rounded bg-slate-800/40 px-2 py-1.5 text-xs text-slate-400">
-              📚 Proposal corpus <span className="text-[10px] text-slate-600">(winning volumes)</span>
+              <BookOpen className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> Proposal corpus <span className="text-[10px] text-slate-600">(winning volumes)</span>
             </div>
           </div>
         </div>

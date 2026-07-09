@@ -9,6 +9,7 @@
  * (same-workspace OR same-user); this component just renders + posts.
  */
 import { useCallback, useEffect, useState } from 'react';
+import { MessageSquare } from 'lucide-react';
 import { authedFetch } from '../authHeaders';
 
 interface Comment {
@@ -99,8 +100,8 @@ export default function PursuitComments({ pipelineId, email }: PursuitCommentsPr
 
   return (
     <div className="mt-4">
-      <div className="text-xs font-semibold text-slate-300 mb-2">
-        💬 Team discussion {comments.length > 0 && <span className="text-slate-500">({comments.length})</span>}
+      <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 mb-2">
+        <MessageSquare className="h-4 w-4 shrink-0 text-muted" strokeWidth={2} /> Team discussion {comments.length > 0 && <span className="text-slate-500">({comments.length})</span>}
       </div>
 
       <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">

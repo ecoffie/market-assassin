@@ -19,6 +19,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { Lock } from 'lucide-react';
 import type { AppPanel } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 import LockedPreview from './LockedPreview';
@@ -225,8 +226,8 @@ export default function CatalogTeaserFree({ email, featureId, onPanelChange }: P
       <div className="mx-auto max-w-4xl px-4 py-6">
         <div className="flex items-center gap-2">
           <h1 className="text-lg font-semibold text-white">{cfg.title}</h1>
-          <span className="rounded-full border border-purple-500/40 bg-purple-500/10 px-2 py-0.5 text-[11px] font-medium text-purple-300">
-            🔒 Pro
+          <span className="inline-flex items-center gap-1 rounded-full border border-purple-500/40 bg-purple-500/10 px-2 py-0.5 text-[11px] font-medium text-purple-300">
+            <Lock className="h-3 w-3 shrink-0" strokeWidth={2} /> Pro
           </span>
         </div>
         <div className="mt-5 rounded-xl border border-amber-500/30 bg-gradient-to-br from-amber-950/30 to-slate-950/60 p-6">

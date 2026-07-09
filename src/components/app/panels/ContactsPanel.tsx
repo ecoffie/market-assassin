@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import { RefreshCw, X, Handshake } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders } from '../authHeaders';
 import { useAppTracker } from '../track';
@@ -406,9 +407,9 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
           </span>
           <button
             onClick={loadPartners}
-            className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm rounded-lg transition-colors"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm rounded-lg transition-colors"
           >
-            🔄 Refresh
+            <RefreshCw className="h-4 w-4 shrink-0" strokeWidth={2} /> Refresh
           </button>
           <button
             onClick={() => setIsAdding(true)}
@@ -423,8 +424,8 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
       {error && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-4 text-red-400">
           {error}
-          <button onClick={() => setError(null)} className="ml-2 text-red-300 hover:text-red-200">
-            ✕
+          <button onClick={() => setError(null)} aria-label="Dismiss" className="ml-2 inline-flex items-center text-red-300 hover:text-red-200">
+            <X className="h-3.5 w-3.5" strokeWidth={2.5} />
           </button>
         </div>
       )}
@@ -560,7 +561,7 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
         </div>
       ) : (
         <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
-          <div className="text-5xl mb-4">🤝</div>
+          <Handshake className="h-12 w-12 mx-auto mb-4 text-faint" strokeWidth={1.5} />
           <h3 className="text-xl font-semibold text-white mb-2">Build Your Network</h3>
           <p className="text-slate-400 mb-4">
             Add teaming partners to track relationships and coordinate joint pursuits.

@@ -9,6 +9,7 @@
  * Authed /api/app route → MUST send getMIApiHeaders(email) or it 401s.
  */
 import { useState, useCallback, useEffect } from 'react';
+import { Package, Flame, Zap } from 'lucide-react';
 import { authedFetch } from '../authHeaders';
 import type { AppTier } from '../UnifiedSidebar';
 
@@ -113,7 +114,7 @@ export default function DibbsPanel({ email }: Props) {
       {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-white flex items-center gap-2">
-          <span>📦</span> DIBBS — DLA Small-Buy RFQs
+          <Package className="h-5 w-5 shrink-0" strokeWidth={2} /> DIBBS — DLA Small-Buy RFQs
         </h1>
         <p className="text-sm text-slate-400 mt-1">
           DLA Internet Bid Board solicitations (NSN / parts) — the small-buy market that
@@ -234,13 +235,13 @@ export default function DibbsPanel({ email }: Props) {
                         </span>
                       )}
                       {isUrgent && (
-                        <span className="px-2 py-0.5 text-xs bg-red-500/20 text-red-400 rounded font-medium">
-                          🔥 {dl} day{dl === 1 ? '' : 's'} left
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-red-500/20 text-red-400 rounded font-medium">
+                          <Flame className="h-3 w-3 shrink-0" strokeWidth={2} /> {dl} day{dl === 1 ? '' : 's'} left
                         </span>
                       )}
                       {isSoon && (
-                        <span className="px-2 py-0.5 text-xs bg-amber-500/20 text-amber-400 rounded">
-                          ⚡ {dl} days left
+                        <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-amber-500/20 text-amber-400 rounded">
+                          <Zap className="h-3 w-3 shrink-0" strokeWidth={2} /> {dl} days left
                         </span>
                       )}
                     </div>

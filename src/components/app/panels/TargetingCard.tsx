@@ -19,6 +19,7 @@
  */
 
 import { useCallback, useEffect, useState } from 'react';
+import { AlertTriangle, Globe, Check } from 'lucide-react';
 import type { AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders, authedFetch } from '../authHeaders';
 import { isDistinctiveKeyword, sanitizeKeywords } from '@/lib/market/keyword-sanitize';
@@ -402,13 +403,13 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
                   onClick={() => { setAddingField('keywords'); setAddValue(''); }}
                   disabled={saving}
                   className={noKeywords
-                    ? 'rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-300 hover:bg-amber-500/20'
+                    ? 'inline-flex items-center gap-1 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-300 hover:bg-amber-500/20'
                     : 'rounded border border-dashed border-slate-600 px-2 py-0.5 text-xs text-slate-400 hover:text-emerald-300 hover:border-emerald-500 disabled:opacity-40'}
-                >{noKeywords ? '⚠ Add keywords so alerts catch mislabeled opps' : '+ add'}</button>
+                >{noKeywords ? <><AlertTriangle className="h-3 w-3 shrink-0" strokeWidth={2} /> Add keywords so alerts catch mislabeled opps</> : '+ add'}</button>
               )
             )}
             {noKeywords && !canInlineEdit && (
-              <span className="text-xs text-amber-300">⚠ No keywords yet — add in Settings</span>
+              <span className="inline-flex items-center gap-1 text-xs text-amber-300"><AlertTriangle className="h-3 w-3 shrink-0" strokeWidth={2} /> No keywords yet — add in Settings</span>
             )}
           </div>
           {addNote && (
@@ -472,7 +473,7 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
                 <span key={st} className="rounded bg-blue-500/15 px-2 py-0.5 text-xs text-blue-300">{st}</span>
               ))
             ) : (
-              <span className="rounded bg-slate-800 px-2 py-0.5 text-xs text-slate-300">🌎 Nationwide</span>
+              <span className="inline-flex items-center gap-1 rounded bg-slate-800 px-2 py-0.5 text-xs text-slate-300"><Globe className="h-3 w-3 shrink-0" strokeWidth={2} /> Nationwide</span>
             )}
           </div>
         </div>
@@ -564,8 +565,8 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
             </>
           ) : (
             <div className="text-xs">
-              <div className="text-emerald-400 font-medium">
-                ✓ Full coverage — your {naics.length} code{naics.length !== 1 ? 's' : ''} cover {Math.round((coverage.coveragePct || 0) * 100)}% of your {fmtMoney(coverage.sectorMarket || coverage.totalMarket)} &ldquo;{coverage.keyword}&rdquo; market.
+              <div className="flex items-start gap-1 text-emerald-400 font-medium">
+                <Check className="mt-0.5 h-3 w-3 shrink-0" strokeWidth={2.5} /> <span>Full coverage — your {naics.length} code{naics.length !== 1 ? 's' : ''} cover {Math.round((coverage.coveragePct || 0) * 100)}% of your {fmtMoney(coverage.sectorMarket || coverage.totalMarket)} &ldquo;{coverage.keyword}&rdquo; market.</span>
               </div>
               <div className="text-slate-500 mt-1">
                 Fewer, precise codes mean less noise — not less opportunity. These capture the real spend, and your keywords catch anything mislabeled. (More codes just flood your alerts with work you don&rsquo;t do.)

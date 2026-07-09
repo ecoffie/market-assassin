@@ -11,6 +11,7 @@
  * (GOVT-GTM Track 1 · memory: naics_vs_psc_search.)
  */
 import { useState, useCallback } from 'react';
+import { Download } from 'lucide-react';
 import { authedFetch } from '../authHeaders';
 
 interface Props { email: string }
@@ -140,8 +141,8 @@ export default function OsbpSmbResearchPanel({ email }: Props) {
             </h3>
             {rows.length > 0 && (
               <button onClick={exportCsv}
-                className="px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 text-sm rounded-lg transition-colors">
-                ⬇ Export {rows.length} to CSV
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-300 text-sm rounded-lg transition-colors">
+                <Download className="h-4 w-4 shrink-0" strokeWidth={2} /> Export {rows.length} to CSV
               </button>
             )}
           </div>

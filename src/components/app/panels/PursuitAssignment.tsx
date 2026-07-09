@@ -12,6 +12,7 @@
  * the drawer's single Save writes them alongside the rest of the edit.
  */
 import { useEffect, useState } from 'react';
+import { Check, Plus } from 'lucide-react';
 import { authedFetch } from '../authHeaders';
 
 interface Member {
@@ -99,13 +100,13 @@ export default function PursuitAssignment({
                     key={m.user_email}
                     type="button"
                     onClick={() => toggleCollaborator(m.user_email)}
-                    className={`rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
+                    className={`inline-flex items-center gap-1 rounded-full px-2.5 py-1 text-[11px] font-medium transition-colors ${
                       active
                         ? 'bg-purple-600 text-white'
                         : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-slate-200'
                     }`}
                   >
-                    {active ? '✓ ' : '+ '}{label(m.user_email)}
+                    {active ? <Check className="h-3 w-3 shrink-0" strokeWidth={2.5} /> : <Plus className="h-3 w-3 shrink-0" strokeWidth={2.5} />} {label(m.user_email)}
                   </button>
                 );
               })}

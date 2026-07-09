@@ -9,6 +9,7 @@
  * (Plan: docs/PLAN-mindy-guided-journeys.md)
  */
 import { useEffect, useState, useCallback } from 'react';
+import { Check } from 'lucide-react';
 import { authedFetch } from '../authHeaders';
 import { JOURNEYS, journeysCompletedCount, type JourneyKey, type JourneyProgress } from '@/lib/journeys/definitions';
 
@@ -76,7 +77,7 @@ export default function GettingStartedPanel({
                 className="w-full flex items-start gap-3 p-4 text-left"
               >
                 <span className={`shrink-0 mt-0.5 flex h-7 w-7 items-center justify-center rounded-full text-sm font-semibold ${done ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-300'}`}>
-                  {done ? '✓' : j.num}
+                  {done ? <Check className="h-4 w-4" strokeWidth={3} /> : j.num}
                 </span>
                 <span className="flex-1">
                   <span className="text-white font-medium">{j.title}</span>

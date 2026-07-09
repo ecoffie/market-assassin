@@ -7,7 +7,7 @@ import {
   PieChart, Pie, Cell,
   XAxis, YAxis, Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { Zap, Gauge, Loader2, BarChart3, Wallet, TrendingUp, User, Handshake, Target, LineChart, Building2, X, type LucideIcon } from 'lucide-react';
+import { Zap, Gauge, Loader2, BarChart3, Wallet, TrendingUp, User, Handshake, Target, LineChart, Building2, X, Check, CheckCircle2, Star, AlertTriangle, Landmark, Mail, Phone, type LucideIcon } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders, authedFetch } from '../authHeaders';
 import MarketCoverageBanner, { type MarketCoverage } from '../market/MarketCoverageBanner';
@@ -2013,27 +2013,27 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                           pscCode: pscToApply.map(s => s.code).join(', '),
                           businessType: f.businessType || 'Small Business',
                         }))}
-                        className="w-full rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 py-2 text-xs font-semibold text-white"
+                        className="w-full inline-flex items-center gap-1.5 justify-center rounded-lg bg-emerald-600 hover:bg-emerald-500 px-3 py-2 text-xs font-semibold text-white"
                       >
-                        ✓ Use these codes (Small Business) — then Build Market Map
+                        <Check className="h-4 w-4 shrink-0" strokeWidth={2.5} /> Use these codes (Small Business) — then Build Market Map
                       </button>
 
                       {/* SAVE TO PROFILE — persist the full coverage set + keyword to
                           the user's alert profile (replaces current codes). The fix
                           for "I researched my market but my alerts never changed." */}
                       {profileSaved ? (
-                        <div className="mt-2 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200 text-center">
-                          ✅ Saved — your daily alerts now track &ldquo;{sportKeyword || 'this market'}&rdquo;
+                        <div className="mt-2 inline-flex items-center justify-center gap-1.5 rounded-lg border border-emerald-500/40 bg-emerald-500/10 px-3 py-2 text-xs text-emerald-200 text-center">
+                          <CheckCircle2 className="h-4 w-4 shrink-0" strokeWidth={2} /> Saved — your daily alerts now track &ldquo;{sportKeyword || 'this market'}&rdquo;
                         </div>
                       ) : (
                         <button
                           type="button"
                           disabled={savingProfile}
                           onClick={() => saveResearchToProfile(sportSuggestions.naics, sportSuggestions.psc, sportKeyword)}
-                          className="mt-2 w-full rounded-lg border border-purple-500/40 bg-purple-500/10 px-3 py-2 text-xs font-semibold text-purple-200 hover:bg-purple-500/20 disabled:opacity-60"
+                          className="mt-2 w-full inline-flex items-center gap-1.5 justify-center rounded-lg border border-purple-500/40 bg-purple-500/10 px-3 py-2 text-xs font-semibold text-purple-200 hover:bg-purple-500/20 disabled:opacity-60"
                           title="Replaces your current NAICS with this market's codes and adds the keyword to your alerts"
                         >
-                          {savingProfile ? 'Saving…' : '★ Save this market to my profile (updates my alerts)'}
+                          {savingProfile ? 'Saving…' : <><Star className="h-4 w-4 shrink-0" strokeWidth={2} /> Save this market to my profile (updates my alerts)</>}
                         </button>
                       )}
                     </div>
@@ -2133,9 +2133,9 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           <button
             type="button"
             onClick={() => setShowAdvancedProfile((v) => !v)}
-            className="ml-auto text-xs text-slate-500 hover:text-slate-300"
+            className="ml-auto inline-flex items-center gap-1 text-xs text-slate-500 hover:text-slate-300"
           >
-            {showAdvancedProfile ? '✕ Close' : 'Edit'}
+            {showAdvancedProfile ? <><X className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} /> Close</> : 'Edit'}
           </button>
         </div>
       ) : (
@@ -2155,14 +2155,14 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
       {error && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-red-400 text-sm flex items-center justify-between">
           <span>{error}</span>
-          <button onClick={() => setError(null)} className="text-red-300 hover:text-red-200">✕</button>
+          <button onClick={() => setError(null)} aria-label="Close" className="inline-flex items-center text-red-300 hover:text-red-200"><X className="h-4 w-4" strokeWidth={2} /></button>
         </div>
       )}
 
       {/* Validation Error */}
       {validationError && (
         <div className="bg-red-500/10 border border-red-500/30 rounded-lg p-3 text-red-400 text-sm flex items-center">
-          <span className="mr-2">⚠️</span>
+          <AlertTriangle className="mr-2 h-4 w-4 shrink-0" strokeWidth={2} />
           {validationError}
         </div>
       )}
@@ -2175,9 +2175,10 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
             <button
               type="button"
               onClick={() => setShowAdvancedProfile(false)}
-              className="text-slate-500 hover:text-slate-300"
+              aria-label="Close"
+              className="inline-flex items-center text-muted hover:text-slate-300"
             >
-              ✕
+              <X className="h-4 w-4" strokeWidth={2} />
             </button>
           </div>
 
@@ -2275,9 +2276,10 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                     <button
                       type="button"
                       onClick={() => setShowSaveFocus(false)}
-                      className="text-slate-500 hover:text-slate-300"
+                      aria-label="Close"
+                      className="inline-flex items-center text-muted hover:text-slate-300"
                     >
-                      ✕
+                      <X className="h-4 w-4" strokeWidth={2} />
                     </button>
                   </div>
                 ) : (
@@ -3869,7 +3871,7 @@ function MindyNarrative({
     return (
       <section className="rounded-xl border border-purple-500/30 bg-gradient-to-br from-purple-900/30 to-purple-800/10 p-5">
         <div className="flex items-center gap-2 mb-2">
-          <span className="text-purple-300 text-lg">★</span>
+          <Star className="h-5 w-5 shrink-0 text-purple-300" strokeWidth={2} fill="currentColor" />
           <h3 className="text-sm font-bold uppercase tracking-wider text-purple-300">Mindy Says</h3>
           <span className="ml-auto text-[10px] uppercase tracking-wider text-purple-400/70">Pro feature</span>
         </div>
@@ -3887,7 +3889,7 @@ function MindyNarrative({
   return (
     <section className="rounded-xl border border-purple-500/20 bg-gradient-to-br from-purple-900/20 to-purple-800/5 p-5">
       <div className="flex items-center gap-2 mb-3">
-        <span className="text-purple-300 text-lg">★</span>
+        <Star className="h-5 w-5 shrink-0 text-purple-300" strokeWidth={2} fill="currentColor" />
         <h3 className="text-sm font-bold uppercase tracking-wider text-purple-300">Mindy Says</h3>
         {cached && (
           <span className="ml-2 text-[10px] text-purple-400/60 uppercase tracking-wider">cached</span>
@@ -4856,10 +4858,10 @@ function AgencyTable({
                   <button
                     type="button"
                     onClick={onClearParentFilter}
-                    className="text-emerald-300 hover:text-white"
+                    className="inline-flex items-center text-emerald-300 hover:text-white"
                     aria-label="Clear filter"
                   >
-                    ✕
+                    <X className="h-4 w-4" strokeWidth={2} />
                   </button>
                 )}
               </div>
@@ -4958,7 +4960,7 @@ function AgencyTable({
                         {expandedOffices[row.id] ? '▾' : '▸'}
                       </button>
                       {savedTargets[row.contractingOffice || row.name] && (
-                        <span className="text-amber-400 text-xs" title="In your target list">★</span>
+                        <span title="In your target list"><Star className="h-3 w-3 shrink-0 text-amber-400" strokeWidth={2} fill="currentColor" /></span>
                       )}
                       <div className="font-medium text-slate-200">{row.contractingOffice || row.name}</div>
                     </div>
@@ -5019,7 +5021,7 @@ function AgencyTable({
                           <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Contracting offices in NAICS {naicsCode}</div>
                           {expandedOffices[row.id].offices.map((o, i) => (
                             <div key={i} className="flex items-center justify-between gap-3 text-xs">
-                              <span className="text-slate-300 truncate">🏛 {o.name}</span>
+                              <span className="inline-flex items-center gap-1 truncate text-slate-300"><Landmark className="h-3.5 w-3.5 shrink-0 text-muted" strokeWidth={2} /> {o.name}</span>
                               <span className="text-slate-400 shrink-0">{formatRowCurrency(o.total)} · {o.awards.toLocaleString()} awards</span>
                             </div>
                           ))}
@@ -5471,7 +5473,7 @@ function AgencyDrawer({
             {savedTargetId ? (
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                  <span className="text-emerald-400">★</span>
+                  <Star className="h-4 w-4 shrink-0 text-emerald-400" strokeWidth={2} fill="currentColor" />
                   <div>
                     <div className="text-sm font-semibold text-emerald-400">In your target list</div>
                     <p className="text-xs text-slate-500">Open My Target List to log outreach and track status.</p>
@@ -5788,9 +5790,9 @@ function CompetitorAwardsExpander({ email, name }: { email: string | null; name:
       <button
         type="button"
         onClick={() => { setOpen(o => !o); if (!loaded) load(); }}
-        className="text-xs text-blue-400 hover:text-blue-300 underline"
+        className="inline-flex items-center gap-1.5 text-xs text-blue-400 hover:text-blue-300 underline"
       >
-        {open ? 'Hide recent awards' : '📊 See what they’ve won'}
+        {open ? 'Hide recent awards' : <><BarChart3 className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> See what they’ve won</>}
       </button>
       {open && (
         <div className="mt-2 rounded-lg border border-slate-700 bg-slate-950/40 p-3">
@@ -5851,7 +5853,7 @@ function ReportViewer({
           <h3 className="font-semibold text-white">
             {isGenerating ? 'Building your market map…' : 'Report not ready'}
           </h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-white">✕</button>
+          <button onClick={onClose} aria-label="Close" className="inline-flex items-center text-muted hover:text-white"><X className="h-4 w-4" strokeWidth={2} /></button>
         </div>
         {isGenerating ? (
           <div className="flex items-center gap-3 text-slate-400">
@@ -5945,7 +5947,7 @@ function ReportViewer({
                       type="button"
                       onClick={() => onSaveBuyer(agency)}
                       disabled={isSaved || isSaving}
-                      className={`shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                      className={`shrink-0 inline-flex items-center gap-1.5 justify-center px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                         isSaved
                           ? 'bg-emerald-500/20 text-emerald-300 cursor-default'
                           : isSaving
@@ -5953,7 +5955,7 @@ function ReportViewer({
                             : 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30'
                       }`}
                     >
-                      {isSaved ? '✓ Saved' : isSaving ? 'Saving...' : 'Save to Network'}
+                      {isSaved ? <><Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} /> Saved</> : isSaving ? 'Saving...' : 'Save to Network'}
                     </button>
                   )}
                 </div>
@@ -5984,9 +5986,9 @@ function ReportViewer({
                     <div className="font-medium text-white">{agency.contractingOffice}</div>
                     {agency.osbp && (
                       <div className="mt-2 text-sm">
-                        {agency.osbp.director && <div className="text-slate-300">👤 {agency.osbp.director} <span className="text-[10px] text-slate-500">(as of Dec 2025 — verify)</span></div>}
-                        {agency.osbp.email && <div className="text-blue-400">✉️ {agency.osbp.email}</div>}
-                        {agency.osbp.phone && <div className="text-slate-400">📞 {agency.osbp.phone}</div>}
+                        {agency.osbp.director && <div className="flex items-center gap-1 text-slate-300"><User className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> {agency.osbp.director} <span className="text-[10px] text-slate-500">(as of Dec 2025 — verify)</span></div>}
+                        {agency.osbp.email && <div className="flex items-center gap-1 text-blue-400"><Mail className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> {agency.osbp.email}</div>}
+                        {agency.osbp.phone && <div className="flex items-center gap-1 text-slate-400"><Phone className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> {agency.osbp.phone}</div>}
                       </div>
                     )}
                   </div>
@@ -5995,7 +5997,7 @@ function ReportViewer({
                       type="button"
                       onClick={() => onSaveBuyer(agency)}
                       disabled={isSaved || isSaving}
-                      className={`shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                      className={`shrink-0 inline-flex items-center gap-1.5 justify-center px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                         isSaved
                           ? 'bg-emerald-500/20 text-emerald-300 cursor-default'
                           : isSaving
@@ -6003,7 +6005,7 @@ function ReportViewer({
                             : 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30'
                       }`}
                     >
-                      {isSaved ? '✓ Saved' : isSaving ? 'Saving...' : 'Save to Network'}
+                      {isSaved ? <><Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} /> Saved</> : isSaving ? 'Saving...' : 'Save to Network'}
                     </button>
                   )}
                 </div>
@@ -6069,7 +6071,7 @@ function ReportViewer({
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-white">{prime.name}</div>
                     {prime.reason && <div className="text-sm text-slate-400 mt-1">{prime.reason}</div>}
-                    {prime.email && <div className="text-sm text-blue-400 mt-1">✉️ {prime.email}</div>}
+                    {prime.email && <div className="flex items-center gap-1 text-sm text-blue-400 mt-1"><Mail className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> {prime.email}</div>}
                     {prime.naicsCategories && prime.naicsCategories.length > 0 && (
                       <div className="text-xs text-slate-500 mt-1">NAICS: {prime.naicsCategories.slice(0, 3).join(', ')}</div>
                     )}
@@ -6081,7 +6083,7 @@ function ReportViewer({
                       type="button"
                       onClick={() => onSavePartner(prime)}
                       disabled={isSaved || isSaving}
-                      className={`shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                      className={`shrink-0 inline-flex items-center gap-1.5 justify-center px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                         isSaved
                           ? 'bg-emerald-500/20 text-emerald-300 cursor-default'
                           : isSaving
@@ -6089,7 +6091,7 @@ function ReportViewer({
                             : 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30'
                       }`}
                     >
-                      {isSaved ? '✓ Saved' : isSaving ? 'Saving...' : 'Save Partner'}
+                      {isSaved ? <><Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} /> Saved</> : isSaving ? 'Saving...' : 'Save Partner'}
                     </button>
                   )}
                 </div>
@@ -6134,7 +6136,7 @@ function ReportViewer({
                       type="button"
                       onClick={() => onTrackOpportunity(forecast)}
                       disabled={isTracked || isTracking}
-                      className={`shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                      className={`shrink-0 inline-flex items-center gap-1.5 justify-center px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                         isTracked
                           ? 'bg-emerald-500/20 text-emerald-300 cursor-default'
                           : isTracking
@@ -6142,7 +6144,7 @@ function ReportViewer({
                             : 'bg-amber-500/20 text-amber-300 hover:bg-amber-500/30'
                       }`}
                     >
-                      {isTracked ? '✓ Tracked' : isTracking ? 'Adding...' : 'Track in Pipeline'}
+                      {isTracked ? <><Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} /> Tracked</> : isTracking ? 'Adding...' : 'Track in Pipeline'}
                     </button>
                   )}
                 </div>
@@ -6251,7 +6253,7 @@ function ReportViewer({
                   <div className="flex-1 min-w-0">
                     <div className="font-medium text-white">{partner.name}</div>
                     {partner.reason && <div className="text-sm text-slate-400 mt-1">{partner.reason}</div>}
-                    {partner.email && <div className="text-sm text-blue-400 mt-1">✉️ {partner.email}</div>}
+                    {partner.email && <div className="flex items-center gap-1 text-sm text-blue-400 mt-1"><Mail className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> {partner.email}</div>}
                     {partner.certifications && partner.certifications.length > 0 && (
                       <div className="flex gap-1 mt-2">
                         {partner.certifications.slice(0, 3).map((cert, i) => (
@@ -6267,7 +6269,7 @@ function ReportViewer({
                       type="button"
                       onClick={() => onSavePartner(partner)}
                       disabled={isSaved || isSaving}
-                      className={`shrink-0 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
+                      className={`shrink-0 inline-flex items-center gap-1.5 justify-center px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                         isSaved
                           ? 'bg-emerald-500/20 text-emerald-300 cursor-default'
                           : isSaving
@@ -6275,7 +6277,7 @@ function ReportViewer({
                             : 'bg-purple-500/20 text-purple-300 hover:bg-purple-500/30'
                       }`}
                     >
-                      {isSaved ? '✓ Saved' : isSaving ? 'Saving...' : 'Save to Network'}
+                      {isSaved ? <><Check className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} /> Saved</> : isSaving ? 'Saving...' : 'Save to Network'}
                     </button>
                   )}
                 </div>

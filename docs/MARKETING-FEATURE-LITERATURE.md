@@ -3829,3 +3829,29 @@ corrected the same way). Verified end-to-end with a coach session.
 opportunities that were previously misrouted into the coach's pipeline are relocated
 separately. Tracking in your own (non-coach) workspace was always correct and is
 unchanged.
+
+---
+
+## Design polish — icon system consistency (Phase 2b, Jul 9 2026)
+
+**What:** Replaced emoji-as-icons with the lucide-react icon set across the remaining
+~20 secondary `/app` panels (Recompetes, Mindy Chat, Settings, Contacts, Market
+Dossier, Proposal Chat, Targeting, Decision Makers, Bid Gate, Coach, Getting Started,
+Library, and the 6k-line Market Research panel, plus the smaller tail). Every icon now
+renders at one consistent stroke weight, inherits the surrounding text color, and
+aligns on a shared flex baseline — the same visual system Linear, Stripe, and Ramp use.
+
+**Why:** A trustworthy-enterprise product can't mix OS-rendered emoji (which look
+different on every device and read as "vibe-coded") with real UI. Consistent line
+icons are the single highest-signal polish cue for "this is production software."
+This completes the emoji→lucide migration begun on the 12 primary panels.
+
+**SEO/positioning:** Reinforces the "enterprise-grade federal BD platform" narrative
+for getmindy.ai — screenshots and demo reels now read as a mature SaaS surface.
+
+**Proof:** Migration is a verified visual no-op — full `tsc --noEmit` clean,
+production build ✓ (551/551 pages), and a design-token drift guard
+(`scripts/audit-design-tokens.mjs`) confirms zero new raw-color usages, so every icon
+color resolves through the semantic token system (`text-muted`/`text-faint`/`text-accent`
++ traffic-light status colors). Deliberate leaves (toast strings, `<option>` labels,
+compliance-state glyphs, code comments) were left untouched by design.

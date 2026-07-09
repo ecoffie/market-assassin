@@ -9,6 +9,7 @@
  * emailed until DISA approves). Demo-first. (DISA-VEHICLE-WATCH-SPEC.md)
  */
 import { useState, useEffect, useCallback } from 'react';
+import { Download } from 'lucide-react';
 import { authedFetch } from '../authHeaders';
 
 interface Props { email: string }
@@ -199,9 +200,9 @@ export default function DisaVehicleWatchPanel({ email }: Props) {
               <pre className="text-xs text-slate-300 whitespace-pre-wrap font-sans bg-slate-900/60 rounded p-3 mt-1">{n.body}</pre>
               <button
                 onClick={() => downloadNotice(n.vehicle_id, n.vehicle_piid)}
-                className="mt-2 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
               >
-                ⬇ Download notice (.docx)
+                <Download className="h-4 w-4 shrink-0" strokeWidth={2} /> Download notice (.docx)
               </button>
             </div>
           ))}

@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { MessageSquare, Check, Plus, Compass } from 'lucide-react';
 import type { AppTier } from '../UnifiedSidebar';
 import { getMIApiHeaders, authedFetch } from '../authHeaders';
 import { useAppTracker } from '../track';
@@ -595,12 +596,12 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                   code before it's ever texted (TCPA/CTIA + carrier A2P). */}
               <div className="md:col-span-2 rounded-lg border border-slate-700 bg-slate-800/40 p-4">
                 <div className="flex items-start gap-3">
-                  <span className="mt-0.5 text-lg leading-none">💬</span>
+                  <MessageSquare className="mt-0.5 h-5 w-5 shrink-0 text-muted" strokeWidth={2} />
                   <div className="min-w-0 flex-1">
                     <span className="block text-sm font-medium text-white">
                       Text me when a tracked pursuit changes
                       {smsVerified && (
-                        <span className="ml-2 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300 align-middle">✓ VERIFIED</span>
+                        <span className="ml-2 inline-flex items-center gap-1 rounded bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-semibold text-emerald-300 align-middle"><Check className="h-3 w-3 shrink-0" strokeWidth={2.5} /> VERIFIED</span>
                       )}
                     </span>
                     <span className="block text-xs text-slate-400 mt-0.5">
@@ -741,7 +742,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                           return (
                             <button key={s.code} onClick={() => toggleNaicsCode(s.code)} title={s.name}
                               className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors ${added ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-200' : 'border-slate-600 bg-slate-800 text-slate-200 hover:bg-slate-700'}`}>
-                              {added ? '✓' : '+'} {s.code} <span className="max-w-[150px] truncate opacity-70">{s.name}</span>
+                              {added ? <Check className="h-3 w-3 shrink-0" strokeWidth={2.5} /> : <Plus className="h-3 w-3 shrink-0" strokeWidth={2.5} />} {s.code} <span className="max-w-[150px] truncate opacity-70">{s.name}</span>
                             </button>
                           );
                         })}
@@ -757,7 +758,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                           return (
                             <button key={s.code} onClick={() => togglePscSuggestion(s.code)} title={s.name}
                               className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors ${added ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-200' : 'border-purple-500/40 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20'}`}>
-                              {added ? '✓' : '+'} {s.code} <span className="max-w-[150px] truncate opacity-70">{s.name}</span>
+                              {added ? <Check className="h-3 w-3 shrink-0" strokeWidth={2.5} /> : <Plus className="h-3 w-3 shrink-0" strokeWidth={2.5} />} {s.code} <span className="max-w-[150px] truncate opacity-70">{s.name}</span>
                             </button>
                           );
                         })}
@@ -862,7 +863,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                           title={added ? `Click to remove ${p.code}` : p.name}
                           className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-1 text-xs transition-colors ${added ? 'border-emerald-500/50 bg-emerald-500/15 text-emerald-200 hover:bg-emerald-500/25' : 'border-purple-500/40 bg-purple-500/10 text-purple-200 hover:bg-purple-500/20'}`}
                         >
-                          {added ? '✓' : '+'} {p.code} <span className="max-w-[150px] truncate opacity-70">{p.name}</span>
+                          {added ? <Check className="h-3 w-3 shrink-0" strokeWidth={2.5} /> : <Plus className="h-3 w-3 shrink-0" strokeWidth={2.5} />} {p.code} <span className="max-w-[150px] truncate opacity-70">{p.name}</span>
                         </button>
                       );
                     })}
@@ -935,7 +936,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
                   onClick={() => window.dispatchEvent(new Event('mindy:start-tour'))}
                   className="mt-3 w-full flex items-center justify-center gap-2 px-3 py-2.5 text-sm font-semibold text-white bg-purple-600 hover:bg-purple-500 rounded-lg transition-colors"
                 >
-                  🧭 Take the product tour
+                  <Compass className="h-4 w-4 shrink-0" strokeWidth={2} /> Take the product tour
                 </button>
               </>
             )}
@@ -1342,8 +1343,8 @@ function StatesField({ value, onChange }: { value: string[]; onChange: (states: 
 function ChecklistItem({ label, done }: { label: string; done: boolean }) {
   return (
     <div className="flex items-center gap-3 text-sm">
-      <span className={`h-5 w-5 rounded-full flex items-center justify-center text-xs ${done ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-500'}`}>
-        {done ? '✓' : ''}
+      <span className={`h-5 w-5 rounded-full flex items-center justify-center ${done ? 'bg-emerald-500 text-white' : 'bg-slate-800 text-slate-500'}`}>
+        {done && <Check className="h-3 w-3" strokeWidth={3} />}
       </span>
       <span className={done ? 'text-slate-200' : 'text-slate-500'}>{label}</span>
     </div>

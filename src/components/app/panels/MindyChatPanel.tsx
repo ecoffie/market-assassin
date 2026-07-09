@@ -16,6 +16,7 @@
  */
 
 import { useState, useEffect, useRef, useCallback } from 'react';
+import { Menu, MessageCircle, BookOpen, Lock, FileText } from 'lucide-react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 import { UpgradeModal } from '../UpgradeModal';
@@ -382,15 +383,15 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
           <div className="flex items-center gap-3">
             <button
               onClick={() => setSidebarOpen(o => !o)}
-              className="text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition-colors"
+              className="inline-flex items-center text-slate-400 hover:text-white p-1 rounded hover:bg-slate-800 transition-colors"
               title={sidebarOpen ? 'Hide history' : 'Show history'}
               aria-label="Toggle conversation history"
             >
-              ☰
+              <Menu className="h-5 w-5" strokeWidth={2} />
             </button>
             <div>
               <div className="flex items-center gap-2">
-                <h1 className="text-lg font-semibold">💬 Mindy Chat</h1>
+                <h1 className="inline-flex items-center gap-1.5 text-lg font-semibold"><MessageCircle className="h-5 w-5 shrink-0 text-accent" strokeWidth={2} /> Mindy Chat</h1>
                 <span className="text-[10px] font-semibold tracking-wider px-1.5 py-0.5 rounded bg-purple-500/20 text-purple-300 border border-purple-500/30">BETA</span>
               </div>
               <p className="text-xs text-slate-500 mt-0.5">
@@ -404,10 +405,10 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
             {onPanelChange && (
               <button
                 onClick={() => onPanelChange('knowledge-base')}
-                className="text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded border border-slate-700 hover:border-slate-600 transition-colors"
+                className="inline-flex items-center gap-1.5 text-xs text-slate-400 hover:text-slate-200 px-3 py-1.5 rounded border border-slate-700 hover:border-slate-600 transition-colors"
                 title="Browse the documents Mindy cites"
               >
-                📚 Browse sources
+                <BookOpen className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> Browse sources
               </button>
             )}
             {messages.length > 0 && !isStreaming && (
@@ -429,7 +430,10 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
           // knowledge base, so it's a Pro feature. Show the value + a CTA.
           <div className="max-w-2xl mx-auto pt-12">
             <div className="text-center mb-8">
-              <div className="text-4xl mb-3">🔒💬</div>
+              <div className="relative inline-flex mb-3">
+                <MessageCircle className="h-10 w-10 text-faint" strokeWidth={1.5} />
+                <Lock className="absolute -bottom-1 -right-1 h-5 w-5 text-accent" strokeWidth={2} />
+              </div>
               <h2 className="text-xl font-semibold text-white mb-1">Mindy Chat is a Pro feature</h2>
               <p className="text-sm text-slate-400 max-w-lg mx-auto">
                 Ask Mindy anything about federal contracting and get a straight answer,
@@ -459,7 +463,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
         ) : messages.length === 0 ? (
           <div className="max-w-2xl mx-auto pt-12">
             <div className="text-center mb-8">
-              <div className="text-4xl mb-3">💬</div>
+              <MessageCircle className="h-10 w-10 mx-auto mb-3 text-accent" strokeWidth={1.5} />
               <h2 className="text-xl font-semibold text-white mb-1">What do you want to know?</h2>
               <p className="text-sm text-slate-400">
                 Mindy draws on 743 podcast interviews, real proposal templates, and 8 years of federal contracting teaching.
@@ -519,10 +523,10 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                                 onClick={() => onPanelChange
                                   ? onPanelChange('knowledge-base', { doc: c.document_id })
                                   : setDrawerDocId(c.document_id)}
-                                className="text-[11px] px-2 py-1 rounded bg-slate-800/60 border border-slate-700/60 text-slate-300 hover:border-purple-500/40 hover:text-purple-200 transition-colors cursor-pointer text-left"
+                                className="inline-flex items-center gap-1 text-[11px] px-2 py-1 rounded bg-slate-800/60 border border-slate-700/60 text-slate-300 hover:border-purple-500/40 hover:text-purple-200 transition-colors cursor-pointer text-left"
                                 title={`Open in Knowledge Base · ${c.doc_type || ''}`}
                               >
-                                📄 {label}
+                                <FileText className="h-3 w-3 shrink-0" strokeWidth={2} /> {label}
                               </button>
                             );
                           }
