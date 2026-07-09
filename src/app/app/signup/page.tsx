@@ -25,8 +25,8 @@ function readAttribution(): unknown {
 export default function MindySignupPage() {
   return (
     <Suspense fallback={
-      <main className="min-h-screen bg-slate-950 flex items-center justify-center">
-        <div className="text-slate-400">Loading...</div>
+      <main className="min-h-screen bg-ground-deep flex items-center justify-center">
+        <div className="text-muted">Loading...</div>
       </main>
     }>
       <MindySignupContent />
@@ -118,7 +118,7 @@ function MindySignupContent() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+    <main className="min-h-screen bg-ground-deep flex items-center justify-center p-4">
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-8">
@@ -126,7 +126,7 @@ function MindySignupContent() {
             <MindyLogo size={64} className="mx-auto mb-4" />
           </Link>
           <h1 className="text-2xl font-bold text-white">Create your Mindy account</h1>
-          <p className="text-slate-400 mt-2">Start getting federal market intelligence</p>
+          <p className="text-muted mt-2">Start getting federal market intelligence</p>
           {partnerProgram && (
             <p className="text-emerald-400 text-sm mt-3 font-medium">
               {partnerProgram.name} partner offer: {partnerProgram.trialDays}-day Mindy Pro trial included
@@ -135,7 +135,7 @@ function MindySignupContent() {
         </div>
 
         {/* Card */}
-        <div className="bg-slate-900 border border-slate-800 rounded-2xl p-8">
+        <div className="bg-ground border border-surface rounded-2xl p-8">
           {!submitted ? (
             <>
               {/* OAuth Buttons */}
@@ -192,17 +192,17 @@ function MindySignupContent() {
               {/* Divider */}
               <div className="relative my-6">
                 <div className="absolute inset-0 flex items-center">
-                  <div className="w-full border-t border-slate-700"></div>
+                  <div className="w-full border-t border-hairline"></div>
                 </div>
                 <div className="relative flex justify-center text-sm">
-                  <span className="px-4 bg-slate-900 text-slate-500">or continue with email</span>
+                  <span className="px-4 bg-ground text-faint">or continue with email</span>
                 </div>
               </div>
 
               {/* Email Form */}
               <form onSubmit={handleEmailSignup} className="space-y-4">
                 <div>
-                  <label htmlFor="email" className="block text-sm font-medium text-slate-300 mb-2">
+                  <label htmlFor="email" className="block text-sm font-medium text-ink-soft mb-2">
                     Email address
                   </label>
                   <input
@@ -212,7 +212,7 @@ function MindySignupContent() {
                     onChange={(e) => setEmail(e.target.value)}
                     placeholder="you@company.com"
                     required
-                    className="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+                    className="w-full px-4 py-3 bg-surface border border-hairline rounded-xl text-white placeholder-faint focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
                   />
                 </div>
 
@@ -231,7 +231,7 @@ function MindySignupContent() {
                 </button>
               </form>
 
-              <p className="text-center text-slate-500 text-xs mt-4">
+              <p className="text-center text-faint text-xs mt-4">
                 Free forever. No credit card required.
               </p>
             </>
@@ -256,20 +256,20 @@ function MindySignupContent() {
               {queued ? (
                 <>
                   <h2 className="text-xl font-bold text-white mb-2">You&apos;re on the list</h2>
-                  <p className="text-slate-400 mb-4">
+                  <p className="text-muted mb-4">
                     We saved your spot for <span className="text-white">{email}</span>
                   </p>
-                  <p className="text-slate-500 text-sm">
+                  <p className="text-faint text-sm">
                     We&apos;re finishing setup and will email your link shortly — no need to sign up again. Thanks for your patience.
                   </p>
                 </>
               ) : (
                 <>
                   <h2 className="text-xl font-bold text-white mb-2">Check your inbox</h2>
-                  <p className="text-slate-400 mb-4">
+                  <p className="text-muted mb-4">
                     We sent a verification link to <span className="text-white">{email}</span>
                   </p>
-                  <p className="text-slate-500 text-sm">
+                  <p className="text-faint text-sm">
                     Click the link in the email to set up your password and complete signup.
                   </p>
                 </>
@@ -278,8 +278,8 @@ function MindySignupContent() {
           )}
 
           {/* Sign in link */}
-          <div className="mt-6 pt-6 border-t border-slate-800 text-center">
-            <p className="text-slate-400 text-sm">
+          <div className="mt-6 pt-6 border-t border-surface text-center">
+            <p className="text-muted text-sm">
               Already have an account?{' '}
               <Link href="/app" className="text-purple-400 hover:text-purple-300 font-medium">
                 Sign in
@@ -291,11 +291,11 @@ function MindySignupContent() {
         {/* Terms */}
         <p className="text-center text-slate-600 text-xs mt-6">
           By signing up, you agree to our{' '}
-          <Link href="/terms" className="text-slate-500 hover:text-slate-400">
+          <Link href="/terms" className="text-faint hover:text-muted">
             Terms of Service
           </Link>{' '}
           and{' '}
-          <Link href="/privacy" className="text-slate-500 hover:text-slate-400">
+          <Link href="/privacy" className="text-faint hover:text-muted">
             Privacy Policy
           </Link>
         </p>

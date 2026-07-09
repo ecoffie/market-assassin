@@ -109,4 +109,10 @@ for the shell's raw classes — it's recorded in the drift baseline, exactly lik
 - **P2** ✅ collapse two blues → one `bg-navy`; emoji→lucide across all panels
 - **P3** ✅ radius/shadow tokens + `<Card>` primitive (this doc), adopt going forward
 - **P4** ✅ type scale (`text-page`/`title`/`eyebrow`/`micro`, wired into `CardHeader`) + deleted 7 truly-dead motion classes. Adopt going forward.
-- **P5** (in progress) the raw-neutral → token migration by screen traffic, via the exact no-op map above. **Done so far:** Dashboard (91→6), MarketResearch (390→31), Proposals (288→43), Pipeline (182→24), Alerts (180→34), MyTargetList (160→30), Recompetes (156→27), Vault (154→7), UnifiedSettings (118→8). Baseline 10,557→**9,048** (−1,509). Remaining panels migrate the same way (python `\b`-anchored regex; leave shades with no exact token).
+- **P5** (in progress) the raw-neutral → token migration via the exact no-op map above.
+  **Batches shipped:** (1) Dashboard reference pass; (2) top-8 panels; (3) full `/app` sweep
+  (`src/components/app` + `src/app/app`, 58 files incl. market-intel & onboarding pages).
+  Baseline 10,557 → **7,377** (−3,180, ~30% of the total debt). The whole `/app` surface is now
+  largely token-driven; leftovers are the no-exact-token shades (`text-slate-200`/`-600`,
+  `border-slate-600`/`-500`) plus non-`/app` areas (marketing/admin), which migrate the same way
+  when touched (python `\b`-anchored regex over the map; leave shades with no exact token).

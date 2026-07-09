@@ -77,7 +77,7 @@ export default function HiddenWorkNudge({ email, onGo }: HiddenWorkNudgeProps) {
             <Lightbulb className="h-4 w-4 shrink-0 text-amber-400" strokeWidth={2} />
             <span className="text-sm font-bold text-white">Unlock Hidden Work</span>
           </div>
-          <div className="text-xs text-slate-400 mt-1 leading-relaxed">
+          <div className="text-xs text-muted mt-1 leading-relaxed">
             The government bundles scopes under names you&apos;d never search — a
             &ldquo;building envelope&rdquo; contract that&apos;s really cybersecurity.
             Set your <span className="text-purple-300 font-medium">real NAICS codes and keywords</span> and
@@ -86,7 +86,7 @@ export default function HiddenWorkNudge({ email, onGo }: HiddenWorkNudgeProps) {
         </div>
         <button
           onClick={dismiss}
-          className="shrink-0 text-xs text-slate-500 hover:text-slate-300"
+          className="shrink-0 text-xs text-faint hover:text-ink-soft"
           title="Hide"
         >
           Hide
@@ -100,7 +100,7 @@ export default function HiddenWorkNudge({ email, onGo }: HiddenWorkNudgeProps) {
         >
           Set up my profile →
         </button>
-        <span className="text-[11px] text-slate-500">Takes about 30 seconds.</span>
+        <span className="text-[11px] text-faint">Takes about 30 seconds.</span>
       </div>
     </div>
   );

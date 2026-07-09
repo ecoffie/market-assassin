@@ -67,38 +67,38 @@ export default function MiccMrrPanel({ email }: Props) {
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Market Research Report</h1>
-        <p className="text-sm text-slate-400 mt-1">
+        <p className="text-sm text-muted mt-1">
           Auto-draft the data sections of the official Army MRR (MAY 2026 template) — procurement
           history, capable suppliers, market intelligence, and the set-aside recommendation — from
           real federal award data. Export to Word, then complete the IGE and determinations.
         </p>
       </div>
 
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 space-y-4">
+      <div className="bg-ground border border-surface rounded-xl p-5 space-y-4">
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Requirement title</label>
+            <label className="block text-xs text-faint mb-1">Requirement title</label>
             <input value={title} onChange={e => setTitle(e.target.value)} placeholder="Engineering & Technical Support at Fort X"
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-blue-500 focus:outline-none" />
+              className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-blue-500 focus:outline-none" />
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">Keyword <span className="text-slate-600">(optional — context)</span></label>
+            <label className="block text-xs text-faint mb-1">Keyword <span className="text-slate-600">(optional — context)</span></label>
             <input value={keyword} onChange={e => setKeyword(e.target.value)} placeholder="ship repair"
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-blue-500 focus:outline-none" />
+              className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-blue-500 focus:outline-none" />
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">PSC Code <span className="text-emerald-400/70">(what you\'re buying)</span></label>
+            <label className="block text-xs text-faint mb-1">PSC Code <span className="text-emerald-400/70">(what you\'re buying)</span></label>
             <input value={psc} onChange={e => setPsc(e.target.value)} placeholder="R425"
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-emerald-500 focus:outline-none uppercase" />
+              className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-emerald-500 focus:outline-none uppercase" />
           </div>
           <div>
-            <label className="block text-xs text-slate-500 mb-1">NAICS Code</label>
+            <label className="block text-xs text-faint mb-1">NAICS Code</label>
             <input value={naics} onChange={e => setNaics(e.target.value)} placeholder="541330"
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-blue-500 focus:outline-none" />
+              className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-blue-500 focus:outline-none" />
           </div>
         </div>
         <button onClick={generate} disabled={loading}
-          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-700 text-white font-medium rounded-lg transition-colors">
+          className="px-5 py-2.5 bg-blue-600 hover:bg-blue-500 disabled:bg-input text-white font-medium rounded-lg transition-colors">
           {loading ? 'Researching…' : 'Generate MRR draft'}
         </button>
       </div>
@@ -107,10 +107,10 @@ export default function MiccMrrPanel({ email }: Props) {
 
       {mrr && (
         <>
-          <div className="bg-slate-900 border border-emerald-500/30 rounded-xl p-5 flex items-center justify-between gap-4 flex-wrap">
+          <div className="bg-ground border border-emerald-500/30 rounded-xl p-5 flex items-center justify-between gap-4 flex-wrap">
             <div>
               <h3 className="text-sm font-semibold text-white">MRR draft ready</h3>
-              <p className="text-xs text-slate-500 mt-1">Data sections auto-filled from USASpending. Download the official Army template and complete the bracketed sections.</p>
+              <p className="text-xs text-faint mt-1">Data sections auto-filled from USASpending. Download the official Army template and complete the bracketed sections.</p>
             </div>
             <button onClick={downloadDocx} className="inline-flex items-center gap-1.5 px-4 py-2 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg"><Download className="h-4 w-4 shrink-0" strokeWidth={2} /> Download MRR (.docx)</button>
           </div>
@@ -125,32 +125,32 @@ export default function MiccMrrPanel({ email }: Props) {
 
           {/* §5 market size — anchored to the PSC/NAICS (precise to the requirement) */}
           {mrr.taxonomy.marketTotal != null && (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+            <div className="bg-ground border border-surface rounded-xl p-5">
               <p className="text-xs uppercase tracking-wider text-emerald-300 mb-1">§5 Federal market size</p>
               <p className="text-lg font-semibold text-white">
                 {$(mrr.taxonomy.marketTotal)}
-                {mrr.taxonomy.psc ? <span className="text-slate-400 text-sm font-normal"> · PSC {mrr.taxonomy.psc}</span> : null}
+                {mrr.taxonomy.psc ? <span className="text-muted text-sm font-normal"> · PSC {mrr.taxonomy.psc}</span> : null}
               </p>
-              {mrr.taxonomy.topPsc && <p className="text-xs text-slate-500 mt-1">Most-purchased: {mrr.taxonomy.topPsc} · source: USASpending</p>}
+              {mrr.taxonomy.topPsc && <p className="text-xs text-faint mt-1">Most-purchased: {mrr.taxonomy.topPsc} · source: USASpending</p>}
             </div>
           )}
 
           {/* §12 recommendation */}
-          <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
+          <div className="bg-ground border border-surface rounded-xl p-5">
             <p className="text-xs uppercase tracking-wider text-purple-300 mb-1">§12 Recommended approach</p>
             <p className="text-lg font-semibold text-white">{mrr.smallBizRecommendation.recommendedSetAside}</p>
-            <p className="text-sm text-slate-400 mt-1">{mrr.smallBizRecommendation.rationale}</p>
+            <p className="text-sm text-muted mt-1">{mrr.smallBizRecommendation.rationale}</p>
           </div>
 
           {/* §9 procurement history preview */}
           {mrr.procurementHistory.length > 0 && (
-            <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-              <div className="px-5 py-3 border-b border-slate-800 text-sm font-semibold text-slate-400 uppercase tracking-wider">§9 Procurement History (top {Math.min(mrr.procurementHistory.length, 8)})</div>
+            <div className="bg-ground border border-surface rounded-xl overflow-hidden">
+              <div className="px-5 py-3 border-b border-surface text-sm font-semibold text-muted uppercase tracking-wider">§9 Procurement History (top {Math.min(mrr.procurementHistory.length, 8)})</div>
               <div className="divide-y divide-slate-800">
                 {mrr.procurementHistory.slice(0, 8).map((r: Mrr) => (
                   <div key={r.recipient_uei} className="p-3 flex justify-between gap-3 text-sm">
                     <span className="text-white truncate">{r.recipient_name}</span>
-                    <span className="text-slate-500 shrink-0">{r.contract_type} · {$(r.total_obligated)} · {r.award_count}aw</span>
+                    <span className="text-faint shrink-0">{r.contract_type} · {$(r.total_obligated)} · {r.award_count}aw</span>
                   </div>
                 ))}
               </div>
@@ -172,9 +172,9 @@ export default function MiccMrrPanel({ email }: Props) {
 
 function Stat({ n, label, sub }: { n: string; label: string; sub: string }) {
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+    <div className="bg-ground border border-surface rounded-xl p-4">
       <div className="text-2xl font-bold text-white">{n}</div>
-      <div className="text-xs text-slate-500">{label}</div>
+      <div className="text-xs text-faint">{label}</div>
       <div className="text-[11px] text-slate-600 mt-1">{sub}</div>
     </div>
   );

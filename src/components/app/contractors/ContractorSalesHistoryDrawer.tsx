@@ -122,22 +122,22 @@ export default function ContractorSalesHistoryDrawer({
         className="absolute inset-0 cursor-default"
         onClick={onClose}
       />
-      <aside className="relative h-full w-full max-w-3xl overflow-y-auto border-l border-slate-800 bg-slate-950 shadow-2xl">
-        <div className="sticky top-0 z-10 border-b border-slate-800 bg-slate-950/95 px-6 py-5 backdrop-blur">
+      <aside className="relative h-full w-full max-w-3xl overflow-y-auto border-l border-surface bg-ground-deep shadow-2xl">
+        <div className="sticky top-0 z-10 border-b border-surface bg-ground-deep/95 px-6 py-5 backdrop-blur">
           <div className="flex items-start justify-between gap-4">
             <div>
               <p className="text-xs font-semibold uppercase tracking-[0.2em] text-emerald-400">
                 Federal award history
               </p>
               <h2 className="mt-2 text-2xl font-bold text-white">{contractor.company}</h2>
-              <p className="mt-1 text-sm text-slate-400">
+              <p className="mt-1 text-sm text-muted">
                 Year-over-year sales, agency concentration, and recent awards.
               </p>
             </div>
             <button
               type="button"
               onClick={onClose}
-              className="rounded-lg border border-slate-700 px-3 py-2 text-sm text-slate-300 hover:border-slate-500 hover:text-white"
+              className="rounded-lg border border-hairline px-3 py-2 text-sm text-ink-soft hover:border-slate-500 hover:text-white"
             >
               Close
             </button>
@@ -147,9 +147,9 @@ export default function ContractorSalesHistoryDrawer({
         <div className="space-y-6 p-6">
           {loading && (
             <div className="space-y-4">
-              <div className="h-24 animate-pulse rounded-xl bg-slate-900" />
-              <div className="h-64 animate-pulse rounded-xl bg-slate-900" />
-              <div className="h-40 animate-pulse rounded-xl bg-slate-900" />
+              <div className="h-24 animate-pulse rounded-xl bg-ground" />
+              <div className="h-64 animate-pulse rounded-xl bg-ground" />
+              <div className="h-40 animate-pulse rounded-xl bg-ground" />
             </div>
           )}
 
@@ -168,37 +168,37 @@ export default function ContractorSalesHistoryDrawer({
               )}
 
               <div className="grid gap-3 md:grid-cols-4">
-                <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+                <div className="rounded-xl border border-surface bg-ground p-4">
                   <div className="text-2xl font-bold text-white">
                     {formatCurrency(history.summary.totalObligations || contractor.contract_value_num)}
                   </div>
-                  <div className="mt-1 text-xs text-slate-500">Known federal sales</div>
+                  <div className="mt-1 text-xs text-faint">Known federal sales</div>
                 </div>
-                <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+                <div className="rounded-xl border border-surface bg-ground p-4">
                   <div className="text-2xl font-bold text-emerald-400">
                     {history.summary.awardCount || contractor.contract_count}
                   </div>
-                  <div className="mt-1 text-xs text-slate-500">Awards found</div>
+                  <div className="mt-1 text-xs text-faint">Awards found</div>
                 </div>
-                <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+                <div className="rounded-xl border border-surface bg-ground p-4">
                   <div className="text-2xl font-bold text-blue-400">
                     {history.summary.latestFiscalYear || 'N/A'}
                   </div>
-                  <div className="mt-1 text-xs text-slate-500">Latest fiscal year</div>
+                  <div className="mt-1 text-xs text-faint">Latest fiscal year</div>
                 </div>
-                <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
+                <div className="rounded-xl border border-surface bg-ground p-4">
                   <div className="truncate text-lg font-bold text-purple-300">
                     {history.summary.topAgency || 'Unknown'}
                   </div>
-                  <div className="mt-1 text-xs text-slate-500">Top agency</div>
+                  <div className="mt-1 text-xs text-faint">Top agency</div>
                 </div>
               </div>
 
-              <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+              <section className="rounded-xl border border-surface bg-ground p-5">
                 <div className="mb-5 flex items-center justify-between gap-2">
                   <div>
                     <h3 className="text-lg font-semibold text-white">Sales by Fiscal Year</h3>
-                    <p className="text-sm text-slate-500">Federal obligations grouped by year.</p>
+                    <p className="text-sm text-faint">Federal obligations grouped by year.</p>
                   </div>
                   {/* Two escape hatches from the drawer:
                       - "Open full profile" (primary, emerald) → in-app
@@ -220,7 +220,7 @@ export default function ContractorSalesHistoryDrawer({
                       href={`/contractors/${history.contractor.slug}`}
                       target="_blank"
                       rel="noreferrer"
-                      className="rounded-lg bg-slate-800 px-3 py-2 text-xs font-medium text-slate-300 hover:bg-slate-700"
+                      className="rounded-lg bg-surface px-3 py-2 text-xs font-medium text-ink-soft hover:bg-input"
                     >
                       Public page ↗
                     </a>
@@ -247,18 +247,18 @@ export default function ContractorSalesHistoryDrawer({
                             type="button"
                             onClick={() => breakdown.length > 0 && setExpandedYear(isExpanded ? null : year.fiscalYear)}
                             className={`group flex flex-col items-center justify-end flex-1 min-w-[44px] h-full rounded-md px-1 pt-1 transition-colors ${
-                              breakdown.length > 0 ? 'hover:bg-slate-800/30 cursor-pointer' : 'cursor-default'
+                              breakdown.length > 0 ? 'hover:bg-surface/30 cursor-pointer' : 'cursor-default'
                             }`}
                             title={`FY ${year.fiscalYear}: ${formatCurrency(year.totalObligations)}`}
                           >
                             {/* value label on top of the column ($0 dimmed) */}
-                            <span className={`text-[10px] font-semibold mb-1 whitespace-nowrap ${isZero ? 'text-slate-600' : 'text-slate-300'}`}>
+                            <span className={`text-[10px] font-semibold mb-1 whitespace-nowrap ${isZero ? 'text-slate-600' : 'text-ink-soft'}`}>
                               {isZero ? '$0' : formatCurrency(year.totalObligations)}
                             </span>
                             {/* the rising bar — $0 years show a faint baseline
                                 stub so the year reads "present but zero". */}
                             {isZero ? (
-                              <div className="w-full max-w-[40px] h-[2px] rounded bg-slate-700" />
+                              <div className="w-full max-w-[40px] h-[2px] rounded bg-input" />
                             ) : (
                               <div
                                 className={`w-full max-w-[40px] rounded-t transition-colors ${
@@ -268,7 +268,7 @@ export default function ContractorSalesHistoryDrawer({
                               />
                             )}
                             {/* year axis label */}
-                            <span className={`mt-1.5 text-[11px] font-medium whitespace-nowrap ${isExpanded ? 'text-emerald-400' : isZero ? 'text-slate-600' : 'text-slate-400'}`}>
+                            <span className={`mt-1.5 text-[11px] font-medium whitespace-nowrap ${isExpanded ? 'text-emerald-400' : isZero ? 'text-slate-600' : 'text-muted'}`}>
                               {`'${String(year.fiscalYear).slice(2)}`}
                             </span>
                           </button>
@@ -282,12 +282,12 @@ export default function ContractorSalesHistoryDrawer({
                       const breakdown = (yr?.agencyBreakdown || []).slice().sort((a, b) => b.amount - a.amount);
                       if (breakdown.length === 0) return null;
                       return (
-                        <div className="mt-4 rounded-lg border border-slate-800 bg-slate-900/40 p-4 space-y-1.5">
-                          <p className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">Agencies awarding in FY {expandedYear}</p>
+                        <div className="mt-4 rounded-lg border border-surface bg-ground/40 p-4 space-y-1.5">
+                          <p className="text-[10px] uppercase tracking-wider text-faint mb-1">Agencies awarding in FY {expandedYear}</p>
                           {breakdown.slice(0, 8).map((row) => (
                             <div key={`${expandedYear}-${row.agency}`} className="flex items-center justify-between gap-3 text-xs">
-                              <span className="text-slate-300 truncate flex-1">{row.agency}</span>
-                              <span className="text-slate-500 shrink-0">{row.count} {row.count === 1 ? 'award' : 'awards'}</span>
+                              <span className="text-ink-soft truncate flex-1">{row.agency}</span>
+                              <span className="text-faint shrink-0">{row.count} {row.count === 1 ? 'award' : 'awards'}</span>
                               <span className="text-emerald-400 font-semibold shrink-0 w-20 text-right">{formatCurrency(row.amount)}</span>
                             </div>
                           ))}
@@ -299,11 +299,11 @@ export default function ContractorSalesHistoryDrawer({
                     })()}
 
                     {history.series.some(y => (y.agencyBreakdown || []).length > 0) && (
-                      <p className="text-[10px] text-slate-500 italic pt-3 text-center">Click any year to see which agencies awarded.</p>
+                      <p className="text-[10px] text-faint italic pt-3 text-center">Click any year to see which agencies awarded.</p>
                     )}
                   </div>
                 ) : (
-                  <div className="rounded-lg border border-slate-800 bg-slate-950 p-5 text-sm text-slate-400">
+                  <div className="rounded-lg border border-surface bg-ground-deep p-5 text-sm text-muted">
                     No year-by-year cached awards found yet. The contractor database still shows{' '}
                     {formatCurrency(contractor.contract_value_num)} across {contractor.contract_count} contracts.
                   </div>
@@ -311,14 +311,14 @@ export default function ContractorSalesHistoryDrawer({
               </section>
 
               <div className="grid gap-4 md:grid-cols-2">
-                <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+                <section className="rounded-xl border border-surface bg-ground p-5">
                   <h3 className="text-lg font-semibold text-white">Top Agencies</h3>
                   <div className="mt-4 space-y-3">
                     {history.topAgencies.length ? history.topAgencies.map((agency) => (
                       <div key={agency.agency} className="flex items-center justify-between gap-4">
                         <div className="min-w-0">
                           <div className="truncate text-sm font-medium text-slate-200">{agency.agency}</div>
-                          <div className="text-xs text-slate-500">
+                          <div className="text-xs text-faint">
                             {typeof agency.share === 'number' && agency.share > 0
                               ? `${(agency.share * 100).toFixed(1)}% of total obligations`
                               : `${agency.count} ${agency.count === 1 ? 'award' : 'awards'}`}
@@ -327,24 +327,24 @@ export default function ContractorSalesHistoryDrawer({
                         <div className="text-sm font-semibold text-emerald-400">{formatCurrency(agency.amount)}</div>
                       </div>
                     )) : (
-                      <p className="text-sm text-slate-500">Agency breakdown is not cached yet.</p>
+                      <p className="text-sm text-faint">Agency breakdown is not cached yet.</p>
                     )}
                   </div>
                 </section>
 
-                <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+                <section className="rounded-xl border border-surface bg-ground p-5">
                   <h3 className="text-lg font-semibold text-white">Top NAICS</h3>
                   <div className="mt-4 space-y-3">
                     {history.topNaics.length ? history.topNaics.map((naics) => (
                       <div key={naics.naics} className="flex items-center justify-between gap-4">
                         <div className="min-w-0">
                           <div className="text-sm font-medium text-slate-200">{naics.naics}</div>
-                          <div className="truncate text-xs text-slate-500">{naics.description || 'No description'}</div>
+                          <div className="truncate text-xs text-faint">{naics.description || 'No description'}</div>
                         </div>
                         <div className="text-sm font-semibold text-emerald-400">{formatCurrency(naics.amount)}</div>
                       </div>
                     )) : (
-                      <p className="text-sm text-slate-500">
+                      <p className="text-sm text-faint">
                         {contractor.naics && contractor.naics !== 'N/A'
                           ? `Known profile NAICS: ${contractor.naics}`
                           : 'NAICS breakdown is not cached yet.'}
@@ -354,15 +354,15 @@ export default function ContractorSalesHistoryDrawer({
                 </section>
               </div>
 
-              <section className="rounded-xl border border-slate-800 bg-slate-900 p-5">
+              <section className="rounded-xl border border-surface bg-ground p-5">
                 <h3 className="text-lg font-semibold text-white">Recent Awards</h3>
                 <div className="mt-4 space-y-3">
                   {history.recentAwards.length ? history.recentAwards.map((award) => (
-                    <div key={award.id} className="rounded-lg border border-slate-800 bg-slate-950 p-4">
+                    <div key={award.id} className="rounded-lg border border-surface bg-ground-deep p-4">
                       <div className="flex items-start justify-between gap-4">
                         <div className="min-w-0">
                           <h4 className="line-clamp-2 text-sm font-semibold text-white">{award.title}</h4>
-                          <p className="mt-1 text-xs text-slate-500">
+                          <p className="mt-1 text-xs text-faint">
                             {award.agency} · {formatDate(award.startDate)}
                           </p>
                         </div>
@@ -372,7 +372,7 @@ export default function ContractorSalesHistoryDrawer({
                       </div>
                     </div>
                   )) : (
-                    <p className="text-sm text-slate-500">Recent award details are not cached yet.</p>
+                    <p className="text-sm text-faint">Recent award details are not cached yet.</p>
                   )}
                 </div>
               </section>

@@ -88,7 +88,7 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
     <div className="p-6">
       <div className="mb-4">
         <h1 className="text-2xl font-bold text-white">Knowledge Base</h1>
-        <p className="text-slate-400 mt-1 text-sm">
+        <p className="text-muted mt-1 text-sm">
           Mindy&apos;s source library — winning proposals, templates, capability statements, training, and podcast insights. The documents behind every answer.
         </p>
       </div>
@@ -100,14 +100,14 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
           onChange={e => setQ(e.target.value)}
           onKeyDown={e => { if (e.key === 'Enter') load(); }}
           placeholder="Search the knowledge base…"
-          className="flex-1 min-w-[240px] h-10 px-3 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
+          className="flex-1 min-w-[240px] h-10 px-3 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-emerald-500 focus:outline-none"
         />
         <button onClick={load} className="h-10 px-5 bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-medium rounded-lg">Search</button>
       </div>
       <div className="flex flex-wrap gap-1.5 mb-4">
-        <button onClick={() => setDocType('')} className={`px-3 py-1 rounded-full text-xs ${!docType ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}>All ({total})</button>
+        <button onClick={() => setDocType('')} className={`px-3 py-1 rounded-full text-xs ${!docType ? 'bg-emerald-600 text-white' : 'bg-surface text-muted hover:text-white'}`}>All ({total})</button>
         {facets.map(f => (
-          <button key={f.docType} onClick={() => setDocType(f.docType)} className={`px-3 py-1 rounded-full text-xs ${docType === f.docType ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-400 hover:text-white'}`}>
+          <button key={f.docType} onClick={() => setDocType(f.docType)} className={`px-3 py-1 rounded-full text-xs ${docType === f.docType ? 'bg-emerald-600 text-white' : 'bg-surface text-muted hover:text-white'}`}>
             {f.label} ({f.count})
           </button>
         ))}
@@ -116,34 +116,34 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
       {/* Split pane */}
       <div className="grid grid-cols-1 lg:grid-cols-[360px_1fr] gap-4">
         {/* List */}
-        <div className="border border-slate-800 rounded-xl bg-slate-900 overflow-hidden">
+        <div className="border border-surface rounded-xl bg-ground overflow-hidden">
           <div className="max-h-[600px] overflow-y-auto divide-y divide-slate-800">
-            {loading && <div className="p-4 text-sm text-slate-500">Loading…</div>}
-            {!loading && docs.length === 0 && <div className="p-4 text-sm text-slate-500">No documents match.</div>}
+            {loading && <div className="p-4 text-sm text-faint">Loading…</div>}
+            {!loading && docs.length === 0 && <div className="p-4 text-sm text-faint">No documents match.</div>}
             {docs.map(doc => (
               <button
                 key={doc.id}
                 onClick={() => openDoc(doc)}
-                className={`w-full text-left px-4 py-3 hover:bg-slate-800/50 ${selected?.id === doc.id ? 'bg-slate-800/70 border-l-2 border-emerald-500' : 'border-l-2 border-transparent'}`}
+                className={`w-full text-left px-4 py-3 hover:bg-surface/50 ${selected?.id === doc.id ? 'bg-surface/70 border-l-2 border-emerald-500' : 'border-l-2 border-transparent'}`}
               >
                 <div className="text-sm font-medium text-white truncate">{doc.title}</div>
-                <div className="text-[11px] text-slate-500 mt-0.5">
+                <div className="text-[11px] text-faint mt-0.5">
                   {doc.docTypeLabel}{doc.pages ? ` · ${doc.pages}p` : doc.words ? ` · ${doc.words.toLocaleString()} words` : ''}
                 </div>
-                {doc.summary && <div className="text-xs text-slate-400 mt-1 line-clamp-2">{doc.summary}</div>}
+                {doc.summary && <div className="text-xs text-muted mt-1 line-clamp-2">{doc.summary}</div>}
               </button>
             ))}
           </div>
         </div>
 
         {/* Preview */}
-        <div className="border border-slate-800 rounded-xl bg-slate-900 overflow-hidden">
+        <div className="border border-surface rounded-xl bg-ground overflow-hidden">
           {selected ? (
             <div className="flex flex-col h-full">
-              <div className="px-5 py-3 border-b border-slate-800 flex items-start justify-between gap-3">
+              <div className="px-5 py-3 border-b border-surface flex items-start justify-between gap-3">
                 <div>
                   <div className="text-base font-semibold text-white">{selected.title}</div>
-                  <div className="text-xs text-slate-500 mt-0.5">{selected.docTypeLabel}</div>
+                  <div className="text-xs text-faint mt-0.5">{selected.docTypeLabel}</div>
                 </div>
                 {/* Watch/Listen — so YT Live / podcast / webinar docs aren't a
                     dead end (Eric). Opens the episode in a new tab. */}
@@ -160,14 +160,14 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
               </div>
               <div className="px-5 py-4 overflow-y-auto max-h-[560px]">
                 {docLoading ? (
-                  <div className="text-sm text-slate-500">Loading document…</div>
+                  <div className="text-sm text-faint">Loading document…</div>
                 ) : (
-                  <pre className="whitespace-pre-wrap font-sans text-sm text-slate-300 leading-relaxed">{docText}</pre>
+                  <pre className="whitespace-pre-wrap font-sans text-sm text-ink-soft leading-relaxed">{docText}</pre>
                 )}
               </div>
             </div>
           ) : (
-            <div className="p-10 text-center text-slate-500 text-sm">Select a document to read it.</div>
+            <div className="p-10 text-center text-faint text-sm">Select a document to read it.</div>
           )}
         </div>
       </div>

@@ -130,7 +130,7 @@ export default function DisaVehicleWatchPanel({ email }: Props) {
     <div className="p-6 space-y-6">
       <div>
         <h1 className="text-2xl font-bold text-white">Vehicle Expiry Watch</h1>
-        <p className="text-sm text-slate-400 mt-1">
+        <p className="text-sm text-muted mt-1">
           Upload your IDIQ/IDV vehicle list once. The system watches every expiration date and
           prepares the incumbent notice automatically — no more manual spreadsheet tracking.
           <span className="ml-1 text-amber-300">Notices are preview-only (dry run) until you approve sending.</span>
@@ -148,9 +148,9 @@ export default function DisaVehicleWatchPanel({ email }: Props) {
       )}
 
       {/* Upload */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl p-5">
-        <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider mb-2">Import your vehicle spreadsheet</h3>
-        <p className="text-xs text-slate-500 mb-3">
+      <div className="bg-ground border border-surface rounded-xl p-5">
+        <h3 className="text-sm font-semibold text-muted uppercase tracking-wider mb-2">Import your vehicle spreadsheet</h3>
+        <p className="text-xs text-faint mb-3">
           CSV with columns for PIID/contract #, incumbent, incumbent email, and expiration date
           (extra columns ignored; we auto-map common header names).
         </p>
@@ -166,13 +166,13 @@ export default function DisaVehicleWatchPanel({ email }: Props) {
 
       {/* Dry-run preview action */}
       {vehicles.length > 0 && (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-5 flex items-center justify-between gap-4 flex-wrap">
+        <div className="bg-ground border border-surface rounded-xl p-5 flex items-center justify-between gap-4 flex-wrap">
           <div>
             <h3 className="text-sm font-semibold text-white">Preview notices that would send today</h3>
-            <p className="text-xs text-slate-500 mt-1">Dry run — shows the exact email per due incumbent. Nothing is sent.</p>
+            <p className="text-xs text-faint mt-1">Dry run — shows the exact email per due incumbent. Nothing is sent.</p>
           </div>
           <button onClick={runPreview} disabled={previewLoading}
-            className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 text-white text-sm font-medium rounded-lg transition-colors">
+            className="px-4 py-2 bg-purple-600 hover:bg-purple-500 disabled:bg-input text-white text-sm font-medium rounded-lg transition-colors">
             {previewLoading ? 'Checking…' : 'Preview notices'}
           </button>
         </div>
@@ -180,27 +180,27 @@ export default function DisaVehicleWatchPanel({ email }: Props) {
 
       {/* Preview results */}
       {notices && (
-        <div className="bg-slate-900 border border-purple-500/30 rounded-xl p-5 space-y-4">
+        <div className="bg-ground border border-purple-500/30 rounded-xl p-5 space-y-4">
           <div className="flex items-center gap-2">
             <span className="px-2 py-0.5 rounded text-xs font-semibold bg-purple-500/20 text-purple-300">DRY RUN</span>
-            <span className="text-sm text-slate-300">
+            <span className="text-sm text-ink-soft">
               {notices.filter(n => n.hasEmail).length} notice{notices.filter(n => n.hasEmail).length === 1 ? '' : 's'} would send
               {notices.some(n => !n.hasEmail) && ` · ${notices.filter(n => !n.hasEmail).length} blocked (no incumbent email)`}
             </span>
           </div>
-          {notices.length === 0 && <p className="text-sm text-slate-500">No vehicles are due for a notice right now.</p>}
+          {notices.length === 0 && <p className="text-sm text-faint">No vehicles are due for a notice right now.</p>}
           {notices.map(n => (
-            <div key={n.vehicle_id} className="rounded-lg border border-slate-700 bg-slate-950/50 p-4">
+            <div key={n.vehicle_id} className="rounded-lg border border-hairline bg-ground-deep/50 p-4">
               <div className="flex items-center gap-2 mb-2 flex-wrap">
-                <span className={`px-2 py-0.5 rounded text-xs font-medium ${STAGE_BADGE[n.stage] || 'bg-slate-700 text-slate-300'}`}>{STAGE_LABEL[n.stage] || n.stage}</span>
+                <span className={`px-2 py-0.5 rounded text-xs font-medium ${STAGE_BADGE[n.stage] || 'bg-input text-ink-soft'}`}>{STAGE_LABEL[n.stage] || n.stage}</span>
                 <span className="text-sm font-medium text-white">{n.vehicle_piid}</span>
-                <span className="text-xs text-slate-500">→ {n.to || '⚠ no email on file'}</span>
+                <span className="text-xs text-faint">→ {n.to || '⚠ no email on file'}</span>
               </div>
-              <p className="text-xs text-slate-400 mb-1"><span className="text-slate-500">Subject:</span> {n.subject}</p>
-              <pre className="text-xs text-slate-300 whitespace-pre-wrap font-sans bg-slate-900/60 rounded p-3 mt-1">{n.body}</pre>
+              <p className="text-xs text-muted mb-1"><span className="text-faint">Subject:</span> {n.subject}</p>
+              <pre className="text-xs text-ink-soft whitespace-pre-wrap font-sans bg-ground/60 rounded p-3 mt-1">{n.body}</pre>
               <button
                 onClick={() => downloadNotice(n.vehicle_id, n.vehicle_piid)}
-                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-slate-700 hover:bg-slate-600 text-slate-200 transition-colors"
+                className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-input hover:bg-slate-600 text-slate-200 transition-colors"
               >
                 <Download className="h-4 w-4 shrink-0" strokeWidth={2} /> Download notice (.docx)
               </button>
@@ -210,37 +210,37 @@ export default function DisaVehicleWatchPanel({ email }: Props) {
       )}
 
       {/* Watched vehicles table */}
-      <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-800">
-          <h3 className="text-sm font-semibold text-slate-400 uppercase tracking-wider">
+      <div className="bg-ground border border-surface rounded-xl overflow-hidden">
+        <div className="px-5 py-4 border-b border-surface">
+          <h3 className="text-sm font-semibold text-muted uppercase tracking-wider">
             {loading ? 'Loading…' : `${vehicles.length} Watched Vehicles`}
           </h3>
         </div>
         {!loading && vehicles.length === 0 && (
-          <div className="p-8 text-center text-slate-500 text-sm">No vehicles yet — upload your spreadsheet above to start.</div>
+          <div className="p-8 text-center text-faint text-sm">No vehicles yet — upload your spreadsheet above to start.</div>
         )}
         <div className="divide-y divide-slate-800">
           {vehicles.map(v => (
-            <div key={v.id} className="p-4 flex items-start justify-between gap-4 hover:bg-slate-800/40">
+            <div key={v.id} className="p-4 flex items-start justify-between gap-4 hover:bg-surface/40">
               <div className="flex-1 min-w-0">
                 <div className="flex items-center gap-2 mb-1 flex-wrap">
                   {v.stage && <span className={`px-2 py-0.5 rounded text-xs font-medium ${STAGE_BADGE[v.stage]}`}>{STAGE_LABEL[v.stage]}</span>}
                   <span className="text-sm font-medium text-white truncate">{v.vehicle_piid}</span>
-                  {v.naics && <span className="px-2 py-0.5 rounded text-xs bg-slate-700 text-slate-300">NAICS {v.naics}</span>}
+                  {v.naics && <span className="px-2 py-0.5 rounded text-xs bg-input text-ink-soft">NAICS {v.naics}</span>}
                   {v.last_notified_stage && <span className="px-2 py-0.5 rounded text-xs bg-emerald-500/20 text-emerald-300">notified {v.last_notified_stage}</span>}
                 </div>
-                {v.vehicle_title && <p className="text-xs text-slate-400 truncate">{v.vehicle_title}</p>}
-                <p className="text-xs text-slate-500 mt-1">
+                {v.vehicle_title && <p className="text-xs text-muted truncate">{v.vehicle_title}</p>}
+                <p className="text-xs text-faint mt-1">
                   Incumbent: {v.incumbent_name || '—'}
-                  {v.incumbent_email ? <span className="text-slate-400"> · {v.incumbent_email}</span> : <span className="text-red-400"> · no email</span>}
+                  {v.incumbent_email ? <span className="text-muted"> · {v.incumbent_email}</span> : <span className="text-red-400"> · no email</span>}
                 </p>
               </div>
               <div className="text-right shrink-0">
                 <div className="text-sm text-white">{v.expiration_date || '—'}</div>
-                <div className={`text-xs ${v.daysUntilExpiration !== null && v.daysUntilExpiration <= 90 ? 'text-amber-400' : 'text-slate-500'}`}>{fmtDays(v.daysUntilExpiration)}</div>
-                <div className="text-xs text-slate-500">{fmtVal(v.ceiling_value)}</div>
+                <div className={`text-xs ${v.daysUntilExpiration !== null && v.daysUntilExpiration <= 90 ? 'text-amber-400' : 'text-faint'}`}>{fmtDays(v.daysUntilExpiration)}</div>
+                <div className="text-xs text-faint">{fmtVal(v.ceiling_value)}</div>
                 <div className="flex items-center gap-3 justify-end mt-1">
-                  <button onClick={() => downloadNotice(v.id, v.vehicle_piid)} className="text-[11px] text-slate-500 hover:text-amber-300">notice .docx</button>
+                  <button onClick={() => downloadNotice(v.id, v.vehicle_piid)} className="text-[11px] text-faint hover:text-amber-300">notice .docx</button>
                   <button onClick={() => removeVehicle(v.id)} className="text-[11px] text-slate-600 hover:text-red-400">remove</button>
                 </div>
               </div>
@@ -254,9 +254,9 @@ export default function DisaVehicleWatchPanel({ email }: Props) {
 
 function Card({ n, label, sub, color }: { n: number; label: string; sub: string; color: string }) {
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+    <div className="bg-ground border border-surface rounded-xl p-4">
       <div className={`text-2xl font-bold ${color}`}>{n.toLocaleString()}</div>
-      <div className="text-xs text-slate-500">{label}</div>
+      <div className="text-xs text-faint">{label}</div>
       <div className="text-[11px] text-slate-600 mt-1">{sub}</div>
     </div>
   );

@@ -100,15 +100,15 @@ export default function PursuitComments({ pipelineId, email }: PursuitCommentsPr
 
   return (
     <div className="mt-4">
-      <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-slate-300 mb-2">
-        <MessageSquare className="h-4 w-4 shrink-0 text-muted" strokeWidth={2} /> Team discussion {comments.length > 0 && <span className="text-slate-500">({comments.length})</span>}
+      <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-ink-soft mb-2">
+        <MessageSquare className="h-4 w-4 shrink-0 text-muted" strokeWidth={2} /> Team discussion {comments.length > 0 && <span className="text-faint">({comments.length})</span>}
       </div>
 
       <div className="space-y-2.5 max-h-56 overflow-y-auto pr-1">
         {loading ? (
-          <div className="text-xs text-slate-500">Loading…</div>
+          <div className="text-xs text-faint">Loading…</div>
         ) : comments.length === 0 ? (
-          <div className="text-xs text-slate-500 italic">No comments yet. Start the conversation with your team.</div>
+          <div className="text-xs text-faint italic">No comments yet. Start the conversation with your team.</div>
         ) : (
           comments.map((c) => (
             <div key={c.id} className="flex items-start gap-2.5 group">
@@ -117,8 +117,8 @@ export default function PursuitComments({ pipelineId, email }: PursuitCommentsPr
               </div>
               <div className="min-w-0 flex-1">
                 <div className="flex items-center gap-2">
-                  <span className="text-[11px] font-medium text-slate-300 truncate">{c.user_email?.split('@')[0]}</span>
-                  <span className="text-[10px] text-slate-500">{timeAgo(c.created_at)}</span>
+                  <span className="text-[11px] font-medium text-ink-soft truncate">{c.user_email?.split('@')[0]}</span>
+                  <span className="text-[10px] text-faint">{timeAgo(c.created_at)}</span>
                   {mine(c) && (
                     <button
                       onClick={() => remove(c.id)}
@@ -143,7 +143,7 @@ export default function PursuitComments({ pipelineId, email }: PursuitCommentsPr
           onKeyDown={(e) => { if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) post(); }}
           placeholder="Add a note for your team… (⌘+Enter to send)"
           rows={2}
-          className="flex-1 resize-none rounded-lg border border-slate-700 bg-slate-900 px-3 py-2 text-xs text-white placeholder:text-slate-600 focus:border-purple-500 focus:outline-none"
+          className="flex-1 resize-none rounded-lg border border-hairline bg-ground px-3 py-2 text-xs text-white placeholder:text-slate-600 focus:border-purple-500 focus:outline-none"
         />
         <button
           onClick={post}

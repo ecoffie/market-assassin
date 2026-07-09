@@ -112,13 +112,13 @@ export default function OnboardingScan({ reveal, onContinue }: Props) {
           <span className="animate-pulse">🧠</span>
         </div>
         <h3 className="mt-3 text-lg font-bold text-white">Building your Mindy…</h3>
-        <p className="mt-1 text-xs text-slate-400">
+        <p className="mt-1 text-xs text-muted">
           Cross-referencing <span className="font-semibold text-emerald-300">28 federal data sources</span> into one market
         </p>
       </div>
 
       {/* progress bar */}
-      <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-slate-800">
+      <div className="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-surface">
         <div className="h-full rounded-full bg-gradient-to-r from-emerald-500 to-emerald-300 transition-all duration-300" style={{ width: `${pct}%` }} />
       </div>
 
@@ -135,7 +135,7 @@ export default function OnboardingScan({ reveal, onContinue }: Props) {
                   : <span className="inline-block animate-spin text-emerald-300">◌</span>}
               </span>
               <span className="text-base">{s.icon}</span>
-              <span className="text-slate-300">
+              <span className="text-ink-soft">
                 {isCurrent && !reveal && i === SCAN_STEPS.length - 1 ? 'Resolving your market…' : s.label}
               </span>
             </div>
@@ -154,7 +154,7 @@ function Reveal({ reveal, onContinue }: { reveal: RevealData; onContinue: () => 
     <div className="rounded-2xl border border-emerald-500/40 bg-gradient-to-br from-emerald-950/40 to-slate-900 p-6 text-center">
       <div className="text-3xl">🎯</div>
       <h3 className="mt-2 text-xl font-black text-white">Your market is ready.</h3>
-      <p className="mt-1 text-sm text-slate-400">
+      <p className="mt-1 text-sm text-muted">
         Mindy just assembled everything for <span className="font-semibold text-emerald-300">{reveal.headline}</span>.
       </p>
 
@@ -177,10 +177,10 @@ function StatCell({ stat, run }: { stat: RevealStat; run: boolean }) {
   const counted = useCountUp(stat.value, run);
   const shown = stat.display ?? (stat.value != null ? counted.toLocaleString() : '');
   return (
-    <div className={`rounded-xl border p-3 ${stat.accent ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-slate-800 bg-slate-900/70'}`}>
+    <div className={`rounded-xl border p-3 ${stat.accent ? 'border-emerald-500/40 bg-emerald-500/10' : 'border-surface bg-ground/70'}`}>
       <div className="text-lg">{stat.icon}</div>
       <div className={`mt-0.5 text-2xl font-black ${stat.accent ? 'text-emerald-300' : 'text-white'}`}>{shown}</div>
-      <div className="text-[11px] leading-tight text-slate-400">{stat.label}</div>
+      <div className="text-[11px] leading-tight text-muted">{stat.label}</div>
     </div>
   );
 }

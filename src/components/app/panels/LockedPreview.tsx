@@ -82,7 +82,7 @@ export default function LockedPreview({
               <Lock className="h-3 w-3 shrink-0" strokeWidth={2} /> Pro
             </span>
           </div>
-          {subtitle && <p className="mt-1 text-sm text-slate-400">{subtitle}</p>}
+          {subtitle && <p className="mt-1 text-sm text-muted">{subtitle}</p>}
         </div>
         <button
           type="button"
@@ -95,9 +95,9 @@ export default function LockedPreview({
 
       {/* Treatment B — real count + blurred teaser rows (catalog surfaces). */}
       {hasCatalog && (
-        <div className="mt-5 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+        <div className="mt-5 rounded-xl border border-surface bg-ground/60 p-4">
           {loading ? (
-            <div className="text-sm text-slate-500">Counting matches…</div>
+            <div className="text-sm text-faint">Counting matches…</div>
           ) : (
             <>
               {typeof count === 'number' && (
@@ -111,10 +111,10 @@ export default function LockedPreview({
                   {sampleRows.slice(0, 5).map((row, i) => (
                     <li
                       key={i}
-                      className="flex items-center gap-2 rounded-lg border border-slate-800 bg-slate-950/50 px-3 py-2"
+                      className="flex items-center gap-2 rounded-lg border border-surface bg-ground-deep/50 px-3 py-2"
                     >
                       {/* Real row, blurred — obscured, not invented. */}
-                      <span className="min-w-0 flex-1 truncate text-sm text-slate-300 select-none blur-sm" aria-hidden>
+                      <span className="min-w-0 flex-1 truncate text-sm text-ink-soft select-none blur-sm" aria-hidden>
                         {row}
                       </span>
                       <Lock className="h-3.5 w-3.5 shrink-0 text-faint" strokeWidth={2} />

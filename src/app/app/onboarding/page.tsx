@@ -936,7 +936,7 @@ export default function OnboardingPage() {
 
   if (loading) {
     return (
-      <main className="min-h-screen bg-slate-950 flex items-center justify-center">
+      <main className="min-h-screen bg-ground-deep flex items-center justify-center">
         <div className="h-8 w-8 animate-spin rounded-full border-2 border-purple-500 border-t-transparent" />
       </main>
     );
@@ -945,12 +945,12 @@ export default function OnboardingPage() {
   // ── AUTO vs MANUAL (#64) — the two-door picker + the Auto paste/confirm flow.
   if (mode !== 'manual') {
     return (
-      <main className="min-h-screen bg-slate-950 px-4 py-10 text-white">
+      <main className="min-h-screen bg-ground-deep px-4 py-10 text-white">
         <div className="mx-auto max-w-2xl">
           <header className="mb-8 text-center">
             <MindyLogo size={64} className="mx-auto mb-5" />
             <h1 className="text-3xl font-bold">Set up your profile</h1>
-            <p className="mt-2 text-slate-400">Mindy finds the right federal opportunities for you</p>
+            <p className="mt-2 text-muted">Mindy finds the right federal opportunities for you</p>
           </header>
 
           {/* The door choice — UEI first (highest-quality: pulls real identity +
@@ -963,21 +963,21 @@ export default function OnboardingPage() {
                   <span className="text-lg font-semibold text-white">Set up from my SAM.gov UEI</span>
                   <span className="ml-auto text-[10px] uppercase tracking-wide bg-emerald-500/20 text-emerald-300 px-2 py-0.5 rounded-full">Best</span>
                 </div>
-                <p className="text-sm text-slate-400">Paste your 12-character UEI. Mindy pulls your legal name, NAICS, certifications, and your real federal award history — the most accurate setup, and it powers capability-matched opportunities.</p>
+                <p className="text-sm text-muted">Paste your 12-character UEI. Mindy pulls your legal name, NAICS, certifications, and your real federal award history — the most accurate setup, and it powers capability-matched opportunities.</p>
                 <div className="text-xs text-emerald-300 mt-3 font-medium">~10 seconds, most accurate →</div>
               </button>
               <div className="grid sm:grid-cols-2 gap-4">
                 <button onClick={() => setMode('auto')} className="text-left rounded-xl border border-purple-500/40 bg-purple-950/20 p-5 hover:border-purple-400 transition-colors">
                   <div className="text-2xl mb-2">⚡</div>
                   <div className="text-lg font-semibold text-white">Describe my business</div>
-                  <p className="text-sm text-slate-400 mt-1">No UEI? Paste your capability statement or describe what you do in a sentence. Mindy figures out your codes, market, and who buys.</p>
+                  <p className="text-sm text-muted mt-1">No UEI? Paste your capability statement or describe what you do in a sentence. Mindy figures out your codes, market, and who buys.</p>
                   <div className="text-xs text-purple-300 mt-3 font-medium">~30 seconds →</div>
                 </button>
-                <button onClick={() => { setMode('manual'); setStep(1); }} className="text-left rounded-xl border border-slate-700 bg-slate-900 p-5 hover:border-slate-500 transition-colors">
+                <button onClick={() => { setMode('manual'); setStep(1); }} className="text-left rounded-xl border border-hairline bg-ground p-5 hover:border-slate-500 transition-colors">
                   <div className="text-2xl mb-2">✏️</div>
                   <div className="text-lg font-semibold text-white">Manual setup</div>
-                  <p className="text-sm text-slate-400 mt-1">Go step by step — pick your NAICS codes, target agencies, and geography yourself.</p>
-                  <div className="text-xs text-slate-500 mt-3 font-medium">For power users →</div>
+                  <p className="text-sm text-muted mt-1">Go step by step — pick your NAICS codes, target agencies, and geography yourself.</p>
+                  <div className="text-xs text-faint mt-3 font-medium">For power users →</div>
                 </button>
               </div>
             </div>
@@ -992,7 +992,7 @@ export default function OnboardingPage() {
 
           {mode === 'uei' && !autoProfile && scanPhase === 'idle' && (
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/10 p-5">
-              <button onClick={() => { setMode('choose'); setError(''); }} className="text-xs text-slate-400 hover:text-white mb-3">← Back</button>
+              <button onClick={() => { setMode('choose'); setError(''); }} className="text-xs text-muted hover:text-white mb-3">← Back</button>
               <label className="block text-sm font-medium text-white mb-2">Your SAM.gov UEI</label>
               <input
                 value={ueiInput}
@@ -1000,15 +1000,15 @@ export default function OnboardingPage() {
                 onKeyDown={e => { if (e.key === 'Enter') runUeiExtract(); }}
                 maxLength={12}
                 placeholder="e.g. ABC123DEF456"
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm tracking-widest placeholder-slate-500 focus:border-emerald-500 focus:outline-none"
+                className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm tracking-widest placeholder-faint focus:border-emerald-500 focus:outline-none"
               />
-              <p className="text-xs text-slate-500 mt-2">The 12-character ID from your SAM.gov registration. Find it at sam.gov → Entity Management.</p>
+              <p className="text-xs text-faint mt-2">The 12-character ID from your SAM.gov registration. Find it at sam.gov → Entity Management.</p>
               {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
               <div className="mt-3 flex items-center gap-3">
-                <button onClick={runUeiExtract} disabled={autoLoading || ueiInput.trim().length !== 12} className="h-10 px-5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white text-sm font-medium rounded-lg">
+                <button onClick={runUeiExtract} disabled={autoLoading || ueiInput.trim().length !== 12} className="h-10 px-5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-input text-white text-sm font-medium rounded-lg">
                   {autoLoading ? 'Pulling from SAM.gov…' : 'Pull my profile →'}
                 </button>
-                <button onClick={() => { setError(''); setMode('auto'); }} className="text-sm text-slate-400 hover:text-white underline underline-offset-2">
+                <button onClick={() => { setError(''); setMode('auto'); }} className="text-sm text-muted hover:text-white underline underline-offset-2">
                   No UEI? Describe my business instead
                 </button>
               </div>
@@ -1018,17 +1018,17 @@ export default function OnboardingPage() {
           {/* AUTO — paste, then a LIGHT confirm screen */}
           {mode === 'auto' && !autoProfile && scanPhase === 'idle' && (
             <div className="rounded-xl border border-purple-500/30 bg-purple-950/20 p-5">
-              <button onClick={() => setMode('choose')} className="text-xs text-slate-400 hover:text-white mb-3">← Back</button>
+              <button onClick={() => setMode('choose')} className="text-xs text-muted hover:text-white mb-3">← Back</button>
               <label className="block text-sm font-medium text-white mb-2">Tell Mindy what you do</label>
               <textarea
                 value={autoText}
                 onChange={e => setAutoText(e.target.value)}
                 rows={4}
                 placeholder="Paste your capability statement / website text, or just describe it — e.g. 'We provide commercial janitorial and facility cleaning for federal buildings in Florida. SDVOSB.'  (One sentence like 'I do IT staffing in Texas' works too.)"
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-purple-500 focus:outline-none resize-y"
+                className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-purple-500 focus:outline-none resize-y"
               />
               {error && <p className="text-xs text-red-400 mt-2">{error}</p>}
-              <button onClick={runAutoExtract} disabled={autoLoading || autoText.trim().length < 4} className="mt-3 h-10 px-5 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 text-white text-sm font-medium rounded-lg">
+              <button onClick={runAutoExtract} disabled={autoLoading || autoText.trim().length < 4} className="mt-3 h-10 px-5 bg-purple-600 hover:bg-purple-500 disabled:bg-input text-white text-sm font-medium rounded-lg">
                 {autoLoading ? 'Reading…' : 'Set me up →'}
               </button>
               {/* Escape hatch — if auto-extract fails (niche description, no NAICS
@@ -1037,7 +1037,7 @@ export default function OnboardingPage() {
               {error && (
                 <button
                   onClick={() => { setError(''); setMode('manual'); setStep(1); }}
-                  className="mt-3 ml-3 h-10 px-4 text-sm font-medium text-slate-300 hover:text-white underline underline-offset-2"
+                  className="mt-3 ml-3 h-10 px-4 text-sm font-medium text-ink-soft hover:text-white underline underline-offset-2"
                 >
                   Set it up manually instead →
                 </button>
@@ -1048,7 +1048,7 @@ export default function OnboardingPage() {
           {/* AUTO confirm — the wow + safety net (editable states) */}
           {(mode === 'auto' || mode === 'uei') && autoProfile && scanPhase === 'done' && (
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/10 p-5">
-              <div className="text-sm text-slate-400 mb-3">
+              <div className="text-sm text-muted mb-3">
                 {autoProfile.uei
                   ? <>Pulled from SAM.gov{autoProfile.legalName ? ` — ${autoProfile.legalName}` : ''}{autoProfile.pastPerfCount ? ` · ${autoProfile.pastPerfCount} past awards found` : ''}. Look right? Fix anything below.</>
                   : <>Here&rsquo;s what Mindy found — look right? Anything off, just fix it.</>}
@@ -1066,7 +1066,7 @@ export default function OnboardingPage() {
                     <span className="text-3xl font-black text-emerald-400">{autoProfile.naics.length}</span>
                     <span className="text-sm font-semibold text-white">NAICS codes cover ~90% of your market</span>
                   </div>
-                  <p className="mt-1 text-xs text-slate-400">
+                  <p className="mt-1 text-xs text-muted">
                     Most contractors track just the one obvious code.
                     {autoProfile.totalMarket ? (
                       <> Mindy mapped a{' '}
@@ -1100,15 +1100,15 @@ export default function OnboardingPage() {
               <div className="space-y-3 text-sm">
                 {/* Industry — editable. Wrong guess? Retype it → Mindy re-grounds. */}
                 <div>
-                  <span className="text-slate-500">Your work: </span>
+                  <span className="text-faint">Your work: </span>
                   {editingIndustry ? (
                     <span className="inline-flex items-center gap-2">
                       <input autoFocus value={industryDraft} onChange={e => setIndustryDraft(e.target.value)}
                         onKeyDown={e => { if (e.key === 'Enter') reExtractIndustry(); }}
                         placeholder="e.g. nurse staffing, medical supplies"
-                        className="px-2 py-1 bg-slate-800 border border-purple-500 rounded text-white text-sm w-56 focus:outline-none" />
+                        className="px-2 py-1 bg-surface border border-purple-500 rounded text-white text-sm w-56 focus:outline-none" />
                       <button onClick={reExtractIndustry} disabled={autoLoading} className="text-xs text-emerald-400">{autoLoading ? '…' : 'Update'}</button>
-                      <button onClick={() => setEditingIndustry(false)} className="text-xs text-slate-500">cancel</button>
+                      <button onClick={() => setEditingIndustry(false)} className="text-xs text-faint">cancel</button>
                     </span>
                   ) : (
                     <>
@@ -1119,10 +1119,10 @@ export default function OnboardingPage() {
                 </div>
                 {/* Codes — removable chips (the nurse case: drop generic 561320). */}
                 <div>
-                  <span className="text-slate-500">Codes (click ✕ to remove): </span>
+                  <span className="text-faint">Codes (click ✕ to remove): </span>
                   {(autoProfile.naics || []).slice(0, 8).map((c: string) => (
-                    <span key={c} className="inline-flex items-center gap-1 rounded bg-slate-800 px-2 py-0.5 text-xs text-slate-200 mr-1 mb-1">
-                      {c}<button onClick={() => removeAutoNaics(c)} className="text-slate-500 hover:text-red-400">✕</button>
+                    <span key={c} className="inline-flex items-center gap-1 rounded bg-surface px-2 py-0.5 text-xs text-slate-200 mr-1 mb-1">
+                      {c}<button onClick={() => removeAutoNaics(c)} className="text-faint hover:text-red-400">✕</button>
                     </span>
                   ))}
                   {autoProfile.topPsc && <span className="inline-block rounded bg-purple-500/20 px-2 py-0.5 text-xs text-purple-300 mr-1">PSC {autoProfile.topPsc.code}</span>}
@@ -1152,11 +1152,11 @@ export default function OnboardingPage() {
                 {/* Keywords — tune the words that catch mislabeled opportunity titles.
                     Extraction can grab generics; drop junk + add real capability words. */}
                 <div>
-                  <span className="text-slate-500">Keywords (catch titles your codes miss): </span>
+                  <span className="text-faint">Keywords (catch titles your codes miss): </span>
                   <div className="mt-1.5 flex flex-wrap items-center gap-1">
                     {(autoProfile.keywords || []).map((kw: string) => (
-                      <span key={kw} className="inline-flex items-center gap-1 rounded bg-slate-800 px-2 py-0.5 text-xs text-slate-200">
-                        {kw}<button onClick={() => removeAutoKeyword(kw)} className="text-slate-500 hover:text-red-400">✕</button>
+                      <span key={kw} className="inline-flex items-center gap-1 rounded bg-surface px-2 py-0.5 text-xs text-slate-200">
+                        {kw}<button onClick={() => removeAutoKeyword(kw)} className="text-faint hover:text-red-400">✕</button>
                       </span>
                     ))}
                     <input
@@ -1164,7 +1164,7 @@ export default function OnboardingPage() {
                       onChange={e => setKeywordDraft(e.target.value)}
                       onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addAutoKeyword(); } }}
                       placeholder="+ add a keyword"
-                      className="w-32 bg-transparent border-b border-slate-700 text-xs text-white placeholder-slate-600 focus:border-purple-500 focus:outline-none px-1 py-0.5"
+                      className="w-32 bg-transparent border-b border-hairline text-xs text-white placeholder-slate-600 focus:border-purple-500 focus:outline-none px-1 py-0.5"
                     />
                   </div>
                   {keywordNote && (
@@ -1172,17 +1172,17 @@ export default function OnboardingPage() {
                   )}
                 </div>
                 {autoProfile.setAsides?.length > 0 && (
-                  <div><span className="text-slate-500">Set-asides detected: </span>{autoProfile.setAsides.map((s: string) => <span key={s} className="inline-block rounded bg-amber-500/20 px-2 py-0.5 text-xs text-amber-300 mr-1">{s}</span>)}</div>
+                  <div><span className="text-faint">Set-asides detected: </span>{autoProfile.setAsides.map((s: string) => <span key={s} className="inline-block rounded bg-amber-500/20 px-2 py-0.5 text-xs text-amber-300 mr-1">{s}</span>)}</div>
                 )}
                 {/* States — editable coverage control (Eric: add/remove states here) */}
                 <div>
-                  <span className="text-slate-500">Where you&rsquo;ll get alerts (click to add/remove): </span>
+                  <span className="text-faint">Where you&rsquo;ll get alerts (click to add/remove): </span>
                   <div className="mt-1.5 flex flex-wrap gap-1">
                     {[...US_STATES, 'PR'].map((code) => {
                       const on = (autoProfile.states || []).includes(code);
                       return (
                         <button key={code} type="button" onClick={() => toggleAutoState(code)}
-                          className={`px-1.5 py-0.5 rounded text-[11px] ${on ? 'bg-emerald-600 text-white' : 'bg-slate-800 text-slate-500 hover:text-slate-300'}`}>
+                          className={`px-1.5 py-0.5 rounded text-[11px] ${on ? 'bg-emerald-600 text-white' : 'bg-surface text-faint hover:text-ink-soft'}`}>
                           {code}
                         </button>
                       );
@@ -1191,16 +1191,16 @@ export default function OnboardingPage() {
                   <p className="text-[11px] text-slate-600 mt-1">No states selected = nationwide alerts.</p>
                 </div>
                 <div>
-                  <span className="text-slate-500">Who buys this: </span>
-                  <span className="text-slate-300">{(autoProfile.agencies || []).slice(0, 5).map((a: { name: string }) => a.name.replace('Department of ', '')).join(', ')}</span>
+                  <span className="text-faint">Who buys this: </span>
+                  <span className="text-ink-soft">{(autoProfile.agencies || []).slice(0, 5).map((a: { name: string }) => a.name.replace('Department of ', '')).join(', ')}</span>
                 </div>
               </div>
               {error && <p className="text-xs text-red-400 mt-3">{error}</p>}
               <div className="mt-5 flex items-center gap-3">
-                <button onClick={confirmAuto} disabled={saving} className="h-10 px-5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white text-sm font-medium rounded-lg">
+                <button onClick={confirmAuto} disabled={saving} className="h-10 px-5 bg-emerald-600 hover:bg-emerald-500 disabled:bg-input text-white text-sm font-medium rounded-lg">
                   {saving ? 'Setting up…' : 'Looks right — finish setup ✓'}
                 </button>
-                <button onClick={adjustInManual} className="h-10 px-4 text-sm text-slate-300 hover:text-white">Let me adjust the details</button>
+                <button onClick={adjustInManual} className="h-10 px-4 text-sm text-ink-soft hover:text-white">Let me adjust the details</button>
               </div>
             </div>
           )}
@@ -1210,12 +1210,12 @@ export default function OnboardingPage() {
   }
 
   return (
-    <main className="min-h-screen bg-slate-950 px-4 py-10 text-white">
+    <main className="min-h-screen bg-ground-deep px-4 py-10 text-white">
       <div className="mx-auto max-w-3xl">
         <header className="mb-8 text-center">
           <MindyLogo size={64} className="mx-auto mb-5" />
           <h1 className="text-3xl font-bold">Set up your profile</h1>
-          <p className="mt-2 text-slate-400">Help Mindy find the right opportunities for you</p>
+          <p className="mt-2 text-muted">Help Mindy find the right opportunities for you</p>
         </header>
 
         <div className="mb-8">
@@ -1231,7 +1231,7 @@ export default function OnboardingPage() {
                     className={`flex h-10 w-10 items-center justify-center rounded-full text-sm font-semibold transition-colors ${
                       isComplete || isActive
                         ? 'bg-purple-600 text-white'
-                        : 'bg-slate-800 text-slate-500'
+                        : 'bg-surface text-faint'
                     }`}
                   >
                     {isComplete ? '✓' : stepNumber}
@@ -1240,20 +1240,20 @@ export default function OnboardingPage() {
               );
             })}
           </div>
-          <div className="h-2 overflow-hidden rounded-full bg-slate-800">
+          <div className="h-2 overflow-hidden rounded-full bg-surface">
             <div
               className="h-full bg-gradient-to-r from-purple-600 to-purple-500 transition-all"
               style={{ width: `${((step - 1) / (TOTAL_STEPS - 1)) * 100}%` }}
             />
           </div>
-          <div className="mt-2 grid grid-cols-5 gap-1 text-center text-xs text-slate-500">
+          <div className="mt-2 grid grid-cols-5 gap-1 text-center text-xs text-faint">
             {STEP_LABELS.map(label => (
               <span key={label}>{label}</span>
             ))}
           </div>
         </div>
 
-        <section className="rounded-2xl border border-slate-800 bg-slate-900 p-6 md:p-8">
+        <section className="rounded-2xl border border-surface bg-ground p-6 md:p-8">
           {error && (
             <div className="mb-5 rounded-lg border border-red-500/25 bg-red-500/10 px-4 py-3 text-sm text-red-300">
               {error}
@@ -1268,7 +1268,7 @@ export default function OnboardingPage() {
           {step === 1 && (
             <div>
               <h2 className="mb-2 text-xl font-semibold">Tell us about your business</h2>
-              <p className="mb-6 text-sm text-slate-400">
+              <p className="mb-6 text-sm text-muted">
                 Describe what your company does so Mindy can match the right opportunities.
               </p>
               <textarea
@@ -1276,9 +1276,9 @@ export default function OnboardingPage() {
                 onChange={event => setBusinessDescription(event.target.value)}
                 placeholder="Example: We provide cybersecurity consulting, cloud security assessments, and compliance support for federal agencies."
                 rows={5}
-                className="w-full resize-none rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm text-white placeholder-slate-500 outline-none focus:border-purple-500"
+                className="w-full resize-none rounded-xl border border-hairline bg-surface px-4 py-3 text-sm text-white placeholder-faint outline-none focus:border-purple-500"
               />
-              <p className="mt-2 text-xs text-slate-500">
+              <p className="mt-2 text-xs text-faint">
                 Optional, but it helps Mindy rank matches more intelligently.
               </p>
               <button
@@ -1288,11 +1288,11 @@ export default function OnboardingPage() {
                   setShowSamplePicker(true);
                 }}
                 disabled={businessDescription.trim().length < 10}
-                className="mt-4 w-full rounded-xl border border-purple-500/40 bg-purple-600/20 px-5 py-3 text-sm font-semibold text-purple-100 transition-colors hover:bg-purple-600/30 disabled:cursor-not-allowed disabled:border-slate-700 disabled:bg-slate-800 disabled:text-slate-500"
+                className="mt-4 w-full rounded-xl border border-purple-500/40 bg-purple-600/20 px-5 py-3 text-sm font-semibold text-purple-100 transition-colors hover:bg-purple-600/30 disabled:cursor-not-allowed disabled:border-hairline disabled:bg-surface disabled:text-faint"
               >
                 Show real opportunities and suggest NAICS
               </button>
-              <p className="mt-2 text-center text-xs text-slate-500">
+              <p className="mt-2 text-center text-xs text-faint">
                 Pick examples that look right, and Mindy will pre-fill NAICS codes and agencies for review.
               </p>
             </div>
@@ -1301,7 +1301,7 @@ export default function OnboardingPage() {
           {step === 2 && (
             <div>
               <h2 className="mb-2 text-xl font-semibold">What industries do you serve?</h2>
-              <p className="mb-6 text-sm text-slate-400">
+              <p className="mb-6 text-sm text-muted">
                 Select your primary industries. You can also add specific NAICS codes.
               </p>
               {profileSuggestions && (
@@ -1309,12 +1309,12 @@ export default function OnboardingPage() {
                   <div className="mb-3 flex items-center justify-between gap-3">
                     <div>
                       <p className="text-sm font-semibold text-purple-100">Mindy found suggestions from your description</p>
-                      <p className="mt-1 text-xs text-slate-400">Review these now. You can add or remove anything before finishing setup.</p>
+                      <p className="mt-1 text-xs text-muted">Review these now. You can add or remove anything before finishing setup.</p>
                     </div>
                     <button
                       type="button"
                       onClick={() => setProfileSuggestions(null)}
-                      className="rounded-lg border border-slate-700 px-3 py-1.5 text-xs text-slate-300 hover:border-slate-500 hover:text-white"
+                      className="rounded-lg border border-hairline px-3 py-1.5 text-xs text-ink-soft hover:border-slate-500 hover:text-white"
                     >
                       Hide
                     </button>
@@ -1322,7 +1322,7 @@ export default function OnboardingPage() {
                   <div className="grid gap-3 text-xs sm:grid-cols-2">
                     {profileSuggestions.industries.length > 0 && (
                       <div>
-                        <p className="mb-1 font-medium uppercase tracking-wide text-slate-500">Industries</p>
+                        <p className="mb-1 font-medium uppercase tracking-wide text-faint">Industries</p>
                         <div className="flex flex-wrap gap-1.5">
                           {profileSuggestions.industries.map(value => (
                             <span key={value} className="rounded-full bg-purple-600/30 px-2 py-1 text-purple-100">{value}</span>
@@ -1332,17 +1332,17 @@ export default function OnboardingPage() {
                     )}
                     {profileSuggestions.naicsCodes.length > 0 && (
                       <div>
-                        <p className="mb-1 font-medium uppercase tracking-wide text-slate-500">NAICS</p>
+                        <p className="mb-1 font-medium uppercase tracking-wide text-faint">NAICS</p>
                         <div className="flex flex-wrap gap-1.5">
                           {profileSuggestions.naicsCodes.map(value => (
-                            <span key={value} className="rounded-full bg-slate-800 px-2 py-1 font-mono text-slate-200">{value}</span>
+                            <span key={value} className="rounded-full bg-surface px-2 py-1 font-mono text-slate-200">{value}</span>
                           ))}
                         </div>
                       </div>
                     )}
                     {profileSuggestions.states.length > 0 && (
                       <div>
-                        <p className="mb-1 font-medium uppercase tracking-wide text-slate-500">Geography</p>
+                        <p className="mb-1 font-medium uppercase tracking-wide text-faint">Geography</p>
                         <div className="flex flex-wrap gap-1.5">
                           {profileSuggestions.states.map(value => (
                             <span key={value} className="rounded-full bg-emerald-600/20 px-2 py-1 text-emerald-100">{value}</span>
@@ -1352,17 +1352,17 @@ export default function OnboardingPage() {
                     )}
                     {profileSuggestions.agencies.length > 0 && (
                       <div>
-                        <p className="mb-1 font-medium uppercase tracking-wide text-slate-500">Agencies</p>
+                        <p className="mb-1 font-medium uppercase tracking-wide text-faint">Agencies</p>
                         <div className="flex flex-wrap gap-1.5">
                           {profileSuggestions.agencies.map(value => (
-                            <span key={value} className="rounded-full bg-slate-800 px-2 py-1 text-slate-200">{value}</span>
+                            <span key={value} className="rounded-full bg-surface px-2 py-1 text-slate-200">{value}</span>
                           ))}
                         </div>
                       </div>
                     )}
                     {profileSuggestions.setAsides.length > 0 && (
                       <div>
-                        <p className="mb-1 font-medium uppercase tracking-wide text-slate-500">Set-asides</p>
+                        <p className="mb-1 font-medium uppercase tracking-wide text-faint">Set-asides</p>
                         <div className="flex flex-wrap gap-1.5">
                           {profileSuggestions.setAsides.map(value => (
                             <span key={value} className="rounded-full bg-amber-500/20 px-2 py-1 text-amber-100">{value}</span>
@@ -1382,22 +1382,22 @@ export default function OnboardingPage() {
                     className={`rounded-xl border p-4 text-left transition-colors ${
                       selectedIndustries.includes(preset.label)
                         ? 'border-purple-500 bg-purple-600/20 ring-2 ring-purple-500/25'
-                        : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                        : 'border-hairline bg-surface/50 hover:border-slate-600'
                     }`}
                   >
                     <div className="font-medium">{preset.label}</div>
-                    <p className="mt-1 text-xs text-slate-500">{preset.description}</p>
+                    <p className="mt-1 text-xs text-faint">{preset.description}</p>
                   </button>
                 ))}
               </div>
-              <label className="mb-2 block text-sm font-medium text-slate-300">
+              <label className="mb-2 block text-sm font-medium text-ink-soft">
                 Additional NAICS codes
               </label>
               <input
                 value={customNaics}
                 onChange={event => setCustomNaics(event.target.value)}
                 placeholder="541512, 236220, 541"
-                className="w-full rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 font-mono text-sm text-white placeholder-slate-500 outline-none focus:border-purple-500"
+                className="w-full rounded-xl border border-hairline bg-surface px-4 py-3 font-mono text-sm text-white placeholder-faint outline-none focus:border-purple-500"
               />
               {allNaicsCodes.length > 0 && (
                 <div className="mt-4 rounded-lg border border-purple-500/20 bg-purple-500/10 p-3">
@@ -1409,7 +1409,7 @@ export default function OnboardingPage() {
                       </span>
                     ))}
                     {allNaicsCodes.length > 18 && (
-                      <span className="text-xs text-slate-500">+{allNaicsCodes.length - 18} more</span>
+                      <span className="text-xs text-faint">+{allNaicsCodes.length - 18} more</span>
                     )}
                   </div>
                 </div>
@@ -1420,7 +1420,7 @@ export default function OnboardingPage() {
           {step === 3 && (
             <div>
               <h2 className="mb-2 text-xl font-semibold">Where do you perform work?</h2>
-              <p className="mb-6 text-sm text-slate-400">
+              <p className="mb-6 text-sm text-muted">
                 Select states for place-of-performance filtering. Leave blank for nationwide coverage.
               </p>
               <div className="mb-4 flex flex-wrap gap-2">
@@ -1429,7 +1429,7 @@ export default function OnboardingPage() {
                     key={region}
                     type="button"
                     onClick={() => setSelectedStates(REGION_PRESETS[region])}
-                    className="rounded-full bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-400 transition-colors hover:bg-slate-700 hover:text-white"
+                    className="rounded-full bg-surface px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-input hover:text-white"
                   >
                     {region}
                   </button>
@@ -1437,12 +1437,12 @@ export default function OnboardingPage() {
                 <button
                   type="button"
                   onClick={() => setSelectedStates([])}
-                  className="rounded-full bg-slate-800 px-3 py-1.5 text-xs font-medium text-slate-400 transition-colors hover:bg-slate-700 hover:text-white"
+                  className="rounded-full bg-surface px-3 py-1.5 text-xs font-medium text-muted transition-colors hover:bg-input hover:text-white"
                 >
                   Clear
                 </button>
               </div>
-              <div className="max-h-64 overflow-y-auto rounded-xl border border-slate-800 p-3">
+              <div className="max-h-64 overflow-y-auto rounded-xl border border-surface p-3">
                 <div className="grid grid-cols-4 gap-1 sm:grid-cols-6">
                   {US_STATES.map(state => (
                     <button
@@ -1452,7 +1452,7 @@ export default function OnboardingPage() {
                       className={`rounded px-2 py-1.5 text-xs font-medium transition-colors ${
                         selectedStates.includes(state)
                           ? 'bg-purple-600 text-white'
-                          : 'bg-slate-800/60 text-slate-400 hover:bg-slate-800 hover:text-white'
+                          : 'bg-surface/60 text-muted hover:bg-surface hover:text-white'
                       }`}
                     >
                       {state}
@@ -1460,7 +1460,7 @@ export default function OnboardingPage() {
                   ))}
                 </div>
               </div>
-              <div className="mt-4 rounded-lg border border-slate-700 bg-slate-800/50 p-3 text-sm text-slate-300">
+              <div className="mt-4 rounded-lg border border-hairline bg-surface/50 p-3 text-sm text-ink-soft">
                 {selectedStates.length > 0 ? `${selectedStates.length} states selected: ${selectedStates.join(', ')}` : 'No states selected = nationwide coverage'}
               </div>
             </div>
@@ -1469,7 +1469,7 @@ export default function OnboardingPage() {
           {step === 4 && (
             <div>
               <h2 className="mb-2 text-xl font-semibold">Which agencies matter most?</h2>
-              <p className="mb-6 text-sm text-slate-400">
+              <p className="mb-6 text-sm text-muted">
                 Pick priority agencies or leave this open for all federal opportunities.
               </p>
               <div className="mb-6 flex flex-wrap gap-2">
@@ -1481,14 +1481,14 @@ export default function OnboardingPage() {
                     className={`rounded-full px-4 py-2 text-sm font-medium transition-colors ${
                       selectedAgencies.includes(agency)
                         ? 'bg-purple-600 text-white'
-                        : 'bg-slate-800 text-slate-400 hover:bg-slate-700 hover:text-white'
+                        : 'bg-surface text-muted hover:bg-input hover:text-white'
                     }`}
                   >
                     {agency}
                   </button>
                 ))}
               </div>
-              <label className="mb-2 block text-sm font-medium text-slate-300">
+              <label className="mb-2 block text-sm font-medium text-ink-soft">
                 Other agencies
               </label>
               <textarea
@@ -1496,12 +1496,12 @@ export default function OnboardingPage() {
                 onChange={event => setCustomAgencies(event.target.value)}
                 placeholder="Army Corps of Engineers, USPS, FBI"
                 rows={2}
-                className="w-full resize-none rounded-xl border border-slate-700 bg-slate-800 px-4 py-3 text-sm text-white placeholder-slate-500 outline-none focus:border-purple-500"
+                className="w-full resize-none rounded-xl border border-hairline bg-surface px-4 py-3 text-sm text-white placeholder-faint outline-none focus:border-purple-500"
               />
-              <label className="mb-2 mt-6 block text-sm font-medium text-slate-300">
+              <label className="mb-2 mt-6 block text-sm font-medium text-ink-soft">
                 Set-aside eligibility
               </label>
-              <p className="mb-3 text-xs text-slate-500">
+              <p className="mb-3 text-xs text-faint">
                 Choose only certifications you actually hold. Mindy uses this to avoid ranking opportunities you are not eligible to prime.
               </p>
               <div className="grid gap-2">
@@ -1513,14 +1513,14 @@ export default function OnboardingPage() {
                       className={`flex cursor-pointer items-center gap-3 rounded-xl border px-4 py-3 text-sm transition-colors ${
                         checked
                           ? 'border-purple-500/40 bg-purple-600/20 text-white'
-                          : 'border-slate-700 bg-slate-800 text-slate-400 hover:border-slate-600 hover:text-white'
+                          : 'border-hairline bg-surface text-muted hover:border-slate-600 hover:text-white'
                       }`}
                     >
                       <input
                         type="checkbox"
                         checked={checked}
                         onChange={() => toggleValue(type.value, setSelectedSetAsides)}
-                        className="h-4 w-4 rounded border-slate-600 bg-slate-900 text-purple-600 focus:ring-purple-500"
+                        className="h-4 w-4 rounded border-slate-600 bg-ground text-purple-600 focus:ring-purple-500"
                       />
                       <span>{type.label}</span>
                     </label>
@@ -1548,7 +1548,7 @@ export default function OnboardingPage() {
           {step === 5 && (
             <div>
               <h2 className="mb-2 text-xl font-semibold">How often should Mindy alert you?</h2>
-              <p className="mb-6 text-sm text-slate-400">
+              <p className="mb-6 text-sm text-muted">
                 Choose your preferred delivery frequency. You can change this later.
               </p>
               <div className="space-y-3">
@@ -1566,22 +1566,22 @@ export default function OnboardingPage() {
                     className={`w-full rounded-xl border p-4 text-left transition-colors ${
                       frequency === option.value
                         ? 'border-purple-500 bg-purple-600/20 ring-2 ring-purple-500/25'
-                        : 'border-slate-700 bg-slate-800/50 hover:border-slate-600'
+                        : 'border-hairline bg-surface/50 hover:border-slate-600'
                     }`}
                   >
                     <div className="font-medium">{option.title}</div>
-                    <p className="mt-1 text-sm text-slate-400">{option.detail}</p>
+                    <p className="mt-1 text-sm text-muted">{option.detail}</p>
                   </button>
                 ))}
               </div>
             </div>
           )}
 
-          <div className="mt-8 flex items-center justify-between border-t border-slate-800 pt-6">
+          <div className="mt-8 flex items-center justify-between border-t border-surface pt-6">
             <button
               type="button"
               onClick={() => (step > 1 ? goToStep(step - 1) : router.push('/signup'))}
-              className="px-4 py-2.5 text-sm font-medium text-slate-400 transition-colors hover:text-white"
+              className="px-4 py-2.5 text-sm font-medium text-muted transition-colors hover:text-white"
             >
               Back
             </button>
@@ -1594,7 +1594,7 @@ export default function OnboardingPage() {
                     setSkippedSamplePicker(true);
                     goToStep(2);
                   }}
-                  className="px-4 py-2.5 text-sm font-medium text-slate-400 transition-colors hover:text-white"
+                  className="px-4 py-2.5 text-sm font-medium text-muted transition-colors hover:text-white"
                 >
                   Skip for now
                 </button>
@@ -1621,7 +1621,7 @@ export default function OnboardingPage() {
           />
         )}
 
-        <p className="mt-6 text-center text-xs text-slate-500">Setting up for {email}</p>
+        <p className="mt-6 text-center text-xs text-faint">Setting up for {email}</p>
       </div>
     </main>
   );

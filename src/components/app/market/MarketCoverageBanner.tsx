@@ -67,23 +67,23 @@ export default function MarketCoverageBanner({ coverage, email }: { coverage: Ma
         </p>
       </div>
 
-      <div className="text-xs text-slate-400 mb-1.5">
+      <div className="text-xs text-muted mb-1.5">
         Set-aside eligibility tracked across <b className="text-white">{coverage.coverage_pct}%</b> of this market via{' '}
         <b className="text-white">{coverage.codes_used} of {coverage.naics_count}</b> vendor NAICS codes
       </div>
-      <div className="h-2.5 bg-slate-800 rounded-full overflow-hidden mb-3">
+      <div className="h-2.5 bg-surface rounded-full overflow-hidden mb-3">
         <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-300" style={{ width: `${coverage.coverage_pct}%` }} />
       </div>
 
       <div className={`grid grid-cols-1 gap-3 text-xs ${keywords.length > 0 ? 'sm:grid-cols-2 lg:grid-cols-3' : 'sm:grid-cols-2'}`}>
-        <div className="rounded-lg bg-slate-950/40 p-2.5">
-          <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">⚠️ Vendor NAICS (not for ranking)</div>
+        <div className="rounded-lg bg-ground-deep/40 p-2.5">
+          <div className="text-[10px] uppercase tracking-wider text-faint mb-1">⚠️ Vendor NAICS (not for ranking)</div>
           <div className="text-slate-200">Top &ldquo;obvious&rdquo; code = only <b className="text-amber-400">{coverage.top_code_pct}%</b></div>
           <div className="text-slate-600 mt-0.5">NAICS tells you who <em>sold</em> — miss <b className="text-red-400">{hiddenPct}%</b> if you rank by it</div>
         </div>
         {coverage.top_psc && (
-          <div className="rounded-lg bg-slate-950/40 p-2.5">
-            <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">💡 What&rsquo;s actually bought (PSC)</div>
+          <div className="rounded-lg bg-ground-deep/40 p-2.5">
+            <div className="text-[10px] uppercase tracking-wider text-faint mb-1">💡 What&rsquo;s actually bought (PSC)</div>
             <div className="text-slate-200">{coverage.top_psc.code} <b className="text-emerald-300">{coverage.top_psc.name}</b></div>
             <div className="text-slate-600 mt-0.5">
               {coverage.uses_psc_ranking
@@ -93,9 +93,9 @@ export default function MarketCoverageBanner({ coverage, email }: { coverage: Ma
           </div>
         )}
         {keywords.length > 0 && (
-          <div className={`rounded-lg bg-slate-950/40 p-2.5 ${!coverage.top_psc ? 'sm:col-span-2 lg:col-span-1' : ''}`}>
+          <div className={`rounded-lg bg-ground-deep/40 p-2.5 ${!coverage.top_psc ? 'sm:col-span-2 lg:col-span-1' : ''}`}>
             <div className="flex items-center justify-between gap-2 mb-1.5">
-              <div className="text-[10px] uppercase tracking-wider text-slate-500">🔑 Search keywords for this market</div>
+              <div className="text-[10px] uppercase tracking-wider text-faint">🔑 Search keywords for this market</div>
               {email && (
                 added ? (
                   <span className="text-[11px] font-medium text-emerald-400">✓ Added</span>
@@ -112,18 +112,18 @@ export default function MarketCoverageBanner({ coverage, email }: { coverage: Ma
             </div>
             <div className="flex flex-wrap gap-1.5">
               {keywords.map((kw) => (
-                <span key={kw} className="rounded-full border border-slate-700 bg-slate-900 px-2 py-0.5 text-[11px] text-slate-300">{kw}</span>
+                <span key={kw} className="rounded-full border border-hairline bg-ground px-2 py-0.5 text-[11px] text-ink-soft">{kw}</span>
               ))}
             </div>
           </div>
         )}
       </div>
 
-      <div className="text-[11px] text-slate-500 mt-2.5">
-        💬 <b className="text-slate-400">Lesson:</b> &ldquo;{coverage.keyword}&rdquo; appears in{' '}
-        <b className="text-slate-400">{coverage.naics_count} vendor NAICS</b>
+      <div className="text-[11px] text-faint mt-2.5">
+        💬 <b className="text-muted">Lesson:</b> &ldquo;{coverage.keyword}&rdquo; appears in{' '}
+        <b className="text-muted">{coverage.naics_count} vendor NAICS</b>
         {coverage.psc_count ? ` and ${coverage.psc_count} PSC codes` : ''} — Mindy ranks agencies by{' '}
-        <b className="text-slate-400">{coverage.uses_psc_ranking ? 'keyword + top PSC' : 'keyword'}</b>, not NAICS.
+        <b className="text-muted">{coverage.uses_psc_ranking ? 'keyword + top PSC' : 'keyword'}</b>, not NAICS.
       </div>
     </div>
   );

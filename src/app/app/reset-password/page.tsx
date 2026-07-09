@@ -118,11 +118,11 @@ export default function MIResetPasswordPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-950 to-slate-900 flex items-center justify-center px-6 py-12">
-      <div className="w-full max-w-md rounded-2xl border border-slate-800 bg-slate-900/70 p-8 shadow-2xl">
+      <div className="w-full max-w-md rounded-2xl border border-surface bg-ground/70 p-8 shadow-2xl">
         <div className="mb-8 text-center">
           <MindyLogo size={56} className="mx-auto mb-5" />
           <h1 className="text-2xl font-bold text-white">Choose a new password</h1>
-          <p className="mt-2 text-sm text-slate-400">
+          <p className="mt-2 text-sm text-muted">
             After this, sign in again with 2FA to access Mindy.
           </p>
         </div>
@@ -146,7 +146,7 @@ export default function MIResetPasswordPage() {
               <Link href="/app" className="font-medium text-emerald-400 hover:text-emerald-300">
                 Sign in with your password instead
               </Link>
-              <Link href="/forgot-password" className="text-slate-400 hover:text-slate-300">
+              <Link href="/forgot-password" className="text-muted hover:text-ink-soft">
                 Request new reset link
               </Link>
             </div>
@@ -168,7 +168,7 @@ export default function MIResetPasswordPage() {
               onChange={(event) => setPassword(event.target.value)}
               placeholder="New password"
               autoComplete="new-password"
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none transition-colors placeholder:text-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+              className="w-full rounded-lg border border-hairline bg-surface px-4 py-3 text-white outline-none transition-colors placeholder:text-faint focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
               disabled={isLoading}
             />
             <input
@@ -177,13 +177,13 @@ export default function MIResetPasswordPage() {
               onChange={(event) => setConfirmPassword(event.target.value)}
               placeholder="Confirm new password"
               autoComplete="new-password"
-              className="w-full rounded-lg border border-slate-700 bg-slate-800 px-4 py-3 text-white outline-none transition-colors placeholder:text-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
+              className="w-full rounded-lg border border-hairline bg-surface px-4 py-3 text-white outline-none transition-colors placeholder:text-faint focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500"
               disabled={isLoading}
             />
             <button
               type="submit"
               disabled={isLoading}
-              className="w-full rounded-lg bg-emerald-600 px-4 py-3 font-medium text-white transition-colors hover:bg-emerald-500 disabled:bg-slate-700 disabled:text-slate-400"
+              className="w-full rounded-lg bg-emerald-600 px-4 py-3 font-medium text-white transition-colors hover:bg-emerald-500 disabled:bg-input disabled:text-muted"
             >
               {isLoading ? 'Updating password...' : 'Update password'}
             </button>

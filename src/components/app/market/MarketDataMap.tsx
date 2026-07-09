@@ -76,10 +76,10 @@ export default function MarketDataMap({ keyword, naics, state, email, upgradeHre
 
   if (loading) {
     return (
-      <div className={`rounded-2xl border border-slate-800 bg-slate-900/60 p-6 ${className || ''}`}>
-        <div className="h-5 w-48 animate-pulse rounded bg-slate-800" />
+      <div className={`rounded-2xl border border-surface bg-ground/60 p-6 ${className || ''}`}>
+        <div className="h-5 w-48 animate-pulse rounded bg-surface" />
         <div className="mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-          {[0, 1, 2, 3].map((i) => <div key={i} className="h-24 animate-pulse rounded-xl bg-slate-800/60" />)}
+          {[0, 1, 2, 3].map((i) => <div key={i} className="h-24 animate-pulse rounded-xl bg-surface/60" />)}
         </div>
       </div>
     );
@@ -88,9 +88,9 @@ export default function MarketDataMap({ keyword, naics, state, email, upgradeHre
   // failed, keep a slim placeholder card instead of returning null.
   if (error || !data) {
     return (
-      <div className={`rounded-2xl border border-slate-800 bg-slate-900/60 p-5 text-center ${className || ''}`}>
+      <div className={`rounded-2xl border border-surface bg-ground/60 p-5 text-center ${className || ''}`}>
         <p className="text-xs font-semibold uppercase tracking-wider text-emerald-300">Your federal market</p>
-        <p className="mt-1 text-sm text-slate-400">Mapping forecasts, recompetes &amp; grants for your codes…</p>
+        <p className="mt-1 text-sm text-muted">Mapping forecasts, recompetes &amp; grants for your codes…</p>
       </div>
     );
   }
@@ -105,7 +105,7 @@ export default function MarketDataMap({ keyword, naics, state, email, upgradeHre
           <p className="text-xs font-semibold uppercase tracking-wider text-emerald-300">Your federal market</p>
           <div className="mt-1 flex items-baseline gap-2">
             <span className="text-3xl font-bold text-white">{money(m.totalMarket)}</span>
-            <span className="text-sm text-slate-400">/ yr · {m.naicsCount} NAICS · {m.codes.join(', ')}{m.topPsc ? ` · PSC ${m.topPsc.code}` : ''}</span>
+            <span className="text-sm text-muted">/ yr · {m.naicsCount} NAICS · {m.codes.join(', ')}{m.topPsc ? ` · PSC ${m.topPsc.code}` : ''}</span>
           </div>
         </div>
         {!isPaid && (
@@ -136,10 +136,10 @@ export default function MarketDataMap({ keyword, naics, state, email, upgradeHre
 function TileCard({ tile, isPaid, upgradeHref }: { tile: Tile; isPaid: boolean; upgradeHref: string }) {
   const showValue = tile.value > 0;
   const inner = (
-    <div className="relative h-full rounded-xl border border-slate-800 bg-slate-900/70 p-4 transition-colors hover:border-emerald-500/40">
+    <div className="relative h-full rounded-xl border border-surface bg-ground/70 p-4 transition-colors hover:border-emerald-500/40">
       <div className="text-lg">{tile.icon}</div>
       <div className="mt-1 text-2xl font-bold text-white">{tile.count.toLocaleString()}</div>
-      <div className="text-[11px] leading-tight text-slate-400">{tile.label}</div>
+      <div className="text-[11px] leading-tight text-muted">{tile.label}</div>
       {showValue && <div className="mt-1 text-xs font-semibold text-emerald-300">{money(tile.value)}{tile.note ? ` ${tile.note}` : ''}</div>}
       {!isPaid && tile.locked && (
         <span className="absolute right-2 top-2 text-xs text-amber-300" title="Open the list with Pro">🔒</span>

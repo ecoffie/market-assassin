@@ -80,7 +80,7 @@ function CheckIcon() {
 
 export default function TrustPage() {
   return (
-    <main className="min-h-screen bg-slate-950 text-slate-200">
+    <main className="min-h-screen bg-ground-deep text-slate-200">
       <div className="mx-auto max-w-3xl px-6 py-16">
         {/* Hero — the thesis, stated plainly */}
         <div className="flex items-center gap-2 text-sm font-medium uppercase tracking-wider text-emerald-400">
@@ -90,7 +90,7 @@ export default function TrustPage() {
         <h1 className="mt-4 text-4xl font-bold text-white text-balance">
           Your data is yours.
         </h1>
-        <p className="mt-4 max-w-2xl text-lg leading-relaxed text-slate-400">
+        <p className="mt-4 max-w-2xl text-lg leading-relaxed text-muted">
           You put your most sensitive information into Mindy — your company
           details, real contract history, team, and documents. Here’s exactly how
           we protect it, and what you can do with it. Every promise below is
@@ -102,7 +102,7 @@ export default function TrustPage() {
           {PROMISES.map((p) => (
             <section
               key={p.claim}
-              className="rounded-xl border border-slate-800 bg-slate-900/50 p-6"
+              className="rounded-xl border border-surface bg-ground/50 p-6"
             >
               <div className="flex items-start gap-3">
                 <CheckIcon />
@@ -115,7 +115,7 @@ export default function TrustPage() {
                       {p.how}
                     </span>
                   </div>
-                  <p className="mt-2 leading-relaxed text-slate-400">
+                  <p className="mt-2 leading-relaxed text-muted">
                     {p.detail}
                   </p>
                 </div>
@@ -125,11 +125,11 @@ export default function TrustPage() {
         </div>
 
         {/* Honest scope — the measured note that builds more trust than overclaiming */}
-        <section className="mt-10 rounded-xl border border-slate-800 bg-slate-900/30 p-6">
+        <section className="mt-10 rounded-xl border border-surface bg-ground/30 p-6">
           <h2 className="text-base font-semibold text-white">
             What we’re still building
           </h2>
-          <p className="mt-2 leading-relaxed text-slate-400">
+          <p className="mt-2 leading-relaxed text-muted">
             We’re honest about the roadmap. For teams and agencies that need it,
             we’re adding organization-level workspaces and, where a contract
             requires it, deployment inside your own government-authorized cloud
@@ -149,7 +149,7 @@ export default function TrustPage() {
           </Link>
           <Link
             href="/privacy"
-            className="inline-flex items-center justify-center rounded-lg border border-slate-700 px-5 py-2.5 font-medium text-slate-200 transition-colors hover:border-slate-600 hover:bg-slate-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500"
+            className="inline-flex items-center justify-center rounded-lg border border-hairline px-5 py-2.5 font-medium text-slate-200 transition-colors hover:border-slate-600 hover:bg-ground focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-500"
           >
             Read the full privacy policy
           </Link>
@@ -159,7 +159,7 @@ export default function TrustPage() {
           Questions about how your data is handled? Email{' '}
           <a
             href="mailto:service@govcongiants.com"
-            className="text-slate-400 underline underline-offset-2 hover:text-slate-300"
+            className="text-muted underline underline-offset-2 hover:text-ink-soft"
           >
             service@govcongiants.com
           </a>

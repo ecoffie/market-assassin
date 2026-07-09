@@ -220,11 +220,11 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
     return (
       <div className="p-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-slate-800 rounded w-56" />
+          <div className="h-8 bg-surface rounded w-56" />
           <div className="grid grid-cols-3 gap-4">
-            {[1, 2, 3].map(i => <div key={i} className="h-24 bg-slate-800 rounded-xl" />)}
+            {[1, 2, 3].map(i => <div key={i} className="h-24 bg-surface rounded-xl" />)}
           </div>
-          <div className="h-72 bg-slate-800 rounded-xl" />
+          <div className="h-72 bg-surface rounded-xl" />
         </div>
       </div>
     );
@@ -235,7 +235,7 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
       <div className="flex items-start justify-between gap-4">
         <div>
           <h1 className="text-2xl font-bold text-white">Team Access</h1>
-          <p className="text-slate-400 mt-1">{workspaceName} shared workspace</p>
+          <p className="text-muted mt-1">{workspaceName} shared workspace</p>
         </div>
         <span className="px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/30 text-xs text-blue-300">
           {tier === 'team' || tier === 'enterprise' ? 'Team Plan' : 'Team Preview'}
@@ -255,11 +255,11 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[1fr_380px] gap-6">
-        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
-          <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+        <div className="bg-ground border border-surface rounded-xl overflow-hidden">
+          <div className="px-5 py-4 border-b border-surface flex items-center justify-between">
             <div>
               <h2 className="font-semibold text-white">Team Members</h2>
-              <p className="text-xs text-slate-500 mt-1">Owner, admin, member, and viewer roles</p>
+              <p className="text-xs text-faint mt-1">Owner, admin, member, and viewer roles</p>
             </div>
           </div>
 
@@ -268,7 +268,7 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
               <div key={member.id} className="px-5 py-4 flex items-center justify-between gap-4">
                 <div className="min-w-0">
                   <div className="font-medium text-white truncate">{member.user_email}</div>
-                  <div className="text-xs text-slate-500 mt-1">
+                  <div className="text-xs text-faint mt-1">
                     {member.status === 'invited'
                       ? `Invited${member.invited_by ? ` by ${member.invited_by}` : ''}`
                       : `Active${member.accepted_at ? ` since ${formatDate(member.accepted_at)}` : ''}`}
@@ -282,7 +282,7 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
                       value={member.role}
                       onChange={(e) => changeRole(member.id, e.target.value)}
                       disabled={saving}
-                      className="px-2 py-1 rounded bg-slate-800 border border-slate-700 text-xs text-slate-300 capitalize outline-none focus:border-blue-500 disabled:opacity-50"
+                      className="px-2 py-1 rounded bg-surface border border-hairline text-xs text-ink-soft capitalize outline-none focus:border-blue-500 disabled:opacity-50"
                       aria-label={`Role for ${member.user_email}`}
                     >
                       {/* Only the owner can grant admin (API enforces this too) */}
@@ -291,7 +291,7 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
                       <option value="viewer">Viewer</option>
                     </select>
                   ) : (
-                    <span className="px-2 py-1 rounded bg-slate-800 text-xs text-slate-300 capitalize">{member.role}</span>
+                    <span className="px-2 py-1 rounded bg-surface text-xs text-ink-soft capitalize">{member.role}</span>
                   )}
                   <span className={`px-2 py-1 rounded text-xs ${member.status === 'active' ? 'bg-emerald-500/10 text-emerald-300' : 'bg-amber-500/10 text-amber-300'}`}>
                     {member.status}
@@ -302,7 +302,7 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
                       disabled={saving}
                       title={member.status === 'invited' ? 'Revoke invite' : 'Remove member'}
                       aria-label={member.status === 'invited' ? 'Revoke invite' : 'Remove member'}
-                      className="inline-flex items-center p-1 rounded text-slate-500 hover:text-red-300 hover:bg-red-500/10 disabled:opacity-50 transition-colors"
+                      className="inline-flex items-center p-1 rounded text-faint hover:text-red-300 hover:bg-red-500/10 disabled:opacity-50 transition-colors"
                     >
                       <X className="h-3.5 w-3.5" strokeWidth={2.5} />
                     </button>
@@ -323,13 +323,13 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
                 onChange={(e) => setInviteEmail(e.target.value)}
                 disabled={!canInvite}
                 placeholder="teammate@company.com"
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 disabled:opacity-50 outline-none focus:border-blue-500"
+                className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white placeholder-faint disabled:opacity-50 outline-none focus:border-blue-500"
               />
               <select
                 value={inviteRole}
                 onChange={(e) => setInviteRole(e.target.value)}
                 disabled={!canInvite}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white disabled:opacity-50 outline-none focus:border-blue-500"
+                className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white disabled:opacity-50 outline-none focus:border-blue-500"
               >
                 <option value="member">Member</option>
                 <option value="admin">Admin</option>
@@ -338,11 +338,11 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
               <button
                 onClick={inviteMember}
                 disabled={!canInvite || saving || !inviteEmail.trim()}
-                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg font-medium transition-colors"
+                className="w-full px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-surface disabled:text-faint text-white rounded-lg font-medium transition-colors"
               >
                 {saving ? 'Inviting...' : 'Invite Teammate'}
               </button>
-              {!['owner', 'admin'].includes(currentRole) && <p className="text-xs text-slate-500">Only owners and admins can invite teammates.</p>}
+              {!['owner', 'admin'].includes(currentRole) && <p className="text-xs text-faint">Only owners and admins can invite teammates.</p>}
               {['owner', 'admin'].includes(currentRole) && !hasSeatCapacity && (
                 <p className="text-xs text-amber-300">Mindy Team includes {TEAM_SEAT_LIMIT} seats. Upgrade to Enterprise for more users.</p>
               )}
@@ -353,7 +353,7 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
             <h2 className="font-semibold text-white mb-4">Due Soon</h2>
             <div className="space-y-3">
               {reminders.slice(0, 5).map(reminder => (
-                <div key={reminder.id} className="rounded-lg bg-slate-800/60 p-3">
+                <div key={reminder.id} className="rounded-lg bg-surface/60 p-3">
                   <div className="text-sm font-medium text-white line-clamp-2">{reminder.next_action || reminder.title}</div>
                   <div className={`text-xs mt-1 ${reminder.isOverdue ? 'text-red-300' : 'text-amber-300'}`}>
                     {reminder.isOverdue ? 'Overdue' : `Due in ${reminder.daysUntilDue} days`}
@@ -361,7 +361,7 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
                   </div>
                 </div>
               ))}
-              {reminders.length === 0 && <p className="text-sm text-slate-500">No next actions due this week.</p>}
+              {reminders.length === 0 && <p className="text-sm text-faint">No next actions due this week.</p>}
             </div>
           </Card>
         </div>
@@ -375,29 +375,29 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
               <div className="mt-1 h-2 w-2 rounded-full bg-blue-400" />
               <div>
                 <div className="text-sm text-slate-200">{item.summary}</div>
-                <div className="text-xs text-slate-500">{item.actor_email} • {formatDate(item.created_at)}</div>
+                <div className="text-xs text-faint">{item.actor_email} • {formatDate(item.created_at)}</div>
               </div>
             </div>
           ))}
-          {activity.length === 0 && <p className="text-sm text-slate-500">No team activity yet.</p>}
+          {activity.length === 0 && <p className="text-sm text-faint">No team activity yet.</p>}
         </div>
       </Card>
 
       {/* Workspace Settings - Admin/Owner only */}
       {canEditSettings && (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+        <div className="bg-ground border border-surface rounded-xl overflow-hidden">
           <button
             onClick={() => setShowSettings(!showSettings)}
-            className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-slate-800/50 transition-colors"
+            className="w-full px-5 py-4 flex items-center justify-between text-left hover:bg-surface/50 transition-colors"
           >
             <div>
               <h2 className="font-semibold text-white">Workspace Settings</h2>
-              <p className="text-xs text-slate-500 mt-1">
+              <p className="text-xs text-faint mt-1">
                 {workspaceSettings.company_name || workspaceName} • Manage team defaults
               </p>
             </div>
             <svg
-              className={`w-5 h-5 text-slate-400 transition-transform ${showSettings ? 'rotate-180' : ''}`}
+              className={`w-5 h-5 text-muted transition-transform ${showSettings ? 'rotate-180' : ''}`}
               fill="none"
               stroke="currentColor"
               viewBox="0 0 24 24"
@@ -407,9 +407,9 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
           </button>
 
           {showSettings && (
-            <div className="px-5 pb-5 space-y-4 border-t border-slate-800">
+            <div className="px-5 pb-5 space-y-4 border-t border-surface">
               <div className="pt-4">
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-ink-soft mb-2">
                   Company Name
                 </label>
                 <input
@@ -417,12 +417,12 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
                   value={settingsForm.company_name || ''}
                   onChange={(e) => setSettingsForm({ ...settingsForm, company_name: e.target.value })}
                   placeholder={workspaceName}
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 outline-none focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white placeholder-faint outline-none focus:border-blue-500"
                 />
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-ink-soft mb-2">
                   Default NAICS Codes (comma-separated)
                 </label>
                 <input
@@ -433,13 +433,13 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
                     default_naics_codes: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
                   })}
                   placeholder="541512, 541611, 541330"
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 outline-none focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white placeholder-faint outline-none focus:border-blue-500"
                 />
-                <p className="text-xs text-slate-500 mt-1">Applied to new team members by default</p>
+                <p className="text-xs text-faint mt-1">Applied to new team members by default</p>
               </div>
 
               <div>
-                <label className="block text-sm font-medium text-slate-300 mb-2">
+                <label className="block text-sm font-medium text-ink-soft mb-2">
                   Target Agencies (comma-separated)
                 </label>
                 <input
@@ -450,7 +450,7 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
                     default_agencies: e.target.value.split(',').map(s => s.trim()).filter(Boolean)
                   })}
                   placeholder="DOD, VA, HHS"
-                  className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 outline-none focus:border-blue-500"
+                  className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white placeholder-faint outline-none focus:border-blue-500"
                 />
               </div>
 
@@ -460,14 +460,14 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
                     setSettingsForm(workspaceSettings);
                     setShowSettings(false);
                   }}
-                  className="flex-1 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 rounded-lg font-medium transition-colors"
+                  className="flex-1 px-4 py-2 bg-surface hover:bg-input text-ink-soft rounded-lg font-medium transition-colors"
                 >
                   Cancel
                 </button>
                 <button
                   onClick={saveWorkspaceSettings}
                   disabled={saving}
-                  className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 text-white rounded-lg font-medium transition-colors"
+                  className="flex-1 px-4 py-2 bg-blue-600 hover:bg-blue-500 disabled:bg-surface disabled:text-faint text-white rounded-lg font-medium transition-colors"
                 >
                   {saving ? 'Saving...' : 'Save Settings'}
                 </button>
@@ -482,9 +482,9 @@ export default function TeamPanel({ email, tier }: TeamPanelProps) {
 
 function StatCard({ label, value }: { label: string; value: string | number }) {
   return (
-    <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+    <div className="bg-ground border border-surface rounded-xl p-4">
       <div className="text-2xl font-bold text-white capitalize">{value}</div>
-      <div className="text-xs text-slate-500 mt-1">{label}</div>
+      <div className="text-xs text-faint mt-1">{label}</div>
     </div>
   );
 }

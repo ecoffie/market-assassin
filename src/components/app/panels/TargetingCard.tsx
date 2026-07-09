@@ -281,17 +281,17 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
   const statesLabel = states.length > 0 ? states.join(', ') : 'Nationwide';
 
   return (
-    <div className="mb-4 rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+    <div className="mb-4 rounded-xl border border-surface bg-ground/60 p-4">
       <div className="flex items-start justify-between gap-3">
         <button
           onClick={() => setCollapsed((v) => !v)}
           className="flex min-w-0 items-center gap-2 text-left"
           aria-expanded={!collapsed}
         >
-          <span className={`text-slate-500 transition-transform ${collapsed ? '-rotate-90' : ''}`}>▾</span>
+          <span className={`text-faint transition-transform ${collapsed ? '-rotate-90' : ''}`}>▾</span>
           <span className="min-w-0">
             <span className="block text-sm font-semibold text-white">Your targeting</span>
-            <span className="block text-xs text-slate-500">
+            <span className="block text-xs text-faint">
               {collapsed
                 ? `${naics.length} NAICS · ${keywords.length} keywords · ${psc.length} PSC · ${statesLabel}`
                 : 'What Mindy matches your alerts against'}
@@ -302,7 +302,7 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
           {typeof onReset === 'function' && (
             <button
               onClick={onReset}
-              className="text-xs text-slate-400 hover:text-red-400 transition-colors"
+              className="text-xs text-muted hover:text-red-400 transition-colors"
               title="Clear your profile and start over"
             >
               ↺ Start over
@@ -324,18 +324,18 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
       <div className="mt-3 grid grid-cols-1 gap-3 sm:grid-cols-2">
         {/* NAICS — inline add/remove (edit right here, like the top settings). */}
         <div>
-          <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">
+          <div className="text-[11px] uppercase tracking-wide text-faint mb-1">
             NAICS codes ({naics.length})
           </div>
           <div className="flex flex-wrap gap-1 items-center">
             {naics.map((c) => (
-              <span key={c} className="group inline-flex items-center gap-1 rounded bg-slate-800 px-2 py-0.5 text-xs text-slate-200">
+              <span key={c} className="group inline-flex items-center gap-1 rounded bg-surface px-2 py-0.5 text-xs text-slate-200">
                 {c}
                 {canInlineEdit && (
                   <button
                     onClick={() => removeItem('naics', c)}
                     disabled={saving}
-                    className="text-slate-500 hover:text-red-400 disabled:opacity-40"
+                    className="text-faint hover:text-red-400 disabled:opacity-40"
                     title={`Remove ${c}`}
                     aria-label={`Remove NAICS ${c}`}
                   >×</button>
@@ -351,25 +351,25 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
                   onKeyDown={(e) => { if (e.key === 'Enter') commitAdd('naics'); if (e.key === 'Escape') { setAddingField(null); setAddValue(''); } }}
                   onBlur={() => commitAdd('naics')}
                   placeholder="e.g. 541512"
-                  className="w-24 rounded bg-slate-950 border border-slate-700 px-2 py-0.5 text-xs text-slate-100 outline-none focus:border-purple-500"
+                  className="w-24 rounded bg-ground-deep border border-hairline px-2 py-0.5 text-xs text-slate-100 outline-none focus:border-purple-500"
                 />
               ) : (
                 <button
                   onClick={() => { setAddingField('naics'); setAddValue(''); }}
                   disabled={saving}
-                  className="rounded border border-dashed border-slate-600 px-2 py-0.5 text-xs text-slate-400 hover:text-purple-300 hover:border-purple-500 disabled:opacity-40"
+                  className="rounded border border-dashed border-slate-600 px-2 py-0.5 text-xs text-muted hover:text-purple-300 hover:border-purple-500 disabled:opacity-40"
                 >+ add</button>
               )
             )}
             {naics.length === 0 && !canInlineEdit && (
-              <span className="text-xs text-slate-500">No codes set</span>
+              <span className="text-xs text-faint">No codes set</span>
             )}
           </div>
         </div>
 
         {/* Keywords — loudly flag the empty state (the half-onboarded profile). */}
         <div>
-          <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">
+          <div className="text-[11px] uppercase tracking-wide text-faint mb-1">
             Keywords ({keywords.length})
           </div>
           <div className="flex flex-wrap gap-1 items-center">
@@ -396,7 +396,7 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
                   onKeyDown={(e) => { if (e.key === 'Enter') commitAdd('keywords'); if (e.key === 'Escape') { setAddingField(null); setAddValue(''); } }}
                   onBlur={() => commitAdd('keywords')}
                   placeholder="e.g. medical supplies"
-                  className="w-40 rounded bg-slate-950 border border-slate-700 px-2 py-0.5 text-xs text-slate-100 outline-none focus:border-emerald-500"
+                  className="w-40 rounded bg-ground-deep border border-hairline px-2 py-0.5 text-xs text-slate-100 outline-none focus:border-emerald-500"
                 />
               ) : (
                 <button
@@ -404,7 +404,7 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
                   disabled={saving}
                   className={noKeywords
                     ? 'inline-flex items-center gap-1 rounded-lg border border-amber-500/40 bg-amber-500/10 px-2.5 py-1 text-xs text-amber-300 hover:bg-amber-500/20'
-                    : 'rounded border border-dashed border-slate-600 px-2 py-0.5 text-xs text-slate-400 hover:text-emerald-300 hover:border-emerald-500 disabled:opacity-40'}
+                    : 'rounded border border-dashed border-slate-600 px-2 py-0.5 text-xs text-muted hover:text-emerald-300 hover:border-emerald-500 disabled:opacity-40'}
                 >{noKeywords ? <><AlertTriangle className="h-3 w-3 shrink-0" strokeWidth={2} /> Add keywords so alerts catch mislabeled opps</> : '+ add'}</button>
               )
             )}
@@ -419,7 +419,7 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
 
         {/* PSC codes — what's BOUGHT (the precise axis). Display-only here; edit in Settings. */}
         <div>
-          <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">
+          <div className="text-[11px] uppercase tracking-wide text-faint mb-1">
             PSC codes ({psc.length})
           </div>
           <div className="flex flex-wrap gap-1 items-center">
@@ -446,25 +446,25 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
                   onKeyDown={(e) => { if (e.key === 'Enter') commitAdd('psc'); if (e.key === 'Escape') { setAddingField(null); setAddValue(''); } }}
                   onBlur={() => commitAdd('psc')}
                   placeholder="e.g. 6515"
-                  className="w-24 rounded bg-slate-950 border border-slate-700 px-2 py-0.5 text-xs text-slate-100 outline-none focus:border-purple-500"
+                  className="w-24 rounded bg-ground-deep border border-hairline px-2 py-0.5 text-xs text-slate-100 outline-none focus:border-purple-500"
                 />
               ) : (
                 <button
                   onClick={() => { setAddingField('psc'); setAddValue(''); }}
                   disabled={saving}
-                  className="rounded border border-dashed border-slate-600 px-2 py-0.5 text-xs text-slate-400 hover:text-purple-300 hover:border-purple-500 disabled:opacity-40"
+                  className="rounded border border-dashed border-slate-600 px-2 py-0.5 text-xs text-muted hover:text-purple-300 hover:border-purple-500 disabled:opacity-40"
                 >+ add</button>
               )
             )}
             {psc.length === 0 && !canInlineEdit && (
-              <span className="text-xs text-slate-500">None set</span>
+              <span className="text-xs text-faint">None set</span>
             )}
           </div>
         </div>
 
         {/* Coverage area — the states alerts are scoped to. "Nationwide" when empty. */}
         <div>
-          <div className="text-[11px] uppercase tracking-wide text-slate-500 mb-1">
+          <div className="text-[11px] uppercase tracking-wide text-faint mb-1">
             Coverage area
           </div>
           <div className="flex flex-wrap gap-1">
@@ -473,7 +473,7 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
                 <span key={st} className="rounded bg-blue-500/15 px-2 py-0.5 text-xs text-blue-300">{st}</span>
               ))
             ) : (
-              <span className="inline-flex items-center gap-1 rounded bg-slate-800 px-2 py-0.5 text-xs text-slate-300"><Globe className="h-3 w-3 shrink-0" strokeWidth={2} /> Nationwide</span>
+              <span className="inline-flex items-center gap-1 rounded bg-surface px-2 py-0.5 text-xs text-ink-soft"><Globe className="h-3 w-3 shrink-0" strokeWidth={2} /> Nationwide</span>
             )}
           </div>
         </div>
@@ -490,10 +490,10 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
               ? 'Your keywords are broad — add specific phrases to sharpen matches'
               : 'Your profile spans several industries — matches may be noisy'}
           </div>
-          <div className="text-slate-400">
+          <div className="text-muted">
             {keywordsTooBroad ? (
-              <>Single words like <span className="text-slate-300">&ldquo;management&rdquo;</span> or{' '}
-                <span className="text-slate-300">&ldquo;technical&rdquo;</span> match almost everything. Two-word
+              <>Single words like <span className="text-ink-soft">&ldquo;management&rdquo;</span> or{' '}
+                <span className="text-ink-soft">&ldquo;technical&rdquo;</span> match almost everything. Two-word
                 phrases like <span className="text-emerald-300">&ldquo;program management&rdquo;</span> or{' '}
                 <span className="text-emerald-300">&ldquo;technical writing&rdquo;</span> are far more precise.</>
             ) : (
@@ -513,20 +513,20 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
           "what's bought" — that's audit detail, it lives in Settings (Eric QC
           2026-06-17: dashboards = what I'm targeting, not noise). */}
       {coverage && coverage.totalMarket > 0 && variant === 'compact' && (
-        <div className="mt-3 border-t border-slate-800 pt-3 text-xs">
+        <div className="mt-3 border-t border-surface pt-3 text-xs">
           {coverage.missing.length === 0 ? (
-            <span className="text-slate-300">
+            <span className="text-ink-soft">
               Your <span className="text-emerald-300 font-semibold">{naics.length} code{naics.length !== 1 ? 's' : ''}</span> cover{' '}
               <span className="text-emerald-300 font-semibold">{Math.round((coverage.coveragePct || 0) * 100)}%</span>{' '}
               of your <span className="font-semibold">{fmtMoney(coverage.sectorMarket || coverage.totalMarket)}</span> &ldquo;{coverage.keyword}&rdquo; market.
-              <span className="text-slate-500"> You&rsquo;re not missing the money — keywords catch the rest.</span>
+              <span className="text-faint"> You&rsquo;re not missing the money — keywords catch the rest.</span>
             </span>
           ) : (
-            <span className="text-slate-400">
+            <span className="text-muted">
               Tracking{' '}
               <span className="text-amber-300 font-semibold">{Math.round(coverage.heldPct * 100)}%</span>{' '}
               of your &ldquo;{coverage.keyword}&rdquo; market.
-              <span className="text-slate-500"> {coverage.missing.length} high-value code{coverage.missing.length > 1 ? 's' : ''} missing — see Settings.</span>
+              <span className="text-faint"> {coverage.missing.length} high-value code{coverage.missing.length > 1 ? 's' : ''} missing — see Settings.</span>
             </span>
           )}
         </div>
@@ -536,10 +536,10 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
           breakdown, no "not all these are your work" (that read like you had WRONG
           codes; Eric QC 2026-06-17). Only: what you have, what you're missing. */}
       {coverage && coverage.totalMarket > 0 && variant === 'full' && (
-        <div className="mt-3 border-t border-slate-800 pt-3">
+        <div className="mt-3 border-t border-surface pt-3">
           {coverage.missing.length > 0 ? (
             <>
-              <div className="text-xs text-slate-400 mb-2">
+              <div className="text-xs text-muted mb-2">
                 You&rsquo;re tracking{' '}
                 <span className="text-amber-300 font-semibold">{Math.round(coverage.heldPct * 100)}%</span>{' '}
                 of your &ldquo;{coverage.keyword}&rdquo; line of work — add the codes below for full coverage.
@@ -551,10 +551,10 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
                 <div className="space-y-1">
                   {coverage.missing.slice(0, 8).map((m) => (
                     <div key={m.code} className="flex items-center justify-between gap-2 text-xs">
-                      <span className="min-w-0 truncate text-slate-300">
+                      <span className="min-w-0 truncate text-ink-soft">
                         <span className="text-amber-400">{m.code}</span> {m.name}
                       </span>
-                      <span className="shrink-0 text-slate-400">{fmtMoney(m.amount)}</span>
+                      <span className="shrink-0 text-muted">{fmtMoney(m.amount)}</span>
                     </div>
                   ))}
                 </div>
@@ -568,7 +568,7 @@ export default function TargetingCard({ email, onEdit, onReset, variant = 'compa
               <div className="flex items-start gap-1 text-emerald-400 font-medium">
                 <Check className="mt-0.5 h-3 w-3 shrink-0" strokeWidth={2.5} /> <span>Full coverage — your {naics.length} code{naics.length !== 1 ? 's' : ''} cover {Math.round((coverage.coveragePct || 0) * 100)}% of your {fmtMoney(coverage.sectorMarket || coverage.totalMarket)} &ldquo;{coverage.keyword}&rdquo; market.</span>
               </div>
-              <div className="text-slate-500 mt-1">
+              <div className="text-faint mt-1">
                 Fewer, precise codes mean less noise — not less opportunity. These capture the real spend, and your keywords catch anything mislabeled. (More codes just flood your alerts with work you don&rsquo;t do.)
               </div>
             </div>

@@ -85,7 +85,7 @@ export function UpgradeModal({
         <button
           onClick={onClose}
           aria-label="Close"
-          className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-slate-400 hover:bg-slate-800 hover:text-white transition-colors"
+          className="absolute right-3 top-3 flex h-8 w-8 items-center justify-center rounded-full text-muted hover:bg-surface hover:text-white transition-colors"
         >
           <X className="h-5 w-5" strokeWidth={1.75} />
         </button>
@@ -95,11 +95,11 @@ export function UpgradeModal({
             <Sparkles className="h-3.5 w-3.5" strokeWidth={2} /> {isTeamUpsell ? 'Mindy Teams' : 'Mindy Pro'}
           </div>
           <h2 className="mt-2 text-2xl font-bold text-white">Unlock {pitch.title}</h2>
-          <p className="mt-2 text-sm text-slate-300">{pitch.line}</p>
+          <p className="mt-2 text-sm text-ink-soft">{pitch.line}</p>
 
           <ul className="mt-5 space-y-2">
             {(isTeamUpsell ? TEAM_BENEFITS : PRO_BENEFITS).map((b) => (
-              <li key={b} className="flex items-start gap-2 text-sm text-slate-300">
+              <li key={b} className="flex items-start gap-2 text-sm text-ink-soft">
                 <Check className="mt-0.5 h-4 w-4 shrink-0 text-emerald-400" strokeWidth={2.5} />
                 <span>{b}</span>
               </li>
@@ -108,7 +108,7 @@ export function UpgradeModal({
 
           <div className="mt-6 flex items-baseline gap-2">
             <span className="text-3xl font-black text-white">{isTeamUpsell ? '$499' : '$149'}</span>
-            <span className="text-sm text-slate-400">/mo — cancel anytime</span>
+            <span className="text-sm text-muted">/mo — cancel anytime</span>
           </div>
 
           {isTeamUpsell ? (
@@ -131,7 +131,7 @@ export function UpgradeModal({
           <Link
             href="/market-intelligence"
             onClick={() => onCtaClick?.('pricing')}
-            className="mt-2 block w-full text-center text-sm text-slate-400 hover:text-slate-200"
+            className="mt-2 block w-full text-center text-sm text-muted hover:text-slate-200"
           >
             See full pricing & annual plans
           </Link>

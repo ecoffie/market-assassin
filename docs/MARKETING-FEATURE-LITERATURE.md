@@ -3949,3 +3949,21 @@ so the change is invisible; shades with no exact token were left untouched (migr
 would change the color). Verified: tsc clean, production build ✓, opacity suffixes preserved
 (bg-ground-deep/40, bg-input/30, …), no malformed tokens. Drift-guard baseline dropped
 10,472 → 9,048 (−14% of the total debt in one batch); the guard blocks any regression.
+
+---
+
+## Design polish — P5 full /app token sweep (Jul 9 2026)
+
+**What:** Swept the entire `/app` surface (58 files across `src/components/app` and
+`src/app/app`, including the Market Intel and Onboarding pages) through the semantic token
+system: **1,946 → 275 raw-neutral (−1,671)** in one verified pass. Cumulative P5: 10,557 →
+7,377 raw-neutral (~30% of the total color debt cleared).
+
+**Why:** The whole in-app experience now renders through named design tokens rather than
+hand-picked slate/gray values — the property that lets the app be re-themed, audited, or
+tightened in one place, and the last structural "vibe-coded" tell to fall.
+
+**Proof:** Every swap is the exact-hex no-op map (token color == the slate shade replaced),
+so it's visually invisible; shades with no exact token were left (migrating would change the
+color). Verified: tsc clean, production build ✓, no malformed tokens across 58 files, opacity
+suffixes preserved. Drift-guard baseline 9,048 → 7,377; the guard blocks any regression.

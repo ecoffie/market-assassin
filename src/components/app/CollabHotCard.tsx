@@ -123,9 +123,9 @@ export function CollabHotCard({ email, onPanelChange }: CollabHotCardProps) {
         </h3>
 
         {/* Sub line: agency + deadline */}
-        <p className="mt-1 text-xs text-slate-400">
+        <p className="mt-1 text-xs text-muted">
           {hot.agency || 'Federal opportunity'}
-          {deadline && <span className="text-slate-500"> · responses due {deadline}</span>}
+          {deadline && <span className="text-faint"> · responses due {deadline}</span>}
         </p>
 
         {/* WHY it fits — the credibility line for "best fit". */}

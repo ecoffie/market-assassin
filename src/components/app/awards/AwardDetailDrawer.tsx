@@ -71,11 +71,11 @@ export default function AwardDetailDrawer({
   useEffect(() => { load(); }, [load]);
 
   if (state === 'loading') {
-    return <div className={`rounded-lg border border-slate-700 bg-slate-950/50 p-3 text-xs text-slate-500 ${className}`}>Loading award detail from USASpending…</div>;
+    return <div className={`rounded-lg border border-hairline bg-ground-deep/50 p-3 text-xs text-faint ${className}`}>Loading award detail from USASpending…</div>;
   }
   if (state === 'error') {
     return (
-      <div className={`rounded-lg border border-slate-700 bg-slate-950/50 p-3 text-xs text-slate-500 ${className}`}>
+      <div className={`rounded-lg border border-hairline bg-ground-deep/50 p-3 text-xs text-faint ${className}`}>
         Live spend detail isn’t on file for this award number.
         {fallbackUrl && <> <a href={fallbackUrl} target="_blank" rel="noreferrer" className="text-amber-400 hover:text-amber-300" onClick={(e) => e.stopPropagation()}>Look it up on USASpending ↗</a></>}
       </div>
@@ -86,22 +86,22 @@ export default function AwardDetailDrawer({
     <div className={`rounded-lg border border-amber-500/20 bg-amber-500/[0.04] p-4 ${className}`}>
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-slate-500">Obligated → Ceiling</div>
+          <div className="text-[10px] uppercase tracking-wider text-faint">Obligated → Ceiling</div>
           <div className="text-sm font-semibold text-emerald-300">{formatMindyCurrency(d.obligated)} → {formatMindyCurrency(d.ceiling)}</div>
           <div className="text-[10px] text-slate-600">the real prize size</div>
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-slate-500">Parent vehicle (IDV)</div>
+          <div className="text-[10px] uppercase tracking-wider text-faint">Parent vehicle (IDV)</div>
           <div className="text-sm font-medium text-white truncate">{d.parentIdvPiid || d.parentIdvId || '—'}</div>
           <div className="text-[10px] text-slate-600">{(d.parentIdvId || d.parentIdvPiid) ? 'get on this to compete' : 'standalone award'}</div>
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-slate-500">Period of performance</div>
+          <div className="text-[10px] uppercase tracking-wider text-faint">Period of performance</div>
           <div className="text-sm font-medium text-white">{fmtDate(d.popStart)} → {fmtDate(d.popPotentialEnd || d.popEnd)}</div>
           <div className="text-[10px] text-slate-600">recompete window</div>
         </div>
         <div>
-          <div className="text-[10px] uppercase tracking-wider text-slate-500">Incumbent</div>
+          <div className="text-[10px] uppercase tracking-wider text-faint">Incumbent</div>
           <div className="text-sm font-medium text-white truncate">{[d.recipientCity, d.recipientState].filter(Boolean).join(', ') || '—'}</div>
           <div className="text-[10px] text-slate-600">
             {d.recipientCongressionalDistrict ? `CD ${d.recipientState}-${d.recipientCongressionalDistrict}` : ''}
@@ -110,7 +110,7 @@ export default function AwardDetailDrawer({
         </div>
       </div>
       {(d.naicsDescription || d.pscDescription) && (
-        <div className="mt-2 text-[11px] text-slate-500">
+        <div className="mt-2 text-[11px] text-faint">
           {d.naicsDescription && <span>NAICS: {d.naicsDescription}</span>}
           {d.naicsDescription && d.pscDescription && <span className="text-slate-700"> · </span>}
           {d.pscDescription && <span>PSC: {d.pscDescription}</span>}

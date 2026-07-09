@@ -89,7 +89,7 @@ function stageColor(stage: string): string {
     case 'contacted': return 'bg-sky-500/15 text-sky-300';
     case 'met': return 'bg-emerald-500/15 text-emerald-300';
     case 'champion': return 'bg-purple-500/15 text-purple-300';
-    default: return 'bg-slate-800 text-slate-400';
+    default: return 'bg-surface text-muted';
   }
 }
 
@@ -422,11 +422,11 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
     return (
       <div className="p-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-slate-800 rounded w-56" />
+          <div className="h-8 bg-surface rounded w-56" />
           <div className="grid grid-cols-4 gap-3">
-            {[1, 2, 3, 4].map(i => <div key={i} className="h-20 bg-slate-800 rounded-xl" />)}
+            {[1, 2, 3, 4].map(i => <div key={i} className="h-20 bg-surface rounded-xl" />)}
           </div>
-          <div className="h-80 bg-slate-800 rounded-xl" />
+          <div className="h-80 bg-surface rounded-xl" />
         </div>
       </div>
     );
@@ -447,7 +447,7 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Relationships</h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-muted mt-1">
             {activeTab === 'network'
               ? 'Your saved buyers, partners, and pursuit contacts.'
               : activeTab === 'buyers'
@@ -458,19 +458,19 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
           </p>
         </div>
         <div className="text-right">
-          <div className="text-[10px] uppercase tracking-wider text-slate-500 mb-1">In your network</div>
+          <div className="text-[10px] uppercase tracking-wider text-faint mb-1">In your network</div>
           <div className="flex flex-wrap gap-3">
-            <div className="rounded-lg bg-slate-800 px-4 py-2 text-center">
+            <div className="rounded-lg bg-surface px-4 py-2 text-center">
               <div className="text-lg font-bold text-white">{stats.buyers}</div>
-              <div className="text-xs text-slate-500">Gov buyers</div>
+              <div className="text-xs text-faint">Gov buyers</div>
             </div>
-            <div className="rounded-lg bg-slate-800 px-4 py-2 text-center">
+            <div className="rounded-lg bg-surface px-4 py-2 text-center">
               <div className="text-lg font-bold text-white">{stats.partners}</div>
-              <div className="text-xs text-slate-500">Partners</div>
+              <div className="text-xs text-faint">Partners</div>
             </div>
-            <div className="rounded-lg bg-slate-800 px-4 py-2 text-center" title="Contacts you've linked to a specific pursuit">
+            <div className="rounded-lg bg-surface px-4 py-2 text-center" title="Contacts you've linked to a specific pursuit">
               <div className="text-lg font-bold text-emerald-400">{stats.attached}</div>
-              <div className="text-xs text-slate-500">On a pursuit</div>
+              <div className="text-xs text-faint">On a pursuit</div>
             </div>
           </div>
         </div>
@@ -482,23 +482,23 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
       <div className="space-y-3">
         {/* Row 1 — MY NETWORK (what you have) */}
         <div className="flex items-center gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-20 shrink-0">Your network</span>
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-faint w-20 shrink-0">Your network</span>
           <button
             onClick={() => { setActiveTab('network'); setNotice(null); setError(null); }}
             className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
               activeTab === 'network'
                 ? 'bg-emerald-500/20 text-emerald-300 border border-emerald-500/30'
-                : 'text-slate-400 hover:text-white hover:bg-slate-800 border border-transparent'
+                : 'text-muted hover:text-white hover:bg-surface border border-transparent'
             }`}
           >
             <span className="inline-flex items-center gap-1.5"><Contact className="h-4 w-4 shrink-0" strokeWidth={2} /> My Saved Contacts</span>
-            <span className="ml-2 text-xs text-slate-500">({stats.total})</span>
+            <span className="ml-2 text-xs text-faint">({stats.total})</span>
           </button>
         </div>
 
         {/* Row 2 — FIND NEW (discovery search) */}
         <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[11px] font-semibold uppercase tracking-wider text-slate-500 w-20 shrink-0">Find new</span>
+          <span className="text-[11px] font-semibold uppercase tracking-wider text-faint w-20 shrink-0">Find new</span>
           {TABS.filter(tab => tab.isDiscovery).map(tab => (
             <button
               key={tab.id}
@@ -506,7 +506,7 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
               className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                 activeTab === tab.id
                   ? 'bg-blue-500/20 text-blue-300 border border-blue-500/30'
-                  : 'text-slate-400 hover:text-white hover:bg-slate-800 border border-transparent'
+                  : 'text-muted hover:text-white hover:bg-surface border border-transparent'
               }`}
             >
               <span className="inline-flex items-center gap-1.5"><Search className="h-4 w-4 shrink-0" strokeWidth={2} /> {tab.label}</span>
@@ -521,37 +521,37 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
         </div>
       )}
 
-      <div className="rounded-xl border border-slate-800 bg-slate-900 p-5 space-y-4">
+      <div className="rounded-xl border border-surface bg-ground p-5 space-y-4">
         <div className="flex flex-wrap items-end gap-3">
           <div className="flex-1 min-w-[220px]">
-            <label className="block text-sm text-slate-400 mb-2">
+            <label className="block text-sm text-muted mb-2">
               {activeTab === 'network' ? 'Search My Network' : `Search ${activeTabConfig.label}`}
             </label>
             <input
               value={searchQuery}
               onChange={(event) => setSearchQuery(event.target.value)}
               placeholder="Name, agency, company, title, email..."
-              className="w-full px-3 py-3 rounded-lg bg-slate-800 border border-slate-700 text-white placeholder-slate-500 outline-none focus:border-emerald-500"
+              className="w-full px-3 py-3 rounded-lg bg-surface border border-hairline text-white placeholder-faint outline-none focus:border-emerald-500"
             />
           </div>
           {activeTab !== 'network' && (
             <>
               <div className="w-full md:w-44">
-                <label className="block text-sm text-slate-400 mb-2">NAICS</label>
+                <label className="block text-sm text-muted mb-2">NAICS</label>
                 <input
                   value={naicsFilter}
                   onChange={(event) => setNaicsFilter(event.target.value)}
                   placeholder="236, 541"
-                  className="w-full px-3 py-3 rounded-lg bg-slate-800 border border-slate-700 text-white placeholder-slate-500 outline-none focus:border-emerald-500"
+                  className="w-full px-3 py-3 rounded-lg bg-surface border border-hairline text-white placeholder-faint outline-none focus:border-emerald-500"
                 />
               </div>
               <div className="w-full md:w-56">
-                <label className="block text-sm text-slate-400 mb-2">Agency</label>
+                <label className="block text-sm text-muted mb-2">Agency</label>
                 <input
                   value={agencyFilter}
                   onChange={(event) => setAgencyFilter(event.target.value)}
                   placeholder="VA, DHS, GSA"
-                  className="w-full px-3 py-3 rounded-lg bg-slate-800 border border-slate-700 text-white placeholder-slate-500 outline-none focus:border-emerald-500"
+                  className="w-full px-3 py-3 rounded-lg bg-surface border border-hairline text-white placeholder-faint outline-none focus:border-emerald-500"
                 />
               </div>
             </>
@@ -559,7 +559,7 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
           <button
             onClick={activeTab === 'network' ? loadSavedContacts : searchCandidates}
             disabled={searching}
-            className="px-6 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-700 text-white font-medium"
+            className="px-6 py-3 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-input text-white font-medium"
           >
             {searching ? 'Searching...' : 'Search'}
           </button>
@@ -569,29 +569,29 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
             built BEFORE pursuing). The relationship lives with the agency in
             your Target List; pursuit-attach is optional + secondary. */}
         <div className="flex flex-wrap items-center gap-3">
-          <span className="text-sm text-slate-500">
+          <span className="text-sm text-faint">
             {activeTab === 'network' ? 'These contacts belong to:' : 'Save to agency:'}
           </span>
           {targetAgencies.length > 0 ? (
             <select
               value={attachAgency}
               onChange={(event) => setAttachAgency(event.target.value)}
-              className="min-w-[260px] px-3 py-2 rounded-lg bg-slate-800 border border-slate-700 text-white outline-none focus:border-emerald-500"
+              className="min-w-[260px] px-3 py-2 rounded-lg bg-surface border border-hairline text-white outline-none focus:border-emerald-500"
             >
               {targetAgencies.map(a => <option key={a} value={a}>{a}</option>)}
               <option value="__other__">Other agency…</option>
             </select>
           ) : (
-            <span className="text-xs text-slate-500">Add agencies to <b>My Target List</b> first — relationships are built per target agency.</span>
+            <span className="text-xs text-faint">Add agencies to <b>My Target List</b> first — relationships are built per target agency.</span>
           )}
           {/* Optional: also link to a pursuit (late-stage teaming). */}
           {pursuits.length > 0 && (
-            <details className="text-xs text-slate-500">
-              <summary className="cursor-pointer hover:text-slate-300">also link a pursuit (optional)</summary>
+            <details className="text-xs text-faint">
+              <summary className="cursor-pointer hover:text-ink-soft">also link a pursuit (optional)</summary>
               <select
                 value={selectedPursuit}
                 onChange={(event) => setSelectedPursuit(event.target.value)}
-                className="mt-1 min-w-[220px] px-2 py-1.5 rounded bg-slate-800 border border-slate-700 text-white text-xs outline-none"
+                className="mt-1 min-w-[220px] px-2 py-1.5 rounded bg-surface border border-hairline text-white text-xs outline-none"
               >
                 <option value="">No pursuit</option>
                 {pursuits.map(pursuit => (
@@ -605,18 +605,18 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
 
       {/* Recently Saved Quick View (My Network tab only, when contacts exist) */}
       {activeTab === 'network' && stats.recentlySaved.length > 0 && !searchQuery.trim() && (
-        <div className="rounded-xl border border-slate-800 bg-slate-900 p-4">
-          <h3 className="text-sm font-medium text-slate-400 mb-3">Recently Saved</h3>
+        <div className="rounded-xl border border-surface bg-ground p-4">
+          <h3 className="text-sm font-medium text-muted mb-3">Recently Saved</h3>
           <div className="flex flex-wrap gap-2">
             {stats.recentlySaved.map(contact => (
               <div
                 key={contact.id}
-                className="flex items-center gap-2 rounded-lg bg-slate-800 px-3 py-2"
+                className="flex items-center gap-2 rounded-lg bg-surface px-3 py-2"
               >
-                <span className="text-xs text-slate-500">{contactTypeLabel(contact.contact_type)}</span>
+                <span className="text-xs text-faint">{contactTypeLabel(contact.contact_type)}</span>
                 <span className="text-sm text-white">{contact.full_name}</span>
                 {contact.organization && (
-                  <span className="text-xs text-slate-500">· {contact.organization.slice(0, 20)}</span>
+                  <span className="text-xs text-faint">· {contact.organization.slice(0, 20)}</span>
                 )}
               </div>
             ))}
@@ -624,20 +624,20 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
         </div>
       )}
 
-      <div className="rounded-xl border border-slate-800 bg-slate-900 overflow-hidden">
-        <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
+      <div className="rounded-xl border border-surface bg-ground overflow-hidden">
+        <div className="px-5 py-4 border-b border-surface flex items-center justify-between">
           <div>
             <h2 className="inline-flex items-center gap-1.5 font-semibold text-white">
               {activeTab === 'network'
                 ? <><Contact className="h-4 w-4 shrink-0" strokeWidth={2} /> My Saved Contacts</>
                 : <><Search className="h-4 w-4 shrink-0" strokeWidth={2} /> Search results · {activeTabConfig.label}</>}
             </h2>
-            <p className="text-xs text-slate-500 mt-1">
+            <p className="text-xs text-faint mt-1">
               {activeTab === 'network'
                 ? `${savedContacts.length} contact${savedContacts.length === 1 ? '' : 's'} in your network`
                 : candidatesTruncated && candidatesTotal > candidates.length
                   ? <>
-                      <span className="text-blue-300">Found {candidatesTotal.toLocaleString()}+</span> — showing {candidates.length}. <span className="text-slate-400">Click <b>Save</b> on anyone to add them to your network.</span> Narrow by NAICS/agency to focus.
+                      <span className="text-blue-300">Found {candidatesTotal.toLocaleString()}+</span> — showing {candidates.length}. <span className="text-muted">Click <b>Save</b> on anyone to add them to your network.</span> Narrow by NAICS/agency to focus.
                     </>
                   : <><span className="text-blue-300">Found {candidates.length}</span> you can add — click <b>Save</b> on anyone to add them to your network.</>}
             </p>
@@ -656,14 +656,14 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
             return (
               <div key={contact.id}>
               {showAgencyHeader && (
-                <div className="px-5 py-2 bg-slate-900/60 border-y border-slate-800 text-xs font-semibold uppercase tracking-wider text-emerald-300">
+                <div className="px-5 py-2 bg-ground/60 border-y border-surface text-xs font-semibold uppercase tracking-wider text-emerald-300">
                   {agencyOf(contact)}
                 </div>
               )}
               <div className="p-5 flex flex-col xl:flex-row xl:items-center justify-between gap-4">
                 <div className="min-w-0">
                   <div className="flex flex-wrap items-center gap-2 mb-2">
-                    <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-300">{contactTypeLabel(contact.contact_type)}</span>
+                    <span className="rounded bg-surface px-2 py-1 text-xs text-ink-soft">{contactTypeLabel(contact.contact_type)}</span>
                     {/* v2: relationship STAGE — develop-before-pursue tracking.
                         Network tab only; quick inline change. */}
                     {activeTab === 'network' && (
@@ -676,20 +676,20 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
                         {STAGES.map(s => <option key={s.id} value={s.id}>{s.emoji} {s.label}</option>)}
                       </select>
                     )}
-                    {contact.source && <span className="rounded bg-slate-800 px-2 py-1 text-xs text-slate-500">{contact.source}</span>}
+                    {contact.source && <span className="rounded bg-surface px-2 py-1 text-xs text-faint">{contact.source}</span>}
                     {attached.length > 0 && <span className="rounded bg-emerald-500/10 px-2 py-1 text-xs text-emerald-300">Attached to {attached.length} pursuit{attached.length === 1 ? '' : 's'}</span>}
                   </div>
                   <h3 className="text-lg font-semibold text-white">{contact.full_name}</h3>
-                  <p className="text-sm text-slate-400 mt-1">
+                  <p className="text-sm text-muted mt-1">
                     {[contact.title, contact.organization, contact.agency].filter(Boolean).join(' · ') || 'Relationship record'}
                   </p>
                   {(contact.email || contact.phone || contact.office) && (
-                    <p className="text-sm text-slate-500 mt-2">
+                    <p className="text-sm text-faint mt-2">
                       {[contact.email, contact.phone, contact.office].filter(Boolean).join(' · ')}
                     </p>
                   )}
                   {(contact.context || contact.notes) && (
-                    <p className="text-sm text-slate-500 mt-2 max-w-3xl">{contact.context || contact.notes}</p>
+                    <p className="text-sm text-faint mt-2 max-w-3xl">{contact.context || contact.notes}</p>
                   )}
                 </div>
 
@@ -701,18 +701,18 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
                       <button
                         onClick={() => attachContact(contact.id)}
                         disabled={savingId === contact.id}
-                        className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-sm font-medium"
+                        className="px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-500 disabled:bg-surface disabled:text-faint text-white text-sm font-medium"
                       >
                         {savingId === contact.id ? 'Attaching...' : 'Attach to Pursuit'}
                       </button>
                     ) : (
-                      <span className="text-xs text-slate-500 px-2">In your network{contact.agency ? ` · ${contact.agency}` : ''}</span>
+                      <span className="text-xs text-faint px-2">In your network{contact.agency ? ` · ${contact.agency}` : ''}</span>
                     )
                   ) : (
                     <button
                       onClick={() => saveContact(contact)}
                       disabled={isSaved || savingId === contact.id}
-                      className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-slate-800 disabled:text-slate-500 text-white text-sm font-medium"
+                      className="px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 disabled:bg-surface disabled:text-faint text-white text-sm font-medium"
                     >
                       {isSaved ? 'Saved' : savingId === contact.id ? 'Saving...' : 'Save to My Network'}
                     </button>
@@ -728,7 +728,7 @@ export default function RelationshipsPanel({ email, tier, panelContext }: Relati
               <div className="text-lg font-semibold text-white mb-2">
                 {activeTab === 'network' ? 'No saved contacts yet' : 'No records found yet'}
               </div>
-              <p className="text-slate-500 max-w-xl mx-auto">
+              <p className="text-faint max-w-xl mx-auto">
                 {activeTab === 'network'
                   ? 'Save buyers or partners from the other tabs, then attach them to pursuits here.'
                   : activeTab === 'buyers'

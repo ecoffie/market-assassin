@@ -238,7 +238,7 @@ export default function CoachPanel({
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center min-h-[40vh] text-slate-400 text-sm">
+      <div className="flex items-center justify-center min-h-[40vh] text-muted text-sm">
         Loading clients…
       </div>
     );
@@ -250,7 +250,7 @@ export default function CoachPanel({
       return (
         <div className="mx-auto max-w-2xl p-6 md:p-8">
           <h1 className="text-2xl font-bold text-white">My Clients</h1>
-          <p className="mt-2 text-slate-400 text-sm leading-relaxed">
+          <p className="mt-2 text-muted text-sm leading-relaxed">
             Manage other businesses&apos; BD — each client gets its own pipeline, target agencies, and market research.
             Solopreneur covers one business; add Coach Mode to run a book of clients.
           </p>
@@ -259,9 +259,9 @@ export default function CoachPanel({
           <div className="mt-6 rounded-xl border border-emerald-500/30 bg-emerald-950/20 p-5">
             <div className="flex items-baseline justify-between">
               <span className="text-sm font-semibold text-emerald-300">Coach Mode add-on</span>
-              <span className="text-sm text-slate-300"><span className="font-semibold text-white">$99</span>/mo</span>
+              <span className="text-sm text-ink-soft"><span className="font-semibold text-white">$99</span>/mo</span>
             </div>
-            <p className="mt-2 text-sm text-slate-300">
+            <p className="mt-2 text-sm text-ink-soft">
               Adds My Clients to your Pro plan — up to <span className="font-medium text-white">3 client workspaces</span>. Perfect if you consult for a handful of businesses.
             </p>
             <a
@@ -273,8 +273,8 @@ export default function CoachPanel({
           </div>
 
           {/* Secondary: Teams, for scale. */}
-          <div className="mt-3 rounded-xl border border-slate-700 bg-slate-900/40 p-4">
-            <p className="text-sm text-slate-400">
+          <div className="mt-3 rounded-xl border border-hairline bg-ground/40 p-4">
+            <p className="text-sm text-muted">
               Running more than 3 clients? <span className="text-slate-200 font-medium">Mindy Teams</span> ($499/mo) includes up to 5 client workspaces plus shared team seats.{' '}
               <a href="/market-intelligence#teams" className="text-blue-300 hover:text-blue-200 underline underline-offset-2">Compare Teams →</a>
             </p>
@@ -286,7 +286,7 @@ export default function CoachPanel({
     return (
       <div className="mx-auto max-w-2xl p-6 md:p-8">
         <h1 className="text-2xl font-bold text-white">Manage multiple clients</h1>
-        <p className="mt-2 text-slate-400 text-sm leading-relaxed">
+        <p className="mt-2 text-muted text-sm leading-relaxed">
           Each client gets their own pipeline, target agencies, and market research.
           Add one below to get started.
         </p>
@@ -314,7 +314,7 @@ export default function CoachPanel({
     <div className="mx-auto max-w-5xl p-6 md:p-8">
       <header className="mb-8">
         <h1 className="text-2xl font-bold text-white">{org?.tabLabel || 'My Clients'}</h1>
-        <p className="mt-1 text-sm text-slate-400">
+        <p className="mt-1 text-sm text-muted">
           {activeClient
             ? <>You are managing <span className="text-emerald-300 font-medium">{activeClient.businessName}</span>. Use the tabs below or the sidebar — everything scopes to them.</>
             : 'Select a client to open their workspace. Pipeline, target agencies, and research all switch to that business.'}
@@ -328,14 +328,14 @@ export default function CoachPanel({
             value={search}
             onChange={e => setSearch(e.target.value)}
             placeholder="Search clients by name…"
-            className="h-9 w-full pl-9 pr-3 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-purple-500 focus:outline-none"
+            className="h-9 w-full pl-9 pr-3 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-purple-500 focus:outline-none"
           />
-          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 inline-flex items-center text-slate-500 text-sm">
+          <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 inline-flex items-center text-faint text-sm">
             {listLoading ? <span className="inline-block w-3.5 h-3.5 border-2 border-slate-500 border-t-transparent rounded-full animate-spin" /> : <Search className="h-3.5 w-3.5 shrink-0" strokeWidth={2} />}
           </span>
         </div>
         {pagination && (
-          <p className="text-xs text-slate-500">
+          <p className="text-xs text-faint">
             {matchCount} client{matchCount === 1 ? '' : 's'}{q ? ' matching' : ' total'}
           </p>
         )}
@@ -343,7 +343,7 @@ export default function CoachPanel({
 
       <div className="space-y-4">
         {visibleClients.length === 0 && (
-          <p className="rounded-lg border border-slate-800 bg-slate-900/40 px-4 py-6 text-center text-sm text-slate-500">
+          <p className="rounded-lg border border-surface bg-ground/40 px-4 py-6 text-center text-sm text-faint">
             {q ? `No clients matching “${search.trim()}”.` : 'No clients yet — add one or import a roster below.'}
           </p>
         )}
@@ -356,7 +356,7 @@ export default function CoachPanel({
               className={`rounded-xl border p-5 transition-colors ${
                 isActive
                   ? 'border-emerald-500/50 bg-emerald-500/5 shadow-[0_0_0_1px_rgba(16,185,129,0.15)]'
-                  : 'border-slate-800 bg-slate-900/80 hover:border-slate-700'
+                  : 'border-surface bg-ground/80 hover:border-hairline'
               }`}
             >
               <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
@@ -369,13 +369,13 @@ export default function CoachPanel({
                       </span>
                     )}
                   </div>
-                  <p className={`mt-1 text-sm ${stats.empty ? 'text-amber-400/90' : 'text-slate-400'}`}>
+                  <p className={`mt-1 text-sm ${stats.empty ? 'text-amber-400/90' : 'text-muted'}`}>
                     {stats.line}
                   </p>
                   {!stats.empty && stats.keywords && stats.keywords.length > 0 && (
                     <div className="mt-2 flex flex-wrap gap-1.5">
                       {stats.keywords.map(kw => (
-                        <span key={kw} className="rounded-md bg-slate-800 px-2 py-0.5 text-xs text-slate-300">
+                        <span key={kw} className="rounded-md bg-surface px-2 py-0.5 text-xs text-ink-soft">
                           {kw}
                         </span>
                       ))}
@@ -401,7 +401,7 @@ export default function CoachPanel({
                     <button
                       type="button"
                       onClick={clearActive}
-                      className="h-9 px-4 rounded-lg border border-slate-700 text-sm text-slate-400 hover:text-white"
+                      className="h-9 px-4 rounded-lg border border-hairline text-sm text-muted hover:text-white"
                     >
                       Exit to my account
                     </button>
@@ -410,8 +410,8 @@ export default function CoachPanel({
               </div>
 
               {isActive && (
-                <div className="mt-4 pt-4 border-t border-slate-800/80">
-                  <p className="text-xs font-medium uppercase tracking-wider text-slate-500 mb-2">
+                <div className="mt-4 pt-4 border-t border-surface/80">
+                  <p className="text-xs font-medium uppercase tracking-wider text-faint mb-2">
                     Their workspace
                   </p>
                   <div className="grid gap-2 sm:grid-cols-3">
@@ -420,10 +420,10 @@ export default function CoachPanel({
                         key={panel}
                         type="button"
                         onClick={() => switchTo(c, panel)}
-                        className="rounded-lg border border-slate-700 bg-slate-800/60 px-4 py-3 text-left hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-colors"
+                        className="rounded-lg border border-hairline bg-surface/60 px-4 py-3 text-left hover:border-emerald-500/40 hover:bg-emerald-500/5 transition-colors"
                       >
                         <div className="text-sm font-medium text-white">{label}</div>
-                        <div className="text-xs text-slate-500 mt-0.5">{desc}</div>
+                        <div className="text-xs text-faint mt-0.5">{desc}</div>
                       </button>
                     ))}
                   </div>
@@ -442,16 +442,16 @@ export default function CoachPanel({
             type="button"
             disabled={page <= 0 || listLoading}
             onClick={() => { const np = page - 1; setPage(np); load({ search, page: np, quiet: true }); }}
-            className="h-8 px-3 rounded-lg border border-slate-700 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:border-slate-600"
+            className="h-8 px-3 rounded-lg border border-hairline text-ink-soft disabled:opacity-40 disabled:cursor-not-allowed hover:border-slate-600"
           >
             ← Prev
           </button>
-          <span className="text-slate-500 text-xs">Page {page + 1} of {pagination.totalPages}</span>
+          <span className="text-faint text-xs">Page {page + 1} of {pagination.totalPages}</span>
           <button
             type="button"
             disabled={page >= pagination.totalPages - 1 || listLoading}
             onClick={() => { const np = page + 1; setPage(np); load({ search, page: np, quiet: true }); }}
-            className="h-8 px-3 rounded-lg border border-slate-700 text-slate-300 disabled:opacity-40 disabled:cursor-not-allowed hover:border-slate-600"
+            className="h-8 px-3 rounded-lg border border-hairline text-ink-soft disabled:opacity-40 disabled:cursor-not-allowed hover:border-slate-600"
           >
             Next →
           </button>
@@ -476,15 +476,15 @@ export default function CoachPanel({
       {(orgTab.deadlines.length > 0 || orgTab.changes.length > 0 || orgTab.news.length > 0) && (
         <div className="mt-8 grid gap-4 md:grid-cols-2">
           {orgTab.deadlines.length > 0 && (
-            <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+            <section className="rounded-xl border border-surface bg-ground/60 p-4">
               <h3 className="text-sm font-semibold text-white mb-3">Upcoming deadlines</h3>
               <div className="space-y-2">
                 {orgTab.deadlines.slice(0, 8).map(d => {
                   const days = Math.ceil((new Date(d.response_deadline).getTime() - Date.now()) / 86400000);
                   return (
                     <div key={d.id} className="flex justify-between gap-2 text-sm">
-                      <span className="text-slate-300 truncate"><span className="text-slate-500">{d.client}</span> · {d.title}</span>
-                      <span className={`shrink-0 text-xs font-medium ${days <= 3 ? 'text-red-400' : days <= 7 ? 'text-amber-400' : 'text-slate-500'}`}>
+                      <span className="text-ink-soft truncate"><span className="text-faint">{d.client}</span> · {d.title}</span>
+                      <span className={`shrink-0 text-xs font-medium ${days <= 3 ? 'text-red-400' : days <= 7 ? 'text-amber-400' : 'text-faint'}`}>
                         {days <= 0 ? 'due' : `${days}d`}
                       </span>
                     </div>
@@ -494,11 +494,11 @@ export default function CoachPanel({
             </section>
           )}
           {orgTab.news.length > 0 && (
-            <section className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+            <section className="rounded-xl border border-surface bg-ground/60 p-4">
               <h3 className="text-sm font-semibold text-white mb-3">{org?.name || 'Org'} news</h3>
               <div className="space-y-2">
                 {orgTab.news.map(n => (
-                  <div key={n.id} className="text-sm text-slate-300">{n.pinned && <Pin className="inline h-3 w-3 mr-1 shrink-0 text-muted" strokeWidth={2} />}{n.title}</div>
+                  <div key={n.id} className="text-sm text-ink-soft">{n.pinned && <Pin className="inline h-3 w-3 mr-1 shrink-0 text-muted" strokeWidth={2} />}{n.title}</div>
                 ))}
               </div>
             </section>
@@ -522,9 +522,9 @@ function AddClientCard({
   compactTitle?: string;
 }) {
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+    <div className="rounded-xl border border-surface bg-ground/60 p-5">
       <h3 className="text-sm font-semibold text-white">{compactTitle || 'Add a client'}</h3>
-      <p className="mt-1 text-xs text-slate-500 mb-4">
+      <p className="mt-1 text-xs text-faint mb-4">
         Paste their capability statement to auto-extract NAICS, keywords, and target agencies.
       </p>
       <div className="flex flex-col gap-3 sm:flex-row">
@@ -532,13 +532,13 @@ function AddClientCard({
           value={newName}
           onChange={e => setNewName(e.target.value)}
           placeholder="Business name"
-          className="h-10 flex-1 px-3 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:border-purple-500 focus:outline-none"
+          className="h-10 flex-1 px-3 bg-surface border border-hairline rounded-lg text-white text-sm focus:border-purple-500 focus:outline-none"
         />
         <button
           type="button"
           onClick={onAdd}
           disabled={adding || !newName.trim()}
-          className="h-10 px-5 shrink-0 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 text-white text-sm font-medium rounded-lg"
+          className="h-10 px-5 shrink-0 bg-purple-600 hover:bg-purple-500 disabled:bg-input text-white text-sm font-medium rounded-lg"
         >
           {adding ? 'Adding…' : 'Add client'}
         </button>
@@ -548,7 +548,7 @@ function AddClientCard({
         onChange={e => setCapabilityText(e.target.value)}
         placeholder="Capability statement or website text (optional but recommended)"
         rows={3}
-        className="w-full mt-3 px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-purple-500 focus:outline-none resize-none"
+        className="w-full mt-3 px-3 py-2.5 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-purple-500 focus:outline-none resize-none"
       />
       {seededNote && <p className="text-xs text-emerald-300 mt-2">{seededNote}</p>}
     </div>
@@ -570,7 +570,7 @@ function BulkImportCard({
 }) {
   const pct = progress && progress.total ? Math.round((progress.done / progress.total) * 100) : 0;
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-5">
+    <div className="rounded-xl border border-surface bg-ground/60 p-5">
       <div className="flex items-center justify-between">
         <h3 className="text-sm font-semibold text-white">Import a client roster</h3>
         {!open && (
@@ -579,9 +579,9 @@ function BulkImportCard({
           </button>
         )}
       </div>
-      <p className="mt-1 text-xs text-slate-500 mb-3">
+      <p className="mt-1 text-xs text-faint mb-3">
         Add dozens or hundreds of clients at once. One per line:{' '}
-        <code className="text-slate-400">Business Name | capability text | email</code>{' '}
+        <code className="text-muted">Business Name | capability text | email</code>{' '}
         (only the name is required).
       </p>
 
@@ -593,17 +593,17 @@ function BulkImportCard({
             placeholder={"Acme Fabrication | steel fabrication and welding for federal facilities | ops@acme.com\nCoastal IT Services | managed IT and cybersecurity\nPiedmont Logistics"}
             rows={8}
             disabled={running}
-            className="w-full px-3 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white text-xs font-mono leading-relaxed placeholder-slate-600 focus:border-purple-500 focus:outline-none resize-y disabled:opacity-60"
+            className="w-full px-3 py-2.5 bg-surface border border-hairline rounded-lg text-white text-xs font-mono leading-relaxed placeholder-slate-600 focus:border-purple-500 focus:outline-none resize-y disabled:opacity-60"
           />
           <div className="mt-3 flex items-center justify-between gap-3">
-            <span className="text-xs text-slate-500">
+            <span className="text-xs text-faint">
               {parseCount > 0 ? `${parseCount} client${parseCount === 1 ? '' : 's'} ready` : 'Paste your roster above'}
             </span>
             <button
               type="button"
               onClick={onRun}
               disabled={running || parseCount === 0}
-              className="h-9 px-5 shrink-0 bg-purple-600 hover:bg-purple-500 disabled:bg-slate-700 text-white text-sm font-medium rounded-lg"
+              className="h-9 px-5 shrink-0 bg-purple-600 hover:bg-purple-500 disabled:bg-input text-white text-sm font-medium rounded-lg"
             >
               {running ? 'Importing…' : `Import ${parseCount || ''} client${parseCount === 1 ? '' : 's'}`}
             </button>
@@ -611,10 +611,10 @@ function BulkImportCard({
 
           {running && progress && (
             <div className="mt-3">
-              <div className="h-1.5 w-full rounded-full bg-slate-800 overflow-hidden">
+              <div className="h-1.5 w-full rounded-full bg-surface overflow-hidden">
                 <div className="h-full bg-emerald-500 transition-all" style={{ width: `${pct}%` }} />
               </div>
-              <p className="mt-1.5 text-xs text-slate-400">{progress.done} of {progress.total} processed…</p>
+              <p className="mt-1.5 text-xs text-muted">{progress.done} of {progress.total} processed…</p>
             </div>
           )}
         </>

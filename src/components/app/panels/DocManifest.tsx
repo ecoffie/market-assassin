@@ -64,7 +64,7 @@ export default function DocManifest({ email, pursuitId }: { email: string | null
     } catch { /* */ }
   };
 
-  if (loading) return <div className="text-xs text-slate-500">Loading document manifest…</div>;
+  if (loading) return <div className="text-xs text-faint">Loading document manifest…</div>;
   if (docs.length === 0) return null;
 
   // Split readable vs couldn't-read (Eric QC: a 32MB drawings PDF + .xlsx pricing
@@ -85,24 +85,24 @@ export default function DocManifest({ email, pursuitId }: { email: string | null
   };
 
   return (
-    <div className="rounded-xl border border-slate-800 bg-slate-900/60 p-4">
+    <div className="rounded-xl border border-surface bg-ground/60 p-4">
       <div className="flex items-center justify-between mb-3">
         <h3 className="inline-flex items-center gap-1.5 text-sm font-semibold text-white"><FolderOpen className="h-4 w-4 shrink-0" strokeWidth={2} /> Documents — {readable.length} readable{skipped.length ? ` · ${skipped.length} need manual download` : ''}</h3>
-        <span className="text-[11px] text-slate-500">Hand the right file to the right person</span>
+        <span className="text-[11px] text-faint">Hand the right file to the right person</span>
       </div>
       <div className="space-y-3">
         {orderedKinds.map(kind => (
           <div key={kind}>
             <div className="flex items-center gap-2 mb-1">
               {(() => { const Icon = KIND_ICON[kind] || Paperclip; return <Icon className="h-4 w-4 shrink-0 text-muted" strokeWidth={2} />; })()}
-              <span className="text-xs font-semibold text-slate-300">{KIND_LABEL[kind] || kind}</span>
+              <span className="text-xs font-semibold text-ink-soft">{KIND_LABEL[kind] || kind}</span>
               <span className="text-[10px] text-slate-600">({groups[kind].length})</span>
               {KIND_HINT[kind] && <span className="text-[10px] text-emerald-400/80">· {KIND_HINT[kind]}</span>}
             </div>
             <div className="space-y-1 pl-6">
               {groups[kind].map(d => (
                 <div key={d.id} className="flex items-center justify-between gap-2 text-xs">
-                  <span className="truncate text-slate-400" title={d.filename}>
+                  <span className="truncate text-muted" title={d.filename}>
                     {d.filename}
                     {d.doc_kind_confidence === 'low' && <span className="ml-1 text-amber-500/70" title="Low-confidence classification — verify">?</span>}
                   </span>
@@ -120,7 +120,7 @@ export default function DocManifest({ email, pursuitId }: { email: string | null
       {/* Couldn't-read docs — surfaced honestly with a SAM.gov link so the user
           knows they exist and can grab them manually (Eric QC). */}
       {skipped.length > 0 && (
-        <div className="mt-3 pt-3 border-t border-slate-800">
+        <div className="mt-3 pt-3 border-t border-surface">
           <div className="flex items-center gap-2 mb-1">
             <AlertTriangle className="h-4 w-4 shrink-0 text-amber-400" strokeWidth={2} />
             <span className="text-xs font-semibold text-amber-300/90">Not auto-loaded ({skipped.length}) — download from SAM.gov</span>
@@ -128,7 +128,7 @@ export default function DocManifest({ email, pursuitId }: { email: string | null
           <div className="space-y-1 pl-6">
             {skipped.map(d => (
               <div key={d.id} className="flex items-center justify-between gap-2 text-xs">
-                <span className="truncate text-slate-400" title={d.filename}>
+                <span className="truncate text-muted" title={d.filename}>
                   {d.filename}
                   <span className="ml-1 text-amber-500/60">· {skipReason(d)}</span>
                 </span>

@@ -58,7 +58,7 @@ const PARTNER_TYPES = [
 ] as const;
 
 const OUTREACH_STATUSES = [
-  { id: 'none', label: 'Not Started', color: 'text-slate-400 bg-slate-500/20' },
+  { id: 'none', label: 'Not Started', color: 'text-muted bg-slate-500/20' },
   { id: 'contacted', label: 'Contacted', color: 'text-blue-400 bg-blue-500/20' },
   { id: 'responded', label: 'Responded', color: 'text-amber-400 bg-amber-500/20' },
   { id: 'meeting', label: 'Meeting Set', color: 'text-purple-400 bg-purple-500/20' },
@@ -379,13 +379,13 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
     return (
       <div className="p-6">
         <div className="animate-pulse space-y-4">
-          <div className="h-8 bg-slate-800 rounded w-48" />
+          <div className="h-8 bg-surface rounded w-48" />
           <div className="grid grid-cols-4 gap-4">
             {[1, 2, 3, 4].map(i => (
-              <div key={i} className="h-24 bg-slate-800 rounded-xl" />
+              <div key={i} className="h-24 bg-surface rounded-xl" />
             ))}
           </div>
-          <div className="h-64 bg-slate-800 rounded-xl" />
+          <div className="h-64 bg-surface rounded-xl" />
         </div>
       </div>
     );
@@ -397,17 +397,17 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-2xl font-bold text-white">Teaming CRM</h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-muted mt-1">
             {stats.total} teaming partner{stats.total !== 1 ? 's' : ''} in your network
           </p>
         </div>
         <div className="flex items-center gap-3">
-          <span className="px-3 py-1 rounded-full bg-slate-800 border border-slate-700 text-xs text-slate-300">
+          <span className="px-3 py-1 rounded-full bg-surface border border-hairline text-xs text-ink-soft">
             {tierLabel}
           </span>
           <button
             onClick={loadPartners}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm rounded-lg transition-colors"
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-surface hover:bg-input text-ink-soft text-sm rounded-lg transition-colors"
           >
             <RefreshCw className="h-4 w-4 shrink-0" strokeWidth={2} /> Refresh
           </button>
@@ -432,16 +432,16 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
 
       {/* Stats */}
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+        <div className="bg-ground border border-surface rounded-xl p-4">
           <div className="text-2xl font-bold text-white">{stats.total}</div>
-          <div className="text-xs text-slate-500">Total Partners</div>
+          <div className="text-xs text-faint">Total Partners</div>
         </div>
         {OUTREACH_STATUSES.slice(1).map(status => (
-          <div key={status.id} className="bg-slate-900 border border-slate-800 rounded-xl p-4">
+          <div key={status.id} className="bg-ground border border-surface rounded-xl p-4">
             <div className={`text-2xl font-bold ${status.color.split(' ')[0]}`}>
               {stats.byStatus[status.id] || 0}
             </div>
-            <div className="text-xs text-slate-500">{status.label}</div>
+            <div className="text-xs text-faint">{status.label}</div>
           </div>
         ))}
       </div>
@@ -452,13 +452,13 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
           type="search"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          className="min-w-0 flex-1 px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm placeholder-slate-500 focus:border-blue-500 outline-none"
+          className="min-w-0 flex-1 px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm placeholder-faint focus:border-blue-500 outline-none"
           placeholder="Search partners, contacts, NAICS, notes..."
         />
         <select
           value={filterType}
           onChange={(e) => setFilterType(e.target.value)}
-          className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:border-blue-500 outline-none"
+          className="px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm focus:border-blue-500 outline-none"
         >
           <option value="">All Types</option>
           {PARTNER_TYPES.map(type => (
@@ -468,7 +468,7 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
         <select
           value={filterStatus}
           onChange={(e) => setFilterStatus(e.target.value)}
-          className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:border-blue-500 outline-none"
+          className="px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm focus:border-blue-500 outline-none"
         >
           <option value="">All Statuses</option>
           {OUTREACH_STATUSES.map(status => (
@@ -479,7 +479,7 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
 
       {/* Partners List */}
       {filteredPartners.length > 0 ? (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl overflow-hidden">
+        <div className="bg-ground border border-surface rounded-xl overflow-hidden">
           <div className="divide-y divide-slate-800">
             {filteredPartners.map(partner => {
               const statusBadge = getStatusBadge(partner.outreach_status);
@@ -490,7 +490,7 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
                 <div
                   key={partner.id}
                   onClick={() => setSelectedPartner(partner)}
-                  className="p-4 hover:bg-slate-800/50 cursor-pointer transition-colors"
+                  className="p-4 hover:bg-surface/50 cursor-pointer transition-colors"
                 >
                   <div className="flex items-start justify-between gap-4">
                     <div className="flex-1">
@@ -506,19 +506,19 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
                         </span>
                       </div>
                       {partner.contact_name && (
-                        <div className="text-sm text-slate-400">
+                        <div className="text-sm text-muted">
                           {partner.contact_name}
-                          {partner.contact_title && <span className="text-slate-500"> • {partner.contact_title}</span>}
+                          {partner.contact_title && <span className="text-faint"> • {partner.contact_title}</span>}
                         </div>
                       )}
-                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-slate-500">
+                      <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-faint">
                         {partner.contact_email && <span>{partner.contact_email}</span>}
                         {partner.contact_phone && <span>{partner.contact_phone}</span>}
                         {partner.uei && <span>UEI {partner.uei}</span>}
                         {partner.cage_code && <span>CAGE {partner.cage_code}</span>}
                       </div>
                       {partner.naics_codes && partner.naics_codes.length > 0 && (
-                        <div className="text-xs text-slate-500 mt-1">
+                        <div className="text-xs text-faint mt-1">
                           NAICS:{' '}
                           {partner.naics_codes.map((code, idx) => {
                             const entry = getNaics(code);
@@ -535,12 +535,12 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
                       {pursuits.length > 0 && (
                         <div className="mt-3 flex flex-wrap gap-2">
                           {pursuits.slice(0, 3).map(opp => (
-                            <span key={opp.id} className="px-2 py-1 rounded bg-slate-800 text-xs text-slate-300">
+                            <span key={opp.id} className="px-2 py-1 rounded bg-surface text-xs text-ink-soft">
                               {opp.title}
                             </span>
                           ))}
                           {pursuits.length > 3 && (
-                            <span className="px-2 py-1 rounded bg-slate-800 text-xs text-slate-400">
+                            <span className="px-2 py-1 rounded bg-surface text-xs text-muted">
                               +{pursuits.length - 3} more
                             </span>
                           )}
@@ -548,9 +548,9 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
                       )}
                     </div>
                     <div className="text-right shrink-0">
-                      <div className="text-sm text-slate-400">Pursuits</div>
+                      <div className="text-sm text-muted">Pursuits</div>
                       <div className="text-sm text-white mb-3">{pursuits.length}</div>
-                      <div className="text-sm text-slate-400">Last Contact</div>
+                      <div className="text-sm text-muted">Last Contact</div>
                       <div className="text-sm text-white">{formatDate(partner.last_contact)}</div>
                     </div>
                   </div>
@@ -560,10 +560,10 @@ export default function ContactsPanel({ email, tier }: ContactsPanelProps) {
           </div>
         </div>
       ) : (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
+        <div className="bg-ground border border-surface rounded-xl p-8 text-center">
           <Handshake className="h-12 w-12 mx-auto mb-4 text-faint" strokeWidth={1.5} />
           <h3 className="text-xl font-semibold text-white mb-2">Build Your Network</h3>
-          <p className="text-slate-400 mb-4">
+          <p className="text-muted mb-4">
             Add teaming partners to track relationships and coordinate joint pursuits.
           </p>
           <button
@@ -659,20 +659,20 @@ function PartnerModal({
 
   return (
     <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4">
-      <div className="bg-slate-900 border border-slate-700 rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
-        <div className="p-6 border-b border-slate-800">
+      <div className="bg-ground border border-hairline rounded-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto">
+        <div className="p-6 border-b border-surface">
           <h3 className="text-lg font-semibold text-white">
             {partner ? 'Edit Partner' : 'Add Partner'}
           </h3>
         </div>
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
           <div>
-            <label className="block text-sm text-slate-400 mb-1">Company Name *</label>
+            <label className="block text-sm text-muted mb-1">Company Name *</label>
             <input
               type="text"
               value={formData.partner_name}
               onChange={(e) => setFormData({ ...formData, partner_name: e.target.value })}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 outline-none"
+              className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white placeholder-faint focus:border-blue-500 outline-none"
               placeholder="Acme Corp"
               required
             />
@@ -680,11 +680,11 @@ function PartnerModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-slate-400 mb-1">Partner Type</label>
+              <label className="block text-sm text-muted mb-1">Partner Type</label>
               <select
                 value={formData.partner_type}
                 onChange={(e) => setFormData({ ...formData, partner_type: e.target.value as TeamingPartner['partner_type'] })}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-blue-500 outline-none"
+                className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white focus:border-blue-500 outline-none"
               >
                 {PARTNER_TYPES.map(type => (
                   <option key={type.id} value={type.id}>{type.label}</option>
@@ -692,11 +692,11 @@ function PartnerModal({
               </select>
             </div>
             <div>
-              <label className="block text-sm text-slate-400 mb-1">Outreach Status</label>
+              <label className="block text-sm text-muted mb-1">Outreach Status</label>
               <select
                 value={formData.outreach_status}
                 onChange={(e) => setFormData({ ...formData, outreach_status: e.target.value as TeamingPartner['outreach_status'] })}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white focus:border-blue-500 outline-none"
+                className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white focus:border-blue-500 outline-none"
               >
                 {OUTREACH_STATUSES.map(status => (
                   <option key={status.id} value={status.id}>{status.label}</option>
@@ -707,22 +707,22 @@ function PartnerModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-slate-400 mb-1">Contact Name</label>
+              <label className="block text-sm text-muted mb-1">Contact Name</label>
               <input
                 type="text"
                 value={formData.contact_name}
                 onChange={(e) => setFormData({ ...formData, contact_name: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 outline-none"
+                className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white placeholder-faint focus:border-blue-500 outline-none"
                 placeholder="John Smith"
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-400 mb-1">Title</label>
+              <label className="block text-sm text-muted mb-1">Title</label>
               <input
                 type="text"
                 value={formData.contact_title}
                 onChange={(e) => setFormData({ ...formData, contact_title: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 outline-none"
+                className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white placeholder-faint focus:border-blue-500 outline-none"
                 placeholder="BD Director"
               />
             </div>
@@ -730,22 +730,22 @@ function PartnerModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-slate-400 mb-1">Email</label>
+              <label className="block text-sm text-muted mb-1">Email</label>
               <input
                 type="email"
                 value={formData.contact_email}
                 onChange={(e) => setFormData({ ...formData, contact_email: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 outline-none"
+                className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white placeholder-faint focus:border-blue-500 outline-none"
                 placeholder="john@acme.com"
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-400 mb-1">Phone</label>
+              <label className="block text-sm text-muted mb-1">Phone</label>
               <input
                 type="tel"
                 value={formData.contact_phone}
                 onChange={(e) => setFormData({ ...formData, contact_phone: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 outline-none"
+                className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white placeholder-faint focus:border-blue-500 outline-none"
                 placeholder="(555) 123-4567"
               />
             </div>
@@ -753,22 +753,22 @@ function PartnerModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-slate-400 mb-1">UEI</label>
+              <label className="block text-sm text-muted mb-1">UEI</label>
               <input
                 type="text"
                 value={formData.uei}
                 onChange={(e) => setFormData({ ...formData, uei: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 outline-none"
+                className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white placeholder-faint focus:border-blue-500 outline-none"
                 placeholder="12-character UEI"
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-400 mb-1">CAGE Code</label>
+              <label className="block text-sm text-muted mb-1">CAGE Code</label>
               <input
                 type="text"
                 value={formData.cage_code}
                 onChange={(e) => setFormData({ ...formData, cage_code: e.target.value })}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 outline-none"
+                className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white placeholder-faint focus:border-blue-500 outline-none"
                 placeholder="5-character CAGE"
               />
             </div>
@@ -776,60 +776,60 @@ function PartnerModal({
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-sm text-slate-400 mb-1">NAICS Codes</label>
+              <label className="block text-sm text-muted mb-1">NAICS Codes</label>
               <input
                 type="text"
                 value={naicsInput}
                 onChange={(e) => setNaicsInput(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 outline-none"
+                className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white placeholder-faint focus:border-blue-500 outline-none"
                 placeholder="541512, 541611"
               />
             </div>
             <div>
-              <label className="block text-sm text-slate-400 mb-1">Certifications</label>
+              <label className="block text-sm text-muted mb-1">Certifications</label>
               <input
                 type="text"
                 value={certsInput}
                 onChange={(e) => setCertsInput(e.target.value)}
-                className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 outline-none"
+                className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white placeholder-faint focus:border-blue-500 outline-none"
                 placeholder="8(a), SDVOSB, HUBZone"
               />
             </div>
           </div>
 
           <div>
-            <label className="block text-sm text-slate-400 mb-1">Past Performance</label>
+            <label className="block text-sm text-muted mb-1">Past Performance</label>
             <textarea
               value={formData.past_performance || ''}
               onChange={(e) => setFormData({ ...formData, past_performance: e.target.value })}
               rows={3}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 outline-none resize-none"
+              className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white placeholder-faint focus:border-blue-500 outline-none resize-none"
               placeholder="Relevant agencies, contract vehicles, incumbent work, strengths..."
             />
           </div>
 
           <div>
-            <label className="block text-sm text-slate-400 mb-1">Notes</label>
+            <label className="block text-sm text-muted mb-1">Notes</label>
             <textarea
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
               rows={3}
-              className="w-full px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-blue-500 outline-none resize-none"
+              className="w-full px-3 py-2 bg-surface border border-hairline rounded-lg text-white placeholder-faint focus:border-blue-500 outline-none resize-none"
               placeholder="Add notes about this partner..."
             />
           </div>
 
           {partner && (
-            <div className="border border-slate-800 rounded-lg overflow-hidden">
-              <div className="px-4 py-3 bg-slate-800/60 border-b border-slate-800">
+            <div className="border border-surface rounded-lg overflow-hidden">
+              <div className="px-4 py-3 bg-surface/60 border-b border-surface">
                 <div className="flex items-center justify-between">
                   <div>
                     <h4 className="text-sm font-medium text-white">Attached Pursuits</h4>
-                    <p className="text-xs text-slate-500 mt-1">
+                    <p className="text-xs text-faint mt-1">
                       {attachedPursuits.length} active pursuit{attachedPursuits.length !== 1 ? 's' : ''} linked to this partner
                     </p>
                   </div>
-                  {pipelineLoading && <span className="text-xs text-slate-500">Loading...</span>}
+                  {pipelineLoading && <span className="text-xs text-faint">Loading...</span>}
                 </div>
               </div>
 
@@ -841,17 +841,17 @@ function PartnerModal({
                     return (
                       <label
                         key={opp.id}
-                        className="flex items-start gap-3 px-4 py-3 hover:bg-slate-800/50 cursor-pointer"
+                        className="flex items-start gap-3 px-4 py-3 hover:bg-surface/50 cursor-pointer"
                       >
                         <input
                           type="checkbox"
                           checked={checked}
                           onChange={() => onTogglePursuit?.(opp)}
-                          className="mt-1 h-4 w-4 rounded border-slate-600 bg-slate-900 text-blue-600 focus:ring-blue-500"
+                          className="mt-1 h-4 w-4 rounded border-slate-600 bg-ground text-blue-600 focus:ring-blue-500"
                         />
                         <span className="min-w-0 flex-1">
                           <span className="block text-sm text-white truncate">{opp.title}</span>
-                          <span className="mt-1 flex flex-wrap gap-2 text-xs text-slate-500">
+                          <span className="mt-1 flex flex-wrap gap-2 text-xs text-faint">
                             {opp.agency && <span>{opp.agency}</span>}
                             {opp.stage && <span>{opp.stage}</span>}
                             {opp.priority && <span>{opp.priority} priority</span>}
@@ -863,7 +863,7 @@ function PartnerModal({
                   })}
                 </div>
               ) : (
-                <div className="px-4 py-5 text-sm text-slate-500">
+                <div className="px-4 py-5 text-sm text-faint">
                   No active pipeline pursuits yet.
                 </div>
               )}
@@ -886,7 +886,7 @@ function PartnerModal({
               <button
                 type="button"
                 onClick={onClose}
-                className="px-4 py-2 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm rounded-lg transition-colors"
+                className="px-4 py-2 bg-surface hover:bg-input text-ink-soft text-sm rounded-lg transition-colors"
               >
                 Cancel
               </button>

@@ -80,11 +80,11 @@ export default function RecompeteSowMatch({
   };
 
   const renderMatch = (m: SowMatch, confident: boolean) => (
-    <div className={`rounded-lg border p-3 text-xs ${confident ? 'border-emerald-500/30 bg-emerald-500/[0.04]' : 'border-slate-700 bg-slate-900/50'}`}>
+    <div className={`rounded-lg border p-3 text-xs ${confident ? 'border-emerald-500/30 bg-emerald-500/[0.04]' : 'border-hairline bg-ground/50'}`}>
       <div className="flex flex-wrap items-center gap-2">
         <span className="font-semibold text-white">{m.title || 'Recovered scope document'}</span>
         {m.sowDocType && (
-          <span className="rounded bg-slate-700 px-1.5 py-0.5 text-[10px] text-slate-300">
+          <span className="rounded bg-input px-1.5 py-0.5 text-[10px] text-ink-soft">
             {DOC_BADGE[m.sowDocType] || m.sowDocType.toUpperCase()}
           </span>
         )}
@@ -92,9 +92,9 @@ export default function RecompeteSowMatch({
           {m.scorePct}% similar
         </span>
       </div>
-      <p className="mt-1 text-[10px] text-slate-500">{m.label}</p>
-      {m.sowFilename && <p className="mt-1 text-slate-400">📄 {m.sowFilename}</p>}
-      {m.snippet && <p className="mt-2 leading-5 text-slate-300">{m.snippet}</p>}
+      <p className="mt-1 text-[10px] text-faint">{m.label}</p>
+      {m.sowFilename && <p className="mt-1 text-muted">📄 {m.sowFilename}</p>}
+      {m.snippet && <p className="mt-2 leading-5 text-ink-soft">{m.snippet}</p>}
       <div className="mt-2 flex flex-wrap gap-3">
         {m.samUrl && (
           <a href={m.samUrl} target="_blank" rel="noopener noreferrer" className="text-amber-400 hover:text-amber-300">
@@ -102,7 +102,7 @@ export default function RecompeteSowMatch({
           </a>
         )}
         {m.solicitationNumber && (
-          <span className="text-slate-500">Sol# {m.solicitationNumber}</span>
+          <span className="text-faint">Sol# {m.solicitationNumber}</span>
         )}
       </div>
     </div>
@@ -120,10 +120,10 @@ export default function RecompeteSowMatch({
       {open && (
         <div className="mt-2 space-y-2">
           {state === 'loading' && (
-            <div className="text-[11px] text-slate-500">Searching recovered SOW/PWS documents by semantic similarity…</div>
+            <div className="text-[11px] text-faint">Searching recovered SOW/PWS documents by semantic similarity…</div>
           )}
           {state === 'error' && (
-            <div className="text-[11px] text-slate-500">Couldn&apos;t run the SOW match right now.</div>
+            <div className="text-[11px] text-faint">Couldn&apos;t run the SOW match right now.</div>
           )}
           {typeof state === 'object' && state.verdict === 'confident_match' && state.match && (
             renderMatch(state.match, true)
@@ -138,7 +138,7 @@ export default function RecompeteSowMatch({
                   {renderMatch(state.possible, false)}
                 </div>
               ) : (
-                <div className="text-[11px] text-slate-500">
+                <div className="text-[11px] text-faint">
                   No confident SOW match found for this recompete
                   {state.reason === 'no_candidates'
                     ? ' (no recovered scope docs in this agency/NAICS slice yet).'

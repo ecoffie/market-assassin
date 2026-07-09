@@ -34,7 +34,7 @@ function clearStoredAppAuth() {
 // Loading fallback
 function DashboardLoading() {
   return (
-    <div className="min-h-screen bg-slate-950 flex items-center justify-center">
+    <div className="min-h-screen bg-ground-deep flex items-center justify-center">
       <div className="text-center">
         <div className="w-12 h-12 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4" />
         <p className="text-gray-400">Loading Mindy...</p>
@@ -1011,7 +1011,7 @@ function AppDashboard() {
                     type="button"
                     onClick={handleMicrosoftSignIn}
                     disabled={oauthLoading !== null || authLoading}
-                    className="w-full inline-flex items-center justify-center gap-3 px-4 py-3 bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-slate-700"
+                    className="w-full inline-flex items-center justify-center gap-3 px-4 py-3 bg-ground hover:bg-surface text-white rounded-lg font-medium text-sm transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-hairline"
                   >
                     {oauthLoading === 'microsoft' ? (
                       <span className="w-4 h-4 border-2 border-slate-400 border-t-transparent rounded-full animate-spin" />
@@ -1373,7 +1373,7 @@ function AppDashboard() {
 
   // Logged in - show dashboard
   return (
-    <div className="min-h-screen bg-slate-950 flex">
+    <div className="min-h-screen bg-ground-deep flex">
       {/* Interactive product tour — drives the app for new users. */}
       <ProductTour key={tourRunId} run={runTour} onPanelChange={handlePanelChange} onFinish={finishTour} />
       {/* Sidebar */}
@@ -1412,18 +1412,18 @@ function AppDashboard() {
       {/* Main Content */}
       <main className="flex-1 min-h-screen overflow-y-auto overflow-x-hidden pb-24 md:pb-0 w-full min-w-0">
         {/* Top Bar */}
-        <header className="sticky top-0 z-30 bg-slate-950/90 backdrop-blur border-b border-slate-800 px-4 md:px-6 py-3 md:py-4">
+        <header className="sticky top-0 z-30 bg-ground-deep/90 backdrop-blur border-b border-surface px-4 md:px-6 py-3 md:py-4">
           <div className="flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0">
               {/* Mobile hamburger — opens the sidebar drawer */}
               <button
                 onClick={() => setIsMobileSidebarOpen(true)}
-                className="md:hidden p-2 -ml-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                className="md:hidden p-2 -ml-2 text-muted hover:text-white hover:bg-surface rounded-lg transition-colors"
                 aria-label="Open menu"
               >
                 <Menu className="w-5 h-5" strokeWidth={1.75} />
               </button>
-              <span className="hidden lg:inline text-sm text-slate-400 truncate">
+              <span className="hidden lg:inline text-sm text-muted truncate">
                 Logged in as <span className="text-white">{email}</span>
               </span>
             </div>
@@ -1435,13 +1435,13 @@ function AppDashboard() {
             <div className="flex items-center gap-2 md:gap-3 shrink-0">
               <span className={`
                 hidden sm:inline px-2 py-1 text-xs rounded
-                ${tier === 'free' ? 'bg-slate-700 text-slate-300' : 'bg-emerald-500/20 text-emerald-400'}
+                ${tier === 'free' ? 'bg-input text-ink-soft' : 'bg-emerald-500/20 text-emerald-400'}
               `}>
                 {tier === 'free' ? 'Free' : tier === 'team' ? 'Team' : tier === 'enterprise' ? 'Enterprise' : 'Pro'} Plan
               </span>
               <button
                 onClick={() => setIsSettingsOpen(true)}
-                className="p-2 text-slate-400 hover:text-white hover:bg-slate-800 rounded-lg transition-colors"
+                className="p-2 text-muted hover:text-white hover:bg-surface rounded-lg transition-colors"
                 title="Settings & Preferences"
                 aria-label="Settings"
               >

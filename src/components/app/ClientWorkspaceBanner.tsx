@@ -103,9 +103,9 @@ export default function ClientWorkspaceBanner({
             !client.enriched ? (
               // Profile not loaded yet — show a quiet placeholder, never the
               // alarming "No profile yet" (it flashed on every switch, Jul 7).
-              <p className="text-xs text-slate-500 truncate">Loading profile…</p>
+              <p className="text-xs text-faint truncate">Loading profile…</p>
             ) : hasProfile ? (
-              <p className="text-xs text-slate-400 truncate">{profLine}</p>
+              <p className="text-xs text-muted truncate">{profLine}</p>
             ) : (
               // First thing to do for a brand-new client: set up their market
               // profile. Make it an action, not a dead-end hint. (Eric, Jun 23.)
@@ -118,7 +118,7 @@ export default function ClientWorkspaceBanner({
               </button>
             )
           ) : (
-            <p className="text-xs text-slate-400 truncate">
+            <p className="text-xs text-muted truncate">
               Viewing {client.workspaceId} — exit to return to your own workspace
             </p>
           )}
@@ -126,7 +126,7 @@ export default function ClientWorkspaceBanner({
         <div className="flex flex-wrap items-center gap-2">
           {coachModeAllowed && (
             <>
-              <span className="text-[11px] text-slate-500 mr-1 hidden sm:inline">Their workspace →</span>
+              <span className="text-[11px] text-faint mr-1 hidden sm:inline">Their workspace →</span>
               {([
                 ['pipeline', 'Pipeline'],
                 ['target-list', 'Target agencies'],
@@ -144,7 +144,7 @@ export default function ClientWorkspaceBanner({
               <button
                 type="button"
                 onClick={() => onPanelChange('coach')}
-                className="h-8 px-3 rounded-lg border border-slate-700 text-xs text-slate-400 hover:text-white"
+                className="h-8 px-3 rounded-lg border border-hairline text-xs text-muted hover:text-white"
               >
                 My Clients
               </button>

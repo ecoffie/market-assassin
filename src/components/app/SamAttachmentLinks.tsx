@@ -71,7 +71,7 @@ export default function SamAttachmentLinks({
 
   return (
     <div className={className}>
-      <div className="text-xs text-slate-500 uppercase tracking-wider mb-2">
+      <div className="text-xs text-faint uppercase tracking-wider mb-2">
         Attachments ({parsed.length})
       </div>
       <ul className="space-y-1.5">

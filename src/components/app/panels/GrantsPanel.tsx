@@ -162,7 +162,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
       <div className="flex flex-wrap items-end justify-between gap-3">
         <div>
           <h1 className="text-2xl font-bold text-white">Federal Grants</h1>
-          <p className="text-slate-400 mt-1">
+          <p className="text-muted mt-1">
             Search open and forecasted opportunities from Grants.gov
             {totalHits > 0 && (
               <span className="text-emerald-400 ml-2">
@@ -174,16 +174,16 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
         {/* Sort toggle — "For me" (profile rank) vs "Newest" (browse all).
             Only shown when the user has a profile to rank by. */}
         {hasProfile && (
-          <div className="inline-flex rounded-lg border border-slate-700 bg-slate-800 p-0.5 text-sm">
+          <div className="inline-flex rounded-lg border border-hairline bg-surface p-0.5 text-sm">
             <button
               onClick={() => { setSort('relevance'); searchGrants(searchKeyword, selectedAgency, selectedCategory, selectedStatus, 'relevance', 0); }}
-              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md transition-colors ${sort === 'relevance' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              className={`inline-flex items-center gap-1 px-3 py-1.5 rounded-md transition-colors ${sort === 'relevance' ? 'bg-emerald-600 text-white' : 'text-muted hover:text-white'}`}
             >
               <Star className="h-3.5 w-3.5 shrink-0" strokeWidth={2} /> For me
             </button>
             <button
               onClick={() => { setSort('newest'); searchGrants(searchKeyword, selectedAgency, selectedCategory, selectedStatus, 'newest', 0); }}
-              className={`px-3 py-1.5 rounded-md transition-colors ${sort === 'newest' ? 'bg-emerald-600 text-white' : 'text-slate-400 hover:text-white'}`}
+              className={`px-3 py-1.5 rounded-md transition-colors ${sort === 'newest' ? 'bg-emerald-600 text-white' : 'text-muted hover:text-white'}`}
             >
               Newest
             </button>
@@ -201,7 +201,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
             onChange={(e) => setSearchKeyword(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleSearch()}
             placeholder="Search grants (e.g., cybersecurity, SBIR, research)"
-            className="flex-1 px-4 py-2.5 bg-slate-800 border border-slate-700 rounded-lg text-white placeholder-slate-500 focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
+            className="flex-1 px-4 py-2.5 bg-surface border border-hairline rounded-lg text-white placeholder-faint focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 outline-none"
           />
           <button
             onClick={handleSearch}
@@ -218,7 +218,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
           <select
             value={selectedAgency}
             onChange={(e) => setSelectedAgency(e.target.value)}
-            className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:border-emerald-500 outline-none"
+            className="px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm focus:border-emerald-500 outline-none"
           >
             <option value="">All Agencies</option>
             {metadata?.agencies.map((a) => (
@@ -230,7 +230,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
           <select
             value={selectedCategory}
             onChange={(e) => setSelectedCategory(e.target.value)}
-            className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:border-emerald-500 outline-none"
+            className="px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm focus:border-emerald-500 outline-none"
           >
             <option value="">All Categories</option>
             {metadata?.categories.map((c) => (
@@ -242,7 +242,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
           <select
             value={selectedStatus}
             onChange={(e) => setSelectedStatus(e.target.value)}
-            className="px-3 py-2 bg-slate-800 border border-slate-700 rounded-lg text-white text-sm focus:border-emerald-500 outline-none"
+            className="px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm focus:border-emerald-500 outline-none"
           >
             <option value="posted">Open Now</option>
             <option value="forecasted">Forecasted</option>
@@ -262,7 +262,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
       {isLoading && (
         <div className="space-y-3">
           {[1, 2, 3].map(i => (
-            <div key={i} className="h-24 bg-slate-800 rounded-xl animate-pulse" />
+            <div key={i} className="h-24 bg-surface rounded-xl animate-pulse" />
           ))}
         </div>
       )}
@@ -281,8 +281,8 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
                 href={grant.url}
                 target="_blank"
                 rel="noopener noreferrer"
-                className={`block bg-slate-900 border rounded-xl p-4 hover:border-emerald-500/50 transition-colors ${
-                  isUrgent ? 'border-red-500/50 bg-red-500/5' : 'border-slate-800'
+                className={`block bg-ground border rounded-xl p-4 hover:border-emerald-500/50 transition-colors ${
+                  isUrgent ? 'border-red-500/50 bg-red-500/5' : 'border-surface'
                 }`}
               >
                 <div className="flex items-start justify-between gap-4">
@@ -295,7 +295,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
                           className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded font-semibold ${
                             grant.score >= 50 ? 'bg-emerald-500/20 text-emerald-300'
                             : grant.score >= 30 ? 'bg-blue-500/20 text-blue-300'
-                            : 'bg-slate-700 text-slate-400'
+                            : 'bg-input text-muted'
                           }`}
                         >
                           {grant.score >= 50 ? <><Star className="h-3 w-3 shrink-0" strokeWidth={2.5} /> Strong match</> : grant.score >= 30 ? 'Good match' : 'Weak match'}
@@ -310,7 +310,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
                         <span className={`px-2 py-0.5 text-xs rounded ${
                           grant.status === 'posted'
                             ? 'bg-emerald-500/20 text-emerald-400'
-                            : 'bg-slate-700 text-slate-400'
+                            : 'bg-input text-muted'
                         }`}>
                           {grant.status}
                         </span>
@@ -329,9 +329,9 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
 
                     {/* Title */}
                     <h3 className="font-medium text-white mb-1 line-clamp-2">{grant.title}</h3>
-                    <p className="text-sm text-slate-400">{grant.agency}</p>
+                    <p className="text-sm text-muted">{grant.agency}</p>
                     {grant.oppNumber && (
-                      <p className="text-xs text-slate-500 mt-1">#{grant.oppNumber}</p>
+                      <p className="text-xs text-faint mt-1">#{grant.oppNumber}</p>
                     )}
                   </div>
 
@@ -342,7 +342,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
                         <div className="text-sm font-medium text-white">
                           Closes {formatDate(grant.closeDate)}
                         </div>
-                        <div className="text-xs text-slate-500 mt-1">
+                        <div className="text-xs text-faint mt-1">
                           Posted {formatDate(grant.postedDate)}
                         </div>
                       </>
@@ -363,36 +363,36 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
             <button
               onClick={() => searchGrants(searchKeyword, selectedAgency, selectedCategory, selectedStatus, sort, grants.length)}
               disabled={loadingMore}
-              className="w-full py-3 bg-slate-800 hover:bg-slate-700 disabled:opacity-50 text-slate-200 font-medium rounded-lg border border-slate-700 transition-colors"
+              className="w-full py-3 bg-surface hover:bg-input disabled:opacity-50 text-slate-200 font-medium rounded-lg border border-hairline transition-colors"
             >
               {loadingMore ? 'Loading…' : `Load more (${(totalHits - grants.length).toLocaleString()} more)`}
             </button>
           )}
           {!hasMore && grants.length > 0 && totalHits > 25 && (
-            <p className="text-center text-xs text-slate-500 py-2">That&apos;s all {totalHits.toLocaleString()} — end of results.</p>
+            <p className="text-center text-xs text-faint py-2">That&apos;s all {totalHits.toLocaleString()} — end of results.</p>
           )}
         </div>
       )}
 
       {/* Empty State */}
       {!isLoading && grants.length === 0 && !error && (
-        <div className="bg-slate-900 border border-slate-800 rounded-xl p-8 text-center">
+        <div className="bg-ground border border-surface rounded-xl p-8 text-center">
           <div className="mb-4 flex justify-center"><Search className="h-9 w-9 text-faint" strokeWidth={1.5} /></div>
           <h3 className="text-lg font-medium text-white mb-2">No Grants Found</h3>
-          <p className="text-slate-400 text-sm">
+          <p className="text-muted text-sm">
             No grants matched this search. Try a broader keyword, a different agency, or forecasted status.
           </p>
         </div>
       )}
 
       {/* Quick Actions */}
-      <div className="flex flex-wrap gap-2 pt-4 border-t border-slate-800">
+      <div className="flex flex-wrap gap-2 pt-4 border-t border-surface">
         <button
           onClick={() => {
             setSearchKeyword('SBIR');
             searchGrants('SBIR', '', '', 'posted', sort, 0);
           }}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface text-muted text-sm rounded-lg hover:bg-input hover:text-white transition-colors"
         >
           <FlaskConical className="h-4 w-4 shrink-0" strokeWidth={2} /> SBIR/STTR
         </button>
@@ -401,7 +401,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
             setSearchKeyword('cybersecurity');
             searchGrants('cybersecurity', '', '', 'posted', sort, 0);
           }}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface text-muted text-sm rounded-lg hover:bg-input hover:text-white transition-colors"
         >
           <ShieldCheck className="h-4 w-4 shrink-0" strokeWidth={2} /> Cybersecurity
         </button>
@@ -410,7 +410,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
             setSearchKeyword('research');
             searchGrants('research', '', '', 'posted', sort, 0);
           }}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface text-muted text-sm rounded-lg hover:bg-input hover:text-white transition-colors"
         >
           <BarChart3 className="h-4 w-4 shrink-0" strokeWidth={2} /> Research
         </button>
@@ -420,7 +420,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
             setSelectedAgency('DOD');
             searchGrants('', 'DOD', '', 'posted', sort, 0);
           }}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface text-muted text-sm rounded-lg hover:bg-input hover:text-white transition-colors"
         >
           <Medal className="h-4 w-4 shrink-0" strokeWidth={2} /> DOD Grants
         </button>
@@ -430,7 +430,7 @@ export default function GrantsPanel({ email, tier }: GrantsPanelProps) {
             setSelectedAgency('HHS');
             searchGrants('', 'HHS', '', 'posted', sort, 0);
           }}
-          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-slate-800 text-slate-400 text-sm rounded-lg hover:bg-slate-700 hover:text-white transition-colors"
+          className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-surface text-muted text-sm rounded-lg hover:bg-input hover:text-white transition-colors"
         >
           <HeartPulse className="h-4 w-4 shrink-0" strokeWidth={2} /> HHS Grants
         </button>
