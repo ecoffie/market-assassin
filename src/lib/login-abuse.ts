@@ -59,7 +59,6 @@ async function alertOnce(
     subject,
     html: `<p>${subject}</p><p>${lines.replace(/\n/g, '<br>')}</p>`,
     text: `${subject}\n${lines}`,
-    channel: 'security',
   });
 
   await recordAudit({
