@@ -2,6 +2,8 @@ import { createHash } from 'crypto';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createTwoFactorSessionToken } from '@/lib/two-factor-session';
+import { recordFailedLogin, clearFailedLogins } from '@/lib/login-abuse';
+import { getClientIP } from '@/lib/rate-limit';
 
 const MAX_ATTEMPTS = 5;
 
@@ -67,7 +69,10 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const ip = getClientIP(request);
+
     if ((pendingCode.attempts || 0) >= MAX_ATTEMPTS) {
+      await recordFailedLogin({ email, ip, reason: 'lockout', route: 'two-factor/verify' });
       return NextResponse.json(
         { success: false, error: 'Too many attempts. Request a new code.' },
         { status: 429 }
@@ -81,6 +86,8 @@ export async function POST(request: NextRequest) {
         .update({ attempts: (pendingCode.attempts || 0) + 1 })
         .eq('id', pendingCode.id);
 
+      await recordFailedLogin({ email, ip, reason: 'bad_2fa_code', route: 'two-factor/verify' });
+
       return NextResponse.json(
         { success: false, error: 'Invalid verification code' },
         { status: 401 }
@@ -91,6 +98,9 @@ export async function POST(request: NextRequest) {
       .from('two_factor_codes')
       .update({ consumed_at: now, attempts: (pendingCode.attempts || 0) + 1 })
       .eq('id', pendingCode.id);
+
+    // Successful login — reset the per-account failure counter.
+    await clearFailedLogins(email);
 
     return NextResponse.json({
       success: true,

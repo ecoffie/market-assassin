@@ -13,7 +13,18 @@
 
 ---
 
-## P0 — Leaked DB credential (CRITICAL, in progress)
+## STATUS (2026-07-10): P0 ✅ done · P1 ✅ done · P2 ✅ done · P3 next · P4 plan-only
+
+## P0 — Leaked DB credential (CRITICAL) — ✅ DONE (commit ee590a9a)
+Password rotated in Supabase (Eric) + 5 scripts de-hardcoded via scripts/lib/db-url.js.
+
+## P1 — Structured audit_log — ✅ DONE (commit 6d70c82c)
+Table live (verified), src/lib/audit-log.ts recordAudit(), admin read endpoint, wired into grant-ma-access.
+
+## P2 — Failed-login + Slack alerts — ✅ DONE
+src/lib/login-abuse.ts: KV windowed counters (email≥5 / IP≥12 per 15m) → one de-duped sendOpsAlert() + audit row. Wired into two-factor/verify (bad code + lockout, clears on success) and admin/grant-ma-access (admin-password failures). Verified live: threshold trips at 5, alert de-dupes to 1/window, counter clears on success, real Slack post ok. To tune: EMAIL_THRESHOLD / IP_THRESHOLD / WINDOW_SECONDS in login-abuse.ts.
+
+## P0 — (original notes) Leaked DB credential (CRITICAL, in progress)
 - **Finding:** `scripts/run-migration-pg.js:8` — plaintext prod Postgres URL+password, committed (commit 4a2aee9d, in git history).
 - **Fix:** (1) **Eric rotates** DB password in Supabase + sets `DATABASE_URL` in Vercel → invalidates leaked one. (2) Claude rewrites script to `process.env.DATABASE_URL`, removes hardcoded line, commits.
 - **Note:** deleting the line does NOT remove it from history — rotation is the actual fix. (History-scrub via git-filter-repo optional later; rotation makes the leaked value dead regardless.)

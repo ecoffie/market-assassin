@@ -3,6 +3,7 @@ import { kv } from '@vercel/kv';
 import { verifyAdminPassword } from '@/lib/admin-auth';
 import { checkAdminRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
 import { recordAudit } from '@/lib/audit-log';
+import { recordFailedLogin } from '@/lib/login-abuse';
 
 interface MAAccessToken {
   token: string;
@@ -37,6 +38,7 @@ export async function POST(request: NextRequest) {
         request,
         actorIp: ip,
       });
+      await recordFailedLogin({ ip, reason: 'admin_password', route: 'admin/grant-ma-access' });
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
