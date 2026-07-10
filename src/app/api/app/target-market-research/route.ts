@@ -808,6 +808,7 @@ export async function POST(request: NextRequest) {
     eventHorizon.setDate(eventHorizon.getDate() + EVENT_HORIZON_DAYS);
     const eventCounts: Record<string, number> = {};          // keyed by normalizeAgencyKey()
     const eventCountsByDodaac: Record<string, number> = {};   // keyed by 6-char inferred DoDAAC
+    const eventCountsByOffice: Record<string, number> = {};   // keyed by normalized inferred_office name
     try {
       // backfill-event-offices tags each event's REAL buying office via the
       // solicitation-number DoDAAC (`inferred_dodaac`). Pull it alongside `agency`
@@ -815,9 +816,16 @@ export async function POST(request: NextRequest) {
       // the same anchoring the opportunities count uses. (sam_events.agency is
       // department-level, so without this every DARPA/USACE office inherits all of
       // DoD's events.)
+      //
+      // Also pull `inferred_office` — SAM's OWN office name, populated on
+      // pre-award notices (RFI/Sources Sought/Industry Day) where FPDS has no
+      // DoDAAC-award office yet. 94% of undecodable-DoDAAC events are pre-award
+      // (audit 2026-07-10), so this office-name bucket rescues the events the
+      // DoDAAC path can't anchor. Keyed by normalizeAgencyKey(office) so it
+      // matches the row's contractingOffice/name the same way.
       const { data: eventRows } = await supabase
         .from('sam_events')
-        .select('agency, inferred_dodaac')
+        .select('agency, inferred_dodaac, inferred_office')
         .gte('event_date', new Date().toISOString().slice(0, 10))
         .lte('event_date', eventHorizon.toISOString().slice(0, 10));
       for (const row of eventRows || []) {
@@ -828,6 +836,8 @@ export async function POST(request: NextRequest) {
           const code = dod.slice(0, 6);
           eventCountsByDodaac[code] = (eventCountsByDodaac[code] || 0) + 1;
         }
+        const officeKey = normalizeAgencyKey(String(row.inferred_office || ''));
+        if (officeKey) eventCountsByOffice[officeKey] = (eventCountsByOffice[officeKey] || 0) + 1;
       }
     } catch (eventErr) {
       console.warn('[target-market-research] sam_events count failed:', eventErr);
@@ -1015,7 +1025,30 @@ export async function POST(request: NextRequest) {
       // events tagged to ITS DoDAACs (via inferred_dodaac), not the whole-DoD bucket.
       const dodaacEventCount = dodaacCodes.reduce((n, c) => n + (eventCountsByDodaac[c] || 0), 0);
       const deptWideEventCount = oppKeyCandidates.reduce((n, k) => n || eventCounts[k] || 0, 0);
-      const upcomingEventCount = isOfficeAnchored ? dodaacEventCount : deptWideEventCount;
+      // SAM-office match: for pre-award notices (RFI/Sources Sought) with no
+      // decodable DoDAAC, SAM's inferred_office still names the buying office.
+      // Match it to this row's office/name. This is office-specific (like the
+      // DoDAAC path), so it's safe to prefer over the whole-department count.
+      const officeEventKeys = [a.contractingOffice, a.name, a.subAgency]
+        .map(s => normalizeAgencyKey(s || ''))
+        .filter(Boolean);
+      const officeEventCount = officeEventKeys.reduce((n, k) => n || eventCountsByOffice[k] || 0, 0);
+      // Is this row a SPECIFIC office (vs a department / sub-agency)? The signal
+      // is a distinct contractingOffice — that names an actual buying office
+      // (e.g. "Engineer District Tulsa"). A specific office must NEVER inherit the
+      // whole-department event count (that was the "337 events on every Army
+      // district" bug) — it shows its own DoDAAC/SAM-office count, or 0.
+      // Department- and sub-agency-tier rows (e.g. "Department of the Army", empty
+      // contractingOffice) legitimately keep the rolled-up dept count.
+      const officeName = (a.contractingOffice || '').trim();
+      const isSpecificOffice =
+        isOfficeAnchored
+        || (officeName.length > 0
+            && normalizeAgencyKey(officeName) !== normalizeAgencyKey(a.subAgency || '')
+            && normalizeAgencyKey(officeName) !== normalizeAgencyKey(a.parentAgency || ''));
+      const upcomingEventCount = isSpecificOffice
+        ? (dodaacEventCount || officeEventCount) // office's own events, or 0 — never dept-wide
+        : (officeEventCount || deptWideEventCount);
       const satRatio = (a.contractCount && a.contractCount > 0)
         ? (a.satContractCount || 0) / a.contractCount
         : 0;
@@ -1187,6 +1220,11 @@ export async function POST(request: NextRequest) {
 
       const nk = normalizeAgencyKey(name);
       const openOppCount = oppCounts[nk] || 0;
+      // These are DEPARTMENT/sub-agency spend-total rows (buyers present in the
+      // spend rollup but NOT sampled as individual offices) — so the dept-level
+      // event count is the RIGHT granularity here. Do NOT add the office-name
+      // match used in the findAgencies rows above: there's no specific office to
+      // anchor to at this level.
       const upcomingEventCount = eventCounts[nk] || 0;
       const painData = getPainPointsForAgency(name);
       const painPointCount = painData
