@@ -13,7 +13,14 @@
 
 ---
 
-## STATUS (2026-07-10): P0 ✅ done · P1 ✅ done · P2 ✅ done · P3 next · P4 plan-only
+## STATUS (2026-07-10): P0 ✅ · P1 ✅ · P2 ✅ · P3 🟡 core shipped (3a) · P4 plan-only
+
+## P3 — Per-user admin — 🟡 PHASE 3a SHIPPED (commit cc67af4f)
+src/lib/admin-identity.ts verifyAdminAuth() = session/2FA(admin role) OR shared-password fallback.
+Wired into grant-ma-access; audit now records real actorEmail. Verified all 4 auth paths live.
+TODO: (3b) fan out the one-line swap to the other ~225 verifyAdminPassword routes in batches;
+(3c) set MI_ADMIN_EMAILS in Vercel + admins log in via 2FA; (3d) flip ADMIN_PASSWORD_BREAKGLASS_ONLY=true.
+
 
 ## P0 — Leaked DB credential (CRITICAL) — ✅ DONE (commit ee590a9a)
 Password rotated in Supabase (Eric) + 5 scripts de-hardcoded via scripts/lib/db-url.js.
