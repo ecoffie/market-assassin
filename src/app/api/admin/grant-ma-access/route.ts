@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { kv } from '@vercel/kv';
 import { verifyAdminPassword } from '@/lib/admin-auth';
 import { checkAdminRateLimit, getClientIP, rateLimitResponse } from '@/lib/rate-limit';
+import { recordAudit } from '@/lib/audit-log';
 
 interface MAAccessToken {
   token: string;
@@ -28,6 +29,14 @@ export async function POST(request: NextRequest) {
     const { email, name, adminPassword } = await request.json();
 
     if (!verifyAdminPassword(adminPassword)) {
+      await recordAudit({
+        action: 'admin_auth_failed',
+        targetEmail: email,
+        targetTable: 'grant-ma-access',
+        detail: { route: 'grant-ma-access' },
+        request,
+        actorIp: ip,
+      });
       return NextResponse.json(
         { error: 'Unauthorized' },
         { status: 401 }
@@ -58,6 +67,16 @@ export async function POST(request: NextRequest) {
     const accessLink = `https://getmindy.ai/api/ma-access/${token}`;
 
     console.log(`🎯 Admin granted Market Assassin access to ${email}, token: ${token}`);
+
+    // Queryable audit trail (never store the full token).
+    await recordAudit({
+      action: 'grant_ma_access',
+      targetEmail: email,
+      targetTable: 'kv:matoken',
+      detail: { tokenPrefix: token.slice(0, 6), customerName: name || null },
+      request,
+      actorIp: ip,
+    });
 
     return NextResponse.json({
       success: true,
