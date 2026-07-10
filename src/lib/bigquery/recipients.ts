@@ -959,6 +959,12 @@ export async function getTopRecipientsForSitemap(
       LIMIT @limit
     `,
     params: { limit },
+    // Self-warm on a cold key. queryCached defaults cacheOnly:true (returns []
+    // on a miss to block cost spikes), but the sitemap has no other warmer — so
+    // a fresh cacheKey (e.g. the :v5 bump) would leave the contractor block
+    // permanently empty. This query is a single 0.016 GB scan gated to once/day
+    // by the route's `revalidate = 86400`, so a live cold-load is safe here.
+    cacheOnly: false,
   });
 }
 
