@@ -1017,10 +1017,25 @@ export async function POST(request: NextRequest) {
       const dodaacOppCount = dodaacCodes.reduce((n, c) => n + (oppCountsByDodaac[c] || 0), 0);
       const deptWideOppCount = oppKeyCandidates.reduce((n, k) => n || oppCounts[k] || 0, 0);
       const isOfficeAnchored = dodaacCodes.length > 0;
-      const openOppCount = isOfficeAnchored ? dodaacOppCount : deptWideOppCount;
-      // Expose the department-wide number only for office-anchored agencies, so
-      // the card can say "0 open at DARPA now · N DoD-wide" honestly.
-      const oppCountDodWide = isOfficeAnchored ? deptWideOppCount : null;
+      // Is this row a SPECIFIC office (vs a department / sub-agency)? A distinct
+      // contractingOffice names an actual buying office (e.g. "Engineer District
+      // Tulsa"). Such a row must NEVER inherit the whole-department count — for
+      // BOTH opps and events (the "295 on every Army district" leak). It shows its
+      // own DoDAAC/office count, or 0. Department/sub-agency-tier rows (empty
+      // contractingOffice) legitimately keep the rolled-up dept count.
+      const officeName = (a.contractingOffice || '').trim();
+      const isSpecificOffice =
+        isOfficeAnchored
+        || (officeName.length > 0
+            && normalizeAgencyKey(officeName) !== normalizeAgencyKey(a.subAgency || '')
+            && normalizeAgencyKey(officeName) !== normalizeAgencyKey(a.parentAgency || ''));
+      // A specific office shows its own DoDAAC opps, or 0 — never dept-wide.
+      // (Opps have no inferred_office bucket — sam_opportunities lacks that column
+      // — so the office signal here is the DoDAAC count only.)
+      const openOppCount = isSpecificOffice ? dodaacOppCount : deptWideOppCount;
+      // Expose the department-wide number for specific offices so the card can say
+      // "0 open at DARPA now · N dept-wide" honestly.
+      const oppCountDodWide = isSpecificOffice ? deptWideOppCount : null;
       // Events anchor the SAME way as opps: an office-anchored agency counts only
       // events tagged to ITS DoDAACs (via inferred_dodaac), not the whole-DoD bucket.
       const dodaacEventCount = dodaacCodes.reduce((n, c) => n + (eventCountsByDodaac[c] || 0), 0);
@@ -1033,19 +1048,8 @@ export async function POST(request: NextRequest) {
         .map(s => normalizeAgencyKey(s || ''))
         .filter(Boolean);
       const officeEventCount = officeEventKeys.reduce((n, k) => n || eventCountsByOffice[k] || 0, 0);
-      // Is this row a SPECIFIC office (vs a department / sub-agency)? The signal
-      // is a distinct contractingOffice — that names an actual buying office
-      // (e.g. "Engineer District Tulsa"). A specific office must NEVER inherit the
-      // whole-department event count (that was the "337 events on every Army
-      // district" bug) — it shows its own DoDAAC/SAM-office count, or 0.
-      // Department- and sub-agency-tier rows (e.g. "Department of the Army", empty
-      // contractingOffice) legitimately keep the rolled-up dept count.
-      const officeName = (a.contractingOffice || '').trim();
-      const isSpecificOffice =
-        isOfficeAnchored
-        || (officeName.length > 0
-            && normalizeAgencyKey(officeName) !== normalizeAgencyKey(a.subAgency || '')
-            && normalizeAgencyKey(officeName) !== normalizeAgencyKey(a.parentAgency || ''));
+      // Events use the SAME isSpecificOffice gate (computed above with opps), plus
+      // the SAM-office bucket for pre-award notices the DoDAAC path can't anchor.
       const upcomingEventCount = isSpecificOffice
         ? (dodaacEventCount || officeEventCount) // office's own events, or 0 — never dept-wide
         : (officeEventCount || deptWideEventCount);
