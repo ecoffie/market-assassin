@@ -62,7 +62,24 @@ export interface DodaacInfo {
   instrumentType: string | null; // BPA / IDIQ / OTA / Purchase Order / RFQ ...
 }
 
-export function decodeDodaac(solicitationNumber: string | null): DodaacInfo | null {
+function isValidFy(fy: number | null): fy is number {
+  return fy != null && fy >= 2010 && fy <= 2035;
+}
+
+/**
+ * @param solicitationNumber the PIID / sol number to decode.
+ * @param knownDodaacs optional set of REAL DoDAAC codes (from the directory).
+ *   When the sol number carries no parseable fiscal year (e.g. underscore
+ *   formats like `FA8105_CCR_Rev2`), we normally reject it as garbage. But if
+ *   the 6-char prefix IS a known real DoDAAC, that membership is itself strong
+ *   proof — so we accept it. This rescues valid codes without weakening the
+ *   anti-false-positive guard for UNKNOWN prefixes (e.g. `GASKET_26` stays
+ *   rejected because GASKET isn't a real DoDAAC).
+ */
+export function decodeDodaac(
+  solicitationNumber: string | null,
+  knownDodaacs?: Set<string> | Map<string, unknown> | null,
+): DodaacInfo | null {
   if (!solicitationNumber) return null;
   const raw = solicitationNumber.toUpperCase().trim();
   // DoDAAC = first 6 alphanumerics (works for both dashed and undashed forms).
@@ -75,28 +92,50 @@ export function decodeDodaac(solicitationNumber: string | null): DodaacInfo | nu
   // A valid DoDAAC is 6 chars and starts with a letter (N/W/F/S/M/H...).
   if (dodaac.length !== 6 || !/^[A-Z]/.test(dodaac)) return null;
 
-  // FY + type char: handle dashed (N61331-26-Q-...) vs packed (N0010426R...).
-  let fyStr = '';
-  let typeChar = '';
-  if (raw.includes('-')) {
-    const parts = raw.split('-');
-    fyStr = (parts[1] || '').replace(/[^0-9]/g, '').slice(0, 2);
-    typeChar = (parts[2] || '').replace(/[^A-Z0-9]/g, '').charAt(0);
-  } else {
-    fyStr = compact.slice(6, 8);
-    typeChar = compact.charAt(8);
-  }
-  const fyNum = /^\d{2}$/.test(fyStr) ? 2000 + parseInt(fyStr, 10) : null;
+  // Fiscal-year position: the FY lives at COMPACT chars 7-8 for both packed
+  // (N0010426R...) and suffix forms (W911S626QA025-SSN — the '-SSN' is a suffix,
+  // NOT the FY delimiter). Try compact first; only fall back to the dashed-split
+  // FY (N61331-26-Q-... where the DoDAAC itself contains no interior digits at
+  // 7-8) when compact doesn't yield a valid year. This fixes the old bug where a
+  // trailing '-<suffix>' sent parsing down the dashed branch and dropped the FY.
+  const compactFy = /^\d{2}$/.test(compact.slice(6, 8)) ? 2000 + parseInt(compact.slice(6, 8), 10) : null;
+  let fyNum: number | null = isValidFy(compactFy) ? compactFy : null;
+  let typeChar = compact.charAt(8);
 
-  // REQUIRE a plausible fiscal year at the FY position. This is the strongest
-  // signal that the input is a real PIID and not a UUID / random ID — without
-  // it we'd decode garbage. A DoDAAC PIID always carries the FY here.
-  if (!fyNum || fyNum < 2010 || fyNum > 2035) return null;
+  if (!fyNum && raw.includes('-')) {
+    const parts = raw.split('-');
+    const dashedFyStr = (parts[1] || '').replace(/[^0-9]/g, '').slice(0, 2);
+    const dashedFy = /^\d{2}$/.test(dashedFyStr) ? 2000 + parseInt(dashedFyStr, 10) : null;
+    if (isValidFy(dashedFy)) {
+      fyNum = dashedFy;
+      typeChar = (parts[2] || '').replace(/[^A-Z0-9]/g, '').charAt(0);
+    }
+  }
+
+  // Directory membership (passed in) or the curated in-code map is proof the
+  // prefix is a genuine office code.
+  const hasDirectory = knownDodaacs != null;
+  const inDirectory =
+    (knownDodaacs instanceof Map ? knownDodaacs.has(dodaac) : knownDodaacs?.has(dodaac)) ||
+    DODAAC_NAMES[dodaac] !== undefined;
+
+  if (hasDirectory) {
+    // A directory was provided → treat it as AUTHORITATIVE (a whitelist). Only
+    // real DoDAACs decode. This rescues no-FY underscore formats (FA8105_CCR)
+    // AND rejects plausible-but-fake prefixes that happen to carry a valid-
+    // looking FY (GASKET_26 → GASKET/FY26 structurally, but not a real code).
+    if (!inDirectory) return null;
+  } else {
+    // No directory → fall back to the FY heuristic: a plausible fiscal year at
+    // the FY position is the strongest available signal that this is a real
+    // PIID and not a UUID/random id. (in-code DODAAC_NAMES also counts.)
+    if (!isValidFy(fyNum) && DODAAC_NAMES[dodaac] === undefined) return null;
+  }
 
   return {
     dodaac,
     officeName: DODAAC_NAMES[dodaac] || null,
-    fiscalYear: fyNum,
+    fiscalYear: isValidFy(fyNum) ? fyNum : null,
     instrumentType: typeChar ? (TYPE_BY_CHAR[typeChar] || null) : null,
   };
 }
