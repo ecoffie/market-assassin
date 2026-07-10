@@ -59,5 +59,27 @@ safely relax the FY requirement when the prefix IS a known DoDAAC.
    the stale 337/295 clears. (Bulk write → ask Eric first, dry-run, show counts.)
 5. Longer term: resolve-at-ingest into a canonical office id (the HigherGov model).
 
+## Directory-fill investigation (2026-07-10) — DEAD END, redirected
+Checked all 38 "missing decodable" codes against FPDS (BigQuery awards.awarding_office,
+the authoritative name source). **0 of 38 exist in FPDS.** Root cause:
+- **67/71 (94%) of these events are RFI / Sources Sought / Industry Day = PRE-AWARD.**
+  FPDS only records AWARDS, so it structurally has no office name for a code that
+  hasn't awarded yet. 16 are Panama/overseas PAN* codes (same story).
+- Many "codes" were FY-heuristic FALSE POSITIVES from title slugs (IPOPFY←"IPOP-FY26",
+  NISTSS←"NIST-SS26", REQUIR←"REQUIREMENTS", TREXII, RFIFOG…). The new
+  directory-authoritative decoder already rejects these in production.
+**Conclusion:** cannot fill from FPDS, and must NOT hand-write office names (rule #1:
+no LLM-guessed data). Directory-fill is NOT the lever.
+
+**REDIRECT → the real remaining lever is SAM's own office field.** SAM populates
+`office`/`sub_tier` (and we store inferred_office/inferred_subagency) on these pre-award
+notices even when FPDS can't. Next step = wire the SAM-resolved office into the TMR
+count key (route.ts line 1018/1190) so pre-award events count to their SAM office
+instead of the whole-DoD bucket. (resolveEventOffice() in event-office.ts already does
+DoDAAC→then→SAM-office; the COUNT path just doesn't use the SAM-office result yet.)
+
 ## Fixed this session
-- NAICS/PSC provenance pill hidden (MyTargetListPanel.tsx). Commit pending.
+- NAICS/PSC provenance pill hidden (MyTargetListPanel.tsx). ✅ committed.
+- decodeDodaac: suffix-hyphen + underscore formats + directory-authoritative. ✅ committed
+  (51%→60% office resolution, 12 unit tests, 217/217 suite green).
+- Directory-fill: investigated, found to be a dead end (above) — no bogus rows added.
