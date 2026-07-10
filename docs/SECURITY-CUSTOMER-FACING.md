@@ -45,6 +45,13 @@ providers by default.
   before being processed. We never store your raw card details — those are handled
   entirely by Stripe.
 
+## Data isolation
+
+- **Row-Level Security (RLS) enabled on every database table.** Access is enforced at
+  the database layer, not just in application code — so customer data is protected by
+  defense-in-depth. Database credentials are restricted to our server-side services;
+  the public application key cannot read your data directly.
+
 ## Secure development
 
 - Credentials are stored in secure environment configuration, never in our source code.
@@ -53,8 +60,8 @@ providers by default.
 
 ## On the roadmap
 
-We continuously improve our security posture. Currently in progress: **database-level
-row isolation (Row-Level Security)** for defense-in-depth beyond the application layer.
+We continuously improve our security posture — expanding per-user access controls and
+monitoring coverage as we grow.
 
 ---
 

@@ -29,7 +29,7 @@ stack (see the mapping table), and we've built them.
 | **MFA** | Strong login, no shared secrets | Email + 2FA (TOTP-style 6-digit codes), per-user admin | ✅ Live |
 | **CloudTrail** | Audit log: who did what, when | `audit_log` table + queryable admin API | ✅ Live |
 | **GuardDuty** | Threat/abuse monitoring + alerts | Login-abuse detection → real-time Slack alerts | ✅ Live |
-| **VPC Flow Logs** | Network/access boundary + logs | Supabase Row-Level Security + Vercel/Supabase access logs | 🟡 In progress (RLS) |
+| **VPC Flow Logs** | Network/access boundary + logs | Supabase Row-Level Security + Vercel/Supabase access logs | ✅ RLS live (all tables) |
 
 ---
 
@@ -82,11 +82,14 @@ stack (see the mapping table), and we've built them.
 
 ---
 
+### Data isolation (RLS) — ✅ live
+- **Row-Level Security enabled + forced on all 127 public tables** (2026-07-10), with a
+  service-role-only policy and anon/authenticated grants revoked. Closed a finding where
+  the public anon key could read every table. Verified: anon-readable 127→0, app (service-
+  role) reads intact. Migration: `migrations/20260710_enable_rls_all_public.sql`.
+
 ## In progress / planned (be honest about these)
 
-- 🟡 **Row-Level Security (RLS)** *(in progress)* — database-enforced row isolation so
-  that even in a worst case, data access is bounded at the database layer, not only the
-  application layer. Being rolled out in careful, verified stages.
 - 🔲 **Per-user admin fan-out** *(in progress)* — the identity mechanism is live; we're
   extending it across all admin endpoints.
 - 🔲 **Formal compliance attestation (SOC-2 / etc.)** *(not yet)* — we inherit SOC-2
