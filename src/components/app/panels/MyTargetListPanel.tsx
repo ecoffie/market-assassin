@@ -698,25 +698,12 @@ export default function MyTargetListPanel({
                             {t.upcoming_event_count} events
                           </span>
                         )}
-                        {/* Provenance (roadmap Slice 5b) — which code
-                            surfaced this office. PSC shown first since
-                            it's the more precise classifier. */}
-                        {t.source_psc && (
-                          <span
-                            className="px-2 py-0.5 rounded bg-sky-500/10 text-sky-300"
-                            title="The PSC code you were searching when you saved this office. PSC is a tighter match than NAICS for what an office actually buys."
-                          >
-                            from PSC {t.source_psc}
-                          </span>
-                        )}
-                        {t.source_naics && !t.source_psc && (
-                          <span
-                            className="px-2 py-0.5 rounded bg-input/40 text-ink-soft"
-                            title="The NAICS code you were searching when you saved this office."
-                          >
-                            from NAICS {t.source_naics}
-                          </span>
-                        )}
+                        {/* Provenance pill (source NAICS/PSC) intentionally
+                            hidden — it rendered raw comma-separated code lists
+                            (e.g. "from NAICS 334511,336411,…") which read as a
+                            debug artifact to customers. source_naics/source_psc
+                            are still stored + used server-side for SAT/opp
+                            enrichment; just not surfaced on the card. */}
                       </div>
 
                       {/* Notes — inline editable */}
