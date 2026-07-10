@@ -102,6 +102,17 @@ written at save time, never recomputed → stale + carry the dept-wide leak for 
 3. Await Explore agent for other LIVE surfaces that render these counts (dashboard,
    pipeline, alerts) — they may recompute or read the stale snapshot.
 
+## SHIPPED + EXECUTED (2026-07-10)
+- Backfill EXECUTED in prod: 61 office rows / 16 users corrected (updated:61),
+  DB-verified (Engineer Districts 337→0 etc), idempotent (re-preview would_change=0).
+  Dept rows (220) left untouched per Eric.
+- **Cron swapped:** cron_jobs row 94412fbe-... repointed from
+  /api/admin/backfill-target-opp-counts → /api/admin/backfill-target-counts
+  (job_name backfill-target-counts, 0 14 * * *, enabled, timeout 60s; backfill ~9s).
+  New route does BOTH events+opps with office-anchoring. Old opp-only route file
+  left in place (harmless) but is NO LONGER cron-scheduled. Cron-dispatch auth path
+  verified (HTTP 200, matches old route). Steady-state now keeps both counts fresh.
+
 ## Fixed this session
 - NAICS/PSC provenance pill hidden (MyTargetListPanel.tsx). ✅ committed.
 - decodeDodaac: suffix-hyphen + underscore formats + directory-authoritative. ✅ committed
