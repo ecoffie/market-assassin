@@ -67,7 +67,7 @@ export async function POST(request: NextRequest) {
       .from('user_notification_settings')
       .select('user_email, briefings_enabled')
       .eq('user_email', email.toLowerCase())
-      .single();
+      .maybeSingle(); // may not exist yet — returns null instead of PGRST116
 
     if (!userSettings) {
       return NextResponse.json(

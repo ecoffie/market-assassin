@@ -90,7 +90,7 @@ export async function POST(request: NextRequest) {
         .select('*')
         .eq('license_key', licenseKey)
         .eq('status', 'completed')
-        .single();
+        .maybeSingle(); // no matching purchase is expected — avoids PGRST116 noise
 
       if (error || !purchase) {
         return NextResponse.json({

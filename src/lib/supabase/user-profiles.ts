@@ -112,7 +112,7 @@ export async function getOrCreateProfile(email: string, name?: string): Promise<
     .from('user_profiles')
     .select('*')
     .eq('email', normalizedEmail)
-    .single();
+    .maybeSingle(); // read that may be empty (new user) — avoids PGRST116 error-log noise
 
   if (existing && !fetchError) {
     return existing as UserProfile;
@@ -159,16 +159,14 @@ export async function getProfileByEmail(email: string): Promise<UserProfile | nu
     .from('user_profiles')
     .select('*')
     .eq('email', email.toLowerCase().trim())
-    .single();
+    .maybeSingle(); // may be empty — returns null instead of a PGRST116 error
 
   if (error) {
-    if (error.code !== 'PGRST116') { // Not found is ok
-      console.error('Error fetching profile:', error);
-    }
+    console.error('Error fetching profile:', error);
     return null;
   }
 
-  return data as UserProfile;
+  return (data as UserProfile) || null;
 }
 
 /**
@@ -182,12 +180,10 @@ export async function getProfileByLicenseKey(licenseKey: string): Promise<UserPr
     .from('user_profiles')
     .select('*')
     .eq('license_key', licenseKey.toUpperCase().trim())
-    .single();
+    .maybeSingle(); // may be empty — returns null instead of a PGRST116 error
 
   if (error) {
-    if (error.code !== 'PGRST116') {
-      console.error('Error fetching profile by license:', error);
-    }
+    console.error('Error fetching profile by license:', error);
     return null;
   }
 

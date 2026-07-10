@@ -114,7 +114,7 @@ export async function GET(request: NextRequest) {
     .from('user_profiles')
     .select('*')
     .eq('email', email)
-    .single();
+    .maybeSingle(); // may not exist — returns null instead of PGRST116
 
   const supabaseFlags: Record<string, boolean> = {};
   if (profile) {

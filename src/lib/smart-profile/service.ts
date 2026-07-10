@@ -73,7 +73,7 @@ export async function getSmartProfile(email: string): Promise<SmartUserProfile |
       .from('user_briefing_profile')
       .select('*')
       .eq('user_email', email)
-      .single();
+      .maybeSingle(); // may be empty — returns null instead of a PGRST116 error
 
     if (error || !data) {
       console.log(`[SmartProfile] No profile found for ${email}`);
