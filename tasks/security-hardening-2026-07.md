@@ -83,3 +83,13 @@ src/lib/login-abuse.ts: KV windowed counters (email≥5 / IP≥12 per 15m) → o
 ## Non-negotiables honored
 - Migrations hand-run in Supabase (pbcopy SQL, confirm "Success", verify columns) — no in-app DDL.
 - No secrets in code. Ask before bulk/irreversible writes. Full `npm run build` before ship.
+
+## P4 — RLS — ✅ DONE (2026-07-10)
+Supabase Advisor flagged "RLS Disabled"; probe found ALL 127 public tables anon-readable
+(NEXT_PUBLIC anon key → real rows from purchases/user_profiles/contacts/audit_log/...).
+Live PII+payment leak. Safe to fix: app uses service-role only (287 routes; 0 client anon reads).
+Migration migrations/20260710_enable_rls_all_public.sql: ENABLE+FORCE RLS + service_role
+policy + REVOKE anon/authenticated/PUBLIC grants, dynamically over every public table.
+Tested single-table first (signup_events: anon 401, service-role 200), then ran full.
+VERIFIED: anon-readable 127→0; service-role reads 9/9 critical tables OK; live prod route
+read user_target_list (523 rows, HTTP 200). Leak closed, app intact.
