@@ -21,6 +21,22 @@ interface OpsAlertArgs {
   text?: string;
   emailType?: string;
   transactional?: boolean;
+  // Route to a dedicated channel. 'security' → SLACK_SECURITY_WEBHOOK_URL so
+  // login-abuse / auth alerts don't drown in the lead+ops stream. Falls back
+  // to the ops webhook when the security webhook isn't set yet (safe default).
+  channel?: 'ops' | 'security';
+}
+
+// Pick the destination webhook by channel, with graceful fallback so a missing
+// dedicated webhook never means a dropped alert.
+function resolveWebhook(channel: 'ops' | 'security' | undefined): { url?: string; label: string } {
+  const ops = process.env.SLACK_LEAD_WEBHOOK_URL || process.env.SLACK_OPS_WEBHOOK_URL;
+  if (channel === 'security') {
+    const sec = process.env.SLACK_SECURITY_WEBHOOK_URL;
+    if (sec) return { url: sec, label: 'security' };
+    return { url: ops, label: 'security→ops(fallback)' };
+  }
+  return { url: ops, label: 'ops' };
 }
 
 // Crude but dependency-free HTML → text for the Slack body.
@@ -39,22 +55,26 @@ function htmlToText(html: string): string {
 }
 
 export async function sendOpsAlert(args: OpsAlertArgs): Promise<{ ok: boolean; error?: string }> {
-  const url = process.env.SLACK_LEAD_WEBHOOK_URL || process.env.SLACK_OPS_WEBHOOK_URL;
+  const { url, label } = resolveWebhook(args.channel);
   if (!url) {
-    console.warn('[ops-alert] no Slack webhook set (SLACK_LEAD_WEBHOOK_URL) — alert dropped:', args.subject);
+    console.warn('[ops-alert] no Slack webhook set — alert dropped:', args.subject);
     return { ok: false, error: 'no webhook' };
   }
+  const isSecurity = args.channel === 'security';
+  const footer = isSecurity
+    ? 'Mindy security alert · getmindy.ai'
+    : 'Mindy ops alert · getmindy.ai';
   const body = htmlToText(args.html).slice(0, 2800); // Slack block text limit is 3000
   try {
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        text: `:rotating_light: *${args.subject}*`,
+        text: `:rotating_light: *${args.subject}* (${label})`,
         blocks: [
           { type: 'header', text: { type: 'plain_text', text: `🚨 ${args.subject}`.slice(0, 150), emoji: true } },
           { type: 'section', text: { type: 'mrkdwn', text: body || '_(no detail)_' } },
-          { type: 'context', elements: [{ type: 'mrkdwn', text: 'Mindy ops alert · getmindy.ai' }] },
+          { type: 'context', elements: [{ type: 'mrkdwn', text: footer }] },
         ],
       }),
     });
