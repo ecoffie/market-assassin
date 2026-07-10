@@ -553,9 +553,37 @@ export async function POST(request: NextRequest) {
         body: findAgenciesBody(false),
       }),
     ]);
-    const findData = (await findRes.json()) as FindAgenciesPayload;
-    const totalData = (await totalRes.json().catch(() => ({ success: false }))) as FindAgenciesPayload;
+    // find-agencies fans out to USASpending and, on a giant national market (e.g.
+    // NAICS 561720 with no state), can itself hit its function budget → Vercel
+    // returns a 504 HTML page, NOT JSON. A bare .json() there throws and the whole
+    // route 500s with an unparseable-JSON error. Parse defensively: a non-JSON
+    // primary response means the upstream timed out → return a clean, actionable
+    // "narrow it down" result the panel already knows how to render, instead of a
+    // 500. (Bug fix 2026-07-09 — reported as Market Research "Network error".)
+    const safeJson = async (res: Response): Promise<FindAgenciesPayload> => {
+      const ct = res.headers.get('content-type') || '';
+      if (!res.ok || !ct.includes('application/json')) {
+        return { success: false, error: res.status >= 500 ? 'upstream_timeout' : 'upstream_error' } as FindAgenciesPayload;
+      }
+      return (await res.json().catch(() => ({ success: false, error: 'upstream_error' }))) as FindAgenciesPayload;
+    };
+    const findData = await safeJson(findRes);
+    const totalData = await safeJson(totalRes);
     const findAgenciesMs = Date.now() - findAgenciesStart;
+
+    // Upstream (find-agencies) timed out on a market too big to break down in the
+    // budget. Tell the user how to make it succeed rather than dead-ending. The
+    // panel keys on error==='market_too_large' to show the "narrow it down" copy.
+    if (findData.error === 'upstream_timeout') {
+      return NextResponse.json({
+        success: false,
+        error: 'market_too_large',
+        message:
+          'This market is large enough that the full breakdown timed out. Narrow it down — pick a state, add a set-aside, or use a more specific NAICS/PSC — then try again.',
+        agencies: [],
+        total_count: 0,
+      });
+    }
 
     if (!findData.success || !findData.agencies || findData.agencies.length === 0) {
       // If find-agencies rejected the NAICS itself (invalid_naics), surface the
@@ -632,23 +660,41 @@ export async function POST(request: NextRequest) {
     // $116B and FERC inherited Department of Energy's national $65.9B.
     applyStateScope(catFilterBase, marketScope.states);
     const catScopeUsable = Boolean(marketFilter || expanded.length > 0);
+    // Tracks whether the AUTHORITATIVE department total (the headline "Relevant
+    // spending") was actually obtained. When USASpending's aggregation endpoint
+    // 5xx/times-out, this stays false and the headline would silently fall back to
+    // the sampled row-sum — a 14× understatement with no signal (e.g. $2.79B shown
+    // for a market that's truly $40B). We retry it, and if it STILL fails we flag
+    // the response as partial so the UI/caller knows the headline is degraded
+    // instead of trusting a wrong-but-plausible number. (Bug found by the
+    // verify:data harness, Jul 9 2026.)
+    let authoritativeTotalObtained = false;
+    // Bounded fetch helper with one retry for a slow/5xx category call. The
+    // department total is the headline, so it's worth a second attempt.
+    const fetchCategory = async (category: string, retries = 0): Promise<Array<{ name: string; amount: number }> | null> => {
+      for (let attempt = 0; attempt <= retries; attempt++) {
+        try {
+          const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_category', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            signal: AbortSignal.timeout(20_000),
+            body: JSON.stringify({ category, filters: catFilterBase, subawards: false, limit: 100, page: 1 }),
+          });
+          if (res.ok) return ((await res.json()).results || []) as Array<{ name: string; amount: number }>;
+        } catch { /* fall through to retry / null */ }
+      }
+      return null;
+    };
     try {
       if (catScopeUsable) {
         // Sub-agency + parent department totals (keyword or NAICS). Parent-level
         // keys let DoD/HHS rank correctly; sub-agency keys surface USACE/Navy.
         for (const category of ['awarding_subagency', 'awarding_agency'] as const) {
-          const catRes = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_category', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              category,
-              filters: catFilterBase,
-              subawards: false, limit: 100, page: 1,
-            }),
-          });
-          if (!catRes.ok) continue;
-          const catJson = await catRes.json();
-          const catResults = (catJson.results || []) as Array<{ name: string; amount: number }>;
+          // Retry ONLY the department total (the headline). The sub-agency roster
+          // enriches rows and can degrade gracefully, but a missing headline is the
+          // silent-wrong-number bug — so give it a second chance.
+          const catResults = await fetchCategory(category, category === 'awarding_agency' ? 2 : 0);
+          if (!catResults) continue;
           for (const r of catResults) {
             const k = normalizeAgencyKey(r.name || '');
             if (k) categoryTotalByKey[k] = Math.max(categoryTotalByKey[k] || 0, r.amount || 0);
@@ -662,6 +708,7 @@ export async function POST(request: NextRequest) {
           // Department-level pass = the authoritative non-overlapping market total.
           if (category === 'awarding_agency') {
             authoritativeMarketTotal = catResults.reduce((s, r) => s + (r.amount || 0), 0);
+            authoritativeTotalObtained = authoritativeMarketTotal > 0;
           }
         }
 
@@ -687,6 +734,7 @@ export async function POST(request: NextRequest) {
             const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_category', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
+              signal: AbortSignal.timeout(20_000),
               body: JSON.stringify({ category: 'awarding_subagency', filters, subawards: false, limit: 100, page: 1 }),
             });
             if (!res.ok) return;
@@ -892,13 +940,48 @@ export async function POST(request: NextRequest) {
     // Pre-resolve each agency's DoDAAC office codes (async) so the row map below
     // can look up the DoDAAC-anchored opp count synchronously. Only sub-agencies
     // in dodaac_directory resolve; others stay on the department count.
+    //
+    // TIME BUDGET (Bug fix 2026-07-09 — big national markets 504'd): on a cache
+    // miss the DoDAAC directory cold-loads (pages up to 60k rows once) and then
+    // this fans out one resolve per unique sub-agency. On a large market (e.g.
+    // NAICS 561720, hundreds of agencies) that pushed the whole request past the
+    // 120s function limit → HTTP 504 + a useless "Network error" for the user.
+    // This enrichment is a NICE-TO-HAVE (office-anchored opp counts); the core
+    // deliverable is the spend + agency table. So we skip it when we're already
+    // past a soft budget, letting rows fall back to the department-wide opp count.
+    // Partial (department-level) data beats a 504.
+    const DODAAC_BUDGET_MS = 75_000; // leave ~45s headroom under the 120s cap
     const dodaacByAgency = new Map<string, string[]>();
-    await Promise.all(
-      Array.from(new Set(findAgencies.map((a) => a.subAgency || a.name).filter(Boolean) as string[]))
-        .map(async (nm) => {
-          try { dodaacByAgency.set(nm, await dodaacCodesForAgency(nm)); } catch { /* skip */ }
-        }),
-    );
+    let dodaacEnrichmentSkipped = false;
+    if (Date.now() - startedAt > DODAAC_BUDGET_MS) {
+      dodaacEnrichmentSkipped = true;
+      console.warn(
+        `[target-market-research] skipping DoDAAC enrichment — already ${Math.round((Date.now() - startedAt) / 1000)}s in (budget ${DODAAC_BUDGET_MS / 1000}s)`,
+      );
+    } else {
+      await Promise.all(
+        Array.from(new Set(findAgencies.map((a) => a.subAgency || a.name).filter(Boolean) as string[]))
+          .map(async (nm) => {
+            try { dodaacByAgency.set(nm, await dodaacCodesForAgency(nm)); } catch { /* skip */ }
+          }),
+      );
+    }
+
+    // A SPECIFIC socioeconomic/veteran set-aside was requested (not the general
+    // "Small Business" default). This matters for the Set-Aside $ column below:
+    // find-agencies BROADENS the award set when a narrow set-aside returns too few
+    // agencies (relaxes to all-SB, then to no-set-aside — see find-agencies
+    // ~L813-852), so a.setAsideSpending on that pass is NOT the requested set-aside
+    // figure — it's the broadened total (WOSB read $4.2B at CMS when true WOSB is
+    // <$120M nationwide). USASpending's per-award 'Set-Aside Type' field is
+    // unreliable (comes back blank even on filtered queries), so we can't re-filter
+    // the sample client-side. The ONLY trustworthy set-aside $ for a specific type
+    // is the authoritative spending_by_category set-aside pass (setAsideCatByKey),
+    // which filters server-side by the codes. So for a specific set-aside we use
+    // that figure and 0 when the category pass has no entry — never the broadened
+    // find-agencies fallback. (Bug found by verify:data harness, Jul 9 2026.)
+    const isSpecificSetAside =
+      effectiveBusinessType !== 'Small Business' || Boolean((veteranStatus || '').trim());
 
     // Build the merged research rows. Each row gets all 4 sort
     // metrics pre-computed so the UI can sort without re-fetching.
@@ -990,9 +1073,18 @@ export async function POST(request: NextRequest) {
       // fall back to the sampled number only for office rows / when the category
       // pass had no match. Never let it exceed the row's own total (a subset can't
       // be larger than the whole).
+      //
+      // For a SPECIFIC socioeconomic/veteran set-aside, the find-agencies fallback
+      // (a.setAsideSpending) is the BROADENED figure, not the requested type — so we
+      // trust ONLY the authoritative category pass and use 0 when it has no entry
+      // (that agency genuinely has no spend in this set-aside type). For the general
+      // "Small Business" default the sampled fallback is fine (it wasn't broadened
+      // past small-business). This is what fixes WOSB reading ~$13.6B when the true
+      // figure is <$120M.
+      const setAsideFallback = isSpecificSetAside ? 0 : (a.setAsideSpending || 0);
       const resolvedSetAside = Math.min(
         totalSpending,
-        (!isOfficeLevel && accurateSetAside > 0) ? accurateSetAside : (a.setAsideSpending || 0),
+        (!isOfficeLevel && accurateSetAside > 0) ? accurateSetAside : setAsideFallback,
       );
       // Keyword searches: ONLY USAspending category totals for this keyword — never
       // the NAICS-sample setAsideSpending (Eric: DOE $2B / NASA $6B on Set-Aside lens
@@ -1162,7 +1254,15 @@ export async function POST(request: NextRequest) {
     // show) and run in small parallel batches so it stays inside maxDuration. Only
     // the recovered rows (id 'cat:') need it; sampled rows already counted real
     // awards. Runs only on a cache MISS (cache hits already carry the counts).
-    if (catScopeUsable) {
+    // COST BUDGET (Bug fix 2026-07-09): this contract-count enrichment is the last
+    // — and, on a scoped-but-large market, most expensive — step: up to 20 per-
+    // agency USASpending calls after the whole request has already spent time on
+    // find-agencies + category aggregates + opp/event scans. It's cosmetic (fills
+    // the "contracts" column on recovered rows; they show "—" without it). If
+    // we're already past the budget, SKIP it and ship the spend + agency table
+    // we've built — a complete table beats a 504 with no data at all.
+    const COUNT_BUDGET_MS = 90_000; // ~30s headroom under the 120s cap for the upsert + response
+    if (catScopeUsable && Date.now() - startedAt < COUNT_BUDGET_MS) {
       const ANCHORED_COUNT_CAP = 20;
       const CONC = 6;
       const needCount = rows
@@ -1170,12 +1270,16 @@ export async function POST(request: NextRequest) {
         .sort((a, b) => b.totalSpending - a.totalSpending)
         .slice(0, ANCHORED_COUNT_CAP);
       for (let i = 0; i < needCount.length; i += CONC) {
+        // Re-check the budget between batches so a slow first round doesn't drag
+        // the request to the cliff.
+        if (Date.now() - startedAt >= COUNT_BUDGET_MS) break;
         const batch = needCount.slice(i, i + CONC);
         await Promise.all(batch.map(async (r) => {
           try {
             const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_award_count/', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
+              signal: AbortSignal.timeout(15_000),
               body: JSON.stringify({
                 filters: { ...catFilterBase, agencies: [{ type: 'awarding', tier: 'subtier', name: r.name }] },
               }),
@@ -1204,6 +1308,18 @@ export async function POST(request: NextRequest) {
       : (findData.totalSpending || 0);
     const rawRelevantSpending = authoritativeMarketTotal || noSetAsideMarketTotal || 0;
 
+    // DEGRADED-HEADLINE SIGNAL (Bug found Jul 9): if the authoritative department
+    // total couldn't be obtained (USASpending 5xx/timeout even after retry), the
+    // headline above is the SAMPLED row-sum, which can be many times too low. Flag
+    // it so the response can tell the UI "this number is approximate / partial"
+    // instead of presenting a silently-wrong figure as authoritative.
+    const spendingIsPartial = !authoritativeTotalObtained;
+    if (spendingIsPartial) {
+      console.warn(
+        `[target-market-research] PARTIAL: authoritative department total unavailable after retry — headline $${Math.round(rawRelevantSpending / 1e6)}M is the sampled fallback, not the true market total. naics=${naics} states=[${marketScope.states.join(',')}]`,
+      );
+    }
+
     // Reconcile (#3): the headline total and the rows must come from the SAME
     // scope. If the top row dwarfs the market total (national vs state-scoped, or
     // a sub-agency carrying a parent figure), floor the headline to the largest
@@ -1216,7 +1332,13 @@ export async function POST(request: NextRequest) {
 
     // Persist to cache. Idempotent upsert. Failures are non-fatal — we
     // still return the live data to the user.
-    try {
+    // BUT never cache a PARTIAL (degraded-headline) result: it would freeze a
+    // silently-wrong "Relevant spending" figure for 24h. Skip the write so the next
+    // request recomputes when USASpending is healthy again. The user still gets this
+    // response (flagged partial); we just don't persist the bad number.
+    if (spendingIsPartial) {
+      console.warn('[target-market-research] skipping cache write — result is partial (degraded headline)');
+    } else try {
       await supabase
         .from('agency_target_data_cache')
         .upsert({
@@ -1258,6 +1380,10 @@ export async function POST(request: NextRequest) {
       // NO-SET-ASIDE market total (never the set-aside pass), then 0, if the
       // category pass returned nothing (#2 reconciliation).
       relevant_spending: relevantSpending,
+      // True when the authoritative department total couldn't be obtained and the
+      // headline is the sampled fallback (USASpending was degraded) — the UI should
+      // mark "Relevant spending" as approximate rather than present it as exact.
+      spending_is_partial: spendingIsPartial,
       spend_window_label: MARKET_SPEND_WINDOW_LABEL,
       sat_summary: findData.satSummary,
       // KEYWORD-FIRST coverage (#59) — when researched by keyword, tell the UI the
