@@ -78,6 +78,30 @@ count key (route.ts line 1018/1190) so pre-award events count to their SAM offic
 instead of the whole-DoD bucket. (resolveEventOffice() in event-office.ts already does
 DoDAAC→then→SAM-office; the COUNT path just doesn't use the SAM-office result yet.)
 
+## BLAST RADIUS (measured 2026-07-10, ALL users — not just Eric)
+user_target_list = **524 saved targets across 43 distinct users** (per-user table).
+Stored snapshot columns (upcoming_event_count, open_opp_count, pain_point_count) are
+written at save time, never recomputed → stale + carry the dept-wide leak for everyone.
+
+- **Event-count leak:** 37 rows have events; **14 rows / 3 users** carry a shared
+  ("337-signature") count across ≥3 distinct offices. The 337 itself is on 3 offices.
+- **Opp-count leak is BIGGER (parallel bug):** 58 rows have opps; **34 rows / 10 users**
+  carry a shared count across ≥3 offices (e.g. 38-on-4-offices, 33-on-4-offices). The
+  open_opp_count path (oppCountsByDodaac + deptWideOppCount fallback, route line 1007-
+  1013) has the SAME dept-wide-leak that events had — needs the SAME isSpecificOffice
+  gate. NOT YET FIXED.
+- Plus quiet staleness: any row saved before the horizon moved shows an out-of-date
+  number even if it doesn't match the shared-value signature.
+
+## STILL TO DO (the "100+ users" completeness)
+1. **Apply the isSpecificOffice gate to open_opp_count** (route line ~1010) — parallel
+   to the event fix just shipped. Bigger leak (10 users). LIVE-compute fix.
+2. **Backfill user_target_list** for ALL users so stored snapshots recompute (clears the
+   already-saved 337/38/etc). Extend backfill-target-opp-counts to also recompute events
+   + apply the office logic; run for every user, not one. BULK WRITE → dry-run + Eric ok.
+3. Await Explore agent for other LIVE surfaces that render these counts (dashboard,
+   pipeline, alerts) — they may recompute or read the stale snapshot.
+
 ## Fixed this session
 - NAICS/PSC provenance pill hidden (MyTargetListPanel.tsx). ✅ committed.
 - decodeDodaac: suffix-hyphen + underscore formats + directory-authoritative. ✅ committed
