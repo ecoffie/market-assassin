@@ -140,6 +140,14 @@ export default async function sitemap(): Promise<MetadataRoute.Sitemap> {
     if (!slug || seenSlugs.has(slug)) continue;
     seenSlugs.add(slug);
 
+    // Thin-content gate on the OVERVIEW url — MUST match the noindex predicate
+    // in contractors/[slug]/page.tsx. A rollup with < $25K obligated or a
+    // single award is noindexed at the page level; advertising it here would
+    // just tell Google to crawl a URL we then tell it not to index (the exact
+    // waste the SUBPAGE_MIN_ROWS gate below avoids for sub-pages). Skip the
+    // whole contractor — overview + every sub-tab.
+    if ((c.total_obligated || 0) < 25000 || (c.award_count || 0) < 2) continue;
+
     // Priority graded by spend tier. Google's "priority" field is
     // a hint relative to OTHER URLs in the sitemap, not absolute.
     const spend = c.total_obligated || 0;

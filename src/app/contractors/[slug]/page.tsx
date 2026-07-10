@@ -98,11 +98,26 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
       : `${displayName} — Federal Contract Awards & History | Mindy`;
   const description = `${displayName} federal contracting profile: ${fmtMoney(recipient.total_obligated)} across ${Number(recipient.award_count || 0).toLocaleString()} awards from ${Number(recipient.distinct_agency_count || 0)} agencies. UEI, NAICS, recent contracts, year-over-year trends.`;
 
+  // Thin-content gate. ~38% of the ~293K contractor rollups have < $25K
+  // obligated or a single award — pages Google crawls but parks as "Crawled -
+  // currently not indexed", diluting crawl budget across the whole surface.
+  // Measured against 90d GSC data: EVERY contractor overview page that earns
+  // search impressions is $290K+ (nearly all $1M+), so noindexing the thin tier
+  // costs no real traffic while concentrating crawl + link equity on the
+  // contractors that actually rank. noindex,follow keeps Google crawling
+  // THROUGH these pages (similar-contractor links) to the substantial ones.
+  // Threshold mirrors the SUBPAGE_MIN_ROWS pattern already used on the
+  // naics/agencies sub-pages; sitemap.ts applies the same predicate so it never
+  // advertises a URL this page then noindexes.
+  const isThinContractor =
+    totalObligated < 25000 || Number(recipient.award_count || 0) < 2;
+
   // Canonical always points at the rollup's own slug, even when this page
   // was reached via a sibling-UEI slug (which 308s before render anyway).
   return {
     title,
     description,
+    robots: isThinContractor ? { index: false, follow: true } : undefined,
     alternates: { canonical: `${SITE_URL}/contractors/${recipient.canonical_slug}` },
     openGraph: {
       title,

@@ -932,6 +932,11 @@ export interface SitemapRecipientRow {
   // correctly clear the gate instead of being suppressed by per-UEI scatter.
   distinct_agency_count: number;
   distinct_naics_count: number;
+  // Thin-content gate on the contractor OVERVIEW url (mirrors the noindex
+  // predicate in contractors/[slug]/page.tsx): a rollup with < $25K obligated
+  // or a single award earns ~no search traffic, so we neither index it nor
+  // advertise it in the sitemap.
+  award_count: number;
 }
 
 export async function getTopRecipientsForSitemap(
@@ -939,11 +944,13 @@ export async function getTopRecipientsForSitemap(
 ): Promise<SitemapRecipientRow[]> {
   return queryCached<SitemapRecipientRow>({
     // :v4 — source switched to recipients_rollup_merged (one row per company).
-    cacheKey: `sitemap:top-recipients:${limit}:v4`,
+    // :v5 — added award_count for the overview thin-content sitemap gate.
+    cacheKey: `sitemap:top-recipients:${limit}:v5`,
     query: `
       SELECT
         rollup_name AS recipient_name,
         total_obligated,
+        award_count,
         distinct_agency_count,
         distinct_naics_count
       FROM ${BQ_TABLES.recipientsRollup}
