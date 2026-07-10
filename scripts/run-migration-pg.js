@@ -4,8 +4,9 @@
  */
 
 const { Pool } = require('pg');
+const { getDatabaseUrl } = require('./lib/db-url');
 
-const DATABASE_URL = 'postgresql://postgres.krpyelfrbicmvsmwovti:[2g0MRz3\\JL4q,sUf@aws-0-us-east-1.pooler.supabase.com:6543/postgres';
+const DATABASE_URL = getDatabaseUrl();
 
 const SQL = `
 CREATE TABLE IF NOT EXISTS sam_opportunities (

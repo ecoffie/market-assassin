@@ -6,9 +6,10 @@
 const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
+const { getDatabaseUrl } = require('./lib/db-url');
 
-// Connection string from Supabase
-const connectionString = 'postgresql://postgres:galata-supabase-2026@db.krpyelfrbicmvsmwovti.supabase.co:5432/postgres';
+// Connection string from Supabase — read from env, never hardcoded.
+const connectionString = getDatabaseUrl();
 
 async function runMigration() {
   const pool = new Pool({ connectionString, ssl: { rejectUnauthorized: false } });

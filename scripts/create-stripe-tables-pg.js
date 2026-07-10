@@ -4,11 +4,10 @@
  */
 
 const { Pool } = require('pg');
+const { getDatabaseUrl } = require('./lib/db-url');
 
-// Supabase session pooler connection (Session mode, port 5432)
-// Format: postgres://postgres.[PROJECT-REF]:[PASSWORD]@aws-0-us-east-1.pooler.supabase.com:5432/postgres
-const connectionString = process.env.DATABASE_URL ||
-  'postgresql://postgres.krpyelfrbicmvsmwovti:galata-supabase-2026@aws-0-us-east-1.pooler.supabase.com:5432/postgres';
+// Supabase pooler connection — read from env, never hardcoded.
+const connectionString = getDatabaseUrl();
 
 const SQL_STATEMENTS = [
   // 1. Stripe Customers

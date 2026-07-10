@@ -13,10 +13,10 @@
 const { Pool } = require('pg');
 const fs = require('fs');
 const path = require('path');
+const { getDatabaseUrl } = require('./lib/db-url');
 
-// Supabase connection string (using pooler)
-const DATABASE_URL = process.env.DATABASE_URL ||
-  'postgresql://postgres.krpyelfrbicmvsmwovti:galata-supabase-2026@aws-0-us-east-1.pooler.supabase.com:6543/postgres';
+// Supabase connection string (pooler) — read from env, never hardcoded.
+const DATABASE_URL = getDatabaseUrl();
 
 // Parse arguments
 const args = process.argv.slice(2);

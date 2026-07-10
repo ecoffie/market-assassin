@@ -4,9 +4,10 @@
  */
 
 const { Pool } = require('pg');
+const { getDatabaseUrl } = require('./lib/db-url');
 
-// Supabase connection string (transaction pooler)
-const connectionString = 'postgresql://postgres.krpyelfrbicmvsmwovti:PostgresPassword2024!@aws-0-us-east-1.pooler.supabase.com:6543/postgres';
+// Supabase connection string (transaction pooler) — read from env, never hardcoded.
+const connectionString = getDatabaseUrl();
 
 const pool = new Pool({ connectionString });
 
