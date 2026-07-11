@@ -4,6 +4,20 @@
 
 ---
 
+## ⏰ CHECK TOMORROW (Jul 12) — daily-alerts 1000-row cap fix
+
+- [ ] **Open the ops dashboard (7-Day Alert Delivery) and confirm `processed` climbs
+      PAST 1,000 toward ~1,541.** That's the behavioral confirmation of PR #113
+      (`d34ddd8a`, shipped + live Jul 11): the eligible-audience query was capped at
+      1,000 of 1,541 eligible subscribers → 541 never got alerts. Now paginated.
+      Also set `DAILY_ALERT_BATCH_SIZE=250` (prod, bound on the #113 build).
+  - If it does NOT climb: check the deploy actually bound the env, that the dispatcher
+    is firing all ~21 runs, and re-run the live count (eligible should be ≥1,541).
+  - Next scaling knob: bump `DAILY_ALERT_BATCH_SIZE` toward ~500 (env only, ~10k/day
+    capacity) when eligible audience nears ~3,000. Capacity now = 21 runs × 250 = ~5,250/day.
+
+---
+
 ## 🔄 RECONCILIATION — July 11, 2026 (post-`90c0fe91` pull)
 
 Reconciled the list against what actually landed on `main`. Closed items below:
