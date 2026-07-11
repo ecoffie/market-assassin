@@ -20,11 +20,12 @@ Reconciled the list against what actually landed on `main`. Closed items below:
 - **SMS → GHL-only — SHIPPED** (`7ac54b41` removed all Twilio *code*; double opt-in +
   STOP webhook live). ⚠️ `twilio@^5.12.2` is still a dep in `package.json` — dead
   weight, safe to drop in a cleanup.
-- **Read replica — FULLY ACTIVATED + LIVE** (verified Jul 11): replica provisioned in
-  Supabase (Oregon, HEALTHY, Jul 6) + `SUPABASE_REPLICA_URL` set in Vercel Prod (5d ago).
-  ~19 admin-analytics routes + snapshot-metrics cron already route to it. Remaining work
-  is only migrating the hot production read paths (`user_notification_settings`,
-  `email_provider_sends`, `user_pipeline`) with a read-after-write audit — see Resilience.
+- **Read replica — FULLY ACTIVATED + hot-path migration DONE** (verified Jul 11): replica
+  provisioned in Supabase (Oregon, HEALTHY, Jul 6) + `SUPABASE_REPLICA_URL` set in Vercel
+  Prod (5d ago). ~19 admin-analytics routes already route to it; this session added the
+  two heavy precompute crons. Send paths (`daily-alerts`), `email_provider_sends`, and
+  `/app` writes-then-reads deliberately kept on primary (read-after-write / crown-jewel
+  risk, negligible gain) — see Resilience for the full verdict.
 - **Design system / De-vibe (P1–P5), audit_log, login-abuse Slack alerts, DIBBS panel,
   Vitest + pre-push gate — all SHIPPED** in this pull.
 
@@ -49,14 +50,22 @@ backups verified, **vault-file backup (daily, live)**, read-replica **factory**.
       mrr-goal, dau-wau-history, beta-conversion, feature-usage, etc.) + the
       `snapshot-metrics` cron + the sam-gov briefings pipeline. This was the OOM-relief
       goal (`e2a83a5f`) — DONE.
-- [ ] **READ REPLICA — migrate the HOT production read paths** (the real remaining work).
-      The firehose in the logs is `user_notification_settings` (called on every
-      alert/briefing/cron pass), `email_provider_sends`, `user_pipeline` — none on the
-      replica yet. Order: (1) safe-to-stale first → `email_provider_sends` + any pure
-      analytics read; (2) then `daily-alerts` / weekly-alerts / briefings crons, but
-      AUDIT read-after-write on `user_notification_settings` + `user_pipeline` (users
-      write then immediately re-read these) before switching. Factory + env are ready —
-      this is per-route code only, no infra.
+- [x] **READ REPLICA — hot-path migration DONE / effectively complete** (Jul 11, PR
+      `chore/read-replica-reconcile-and-migrate`). Migrated the two heavy batch crons —
+      `precompute-briefings` + `precompute-weekly-briefings` — whose population read of
+      the enabled-user set is a pure batch read (no read-after-write; writes stay on
+      primary). Combined with the ~19 admin-analytics routes already on the replica,
+      that's the bulk of the worthwhile read load off the primary.
+      **Deliberately LEFT on the primary (audited, not an oversight):**
+      - `daily-alerts` / `weekly-alerts` population reads — read-after-write is CLEAN
+        (cron never writes `user_notification_settings`), BUT it's one tiny SELECT
+        (~1.3k rows, primary at ~5% CPU → ~zero gain) on the most critical free-for-all
+        send path, and `getReadClient()` has NO fallback-on-replica-error (only falls
+        back when the env is unset). Bad risk/reward → keep authoritative primary.
+      - `email_provider_sends` — read INSIDE the send-path daily-cap counter +
+        cron dedup guards = genuine read-after-write. Must stay primary.
+      - `/app` settings + `user_pipeline` app routes — user saves then immediately
+        re-reads. Must stay primary.
 - [ ] **PITR** — OFF on purpose (daily backups are the baseline). Enable only if a
       contract needs sub-day recovery (~$100/mo, 30-sec toggle).
 - [ ] **Off-provider file backup** (S3/R2) — later tier; only if a contract needs
