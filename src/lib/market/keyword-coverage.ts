@@ -304,6 +304,31 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
       }
     }
 
+    // TITLE-MATCH LEAD PROMOTION (the "236220-over-238220" fix, Jul 11 2026).
+    // Keyword search ranks by how AGENCIES coded their awards, which surfaces the
+    // big mislabeled catch-all, not the code that literally describes the work:
+    //   "landscaping" → #1 562119 "Other Waste" ($2.3B) over 561730 "Landscaping
+    //                   Services" ($656M) — agencies bury grounds work under waste primes.
+    //   "welding"     → #1 336611 "Ship Building" over the welding trade code.
+    // When the raw #1 code's OFFICIAL TITLE does NOT contain the search term but a
+    // lower-ranked code's title DOES, promote the title-matching code to lead. The
+    // signal is the code's own Census title (real data, not a guess); we only reorder
+    // the HEAD, never drop the mislabeled code (it stays in the set — that spend is
+    // real). Measured green by the DSBS keyword harness.
+    const sigWords = raw.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+      .filter((w) => w.length >= 4 && isDistinctiveKeyword(w));
+    const titleMatches = (name: string | undefined) => {
+      const n = (name || '').toLowerCase();
+      return sigWords.some((w) => n.includes(w));
+    };
+    if (rows.length > 1 && sigWords.length && !titleMatches(rows[0].name)) {
+      const idx = rows.findIndex((r) => titleMatches(r.name));
+      if (idx > 0) {
+        const [promoted] = rows.splice(idx, 1);
+        rows.unshift(promoted);
+      }
+    }
+
     const total = rows.reduce((s: number, r: { amount: number }) => s + r.amount, 0);
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const allNaics = rows.map((r: any) => ({ code: r.code, name: r.name || r.code, amount: r.amount, pct: r.amount / total }));

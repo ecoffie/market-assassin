@@ -29,10 +29,15 @@ import * as dotenv from 'dotenv';
 import * as fs from 'fs';
 import * as path from 'path';
 import { buildProfileFromText } from '../src/lib/market/profile-from-text';
+import { keywordCoverage } from '../src/lib/market/keyword-coverage';
 dotenv.config({ path: '.env.local' });
 
 const QUICK = process.argv.includes('--quick');
 const ONLY = (process.argv.find((a) => a.startsWith('--only=')) || '').split('=')[1] || null;
+// --naics-only: skip the expensive semantic keyword derivation (80 embedding calls
+// per case) and measure ONLY the lead-NAICS ranking via keywordCoverage directly.
+// Fast + deterministic — this is the metric the NAICS-ranking fix targets.
+const NAICS_ONLY = process.argv.includes('--naics-only');
 
 // ---------------------------------------------------------------------------
 // The corpus. Each industry has: the expected LEAD trade NAICS (what a GovCon
@@ -255,11 +260,30 @@ async function main() {
   const rows: Row[] = [];
 
   for (const ind of industries) {
-    const vocab = await groundTruthVocab(ind.naics);
-    process.stdout.write(`\n${ind.key} (ground-truth vocab: ${vocab.size} terms from real ${ind.naics} awards)\n`);
+    const vocab = NAICS_ONLY ? new Set<string>() : await groundTruthVocab(ind.naics);
+    process.stdout.write(`\n${ind.key}${NAICS_ONLY ? '' : ` (ground-truth vocab: ${vocab.size} terms from real ${ind.naics} awards)`}\n`);
     const phrasings = QUICK ? ind.phrasings.slice(-1) : ind.phrasings;
 
     for (const phrase of phrasings) {
+      // NAICS-only fast path: keywordCoverage gives the lead ranking directly,
+      // skipping the ~80-embedding keyword derivation. Deterministic + ~10× faster.
+      if (NAICS_ONLY) {
+        // Retry on empty — a bare "—" is almost always USASpending rate-limiting
+        // (10 requests/coverage-call × 51 cases), NOT a real ranking failure. A
+        // harness that can't tell those apart is worthless (Eric's sample-size
+        // point). So: pace the calls and retry an empty result with backoff.
+        let cov = await keywordCoverage(phrase);
+        for (let attempt = 0; attempt < 3 && !cov?.allNaics?.length; attempt++) {
+          await new Promise((r) => setTimeout(r, 2500 * (attempt + 1)));
+          cov = await keywordCoverage(phrase);
+        }
+        await new Promise((r) => setTimeout(r, 1200));   // pace between cases
+        const leadNaics = cov?.allNaics?.[0]?.code || '—';
+        const leadOk = ind.expectLeadNaics.includes(leadNaics);
+        rows.push({ industry: ind.key, phrasing: phrase, leadNaics, leadOk, hasDefining: true, recall: 0, nKw: 0, keywords: [] });
+        console.log(`  [lead ${leadNaics} ${leadOk ? '✓' : '✗'}] ${cov?.allNaics?.[0]?.name?.slice(0, 34) || ''}  "${phrase.slice(0, 40)}"`);
+        continue;
+      }
       const p = await buildProfileFromText(phrase);
       if (!p) { console.log(`  ⚠️  "${phrase}" → NULL profile`); continue; }
       const derivedWords = keywordWords(p.keywords);
