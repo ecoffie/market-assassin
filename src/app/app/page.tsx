@@ -10,7 +10,6 @@ import ClientWorkspaceBanner from '@/components/app/ClientWorkspaceBanner';
 import { reconcileActiveWorkspace, getActiveWorkspace } from '@/components/app/activeWorkspace';
 import VoiceCaptureModal from '@/components/app/voice/VoiceCaptureModal';
 import { Mic, Menu } from 'lucide-react';
-import SettingsPanel from '@/components/briefings/SettingsPanel';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
 import { ToastHost } from '@/components/app/Toast';
 import { getSupabase } from '@/lib/supabase/client';
@@ -86,7 +85,6 @@ function AppDashboard() {
   const [panelContext, setPanelContext] = useState<Record<string, unknown> | undefined>(undefined);
   const [isLoading, setIsLoading] = useState(true);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
   // Interactive product tour (PRD-interactive-product-tour). Auto-starts once
   // for a new user; replayable from Settings via the 'mindy:start-tour' event.
   const [runTour, setRunTour] = useState(false);
@@ -480,7 +478,6 @@ function AppDashboard() {
       setIsSignUpMode(false);
       setSignUpEmail('');
       setSignUpSent(false);
-      setIsSettingsOpen(false);
       setIsLoading(false);
       setAuthLoading(false);
 
@@ -1395,19 +1392,6 @@ function AppDashboard() {
         onSwitchAccount={handleSwitchAccount}
       />
 
-      {/* Settings Panel */}
-      {email && (
-        <SettingsPanel
-          isOpen={isSettingsOpen}
-          onClose={() => setIsSettingsOpen(false)}
-          email={email}
-          mode={tier === 'free' ? 'alerts' : 'briefings'}
-          onSaved={() => {
-            loadUserProfile(email);
-            setIsSettingsOpen(false);
-          }}
-        />
-      )}
 
       {/* Main Content */}
       <main className="flex-1 min-h-screen overflow-y-auto overflow-x-hidden pb-24 md:pb-0 w-full min-w-0">
@@ -1439,19 +1423,12 @@ function AppDashboard() {
               `}>
                 {tier === 'free' ? 'Free' : tier === 'team' ? 'Team' : tier === 'enterprise' ? 'Enterprise' : 'Pro'} Plan
               </span>
-              <button
-                onClick={() => setIsSettingsOpen(true)}
-                className="p-2 text-muted hover:text-white hover:bg-surface rounded-lg transition-colors"
-                title="Settings & Preferences"
-                aria-label="Settings"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-                </svg>
-              </button>
-              {/* Switch Account + Sign out moved to the bottom-of-sidebar account
-                  menu (Slack/Linear/Vercel convention) — reachable on mobile too. */}
+              {/* Settings lives in ONE place — the sidebar footer 'Settings'
+                  (UnifiedSettingsPanel). The old top-right gear opened a SECOND,
+                  legacy settings slide-out (briefings/SettingsPanel) — two settings
+                  surfaces confused users, so the header gear was removed (Eric,
+                  2026-07-11). Switch Account + Sign out live in the sidebar account
+                  menu (Slack/Linear/Vercel convention). */}
             </div>
           </div>
         </header>
