@@ -65,3 +65,6 @@ supabase/.temp/
 # referenced nowhere in the app build — scratch, not source)
 preview-*.html
 .ghl-tag-sync-cursor.json
+
+# Local test/fetch caches (keyword-derivation harness, etc.)
+.cache/

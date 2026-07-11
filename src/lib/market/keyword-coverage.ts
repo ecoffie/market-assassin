@@ -14,8 +14,28 @@
 import { fiscalYearTimePeriod } from '@/lib/utils/fiscal-year';
 import { sectorSubTradeKeywords } from './sector-expansions';
 import { isDistinctiveKeyword, keywordCandidates } from './keyword-sanitize';
+import { codesForTerm } from './vocabulary';
 
 const BASE = 'https://api.usaspending.gov/api/v2/search/spending_by_category';
+
+// Vocabulary synonym expansion — a SMALL set of ubiquitous abbreviations/aliases
+// that federal award text spells out in full, so the naics_vocabulary table keys
+// them by the long form. Without this, "IT support" and "help desk" find no vocab
+// row (the table has "information technology" → 541512/541519, never "it"). We
+// EXPAND to the real vocab term (which then resolves to real codes) — not a
+// hardcoded code map, so the lead still comes from actual buyer data. Keep this
+// list tiny and only for aliases the vocab genuinely lacks; the vocab is primary.
+const VOCAB_SYNONYMS: Record<string, string> = {
+  'it': 'information technology',
+  'it support': 'information technology',
+  // Route help/service-desk to "information technology" (reaches 541512/541513/
+  // 541519 — real IT service codes). NOT "technical support": that vocab term is
+  // dominated by 541620 Environmental Consulting (a false friend), which would
+  // mislead the lead. Verified against naics_vocabulary.
+  'help desk': 'information technology',
+  'helpdesk': 'information technology',
+  'service desk': 'information technology',
+};
 
 /** How agency rankings + discovery filter USAspending — keyword/PSC, never NAICS. */
 export type MarketFilterMode = 'keyword' | 'keyword_psc' | 'psc' | 'naics';
@@ -304,28 +324,114 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
       }
     }
 
-    // TITLE-MATCH LEAD PROMOTION (the "236220-over-238220" fix, Jul 11 2026).
+    // LEAD PROMOTION / INJECTION (the "236220-over-238220" fix, Jul 11 2026).
     // Keyword search ranks by how AGENCIES coded their awards, which surfaces the
     // big mislabeled catch-all, not the code that literally describes the work:
     //   "landscaping" → #1 562119 "Other Waste" ($2.3B) over 561730 "Landscaping
     //                   Services" ($656M) — agencies bury grounds work under waste primes.
     //   "welding"     → #1 336611 "Ship Building" over the welding trade code.
-    // When the raw #1 code's OFFICIAL TITLE does NOT contain the search term but a
-    // lower-ranked code's title DOES, promote the title-matching code to lead. The
-    // signal is the code's own Census title (real data, not a guess); we only reorder
-    // the HEAD, never drop the mislabeled code (it stays in the set — that spend is
-    // real). Measured green by the DSBS keyword harness.
-    const sigWords = raw.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
-      .filter((w) => w.length >= 4 && isDistinctiveKeyword(w));
+    //   "security guard" → USASpending never floats 561612 into the head at all.
+    // The naics_vocabulary table (real buyer words → code, TF-IDF ranked) is the
+    // AUTHORITATIVE lead signal; USASpending stays authoritative for the dollars.
+    // We (a) reorder when the right code is already in the set, and (b) INJECT it
+    // (with its real award $, fetched from USASpending) when it was buried below
+    // the cutoff. Title-match is the fallback for terms not yet in the vocabulary.
+    //
+    // sigWords: significant words in the query. A word normally dropped as generic
+    // English ("support", "help", "guard") is KEPT when it's real buyer vocabulary
+    // — "IT support" / "help desk" are exactly the defining words for 5415xx, so
+    // pre-filtering them left the promotion block with nothing to work on (the
+    // whole-industry '—' misses: it-support, security-guard). Validated against the
+    // vocabulary table, not a hand-list.
+    const rawWords = raw.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)
+      .filter((w) => w.length >= 2);
+    // Query TERMS to look up in the vocabulary = each word PLUS each adjacent word
+    // pair (bigram). Bigrams matter: the backfill stored "pest control" → 561710,
+    // "grounds maintenance" → 561730, "information technology" → 541513/541512 as
+    // BIGRAM rows that no single word reproduces ("control" alone is ambiguous;
+    // "pest control" is not). Single-word-only lookup was the whole miss for these.
+    const bigrams: string[] = [];
+    for (let i = 0; i < rawWords.length - 1; i++) bigrams.push(`${rawWords[i]} ${rawWords[i + 1]}`);
+    // Expand known abbreviations to their spelled-out vocab term ("it" →
+    // "information technology", "help desk" → "technical support"). The expansion
+    // is looked up like any other term, so its codes come from real award data.
+    const synExpansions = [...bigrams, ...rawWords]
+      .map((t) => VOCAB_SYNONYMS[t])
+      .filter((t): t is string => Boolean(t));
+    const lookupTerms = Array.from(new Set([...synExpansions, ...bigrams, ...rawWords])).slice(0, 14);
+    // Vocabulary lookup per term (best-effort, one parallel pass; reused below for
+    // both keeping generic-but-real words AND choosing/injecting the lead code).
+    const termVocab = new Map<string, { code: string; weight: number }[]>();
+    try {
+      const lists = await Promise.all(lookupTerms.map((t) => codesForTerm(t, { limit: 15 })));
+      lookupTerms.forEach((t, i) => termVocab.set(t, lists[i]));
+    } catch { /* vocab unavailable — fall back to distinctiveness + title-match */ }
+    const hasVocab = (t: string) => (termVocab.get(t)?.length ?? 0) > 0;
+    // Significant words: distinctive-by-English OR real buyer vocabulary. A word
+    // dropped as generic English ("support", "guard") is KEPT when the vocab knows
+    // it, so "IT support" / "security guard" aren't left with nothing to match.
+    const sigWords = rawWords.filter(
+      (w) => (w.length >= 4 && isDistinctiveKeyword(w)) || hasVocab(w),
+    );
     const titleMatches = (name: string | undefined) => {
       const n = (name || '').toLowerCase();
-      return sigWords.some((w) => n.includes(w));
+      return sigWords.some((w) => w.length >= 4 && n.includes(w));
     };
-    if (rows.length > 1 && sigWords.length && !titleMatches(rows[0].name)) {
-      const idx = rows.findIndex((r) => titleMatches(r.name));
-      if (idx > 0) {
-        const [promoted] = rows.splice(idx, 1);
-        rows.unshift(promoted);
+    if (rows.length > 0 && (sigWords.length || bigrams.some(hasVocab) || synExpansions.some(hasVocab))) {
+      // AGGREGATE vocab weight per code across ALL terms, bigrams weighted higher
+      // (2×) — they're the specific signal. A code that several query terms agree on
+      // rises above a single word's misleading top hit: "welding" alone points at
+      // 333992 (welding-MACHINERY mfg), but "fabrication" + "metal" reinforce 332710
+      // (the machine-shop TRADE code), which is the right lead. This is the fix for
+      // the weight-of-one-word class (welding/metal) — real data, cross-confirmed.
+      const codeScore = new Map<string, number>();
+      const scoreTerm = (t: string, mult: number) => {
+        for (const c of termVocab.get(t) || []) {
+          codeScore.set(c.code, (codeScore.get(c.code) || 0) + c.weight * mult);
+        }
+      };
+      for (const s of synExpansions) scoreTerm(s, 2); // alias expansions = specific
+      for (const b of bigrams) scoreTerm(b, 2);
+      for (const w of sigWords) scoreTerm(w, 1);
+      const vocabRanked = Array.from(codeScore.entries())
+        .map(([code, score]) => ({ code, score }))
+        .sort((a, b) => b.score - a.score);
+      const vocabCodes = new Set(vocabRanked.map((c) => c.code));
+      const isRightLead = (r: { code: string; name?: string }) =>
+        vocabCodes.has(r.code) || titleMatches(r.name);
+
+      if (rows.length > 1 && !isRightLead(rows[0])) {
+        // (a) Reorder: the right code is already in the set, just not at the head.
+        // Prefer the HIGHEST-scoring vocab code that's present (not just any).
+        let idx = -1;
+        for (const v of vocabRanked) {
+          const i = rows.findIndex((r) => r.code === v.code);
+          if (i > 0) { idx = i; break; }
+          if (i === 0) { idx = 0; break; } // already lead → stop, nothing to do
+        }
+        if (idx < 0) idx = rows.findIndex((r) => titleMatches(r.name));
+        if (idx > 0) {
+          const [promoted] = rows.splice(idx, 1);
+          rows.unshift(promoted);
+        }
+      }
+
+      // (b) Inject: the vocab's top code isn't in the set at all (USASpending buried
+      // it below the keyword-ranking cutoff — e.g. "security guard" never floats
+      // 561612 into the head). Pull that code's REAL award $ by querying its NAICS
+      // directly, and lead with it. Both the code (vocabulary) and its dollars
+      // (USASpending) are real — nothing fabricated. Single best vocab code only.
+      const topVocab = vocabRanked[0]?.code;
+      if (topVocab && !rows.some((r) => r.code === topVocab)) {
+        try {
+          const sized = await codeMarketSize({ naics: topVocab });
+          const amount = sized?.totalMarket || 0;
+          if (amount > 0) {
+            // codeMarketSize's NAICS query returns the code's own Census name as
+            // the first row — carry it so the lead card reads a real title, not a code.
+            rows.unshift({ code: topVocab, name: sized?.leadName || topVocab, amount });
+          }
+        } catch { /* injection is best-effort; the set without it is still valid */ }
       }
     }
 
@@ -387,7 +493,7 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
 export async function codeMarketSize(opts: {
   psc?: string;
   naics?: string;
-}): Promise<{ totalMarket: number; topPsc: { code: string; name: string } | null; basis: 'psc' | 'naics' } | null> {
+}): Promise<{ totalMarket: number; topPsc: { code: string; name: string } | null; basis: 'psc' | 'naics'; leadName?: string } | null> {
   const psc = (opts.psc || '').trim();
   const naics = (opts.naics || '').trim();
   if (!psc && !naics) return null;
@@ -421,7 +527,12 @@ export async function codeMarketSize(opts: {
     if (rows.length === 0) return null;
     const total = rows.reduce((s: number, r: { amount: number }) => s + (r.amount || 0), 0);
     const topPsc = pscRows[0] ? { code: pscRows[0].code, name: pscRows[0].name || pscRows[0].code } : null;
-    return { totalMarket: total, topPsc, basis };
+    // When queried by a single NAICS, the matching row carries that code's Census
+    // title — surfaced so callers (lead injection) can label the code, not guess.
+    const leadName = basis === 'naics'
+      ? (naicsRows.find((r: { code: string; name?: string }) => r.code === naics)?.name || undefined)
+      : undefined;
+    return { totalMarket: total, topPsc, basis, leadName };
   } catch {
     return null;
   }
