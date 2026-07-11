@@ -22,6 +22,15 @@ import {
 } from '@/lib/mindy/coach-access';
 // Shared provisioning — the SAME unit for single-add + bulk import (no drift).
 import { provisionClient, parseBulkImportRows, computeBulkImportCap } from '@/lib/mindy/coach-provision';
+// Capability milestones (PRD-capability-milestones-funder-report).
+import {
+  detectAutoMilestones,
+  persistAutoMilestones,
+  buildMilestoneState,
+  MANUAL_MILESTONES,
+  MILESTONE_KEYS,
+  type MilestoneKey,
+} from '@/lib/mindy/client-milestones';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -177,6 +186,46 @@ export async function GET(request: NextRequest) {
     }
   }
 
+  // ---- Capability milestones for the current page --------------------------
+  // 2 auto (first_bid/first_award, detected READ-ONLY from user_pipeline) + 3 manual
+  // (stored counselor marks). Detect, persist newly-found auto stamps, then merge into
+  // each card. Isolation (PRD §8a): reads user_pipeline; writes ONLY client_milestones.
+  const milestonesByWs = new Map<string, ReturnType<typeof buildMilestoneState>>();
+  if (workspaceIds.length) {
+    const [autoByWs, storedRes] = await Promise.all([
+      detectAutoMilestones(supabase, workspaceIds),
+      supabase
+        .from('client_milestones')
+        .select('workspace_id, milestone_key, achieved_at, source, marked_by')
+        .in('workspace_id', workspaceIds),
+    ]);
+    // Persist newly-detected auto milestones so the funder report reads them without re-scan.
+    await persistAutoMilestones(
+      supabase,
+      clientList.map((c: Record<string, unknown>) => ({
+        org_client_id: c.id as string,
+        workspace_id: c.workspace_id as string,
+      })),
+      autoByWs,
+    );
+    const storedByWs = new Map<string, Array<Record<string, unknown>>>();
+    for (const r of (storedRes.data || []) as Array<Record<string, unknown>>) {
+      const ws = r.workspace_id as string;
+      const arr = storedByWs.get(ws) || [];
+      arr.push(r);
+      storedByWs.set(ws, arr);
+    }
+    for (const ws of workspaceIds) {
+      milestonesByWs.set(
+        ws,
+        buildMilestoneState(
+          (storedByWs.get(ws) || []) as unknown as Parameters<typeof buildMilestoneState>[0],
+          autoByWs.get(ws),
+        ),
+      );
+    }
+  }
+
   return NextResponse.json({
     success: true,
     isCoach: true,
@@ -206,6 +255,7 @@ export async function GET(request: NextRequest) {
           pipeline: pipelineCount.get(ws) || 0,
           targets: targetCount.get(ws) || 0,
         },
+        milestones: milestonesByWs.get(ws) || [],
       };
     }),
     pagination: {
@@ -362,6 +412,50 @@ export async function POST(request: NextRequest) {
     });
     if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
     return NextResponse.json({ success: true });
+  }
+
+  // ---- Mark / unmark a MANUAL capability milestone (PRD §4) -----------------
+  // Only the 3 manual milestones are settable by hand; auto ones (first_bid/first_award)
+  // are derived from pipeline and rejected here. Authorization: org_admin can mark any
+  // client in the org; a coach only their assigned clients — same rule as read scoping.
+  if (body.action === 'set_milestone') {
+    const orgClientId = String(body.org_client_id || '');
+    const milestoneKey = String(body.milestone_key || '') as MilestoneKey;
+    const achieved = !!body.achieved;
+    if (!orgClientId || !MILESTONE_KEYS.includes(milestoneKey)) {
+      return NextResponse.json({ success: false, error: 'org_client_id + valid milestone_key required' }, { status: 400 });
+    }
+    if (!MANUAL_MILESTONES.includes(milestoneKey)) {
+      return NextResponse.json({ success: false, error: 'Auto milestones cannot be set manually' }, { status: 400 });
+    }
+    // Verify the client belongs to this org AND (for a coach) is assigned to them.
+    const { data: client } = await supabase
+      .from('org_clients')
+      .select('id, workspace_id, assigned_coach')
+      .eq('id', orgClientId)
+      .eq('org_id', membership.org_id)
+      .eq('status', 'active')
+      .maybeSingle();
+    if (!client) return NextResponse.json({ success: false, error: 'Client not found in your org' }, { status: 404 });
+    if (membership.role === 'coach' && client.assigned_coach !== email) {
+      return NextResponse.json({ success: false, error: 'Not your assigned client' }, { status: 403 });
+    }
+
+    const { error } = await supabase.from('client_milestones').upsert(
+      {
+        org_client_id: client.id,
+        workspace_id: client.workspace_id,
+        milestone_key: milestoneKey,
+        achieved_at: achieved ? new Date().toISOString() : null,
+        source: 'manual',
+        marked_by: email,
+        note: body.note ? String(body.note).slice(0, 500) : null,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: 'org_client_id,milestone_key' },
+    );
+    if (error) return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+    return NextResponse.json({ success: true, milestone_key: milestoneKey, achieved });
   }
 
   return NextResponse.json({ success: false, error: 'Unknown action' }, { status: 400 });

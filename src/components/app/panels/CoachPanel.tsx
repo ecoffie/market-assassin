@@ -1,9 +1,18 @@
 'use client';
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { Search, Pin, CheckCircle2 } from 'lucide-react';
+import { Search, Pin, CheckCircle2, Circle, Download, FileText } from 'lucide-react';
 import type { AppPanel } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 import { setActiveWorkspace, clearActiveWorkspace, getActiveWorkspace } from '../activeWorkspace';
+
+// The current calendar quarter as "YYYY-Qn" — the default for the funder-report export.
+function defaultQuarter(): string {
+  const d = new Date();
+  return `${d.getUTCFullYear()}-Q${Math.floor(d.getUTCMonth() / 3) + 1}`;
+}
+// Which milestone keys the counselor can toggle by hand (the 3 manual ones). Auto
+// milestones (first_bid/first_award) are derived from pipeline and shown read-only.
+const MANUAL_MILESTONE_KEYS = new Set(['sam_registration', 'certification', 'capability_statement']);
 
 interface ClientProfile {
   naics: string[];
@@ -13,6 +22,14 @@ interface ClientProfile {
   keywordCount: number;
   industry?: string | null;
 }
+interface Milestone {
+  key: string;
+  label: string;
+  achieved: boolean;
+  achievedAt: string | null;
+  source: 'auto' | 'manual';
+  markedBy?: string | null;
+}
 interface Client {
   id: string;
   workspaceId: string;
@@ -20,6 +37,7 @@ interface Client {
   primaryEmail?: string;
   profile?: ClientProfile | null;
   stats?: { pipeline: number; targets: number };
+  milestones?: Milestone[];
 }
 interface OrgTab {
   deadlines: Array<{ id: string; title: string; response_deadline: string; client: string; stage: string }>;
@@ -48,6 +66,8 @@ export default function CoachPanel({
     upgradeRequired?: string | null;
   } | null>(null);
   const [org, setOrg] = useState<{ name: string; tabLabel: string } | null>(null);
+  const [role, setRole] = useState<string>('');
+  const [reportQuarter, setReportQuarter] = useState<string>(defaultQuarter());
   const [clients, setClients] = useState<Client[]>([]);
   const [orgTab, setOrgTab] = useState<OrgTab>({ deadlines: [], changes: [], news: [] });
   const [adding, setAdding] = useState(false);
@@ -90,6 +110,7 @@ export default function CoachPanel({
       setIsCoach(!!d.isCoach);
       if (d.isCoach) {
         setOrg(d.org || null);
+        setRole(d.role || '');
         setClients(d.clients || []);
         setOrgTab(d.orgTab || { deadlines: [], changes: [], news: [] });
         setPagination(d.pagination ? { total: d.pagination.total, totalPages: d.pagination.totalPages } : null);
@@ -133,6 +154,57 @@ export default function CoachPanel({
   const clearActive = () => {
     clearActiveWorkspace();
     goApp();
+  };
+
+  // Toggle a MANUAL milestone (SAM / cert / cap statement). Optimistic UI, then persist.
+  const [savingMilestone, setSavingMilestone] = useState<string>('');
+  const toggleMilestone = async (c: Client, m: Milestone) => {
+    if (!email || !MANUAL_MILESTONE_KEYS.has(m.key)) return;
+    const next = !m.achieved;
+    const tag = `${c.id}:${m.key}`;
+    setSavingMilestone(tag);
+    // Optimistic update.
+    setClients(prev => prev.map(cl => cl.id !== c.id ? cl : {
+      ...cl,
+      milestones: (cl.milestones || []).map(ms => ms.key !== m.key ? ms : {
+        ...ms, achieved: next, achievedAt: next ? new Date().toISOString() : null, markedBy: email,
+      }),
+    }));
+    try {
+      const res = await authedFetch('/api/app/coach', email, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, action: 'set_milestone', org_client_id: c.id, milestone_key: m.key, achieved: next }),
+      });
+      if (!res.ok) throw new Error('save failed');
+    } catch {
+      // Revert on failure.
+      setClients(prev => prev.map(cl => cl.id !== c.id ? cl : {
+        ...cl,
+        milestones: (cl.milestones || []).map(ms => ms.key !== m.key ? ms : { ...ms, achieved: m.achieved, achievedAt: m.achievedAt }),
+      }));
+    }
+    setSavingMilestone('');
+  };
+
+  // Download the quarterly funder report (org_admin only) as CSV.
+  const [reportBusy, setReportBusy] = useState(false);
+  const downloadReport = async () => {
+    if (!email) return;
+    setReportBusy(true);
+    try {
+      const res = await authedFetch(`/api/app/coach/report?email=${encodeURIComponent(email)}&quarter=${reportQuarter}&format=csv`, email);
+      if (!res.ok) { setReportBusy(false); return; }
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `funder-report-${reportQuarter}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch { /* ignore */ }
+    setReportBusy(false);
   };
 
   const addClient = async () => {
@@ -321,6 +393,37 @@ export default function CoachPanel({
         </p>
       </header>
 
+      {/* Quarterly funder report — org_admin only. The SBTDC/SBA rollup, one click. */}
+      {role === 'org_admin' && (
+        <div className="mb-6 flex flex-col gap-3 rounded-xl border border-purple-500/25 bg-purple-500/5 p-4 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-start gap-3">
+            <FileText className="mt-0.5 h-5 w-5 shrink-0 text-purple-300" />
+            <div>
+              <p className="text-sm font-semibold text-white">Quarterly funder report</p>
+              <p className="text-xs text-muted">Businesses served, capability milestones, and pipeline outcomes — exported for your funder.</p>
+            </div>
+          </div>
+          <div className="flex shrink-0 items-center gap-2">
+            <input
+              value={reportQuarter}
+              onChange={e => setReportQuarter(e.target.value.trim())}
+              placeholder="2026-Q1"
+              className="h-9 w-24 rounded-lg border border-hairline bg-surface px-2.5 text-sm text-white placeholder-faint focus:border-purple-500 focus:outline-none"
+              aria-label="Report quarter (YYYY-Qn)"
+            />
+            <button
+              type="button"
+              onClick={downloadReport}
+              disabled={reportBusy || !/^\d{4}-Q[1-4]$/.test(reportQuarter)}
+              className="inline-flex h-9 items-center gap-1.5 rounded-lg bg-purple-600 px-4 text-sm font-medium text-white hover:bg-purple-500 disabled:opacity-50"
+            >
+              <Download className="h-4 w-4" />
+              {reportBusy ? 'Preparing…' : 'Export CSV'}
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Search + count — usable at hundreds of clients, not a flat card wall. */}
       <div className="mb-4 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <div className="relative flex-1 max-w-sm">
@@ -408,6 +511,43 @@ export default function CoachPanel({
                   )}
                 </div>
               </div>
+
+              {c.milestones && c.milestones.length > 0 && (
+                <div className="mt-4 pt-4 border-t border-surface/80">
+                  <p className="text-xs font-medium uppercase tracking-wider text-faint mb-2">
+                    Capability progression
+                  </p>
+                  <div className="flex flex-wrap gap-2">
+                    {c.milestones.map(m => {
+                      const manual = MANUAL_MILESTONE_KEYS.has(m.key);
+                      const saving = savingMilestone === `${c.id}:${m.key}`;
+                      const done = m.achieved;
+                      return (
+                        <button
+                          key={m.key}
+                          type="button"
+                          disabled={!manual || saving}
+                          onClick={() => manual && toggleMilestone(c, m)}
+                          title={
+                            manual
+                              ? (done ? `Marked${m.achievedAt ? ' ' + m.achievedAt.slice(0, 10) : ''} — click to unmark` : 'Click to mark reached')
+                              : `Auto — from pipeline${m.achievedAt ? ' (' + m.achievedAt.slice(0, 10) + ')' : ' (not yet)'}`
+                          }
+                          className={`inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-xs transition-colors ${
+                            done
+                              ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-300'
+                              : 'border-hairline bg-surface/40 text-faint'
+                          } ${manual ? 'hover:border-emerald-500/50 cursor-pointer' : 'cursor-default opacity-90'} ${saving ? 'opacity-50' : ''}`}
+                        >
+                          {done ? <CheckCircle2 className="h-3.5 w-3.5" /> : <Circle className="h-3.5 w-3.5" />}
+                          <span>{m.label}</span>
+                          {!manual && <span className="text-[9px] uppercase tracking-wide opacity-60">auto</span>}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
+              )}
 
               {isActive && (
                 <div className="mt-4 pt-4 border-t border-surface/80">
