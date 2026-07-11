@@ -1,0 +1,390 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>GCAP × Mindy — Federal BD Intelligence & Progression Reporting License</title>
+  <style>
+    :root {
+      --navy: #1e3a8a;
+      --purple: #7c3aed;
+      --green: #10b981;
+      --slate: #334155;
+      --light: #f8fafc;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      color: #0f172a;
+      background: #fff;
+      line-height: 1.45;
+      font-size: 14px;
+    }
+    .page {
+      max-width: 820px;
+      margin: 0 auto;
+      padding: 40px 48px 48px;
+    }
+    @media print {
+      .page { padding: 24px 32px; }
+      .no-print { display: none; }
+    }
+    .header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 24px;
+      padding-bottom: 20px;
+      border-bottom: 3px solid var(--navy);
+      margin-bottom: 24px;
+    }
+    .logo-block h1 {
+      font-size: 22px;
+      font-weight: 800;
+      background: linear-gradient(135deg, var(--navy), var(--purple));
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+    .logo-block p { color: var(--slate); font-size: 13px; margin-top: 4px; }
+    .meta { text-align: right; font-size: 12px; color: var(--slate); }
+    .meta strong { color: #0f172a; display: block; font-size: 13px; }
+    .hero {
+      background: linear-gradient(135deg, #eff6ff 0%, #f5f3ff 100%);
+      border: 1px solid #c7d2fe;
+      border-radius: 12px;
+      padding: 20px 24px;
+      margin-bottom: 24px;
+    }
+    .hero h2 { font-size: 18px; color: var(--navy); margin-bottom: 8px; }
+    .hero p { color: var(--slate); font-size: 13px; }
+    .hero p + p { margin-top: 8px; }
+    h3 {
+      font-size: 13px;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--purple);
+      margin: 22px 0 10px;
+    }
+    p.body { color: var(--slate); font-size: 13px; margin-bottom: 6px; }
+    .grid-2 {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 16px;
+    }
+    @media (max-width: 640px) {
+      .grid-2 { grid-template-columns: 1fr; }
+      .page { padding: 24px 20px; }
+    }
+    .option {
+      border: 2px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 18px 20px;
+      position: relative;
+    }
+    .option.recommended {
+      border-color: var(--green);
+      background: #ecfdf5;
+    }
+    .badge {
+      position: absolute;
+      top: -10px;
+      right: 16px;
+      background: var(--green);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      padding: 4px 10px;
+      border-radius: 999px;
+    }
+    .option h4 { font-size: 16px; color: var(--navy); margin-bottom: 4px; }
+    .option .subtitle { font-size: 12px; color: var(--slate); margin-bottom: 12px; }
+    .price {
+      font-size: 28px;
+      font-weight: 800;
+      color: #0f172a;
+      margin: 8px 0 2px;
+    }
+    .price span { font-size: 13px; font-weight: 500; color: var(--slate); }
+    .retail {
+      font-size: 12px;
+      color: #64748b;
+      margin-bottom: 12px;
+    }
+    ul.features {
+      list-style: none;
+      font-size: 12.5px;
+      color: var(--slate);
+    }
+    ul.features li {
+      padding: 4px 0 4px 18px;
+      position: relative;
+    }
+    ul.features li::before {
+      content: "✓";
+      position: absolute;
+      left: 0;
+      color: var(--green);
+      font-weight: 700;
+    }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12.5px;
+      margin-top: 8px;
+    }
+    th, td {
+      border: 1px solid #e2e8f0;
+      padding: 8px 10px;
+      text-align: left;
+      vertical-align: top;
+    }
+    th { background: #f1f5f9; color: var(--navy); font-weight: 600; }
+    .step-row { display: flex; gap: 12px; margin-top: 10px; flex-wrap: wrap; }
+    .step {
+      flex: 1;
+      min-width: 200px;
+      border: 1px solid #e2e8f0;
+      border-radius: 10px;
+      padding: 14px 16px;
+    }
+    .step .n {
+      display: inline-block;
+      width: 22px; height: 22px;
+      background: var(--navy); color: #fff;
+      border-radius: 50%;
+      text-align: center; line-height: 22px;
+      font-size: 12px; font-weight: 700;
+      margin-bottom: 6px;
+    }
+    .step h5 { font-size: 13px; color: var(--navy); margin-bottom: 4px; }
+    .step p { font-size: 12px; color: var(--slate); }
+    .cta {
+      margin-top: 24px;
+      padding: 20px 24px;
+      background: var(--navy);
+      color: #fff;
+      border-radius: 12px;
+      text-align: center;
+    }
+    .cta h4 { font-size: 16px; margin-bottom: 6px; }
+    .cta p { font-size: 13px; opacity: 0.9; }
+    .cta a { color: #a5f3fc; }
+    .footer {
+      margin-top: 28px;
+      padding-top: 16px;
+      border-top: 1px solid #e2e8f0;
+      font-size: 11px;
+      color: #64748b;
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      flex-wrap: wrap;
+    }
+    .fill { color: #94a3b8; font-style: italic; }
+    .note {
+      font-size: 11px; color: #94a3b8; font-style: italic;
+      margin-top: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="header">
+      <div class="logo-block">
+        <h1>Mindy × GCAP</h1>
+        <p>Federal BD intelligence &amp; client-progression reporting — SBDC partner license</p>
+      </div>
+      <div class="meta">
+        <strong>Prepared for</strong>
+        <span class="fill">[Director Name]</span><br />
+        Government Contractor Assistance Program<br />
+        <span class="fill">[Date]</span>
+      </div>
+    </header>
+
+    <section class="hero">
+      <h2>One system that runs your counselors' BD work — and produces the numbers you report to SBA</h2>
+      <p>
+        Mindy is an AI-powered federal market intelligence platform: daily opportunity ranking,
+        agency forecasts, expiring contracts, teaming, a 317K-contractor database, pipeline
+        tracking, and per-client workspaces. Your 8 counselors (12 with the new hires) manage
+        all ~1,000 businesses from one dashboard.
+      </p>
+      <p>
+        The point isn't more tools. It's <strong>capability progression made measurable</strong> —
+        moving each business from an opportunity, to an honest read on whether they can win it, to
+        closing the gap — and exporting that progression as the report your funder already expects.
+      </p>
+    </section>
+
+    <h3>The problem this solves for GCAP</h3>
+    <p class="body">
+      Your value is building capability, not handing out leads. But the work of moving a business
+      from "here's an opportunity" to "here's an honest assessment of your ability to win it, and
+      here's the gap to close" lives across spreadsheets, inboxes, and counselors' heads. And every
+      quarter that progress has to be re-assembled by hand into a report for SBTDC / SBA.
+    </p>
+    <p class="body">
+      Mindy makes the capability work the system of record, so the reporting is a by-product, not a
+      second job.
+    </p>
+
+    <h3>What GCAP gets</h3>
+    <table>
+      <tr>
+        <th>Capability</th>
+        <th>Counselor (org admin)</th>
+        <th>Client business (managed)</th>
+      </tr>
+      <tr>
+        <td><strong>My Clients</strong> — each business in its own workspace, one dashboard across all ~1,000</td>
+        <td>✓ Manages every client</td>
+        <td>Managed by counselor (own login optional)</td>
+      </tr>
+      <tr>
+        <td>Today's Intel — AI-ranked daily opportunities, scoped to each client's NAICS/keywords/agencies</td>
+        <td>✓ Per client</td>
+        <td>✓ Own free alerts</td>
+      </tr>
+      <tr>
+        <td>Target agencies, pipeline, teaming, market research, forecasts, expiring contracts, 317K contractor DB</td>
+        <td>✓ Full platform</td>
+        <td>✓ Scoped to their profile</td>
+      </tr>
+      <tr>
+        <td><strong>Capability progression tracking</strong> — SAM · certification (WOSB/HUBZone/8(a)) · capability statement · first bid · first award</td>
+        <td>✓ Per client, milestone by milestone</td>
+        <td>Visible in their workspace</td>
+      </tr>
+      <tr>
+        <td>GCAP-branded org tab + internal news</td>
+        <td>✓</td>
+        <td>✓</td>
+      </tr>
+      <tr>
+        <td><strong>Quarterly funder report</strong> — the SBTDC / SBA numbers, exported</td>
+        <td>✓ One click</td>
+        <td>—</td>
+      </tr>
+    </table>
+    <p class="note">Included in the license: the full platform above. Carved out: Proposal Assist (the one AI-token feature) is a metered add-on or bring-your-own-LLM — so the flat license price never moves with usage.</p>
+
+    <h3>The reporting engine — the part we most want to get right</h3>
+    <p class="body">
+      If Mindy produces the numbers you already have to report, it stops being another tool and
+      becomes the system that renews your funding. Mindy tracks each business's progression through
+      the milestones that matter to SBA, per counselor, and rolls it up:
+    </p>
+    <table>
+      <tr><th>What GCAP reports</th><th>How Mindy produces it</th></tr>
+      <tr><td>Businesses served + activity</td><td>Per-client workspaces, counselor assignment, last-touch, pursuits tracked</td></tr>
+      <tr><td>Capability milestones reached</td><td>SAM registration, certification, capability statement, first bid, first award — timestamped per business</td></tr>
+      <tr><td>Pipeline &amp; outcomes</td><td>Opportunities pursued, bids submitted, awards won — exportable by quarter</td></tr>
+      <tr><td>Counselor efficiency</td><td>One dashboard across all clients; no re-keying between systems</td></tr>
+    </table>
+    <p class="note">We'll confirm the exact fields against the report you hand SBTDC / SBA today, so the export matches your funder's format — not a generic dashboard. <span class="fill">[Attach current report template during scoping.]</span></p>
+
+    <h3>How we start — a two-step that fits a funded budget line</h3>
+    <div class="step-row">
+      <div class="step">
+        <span class="n">1</span>
+        <h5>Director pilot — $0, 60 days</h5>
+        <p>You get org-admin access and onboard a first set of client workspaces from their capability statements (NAICS, keywords, target agencies auto-seeded). Prove the counselor workflow and the report on your own data before any spend.</p>
+      </div>
+      <div class="step">
+        <span class="n">2</span>
+        <h5>Full center license</h5>
+        <p>Activate your counselor seats (8 today, 12 as the new hires land) and the ~1,000 client workspaces, GCAP-branded tab, and the quarterly funder export. Flat $250/seat/mo, annual prepaid — one line item procurement can budget.</p>
+      </div>
+    </div>
+
+    <h3>Investment</h3>
+    <p class="body">
+      One flat rate — <strong>$250 per counselor seat / month</strong> — billed as a single annual
+      center license. Your ~1,000 client workspaces are <strong>included</strong>, not metered, so the
+      price tracks your team, not your caseload. Start at your 8 counselors today and it grows to your
+      funded 12 at the same rate — no re-quote, no true-up.
+    </p>
+    <table>
+      <tr><th>Counselor seats</th><th>Flat annual center license</th><th>When</th></tr>
+      <tr><td>8 seats (today)</td><td><strong>$24,000/yr</strong></td><td>Activate now at current headcount</td></tr>
+      <tr><td>12 seats (funded)</td><td><strong>$36,000/yr</strong></td><td>The 4 new hires fold in at the same $250 rate</td></tr>
+    </table>
+    <p class="note">~1,000 managed client workspaces included at either tier · annual prepaid · Proposal Assist is a separate optional add-on (below).</p>
+
+    <div class="grid-2" style="margin-top:16px;">
+      <div class="option recommended">
+        <span class="badge">Recommended</span>
+        <h4>Two-step — pilot then license</h4>
+        <p class="subtitle">Prove ROI on your own data first; activate the center when the budget line is set</p>
+        <div class="price">$0 <span>→ $250/seat/mo</span></div>
+        <p class="retail">$0 60-day pilot, then flat annual license at your seat count ($24K at 8 → $36K at 12)</p>
+        <ul class="features">
+          <li><strong>Phase 1 (60 days, $0):</strong> director org-admin + first client workspaces + the report on your data</li>
+          <li><strong>Phase 2:</strong> activate your counselor seats · manage ~1,000 client workspaces</li>
+          <li>Full intel suite: forecasts, expiring contracts, teaming, 317K contractor DB, market research</li>
+          <li>Capability-progression tracking + GCAP-branded org tab</li>
+          <li>Quarterly SBTDC / SBA funder export</li>
+          <li>Onboarding + monthly office-hours slot</li>
+        </ul>
+      </div>
+
+      <div class="option">
+        <h4>Full license — day one</h4>
+        <p class="subtitle">Best when the technology line is already approved</p>
+        <div class="price">$250<span>/seat/mo</span></div>
+        <p class="retail">Flat annual center license · $24,000/yr at 8 seats → $36,000/yr at 12 · Proposal Assist separate</p>
+        <ul class="features">
+          <li>Your counselor seats · ~1,000 managed client workspaces included</li>
+          <li>Everything in the platform layer, live day one</li>
+          <li>GCAP branding + quarterly funder report</li>
+          <li>Named onboarding contact</li>
+          <li><strong>Multi-year:</strong> 2-yr ~8% / 3-yr ~12% off list, annual prepaid</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="option" style="margin-top:16px;border-style:dashed;">
+      <h4>Optional add-on — Proposal Assist</h4>
+      <p class="subtitle">The one AI-drafting feature — metered so the flat license price never moves with usage</p>
+      <ul class="features">
+        <li>AI-assisted proposal drafting: compliance matrix, bid/no-bid gate, response drafts</li>
+        <li><strong>Metered credit-pack</strong> (priced per proposal) — buy only if/when counselors use it</li>
+        <li>Or <strong>bring your own LLM key</strong> — counselors run it on their own tokens at no add-on cost</li>
+        <li>Buyable by the center for all counselors, or by an individual client for their own use</li>
+      </ul>
+      <p class="note">Carved out of the flat license on purpose: it's the only feature that consumes AI tokens, so metering it keeps your center license fixed and budgetable. <span class="fill">[Credit-pack pricing confirmed at scoping.]</span></p>
+    </div>
+
+    <h3>Why this fits an SBDC / SBTDC budget</h3>
+    <table>
+      <tr><th>Funder need</th><th>How Mindy delivers</th></tr>
+      <tr><td>Measurable client outcomes</td><td>Capability milestones + pursuits + awards, tracked per business, exported quarterly</td></tr>
+      <tr><td>Hands-on federal BD capability</td><td>Live platform: SAM opportunities, forecasts, recompetes, teaming, 317K contractor database</td></tr>
+      <tr><td>Technology / platform line item</td><td>Flat annual license ($24K at 8 seats → $36K at 12) — one budgetable PO line, workspaces included, no caseload true-ups</td></tr>
+      <tr><td>Counselor capacity as you grow to 12</td><td>One dashboard across all ~1,000 clients; new counselors onboard into the same system</td></tr>
+    </table>
+
+    <div class="cta">
+      <h4>Next step</h4>
+      <p>
+        A 30-minute working session: we open the platform on a few of your real clients, and you
+        show us the report you hand SBTDC / SBA so we can match the export.
+        Provision director access at <a href="https://getmindy.ai/app">getmindy.ai/app</a>.
+        Reply to schedule · <a href="mailto:hello@govconedu.com">hello@govconedu.com</a>
+      </p>
+    </div>
+
+    <footer class="footer">
+      <span>GovCon Giants · Mindy Federal Market Intelligence</span>
+      <span>Proposal valid 90 days · Pricing for a single GCAP center; multi-site / network terms separate</span>
+    </footer>
+  </div>
+  <p class="no-print" style="text-align:center;padding:16px;font-size:12px;color:#64748b;">
+    Print to PDF: File → Print → Save as PDF (or open in Chrome and Ctrl+P)
+  </p>
+</body>
+</html>
