@@ -183,22 +183,41 @@ export async function buildProfileFromText(text: string): Promise<ExtractedProfi
   //    lexical tokens so a keyword is never empty.
   let keywords = lexicalKeywords;
   try {
-    // NAICS titles + PSC product name from real award data ("who buys this"),
-    // plus deriveCoverageKeywords (keyword + top-PSC name + NAICS signal words).
-    const naicsTitles = (cov?.allNaics || []).slice(0, 6).map((n) => n.name).filter(Boolean);
+    // Candidate SOURCES matter: feed only CLEAN, self-contained signal. The
+    // user's own description + the LLM industry phrase are precise. Raw NAICS
+    // TITLES are NOT — dumping 6 of them as free text let candidatePhrases stitch
+    // words across unrelated titles into junk bigrams ("interpreting missile",
+    // "aeronautical biotechnology", "except poultry slaughtering"). Instead use
+    // deriveCoverageKeywords, which pulls ONE best signal word per NAICS title
+    // without cross-stitching, plus the top-PSC product name (the literal thing
+    // bought). This keeps the derivation grounded in real award data but drops
+    // the title-fragment noise.
     const coverageKw = cov ? deriveCoverageKeywords(cov) : [];
     const derived = await deriveSemanticKeywords({
       oneLiner: industryPhrase,
-      capabilities: [t, ...coverageKw],
-      naicsDescriptions: naicsTitles,
+      elevatorPitch: t,                 // the user's own words = strongest signal
+      capabilities: coverageKw,         // clean per-NAICS signal words (no cross-stitch)
       pscDescriptions: cov?.topPsc?.name ? [cov.topPsc.name] : [],
-    }, 12);
+      // Pin the MEANING vector to the user's own words + industry phrase (clean),
+      // so candidates drawn from broad coverage data are scored against precise
+      // meaning — off-topic signal words ("missile", "biotechnology", "slaughtering"
+      // leaking from a broad NAICS coverage set) score low and drop.
+      meaningText: `${industryPhrase}. ${t}`,
+    }, 12, 0.72);   // relative cutoff — trims the off-topic tail
     // Keep only distinctive keywords (phrases + non-generic singles) so the profile
     // isn't flooded with "systems"/"commercial"-style noise. Lead with the LLM
     // industry phrase (the strongest single signal), then the semantically-ranked
-    // set, then coverage keywords, then the raw tokens as a floor.
-    const merged = distinctiveKeywords([industryPhrase, ...derived, ...coverageKw, ...lexicalKeywords]);
-    if (merged.length > 0) keywords = merged.slice(0, 12);
+    // + cut-off set, then the raw user tokens as a floor. NOTE: we do NOT append the
+    // full coverageKw list here — it carries one raw signal word per NAICS in a
+    // BROAD coverage set (e.g. "missile"/"nanotechnology" for a drone-imaging code)
+    // plus the full PSC title; those only belong if they survived the semantic cut
+    // (in which case they're already in `derived`). Adding them raw reintroduced the
+    // off-topic tail. Also drop title-shaped strings (list commas / colons / >4 words)
+    // — those are data-source labels, not search keywords.
+    const isTitleShaped = (s: string) => /[:,]/.test(s) || s.trim().split(/\s+/).length > 4;
+    const merged = distinctiveKeywords([industryPhrase, ...derived, ...lexicalKeywords])
+      .filter((k) => !isTitleShaped(k));
+    if (merged.length > 0) keywords = merged.slice(0, 10);
   } catch {
     /* embeddings unavailable — keep the lexical tokens */
   }

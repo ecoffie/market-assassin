@@ -81,15 +81,29 @@ export interface CompanyKeywordInput {
   naicsDescriptions?: string[];       // NAICS title text
   pscDescriptions?: string[];         // PSC title text
   scopeDescriptions?: string[];       // past-perf scope_description (the gold)
+  // The CLEAN text that defines what the company means. When set, the company
+  // meaning-vector is built from THIS alone (not the whole blob), so candidates
+  // pulled from broad grounding data (coverage-NAICS signal words, PSC titles) are
+  // scored against precise meaning and off-topic ones drop. Without it, the vector
+  // is the whole blob (original behavior). Use for the onboarding path where the
+  // grounding sources are broad and would otherwise pollute the meaning vector
+  // ("missile", "biotechnology" leaking onto a drone-imaging profile).
+  meaningText?: string | null;
 }
 
 /**
  * Derive up to `limit` keywords, semantically ranked to the company's meaning.
  * Returns lowercased, deduped, ordered most→least central.
+ *
+ * `minRelScore` (0-1) drops the off-topic tail: a candidate is kept only if its
+ * cosine similarity is at least `minRelScore × (top candidate's score)`. 0 = keep
+ * up to `limit` regardless (original behavior). ~0.7 trims junk while keeping the
+ * on-topic set.
  */
 export async function deriveSemanticKeywords(
   input: CompanyKeywordInput,
   limit = 12,
+  minRelScore = 0,
 ): Promise<string[]> {
   const blobParts = [
     input.oneLiner,
@@ -102,6 +116,10 @@ export async function deriveSemanticKeywords(
 
   const blob = blobParts.join('. ').slice(0, 8000);
   if (!blob.trim()) return [];
+
+  // The meaning vector defaults to the whole blob, but a caller can pin it to a
+  // CLEAN subset (meaningText) so broad grounding data doesn't pollute it.
+  const meaningBlob = (input.meaningText || '').trim() || blob;
 
   // Candidate phrases come from the company's OWN words (scope + capabilities +
   // NAICS/PSC titles weighted in by appearing in the blob).
@@ -118,7 +136,7 @@ export async function deriveSemanticKeywords(
   // Semantic ranking — embed the company meaning + each candidate, keep the most
   // central. Fail soft to lexical order if embeddings are unavailable.
   try {
-    const companyVec = await embedText(blob);
+    const companyVec = await embedText(meaningBlob);
     const scored: { kw: string; score: number }[] = [];
     for (const c of candidates) {
       try {
@@ -131,7 +149,12 @@ export async function deriveSemanticKeywords(
     if (scored.length === 0) return candidates.slice(0, limit);
 
     // Rank, then dedupe near-duplicates (e.g. "audiovisual" vs "audio visual").
-    const ranked = scored.sort((a, b) => b.score - a.score).map((s) => s.kw);
+    const rankedScored = scored.sort((a, b) => b.score - a.score);
+    // Relative-similarity cutoff — drop the off-topic tail (candidates far below the
+    // best match). Skipped when minRelScore is 0.
+    const topScore = rankedScored[0]?.score ?? 0;
+    const cutoff = minRelScore > 0 ? topScore * minRelScore : -Infinity;
+    const ranked = rankedScored.filter((s) => s.score >= cutoff).map((s) => s.kw);
     const kept: string[] = [];
     for (const kw of ranked) {
       const collapsed = kw.replace(/[\s-]/g, '');
