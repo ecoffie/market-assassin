@@ -107,6 +107,8 @@ export async function GET(request: NextRequest) {
         // the cheap fallback.
         job: 'reasoning',
         openaiModel: 'gpt-4o',
+        tool: 'proposal_bid_gates',
+        userEmail: email,
       });
       const parsed = JSON.parse(text.replace(/```json\n?|```\n?/g, '').trim());
       // Drop near-universal items that slip through — they're not eliminators

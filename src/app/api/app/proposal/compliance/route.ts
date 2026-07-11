@@ -128,6 +128,10 @@ async function extractChunk(_apiKey: string, fileName: string | undefined, chunk
       maxTokens: 4000,
       temperature: 0.2,
       job: 'extraction', // high volume — Groq only, never Claude
+      tool: 'proposal_compliance',
+      // email isn't threaded into extractChunk (would require a signature
+      // refactor across the chunk pool); attribute at the tool level.
+      userEmail: null,
     });
     const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
     const parsed = JSON.parse(cleaned);

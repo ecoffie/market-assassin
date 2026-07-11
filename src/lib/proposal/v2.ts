@@ -355,6 +355,8 @@ export async function generateV2Draft(opts: {
     // contracts, team) → no-training providers only (Data Trust 3.1). This also
     // keeps PII off grok, which the drafting chain would otherwise fall back to.
     dataClass: 'sensitive',
+    tool: 'proposal_v2',
+    userEmail: opts.email,
   });
   const rawDraft = (rawDraftRaw || '').trim();
   if (!rawDraft) throw new Error('AI returned empty draft (all providers)');

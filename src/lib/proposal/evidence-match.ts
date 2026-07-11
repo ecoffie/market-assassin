@@ -239,7 +239,7 @@ async function rerank(requirement: string, candidates: EvidenceItem[], keep: num
   try {
     // dataClass 'sensitive' — the prompt embeds the bidder's real vault evidence
     // (PII), so restrict to the vetted no-training providers (Data Trust 3.1).
-    const { text } = await callLLM({ system, user, json: true, job: 'reasoning', temperature: 0, maxTokens: 500, dataClass: 'sensitive' });
+    const { text } = await callLLM({ system, user, json: true, job: 'reasoning', temperature: 0, maxTokens: 500, dataClass: 'sensitive', tool: 'proposal_evidence_match', userEmail: null });
     const parsed = JSON.parse(text) as RerankOut;
     if (!parsed?.picks?.length) return [];
     const out: EvidenceItem[] = [];

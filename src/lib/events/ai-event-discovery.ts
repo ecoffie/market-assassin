@@ -23,6 +23,7 @@
  */
 import { searchWeb, isSerperConfigured } from '@/lib/briefings/web-intel';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
+import { recordLlmUsage } from '@/lib/llm/usage-cost';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.3-70b-versatile';
@@ -197,6 +198,16 @@ export async function searchEventsViaAI(
   if (!content) {
     return { events: [], queriesUsed: queries, searchResultCount: results.length, reason: 'ai_empty' };
   }
+
+  void recordLlmUsage({
+    tool: 'event_discovery',
+    userEmail: null,
+    provider: 'groq',
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    model: (payload as any)?.model || GROQ_MODEL,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    usage: (payload as any)?.usage,
+  });
 
   const parsed = safeParseJSON<{ events?: unknown[] } | null>(content, {
     fallback: null,

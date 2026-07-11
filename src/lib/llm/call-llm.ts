@@ -11,6 +11,7 @@
  *
  * Use: const text = await callLLM({ system, user, json: true, maxTokens });
  */
+import { recordLlmUsage } from './usage-cost';
 
 // Per-JOB chains (Eric: Claude's limits hit fast + it's pricey — use it ONLY for
 // low-volume high-value calls, NEVER bulk extraction). The job determines which
@@ -39,6 +40,13 @@ export interface LlmOpts {
   // exactly which providers ever see their data. Default 'standard' = today's
   // behavior (non-PII: SAM notices, agency data, public RFP text).
   dataClass?: 'standard' | 'sensitive';
+  // Cost attribution (usage-cost.ts). Optional — when set, every successful call
+  // is logged to llm_usage_log with its real token cost so per-user / per-tool
+  // spend becomes MEASURED, not estimated. `tool` = the feature (e.g. 'chat',
+  // 'proposal_draft', 'briefing'); `userEmail` = who to bill it to (null for
+  // system/cron work). Logging is fire-and-forget and never affects the call.
+  tool?: string;
+  userEmail?: string | null;
 }
 
 type Provider = 'groq70b' | 'groq8b' | 'claude' | 'openai' | 'grok';
@@ -104,13 +112,21 @@ async function callProvider(p: Provider, opts: LlmOpts): Promise<CallResult | { 
   try {
     if (p === 'claude') {
       const model = process.env.LLM_CLAUDE_MODEL || 'claude-haiku-4-5-20251001';
+      // New-generation Claude (Sonnet 5 / Opus 4.7+ / Fable 5) REJECTS any
+      // non-default temperature/top_p/top_k with a 400. Older models (Haiku 4.5,
+      // Sonnet/Opus 4.x) still accept temperature. So only send `temperature` on
+      // models that allow it — otherwise a Sonnet-5 upgrade would 400 on every
+      // draft and silently fall through to Groq (the opposite of the upgrade).
+      const acceptsTemperature = /haiku-4-5|sonnet-4-|opus-4-[0-5]|claude-3/i.test(model);
+      const body: Record<string, unknown> = {
+        model, max_tokens: max, system: opts.system,
+        messages: [{ role: 'user', content: opts.json ? `${opts.user}\n\nRespond with ONLY valid JSON.` : opts.user }],
+      };
+      if (acceptsTemperature) body.temperature = temp;
       const res = await fetch('https://api.anthropic.com/v1/messages', {
         method: 'POST',
         headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
-        body: JSON.stringify({
-          model, max_tokens: max, temperature: temp, system: opts.system,
-          messages: [{ role: 'user', content: opts.json ? `${opts.user}\n\nRespond with ONLY valid JSON.` : opts.user }],
-        }),
+        body: JSON.stringify(body),
       });
       if (res.status === 429 || res.status === 529 || res.status === 400) return { retry: true };
       if (!res.ok) return { retry: true };
@@ -173,7 +189,21 @@ export async function callLLM(opts: LlmOpts): Promise<{ text: string; provider: 
   let lastErr = '';
   for (const p of chain) {
     const r = await callProvider(p, opts);
-    if (r && 'text' in r && r.text) return r;
+    if (r && 'text' in r && r.text) {
+      // Cost attribution — log the real token cost when a `tool` is provided.
+      // Fire-and-forget: recordLlmUsage swallows its own errors and never blocks.
+      if (opts.tool) {
+        void recordLlmUsage({
+          userEmail: opts.userEmail ?? null,
+          tool: opts.tool,
+          job: opts.job,
+          provider: r.provider,
+          model: r.model,
+          usage: r.usage,
+        });
+      }
+      return r;
+    }
     lastErr = `${p} unavailable`;
   }
   throw new Error(`All LLM providers failed (${lastErr})`);

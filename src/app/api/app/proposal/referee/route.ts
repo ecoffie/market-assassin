@@ -77,6 +77,8 @@ export async function POST(request: NextRequest) {
         // contracts, team) → no-training providers only (Data Trust 3.1).
         dataClass: 'sensitive',
         job: 'referee', // independent model (Claude) — different from the drafter
+        tool: 'proposal_referee',
+        userEmail: email,
       });
       const cleaned = text.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
       const parsed = JSON.parse(cleaned);

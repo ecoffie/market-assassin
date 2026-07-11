@@ -6,6 +6,7 @@
  */
 
 import { GeneratedQuery, WebIntelUserProfile } from './types';
+import { recordLlmUsage } from '@/lib/llm/usage-cost';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.1-8b-instant'; // Fast and cheap
@@ -72,6 +73,14 @@ export async function generateSearchQueries(
       console.error('[QueryGen] Empty response from Groq');
       return generateFallbackQueries(userProfile);
     }
+
+    void recordLlmUsage({
+      tool: 'web_intel_query',
+      userEmail: null,
+      provider: 'groq',
+      model: data.model || GROQ_MODEL,
+      usage: data.usage,
+    });
 
     const queries = parseGeneratedQueries(content);
     console.log(`[QueryGen] Generated ${queries.length} queries`);

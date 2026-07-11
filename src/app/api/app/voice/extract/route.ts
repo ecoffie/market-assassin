@@ -19,6 +19,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { verifyUserOwnsEmail } from '@/lib/api-auth';
+import { recordLlmUsage } from '@/lib/llm/usage-cost';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -161,6 +162,14 @@ export async function POST(request: NextRequest) {
   }
 
   const responseBody = await groqRes.json();
+  // Cost attribution — direct Groq fetch (bypasses callLLM). Fire-and-forget.
+  void recordLlmUsage({
+    userEmail: auth.email,
+    tool: 'voice_extract',
+    provider: 'groq',
+    model: GROQ_MODEL,
+    usage: responseBody?.usage as { prompt_tokens?: number; completion_tokens?: number } | undefined,
+  });
   const content = responseBody?.choices?.[0]?.message?.content;
   if (!content || typeof content !== 'string') {
     return NextResponse.json({ error: 'Empty extraction from model' }, { status: 502 });

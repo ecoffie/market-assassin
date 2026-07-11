@@ -90,6 +90,10 @@ async function llmIndustryPhrase(text: string): Promise<string | null> {
   try {
     const { text: out } = await callLLM({
       job: 'reasoning',
+      tool: 'profile_from_text',
+      // buildProfileFromText has no email param (shared onboarding/coach engine);
+      // attribute at the tool level rather than refactor the signature.
+      userEmail: null,
       json: true,
       maxTokens: 80,
       system: [

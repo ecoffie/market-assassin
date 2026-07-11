@@ -15,6 +15,7 @@ import {
 } from './types';
 import { getAgencyAcronym, formatContractValue } from './data-aggregator';
 import { fiscalYearTimePeriod } from '@/lib/utils/fiscal-year';
+import { recordLlmUsage } from '@/lib/llm/usage-cost';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 
@@ -81,6 +82,13 @@ Return ONLY the displacement angle text, nothing else.`;
     }
 
     const data = await response.json();
+    void recordLlmUsage({
+      tool: 'briefing_recompete',
+      userEmail: null,
+      provider: 'groq',
+      model: data.model || 'llama-3.1-8b-instant',
+      usage: data.usage,
+    });
     return data.choices[0]?.message?.content?.trim() || getDefaultDisplacementAngle(contract);
   } catch (error) {
     console.error('[AI] Error generating displacement angle:', error);
