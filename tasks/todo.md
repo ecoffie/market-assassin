@@ -36,6 +36,11 @@ Reconciled the list against what actually landed on `main`. Closed items below:
   `28E00k6IC5V0fRH5WMfnO0G` wired into `purchase-attribution.ts`. Only residual is a
   Stripe-dashboard verification (see that section).
 - **Coach Mode add-on $99/mo + Teams cap 10→5 — SHIPPED** (`594802e6`).
+- **GCAP: capability milestones + quarterly funder report — SHIPPED + LIVE** (`e9d5a9ed`,
+  Jul 11): the two GCAP-proposal claims that had zero code. 5 milestones (2 auto from
+  pipeline / 3 manual counselor checkbox) + org-admin CSV/PDF funder report. New additive
+  `client_milestones` table (migration applied live). Verified 401 unauth on both coach
+  routes in prod. See the Coach-Mode section below for full detail.
 - **SMS → GHL-only — SHIPPED** (`7ac54b41` removed all Twilio *code*; double opt-in +
   STOP webhook live). ⚠️ `twilio@^5.12.2` is still a dep in `package.json` — dead
   weight, safe to drop in a cleanup.
@@ -114,8 +119,21 @@ star of this demo (a coach/counselor managing many client small businesses).
   - [ ] **Smoke-test live**: /app → My Clients → import roster → search → switch → drill in
     *(not verified from code — needs a live pass)*
   - Memory: `coach_mode_tenancy` (shared DB decision), `coach_mode_header_drop`.
+  - [x] **Capability milestones + quarterly funder report — SHIPPED + LIVE (Jul 11,
+    `e9d5a9ed`)** — the two GCAP-proposal claims that had zero code. 5 milestones per
+    managed client (2 auto: first_bid=pipeline `submitted`, first_award=`won`, read-only
+    from `user_pipeline`; 3 manual counselor checkbox: SAM reg, certification, capability
+    statement — never fabricated). One-click org-admin quarterly funder report (SBTDC/SBA):
+    CSV always + PDF via Puppeteer w/ HTML fallback. New additive `client_milestones` table
+    (FK to `org_clients` → structurally invisible to solo users; migration applied live,
+    RLS on). 16 unit tests, full build green. Live: `/api/app/coach` GET returns per-client
+    milestone state + `set_milestone` POST; `/api/app/coach/report` (org-admin only). Both
+    verified 401 unauth in prod (auth gate before DB, no table-missing 500). CoachPanel shows
+    a milestone strip per client + org-admin export bar. PRD:
+    `tasks/PRD-capability-milestones-funder-report.md`. Proposal docs now in-repo
+    (`docs/proposals/GCAP-Mindy-Proposal.html`, `docs/strategy/GCAP-PROPOSAL-FACTS.md`).
   - Phase 2 (after Monday / roadmap): org-admin counselor mgmt + assignment, Org Tab news
-    posting UI, analytics/funder reporting, white-label branding. Engine/schema ready.
+    posting UI, white-label branding. Engine/schema ready. *(funder reporting ↑ now shipped)*
 - [ ] **Tutorial videos** — record walkthrough(s) this weekend. (Same slot pattern as
   the Getting Started Loom videos — memory `guided_journeys_loom_videos`: 60–90s,
   Mindy-branded, Vimeo → player URLs. Confirm which flows: likely coach onboarding +
