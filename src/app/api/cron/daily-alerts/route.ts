@@ -57,6 +57,30 @@ function getSupabase() {
   );
 }
 
+// Supabase/PostgREST hard-caps a single response at 1000 rows. Our eligible alert
+// audience is larger (1,541 as of Jul 2026), so a plain .select() silently returned
+// only the first 1000 — leaving ~541 subscribers NEVER processed and pinning the daily
+// send at ~1000 regardless of signups. This pages through the WHOLE set via .range().
+// The query factory MUST include a stable .order() so pages partition cleanly (no
+// overlap / no gaps). Returns all rows; throws on a page error so callers keep their
+// existing error handling.
+const SUPABASE_PAGE_SIZE = 1000;
+async function fetchAllPaged<T = any>(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  makeQuery: () => any,
+  pageSize = SUPABASE_PAGE_SIZE
+): Promise<T[]> {
+  const all: T[] = [];
+  for (let from = 0; ; from += pageSize) {
+    const { data, error } = await makeQuery().range(from, from + pageSize - 1);
+    if (error) throw new Error(error.message);
+    if (!data || data.length === 0) break;
+    all.push(...(data as T[]));
+    if (data.length < pageSize) break; // last page
+  }
+  return all;
+}
+
 function getTransporter() {
   return nodemailer.createTransport({
     host: process.env.SMTP_HOST || 'smtp.office365.com',
@@ -388,21 +412,27 @@ async function runDailyAlertJob(options?: {
     //   mwf      = Mon/Wed/Fri (every other day, BD-friendly)
     //   tth      = Tue/Thu (twice a week)
     // Per-user day check happens inside the loop below.
-    let query = getSupabase()
-      .from('user_notification_settings')
-      .select('*')
-      .eq('is_active', true)
-      .eq('alerts_enabled', true)
-      .in('alert_frequency', ['daily', 'weekdays', 'weekends', 'mwf', 'tth']);
-
-    // If test email specified, only process that user
-    if (options?.testEmail) {
-      query = query.eq('user_email', options.testEmail);
-    }
-
-    const { data: users, error: usersError } = await query;
-
-    if (usersError) {
+    // Page through the ENTIRE eligible audience (was capped at 1000 → ~541 users
+    // silently never processed). Stable .order('user_email') so .range() pages
+    // partition cleanly and the daily batch drains deterministically (alphabetically)
+    // across the dispatcher window instead of an arbitrary, drifting 1000-row window.
+    let users: AlertUser[];
+    try {
+      users = await fetchAllPaged<AlertUser>(() => {
+        let q = getSupabase()
+          .from('user_notification_settings')
+          .select('*')
+          .eq('is_active', true)
+          .eq('alerts_enabled', true)
+          .in('alert_frequency', ['daily', 'weekdays', 'weekends', 'mwf', 'tth'])
+          .order('user_email', { ascending: true });
+        // If test email specified, only process that user
+        if (options?.testEmail) {
+          q = q.eq('user_email', options.testEmail);
+        }
+        return q;
+      });
+    } catch (usersError) {
       console.error('[Daily Alerts] Error fetching users:', usersError);
       return NextResponse.json({ error: 'Failed to fetch users' }, { status: 500 });
     }
@@ -426,12 +456,24 @@ async function runDailyAlertJob(options?: {
     // Multiple cron runs (11, 12, 14, 16 UTC) will process all users
     // =====================================================
     const today = new Date().toISOString().split('T')[0];
-    const { data: alreadyProcessedToday } = await getSupabase()
-      .from('alert_log')
-      .select('user_email, delivery_status')
-      .eq('alert_date', today)
-      .eq('alert_type', 'daily')
-      .in('delivery_status', ['sent', 'skipped', 'failed']);
+    // Page this too: once daily volume exceeds 1000, a capped read here would return
+    // an INCOMPLETE already-processed set → users past row 1000 look un-processed and
+    // get re-sent (duplicate alerts). Order for clean .range() paging.
+    let alreadyProcessedToday: { user_email: string; delivery_status: string }[] = [];
+    try {
+      alreadyProcessedToday = await fetchAllPaged<{ user_email: string; delivery_status: string }>(() =>
+        getSupabase()
+          .from('alert_log')
+          .select('user_email, delivery_status')
+          .eq('alert_date', today)
+          .eq('alert_type', 'daily')
+          .in('delivery_status', ['sent', 'skipped', 'failed'])
+          .order('user_email', { ascending: true })
+      );
+    } catch (e) {
+      // Non-fatal: an empty set just means we may re-consider some users this run.
+      console.error('[Daily Alerts] Error fetching already-processed set:', e);
+    }
 
     const alreadyProcessedEmails = new Set((alreadyProcessedToday || []).map((s: { user_email: string }) => s.user_email));
     if (options?.forceResend && options.testEmail) {
