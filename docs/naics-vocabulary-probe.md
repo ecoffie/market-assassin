@@ -1,124 +1,302 @@
-# NAICS vocabulary PROBE
+# NAICS vocabulary PROBE v2 (cross-NAICS cleaned)
 
-_Real federal-buyer vocabulary mined from live USASpending award descriptions. "df" = # of (top-value) awards using the term. This is the probe to judge quality before the full backfill + naics_vocabulary table._
+_Real federal-buyer vocabulary from live USASpending award text, 49 NAICS. Terms scored by TF-IDF: frequency IN the code × distinctiveness ACROSS codes. Filler that appears in >40% of codes (services, center, year, maintenance) is dropped automatically — no hand-stoplist._
+
+## Dropped as cross-NAICS generic (top 25)
+
+services (44/49), support (34/49), base (29/49), center (29/49), maintenance (23/49), system (23/49), service (23/49), management (20/49), support services (20/49)
 
 ## 238220 — Plumbing/Heating/AC (HVAC)
 
-_300 awards sampled._
+_300 awards._
 
-hvac· (82), system· (36), repair· (33), maintenance· (25), repairs· (19), water· (18), chiller· (18), fire· (17), construction· (15), systems· (15), chillers· (15), boiler· (15), upgrade· (14), heating· (13), center· (13), plant· (12), hvac replacement (11), steam· (11), upgrades· (11), phase· (11), hvac system (10), control· (10), units· (10), boilers· (9), design· (9)
+hvac·, replace·, replacement·, building·, chillers·, boiler·, hvac replacement, heating·, hvac system, chiller·, steam·, water·, fire·, plant·, project·, boilers·, repair·, repairs·, upgrade·, units·
 
 ## 238210 — Electrical Contractors
 
-_300 awards sampled._
+_300 awards._
 
-system· (51), electrical· (46), upgrade· (37), power· (37), fire· (32), repair· (32), switchgear· (22), alarm· (20), maintenance· (18), phase· (18), fire alarm (17), generator· (17), systems· (16), construction· (15), equipment· (15), design· (12), install· (12), upgrades· (11), voltage· (11), emergency· (11), center· (11), infrastructure· (11), line· (10), alarm system (9), aceps· (9)
+electrical·, power·, switchgear·, upgrade·, fire·, fire alarm, alarm·, replacement·, generator·, replace·, alarm system, voltage·, project·, aceps·, substation·, repair·, line·, infrastructure·, phase·, upgrades·
 
 ## 238160 — Roofing Contractors
 
-_300 awards sampled._
+_300 awards._
 
-roof· (209), repair· (83), roof replacement (56), roofs· (40), replace roof (37), roofing· (35), construction· (24), repairs· (22), replace roofs (20), roof repair (18), repair roof (17), maintenance· (17), roof repairs (16), center· (15), design· (14), construction services (13), system· (13), call· (11), repair replace (10), national· (10), call order (9), install· (9), wide· (9)
+roof·, roof replacement, replace roof, roofs·, replace·, roofing·, replacement·, replace roofs, roof repair, repair roof, repair·, building·, roof repairs, building roof, roof building, project·, repair replace, buildings·, construction services, replacement project
+
+## 238110 — Poured Concrete Foundation
+
+_176 awards._
+
+concrete·, watervliet arsenal, watervliet·, arsenal·, reference sheet, reference·, sheet·, install·, repair·, replace·, foundation·, cover cost, parking·, sidewalk·, machine·, cover·, cost·, ramp·, sidewalks·, ladder·
+
+## 238910 — Site Prep Contractors
+
+_300 awards._
+
+demolition·, demo·, demolish·, site·, buildings·, demolish building, building·, road·, abatement·, project·, park·, restoration·, structures·, materials·, removal·, facility·, construction·, labor·, equipment·, work·
+
+## 238320 — Painting/Wall Covering
+
+_300 awards._
+
+paint·, painting·, exterior·, interior·, statement work, paint exterior, statement·, repaint·, exterior painting, japan·, okinawa japan, floor·, okinawa·, coating·, labor materials, idiq·, materials·, please direct, direct young, repaint entire
+
+## 238140 — Masonry Contractors
+
+_93 awards._
+
+masonry·, mortar joints, remove damaged, damaged deteriorated, deteriorated mortar, joints pointing, pointing obtain, obtain visually, visually compatible, compatible features, features create, create same, same color, color tooling, tooling joints, joints resetting, resetting stone, stone remove, remove replace, replace reuse
 
 ## 561720 — Janitorial Services
 
-_300 awards sampled._
+_300 awards._
 
-custodial· (151), custodial services (99), janitorial· (69), janitorial services (43), healthcare· (26), year· (26), cleaning· (25), grounds· (21), healthcare environmental (17), cleaning services (17), environmental· (17), maintenance· (17), environmental cleaning (16), center· (16), abilityone· (16), funding· (16), grounds maintenance (14), housekeeping· (13), management· (13), option year (12), base year (11), housekeeping services (10), recurring· (10), management services (9), custodial grounds (9)
+custodial·, custodial services, janitorial·, janitorial services, cleaning·, healthcare environmental, cleaning services, environmental cleaning, grounds·, healthcare·, abilityone·, grounds maintenance, housekeeping·, housekeeping services, custodial grounds, base custodial, option year, management services, base year, environmental·
 
 ## 561730 — Landscaping Services
 
-_300 awards sampled._
+_300 awards._
 
-maintenance· (187), grounds· (173), grounds maintenance (143), maintenance services (66), period· (24), funding· (24), landscaping· (23), year· (22), removal· (18), ground· (18), snow· (16), ground maintenance (14), snow removal (13), cemetery· (13), recurring· (13), control· (12), equipment· (12), option year (11), national· (11), supervision· (11), maintenance service (10), national cemetery (10), maintenance contract (10), base year (10), area· (10)
+grounds maintenance, grounds·, maintenance services, landscaping·, ground maintenance, snow removal, snow·, cemetery·, maintenance service, maintenance contract, option period, maintenance landscaping, removal·, ground·, funding·, recurring·, option year, supervision·, mowing·, base year
 
 ## 561710 — Exterminating/Pest Control
 
-_300 awards sampled._
+_300 awards._
 
-pest· (219), control· (180), pest control (155), control services (106), management· (54), pest management (48), management services (36), integrated pest (27), year· (27), integrated· (27), period· (18), base year (14), recurring· (14), funding· (13), performance· (12), rodent· (11), control service (10)
+pest·, pest control, control services, control·, pest management, management services, integrated pest, integrated·, control service, base year, rodent·, recurring·, year·, performance·, facilities·, period·, funding·, work·
 
 ## 561612 — Security Guard Services
 
-_300 awards sampled._
+_300 awards._
 
-security· (140), protective· (81), guard· (78), officer· (61), protective security (60), security officer (58), officer services (53), guard services (49), armed· (42), detention· (40), transportation· (36), local· (33), throughout· (33), local guard (30), services throughout (30), state· (28), center· (26), mission· (23), transportation services (19), security services (18), funding· (18), screening services (17), security guard (17), armed protective (17), screening· (17)
+guard·, protective security, guard services, security officer, security·, protective·, officer services, officer·, local guard, armed·, detention·, services throughout, local·, throughout·, security services, screening services, security guard, transportation·, state·, security screening
 
 ## 561320 — Temporary Help (Staffing)
 
-_300 awards sampled._
+_300 awards._
 
-medical· (52), staffing· (47), staffing services (31), nursing· (24), registered· (24), health· (22), physician· (21), center· (20), nurse· (19), temporary· (17), care· (17), healthcare· (16), period· (14), nursing services (13), year· (13), obligated· (13), physician services (12), base obligated (12), technician· (12), emergency· (12), amount· (12), clinical· (11), unit· (11), nurses· (11), technologist· (10)
+staffing services, staffing·, medical·, registered·, temporary·, base obligated, nursing·, physician·, nurse·, obligated·, nursing services, obligated amount, physician services, care·, healthcare·, health·, amount·, registered nurses, clinical·, aggregate·
+
+## 561210 — Facilities Support Services
+
+_292 awards._
+
+operation·, logistics·, logcap·, life support, facilities·, operations maintenance, operations·, management operation, operations support, base operations, base life, operation maintenance, augmentation program, program logcap, facilities maintenance, logistics support, life·, facility·, civil·, industrial operations
+
+## 561621 — Security Systems Services
+
+_300 awards._
+
+security system, security·, access control, alarm·, physical·, fire alarm, protective security, security officer, physical security, armed protective, officer services, access·, electronic security, intrusion detection, control system, fire·, security systems, physical access, armed·, officer·
 
 ## 541512 — Computer Systems Design
 
-_300 awards sampled._
+_300 awards._
 
-enterprise· (61), management· (42), information· (40), technology· (39), information technology (30), system· (27), data· (22), infrastructure· (21), maintenance· (21), development· (20), systems· (19), software· (17), engineering· (16), center· (16), mission· (16), under· (15), ehrm· (15), technical· (13), office· (13), modernization· (13), sustainment· (13), integration· (12), delivery· (12), network· (11), business· (11)
+enterprise·, information technology, information·, technology·, infrastructure·, ehrm·, operations·, enterprise services, data·, modernization·, program management, network·, applications·, defend·, group·, development·, application·, software·, operations maintenance, engineering·
 
 ## 541519 — Other Computer Services
 
-_300 awards sampled._
+_300 awards._
 
-enterprise· (36), software· (35), maintenance· (33), information· (30), management· (28), technology· (25), system· (24), systems· (21), information technology (17), development· (16), center· (15), security· (15), operations maintenance (14), licenses· (13), sustainment· (13), call· (13), delivery· (12), period· (12), license· (11), call order (10), technical· (10), data· (10), license agreement (9), maintenance support (9), sewp· (9)
+enterprise·, information·, software·, information technology, technology·, operations maintenance, licenses·, license agreement, maintenance support, operations·, license·, sewp·, call order, application·, development·, security·, sustainment·, systems·, call·, delivery·
+
+## 541511 — Custom Computer Programming
+
+_300 awards._
+
+development·, enterprise·, software·, operations maintenance, information·, operations·, control battle, battle management, management communications, engineering·, environment·, services support, develop·, battle·, follow·, cloud·, communications·, information technology, technology·, security·
 
 ## 541611 — Admin/Management Consulting
 
-_300 awards sampled._
+_300 awards._
 
-management· (43), technical· (33), office· (31), management support (22), program management (19), administrative· (19), assistance· (17), center· (14), professional· (14), technical assistance (13), idiq· (13), analysis· (13), call· (13), financial· (12), data· (11), transformation· (11), training· (11), technical support (10), systems· (10), system· (10), operational· (10), health· (9), national· (9), business· (9), strategic· (9)
+management support, program management, programs·, financial·, technical·, program·, administrative·, transformation·, technical assistance, assistance·, office·, technical support, strategic·, hill·, idiq·, analysis·, professional·, operational·, business·, call·
 
 ## 541330 — Engineering Services
 
-_298 awards sampled._
+_298 awards._
 
-engineering· (74), systems· (42), system· (27), logistics· (27), technical· (26), design· (24), engineering services (23), management· (23), development· (21), mission· (21), test· (20), training· (17), integration· (16), sustainment· (15), ground· (15), systems engineering (13), maintenance· (13), performance· (13), program management (12), integrated· (12), technology· (12), engineering support (11), production· (11), operational· (11), technical support (10)
+engineering·, engineering services, logistics·, systems engineering, services support, test·, systems·, engineering support, program management, operations·, mission·, ground·, technical·, integration·, technical support, development·, production·, program·, design·, missile·
 
 ## 541930 — Translation/Interpretation
 
-_300 awards sampled._
+_300 awards._
 
-language· (134), sign language (63), interpretation· (63), sign· (63), translation· (55), interpreting· (37), interpreter· (35), language services (32), interpretation services (29), language interpreting (29), interpreting services (28), translations· (27), foreign· (25), interpreter services (24), foreign language (23), call· (22), language interpretation (20), translation services (19), call order (18), office· (17), translations interpretation (14), year· (13), language translations (12), language interpreter (11), international· (11)
+language·, sign language, interpretation·, sign·, translation·, language services, interpretation services, language interpreting, interpreting·, interpreting services, interpreter·, interpreter services, foreign language, translations·, language interpretation, foreign·, translation services, translations interpretation, language translations, call order
+
+## 541990 — Other Professional/Technical
+
+_300 awards._
+
+activity·, safari·, overseas contract, usaid·, overseas·, research analysis, research·, analysis support, research development, analysis·, health·, development·, technical·, improve·, studies·, engineering·, technical assistance, funded·, through·, assistance·
+
+## 541614 — Logistics Consulting
+
+_299 awards._
+
+logistics·, logistics support, contractor logistics, warehouse·, facility·, aviation·, management support, planning·, housing·, base year, supply·, mission·, labor·, assistance·, transportation·, performance·, equipment·, year·, program·, operations·
+
+## 541620 — Environmental Consulting
+
+_300 awards._
+
+technical support, environmental·, technical·, assessment·, start·, response·, consulting·, compliance·, assistance·, division·, activities·, call order, environmental services, program support, order under, technical assistance, scientific·, site·, program·, remedial·
+
+## 541380 — Testing Laboratories
+
+_300 awards._
+
+testing·, centralized omics, omics resource, resource core, analytical·, resource·, core·, laboratory·, centralized·, analysis·, omics·, nhlbi trans, trans omics, omics precision, precision medicine, medicine topmed, topmed centralized, test·, laboratory support, esat·
+
+## 541712 — Physical/Bio Research
+
+_300 awards._
+
+engineering·, engineering professional, professional administrative, directorate·, administrative support, services epass, research development, epass·, development·, space·, research·, systems engineering, engineering technical, life cycle, technology·, technologies·, professional·, administrative·, division·, systems·
 
 ## 236220 — Commercial Building Construction
 
-_300 awards sampled._
+_300 awards._
 
-construction· (100), design· (77), build· (61), design build (60), center· (29), compound· (27), construct· (26), construction services (22), build construction (22), phase· (22), embassy· (21), hangar· (18), embassy compound (16), design construction (15), border· (15), complex· (14), repair· (12), guam· (12), build services (11), modernization· (11), joint· (11), naval· (10), maintenance· (10), services embassy (9), barrier· (9)
+design build, build·, construction·, design·, compound·, build construction, construction services, construct·, design construction, hangar·, facility·, build services, complex·, joint·, building·, facilities·, phase·, barrier·, consulate·, modernization·
+
+## 236210 — Industrial Building Construction
+
+_300 awards._
+
+space center, design build, facility·, building·, space·, build·, construction·, replace·, storage·, repair·, renovation·, final·, hvac·, design·, construct·, project·, replacement·, hangar·, roof·, repairs·
+
+## 237310 — Highway/Street/Bridge
+
+_300 awards._
+
+project consists, consists·, road·, work includes, construction·, bridge·, flap·, project·, pavement·, parking·, construction contract, project project, rehabilitation·, reconstruction·, erfo·, consists repairing, work·, drainage·, roadway·, construction project
+
+## 237110 — Water/Sewer Line Construction
+
+_299 awards._
+
+water·, sewer·, treatment·, treatment plant, water treatment, wastewater·, replace·, potable water, sanitary sewer, plant·, potable·, tank·, sanitary·, wastewater treatment, repair water, repair·, treatment system, replacement·, pump·, lines·
 
 ## 332710 — Machine Shops
 
-_300 awards sampled._
+_300 awards._
 
-assembly· (37), fabrication· (26), equipment· (15), assemblies· (14), ring· (11), river· (11), adapter· (10), locks· (9), delivery· (9), test· (9)
+assembly·, fabrication·, assemblies·, ring·, adapter·, locks·, river·, test·, delivery·, equipment·
+
+## 332312 — Fabricated Structural Metal
+
+_300 awards._
+
+steel·, fabrication·, gate·, building special, marietta repair, special·, lock·, marietta·, material·, supply·, purchase·, assembly·, metal·, materials·, building·, delivery·, production·, repair·, area·, work·
 
 ## 333415 — AC/Refrigeration Equipment Mfg
 
-_300 awards sampled._
+_300 awards._
 
-chiller· (36), unit· (33), cooling· (23), compressor· (21), units· (20), environmental· (17), coil· (17), cooling coil (15), cooler· (14), compressor refriger (12), repair· (12), refriger· (12), hvac· (12), purchase· (12), cooler unit (11), refrigeration· (11), environmental contr (9), system· (9), contr· (9), trane· (9), equipment· (9)
+chiller·, cooling·, compressor·, cooling coil, unit·, coil·, compressor refriger, units·, cooler unit, cooler·, refriger·, environmental contr, refrigeration·, environmental·, contr·, trane·, hvac·, purchase·, replacement·, repair·
+
+## 336611 — Ship Building and Repair
+
+_296 awards._
+
+availability·, dsra·, usns·, selected restricted, restricted availability, delivery order, class·, ship·, planning·, material·, docking·, selected·, restricted·, lead·, craft·, long lead, lead time, time material, detail design, fiscal year
 
 ## 621111 — Offices of Physicians
 
-_300 awards sampled._
+_300 awards._
 
-medical· (111), medical disability (60), disability· (60), benefits· (52), exams· (45), disability examinations (44), examinations· (44), physician· (41), region· (40), under· (37), public· (37), examinations mdes (36), mdes under (36), under section (36), benefits improvements (36), improvements public (36), mdes· (36), section· (36), improvements· (36), public region (34), physician services (30), health· (25), emergency· (25), center· (25), examination· (20)
+medical disability, disability·, disability examinations, benefits·, medical·, examinations mdes, mdes under, under section, benefits improvements, improvements public, exams·, examinations·, public·, mdes·, section·, improvements·, physician·, physician services, funding task, examination services
 
 ## 622110 — General Hospitals
 
-_300 awards sampled._
+_300 awards._
 
-medical· (78), registered· (48), physician· (46), nurse· (42), registered nurse (33), ancillary· (29), nursing· (29), certified· (28), clinical· (26), health· (25), technician· (24), assistant· (23), dental· (22), center· (22), assistants· (22), medical center (21), pharmacist· (18), nurses· (18), licensed· (17), nursing services (16), physical· (16), therapist· (16), ancillary services (15), registered nurses (15), hospital· (15)
+registered nurse, registered·, medical·, physician·, nurse·, ancillary·, certified·, dental·, assistants·, clinical·, medical center, ancillary services, nursing·, medical services, technician·, licensed·, certified medical, assistant·, registered nurses, therapist·
+
+## 621399 — Other Health Practitioners
+
+_300 awards._
+
+medical·, registered nursing, registered·, nursing·, nursing services, personal·, nurse·, personal healthcare, healthcare services, pharmacist·, services area, area wide, service unit, nurse practitioner, wide idiq, healthcare·, staffing·, crna·, crna services, pharmacy·
 
 ## 484121 — General Freight Trucking
 
-_91 awards sampled._
+_91 awards._
 
-commercial trucking (38), trucking solution (38), solution contract (38), commercial· (38), trucking· (38), solution· (38), movement· (26), transportation· (21), movement from (17), iwakuni· (17), oversized· (15), oversized overweight (14), general trucking (14), overweight· (14), washington· (11), trucking transportation (10), transportation george (10), george washington (10), george· (10), yokosuka· (10), osow· (10), jasdf· (10), cargo· (8), exercise support (7), trucking movement (7)
+commercial trucking, trucking solution, solution contract, trucking·, solution·, commercial·, movement·, movement from, oversized overweight, general trucking, general·, contract general, oversized·, overweight·, trucking transportation, transportation·, osow·, exercise support, trucking movement, cargo·
+
+## 488510 — Freight Transportation Arrangement
+
+_300 awards._
+
+pack·, shipping·, transportation·, permanent change, relocation·, supply·, freight·, permanent·, change·, consolidated transportation, transportation shipments, shipments made, made decentralized, decentralized ordering, ordering officers, global household, household goods, goods relocation, relocation services, services service
 
 ## 811310 — Industrial Machinery Repair
 
-_300 awards sampled._
+_300 awards._
 
-maintenance· (100), repair· (91), sustainment· (43), repair sustainment (35), noise· (35), suppression· (34), noise suppression (33), suppression repair (33), equipment· (25), maintenance repair (20), preventive· (19), system· (17), preventive maintenance (15), marine· (15), prepositioning program (14), prepositioning· (14), year· (12), systems· (12), period· (12), maintenance services (11), power· (11), preventative· (11), emergency· (10), nirop capital (9), capital maintenance (9)
+repair sustainment, noise suppression, suppression repair, noise·, suppression·, repair·, maintenance repair, sustainment·, preventive maintenance, preventive·, prepositioning program, marine·, prepositioning·, nirop capital, capital maintenance, maintenance services, power·, preventative·, nirop·, inspection·
+
+## 811210 — Electronic Equipment Repair
+
+_300 awards._
+
+repair services, maintenance repair, express report, equipment maintenance, data purchase, order data, repair·, report·, purchase order, maintenance services, varian·, express·, hearing contract, repairs·, radio·, laircm repairs, land mobile, purchase·, data·, equipment·
+
+## 561499 — Other Business Support
+
+_300 awards._
+
+mail·, mailroom·, mail manifesting, manifesting services, postage·, manifesting·, locker·, processing·, management consolidated, consolidated business, business center, administrative·, indoor·, business·, records·, consolidated·, office·, operations·, environmental·, medical·
+
+## 561110 — Office Administrative Services
+
+_300 awards._
+
+administrative support, administrative·, administrative services, admin·, professional support, office·, management support, professional·, personnel·, medical·, records·, administration·, personal·, program·, research·, facility·, operations·
+
+## 423450 — Medical Equipment Wholesalers
+
+_300 awards._
+
+modality·, purchase order, medical surgical, purchase·, surgical·, modality purchase, canon·, medical·, prime vendor, report medical, surgical prime, vendor expenditures, expenditures month, express report, prime·, consolidation·, vendor·, expenditures·, digital radiology, pacs·
+
+## 423610 — Electrical Equipment Wholesalers
+
+_300 awards._
+
+procure·, procure replace, gradation with, with binder, replace·, material only, units·, gradation·, binder·, model·, only·, cooled·, chiller·, portable·, material·, concrete·, unit·, install·
+
+## 511210 — Software Publishers
+
+_300 awards._
+
+licenses·, microsoft·, software·, enterprise·, subscription·, license·, software licenses, microsoft enterprise, servicenow·, renewal·, enterprise license, subscription licenses, software maintenance, enterprise agreement, license agreement, maintenance support, products·, platform·, subscriptions·, information·
+
+## 517311 — Wired Telecom Carriers
+
+_300 awards._
+
+circuit·, eastern western, commercial·, western operational, commercial circuit, telecommunications·, eastern·, operational communications, communications services, local·, western·, telecommunication services, telecommunication·, ethernet·, telecommunications services, local exchange, communications·, nlec·, ewocs·, link·
+
+## 928110 — National Security
+
+_43 awards._
+
+suntax·, suntax access, access agreement, access·, parts·, fraud·, security·, support ground, ground radar, radar requirement, requirement necessary, necessary make, make extension, equipment training, uscis office, office fraud, fraud detection, development department, state california, logistics support
+
+## 115310 — Support for Forestry
+
+_300 awards._
+
+irsc·, total·, contract value, value·, total contract, stewardship·, stewardship irsc, performance period, forest·, period awarded, awarded items, usda·, usda performance, items·, awarded·, single engine, flight services, fuels·, engine tanker, tanker seat
+
+## 562910 — Remediation Services
+
+_300 awards._
+
+remedial action, remediation·, action·, remedial·, superfund site, site·, environmental·, superfund·, response·, environmental remediation, removal·, remediation services, activities·, pfas·, former·, remediation contract, completion·, fusrap·, optimized remediation, waste·
 
