@@ -13,6 +13,11 @@
       Also set `DAILY_ALERT_BATCH_SIZE=250` (prod, bound on the #113 build).
   - If it does NOT climb: check the deploy actually bound the env, that the dispatcher
     is firing all ~21 runs, and re-run the live count (eligible should be ≥1,541).
+- [ ] **Confirm `DAILY_ALERT_BATCH_SIZE=250` actually took effect.** It was set in prod
+      Jul 11 but env vars only bind on a build AFTER they're added — the #113 merge build
+      should have bound it, but verify: the daily run should drain all ~1,541 in ~7 runs
+      (not ~11). If sends still behave like batch=150 (plateau / slow drain), the env
+      didn't bind → trigger a fresh redeploy (empty commit) to pick it up.
   - Next scaling knob: bump `DAILY_ALERT_BATCH_SIZE` toward ~500 (env only, ~10k/day
     capacity) when eligible audience nears ~3,000. Capacity now = 21 runs × 250 = ~5,250/day.
 
