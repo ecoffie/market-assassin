@@ -34,7 +34,18 @@ const STOP = new Set([
 ]);
 
 function clean(s: string): string {
-  return (s || '').toLowerCase().replace(/[^a-z0-9\s-]/g, ' ').replace(/\s+/g, ' ').trim();
+  // Strip dangling hyphens (PSC titles like "MEDICAL- NURSING" leak "medical-").
+  return (s || '').toLowerCase().replace(/[^a-z0-9\s-]/g, ' ')
+    .replace(/\s-+|-+\s/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+// A phrase whose first OR last token is a stopword reads as a fragment
+// ("hvac installation and", "buildings hvac repair" is fine but "and hvac" isn't).
+// Reject phrases with a filler word on either EDGE — the signal must anchor the ends.
+function edgesAreSignal(tokens: string[]): boolean {
+  const first = tokens[0];
+  const last = tokens[tokens.length - 1];
+  return !STOP.has(first) && !STOP.has(last);
 }
 
 /** Extract candidate keyword phrases (1-3 word, signal-bearing) from text. */
@@ -46,15 +57,16 @@ function candidatePhrases(text: string): string[] {
   for (const w of words) {
     if (w.length >= 4 && !STOP.has(w) && !/^\d+$/.test(w)) out.add(w);
   }
-  // Bigrams / trigrams where at least one token is signal-bearing.
+  // Bigrams / trigrams where at least one token is signal-bearing AND neither edge
+  // is a stopword (drops "hvac installation and" / "staffing for va" fragments).
   for (let i = 0; i < words.length - 1; i++) {
     const bi = [words[i], words[i + 1]];
-    if (bi.every((w) => w.length >= 3) && bi.some((w) => !STOP.has(w) && w.length >= 4)) {
+    if (bi.every((w) => w.length >= 3) && bi.some((w) => !STOP.has(w) && w.length >= 4) && edgesAreSignal(bi)) {
       out.add(bi.join(' '));
     }
     if (i < words.length - 2) {
       const tri = [words[i], words[i + 1], words[i + 2]];
-      if (tri.every((w) => w.length >= 3) && tri.filter((w) => !STOP.has(w)).length >= 2) {
+      if (tri.every((w) => w.length >= 3) && tri.filter((w) => !STOP.has(w)).length >= 2 && edgesAreSignal(tri)) {
         out.add(tri.join(' '));
       }
     }

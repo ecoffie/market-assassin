@@ -11,8 +11,9 @@
  * (codes, $, agencies) still comes from real data.
  */
 import { callLLM } from '@/lib/llm/call-llm';
-import { keywordCoverage } from './keyword-coverage';
-import { sanitizeKeywords } from './keyword-sanitize';
+import { keywordCoverage, deriveCoverageKeywords } from './keyword-coverage';
+import { sanitizeKeywords, distinctiveKeywords } from './keyword-sanitize';
+import { deriveSemanticKeywords } from './semantic-keywords';
 
 export interface ExtractedProfile {
   industryPhrase: string;          // what the LLM decided this company does
@@ -143,19 +144,24 @@ export async function buildProfileFromText(text: string): Promise<ExtractedProfi
 
   // 1) The INDUSTRY phrase — LLM first (understands "facility services + janitorial
   //    = cleaning"), keyword fallback if the LLM is unavailable.
-  const keywords = sanitizeKeywords(t.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)).slice(0, 12);
+  //    lexicalKeywords = the raw single-word tokens of the sentence, used ONLY as
+  //    the meaningful-input guard and as a last-resort fallback. They are NOT the
+  //    final keywords: splitting "commercial HVAC systems" into single words leaves
+  //    only "hvac" (commercial/systems are generic), a thin profile that misses the
+  //    market. The real keywords come from deriveSemanticKeywords below (step 4).
+  const lexicalKeywords = sanitizeKeywords(t.toLowerCase().replace(/[^a-z0-9\s]/g, ' ').split(/\s+/)).slice(0, 12);
 
   // Guard against the LLM hallucinating an industry for nonsense (QA: "asdfqwer
   // zxcvbnm" → cyber codes). If the input has no real dictionary-ish words (no
   // sanitizable keywords AND no recognizable industry token), don't fabricate a
   // profile — be honest that we couldn't tell.
-  const looksMeaningful = keywords.length > 0 || /\b(it|hr|ai|qa)\b/i.test(t);
+  const looksMeaningful = lexicalKeywords.length > 0 || /\b(it|hr|ai|qa)\b/i.test(t);
   if (!looksMeaningful) return null;
 
   let industryPhrase = await llmIndustryPhrase(t);
   let source: 'llm' | 'keyword-fallback' = 'llm';
   if (!industryPhrase) {
-    industryPhrase = keywords.slice(0, 2).join(' ') || keywords[0] || t.slice(0, 60);
+    industryPhrase = lexicalKeywords.slice(0, 2).join(' ') || lexicalKeywords[0] || t.slice(0, 60);
     source = 'keyword-fallback';
   }
 
@@ -167,6 +173,35 @@ export async function buildProfileFromText(text: string): Promise<ExtractedProfi
   const states = detectStates(t);
   const setAsides = detectSetAsides(t);
   const agencies = await topAgencies(naics);
+
+  // 4) KEYWORDS BY MEANING — the fix. Single-word tokenization of the sentence
+  //    ("commercial HVAC systems" → only "hvac") leaves a thin, generic profile
+  //    that misses body-buried opps. Derive real phrase keywords ("hvac systems",
+  //    "hvac maintenance", "mechanical") from the company's OWN words + the grounded
+  //    NAICS titles + the LLM industry phrase — the same semantic engine the UEI
+  //    autofill path uses (memory: semantic_keywords_from_uei). Fails soft to the
+  //    lexical tokens so a keyword is never empty.
+  let keywords = lexicalKeywords;
+  try {
+    // NAICS titles + PSC product name from real award data ("who buys this"),
+    // plus deriveCoverageKeywords (keyword + top-PSC name + NAICS signal words).
+    const naicsTitles = (cov?.allNaics || []).slice(0, 6).map((n) => n.name).filter(Boolean);
+    const coverageKw = cov ? deriveCoverageKeywords(cov) : [];
+    const derived = await deriveSemanticKeywords({
+      oneLiner: industryPhrase,
+      capabilities: [t, ...coverageKw],
+      naicsDescriptions: naicsTitles,
+      pscDescriptions: cov?.topPsc?.name ? [cov.topPsc.name] : [],
+    }, 12);
+    // Keep only distinctive keywords (phrases + non-generic singles) so the profile
+    // isn't flooded with "systems"/"commercial"-style noise. Lead with the LLM
+    // industry phrase (the strongest single signal), then the semantically-ranked
+    // set, then coverage keywords, then the raw tokens as a floor.
+    const merged = distinctiveKeywords([industryPhrase, ...derived, ...coverageKw, ...lexicalKeywords]);
+    if (merged.length > 0) keywords = merged.slice(0, 12);
+  } catch {
+    /* embeddings unavailable — keep the lexical tokens */
+  }
 
   return {
     industryPhrase,

@@ -586,15 +586,25 @@ export default function OnboardingPage() {
       const naics: string[] = Array.isArray(identity.primary_naics)
         ? identity.primary_naics.filter((c: unknown) => typeof c === 'string' && /^\d{2,6}$/.test(c))
         : [];
+      // The AI coach one-liner + elevator pitch live on `d.identity` (the prefill GET
+      // layers them onto identity), NOT `d.ai_coach` — reading d.ai_coach?.one_liner
+      // was always undefined, so the profile fell back to the legal name and the
+      // pitch was silently dropped. Read them from identity and carry BOTH through
+      // so confirmAuto can write them to the Vault.
+      const oneLiner: string = (identity.one_liner || '').trim();
+      const elevatorPitch: string = (identity.elevator_pitch || '').trim();
       // Map prefill → the confirm screen's autoProfile shape. industryPhrase from
       // the AI one-liner (or legal name); agencies from real award history.
       const agencyNames = Array.from(new Set(
         (d.past_performance || []).map((p: { agency?: string }) => p.agency).filter(Boolean),
       )).slice(0, 6).map((name) => ({ name }));
       setAutoProfile({
-        industryPhrase: (d.ai_coach?.one_liner || identity.legal_name || 'Your business').slice(0, 80),
+        industryPhrase: (oneLiner || identity.legal_name || 'Your business').slice(0, 80),
         naics,
         naicsCount: naics.length,
+        // Semantic keywords from the company's own words (one-liner + pitch +
+        // AI-drafted capabilities + NAICS titles) so the UEI path isn't keyword-empty
+        // either. Derived server-side by the prefill POST; seeded here for display.
         keywords: [],
         topPsc: null,
         agencies: agencyNames,
@@ -603,12 +613,23 @@ export default function OnboardingPage() {
         totalMarket: 0,
         uei,                       // carried through confirmAuto → Vault write
         legalName: identity.legal_name || null,
+        oneLiner: oneLiner || null,          // → Vault identity.one_liner
+        elevatorPitch: elevatorPitch || null, // → Vault identity.elevator_pitch
+        // Full prefill payload carried so confirmAuto can write the COMPLETE Vault
+        // identity (incl. one_liner + elevator_pitch), real past-perf, AI-drafted
+        // capabilities + sample past-perf, and derive semantic keywords. The old
+        // `accept:{...}` shorthand wrote NOTHING (the POST reads body.identity, not
+        // body.accept), so the pitch never persisted → Vault re-prompted "set up".
+        prefillIdentity: identity,
+        prefillPastPerformance: Array.isArray(d.past_performance) ? d.past_performance : [],
+        aiCapabilities: Array.isArray(d.capabilities) ? d.capabilities : [],
+        aiSamplePp: Array.isArray(d.sample_past_performance) ? d.sample_past_performance : [],
         pastPerfCount: (d.past_performance || []).length,
       });
       track('onboarding_step', 'onboarding', { step: 'uei_extract', uei, pastPerf: (d.past_performance || []).length });
       // Even the UEI path gets a market reveal — overview grounds $ + tiles from the
       // one-liner + the registration's NAICS (covers UEI's totalMarket=0).
-      void loadOverview({ industryPhrase: (d.ai_coach?.one_liner || identity.legal_name || ''), naics });
+      void loadOverview({ industryPhrase: (oneLiner || identity.legal_name || ''), naics });
     } catch {
       setScanPhase('idle');
       setError('Couldn’t reach SAM.gov just now. Try again or describe your business instead.');
@@ -624,13 +645,32 @@ export default function OnboardingPage() {
       // UEI path: write SAM identity + USASpending past performance into the Vault
       // FIRST (non-blocking) — this is what grounds the hidden-match capability
       // vector on real award history. Failure here doesn't block the profile save.
-      if (autoProfile.uei) {
+      // Send the REAL payload the POST handler reads (identity / past_performance /
+      // capabilities / sample_past_performance) — NOT the old `accept:{...}` shorthand,
+      // which the handler ignored, so the one-liner + elevator pitch never persisted
+      // and the Vault re-prompted the user to "set up Mindy" again. Capture the
+      // server-derived semantic keywords so we save THEM (not an empty list).
+      let ueiKeywords: string[] = [];
+      if (autoProfile.uei && autoProfile.prefillIdentity) {
         try {
-          await authedFetch('/api/app/vault/prefill', email, {
+          const vRes = await authedFetch('/api/app/vault/prefill', email, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-            body: JSON.stringify({ email, uei: autoProfile.uei, accept: { identity: true, past_performance: true } }),
+            body: JSON.stringify({
+              email,
+              uei: autoProfile.uei,
+              identity: {
+                ...autoProfile.prefillIdentity,
+                one_liner: autoProfile.oneLiner || autoProfile.prefillIdentity.one_liner || null,
+                elevator_pitch: autoProfile.elevatorPitch || autoProfile.prefillIdentity.elevator_pitch || null,
+              },
+              past_performance: autoProfile.prefillPastPerformance || [],
+              capabilities: autoProfile.aiCapabilities || [],
+              sample_past_performance: autoProfile.aiSamplePp || [],
+            }),
           });
+          const vData = await vRes.json().catch(() => null);
+          if (Array.isArray(vData?.keywords_derived)) ueiKeywords = vData.keywords_derived;
         } catch { /* non-fatal — alerts profile below still saves */ }
       }
       const res = await fetch('/api/mindy/profile', {
@@ -648,8 +688,10 @@ export default function OnboardingPage() {
           precise: true,
           // Persist the extracted keywords — they were shown on the confirm screen
           // but used to be dropped, leaving keyword-empty profiles. The user's own
-          // words are the strongest search signal.
-          keywords: autoProfile.keywords || [],
+          // words are the strongest search signal. UEI path: use the semantic
+          // keywords the Vault prefill derived from the company's identity (the
+          // describe-business path already carries them on autoProfile.keywords).
+          keywords: (ueiKeywords.length ? ueiKeywords : autoProfile.keywords) || [],
           businessType: autoProfile.setAsides?.[0] || 'Small Business',
           setAsides: autoProfile.setAsides || [],
           targetAgencies: (autoProfile.agencies || []).map((a: { name: string }) => a.name),
