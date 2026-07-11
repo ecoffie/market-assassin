@@ -1,6 +1,35 @@
 # GovCon Giants - Tasks by Priority
 
-**Last Updated:** July 5, 2026
+**Last Updated:** July 11, 2026
+
+---
+
+## 🔄 RECONCILIATION — July 11, 2026 (post-`90c0fe91` pull)
+
+Reconciled the list against what actually landed on `main`. Closed items below:
+- **RLS everywhere — DONE + LIVE** (`b7528e6a`, Jul 10): all 127 public tables now
+  ENABLE+FORCE RLS + service_role policy + REVOKE anon/authenticated. Verified live
+  (anon-readable 127→0). This supersedes the Coach-Mode "RUN the RLS migration" item —
+  the coach/org tables are covered by the base-wide sweep. `20260702_coach_org_rls.sql`
+  is committed and its policies are in place.
+- **Founders Lifetime $4,997 — MERGED + LIVE** (`b083c4dc`, Jul 5): branch merged to
+  main; `$2,997` bootcamp rate discontinued; pricing forced to `$4,997`; Stripe link
+  `28E00k6IC5V0fRH5WMfnO0G` wired into `purchase-attribution.ts`. Only residual is a
+  Stripe-dashboard verification (see that section).
+- **Coach Mode add-on $99/mo + Teams cap 10→5 — SHIPPED** (`594802e6`).
+- **SMS → GHL-only — SHIPPED** (`7ac54b41` removed all Twilio *code*; double opt-in +
+  STOP webhook live). ⚠️ `twilio@^5.12.2` is still a dep in `package.json` — dead
+  weight, safe to drop in a cleanup.
+- **Read replica — FULLY ACTIVATED + LIVE** (verified Jul 11): replica provisioned in
+  Supabase (Oregon, HEALTHY, Jul 6) + `SUPABASE_REPLICA_URL` set in Vercel Prod (5d ago).
+  ~19 admin-analytics routes + snapshot-metrics cron already route to it. Remaining work
+  is only migrating the hot production read paths (`user_notification_settings`,
+  `email_provider_sends`, `user_pipeline`) with a read-after-write audit — see Resilience.
+- **Design system / De-vibe (P1–P5), audit_log, login-abuse Slack alerts, DIBBS panel,
+  Vitest + pre-push gate — all SHIPPED** in this pull.
+
+⚠️ **Stale framing:** the "NCMBC demo (Monday)" section below was written Jul 5 for a
+demo that has since passed. Treating its Coach-Mode Phase 1 checklist as shipped.
 
 ---
 
@@ -11,11 +40,23 @@ this session: graceful degradation (8 routes), db-health-watch (hourly), vault
 export/delete, RLS backstop, strong-auth, no-training AI guarantee, DB daily
 backups verified, **vault-file backup (daily, live)**, read-replica **factory**.
 
-- [ ] **READ REPLICA — activate** (factory already shipped as a no-op). ~$70/mo,
-      ~½ day. Steps: Supabase → Replication → add same-region replica → set
-      `SUPABASE_REPLICA_URL` in Vercel → migrate `daily-alerts` to `getReadClient()`
-      FIRST (audit read-after-write), then weekly-alerts/briefings/forecasts.
-      **Do AFTER the NCMBC demo.**
+- [x] **READ REPLICA — ACTIVATED** (verified Jul 11). Replica LIVE in Supabase
+      (ID `lxlqk`, West US Oregon `us-west-2` t4g.medium, created Jul 6, HEALTHY) +
+      `SUPABASE_REPLICA_URL` set in Vercel Production (5d ago). The `getReadClient()`
+      factory returns the replica whenever that env is present → **~19 routes are
+      already live-routing to Oregon**: all `/api/admin/*` analytics
+      (dashboard, engagement-metrics, mi-growth-brief, qualify-customers, churn-risk,
+      mrr-goal, dau-wau-history, beta-conversion, feature-usage, etc.) + the
+      `snapshot-metrics` cron + the sam-gov briefings pipeline. This was the OOM-relief
+      goal (`e2a83a5f`) — DONE.
+- [ ] **READ REPLICA — migrate the HOT production read paths** (the real remaining work).
+      The firehose in the logs is `user_notification_settings` (called on every
+      alert/briefing/cron pass), `email_provider_sends`, `user_pipeline` — none on the
+      replica yet. Order: (1) safe-to-stale first → `email_provider_sends` + any pure
+      analytics read; (2) then `daily-alerts` / weekly-alerts / briefings crons, but
+      AUDIT read-after-write on `user_notification_settings` + `user_pipeline` (users
+      write then immediately re-read these) before switching. Factory + env are ready —
+      this is per-route code only, no infra.
 - [ ] **PITR** — OFF on purpose (daily backups are the baseline). Enable only if a
       contract needs sub-day recovery (~$100/mo, 30-sec toggle).
 - [ ] **Off-provider file backup** (S3/R2) — later tier; only if a contract needs
@@ -40,8 +81,10 @@ star of this demo (a coach/counselor managing many client small businesses).
   - [x] NCMBC enterprise org provisioned (eric=org_admin, unlimited, test clients cleared)
   - [x] 60-business NC sample roster (`scripts/demo-rosters/ncmbc-sample-clients.txt`)
   - [x] RLS on org tables (anon backstop) + app-level isolation AUDITED (PRD Risk #1 clean)
-  - [ ] **RUN the RLS migration** `20260702_coach_org_rls.sql` in Supabase (on clipboard)
+  - [x] **RLS migration** — superseded by the Jul 10 base-wide RLS sweep (`b7528e6a`,
+    all 127 tables live); coach/org tables covered. `20260702_coach_org_rls.sql` committed.
   - [ ] **Smoke-test live**: /app → My Clients → import roster → search → switch → drill in
+    *(not verified from code — needs a live pass)*
   - Memory: `coach_mode_tenancy` (shared DB decision), `coach_mode_header_drop`.
   - Phase 2 (after Monday / roadmap): org-admin counselor mgmt + assignment, Org Tab news
     posting UI, analytics/funder reporting, white-label branding. Engine/schema ready.
@@ -400,8 +443,10 @@ Public anchor: Founders $4,997 on getmindy.ai/lifetime + govcongiants.com homepa
 
 **Eric — Stripe dashboard (blocks go-live):**
 - [x] Create Founders Lifetime $4,997 payment link → `buy.stripe.com/28E00k6IC5V0fRH5WMfnO0G`
+- [x] Merge branch + deploy — DONE (`b083c4dc` on main, pricing forced to $4,997)
 - [ ] Update bootcamp $1,497 link metadata to `tier=briefings_lifetime` (or create new link)
-- [ ] Merge branch + deploy
+- [ ] **Verify no stale $2,997 Stripe link is still live** (commit note flagged the old
+      $2,997 dashboard link may still charge — kill or repoint it)
 
 ---
 
