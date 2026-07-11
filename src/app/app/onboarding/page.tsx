@@ -546,12 +546,20 @@ export default function OnboardingPage() {
     const tiles = (overview?.tiles || []) as Array<{ key: string; count: number }>;
     const tileCount = (k: string) => tiles.find((t) => t.key === k)?.count || 0;
     const market = overview?.market?.totalMarket || autoProfile.totalMarket || 0;
-    const codeCount = autoProfile.naicsCount || (autoProfile.naics || []).length || 0;
+    // Two DIFFERENT numbers, labeled honestly:
+    //  • marketCodeCount = how many NAICS the money spreads across (the real,
+    //    paginated market breadth) → "NAICS codes in your market".
+    //  • appliedCodeCount = the tight ~90%-coverage set Mindy actually watches.
+    // The old label "NAICS codes mapped" on the big number was wrong — we don't map
+    // 122 codes onto the profile, we watch the 6 that hold the money.
+    const marketCodeCount = autoProfile.naicsCount || (autoProfile.naics || []).length || 0;
+    const appliedCodeCount = (autoProfile.naics || []).length || 0;
     const contractors = overview?.scope?.contractors || 0;
     const agencies = overview?.scope?.agencies || 0;
     const stats: RevealData['stats'] = [];
     if (market > 0) stats.push({ icon: '💰', display: money(market), label: 'addressable market', accent: true });
-    if (codeCount) stats.push({ icon: '🧩', value: codeCount, label: 'NAICS codes mapped' });
+    if (appliedCodeCount) stats.push({ icon: '🎯', value: appliedCodeCount, label: 'NAICS codes we watch' });
+    if (marketCodeCount > appliedCodeCount) stats.push({ icon: '🧩', value: marketCodeCount, label: 'NAICS codes in your market' });
     if (agencies) stats.push({ icon: '🏛️', value: agencies, label: 'buying agencies' });
     if (contractors) stats.push({ icon: '🏢', value: contractors, label: 'contractors in your space' });
     if (tileCount('forecasts')) stats.push({ icon: '📋', value: tileCount('forecasts'), label: 'forecasted buys' });
@@ -1104,25 +1112,35 @@ export default function OnboardingPage() {
                   under-reporting $1.4B as $8M — fixed in keyword-coverage). */}
               {(autoProfile.naics?.length || 0) > 1 && (
                 <div className="mb-4 rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/40 to-slate-900 p-4">
+                  {/* ONE story, two numbers: the HERO is the tight applied set (the
+                      chips below — e.g. 6). The supporting proof is the FULL market —
+                      $ + how many codes the money actually spreads across (now a REAL
+                      paginated count, not the old cap-shaped "100"). Framing makes the
+                      small number the thing we watch and the big number why it matters,
+                      instead of two competing "how many codes?" claims. */}
                   <div className="flex items-baseline gap-2">
                     <span className="text-3xl font-black text-emerald-400">{autoProfile.naics.length}</span>
-                    <span className="text-sm font-semibold text-white">NAICS codes cover ~90% of your market</span>
+                    <span className="text-sm font-semibold text-white">
+                      {autoProfile.totalMarket ? (
+                        <>codes cover ~90% of your{' '}
+                          <span className="text-emerald-300">
+                            {autoProfile.totalMarket >= 1e9
+                              ? `$${(autoProfile.totalMarket / 1e9).toFixed(1)}B`
+                              : `$${Math.round(autoProfile.totalMarket / 1e6)}M`}
+                          </span>{' '}market</>
+                      ) : <>NAICS codes cover ~90% of your market</>}
+                    </span>
                   </div>
                   <p className="mt-1 text-xs text-muted">
                     Most contractors track just the one obvious code.
-                    {autoProfile.totalMarket ? (
-                      <> Mindy mapped a{' '}
-                        <span className="text-emerald-300 font-semibold">
-                          {autoProfile.totalMarket >= 1e9
-                            ? `$${(autoProfile.totalMarket / 1e9).toFixed(1)}B`
-                            : `$${Math.round(autoProfile.totalMarket / 1e6)}M`}
-                        </span>{' '}
-                        market across{' '}
+                    {autoProfile.naicsCount && autoProfile.naicsCount > autoProfile.naics.length ? (
+                      <> Federal buyers actually spread this work across{' '}
                         <span className="text-emerald-300 font-semibold">{autoProfile.naicsCount}</span> codes
                         {autoProfile.topPsc ? <> (top buy: PSC <span className="text-emerald-300 font-semibold">{autoProfile.topPsc.code}</span>)</> : null}
-                      </>
-                    ) : null}
-                    {' '}— so your alerts catch opportunities the single-code crowd misses.
+                        {' '}— Mindy watches the {autoProfile.naics.length} that hold the money, so your alerts catch what the single-code crowd misses.</>
+                    ) : (
+                      <> Mindy tracks all {autoProfile.naics.length} so your alerts catch what the single-code crowd misses.</>
+                    )}
                   </p>
                 </div>
               )}

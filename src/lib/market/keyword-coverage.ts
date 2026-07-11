@@ -215,21 +215,36 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
 
   // kw can be a single phrase OR an array (USASpending ORs the array) — the array
   // form grounds a sector's specialty sub-trades in one call.
+  //
+  // PAGINATION: spending_by_category is hard-capped at limit:100 PER PAGE. A single
+  // page silently truncated the market to the top-100 codes — so a broad term like
+  // "hvac" reported exactly naicsCount=100 (a fake, cap-shaped number) and undercut
+  // totalMarket by dropping everything past rank 100. We now follow page_metadata
+  // .hasNext up to MAX_PAGES so the count + $ are REAL, not cap-artifacts. Bounded
+  // at 5 pages (500 codes) to keep cold-cache latency sane; the 10-min coverage
+  // cache absorbs the extra calls. (Eric, Jul 11 2026 — "found 100 NAICS" wasn't true.)
+  const MAX_COVERAGE_PAGES = 5;
   const fetchCat = async (kw: string | string[], cat: 'naics' | 'psc') => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const all: any[] = [];
     try {
-      const res = await fetch(`${BASE}/${cat}/`, {
-        method: 'POST', headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          filters: { keywords: Array.isArray(kw) ? kw : [kw], time_period: [fiscalYearTimePeriod()], award_type_codes: ['A', 'B', 'C', 'D'] },
-          category: cat, limit: 100,
-        }),
-      });
-      if (!res.ok) return [];
-      const j = await res.json();
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      return (j.results || []).filter((r: any) => r.code && (r.amount || 0) > 0)
-        .sort((a: { amount: number }, b: { amount: number }) => b.amount - a.amount);
-    } catch { return []; }
+      for (let page = 1; page <= MAX_COVERAGE_PAGES; page++) {
+        const res = await fetch(`${BASE}/${cat}/`, {
+          method: 'POST', headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            filters: { keywords: Array.isArray(kw) ? kw : [kw], time_period: [fiscalYearTimePeriod()], award_type_codes: ['A', 'B', 'C', 'D'] },
+            category: cat, limit: 100, page,
+          }),
+        });
+        if (!res.ok) break;
+        const j = await res.json();
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const rows = (j.results || []).filter((r: any) => r.code && (r.amount || 0) > 0);
+        all.push(...rows);
+        if (!j.page_metadata?.hasNext) break;
+      }
+    } catch { /* return what we have so far */ }
+    return all.sort((a: { amount: number }, b: { amount: number }) => b.amount - a.amount);
   };
   try {
     // Resolve the keyword to the market a user would SEE if they fact-checked on
