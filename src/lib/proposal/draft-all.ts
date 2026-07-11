@@ -27,6 +27,7 @@ import type { NoticePocSet } from './notice-poc';
 import type { ComplianceReq } from './section-alignment';
 import { getSectionMeta } from './sections';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
+import { recordLlmUsage } from '@/lib/llm/usage-cost';
 import { isCapStatementSection, type SectionType, type DraftResult } from './types';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -138,6 +139,13 @@ JSON only.`;
       return sectionTypes.map(s => ({ sectionType: s, emphasis: '', keyAngles: [] }));
     }
     const data = await response.json();
+    void recordLlmUsage({
+      tool: 'proposal_draft',
+      userEmail: null,
+      provider: 'groq',
+      model: data.model || GROQ_MODEL,
+      usage: data.usage,
+    });
     const content = data.choices?.[0]?.message?.content || '';
     const parsed = safeParseJSON<{ outlines?: SectionOutline[] }>(content, {
       fallback: { outlines: [] },

@@ -15,6 +15,7 @@
 import { retrieveRagContext, formatChunksForPrompt } from '@/lib/rag/retrieve';
 import { loadBidderProfile, loadVaultContext, formatProfileForPrompt, formatVaultForPrompt } from './loaders';
 import { getSectionMeta } from './sections';
+import { recordLlmUsage } from '@/lib/llm/usage-cost';
 import { isCapStatementSection, type SectionType, type DraftResult } from './types';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -118,6 +119,13 @@ Rules:
   }
 
   const completion = await response.json();
+  void recordLlmUsage({
+    tool: 'proposal_v1',
+    userEmail: email,
+    provider: 'groq',
+    model: completion.model || GROQ_MODEL,
+    usage: completion.usage,
+  });
   const draft = (completion.choices?.[0]?.message?.content || '').trim();
   if (!draft) throw new Error('AI returned empty draft');
 

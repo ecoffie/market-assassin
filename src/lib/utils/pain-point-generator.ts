@@ -4,6 +4,7 @@
 
 import { AgencyOversightContext, formatOversightContextForPrompt } from './federal-oversight-data';
 import { safeParseJSON } from './safe-parse-json';
+import { recordLlmUsage } from '@/lib/llm/usage-cost';
 
 const GROK_API_KEY = process.env.GROK_API_KEY;
 const GROK_API_URL = 'https://api.x.ai/v1/chat/completions';
@@ -53,6 +54,13 @@ async function callGrokForPainPoints(prompt: string, systemPrompt: string): Prom
   }
 
   const data = await response.json();
+  void recordLlmUsage({
+    tool: 'pain_point_gen',
+    userEmail: null,
+    provider: 'grok',
+    model: data.model || GROK_MODEL,
+    usage: data.usage,
+  });
   return data.choices[0].message.content;
 }
 

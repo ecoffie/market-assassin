@@ -97,6 +97,19 @@ const GENERIC_SINGLE_WORDS = new Set([
   // process/output nouns that read distinctive but match everything.
   'production', 'produce', 'operation', 'process', 'processing', 'delivery',
   'performance', 'programs', 'consulting',
+  // More federal-search wildcards, measured by the DSBS keyword harness
+  // (scripts/test-keyword-derivation.ts, Jul 11 2026). Each is a distinctive-
+  // LOOKING single noun that alone names a huge UNRELATED market and hijacked a
+  // real phrase in keyword-coverage's ≥3×-market override:
+  //   "control"  → 334511 Search/Navigation/Control instruments ($3.1B) —
+  //                "pest control" collapsed to "control" → nav instruments.
+  //   "medical"  → 524114 Direct Health Insurance ($47B) — "medical staffing"
+  //                collapsed to "medical" → health insurance.
+  //   "metal"    → 331410 Nonferrous Metal Smelting ($1.5B) — "metal fabrication"
+  //                collapsed to "metal" → smelting.
+  // These are real capabilities ONLY inside a phrase ("pest control", "medical
+  // staffing", "metal fabrication"); alone they must never be a strong signal.
+  'control', 'medical', 'metal', 'materials', 'material',
 ]);
 
 /**

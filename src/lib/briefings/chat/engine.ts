@@ -7,6 +7,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
+import { recordLlmUsage } from '@/lib/llm/usage-cost';
 import type { ChatMessage, ChatContext, ChatResponse, BriefingSnapshot, BriefingItemSummary } from './types';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
@@ -58,6 +59,13 @@ export async function generateChatResponse(
     const result = await response.json();
 
     if (result.choices?.[0]?.message?.content) {
+      void recordLlmUsage({
+        tool: 'briefing_chat',
+        userEmail,
+        provider: 'groq',
+        model: result.model || CHAT_MODEL,
+        usage: result.usage,
+      });
       return {
         message: result.choices[0].message.content,
         tokensUsed: result.usage?.total_tokens,

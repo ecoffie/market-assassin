@@ -3985,3 +3985,29 @@ one place.
 exact token left untouched. Verified: tsc clean, production build ✓, 0 malformed tokens across
 19 files, opacity suffixes preserved. Drift-guard baseline 7,377 → 6,417; the guard blocks any
 regression.
+
+---
+
+## Onboarding: keywords by meaning + UEI pitch persistence (Jul 11, 2026)
+
+**What:** Two onboarding correctness fixes. (1) The "describe your business" step now
+derives real *phrase* keywords by meaning — "we install and service commercial HVAC systems"
+yields `commercial hvac`, `hvac installation`, `hvac repair`, `heating and air-conditioning`,
+`facilities maintenance commercial` instead of the single stray token `hvac`. (2) The UEI
+autofill path now correctly persists the AI-drafted one-liner + elevator pitch to the Vault
+and seeds the profile with semantic keywords, instead of dropping them and re-prompting the
+user to "set up Mindy" a second time.
+
+**Why:** A profile is only as good as the keywords behind it. Single-word tokenization left
+new users with thin, generic keyword sets that missed the body-buried opportunities titles
+don't name — the exact miss the keyword-first model exists to prevent. And a UEI user who
+watched Mindy pull their SAM identity, then got asked to set up again with a blank pitch, saw
+the setup as broken. Both are activation killers at the most fragile moment — first run.
+
+**SEO/Positioning:** "From your UEI to a complete, matchable profile in one pass — Mindy reads
+what your company actually does and builds the keywords buyers use, not just the words in your
+sentence."
+
+**Proof:** Keywords are grounded in real USASpending award data (coverage NAICS + top PSC) and
+ranked semantically against the company's own description. Verified live on getmindy.ai/app —
+HVAC test input produced 12 matchable keywords; tsc clean; production build ✓.

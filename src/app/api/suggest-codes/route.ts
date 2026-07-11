@@ -17,6 +17,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { logToolError, recordToolSuccess, ToolNames, classifyError, AIProviders } from '@/lib/tool-errors';
+import { recordLlmUsage } from '@/lib/llm/usage-cost';
 import { fiscalYearTimePeriod, fiscalYearLabel } from '@/lib/utils/fiscal-year';
 import { sectorSubTradeKeywords } from '@/lib/market/sector-expansions';
 import { keywordCandidates, isDistinctiveKeyword } from '@/lib/market/keyword-sanitize';
@@ -303,6 +304,8 @@ export async function POST(request: NextRequest): Promise<NextResponse<SuggestCo
   try {
     const body = await request.json();
     const { description, maxResults = 5 } = body;
+    // Public route — email is usually absent; thread it when the caller sends it.
+    const userEmail = typeof body.email === 'string' ? body.email.toLowerCase().trim() : null;
 
     // Allow short single-word industry queries ("drones", "HVAC", "janitorial")
     // — a 10-char minimum blocked legitimate keyword lookups (Eric: "drone does
@@ -413,6 +416,14 @@ Return ONLY valid JSON, no other text.`;
     }
 
     const completion = await response.json();
+    // Cost attribution — direct Groq fetch (bypasses callLLM). Fire-and-forget.
+    void recordLlmUsage({
+      userEmail,
+      tool: 'suggest_codes',
+      provider: 'groq',
+      model: GROQ_MODEL,
+      usage: completion?.usage as { prompt_tokens?: number; completion_tokens?: number } | undefined,
+    });
     const responseText = completion.choices?.[0]?.message?.content || '';
 
     // Parse the JSON response

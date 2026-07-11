@@ -34,7 +34,7 @@ import { hasProAccess } from '@/lib/access/resolve-access';
 import { retrieveRagContext, type RagChunkResult } from '@/lib/rag/retrieve';
 import { retrievePodcastEpisodes, formatPodcastCardsForPrompt, type PodcastEpisodeCard } from '@/lib/rag/podcast-search';
 import { loadBidderProfile, formatProfileForPrompt } from '@/lib/proposal/loaders';
-import { isUserOverBudget } from '@/lib/llm/usage-cost';
+import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -401,16 +401,25 @@ export async function POST(request: NextRequest) {
         const streamFrom = (url: string, key: string, model: string) => fetch(url, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model, messages, temperature: TEMPERATURE, max_tokens: MAX_TOKENS, stream: true }),
+          // stream_options.include_usage → OpenAI/Groq emit a final usage-only
+          // chunk after the deltas. Without it, a streaming call returns NO usage
+          // object, so cost attribution (esp. gpt-4o Chat) would log $0. The extra
+          // frame is usage-only (empty choices) and the SSE parser already tolerates it.
+          body: JSON.stringify({ model, messages, temperature: TEMPERATURE, max_tokens: MAX_TOKENS, stream: true, stream_options: { include_usage: true } }),
         });
 
         let groqRes: Response | null = null;
+        // Track which provider/model actually served the response for cost attribution.
+        let usedProvider = 'groq';
+        let usedModel = GROQ_MODEL;
         if (openaiKey) {
           const r = await streamFrom('https://api.openai.com/v1/chat/completions', openaiKey, chatModel);
-          if (r.ok && r.body) groqRes = r;
+          if (r.ok && r.body) { groqRes = r; usedProvider = 'openai'; usedModel = chatModel; }
         }
         if (!groqRes) {
           groqRes = await streamFrom('https://api.groq.com/openai/v1/chat/completions', groqKey || '', GROQ_MODEL);
+          usedProvider = 'groq';
+          usedModel = GROQ_MODEL;
         }
 
         if (!groqRes.ok || !groqRes.body) {
@@ -423,6 +432,8 @@ export async function POST(request: NextRequest) {
 
         let assistantContent = '';
         let tokensUsed: number | null = null;
+        // Full usage object (prompt/completion split) for cost attribution.
+        let usageForCost: { prompt_tokens?: number; completion_tokens?: number } | null = null;
         const reader = groqRes.body.getReader();
         const decoder = new TextDecoder();
         let leftover = '';
@@ -449,6 +460,12 @@ export async function POST(request: NextRequest) {
               if (parsed?.usage?.total_tokens) {
                 tokensUsed = parsed.usage.total_tokens;
               }
+              if (parsed?.usage && (parsed.usage.prompt_tokens || parsed.usage.completion_tokens)) {
+                usageForCost = {
+                  prompt_tokens: parsed.usage.prompt_tokens,
+                  completion_tokens: parsed.usage.completion_tokens,
+                };
+              }
             } catch {
               // Ignore unparseable lines — Groq occasionally sends keep-alives
             }
@@ -470,6 +487,16 @@ export async function POST(request: NextRequest) {
         send({ type: 'citations', sources: citedSources });
         send({ type: 'done' });
         controller.close();
+
+        // Cost attribution — this route calls the LLM provider directly (bypasses
+        // callLLM), so log usage explicitly. Fire-and-forget; never throws.
+        void recordLlmUsage({
+          userEmail: auth.email,
+          tool: 'chat',
+          provider: usedProvider,
+          model: usedModel,
+          usage: usageForCost || undefined,
+        });
 
         // Fire-and-forget persistence (no await — don't block response close)
         const latencyMs = Date.now() - startedAt;

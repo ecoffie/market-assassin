@@ -6,6 +6,7 @@
  */
 
 import { SearchResult, WebSignal, WebIntelUserProfile, SignalType, Urgency } from './types';
+import { recordLlmUsage } from '@/lib/llm/usage-cost';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = 'llama-3.1-8b-instant';
@@ -97,6 +98,14 @@ async function processBatch(
     if (!content) {
       return [];
     }
+
+    void recordLlmUsage({
+      tool: 'web_intel_filter',
+      userEmail: null,
+      provider: 'groq',
+      model: data.model || GROQ_MODEL,
+      usage: data.usage,
+    });
 
     return parseSignals(content, results);
   } catch (error) {

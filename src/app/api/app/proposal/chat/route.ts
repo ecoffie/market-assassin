@@ -16,7 +16,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { callLLM } from '@/lib/llm/call-llm';
-import { isUserOverBudget } from '@/lib/llm/usage-cost';
+import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { createClient } from '@supabase/supabase-js';
 import { loadBidderProfile, formatProfileForPrompt, loadVaultContext } from '@/lib/proposal/loaders';
 import { retrieveRagContext, formatChunksForPrompt } from '@/lib/rag/retrieve';
@@ -243,24 +243,35 @@ export async function POST(request: NextRequest) {
         const streamFrom = (url: string, key: string, model: string) => fetch(url, {
           method: 'POST',
           headers: { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
-          body: JSON.stringify({ model, messages, temperature: TEMPERATURE, max_tokens: MAX_TOKENS, stream: true }),
+          // include_usage → provider emits a final usage-only chunk so streaming
+          // cost attribution isn't logged at $0. Parser already tolerates the frame.
+          body: JSON.stringify({ model, messages, temperature: TEMPERATURE, max_tokens: MAX_TOKENS, stream: true, stream_options: { include_usage: true } }),
         });
         let groqRes: Response | null = null;
+        // Track which provider/model actually served the direct-fetch stream for
+        // cost attribution (the callLLM fallback below logs itself).
+        let usedProvider = 'groq';
+        let usedModel = GROQ_MODEL;
         // Budget cap (#37): a user past their monthly LLM budget is downgraded to
         // cheap Groq (never blocked — degraded, not denied). Protects $149 margin.
         const overBudget = await isUserOverBudget(email).catch(() => false);
         if (openaiKey && !overBudget) {
           const r = await streamFrom('https://api.openai.com/v1/chat/completions', openaiKey, chatModel);
-          if (r.ok && r.body) groqRes = r;
+          if (r.ok && r.body) { groqRes = r; usedProvider = 'openai'; usedModel = chatModel; }
         }
         if (!groqRes) {
           groqRes = await streamFrom('https://api.groq.com/openai/v1/chat/completions', groqKey, GROQ_MODEL);
-          if (groqRes.status === 429) groqRes = await streamFrom('https://api.groq.com/openai/v1/chat/completions', groqKey, 'llama-3.3-70b-versatile');
+          usedProvider = 'groq';
+          usedModel = GROQ_MODEL;
+          if (groqRes.status === 429) {
+            groqRes = await streamFrom('https://api.groq.com/openai/v1/chat/completions', groqKey, 'llama-3.3-70b-versatile');
+            usedModel = 'llama-3.3-70b-versatile';
+          }
         }
         if (!groqRes.ok || !groqRes.body) {
           // Last resort: non-streaming callLLM (Claude/OpenAI) so chat never dies.
           try {
-            const { text } = await callLLM({ system: SYSTEM_PROMPT, user: messages[messages.length - 1].content, maxTokens: MAX_TOKENS, temperature: TEMPERATURE, job: 'reasoning', dataClass: 'sensitive' });
+            const { text } = await callLLM({ system: SYSTEM_PROMPT, user: messages[messages.length - 1].content, maxTokens: MAX_TOKENS, temperature: TEMPERATURE, job: 'reasoning', dataClass: 'sensitive', tool: 'proposal_chat', userEmail: email });
             if (text?.trim()) { send({ type: 'token', content: text }); send({ type: 'done' }); controller.close(); return; }
           } catch { /* fall to error */ }
           send({ type: 'error', message: 'AI is busy right now — try again in a moment.' });
@@ -272,6 +283,9 @@ export async function POST(request: NextRequest) {
         const reader = groqRes.body.getReader();
         const decoder = new TextDecoder();
         let leftover = '';
+        // Usage (prompt/completion split) for cost attribution, when the provider
+        // emits it on the final SSE chunk.
+        let usageForCost: { prompt_tokens?: number; completion_tokens?: number } | null = null;
         while (true) {
           const { done, value } = await reader.read();
           if (done) break;
@@ -284,13 +298,29 @@ export async function POST(request: NextRequest) {
             const payload = line.slice(5).trim();
             if (payload === '[DONE]') continue;
             try {
-              const delta = JSON.parse(payload)?.choices?.[0]?.delta?.content;
+              const parsed = JSON.parse(payload);
+              const delta = parsed?.choices?.[0]?.delta?.content;
               if (typeof delta === 'string' && delta.length > 0) send({ type: 'token', content: delta });
+              if (parsed?.usage && (parsed.usage.prompt_tokens || parsed.usage.completion_tokens)) {
+                usageForCost = {
+                  prompt_tokens: parsed.usage.prompt_tokens,
+                  completion_tokens: parsed.usage.completion_tokens,
+                };
+              }
             } catch { /* keep-alive line */ }
           }
         }
         send({ type: 'done' });
         controller.close();
+
+        // Cost attribution — direct provider fetch (bypasses callLLM). Fire-and-forget.
+        void recordLlmUsage({
+          userEmail: email,
+          tool: 'proposal_chat',
+          provider: usedProvider,
+          model: usedModel,
+          usage: usageForCost || undefined,
+        });
       } catch (e) {
         send({ type: 'error', message: (e as Error).message });
         send({ type: 'done' });

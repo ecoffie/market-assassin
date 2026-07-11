@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { logToolError, ToolNames, AIProviders, classifyError } from '@/lib/tool-errors';
+import { recordLlmUsage } from '@/lib/llm/usage-cost';
 import type { LoiFields } from '@/lib/proposal/loi-fields';
 import { LOI_FIELDS_KEYS } from '@/lib/proposal/loi-fields';
 
@@ -178,6 +179,14 @@ export async function POST(request: NextRequest) {
     }
 
     const completion = await response.json();
+    // Cost attribution — direct Groq fetch (bypasses callLLM). Fire-and-forget.
+    void recordLlmUsage({
+      userEmail: email,
+      tool: 'proposal_loi_fields',
+      provider: 'groq',
+      model: GROQ_MODEL,
+      usage: completion?.usage as { prompt_tokens?: number; completion_tokens?: number } | undefined,
+    });
     const raw = completion.choices?.[0]?.message?.content || '';
 
     let parsed: unknown;

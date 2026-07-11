@@ -1,3 +1,5 @@
+import { recordLlmUsage } from '@/lib/llm/usage-cost';
+
 export type BriefingTask = 'daily' | 'weekly' | 'pursuit';
 export type LlmProvider = 'groq' | 'anthropic' | 'openai';
 
@@ -126,12 +128,24 @@ async function generateWithAnthropic(
 
   const data = await response.json() as {
     content?: Array<{ type: string; text?: string }>;
+    usage?: { input_tokens?: number; output_tokens?: number };
   };
 
   const text = data.content?.find((item) => item.type === 'text')?.text;
   if (!text) {
     throw new Error('Anthropic returned no text content');
   }
+
+  void recordLlmUsage({
+    tool: 'briefing_generate',
+    userEmail: null,
+    provider: 'claude',
+    model,
+    usage: {
+      prompt_tokens: data.usage?.input_tokens,
+      completion_tokens: data.usage?.output_tokens,
+    },
+  });
 
   return text;
 }
@@ -179,12 +193,22 @@ async function generateWithGroq(
 
   const data = await response.json() as {
     choices?: Array<{ message?: { content?: string } }>;
+    model?: string;
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
 
   const text = data.choices?.[0]?.message?.content;
   if (!text) {
     throw new Error('Groq returned no message content');
   }
+
+  void recordLlmUsage({
+    tool: 'briefing_generate',
+    userEmail: null,
+    provider: 'groq',
+    model: data.model || model,
+    usage: data.usage,
+  });
 
   return text;
 }
@@ -223,12 +247,22 @@ async function generateWithOpenAI(
 
   const data = await response.json() as {
     choices?: Array<{ message?: { content?: string } }>;
+    model?: string;
+    usage?: { prompt_tokens?: number; completion_tokens?: number };
   };
 
   const text = data.choices?.[0]?.message?.content;
   if (!text) {
     throw new Error('OpenAI returned no message content');
   }
+
+  void recordLlmUsage({
+    tool: 'briefing_generate',
+    userEmail: null,
+    provider: 'openai',
+    model: data.model || model,
+    usage: data.usage,
+  });
 
   return text;
 }

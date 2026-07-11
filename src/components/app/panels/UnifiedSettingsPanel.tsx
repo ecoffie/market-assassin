@@ -61,6 +61,10 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
   const [smsMsg, setSmsMsg] = useState<string | null>(null);
   // Styled "Start over?" confirm (replaces native window.confirm).
   const [showResetConfirm, setShowResetConfirm] = useState(false);
+  // Type-to-confirm gate for the destructive reset — the user must type the exact
+  // phrase before "Start over" enables (GitHub/Stripe destructive-action convention).
+  const [resetConfirmText, setResetConfirmText] = useState('');
+  const RESET_CONFIRM_PHRASE = 'delete my profile';
   // Unified "describe what you do → codes" box (the Market Research pattern):
   // one input → suggest NAICS + PSC together, tap to add. So users never have to
   // know which box (NAICS vs PSC) a thing goes in. The manual fields collapse
@@ -471,7 +475,11 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
 
   const confirmResetProfile = async () => {
     if (!email) return;
+    // Guard: the type-to-confirm phrase must match (belt-and-suspenders — the
+    // button is also disabled until it matches).
+    if (resetConfirmText.trim().toLowerCase() !== RESET_CONFIRM_PHRASE) return;
     setShowResetConfirm(false);
+    setResetConfirmText('');
     setSaving(true); setError(null); setMessage(null);
     try {
       const res = await fetch('/api/alerts/preferences', {
@@ -526,7 +534,7 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
       {showResetConfirm && (
         <div
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4"
-          onClick={() => setShowResetConfirm(false)}
+          onClick={() => { setShowResetConfirm(false); setResetConfirmText(''); }}
         >
           <div
             className="w-full max-w-md rounded-2xl border border-hairline bg-ground p-6 shadow-2xl"
@@ -537,16 +545,29 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
               This clears your codes, keywords, and agencies, then walks you back through guided setup to rebuild your
               profile. Your saved pursuits and target list aren&apos;t touched.
             </p>
+            <label className="mt-4 block text-sm text-ink-soft">
+              Type <span className="font-semibold text-white">{RESET_CONFIRM_PHRASE}</span> to confirm:
+              <input
+                type="text"
+                value={resetConfirmText}
+                onChange={(e) => setResetConfirmText(e.target.value)}
+                autoFocus
+                autoComplete="off"
+                placeholder={RESET_CONFIRM_PHRASE}
+                className="mt-1.5 w-full rounded-lg border border-hairline bg-input px-3 py-2 text-sm text-white placeholder:text-muted/60 focus:border-purple-500 focus:outline-none"
+              />
+            </label>
             <div className="mt-5 flex justify-end gap-3">
               <button
-                onClick={() => setShowResetConfirm(false)}
+                onClick={() => { setShowResetConfirm(false); setResetConfirmText(''); }}
                 className="rounded-lg border border-hairline px-4 py-2 text-sm font-medium text-ink-soft hover:bg-surface"
               >
                 Cancel
               </button>
               <button
                 onClick={confirmResetProfile}
-                className="rounded-lg bg-purple-600 px-4 py-2 text-sm font-semibold text-white hover:bg-purple-500"
+                disabled={resetConfirmText.trim().toLowerCase() !== RESET_CONFIRM_PHRASE}
+                className="rounded-lg bg-red-600 px-4 py-2 text-sm font-semibold text-white hover:bg-red-500 disabled:cursor-not-allowed disabled:opacity-40 disabled:hover:bg-red-600"
               >
                 Start over
               </button>

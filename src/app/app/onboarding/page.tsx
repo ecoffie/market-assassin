@@ -546,12 +546,20 @@ export default function OnboardingPage() {
     const tiles = (overview?.tiles || []) as Array<{ key: string; count: number }>;
     const tileCount = (k: string) => tiles.find((t) => t.key === k)?.count || 0;
     const market = overview?.market?.totalMarket || autoProfile.totalMarket || 0;
-    const codeCount = autoProfile.naicsCount || (autoProfile.naics || []).length || 0;
+    // Two DIFFERENT numbers, labeled honestly:
+    //  • marketCodeCount = how many NAICS the money spreads across (the real,
+    //    paginated market breadth) → "NAICS codes in your market".
+    //  • appliedCodeCount = the tight ~90%-coverage set Mindy actually watches.
+    // The old label "NAICS codes mapped" on the big number was wrong — we don't map
+    // 122 codes onto the profile, we watch the 6 that hold the money.
+    const marketCodeCount = autoProfile.naicsCount || (autoProfile.naics || []).length || 0;
+    const appliedCodeCount = (autoProfile.naics || []).length || 0;
     const contractors = overview?.scope?.contractors || 0;
     const agencies = overview?.scope?.agencies || 0;
     const stats: RevealData['stats'] = [];
     if (market > 0) stats.push({ icon: '💰', display: money(market), label: 'addressable market', accent: true });
-    if (codeCount) stats.push({ icon: '🧩', value: codeCount, label: 'NAICS codes mapped' });
+    if (appliedCodeCount) stats.push({ icon: '🎯', value: appliedCodeCount, label: 'NAICS codes we watch' });
+    if (marketCodeCount > appliedCodeCount) stats.push({ icon: '🧩', value: marketCodeCount, label: 'NAICS codes in your market' });
     if (agencies) stats.push({ icon: '🏛️', value: agencies, label: 'buying agencies' });
     if (contractors) stats.push({ icon: '🏢', value: contractors, label: 'contractors in your space' });
     if (tileCount('forecasts')) stats.push({ icon: '📋', value: tileCount('forecasts'), label: 'forecasted buys' });
@@ -586,15 +594,25 @@ export default function OnboardingPage() {
       const naics: string[] = Array.isArray(identity.primary_naics)
         ? identity.primary_naics.filter((c: unknown) => typeof c === 'string' && /^\d{2,6}$/.test(c))
         : [];
+      // The AI coach one-liner + elevator pitch live on `d.identity` (the prefill GET
+      // layers them onto identity), NOT `d.ai_coach` — reading d.ai_coach?.one_liner
+      // was always undefined, so the profile fell back to the legal name and the
+      // pitch was silently dropped. Read them from identity and carry BOTH through
+      // so confirmAuto can write them to the Vault.
+      const oneLiner: string = (identity.one_liner || '').trim();
+      const elevatorPitch: string = (identity.elevator_pitch || '').trim();
       // Map prefill → the confirm screen's autoProfile shape. industryPhrase from
       // the AI one-liner (or legal name); agencies from real award history.
       const agencyNames = Array.from(new Set(
         (d.past_performance || []).map((p: { agency?: string }) => p.agency).filter(Boolean),
       )).slice(0, 6).map((name) => ({ name }));
       setAutoProfile({
-        industryPhrase: (d.ai_coach?.one_liner || identity.legal_name || 'Your business').slice(0, 80),
+        industryPhrase: (oneLiner || identity.legal_name || 'Your business').slice(0, 80),
         naics,
         naicsCount: naics.length,
+        // Semantic keywords from the company's own words (one-liner + pitch +
+        // AI-drafted capabilities + NAICS titles) so the UEI path isn't keyword-empty
+        // either. Derived server-side by the prefill POST; seeded here for display.
         keywords: [],
         topPsc: null,
         agencies: agencyNames,
@@ -603,12 +621,23 @@ export default function OnboardingPage() {
         totalMarket: 0,
         uei,                       // carried through confirmAuto → Vault write
         legalName: identity.legal_name || null,
+        oneLiner: oneLiner || null,          // → Vault identity.one_liner
+        elevatorPitch: elevatorPitch || null, // → Vault identity.elevator_pitch
+        // Full prefill payload carried so confirmAuto can write the COMPLETE Vault
+        // identity (incl. one_liner + elevator_pitch), real past-perf, AI-drafted
+        // capabilities + sample past-perf, and derive semantic keywords. The old
+        // `accept:{...}` shorthand wrote NOTHING (the POST reads body.identity, not
+        // body.accept), so the pitch never persisted → Vault re-prompted "set up".
+        prefillIdentity: identity,
+        prefillPastPerformance: Array.isArray(d.past_performance) ? d.past_performance : [],
+        aiCapabilities: Array.isArray(d.capabilities) ? d.capabilities : [],
+        aiSamplePp: Array.isArray(d.sample_past_performance) ? d.sample_past_performance : [],
         pastPerfCount: (d.past_performance || []).length,
       });
       track('onboarding_step', 'onboarding', { step: 'uei_extract', uei, pastPerf: (d.past_performance || []).length });
       // Even the UEI path gets a market reveal — overview grounds $ + tiles from the
       // one-liner + the registration's NAICS (covers UEI's totalMarket=0).
-      void loadOverview({ industryPhrase: (d.ai_coach?.one_liner || identity.legal_name || ''), naics });
+      void loadOverview({ industryPhrase: (oneLiner || identity.legal_name || ''), naics });
     } catch {
       setScanPhase('idle');
       setError('Couldn’t reach SAM.gov just now. Try again or describe your business instead.');
@@ -624,13 +653,32 @@ export default function OnboardingPage() {
       // UEI path: write SAM identity + USASpending past performance into the Vault
       // FIRST (non-blocking) — this is what grounds the hidden-match capability
       // vector on real award history. Failure here doesn't block the profile save.
-      if (autoProfile.uei) {
+      // Send the REAL payload the POST handler reads (identity / past_performance /
+      // capabilities / sample_past_performance) — NOT the old `accept:{...}` shorthand,
+      // which the handler ignored, so the one-liner + elevator pitch never persisted
+      // and the Vault re-prompted the user to "set up Mindy" again. Capture the
+      // server-derived semantic keywords so we save THEM (not an empty list).
+      let ueiKeywords: string[] = [];
+      if (autoProfile.uei && autoProfile.prefillIdentity) {
         try {
-          await authedFetch('/api/app/vault/prefill', email, {
+          const vRes = await authedFetch('/api/app/vault/prefill', email, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${accessToken}` },
-            body: JSON.stringify({ email, uei: autoProfile.uei, accept: { identity: true, past_performance: true } }),
+            body: JSON.stringify({
+              email,
+              uei: autoProfile.uei,
+              identity: {
+                ...autoProfile.prefillIdentity,
+                one_liner: autoProfile.oneLiner || autoProfile.prefillIdentity.one_liner || null,
+                elevator_pitch: autoProfile.elevatorPitch || autoProfile.prefillIdentity.elevator_pitch || null,
+              },
+              past_performance: autoProfile.prefillPastPerformance || [],
+              capabilities: autoProfile.aiCapabilities || [],
+              sample_past_performance: autoProfile.aiSamplePp || [],
+            }),
           });
+          const vData = await vRes.json().catch(() => null);
+          if (Array.isArray(vData?.keywords_derived)) ueiKeywords = vData.keywords_derived;
         } catch { /* non-fatal — alerts profile below still saves */ }
       }
       const res = await fetch('/api/mindy/profile', {
@@ -648,8 +696,10 @@ export default function OnboardingPage() {
           precise: true,
           // Persist the extracted keywords — they were shown on the confirm screen
           // but used to be dropped, leaving keyword-empty profiles. The user's own
-          // words are the strongest search signal.
-          keywords: autoProfile.keywords || [],
+          // words are the strongest search signal. UEI path: use the semantic
+          // keywords the Vault prefill derived from the company's identity (the
+          // describe-business path already carries them on autoProfile.keywords).
+          keywords: (ueiKeywords.length ? ueiKeywords : autoProfile.keywords) || [],
           businessType: autoProfile.setAsides?.[0] || 'Small Business',
           setAsides: autoProfile.setAsides || [],
           targetAgencies: (autoProfile.agencies || []).map((a: { name: string }) => a.name),
@@ -1062,25 +1112,35 @@ export default function OnboardingPage() {
                   under-reporting $1.4B as $8M — fixed in keyword-coverage). */}
               {(autoProfile.naics?.length || 0) > 1 && (
                 <div className="mb-4 rounded-xl border border-emerald-500/30 bg-gradient-to-br from-emerald-950/40 to-slate-900 p-4">
+                  {/* ONE story, two numbers: the HERO is the tight applied set (the
+                      chips below — e.g. 6). The supporting proof is the FULL market —
+                      $ + how many codes the money actually spreads across (now a REAL
+                      paginated count, not the old cap-shaped "100"). Framing makes the
+                      small number the thing we watch and the big number why it matters,
+                      instead of two competing "how many codes?" claims. */}
                   <div className="flex items-baseline gap-2">
                     <span className="text-3xl font-black text-emerald-400">{autoProfile.naics.length}</span>
-                    <span className="text-sm font-semibold text-white">NAICS codes cover ~90% of your market</span>
+                    <span className="text-sm font-semibold text-white">
+                      {autoProfile.totalMarket ? (
+                        <>codes cover ~90% of your{' '}
+                          <span className="text-emerald-300">
+                            {autoProfile.totalMarket >= 1e9
+                              ? `$${(autoProfile.totalMarket / 1e9).toFixed(1)}B`
+                              : `$${Math.round(autoProfile.totalMarket / 1e6)}M`}
+                          </span>{' '}market</>
+                      ) : <>NAICS codes cover ~90% of your market</>}
+                    </span>
                   </div>
                   <p className="mt-1 text-xs text-muted">
                     Most contractors track just the one obvious code.
-                    {autoProfile.totalMarket ? (
-                      <> Mindy mapped a{' '}
-                        <span className="text-emerald-300 font-semibold">
-                          {autoProfile.totalMarket >= 1e9
-                            ? `$${(autoProfile.totalMarket / 1e9).toFixed(1)}B`
-                            : `$${Math.round(autoProfile.totalMarket / 1e6)}M`}
-                        </span>{' '}
-                        market across{' '}
+                    {autoProfile.naicsCount && autoProfile.naicsCount > autoProfile.naics.length ? (
+                      <> Federal buyers actually spread this work across{' '}
                         <span className="text-emerald-300 font-semibold">{autoProfile.naicsCount}</span> codes
                         {autoProfile.topPsc ? <> (top buy: PSC <span className="text-emerald-300 font-semibold">{autoProfile.topPsc.code}</span>)</> : null}
-                      </>
-                    ) : null}
-                    {' '}— so your alerts catch opportunities the single-code crowd misses.
+                        {' '}— Mindy watches the {autoProfile.naics.length} that hold the money, so your alerts catch what the single-code crowd misses.</>
+                    ) : (
+                      <> Mindy tracks all {autoProfile.naics.length} so your alerts catch what the single-code crowd misses.</>
+                    )}
                   </p>
                 </div>
               )}

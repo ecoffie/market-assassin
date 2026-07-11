@@ -214,6 +214,8 @@ export async function POST(request: NextRequest) {
       openaiModel: 'gpt-4o',
       // Cap statements are customer PII → no-training providers only (Trust 3.1).
       dataClass: 'sensitive',
+      tool: 'vault_doc_parse',
+      userEmail,
     });
     const raw = JSON.parse(out.replace(/```json\n?|```\n?/g, '').trim());
     const rid = (raw?.identity ?? {}) as Record<string, unknown>;

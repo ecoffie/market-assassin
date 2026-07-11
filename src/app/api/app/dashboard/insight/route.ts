@@ -24,6 +24,7 @@ import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { saveSnapshot, readSnapshot, freshMeta, degradedMeta, isUpstreamOutage } from '@/lib/resilience/last-good';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
+import { recordLlmUsage } from '@/lib/llm/usage-cost';
 import { dateSeed, isSimilarToRecent, selectInsightOpportunities } from '@/lib/dashboard/insight-selection';
 import { getPodcastInsightForProfile, podcastInsightFeatureEnabled } from '@/lib/rag/podcast-insights';
 import {
@@ -397,6 +398,14 @@ Extract ONE shareable insight as JSON.`;
     });
     if (!res.ok) return null;
     const data = await res.json();
+    // Cost attribution — direct Groq fetch (bypasses callLLM). Fire-and-forget.
+    void recordLlmUsage({
+      userEmail,
+      tool: 'dashboard_insight',
+      provider: 'groq',
+      model: GROQ_MODEL,
+      usage: data?.usage as { prompt_tokens?: number; completion_tokens?: number } | undefined,
+    });
     const content = data.choices?.[0]?.message?.content;
     if (!content) return null;
     const parsed = safeParseJSON<{ quote?: string; format?: string; attribution?: string }>(content, {

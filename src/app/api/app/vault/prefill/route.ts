@@ -32,6 +32,7 @@ import { deriveSemanticKeywords } from '@/lib/market/semantic-keywords';
 import { humanize } from '@/lib/proposal/humanize';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
 import { fetchUSASpendingAwardsByUei } from '@/lib/usaspending/awards-by-uei';
+import { recordLlmUsage } from '@/lib/llm/usage-cost';
 
 const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODEL = process.env.PROPOSAL_GROQ_MODEL || 'llama-3.3-70b-versatile';
@@ -93,6 +94,7 @@ async function draftAICoachContent(
   legal_name: string,
   naics: NaicsWithDescription[],
   certifications: string[],
+  userEmail?: string | null,
 ): Promise<AICoachOutput | null> {
   const apiKey = process.env.GROQ_API_KEY;
   if (!apiKey) {
@@ -176,6 +178,14 @@ Draft an initial capability profile that accurately reflects the NAICS MIX above
       return null;
     }
     const data = await res.json();
+    // Cost attribution — direct Groq fetch (bypasses callLLM). Fire-and-forget.
+    void recordLlmUsage({
+      userEmail: userEmail || null,
+      tool: 'vault_prefill',
+      provider: 'groq',
+      model: GROQ_MODEL,
+      usage: data?.usage as { prompt_tokens?: number; completion_tokens?: number } | undefined,
+    });
     const content = data.choices?.[0]?.message?.content;
     if (!content) return null;
     // safeParseJSON tolerates the LLM wrapping JSON in code fences,
@@ -307,6 +317,7 @@ export async function GET(request: NextRequest) {
         identity.legal_name,
         naicsWithDescriptions,
         identity.certifications,
+        auth.email || email,
       )
     : null;
 

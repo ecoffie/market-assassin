@@ -21,6 +21,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { verifyMIAccess } from '@/lib/api-auth';
 import { logToolError, classifyError, ToolNames, AIProviders } from '@/lib/tool-errors';
+import { recordLlmUsage } from '@/lib/llm/usage-cost';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
 import { smallBizSharePct } from './share';
 
@@ -355,6 +356,15 @@ export async function POST(request: NextRequest) {
   const content = (payload as any)?.choices?.[0]?.message?.content as string | undefined;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const usage = (payload as any)?.usage as { prompt_tokens?: number; completion_tokens?: number } | undefined;
+
+  // Cost attribution — direct Groq fetch (bypasses callLLM). Fire-and-forget.
+  void recordLlmUsage({
+    userEmail: email,
+    tool: 'market_narrative',
+    provider: 'groq',
+    model: GROQ_MODEL,
+    usage,
+  });
 
   if (!content) {
     return serveFallback('ai_empty');
