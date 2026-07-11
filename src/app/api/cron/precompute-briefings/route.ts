@@ -17,6 +17,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getReadClient } from '@/lib/supabase/server-clients';
 import { generateAIBriefing } from '@/lib/briefings/delivery/ai-briefing-generator';
 import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 import { DEFAULT_NAICS_CODES } from '@/lib/config/defaults';
@@ -94,8 +95,11 @@ function getSupabase() {
   console.log('[PrecomputeBriefings] Starting template generation...');
 
   try {
-    // Step 1: Get all unique NAICS profiles from enabled users
-    const { data: users, error: usersError } = await getSupabase()
+    // Step 1: Get all unique NAICS profiles from enabled users.
+    // Read from the replica: this is a nightly batch read of the whole enabled-user
+    // population (no read-after-write dependency), so sub-second replication lag is
+    // irrelevant here. All WRITES below stay on getSupabase() (primary).
+    const { data: users, error: usersError } = await getReadClient()
       .from('user_notification_settings')
       .select('user_email, naics_codes')
       .eq('briefings_enabled', true);

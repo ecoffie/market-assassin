@@ -15,6 +15,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
+import { getReadClient } from '@/lib/supabase/server-clients';
 import { fetchSamOpportunityNoticeSummaryFromCache } from '@/lib/briefings/pipelines/sam-gov';
 import { generateWeeklyDeepDiveFromContracts } from '@/lib/briefings/delivery/weekly-briefing-generator';
 import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
@@ -171,7 +172,10 @@ function getSupabase() {
   try {
     // Step 1: Get all unique NAICS profiles with full profile data
     // Note: table has keywords and agencies columns (no psc_codes column yet)
-    const { data: users, error: usersError } = await getSupabase()
+    // Read from the replica: nightly batch read of the whole enabled-user population,
+    // no read-after-write dependency, so replication lag is irrelevant. Writes below
+    // (briefing_templates) stay on getSupabase() (primary).
+    const { data: users, error: usersError } = await getReadClient()
       .from('user_notification_settings')
       .select('user_email, naics_codes, keywords, agencies')
       .eq('briefings_enabled', true);
