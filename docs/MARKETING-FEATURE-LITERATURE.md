@@ -4055,3 +4055,38 @@ per user, guarding the June-2026 $2,075 spike). Verified live on getmindy.ai: 8/
 checks passed against production — real pipeline rows returned, isolation held, live SAM opp
 surfaced (USMC EDCOM ITSS), and a real contractor profile returned ("Leidos, Inc… $16.6 billion
 across 11,000+ awards"). 95 unit tests, full production build ✓.
+
+---
+
+## Mindy Chat — personalized starter prompts that show you what's now possible (Jul 11, 2026)
+
+**What:** The chat's empty-state suggestion chips — the first thing you see before typing —
+were rewritten to showcase what Chat v2 can now do, and to speak to *your* account. Instead of
+four generic teaching questions, the chips now span the four live capabilities — your pipeline,
+the live SAM.gov feed, contractor/competitive intel, and your Vault — and adapt to your real
+profile: a user with tracked pursuits sees "Which of my pursuits has the nearest deadline?",
+while a new user sees "Find me open opportunities to add to my pipeline"; the market and intel
+chips fill in your actual NAICS ("What SAM opportunities are open right now in NAICS 541512?").
+
+**Why:** A feature nobody discovers may as well not exist. Chat v2 quietly gained the ability to
+read your pipeline, search live opportunities, and profile any contractor — but a user who only
+ever saw "How do I respond to a Sources Sought?" would never think to ask. The starter prompts
+are the discovery surface: they teach the new capability by example, in one glance, the moment
+the chat opens. Personalizing them to the user's own NAICS and pipeline state turns a generic
+demo into "oh — it already knows my business."
+
+**SEO/Positioning:** "Open the chat and it already knows your market — Mindy suggests the exact
+questions worth asking about your pipeline, your NAICS, and who's winning the work you want."
+Reinforces the "AI that knows your federal business, not a blank chatbox" angle.
+
+**Proof:** Personalization is grounded in the user's real saved profile — their NAICS and
+set-asides from `user_notification_settings`, and a live count of their `user_pipeline` rows —
+never invented: the builder never fabricates a NAICS, and only offers a "my pursuits" prompt to
+users who actually have some (9 unit tests cover the no-fabrication cases). Served by
+`GET /api/app/chat/suggestions` with a graceful generic fallback so the empty state never
+blocks. Verified live on getmindy.ai: a user with pursuits gets the "nearest deadline" prompt,
+a user without gets the "build your pipeline" prompt, and users with saved NAICS get their real
+code (541512, 541511, 236…) in the market + intel chips. *(Shipping this surfaced and fixed a
+latent bug — `loadBidderProfile` had been silently returning an empty profile for every user
+because its query referenced a non-existent column; personalization across the chat now reads
+the real profile it always should have.)*
