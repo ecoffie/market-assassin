@@ -120,6 +120,22 @@ else {
   record('6. live SAM search (Tier-1)', engaged, engaged ? `engaged market data → "${a4.answer.slice(0, 160)}…"` : `punted instead of searching → "${a4.answer.slice(0, 200)}"`);
 }
 
+// 7. Tier-2: contractor profile — name a big known prime, expect grounded award history (or honest not-found)
+const a5 = await ask(USER_A, 'Look up the contractor Leidos — what have they won and which agencies buy from them?');
+if (a5.status !== 200) { record('7. contractor profile (Tier-2)', false, `HTTP ${a5.status}`); }
+else {
+  const engaged = a5.answer.length > 40 && !/i don'?t have|try the .* panel|knowledge base/i.test(a5.answer);
+  record('7. contractor profile (Tier-2)', engaged, engaged ? `engaged BQ intel → "${a5.answer.slice(0, 160)}…"` : `punted → "${a5.answer.slice(0, 200)}"`);
+}
+
+// 8. Tier-2: find capable contractors in a NAICS — expect firms or honest none (not a punt)
+const a6 = await ask(USER_A, 'Who are some contractors that win work in NAICS 541512? I need teaming partners.');
+if (a6.status !== 200) { record('8. find capable contractors (Tier-2)', false, `HTTP ${a6.status}`); }
+else {
+  const engaged = a6.answer.length > 40 && !/i don'?t have|try the .* panel|knowledge base/i.test(a6.answer);
+  record('8. find capable contractors (Tier-2)', engaged, engaged ? `engaged BQ intel → "${a6.answer.slice(0, 160)}…"` : `punted → "${a6.answer.slice(0, 200)}"`);
+}
+
 console.log('================ E2E VERDICT ================');
 const passed = checks.filter(c => c.pass).length;
 for (const c of checks) console.log(`  ${c.pass ? '✅' : '❌'} ${c.name}`);

@@ -37,6 +37,7 @@ import { loadBidderProfile, formatProfileForPrompt } from '@/lib/proposal/loader
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
 import { makeTier1Tools, TIER1_TOOL_DEFS } from '@/lib/chat/tier1-tools';
+import { makeTier2Tools, TIER2_TOOL_DEFS, TIER2_TOOL_NAMES } from '@/lib/chat/tier2-tools';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -118,7 +119,11 @@ Their OWN account (private):
 Live federal market (public):
 - search_sam_opportunities — currently-open SAM.gov opportunities by keyword (+ optional NAICS / set-aside). Call it when they ask what opportunities/RFPs/solicitations are open or available in a topic or their market.
 - get_market_vocabulary — the distinctive buyer words/phrases that win in a NAICS. Call it when they ask what keywords to search, how buyers describe a market, or how to phrase a capability statement for a NAICS.
-- When a tool returns count 0 / has_any false, say so plainly — NEVER invent a pursuit, opportunity, contract, agency, deadline, or term. Ground every specific (title, agency, deadline, dollar, solicitation #) ONLY in what the tool actually returned.
+Contractor / competitive intel (public):
+- get_contractor_profile — look up a specific company's federal award history, top agencies, and recent contracts. Call it when they name a company (incumbent, competitor, teaming target) and ask who they are or what they've won.
+- find_capable_contractors — find firms that have won work in a NAICS/PSC (teaming partners, subs, competition). Call it when they ask who does a kind of work or who to team with.
+- If a contractor tool returns a "slow down"/rate_limited note, relay it briefly and suggest they try again shortly — do NOT retry it yourself.
+- When a tool returns count 0 / found false / has_any false, say so plainly — NEVER invent a pursuit, opportunity, contract, company, agency, deadline, dollar, or term. Ground every specific (title, agency, deadline, dollar, solicitation #) ONLY in what the tool actually returned.
 - The pipeline/Vault tools return only THIS signed-in user's data. Do not claim to see anyone else's.
 
 SCOPE:
@@ -420,11 +425,14 @@ export async function POST(request: NextRequest) {
         try {
           const tier0 = makeTier0Tools(getSupabase(), auth.email!);
           const tier1 = makeTier1Tools(getSupabase());
-          // Route a called tool to the toolset that owns it. Tier-0 names are the
-          // private set; everything else in the combined defs is Tier-1.
+          const tier2 = makeTier2Tools(auth.email!); // email = rate-limit key only (public data)
+          // Route a called tool to the toolset that owns it, by name:
+          //   Tier-0 (private, session-scoped) → Tier-2 (BigQuery, cost-gated) → else Tier-1.
           const execTool = (name: string, args: Record<string, unknown>) =>
-            TIER0_TOOL_NAMES.has(name) ? tier0.execute(name, args) : tier1.execute(name, args);
-          const ALL_TOOL_DEFS = [...TIER0_TOOL_DEFS, ...TIER1_TOOL_DEFS];
+            TIER0_TOOL_NAMES.has(name) ? tier0.execute(name, args)
+              : TIER2_TOOL_NAMES.has(name) ? tier2.execute(name, args)
+                : tier1.execute(name, args);
+          const ALL_TOOL_DEFS = [...TIER0_TOOL_DEFS, ...TIER1_TOOL_DEFS, ...TIER2_TOOL_DEFS];
           const toolReqBody = (model: string) => JSON.stringify({
             model, messages, temperature: 0, max_tokens: 512,
             tools: ALL_TOOL_DEFS, tool_choice: 'auto',
