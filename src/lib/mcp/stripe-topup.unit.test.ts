@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('./credits', () => ({ applyCreditOnce: vi.fn() }));
+// Stub the Stripe client so the product-metadata fallback is testable offline.
+const listLineItems = vi.fn();
+vi.mock('@/lib/stripe', () => ({ getStripe: () => ({ checkout: { sessions: { listLineItems } } }) }));
 
 import { handleMcpCreditTopup } from './stripe-topup';
 import * as credits from './credits';
@@ -12,6 +15,25 @@ const session = (over: any) => ({ id: 'cs_1', metadata: {}, ...over }) as any;
 beforeEach(() => {
   vi.clearAllMocks();
   m(credits.applyCreditOnce).mockResolvedValue({ applied: true, newBalance: 250 });
+  listLineItems.mockResolvedValue({ data: [] }); // default: no line items
+});
+
+describe('handleMcpCreditTopup — PRODUCT metadata (Dashboard-set, the live path)', () => {
+  it('reads type+package off the purchased product when the session has none', async () => {
+    listLineItems.mockResolvedValue({
+      data: [{ price: { product: { metadata: { type: 'mcp_credit_topup', package: 'plus' } } } }],
+    });
+    const r = await handleMcpCreditTopup(session({ metadata: {}, client_reference_id: 'buyer@x.com' }));
+    expect(r).toMatchObject({ handled: true, applied: true, credits: 800, email: 'buyer@x.com' });
+    expect(credits.applyCreditOnce).toHaveBeenCalledWith('cs_1', 'buyer@x.com', 800, 'stripe_topup');
+  });
+
+  it('still ignores a non-MCP product (normal purchase) without granting', async () => {
+    listLineItems.mockResolvedValue({ data: [{ price: { product: { metadata: { tier: 'briefings' } } } }] });
+    const r = await handleMcpCreditTopup(session({ metadata: {} }));
+    expect(r.handled).toBe(false);
+    expect(credits.applyCreditOnce).not.toHaveBeenCalled();
+  });
 });
 
 describe('handleMcpCreditTopup', () => {

@@ -15,11 +15,12 @@ describe('mcp credit packages', () => {
     expect(creditsForPackage(undefined)).toBeNull();
   });
 
-  it('every package has positive credits + price + a stable id', () => {
+  it('every package has positive credits + price + a stable id + a Stripe checkout link', () => {
     for (const p of CREDIT_PACKAGES) {
       expect(p.credits).toBeGreaterThan(0);
       expect(p.usd).toBeGreaterThan(0);
       expect(p.id).toMatch(/^[a-z]+$/);
+      expect(p.checkoutUrl).toMatch(/^https:\/\/buy\.stripe\.com\//);
     }
   });
 });

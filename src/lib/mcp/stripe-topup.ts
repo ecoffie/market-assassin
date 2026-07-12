@@ -13,6 +13,7 @@
 import type Stripe from 'stripe';
 import { creditsForPackage } from './packages';
 import { applyCreditOnce } from './credits';
+import { getStripe } from '@/lib/stripe';
 
 export const MCP_TOPUP_TYPE = 'mcp_credit_topup';
 
@@ -41,7 +42,24 @@ export interface McpTopupOutcome {
  * any other session so the caller's normal provisioning is unaffected.
  */
 export async function handleMcpCreditTopup(session: Stripe.Checkout.Session): Promise<McpTopupOutcome> {
-  const meta = (session.metadata || {}) as Record<string, unknown>;
+  // The `type`/`package` metadata can live on the SESSION (API-created links) OR, as
+  // set in the Stripe Dashboard, on the PRODUCT. Prefer the session; fall back to the
+  // purchased product's metadata (one extra API call, only when the session lacks it).
+  let meta = (session.metadata || {}) as Record<string, unknown>;
+  if (meta.type !== MCP_TOPUP_TYPE) {
+    try {
+      const items = await getStripe().checkout.sessions.listLineItems(session.id, {
+        expand: ['data.price.product'],
+        limit: 1,
+      });
+      const product = items.data[0]?.price?.product;
+      if (product && typeof product === 'object' && 'metadata' in product && product.metadata) {
+        meta = product.metadata as Record<string, unknown>;
+      }
+    } catch (err) {
+      console.error('[mcp:topup] product-metadata fetch failed', session.id, err);
+    }
+  }
   if (meta.type !== MCP_TOPUP_TYPE) return { handled: false };
 
   const email = resolveEmail(session);

@@ -20,7 +20,7 @@ interface KeyRow {
   revoked_at: string | null;
 }
 interface Tool { name: string; description: string; credits: number }
-interface Pkg { id: string; credits: number; usd: number; label: string }
+interface Pkg { id: string; credits: number; usd: number; label: string; checkoutUrl?: string }
 interface Call { tool_name: string; status: string; credits_charged: number; created_at: string }
 
 const MCP_URL = 'https://mcp.getmindy.ai/mcp';
@@ -182,14 +182,26 @@ export default function McpDashboard() {
           <h2 className="font-semibold mb-3">Buy credits</h2>
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
             {packages.map((p) => (
-              <div key={p.id} className="rounded-lg border border-slate-800 bg-slate-950 p-4 text-center">
+              <div key={p.id} className="rounded-lg border border-slate-800 bg-slate-950 p-4 text-center flex flex-col">
                 <div className="text-lg font-bold">${p.usd}</div>
                 <div className="text-emerald-400 text-sm">{p.credits.toLocaleString()} credits</div>
-                <div className="text-xs text-slate-500 mt-1">{p.label}</div>
+                <div className="text-xs text-slate-500 mt-1 mb-3 flex-1">{p.label}</div>
+                {p.checkoutUrl ? (
+                  <a
+                    href={`${p.checkoutUrl}?client_reference_id=${encodeURIComponent(email)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="bg-emerald-700 hover:bg-emerald-600 rounded-lg py-1.5 text-sm font-medium"
+                  >
+                    Buy
+                  </a>
+                ) : (
+                  <span className="text-xs text-slate-600">Coming soon</span>
+                )}
               </div>
             ))}
           </div>
-          <p className="text-xs text-slate-500 mt-3">Checkout activates once Stripe products are live. Pro subscribers get a monthly credit allowance automatically.</p>
+          <p className="text-xs text-slate-500 mt-3">Credits never expire. Pro subscribers get a monthly credit allowance automatically.</p>
         </section>
 
         {/* Tool prices */}
