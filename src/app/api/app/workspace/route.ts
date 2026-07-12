@@ -39,7 +39,7 @@ export async function GET(request: NextRequest) {
   // operating as a client, so it reads THAT client's row, not the coach's.
   const displayEmail = notifEmail;
 
-  const [{ data: members }, { data: settings }, { data: workspaceSettings }, { data: notificationProfile }, { data: briefingProfile }, { data: activity }, { data: pipeline }] = await Promise.all([
+  const [{ data: members }, { data: settings }, { data: workspaceSettings }, { data: notificationProfile }, { data: briefingProfile, error: briefingProfileErr }, { data: activity }, { data: pipeline }] = await Promise.all([
     supabase.from('mi_beta_team_members').select('*').eq('workspace_id', workspaceId).order('created_at', { ascending: true }),
     supabase.from('mi_beta_user_settings').select('*').eq('user_email', displayEmail).maybeSingle(),
     // Workspace-level defaults (company, NAICS, agencies) shared by all members —
@@ -61,9 +61,14 @@ export async function GET(request: NextRequest) {
       .select('user_email, naics_codes, psc_codes, agencies, keywords, business_type, location_states, aggregated_profile')
       .eq('user_email', notifEmail)
       .maybeSingle(),
+    // profile.briefing feeds the Contractors/Recompetes/Forecasts/MarketResearch panels'
+    // default naics/agency filters. user_briefing_profile never existed → those panels ran
+    // unfiltered for every user. Read the REAL table; only columns that exist on it
+    // (company_name/zip_code/certifications are NOT on user_notification_settings →
+    // set_aside_certifications/location_zip are). tasks/smart-profile-dead-table-findings.md.
     supabase
-      .from('user_briefing_profile')
-      .select('user_email, naics_codes, agencies, keywords, company_name, zip_code, certifications, set_aside_preferences, aggregated_profile')
+      .from('user_notification_settings')
+      .select('user_email, naics_codes, agencies, keywords, location_zip, set_aside_certifications, set_aside_preferences, aggregated_profile')
       .eq('user_email', normalizedEmail)
       .maybeSingle(),
     supabase.from('mi_beta_activity').select('*').eq('workspace_id', workspaceId).order('created_at', { ascending: false }).limit(20),
@@ -74,6 +79,8 @@ export async function GET(request: NextRequest) {
       .order('next_action_date', { ascending: true, nullsFirst: false })
       .limit(100),
   ]);
+
+  if (briefingProfileErr) console.error('[workspace] briefing profile query error:', briefingProfileErr.message);
 
   const today = new Date();
   today.setHours(0, 0, 0, 0);

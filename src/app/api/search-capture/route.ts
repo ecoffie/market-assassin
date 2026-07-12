@@ -135,12 +135,14 @@ export async function POST(request: NextRequest) {
       const email = body.user_email.toLowerCase().trim();
       const searchType = body.search_type || 'keyword';
 
-      // Map search type to profile column
+      // Map search type to profile column. Columns must exist on
+      // user_notification_settings (the REAL table; user_briefing_profile never existed —
+      // tasks/smart-profile-dead-table-findings.md). `zip` dropped: no array zip column
+      // there (location_zip is a scalar), so a searched zip is not appended.
       const columnMap: Record<string, string> = {
         naics: 'naics_codes',
         agency: 'agencies',
         keyword: 'keywords',
-        zip: 'zip_codes',
         company: 'watched_companies',
         contract: 'watched_contracts',
         psc: 'keywords',
@@ -149,11 +151,12 @@ export async function POST(request: NextRequest) {
 
       const column = columnMap[searchType];
       if (column) {
-        const { data: profile } = await supabase
-          .from('user_briefing_profile')
+        const { data: profile, error: captureReadErr } = await supabase
+          .from('user_notification_settings')
           .select(`${column}, aggregated_profile`)
           .eq('user_email', email)
-          .single();
+          .maybeSingle();
+        if (captureReadErr) console.error('[search-capture] profile read error:', captureReadErr.message);
 
         if (profile) {
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -167,10 +170,11 @@ export async function POST(request: NextRequest) {
               : {};
             const updatedJsonb = { ...currentJsonb, [column]: updatedValues };
 
-            await supabase
-              .from('user_briefing_profile')
+            const { error: captureUpdateErr } = await supabase
+              .from('user_notification_settings')
               .update({ [column]: updatedValues, aggregated_profile: updatedJsonb, updated_at: new Date().toISOString() })
               .eq('user_email', email);
+            if (captureUpdateErr) console.error('[search-capture] profile update error:', captureUpdateErr.message);
           }
         }
       }
@@ -234,12 +238,12 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Also get the aggregated profile
+    // Also get the aggregated profile (real table; user_briefing_profile never existed)
     const { data: profile } = await supabase
-      .from('user_briefing_profile')
+      .from('user_notification_settings')
       .select('*')
       .eq('user_email', email.toLowerCase().trim())
-      .single();
+      .maybeSingle();
 
     return NextResponse.json({
       email,

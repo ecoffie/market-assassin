@@ -137,12 +137,14 @@ function getSupabase() {
   const today = now.toISOString().split('T')[0];
 
   try {
-    // Fetch user profile
-    const { data: profile } = await getSupabase()
-      .from('user_briefing_profile')
+    // Fetch user profile from the REAL profile table (user_briefing_profile never
+    // existed → this silently returned null for every user; tasks/smart-profile-dead-table-findings.md)
+    const { data: profile, error: profileErr } = await getSupabase()
+      .from('user_notification_settings')
       .select('naics_codes, agencies, watched_companies, watched_contracts')
       .eq('user_email', email)
-      .single();
+      .maybeSingle();
+    if (profileErr) console.error('[lindy/intelligence] profile query error:', profileErr.message);
 
     const profileSummary = {
       naics_codes: profile?.naics_codes || [],

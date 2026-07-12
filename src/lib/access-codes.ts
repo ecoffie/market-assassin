@@ -787,25 +787,31 @@ export async function grantBriefingAccess(email: string): Promise<void> {
         naics_codes: ['541512', '541611'], // IT + consulting (most common GovCon)
         agencies: [],
         keywords: ['small business', 'set-aside'],
-        zip_codes: [],
         watched_companies: [],
         watched_contracts: [],
       };
-      await supabase.from('user_briefing_profile').upsert({
-        user_email: email.toLowerCase(),
-        naics_codes: defaultProfile.naics_codes,
-        agencies: defaultProfile.agencies,
-        keywords: defaultProfile.keywords,
-        zip_codes: defaultProfile.zip_codes,
-        watched_companies: defaultProfile.watched_companies,
-        watched_contracts: defaultProfile.watched_contracts,
-        aggregated_profile: defaultProfile,
-        timezone: 'America/New_York',
-        email_frequency: 'daily',
-        sms_enabled: false,
-        updated_at: new Date().toISOString(),
-      }, { onConflict: 'user_email' });
-      console.log(`✅ Briefing profile seeded for: ${email}`);
+      // Seed the REAL profile row (user_briefing_profile never existed → this upsert
+      // silently no-op'd, so seeded users still got generic briefings until they searched.
+      // Only columns that exist on user_notification_settings; onConflict must not clobber
+      // an existing richer profile → ignoreDuplicates so a re-grant never overwrites.
+      // tasks/smart-profile-dead-table-findings.md.
+      const { error: seedErr } = await supabase
+        .from('user_notification_settings')
+        .upsert({
+          user_email: email.toLowerCase(),
+          naics_codes: defaultProfile.naics_codes,
+          agencies: defaultProfile.agencies,
+          keywords: defaultProfile.keywords,
+          watched_companies: defaultProfile.watched_companies,
+          watched_contracts: defaultProfile.watched_contracts,
+          aggregated_profile: defaultProfile,
+          timezone: 'America/New_York',
+          briefing_frequency: 'daily',
+          sms_enabled: false,
+          updated_at: new Date().toISOString(),
+        }, { onConflict: 'user_email', ignoreDuplicates: true });
+      if (seedErr) console.error(`[grantBriefingAccess] seed error for ${email}:`, seedErr.message);
+      else console.log(`✅ Briefing profile seeded for: ${email}`);
     }
   } catch (err) {
     // Non-fatal — profile will be created by aggregate-profiles cron later

@@ -98,11 +98,13 @@ async function fetchUserContext(email: string): Promise<ChatContext> {
 
   // Fetch profile and recent briefings in parallel
   const [profileResult, briefingsResult] = await Promise.all([
+    // Real profile lives in user_notification_settings; user_briefing_profile never
+    // existed (tasks/smart-profile-dead-table-findings.md).
     supabase
-      .from('user_briefing_profile')
+      .from('user_notification_settings')
       .select('naics_codes, agencies, keywords, watched_companies, aggregated_profile')
       .eq('user_email', email)
-      .single(),
+      .maybeSingle(),
     supabase
       .from('briefing_log')
       .select('briefing_date, briefing_content, items_count')
@@ -112,6 +114,7 @@ async function fetchUserContext(email: string): Promise<ChatContext> {
   ]);
 
   // Parse profile
+  if (profileResult.error) console.error('[briefings/chat] profile query error:', profileResult.error.message);
   if (profileResult.data) {
     const p = profileResult.data;
     context.naicsCodes = p.naics_codes || [];
