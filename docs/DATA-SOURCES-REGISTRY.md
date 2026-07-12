@@ -9,7 +9,7 @@
 > BUILD PIPELINE (the scraper / merge script that produced it) — provenance lives
 > in the build, not always in an inline `source` field.
 
-_Last verified: 2026-06-08 · updated 2026-07-11 (added NAICS buyer vocabulary source)_
+_Last verified: 2026-06-08 · updated 2026-07-12 (added Mindy MCP live-API sources: GSA CALC, SEC EDGAR, Federal Register)_
 
 ---
 
@@ -22,6 +22,9 @@ _Last verified: 2026-06-08 · updated 2026-07-11 (added NAICS buyer vocabulary s
 | **USASpending — offices** | Office-level drill-down | `spending_by_award` → `Awarding Office` | Official, aggregated per office. |
 | **SAM.gov** | Opportunities, `federal_contacts` POCs | `api.sam.gov/opportunities/v2` | Official federal solicitation data. |
 | **Grants.gov** | Federal grants | `api.grants.gov/v1/api/search2` | Official. |
+| **GSA CALC+** | MCP `get_pricing_intel` — price-to-win labor rates (p25/p50/p75, small-vs-large gap, top vendors) | `api.gsa.gov/acquisition/calc/v3/api/ceilingrates/` (keyless, ~240K awarded labor categories, daily refresh) | Official. Live fetch + 12h TTL response cache (`mcp_external_cache`). Wrapped via `src/lib/utils/calc-rates.ts`. |
+| **SEC EDGAR** | MCP `get_incumbent_financials` — incumbent revenue/net income/gross margin/public float/employees/latest 10-K | `www.sec.gov/files/company_tickers.json` → `data.sec.gov/api/xbrl/companyfacts/CIK##########.json` + `data.sec.gov/submissions/CIK##########.json` (keyless, requires `User-Agent`) | Official. Public filers only — private contractors return `grounded=false` (no invented figures). Cache 24h/6h. `src/lib/edgar`. |
+| **Federal Register** | MCP `get_regulatory_demand` — "demand before SAM" leading indicator (proposed/final rules precede solicitations 6-18mo) | `federalregister.gov/api/v1/documents.json` (keyless) | Official. Does NOT tag items to NAICS — any NAICS mapping is inference, not data. Cache 1h. `src/lib/federal-register`. |
 
 ## Built / curated sources (real provenance, needs periodic refresh)
 
@@ -41,7 +44,7 @@ _Last verified: 2026-06-08 · updated 2026-07-11 (added NAICS buyer vocabulary s
 A complete sweep (2026-06-08) accounts for **every** data source in the platform.
 This is the acquisition data asset — provenance + refresh plan for each.
 
-**Totals:** 28 static data files · 80+ Supabase tables · 24 live external APIs ·
+**Totals:** 28 static data files · 80+ Supabase tables · 27 live external APIs ·
 50+ build/scrape scripts · ~400K+ prod records.
 
 ### Static data files (28) — all have a build pipeline
@@ -64,10 +67,11 @@ intel (`agency_intelligence` 557, `agency_forecasts` 7,764, `forecast_sources`/`
 ops (`tool_errors`, `tool_health_metrics`, `api_provider_status`, `cron_jobs`, `sam_api_cache`),
 contacts (`federal_contacts` 123K, `dodaac_directory`).
 
-### Live external APIs (24)
+### Live external APIs (27)
 SAM.gov (5 endpoints: opportunities/awards/entity/hierarchy/subaward), USASpending (4),
 Grants.gov (2), NIH Reporter, SBIR.gov, GSA (Acquisition Gateway forecasts + CALC rates),
-GovInfo (GAO reports), LLMs (Groq/OpenAI/Anthropic/Grok/Perplexity), Stripe.
+GovInfo (GAO reports), **SEC EDGAR** (company_tickers + companyfacts + submissions),
+**Federal Register** (documents), LLMs (Groq/OpenAI/Anthropic/Grok/Perplexity), Stripe.
 
 ### Build/scrape scripts (50+)
 `~/Bootcamp/`: compile-sblo-list, scrape-dhs-*, scan-ndaa-sections, search-sba-dsbs-tribal-8a,

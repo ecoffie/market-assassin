@@ -177,6 +177,13 @@ export async function GET(request: NextRequest) {
     { key: 'budget_authority', label: 'Budget authority', source: 'OMB / USASpending toptier budgets', provenance: 'curated', count: budgetAgencies, note: 'toptier agency budget trends (winners/losers)', sources: ['OMB budget data', 'USASpending toptier accounts'] },
     { key: 'grants', label: 'Federal grants', source: 'Grants.gov API (live)', provenance: 'passthrough', count: null, note: 'queried live per search', sources: ['Grants.gov API'] },
     { key: 'sbir', label: 'SBIR / STTR', source: 'NIH RePORTER + SBIR Multisite (live)', provenance: 'passthrough', count: null, note: 'queried live per search', sources: ['NIH RePORTER API', 'SBIR.gov Multisite'] },
+    // Mindy MCP live-API sources (2026-07-12) — fetched on demand with a short-TTL
+    // response cache (mcp_external_cache), NOT a mirrored dataset. count is null
+    // because the live upstream count is not ours to claim. See src/lib/edgar,
+    // src/lib/federal-register, src/lib/utils/calc-rates.ts.
+    { key: 'pricing_intel', label: 'Pricing intel (GSA CALC)', source: 'GSA CALC+ labor rates (live)', provenance: 'passthrough', count: null, note: 'MCP get_pricing_intel · ~240K awarded labor categories · price-to-win p25/p50/p75 · cache 12h', sources: ['GSA CALC+ API (api.gsa.gov)'] },
+    { key: 'incumbent_financials', label: 'Incumbent financials (SEC EDGAR)', source: 'SEC EDGAR companyfacts (live)', provenance: 'passthrough', count: null, note: 'MCP get_incumbent_financials · public filers only (private → grounded=false) · cache 24h/6h', sources: ['SEC EDGAR (www.sec.gov / data.sec.gov)'] },
+    { key: 'regulatory_demand', label: 'Regulatory demand (Federal Register)', source: 'Federal Register documents (live)', provenance: 'passthrough', count: null, note: 'MCP get_regulatory_demand · "demand before SAM" leading indicator · no NAICS tagging · cache 1h', sources: ['Federal Register API (federalregister.gov)'] },
   ];
 
   const byProvenance = (p: Provenance) =>
