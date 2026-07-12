@@ -4176,3 +4176,33 @@ active opps had a deadline earlier today (leaked by the old date-only filter, no
 expired in the best-fit pool after the fix. `market-dossier` needed no change — it reads the
 shared `fetchSamOpportunitiesFromCache`, already fixed. Every open-opportunity surface now
 shares one runway model. tsc clean; production build green.
+
+---
+
+## Pre-track nudge: "why this fits you + your next move" on every feed card (2026-07-12)
+
+**What:** Each opportunity in the Source Feed now shows, before you track it, a plain-language
+line: ✓ why it fits YOU (your matching NAICS / keyword / a set-aside you qualify for) and →
+your next move (Draft your response · Submit a letter of interest · Find the contracting
+officer). A passive list becomes "here's your move."
+
+**Why:** Measurement drove this. Of users who browse but never track, 9 of 10 have a REAL
+profile — they see relevant opportunities and choose not to act. The gap isn't targeting (we
+fixed runway/expired/nulls); it's motivation. The old card showed a title + badges and left
+the "is this for me, and what would I do?" math to the user. This does that math for them, from
+data the feed already computes.
+
+**Honest-or-silent:** the line renders ONLY on a genuinely strong match — exact or
+same-4-digit-industry-group NAICS, a real keyword hit, or a qualifying set-aside. A mere
+3-digit-subsector coincidence (how the feed widens to catch non-obvious codes) earns no "fits
+you" claim. Testing on a real law firm proved why this matters: 11 of 12 loose 3-digit matches
+(fume-hood jobs, A/E engineering) correctly show NO nudge instead of a dishonest "Matches your
+NAICS." We never claim fit we can't back.
+
+**SEO / positioning:** "Every opportunity tells you why it fits you and what to do next — no
+guesswork."
+
+**Proof:** `src/lib/opportunities/why-fit.ts` (pure, 12 unit assertions) + inline render in
+AlertsPanel, reusing the existing `computeNextAction` and the user's own `searchCriteria`
+already on the client (no new endpoint). Verified on real users against live `sam_opportunities`.
+tsc clean (feature files); production build green.

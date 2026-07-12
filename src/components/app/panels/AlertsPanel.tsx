@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback, useMemo } from 'react';
-import { Target, RefreshCw, Check, Lock, Flame, Zap, Star, Users, MapPin, Landmark, Plus, ClipboardList, AlertTriangle } from 'lucide-react';
+import { Target, RefreshCw, Check, Lock, Flame, Zap, Star, Users, MapPin, Landmark, Plus, ClipboardList, AlertTriangle, ArrowRight } from 'lucide-react';
 import Link from 'next/link';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders, authedFetch } from '../authHeaders';
@@ -17,6 +17,7 @@ import SamAttachmentLinks from '@/components/app/SamAttachmentLinks';
 import CollapsibleOpportunityDescription from '@/components/app/CollapsibleOpportunityDescription';
 import OpportunityDetailStrip from '@/components/app/OpportunityDetailStrip';
 import { computeNextAction, nextActionButton } from '@/lib/pipeline/next-action';
+import { computeWhyFit } from '@/lib/opportunities/why-fit';
 
 interface AlertsPanelProps {
   email: string | null;
@@ -43,6 +44,7 @@ interface Alert {
   pscCode?: string;
   setAside?: string;
   setAsideDescription?: string;
+  setAsideEligible?: boolean;
   popState?: string;
   popCity?: string;
   popZip?: string;
@@ -1494,6 +1496,41 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                   {alert.office && alert.office !== getAlertBuyer(alert).secondary && (
                     <p className="text-xs text-faint mt-0.5">{alert.office}</p>
                   )}
+
+                  {/* PRE-TRACK NUDGE — the give-up fix. 9/10 give-up users have a
+                      real profile: they see relevant opps and don't act. Show, in
+                      plain language, WHY this fits THEM (their matched NAICS/keyword/
+                      set-aside) + WHAT they'd do next — before tracking, so a passive
+                      list becomes "here's your move." Renders only when there's a real
+                      match (computeWhyFit returns empty otherwise → no noise). */}
+                  {(() => {
+                    const wf = computeWhyFit(
+                      {
+                        naicsCode: alert.naicsCode,
+                        title: alert.title,
+                        description: alert.description,
+                        noticeType: alert.noticeType,
+                        setAsideEligible: alert.setAsideEligible,
+                        setAsideDescription: alert.setAsideDescription || alert.setAside,
+                      },
+                      { naicsCodes: searchCriteria.naicsCodes, keywords: searchCriteria.keywords },
+                    );
+                    if (!wf.whyLine) return null;
+                    return (
+                      <div className="mt-2 flex flex-col gap-1 text-xs">
+                        <p className="inline-flex items-start gap-1.5 text-emerald-300">
+                          <Check className="h-3.5 w-3.5 shrink-0 mt-px" strokeWidth={2.5} aria-hidden />
+                          <span>{wf.whyLine}</span>
+                        </p>
+                        {wf.nextStep && (
+                          <p className="inline-flex items-center gap-1.5 text-ink-soft">
+                            <ArrowRight className="h-3.5 w-3.5 shrink-0" strokeWidth={2.5} aria-hidden />
+                            <span>Next: {wf.nextStep}</span>
+                          </p>
+                        )}
+                      </div>
+                    );
+                  })()}
 
                   {/* Description preview */}
                   {alert.description && (
