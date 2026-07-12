@@ -178,42 +178,25 @@ async function getUserProfile(
       };
     }
 
-    // Fallback to database queries if no smart profile
-    // Try user_briefing_profile first
-    const { data: briefingProfile } = await supabase
-      .from('user_briefing_profile')
-      .select('naics_codes, agencies, watched_companies, keywords')
+    // Read the REAL per-user profile from user_notification_settings (previously
+    // fell back through user_briefing_profile → user_alert_settings, both of which
+    // do not exist → every briefing ran generic. tasks/smart-profile-dead-table-findings.md).
+    const { data: settings, error: settingsErr } = await supabase
+      .from('user_notification_settings')
+      .select('naics_codes, agencies, watched_companies, business_type')
       .eq('user_email', email)
-      .single();
+      .maybeSingle();
+    if (settingsErr) console.error('[RecompeteGen] settings query error:', settingsErr.message);
 
-    const bp = briefingProfile as { naics_codes?: string[]; agencies?: string[]; watched_companies?: string[] } | null;
+    const s = settings as { naics_codes?: string[]; agencies?: string[]; watched_companies?: string[]; business_type?: string } | null;
 
-    if (bp && bp.naics_codes && bp.naics_codes.length > 0) {
+    if (s && s.naics_codes && s.naics_codes.length > 0) {
       return {
         email,
-        naicsCodes: bp.naics_codes || [],
-        agencies: bp.agencies || [],
-        watchedCompanies: bp.watched_companies || [],
-        businessType: 'Small Business',
-      };
-    }
-
-    // Try user_alert_settings as fallback
-    const { data: alertSettings } = await supabase
-      .from('user_alert_settings')
-      .select('naics_codes, business_type, target_agencies')
-      .eq('user_email', email)
-      .single();
-
-    const as_ = alertSettings as { naics_codes?: string[]; business_type?: string; target_agencies?: string[] } | null;
-
-    if (as_ && as_.naics_codes && as_.naics_codes.length > 0) {
-      return {
-        email,
-        naicsCodes: as_.naics_codes || [],
-        agencies: as_.target_agencies || [],
-        watchedCompanies: [],
-        businessType: as_.business_type || 'Small Business',
+        naicsCodes: s.naics_codes || [],
+        agencies: s.agencies || [],
+        watchedCompanies: s.watched_companies || [],
+        businessType: s.business_type || 'Small Business',
       };
     }
 

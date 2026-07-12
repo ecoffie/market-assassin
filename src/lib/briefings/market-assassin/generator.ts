@@ -193,41 +193,30 @@ async function getMAUserProfile(email: string): Promise<MAUserProfile | null> {
     const supabase = getSupabaseClient();
     if (!supabase) return hasMAAccess ? getDefaultMAProfile(email, hasMAAccess, maTier) : null;
 
-    // Try user_briefing_profile first
-    const { data: briefingProfile } = await supabase
-      .from('user_briefing_profile')
-      .select('naics_codes, agencies, watched_companies, keywords')
+    // Read the REAL per-user profile from user_notification_settings — the table
+    // where a user's saved NAICS/agencies/keywords actually live. (Previously this
+    // fell back through user_briefing_profile → user_alert_settings, BOTH of which
+    // do not exist, so every briefing silently ran on generic defaults. See
+    // tasks/smart-profile-dead-table-findings.md.)
+    const { data: settings, error: settingsErr } = await supabase
+      .from('user_notification_settings')
+      .select('naics_codes, agencies, watched_companies, keywords, business_type, set_aside_preferences')
       .eq('user_email', email)
-      .single();
+      .maybeSingle();
+    if (settingsErr) console.error('[MABriefingGen] settings query error:', settingsErr.message);
 
-    if (briefingProfile && briefingProfile.naics_codes && briefingProfile.naics_codes.length > 0) {
+    if (settings && settings.naics_codes && settings.naics_codes.length > 0) {
       return {
         email,
-        naicsCodes: briefingProfile.naics_codes,
-        targetAgencies: briefingProfile.agencies || [],
-        watchedCompetitors: briefingProfile.watched_companies || [],
-        capabilities: briefingProfile.keywords || [],
-        setAsideTypes: [],
-        hasMAAccess,
-        maTier,
-      };
-    }
-
-    // Fallback to user_alert_settings
-    const { data: alertSettings } = await supabase
-      .from('user_alert_settings')
-      .select('naics_codes, business_type, target_agencies')
-      .eq('user_email', email)
-      .single();
-
-    if (alertSettings && alertSettings.naics_codes && alertSettings.naics_codes.length > 0) {
-      return {
-        email,
-        naicsCodes: alertSettings.naics_codes,
-        targetAgencies: alertSettings.target_agencies || [],
-        watchedCompetitors: ['Leidos', 'CACI', 'Booz Allen', 'Peraton', 'SAIC'],
-        capabilities: [],
-        setAsideTypes: alertSettings.business_type ? [alertSettings.business_type] : [],
+        naicsCodes: settings.naics_codes,
+        targetAgencies: settings.agencies || [],
+        watchedCompetitors: (settings.watched_companies && settings.watched_companies.length > 0)
+          ? settings.watched_companies
+          : ['Leidos', 'CACI', 'Booz Allen', 'Peraton', 'SAIC'],
+        capabilities: settings.keywords || [],
+        setAsideTypes: settings.set_aside_preferences && settings.set_aside_preferences.length > 0
+          ? settings.set_aside_preferences
+          : (settings.business_type ? [settings.business_type] : []),
         hasMAAccess,
         maTier,
       };

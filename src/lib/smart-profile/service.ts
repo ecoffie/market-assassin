@@ -69,14 +69,20 @@ export async function getSmartProfile(email: string): Promise<SmartUserProfile |
   if (!supabase) return null;
 
   try {
+    // Read from user_notification_settings — the real profile table (the old
+    // `user_briefing_profile` never existed). mapDbToProfile reads named fields,
+    // so columns this table lacks (weights, click-tracking) just map to defaults.
     const { data, error } = await supabase
-      .from('user_briefing_profile')
+      .from('user_notification_settings')
       .select('*')
       .eq('user_email', email)
       .maybeSingle(); // may be empty — returns null instead of a PGRST116 error
 
-    if (error || !data) {
-      console.log(`[SmartProfile] No profile found for ${email}`);
+    if (error) {
+      console.error('[SmartProfile] profile query error:', error.message);
+      return null;
+    }
+    if (!data) {
       return null;
     }
 
@@ -103,27 +109,26 @@ export async function getOrCreateProfile(email: string): Promise<SmartUserProfil
 
   try {
     const now = new Date().toISOString();
+    // Seed a row in the REAL table (user_notification_settings) with only columns
+    // it actually has. upsert (not insert) so a concurrent/existing row is a no-op
+    // rather than a unique-violation.
     const { data, error } = await supabase
-      .from('user_briefing_profile')
-      .insert({
+      .from('user_notification_settings')
+      .upsert({
         user_email: email,
         naics_codes: [],
         agencies: [],
         watched_companies: [],
         keywords: [],
         timezone: 'America/New_York',
-        email_frequency: 'daily',
         preferred_delivery_hour: 7,
-        engagement_score: 50,
-        profile_completeness: 10,
-        created_at: now,
         updated_at: now,
-      })
+      }, { onConflict: 'user_email' })
       .select()
       .single();
 
     if (error) {
-      console.error('[SmartProfile] Error creating profile:', error);
+      console.error('[SmartProfile] Error creating profile:', error.message);
       return { email, ...DEFAULT_PROFILE } as SmartUserProfile;
     }
 
@@ -145,47 +150,29 @@ export async function updateProfile(
   if (!supabase) return null;
 
   try {
-    // Map TypeScript fields to database columns
+    // Persist to user_notification_settings — the REAL profile table the rest of
+    // the app reads (briefings, chat, opportunity feed). The old target
+    // `user_briefing_profile` never existed, so this write always 500'd (see
+    // tasks/smart-profile-dead-table-findings.md). Only map fields that are real
+    // columns on user_notification_settings; unmapped payload fields (cage_code,
+    // annual_revenue, contract_vehicles, muted_*, etc.) have no home here and are
+    // dropped rather than failing the whole upsert on a bad column.
     const dbUpdates: Record<string, unknown> = {
       updated_at: new Date().toISOString(),
-      last_profile_update: new Date().toISOString(),
     };
 
     if (updates.naicsCodes !== undefined) dbUpdates.naics_codes = updates.naicsCodes;
     if (updates.targetAgencies !== undefined) dbUpdates.agencies = updates.targetAgencies;
     if (updates.watchedCompanies !== undefined) dbUpdates.watched_companies = updates.watchedCompanies;
     if (updates.keywords !== undefined) dbUpdates.keywords = updates.keywords;
-
-    if (updates.state !== undefined) dbUpdates.state = updates.state;
-    if (updates.zipCode !== undefined) dbUpdates.zip_code = updates.zipCode;
-    if (updates.geographicPreference !== undefined) dbUpdates.geographic_preference = updates.geographicPreference;
-
-    if (updates.companyName !== undefined) dbUpdates.company_name = updates.companyName;
-    if (updates.cageCode !== undefined) dbUpdates.cage_code = updates.cageCode;
-    if (updates.companySize !== undefined) dbUpdates.company_size = updates.companySize;
-    if (updates.annualRevenue !== undefined) dbUpdates.annual_revenue = updates.annualRevenue;
-    if (updates.employeeCount !== undefined) dbUpdates.employee_count = updates.employeeCount;
-
-    if (updates.certifications !== undefined) dbUpdates.certifications = updates.certifications;
     if (updates.setAsidePreferences !== undefined) dbUpdates.set_aside_preferences = updates.setAsidePreferences;
-
-    if (updates.capabilityKeywords !== undefined) dbUpdates.capability_keywords = updates.capabilityKeywords;
-    if (updates.pastPerformanceAgencies !== undefined) dbUpdates.past_performance_agencies = updates.pastPerformanceAgencies;
-    if (updates.contractVehicles !== undefined) dbUpdates.contract_vehicles = updates.contractVehicles;
-    if (updates.maxContractSize !== undefined) dbUpdates.max_contract_size = updates.maxContractSize;
-
     if (updates.timezone !== undefined) dbUpdates.timezone = updates.timezone;
-    if (updates.emailFrequency !== undefined) dbUpdates.email_frequency = updates.emailFrequency;
     if (updates.preferredDeliveryHour !== undefined) dbUpdates.preferred_delivery_hour = updates.preferredDeliveryHour;
+    if (updates.state !== undefined) dbUpdates.location_state = updates.state;
 
-    if (updates.mutedAgencies !== undefined) dbUpdates.muted_agencies = updates.mutedAgencies;
-    if (updates.mutedNaics !== undefined) dbUpdates.muted_naics = updates.mutedNaics;
-    if (updates.minContractValue !== undefined) dbUpdates.min_contract_value = updates.minContractValue;
-    if (updates.maxDistanceMiles !== undefined) dbUpdates.max_distance_miles = updates.maxDistanceMiles;
-
-    // Upsert
+    // Upsert into the real table.
     const { data, error } = await supabase
-      .from('user_briefing_profile')
+      .from('user_notification_settings')
       .upsert(
         { user_email: email, ...dbUpdates },
         { onConflict: 'user_email' }
@@ -194,7 +181,7 @@ export async function updateProfile(
       .single();
 
     if (error) {
-      console.error('[SmartProfile] Error updating profile:', error);
+      console.error('[SmartProfile] Error updating profile:', error.message);
       return null;
     }
 
