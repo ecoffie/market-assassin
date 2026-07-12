@@ -31,12 +31,15 @@
     "audit:client-auth": "node scripts/audit-client-auth.mjs",
     "prepare": "git config core.hooksPath .githooks || true",
     "test:unit": "vitest run",
-    "test:unit:watch": "vitest"
+    "test:unit:watch": "vitest",
+    "mcp:dev": "node scripts/mcp-dev.mjs",
+    "mcp:smoke": "node scripts/mcp-smoke.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
     "@google-cloud/bigquery": "^8.3.1",
     "@google-cloud/storage": "^7.19.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "@supabase/supabase-js": "^2.90.0",
     "@tanstack/react-query": "^5.100.9",
     "@upstash/qstash": "^2.11.0",
