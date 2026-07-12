@@ -42,3 +42,16 @@ The 3 briefing generators (`market-assassin`, `contractor-db`, `recompete`) each
 **D. Remove the dead smart-profile system** — if the `/app` onboarding fully replaced it, delete `smart-profile/` + the legacy `/profile/*` pages and the dead fallback levels. Cleanup, no revival.
 
 **Recommendation:** B + C. B restores real briefing personalization for every user (the actual damage) by reading the table that already has the data; C stops the 500. A (revive click-learning) is optional polish; D (delete) only if the legacy onboarding is confirmed replaced. All should also add the `{ error }` check so the next dead-table is loud (per the swallowed-error audit).
+
+---
+
+## ✅ DONE — B + C shipped & verified on prod (`a36e835e`, 2026-07-11)
+
+- **B:** all 3 briefing generators (market-assassin / contractor-db / recompete) now read `user_notification_settings` instead of the two dead tables. Verified: chris.ford's generator profile read returns naics=5 keywords=10 (was generic defaults).
+- **C:** `updateProfile` + `getSmartProfile` + `getOrCreateProfile` now read/write `user_notification_settings` (only columns that exist there; legacy fields like cage_code/annual_revenue dropped, not failed-on). Verified on prod: `POST /api/profile {email, naicsCodes:["541512","541611"], targetAgencies:["DHS"]}` → **200**, returns the saved values (was **500**). Test rows cleaned up.
+- All swallowed-error reads in these paths now surface `{ error }`.
+
+**Still open (deferred, not done):**
+- **A** — click-learning (`learnFromClick`, `updateEngagementScore`, `recordInteraction`'s side effects, `calculateProfileCompleteness`, `completeOnboarding`) still targets the nonexistent `user_briefing_profile` and silently no-ops. `briefing_interactions` (the write target for raw interactions) DOES exist and works, but nothing reads the learned weights back. Revive only if click-weighted personalization is wanted — needs a real `user_briefing_profile` table (author a proper CREATE, hand-run) OR move the weight columns onto `user_notification_settings`.
+- **D** — the legacy `/profile/setup` ↔ `/profile/complete` pages still exist (now functional via C, but superseded by `/app/onboarding`). Retire if confirmed dead. The health-check cron still pings `/profile/setup` expecting 200 (still passes).
+- `mapDbToProfile` reads some fields that don't exist on `user_notification_settings` (weights, engagement_score) → they map to defaults; harmless but worth a cleanup pass if A is done.
