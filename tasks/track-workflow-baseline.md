@@ -77,3 +77,23 @@ NAICS-title filler.
   LEFT UNTOUCHED (re-derive proved unsafe: IT profile → "pharmaceutical/steel/cutlery" via prefix
   fallback; NAICS matching still covers them). Snapshot saved to scratchpad before write.
   Verified: sample profiles hold cleaned arrays; strip-only remaining ~0.
+
+## DENOMINATOR CORRECTION (2026-07-12) — measure against ELIGIBLE, not raw records
+IMPORTANT for future sessions: do NOT measure profile/setup/give-up rates against the 10,236
+`user_notification_settings` rows. That's raw account inventory — mostly dormant records that
+never enabled alerts (the command-center dashboard note: "totals should not be compared directly
+to daily sends"). Earlier work wrongly framed "86% un-set-up / 8,833 users" off this.
+
+**ELIGIBLE = alerts_enabled=true = 1,664** (decided w/ Eric, matches dashboard "Alerts enabled
+total"). Measured against THAT (non-excluded):
+| segment | count | % of eligible |
+|---|---|---|
+| REAL profile (custom NAICS or distinctive kw) | 1,341 | 81% |
+| un-set-up (generic/default/no real signal) | 323 | 19% |
+| ├ default NAICS only | 34 | |
+| └ no NAICS | 296 | |
+| un-set-up AND active in 30d | 200 | |
+
+So the audience is HEALTHY (81% set up). The generic-feed banner + setup nudges target ~200-323
+real people, NOT thousands. The dashboard (getmindy.ai/command-center/dashboard) is the source of
+truth — read it, don't re-derive off raw table counts.
