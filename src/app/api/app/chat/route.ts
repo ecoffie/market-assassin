@@ -35,6 +35,7 @@ import { retrieveRagContext, type RagChunkResult } from '@/lib/rag/retrieve';
 import { retrievePodcastEpisodes, formatPodcastCardsForPrompt, type PodcastEpisodeCard } from '@/lib/rag/podcast-search';
 import { loadBidderProfile, formatProfileForPrompt } from '@/lib/proposal/loaders';
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
+import { makeTier0Tools, TIER0_TOOL_DEFS } from '@/lib/chat/tier0-tools';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -108,6 +109,12 @@ GROUNDING:
 - Use this context to ground your answers. DO NOT add inline citation markers (no [→ Episode 326], no [→ Day 14], no bracket refs at all). The UI surfaces the sources you used as clickable chips below your answer automatically — that's the user's path to the docs.
 - Write naturally as if you read the material and are explaining it. Reference podcasts by guest name when natural ("Ryan Atencio explains how to..."), not by episode number.
 - If the context doesn't contain what's needed, say so directly: "I don't have that in my knowledge base — try the [X] panel for that." DO NOT invent federal programs, agency names, or contract values.
+
+YOUR DATA TOOLS (the user's OWN account):
+- get_my_pipeline — the user's tracked pursuits (their pipeline: titles, agencies, deadlines, stages). Call it when they ask about THEIR pipeline, pursuits, deadlines, or what they're bidding/tracking.
+- search_my_vault — the user's OWN Vault: company identity, past performance (contracts/CPARS), capabilities. Call it when they ask about their own experience/past performance/capabilities, or want you to reference their real record.
+- When a tool returns count 0 / has_any false, tell them plainly they have none yet — NEVER invent a pursuit, contract, agency, or deadline. Ground every specific (title, agency, deadline, dollar) ONLY in what the tool actually returned.
+- These tools return only THIS signed-in user's data. Do not claim to see anyone else's.
 
 SCOPE:
 - You answer questions about US federal contracting — set-asides, certifications, SAM.gov, capability statements, teaming, proposals, market intel, GovCon BD.
@@ -381,7 +388,79 @@ export async function POST(request: NextRequest) {
         const userTurn = contextBlock
           ? `${message}\n\n---\nCONTEXT (federal contracting teaching + podcast quotes + episode summaries):\n${contextBlock}`
           : message;
-        messages.push({ role: 'user', content: userTurn });
+        // messages is heterogeneous once tools enter (assistant tool_calls +
+        // role:'tool' results), so type it loosely for the tool round.
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        (messages as any[]).push({ role: 'user', content: userTurn });
+
+        const openaiKeyEarly = process.env.OPENAI_API_KEY;
+        const overBudgetEarly = await isUserOverBudget(email).catch(() => false);
+        const chatModelEarly = overBudgetEarly
+          ? (process.env.LLM_OPENAI_MODEL || 'gpt-4o-mini')
+          : (process.env.CHAT_OPENAI_MODEL || 'gpt-4o');
+
+        // ── Mindy Chat v2: Tier-0 tool round (PRD-mindy-chat-data-core §5a) ──
+        // ONE non-streamed pre-flight call offering the user's own pipeline/Vault
+        // tools. If the model calls one, we execute it (email bound from the
+        // SESSION — never a tool arg) and append the result so the streaming
+        // block below produces a grounded final answer. If no tool is called,
+        // messages is untouched and v1 behaviour is byte-for-byte preserved.
+        // Phase-0 spike proved both gpt-4o and the 8b Groq fallback do this
+        // reliably (scripts/spike-chat-v2-toolcall.mjs).
+        let toolProvider = ''; let toolModel = '';
+        let toolUsageForCost: { prompt_tokens?: number; completion_tokens?: number } | null = null;
+        try {
+          const tier0 = makeTier0Tools(getSupabase(), auth.email!);
+          const toolReqBody = (model: string) => JSON.stringify({
+            model, messages, temperature: 0, max_tokens: 512,
+            tools: TIER0_TOOL_DEFS, tool_choice: 'auto',
+          });
+          const callToolRound = async (): Promise<{ provider: string; model: string; json: unknown } | null> => {
+            if (openaiKeyEarly) {
+              const r = await fetch('https://api.openai.com/v1/chat/completions', {
+                method: 'POST', headers: { Authorization: `Bearer ${openaiKeyEarly}`, 'Content-Type': 'application/json' },
+                body: toolReqBody(chatModelEarly),
+              });
+              if (r.ok) return { provider: 'openai', model: chatModelEarly, json: await r.json() };
+            }
+            const g = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+              method: 'POST', headers: { Authorization: `Bearer ${groqKey || ''}`, 'Content-Type': 'application/json' },
+              body: toolReqBody(GROQ_MODEL),
+            });
+            if (g.ok) return { provider: 'groq', model: GROQ_MODEL, json: await g.json() };
+            return null;
+          };
+
+          const first = await callToolRound();
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const choice = (first?.json as any)?.choices?.[0]?.message;
+          const toolCalls = choice?.tool_calls as Array<{ id?: string; function?: { name?: string; arguments?: string } }> | undefined;
+          if (first && Array.isArray(toolCalls) && toolCalls.length > 0) {
+            toolProvider = first.provider; toolModel = first.model;
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const u = (first.json as any)?.usage;
+            if (u) toolUsageForCost = { prompt_tokens: u.prompt_tokens, completion_tokens: u.completion_tokens };
+            // Append the assistant's tool-call turn verbatim, then each tool result.
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            (messages as any[]).push({ role: 'assistant', content: choice.content ?? null, tool_calls: toolCalls });
+            for (const tc of toolCalls) {
+              let args: Record<string, unknown> = {};
+              try { args = JSON.parse(tc.function?.arguments || '{}'); } catch { args = {}; }
+              const result = await tier0.execute(tc.function?.name || '', args);
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              (messages as any[]).push({ role: 'tool', tool_call_id: tc.id || 'call_0', content: JSON.stringify(result) });
+            }
+          }
+        } catch (toolErr) {
+          // Tool round is best-effort: on any failure, fall through to the plain
+          // RAG stream. A tool hiccup must never break the chat.
+          console.error('[chat] tier0 tool round failed (continuing without tools):', toolErr);
+        }
+        // Log the tool-round LLM spend separately (fire-and-forget).
+        if (toolProvider) {
+          void recordLlmUsage({ userEmail: auth.email, tool: 'chat_tool_round', provider: toolProvider, model: toolModel, usage: toolUsageForCost || undefined });
+        }
+        // ── end Tier-0 tool round ──
 
         // Mindy Chat is the FLAGSHIP user-facing experience — every answer is read,
         // so grounded-Q&A quality is worth the model spend here (Eric, Jul 2: "the
@@ -390,14 +469,12 @@ export async function POST(request: NextRequest) {
         // the surface where the quality jump shows. Override via CHAT_OPENAI_MODEL if
         // we ever need to dial it back per-env. Both speak the OpenAI streaming
         // format, so the SSE parser below is unchanged and we keep streaming UX.
-        const openaiKey = process.env.OPENAI_API_KEY;
         // Margin guard (#37, mirrors proposal/chat): a user past their monthly LLM
         // budget is downgraded from gpt-4o to gpt-4o-mini — never blocked, just a
         // cheaper model. Protects the $149 margin now that chat leads with gpt-4o.
-        const overBudget = await isUserOverBudget(email).catch(() => false);
-        const chatModel = overBudget
-          ? (process.env.LLM_OPENAI_MODEL || 'gpt-4o-mini')
-          : (process.env.CHAT_OPENAI_MODEL || 'gpt-4o');
+        // (Resolved once above for the tool round; reuse to avoid a second budget read.)
+        const openaiKey = openaiKeyEarly;
+        const chatModel = chatModelEarly;
         const streamFrom = (url: string, key: string, model: string) => fetch(url, {
           method: 'POST',
           headers: { 'Authorization': `Bearer ${key}`, 'Content-Type': 'application/json' },
