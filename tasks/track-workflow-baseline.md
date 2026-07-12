@@ -117,3 +117,13 @@ cron_expression). A .select() with wrong names silently returns null → false "
 Daily-alerts today: **1,314 distinct recipients / 1,541 daily-eligible = 85%, still firing**
 (pagination fix PR#113 working; was capped ~1,000). alert_log has NO status column (another
 silent-null trap). Trending to ~1,500 as Eric expected.
+
+## Daily-alerts window widened (2026-07-12) — finish before 8am EST
+Goal (Eric): total processed complete by 8am EST with margin as the audience grows to ~1,500+.
+Today drained fine (last send 6:05am EDT) but the old window's hard stop left little headroom.
+Changed cron_jobs rows (NOT vercel.json):
+- daily-alerts:    `0,15,30,45 5-9 * * *`  → `0,15,30,45 4-10 * * *`  (start 1hr earlier, end +1hr)
+- daily-alerts-10: `0 10 * * *`            → `0 11 * * *`             (backstop after new window)
+New window: 04:00–10:45 UTC + 11:00 backstop = 11pm–5:45am EST (12am–6:45am EDT). ~2hr more runtime.
+Takes effect next window (tonight). WATCH on 07-19: actual completion time — if audience growth
+outpaces throughput, bump DAILY_ALERT_BATCH_SIZE (currently 250) rather than widen further.
