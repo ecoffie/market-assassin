@@ -11,6 +11,7 @@
     "test:pre-deploy": "bash tests/test-pre-deploy.sh",
     "test:local": "bash tests/test-pre-deploy.sh --local",
     "test:schema": "node tests/test-schema-sync.js",
+    "audit:supabase-errors": "node scripts/audit-supabase-errors.mjs",
     "verify:data": "npx tsx scripts/verify-data-truth.ts",
     "eval:cap-parse": "npx tsx scripts/eval-cap-parse.ts",
     "eval:evidence-match": "npx tsx scripts/eval-evidence-match.ts",
