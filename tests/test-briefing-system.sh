@@ -100,7 +100,7 @@ echo "TEST 2: Briefing Delivery Status"
 echo "--------------------------------"
 
 # Query Supabase for recent briefing logs
-SUPABASE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImtycHllbGZyYmljbXZzbXdvdnRpIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc2ODA3NTUwMCwiZXhwIjoyMDgzNjUxNTAwfQ.vt66ATmjPwS0HclhBP1g1-dQ-aEPEbWwG4xcn8j4GCg"
+SUPABASE_KEY="${SUPABASE_SERVICE_ROLE_KEY:?SUPABASE_SERVICE_ROLE_KEY env var is required}"
 
 BRIEFING_LOGS=$(curl -s "https://krpyelfrbicmvsmwovti.supabase.co/rest/v1/briefing_log?select=delivery_status,created_at&order=created_at.desc&limit=20" \
   -H "apikey: ${SUPABASE_KEY}" \
