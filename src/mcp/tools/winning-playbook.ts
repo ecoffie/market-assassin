@@ -20,7 +20,7 @@
  *      quote from a real podcast guest, when NAICS codes are provided.
  */
 
-import { retrieveRagContext, formatChunksForPrompt } from '@/lib/rag/retrieve';
+import { retrieveRagContext } from '@/lib/rag/retrieve';
 import { getPodcastInsightForProfile } from '@/lib/rag/podcast-insights';
 
 /** Doc types that carry actual how-to-win guidance (mirrors the chat/proposal pulls). */
@@ -63,6 +63,7 @@ export interface WinningPlaybookResult {
     guidance_chunks: number;
     corpus: string;
     grounded: boolean; // false => nothing matched; agent should NOT invent an answer
+    degraded: boolean; // true => retrieval ERRORED (corpus unreachable) — NOT a genuine no-match
   };
 }
 
@@ -82,14 +83,23 @@ export async function getWinningPlaybook(
 
   // 1) Tactical guidance from the teaching corpus.
   let chunks: Awaited<ReturnType<typeof retrieveRagContext>> = [];
+  let retrievalFailed = false;
   try {
     chunks = await retrieveRagContext({
       query: topic,
       docTypes: PLAYBOOK_DOC_TYPES,
       limit,
+      // Distinguish a corpus ERROR (auth/connection — e.g. a stale service key) from a
+      // genuine no-match. retrieveRagContext swallows RPC errors into []; without this
+      // signal an infra failure is indistinguishable from "no content", so the agent
+      // would wrongly tell the user Mindy has no coaching on the topic.
+      onError: () => {
+        retrievalFailed = true;
+      },
     });
   } catch (err) {
     // Surface, don't swallow — a retrieval failure must be visible, not silent-empty.
+    retrievalFailed = true;
     console.error('[mcp:get_winning_playbook] corpus retrieval failed:', err);
   }
 
@@ -123,9 +133,14 @@ export async function getWinningPlaybook(
   }
 
   const grounded = guidance.length > 0 || winStory !== null;
+  // Retrieval errored AND we have nothing to show → a system failure, NOT a real
+  // no-match. Must be reported differently or the agent misdiagnoses (see onError above).
+  const degraded = retrievalFailed && !grounded;
 
   // Pre-narrated conclusion — every fact traces to the real returned data (no LLM guess).
-  const summary = grounded
+  const summary = degraded
+    ? `The GovCon Giants teaching corpus could not be reached (retrieval error) for "${topic}". This is a TEMPORARY SYSTEM ISSUE — NOT a sign the corpus lacks content. Tell the user Mindy's coaching data is briefly unavailable and to retry; do NOT state that no coaching content exists.`
+    : grounded
     ? `Found ${guidance.length} guidance passage${guidance.length === 1 ? '' : 's'} from the GovCon Giants teaching corpus on "${topic}"` +
       (winStory
         ? `, plus a real win story from ${winStory.guest || 'a podcast guest'}${winStory.company ? ` (${winStory.company})` : ''}.`
@@ -138,10 +153,14 @@ export async function getWinningPlaybook(
     win_story: winStory,
     _ai_hint: {
       summary,
-      how_to_use: grounded
+      how_to_use: degraded
+        ? 'Retrieval errored — tell the user the coaching corpus is temporarily unavailable and to retry; do NOT claim no content exists or generate advice.'
+        : grounded
         ? 'Quote the guidance passages as Eric Coffie / GovCon Giants coaching, and the win_story as a real contractor precedent. These are proprietary teaching content, not public data.'
         : 'No grounded content returned; state that plainly rather than generating advice.',
-      key_caveats: grounded
+      key_caveats: degraded
+        ? ['Corpus was unreachable (system error) — this is NOT a real no-match; do not conclude the topic has no coaching content.']
+        : grounded
         ? ['Guidance is teaching material, not legal/contractual advice.', 'Verify agency-specific requirements against the actual solicitation.']
         : ['Zero corpus matches — any advice here would be ungrounded.'],
     },
@@ -149,32 +168,7 @@ export async function getWinningPlaybook(
       guidance_chunks: guidance.length,
       corpus: 'GovCon Giants teaching corpus (mindy_rag_chunks + podcast_episodes)',
       grounded,
+      degraded,
     },
   };
-}
-
-/** Convenience for a text-first agent surface: a single prompt-ready string. */
-export function formatPlaybookForPrompt(result: WinningPlaybookResult): string {
-  const parts: string[] = [`# Winning Playbook — ${result.topic}\n`];
-  if (result.guidance.length) {
-    parts.push(formatChunksForPrompt(
-      result.guidance.map((g, i) => ({
-        document_id: String(i),
-        chunk_index: i,
-        chunk_text: g.text,
-        doc_title: g.source,
-        doc_type: g.doc_type,
-        doc_top_level_folder: null,
-        source_path: null,
-        rank: 0,
-      })),
-    ));
-  }
-  if (result.win_story) {
-    parts.push(`\n## Real win story\n"${result.win_story.quote}"\n— ${result.win_story.guest || 'Podcast guest'}${result.win_story.company ? `, ${result.win_story.company}` : ''} (${result.win_story.episode})`);
-  }
-  if (!result.guidance.length && !result.win_story) {
-    parts.push('\n(No teaching-corpus match — do not fabricate advice.)');
-  }
-  return parts.join('\n');
 }

@@ -61,6 +61,13 @@ export interface RetrieveOptions {
   maxChars?: number;
   /** Max chunks per source document (default 2) — favors breadth */
   maxPerDoc?: number;
+  /**
+   * Optional: invoked when the underlying RPC ERRORS (auth/connection/etc.) — as
+   * opposed to a genuine empty result. Lets a caller distinguish "corpus is down"
+   * from "no match" (both otherwise return `[]`). Backward-compatible: existing
+   * callers that don't pass it see no behavior change.
+   */
+  onError?: (error: { message: string }) => void;
 }
 
 /**
@@ -83,6 +90,7 @@ export async function retrieveRagContext(opts: RetrieveOptions): Promise<RagChun
     limit = 8,
     maxChars = 6000,
     maxPerDoc = 2,
+    onError,
   } = opts;
 
   const trimmed = (query || '').trim();
@@ -105,6 +113,7 @@ export async function retrieveRagContext(opts: RetrieveOptions): Promise<RagChun
 
   if (error) {
     console.error('[RAG] retrieve failed:', error.message);
+    onError?.(error);
     return [];
   }
 
@@ -115,6 +124,7 @@ export async function retrieveRagContext(opts: RetrieveOptions): Promise<RagChun
     const fallback = await runSearch(looseQuery);
     if (fallback.error) {
       console.error('[RAG] fallback retrieve failed:', fallback.error.message);
+      onError?.(fallback.error);
       return [];
     }
     data = fallback.data;
