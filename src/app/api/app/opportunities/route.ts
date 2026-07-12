@@ -350,12 +350,21 @@ export async function GET(request: NextRequest) {
   const profileEmail = asClient ? clientNotificationEmail(activeWsId) : email;
 
   if (email) {
-    const { data: profile } = await supabase
+    // NOTE: `business_description` is NOT a column on user_notification_settings.
+    // It was in this SELECT, which made PostgREST fail the WHOLE query (error,
+    // data=null) → userProfile stayed null → the ENTIRE opportunity feed ran
+    // de-personalized (no NAICS/keywords/set-aside/agency scoring) for every
+    // user. Same class as the loadBidderProfile `company_name` bug. Check the
+    // error so a stale column is loud next time, not a silent empty.
+    const { data: profile, error: profileErr } = await supabase
       .from('user_notification_settings')
-      .select('naics_codes,keywords,business_description,business_type,set_aside_preferences,location_states')
+      .select('naics_codes,keywords,business_type,set_aside_preferences,location_states')
       .eq('user_email', profileEmail)
       .maybeSingle();
 
+    if (profileErr) {
+      console.error('[opportunities] user profile query error:', profileErr.message);
+    }
     userProfile = profile || null;
 
     if (profile?.naics_codes?.length) {

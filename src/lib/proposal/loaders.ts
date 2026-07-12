@@ -153,10 +153,20 @@ export async function loadVaultContext(email: string, sectionType: SectionType):
 
   const results = await Promise.all(queries);
   let idx = 0;
-  if (needsIdentity)     { ctx.identity = (results[idx++] as { data: Record<string, unknown> | null }).data; }
-  if (needsPastPerf)     { ctx.past_performance = (results[idx++] as { data: Array<Record<string, unknown>> | null }).data || []; }
-  if (needsCapabilities) { ctx.capabilities = (results[idx++] as { data: Array<Record<string, unknown>> | null }).data || []; }
-  if (needsTeam)         { ctx.team = (results[idx++] as { data: Array<Record<string, unknown>> | null }).data || []; }
+  // Surface any query error (e.g. a stale column) instead of silently reading it
+  // as an empty Vault — the same swallowed-error trap that hid the company_name
+  // bug in loadBidderProfile. Behaviour is unchanged (still degrades to empty),
+  // but a broken query is now loud.
+  type QResult = { data: unknown; error: { message?: string } | null };
+  const take = (label: string): unknown => {
+    const r = results[idx++] as QResult;
+    if (r?.error) console.error(`[proposal/loaders] vault ${label} query error:`, r.error.message);
+    return r?.data;
+  };
+  if (needsIdentity)     { ctx.identity = take('identity') as Record<string, unknown> | null; }
+  if (needsPastPerf)     { ctx.past_performance = (take('past_performance') as Array<Record<string, unknown>> | null) || []; }
+  if (needsCapabilities) { ctx.capabilities = (take('capabilities') as Array<Record<string, unknown>> | null) || []; }
+  if (needsTeam)         { ctx.team = (take('team') as Array<Record<string, unknown>> | null) || []; }
 
   const identityHas = ctx.identity && Object.entries(ctx.identity).some(([k, v]) =>
     k !== 'user_email' && k !== 'created_at' && k !== 'updated_at' &&

@@ -254,11 +254,15 @@ export async function POST(request: NextRequest) {
 
   // Pull the user profile so the analysis is personalized.
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const { data: profile } = await (supabase
+  // `target_agencies` is NOT a column here (the real one is `agencies`) — it made
+  // PostgREST fail the whole query, so the bid/no-bid analysis silently ran
+  // un-personalized. Dropped it; surface the error instead of swallowing it.
+  const { data: profile, error: profileErr } = await (supabase
     .from('user_notification_settings')
-    .select('naics_codes, business_type, set_aside_preferences, target_agencies, agencies') as any)
+    .select('naics_codes, business_type, set_aside_preferences, agencies') as any)
     .eq('user_email', scopedEmail)
     .maybeSingle();
+  if (profileErr) console.error('[bid-no-bid] profile query error:', profileErr.message);
 
   // callLLM (job:'reasoning') picks from openai/groq/claude — just need one key.
   if (!process.env.OPENAI_API_KEY && !process.env.GROQ_API_KEY && !process.env.ANTHROPIC_API_KEY) {
