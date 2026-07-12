@@ -69,14 +69,24 @@ export function filterRealRows<T extends Record<string, unknown>>(rows: T[] | nu
 export async function loadBidderProfile(email: string): Promise<BidderProfile> {
   try {
     const supabase = getSupabase();
-    const { data } = await supabase
+    // NOTE: `company_name` is NOT a column on user_notification_settings — it
+    // used to be in this SELECT, which made PostgREST fail the WHOLE query
+    // (error, data=null) and silently return {} for EVERY user. That starved
+    // the chat/proposal personalization of the user's real NAICS/set-asides.
+    // Company name lives in the Vault (user_identity_profile), not here.
+    const { data, error } = await supabase
       .from('user_notification_settings')
-      .select('naics_codes, business_type, company_name, agencies, set_aside_preferences, location_states')
+      .select('naics_codes, business_type, agencies, set_aside_preferences, location_states')
       .eq('user_email', email)
       .maybeSingle();
+    // Surface the error instead of swallowing it — a bad column here should be
+    // loud, not a silent empty profile (that's how the company_name bug hid).
+    if (error) {
+      console.error('[proposal/loaders] bidder profile query error:', error.message);
+      return {};
+    }
     if (!data) return {};
     return {
-      companyName: data.company_name || undefined,
       businessType: data.business_type || undefined,
       naicsCodes: Array.isArray(data.naics_codes) ? data.naics_codes : [],
       agencies: Array.isArray(data.agencies) ? data.agencies : [],

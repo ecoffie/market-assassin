@@ -57,7 +57,6 @@ export async function GET(request: NextRequest) {
 
     const prompts = buildStarterPrompts({
       naicsCodes: profile.naicsCodes,
-      companyName: profile.companyName,
       setAsides: profile.setAsides,
       hasPipeline: pipelineCount > 0,
     });
