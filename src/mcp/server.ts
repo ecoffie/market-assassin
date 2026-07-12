@@ -20,6 +20,9 @@ import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { z } from 'zod';
 import { getWinningPlaybook } from './tools/winning-playbook';
+import { getPricingIntel } from './tools/pricing-intel';
+import { getIncumbentFinancials } from './tools/incumbent-financials';
+import { getRegulatoryDemand } from './tools/regulatory-demand';
 
 const server = new McpServer({
   name: 'mindy-govcon',
@@ -68,10 +71,128 @@ server.registerTool(
   },
 );
 
+server.registerTool(
+  'get_pricing_intel',
+  {
+    title: 'Get Pricing Intel (GSA CALC)',
+    description:
+      'Price-to-win labor-rate intelligence from the GSA CALC+ API (~240K awarded labor ' +
+      'categories, daily refresh). Pass a NAICS code OR a labor-category keyword (e.g. ' +
+      '"Software Engineer, Project Manager") to get the market median, aggressive/competitive/' +
+      'premium price-to-win rates, small-vs-large business gap, top labor categories, and top ' +
+      'competing vendors. Returns grounded=false when CALC has no rates for the input — in that ' +
+      'case tell the user no pricing data was found and suggest a broader/sibling term; do NOT ' +
+      'invent rates. Rates are GSA Schedule ceiling rates only (not commercial).',
+    inputSchema: {
+      naics: z
+        .string()
+        .optional()
+        .describe('NAICS code, e.g. "541512". Mutually exclusive with keyword; pass exactly one.'),
+      keyword: z
+        .string()
+        .optional()
+        .describe(
+          'Labor-category keyword(s), comma-separated, e.g. "Software Engineer, Project Manager". ' +
+            'Mutually exclusive with naics; pass exactly one.',
+        ),
+    },
+  },
+  async ({ naics, keyword }) => {
+    const result = await getPricingIntel({ naics, keyword });
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
+  'get_incumbent_financials',
+  {
+    title: 'Get Incumbent Financials (SEC EDGAR)',
+    description:
+      'Turn an incumbent company name into a competitive financial read via SEC EDGAR (revenue, ' +
+      'net income, gross margin, public float, employees, latest 10-K, recent filings). Public ' +
+      'filers only — returns grounded=false for private contractors; in that case do NOT invent ' +
+      'figures, tell the user no EDGAR filing exists (likely private) and suggest the contractor-' +
+      'profile tool for their federal award history. EDGAR does not break out government-vs-' +
+      'commercial revenue; any gov-dependence is an estimate, not a reported figure.',
+    inputSchema: {
+      company_name: z
+        .string()
+        .min(2)
+        .describe('Company name, e.g. "Leidos" or "Booz Allen Hamilton".'),
+      as_of_year: z
+        .number()
+        .int()
+        .optional()
+        .describe('Optional fiscal year to surface first (defaults to most recent reported).'),
+    },
+  },
+  async ({ company_name, as_of_year }) => {
+    const result = await getIncumbentFinancials({ company_name, as_of_year });
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
+  'get_regulatory_demand',
+  {
+    title: 'Get Regulatory Demand (Federal Register)',
+    description:
+      'Leading "demand before SAM" indicator: recent Federal Register rules/notices for a topic ' +
+      'or agency. A proposed or final rule in a subject area often precedes agency solicitations ' +
+      'by 6-18 months as the agency staffs up to implement it — a signal SAM/USASpending cannot ' +
+      'provide. Pass at least one of query/agency. Returns grounded=false when no items match — ' +
+      'suggest a broader term or longer window; do NOT invent demand. Federal Register does NOT ' +
+      'tag items to NAICS; any NAICS mapping is inference, not data — do not claim one.',
+    inputSchema: {
+      query: z
+        .string()
+        .optional()
+        .describe('Keyword / CFR topic, e.g. "cybersecurity" or "CMMC".'),
+      agency: z
+        .string()
+        .optional()
+        .describe('Agency slug or name, e.g. "defense" or "Department of Defense".'),
+      document_type: z
+        .enum(['RULE', 'PROPOSED_RULE', 'NOTICE'])
+        .optional()
+        .describe('Filter to a document type. RULE/PROPOSED_RULE carry the strongest demand signal.'),
+      days_back: z
+        .number()
+        .int()
+        .min(1)
+        .max(365)
+        .optional()
+        .describe('Look-back window in days (default 90).'),
+      limit: z
+        .number()
+        .int()
+        .min(1)
+        .max(50)
+        .optional()
+        .describe('Max items to return (default 15).'),
+    },
+  },
+  async ({ query, agency, document_type, days_back, limit }) => {
+    const result = await getRegulatoryDemand({ query, agency, document_type, days_back, limit });
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
-  console.error('[mindy-mcp] stdio server ready — get_winning_playbook registered');
+  console.error(
+    '[mindy-mcp] stdio server ready — get_winning_playbook + get_pricing_intel + get_incumbent_financials + get_regulatory_demand registered',
+  );
 }
 
 main().catch((err) => {

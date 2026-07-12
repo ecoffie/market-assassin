@@ -1619,6 +1619,62 @@ passes `liveBq: true`. Also: name-search now matches exact UEI too. Diagnostic: 
 
 ---
 
+## Mindy MCP Server — Data Core tools (2026-07-12)
+
+The Mindy MCP server exposes Mindy's proprietary + live-API intelligence to any AI agent.
+Two transports wrap the **same transport-agnostic pure functions** (`src/mcp/tools/*.ts`):
+- **stdio** (`src/mcp/server.ts`) — local dev + smoke (`npm run mcp:dev` / `npm run mcp:smoke`).
+- **Hosted HTTP edge** (`src/app/mcp/[transport]/route.ts`) — dispatcher `src/lib/mcp/tool-registry.ts`,
+  API-key auth + credit metering (Phase-1 Slice 2/3). `mcp.getmindy.ai` target.
+
+**Tools live (4):** `get_winning_playbook` (proprietary RAG corpus — the moat), `get_pricing_intel`
+(GSA CALC labor rates, promoted existing client), `get_incumbent_financials` (SEC EDGAR — public filers
+only, private→`grounded=false` honest miss), `get_regulatory_demand` (Federal Register — "demand before SAM"
+leading indicator). Credit prices in `TOOL_CREDITS`: playbook=1, pricing_intel=1, incumbent_financials=2,
+regulatory_demand=1.
+
+**Tool pattern (follow exactly — `winning-playbook.ts` is the reference):**
+- Pure async fn `(input) → Result`. NO transport, NO auth, NO `console.log` (stdout is the MCP wire;
+  diagnostics → `console.error`). Both transports wrap it → zero rework.
+- `Result` carries `_meta: { grounded, degraded, <counts> }` — **ALWAYS ships** (machine-readable;
+  the edge/agent branches on it). `grounded` = ≥1 real row returned; `degraded` = upstream *errored*
+  (distinct from a genuine empty result — surface, don't swallow, via catch + `console.error`).
+- `_ai_hint: { summary, how_to_use, key_caveats }` — **OPTIONAL, OFF by default** (data-first principle,
+  Eric 2026-07-12: the raw grounded DATA is the moat; nothing narrated ships until explicitly enabled).
+  Gate it: `if (mcpFlags.aiHint) result._ai_hint = buildHint(...)` (`mcpFlags.aiHint` reads
+  `MCP_ENABLE_AI_HINT`, OFF by default; smoke sets it to exercise the layer).
+- **No-fabrication contract:** `buildHint` branches `degraded → grounded → else` (the three-way ternary).
+  When `!grounded && !degraded`, the hint MUST say "no data found" and instruct the agent NOT to invent.
+  Every fact in a grounded hint must trace to the returned data (smoke asserts traceability). Never map a
+  record to a NAICS/set-aside the source doesn't carry (Federal Register has NO NAICS tag — say so; do NOT
+  invent one). EDGAR: no gov-vs-commercial revenue breakout unless the filer volunteers a segment.
+
+**Shared response cache:** `mcp_external_cache` Supabase table (cache_key md5 UNIQUE, api_type,
+query_params jsonb, response_data jsonb, fetched_at, expires_at, hit_count). `withCache<T>(apiType, params,
+ttl, fetcher) → {value, fromCache}` in `src/lib/mcp/external-cache.ts` — degrades to no-cache on any error.
+TTLs: EDGAR facts 24h / submissions 6h / tickers 24h; Federal Register 1h; CALC 12h. RLS service-role-only.
+
+**Gotchas:**
+- **GSA CALC is keyless and rate-limits per IP.** `fetchPricingIntel(naics)` fans out 5 parallel CALC calls
+  (3 terms + 2 biz-size splits) → bursts past the limit on repeat runs. The client swallows 429s to `null`
+  → tool reports `grounded=false, degraded=false` (indistinguishable from a genuine empty result). The smoke
+  treats pricing-intel `grounded=false` as NON-FATAL for this reason (verified passing in a prior run); the
+  permanent fix is the `mcp_external_cache` table (warm calls skip the fan-out). If pricing-intel stays
+  grounded=false after CALC recovers, THAT's a regression.
+- **SEC EDGAR requires `User-Agent: <name> (<contact email>)`** on every request (10 req/s ceiling). The
+  client sends `Mindy-MCP-GovConGiants (<MCP_CONTACT_EMAIL or hello@govcongiants.com>)`. Public filers
+  only — a private contractor name → no CIK match → `grounded=false` (do NOT invent financials).
+- **Migrations are hand-run by Eric** (no auto-apply): `20260712_mcp_external_cache.sql` +
+  `20260712_mcp_data_sources_seed.sql` (idempotent `ON CONFLICT DO UPDATE`). Verify live after running.
+
+**Adding a new tool:** pure fn in `src/mcp/tools/<name>.ts` + client in `src/lib/<source>/` → register in
+BOTH `src/lib/mcp/tool-registry.ts` (def + `listMcpTools`/`isMcpTool`/`runMcpTool` + `TOOL_CREDITS`) AND
+`src/mcp/server.ts` (zod inputSchema) → add a `callTool` block to `scripts/mcp-smoke.mjs` (assert grounded +
+traceability) → add a `data_sources` seed row + a `DatasetEntry` (provenance 'passthrough') in
+`src/app/api/admin/data-inventory/route.ts` + a row in `docs/DATA-SOURCES-REGISTRY.md`.
+
+---
+
 ## Verification Recipes — how to PROVE each surface works (rule #2)
 
 The concrete "it works" evidence, centralized so skills/agents stop re-deriving it.

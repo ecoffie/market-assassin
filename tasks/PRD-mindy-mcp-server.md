@@ -520,8 +520,22 @@ data project.)*
   NAICS/PSC reference tables — table-stakes plumbing only. **Correction to first §1a draft:** the
   hand-curated agency pain-points DB is a proprietary Tier-1 asset (was under-weighted); corpus
   counts updated to the audited figures.
-
----
-
-**Status:** ☐ PRD only · ☑ **Approved to build** (Eric, 2026-07-11)
-*(Next: Eric flips to Approved → Phase 0 spike, or edits scope. This command specs; it does not build.)*
+- **2026-07-12** — **Three "demand-before-SAM" MCP tools shipped (§5a):** `get_pricing_intel`
+  (promoted existing GSA CALC client — *CALC was already built*, a promotion not a build), `get_incumbent_financials`
+  (net-new SEC EDGAR client: name→CIK→XBRL companyfacts, public filers only, private→`grounded=false` honest miss),
+  and `get_regulatory_demand` (net-new Federal Register client: the "demand before SAM" leading indicator).
+  All three follow the Phase-0 `winning-playbook.ts` pattern (transport-agnostic pure fn + `_meta.grounded/degraded`
+  always-ships). Registered in BOTH `tool-registry.ts` (hosted HTTP edge + credit metering, priced 1/2/1) AND
+  `server.ts` (stdio dev/smoke). Verified live end-to-end via `scripts/mcp-smoke.mjs` (EDGAR Leidos CIK 1336920/
+  $15.44B revenue/10-K 2026-02-17; Federal Register 15 items/218 total/FCC NG911 Rule; EDGAR private-miss grounded=false;
+  playbook grounded). Smoke pricing-intel assertion is NON-FATAL on a transient upstream CALC 429 (the keyless
+  CALC API rate-limits per IP; verified passing in a prior run).
+- **2026-07-12 (Eric, data-first principle — supersedes the always-emit-`_ai_hint` plan):** the raw grounded DATA
+  is the moat; nothing narrated ships until explicitly enabled. So `_ai_hint` is gated behind `mcpFlags.aiHint`
+  (env `MCP_ENABLE_AI_HINT`, **OFF by default**) in all three tools + winning-playbook. `_meta` (grounded/degraded/
+  counts) ALWAYS ships — machine-readable, the edge/agent branches on it. When enabled, every `_ai_hint` fact
+  still traces to real returned data (no-fabrication contract intact). Deferred §5a sources: Congress.gov
+  appropriations + GAO protests (built later). Branch `feat/mcp-data-core-sources` (isolated worktree off HEAD 6460210f);
+  merge deferred until the parallel Phase-1 session stabilizes. Two migrations handed to Eric to run by hand:
+  `20260712_mcp_external_cache.sql` (shared response-cache table, backs all three tools' TTL cache) +
+  `20260712_mcp_data_sources_seed.sql` (idempotent `data_sources` seed for the 3 new live-API sources).

@@ -20,6 +20,9 @@ import { getWriteClient } from '@/lib/supabase/server-clients';
 import { makeTier1Tools, TIER1_TOOL_DEFS, TIER1_TOOL_NAMES, type Tier1Db } from '@/lib/chat/tier1-tools';
 import { makeTier2Tools, TIER2_TOOL_DEFS, TIER2_TOOL_NAMES } from '@/lib/chat/tier2-tools';
 import { getWinningPlaybook } from '@/mcp/tools/winning-playbook';
+import { getPricingIntel } from '@/mcp/tools/pricing-intel';
+import { getIncumbentFinancials } from '@/mcp/tools/incumbent-financials';
+import { getRegulatoryDemand } from '@/mcp/tools/regulatory-demand';
 import { getBalance } from '@/lib/mcp/credits';
 
 export interface McpToolContext {
@@ -39,6 +42,9 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   get_contractor_profile: 5,
   find_capable_contractors: 8,
   get_winning_playbook: 2,
+  get_pricing_intel: 1, // GSA CALC labor-rate intel (free upstream, multi-call; warm cache ~free)
+  get_incumbent_financials: 2, // SEC EDGAR (multi-endpoint, all free)
+  get_regulatory_demand: 1, // Federal Register (single free call, cacheable)
   get_balance: 0, // meta tool — always free
 };
 
@@ -73,9 +79,82 @@ const PLAYBOOK_TOOL_DEF = {
   },
 };
 
+/** OpenAI-style def for the GSA CALC pricing-intel tool (mirrors src/mcp/server.ts zod schema). */
+const PRICING_INTEL_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_pricing_intel',
+    description:
+      'Price-to-win labor-rate intelligence from the GSA CALC+ API (~240K awarded labor categories, ' +
+      'daily refresh). Pass a NAICS code OR a labor-category keyword to get the market median, ' +
+      'aggressive/competitive/premium price-to-win rates, small-vs-large gap, top labor categories, ' +
+      'and top competing vendors. Returns grounded=false when CALC has no rates — do not invent rates. ' +
+      'Rates are GSA Schedule ceiling rates (not commercial).',
+    parameters: {
+      type: 'object',
+      properties: {
+        naics: { type: 'string', description: 'NAICS code, e.g. "541512". Mutually exclusive with keyword.' },
+        keyword: { type: 'string', description: 'Labor-category keyword(s), e.g. "Software Engineer". Mutually exclusive with naics.' },
+      },
+    },
+  },
+};
+
+/** OpenAI-style def for the SEC EDGAR incumbent-financials tool. */
+const INCUMBENT_FINANCIALS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_incumbent_financials',
+    description:
+      'Turn an incumbent company NAME into a competitive financial read via SEC EDGAR (revenue, net ' +
+      'income, gross margin, public float, employees, latest 10-K). Public filers only — returns ' +
+      'grounded=false for private contractors (do not invent figures). EDGAR does not break out ' +
+      'government-vs-commercial revenue; pair with get_contractor_profile for federal award totals.',
+    parameters: {
+      type: 'object',
+      properties: {
+        company_name: { type: 'string', description: 'Company name, e.g. "Leidos".' },
+        as_of_year: { type: 'number', description: 'Optional fiscal year to surface first.' },
+      },
+      required: ['company_name'],
+    },
+  },
+};
+
+/** OpenAI-style def for the Federal Register regulatory-demand tool. */
+const REGULATORY_DEMAND_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_regulatory_demand',
+    description:
+      'Leading "demand before SAM" indicator: recent Federal Register rules/notices for a topic or ' +
+      'agency. A proposed/final rule often precedes agency solicitations by 6-18 months. Federal ' +
+      'Register does NOT tag items to NAICS — any NAICS mapping is inference, not data. Pass at least ' +
+      'one of query/agency.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Keyword / CFR topic, e.g. "cybersecurity".' },
+        agency: { type: 'string', description: 'Agency slug or name, e.g. "defense".' },
+        document_type: { type: 'string', enum: ['RULE', 'PROPOSED_RULE', 'NOTICE'], description: 'Filter to a document type.' },
+        days_back: { type: 'number', description: 'Look-back window in days (default 90, max 365).' },
+        limit: { type: 'number', description: 'Max items (default 15, max 50).' },
+      },
+    },
+  },
+};
+
 /** All tools exposed over MCP in v1, each annotated with its credit price. */
 export function listMcpTools(): Array<Record<string, unknown>> {
-  const defs = [...TIER1_TOOL_DEFS, ...TIER2_TOOL_DEFS, PLAYBOOK_TOOL_DEF, GET_BALANCE_TOOL_DEF];
+  const defs = [
+    ...TIER1_TOOL_DEFS,
+    ...TIER2_TOOL_DEFS,
+    PLAYBOOK_TOOL_DEF,
+    PRICING_INTEL_TOOL_DEF,
+    INCUMBENT_FINANCIALS_TOOL_DEF,
+    REGULATORY_DEMAND_TOOL_DEF,
+    GET_BALANCE_TOOL_DEF,
+  ];
   return defs.map((d) => ({ ...d, _credits: TOOL_CREDITS[d.function.name] ?? 0 }));
 }
 
@@ -85,6 +164,9 @@ export function isMcpTool(name: string): boolean {
     TIER1_TOOL_NAMES.has(name) ||
     TIER2_TOOL_NAMES.has(name) ||
     name === 'get_winning_playbook' ||
+    name === 'get_pricing_intel' ||
+    name === 'get_incumbent_financials' ||
+    name === 'get_regulatory_demand' ||
     name === 'get_balance'
   );
 }
@@ -132,6 +214,33 @@ export async function runMcpTool(
     const result = (await getWinningPlaybook({
       topic: String(args.topic ?? ''),
       naics_codes: Array.isArray(args.naics_codes) ? (args.naics_codes as string[]) : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_pricing_intel') {
+    const result = (await getPricingIntel({
+      naics: typeof args.naics === 'string' ? args.naics : undefined,
+      keyword: typeof args.keyword === 'string' ? args.keyword : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_incumbent_financials') {
+    const result = (await getIncumbentFinancials({
+      company_name: String(args.company_name ?? ''),
+      as_of_year: typeof args.as_of_year === 'number' ? args.as_of_year : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_regulatory_demand') {
+    const result = (await getRegulatoryDemand({
+      query: typeof args.query === 'string' ? args.query : undefined,
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      document_type: (args.document_type as 'RULE' | 'PROPOSED_RULE' | 'NOTICE' | undefined) ?? undefined,
+      days_back: typeof args.days_back === 'number' ? args.days_back : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };

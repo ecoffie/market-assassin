@@ -110,6 +110,41 @@ export const CONTRACTOR_SOURCES: DataSource[] = [
 ];
 
 // ============================================================
+// PRICING & REGULATORY DEMAND — Mindy MCP live-API sources (2026-07-12)
+// These are LIVE PASSTHROUGH sources (no mirrored row count): the MCP tools
+// fetch on demand with a short-TTL response cache (mcp_external_cache), not a
+// persisted dataset. coveragePercent is N/A for passthrough — the number is the
+// upstream's, not ours. (PRD §5a — EDGAR + Federal Register net-new; CALC promoted.)
+// ============================================================
+export const REGULATORY_SOURCES: DataSource[] = [
+  {
+    id: 'gsa-calc',
+    name: 'GSA CALC+ Labor Rates',
+    url: 'api.gsa.gov/acquisition/calc/v3',
+    type: 'api',
+    status: 'active',
+    recordCount: 240000,
+    notes: 'MCP tool get_pricing_intel. ~240K awarded labor categories, daily refresh, keyless. Price-to-win p25/p50/p75. Cache 12h.',
+  },
+  {
+    id: 'sec-edgar',
+    name: 'SEC EDGAR Financials',
+    url: 'sec.gov / data.sec.gov',
+    type: 'api',
+    status: 'active',
+    notes: 'MCP tool get_incumbent_financials. Public filers only (private contractors → grounded=false). company_tickers → companyfacts. Cache 24h/6h. Requires User-Agent.',
+  },
+  {
+    id: 'federal-register',
+    name: 'Federal Register',
+    url: 'federalregister.gov/api/v1',
+    type: 'api',
+    status: 'active',
+    notes: 'MCP tool get_regulatory_demand. "Demand before SAM" leading indicator. No NAICS tagging (inference only). Cache 1h. Keyless.',
+  },
+];
+
+// ============================================================
 // MASTER REGISTRY
 // ============================================================
 export const DATA_REGISTRY: DataCategory[] = [
@@ -163,6 +198,14 @@ export const DATA_REGISTRY: DataCategory[] = [
     ],
     missingGaps: ['Micro-purchases', 'Some classified spending'],
     howToExtend: 'APIs are live - coverage is inherent to federal reporting'
+  },
+  {
+    name: 'Pricing & Regulatory',
+    api: 'MCP: get_pricing_intel, get_incumbent_financials, get_regulatory_demand',
+    coveragePercent: 0,
+    sources: REGULATORY_SOURCES,
+    missingGaps: ['Live passthrough — no mirrored count (coverage is the upstream API\'s, not ours)', 'Congress.gov appropriations + GAO protests (PRD §5a, deferred)'],
+    howToExtend: 'Add a tool in src/mcp/tools/ + client in src/lib/<source>/ + register in src/lib/mcp/tool-registry.ts and src/mcp/server.ts'
   }
 ];
 
