@@ -1,12 +1,12 @@
 'use client';
 
 /**
- * getmindy.ai/mcp — the Mindy MCP self-serve dashboard (Phase 1 Slice 5).
+ * getmindy.ai/mcp — the Mindy MCP developer console (Phase 1 Slice 5, redesigned).
  *
- * Generate/revoke API keys, see credit balance + usage, copy the mcp.json snippet, and
- * view the per-tool price table + credit packages. All reads go through /api/mcp/account
- * and /api/mcp/keys (2FA-gated via authedFetch). Lives on the getmindy.ai host — the
- * mcp.getmindy.ai host rewrites /mcp to the transport, so there's no route collision.
+ * Mint/revoke API keys, see credit balance + usage, copy the mcp.json snippet, buy
+ * credits. Lives on the getmindy.ai host (mcp.getmindy.ai rewrites /mcp to the
+ * transport, so no route collision). Auth via authedFetch (2FA-gated); email from
+ * localStorage like every /app surface.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { authedFetch } from '@/components/app/authHeaders';
@@ -24,8 +24,9 @@ interface Pkg { id: string; credits: number; usd: number; label: string; checkou
 interface Call { tool_name: string; status: string; credits_charged: number; created_at: string }
 
 const MCP_URL = 'https://mcp.getmindy.ai/mcp';
+const shortDate = (s: string | null) => (s ? new Date(s).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : null);
 
-export default function McpDashboard() {
+export default function McpConsole() {
   const [email, setEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [balance, setBalance] = useState<number | null>(null);
@@ -33,13 +34,23 @@ export default function McpDashboard() {
   const [packages, setPackages] = useState<Pkg[]>([]);
   const [calls, setCalls] = useState<Call[]>([]);
   const [keys, setKeys] = useState<KeyRow[]>([]);
-  const [newKey, setNewKey] = useState<string | null>(null); // shown ONCE
+  const [newKey, setNewKey] = useState<string | null>(null);
   const [label, setLabel] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [copied, setCopied] = useState<string | null>(null);
+  const [justPurchased, setJustPurchased] = useState(false);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') setEmail(localStorage.getItem('mi_beta_email'));
+    if (typeof window === 'undefined') return;
+    setEmail(localStorage.getItem('mi_beta_email'));
+    if (new URLSearchParams(window.location.search).get('topup') === 'success') setJustPurchased(true);
+  }, []);
+
+  const copy = useCallback((text: string, tag: string) => {
+    navigator.clipboard.writeText(text);
+    setCopied(tag);
+    setTimeout(() => setCopied((c) => (c === tag ? null : c)), 1600);
   }, []);
 
   const load = useCallback(async (e: string) => {
@@ -64,9 +75,7 @@ export default function McpDashboard() {
     }
   }, []);
 
-  useEffect(() => {
-    if (email) load(email);
-  }, [email, load]);
+  useEffect(() => { if (email) load(email); }, [email, load]);
 
   async function createKey() {
     if (!email) return;
@@ -78,14 +87,9 @@ export default function McpDashboard() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email, label: label.trim() || undefined }),
       }).then((res) => res.json());
-      if (r?.key) {
-        setNewKey(r.key);
-        setLabel('');
-        await load(email);
-      } else setError(r?.error || 'Could not create key');
-    } finally {
-      setBusy(false);
-    }
+      if (r?.key) { setNewKey(r.key); setLabel(''); await load(email); }
+      else setError(r?.error || 'Could not create key');
+    } finally { setBusy(false); }
   }
 
   async function revokeKey(id: string) {
@@ -94,146 +98,205 @@ export default function McpDashboard() {
     await load(email);
   }
 
+  const activeKeys = keys.filter((k) => !k.revoked_at);
   const mcpJson = `{
   "mcpServers": {
     "mindy": {
       "url": "${MCP_URL}",
-      "headers": { "Authorization": "Bearer ${newKey || 'mcp_live_YOUR_KEY'}" }
+      "headers": { "Authorization": "Bearer ${newKey || (activeKeys[0] ? activeKeys[0].key_prefix + '…' : 'mcp_live_YOUR_KEY')}" }
     }
   }
 }`;
 
+  const step = (n: number, done: boolean) => (
+    <span
+      className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-semibold tabular-nums ${
+        done ? 'bg-emerald-400 text-[#06120c]' : 'bg-white/10 text-slate-300 ring-1 ring-white/10'
+      }`}
+    >
+      {done ? '✓' : n}
+    </span>
+  );
+
   if (!email) {
     return (
-      <main className="min-h-dvh bg-slate-950 text-slate-100 flex items-center justify-center p-6">
-        <div className="max-w-md text-center">
-          <h1 className="text-2xl font-bold mb-2">Mindy MCP</h1>
-          <p className="text-slate-400">Please <a href="/app" className="text-emerald-400 underline">sign in</a> to manage your MCP API keys and credits.</p>
+      <main className="grid min-h-dvh place-items-center bg-[#0a0f1e] px-6 text-slate-100">
+        <div className="max-w-sm text-center">
+          <div className="mx-auto mb-4 grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-emerald-400 text-lg font-bold text-[#0a0f1e]">M</div>
+          <h1 className="text-xl font-semibold">Mindy MCP</h1>
+          <p className="mt-2 text-sm text-slate-400">
+            <a href="/app" className="text-emerald-400 underline decoration-emerald-400/40 underline-offset-2 hover:text-emerald-300">Sign in</a>{' '}
+            to manage your API keys and credits.
+          </p>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="min-h-dvh bg-slate-950 text-slate-100 p-6">
-      <div className="max-w-4xl mx-auto space-y-6">
-        <header className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold">Mindy MCP</h1>
-            <p className="text-slate-400 text-sm">Point any MCP agent at Mindy&apos;s GovCon intelligence.</p>
+    <main className="min-h-dvh bg-[#0a0f1e] text-slate-100 [color-scheme:dark]">
+      <div className="mx-auto max-w-4xl px-5 py-8 sm:px-6">
+        {/* Header */}
+        <header className="flex items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-emerald-400 text-sm font-bold text-[#0a0f1e]">M</div>
+            <div>
+              <h1 className="text-[15px] font-semibold leading-tight">Mindy MCP</h1>
+              <p className="text-xs text-slate-400">Federal contracting intel for any AI agent</p>
+            </div>
           </div>
-          <div className="text-right">
-            <div className="text-3xl font-bold text-emerald-400">{balance ?? '—'}</div>
-            <div className="text-xs text-slate-400 uppercase tracking-wide">credits</div>
+          <div className="flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-3 py-1.5">
+            <span className="text-lg font-semibold tabular-nums text-emerald-300">{balance ?? '—'}</span>
+            <span className="text-[11px] uppercase tracking-wide text-emerald-400/70">credits</span>
           </div>
         </header>
 
-        {error && <div className="rounded-lg bg-rose-950/60 border border-rose-800 px-4 py-3 text-rose-200 text-sm">{error}</div>}
+        {justPurchased && (
+          <div className="mt-5 flex items-center justify-between gap-3 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">
+            <span>Payment received — credits added. Your balance is now <strong className="tabular-nums">{balance ?? '…'}</strong>.</span>
+            <button onClick={() => setJustPurchased(false)} className="text-emerald-400/60 hover:text-emerald-300">Dismiss</button>
+          </div>
+        )}
+        {error && <div className="mt-5 rounded-xl border border-rose-500/25 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{error}</div>}
 
-        {/* Connect snippet */}
-        <section className="rounded-xl bg-slate-900 border border-slate-800 p-5">
-          <h2 className="font-semibold mb-2">Connect your agent</h2>
-          <p className="text-slate-400 text-sm mb-3">Create a key below, then drop this into your client&apos;s <code className="text-slate-300">mcp.json</code>:</p>
-          <pre className="bg-slate-950 border border-slate-800 rounded-lg p-3 text-xs overflow-x-auto text-slate-300">{mcpJson}</pre>
-          <button onClick={() => navigator.clipboard.writeText(mcpJson)} className="mt-2 text-xs text-emerald-400 hover:underline">Copy snippet</button>
+        {/* Quickstart — a real 3-step sequence */}
+        <section className="mt-6 grid gap-3 sm:grid-cols-3">
+          <div className="flex items-center gap-2.5 rounded-xl border border-white/[0.07] bg-white/[0.02] px-3.5 py-3 text-sm">
+            {step(1, activeKeys.length > 0)}<span className="text-slate-300">Create an API key</span>
+          </div>
+          <div className="flex items-center gap-2.5 rounded-xl border border-white/[0.07] bg-white/[0.02] px-3.5 py-3 text-sm">
+            {step(2, (balance ?? 0) > 0)}<span className="text-slate-300">Add credits</span>
+          </div>
+          <div className="flex items-center gap-2.5 rounded-xl border border-white/[0.07] bg-white/[0.02] px-3.5 py-3 text-sm">
+            {step(3, false)}<span className="text-slate-300">Connect your agent</span>
+          </div>
         </section>
 
-        {/* Keys */}
-        <section className="rounded-xl bg-slate-900 border border-slate-800 p-5">
-          <h2 className="font-semibold mb-3">API keys</h2>
+        {/* Connect snippet */}
+        <Panel eyebrow="Connect" title="Point your agent at Mindy">
+          <p className="text-sm text-slate-400">Drop this into your MCP client&apos;s <code className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-[12px] text-slate-300">mcp.json</code> (Claude Desktop, Cursor, or your own agent).</p>
+          <div className="relative mt-3">
+            <pre className="overflow-x-auto rounded-lg border border-white/[0.06] bg-[#070b16] p-3.5 font-mono text-[12px] leading-relaxed text-slate-300">{mcpJson}</pre>
+            <button onClick={() => copy(mcpJson, 'snippet')} className="absolute right-2.5 top-2.5 rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-[11px] text-slate-300 hover:bg-white/10">{copied === 'snippet' ? 'Copied' : 'Copy'}</button>
+          </div>
+        </Panel>
+
+        {/* API keys */}
+        <Panel eyebrow="API keys" title="Your keys">
           {newKey && (
-            <div className="mb-4 rounded-lg bg-emerald-950/50 border border-emerald-800 p-3">
-              <p className="text-emerald-200 text-sm font-medium mb-1">Your new key — copy it now, it won&apos;t be shown again:</p>
+            <div className="mb-4 rounded-lg border border-emerald-400/25 bg-emerald-400/[0.07] p-3">
+              <p className="mb-1.5 text-[13px] font-medium text-emerald-200">Copy your key now — it won&apos;t be shown again.</p>
               <div className="flex items-center gap-2">
-                <code className="flex-1 bg-slate-950 rounded px-2 py-1 text-xs text-emerald-300 overflow-x-auto">{newKey}</code>
-                <button onClick={() => navigator.clipboard.writeText(newKey)} className="text-xs bg-emerald-700 hover:bg-emerald-600 px-2 py-1 rounded">Copy</button>
+                <code className="flex-1 overflow-x-auto rounded bg-[#070b16] px-2 py-1.5 font-mono text-[12px] text-emerald-300">{newKey}</code>
+                <button onClick={() => copy(newKey, 'newkey')} className="shrink-0 rounded-md bg-emerald-500 px-2.5 py-1.5 text-[12px] font-medium text-[#06120c] hover:bg-emerald-400">{copied === 'newkey' ? 'Copied' : 'Copy'}</button>
               </div>
             </div>
           )}
-          <div className="flex gap-2 mb-4">
-            <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label (e.g. Claude Desktop)" className="flex-1 bg-slate-950 border border-slate-800 rounded-lg px-3 py-2 text-sm" />
-            <button onClick={createKey} disabled={busy} className="bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 px-4 py-2 rounded-lg text-sm font-medium">{busy ? 'Creating…' : 'Create key'}</button>
+          <div className="mb-4 flex gap-2">
+            <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label (e.g. Claude Desktop)" className="min-w-0 flex-1 rounded-lg border border-white/[0.08] bg-[#070b16] px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:border-emerald-400/40 focus:outline-none" />
+            <button onClick={createKey} disabled={busy} className="shrink-0 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-[#06120c] hover:bg-emerald-400 disabled:opacity-50">{busy ? 'Creating…' : 'Create key'}</button>
           </div>
           {loading ? (
-            <p className="text-slate-500 text-sm">Loading…</p>
+            <p className="text-sm text-slate-500">Loading…</p>
           ) : keys.length === 0 ? (
-            <p className="text-slate-500 text-sm">No keys yet. Create one to get started (you get free credits on your first key).</p>
+            <p className="text-sm text-slate-500">No keys yet. Create one to get started — your first key comes with free credits.</p>
           ) : (
-            <ul className="divide-y divide-slate-800">
+            <ul className="divide-y divide-white/[0.06]">
               {keys.map((k) => (
-                <li key={k.id} className="py-2 flex items-center justify-between text-sm">
-                  <div>
-                    <code className="text-slate-300">{k.key_prefix}…</code>
-                    {k.label && <span className="text-slate-500 ml-2">{k.label}</span>}
-                    {k.revoked_at && <span className="text-rose-400 ml-2 text-xs">revoked</span>}
-                    <div className="text-xs text-slate-500">
-                      {k.last_used_at ? `last used ${new Date(k.last_used_at).toLocaleDateString()}` : 'never used'}
+                <li key={k.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                  <div className="min-w-0">
+                    <div className="flex items-center gap-2">
+                      <code className="font-mono text-[13px] text-slate-200">{k.key_prefix}…</code>
+                      {k.label && <span className="truncate text-slate-500">{k.label}</span>}
+                      {k.revoked_at ? <Chip tone="rose">revoked</Chip> : <Chip tone="emerald">active</Chip>}
                     </div>
+                    <div className="mt-0.5 text-[12px] text-slate-500">{k.last_used_at ? `last used ${shortDate(k.last_used_at)}` : 'never used'} · created {shortDate(k.created_at)}</div>
                   </div>
-                  {!k.revoked_at && <button onClick={() => revokeKey(k.id)} className="text-rose-400 hover:underline text-xs">Revoke</button>}
+                  {!k.revoked_at && <button onClick={() => revokeKey(k.id)} className="shrink-0 text-[12px] text-slate-400 hover:text-rose-400">Revoke</button>}
                 </li>
               ))}
             </ul>
           )}
-        </section>
+        </Panel>
 
-        {/* Credits / packages */}
-        <section className="rounded-xl bg-slate-900 border border-slate-800 p-5">
-          <h2 className="font-semibold mb-3">Buy credits</h2>
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+        {/* Credits */}
+        <Panel eyebrow="Credits" title="Buy credits">
+          <div className="grid gap-3 sm:grid-cols-3">
             {packages.map((p) => (
-              <div key={p.id} className="rounded-lg border border-slate-800 bg-slate-950 p-4 text-center flex flex-col">
-                <div className="text-lg font-bold">${p.usd}</div>
-                <div className="text-emerald-400 text-sm">{p.credits.toLocaleString()} credits</div>
-                <div className="text-xs text-slate-500 mt-1 mb-3 flex-1">{p.label}</div>
+              <div key={p.id} className="flex flex-col rounded-xl border border-white/[0.08] bg-[#070b16] p-4 text-center">
+                <div className="text-2xl font-semibold tabular-nums">${p.usd}</div>
+                <div className="mt-0.5 text-sm font-medium tabular-nums text-emerald-300">{p.credits.toLocaleString()} credits</div>
+                <div className="mb-3 mt-1 flex-1 text-[12px] text-slate-500">{p.label.replace(/^.*—\s*/, '')}</div>
                 {p.checkoutUrl ? (
-                  <a
-                    href={`${p.checkoutUrl}?client_reference_id=${encodeURIComponent(email)}`}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="bg-emerald-700 hover:bg-emerald-600 rounded-lg py-1.5 text-sm font-medium"
-                  >
-                    Buy
-                  </a>
+                  <a href={`${p.checkoutUrl}?client_reference_id=${encodeURIComponent(email)}`} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-emerald-500 py-1.5 text-sm font-medium text-[#06120c] hover:bg-emerald-400">Buy</a>
                 ) : (
-                  <span className="text-xs text-slate-600">Coming soon</span>
+                  <span className="text-[12px] text-slate-600">Coming soon</span>
                 )}
               </div>
             ))}
           </div>
-          <p className="text-xs text-slate-500 mt-3">Credits never expire. Pro subscribers get a monthly credit allowance automatically.</p>
-        </section>
+          <p className="mt-3 text-[12px] text-slate-500">Credits never expire. Pro subscribers get a monthly credit allowance automatically.</p>
+        </Panel>
 
-        {/* Tool prices */}
-        <section className="rounded-xl bg-slate-900 border border-slate-800 p-5">
-          <h2 className="font-semibold mb-3">Tools &amp; pricing</h2>
-          <table className="w-full text-sm">
-            <thead><tr className="text-left text-slate-500 text-xs uppercase"><th className="pb-2">Tool</th><th className="pb-2 text-right">Credits</th></tr></thead>
-            <tbody className="divide-y divide-slate-800">
-              {tools.map((t) => (
-                <tr key={t.name}><td className="py-2"><code className="text-slate-300">{t.name}</code></td><td className="py-2 text-right text-emerald-400">{t.credits}</td></tr>
-              ))}
-            </tbody>
-          </table>
-        </section>
+        {/* Tools & pricing */}
+        <Panel eyebrow="Pricing" title="Tools &amp; cost per call">
+          <div className="overflow-x-auto">
+            <table className="w-full text-sm">
+              <tbody className="divide-y divide-white/[0.06]">
+                {tools.map((t) => (
+                  <tr key={t.name}>
+                    <td className="py-2 pr-3"><code className="font-mono text-[13px] text-slate-200">{t.name}</code></td>
+                    <td className="py-2 text-right tabular-nums text-slate-400">{t.credits === 0 ? 'free' : `${t.credits} cr`}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </Panel>
 
-        {/* Recent usage */}
+        {/* Usage */}
         {calls.length > 0 && (
-          <section className="rounded-xl bg-slate-900 border border-slate-800 p-5">
-            <h2 className="font-semibold mb-3">Recent usage</h2>
-            <ul className="divide-y divide-slate-800 text-sm">
-              {calls.map((c, i) => (
-                <li key={i} className="py-1.5 flex items-center justify-between">
-                  <code className="text-slate-300">{c.tool_name}</code>
-                  <span className="text-slate-500 text-xs">{c.status}</span>
-                  <span className="text-slate-400">−{c.credits_charged}</span>
-                  <span className="text-slate-600 text-xs">{new Date(c.created_at).toLocaleString()}</span>
-                </li>
-              ))}
-            </ul>
-          </section>
+          <Panel eyebrow="Activity" title="Recent usage">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <tbody className="divide-y divide-white/[0.06]">
+                  {calls.map((c, i) => (
+                    <tr key={i}>
+                      <td className="py-2 pr-3"><code className="font-mono text-[13px] text-slate-200">{c.tool_name}</code></td>
+                      <td className="py-2"><Chip tone={c.status === 'success' ? 'emerald' : c.status === 'failed' ? 'rose' : 'amber'}>{c.status}</Chip></td>
+                      <td className="py-2 text-right tabular-nums text-slate-400">{c.credits_charged ? `−${c.credits_charged}` : '—'}</td>
+                      <td className="py-2 pl-3 text-right text-[12px] tabular-nums text-slate-500">{new Date(c.created_at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' })}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </Panel>
         )}
+
+        <footer className="mt-8 border-t border-white/[0.06] pt-5 text-[12px] text-slate-500">
+          Need help? <a href="/app" className="text-slate-400 underline underline-offset-2 hover:text-slate-300">Open Mindy</a> · endpoint <code className="font-mono text-slate-400">{MCP_URL}</code>
+        </footer>
       </div>
     </main>
   );
+}
+
+function Panel({ eyebrow, title, children }: { eyebrow: string; title: string; children: React.ReactNode }) {
+  return (
+    <section className="mt-5 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5">
+      <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">{eyebrow}</p>
+      <h2 className="mb-3 mt-0.5 text-[15px] font-semibold text-slate-100">{title}</h2>
+      {children}
+    </section>
+  );
+}
+
+function Chip({ tone, children }: { tone: 'emerald' | 'rose' | 'amber'; children: React.ReactNode }) {
+  const tones = {
+    emerald: 'bg-emerald-400/10 text-emerald-300 ring-emerald-400/20',
+    rose: 'bg-rose-500/10 text-rose-300 ring-rose-500/20',
+    amber: 'bg-amber-400/10 text-amber-300 ring-amber-400/20',
+  } as const;
+  return <span className={`inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-medium ring-1 ${tones[tone]}`}>{children}</span>;
 }
