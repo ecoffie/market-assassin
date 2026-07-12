@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUserAuth } from '@/lib/api-auth';
 import { issueApiKey, listApiKeys, revokeApiKey } from '@/lib/mcp/api-keys';
+import { grantSignupCreditsIfFirst } from '@/lib/mcp/credits';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -32,8 +33,10 @@ export async function POST(request: NextRequest) {
 
   try {
     const { key, row } = await issueApiKey(auth.email, { label });
+    // Grant one-time free credits on the user's FIRST key (no balance row yet).
+    const signupCredits = await grantSignupCreditsIfFirst(auth.email).catch(() => 0);
     // `key` is returned exactly once here and never again.
-    return NextResponse.json({ success: true, key, keyInfo: row });
+    return NextResponse.json({ success: true, key, keyInfo: row, signupCredits });
   } catch (err) {
     console.error('[mcp:keys] issue failed:', err);
     return NextResponse.json({ error: 'Failed to create key' }, { status: 500 });

@@ -20,6 +20,7 @@ import { getWriteClient } from '@/lib/supabase/server-clients';
 import { makeTier1Tools, TIER1_TOOL_DEFS, TIER1_TOOL_NAMES, type Tier1Db } from '@/lib/chat/tier1-tools';
 import { makeTier2Tools, TIER2_TOOL_DEFS, TIER2_TOOL_NAMES } from '@/lib/chat/tier2-tools';
 import { getWinningPlaybook } from '@/mcp/tools/winning-playbook';
+import { getBalance } from '@/lib/mcp/credits';
 
 export interface McpToolContext {
   /** The verified key owner — used for user-bound tools + (Slice 3) the debit. */
@@ -38,6 +39,17 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   get_contractor_profile: 5,
   find_capable_contractors: 8,
   get_winning_playbook: 2,
+  get_balance: 0, // meta tool — always free
+};
+
+/** Free meta-tool: report the caller's live credit balance. */
+const GET_BALANCE_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_balance',
+    description: 'Return the caller\'s current Mindy MCP credit balance. Free (0 credits).',
+    parameters: { type: 'object', properties: {} },
+  },
 };
 
 /** OpenAI-style def for the playbook tool (mirrors src/mcp/server.ts's zod schema). */
@@ -63,13 +75,18 @@ const PLAYBOOK_TOOL_DEF = {
 
 /** All tools exposed over MCP in v1, each annotated with its credit price. */
 export function listMcpTools(): Array<Record<string, unknown>> {
-  const defs = [...TIER1_TOOL_DEFS, ...TIER2_TOOL_DEFS, PLAYBOOK_TOOL_DEF];
+  const defs = [...TIER1_TOOL_DEFS, ...TIER2_TOOL_DEFS, PLAYBOOK_TOOL_DEF, GET_BALANCE_TOOL_DEF];
   return defs.map((d) => ({ ...d, _credits: TOOL_CREDITS[d.function.name] ?? 0 }));
 }
 
 /** Is `name` a tool this server exposes? (Fast reject for unknown calls.) */
 export function isMcpTool(name: string): boolean {
-  return TIER1_TOOL_NAMES.has(name) || TIER2_TOOL_NAMES.has(name) || name === 'get_winning_playbook';
+  return (
+    TIER1_TOOL_NAMES.has(name) ||
+    TIER2_TOOL_NAMES.has(name) ||
+    name === 'get_winning_playbook' ||
+    name === 'get_balance'
+  );
 }
 
 /** The credit price for a tool (0 if unknown/free). */
@@ -118,6 +135,11 @@ export async function runMcpTool(
       limit: typeof args.limit === 'number' ? args.limit : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
+  }
+
+  if (name === 'get_balance') {
+    const balance = await getBalance(ctx.userEmail);
+    return { result: { balance }, credits };
   }
 
   throw new Error(`Unknown MCP tool: ${name}`);
