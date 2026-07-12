@@ -16,6 +16,7 @@ import { userNeedsMindySetup } from '@/lib/alerts/profile-setup';
 import SamAttachmentLinks from '@/components/app/SamAttachmentLinks';
 import CollapsibleOpportunityDescription from '@/components/app/CollapsibleOpportunityDescription';
 import OpportunityDetailStrip from '@/components/app/OpportunityDetailStrip';
+import { computeNextAction, nextActionButton } from '@/lib/pipeline/next-action';
 
 interface AlertsPanelProps {
   email: string | null;
@@ -373,6 +374,8 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
           response_deadline: alert.responseDeadline,
           stage: 'tracking',
           priority: alert.isUrgent ? 'critical' : alert.isClosingSoon ? 'high' : 'medium',
+          // Give the tracked opp a real next step (fixes the browse→track dead-end).
+          next_action: computeNextAction(alert.noticeType, alert.setAside).key,
         }),
       });
       const data = await res.json().catch(() => null);
@@ -396,7 +399,7 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
   // Pursuits is Pro-locked, so "✓ Tracking" was a dead-end (Eric QC 2026-07-02).
   // Read the same user_pipeline rows back (GET /api/pipeline, no tier gate) and
   // show a lightweight read-only list here.
-  type TrackedItem = { id?: string; notice_id?: string; title?: string; agency?: string; external_url?: string; response_deadline?: string; notice_type?: string | null; set_aside?: string | null; value_estimate?: string | null };
+  type TrackedItem = { id?: string; notice_id?: string; title?: string; agency?: string; external_url?: string; response_deadline?: string; notice_type?: string | null; set_aside?: string | null; value_estimate?: string | null; next_action?: string | null };
   const [tracked, setTracked] = useState<TrackedItem[]>([]);
   const [trackedOpen, setTrackedOpen] = useState(false);
 
@@ -851,6 +854,26 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
     });
   }, []);
 
+  // "Today" triage — the two things that make the feed a daily driver: what's NEW
+  // since yesterday, and which tracked pursuits are DUE this week. Both computed
+  // from fields already loaded (alert.postedDate, tracked.response_deadline); no
+  // new fetch. Renders nothing when both are zero (no dead empty-state).
+  const todayTriage = useMemo(() => {
+    const now = Date.now();
+    const DAY = 24 * 60 * 60 * 1000;
+    const newToday = alerts.filter((a) => {
+      if (!a.postedDate) return false;
+      const t = new Date(a.postedDate).getTime();
+      return !Number.isNaN(t) && now - t <= DAY;
+    }).length;
+    const dueThisWeek = tracked.filter((t) => {
+      if (!t.response_deadline) return false;
+      const d = new Date(t.response_deadline).getTime();
+      return !Number.isNaN(d) && d >= now && d - now <= 7 * DAY;
+    }).length;
+    return { newToday, dueThisWeek };
+  }, [alerts, tracked]);
+
   const filterOptions: Array<{ key: AlertFilter; label: string }> = [
     { key: 'all', label: 'All' },
     { key: 'solicitation', label: 'Solicitations' },
@@ -953,6 +976,33 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
           </div>
         )}
       </div>
+
+      {/* "Today" triage strip — the daily-driver hook. New-since-yesterday +
+          pursuits due this week, each a click that filters/opens the right view.
+          Only renders when there's something to act on (no dead empty-state). */}
+      {(todayTriage.newToday > 0 || todayTriage.dueThisWeek > 0) && (
+        <div className="flex flex-wrap items-center gap-2 rounded-xl border border-surface bg-ground/60 px-4 py-3 text-sm">
+          <span className="font-semibold text-white">Today</span>
+          {todayTriage.newToday > 0 && (
+            <button
+              type="button"
+              onClick={() => { setFilter('all'); }}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-emerald-500/15 px-2.5 py-1 text-xs font-medium text-emerald-300 hover:bg-emerald-500/25 transition-colors"
+            >
+              🆕 {todayTriage.newToday} new today
+            </button>
+          )}
+          {todayTriage.dueThisWeek > 0 && (
+            <button
+              type="button"
+              onClick={() => setTrackedOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500/15 px-2.5 py-1 text-xs font-medium text-amber-300 hover:bg-amber-500/25 transition-colors"
+            >
+              ⏰ {todayTriage.dueThisWeek} pursuit{todayTriage.dueThisWeek === 1 ? '' : 's'} due this week
+            </button>
+          )}
+        </div>
+      )}
 
       {/* Market coverage line — shows free users how much of their line of work
           they're tracking, and nudges the "add missing codes" action in Settings.
@@ -1068,6 +1118,24 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                       </a>
                     )}
                   </div>
+                  {/* Next action — turns a tracked bookmark into a workflow step.
+                      Both tiers get a working button (the habit-formation point);
+                      routes to the tool's panel. Legacy rows (null next_action)
+                      recompute from notice_type. Renders nothing for track_only. */}
+                  {(() => {
+                    const na = nextActionButton(t.next_action, t.notice_type);
+                    if (!na || !onPanelChange) return null;
+                    return (
+                      <button
+                        type="button"
+                        onClick={() => onPanelChange(na.panel)}
+                        className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-purple-600/90 px-2.5 py-1.5 text-xs font-medium text-white hover:bg-purple-600 transition-colors"
+                      >
+                        {na.label}
+                        <span aria-hidden>→</span>
+                      </button>
+                    );
+                  })()}
                   {/* Locked Pro strip — advertises what My Pursuits adds (POC, docs,
                       synopsis) without giving it away. Only on free; paid users get
                       the real thing in My Pursuits. */}
