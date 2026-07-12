@@ -4,22 +4,24 @@
 
 ---
 
-## ⏰ CHECK TOMORROW (Jul 12) — daily-alerts 1000-row cap fix
+## ✅ CONFIRMED — daily-alerts 1000-row cap fix is WORKING (capacity baseline updated)
 
-- [ ] **Open the ops dashboard (7-Day Alert Delivery) and confirm `processed` climbs
-      PAST 1,000 toward ~1,541.** That's the behavioral confirmation of PR #113
-      (`d34ddd8a`, shipped + live Jul 11): the eligible-audience query was capped at
-      1,000 of 1,541 eligible subscribers → 541 never got alerts. Now paginated.
-      Also set `DAILY_ALERT_BATCH_SIZE=250` (prod, bound on the #113 build).
-  - If it does NOT climb: check the deploy actually bound the env, that the dispatcher
-    is firing all ~21 runs, and re-run the live count (eligible should be ≥1,541).
-- [ ] **Confirm `DAILY_ALERT_BATCH_SIZE=250` actually took effect.** It was set in prod
-      Jul 11 but env vars only bind on a build AFTER they're added — the #113 merge build
-      should have bound it, but verify: the daily run should drain all ~1,541 in ~7 runs
-      (not ~11). If sends still behave like batch=150 (plateau / slow drain), the env
-      didn't bind → trigger a fresh redeploy (empty commit) to pick it up.
-  - Next scaling knob: bump `DAILY_ALERT_BATCH_SIZE` toward ~500 (env only, ~10k/day
-    capacity) when eligible audience nears ~3,000. Capacity now = 21 runs × 250 = ~5,250/day.
+- [x] **PR #113 (`d34ddd8a`) confirmed live + working.** The eligible-audience query
+      was capped at 1,000 of the real audience → ~540 subscribers never got alerts.
+      Now paginated (`.range()` across the dispatcher window). **Dashboard Jul 11:**
+      `processed` climbed PAST 1,000 (1,002 / 1,111 / 1,091 across the week) and sends
+      hit 931–1,044/day — the exact behavioral proof. No longer pinned at ~1,000.
+- **REAL current baseline (measured Jul 11, not the old "~1,000-era" guess):**
+  - **Eligible daily-alerts audience = 1,540** (`alerts_enabled=true` AND
+    `alert_frequency IN (daily,weekdays,weekends)`). alerts_enabled total = 1,669.
+  - `DAILY_ALERT_BATCH_SIZE=250` (prod, bound). Dispatcher fires ~21 hourly runs.
+  - **Drain math:** ⌈1,540 / 250⌉ = **~7 runs** to process the whole audience;
+    7 of 21 available → comfortable headroom. Theoretical capacity = 21 × 250 = ~5,250/day.
+- **Next scaling knob (unchanged):** bump `DAILY_ALERT_BATCH_SIZE` toward ~500 (env
+  only, ~10k/day capacity) when the eligible audience nears ~3,000. Not needed at 1,540.
+- **⚠️ New per-user cost as of Jul 11:** vocab alert expansion (`VOCAB_ALERT_EXPANSION=on`)
+  adds a `getVocabularyForCodes` lookup + a wider match query per user. 250/run still has
+  ample time budget, but if a future run risks a timeout, that's the first knob to lower.
 
 ---
 

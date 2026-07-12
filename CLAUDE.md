@@ -1473,7 +1473,15 @@ GROQ_API_KEY=gsk_...
 
 ### Batch Enroll Bootcamp Attendees (April 12-19, 2026)
 
-**Status:** Daily alerts confirmed working at scale (~1,284 active users, June 3, 2026 — free-daily is now the permanent model). 8,803 bootcamp attendees already invited (last batch May 21). Remaining enroll batches can proceed.
+**Status:** Daily alerts confirmed working at scale. **Eligible audience = 1,540** as
+of Jul 11, 2026 (`alerts_enabled=true` AND `alert_frequency IN (daily,weekdays,weekends)`;
+alerts_enabled total 1,669) — free-daily is the permanent model. **Jul 11 cap fix (PR
+#113, `d34ddd8a`):** the eligibility query silently returned only the first 1,000 PostgREST
+rows → ~540 subscribers never processed; now paginated via `.range()` across the dispatcher
+window (confirmed live — `processed` climbs past 1,000, sends 931–1,044/day). Capacity:
+`DAILY_ALERT_BATCH_SIZE=250` × ~21 dispatcher runs = ~5,250/day; 1,540 drains in ~7 runs
+(bump batch toward ~500 only when eligible nears ~3,000). 8,803 bootcamp attendees already
+invited (last batch May 21). Remaining enroll batches can proceed.
 
 **Action:** Enroll 8,804 bootcamp attendees from `data/bootcamp-attendees-to-enroll.txt`
 
