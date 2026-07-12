@@ -22,6 +22,7 @@
 
 import { retrieveRagContext } from '@/lib/rag/retrieve';
 import { getPodcastInsightForProfile } from '@/lib/rag/podcast-insights';
+import { mcpFlags } from '@/lib/mcp/flags';
 
 /** Doc types that carry actual how-to-win guidance (mirrors the chat/proposal pulls). */
 const PLAYBOOK_DOC_TYPES = ['proposal_template', 'cap_statement', 'past_performance'];
@@ -52,8 +53,12 @@ export interface WinningPlaybookResult {
     episode_url: string | null;
     matched_naics: string[];
   } | null;
-  /** Pre-narrated conclusion the calling agent can quote verbatim (the _ai_hint moat). */
-  _ai_hint: {
+  /**
+   * Pre-narrated conclusion the calling agent can quote verbatim. OPTIONAL and
+   * TOGGLED OFF by default (mcpFlags.aiHint) — the data layer + `_meta` signals ship
+   * first; narration is opt-in. Absent when the toggle is off.
+   */
+  _ai_hint?: {
     summary: string;
     how_to_use: string;
     key_caveats: string[];
@@ -134,25 +139,35 @@ export async function getWinningPlaybook(
 
   const grounded = guidance.length > 0 || winStory !== null;
   // Retrieval errored AND we have nothing to show → a system failure, NOT a real
-  // no-match. Must be reported differently or the agent misdiagnoses (see onError above).
+  // no-match. Carried in _meta.degraded (machine-readable) regardless of the narration
+  // toggle, so the edge/agent can always tell "corpus down" from "no match".
   const degraded = retrievalFailed && !grounded;
 
-  // Pre-narrated conclusion — every fact traces to the real returned data (no LLM guess).
-  const summary = degraded
-    ? `The GovCon Giants teaching corpus could not be reached (retrieval error) for "${topic}". This is a TEMPORARY SYSTEM ISSUE — NOT a sign the corpus lacks content. Tell the user Mindy's coaching data is briefly unavailable and to retry; do NOT state that no coaching content exists.`
-    : grounded
-    ? `Found ${guidance.length} guidance passage${guidance.length === 1 ? '' : 's'} from the GovCon Giants teaching corpus on "${topic}"` +
-      (winStory
-        ? `, plus a real win story from ${winStory.guest || 'a podcast guest'}${winStory.company ? ` (${winStory.company})` : ''}.`
-        : '.')
-    : `No teaching-corpus match for "${topic}". Do not invent a playbook — tell the user Mindy has no coaching content on this exact scenario and suggest they broaden the topic.`;
-
-  return {
+  const result: WinningPlaybookResult = {
     topic,
     guidance,
     win_story: winStory,
-    _ai_hint: {
-      summary,
+    _meta: {
+      guidance_chunks: guidance.length,
+      corpus: 'GovCon Giants teaching corpus (mindy_rag_chunks + podcast_episodes)',
+      grounded,
+      degraded,
+    },
+  };
+
+  // NARRATION LAYER — toggled OFF by default (data-first). Only when explicitly
+  // enabled do we attach the pre-narrated hint. Even then, every fact traces to the
+  // real returned data (no LLM guess) — see mcpFlags for the rationale.
+  if (mcpFlags.aiHint) {
+    result._ai_hint = {
+      summary: degraded
+        ? `The GovCon Giants teaching corpus could not be reached (retrieval error) for "${topic}". This is a TEMPORARY SYSTEM ISSUE — NOT a sign the corpus lacks content. Tell the user Mindy's coaching data is briefly unavailable and to retry; do NOT state that no coaching content exists.`
+        : grounded
+        ? `Found ${guidance.length} guidance passage${guidance.length === 1 ? '' : 's'} from the GovCon Giants teaching corpus on "${topic}"` +
+          (winStory
+            ? `, plus a real win story from ${winStory.guest || 'a podcast guest'}${winStory.company ? ` (${winStory.company})` : ''}.`
+            : '.')
+        : `No teaching-corpus match for "${topic}". Do not invent a playbook — tell the user Mindy has no coaching content on this exact scenario and suggest they broaden the topic.`,
       how_to_use: degraded
         ? 'Retrieval errored — tell the user the coaching corpus is temporarily unavailable and to retry; do NOT claim no content exists or generate advice.'
         : grounded
@@ -163,12 +178,8 @@ export async function getWinningPlaybook(
         : grounded
         ? ['Guidance is teaching material, not legal/contractual advice.', 'Verify agency-specific requirements against the actual solicitation.']
         : ['Zero corpus matches — any advice here would be ungrounded.'],
-    },
-    _meta: {
-      guidance_chunks: guidance.length,
-      corpus: 'GovCon Giants teaching corpus (mindy_rag_chunks + podcast_episodes)',
-      grounded,
-      degraded,
-    },
-  };
+    };
+  }
+
+  return result;
 }
