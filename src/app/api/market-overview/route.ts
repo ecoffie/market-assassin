@@ -191,10 +191,14 @@ async function setAsideTile(codes: string[]): Promise<{ count: number }> {
   try {
     const supabase = createClient(supabaseUrl, supabaseKey);
     const orFilter = codes.map((c) => (c.length < 6 ? `naics_code.like.${c}%` : `naics_code.eq.${c}`)).join(',');
+    // "biddable now" must mean the deadline hasn't passed — `active` alone counts
+    // expired-but-not-yet-archived notices. Full now() timestamp OR null deadline.
+    const nowIso = new Date().toISOString();
     const { count, error } = await supabase
       .from('sam_opportunities')
       .select('id', { count: 'exact', head: true })
       .eq('active', true)
+      .or(`response_deadline.gte.${nowIso},response_deadline.is.null`)
       .or(orFilter)
       .not('set_aside_code', 'is', null)
       .neq('set_aside_code', '')

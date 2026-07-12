@@ -24,6 +24,7 @@ import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { isDistinctiveKeyword } from '@/lib/market/keyword-sanitize';
 import { naicsSubsectorPrefixes } from '@/lib/utils/naics-expansion';
+import { hasRunway, runwayRank } from '@/lib/opportunities/runway';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -163,7 +164,11 @@ export async function GET(request: NextRequest) {
     // Pull the OPEN, profile-matched pool — the same shape /api/app/opportunities
     // uses: active + future deadline, filtered to the profile's NAICS subsectors
     // (3-digit prefix) OR its distinctive keywords/PSC in the title.
-    const today = new Date().toISOString().split('T')[0];
+    // Full now() timestamp, NOT a date-only string. A date-only "midnight today"
+    // lets same-day-already-passed opps through — and this is the ONE opp we
+    // hold up as "best fit," so an expired best pick is the worst-case trust hit
+    // (the very failure the old most-tracked card had, per the header note).
+    const nowIso = new Date().toISOString();
     const naicsPrefixes = naicsSubsectorPrefixes(profile.naics);
     const naicsFilters = naicsPrefixes.map((c) => `naics_code.like.${c}%`);
     const distinctive = profile.keywords.filter((k) => isDistinctiveKeyword(k));
@@ -178,7 +183,7 @@ export async function GET(request: NextRequest) {
       .from('sam_opportunities')
       .select('notice_id, title, naics_code, psc_code, department, sub_tier, office, notice_type, response_deadline')
       .eq('active', true)
-      .gte('response_deadline', today)
+      .or(`response_deadline.gte.${nowIso},response_deadline.is.null`)
       .or(orFilter)
       .order('response_deadline', { ascending: true })
       .limit(400);
@@ -193,15 +198,23 @@ export async function GET(request: NextRequest) {
     const MIN_STRONG_SCORE = 25;
     const pool = (rows || []) as OppRow[];
     const scored = pool
+      // Runway gate: drop null-deadline rows that aren't respondable (Award /
+      // Justification — already awarded, not a real "best fit"). Dated rows are
+      // already future-bounded by the query.
+      .filter((o) => hasRunway(o.response_deadline, 1, undefined, o.notice_type))
       .map((o) => ({ o, ...scoreOpp(o, profile) }))
       .filter((x) => x.matchScore >= MIN_STRONG_SCORE);
     if (!scored.length) {
       return NextResponse.json({ hot: null }, { headers: { 'Cache-Control': 'no-store' } });
     }
 
-    // Rank by rankScore (match + freshness nudge), then sooner deadline, then SS.
+    // Rank by rankScore (match + freshness), then RUNWAY (real runway beats a
+    // 1-day scramble — the single best pick must be pursuable, not a countdown),
+    // then soonest deadline within a runway tier, then SS.
     scored.sort((a, b) => {
       if (b.rankScore !== a.rankScore) return b.rankScore - a.rankScore;
+      const rr = runwayRank(b.o.response_deadline) - runwayRank(a.o.response_deadline);
+      if (rr !== 0) return rr;
       const ad = a.o.response_deadline ? new Date(a.o.response_deadline).getTime() : Number.MAX_SAFE_INTEGER;
       const bd = b.o.response_deadline ? new Date(b.o.response_deadline).getTime() : Number.MAX_SAFE_INTEGER;
       if (ad !== bd) return ad - bd;

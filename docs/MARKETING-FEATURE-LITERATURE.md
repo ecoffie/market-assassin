@@ -4149,3 +4149,30 @@ respondable (Sources Sought + Consolidate/Bundle) and DROPS 254 Award/Justificat
 notices (already awarded — nothing to respond to). Zero expired rows in the dated set. Alert
 email + resurface sorts now break ties on `runwayRank` (shared model). tsc clean; production
 build green.
+
+---
+
+## Runway sweep: the "⭐ Best Fit" pick is now guaranteed pursuable (2026-07-12)
+
+**What:** Completed the runway sweep across every surface that shows an open opportunity. The
+"⭐ Best fit for you" hero card — the single opportunity Mindy holds up as your top pick — now
+filters expired opps correctly and ranks by real response runway, so your best pick is always
+one you can actually respond to, never one that quietly closed earlier today. The set-aside
+"biddable now" count tile was corrected the same way.
+
+**Why:** After fixing the Source Feed and the alert emails, an audit found the same expired-leak
+class still live in the highest-trust surface. The Best Fit card filtered on a date-only
+"midnight today" string, which lets same-day-already-passed opportunities through — measured
+live at 9 such opportunities at one moment mid-day, growing through the day. It also ranked by
+soonest-deadline, so a 1-day scramble could become "your best pick." An expired or last-minute
+best pick is the single most corrosive thing to trust in the product.
+
+**SEO / positioning:** "Your best-matched federal opportunity — always open, always pursuable."
+
+**Proof:** `hot-opportunity` now filters `response_deadline >= now() OR IS NULL`, applies the
+shared runway gate (drops non-respondable null-deadline rows), and ranks by `runwayRank` before
+soonest-deadline. `market-overview` set-aside tile filtered the same way. Verified live: 9
+active opps had a deadline earlier today (leaked by the old date-only filter, now excluded); 0
+expired in the best-fit pool after the fix. `market-dossier` needed no change — it reads the
+shared `fetchSamOpportunitiesFromCache`, already fixed. Every open-opportunity surface now
+shares one runway model. tsc clean; production build green.
