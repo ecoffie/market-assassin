@@ -23,6 +23,38 @@
 
 ---
 
+## ✅ SHIPPED — July 11, 2026 (PM) — Vocabulary wired into 4 more Mindy surfaces
+
+**Deployed + verified live** (`4e67c34c` + `9ba5b8c7` + `b07745cd` on `main`). The
+25,252-row `naics_vocabulary` table now serves **5 surfaces** (was 1). Same shared
+lib `src/lib/market/vocabulary.ts`, each a fail-soft read.
+
+- **① Onboarding** — `src/app/app/onboarding/page.tsx` + new `/api/app/naics-vocabulary`.
+  "Buyers also say (tap to add): …" — one-tap real buyer work-words for the user's
+  NAICS. Grounds day-1 keywords in real data. **Verified:** vocab API live
+  (`grounds maintenance, hvac, landscaping…`).
+- **② Recompete** — `api/recompete/route.ts` + `RecompetesPanel.tsx`. Work-word chips
+  per vehicle card (1 lookup per distinct code, server-side). **Verified live:**
+  vehicle 561730 → `["grounds maintenance","grounds","landscaping"…]`.
+- **③ Forecasts** — `api/forecasts/route.ts` + `ForecastsPanel.tsx`. Same chips per
+  forecast (real + DoD signals). Endpoint auth-gated (401 anon) → shows for logged-in
+  users; enrichment no-ops on empty set. Chip uses semantic tokens (bg-navy/text-muted).
+- **④ Alerts** — `api/cron/daily-alerts/route.ts`, flag **`VOCAB_ALERT_EXPANSION=on`
+  (SET in prod Jul 11, bound via `b07745cd`)**. Expands each user's MATCH keywords
+  with the top-5 buyer-words for their NAICS so an opp whose title/description uses a
+  buyer-word the user never typed now matches. Flows through the EXISTING keyword
+  OR-match (`sam-gov.ts`) — no matcher change. Skips default-only profiles.
+  **Vocab expands what's FOUND (3 fetch calls → matchKeywords); the user's OWN
+  keywords still decide what RANKS (3 score calls unchanged)** — wider recall, no
+  relevance distortion. **Measured on real profiles:** pest→300+, video production→192,
+  landscaping→300+ active opps match in title alone.
+  - **⏰ WATCH the next daily-alerts run** (~7-8:30 AM UTC): each expanded user logs
+    `+N vocab [terms]`. Confirm the expansion fires + total sends don't crater (a
+    too-wide term would inflate matches). If a generic term over-matches, lower the
+    cap (currently top-5) or unset the env to kill it instantly.
+
+---
+
 ## ✅ SHIPPED — July 11, 2026 (PM) — Keyword→NAICS lead grounded in real vocabulary (53%→98%)
 
 **Merged to `main` (`bb6ee102`, feature commit `35d274c7`) + deployed to prod + verified live.**
