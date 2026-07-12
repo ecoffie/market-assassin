@@ -97,3 +97,23 @@ total"). Measured against THAT (non-excluded):
 So the audience is HEALTHY (81% set up). The generic-feed banner + setup nudges target ~200-323
 real people, NOT thousands. The dashboard (getmindy.ai/command-center/dashboard) is the source of
 truth — read it, don't re-derive off raw table counts.
+
+## No-NAICS / setup-nudge funnel — MEASURED, healthy (2026-07-12)
+Decision was "measure nudge conversion before building a 4th nudge." Done — funnel is working:
+- **profile_complete** (daily_metric_snapshots): 1,088 (May 29) → 1,401 (Jul 11) = **+313 in 6wk,
+  ~13/day and accelerating**. In-app nudges + onboarding convert steadily.
+- **setup-invite-batch email cron**: enabled ✓, runs 2×/day (150/day cap), `last_status: success`.
+  Queue is **DRAINED** — needsSetupRemaining=0, wouldSendThisRun=0 (all 937 entitled users
+  invited/have-login). `setup_emails_sent`=0 recently = queue empty, NOT broken.
+- **zero-alert-nudge**: enabled ✓, 50/day, still draining its ~217 cohort.
+- The 296 no-NAICS eligible: 291 on daily alerts, 292 have ZERO signal, 177 active in-app.
+  BOTH channels already nudge them (in-app "make it mine" banner shipped; email "Fix My Alerts"
+  strip live via userNeedsMindySetup). **No 4th nudge needed** — funnel converting ~13/day.
+
+GOTCHA logged: cron_jobs columns are job_name/enabled/cron_expr/last_run_at (NOT name/active/
+cron_expression). A .select() with wrong names silently returns null → false "0 registered" alarm.
+
+## Send health confirmed (2026-07-12) — Eric's "processed closer to 1500"
+Daily-alerts today: **1,314 distinct recipients / 1,541 daily-eligible = 85%, still firing**
+(pagination fix PR#113 working; was capped ~1,000). alert_log has NO status column (another
+silent-null trap). Trending to ~1,500 as Eric expected.
