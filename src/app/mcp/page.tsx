@@ -1,15 +1,19 @@
 'use client';
 
 /**
- * getmindy.ai/mcp — the Mindy MCP developer console (Phase 1 Slice 5, redesigned).
+ * getmindy.ai/mcp — the Mindy MCP developer console (Higgsfield-style redesign).
  *
- * Mint/revoke API keys, see credit balance + usage, copy the mcp.json snippet, buy
- * credits. Lives on the getmindy.ai host (mcp.getmindy.ai rewrites /mcp to the
- * transport, so no route collision). Auth via authedFetch (2FA-gated); email from
- * localStorage like every /app surface.
+ * Structure: bold hero → per-client connect card (tabs rewrite the steps for
+ * Claude Code / Claude Desktop / Cursor / any client) → API keys → credits →
+ * pricing → usage.
+ *
+ * Identity is server-verified: on load we ask /api/mcp/session who the signed
+ * MI token proves we are, and render THAT account — never the stale plaintext
+ * `mi_beta_email`, which used to show the wrong account's zero balance. No valid
+ * session → the sign-in gate.
  */
-import { useCallback, useEffect, useState } from 'react';
-import { authedFetch } from '@/components/app/authHeaders';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { authedFetch, getMIApiHeaders } from '@/components/app/authHeaders';
 
 interface KeyRow {
   id: string;
@@ -26,7 +30,58 @@ interface Call { tool_name: string; status: string; credits_charged: number; cre
 const MCP_URL = 'https://mcp.getmindy.ai/mcp';
 const shortDate = (s: string | null) => (s ? new Date(s).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : null);
 
+type ClientId = 'claude-code' | 'claude-desktop' | 'cursor' | 'other';
+const CLIENTS: { id: ClientId; name: string }[] = [
+  { id: 'claude-code', name: 'Claude Code' },
+  { id: 'claude-desktop', name: 'Claude Desktop' },
+  { id: 'cursor', name: 'Cursor' },
+  { id: 'other', name: 'Other' },
+];
+
+/** The connect instructions for a client — all real methods for the same hosted URL. */
+function connectFor(client: ClientId, key: string) {
+  const json = `{
+  "mcpServers": {
+    "mindy": {
+      "url": "${MCP_URL}",
+      "headers": { "Authorization": "Bearer ${key}" }
+    }
+  }
+}`;
+  switch (client) {
+    case 'claude-code':
+      return {
+        lead: 'One command in your terminal — Claude Code speaks remote MCP natively.',
+        lang: 'bash' as const,
+        code: `claude mcp add --transport http mindy ${MCP_URL} \\\n  --header "Authorization: Bearer ${key}"`,
+        steps: ['Create an API key below', 'Run this in your terminal', 'Ask your agent: “Use Mindy to find open SAM drone contracts”'],
+      };
+    case 'claude-desktop':
+      return {
+        lead: <>Add this to your <code className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-[12px] text-slate-300">claude_desktop_config.json</code>, then restart Claude Desktop.</>,
+        lang: 'json' as const,
+        code: json,
+        steps: ['Create an API key below', 'Paste into claude_desktop_config.json → restart Claude Desktop', 'Ask Claude to use Mindy'],
+      };
+    case 'cursor':
+      return {
+        lead: <>Add this to <code className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-[12px] text-slate-300">~/.cursor/mcp.json</code>, then enable Mindy in Settings → MCP.</>,
+        lang: 'json' as const,
+        code: json,
+        steps: ['Create an API key below', 'Paste into ~/.cursor/mcp.json', 'Enable Mindy in Cursor → Settings → MCP'],
+      };
+    default:
+      return {
+        lead: 'Point any MCP client at this endpoint with a Bearer header.',
+        lang: 'json' as const,
+        code: json,
+        steps: ['Create an API key below', 'Add the server to your client config', 'Call any Mindy tool from your agent'],
+      };
+  }
+}
+
 export default function McpConsole() {
+  const [authState, setAuthState] = useState<'loading' | 'in' | 'out'>('loading');
   const [email, setEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [balance, setBalance] = useState<number | null>(null);
@@ -40,11 +95,28 @@ export default function McpConsole() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [justPurchased, setJustPurchased] = useState(false);
+  const [client, setClient] = useState<ClientId>('claude-code');
 
+  // Identity: ask the server who our signed token proves we are. Never trust
+  // the client-side email for the account we render.
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    setEmail(localStorage.getItem('mi_beta_email'));
     if (new URLSearchParams(window.location.search).get('topup') === 'success') setJustPurchased(true);
+    (async () => {
+      try {
+        const res = await fetch('/api/mcp/session', { headers: getMIApiHeaders() });
+        const j = await res.json().catch(() => null);
+        if (res.ok && j?.email) {
+          try { localStorage.setItem('mi_beta_email', j.email); } catch { /* ignore */ }
+          setEmail(j.email);
+          setAuthState('in');
+        } else {
+          setAuthState('out');
+        }
+      } catch {
+        setAuthState('out');
+      }
+    })();
   }, []);
 
   const copy = useCallback((text: string, tag: string) => {
@@ -98,41 +170,43 @@ export default function McpConsole() {
     await load(email);
   }
 
-  const activeKeys = keys.filter((k) => !k.revoked_at);
-  const mcpJson = `{
-  "mcpServers": {
-    "mindy": {
-      "url": "${MCP_URL}",
-      "headers": { "Authorization": "Bearer ${newKey || (activeKeys[0] ? activeKeys[0].key_prefix + '…' : 'mcp_live_YOUR_KEY')}" }
-    }
+  function switchAccount() {
+    try {
+      localStorage.removeItem('mi_beta_auth_token');
+      localStorage.removeItem('mi_beta_2fa_token');
+      localStorage.removeItem('mi_beta_email');
+    } catch { /* ignore */ }
+    window.location.href = '/app';
   }
-}`;
 
-  const step = (n: number, done: boolean) => (
-    <span
-      className={`grid h-6 w-6 shrink-0 place-items-center rounded-full text-xs font-semibold tabular-nums ${
-        done ? 'bg-emerald-400 text-[#06120c]' : 'bg-white/10 text-slate-300 ring-1 ring-white/10'
-      }`}
-    >
-      {done ? '✓' : n}
-    </span>
-  );
+  const activeKeys = useMemo(() => keys.filter((k) => !k.revoked_at), [keys]);
+  const keyForSnippet = newKey || (activeKeys[0] ? `${activeKeys[0].key_prefix}…` : 'mcp_live_YOUR_KEY');
+  const conn = useMemo(() => connectFor(client, keyForSnippet), [client, keyForSnippet]);
 
-  if (!email) {
+  // ---- Sign-in gate ----------------------------------------------------------
+  if (authState !== 'in') {
     return (
-      <main className="grid min-h-dvh place-items-center bg-[#0a0f1e] px-6 text-slate-100">
-        <div className="max-w-sm text-center">
-          <div className="mx-auto mb-4 grid h-11 w-11 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-emerald-400 text-lg font-bold text-[#0a0f1e]">M</div>
-          <h1 className="text-xl font-semibold">Mindy MCP</h1>
-          <p className="mt-2 text-sm text-slate-400">
-            <a href="/app" className="text-emerald-400 underline decoration-emerald-400/40 underline-offset-2 hover:text-emerald-300">Sign in</a>{' '}
-            to manage your API keys and credits.
-          </p>
+      <main className="grid min-h-dvh place-items-center bg-[#0a0f1e] px-6 text-slate-100 [color-scheme:dark]">
+        <div className="w-full max-w-sm text-center">
+          <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-emerald-400 text-lg font-bold text-[#0a0f1e]">M</div>
+          <h1 className="text-2xl font-semibold tracking-tight">Mindy MCP</h1>
+          <p className="mt-2 text-sm text-slate-400">Federal contracting intelligence for any AI agent.</p>
+          {authState === 'loading' ? (
+            <p className="mt-6 text-sm text-slate-500">Checking your session…</p>
+          ) : (
+            <>
+              <a href="/app" className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">
+                Sign in to Mindy
+              </a>
+              <p className="mt-3 text-[12px] text-slate-500">Your first API key comes with 25 free credits.</p>
+            </>
+          )}
         </div>
       </main>
     );
   }
 
+  // ---- Console ---------------------------------------------------------------
   return (
     <main className="min-h-dvh bg-[#0a0f1e] text-slate-100 [color-scheme:dark]">
       <div className="mx-auto max-w-4xl px-5 py-8 sm:px-6">
@@ -151,35 +225,84 @@ export default function McpConsole() {
           </div>
         </header>
 
+        {/* Hero */}
+        <section className="mt-8 text-center">
+          <div className="mb-6 flex items-center justify-center -space-x-2">
+            {[
+              { t: '✳', c: 'from-orange-400/80 to-rose-400/80' },
+              { t: '⌘', c: 'from-slate-300/80 to-slate-500/80' },
+            ].map((x, i) => (
+              <div key={i} className={`grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br ${x.c} text-base font-semibold text-[#0a0f1e] ring-4 ring-[#0a0f1e]`}>{x.t}</div>
+            ))}
+            <div className="z-10 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-emerald-400 text-xl font-bold text-[#0a0f1e] ring-4 ring-[#0a0f1e]">M</div>
+            {[
+              { t: '⌨', c: 'from-emerald-300/80 to-teal-500/80' },
+              { t: '❖', c: 'from-sky-300/80 to-indigo-400/80' },
+            ].map((x, i) => (
+              <div key={i} className={`grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br ${x.c} text-base font-semibold text-[#0a0f1e] ring-4 ring-[#0a0f1e]`}>{x.t}</div>
+            ))}
+          </div>
+          <h2 className="mx-auto max-w-2xl text-balance text-3xl font-bold uppercase leading-[1.05] tracking-tight sm:text-4xl">
+            Mindy MCP for any AI agent
+          </h2>
+          <p className="mx-auto mt-3 max-w-xl text-balance text-sm text-slate-400 sm:text-[15px]">
+            SAM opportunities, incumbent financials, GSA pricing, and win playbooks — piped straight into Claude, Cursor, or your own agent.
+          </p>
+          <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/[0.07] px-3.5 py-1.5 text-[13px] text-emerald-200">
+            <span aria-hidden>🎁</span> Your first API key includes 25 free credits
+          </div>
+        </section>
+
         {justPurchased && (
-          <div className="mt-5 flex items-center justify-between gap-3 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">
+          <div className="mt-6 flex items-center justify-between gap-3 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">
             <span>Payment received — credits added. Your balance is now <strong className="tabular-nums">{balance ?? '…'}</strong>.</span>
             <button onClick={() => setJustPurchased(false)} className="text-emerald-400/60 hover:text-emerald-300">Dismiss</button>
           </div>
         )}
-        {error && <div className="mt-5 rounded-xl border border-rose-500/25 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{error}</div>}
+        {error && <div className="mt-6 rounded-xl border border-rose-500/25 bg-rose-500/10 px-4 py-3 text-sm text-rose-200">{error}</div>}
 
-        {/* Quickstart — a real 3-step sequence */}
-        <section className="mt-6 grid gap-3 sm:grid-cols-3">
-          <div className="flex items-center gap-2.5 rounded-xl border border-white/[0.07] bg-white/[0.02] px-3.5 py-3 text-sm">
-            {step(1, activeKeys.length > 0)}<span className="text-slate-300">Create an API key</span>
+        {/* Connect card — client tabs rewrite the steps */}
+        <section className="mt-8 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 sm:p-6">
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">Connect</p>
+            <div className="inline-flex rounded-full border border-white/[0.08] bg-[#070b16] p-1">
+              {CLIENTS.map((c) => (
+                <button
+                  key={c.id}
+                  onClick={() => setClient(c.id)}
+                  className={`rounded-full px-3 py-1 text-[12px] font-medium transition ${client === c.id ? 'bg-emerald-500 text-[#06120c]' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  {c.name}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-2.5 rounded-xl border border-white/[0.07] bg-white/[0.02] px-3.5 py-3 text-sm">
-            {step(2, (balance ?? 0) > 0)}<span className="text-slate-300">Add credits</span>
+
+          {/* Endpoint URL */}
+          <div className="mt-4 flex items-center gap-2 rounded-lg border border-white/[0.08] bg-[#070b16] px-3 py-2">
+            <span className="text-[11px] uppercase tracking-wide text-slate-500">Endpoint</span>
+            <code className="min-w-0 flex-1 truncate font-mono text-[13px] text-emerald-300">{MCP_URL}</code>
+            <button onClick={() => copy(MCP_URL, 'url')} className="shrink-0 rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-[11px] text-slate-300 hover:bg-white/10">{copied === 'url' ? 'Copied' : 'Copy'}</button>
           </div>
-          <div className="flex items-center gap-2.5 rounded-xl border border-white/[0.07] bg-white/[0.02] px-3.5 py-3 text-sm">
-            {step(3, false)}<span className="text-slate-300">Connect your agent</span>
+
+          {/* Steps */}
+          <ol className="mt-4 grid gap-2 sm:grid-cols-3">
+            {conn.steps.map((s, i) => (
+              <li key={i} className="flex items-start gap-2.5 rounded-xl border border-white/[0.06] bg-white/[0.015] px-3 py-2.5 text-[13px] text-slate-300">
+                <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/10 text-[11px] font-semibold text-slate-300">{i + 1}</span>
+                <span>{s}</span>
+              </li>
+            ))}
+          </ol>
+
+          {/* Snippet */}
+          <p className="mt-4 text-sm text-slate-400">{conn.lead}</p>
+          <div className="relative mt-2">
+            <pre className="overflow-x-auto rounded-lg border border-white/[0.06] bg-[#070b16] p-3.5 font-mono text-[12px] leading-relaxed text-slate-300">{conn.code}</pre>
+            <button onClick={() => copy(conn.code, 'snippet')} className="absolute right-2.5 top-2.5 rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-[11px] text-slate-300 hover:bg-white/10">{copied === 'snippet' ? 'Copied' : 'Copy'}</button>
           </div>
+          <p className="mt-2 text-[12px] text-slate-500">Replace <code className="font-mono text-slate-400">mcp_live_YOUR_KEY</code> with a key from below. Keys are shown once at creation.</p>
         </section>
-
-        {/* Connect snippet */}
-        <Panel eyebrow="Connect" title="Point your agent at Mindy">
-          <p className="text-sm text-slate-400">Drop this into your MCP client&apos;s <code className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-[12px] text-slate-300">mcp.json</code> (Claude Desktop, Cursor, or your own agent).</p>
-          <div className="relative mt-3">
-            <pre className="overflow-x-auto rounded-lg border border-white/[0.06] bg-[#070b16] p-3.5 font-mono text-[12px] leading-relaxed text-slate-300">{mcpJson}</pre>
-            <button onClick={() => copy(mcpJson, 'snippet')} className="absolute right-2.5 top-2.5 rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-[11px] text-slate-300 hover:bg-white/10">{copied === 'snippet' ? 'Copied' : 'Copy'}</button>
-          </div>
-        </Panel>
 
         {/* API keys */}
         <Panel eyebrow="API keys" title="Your keys">
@@ -228,7 +351,7 @@ export default function McpConsole() {
                 <div className="mt-0.5 text-sm font-medium tabular-nums text-emerald-300">{p.credits.toLocaleString()} credits</div>
                 <div className="mb-3 mt-1 flex-1 text-[12px] text-slate-500">{p.label.replace(/^.*—\s*/, '')}</div>
                 {p.checkoutUrl ? (
-                  <a href={`${p.checkoutUrl}?client_reference_id=${encodeURIComponent(email)}`} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-emerald-500 py-1.5 text-sm font-medium text-[#06120c] hover:bg-emerald-400">Buy</a>
+                  <a href={`${p.checkoutUrl}?client_reference_id=${encodeURIComponent(email || '')}`} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-emerald-500 py-1.5 text-sm font-medium text-[#06120c] hover:bg-emerald-400">Buy</a>
                 ) : (
                   <span className="text-[12px] text-slate-600">Coming soon</span>
                 )}
@@ -274,8 +397,9 @@ export default function McpConsole() {
           </Panel>
         )}
 
-        <footer className="mt-8 border-t border-white/[0.06] pt-5 text-[12px] text-slate-500">
-          Need help? <a href="/app" className="text-slate-400 underline underline-offset-2 hover:text-slate-300">Open Mindy</a> · endpoint <code className="font-mono text-slate-400">{MCP_URL}</code>
+        <footer className="mt-8 flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.06] pt-5 text-[12px] text-slate-500">
+          <span>Signed in as <span className="text-slate-400">{email}</span> · <button onClick={switchAccount} className="underline underline-offset-2 hover:text-slate-300">Switch account</button></span>
+          <span>endpoint <code className="font-mono text-slate-400">{MCP_URL}</code></span>
         </footer>
       </div>
     </main>
