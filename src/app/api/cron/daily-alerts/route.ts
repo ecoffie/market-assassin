@@ -999,6 +999,15 @@ async function runDailyAlertJob(options?: {
         results.failed++;
         results.errors.push(`${user.user_email}: ${errorMsg}`);
 
+        // Persist a 'failed' alert_log row so this user is VISIBLE (dashboard +
+        // zero-alert-diagnosis) and gets picked up by the retry queue — mirroring the
+        // inner email-send catch (saveFailedAlert). Without this, a pre-send pipeline
+        // error (opp fetch / dedup / grants / action-tips / hidden-match) left NO
+        // alert_log row, so the user was invisible and merely reprocessed every run —
+        // a deterministic per-profile error would silently recur forever. scoredOpps
+        // isn't reliably in scope this early, so log with no opportunities.
+        await saveFailedAlert(user.user_email, [], errorMsg).catch(() => {});
+
         // Log to tool_errors for dashboard visibility
         await logToolError({
           tool: ToolNames.ALERTS,

@@ -88,16 +88,18 @@ export async function GET(request: NextRequest) {
       .range(from, to),
   );
 
-  // Per-user: total opps delivered, whether any row exists, last skip reason.
+  // Per-user: total opps delivered, whether any row exists, last skip reason, last failure.
   const oppByUser = new Map<string, number>();
   const hasRow = new Set<string>();
   const skipReason = new Map<string, string>();
+  const failReason = new Map<string, string>();
   for (const r of logs) {
     const e = (r.user_email || '').toLowerCase();
     if (!e) continue;
     hasRow.add(e);
     oppByUser.set(e, (oppByUser.get(e) || 0) + (r.opportunities_count || 0));
     if (r.delivery_status === 'skipped' && r.error_message) skipReason.set(e, r.error_message);
+    if (r.delivery_status === 'failed' && r.error_message) failReason.set(e, r.error_message);
   }
 
   // Shape counts to detect sweeps.
@@ -112,6 +114,7 @@ export async function GET(request: NextRequest) {
     narrow: { count: 0, samples: [] as string[] },
     neverRan: { count: 0, samples: [] as string[] },
     skipped: { count: 0, samples: [] as Array<{ email: string; reason: string }> },
+    failed: { count: 0, samples: [] as Array<{ email: string; reason: string }> },
   };
   const skipReasonTally: Record<string, number> = {};
 
@@ -142,6 +145,12 @@ export async function GET(request: NextRequest) {
       const reason = skipReason.get(email)!;
       skipReasonTally[reason] = (skipReasonTally[reason] || 0) + 1;
       if (buckets.skipped.samples.length < sampleN) buckets.skipped.samples.push({ email: u.user_email, reason });
+    } else if (failReason.has(email)) {
+      // Only 'failed' rows (no skip, no opps) → a genuine pipeline error, not a thin
+      // market. Distinct from 'narrow' so we don't mislabel bugs as demand.
+      buckets.failed.count++;
+      const reason = failReason.get(email)!;
+      if (buckets.failed.samples.length < sampleN) buckets.failed.samples.push({ email: u.user_email, reason });
     } else {
       // Real custom NAICS, had a sent row, but 0 opps → genuinely narrow market.
       buckets.narrow.count++;
@@ -159,6 +168,7 @@ export async function GET(request: NextRequest) {
       narrow: buckets.narrow.count,         // fix = widen NAICS/keywords / source coverage
       neverRan: buckets.neverRan.count,     // fix = cron eligibility / frequency
       skipped: buckets.skipped.count,       // fix = depends on reason (see tally)
+      failed: buckets.failed.count,         // fix = genuine pipeline error (see sample reasons)
     },
     skipReasonTally,
     samples: buckets,
