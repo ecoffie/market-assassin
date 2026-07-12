@@ -27,6 +27,7 @@ import { logToolError, ToolNames, ErrorTypes } from '@/lib/tool-errors';
 import { persistSentAlert, upsertAlertLog } from '@/lib/alerts/delivery-log';
 import { sendEmail } from '@/lib/send-email';
 import { getInsightForNoticeType, bucketNoticeType, renderInsightHtml } from '@/lib/briefings/mindy-insights';
+import { runwayRank } from '@/lib/opportunities/runway';
 import { userInRollout } from '@/lib/intelligence/feature-flag';
 import { appendEmailUtm, createEmailTrackingToken, generateTrackedLink, generateTrackingPixel } from '@/lib/engagement';
 import { generateEmailToken } from '@/lib/api-auth';
@@ -746,7 +747,10 @@ async function runDailyAlertJob(options?: {
           results.deduplicated += dedupCount;
         }
 
-        // Score and rank - use ORIGINAL codes for scoring (exact matches rank higher)
+        // Score and rank - use ORIGINAL codes for scoring (exact matches rank higher).
+        // Tiebreaker: actionable RUNWAY (higher = more days to respond) so a
+        // strong-fit opp with real runway leads the email, not a 1-day scramble.
+        // The email's own urgency badge still flags the tight ones lower down.
         let scoredOpps = opportunities.map(opp => ({
           ...opp,
           score: scoreOpportunity(opp, {
@@ -757,7 +761,10 @@ async function runDailyAlertJob(options?: {
             business_type: user.business_type || null,
             setAsides: user.set_aside_preferences || undefined,
           }),
-        })).sort((a, b) => b.score - a.score);
+        })).sort((a, b) => {
+          if (b.score !== a.score) return b.score - a.score;
+          return runwayRank(b.responseDeadline) - runwayRank(a.responseDeadline);
+        });
 
         // Limit fallback results to top 15 to avoid overwhelming users
         if (isUsingFallback && scoredOpps.length > 15) {
@@ -816,6 +823,10 @@ async function runDailyAlertJob(options?: {
             .filter(opp => getDaysUntil(opp.responseDeadline) <= 14)
             .sort((a, b) => {
               if (b.score !== a.score) return b.score - a.score;
+              // Real runway first (pursuable over tight), soonest-deadline only
+              // as the final tiebreaker within the same runway tier.
+              const rank = runwayRank(b.responseDeadline) - runwayRank(a.responseDeadline);
+              if (rank !== 0) return rank;
               return getDaysUntil(a.responseDeadline) - getDaysUntil(b.responseDeadline);
             })
             .slice(0, 10);

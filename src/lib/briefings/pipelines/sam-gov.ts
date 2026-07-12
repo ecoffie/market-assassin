@@ -10,6 +10,9 @@
 
 import { getReadClient } from '@/lib/supabase/server-clients';
 import { sanitizeKeywords } from '@/lib/market/keyword-sanitize';
+// Aliased: this file already has a LOCAL classifyNoticeType (summary buckets).
+// This is the authoritative RESPONDABILITY classifier ('bid'|'response'|'none').
+import { classifyNoticeType as classifyRespondability } from '@/lib/utils/notice-type';
 
 // Initialize Supabase client for cached opportunities.
 // READ REPLICA (Resilience Phase 1): this module ONLY reads sam_opportunities
@@ -957,14 +960,29 @@ export async function fetchSamOpportunitiesFromCache(
       lastModifiedDate: row.last_modified || row.posted_date || '',
     }));
 
+    // Respondability gate for NULL-deadline rows. The query now includes
+    // deadline-IS-NULL opps (so open Sources Sought / RFIs aren't silently
+    // dropped), but ~90% of active null-deadline rows are Award Notices /
+    // Justifications — already awarded, nothing to respond to. Keep a
+    // null-deadline row ONLY if its notice type is respondable (Sources Sought /
+    // RFI / a real solicitation); classifyRespondability defaults unknown/blank
+    // types to 'bid' so an un-enriched real solicitation is never wrongly hidden.
+    // Dated opps (deadline present) are unaffected — the query already bounded them.
+    const runwayGated = opportunities.filter(opp => {
+      if (opp.responseDeadline) return true; // has a real future deadline
+      return classifyRespondability(opp.noticeType).respondability !== 'none';
+    });
+
     // Soft keyword filter: If keywords provided, try to filter. If no matches, fall back to NAICS-only results.
     // This prevents users with overly-specific keywords from receiving 0 opportunities.
-    let filtered = opportunities;
+    let filtered = runwayGated;
     let keywordMatchCount = 0;
 
     if (keywords.length > 0) {
       const keywordLower = keywords.map(k => k.toLowerCase());
-      const keywordFiltered = opportunities.filter(opp => {
+      // Filter over the runway-gated set (NOT the raw `opportunities`) so a
+      // keyword match can't re-introduce a non-respondable null-deadline row.
+      const keywordFiltered = runwayGated.filter(opp => {
         const text = `${opp.title} ${opp.description}`.toLowerCase();
         return keywordLower.some(k => text.includes(k));
       });
@@ -974,9 +992,9 @@ export async function fetchSamOpportunitiesFromCache(
       // Only apply keyword filter if it returns results; otherwise fall back to NAICS-only
       if (keywordFiltered.length > 0) {
         filtered = keywordFiltered;
-        console.log(`[SAM Cache] Keyword filter matched ${keywordFiltered.length} of ${opportunities.length} opportunities`);
+        console.log(`[SAM Cache] Keyword filter matched ${keywordFiltered.length} of ${runwayGated.length} opportunities`);
       } else {
-        console.log(`[SAM Cache] Keyword filter returned 0 results - falling back to NAICS-only (${opportunities.length} opportunities)`);
+        console.log(`[SAM Cache] Keyword filter returned 0 results - falling back to NAICS-only (${runwayGated.length} opportunities)`);
       }
     }
 
@@ -1010,7 +1028,15 @@ function applySamCacheFilters(query: any, params: SAMSearchParams) {
   let filteredQuery = query as any;
 
   filteredQuery = filteredQuery.eq('active', true);
-  filteredQuery = filteredQuery.gte('response_deadline', new Date().toISOString());
+  // Runway filter: full now() timestamp (correct — excludes past-deadline opps),
+  // OR a NULL deadline. The old `.gte(now)` silently dropped every null-deadline
+  // opp (a null never satisfies >=), so open no-deadline Sources Sought / RFIs
+  // never reached alerts/briefings/snapshots/dashboard. Include nulls here; the
+  // respondability gate in fetchSamOpportunitiesFromCache() then drops the
+  // non-respondable nulls (Award Notices / Justifications — already awarded,
+  // nothing to respond to) so we surface open RFIs WITHOUT flooding in dead ones.
+  const nowIso = new Date().toISOString();
+  filteredQuery = filteredQuery.or(`response_deadline.gte.${nowIso},response_deadline.is.null`);
 
   if (postedFrom) {
     filteredQuery = filteredQuery.gte('posted_date', postedFrom);

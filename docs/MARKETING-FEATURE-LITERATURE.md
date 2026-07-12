@@ -4120,3 +4120,32 @@ timestamp (was comparing a full timestamp against a date-only "midnight today" s
 same-day-passed and everything-later-today), drops any closed row belt-and-suspenders, and
 ranks by actionable runway. Same model drives the in-app badge so feed, badge, and sort never
 disagree. 22/22 unit assertions; full production build green.
+
+---
+
+## Daily alert emails: runway-ranked + open RFIs no longer dropped (2026-07-12)
+
+**What:** Two fixes to the daily opportunity alert email. (1) It now ranks strong-fit
+opportunities with real response runway ABOVE ones closing in a day or two — so the top of
+your email is winnable, not a panic countdown (the tight ones still appear, flagged, lower
+down). (2) Open Sources Sought / RFIs that have no fixed deadline now show up — they were
+being silently dropped.
+
+**Why:** An audit of the alerts pipeline (following the in-app feed fix) found the emails did
+NOT blast expired opportunities — that filter was already correct — but two subtler problems
+remained. The email sorted soonest-deadline as its tiebreaker, so a 1-day scramble led the
+email over a 3-week opportunity of equal fit. And the deadline filter used `>= now()`, which a
+NULL deadline never satisfies, so every no-deadline opportunity (many open RFIs / Sources
+Sought) was excluded from alerts, briefings, snapshots, and the market dashboard alike.
+
+**SEO / positioning:** "Federal opportunity alerts that lead with what you can actually win —
+including open RFIs, not just last-minute solicitations."
+
+**Proof:** Shared cache filter (`fetchSamOpportunitiesFromCache`) now matches
+`response_deadline >= now() OR response_deadline IS NULL`, then a respondability gate keeps a
+null-deadline row only when its notice type is respondable. Verified live 2026-07-12 against
+`sam_opportunities`: in a 3-code NAICS set, of 256 active null-deadline rows the gate KEEPS 2
+respondable (Sources Sought + Consolidate/Bundle) and DROPS 254 Award/Justification/Presol
+notices (already awarded — nothing to respond to). Zero expired rows in the dated set. Alert
+email + resurface sorts now break ties on `runwayRank` (shared model). tsc clean; production
+build green.
