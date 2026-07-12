@@ -15,8 +15,9 @@
  * The resolved identity (userEmail, scopes, keyId) is attached to the request
  * and read inside the tool via `extra.authInfo.extra`.
  *
- * NOT YET WIRED (Slices 3–4): the prepaid credit debit. See the TODO in the
- * tool handler — for now the edge is auth-gated but does not charge credits.
+ * Metering (Slice 3): tool execution is delegated to runMeteredTool, which
+ * pre-checks the credit balance, debits on success, and logs every call. Stripe
+ * credit top-ups are Slice 4.
  *
  * Route path: this file lives at src/app/mcp/[transport]/route.ts with
  * basePath '/mcp', so the raw endpoints are /mcp/mcp (Streamable HTTP) and
@@ -25,7 +26,7 @@
  */
 import { createMcpHandler, withMcpAuth } from 'mcp-handler';
 import { z } from 'zod';
-import { getWinningPlaybook } from '@/mcp/tools/winning-playbook';
+import { runMeteredTool } from '@/lib/mcp/metered';
 import { verifyApiKey } from '@/lib/mcp/api-keys';
 
 // Node.js runtime: verifyApiKey uses node:crypto + the Supabase service-role
@@ -75,32 +76,31 @@ const baseHandler = createMcpHandler(
         const identity = extra?.authInfo?.extra as
           | { userEmail?: string; keyId?: string }
           | undefined;
+        if (!identity?.userEmail) {
+          // Should be unreachable (required:true), but never run a tool unattributed.
+          return {
+            isError: true,
+            content: [{ type: 'text', text: 'unauthorized: no verified identity' }],
+          };
+        }
 
-        // ── MERGE POINT (Slice 3 metering, in flight on feat/mcp-phase1-slice3-credits) ──
-        // This branch is based on main and calls the tool directly (auth-only,
-        // unmetered). Once src/lib/mcp/metered.ts lands on main, swap the direct
-        // call below for the metered dispatch — it debits credits on success,
-        // logs the call, and rejects with insufficient_credits. Exact form:
-        //
-        //   import { runMeteredTool } from '@/lib/mcp/metered';
-        //   const outcome = await runMeteredTool(
-        //     'get_winning_playbook',
-        //     { topic, naics_codes, limit },
-        //     { userEmail: identity!.userEmail!, apiKeyId: identity!.keyId! },
-        //   );
-        //   if (!outcome.ok) {
-        //     return { isError: true, content: [{ type: 'text',
-        //       text: `${outcome.error.code}: ${outcome.error.message}` }] };
-        //   }
-        //   return { content: [{ type: 'text',
-        //     text: JSON.stringify(outcome.result, null, 2) }],
-        //     structuredContent: outcome.result };
-        // ─────────────────────────────────────────────────────────────────────
-        void identity;
-        const result = await getWinningPlaybook({ topic, naics_codes, limit });
+        // Metered dispatch: pre-checks the credit balance, runs the tool via the
+        // registry, debits on success (get_winning_playbook = 2 credits), and
+        // logs the call. Rejects with insufficient_credits before doing any work.
+        const outcome = await runMeteredTool(
+          'get_winning_playbook',
+          { topic, naics_codes, limit },
+          { userEmail: identity.userEmail, apiKeyId: identity.keyId ?? null },
+        );
+        if (!outcome.ok) {
+          return {
+            isError: true,
+            content: [{ type: 'text', text: `${outcome.error.code}: ${outcome.error.message}` }],
+          };
+        }
         return {
-          content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
-          structuredContent: result as unknown as Record<string, unknown>,
+          content: [{ type: 'text', text: JSON.stringify(outcome.result, null, 2) }],
+          structuredContent: outcome.result,
         };
       },
     );
