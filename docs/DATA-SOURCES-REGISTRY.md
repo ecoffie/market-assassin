@@ -9,7 +9,7 @@
 > BUILD PIPELINE (the scraper / merge script that produced it) — provenance lives
 > in the build, not always in an inline `source` field.
 
-_Last verified: 2026-06-08_
+_Last verified: 2026-06-08 · updated 2026-07-11 (added NAICS buyer vocabulary source)_
 
 ---
 
@@ -32,6 +32,7 @@ _Last verified: 2026-06-08_
 | **Agency pain points / intelligence** (3,045 pts, 307 agencies) | Pain points, agency priorities, "similar agencies" | `scripts/merge-agency-intelligence.js` → **GAO high-risk reports** (tagged `(Source: GAO)`) + **NDAA** (`~/Bootcamp/scan-ndaa-sections.py`) + USASpending spending patterns | Quarterly / on new GAO report | Apr 2026 |
 | **DoDAAC directory** | Office code → office name | `dodaac_directory` table, from BigQuery FPDS awards | As FPDS data updates | Jun 2026 |
 | **Forecast intelligence** (7,764) | `/forecasts` | 13 agency forecast portals (Excel/CSV/Puppeteer) — see `forecast_sources` table | Weekly (per-source) | rolling |
+| **NAICS buyer vocabulary** (25,252) | keyword→NAICS lead selection, onboarding "buyers also say" terms, recompete/forecast work-word chips, alert keyword expansion (`VOCAB_ALERT_EXPANSION`) | `naics_vocabulary` table, from `scripts/build-naics-vocabulary.ts` → **live USASpending award text** (top award descriptions per NAICS) cleaned by **cross-NAICS TF-IDF** (a term appearing across too many codes = filler, dropped). Read via `src/lib/market/vocabulary.ts`. | On rebuild (static; re-run the script when NAICS spend patterns shift materially — no cron) | Jul 2026 |
 
 ---
 
@@ -58,7 +59,8 @@ Opportunities (`sam_opportunities` 29K, `aggregated_opportunities` 50K, `multisi
 `user_pipeline`, `user_past_performance`, vault tables), briefings (`briefing_templates`,
 `briefing_log` 100K+, `briefing_dead_letter`, `briefing_system_health`), alerts (`alert_log`
 100K+), payments (`purchases`, `stripe_*`), RAG (`mindy_rag_documents`, `mindy_rag_chunks` 50K),
-intel (`agency_intelligence` 557, `agency_forecasts` 7,764, `forecast_sources`/`_sync_runs`),
+intel (`agency_intelligence` 557, `agency_forecasts` 7,764, `forecast_sources`/`_sync_runs`,
+`naics_vocabulary` 25,252 — buyer-words per NAICS from USASpending award text + TF-IDF),
 ops (`tool_errors`, `tool_health_metrics`, `api_provider_status`, `cron_jobs`, `sam_api_cache`),
 contacts (`federal_contacts` 123K, `dodaac_directory`).
 
