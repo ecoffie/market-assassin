@@ -21,12 +21,13 @@ vi.mock('@/lib/mcp/api-keys', () => ({
   ),
 }));
 
-// Mock the tool so the happy path never touches Supabase/RAG.
-vi.mock('@/mcp/tools/winning-playbook', () => ({
-  getWinningPlaybook: vi.fn(async () => ({
-    topic: 't',
-    guidance: [],
-    _meta: { grounded: false },
+// Mock the metered dispatcher so the happy path never touches Supabase/RAG.
+vi.mock('@/lib/mcp/metered', () => ({
+  runMeteredTool: vi.fn(async () => ({
+    ok: true,
+    result: { topic: 't', guidance: [], _meta: { grounded: false } },
+    creditsCharged: 2,
+    balance: 98,
   })),
 }));
 
