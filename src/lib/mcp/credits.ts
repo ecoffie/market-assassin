@@ -108,3 +108,32 @@ export async function grantSignupCreditsIfFirst(userEmail: string): Promise<numb
   await grantCredits(userEmail, SIGNUP_CREDITS, 'signup_grant');
   return SIGNUP_CREDITS;
 }
+
+export interface ApplyCreditResult {
+  applied: boolean; // false => this key was already applied (idempotent no-op)
+  newBalance: number;
+}
+
+/**
+ * Apply credits EXACTLY ONCE for an idempotency key (Slice 4). Safe under Stripe
+ * webhook re-delivery + monthly-cron re-runs — the same key never grants twice.
+ *   - Stripe top-up:   key = the checkout session id
+ *   - Pro monthly:     key = `pro:<email>:<YYYY-MM>`
+ */
+export async function applyCreditOnce(
+  idempotencyKey: string,
+  userEmail: string,
+  credits: number,
+  reason: string,
+): Promise<ApplyCreditResult> {
+  const { data, error } = await getWriteClient().rpc('mcp_apply_credit', {
+    p_key: idempotencyKey,
+    p_user: userEmail.toLowerCase(),
+    p_credits: Math.floor(credits),
+    p_reason: reason,
+  });
+  if (error) throw new Error(`applyCreditOnce failed: ${error.message}`);
+  const row = Array.isArray(data) ? data[0] : data;
+  return { applied: Boolean(row?.applied), newBalance: Number(row?.new_balance ?? 0) };
+}
+

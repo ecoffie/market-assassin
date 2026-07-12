@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
+import { handleMcpCreditTopup } from '@/lib/mcp/stripe-topup';
 import {
   sendLicenseKeyEmail,
   sendOpportunityHunterProEmail,
@@ -103,6 +104,14 @@ export async function POST(request: NextRequest) {
   // Handle checkout.session.completed
   if (event.type === 'checkout.session.completed') {
     const session = event.data.object as Stripe.Checkout.Session;
+
+    // MCP credit top-up? Handle + return early — it's a credit purchase, not a
+    // tier/bundle. Idempotent by session id, so safe if a second webhook also fires.
+    const mcpTopup = await handleMcpCreditTopup(session);
+    if (mcpTopup.handled) {
+      return NextResponse.json({ received: true, mcp_topup: mcpTopup });
+    }
+
     let tier = session.metadata?.tier;
     const bundle = session.metadata?.bundle;
     const email = session.customer_details?.email || session.customer_email;
