@@ -37,8 +37,12 @@ const USER_EMAIL_TABLES = [
   'user_referrals',
   'user_engagement',
   'user_engagement_scores',
-  'user_alert_settings',      // legacy, may have been dropped — DELETE silently ignores
-  'user_briefing_profile',    // legacy, may have been dropped
+  // Kept deliberately: this is a PII-purge sweep, so it stays over-inclusive. Both are
+  // dead (user_alert_settings dropped; user_briefing_profile never existed) → deleteRows
+  // catches the per-table error and continues. If either is ever recreated, orphaned PII
+  // still gets purged. tasks/smart-profile-dead-table-findings.md.
+  'user_alert_settings',
+  'user_briefing_profile',
   'mi_beta_user_settings',
   'mi_beta_team_members',
   'mi_beta_activity',

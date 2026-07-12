@@ -447,14 +447,12 @@ export async function calculateProfileCompleteness(email: string): Promise<Profi
   if (breakdown.hasCompanySize) total += 5;
   if (breakdown.hasContractVehicles) total += 5;
 
-  // Update in database
-  const supabase = getSupabase();
-  if (supabase) {
-    await supabase
-      .from('user_briefing_profile')
-      .update({ profile_completeness: total, updated_at: new Date().toISOString() })
-      .eq('user_email', email);
-  }
+  // NOTE: previously persisted `total` to user_briefing_profile.profile_completeness —
+  // a dead table AND a column that doesn't exist on the real user_notification_settings.
+  // The value is computed fresh on every call and callers use the returned `total`
+  // directly; getSmartProfile defaults profileCompleteness to 10 when unset. So the
+  // persist was pure dead weight — dropped rather than add a column via migration for a
+  // recomputed-on-read value. tasks/smart-profile-dead-table-findings.md.
 
   return { total, breakdown, missingFields };
 }

@@ -130,12 +130,14 @@ export async function GET(request: NextRequest) {
     .eq('user_email', email)
     .order('created_at', { ascending: false });
 
-  // 4. Check briefing profile
-  const { data: briefingProfile } = await getSupabase()
-    .from('user_briefing_profile')
+  // 4. Check briefing profile — real table is user_notification_settings
+  // (user_briefing_profile never existed → hasProfile was always false).
+  const { data: briefingProfile, error: briefingProfileErr } = await getSupabase()
+    .from('user_notification_settings')
     .select('user_email, created_at, updated_at')
     .eq('user_email', email)
-    .single();
+    .maybeSingle();
+  if (briefingProfileErr) console.error('[check-access] profile query error:', briefingProfileErr.message);
 
   // 5. Check briefing log
   const { data: recentBriefings } = await getSupabase()

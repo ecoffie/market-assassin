@@ -162,10 +162,30 @@ Reconciled the list against what actually landed on `main`. Closed items below:
   `user_notification_settings` (verified chris.ford → naics=5 keywords=10). **(C)**
   `POST /api/profile` returned HTTP 500 on every save (updateProfile upserted the dead table)
   → pointed updateProfile/getSmartProfile/getOrCreateProfile at the real table (verified prod:
-  200 + returns saved values, was 500). **STILL DEFERRED:** (A) click-learning weights still
-  target the dead table (silently no-op; revive needs a real table or move cols); (D) retire
-  legacy `/profile/setup` pages (now functional but superseded by `/app/onboarding`). Full
-  writeup: `tasks/smart-profile-dead-table-findings.md`.
+  200 + returns saved values, was 500). **(A) click-learning REVIVED — FIXED + LIVE**
+  (Jul 11): migration `20260711_smart_profile_click_learning.sql` (hand-run, 6 cols verified
+  live) added `clicked_naics/agencies/contractors/opportunities`, `last_click_at`,
+  `engagement_score` to `user_notification_settings`; `learnFromClick`/`updateEngagementScore`/
+  `completeOnboarding` now read/write the real row. Verified prod DB: two clicks on 541512 →
+  `naics_weights {"541512":2}`, VA+DHS → `agency_weights {VA:1,DHS:1}` → flows into
+  topNaics/topAgencies → into every briefing. **(live-path sweep) — FIXED + LIVE**
+  (`da999f6d`, Jul 11): found 5 LIVE user-path files still hit the dead table — repointed
+  all at `user_notification_settings`. Biggest: `workspace/route.ts` `profile.briefing` feeds
+  the Contractors/Recompetes/Forecasts/MarketResearch panels' default naics+agency filters →
+  was null → those 4 panels ran UNFILTERED for every user; now filter by real profile
+  (verified prod: c.jacksonbey → 52 NAICS + 5 agencies, was null). Also fixed search-capture
+  "learn my search" append, lindy/intelligence, briefings/chat/engine, access-codes seed.
+  **(admin sweep) — DONE, dead-table class FULLY CLOSED** (Jul 11): 12 admin routes.
+  Class 1 (reads: check-access, user-breakdown, debug-profile) → repointed/cleaned to
+  `user_notification_settings`. Class 2 (the retired `user_alert_settings` subsystem —
+  8 enroll/seed/sync/catch-up routes, none scheduled) → loud **410 Gone** via new
+  `src/lib/retired-route.ts` (NOT revived — that table was dropped on purpose). Also fixed
+  a straggler dead write in `service.ts calculateProfileCompleteness`. `delete-mindy-user`
+  left over-inclusive by design (PII purge). `grep from('user_briefing_profile'|'user_alert_settings')`
+  across src/ = ZERO live queries. tsc 0, 43 tests, build clean. **stripe-webhook verified
+  NOT broken** (comment-only ref; already uses real table). **ONLY REMAINING:** (D) retire
+  legacy `/profile/setup` pages (superseded by `/app/onboarding`).
+  Full writeup: `tasks/smart-profile-dead-table-findings.md`.
 - **SMS → GHL-only — SHIPPED** (`7ac54b41` removed all Twilio *code*; double opt-in +
   STOP webhook live). ⚠️ `twilio@^5.12.2` is still a dep in `package.json` — dead
   weight, safe to drop in a cleanup.

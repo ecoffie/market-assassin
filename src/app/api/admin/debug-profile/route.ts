@@ -67,11 +67,10 @@ export async function GET(request: NextRequest) {
     business = { data: null, error: err instanceof Error ? err.message : 'table missing or query failed' };
   }
 
-  // The Market Research panel ALSO reads these two tables (via /api/app/workspace).
-  // debug-profile used to omit them — so a profile that looked "empty" here could
-  // still hold a stale/INVALID NAICS that auto-runs Market Research into
-  // "No matching agencies". Surface them + flag invalid codes.
-  const briefing = await safeSelect(supabase, 'user_briefing_profile', email);
+  // The Market Research panel reads the profile via /api/app/workspace, which now
+  // reads user_notification_settings (surfaced above as `notification`). The old
+  // `user_briefing_profile` slot was DEAD (table never existed) → always present:false;
+  // removed so this diagnostic reflects reality (tasks/smart-profile-dead-table-findings.md).
   const miBeta = await safeSelect(supabase, 'mi_beta_user_settings', email);
   // The Vault (user_identity_profile) holds the UEI-imported company identity —
   // primary_naics from SAM. Market Research does NOT read it directly; it only
@@ -152,9 +151,6 @@ export async function GET(request: NextRequest) {
           business_description: business.data.business_description,
         }
       : { present: false },
-    user_briefing_profile: briefing
-      ? { present: true, naics_codes: briefing.naics_codes, invalid_naics: invalidNaics(briefing.naics_codes) }
-      : { present: false },
     // naics_codes column RETIRED from mi_beta_user_settings (migration 20260629);
     // targeting NAICS lives in user_notification_settings (shown above).
     mi_beta_user_settings: miBeta ? { present: true } : { present: false },
@@ -176,7 +172,6 @@ export async function GET(request: NextRequest) {
 
 const NAICS_NCOL: Record<string, string> = {
   user_notification_settings: 'naics_codes',
-  user_briefing_profile: 'naics_codes',
   // mi_beta_user_settings.naics_codes RETIRED (migration 20260629) — the column is
   // dropped; targeting lives in user_notification_settings. Do not re-add.
   user_business_profiles: 'extracted_naics_codes',

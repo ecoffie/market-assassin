@@ -51,7 +51,44 @@ The 3 briefing generators (`market-assassin`, `contractor-db`, `recompete`) each
 - **C:** `updateProfile` + `getSmartProfile` + `getOrCreateProfile` now read/write `user_notification_settings` (only columns that exist there; legacy fields like cage_code/annual_revenue dropped, not failed-on). Verified on prod: `POST /api/profile {email, naicsCodes:["541512","541611"], targetAgencies:["DHS"]}` → **200**, returns the saved values (was **500**). Test rows cleaned up.
 - All swallowed-error reads in these paths now surface `{ error }`.
 
+## ✅ DONE — A shipped & verified on prod (2026-07-11)
+
+- **A:** click-learning revived on the REAL profile row instead of forking a duplicate table. Migration `20260711_smart_profile_click_learning.sql` (hand-run, all 6 cols verified live) added `clicked_naics/agencies/contractors/opportunities`, `last_click_at`, `engagement_score` to `user_notification_settings` — next to the `naics_weights/agency_weights/company_weights` JSONB that already lived there and are already read by the generators.
+- `learnFromClick`, `updateEngagementScore`, `completeOnboarding` in `service.ts` now read/write `user_notification_settings` (was the nonexistent `user_briefing_profile`).
+- **Verified on prod DB:** two simulated clicks on NAICS 541512 → `naics_weights: {"541512":2}` (incremented), agencies VA+DHS → `agency_weights: {"VA":1,"DHS":1}`; `clicked_naics` deduped to `["541512"]`. Read back through `getSmartProfile` → flows into `topNaics`/`topAgencies` → into every briefing (B). Test rows cleaned. `/app` 200.
+- `mapDbToProfile` now reads real columns (`clicked_naics`, `engagement_score`, weights) — the earlier "maps to defaults" gap is closed.
+
+## ✅ DONE — live-path sweep shipped & verified on prod (`da999f6d`, 2026-07-11)
+
+Found the dead-table class was wider than this doc first said: **5 LIVE user-path files** (not just admin) still queried `user_briefing_profile`. All repointed at `user_notification_settings`, real columns only, each now surfaces `{ error }`:
+
+- **`workspace/route.ts`** — `profile.briefing` feeds the **Contractors / Recompetes / Forecasts / MarketResearch** panels' default naics+agency filters. Was always null → **those 4 panels ran UNFILTERED for every user** (ignored saved NAICS). Now reads real table (mapped `company_name/zip_code/certifications`, which don't exist there, → `location_zip`/`set_aside_certifications`). **Highest-impact find of the sweep.**
+- **`search-capture/route.ts`** — the real-time "learn my search" append (read + update + GET) no-op'd → searched terms never saved to profile. Repointed; dropped the `zip` column map (no array zip col on the real table).
+- **`lindy/intelligence/route.ts`** — `profile_summary` always empty → repointed.
+- **`briefings/chat/engine.ts`** — chat briefing context always empty → repointed.
+- **`access-codes.ts` `grantBriefingAccess`** — default-profile seed upsert no-op'd → seeded users got generic briefings until they searched. Repointed with `ignoreDuplicates` so a re-grant never clobbers an existing richer profile.
+
+**Verified on prod DB:** `c.jacksonbey@yahoo.com` read now returns **52 real NAICS + 5 agencies** (VA/DHS/ARMY/DOD/NASA) — was `null`. Build + 43 tests green, pre-push gate passed, prod deploy Ready, `/app` 200, `/api/search-capture` alive.
+
+## ✅ DONE — admin sweep shipped (2026-07-11) — dead-table class FULLY CLOSED
+
+Split into two classes and handled each correctly (NOT a blind table swap):
+
+**Class 1 — read/diagnostic routes → repointed to `user_notification_settings`:**
+- `check-access` — `hasProfile` was always false → now truthful.
+- `user-breakdown` — `users_with_alert_config`/`users_with_ma_alerts` were always 0 → reads real table; MA-alerts count derived from `alerts_enabled=true` (read-only, NOT reviving the subsystem).
+- `debug-profile` — dead `user_briefing_profile` diagnostic slot (always `present:false`, duplicated the `notification` slot) **removed** so the tool reflects reality; NAICS_NCOL entry dropped.
+- `service.ts calculateProfileCompleteness` — the missed straggler: wrote `profile_completeness` to the dead table (a col that doesn't even exist on the real table). Value is recomputed on every call + `getSmartProfile` defaults it to 10 → **dropped the dead write** (no migration for a recomputed-on-read value).
+
+**Class 2 — the retired `user_alert_settings` subsystem → loud 410, NOT revived:**
+Per memory `project_mindy_deadletter_automation` ("sync-*-to-alerts routes are DEAD — never re-schedule"), `user_alert_settings` was dropped **on purpose**. Confirmed **none of these routes are scheduled or called from anywhere** (grep of cron/dispatcher/lib = empty). Repointing them would revive retired machinery — so instead they return a **410 Gone** behind the existing admin/cron auth, via new shared helper `src/lib/retired-route.ts`:
+- `sync-naics-to-alerts`, `sync-alert-profiles`, `sync-alert-to-notification` (source table gone), `enroll-leads-to-alerts`, `enroll-ma-alerts`, `seed-alerts`, `send-catch-up-alerts` (email-SENDER — 410 doubly prevents an accidental blast), `alert-status`.
+
+**Deliberately left as-is:** `delete-mindy-user` keeps both dead tables in its PII-purge array (over-inclusive by design — `deleteRows` catches the per-table error and continues; purges orphaned PII if a table is ever recreated). Comment tightened. `.sql` schema files = harmless docs.
+
+**Result:** `grep "from('user_briefing_profile'|'user_alert_settings')"` across `src/` = **ZERO live queries** (only the delete-sweep string array + comments remain). tsc 0 errors, 43 tests, build clean.
+
+**Verified NOT broken:** `stripe-webhook` — its only `user_alert_settings` mention is a *comment* confirming it already writes the real `user_notification_settings`. Never a bug; left untouched.
+
 **Still open (deferred, not done):**
-- **A** — click-learning (`learnFromClick`, `updateEngagementScore`, `recordInteraction`'s side effects, `calculateProfileCompleteness`, `completeOnboarding`) still targets the nonexistent `user_briefing_profile` and silently no-ops. `briefing_interactions` (the write target for raw interactions) DOES exist and works, but nothing reads the learned weights back. Revive only if click-weighted personalization is wanted — needs a real `user_briefing_profile` table (author a proper CREATE, hand-run) OR move the weight columns onto `user_notification_settings`.
-- **D** — the legacy `/profile/setup` ↔ `/profile/complete` pages still exist (now functional via C, but superseded by `/app/onboarding`). Retire if confirmed dead. The health-check cron still pings `/profile/setup` expecting 200 (still passes).
-- `mapDbToProfile` reads some fields that don't exist on `user_notification_settings` (weights, engagement_score) → they map to defaults; harmless but worth a cleanup pass if A is done.
+- **D (pages)** — the legacy `/profile/setup` ↔ `/profile/complete` pages still exist (functional via C, superseded by `/app/onboarding`). Retire if confirmed dead. health-check cron still pings `/profile/setup` expecting 200 (still passes). This is the ONLY remaining item in the whole dead-table class.

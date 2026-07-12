@@ -89,16 +89,20 @@ function getSupabase() {
   }));
   const purchasesError = shopPurchases.length === 0 ? { message: 'No purchases from shop or fetch failed' } : null;
 
-  // Get user_briefing_profile (alert configurations)
+  // The real per-user profile+alert config all lives in user_notification_settings now.
+  // Both user_briefing_profile and user_alert_settings are dead tables (never existed /
+  // dropped) → these counts were always 0. Read the REAL table once and derive both.
+  // tasks/smart-profile-dead-table-findings.md. (Read-only admin counts — NOT reviving
+  // the retired alerts subsystem; those enroll/seed routes stay dead.)
   const { data: briefingProfiles, error: bpError } = await getSupabase()
-    .from('user_briefing_profile')
+    .from('user_notification_settings')
     .select('user_email, naics_codes, agencies, created_at')
     .order('created_at', { ascending: false });
 
-  // Get user_alert_settings (MA Premium weekly alerts)
   const { data: alertSettings, error: asError } = await getSupabase()
-    .from('user_alert_settings')
+    .from('user_notification_settings')
     .select('user_email, naics_codes, business_type, is_active, total_alerts_sent, created_at')
+    .eq('alerts_enabled', true)
     .order('created_at', { ascending: false });
 
   // Get unique users from search history (OH users who searched)
