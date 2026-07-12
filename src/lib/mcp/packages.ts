@@ -11,20 +11,26 @@
  */
 
 export interface CreditPackage {
-  /** Stripe metadata `package` id — must match the payment link's metadata. */
+  /** Stripe product-metadata `package` id — the webhook maps this → credits. */
   id: string;
   /** Credits granted on purchase. */
   credits: number;
   /** Display price (informational; the real charge is the Stripe product's price). */
   usd: number;
   label: string;
+  /** Stripe payment-link URL — the dashboard Buy button appends ?client_reference_id=<email>. */
+  checkoutUrl: string;
 }
 
-/** Low-entry top-up tiers (broad-audience funnel). Tune $/credits at Stripe setup. */
+/**
+ * Live top-up tiers. `checkoutUrl` = the Stripe payment link (created 2026-07-12; each
+ * product carries metadata type=mcp_credit_topup + package=<id>). Credits here MUST
+ * match each Stripe product's stated credit count.
+ */
 export const CREDIT_PACKAGES: readonly CreditPackage[] = [
-  { id: 'starter', credits: 250, usd: 5, label: 'Starter — 250 credits' },
-  { id: 'plus', credits: 800, usd: 15, label: 'Plus — 800 credits (7% bonus)' },
-  { id: 'scale', credits: 2400, usd: 40, label: 'Scale — 2,400 credits (20% bonus)' },
+  { id: 'starter', credits: 250, usd: 5, label: 'Starter — 250 credits', checkoutUrl: 'https://buy.stripe.com/00weVe7MGerw6h7clafnO0L' },
+  { id: 'plus', credits: 800, usd: 15, label: 'Plus — 800 credits (7% bonus)', checkoutUrl: 'https://buy.stripe.com/00w5kE9UO1EK9tjdpefnO0K' },
+  { id: 'scale', credits: 2400, usd: 40, label: 'Scale — 2,400 credits (20% bonus)', checkoutUrl: 'https://buy.stripe.com/14A7sMd703MS8pf4SIfnO0J' },
 ] as const;
 
 const BY_ID = new Map(CREDIT_PACKAGES.map((p) => [p.id, p]));
