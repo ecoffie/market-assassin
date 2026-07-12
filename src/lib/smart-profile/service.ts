@@ -289,13 +289,17 @@ async function learnFromClick(
   if (!supabase) return;
 
   try {
-    // Get current profile
-    const { data: profile } = await supabase
-      .from('user_briefing_profile')
+    // Learning lives on the REAL profile row (user_notification_settings) — the
+    // naics_weights/agency_weights JSONB already live there and drive the
+    // generators' topNaics/topAgencies weighting; the clicked_* + last_click_at
+    // columns were added by 20260711_smart_profile_click_learning.sql.
+    const { data: profile, error: profErr } = await supabase
+      .from('user_notification_settings')
       .select('clicked_naics, clicked_agencies, clicked_contractors, clicked_opportunities, naics_weights, agency_weights')
       .eq('user_email', email)
-      .single();
+      .maybeSingle();
 
+    if (profErr) { console.error('[SmartProfile] learnFromClick read error:', profErr.message); return; }
     if (!profile) return;
 
     const updates: Record<string, unknown> = { updated_at: new Date().toISOString() };
@@ -327,10 +331,11 @@ async function learnFromClick(
 
     updates.last_click_at = new Date().toISOString();
 
-    await supabase
-      .from('user_briefing_profile')
+    const { error: updErr } = await supabase
+      .from('user_notification_settings')
       .update(updates)
       .eq('user_email', email);
+    if (updErr) console.error('[SmartProfile] learnFromClick write error:', updErr.message);
   } catch (error) {
     console.error('[SmartProfile] Error learning from click:', error);
   }
@@ -384,17 +389,17 @@ async function updateEngagementScore(email: string): Promise<number> {
 
     score = Math.max(0, Math.min(100, score)); // Clamp 0-100
 
-    // Update profile
-    await supabase
-      .from('user_briefing_profile')
+    // Persist the score to the real profile row. (opens/clicks are derived from
+    // briefing_interactions on demand, so we don't denormalize them here — only
+    // engagement_score, which callers read.)
+    const { error: scoreErr } = await supabase
+      .from('user_notification_settings')
       .update({
         engagement_score: score,
-        briefings_opened: opens,
-        briefings_clicked: clicks,
-        last_briefing_opened_at: new Date().toISOString(),
         updated_at: new Date().toISOString(),
       })
       .eq('user_email', email);
+    if (scoreErr) console.error('[SmartProfile] engagement score write error:', scoreErr.message);
 
     return score;
   } catch (error) {
@@ -461,13 +466,14 @@ export async function completeOnboarding(email: string): Promise<void> {
   const supabase = getSupabase();
   if (!supabase) return;
 
-  await supabase
-    .from('user_briefing_profile')
-    .update({
-      onboarding_completed: true,
-      updated_at: new Date().toISOString(),
-    })
+  // user_notification_settings has no onboarding_completed flag (and the real
+  // onboarding is /app/onboarding); just touch the profile timestamp so the row
+  // reflects activity. Kept for API compatibility with the legacy setup flow.
+  const { error } = await supabase
+    .from('user_notification_settings')
+    .update({ updated_at: new Date().toISOString() })
     .eq('user_email', email);
+  if (error) console.error('[SmartProfile] completeOnboarding error:', error.message);
 }
 
 // Helper: Get top items by weight
