@@ -9,6 +9,7 @@
  * Contractors" → "roofing"), with generic filler dropped.
  */
 import naicsData from '@/data/naics-codes.json';
+import { isDistinctiveKeyword } from '@/lib/market/keyword-sanitize';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const CODES: Record<string, { title?: string }> = (naicsData as any).codes || {};
@@ -28,7 +29,13 @@ function titleToKeywords(title: string): string[] {
     .replace(/[^a-z0-9\s-]/g, ' ')
     .split(/\s+/)
     .map(w => w.trim())
-    .filter(w => w.length >= 4 && !STOP.has(w))
+    // Drop title stopwords AND run every candidate through the CANONICAL
+    // distinctiveness guard (isDistinctiveKeyword) — the local STOP list missed
+    // generic NAICS-title filler like "computer"/"scientific"/"management" that
+    // matches hundreds of active opps and made 90% of seeded profiles noisy. The
+    // guard is the single source of truth for "is this a real signal or a
+    // wildcard," so derivation and matching agree. (Jul 12 2026.)
+    .filter(w => w.length >= 4 && !STOP.has(w) && isDistinctiveKeyword(w))
     .slice(0, 3); // top few signal words per NAICS title
 }
 

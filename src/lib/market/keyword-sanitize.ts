@@ -110,6 +110,17 @@ const GENERIC_SINGLE_WORDS = new Set([
   // These are real capabilities ONLY inside a phrase ("pest control", "medical
   // staffing", "metal fabrication"); alone they must never be a strong signal.
   'control', 'medical', 'metal', 'materials', 'material',
+  // NAICS-TITLE FILLER auto-seeded into profiles by deriveKeywordsFromNaics (Jul
+  // 12 2026). 90% of keyworded profiles carried >=1 of these; they're words lifted
+  // from NAICS titles (Computer Systems Design, Offices of Lawyers) that name no
+  // capability and match hundreds of active opps. Measured active-opp matches:
+  //   public 846 · title 510 · certified 367 · preparation 281 · legal 131 ·
+  //   computer 85 · scientific 68 · offices 58. A law firm's "title" hit a "Life
+  //   Safety Survey" (doc title), exposing this. Distinctive-LOOKING but wildcards
+  //   alone; fine in a phrase ("title insurance", "computer forensics").
+  //   NOTE: deliberately NOT added — payroll(1), notaries(0), accounting(51),
+  //   landscape(23), architectural(32), settlement(22) are genuinely precise.
+  'public', 'title', 'certified', 'preparation', 'legal', 'computer', 'scientific', 'offices',
 ]);
 
 /**

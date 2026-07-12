@@ -4206,3 +4206,32 @@ guesswork."
 AlertsPanel, reusing the existing `computeNextAction` and the user's own `searchCriteria`
 already on the client (no new endpoint). Verified on real users against live `sam_opportunities`.
 tsc clean (feature files); production build green.
+
+---
+
+## Sharper keyword matching: stop seeding generic NAICS-title filler (2026-07-12)
+
+**What:** Auto-derived profile keywords are now precise. When we suggest keywords from a user's
+NAICS codes, we no longer seed generic filler ("computer", "systems", "management", "title",
+"public") that matches hundreds of unrelated opportunities. An IT consultant's derived keywords
+went from 10 wildcard words to the one that means something ("programming"); a law firm's went
+from "offices, title, public, legal…" to "lawyers, notaries, abstract, settlement, accounting".
+
+**Why:** The pre-track "why this fits you" nudge exposed it — a law firm was shown a "Life Safety
+Survey" because its auto-seeded keyword "title" matched the document title. Measuring the whole
+base: 90% of keyworded profiles (609 of 624) carried at least one generic word, and for 531 the
+ENTIRE keyword list was NAICS-title filler. Root cause: the keyword-derivation function had its
+own weak stopword list instead of the canonical distinctiveness guard.
+
+**SEO / positioning:** "Keyword matching that knows the difference between what you do and words
+that just sound official."
+
+**Proof:** `deriveKeywordsFromNaics` now runs every candidate through the authoritative
+`isDistinctiveKeyword` (single source of truth), and the generic-word set gained 8 measured
+wildcards (public 846 active-opp matches · title 510 · certified 367 · preparation 281 · legal
+131 · computer 85 · scientific 68 · offices 58) while deliberately KEEPING precise ones (payroll
+1, notaries 0, accounting 51, landscape 23). These words stay searchable (broad search unchanged)
+but no longer count as a strong signal or a "fits you" claim. Existing profiles cleaned by a
+dry-run-first backfill (`scripts/clean-generic-keywords.ts`, strip-only, 78 profiles; the
+all-filler profiles left untouched since NAICS matching still covers them and a blind re-derive
+mislabels industries). tsc clean; production build green.
