@@ -26,6 +26,7 @@ import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/works
 import { internalBaseUrl } from '@/lib/utils/internal-base-url';
 import { normalizeOfficeName } from '@/lib/gov-contacts/office-name';
 import { distinctiveKeywords } from '@/lib/market/keyword-sanitize';
+import { mergeScanAgencies, clampSetAsideSpending, validOfficeCode, emptyScanOutcome, type ScanAgency as PureScanAgency } from '@/lib/app/auto-setup';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -142,7 +143,7 @@ export async function POST(request: NextRequest) {
     })),
   ];
 
-  const byKey = new Map<string, ScanAgency>();
+  const agencyLists: ScanAgency[][] = [];
   const scanErrors: string[] = [];
   try {
     const scans = await Promise.all(
@@ -163,11 +164,7 @@ export async function POST(request: NextRequest) {
         scanErrors.push(`${s.req.label}: ${sb.body?.error || `find-agencies ${s.status}`}`);
         continue;
       }
-      for (const a of (Array.isArray(sb.body.agencies) ? sb.body.agencies : []) as ScanAgency[]) {
-        const key = `${(a.name || '').toLowerCase()}|${(a.contractingOffice || '').toLowerCase()}`;
-        const prev = byKey.get(key);
-        if (!prev || (a.setAsideSpending || 0) > (prev.setAsideSpending || 0)) byKey.set(key, a);
-      }
+      agencyLists.push((Array.isArray(sb.body.agencies) ? sb.body.agencies : []) as ScanAgency[]);
     }
   } catch (err) {
     return NextResponse.json(
@@ -175,14 +172,13 @@ export async function POST(request: NextRequest) {
       { status: 502 },
     );
   }
-  // Highest set-aside spend first — the most relevant buyers lead.
-  const agencies: ScanAgency[] = Array.from(byKey.values())
-    .sort((x, y) => (y.setAsideSpending || 0) - (x.setAsideSpending || 0));
+  // Dedup by name+office (keep highest set-aside spend), highest spend first — see lib.
+  const agencies = mergeScanAgencies(agencyLists as unknown as PureScanAgency[][]) as unknown as ScanAgency[];
 
   if (agencies.length === 0) {
-    // Surface the REAL reason instead of a generic "none found" (the silent
-    // failure). If every scan errored, say so; otherwise it's genuinely empty.
-    const allFailed = scanErrors.length > 0 && scanErrors.length === requests.length;
+    // Surface the REAL reason instead of a generic "none found" (the silent failure):
+    // every-scan-errored (502) vs genuinely-empty (200) — see emptyScanOutcome.
+    const { allFailed, status } = emptyScanOutcome(scanErrors.length, requests.length);
     return NextResponse.json(
       {
         success: false,
@@ -191,7 +187,7 @@ export async function POST(request: NextRequest) {
           : 'No matching buying agencies found for your codes.',
         scanErrors: scanErrors.slice(0, 3),
       },
-      { status: allFailed ? 502 : 200 },
+      { status },
     );
   }
 
@@ -209,8 +205,7 @@ export async function POST(request: NextRequest) {
     // with a stray "/xx" suffix ("Army Sustainment Command/ysk"). Only persist a
     // real DoDAAC, and clean the name — so auto_setup stops saving the garbage the
     // manual-save path would have caught via dodaac_directory enrichment.
-    const codeUpper = String(a.officeId || '').toUpperCase().trim();
-    const officeCode = /^[A-Z][A-Z0-9]{5}$/.test(codeUpper) ? codeUpper : null;
+    const officeCode = validOfficeCode(a.officeId);
     const officeName = normalizeOfficeName(rawOfficeName, { mode: 'clean' }) || rawOfficeName;
     const payload = {
       user_email: rowEmail,
@@ -225,7 +220,7 @@ export async function POST(request: NextRequest) {
       source_naics: sourceNaics,
       // set_aside_spending can be billions — round to a safe integer; clamp so a
       // bigint/int column can't reject the row and fail the whole batch silently.
-      set_aside_spending: Math.min(Math.round(a.setAsideSpending || 0), 9_000_000_000),
+      set_aside_spending: clampSetAsideSpending(a.setAsideSpending),
       contract_count: Math.round(a.contractCount || 0),
       status: 'targeting',
       priority: 'medium',
