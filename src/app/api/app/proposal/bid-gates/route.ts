@@ -60,9 +60,10 @@ export async function GET(request: NextRequest) {
   if (!pipelineId) return NextResponse.json({ success: false, error: 'pipeline_id required' }, { status: 400 });
 
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-  const { data: pursuit } = await sb.from('user_pipeline')
+  const { data: pursuit, error: pursuitErr } = await sb.from('user_pipeline')
     .select('title, set_aside, naics_code, response_deadline, notice_id')
     .eq('id', pipelineId).maybeSingle();
+  if (pursuitErr) console.error('[bid-gates] pursuit query error:', pursuitErr.message);
 
   const gates: DerivedGate[] = [];
 
@@ -169,7 +170,8 @@ export async function POST(request: NextRequest) {
 
   const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   // Authorize: the pursuit must belong to the caller or their workspace.
-  const { data: pursuit } = await sb.from('user_pipeline').select('id, user_email, workspace_id').eq('id', pipelineId).maybeSingle();
+  const { data: pursuit, error: pursuitAuthErr } = await sb.from('user_pipeline').select('id, user_email, workspace_id').eq('id', pipelineId).maybeSingle();
+  if (pursuitAuthErr) console.error('[bid-gates] pursuit auth query error:', pursuitAuthErr.message);
   if (!pursuit) return NextResponse.json({ success: false, error: 'Pursuit not found' }, { status: 404 });
   const owns = pursuit.user_email?.toLowerCase() === email!.toLowerCase();
   if (!owns) {

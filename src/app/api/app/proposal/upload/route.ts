@@ -141,11 +141,12 @@ export async function POST(request: NextRequest) {
       try {
         const sb = getSupabase();
         // Ownership check: only attach to a pursuit the caller owns.
-        const { data: row } = await sb
+        const { data: row, error: rowErr } = await sb
           .from('user_pipeline')
           .select('id, user_email, notice_id')
           .eq('id', pipelineId)
           .maybeSingle();
+        if (rowErr) console.error('[proposal/upload] ownership query error:', rowErr.message);
         if (row && (row.user_email || '').toLowerCase() === scopedEmail) {
           const fileId = `upload-${Date.now()}-${file.name.replace(/[^a-zA-Z0-9.-]/g, '_')}`.slice(0, 120);
           const storagePath = `${scopedEmail}/${pipelineId}/${fileId}`.slice(0, 500);

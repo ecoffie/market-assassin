@@ -37,11 +37,12 @@ export async function GET(request: NextRequest) {
   const supabase = getAppSupabase();
 
   // Verify the user has access to this pipeline item (same workspace)
-  const { data: pipelineItem } = await supabase
+  const { data: pipelineItem, error: pipelineItemErr } = await supabase
     .from('user_pipeline')
     .select('id, workspace_id, user_email')
     .eq('id', pipelineId)
     .maybeSingle();
+  if (pipelineItemErr) console.error('[comments] pipeline access query error:', pipelineItemErr.message);
 
   if (!pipelineItem) {
     return NextResponse.json({ success: false, error: 'Pursuit not found' }, { status: 404 });
@@ -98,11 +99,12 @@ export async function POST(request: NextRequest) {
   const supabase = getAppSupabase();
 
   // Verify access to pipeline item
-  const { data: pipelineItem } = await supabase
+  const { data: pipelineItem, error: pipelineItemErr } = await supabase
     .from('user_pipeline')
     .select('id, title, workspace_id, user_email')
     .eq('id', pipelineId)
     .maybeSingle();
+  if (pipelineItemErr) console.error('[comments] pipeline access query error:', pipelineItemErr.message);
 
   if (!pipelineItem) {
     return NextResponse.json({ success: false, error: 'Pursuit not found' }, { status: 404 });
@@ -184,11 +186,12 @@ export async function DELETE(request: NextRequest) {
     return NextResponse.json({ success: false, error: 'You can only delete your own comments' }, { status: 403 });
   }
 
-  const { data: pipelineItem } = await supabase
+  const { data: pipelineItem, error: pipelineItemErr } = await supabase
     .from('user_pipeline')
     .select('id, title')
     .eq('id', comment.pipeline_id)
     .maybeSingle();
+  if (pipelineItemErr) console.error('[comments] pipeline title query error:', pipelineItemErr.message);
 
   const { error } = await supabase
     .from('mi_beta_comments')

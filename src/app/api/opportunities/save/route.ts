@@ -63,11 +63,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Check if user has alert settings (they should be backfilled)
-    const { data: userSettings } = await supabase
+    const { data: userSettings, error: userSettingsErr } = await supabase
       .from('user_notification_settings')
       .select('user_email, briefings_enabled')
       .eq('user_email', email.toLowerCase())
       .maybeSingle(); // may not exist yet — returns null instead of PGRST116
+    if (userSettingsErr) console.error('[opportunities/save] settings query error:', userSettingsErr.message);
 
     if (!userSettings) {
       return NextResponse.json(

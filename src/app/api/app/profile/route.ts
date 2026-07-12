@@ -176,11 +176,12 @@ export async function POST(request: NextRequest) {
     const { workspaceId, asClient } = await resolveActiveWorkspace(normalizedEmail, request);
     const rowEmail = asClient ? clientNotificationEmail(workspaceId) : normalizedEmail;
 
-    const { data: existingSettings } = await supabase
+    const { data: existingSettings, error: existingSettingsErr } = await supabase
       .from('user_notification_settings')
       .select('user_email, invitation_source, trial_source, agencies, keywords')
       .eq('user_email', rowEmail)
       .maybeSingle();
+    if (existingSettingsErr) console.error('[profile] existing settings query error:', existingSettingsErr.message);
 
     if (referralCode && !existingSettings?.invitation_source?.startsWith('partner_')) {
       try {
@@ -311,11 +312,12 @@ export async function POST(request: NextRequest) {
         const access = await verifyMIAccess(normalizedEmail);
         if (access.tier !== 'free' || access.isStaff) {
           // Use the user's CURRENT saved codes (this save may be agencies-only).
-          const { data: prof } = await supabase
+          const { data: prof, error: profErr } = await supabase
             .from('user_notification_settings')
             .select('naics_codes, location_states')
             .eq('user_email', rowEmail)
             .maybeSingle();
+          if (profErr) console.error('[profile] naics reload query error:', profErr.message);
           const { internalBaseUrl } = await import('@/lib/utils/internal-base-url');
           const { seedTargetListFromAgencies } = await import('@/lib/app/seed-target-list');
           const seeded = await seedTargetListFromAgencies({

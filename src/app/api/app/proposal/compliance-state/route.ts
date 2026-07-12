@@ -52,11 +52,12 @@ async function ownsPursuit(
 /** Load the pursuit row and verify the caller may access it. */
 async function authorizePursuit(request: NextRequest, email: string, pipelineId: string) {
   const sb = getSupabase();
-  const { data: pursuit } = await sb
+  const { data: pursuit, error: pursuitErr } = await sb
     .from('user_pipeline')
     .select('id, user_email, workspace_id')
     .eq('id', pipelineId)
     .maybeSingle();
+  if (pursuitErr) console.error('[compliance-state] pursuit query error:', pursuitErr.message);
   if (!pursuit) return { ok: false as const, status: 404, error: 'Pursuit not found' };
   if (!(await ownsPursuit(pursuit, email, request))) return { ok: false as const, status: 403, error: 'Not your pursuit' };
   return { ok: true as const, sb };

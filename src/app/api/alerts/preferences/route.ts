@@ -203,11 +203,12 @@ export async function POST(request: NextRequest) {
 
     // Check if user exists. Also read existing agencies so we can auto-seed them
     // from NAICS when they're still empty (the slurpee never populated this field).
-    const { data: existing } = await getSupabase()
+    const { data: existing, error: existingErr } = await getSupabase()
       .from('user_notification_settings')
       .select('user_email, agencies, keywords')
       .eq('user_email', rowEmail)
-      .single();
+      .maybeSingle();
+    if (existingErr) console.error('[alerts/preferences] settings query error:', existingErr.message);
 
     // Build upsert object
     const record: Record<string, unknown> = {

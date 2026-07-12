@@ -70,11 +70,12 @@ export async function GET(request: NextRequest) {
 
   try {
     // Check if user exists in notification settings
-    const { data: userSettings } = await supabase
+    const { data: userSettings, error: userSettingsErr } = await supabase
       .from('user_notification_settings')
       .select('user_email, briefings_enabled')
       .eq('user_email', auth.email!)
-      .single();
+      .maybeSingle();
+    if (userSettingsErr) console.error('[save-redirect] settings query error:', userSettingsErr.message);
 
     if (!userSettings) {
       return NextResponse.redirect(

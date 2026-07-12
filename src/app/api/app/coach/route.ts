@@ -118,7 +118,7 @@ export async function GET(request: NextRequest) {
   let changes: Array<Record<string, unknown>> = [];
   if (allWorkspaceIds.length) {
     const in30 = new Date(Date.now() + 30 * 86400000).toISOString();
-    const { data: pl } = await supabase
+    const { data: pl, error: plErr } = await supabase
       .from('user_pipeline')
       .select('id, workspace_id, title, response_deadline, stage')
       .in('workspace_id', allWorkspaceIds)
@@ -127,6 +127,7 @@ export async function GET(request: NextRequest) {
       .neq('is_archived', true)
       .order('response_deadline', { ascending: true })
       .limit(50);
+    if (plErr) console.error('[coach] pipeline deadlines query error:', plErr.message);
     deadlines = (pl || []).map((p: Record<string, unknown>) => ({ ...p, client: wsToName.get(p.workspace_id as string) || 'Client' }));
 
     // Recent amendment/change alerts across the coach's clients' pursuits.

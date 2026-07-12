@@ -739,11 +739,12 @@ async function handleExtraction(selectedIds: string[], email: string): Promise<N
       // (memory: profile_table_source_of_truth). Non-fatal on error.
       try {
         const normalizedEmail = email.toLowerCase().trim();
-        const { data: existing } = await supabase
+        const { data: existing, error: existingErr } = await supabase
           .from('user_notification_settings')
           .select('naics_codes, keywords')
           .eq('user_email', normalizedEmail)
           .maybeSingle();
+        if (existingErr) console.error('[sample-opportunities] settings query error:', existingErr.message);
         const hasNaics = Array.isArray(existing?.naics_codes) && existing!.naics_codes.length > 0;
         const hasKeywords = Array.isArray(existing?.keywords) && existing!.keywords.length > 0;
         const seedNaics = naicsCodes.map((n) => n.code).filter((c) => /^\d+$/.test(c)).slice(0, 30);

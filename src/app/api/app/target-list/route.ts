@@ -330,11 +330,12 @@ async function enrichTargetsSat(
 
 async function loadSatBackfillProfile(email: string): Promise<SatBackfillProfile> {
   try {
-    const { data } = await getSupabase()
+    const { data, error } = await getSupabase()
       .from('user_notification_settings')
       .select('naics_codes, business_type')
       .eq('user_email', email.toLowerCase())
       .maybeSingle();
+    if (error) console.error('[target-list] profile query error:', error.message);
     const codes = (data?.naics_codes || []) as string[];
     return {
       naicsCodes: codes.map((c) => String(c).trim()).filter(Boolean),

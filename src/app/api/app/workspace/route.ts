@@ -450,11 +450,12 @@ async function saveWorkspaceDefaults(
       for (const m of (members || []) as Array<{ user_email: string }>) {
         const memberEmail = String(m.user_email || '').toLowerCase().trim();
         if (!memberEmail) continue;
-        const { data: cur } = await sb
+        const { data: cur, error: curErr } = await sb
           .from('user_notification_settings')
           .select('user_email, naics_codes')
           .eq('user_email', memberEmail)
           .maybeSingle();
+        if (curErr) console.error('[workspace] member naics query error:', curErr.message);
         const hasOwn = Array.isArray(cur?.naics_codes) && cur!.naics_codes.length > 0;
         if (hasOwn) continue; // never clobber a tuned profile
         const patch = {

@@ -229,11 +229,12 @@ export async function GET(request: NextRequest) {
       // construction client (Eric, Jun 25).
       const { workspaceId: activeWsId, asClient } = await resolveActiveWorkspace(email, request);
       const profileEmail = asClient ? clientNotificationEmail(activeWsId) : email;
-      const { data: profile } = await supabase
+      const { data: profile, error: profileErr } = await supabase
         .from('user_notification_settings')
         .select('naics_codes, location_states')
         .eq('user_email', profileEmail)
         .maybeSingle();
+      if (profileErr) console.error('[mi-dashboard] profile query error:', profileErr.message);
 
       if (profile?.naics_codes?.length > 0 && !naics) {
         userNaicsCodes = profile.naics_codes;

@@ -79,11 +79,12 @@ export async function POST(request: NextRequest) {
     }
 
     // Get user's profile for context
-    const { data: userSettings } = await supabase
+    const { data: userSettings, error: userSettingsErr } = await supabase
       .from('user_notification_settings')
       .select('naics_codes, agencies, keywords')
       .eq('user_email', auth.email!)
-      .single();
+      .maybeSingle();
+    if (userSettingsErr) console.error('[pursuit-brief] profile query error:', userSettingsErr.message);
 
     const userNaics = userSettings?.naics_codes || [];
     const userAgencies = userSettings?.agencies || [];

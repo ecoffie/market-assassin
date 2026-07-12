@@ -38,11 +38,12 @@ interface GrantsGovOpp {
 async function loadUserProfile(email: string) {
   try {
     const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-    const { data } = await sb
+    const { data, error } = await sb
       .from('user_notification_settings')
       .select('naics_codes, keywords, agencies')
       .eq('user_email', email.toLowerCase())
       .maybeSingle();
+    if (error) console.error('[grants] profile query error:', error.message);
     if (!data) return null;
     // business_description lives in user_business_profiles (separate table);
     // fetch it best-effort so scoreGrant can use description terms.

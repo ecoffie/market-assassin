@@ -81,11 +81,12 @@ export async function POST(request: NextRequest) {
   const rowEmail = asClient ? clientNotificationEmail(workspaceId) : email;
 
   // 1) Read the profile's codes (the same source every surface inherits).
-  const { data: prof } = await getSupabase()
+  const { data: prof, error: profErr } = await getSupabase()
     .from('user_notification_settings')
     .select('naics_codes, keywords, location_states')
     .eq('user_email', rowEmail)
     .maybeSingle();
+  if (profErr) console.error('[auto-setup] profile query error:', profErr.message);
 
   const naicsCodes: string[] = (prof?.naics_codes || []).map(String).filter(Boolean);
   const keywords: string[] = (prof?.keywords || []).map(String).filter(Boolean);

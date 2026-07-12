@@ -467,12 +467,13 @@ export async function PATCH(request: NextRequest) {
 
     // Verify ownership — caller must own the row by user_email OR the
     // workspace it belongs to (team members can edit each other's rows).
-    const { data: existing } = await getSupabase()
+    const { data: existing, error: existingErr } = await getSupabase()
       .from('user_pipeline')
       .select('id, stage')
       .eq('id', id)
       .or(`workspace_id.eq.${workspaceId},user_email.eq.${user_email.toLowerCase()}`)
-      .single();
+      .maybeSingle();
+    if (existingErr) console.error('[pipeline] ownership query error:', existingErr.message);
 
     if (!existing) {
       return NextResponse.json(
@@ -573,12 +574,13 @@ export async function DELETE(request: NextRequest) {
     // ownership check below would 404 the client's row).
     const { workspaceId } = await resolveActiveWorkspace(user_email, request);
 
-    const { data: existing } = await getSupabase()
+    const { data: existing, error: existingErr } = await getSupabase()
       .from('user_pipeline')
       .select('id,title,stage')
       .eq('id', id)
       .or(`workspace_id.eq.${workspaceId},user_email.eq.${user_email.toLowerCase()}`)
-      .single();
+      .maybeSingle();
+    if (existingErr) console.error('[pipeline] ownership query error:', existingErr.message);
 
     if (!existing) {
       return NextResponse.json(
