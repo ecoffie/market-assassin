@@ -117,6 +117,18 @@ Reconciled the list against what actually landed on `main`. Closed items below:
   pipeline / 3 manual counselor checkbox) + org-admin CSV/PDF funder report. New additive
   `client_milestones` table (migration applied live). Verified 401 unauth on both coach
   routes in prod. See the Coach-Mode section below for full detail.
+- **Mindy Chat v2 → Data Core (tool-calling) — SHIPPED + LIVE** (`6786f6c5` Tier-0 /
+  `d64fa51e` Tier-1 / `9ca0d984` Tier-2, Jul 11): flagship chat (`/api/app/chat`) went from
+  RAG-only over the teaching corpus to reaching the Data Core via tool-calling. 3 tiers by
+  sensitivity — **Tier 0** private (`get_my_pipeline`, `search_my_vault`; email bound from
+  session, NO email arg → isolation by construction); **Tier 1** public (`search_sam_opportunities`
+  via `search_tsv` FTS, `get_market_vocabulary` over 25,252-row `naics_vocabulary`); **Tier 2**
+  BigQuery contractor/award (`get_contractor_profile`, `find_capable_contractors`) — cache-first +
+  per-user rate-limited to guard the June-2026 $2,075 BQ spike. No-fabrication contract every
+  tier. **8/8 live-prod E2E passed** (`scripts/verify-chat-v2-e2e.mjs` — real Leidos $16.6B
+  profile, real pipeline rows, isolation held), 95 unit tests, marketing literature updated.
+  PRD `tasks/PRD-mindy-chat-data-core.md` (Phases 0–3 all done). Memory `project_mindy_chat_v2_data_core`.
+  Roadmap remainder = separate PRDs: write actions from chat, multi-tool chains, streaming citations.
 - **SMS → GHL-only — SHIPPED** (`7ac54b41` removed all Twilio *code*; double opt-in +
   STOP webhook live). ⚠️ `twilio@^5.12.2` is still a dep in `package.json` — dead
   weight, safe to drop in a cleanup.
