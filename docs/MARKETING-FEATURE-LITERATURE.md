@@ -4011,3 +4011,47 @@ sentence."
 **Proof:** Keywords are grounded in real USASpending award data (coverage NAICS + top PSC) and
 ranked semantically against the company's own description. Verified live on getmindy.ai/app —
 HVAC test input produced 12 matchable keywords; tsc clean; production build ✓.
+
+---
+
+## Mindy Chat v2 — chat that reaches the Data Core, not just the knowledge base (Jul 11, 2026)
+
+**What:** The flagship Mindy Chat went from a teaching assistant (RAG over Eric's course +
+podcast transcripts) to a **BD cockpit that can query the platform's live data via tool-calling**.
+Ask it a question and Mindy now decides whether to pull from the knowledge base OR call a data
+tool, then answers grounded in the real rows it got back. Three tiers of tools, by data
+sensitivity:
+- **Your own account (private):** `get_my_pipeline` ("which of my pursuits is due first?"),
+  `search_my_vault` ("what's in my past performance for cybersecurity?").
+- **The live federal market (public):** `search_sam_opportunities` ("what IT opps are open in
+  my NAICS right now?"), `get_market_vocabulary` ("what words actually win in 541512?").
+- **Contractor & competitive intel:** `get_contractor_profile` ("who is Leidos, what have they
+  won?"), `find_capable_contractors` ("who can I team with in this NAICS?").
+
+**Why:** Before v2, Mindy knew *how* to win but had no line of sight into *what* to win or
+*where you stand* — every "try the [X] panel" was a question the platform could already answer,
+just not in the chat. Wiring the chat to the Data Core is the jump from "chatbot over a
+knowledge base" to "conversational front-end over your unified market" — the same arc HubSpot
+Breeze, Salesforce Agentforce, and Notion AI all took, and the one that turns a nice feature
+into the daily-open habit. It's also the highest-leverage surface: every answer gets read.
+
+**SEO/Positioning:** "Ask Mindy about your pipeline, your past performance, the live SAM.gov
+feed, or any federal contractor — in plain English — and get a real-data answer, not a search
+result. The only GovCon assistant that talks to your whole market: 104K+ live opportunities,
+317K contractors, your own pursuits and Vault, all in one chat." Anchors the "AI federal
+contracting assistant" / "GovCon copilot" / "ask AI about federal contracts" intent against
+generic ChatGPT wrappers that have no grounded federal data.
+
+**Proof:** Every answer is grounded in the real source — SAM.gov opportunities cache (104,085
+records, `sam_opportunities` FTS), the USASpending-built contractor corpus (317,135 recipients
+in BigQuery + award history), the 25,252-term NAICS buyer vocabulary (`naics_vocabulary`, mined
+from real award text), and the user's own `user_pipeline` + Vault. Never an LLM guess: when a
+tool returns nothing, Mindy says so ("you have no pursuits yet") instead of fabricating —
+enforced by a no-fabrication contract + adversarial tests. **Private data is isolated by
+construction** — the pipeline/Vault tools bind the user's email from the signed session and
+expose no email argument, so one user's chat physically cannot reach another's (merge-blocking
+test with two real accounts). **BigQuery cost is capped** (cache-first; cold scans rate-limited
+per user, guarding the June-2026 $2,075 spike). Verified live on getmindy.ai: 8/8 end-to-end
+checks passed against production — real pipeline rows returned, isolation held, live SAM opp
+surfaced (USMC EDCOM ITSS), and a real contractor profile returned ("Leidos, Inc… $16.6 billion
+across 11,000+ awards"). 95 unit tests, full production build ✓.
