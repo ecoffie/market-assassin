@@ -138,6 +138,8 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
   const [searchQuery, setSearchQuery] = useState('');
   const [sortMode, setSortMode] = useState<SortMode>('recommendation');
   const [selectedAlert, setSelectedAlert] = useState<Alert | null>(null);
+  // Per-session dismissal of the generic-feed setup banner (nudge, don't nag).
+  const [genericBannerDismissed, setGenericBannerDismissed] = useState(false);
   // Lazy-loaded full descriptions per notice_id. SAM stores most
   // descriptions as URL pointers, so the drawer fetches the real
   // text on open and caches it across drawer re-opens.
@@ -1321,6 +1323,37 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
       {!isLoading && alerts.length > 0 && (
         <div className="text-sm text-faint">
           Showing <span className="text-ink-soft">{filteredAlerts.length}</span> of <span className="text-ink-soft">{alerts.length}</span> opportunities
+        </div>
+      )}
+
+      {/* GENERIC-FEED BANNER — the un-set-up gap. 86% of profiles run on default
+          NAICS; ~217 of them actively browse a full-but-GENERIC consulting feed and
+          never see the setup prompt (that only shows on the EMPTY state, and their
+          feed is full). This inline banner appears at the top of a populated feed
+          when the profile is still default/generic — "this feed isn't yours yet."
+          Dismissible (per session) so it nudges without nagging. Any tier. */}
+      {!isLoading && alerts.length > 0 && needsProfileSetup && !genericBannerDismissed && (
+        <div className="flex flex-col sm:flex-row sm:items-center gap-3 bg-amber-500/10 border border-amber-500/30 rounded-lg p-3">
+          <Target className="h-5 w-5 shrink-0 text-amber-300" strokeWidth={2} aria-hidden />
+          <p className="text-sm text-ink-soft flex-1">
+            This is a <span className="font-semibold text-amber-200">generic feed</span> — you&apos;re seeing default opportunities. Tell Mindy what you do and every opportunity, alert, and match becomes yours.
+          </p>
+          <div className="flex items-center gap-2 shrink-0">
+            <Link
+              href={mindySetupHref}
+              className="px-3 py-1.5 bg-amber-500 hover:bg-amber-400 text-slate-950 text-sm font-semibold rounded-lg transition-colors"
+            >
+              Make it mine →
+            </Link>
+            <button
+              type="button"
+              onClick={() => setGenericBannerDismissed(true)}
+              className="text-faint hover:text-ink-soft text-xs px-2 py-1"
+              aria-label="Dismiss"
+            >
+              Later
+            </button>
+          </div>
         </div>
       )}
 

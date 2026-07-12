@@ -110,7 +110,7 @@
     },
     "src/components/app/panels/AlertsPanel.tsx": {
       "hex": 0,
-      "neutral": 34
+      "neutral": 35
     },
     "src/components/app/panels/BidDecisionGate.tsx": {
       "hex": 0,
@@ -796,14 +796,6 @@
       "hex": 0,
       "neutral": 4
     },
-    "src/app/profile/complete/page.tsx": {
-      "hex": 3,
-      "neutral": 17
-    },
-    "src/app/profile/setup/page.tsx": {
-      "hex": 3,
-      "neutral": 35
-    },
     "src/app/purchase/success/page.tsx": {
       "hex": 0,
       "neutral": 29
@@ -869,6 +861,6 @@
       "neutral": 15
     }
   },
-  "totalHex": 8,
-  "totalNeutral": 6417
+  "totalHex": 2,
+  "totalNeutral": 6366
 }

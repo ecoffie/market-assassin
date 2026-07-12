@@ -4235,3 +4235,30 @@ but no longer count as a strong signal or a "fits you" claim. Existing profiles 
 dry-run-first backfill (`scripts/clean-generic-keywords.ts`, strip-only, 78 profiles; the
 all-filler profiles left untouched since NAICS matching still covers them and a blind re-derive
 mislabels industries). tsc clean; production build green.
+
+---
+
+## "Make it mine" — the generic-feed nudge for un-set-up users (2026-07-12)
+
+**What:** When someone browses the Source Feed while still on the default profile, a slim inline
+banner now appears at the top: "This is a generic feed — you're seeing default opportunities.
+Tell Mindy what you do and every opportunity, alert, and match becomes yours." Dismissible per
+session. It only shows to genuinely un-set-up users and vanishes the moment they add a real NAICS
+or keyword.
+
+**Why:** Measurement found the biggest untapped lever. 86% of profiles (8,833 of 10,236) run on
+DEFAULT NAICS — they never told Mindy what they do — and 217 of them are ACTIVELY browsing in the
+last 30 days. They fell through every existing net: not "zero-alert" (the default consulting NAICS
+matches thousands of opps), not "no NAICS" (they have the default five), and the existing setup
+prompt only rendered on an EMPTY feed — but their feed is full of generic opportunities. So they
+scroll a firehose of irrelevant consulting work with no signal that it's fixable. This banner is
+that signal, placed in the populated feed they actually look at.
+
+**SEO / positioning:** "A feed that becomes yours the moment you tell it what you do."
+
+**Proof:** Renders when `userNeedsMindySetup` (canonical `hasRealProfile` check) is true on a
+POPULATED feed — the gap the empty-state prompt missed. Verified targeting: fires for default-NAICS
++ generic-keyword and empty profiles; does NOT fire for a real custom profile OR a default profile
+that carries even one distinctive keyword (self-resolves on first real signal). Reinforced by the
+same-day keyword-precision fix — generic keywords no longer count as "set up," so the banner
+correctly reaches users a stale generic keyword used to hide. tsc clean; production build green.
