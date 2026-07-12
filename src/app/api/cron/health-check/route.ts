@@ -138,11 +138,13 @@ const tests = [
     },
   },
   {
-    name: 'Profile Setup Page',
+    // Legacy /profile/setup was retired (301 → /app/onboarding). Check the REAL
+    // onboarding page now. tasks/smart-profile-dead-table-findings.md.
+    name: 'Onboarding Page',
     category: 'Critical Flows',
     critical: true,
     fn: async () => {
-      const res = await fetch(`${BASE_URL}/profile/setup?email=test@example.com`);
+      const res = await fetch(`${BASE_URL}/app/onboarding?email=test@example.com`);
       return {
         passed: res.status === 200,
         message: res.status === 200 ? 'Page loads' : `HTTP ${res.status}`,

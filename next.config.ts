@@ -263,6 +263,21 @@ const nextConfig: NextConfig = {
           '/?utm_source=youtube&utm_medium=video&utm_campaign=:slug',
         permanent: false,
       },
+      // Legacy onboarding pages RETIRED — the real onboarding is /app/onboarding.
+      // Nothing in the app linked to these; only old bookmarks/emails could hit them.
+      // 301 (permanent) so any stale link lands on the real flow, no dead form, no lost
+      // work. The page.tsx files were deleted alongside this.
+      // tasks/smart-profile-dead-table-findings.md.
+      {
+        source: '/profile/setup',
+        destination: '/app/onboarding',
+        permanent: true,
+      },
+      {
+        source: '/profile/complete',
+        destination: '/app/onboarding',
+        permanent: true,
+      },
       {
         source: '/:path*',
         has: [

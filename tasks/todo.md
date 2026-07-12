@@ -183,8 +183,10 @@ Reconciled the list against what actually landed on `main`. Closed items below:
   a straggler dead write in `service.ts calculateProfileCompleteness`. `delete-mindy-user`
   left over-inclusive by design (PII purge). `grep from('user_briefing_profile'|'user_alert_settings')`
   across src/ = ZERO live queries. tsc 0, 43 tests, build clean. **stripe-webhook verified
-  NOT broken** (comment-only ref; already uses real table). **ONLY REMAINING:** (D) retire
-  legacy `/profile/setup` pages (superseded by `/app/onboarding`).
+  NOT broken** (comment-only ref; already uses real table). **(D) legacy pages — DONE**
+  (Jul 11): `/profile/setup` + `/profile/complete` (nothing linked them) → **301 → /app/onboarding**
+  in next.config, page.tsx files deleted, health-check repointed to /app/onboarding.
+  **ENTIRE dead-table class now COMPLETE — nothing left.**
   Full writeup: `tasks/smart-profile-dead-table-findings.md`.
 - **SMS → GHL-only — SHIPPED** (`7ac54b41` removed all Twilio *code*; double opt-in +
   STOP webhook live). ⚠️ `twilio@^5.12.2` is still a dep in `package.json` — dead

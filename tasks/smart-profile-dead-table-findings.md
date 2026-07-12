@@ -90,5 +90,12 @@ Per memory `project_mindy_deadletter_automation` ("sync-*-to-alerts routes are D
 
 **Verified NOT broken:** `stripe-webhook` — its only `user_alert_settings` mention is a *comment* confirming it already writes the real `user_notification_settings`. Never a bug; left untouched.
 
-**Still open (deferred, not done):**
-- **D (pages)** — the legacy `/profile/setup` ↔ `/profile/complete` pages still exist (functional via C, superseded by `/app/onboarding`). Retire if confirmed dead. health-check cron still pings `/profile/setup` expecting 200 (still passes). This is the ONLY remaining item in the whole dead-table class.
+## ✅ DONE — D (legacy pages) retired — ENTIRE dead-table class COMPLETE (2026-07-11)
+
+Confirmed dead first: **nothing in the app links to `/profile/setup` or `/profile/complete`** (only the health-check cron pinged setup). Retired via **301 redirect** (not delete-and-404):
+- `next.config.ts redirects()`: `/profile/setup` + `/profile/complete` → `/app/onboarding`, `permanent: true` — so any stale bookmark/email link lands on the REAL onboarding, no dead form, no lost work.
+- **Deleted** both `page.tsx` files (nothing imported them; no shared layout).
+- **health-check cron** repointed from `/profile/setup` → `/app/onboarding` (still `critical`, expects 200; `/app/onboarding` verified 200 on prod) so the retirement doesn't page.
+- tsc 0 (after clearing stale `.next/dev/types` that referenced the deleted routes), build clean.
+
+**Nothing left in the dead-table class.** Both dead tables have zero live queries; the smart-profile system, briefings, panels, chat, admin routes, and legacy pages are all resolved.
