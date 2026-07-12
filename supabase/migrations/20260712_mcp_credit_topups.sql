@@ -28,19 +28,20 @@ CREATE OR REPLACE FUNCTION mcp_apply_credit(
   p_key TEXT, p_user TEXT, p_credits INTEGER, p_reason TEXT
 ) RETURNS TABLE(applied BOOLEAN, new_balance INTEGER)
 LANGUAGE plpgsql AS $$
-DECLARE v_inserted BOOLEAN := false; v_balance INTEGER;
+DECLARE v_balance INTEGER;
 BEGIN
   IF p_credits <= 0 THEN
     RETURN QUERY SELECT false, COALESCE((SELECT balance FROM mcp_credit_balance WHERE user_email = p_user), 0);
     RETURN;
   END IF;
 
+  -- Guard row. ON CONFLICT DO NOTHING sets FOUND=false when the key already exists,
+  -- so a duplicate (Stripe re-delivery / cron re-run) skips the grant below.
   INSERT INTO mcp_credit_topups(idempotency_key, user_email, credits, reason)
   VALUES (p_key, p_user, p_credits, p_reason)
   ON CONFLICT (idempotency_key) DO NOTHING;
-  GET DIAGNOSTICS v_inserted = ROW_COUNT;   -- 1 => newly inserted, 0 => already applied
 
-  IF v_inserted = 0 THEN
+  IF NOT FOUND THEN
     RETURN QUERY SELECT false, COALESCE((SELECT balance FROM mcp_credit_balance WHERE user_email = p_user), 0);
     RETURN;
   END IF;
