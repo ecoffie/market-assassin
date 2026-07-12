@@ -19,6 +19,8 @@
  * derivation everywhere so the feed, the badge, and the sort never disagree.
  */
 
+import { classifyNoticeType } from '@/lib/utils/notice-type';
+
 export type RunwayTier = 'closed' | 'tight' | 'soon' | 'open' | 'none';
 
 export interface Runway {
@@ -45,16 +47,32 @@ export function daysUntil(deadline?: string | null, now: Date = new Date()): num
 
 /**
  * Should this opp appear in the pursuable feed at all?
- * - No deadline (null) → yes (no clock; e.g. an open RFI).
- * - daysLeft >= 1 → yes.
- * - daysLeft <= 0 (past, or closes today with the time already gone) → NO.
+ * - Has a deadline: daysLeft >= minDays (default 1). daysLeft <= 0 (past, or
+ *   closes today with the time already gone) → NO.
+ * - No deadline (null): keep ONLY if the notice type is actually respondable
+ *   (Sources Sought / RFI / a real solicitation). This is the critical gate —
+ *   844 of the 900+ active null-deadline rows are AWARD NOTICES (already awarded)
+ *   or Justifications, which have no deadline precisely because there is nothing
+ *   to respond to. Surfacing those as "🟢 Open" would be the same lie in a new
+ *   costume. classifyNoticeType(...).respondability === 'none' → filtered out.
+ *   (When notice type is unknown/blank, classify defaults to biddable, so we
+ *   don't wrongly hide an un-enriched real solicitation.)
  *
  * `minDays` lets a caller demand more runway (e.g. hide anything under 2 days),
- * but the default only hides the genuinely un-actionable (expired / same-day-gone).
+ * but the default only hides the genuinely un-actionable (expired / same-day-gone
+ * / non-respondable-with-no-deadline).
  */
-export function hasRunway(deadline?: string | null, minDays = 1, now: Date = new Date()): boolean {
+export function hasRunway(
+  deadline?: string | null,
+  minDays = 1,
+  now: Date = new Date(),
+  noticeType?: string | null,
+): boolean {
   const days = daysUntil(deadline, now);
-  if (days === null) return true;
+  if (days === null) {
+    // No clock — pursuable only if there IS something to submit.
+    return classifyNoticeType(noticeType).respondability !== 'none';
+  }
   return days >= minDays;
 }
 

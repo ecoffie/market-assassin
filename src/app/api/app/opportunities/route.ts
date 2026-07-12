@@ -575,12 +575,14 @@ export async function GET(request: NextRequest) {
       );
     }
 
-    // Belt-and-suspenders: drop anything whose deadline has actually passed. The
-    // query filter already excludes it, but a row synced with a stale/odd
-    // response_deadline could slip through — hasRunway() is the definitive gate
-    // so the feed NEVER shows a dead opportunity (the "1-day notice → give up"
-    // complaint). Null-deadline rows are kept (open RFIs, no clock).
-    alerts = alerts.filter((alert) => hasRunway(alert.responseDeadline));
+    // Definitive runway gate. Drops (a) anything whose deadline has actually
+    // passed — the query excludes it, but a stale/odd response_deadline could
+    // slip through; and (b) null-deadline rows that are NOT respondable (Award
+    // Notices / Justifications — 844 of ~900 active null-deadline rows — have no
+    // deadline because they're already awarded, not because they're open). Only
+    // genuinely open, respondable opps survive, so the feed never shows a dead OR
+    // un-pursuable opportunity (the "1-day notice → give up" complaint).
+    alerts = alerts.filter((alert) => hasRunway(alert.responseDeadline, 1, undefined, alert.noticeType));
 
     // RANK BY ACTIONABILITY: fit score first (unchanged), then real runway —
     // a strong-fit opp with 3 weeks left beats an equally-strong one closing
