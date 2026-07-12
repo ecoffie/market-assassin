@@ -152,6 +152,18 @@ Reconciled the list against what actually landed on `main`. Closed items below:
   ran de-personalized for every user; `bid-no-bid/route.ts` selected `target_agencies` (real
   col is `agencies`). Also hardened `loadVaultContext` to log errors. Verified old query
   errors, new returns real profile.
+- **PREVENTION + SECURITY: swallowed-error gate + key purge — DONE + LIVE** (Jul 11):
+  (1) **Gate:** new `scripts/audit-supabase-errors.mjs` HARD-BLOCKS (pre-push step 3/6) any
+  NEW `{ data }`-without-`{ error }` hardcoded multi-col `.select()` on user-facing paths;
+  baseline-gated (`tests/fixtures/supabase-errors-baseline.json`), burned **75→62** as fixed.
+  (2) **Instances:** patched the 13 HIGH sites — incl. the **4 DELIVERY briefing generators**
+  (`src/lib/briefings/delivery/*` — the ACTUAL daily/weekly/pursuit send path; task B only
+  fixed the other 3 generators, missed these) + coach/dossier/hot-opp/insight/podcast; smoke-
+  tested prod (env user briefing still 14 items). (3) **Security:** a live **service-role JWT**
+  (valid to 2036) was committed in 14 test/script files → purged (each now requires the env
+  var, fails loud). ⚠️ **STILL OPEN: the key remains in git history → ROTATE in Supabase**
+  (Settings→API→roll service_role) + update Vercel prod/preview + local .env. Memory
+  `project_supabase_swallowed_error_audit`.
 - **BUG FIX: smart-profile dead-table — briefings + profile-save (B + C) — FIXED + LIVE**
   (`a36e835e`, Jul 11): the entire `src/lib/smart-profile/` system targeted
   `user_briefing_profile` — a table that NEVER existed (its migration only ALTERs it, never
