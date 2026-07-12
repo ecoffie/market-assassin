@@ -216,6 +216,37 @@ export async function signInWithMicrosoft(redirectTo?: string): Promise<{ succes
 }
 
 /**
+ * Sign in with Apple OAuth
+ */
+export async function signInWithApple(redirectTo?: string): Promise<{ success: boolean; error?: string }> {
+  const supabase = getSupabase();
+
+  if (!supabase) {
+    return { success: false, error: 'Supabase not configured' };
+  }
+
+  try {
+    const { error } = await supabase.auth.signInWithOAuth({
+      provider: 'apple',
+      options: {
+        redirectTo: redirectTo || `${window.location.origin}/app/onboarding`,
+        // Apple only returns name on the FIRST authorization; email is always
+        // present (may be a private relay address the user chose to share).
+        scopes: 'name email',
+      },
+    });
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+
+    return { success: true };
+  } catch {
+    return { success: false, error: 'An unexpected error occurred' };
+  }
+}
+
+/**
  * Check if user needs onboarding (no NAICS codes set or only defaults)
  */
 export function needsOnboarding(naicsCodes: string[] | null | undefined): boolean {
