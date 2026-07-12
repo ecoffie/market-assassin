@@ -46,6 +46,25 @@ const nextConfig: NextConfig = {
       // beforeFiles rewrites run BEFORE filesystem checks
       // This allows host-based routing to override page.tsx
       beforeFiles: [
+        // mcp.getmindy.ai — hosted MCP edge. The handler lives at
+        // src/app/mcp/[transport]/route.ts (basePath '/mcp'), so raw endpoints
+        // are /mcp/mcp, /mcp/sse, /mcp/message. These rewrites let remote MCP
+        // clients use the clean subdomain paths instead of the doubled prefix.
+        {
+          source: '/mcp',
+          has: [{ type: 'host', value: 'mcp.getmindy.ai' }],
+          destination: '/mcp/mcp',
+        },
+        {
+          source: '/sse',
+          has: [{ type: 'host', value: 'mcp.getmindy.ai' }],
+          destination: '/mcp/sse',
+        },
+        {
+          source: '/message',
+          has: [{ type: 'host', value: 'mcp.getmindy.ai' }],
+          destination: '/mcp/message',
+        },
         // getmindy.ai root serves the Mindy landing page
         {
           source: '/',
