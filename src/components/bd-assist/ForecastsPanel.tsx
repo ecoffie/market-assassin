@@ -471,7 +471,7 @@ export default function ForecastsPanel({ email, autoLoadProfile = true }: Foreca
                         )}
                         {/* Real buyer work-words for this NAICS (naics_vocabulary). */}
                         {(forecast.vocab || []).slice(0, 3).map((w) => (
-                          <span key={w} className="px-2 py-0.5 rounded text-xs font-medium bg-gray-800 text-gray-400">
+                          <span key={w} className="px-2 py-0.5 rounded text-xs font-medium bg-navy text-muted">
                             {w}
                           </span>
                         ))}
