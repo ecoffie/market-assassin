@@ -12,6 +12,29 @@ Re-run the same counts in ~1 week to measure lift.
 | `next_action` NULL | 920 | |
 | **`next_action` fill rate** | **40.3%** (620/1,540) | was 24% pre-deploy — write-time stamp already lifting it as new tracks land |
 
+## Measurement instrument — `scripts/measure-track-workflow.ts`
+Run `npx tsx scripts/measure-track-workflow.ts` (14d vs prior 14d) or `--since 2026-07-11`
+to split on the ship date. Customers only (staff/advocate/test excluded). Whale-capped
+(`PER_USER_CAP=25`) so one power user can't dominate — one account created 761 pipeline rows
+in 14d, so raw row counts are meaningless; distinct trackers + capped fill are the real signal.
+
+### First read — 2026-07-12 (only ~1 day post-ship; mostly baseline-forming)
+| Metric | prior 14d | last 14d | Δ |
+|---|---|---|---|
+| browsers (in-app: market_intelligence + source_feed) | 138 | 145 | — |
+| distinct trackers (new pipeline rows) | 28 | 33 | +5 |
+| browse→track rate | 20.3% | 22.8% | **+2.5 pts** |
+| next_action fill (whale-capped) | 7.8% | 31.2% | **+23.5 pts** |
+| give-up (browsed, never tracked) | 79.7% | 77.2% | **−2.5 pts** |
+
+**Read honestly:** the next_action lift is real and immediate (write-time stamp on every new
+row). The behavioral metrics (browse→track, give-up) are barely moved yet because <1 day of
+post-ship data is in the window — the runway/expired fixes (feed, alerts, best-fit) shipped
+07-11/07-12 and need ~1–2 weeks of users experiencing cleaner feeds before give-up moves.
+**Re-run ~2026-07-19** for the first true before/after. NOTE: the plan's original "4%" browse→
+track baseline used a different denominator (whole 1,540 alert audience, all-time) than this
+script's in-window browsers — not comparable; use THIS script's numbers week-over-week.
+
 ## What "working" looks like (check ~2026-07-18)
 - `next_action` fill rate ↑ toward 100% for NEW tracks (write-time stamp) — legacy 920 nulls get a recomputed button at render but stay null in DB until re-touched.
 - `stage='tracking'` share ↓ off 93% — items advance because the button gives them somewhere to go.
