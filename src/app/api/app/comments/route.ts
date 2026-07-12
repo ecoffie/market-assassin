@@ -171,11 +171,12 @@ export async function DELETE(request: NextRequest) {
   const supabase = getAppSupabase();
 
   // Get comment to verify ownership
-  const { data: comment } = await supabase
+  const { data: comment, error: commentErr } = await supabase
     .from('mi_beta_comments')
     .select('id, user_email, workspace_id, pipeline_id, content')
     .eq('id', commentId)
     .maybeSingle();
+  if (commentErr) console.error('[comments] comment query error:', commentErr.message);
 
   if (!comment) {
     return NextResponse.json({ success: false, error: 'Comment not found' }, { status: 404 });

@@ -615,11 +615,12 @@ function getSupabase() {
 
     // OSDBU contacts from contractor database
     const osdubuContacts: Contact[] = [];
-    const { data: contractors } = await getSupabase()
+    const { data: contractors, error: contractorsErr } = await getSupabase()
       .from('federal_contractors')
       .select('company, sblo_name, sblo_email, sblo_phone, agency')
       .in('agency', topAgencies.slice(0, 5))
       .limit(10);
+    if (contractorsErr) console.error('[market-scanner] contractors query error:', contractorsErr.message);
 
     if (contractors) {
       contractors.forEach((c: { company: string; sblo_name: string; sblo_email: string; sblo_phone: string; agency: string }) => {

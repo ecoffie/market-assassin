@@ -109,12 +109,13 @@ function sseEvent(obj: unknown): string {
  */
 async function loadPursuitContext(pipelineId: string): Promise<{ rfpText: string; rfpFileName: string; requirements: Array<{ requirement: string; category?: string; section?: string }> }> {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-  const { data: docs } = await supabase
+  const { data: docs, error: docsErr } = await supabase
     .from('pursuit_documents')
     .select('filename, doc_kind, extracted_text, notice_id')
     .eq('pipeline_id', pipelineId)
     .in('doc_kind', ['solicitation', 'qa', 'amendment', 'instructions', 'eval_factors', 'sow_pws', 'pricing'])
     .not('extracted_text', 'is', null);
+  if (docsErr) console.error('[proposal/chat] docs query error:', docsErr.message);
   if (!docs || docs.length === 0) return { rfpText: '', rfpFileName: '', requirements: [] };
 
   const rfpText = docs.map(d => `=== ${d.filename} [${d.doc_kind}] ===\n${d.extracted_text}`).join('\n\n');

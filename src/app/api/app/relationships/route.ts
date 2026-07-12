@@ -862,10 +862,11 @@ export async function GET(request: NextRequest) {
     }
 
     const contacts = await getSavedContacts(workspaceId, normalizedEmail, type, search);
-    const { data: links } = await getSupabase()
+    const { data: links, error: linksErr } = await getSupabase()
       .from('mi_beta_contact_opportunity_links')
       .select('id,contact_id,pipeline_id,relationship_role,user_pipeline(id,title,agency,stage)')
       .eq('workspace_id', workspaceId);
+    if (linksErr) console.error('[relationships] links query error:', linksErr.message);
 
     return NextResponse.json({
       success: true,

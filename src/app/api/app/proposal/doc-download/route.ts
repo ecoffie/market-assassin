@@ -34,11 +34,12 @@ export async function GET(request: NextRequest) {
   const scopedEmail = asClient ? clientNotificationEmail(workspaceId) : (email || '').toLowerCase();
 
   const supabase = sb();
-  const { data: doc } = await supabase
+  const { data: doc, error: docErr } = await supabase
     .from('pursuit_documents')
     .select('id, user_email, filename, storage_path, sam_url')
     .eq('id', docId)
     .maybeSingle();
+  if (docErr) console.error('[doc-download] doc query error:', docErr.message);
   if (!doc) return NextResponse.json({ success: false, error: 'not found' }, { status: 404 });
 
   // Owner check against the workspace-scoped email. Docs are public SAM

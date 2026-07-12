@@ -234,11 +234,12 @@ async function persistExchange(params: {
   const supabase = getSupabase();
 
   // Upsert session (create if missing, bump updated_at + message_count if present)
-  const { data: existing } = await supabase
+  const { data: existing, error: existingErr } = await supabase
     .from('mindy_chat_sessions')
     .select('id, message_count')
     .eq('id', params.sessionId)
     .maybeSingle();
+  if (existingErr) console.error('[chat] session query error:', existingErr.message);
 
   const sessionTitle = params.userMessage.slice(0, 60).replace(/\s+/g, ' ').trim();
   const nowIso = new Date().toISOString();

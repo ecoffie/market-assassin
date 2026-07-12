@@ -59,13 +59,14 @@ export async function GET(request: NextRequest) {
   }
 
   // Is this user a coach/admin in any org?
-  const { data: membership } = await supabase
+  const { data: membership, error: membershipErr } = await supabase
     .from('org_members')
     .select('org_id, role')
     .eq('user_email', email)
     .eq('status', 'active')
     .in('role', ['coach', 'org_admin'])
     .maybeSingle();
+  if (membershipErr) console.error('[coach] membership query error:', membershipErr.message);
 
   if (!membership) {
     return NextResponse.json({ success: true, isCoach: false, coachAccess });
@@ -107,9 +108,10 @@ export async function GET(request: NextRequest) {
   // not just this page — so pull the full assigned workspace-id + name set (light:
   // two columns), capped so a 1000-client org doesn't build an unbounded IN().
   const ORG_TAB_CLIENT_CAP = 500;
-  const { data: allClientRows } = await baseFilter(
+  const { data: allClientRows, error: allClientRowsErr } = await baseFilter(
     supabase.from('org_clients').select('workspace_id, business_name'),
   ).limit(ORG_TAB_CLIENT_CAP);
+  if (allClientRowsErr) console.error('[coach] clients query error:', allClientRowsErr.message);
   const allWorkspaceIds = (allClientRows || []).map((c: { workspace_id: string }) => c.workspace_id);
   const wsToName = new Map<string, string>();
   for (const c of allClientRows || []) wsToName.set(c.workspace_id, c.business_name);
@@ -133,24 +135,26 @@ export async function GET(request: NextRequest) {
     // Recent amendment/change alerts across the coach's clients' pursuits.
     const pursuitIds = (pl || []).map((p: { id: string }) => p.id);
     if (pursuitIds.length) {
-      const { data: ch } = await supabase
+      const { data: ch, error: chErr } = await supabase
         .from('pursuit_change_log')
         .select('pursuit_id, summary, change_type, detected_at')
         .in('pursuit_id', pursuitIds)
         .eq('acknowledged', false)
         .order('detected_at', { ascending: false })
         .limit(30);
+      if (chErr) console.error('[coach] change-log query error:', chErr.message);
       changes = ch || [];
     }
   }
 
-  const { data: news } = await supabase
+  const { data: news, error: newsErr } = await supabase
     .from('org_news')
     .select('id, title, body, pinned, created_at')
     .eq('org_id', membership.org_id)
     .order('pinned', { ascending: false })
     .order('created_at', { ascending: false })
     .limit(20);
+  if (newsErr) console.error('[coach] news query error:', newsErr.message);
 
   // Per-client profile + counts so the My Clients panel shows what was seeded.
   const profileByWs = new Map<string, Record<string, unknown>>();
@@ -431,13 +435,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ success: false, error: 'Auto milestones cannot be set manually' }, { status: 400 });
     }
     // Verify the client belongs to this org AND (for a coach) is assigned to them.
-    const { data: client } = await supabase
+    const { data: client, error: clientErr } = await supabase
       .from('org_clients')
       .select('id, workspace_id, assigned_coach')
       .eq('id', orgClientId)
       .eq('org_id', membership.org_id)
       .eq('status', 'active')
       .maybeSingle();
+    if (clientErr) console.error('[coach] client lookup query error:', clientErr.message);
     if (!client) return NextResponse.json({ success: false, error: 'Client not found in your org' }, { status: 404 });
     if (membership.role === 'coach' && client.assigned_coach !== email) {
       return NextResponse.json({ success: false, error: 'Not your assigned client' }, { status: 403 });

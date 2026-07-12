@@ -180,7 +180,7 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ hot: null }, { headers: { 'Cache-Control': 'no-store' } });
     }
 
-    const { data: rows } = await sb()
+    const { data: rows, error: rowsErr } = await sb()
       .from('sam_opportunities')
       .select('notice_id, title, naics_code, psc_code, department, sub_tier, office, notice_type, response_deadline')
       .eq('active', true)
@@ -188,6 +188,7 @@ export async function GET(request: NextRequest) {
       .or(orFilter)
       .order('response_deadline', { ascending: true })
       .limit(400);
+    if (rowsErr) console.error('[hot-opportunity] sam query error:', rowsErr.message);
 
     // "Best fit" must mean a GENUINELY strong match, not merely the least-bad of a
     // broad profile. Require a strong signal: a distinctive keyword (40) or a PSC

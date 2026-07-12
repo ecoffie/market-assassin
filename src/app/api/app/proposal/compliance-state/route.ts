@@ -111,7 +111,8 @@ export async function POST(request: NextRequest) {
   const sb = az.sb;
 
   // Preserve the team's owner/status: read existing rows, key by req_key.
-  const { data: existing } = await sb.from('pursuit_compliance').select('req_key, owner, status').eq('pipeline_id', pipelineId);
+  const { data: existing, error: existingErr } = await sb.from('pursuit_compliance').select('req_key, owner, status').eq('pipeline_id', pipelineId);
+  if (existingErr) console.error('[compliance-state] existing compliance query error:', existingErr.message);
   const prev = new Map((existing || []).map((r) => [r.req_key, { owner: r.owner, status: r.status }]));
 
   // Build the new row set. req_key = the requirement's stable id (its extraction

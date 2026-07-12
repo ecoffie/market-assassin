@@ -128,21 +128,23 @@ export async function POST(request: NextRequest) {
   // Throttle check. If a fresh run exists, return its already-persisted
   // events from sam_events instead of re-firing the AI.
   try {
-    const { data: lastRun } = await supabase
+    const { data: lastRun, error: lastRunErr } = await supabase
       .from('ai_event_discovery_runs')
       .select('last_run_at, events_persisted')
       .eq('agency_key', key)
       .maybeSingle();
+    if (lastRunErr) console.error('[discover-events] last-run query error:', lastRunErr.message);
 
     if (lastRun?.last_run_at) {
       const age = Date.now() - new Date(lastRun.last_run_at).getTime();
       if (age < RUN_TTL_MS) {
-        const { data: cachedEvents } = await supabase
+        const { data: cachedEvents, error: cachedEventsErr } = await supabase
           .from('sam_events')
           .select('title, event_type, event_date, event_location, description, registration_url, confidence')
           .eq('source', 'ai_web_search')
           .ilike('agency', agency)
           .order('event_date', { ascending: true });
+        if (cachedEventsErr) console.error('[discover-events] cached events query error:', cachedEventsErr.message);
         return NextResponse.json({
           success: true,
           cached: true,

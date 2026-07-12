@@ -46,13 +46,14 @@ export async function GET(request: NextRequest) {
   const supabase = sb();
 
   // Org-admin only — the funder report is an org-wide rollup, not a coach's slice.
-  const { data: membership } = await supabase
+  const { data: membership, error: membershipErr } = await supabase
     .from('org_members')
     .select('org_id, role')
     .eq('user_email', email)
     .eq('status', 'active')
     .eq('role', 'org_admin')
     .maybeSingle();
+  if (membershipErr) console.error('[coach/report] membership query error:', membershipErr.message);
   if (!membership) {
     return NextResponse.json({ success: false, error: 'Org admin access required' }, { status: 403 });
   }
@@ -63,12 +64,13 @@ export async function GET(request: NextRequest) {
     .eq('id', membership.org_id)
     .maybeSingle();
 
-  const { data: clientRows } = await supabase
+  const { data: clientRows, error: clientRowsErr } = await supabase
     .from('org_clients')
     .select('workspace_id, business_name, assigned_coach')
     .eq('org_id', membership.org_id)
     .eq('status', 'active')
     .limit(REPORT_CLIENT_CAP);
+  if (clientRowsErr) console.error('[coach/report] clients query error:', clientRowsErr.message);
   const clients = (clientRows || []).map((c: Record<string, unknown>) => ({
     businessName: c.business_name as string,
     workspaceId: c.workspace_id as string,

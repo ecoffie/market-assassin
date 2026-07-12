@@ -474,11 +474,12 @@ export async function POST(request: NextRequest) {
   const officeCode = (body.office_code ? String(body.office_code) : '').toUpperCase().trim();
   if (officeCode && /^[A-Z][A-Z0-9]{5}$/.test(officeCode)) {
     try {
-      const { data: ref } = await getSupabase()
+      const { data: ref, error: refErr } = await getSupabase()
         .from('dodaac_directory')
         .select('office_name, sub_agency')
         .eq('dodaac', officeCode)
         .maybeSingle();
+      if (refErr) console.error('[target-list] dodaac query error:', refErr.message);
       if (ref?.office_name) officeName = ref.office_name;
       if (ref?.sub_agency && !subAgencyName) subAgencyName = ref.sub_agency;
     } catch { /* directory unavailable — keep the passed name */ }

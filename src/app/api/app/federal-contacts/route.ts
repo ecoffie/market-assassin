@@ -325,11 +325,12 @@ export async function GET(request: NextRequest) {
   if (sp.get('facets') === 'subagencies') {
     const facetAgency = (sp.get('agency') || '').trim();
     if (!facetAgency) return NextResponse.json({ success: true, subAgencies: [] });
-    const { data } = await sb
+    const { data, error } = await sb
       .from('federal_contacts')
       .select('contact_email, solicitation_number')
       .ilike('department_ind_agency', `%${facetAgency}%`)
       .limit(5000);
+    if (error) console.error('[federal-contacts] contacts query error:', error.message);
     const counts = new Map<string, number>();
     for (const r of (data || []) as { contact_email: string | null; solicitation_number: string | null }[]) {
       const sa = deriveSubAgency(r.contact_email, r.solicitation_number);

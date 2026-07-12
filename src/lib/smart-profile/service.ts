@@ -352,11 +352,12 @@ async function updateEngagementScore(email: string): Promise<number> {
     // Get recent opens and clicks (last 30 days)
     const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
-    const { data: interactions } = await supabase
+    const { data: interactions, error: interactionsErr } = await supabase
       .from('briefing_interactions')
       .select('interaction_type, created_at')
       .eq('user_email', email)
       .gte('created_at', thirtyDaysAgo);
+    if (interactionsErr) console.error('[SmartProfile] interactions query error:', interactionsErr.message);
 
     const opens = interactions?.filter(i => i.interaction_type === 'open').length || 0;
     const clicks = interactions?.filter(i => i.interaction_type === 'click').length || 0;

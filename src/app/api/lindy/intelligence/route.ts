@@ -187,12 +187,13 @@ function getSupabase() {
     if (includeSections.includes('briefing')) {
       // Try to get both recompete and MA briefings
       // Note: briefing_log uses tools_included array, not briefing_type column
-      const { data: briefings } = await getSupabase()
+      const { data: briefings, error: briefingsErr } = await getSupabase()
         .from('briefing_log')
         .select('briefing_date, tools_included, briefing_data, generated_at')
         .eq('user_email', email)
         .order('briefing_date', { ascending: false })
         .limit(days * 2); // Get more in case of mixed types
+      if (briefingsErr) console.error('[lindy/intelligence] briefing_log query error:', briefingsErr.message);
 
       if (briefings && briefings.length > 0) {
         // Find most recent recompete briefing (weekly_deep_dive includes recompete data) or daily
@@ -308,14 +309,15 @@ function getSupabase() {
 
     // Fetch recompetes if requested
     if (includeSections.includes('recompetes')) {
-      const { data: recompeteSnapshot } = await getSupabase()
+      const { data: recompeteSnapshot, error: recompeteSnapErr } = await getSupabase()
         .from('briefing_snapshots')
         .select('snapshot_data, created_at')
         .eq('user_email', email)
         .eq('tool', 'recompete')
         .order('snapshot_date', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
+      if (recompeteSnapErr) console.error('[lindy/intelligence] recompete snapshot query error:', recompeteSnapErr.message);
 
       if (recompeteSnapshot?.snapshot_data?.contracts) {
         const contracts = recompeteSnapshot.snapshot_data.contracts as RecompeteContract[];
@@ -342,14 +344,15 @@ function getSupabase() {
     // Fetch contractor activity if requested
     if (includeSections.includes('contractors')) {
       // Get awards snapshot for contractor activity
-      const { data: awardsSnapshot } = await getSupabase()
+      const { data: awardsSnapshot, error: awardsSnapErr } = await getSupabase()
         .from('briefing_snapshots')
         .select('snapshot_data, created_at')
         .eq('user_email', email)
         .eq('tool', 'awards')
         .order('snapshot_date', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
+      if (awardsSnapErr) console.error('[lindy/intelligence] awards snapshot query error:', awardsSnapErr.message);
 
       if (awardsSnapshot?.snapshot_data?.awards) {
         const awards = awardsSnapshot.snapshot_data.awards as Array<{
@@ -396,14 +399,15 @@ function getSupabase() {
       }
 
       // Get web intel for additional contractor signals
-      const { data: webIntelSnapshot } = await getSupabase()
+      const { data: webIntelSnapshot, error: webIntelSnapErr } = await getSupabase()
         .from('briefing_snapshots')
         .select('snapshot_data, created_at')
         .eq('user_email', email)
         .eq('tool', 'web_intelligence')
         .order('snapshot_date', { ascending: false })
         .limit(1)
-        .single();
+        .maybeSingle();
+      if (webIntelSnapErr) console.error('[lindy/intelligence] web-intel snapshot query error:', webIntelSnapErr.message);
 
       if (webIntelSnapshot) {
         intelligence.meta.data_freshness.web_intel = webIntelSnapshot.created_at;

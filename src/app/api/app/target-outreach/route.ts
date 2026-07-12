@@ -124,12 +124,13 @@ export async function POST(request: NextRequest) {
   // outreach insert. Prevents another user from inserting activity
   // rows on a target that isn't theirs (the FK alone doesn't enforce
   // ownership since target_id is a UUID, not bound to the requester).
-  const { data: target } = await getSupabase()
+  const { data: target, error: targetErr } = await getSupabase()
     .from('user_target_list')
     .select('id, workspace_id, user_email')
     .eq('id', targetId)
     .eq('user_email', scopedEmail)
     .maybeSingle();
+  if (targetErr) console.error('[target-outreach] target query error:', targetErr.message);
 
   if (!target) {
     return NextResponse.json(

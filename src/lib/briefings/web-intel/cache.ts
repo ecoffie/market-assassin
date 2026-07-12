@@ -208,9 +208,10 @@ export async function getCacheStats(): Promise<{
   }
 
   try {
-    const { data: all } = await supabase
+    const { data: all, error: allErr } = await supabase
       .from('web_intelligence_cache')
       .select('id, results, expires_at');
+    if (allErr) console.error('[web-intel/cache] query error:', allErr.message);
 
     if (!all) {
       return null;

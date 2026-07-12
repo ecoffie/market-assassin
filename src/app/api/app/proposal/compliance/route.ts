@@ -150,12 +150,13 @@ async function extractChunk(_apiKey: string, fileName: string | undefined, chunk
  */
 async function extractMultiDoc(apiKey: string, pipelineId: string, email: string): Promise<{ requirements: ComplianceRequirement[]; sources: string[]; cached?: boolean } | null> {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-  const { data: docs } = await supabase
+  const { data: docs, error: docsErr } = await supabase
     .from('pursuit_documents')
     .select('filename, doc_kind, extracted_text, downloaded_at, notice_id, doc_source')
     .eq('pipeline_id', pipelineId)
     .in('doc_kind', ['solicitation', 'qa', 'amendment', 'instructions', 'eval_factors', 'sow_pws'])
     .not('extracted_text', 'is', null);
+  if (docsErr) console.error('[compliance] docs query error:', docsErr.message);
   if (!docs || docs.length === 0) return null;
 
   // SHARED CACHE (Eric: scaling — the matrix for a PUBLIC SAM notice is identical
@@ -171,11 +172,12 @@ async function extractMultiDoc(apiKey: string, pipelineId: string, email: string
     : null;
 
   if (contentHash) {
-    const { data: hit } = await supabase
+    const { data: hit, error: hitErr } = await supabase
       .from('compliance_matrix_cache')
       .select('requirements, doc_sources, hits')
       .eq('content_hash', contentHash)
       .maybeSingle();
+    if (hitErr) console.error('[compliance] cache query error:', hitErr.message);
     if (hit?.requirements) {
       // count the hit (fire-and-forget) and serve instantly — ~0 tokens.
       supabase.from('compliance_matrix_cache').update({ hits: (hit.hits || 0) + 1 }).eq('content_hash', contentHash).then(() => {});

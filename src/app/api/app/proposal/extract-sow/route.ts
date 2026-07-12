@@ -107,12 +107,13 @@ export async function POST(request: NextRequest) {
   let clinScope: { title: string; body: string; name: string } | null = null;
   if (pipelineId) {
     const sb = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
-    const { data: docs } = await sb.from('pursuit_documents')
+    const { data: docs, error: docsErr } = await sb.from('pursuit_documents')
       .select('filename, doc_kind, extracted_text, char_count')
       .eq('pipeline_id', pipelineId)
       .in('doc_kind', ['sow_pws', 'attachment_other', 'solicitation', 'pricing'])
       .not('extracted_text', 'is', null)
       .order('char_count', { ascending: false });
+    if (docsErr) console.error('[extract-sow] docs query error:', docsErr.message);
 
     // CLIN scope (Eric: "the CLINs give you an idea of the SOW — you just have to
     // find the full scope"). Build a clean scope-at-a-glance from the pricing

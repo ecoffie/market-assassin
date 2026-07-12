@@ -113,12 +113,13 @@ export async function POST(request: NextRequest) {
 
     let sendRecord: JsonRecord | null = null;
     if (providerMessageId) {
-      const { data: existingSend } = await supabase
+      const { data: existingSend, error: existingSendErr } = await supabase
         .from('email_provider_sends')
         .select('user_email,email_type,event_source,tags,metadata')
         .eq('provider', 'resend')
         .eq('provider_message_id', providerMessageId)
         .maybeSingle();
+      if (existingSendErr) console.error('[resend-webhook] send lookup query error:', existingSendErr.message);
 
       sendRecord = existingSend || null;
     }

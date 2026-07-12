@@ -177,11 +177,12 @@ export async function GET(request: NextRequest) {
 
   if (!hasExtractableDoc && isValidSamNoticeId(pipelineRow.notice_id)) {
     try {
-      const { data: samRow } = await supabase
+      const { data: samRow, error: samRowErr } = await supabase
         .from('sam_opportunities')
         .select('title, description, sow_text, description_url, raw_data')
         .eq('notice_id', pipelineRow.notice_id)
         .maybeSingle();
+      if (samRowErr) console.error('[pursuit-docs] sam query error:', samRowErr.message);
 
       const sow = typeof samRow?.sow_text === 'string' ? samRow.sow_text.trim() : '';
       let desc = typeof samRow?.description === 'string' ? samRow.description.trim() : '';

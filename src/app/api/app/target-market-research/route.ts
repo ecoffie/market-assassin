@@ -782,10 +782,11 @@ export async function POST(request: NextRequest) {
     // is the agency's REAL open-opp number (mirrors the contacts fix). Eric, Jun 25.
     const oppCountsByDodaac: Record<string, number> = {};
     try {
-      const { data: oppRows } = await supabase
+      const { data: oppRows, error: oppRowsErr } = await supabase
         .from('sam_opportunities')
         .select('department, solicitation_number')
         .gte('response_deadline', new Date().toISOString());
+      if (oppRowsErr) console.error('[target-market-research] sam query error:', oppRowsErr.message);
       for (const row of oppRows || []) {
         const key = normalizeAgencyKey(row.department || '');
         if (key) oppCounts[key] = (oppCounts[key] || 0) + 1;
@@ -823,11 +824,12 @@ export async function POST(request: NextRequest) {
       // (audit 2026-07-10), so this office-name bucket rescues the events the
       // DoDAAC path can't anchor. Keyed by normalizeAgencyKey(office) so it
       // matches the row's contractingOffice/name the same way.
-      const { data: eventRows } = await supabase
+      const { data: eventRows, error: eventRowsErr } = await supabase
         .from('sam_events')
         .select('agency, inferred_dodaac, inferred_office')
         .gte('event_date', new Date().toISOString().slice(0, 10))
         .lte('event_date', eventHorizon.toISOString().slice(0, 10));
+      if (eventRowsErr) console.error('[target-market-research] events query error:', eventRowsErr.message);
       for (const row of eventRows || []) {
         const key = normalizeAgencyKey(row.agency || '');
         if (key) eventCounts[key] = (eventCounts[key] || 0) + 1;
@@ -882,10 +884,11 @@ export async function POST(request: NextRequest) {
         .trim();
     const smallBizByNormalized = new Map<string, number>();
     try {
-      const { data: goalingRows } = await supabase
+      const { data: goalingRows, error: goalingRowsErr } = await supabase
         .from('sba_goaling')
         .select('funding_department, category, dollars, total')
         .eq('fiscal_year', 2023);
+      if (goalingRowsErr) console.error('[target-market-research] goaling query error:', goalingRowsErr.message);
       const deptStats = new Map<string, { total: number; nonSb: number; normalized: string }>();
       for (const row of (goalingRows || []) as Array<{ funding_department: string; category: string; dollars: number; total: number }>) {
         const dept = row.funding_department;

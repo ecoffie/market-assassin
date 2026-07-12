@@ -260,10 +260,11 @@ export async function GET(request: NextRequest) {
         .limit(10);
 
       // Get coverage from forecast_sources (the actual table)
-      const { data: coverage } = await supabase
+      const { data: coverage, error: coverageErr } = await supabase
         .from('forecast_sources')
         .select('agency_code, total_records, estimated_spend_coverage, is_active')
         .eq('is_active', true);
+      if (coverageErr) console.error('[forecasts] coverage query error:', coverageErr.message);
 
       // If no active sources in forecast_sources, count directly from byAgency
       const activeSources = coverage?.length || byAgency.length;
@@ -275,7 +276,7 @@ export async function GET(request: NextRequest) {
       // the landing view — labeled as early signals, with decoded offices.
       const dodaacNames = await loadDodaacNames();
       const since = new Date(Date.now() - 180 * 86400000).toISOString();
-      const { data: sigData } = await supabase
+      const { data: sigData, error: sigErr } = await supabase
         .from('sam_opportunities')
         .select('solicitation_number, title, description, naics_code, department, office, posted_date, response_deadline, set_aside_description, notice_type')
         .ilike('department', '%defense%')
@@ -283,6 +284,7 @@ export async function GET(request: NextRequest) {
         .gte('posted_date', since)
         .order('posted_date', { ascending: false })
         .limit(40);
+      if (sigErr) console.error('[forecasts] dod signals sam query error:', sigErr.message);
       const defaultDodSignals = (sigData || []).map((s) => ({
         id: `sam:${s.solicitation_number}`,
         title: s.title,
@@ -403,11 +405,12 @@ export async function GET(request: NextRequest) {
       // vs already released (go bid). One batched lookup, not N+1.
       const solNums = dodSignals.map(s => s.solicitation_number).filter(Boolean) as string[];
       if (solNums.length > 0) {
-        const { data: followOns } = await supabase
+        const { data: followOns, error: followOnsErr } = await supabase
           .from('sam_opportunities')
           .select('solicitation_number, notice_type')
           .in('solicitation_number', solNums)
           .in('notice_type', ['Solicitation', 'Combined Synopsis/Solicitation', 'Award Notice']);
+        if (followOnsErr) console.error('[forecasts] follow-on sam query error:', followOnsErr.message);
         const released = new Map<string, string>();
         for (const f of (followOns || []) as { solicitation_number: string; notice_type: string }[]) {
           released.set(f.solicitation_number, f.notice_type);

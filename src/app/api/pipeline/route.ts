@@ -159,10 +159,11 @@ export async function GET(request: NextRequest) {
           // solicitation/contract number there instead (e.g. "36C77626R0003").
 
           // Pass 1 — match on sam_opportunities.notice_id (the UUID case).
-          const { data: byNoticeId } = await sb
+          const { data: byNoticeId, error: byNoticeIdErr } = await sb
             .from('sam_opportunities')
             .select('notice_id, notice_type')
             .in('notice_id', noticeIds);
+          if (byNoticeIdErr) console.error('[pipeline] sam notice_id enrich error:', byNoticeIdErr.message);
           for (const r of byNoticeId || []) {
             if (r.notice_type) typeById.set(r.notice_id, r.notice_type);
           }
@@ -172,10 +173,11 @@ export async function GET(request: NextRequest) {
           // notice_id is actually a solicitation number.
           const stillMissing = noticeIds.filter((id) => !typeById.has(id));
           if (stillMissing.length > 0) {
-            const { data: bySolNum } = await sb
+            const { data: bySolNum, error: bySolNumErr } = await sb
               .from('sam_opportunities')
               .select('solicitation_number, notice_type')
               .in('solicitation_number', stillMissing);
+            if (bySolNumErr) console.error('[pipeline] sam sol_num enrich error:', bySolNumErr.message);
             for (const r of bySolNum || []) {
               if (r.notice_type && r.solicitation_number && !typeById.has(r.solicitation_number)) {
                 typeById.set(r.solicitation_number, r.notice_type);

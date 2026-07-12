@@ -55,11 +55,12 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'sessionId must be a uuid' }, { status: 400 });
     }
     // Ownership check.
-    const { data: session } = await supabase
+    const { data: session, error: sessionErr } = await supabase
       .from('mindy_chat_sessions')
       .select('id, user_email, title')
       .eq('id', sessionId)
       .maybeSingle();
+    if (sessionErr) console.error('[chat-sessions] session query error:', sessionErr.message);
     if (!session || session.user_email?.toLowerCase() !== userEmail) {
       return NextResponse.json({ error: 'conversation not found' }, { status: 404 });
     }
