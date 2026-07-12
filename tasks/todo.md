@@ -145,6 +145,27 @@ Reconciled the list against what actually landed on `main`. Closed items below:
   NAICS now flow through (chris.ford → 541512, etc.). **LESSON: always check `{error}` from a
   Supabase query, not just `{data}`** — a swallowed error looks identical to "no rows".
   Memory `project_loadbidderprofile_silent_empty_bug`.
+- **AUDIT: swallowed-error column bugs (2 more live) — FIXED + LIVE** (`00bce9a1`, Jul 11):
+  swept the codebase for the same class as the loadBidderProfile bug (~380 sites ignore
+  `{error}`; triaged to those failing NOW against the live schema). Fixed 2 more live ones:
+  `opportunities/route.ts` selected `business_description` (not a column) → the CORE opp feed
+  ran de-personalized for every user; `bid-no-bid/route.ts` selected `target_agencies` (real
+  col is `agencies`). Also hardened `loadVaultContext` to log errors. Verified old query
+  errors, new returns real profile.
+- **BUG FIX: smart-profile dead-table — briefings + profile-save (B + C) — FIXED + LIVE**
+  (`a36e835e`, Jul 11): the entire `src/lib/smart-profile/` system targeted
+  `user_briefing_profile` — a table that NEVER existed (its migration only ALTERs it, never
+  hand-run). Two live consequences, both fixed: **(B)** all 3 briefing generators
+  (market-assassin/contractor-db/recompete) fell back through `user_briefing_profile` →
+  `user_alert_settings` (both nonexistent) → hardcoded defaults, so EVERY briefing ran
+  generic for EVERY user since ~March — rewired all 3 to read the REAL
+  `user_notification_settings` (verified chris.ford → naics=5 keywords=10). **(C)**
+  `POST /api/profile` returned HTTP 500 on every save (updateProfile upserted the dead table)
+  → pointed updateProfile/getSmartProfile/getOrCreateProfile at the real table (verified prod:
+  200 + returns saved values, was 500). **STILL DEFERRED:** (A) click-learning weights still
+  target the dead table (silently no-op; revive needs a real table or move cols); (D) retire
+  legacy `/profile/setup` pages (now functional but superseded by `/app/onboarding`). Full
+  writeup: `tasks/smart-profile-dead-table-findings.md`.
 - **SMS → GHL-only — SHIPPED** (`7ac54b41` removed all Twilio *code*; double opt-in +
   STOP webhook live). ⚠️ `twilio@^5.12.2` is still a dep in `package.json` — dead
   weight, safe to drop in a cleanup.
