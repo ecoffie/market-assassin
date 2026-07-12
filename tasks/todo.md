@@ -129,6 +129,22 @@ Reconciled the list against what actually landed on `main`. Closed items below:
   profile, real pipeline rows, isolation held), 95 unit tests, marketing literature updated.
   PRD `tasks/PRD-mindy-chat-data-core.md` (Phases 0–3 all done). Memory `project_mindy_chat_v2_data_core`.
   Roadmap remainder = separate PRDs: write actions from chat, multi-tool chains, streaming citations.
+- **Chat starter prompts refreshed + personalized — SHIPPED + LIVE** (`80ede31d`, Jul 11):
+  empty-state chips now showcase the v2 Data Core tools (pipeline · live SAM · contractor
+  intel · Vault) instead of only v1 teaching Qs, personalized to the user's real NAICS +
+  whether they have pursuits. New `GET /api/app/chat/suggestions` + pure builder
+  `src/lib/chat/starter-prompts.ts` (9 unit tests, no-fabrication: never invents a NAICS).
+  Verified live on prod.
+- **BUG FIX: `loadBidderProfile` silently returned {} for EVERY user — FIXED + LIVE**
+  (`ffd60de7`, Jul 11): its SELECT listed `company_name`, which is NOT a column on
+  `user_notification_settings` → PostgREST failed the WHOLE query → `error` set, `data=null`
+  → the code ignored `{error}` and returned `{}` silently. Impact was BROAD: this loader
+  feeds the flagship chat's tone personalization, the proposal chat, AND the new starter
+  prompts — all ran on an empty profile (no NAICS/set-asides) regardless of what users saved.
+  Fix: dropped `company_name`, now surfaces the query error. Verified on prod — users' real
+  NAICS now flow through (chris.ford → 541512, etc.). **LESSON: always check `{error}` from a
+  Supabase query, not just `{data}`** — a swallowed error looks identical to "no rows".
+  Memory `project_loadbidderprofile_silent_empty_bug`.
 - **SMS → GHL-only — SHIPPED** (`7ac54b41` removed all Twilio *code*; double opt-in +
   STOP webhook live). ⚠️ `twilio@^5.12.2` is still a dep in `package.json` — dead
   weight, safe to drop in a cleanup.
