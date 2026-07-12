@@ -23,6 +23,48 @@
 
 ---
 
+## ✅ SHIPPED — July 11, 2026 (PM) — Keyword→NAICS lead grounded in real vocabulary (53%→98%)
+
+**Merged to `main` (`bb6ee102`, feature commit `35d274c7`) + deployed to prod + verified live.**
+The keyword-search "migrate the words" work: lead-NAICS selection now comes from the
+real `naics_vocabulary` table (25,252 buyer-word→code rows, TF-IDF), not string/title
+guessing. DSBS harness **Lead-NAICS-correct 53-55% → 98%** (50/51).
+
+**What changed (`src/lib/market/keyword-coverage.ts`):**
+- **Bigram vocab lookup** — "pest control"→561710, "grounds maintenance"→561730,
+  "information technology"→541512/541519. The backfill stores multi-word rows no
+  single word reproduces; single-word-only lookup was the whole miss for these.
+- **Cross-term weight aggregation** (bigrams 2×) so a code multiple query terms agree
+  on beats one word's misleading top hit.
+- **Keep generic-but-real words** (support/guard) validated against the vocab, not a
+  hand stoplist — fixed the it-support / security-guard "no signal" misses (Bug A).
+- **Vocab-authoritative INJECTION** — when USASpending buries the right code below the
+  cutoff (e.g. "security guard" never floats 561612), pull its REAL award $ via
+  `codeMarketSize` and lead with it. Code + dollars both real, nothing fabricated (Bug B).
+- **Synonym expansion** for ubiquitous aliases the vocab lacks (IT / help desk →
+  "information technology"), routing to real IT codes.
+
+**Harness (`scripts/test-keyword-derivation.ts`):**
+- **Disk-backed USASpending fetch cache** (only `res.ok` + non-empty bodies cached) —
+  the ~500-call/run harness was THROTTLING mid-run → late cases came back empty
+  ("0 terms" / "—"), faking a 51% score. Cache converges reruns on the true number.
+  `.cache/` gitignored.
+- **Widened welding/electrical expected codes** to the equipment-mfg codes the vocab
+  honestly surfaces (335129 electrical, 333992/331221 welding). DECISION (Eric):
+  trust the real-data answer over the human trade-code opinion — the vocab reports
+  award $ for "electrical"/"welding" concentrates in mfg codes, not the contractor
+  trade code. Those are NOT bugs.
+
+**Verified on prod (getmindy.ai):** `/api/suggest-codes?q=pest control` → **561710**,
+`landscaping` → **561730** (both returned `—` before). Full harness (cache-saturated):
+98%; only miss = bare-word "electrical"→221112 (a lone keyword-ambiguity edge, not a cluster).
+Fixed clusters all green: it-support, security-guard, nurse-staffing, landscaping, pest-control.
+
+**Note:** migration `20260711_naics_vocabulary.sql` was already applied in prod
+(25,252 rows verified live) — no DDL step outstanding.
+
+---
+
 ## 🔄 RECONCILIATION — July 11, 2026 (post-`90c0fe91` pull)
 
 Reconciled the list against what actually landed on `main`. Closed items below:
