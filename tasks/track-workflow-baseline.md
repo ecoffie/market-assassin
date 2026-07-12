@@ -64,3 +64,16 @@ excluding every NULL-deadline opp (nulls never satisfy `>=`).
 **Proof (default-NAICS slice):** 1,178 active-but-expired now HIDDEN; ~480 award-notice nulls
 DROPPED; kept feed = 372 🟢 real-runway · 421 🟡 reasonable · 207 🔴 tight (tight ranked last).
 22/22 + 11/11 unit assertions; tsc clean; build green; prod /app 200, route 401 (gated).
+
+## Keyword precision fix — SHIPPED (2026-07-12)
+The pre-track nudge exposed generic auto-seeded keywords (law firm's "title" → matched a doc
+title). Measured: 90% of keyworded profiles (609/624) had >=1 generic word; 531 were ENTIRELY
+NAICS-title filler.
+- **Forward-fix (live):** deriveKeywordsFromNaics now filters through isDistinctiveKeyword;
+  GENERIC_SINGLE_WORDS gained 8 measured wildcards (public/title/certified/preparation/legal/
+  computer/scientific/offices). New users get clean keywords.
+- **Backfill (done):** scripts/clean-generic-keywords.ts --go wrote 78 strip-only profiles
+  (kept real capability words; law firms → lawyers/notaries/accounting). 530 all-filler profiles
+  LEFT UNTOUCHED (re-derive proved unsafe: IT profile → "pharmaceutical/steel/cutlery" via prefix
+  fallback; NAICS matching still covers them). Snapshot saved to scratchpad before write.
+  Verified: sample profiles hold cleaned arrays; strip-only remaining ~0.
