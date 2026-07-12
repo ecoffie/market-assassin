@@ -43,11 +43,12 @@ interface ViewerProfile {
  *  no market yet → the card hides (nothing to be relevant to). */
 async function getViewerProfile(profileEmail: string): Promise<ViewerProfile> {
   try {
-    const { data } = await sb()
+    const { data, error } = await sb()
       .from('user_notification_settings')
       .select('naics_codes, keywords, psc_codes')
       .eq('user_email', profileEmail)
       .maybeSingle();
+    if (error) console.error('[hot-opportunity] profile query error:', error.message);
     const arr = (v: unknown) => (Array.isArray(v) ? (v as unknown[]).map((c) => String(c).trim()).filter(Boolean) : []);
     return {
       naics: arr(data?.naics_codes),

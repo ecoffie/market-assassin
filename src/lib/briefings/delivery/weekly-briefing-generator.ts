@@ -299,12 +299,15 @@ export async function generateWeeklyBriefing(
   const FALLBACK_NAICS = ['541512', '541611', '541330', '541990', '561210'];
 
   try {
-    // Get user profile from unified table
-    const { data: profileData } = await supabase
+    // Get user profile from unified table. maybeSingle + surface { error }: a
+    // column drift here nulls the whole query → silent FALLBACK_NAICS generic
+    // weekly for every user (swallowed-error class).
+    const { data: profileData, error: profileErr } = await supabase
       .from('user_notification_settings')
       .select('aggregated_profile, naics_codes, agencies, keywords, primary_industry')
       .eq('user_email', userEmail)
-      .single();
+      .maybeSingle();
+    if (profileErr) console.error(`[WeeklyBriefingGen] profile query error for ${userEmail}:`, profileErr.message);
 
     // Use fallback if no profile
     const effectiveProfile = profileData || {
@@ -325,11 +328,12 @@ export async function generateWeeklyBriefing(
 
     // Get last 7 days of snapshots
     const weekAgo = new Date(Date.now() - 7 * 86400000).toISOString().split('T')[0];
-    const { data: snapshots } = await supabase
+    const { data: snapshots, error: snapErr } = await supabase
       .from('briefing_snapshots')
       .select('tool, raw_data, snapshot_date')
       .eq('user_email', userEmail)
       .gte('snapshot_date', weekAgo);
+    if (snapErr) console.error(`[WeeklyBriefingGen] snapshot query error for ${userEmail}:`, snapErr.message);
 
     let organizedData = organizeSnapshots(snapshots || []);
 

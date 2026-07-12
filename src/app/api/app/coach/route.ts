@@ -157,10 +157,11 @@ export async function GET(request: NextRequest) {
   const targetCount = new Map<string, number>();
   if (workspaceIds.length) {
     const clientEmails = workspaceIds.map((ws: string) => clientNotificationEmail(ws));
-    const { data: profiles } = await supabase
+    const { data: profiles, error: profilesErr } = await supabase
       .from('user_notification_settings')
       .select('user_email, naics_codes, keywords, location_states, primary_industry')
       .in('user_email', clientEmails);
+    if (profilesErr) console.error('[coach] client profiles query error:', profilesErr.message);
     for (const p of profiles || []) {
       const ws = clientEmails.find((e: string) => e === p.user_email);
       const wsId = workspaceIds.find((id: string) => clientNotificationEmail(id) === p.user_email);

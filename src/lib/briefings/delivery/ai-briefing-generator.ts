@@ -188,11 +188,12 @@ export async function generateAIBriefing(
   try {
     // Step 1: Get user profile from unified table
     let stepStart = Date.now();
-    const { data: profileData } = await supabase
+    const { data: profileData, error: profileErr } = await supabase
       .from('user_notification_settings')
       .select('aggregated_profile, naics_codes, agencies, keywords, primary_industry')
       .eq('user_email', userEmail)
-      .single();
+      .maybeSingle();
+    if (profileErr) console.error(`[AIBriefingGen] profile query error for ${userEmail}:`, profileErr.message);
     timings.profileFetch = Date.now() - stepStart;
 
     // Use naicsOverride if provided (for pre-computation), else use profile data or fallback
@@ -222,11 +223,12 @@ export async function generateAIBriefing(
     // Step 2: Get today's snapshots
     stepStart = Date.now();
     const today = new Date().toISOString().split('T')[0];
-    const { data: snapshots } = await supabase
+    const { data: snapshots, error: snapErr } = await supabase
       .from('briefing_snapshots')
       .select('tool, raw_data')
       .eq('user_email', userEmail)
       .eq('snapshot_date', today);
+    if (snapErr) console.error(`[AIBriefingGen] snapshot query error for ${userEmail}:`, snapErr.message);
     timings.snapshotsFetch = Date.now() - stepStart;
 
     let organizedData = organizeSnapshots(snapshots || []);

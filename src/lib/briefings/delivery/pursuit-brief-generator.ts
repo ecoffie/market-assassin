@@ -204,12 +204,15 @@ export async function generatePursuitBrief(
   const FALLBACK_NAICS = ['541512', '541611', '541330', '541990', '561210'];
 
   try {
-    // Get user profile from unified table
-    const { data: profileData } = await supabase
+    // Get user profile from unified table. maybeSingle + surface { error }: a
+    // column drift here nulls the whole query → silent FALLBACK_NAICS generic
+    // pursuit brief for every user (swallowed-error class).
+    const { data: profileData, error: profileErr } = await supabase
       .from('user_notification_settings')
       .select('aggregated_profile, naics_codes, agencies, keywords, primary_industry')
       .eq('user_email', userEmail)
-      .single();
+      .maybeSingle();
+    if (profileErr) console.error(`[PursuitBriefGen] profile query error for ${userEmail}:`, profileErr.message);
 
     const profile = profileData ? buildProfile(profileData) : {
       naics_codes: FALLBACK_NAICS,

@@ -180,7 +180,10 @@ async function fetchByNaicsOverlap(naicsCodes: string[], limit: number): Promise
   if (!codes.length) return [];
 
   const sb = getSupabase();
-  const { data } = await sb
+  // 14-column select → highest column-drift risk: if any one column is renamed/
+  // dropped, PostgREST fails the WHOLE query → the podcast feed silently empties.
+  // Surface { error } so that fails loud instead (swallowed-error class).
+  const { data, error } = await sb
     .from('podcast_episode_metadata')
     .select(
       'episode_number, episode_title, episode_url, guest_name, guest_company, topics, agencies_mentioned, naics_mentioned, set_asides_mentioned, key_lessons, summary_2sent, business_type, transcript_keywords, personas'
@@ -190,6 +193,7 @@ async function fetchByNaicsOverlap(naicsCodes: string[], limit: number): Promise
     .not('guest_name', 'is', null)
     .not('key_lessons', 'eq', '{}')
     .limit(limit);
+  if (error) console.error('[podcast-insights] episode query error:', error.message);
 
   return (data || []) as PodcastEpisodeCard[];
 }

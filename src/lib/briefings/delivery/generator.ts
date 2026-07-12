@@ -98,12 +98,17 @@ export async function generateBriefing(
   ];
 
   try {
-    // Step 1: Get user profile from unified user_notification_settings table
-    const { data: notificationSettings } = await supabase
+    // Step 1: Get user profile from unified user_notification_settings table.
+    // maybeSingle (not single — a new user with no row is valid, not an error) +
+    // surface { error }: a dropped/renamed column here nulls the WHOLE query →
+    // silent fallback to generic defaults for every user (the swallowed-error class,
+    // tasks/smart-profile-dead-table-findings.md).
+    const { data: notificationSettings, error: profileErr } = await supabase
       .from('user_notification_settings')
       .select('naics_codes, agencies, keywords, aggregated_profile')
       .eq('user_email', userEmail)
-      .single();
+      .maybeSingle();
+    if (profileErr) console.error(`[BriefingGen] profile query error for ${userEmail}:`, profileErr.message);
 
     let profileData;
 
@@ -167,11 +172,12 @@ export async function generateBriefing(
     const todayStr = today.toISOString().split('T')[0];
     const yesterdayStr = yesterday.toISOString().split('T')[0];
 
-    const { data: snapshots } = await supabase
+    const { data: snapshots, error: snapErr } = await supabase
       .from('briefing_snapshots')
       .select('tool, raw_data, snapshot_date')
       .eq('user_email', userEmail)
       .in('snapshot_date', [todayStr, yesterdayStr]);
+    if (snapErr) console.error(`[BriefingGen] snapshot query error for ${userEmail}:`, snapErr.message);
 
     // Organize snapshots by tool and date
     const snapshotsByTool = organizeSnapshots(snapshots || []);

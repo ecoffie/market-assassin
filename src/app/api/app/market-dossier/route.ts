@@ -76,11 +76,12 @@ export async function GET(request: NextRequest) {
   const profileEmail = asClient ? clientNotificationEmail(workspaceId) : email;
 
   // 1) Profile — the codes/keywords Mindy watches.
-  const { data: prof } = await supabase
+  const { data: prof, error: profErr } = await supabase
     .from('user_notification_settings')
     .select('naics_codes, keywords, business_type, location_states')
     .eq('user_email', profileEmail)
     .maybeSingle();
+  if (profErr) console.error('[market-dossier] profile query error:', profErr.message);
   const naicsCodes: string[] = (prof?.naics_codes || []).map(String).filter(Boolean);
   const keywords: string[] = (prof?.keywords || []).map(String).filter(Boolean);
   const businessType: string = prof?.business_type || '';

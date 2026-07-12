@@ -159,11 +159,12 @@ export async function GET(request: NextRequest) {
     if (prev?.source) excludeSource = prev.source as DailyInsightSource;
   }
 
-  const { data: profileSettings } = await supabase
+  const { data: profileSettings, error: profileSettingsErr } = await supabase
     .from('user_notification_settings')
     .select('naics_codes, agencies')
     .eq('user_email', userEmail)
     .maybeSingle();
+  if (profileSettingsErr) console.error('[dashboard/insight] profile query error:', profileSettingsErr.message);
   const profileNaics = (profileSettings?.naics_codes || []) as string[];
   const profileAgencies = (profileSettings?.agencies || []) as string[];
 
@@ -443,11 +444,12 @@ async function deterministicFallback(
   const supabase = getSupabase();
 
   // Try the user's profile to get NAICS for a NAICS-aware fact
-  const { data: settings } = await supabase
+  const { data: settings, error: settingsErr } = await supabase
     .from('user_notification_settings')
     .select('naics_codes, naics_profile_hash')
     .eq('user_email', userEmail)
     .maybeSingle();
+  if (settingsErr) console.error('[dashboard/insight] naics profile query error:', settingsErr.message);
 
   // Best fact we have without AI: count of opportunities in the user's
   // alert feed today
