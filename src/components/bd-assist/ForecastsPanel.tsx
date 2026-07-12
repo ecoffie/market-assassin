@@ -36,6 +36,8 @@ interface Forecast {
   state?: string;
   pop_state?: string; // fallback
   status?: string;
+  // Real buyer work-words for this NAICS (naics_vocabulary) — context chips.
+  vocab?: string[];
 }
 
 interface ForecastsSummary {
@@ -467,6 +469,12 @@ export default function ForecastsPanel({ email, autoLoadProfile = true }: Foreca
                             PSC {forecast.psc}
                           </span>
                         )}
+                        {/* Real buyer work-words for this NAICS (naics_vocabulary). */}
+                        {(forecast.vocab || []).slice(0, 3).map((w) => (
+                          <span key={w} className="px-2 py-0.5 rounded text-xs font-medium bg-gray-800 text-gray-400">
+                            {w}
+                          </span>
+                        ))}
                       </div>
 
                       {/* Title */}

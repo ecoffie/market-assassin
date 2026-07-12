@@ -30,6 +30,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { groupRecompetesByVehicle } from '@/lib/recompete/vehicle-grouping';
 import { saveSnapshot, readSnapshot, freshMeta, degradedMeta } from '@/lib/resilience/last-good';
+import { getVocabulary } from '@/lib/market/vocabulary';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -505,6 +506,20 @@ async function handleRecompeteGet(request: NextRequest) {
     return orderParam === 'asc' ? cmp : -cmp;
   });
   const pageGroups = allGroups.slice(offset, offset + limit);
+
+  // Real buyer vocabulary per code — the actual work-words agencies use for this
+  // NAICS (naics_vocabulary). One lookup per DISTINCT code on the page (in-process
+  // cached), attached as `vocab` so each card shows what the code really means.
+  // Fails soft: any lookup error → that code just gets no terms.
+  const pageCodes = Array.from(new Set(
+    pageGroups.map((g) => String((g.lead as { naics_code?: string }).naics_code || '').trim()).filter(Boolean),
+  ));
+  const vocabByCode = new Map<string, string[]>();
+  await Promise.all(pageCodes.map(async (code) => {
+    const terms = await getVocabulary(code, { limit: 5 }).catch(() => []);
+    vocabByCode.set(code, terms.map((t) => t.term));
+  }));
+
   const vehicles = pageGroups.map((g) => ({
     ...g.lead,
     is_multi_award: g.members.length > 1,
@@ -513,6 +528,7 @@ async function handleRecompeteGet(request: NextRequest) {
     combined_ceiling: g.combinedCeiling,
     vehicle_expiry: g.latestExpiry,
     vehicle_key: g.key,
+    vocab: vocabByCode.get(String((g.lead as { naics_code?: string }).naics_code || '').trim()) || [],
   }));
   const collapsedFrom = (contracts?.length || 0) - vehicleTotal;
   // The page of raw rows for back-compat consumers = the members of this page's vehicles.

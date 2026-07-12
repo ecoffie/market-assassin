@@ -782,6 +782,40 @@ export default function OnboardingPage() {
     setCodeSuggestions((s) => s.filter((x) => x.code !== code));
   }
 
+  // "Buyers also say …" — the REAL words federal buyers use in award text for the
+  // user's NAICS (naics_vocabulary, mined from real awards). One-tap capability
+  // words grounded in data instead of the user guessing which terms catch opps.
+  // Optional: never blocks the confirm screen.
+  const [vocabSuggestions, setVocabSuggestions] = useState<string[]>([]);
+  useEffect(() => {
+    const codes: string[] = autoProfile?.naics || [];
+    if (codes.length === 0) { setVocabSuggestions([]); return; }
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await authedFetch(
+          `/api/app/naics-vocabulary?codes=${encodeURIComponent(codes.join(','))}`,
+          email,
+          { headers: { Authorization: `Bearer ${accessToken}` } },
+        );
+        if (!res.ok) return;
+        const j = await res.json();
+        const terms = ((j?.terms || []) as { term: string }[]).map((t) => t.term);
+        if (!cancelled) setVocabSuggestions(terms);
+      } catch { /* suggestions are optional — never block the confirm screen */ }
+    })();
+    return () => { cancelled = true; };
+  }, [(autoProfile?.naics || []).join(','), email, accessToken]);
+
+  // Add a suggested buyer-term straight into the user's keywords (sanitized, same
+  // as a typed one) and drop it from the suggestion row.
+  function addVocabKeyword(term: string) {
+    const [clean] = sanitizeKeywords([term.toLowerCase()]);
+    if (!clean) return;
+    setAutoProfile((p: { keywords?: string[] } | null) => p ? { ...p, keywords: [...new Set([...(p.keywords || []), clean])] } : p);
+    setVocabSuggestions((s) => s.filter((t) => t !== term));
+  }
+
   // Keyword tuning on the confirm screen — extraction grabs generic words
   // ("demolition firm" → "firm"); let the user drop junk + add the capability
   // words that catch mislabeled titles. Keywords drive alert matching.
@@ -1227,6 +1261,29 @@ export default function OnboardingPage() {
                       className="w-32 bg-transparent border-b border-hairline text-xs text-white placeholder-slate-600 focus:border-purple-500 focus:outline-none px-1 py-0.5"
                     />
                   </div>
+                  {/* "Buyers also say" — real award-text words for the user's codes
+                      (naics_vocabulary). Tap to add. Hides terms already chosen. */}
+                  {(() => {
+                    const have = new Set((autoProfile.keywords || []).map((k: string) => k.toLowerCase()));
+                    const fresh = vocabSuggestions.filter((t) => !have.has(t.toLowerCase())).slice(0, 8);
+                    if (fresh.length === 0) return null;
+                    return (
+                      <div className="mt-2">
+                        <span className="text-[11px] text-faint">Buyers also say (tap to add): </span>
+                        <div className="mt-1 flex flex-wrap gap-1">
+                          {fresh.map((term) => (
+                            <button
+                              key={term}
+                              onClick={() => addVocabKeyword(term)}
+                              className="inline-flex items-center gap-1 rounded border border-purple-500/40 bg-purple-500/10 px-2 py-0.5 text-xs text-purple-200 hover:bg-purple-500/20"
+                            >
+                              + {term}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    );
+                  })()}
                   {keywordNote && (
                     <div className="mt-1 text-[11px] text-amber-300/90">{keywordNote}</div>
                   )}

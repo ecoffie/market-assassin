@@ -11,6 +11,7 @@ import {
 import { searchGrantsByNAICS, scoreGrant, GrantOpportunity, GRANT_RELEVANCE_THRESHOLD } from '@/lib/briefings/pipelines/grants-gov';
 import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
 import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
+import { getVocabularyForCodes } from '@/lib/market/vocabulary';
 import nodemailer from 'nodemailer';
 import Anthropic from '@anthropic-ai/sdk';
 import { getCapabilityVector } from '@/lib/alerts/capability-vector';
@@ -617,7 +618,26 @@ async function runDailyAlertJob(options?: {
         // Get user keywords
         const userKeywords = user.keywords || [];
 
-        console.log(`[Daily Alerts] ${user.user_email}: ${userNaics.length} NAICS → ${expandedNaics.length} expanded, ${uniquePSCs.length} PSCs, ${userKeywords.length} keywords`);
+        // VOCABULARY EXPANSION (flag: VOCAB_ALERT_EXPANSION) — widen the match with
+        // the REAL buyer work-words for the user's NAICS (naics_vocabulary, mined
+        // from award text). An opp whose title/description uses a buyer-word the
+        // user never typed as a keyword now matches. Top 5 highest-weight terms
+        // only (keeps the OR query small + avoids generic noise), and NOT for
+        // default-only profiles (would inject generic 5415xx terms for everyone).
+        // Flows through the EXISTING keyword OR-match in sam-gov.ts — no matcher
+        // change. Fails soft: any error → the user's own keywords, unchanged.
+        let vocabTerms: string[] = [];
+        const usingDefaults = (user.naics_codes || []).length === 0;
+        if (process.env.VOCAB_ALERT_EXPANSION === 'on' && !usingDefaults) {
+          try {
+            const vocab = await getVocabularyForCodes(userNaics, { limit: 5 });
+            const have = new Set(userKeywords.map((k: string) => k.toLowerCase()));
+            vocabTerms = vocab.map((t) => t.term).filter((t) => !have.has(t.toLowerCase())).slice(0, 5);
+          } catch { /* vocab unavailable — degrade to the user's own keywords */ }
+        }
+        const matchKeywords = [...userKeywords, ...vocabTerms];
+
+        console.log(`[Daily Alerts] ${user.user_email}: ${userNaics.length} NAICS → ${expandedNaics.length} expanded, ${uniquePSCs.length} PSCs, ${userKeywords.length} keywords${vocabTerms.length ? ` +${vocabTerms.length} vocab [${vocabTerms.join(', ')}]` : ''}`);
 
         // Get recently sent opportunity IDs for deduplication
         const recentlySentIds = await getRecentlySentOpportunityIds(user.user_email);
@@ -642,7 +662,7 @@ async function runDailyAlertJob(options?: {
         try {
           noticeSummary = await fetchSamOpportunityNoticeSummaryFromCache({
             naicsCodes: expandedNaics,
-            keywords: userKeywords.length > 0 ? userKeywords : undefined,
+            keywords: matchKeywords.length > 0 ? matchKeywords : undefined,
             setAsides,
             states: userStates,
           });
@@ -660,7 +680,7 @@ async function runDailyAlertJob(options?: {
           const cacheResult = await fetchSamOpportunitiesFromCache({
             naicsCodes: expandedNaics,
             pscCodes: effectivePsc.length > 0 ? effectivePsc : undefined,
-            keywords: userKeywords.length > 0 ? userKeywords : undefined,
+            keywords: matchKeywords.length > 0 ? matchKeywords : undefined,
             setAsides,
             states: userStates,
             limit: 200, // Get more from cache, filter locally
@@ -687,7 +707,7 @@ async function runDailyAlertJob(options?: {
             try {
               const newResult = await fetchSamOpportunities({
                 naicsCodes: expandedNaics,
-                keywords: userKeywords.length > 0 ? userKeywords : undefined,
+                keywords: matchKeywords.length > 0 ? matchKeywords : undefined,
                 setAsides,
                 states: userStates,
                 noticeTypes: ['p', 'r', 'k', 'o'],

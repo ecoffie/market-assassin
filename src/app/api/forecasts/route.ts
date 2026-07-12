@@ -3,6 +3,7 @@ import { createClient } from '@supabase/supabase-js';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 import { loadDodaacNames } from '@/lib/gov-contacts/dodaac-directory';
 import { saveSnapshot, readSnapshot, freshMeta, degradedMeta, isUpstreamOutage } from '@/lib/resilience/last-good';
+import { getVocabulary } from '@/lib/market/vocabulary';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY!;
@@ -419,6 +420,21 @@ export async function GET(request: NextRequest) {
       }
     }
 
+    // Real buyer work-words per NAICS (naics_vocabulary) — one lookup per distinct
+    // code across this page's forecasts + DoD signals (in-process cached), attached
+    // as `vocab` so each forecast card shows what the code actually means. Fails
+    // soft: any lookup error → no terms for that code.
+    const forecastCodes = Array.from(new Set([
+      ...(forecasts || []).map((f: { naics_code?: string }) => String(f.naics_code || '').trim()),
+      ...dodSignals.map((s) => String((s as { naics_code?: string }).naics_code || '').trim()),
+    ].filter(Boolean)));
+    const vocabByCode = new Map<string, string[]>();
+    await Promise.all(forecastCodes.map(async (code) => {
+      const terms = await getVocabulary(code, { limit: 5 }).catch(() => []);
+      vocabByCode.set(code, terms.map((t) => t.term));
+    }));
+    const vocabFor = (code: string | null | undefined) => vocabByCode.get(String(code || '').trim()) || [];
+
     // Build response
     const response = {
       success: true,
@@ -461,6 +477,7 @@ export async function GET(request: NextRequest) {
           contact: isAdmin && f.poc_email ? { name: f.poc_name, email: f.poc_email } : null,
           lastSynced: f.last_synced_at,
           signalType: 'forecast' as const,
+          vocab: vocabFor(f.naics_code),
         })) || []),
         // DoD early signals from SAM, mapped into the same shape + flagged.
         ...dodSignals.map(s => ({
@@ -495,6 +512,7 @@ export async function GET(request: NextRequest) {
           responseDeadline: s.response_deadline,
           rfpReleased: !!s.rfpReleased,
           rfpStage: s.rfpStage || null,
+          vocab: vocabFor((s as { naics_code?: string }).naics_code),
         })),
       ],
       dodEarlySignalCount: dodSignals.length,

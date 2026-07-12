@@ -43,6 +43,9 @@ interface ExpiringContract {
   isMultiAward?: boolean;
   awardeeCount?: number;
   awardees?: string[];
+  // Real buyer work-words for this NAICS (naics_vocabulary) — what the code
+  // actually means in agency award text. Shown as chips for context.
+  vocab?: string[];
 }
 
 // IDV/IDIQ + task-order row from /api/app/idv-contracts (USASpending). Eric: the
@@ -112,6 +115,7 @@ interface RecompeteApiContract {
   awardee_count?: number;
   awardees?: string[];
   combined_ceiling?: number | null;
+  vocab?: string[];
 }
 
 interface StaticRecompeteContract {
@@ -278,6 +282,7 @@ function mapRecompeteContract(contract: RecompeteApiContract): ExpiringContract 
     isMultiAward: contract.is_multi_award || false,
     awardeeCount: contract.awardee_count || 0,
     awardees: contract.awardees || [],
+    vocab: contract.vocab || [],
   };
 }
 
@@ -1108,6 +1113,13 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
                             NAICS {contract.naics}
                           </span>
                         )}
+                        {/* Real buyer work-words for this code (naics_vocabulary) —
+                            what the NAICS actually means in agency award text. */}
+                        {(contract.vocab || []).slice(0, 3).map((w) => (
+                          <span key={w} className="px-2 py-0.5 rounded text-xs font-medium bg-navy/40 text-ink-soft/80">
+                            {w}
+                          </span>
+                        ))}
                       </div>
 
                       {/* Title — the whole card toggles now, so this is just the
