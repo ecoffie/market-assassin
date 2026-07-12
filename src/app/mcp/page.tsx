@@ -4,7 +4,7 @@
  * getmindy.ai/mcp — the Mindy MCP developer console (Higgsfield-style redesign).
  *
  * Structure: bold hero → per-client connect card (tabs rewrite the steps for
- * Claude Code / Claude Desktop / Cursor / any client) → API keys → credits →
+ * Claude Desktop / Claude Code / Cursor / any client) → connection key → credits →
  * pricing → usage.
  *
  * Identity is server-verified: on load we ask /api/mcp/session who the signed
@@ -30,13 +30,15 @@ interface Call { tool_name: string; status: string; credits_charged: number; cre
 const MCP_URL = 'https://mcp.getmindy.ai/mcp';
 const shortDate = (s: string | null) => (s ? new Date(s).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : null);
 
-type ClientId = 'claude-code' | 'claude-desktop' | 'cursor' | 'other';
+type ClientId = 'claude-desktop' | 'claude-code' | 'cursor' | 'other';
 const CLIENTS: { id: ClientId; name: string }[] = [
-  { id: 'claude-code', name: 'Claude Code' },
   { id: 'claude-desktop', name: 'Claude Desktop' },
+  { id: 'claude-code', name: 'Claude Code' },
   { id: 'cursor', name: 'Cursor' },
-  { id: 'other', name: 'Other' },
+  { id: 'other', name: 'Other agent' },
 ];
+
+const codeTag = (t: string) => <code className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-[12px] text-slate-300">{t}</code>;
 
 /** The connect instructions for a client — all real methods for the same hosted URL. */
 function connectFor(client: ClientId, key: string) {
@@ -51,33 +53,67 @@ function connectFor(client: ClientId, key: string) {
   switch (client) {
     case 'claude-code':
       return {
-        lead: 'One command in your terminal — Claude Code speaks remote MCP natively.',
-        lang: 'bash' as const,
+        lead: <>Claude Code speaks remote MCP natively — one command in your terminal. Swap in your connection key.</>,
         code: `claude mcp add --transport http mindy ${MCP_URL} \\\n  --header "Authorization: Bearer ${key}"`,
-        steps: ['Create an API key below', 'Run this in your terminal', 'Ask your agent: “Use Mindy to find open SAM drone contracts”'],
-      };
-    case 'claude-desktop':
-      return {
-        lead: <>Add this to your <code className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-[12px] text-slate-300">claude_desktop_config.json</code>, then restart Claude Desktop.</>,
-        lang: 'json' as const,
-        code: json,
-        steps: ['Create an API key below', 'Paste into claude_desktop_config.json → restart Claude Desktop', 'Ask Claude to use Mindy'],
+        steps: [
+          'Create a connection key below and copy it.',
+          <>Run the command below in your terminal (paste your key in place of {codeTag('mcp_live_YOUR_KEY')}).</>,
+          <>In any project, ask: <span className="text-slate-300">“Use Mindy to find open SAM drone contracts.”</span></>,
+        ],
       };
     case 'cursor':
       return {
-        lead: <>Add this to <code className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-[12px] text-slate-300">~/.cursor/mcp.json</code>, then enable Mindy in Settings → MCP.</>,
-        lang: 'json' as const,
+        lead: <>Add Mindy to Cursor&apos;s MCP config, then turn it on in Settings.</>,
         code: json,
-        steps: ['Create an API key below', 'Paste into ~/.cursor/mcp.json', 'Enable Mindy in Cursor → Settings → MCP'],
+        steps: [
+          'Create a connection key below and copy it.',
+          <>Paste the block below into {codeTag('~/.cursor/mcp.json')} (create the file if it&apos;s not there).</>,
+          <>Cursor → Settings → MCP → enable <span className="text-slate-300">mindy</span>, then ask Cursor to use it.</>,
+        ],
       };
-    default:
+    case 'other':
       return {
-        lead: 'Point any MCP client at this endpoint with a Bearer header.',
-        lang: 'json' as const,
+        lead: <>Mindy works with any MCP-compatible agent — Windsurf, Cline, or your own. Point it at the endpoint with a Bearer header.</>,
         code: json,
-        steps: ['Create an API key below', 'Add the server to your client config', 'Call any Mindy tool from your agent'],
+        steps: [
+          'Create a connection key below and copy it.',
+          <>Add the server block below to your client&apos;s MCP config, with {codeTag('Authorization: Bearer <your key>')}.</>,
+          'Restart the client and call any Mindy tool from your agent.',
+        ],
+      };
+    default: // claude-desktop
+      return {
+        lead: <>Add Mindy as a custom MCP server in Claude Desktop&apos;s config file.</>,
+        code: json,
+        steps: [
+          'Create a connection key below and copy it.',
+          <>Claude Desktop → Settings → Developer → <span className="text-slate-300">Edit Config</span>, and paste the block below into {codeTag('claude_desktop_config.json')}.</>,
+          <>Fully quit &amp; reopen Claude Desktop, then ask: <span className="text-slate-300">“Use Mindy to find open SAM drone contracts.”</span></>,
+        ],
       };
   }
+}
+
+/** Friendly names for translating a credit balance into real usage. */
+const TOOL_LABELS: Record<string, string> = {
+  search_sam_opportunities: 'SAM opportunity searches',
+  get_incumbent_financials: 'incumbent financial reads',
+  find_capable_contractors: '“who can win this” scans',
+  get_winning_playbook: 'win playbooks',
+  get_contractor_profile: 'contractor deep-dives',
+};
+
+/** "≈ 250 SAM searches · 125 financial reads · 31 win scans" from the LIVE tool costs. */
+function valueLine(credits: number, tools: Tool[]): string {
+  const picks = ['search_sam_opportunities', 'get_incumbent_financials', 'find_capable_contractors'];
+  const parts = picks
+    .map((name) => {
+      const t = tools.find((x) => x.name === name);
+      if (!t || t.credits <= 0) return null;
+      return `${Math.floor(credits / t.credits).toLocaleString()} ${TOOL_LABELS[name]}`;
+    })
+    .filter(Boolean) as string[];
+  return parts.length ? parts.join(' · ') : `${credits.toLocaleString()} tool calls`;
 }
 
 export default function McpConsole() {
@@ -95,7 +131,7 @@ export default function McpConsole() {
   const [error, setError] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [justPurchased, setJustPurchased] = useState(false);
-  const [client, setClient] = useState<ClientId>('claude-code');
+  const [client, setClient] = useState<ClientId>('claude-desktop');
 
   // Identity: ask the server who our signed token proves we are. Never trust
   // the client-side email for the account we render.
@@ -180,7 +216,7 @@ export default function McpConsole() {
   }
 
   const activeKeys = useMemo(() => keys.filter((k) => !k.revoked_at), [keys]);
-  const keyForSnippet = newKey || (activeKeys[0] ? `${activeKeys[0].key_prefix}…` : 'mcp_live_YOUR_KEY');
+  const keyForSnippet = newKey || 'mcp_live_YOUR_KEY';
   const conn = useMemo(() => connectFor(client, keyForSnippet), [client, keyForSnippet]);
 
   // ---- Sign-in gate ----------------------------------------------------------
@@ -198,7 +234,7 @@ export default function McpConsole() {
               <a href="/app" className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">
                 Sign in to Mindy
               </a>
-              <p className="mt-3 text-[12px] text-slate-500">Your first API key comes with 25 free credits.</p>
+              <p className="mt-3 text-[12px] text-slate-500">Your first connection key comes with 25 free credits.</p>
             </>
           )}
         </div>
@@ -249,7 +285,7 @@ export default function McpConsole() {
             SAM opportunities, incumbent financials, GSA pricing, and win playbooks — piped straight into Claude, Cursor, or your own agent.
           </p>
           <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/[0.07] px-3.5 py-1.5 text-[13px] text-emerald-200">
-            <span aria-hidden>🎁</span> Your first API key includes 25 free credits
+            <span aria-hidden>🎁</span> Your first connection key includes 25 free credits
           </div>
         </section>
 
@@ -264,7 +300,10 @@ export default function McpConsole() {
         {/* Connect card — client tabs rewrite the steps */}
         <section className="mt-8 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 sm:p-6">
           <div className="flex flex-wrap items-center justify-between gap-3">
-            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">Connect</p>
+            <div>
+              <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">Connect</p>
+              <h2 className="mt-0.5 text-[15px] font-semibold text-slate-100">Plug Mindy into your AI agent</h2>
+            </div>
             <div className="inline-flex rounded-full border border-white/[0.08] bg-[#070b16] p-1">
               {CLIENTS.map((c) => (
                 <button
@@ -301,11 +340,14 @@ export default function McpConsole() {
             <pre className="overflow-x-auto rounded-lg border border-white/[0.06] bg-[#070b16] p-3.5 font-mono text-[12px] leading-relaxed text-slate-300">{conn.code}</pre>
             <button onClick={() => copy(conn.code, 'snippet')} className="absolute right-2.5 top-2.5 rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-[11px] text-slate-300 hover:bg-white/10">{copied === 'snippet' ? 'Copied' : 'Copy'}</button>
           </div>
-          <p className="mt-2 text-[12px] text-slate-500">Replace <code className="font-mono text-slate-400">mcp_live_YOUR_KEY</code> with a key from below. Keys are shown once at creation.</p>
+          <p className="mt-2 text-[12px] text-slate-500">Replace <code className="font-mono text-slate-400">mcp_live_YOUR_KEY</code> with your connection key from below (shown once when you create it).</p>
         </section>
 
-        {/* API keys */}
-        <Panel eyebrow="API keys" title="Your keys">
+        {/* Connection key */}
+        <Panel eyebrow="Connection key" title="Your connection key">
+          <p className="-mt-1 mb-4 text-[13px] leading-relaxed text-slate-400">
+            This is how your AI agent proves the requests are yours. Create one, paste it into the config above, and each call draws from your credit balance. It&apos;s shown once at creation — store it somewhere safe.
+          </p>
           {newKey && (
             <div className="mb-4 rounded-lg border border-emerald-400/25 bg-emerald-400/[0.07] p-3">
               <p className="mb-1.5 text-[13px] font-medium text-emerald-200">Copy your key now — it won&apos;t be shown again.</p>
@@ -322,7 +364,7 @@ export default function McpConsole() {
           {loading ? (
             <p className="text-sm text-slate-500">Loading…</p>
           ) : keys.length === 0 ? (
-            <p className="text-sm text-slate-500">No keys yet. Create one to get started — your first key comes with free credits.</p>
+            <p className="text-sm text-slate-500">No connection key yet. Create one to get started — your first key comes with 25 free credits.</p>
           ) : (
             <ul className="divide-y divide-white/[0.06]">
               {keys.map((k) => (
@@ -349,7 +391,11 @@ export default function McpConsole() {
               <div key={p.id} className="flex flex-col rounded-xl border border-white/[0.08] bg-[#070b16] p-4 text-center">
                 <div className="text-2xl font-semibold tabular-nums">${p.usd}</div>
                 <div className="mt-0.5 text-sm font-medium tabular-nums text-emerald-300">{p.credits.toLocaleString()} credits</div>
-                <div className="mb-3 mt-1 flex-1 text-[12px] text-slate-500">{p.label.replace(/^.*—\s*/, '')}</div>
+                <div className="mb-3 mt-2 flex-1 text-[12px] leading-relaxed text-slate-400">
+                  <span className="text-slate-500">≈ </span>{valueLine(p.credits, tools).split(' · ').map((part, i) => (
+                    <span key={i} className="block">{part}</span>
+                  ))}
+                </div>
                 {p.checkoutUrl ? (
                   <a href={`${p.checkoutUrl}?client_reference_id=${encodeURIComponent(email || '')}`} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-emerald-500 py-1.5 text-sm font-medium text-[#06120c] hover:bg-emerald-400">Buy</a>
                 ) : (
