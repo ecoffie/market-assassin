@@ -35,7 +35,8 @@ import { retrieveRagContext, type RagChunkResult } from '@/lib/rag/retrieve';
 import { retrievePodcastEpisodes, formatPodcastCardsForPrompt, type PodcastEpisodeCard } from '@/lib/rag/podcast-search';
 import { loadBidderProfile, formatProfileForPrompt } from '@/lib/proposal/loaders';
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
-import { makeTier0Tools, TIER0_TOOL_DEFS } from '@/lib/chat/tier0-tools';
+import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
+import { makeTier1Tools, TIER1_TOOL_DEFS } from '@/lib/chat/tier1-tools';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -110,11 +111,15 @@ GROUNDING:
 - Write naturally as if you read the material and are explaining it. Reference podcasts by guest name when natural ("Ryan Atencio explains how to..."), not by episode number.
 - If the context doesn't contain what's needed, say so directly: "I don't have that in my knowledge base — try the [X] panel for that." DO NOT invent federal programs, agency names, or contract values.
 
-YOUR DATA TOOLS (the user's OWN account):
-- get_my_pipeline — the user's tracked pursuits (their pipeline: titles, agencies, deadlines, stages). Call it when they ask about THEIR pipeline, pursuits, deadlines, or what they're bidding/tracking.
+YOUR DATA TOOLS:
+Their OWN account (private):
+- get_my_pipeline — the user's tracked pursuits (titles, agencies, deadlines, stages). Call it when they ask about THEIR pipeline, pursuits, deadlines, or what they're bidding/tracking.
 - search_my_vault — the user's OWN Vault: company identity, past performance (contracts/CPARS), capabilities. Call it when they ask about their own experience/past performance/capabilities, or want you to reference their real record.
-- When a tool returns count 0 / has_any false, tell them plainly they have none yet — NEVER invent a pursuit, contract, agency, or deadline. Ground every specific (title, agency, deadline, dollar) ONLY in what the tool actually returned.
-- These tools return only THIS signed-in user's data. Do not claim to see anyone else's.
+Live federal market (public):
+- search_sam_opportunities — currently-open SAM.gov opportunities by keyword (+ optional NAICS / set-aside). Call it when they ask what opportunities/RFPs/solicitations are open or available in a topic or their market.
+- get_market_vocabulary — the distinctive buyer words/phrases that win in a NAICS. Call it when they ask what keywords to search, how buyers describe a market, or how to phrase a capability statement for a NAICS.
+- When a tool returns count 0 / has_any false, say so plainly — NEVER invent a pursuit, opportunity, contract, agency, deadline, or term. Ground every specific (title, agency, deadline, dollar, solicitation #) ONLY in what the tool actually returned.
+- The pipeline/Vault tools return only THIS signed-in user's data. Do not claim to see anyone else's.
 
 SCOPE:
 - You answer questions about US federal contracting — set-asides, certifications, SAM.gov, capability statements, teaming, proposals, market intel, GovCon BD.
@@ -399,21 +404,30 @@ export async function POST(request: NextRequest) {
           ? (process.env.LLM_OPENAI_MODEL || 'gpt-4o-mini')
           : (process.env.CHAT_OPENAI_MODEL || 'gpt-4o');
 
-        // ── Mindy Chat v2: Tier-0 tool round (PRD-mindy-chat-data-core §5a) ──
-        // ONE non-streamed pre-flight call offering the user's own pipeline/Vault
-        // tools. If the model calls one, we execute it (email bound from the
-        // SESSION — never a tool arg) and append the result so the streaming
-        // block below produces a grounded final answer. If no tool is called,
-        // messages is untouched and v1 behaviour is byte-for-byte preserved.
-        // Phase-0 spike proved both gpt-4o and the 8b Groq fallback do this
-        // reliably (scripts/spike-chat-v2-toolcall.mjs).
+        // ── Mindy Chat v2: Data Core tool round (PRD-mindy-chat-data-core §5a) ──
+        // ONE non-streamed pre-flight call offering the Data Core tools:
+        //   Tier 0 (PRIVATE) — the user's OWN pipeline/Vault, email bound from the
+        //     SESSION (never a tool arg — model cannot reach another user).
+        //   Tier 1 (SHARED)  — public federal data: live SAM opps + NAICS market
+        //     vocabulary (no per-user scoping).
+        // If the model calls one, we execute it and append the result so the
+        // streaming block below produces a grounded final answer. If no tool is
+        // called, messages is untouched and v1 behaviour is byte-for-byte
+        // preserved. Phase-0 spike proved both gpt-4o and the 8b Groq fallback do
+        // this reliably (scripts/spike-chat-v2-toolcall.mjs).
         let toolProvider = ''; let toolModel = '';
         let toolUsageForCost: { prompt_tokens?: number; completion_tokens?: number } | null = null;
         try {
           const tier0 = makeTier0Tools(getSupabase(), auth.email!);
+          const tier1 = makeTier1Tools(getSupabase());
+          // Route a called tool to the toolset that owns it. Tier-0 names are the
+          // private set; everything else in the combined defs is Tier-1.
+          const execTool = (name: string, args: Record<string, unknown>) =>
+            TIER0_TOOL_NAMES.has(name) ? tier0.execute(name, args) : tier1.execute(name, args);
+          const ALL_TOOL_DEFS = [...TIER0_TOOL_DEFS, ...TIER1_TOOL_DEFS];
           const toolReqBody = (model: string) => JSON.stringify({
             model, messages, temperature: 0, max_tokens: 512,
-            tools: TIER0_TOOL_DEFS, tool_choice: 'auto',
+            tools: ALL_TOOL_DEFS, tool_choice: 'auto',
           });
           const callToolRound = async (): Promise<{ provider: string; model: string; json: unknown } | null> => {
             if (openaiKeyEarly) {
@@ -446,7 +460,7 @@ export async function POST(request: NextRequest) {
             for (const tc of toolCalls) {
               let args: Record<string, unknown> = {};
               try { args = JSON.parse(tc.function?.arguments || '{}'); } catch { args = {}; }
-              const result = await tier0.execute(tc.function?.name || '', args);
+              const result = await execTool(tc.function?.name || '', args);
               // eslint-disable-next-line @typescript-eslint/no-explicit-any
               (messages as any[]).push({ role: 'tool', tool_call_id: tc.id || 'call_0', content: JSON.stringify(result) });
             }

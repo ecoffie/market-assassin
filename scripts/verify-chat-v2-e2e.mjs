@@ -102,6 +102,24 @@ if (b1.status === 200) {
   record('4. no-fabrication on empty', honest, honest ? `honest empty-state → "${b1.answer.slice(0, 160)}…"` : `did NOT clearly say empty → "${b1.answer.slice(0, 200)}"`);
 }
 
+// 5. Tier-1: market vocabulary — must return real buyer-words for a known NAICS
+const a3 = await ask(USER_A, 'What keywords or terms do buyers use in NAICS 541512? List a few.');
+if (a3.status !== 200) { record('5. market vocabulary (Tier-1)', false, `HTTP ${a3.status}`); }
+else {
+  // 541512 = Computer Systems Design; real vocab includes tech/IT/software/cyber/network/systems terms
+  const grounded = a3.answer.length > 40 && /software|system|network|cyber|IT|data|develop|technolog|comput|engineer/i.test(a3.answer);
+  record('5. market vocabulary (Tier-1)', grounded, grounded ? `real terms → "${a3.answer.slice(0, 160)}…"` : `no market terms → "${a3.answer.slice(0, 200)}"`);
+}
+
+// 6. Tier-1: live SAM search — must run the tool and answer grounded (real opps OR honest "none open")
+const a4 = await ask(USER_A, 'Search SAM for open IT services opportunities in NAICS 541512.');
+if (a4.status !== 200) { record('6. live SAM search (Tier-1)', false, `HTTP ${a4.status}`); }
+else {
+  // Pass = it engaged the market data: either cited opps OR honestly said none are open — NOT a punt to a panel.
+  const engaged = a4.answer.length > 40 && !/i don'?t have|try the .* panel|knowledge base/i.test(a4.answer);
+  record('6. live SAM search (Tier-1)', engaged, engaged ? `engaged market data → "${a4.answer.slice(0, 160)}…"` : `punted instead of searching → "${a4.answer.slice(0, 200)}"`);
+}
+
 console.log('================ E2E VERDICT ================');
 const passed = checks.filter(c => c.pass).length;
 for (const c of checks) console.log(`  ${c.pass ? '✅' : '❌'} ${c.name}`);
