@@ -99,6 +99,18 @@ SBA events · GSA events.
 SAM.gov Federal Hierarchy API (official org structure) + 450 internal
 abbreviation mappings (`agency-aliases.json`).
 
+## 11. NAICS Buyer Vocabulary — 25,252 · USASpending award text + our TF-IDF
+
+The real WORDS federal buyers use per NAICS, mined from **live USASpending award
+descriptions** (top awards per code) and cleaned by **cross-NAICS TF-IDF** (a term
+appearing across too many codes = filler, dropped). Table `naics_vocabulary`, built
+by `scripts/build-naics-vocabulary.ts`, read via `src/lib/market/vocabulary.ts`.
+Powers keyword→NAICS lead selection, onboarding "buyers also say" terms,
+recompete/forecast work-word chips, and alert keyword expansion. The *derivation*
+(which words are distinctive to which code) is exclusively ours. Planned as a Tier-1
+Data Core chat tool (`get_market_vocabulary`, Phase 2 — see
+`tasks/PRD-mindy-chat-data-core.md`).
+
 ---
 
 ## "To recreate Mindy" — the tally
