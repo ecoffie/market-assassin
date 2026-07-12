@@ -1,6 +1,29 @@
 # GovCon Giants - Tasks by Priority
 
-**Last Updated:** July 11, 2026
+**Last Updated:** July 12, 2026
+
+---
+
+## ✅ SHIPPED — Mindy MCP Server, Phase 1 (2026-07-12)
+
+The full **credit-metered MCP server** is merged to `main` + every migration run &
+verified live (PRs #118–128). Loop proven end-to-end: mint key → connect agent →
+call over `mcp.getmindy.ai` → auth → meter → **atomic debit** → dashboard.
+- **Shipped:** API keys · edge auth · tool registry · atomic credit ledger · hybrid
+  credits (Stripe top-ups exactly-once + Pro monthly allowance) · hosted metered HTTP
+  transport · data-core tools (pricing/EDGAR/FedReg + cache) · `getmindy.ai/mcp` dashboard.
+  `_ai_hint` gated OFF by default (data-first). Full ref: CLAUDE.md "Mindy MCP Server".
+- **⚠️ Billing seam:** any transport MUST dispatch via `runMeteredTool` (not raw
+  `runMcpTool`) or tools run free.
+- **Remaining = config only (Eric):**
+  - [ ] Claim `mcp.getmindy.ai` in Vercel → Domains (enable Fluid Compute; raise maxDuration).
+  - [ ] Create Stripe credit products/links (`type=mcp_credit_topup, package=starter|plus|scale`)
+        + set final $/credits in `src/lib/mcp/packages.ts`.
+  - [ ] Add the `grant-mcp-pro-credits` monthly cron row (dispatcher).
+  - [ ] Live click-through: sign in → `/mcp` → mint key → point Claude Desktop at
+        `mcp.getmindy.ai` → call a tool → confirm the debit + dashboard usage.
+- **Build hygiene learned:** concurrent Claude sessions must each use their own
+  `git worktree` — a shared `.git` entangles commits (a push carried another session's work).
 
 ---
 

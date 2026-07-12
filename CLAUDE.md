@@ -1619,6 +1619,57 @@ passes `liveBq: true`. Also: name-search now matches exact UEI too. Diagnostic: 
 
 ---
 
+## Mindy MCP Server — Phase 1 platform: billing / auth / transport (SHIPPED 2026-07-12)
+
+A hosted, **credit-metered** MCP server (`mcp.getmindy.ai`) exposing Mindy's GovCon
+intelligence to any MCP agent, with a self-serve dashboard at **`getmindy.ai/mcp`**.
+All of Phase 1 is merged to `main` + every migration run & verified live (PRs #118–128).
+
+**Slices shipped:** keys → edge auth → tool registry → **atomic credit ledger** →
+**hybrid credits** (top-ups + Pro monthly allowance) → **hosted metered HTTP transport**
+→ data-core tools → dashboard. `_ai_hint` gated OFF by default (data-first — see below).
+
+**The billing model:**
+- **Free 25 credits on a user's FIRST key** (`grantSignupCreditsIfFirst`, env `MCP_SIGNUP_CREDITS`; re-minting can't farm — gated on "no balance row yet").
+- **Debit-on-success only, atomic.** `runMeteredTool` (`src/lib/mcp/metered.ts`) pre-checks balance → runs the tool → debits on success / **0 on failure**; zero-balance is rejected with a top-up message before the tool runs.
+- **Atomicity is in Postgres**, not app code: `mcp_debit_credits` / `mcp_grant_credits` / `mcp_apply_credit` — the `UPDATE … WHERE balance >= amount RETURNING` (and `INSERT … ON CONFLICT DO NOTHING`) ARE the gates. 100 concurrent debits can't corrupt the balance (verified live); balance never < 0.
+- **Top-ups are exactly-once** by Stripe session id; **Pro monthly** allowance is exactly-once by `pro:<email>:<YYYY-MM>` — both via `applyCreditOnce` → `mcp_apply_credit`.
+
+**⚠️ THE BILLING SEAM (do not break):** the hosted HTTP edge MUST dispatch tool calls
+through **`runMeteredTool`**, NOT raw `runMcpTool`. Raw dispatch = tools run for free.
+Any new transport/entry point bills only if it goes through `runMeteredTool`.
+
+**Key files:**
+| File | Role |
+|---|---|
+| `src/lib/mcp/api-keys.ts` | issue/verify/revoke; stores sha256(key) only, shown once |
+| `src/lib/mcp/auth.ts` | `authenticateMcpRequest` (Bearer / X-Mindy-API-Key → identity) |
+| `src/lib/mcp/tool-registry.ts` | catalog + dispatch + `TOOL_CREDITS` (the tool source of truth) |
+| `src/lib/mcp/credits.ts` | `getBalance`/`grantCredits`/`debitCredits`/`applyCreditOnce`/`logCall` |
+| `src/lib/mcp/metered.ts` | `runMeteredTool` — the billing wrapper (the seam) |
+| `src/lib/mcp/packages.ts` | server-trusted credit packages + `PRO_MONTHLY_CREDITS` |
+| `src/lib/mcp/stripe-topup.ts` | `handleMcpCreditTopup(session)` — wired into `api/stripe-webhook` |
+| `src/app/mcp/[transport]/route.ts` | hosted HTTP transport (verifyApiKey → runMeteredTool) |
+| `src/app/mcp/page.tsx` + `src/app/api/mcp/account/route.ts` + `api/mcp/keys` | dashboard + its APIs |
+| `src/app/api/cron/grant-mcp-pro-credits/route.ts` | monthly Pro-allowance grant (idempotent) |
+| `src/app/api/admin/mcp-credits/route.ts` | admin grant/read (test credits pre-Stripe) |
+
+**DB tables (all hand-run + verified live):** `mcp_api_keys`, `mcp_credit_balance`,
+`mcp_credit_ledger`, `mcp_call_log`, `mcp_credit_topups`, `mcp_external_cache`
+(migrations `20260712_mcp_*`). All RLS service-role-only.
+
+**Still Eric's (config, not code):** claim `mcp.getmindy.ai` in Vercel → Domains ·
+create Stripe credit products/links (`type=mcp_credit_topup, package=starter|plus|scale`)
++ set final $/credits in `packages.ts` · add the `grant-mcp-pro-credits` monthly cron row
+· live click-through (mint key → connect Claude Desktop → call a tool → confirm the debit).
+
+**Multi-session build note:** Phase 1 was built across parallel Claude sessions. Sharing
+ONE working tree + `.git` entangled commits (a push carried another session's commit).
+Fix + rule: **each concurrent session gets its own `git worktree`** — "separate branches"
+alone does NOT isolate a shared `.git`. (Memory: the worktree collision + recovery.)
+
+---
+
 ## Mindy MCP Server — Data Core tools (2026-07-12)
 
 The Mindy MCP server exposes Mindy's proprietary + live-API intelligence to any AI agent.
