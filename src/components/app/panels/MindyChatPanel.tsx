@@ -20,6 +20,7 @@ import { Menu, MessageCircle, BookOpen, Lock, FileText } from 'lucide-react';
 import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { authedFetch } from '../authHeaders';
 import { UpgradeModal } from '../UpgradeModal';
+import { DEFAULT_STARTER_PROMPTS } from '@/lib/chat/starter-prompts';
 
 interface MindyChatPanelProps {
   email: string | null;
@@ -46,12 +47,6 @@ interface ChatMessage {
   errored?: boolean;
 }
 
-const STARTER_PROMPTS = [
-  'How do I respond to a Sources Sought?',
-  "What's the difference between 8(a) and HUBZone?",
-  'How do I win my first federal contract with no past performance?',
-  'Draft me a one-paragraph capability statement intro',
-];
 
 // Strip [→ X] markers from the message body — the server stopped
 // emitting them as of v2 (May 31), but old messages persisted to
@@ -100,6 +95,29 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
   useEffect(() => {
     inputRef.current?.focus();
   }, []);
+
+  // Empty-state starter chips. Seeded with the generic v2 set (showcases the Data
+  // Core tools: pipeline · live SAM · contractor intel · Vault); swapped for a
+  // profile-personalized set once /api/app/chat/suggestions returns (their real
+  // NAICS, whether they have pursuits). Never blocks — falls back to generic.
+  const [starterPrompts, setStarterPrompts] = useState<string[]>(DEFAULT_STARTER_PROMPTS);
+  useEffect(() => {
+    if (!email) return;
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await authedFetch(`/api/app/chat/suggestions?email=${encodeURIComponent(email)}`, email);
+        if (!res.ok) return;
+        const data = await res.json();
+        if (!cancelled && Array.isArray(data?.prompts) && data.prompts.length) {
+          setStarterPrompts(data.prompts);
+        }
+      } catch {
+        // keep the generic set on any failure
+      }
+    })();
+    return () => { cancelled = true; };
+  }, [email]);
 
   // Track whether we've already consumed a voice-pivot seed for this
   // mount so React StrictMode's double-invoke can't fire it twice.
@@ -450,7 +468,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
               </button>
             </div>
             <div className="mt-6 grid grid-cols-1 md:grid-cols-2 gap-3 opacity-50 pointer-events-none">
-              {STARTER_PROMPTS.map((prompt) => (
+              {starterPrompts.map((prompt: string) => (
                 <div
                   key={prompt}
                   className="text-left rounded-lg border border-surface bg-ground/50 p-4"
@@ -470,7 +488,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
               </p>
             </div>
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {STARTER_PROMPTS.map((prompt) => (
+              {starterPrompts.map((prompt: string) => (
                 <button
                   key={prompt}
                   onClick={() => sendMessage(prompt)}
