@@ -4090,3 +4090,33 @@ code (541512, 541511, 236…) in the market + intel chips. *(Shipping this surfa
 latent bug — `loadBidderProfile` had been silently returning an empty profile for every user
 because its query referenced a non-existent column; personalization across the chat now reads
 the real profile it always should have.)*
+
+---
+
+## Honest response-runway — stop surfacing opportunities you can't win (2026-07-11)
+
+**What:** The Source Feed now shows only opportunities you can actually respond to. Every
+opportunity carries an honest runway badge — 🟢 24 days left · 🟡 6 days left · 🔴 2 days,
+tight, act now — and the feed ranks real-runway opportunities above ones closing tomorrow, so
+the top of your feed is pursuable, not a countdown of near-misses. Anything already past its
+response deadline is hidden entirely.
+
+**Why:** Federal buyers keep a notice "active" in SAM until its archive date — often weeks after
+the actual response deadline — so "active" never meant "still open to bid." We measured our own
+active feed and **55% of it (12,120 of 21,962 respondable opportunities) was already past its
+deadline**, plus a tail of 1–2 day notices no small business can realistically turn around. New
+users opened the feed, saw things they couldn't pursue, and quit. This fix makes "shown =
+pursuable" true. Opportunities with no hard deadline (open Sources Sought / RFIs) still show —
+there's no clock to miss.
+
+**SEO / positioning:** "Federal contract opportunities you can actually bid — no expired
+listings, honest response deadlines." Reinforces Mindy's low-floor promise: a beginner isn't
+punished for not knowing that "active" ≠ "open."
+
+**Proof:** Live measurement 2026-07-11 against `sam_opportunities` (21,962 active respondable
+rows with a deadline): 55.2% past-deadline, 1.5% ≤1-day, only 44.8% with future runway. Fix:
+shared runway model (`src/lib/opportunities/runway.ts`) filters the feed on the full `now()`
+timestamp (was comparing a full timestamp against a date-only "midnight today" string, leaking
+same-day-passed and everything-later-today), drops any closed row belt-and-suspenders, and
+ranks by actionable runway. Same model drives the in-app badge so feed, badge, and sort never
+disagree. 22/22 unit assertions; full production build green.

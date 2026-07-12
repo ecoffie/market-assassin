@@ -51,6 +51,9 @@ interface Alert {
   daysLeft?: number | null;
   isUrgent?: boolean;
   isClosingSoon?: boolean;
+  // Honest response-runway (from the shared runway model, server-computed).
+  runwayLabel?: string;
+  runwayTier?: 'closed' | 'tight' | 'soon' | 'open' | 'none';
   recommendationScore?: number;
   feedbackReasons?: string[];
   descriptionUrl?: string | null;
@@ -1402,14 +1405,24 @@ export default function AlertsPanel({ email, tier, onPanelChange }: AlertsPanelP
                         {alert.setAsideDescription || alert.setAside}
                       </span>
                     )}
-                    {alert.isUrgent && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-red-500/20 text-red-400 rounded font-medium">
-                        <Flame className="h-3 w-3 shrink-0" strokeWidth={2.5} /> {alert.daysLeft} days left
-                      </span>
-                    )}
-                    {alert.isClosingSoon && !alert.isUrgent && (
-                      <span className="inline-flex items-center gap-1 px-2 py-0.5 text-xs bg-amber-500/20 text-amber-400 rounded">
-                        <Zap className="h-3 w-3 shrink-0" strokeWidth={2.5} /> {alert.daysLeft} days left
+                    {alert.runwayLabel && (
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 text-xs rounded ${
+                          alert.runwayTier === 'tight' || alert.runwayTier === 'closed'
+                            ? 'bg-red-500/20 text-red-400 font-medium'
+                            : alert.runwayTier === 'soon'
+                            ? 'bg-amber-500/20 text-amber-400'
+                            : 'bg-emerald-500/20 text-emerald-400'
+                        }`}
+                      >
+                        {alert.runwayTier === 'tight' ? (
+                          <Flame className="h-3 w-3 shrink-0" strokeWidth={2.5} />
+                        ) : alert.runwayTier === 'soon' ? (
+                          <Zap className="h-3 w-3 shrink-0" strokeWidth={2.5} />
+                        ) : null}
+                        {/* Strip the leading emoji from the shared label — the icon
+                            already carries the urgency; keeps the chip clean. */}
+                        {alert.runwayLabel.replace(/^[^\w]+\s*/, '')}
                       </span>
                     )}
                     {(alert.ctaTags || []).slice(0, 2).map((tag) => (

@@ -24,6 +24,7 @@ import {
   tagOpportunityInMemory,
   type OpportunityCtaTagPayload,
 } from '@/lib/cta/opportunity-tags';
+import { runwayLabel, runwayTier, runwayRank, hasRunway } from '@/lib/opportunities/runway';
 
 const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL || '';
 const supabaseKey = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
@@ -404,11 +405,22 @@ export async function GET(request: NextRequest) {
     // gives the dedupe + scoring step room to filter without truncating
     // good results.
     const fetchLimit = Math.min(Math.max(limit * 3, limit), 2000);
+    // RUNWAY FILTER — `active=true` means "not yet archived," NOT "still
+    // pursuable." SAM keeps a notice active until its archive_date, often weeks
+    // after the response deadline, so 55% of the active respondable set was
+    // already PAST deadline (measured 2026-07-11). The old filter compared the
+    // full response_deadline TIMESTAMP against a date-only string (midnight
+    // today), which let same-day-already-passed and everything-later-today
+    // through. Compare against the full `now()` timestamp so anything whose
+    // deadline has actually passed is excluded at the query. Rows with a NULL
+    // deadline (open RFIs, no hard clock) are kept via the OR. Downstream
+    // hasRunway() is the belt-and-suspenders drop.
+    const nowIso = new Date().toISOString();
     let query = supabase
       .from('sam_opportunities')
       .select('*')
       .eq('active', true)
-      .gte('response_deadline', new Date().toISOString().split('T')[0])
+      .or(`response_deadline.gte.${nowIso},response_deadline.is.null`)
       .order('response_deadline', { ascending: true })
       .limit(fetchLimit);
 
@@ -539,6 +551,10 @@ export async function GET(request: NextRequest) {
         additionalInfoText: typeof opp.additional_info_text === 'string' ? opp.additional_info_text : null,
         url: getSamOpportunityUrl(opp),
         daysLeft,
+        // Honest runway (shared model): badge text + tier for the panel, and a
+        // rank so pursuable opps float above ones closing tomorrow.
+        runwayLabel: runwayLabel(opp.response_deadline),
+        runwayTier: runwayTier(opp.response_deadline),
         isUrgent: daysLeft !== null && daysLeft <= 7 && daysLeft >= 0,
         isClosingSoon: daysLeft !== null && daysLeft <= 14 && daysLeft > 7,
         setAsideEligible: setAsideFit.eligible,
@@ -559,10 +575,24 @@ export async function GET(request: NextRequest) {
       );
     }
 
+    // Belt-and-suspenders: drop anything whose deadline has actually passed. The
+    // query filter already excludes it, but a row synced with a stale/odd
+    // response_deadline could slip through — hasRunway() is the definitive gate
+    // so the feed NEVER shows a dead opportunity (the "1-day notice → give up"
+    // complaint). Null-deadline rows are kept (open RFIs, no clock).
+    alerts = alerts.filter((alert) => hasRunway(alert.responseDeadline));
+
+    // RANK BY ACTIONABILITY: fit score first (unchanged), then real runway —
+    // a strong-fit opp with 3 weeks left beats an equally-strong one closing
+    // tomorrow, so the TOP of the feed is pursuable, not a countdown of
+    // near-misses. Soonest-deadline is the final tiebreaker within a runway tier.
     alerts = alerts.sort((a, b) => {
       if (b.recommendationScore !== a.recommendationScore) {
         return b.recommendationScore - a.recommendationScore;
       }
+      const aRank = runwayRank(a.responseDeadline);
+      const bRank = runwayRank(b.responseDeadline);
+      if (bRank !== aRank) return bRank - aRank;
       const aDeadline = a.responseDeadline ? new Date(a.responseDeadline).getTime() : Number.MAX_SAFE_INTEGER;
       const bDeadline = b.responseDeadline ? new Date(b.responseDeadline).getTime() : Number.MAX_SAFE_INTEGER;
       return aDeadline - bDeadline;
