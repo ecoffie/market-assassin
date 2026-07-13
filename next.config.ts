@@ -46,6 +46,25 @@ const nextConfig: NextConfig = {
       // beforeFiles rewrites run BEFORE filesystem checks
       // This allows host-based routing to override page.tsx
       beforeFiles: [
+        // MCP OAuth discovery metadata. Next ignores `.well-known` folders in the
+        // app dir, so serve the RFC 8414 / RFC 9728 docs from API routes at the
+        // spec-required well-known paths. Both the apex and the mcp subdomain.
+        {
+          source: '/.well-known/oauth-authorization-server',
+          destination: '/api/oauth/metadata/authorization-server',
+        },
+        {
+          source: '/.well-known/oauth-authorization-server/:path*',
+          destination: '/api/oauth/metadata/authorization-server',
+        },
+        {
+          source: '/.well-known/oauth-protected-resource',
+          destination: '/api/oauth/metadata/protected-resource',
+        },
+        {
+          source: '/.well-known/oauth-protected-resource/:path*',
+          destination: '/api/oauth/metadata/protected-resource',
+        },
         // mcp.getmindy.ai — hosted MCP edge. The handler lives at
         // src/app/mcp/[transport]/route.ts (basePath '/mcp'), so raw endpoints
         // are /mcp/mcp, /mcp/sse, /mcp/message. These rewrites let remote MCP

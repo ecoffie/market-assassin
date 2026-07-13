@@ -28,6 +28,8 @@ import { createMcpHandler, withMcpAuth } from 'mcp-handler';
 import { runMeteredTool } from '@/lib/mcp/metered';
 import { mcpRegistrationList } from '@/lib/mcp/tool-schemas';
 import { verifyApiKey } from '@/lib/mcp/api-keys';
+import { verifyAccessToken } from '@/lib/mcp/oauth/tokens';
+import { mcpFlags } from '@/lib/mcp/flags';
 
 // Node.js runtime: verifyApiKey uses node:crypto + the Supabase service-role
 // client (neither runs on Edge). force-dynamic: never cache an MCP response.
@@ -99,24 +101,43 @@ const baseHandler = createMcpHandler(
 );
 
 /**
- * Bearer-token gate. Resolves the presented key to a Mindy identity; returning
- * undefined makes withMcpAuth answer 401 with the WWW-Authenticate challenge.
+ * Bearer-token gate — accepts TWO credentials, tried in order:
+ *   1. an OAuth 2.1 access token (the keyless "Add connector → Sign in" flow) —
+ *      a stateless JWT validated by signature + exp + audience, no DB read.
+ *   2. an `mcp_live_` API key (the headless/CI fallback), verified against
+ *      mcp_api_keys.
+ * Returning undefined makes withMcpAuth answer 401 with a WWW-Authenticate
+ * challenge whose resource_metadata points clients at the OAuth flow.
  */
 const handler = withMcpAuth(
   baseHandler,
   async (_req, bearerToken) => {
+    // 1) OAuth access token (keyless).
+    const claims = verifyAccessToken(bearerToken);
+    if (claims) {
+      return {
+        token: bearerToken as string,
+        scopes: claims.scope ? claims.scope.split(' ') : ['mcp'],
+        clientId: claims.client_id,
+        extra: { userEmail: claims.sub, keyId: null },
+      };
+    }
+    // 2) API key fallback (headless).
     const verified = await verifyApiKey(bearerToken);
     if (!verified) return undefined;
     return {
       token: bearerToken as string,
-      // MCP scopes gate which tools a key may call (future: per-tier scopes).
       scopes: verified.scopes,
       clientId: verified.userEmail,
-      // Carried through to the tool handler via extra.authInfo.extra.
       extra: { userEmail: verified.userEmail, keyId: verified.keyId },
     };
   },
-  { required: true },
+  {
+    required: true,
+    // Advertise the OAuth flow on 401 only when the flag is on — otherwise the
+    // 401 stays key-only, so existing key clients are unaffected until we go live.
+    ...(mcpFlags.oauth ? { resourceMetadataPath: '/.well-known/oauth-protected-resource' } : {}),
+  },
 );
 
 export { handler as GET, handler as POST, handler as DELETE };

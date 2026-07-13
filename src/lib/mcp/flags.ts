@@ -27,6 +27,16 @@ export const mcpFlags = {
     return on('MCP_ENABLE_AI_HINT');
   },
 
+  /**
+   * Keyless OAuth 2.1 connect. OFF by default so the OAuth endpoints
+   * (register/authorize/token/revoke + discovery metadata) return 404 and the
+   * transport doesn't advertise the OAuth flow on 401 — until we flip it on for
+   * the live Claude Desktop test. API-key auth is unaffected either way.
+   */
+  get oauth(): boolean {
+    return on('MCP_OAUTH_ENABLED');
+  },
+
   // Future toggles plug in the same way, e.g.:
   //   get enrichedSam(): boolean { return on('MCP_ENABLE_ENRICHED_SAM'); }
 } as const;
