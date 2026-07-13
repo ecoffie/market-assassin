@@ -237,10 +237,34 @@ export default function McpConsole() {
     const proCredits = cat?.proMonthlyCredits ?? 1000;
     const catTools = cat?.tools ?? [];
     const packs = cat?.packages ?? [];
-    // Per-pack "what you can do" line, computed from the LIVE tool costs.
-    const packValue = (credits: number) => (catTools.length ? valueLine(credits, catTools) : `${credits.toLocaleString()} tool calls`);
-    // Mark the middle pack "Most popular" (the highlighted tier).
+    // One honest B2B unit instead of a three-way credit-math line: an "opportunity
+    // work-up" = search one opp + pull the incumbent's financials + a who-can-win
+    // scan + a win playbook. Priced from the LIVE tool costs so it never drifts.
+    const toolCr = (name: string, fallback: number) => catTools.find((t) => t.name === name)?.credits ?? fallback;
+    const workupCost =
+      toolCr('search_sam_opportunities', 1) +
+      toolCr('get_incumbent_financials', 2) +
+      toolCr('find_capable_contractors', 25) +
+      toolCr('get_winning_playbook', 2);
+    const workups = (credits: number) => Math.max(1, Math.floor(credits / workupCost));
+    // Mark the middle pack the recommended tier.
     const popularId = packs.length >= 2 ? packs[1].id : undefined;
+    // Optional "N% bonus" pulled from the pack label, e.g. "Plus — 800 credits (7% bonus)".
+    const bonusOf = (label: string) => label.match(/\(([^)]*bonus)\)/i)?.[1] ?? null;
+    // Unified tier rows: free trial first, then the prepaid packs.
+    const tierRows = [
+      { id: 'free', name: 'Free trial', tag: 'one-time', highlight: false, price: '$0', priceSub: 'on first connect', credits: trial, cta: 'Start free' },
+      ...packs.map((p) => ({
+        id: p.id,
+        name: p.label.split('—')[0].trim(),
+        tag: p.id === popularId ? 'Recommended' : bonusOf(p.label),
+        highlight: p.id === popularId,
+        price: `$${p.usd}`,
+        priceSub: 'prepaid',
+        credits: p.credits,
+        cta: 'Get credits',
+      })),
+    ];
 
     return (
       <main className="min-h-dvh bg-[#0a0f1e] text-slate-100 [color-scheme:dark]">
@@ -253,7 +277,7 @@ export default function McpConsole() {
               SAM opportunities, incumbent financials, GSA pricing, and win playbooks — piped straight into Claude, Cursor, or your own agent. Pay only for what you call.
             </p>
             <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/[0.07] px-3.5 py-1.5 text-[13px] text-emerald-200">
-              <span aria-hidden>🎁</span> Start free — {trial} credits on your first connect (≈ {packValue(trial)})
+              <span aria-hidden>🎁</span> Start free — {trial} credits, enough for ~{workups(trial)} full opportunity work-ups
             </div>
             <div className="mt-6">
               <a href="/app" className="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">
@@ -264,36 +288,49 @@ export default function McpConsole() {
             </div>
           </section>
 
-          {/* Plans: Free trial → packs */}
+          {/* Rate card — a procurement-style row list, not a consumer credit-card grid */}
           <section className="mt-14">
-            <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">Credit plans</h2>
-            <p className="mx-auto mt-2 max-w-lg text-center text-[13px] text-slate-400">Prepaid credits, debited per call — on success only. No subscription required; the more you buy, the cheaper each credit.</p>
-            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-              {/* Free trial card */}
-              <div className="flex flex-col rounded-2xl border border-white/10 bg-white/[0.02] p-5">
-                <div className="text-[13px] font-semibold uppercase tracking-wide text-slate-300">Free trial</div>
-                <div className="mt-1 text-[12px] text-slate-500">One-time, on your first connect</div>
-                <div className="mt-4 text-3xl font-bold tabular-nums">{trial}<span className="ml-1 text-sm font-normal text-slate-400">credits</span></div>
-                <div className="mt-1 text-[12px] text-slate-500">$0</div>
-                <div className="mt-4 flex-1 text-[12px] leading-relaxed text-slate-400">≈ {packValue(trial)}</div>
-                <a href="/app" className="mt-5 inline-flex items-center justify-center rounded-lg border border-white/15 px-3 py-2 text-[13px] font-medium text-slate-200 hover:bg-white/5">Start free</a>
+            <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">Credit packs</h2>
+            <p className="mx-auto mt-2 max-w-lg text-center text-[13px] text-slate-400">Prepaid, debited only when a call succeeds. Buy once, use anytime — credits never expire. No subscription.</p>
+            <div className="mx-auto mt-6 max-w-3xl overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02]">
+              {/* column header (desktop) */}
+              <div className="hidden grid-cols-[1.5fr_0.7fr_1.4fr_auto] items-center gap-4 border-b border-white/10 px-5 py-2.5 text-[10px] font-medium uppercase tracking-wider text-slate-500 sm:grid">
+                <div>Pack</div>
+                <div>Price</div>
+                <div>What it gets you</div>
+                <div className="text-right" />
               </div>
-              {/* Pack cards */}
-              {packs.map((p) => {
-                const popular = p.id === popularId;
-                return (
-                  <div key={p.id} className={`relative flex flex-col rounded-2xl border p-5 ${popular ? 'border-emerald-400/40 bg-emerald-400/[0.04]' : 'border-white/10 bg-white/[0.02]'}`}>
-                    {popular && <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-emerald-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#06120c]">Most popular</div>}
-                    <div className="text-[13px] font-semibold uppercase tracking-wide text-slate-200">{p.label.split('—')[0].trim()}</div>
-                    <div className="mt-1 text-[12px] text-slate-500">Prepaid pack</div>
-                    <div className="mt-4 text-3xl font-bold tabular-nums">{p.credits.toLocaleString()}<span className="ml-1 text-sm font-normal text-slate-400">credits</span></div>
-                    <div className="mt-1 text-[12px] text-slate-400">${p.usd} <span className="text-slate-600">·</span> ${(p.usd / p.credits).toFixed(3)}/credit</div>
-                    <div className="mt-4 flex-1 text-[12px] leading-relaxed text-slate-400">≈ {packValue(p.credits)}</div>
-                    <a href="/app" className={`mt-5 inline-flex items-center justify-center rounded-lg px-3 py-2 text-[13px] font-semibold ${popular ? 'bg-emerald-500 text-[#06120c] hover:bg-emerald-400' : 'border border-white/15 text-slate-200 hover:bg-white/5'}`}>Sign in to buy</a>
+              {tierRows.map((t, i) => (
+                <div
+                  key={t.id}
+                  className={`grid grid-cols-1 items-center gap-x-4 gap-y-3 px-5 py-4 sm:grid-cols-[1.5fr_0.7fr_1.4fr_auto] ${i > 0 ? 'border-t border-white/10' : ''} ${t.highlight ? 'bg-emerald-400/[0.05]' : ''}`}
+                >
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-[15px] font-semibold text-slate-100">{t.name}</span>
+                    {t.tag && (
+                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${t.highlight ? 'bg-emerald-500 text-[#06120c]' : 'border border-white/15 text-slate-400'}`}>{t.tag}</span>
+                    )}
                   </div>
-                );
-              })}
+                  <div className="tabular-nums">
+                    <span className="text-[15px] font-semibold text-slate-100">{t.price}</span>
+                    <span className="ml-1.5 text-[11px] text-slate-500 sm:ml-0 sm:block">{t.priceSub}</span>
+                  </div>
+                  <div className="text-[13px] text-slate-400">
+                    <span className="font-medium tabular-nums text-slate-200">{t.credits.toLocaleString()} credits</span>
+                    <span className="text-slate-600"> · </span>~{workups(t.credits)} opportunity work-ups
+                  </div>
+                  <a
+                    href="/app"
+                    className={`inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-[13px] font-semibold sm:justify-self-end ${t.highlight ? 'bg-emerald-500 text-[#06120c] hover:bg-emerald-400' : 'border border-white/15 text-slate-200 hover:bg-white/5'}`}
+                  >
+                    {t.cta}
+                  </a>
+                </div>
+              ))}
             </div>
+            <p className="mx-auto mt-3 max-w-2xl text-center text-[12px] leading-relaxed text-slate-500">
+              A <span className="text-slate-400">work-up</span> ≈ search one opportunity, pull the incumbent&apos;s financials, run a who-can-win scan, and generate a win playbook (~{workupCost} credits). Lighter lookups cost far less — see the full rate list below.
+            </p>
           </section>
 
           {/* Pro cross-sell */}
