@@ -15,6 +15,7 @@
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { authedFetch, getMIApiHeaders } from '@/components/app/authHeaders';
+import { Tool, Pkg, Catalog, MCP_URL, McpNav, AppCluster } from './catalog-ui';
 
 interface KeyRow {
   id: string;
@@ -24,11 +25,8 @@ interface KeyRow {
   last_used_at: string | null;
   revoked_at: string | null;
 }
-interface Tool { name: string; description: string; credits: number }
-interface Pkg { id: string; credits: number; usd: number; label: string; checkoutUrl?: string }
 interface Call { tool_name: string; status: string; credits_charged: number; created_at: string }
 
-const MCP_URL = 'https://getmindy.ai/mcp/mcp';
 const shortDate = (s: string | null) => (s ? new Date(s).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : null);
 
 type ClientId = 'claude-desktop' | 'claude-code' | 'cursor' | 'other';
@@ -126,7 +124,7 @@ export default function McpConsole() {
   const [justPurchased, setJustPurchased] = useState(false);
   const [client, setClient] = useState<ClientId>('claude-desktop');
   // Public catalog (tools + packs + trial size) for the LOGGED-OUT pricing page.
-  const [catalog, setCatalog] = useState<{ tools: Tool[]; packages: Pkg[]; signupCredits: number; proMonthlyCredits: number } | null>(null);
+  const [catalog, setCatalog] = useState<Catalog | null>(null);
 
   // Identity: ask the server who our signed token proves we are. Never trust
   // the client-side email for the account we render.
@@ -227,203 +225,89 @@ export default function McpConsole() {
 }`;
   const conn = useMemo(() => connectFor(client), [client]);
 
-  // ---- Logged-out landing / pricing page (keyless-first) ---------------------
-  // A prospect sees the value + real prices BEFORE signing in — data behind glass,
-  // never a blank sign-in wall. Connect is KEYLESS: sign in through the browser
-  // (OAuth), no key to copy. Keys are the headless/CI fallback only.
+  // ---- Logged-out CONNECT / landing page (keyless-first) ---------------------
+  // App-icon cluster → hero → client-tab connect card. Pricing lives on its own
+  // page (/mcp/pricing). Connect is KEYLESS: sign in through the browser (OAuth),
+  // no key to copy. Keys are the headless/CI fallback only.
   if (authState !== 'in') {
-    const cat = catalog;
-    const trial = cat?.signupCredits ?? 100;
-    const proCredits = cat?.proMonthlyCredits ?? 1000;
-    const catTools = cat?.tools ?? [];
-    const packs = cat?.packages ?? [];
-    // One honest B2B unit instead of a three-way credit-math line: an "opportunity
-    // work-up" = search one opp + pull the incumbent's financials + a who-can-win
-    // scan + a win playbook. Priced from the LIVE tool costs so it never drifts.
-    const toolCr = (name: string, fallback: number) => catTools.find((t) => t.name === name)?.credits ?? fallback;
-    const workupCost =
-      toolCr('search_sam_opportunities', 1) +
-      toolCr('get_incumbent_financials', 2) +
-      toolCr('find_capable_contractors', 25) +
-      toolCr('get_winning_playbook', 2);
-    const workups = (credits: number) => Math.max(1, Math.floor(credits / workupCost));
-    // Mark the middle pack the recommended tier.
-    const popularId = packs.length >= 2 ? packs[1].id : undefined;
-    // Optional "N% bonus" pulled from the pack label, e.g. "Plus — 800 credits (7% bonus)".
-    const bonusOf = (label: string) => label.match(/\(([^)]*bonus)\)/i)?.[1] ?? null;
-    // Concrete "recipes" — how credits map to real BD tasks, priced from the LIVE
-    // tool costs (repeat a tool name to charge it N times). Spread cheap → rich so a
-    // prospect sees credits go a long way on light lookups.
-    const examples: { title: string; desc: string; tools: string[] }[] = [
-      { title: 'Check today’s new opportunities', desc: 'One live SAM search across your NAICS and keywords.', tools: ['search_sam_opportunities'] },
-      { title: 'Draft a win strategy', desc: 'Generate a proprietary win playbook for an opportunity.', tools: ['get_winning_playbook'] },
-      { title: 'Price your bid', desc: 'GSA labor-rate intel plus regulatory demand signals.', tools: ['get_pricing_intel', 'get_regulatory_demand'] },
-      { title: 'Vet an incumbent', desc: 'Pull their SEC financials and a full contractor profile.', tools: ['get_incumbent_financials', 'get_contractor_profile'] },
-      { title: 'Full opportunity work-up', desc: 'Search it, read the incumbent, scan who can win, get the playbook.', tools: ['search_sam_opportunities', 'get_incumbent_financials', 'find_capable_contractors', 'get_winning_playbook'] },
-      { title: 'Build a teaming shortlist', desc: 'A who-can-win scan, then deep-profile your top three partners.', tools: ['find_capable_contractors', 'get_contractor_profile', 'get_contractor_profile', 'get_contractor_profile'] },
-    ];
-    const exampleCost = (names: string[]) => names.reduce((s, n) => s + toolCr(n, 1), 0);
-    // Unified tier rows: free trial first, then the prepaid packs.
-    const tierRows = [
-      { id: 'free', name: 'Free trial', tag: 'one-time', highlight: false, price: '$0', priceSub: 'on first connect', credits: trial, cta: 'Start free' },
-      ...packs.map((p) => ({
-        id: p.id,
-        name: p.label.split('—')[0].trim(),
-        tag: p.id === popularId ? 'Recommended' : bonusOf(p.label),
-        highlight: p.id === popularId,
-        price: `$${p.usd}`,
-        priceSub: 'prepaid',
-        credits: p.credits,
-        cta: 'Get credits',
-      })),
-    ];
+    const trial = catalog?.signupCredits ?? 100;
 
     return (
       <main className="min-h-dvh bg-[#0a0f1e] text-slate-100 [color-scheme:dark]">
-        <div className="mx-auto max-w-5xl px-5 py-12 sm:px-6">
+        <div className="mx-auto max-w-4xl px-5 py-8 sm:px-6">
+          <McpNav active="connect" />
+
           {/* Hero */}
-          <section className="text-center">
-            <div className="mx-auto mb-5 grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-emerald-400 text-lg font-bold text-[#0a0f1e]">M</div>
-            <h1 className="mx-auto max-w-2xl text-balance text-3xl font-bold tracking-tight sm:text-4xl">Federal contracting intelligence for any AI agent</h1>
-            <p className="mx-auto mt-3 max-w-xl text-balance text-sm text-slate-400 sm:text-[15px]">
-              SAM opportunities, incumbent financials, GSA pricing, and win playbooks — piped straight into Claude, Cursor, or your own agent. Pay only for what you call.
+          <section className="mt-12 text-center">
+            <div className="mb-7"><AppCluster /></div>
+            <h1 className="mx-auto max-w-2xl text-balance text-3xl font-bold uppercase leading-[1.05] tracking-tight sm:text-5xl">Mindy MCP for any AI agent</h1>
+            <p className="mx-auto mt-4 max-w-xl text-balance text-sm text-slate-400 sm:text-[15px]">
+              SAM opportunities, incumbent financials, GSA pricing, and win playbooks — piped straight into your agent. Connect keyless in under a minute.
             </p>
-            <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/[0.07] px-3.5 py-1.5 text-[13px] text-emerald-200">
-              <span aria-hidden>🎁</span> Start free — {trial} credits, enough for ~{workups(trial)} full opportunity work-ups
+            <p className="mx-auto mt-3 text-[12px] text-slate-500">
+              Plug into <span className="text-slate-400">Claude · Claude Code · ChatGPT · Cursor · Copilot</span> — any MCP client.
+            </p>
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <a href="/app" className="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">Sign in to connect</a>
+              <a href="/mcp/pricing" className="inline-flex items-center justify-center rounded-xl border border-white/15 px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/5">See pricing</a>
             </div>
-            <div className="mt-6">
-              <a href="/app" className="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">
-                Sign in to connect
-              </a>
-              {authState === 'loading' && <p className="mt-3 text-[12px] text-slate-500">Checking your session…</p>}
-              <p className="mt-3 text-[12px] text-slate-500">No API key to copy — you sign in through your browser.</p>
+            <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/[0.07] px-3.5 py-1.5 text-[13px] text-emerald-200">
+              <span aria-hidden>🎁</span> {trial} free credits on your first connect — no card required
             </div>
+            {authState === 'loading' && <p className="mt-3 text-[12px] text-slate-500">Checking your session…</p>}
           </section>
 
-          {/* Rate card — a procurement-style row list, not a consumer credit-card grid */}
-          <section className="mt-14">
-            <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">Credit packs</h2>
-            <p className="mx-auto mt-2 max-w-lg text-center text-[13px] text-slate-400">Prepaid, debited only when a call succeeds. Buy once, use anytime — credits never expire. No subscription.</p>
-            <div className="mx-auto mt-6 max-w-3xl overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02]">
-              {/* column header (desktop) */}
-              <div className="hidden grid-cols-[1.5fr_0.7fr_1.4fr_auto] items-center gap-4 border-b border-white/10 px-5 py-2.5 text-[10px] font-medium uppercase tracking-wider text-slate-500 sm:grid">
-                <div>Pack</div>
-                <div>Price</div>
-                <div>What it gets you</div>
-                <div className="text-right" />
+          {/* Connect card — client tabs rewrite the steps */}
+          <section className="mt-12 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 sm:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">Connect</p>
+                <h2 className="mt-0.5 text-[15px] font-semibold text-slate-100">Plug Mindy into your AI agent</h2>
               </div>
-              {tierRows.map((t, i) => (
-                <div
-                  key={t.id}
-                  className={`grid grid-cols-1 items-center gap-x-4 gap-y-3 px-5 py-4 sm:grid-cols-[1.5fr_0.7fr_1.4fr_auto] ${i > 0 ? 'border-t border-white/10' : ''} ${t.highlight ? 'bg-emerald-400/[0.05]' : ''}`}
-                >
-                  <div className="flex flex-wrap items-center gap-2">
-                    <span className="text-[15px] font-semibold text-slate-100">{t.name}</span>
-                    {t.tag && (
-                      <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${t.highlight ? 'bg-emerald-500 text-[#06120c]' : 'border border-white/15 text-slate-400'}`}>{t.tag}</span>
-                    )}
-                  </div>
-                  <div className="tabular-nums">
-                    <span className="text-[15px] font-semibold text-slate-100">{t.price}</span>
-                    <span className="ml-1.5 text-[11px] text-slate-500 sm:ml-0 sm:block">{t.priceSub}</span>
-                  </div>
-                  <div className="text-[13px] text-slate-400">
-                    <span className="font-medium tabular-nums text-slate-200">{t.credits.toLocaleString()} credits</span>
-                    <span className="text-slate-600"> · </span>~{workups(t.credits)} opportunity work-ups
-                  </div>
-                  <a
-                    href="/app"
-                    className={`inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-[13px] font-semibold sm:justify-self-end ${t.highlight ? 'bg-emerald-500 text-[#06120c] hover:bg-emerald-400' : 'border border-white/15 text-slate-200 hover:bg-white/5'}`}
+              <div className="inline-flex rounded-full border border-white/[0.08] bg-[#070b16] p-1">
+                {CLIENTS.map((c) => (
+                  <button
+                    key={c.id}
+                    onClick={() => setClient(c.id)}
+                    className={`rounded-full px-3 py-1 text-[12px] font-medium transition ${client === c.id ? 'bg-emerald-500 text-[#06120c]' : 'text-slate-400 hover:text-slate-200'}`}
                   >
-                    {t.cta}
-                  </a>
-                </div>
-              ))}
-            </div>
-            <p className="mx-auto mt-3 max-w-2xl text-center text-[12px] leading-relaxed text-slate-500">
-              A <span className="text-slate-400">work-up</span> ≈ search one opportunity, pull the incumbent&apos;s financials, run a who-can-win scan, and generate a win playbook (~{workupCost} credits). Lighter lookups cost far less — see the full rate list below.
-            </p>
-          </section>
-
-          {/* Example runs — how credits map to real BD work */}
-          {catTools.length > 0 && (
-            <section className="mt-12">
-              <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">What you can do with credits</h2>
-              <p className="mx-auto mt-2 max-w-lg text-center text-[13px] text-slate-400">Each call is priced on its own — chain a few and you&apos;ve run a real BD task. A handful of examples:</p>
-              <div className="mx-auto mt-6 grid max-w-3xl gap-3 sm:grid-cols-2">
-                {examples.map((ex) => {
-                  const cost = exampleCost(ex.tools);
-                  return (
-                    <div key={ex.title} className="flex items-start justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-4">
-                      <div className="min-w-0">
-                        <div className="text-[14px] font-semibold text-slate-100">{ex.title}</div>
-                        <div className="mt-1 text-[12px] leading-relaxed text-slate-400">{ex.desc}</div>
-                      </div>
-                      <div className="shrink-0 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[12px] font-semibold tabular-nums text-emerald-300">{cost} cr</div>
-                    </div>
-                  );
-                })}
-              </div>
-              <p className="mx-auto mt-4 max-w-2xl text-center text-[12px] text-slate-500">
-                Your {trial} free credits alone cover ~{workups(trial)} full work-ups — or dozens of quick lookups. Credits never expire, so run them whenever a pursuit heats up.
-              </p>
-            </section>
-          )}
-
-          {/* Pro cross-sell */}
-          <section className="mt-12">
-            <div className="flex flex-col items-center justify-between gap-3 rounded-2xl border border-indigo-400/20 bg-indigo-400/[0.05] px-5 py-4 sm:flex-row">
-              <p className="text-center text-[13px] text-slate-300 sm:text-left">
-                <span className="font-semibold text-indigo-200">Already a Mindy Pro member?</span> Your $149/mo plan includes <span className="font-semibold tabular-nums">{proCredits.toLocaleString()} MCP credits every month</span> — the best value if you use the agent daily.
-              </p>
-              <a href="/premium" className="shrink-0 rounded-lg border border-indigo-400/30 px-3 py-2 text-[13px] font-medium text-indigo-100 hover:bg-indigo-400/10">See Pro</a>
-            </div>
-          </section>
-
-          {/* Tool / cost table */}
-          {catTools.length > 0 && (
-            <section className="mt-14">
-              <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">What your agent can call</h2>
-              <div className="mx-auto mt-5 max-w-2xl overflow-hidden rounded-2xl border border-white/10">
-                {catTools.filter((t) => t.credits > 0).map((t, i) => (
-                  <div key={t.name} className={`flex items-center justify-between gap-4 px-4 py-3 text-sm ${i % 2 ? 'bg-white/[0.015]' : ''}`}>
-                    <div className="min-w-0">
-                      <div className="font-medium text-slate-200">{TOOL_LABELS[t.name] ?? t.name}</div>
-                      <div className="truncate text-[12px] text-slate-500">{t.description}</div>
-                    </div>
-                    <div className="shrink-0 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[12px] font-semibold tabular-nums text-emerald-300">{t.credits} {t.credits === 1 ? 'credit' : 'credits'}</div>
-                  </div>
+                    {c.name}
+                  </button>
                 ))}
               </div>
-              <p className="mx-auto mt-3 max-w-2xl text-center text-[12px] text-slate-500">Credits are debited only when a call succeeds. Repeat/cached reads are free.</p>
-            </section>
-          )}
+            </div>
 
-          {/* Connect preview — keyless */}
-          <section className="mt-14">
-            <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">Connect in three steps</h2>
-            <p className="mx-auto mt-2 max-w-lg text-center text-[13px] text-slate-400">Add the server to Claude, Cursor, or any MCP client — then sign in through your browser. No key to copy.</p>
-            <ol className="mx-auto mt-5 grid max-w-2xl gap-2 sm:grid-cols-3">
-              {['Copy the endpoint URL', 'Add it as a custom connector', 'Sign in through your browser'].map((s, i) => (
+            {/* Endpoint URL */}
+            <div className="mt-4 flex items-center gap-2 rounded-lg border border-white/[0.08] bg-[#070b16] px-3 py-2">
+              <span className="text-[11px] uppercase tracking-wide text-slate-500">Endpoint</span>
+              <code className="min-w-0 flex-1 truncate font-mono text-[13px] text-emerald-300">{MCP_URL}</code>
+              <button onClick={() => copy(MCP_URL, 'url')} className="shrink-0 rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-[11px] text-slate-300 hover:bg-white/10">{copied === 'url' ? 'Copied' : 'Copy'}</button>
+            </div>
+
+            {/* Steps */}
+            <ol className="mt-4 grid gap-2 sm:grid-cols-3">
+              {conn.steps.map((s, i) => (
                 <li key={i} className="flex items-start gap-2.5 rounded-xl border border-white/[0.06] bg-white/[0.015] px-3 py-2.5 text-[13px] text-slate-300">
                   <span className="grid h-5 w-5 shrink-0 place-items-center rounded-full bg-white/10 text-[11px] font-semibold text-slate-300">{i + 1}</span>
                   <span>{s}</span>
                 </li>
               ))}
             </ol>
-            <div className="mx-auto mt-4 flex max-w-2xl items-center gap-2 rounded-lg border border-white/[0.08] bg-[#070b16] px-3 py-2">
-              <span className="text-[11px] uppercase tracking-wide text-slate-500">Endpoint</span>
-              <code className="min-w-0 flex-1 truncate font-mono text-[13px] text-emerald-300">{MCP_URL}</code>
-              <button onClick={() => copy(MCP_URL, 'landing-url')} className="shrink-0 rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-[11px] text-slate-300 hover:bg-white/10">{copied === 'landing-url' ? 'Copied' : 'Copy'}</button>
-            </div>
-            <p className="mx-auto mt-3 max-w-2xl text-center text-[12px] text-slate-500">Running headless or in CI? Sign in once to mint an API key instead.</p>
-            <div className="mt-8 text-center">
-              <a href="/app" className="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">
-                Sign in to connect
-              </a>
-              <p className="mt-3 text-[12px] text-slate-500">Free to start — {trial} credits on your first connect. No card required.</p>
-            </div>
+
+            {/* Lead + optional command (Claude Code) */}
+            <p className="mt-4 text-sm text-slate-400">{conn.lead}</p>
+            {conn.code && (
+              <div className="relative mt-2">
+                <pre className="overflow-x-auto rounded-lg border border-white/[0.06] bg-[#070b16] p-3.5 font-mono text-[12px] leading-relaxed text-slate-300">{conn.code}</pre>
+                <button onClick={() => copy(conn.code!, 'snippet')} className="absolute right-2.5 top-2.5 rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-[11px] text-slate-300 hover:bg-white/10">{copied === 'snippet' ? 'Copied' : 'Copy'}</button>
+              </div>
+            )}
+            <p className="mt-3 text-[12px] text-slate-500">🔑 No API key needed — you sign in through your browser. Running headless or in CI? Sign in once to mint a key.</p>
           </section>
+
+          <p className="mt-8 text-center text-[13px] text-slate-500">
+            Curious what it costs? <a href="/mcp/pricing" className="text-emerald-300 underline underline-offset-2 hover:text-emerald-200">See pricing &amp; what your agent can do →</a>
+          </p>
         </div>
       </main>
     );
