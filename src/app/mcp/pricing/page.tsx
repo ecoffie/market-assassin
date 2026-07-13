@@ -2,19 +2,26 @@
 
 /**
  * getmindy.ai/mcp/pricing — the standalone PUBLIC pricing page (separate from the
- * /mcp connect/landing page). Rate card + "what you can do with credits" examples
- * (with placeholder demo videos until the real clips exist) + per-call rate list +
- * Pro cross-sell. All numbers come from the public /api/mcp/catalog (no auth, no PII).
+ * /mcp connect/landing page). Pricing cards with a per-pack included/not-included
+ * checklist + the full per-call rate list + Pro cross-sell. All numbers come from
+ * the public /api/mcp/catalog (no auth, no PII). The demo videos live on /mcp.
  */
 import { useEffect, useMemo, useState } from 'react';
-import {
-  Catalog,
-  McpNav,
-  EXAMPLES,
-  exampleCost,
-  workupCostFrom,
-  workups,
-} from '../catalog-ui';
+import { Catalog, McpNav, workupCostFrom, workups } from '../catalog-ui';
+
+/** Honest per-pack checklist. Every pack unlocks ALL tools — the ladder is volume +
+ *  bonus credits + $/credit, so only those rows flip ✓/✗ across tiers. */
+function checklist(packId: string): { label: string; ok: boolean }[] {
+  const bonus = packId === 'plus' ? '+7% bonus credits' : packId === 'scale' ? '+20% bonus credits' : null;
+  return [
+    { label: 'All 9 intelligence tools', ok: true },
+    { label: 'Keyless connect + API keys', ok: true },
+    { label: 'Credits never expire', ok: true },
+    { label: 'Charged on success only', ok: true },
+    { label: bonus ?? 'Bonus credits', ok: !!bonus },
+    { label: 'Best price per credit', ok: packId === 'scale' },
+  ];
+}
 
 export default function McpPricing() {
   const [cat, setCat] = useState<Catalog | null>(null);
@@ -32,14 +39,13 @@ export default function McpPricing() {
   const proCredits = cat?.proMonthlyCredits ?? 1000;
   const workupCost = useMemo(() => (tools.length ? workupCostFrom(tools) : 30), [tools]);
   const popularId = packs.length >= 2 ? packs[1].id : undefined;
-  const bonusOf = (label: string) => label.match(/\(([^)]*bonus)\)/i)?.[1] ?? null;
 
-  const tierRows = [
+  const cards = [
     { id: 'free', name: 'Free trial', tag: 'one-time', highlight: false, price: '$0', priceSub: 'on first connect', credits: trial, cta: 'Start free' },
     ...packs.map((p) => ({
       id: p.id,
       name: p.label.split('—')[0].trim(),
-      tag: p.id === popularId ? 'Recommended' : bonusOf(p.label),
+      tag: p.id === popularId ? 'Recommended' : p.id === 'scale' ? 'Best rate' : null,
       highlight: p.id === popularId,
       price: `$${p.usd}`,
       priceSub: 'prepaid',
@@ -57,48 +63,45 @@ export default function McpPricing() {
         <section className="mt-10 text-center">
           <h1 className="text-balance text-3xl font-bold tracking-tight sm:text-4xl">Simple, prepaid pricing</h1>
           <p className="mx-auto mt-3 max-w-xl text-balance text-sm text-slate-400 sm:text-[15px]">
-            Buy credits, spend them per call — on success only. No subscription, no seats, no expiry. Start with {trial} free.
+            Buy credits, spend them per call — on success only. No subscription, no seats, no expiry. Every pack unlocks all 9 tools; bigger packs just add bonus credits. Start with {trial} free.
           </p>
         </section>
 
-        {/* Rate card */}
+        {/* Pricing cards with per-pack checklist */}
         <section className="mt-10">
-          <div className="mx-auto max-w-3xl overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02]">
-            <div className="hidden grid-cols-[1.5fr_0.7fr_1.4fr_auto] items-center gap-4 border-b border-white/10 px-5 py-2.5 text-[10px] font-medium uppercase tracking-wider text-slate-500 sm:grid">
-              <div>Pack</div>
-              <div>Price</div>
-              <div>What it gets you</div>
-              <div className="text-right" />
-            </div>
-            {tierRows.map((t, i) => (
-              <div
-                key={t.id}
-                className={`grid grid-cols-1 items-center gap-x-4 gap-y-3 px-5 py-4 sm:grid-cols-[1.5fr_0.7fr_1.4fr_auto] ${i > 0 ? 'border-t border-white/10' : ''} ${t.highlight ? 'bg-emerald-400/[0.05]' : ''}`}
-              >
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[15px] font-semibold text-slate-100">{t.name}</span>
-                  {t.tag && (
-                    <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${t.highlight ? 'bg-emerald-500 text-[#06120c]' : 'border border-white/15 text-slate-400'}`}>{t.tag}</span>
-                  )}
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {cards.map((c) => (
+              <div key={c.id} className={`relative flex flex-col rounded-2xl border p-5 ${c.highlight ? 'border-emerald-400/40 bg-emerald-400/[0.04]' : 'border-white/10 bg-white/[0.02]'}`}>
+                {c.tag && (
+                  <span className={`absolute -top-2.5 left-5 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${c.highlight ? 'bg-emerald-500 text-[#06120c]' : 'border border-white/15 bg-[#0a0f1e] text-slate-400'}`}>{c.tag}</span>
+                )}
+                <div className="text-[13px] font-semibold uppercase tracking-wide text-slate-200">{c.name}</div>
+                <div className="mt-3 flex items-baseline gap-1.5">
+                  <span className="text-3xl font-bold tabular-nums">{c.price}</span>
+                  <span className="text-[12px] text-slate-500">{c.priceSub}</span>
                 </div>
-                <div className="tabular-nums">
-                  <span className="text-[15px] font-semibold text-slate-100">{t.price}</span>
-                  <span className="ml-1.5 text-[11px] text-slate-500 sm:ml-0 sm:block">{t.priceSub}</span>
+                <div className="mt-2 text-[13px] text-slate-400">
+                  <span className="font-medium tabular-nums text-slate-200">{c.credits.toLocaleString()} credits</span>
+                  <span className="block text-[12px] text-slate-500">~{workups(c.credits, workupCost)} opportunity work-ups</span>
                 </div>
-                <div className="text-[13px] text-slate-400">
-                  <span className="font-medium tabular-nums text-slate-200">{t.credits.toLocaleString()} credits</span>
-                  <span className="text-slate-600"> · </span>~{workups(t.credits, workupCost)} opportunity work-ups
-                </div>
+                <ul className="mt-4 flex-1 space-y-1.5 border-t border-white/[0.06] pt-4">
+                  {checklist(c.id).map((item) => (
+                    <li key={item.label} className={`flex items-start gap-2 text-[12px] ${item.ok ? 'text-slate-300' : 'text-slate-600'}`}>
+                      <span className={`mt-px shrink-0 ${item.ok ? 'text-emerald-400' : 'text-slate-600'}`}>{item.ok ? '✓' : '✕'}</span>
+                      <span className={item.ok ? '' : 'line-through decoration-slate-700'}>{item.label}</span>
+                    </li>
+                  ))}
+                </ul>
                 <a
                   href="/app"
-                  className={`inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-[13px] font-semibold sm:justify-self-end ${t.highlight ? 'bg-emerald-500 text-[#06120c] hover:bg-emerald-400' : 'border border-white/15 text-slate-200 hover:bg-white/5'}`}
+                  className={`mt-5 inline-flex items-center justify-center rounded-lg px-3 py-2 text-[13px] font-semibold ${c.highlight ? 'bg-emerald-500 text-[#06120c] hover:bg-emerald-400' : 'border border-white/15 text-slate-200 hover:bg-white/5'}`}
                 >
-                  {t.cta}
+                  {c.cta}
                 </a>
               </div>
             ))}
           </div>
-          <p className="mx-auto mt-3 max-w-2xl text-center text-[12px] leading-relaxed text-slate-500">
+          <p className="mx-auto mt-4 max-w-2xl text-center text-[12px] leading-relaxed text-slate-500">
             A <span className="text-slate-400">work-up</span> ≈ search one opportunity, pull the incumbent&apos;s financials, run a who-can-win scan, and generate a win playbook (~{workupCost} credits). Lighter lookups cost far less — see the full rate list below.
           </p>
         </section>
@@ -112,38 +115,6 @@ export default function McpPricing() {
             <a href="/premium" className="shrink-0 rounded-lg border border-indigo-400/30 px-3 py-2 text-[13px] font-medium text-indigo-100 hover:bg-indigo-400/10">See Pro</a>
           </div>
         </section>
-
-        {/* Example runs — with placeholder demo videos */}
-        {tools.length > 0 && (
-          <section className="mt-14">
-            <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">What you can do with credits</h2>
-            <p className="mx-auto mt-2 max-w-lg text-center text-[13px] text-slate-400">Each call is priced on its own — chain a few and you&apos;ve run a real BD task. Watch each one in action:</p>
-            <div className="mx-auto mt-6 grid max-w-4xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {EXAMPLES.map((ex) => {
-                const cost = exampleCost(tools, ex.tools);
-                return (
-                  <div key={ex.title} className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.02]">
-                    {/* Placeholder demo — swap the div for a <video>/<iframe> when clips exist */}
-                    <div className="relative grid aspect-video place-items-center border-b border-white/10 bg-[#070b16]">
-                      <div className="grid h-11 w-11 place-items-center rounded-full bg-white/10 text-slate-300 ring-1 ring-white/10">
-                        <span className="ml-0.5 text-lg">▶</span>
-                      </div>
-                      <span className="absolute left-2 top-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-emerald-300">{cost} cr</span>
-                      <span className="absolute bottom-2 right-2 text-[10px] uppercase tracking-wide text-slate-600">demo soon</span>
-                    </div>
-                    <div className="p-4">
-                      <div className="text-[14px] font-semibold text-slate-100">{ex.title}</div>
-                      <div className="mt-1 text-[12px] leading-relaxed text-slate-400">{ex.desc}</div>
-                    </div>
-                  </div>
-                );
-              })}
-            </div>
-            <p className="mx-auto mt-4 max-w-2xl text-center text-[12px] text-slate-500">
-              Your {trial} free credits alone cover ~{workups(trial, workupCost)} full work-ups — or dozens of quick lookups. Credits never expire.
-            </p>
-          </section>
-        )}
 
         {/* Full per-call rate list — real tool names (how the agent calls them) */}
         {tools.length > 0 && (
@@ -170,7 +141,7 @@ export default function McpPricing() {
           <a href="/app" className="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">
             Sign in to connect
           </a>
-          <p className="mt-3 text-[12px] text-slate-500">Free to start — {trial} credits on your first connect. No card required. <a href="/mcp" className="underline underline-offset-2 hover:text-slate-300">Back to connect →</a></p>
+          <p className="mt-3 text-[12px] text-slate-500">Free to start — {trial} credits on your first connect. No card required. <a href="/mcp" className="underline underline-offset-2 hover:text-slate-300">See it in action →</a></p>
         </section>
       </div>
     </main>
