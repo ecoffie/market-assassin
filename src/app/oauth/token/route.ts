@@ -3,8 +3,9 @@
  *   grant_type=authorization_code → verify PKCE + single-use code → access+refresh
  *   grant_type=refresh_token      → rotate refresh → new access+refresh
  * Public clients (no secret); PKCE is the proof-of-possession. Accepts
- * form-encoded (standard) or JSON. The 25 welcome credits are granted on the
- * FIRST successful code exchange (idempotent — gated on no balance row yet).
+ * form-encoded (standard) or JSON. The welcome credits (SIGNUP_CREDITS, default
+ * 100) are granted on the FIRST successful code exchange (idempotent — gated on no
+ * balance row yet).
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { consumeAuthCode, consumeRefreshToken, saveRefreshToken, getClient } from '@/lib/mcp/oauth/store';

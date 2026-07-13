@@ -32,15 +32,17 @@ export interface McpToolContext {
 
 /**
  * Per-tool credit price. Debited on success in Slice 3; exposed as `_credits` now so
- * clients/docs can show the price. Prices mirror PRD §4 (tune later): cheap data
- * lookups = 1, a live-BQ contractor profile = 5, a capable-contractors scan = 8, the
- * proprietary playbook = 2.
+ * clients/docs can show the price. Prices set from MEASURED BigQuery scan cost (PRD §9 R1,
+ * resolved 2026-07-13, $6.25/TB): cheap data lookups = 1, a live-BQ contractor profile = 5,
+ * a capable-contractors scan = 25 (measured 6.93 GB / $0.042 per cold call — NAICS is not a
+ * partition/cluster key so it scans ~7 GB; the earlier "8" was a guess at only ~1.9× cost,
+ * bumped to 25 for a margin-safe ~6× markup), the proprietary playbook = 2.
  */
 export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   search_sam_opportunities: 1,
   get_market_vocabulary: 1,
   get_contractor_profile: 5,
-  find_capable_contractors: 8,
+  find_capable_contractors: 25,
   get_winning_playbook: 2,
   get_pricing_intel: 1, // GSA CALC labor-rate intel (free upstream, multi-call; warm cache ~free)
   get_incumbent_financials: 2, // SEC EDGAR (multi-endpoint, all free)
