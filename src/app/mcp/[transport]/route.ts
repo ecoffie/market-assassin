@@ -25,8 +25,8 @@
  * mcp.getmindy.ai subdomain so clients use the clean https://mcp.getmindy.ai/mcp.
  */
 import { createMcpHandler, withMcpAuth } from 'mcp-handler';
-import { z } from 'zod';
 import { runMeteredTool } from '@/lib/mcp/metered';
+import { mcpRegistrationList } from '@/lib/mcp/tool-schemas';
 import { verifyApiKey } from '@/lib/mcp/api-keys';
 
 // Node.js runtime: verifyApiKey uses node:crypto + the Supabase service-role
@@ -38,72 +38,48 @@ export const maxDuration = 60;
 
 const baseHandler = createMcpHandler(
   (server) => {
-    server.registerTool(
-      'get_winning_playbook',
-      {
-        title: 'Get Winning Playbook',
-        description:
-          "Retrieve GovCon Giants' proprietary coaching on HOW TO WIN a specific federal " +
-          'contracting scenario — pulled from 8 years of course, proposal-template, and ' +
-          'podcast-guest content. This is teaching intelligence, NOT a public data lookup: ' +
-          'it answers "how do I actually win this," which no free API (SAM, USASpending) ' +
-          'contains. Optionally pass NAICS codes to also get a real contractor win story ' +
-          'matched to that industry. Returns grounded=false when the corpus has no match — ' +
-          'in that case tell the user there is no coaching content, do not invent advice.',
-        inputSchema: {
-          topic: z
-            .string()
-            .min(3)
-            .describe(
-              'The scenario in plain language, e.g. "win an 8(a) construction recompete at the VA" ' +
-                'or "break into cybersecurity contracting as a first-time SDVOSB".',
-            ),
-          naics_codes: z
-            .array(z.string())
-            .optional()
-            .describe('Optional NAICS codes (4-6 digits) to fetch a matching real win story.'),
-          limit: z
-            .number()
-            .int()
-            .min(1)
-            .max(12)
-            .optional()
-            .describe('Max guidance passages to return (default 6).'),
-        },
-      },
-      async ({ topic, naics_codes, limit }, extra) => {
-        // Identity resolved by withMcpAuth (below). Present because required:true.
-        const identity = extra?.authInfo?.extra as
-          | { userEmail?: string; keyId?: string }
-          | undefined;
-        if (!identity?.userEmail) {
-          // Should be unreachable (required:true), but never run a tool unattributed.
-          return {
-            isError: true,
-            content: [{ type: 'text', text: 'unauthorized: no verified identity' }],
-          };
-        }
+    // Register EVERY registry tool (not just the playbook) from the single source
+    // of truth — mcpRegistrationList() derives name + description + input schema
+    // from listMcpTools(), so the endpoint's tools always match runMcpTool + the
+    // /mcp pricing table. Each dispatches through runMeteredTool (debit on success).
+    for (const tool of mcpRegistrationList()) {
+      server.registerTool(
+        tool.name,
+        { description: tool.description, inputSchema: tool.inputSchema },
+        async (args: Record<string, unknown>, extra) => {
+          // Identity resolved by withMcpAuth (below). Present because required:true.
+          const identity = extra?.authInfo?.extra as
+            | { userEmail?: string; keyId?: string }
+            | undefined;
+          if (!identity?.userEmail) {
+            // Should be unreachable (required:true), but never run a tool unattributed.
+            return {
+              isError: true,
+              content: [{ type: 'text', text: 'unauthorized: no verified identity' }],
+            };
+          }
 
-        // Metered dispatch: pre-checks the credit balance, runs the tool via the
-        // registry, debits on success (get_winning_playbook = 2 credits), and
-        // logs the call. Rejects with insufficient_credits before doing any work.
-        const outcome = await runMeteredTool(
-          'get_winning_playbook',
-          { topic, naics_codes, limit },
-          { userEmail: identity.userEmail, apiKeyId: identity.keyId ?? null },
-        );
-        if (!outcome.ok) {
+          // Metered dispatch: pre-checks the credit balance, runs the tool via the
+          // registry, debits its price on success, logs the call. Rejects with
+          // insufficient_credits before doing any work.
+          const outcome = await runMeteredTool(
+            tool.name,
+            (args ?? {}) as Record<string, unknown>,
+            { userEmail: identity.userEmail, apiKeyId: identity.keyId ?? null },
+          );
+          if (!outcome.ok) {
+            return {
+              isError: true,
+              content: [{ type: 'text', text: `${outcome.error.code}: ${outcome.error.message}` }],
+            };
+          }
           return {
-            isError: true,
-            content: [{ type: 'text', text: `${outcome.error.code}: ${outcome.error.message}` }],
+            content: [{ type: 'text', text: JSON.stringify(outcome.result, null, 2) }],
+            structuredContent: outcome.result,
           };
-        }
-        return {
-          content: [{ type: 'text', text: JSON.stringify(outcome.result, null, 2) }],
-          structuredContent: outcome.result,
-        };
-      },
-    );
+        },
+      );
+    }
   },
   // serverOptions — registerTool() manages the tools capability automatically.
   {
