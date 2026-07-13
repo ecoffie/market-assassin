@@ -202,7 +202,8 @@ therefore also mostly built, not just the data plumbing.
 - **API-key middleware** — verify `Authorization: Bearer <key>` (or `X-Mindy-API-Key`), resolve
   to `user_email` + scopes, reject if revoked / no credits.
 - **Credit debit** — a wrapper around each tool call: compute cost by tier (SAM search = 1,
-  vocab = 1, contractor profile w/ live BQ = 5, capable-contractors scan = 8 — tune later),
+  vocab = 1, contractor profile w/ live BQ = 5, capable-contractors scan = **25** — measured & set
+  in R1 2026-07-13; the earlier "8" was a guess, real BQ cost forced 25 for a safe 6× markup),
   **debit on success only**, write `mcp_credit_ledger` + `mcp_call_log`. Reuse the Tier-2
   cache-first pattern so warm/cached hits cost fewer credits (protects our margin AND rewards
   the user).
@@ -458,9 +459,29 @@ data project.)*
 
 ## 9. Risks + open questions
 
-- **R1 — Credit pricing math.** Set per-tool credit costs so we're margin-safe on BigQuery
-  (the one real variable cost) but still cheap vs Tango. Needs a real cost model before launch
-  (measure BQ $/scan, price credits above it). *Owner decision.*
+- **R1 — Credit pricing math. ✅ RESOLVED 2026-07-13** (dry-run measured vs the real 63M-row
+  awards table, BigQuery $6.25/TB). **Peg: `$1 = 100 credits` (1 credit = 1¢).**
+
+  | Tool | Measured BQ scan | Real cost/call | **Credits** | User pays | Markup |
+  |------|------------------|----------------|-------------|-----------|--------|
+  | `search_sam_opportunities` | Supabase FTS (no BQ) | ~$0 | **1** | $0.01 | ∞ |
+  | `get_market_vocabulary` | Supabase (no BQ) | ~$0 | **1** | $0.01 | ∞ |
+  | `get_contractor_profile` | ~0.15 GB (clustered on recipient_uei) | $0.0009 | **5** | $0.05 | 56× |
+  | `find_capable_contractors` | **6.93 GB** (NAICS/PSC un-prunable — awards is partitioned by fiscal_year, clustered by recipient_uei, NOT naics) | **$0.0423** | **25** | $0.25 | **6×** |
+
+  Key finding: `find_capable_contractors` is the ONLY real cost driver (~50× the profile lookup)
+  because its WHERE has no partition/cluster key → scans ~7 GB every cold call. The PRD's original
+  "8 credits" guess would have priced it at $0.08 = only **1.9× cost** (too thin once API/compute
+  overhead is added). Measurement lifted it to **25 credits (6× markup)** — margin-safe. Cache-first
+  (Tier-2 pattern) makes warm hits ~free, so this is worst-case cold pricing.
+
+  - **Top-up packs (Stripe):** $10 = 1,000cr · $25 = 2,500cr · $50 = 5,000cr · $100 = 10,000cr.
+    ($10 buys ~40 capable scans / 200 profiles / 1,000 SAM searches.)
+  - **Free allotment:** 200 credits/mo for signed-in Mindy users (Higgsfield gives 150) — enough
+    to try, not to run a business on. *(Resolves Q1.)*
+  - **Anti-cannibalization vs $149/mo Pro:** MCP = programmatic/agent channel; Pro = human app +
+    the moat (pipeline, Vault, saved pursuits = Tier-0, NOT exposed on MCP). No true substitution —
+    a heavy MCP user still can't get the Tier-0 crown jewels without Pro.
 - **R2 — Abuse / bill-run-up.** An API key looping cold BQ scans = our cost spike. Mitigated by
   reusing the Tier-2 rate-limit + per-turn cap at the MCP edge, + debit-before-expensive-op.
 - **R3 — `_ai_hint` accuracy = the whole moat.** If a narrated conclusion is ever wrong, we've
