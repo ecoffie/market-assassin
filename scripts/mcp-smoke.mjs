@@ -179,14 +179,18 @@ try {
   }
 
   // ── get_award_detail (USASpending) ─────────────────────────────────────────
-  console.error('\n→ calling get_award_detail({ piid: "140F0822D0024" })');
-  const ad = await client.callTool({ name: 'get_award_detail', arguments: { piid: '140F0822D0024' } });
+  // Stable historical DoD award (~$979M ceiling). USASpending retains historical
+  // awards indefinitely, so this PIID reliably resolves — the smoke actually
+  // exercises the grounded resolve+hydrate path, not just an honest miss.
+  console.error('\n→ calling get_award_detail({ piid: "H9222217F0069" })');
+  const ad = await client.callTool({ name: 'get_award_detail', arguments: { piid: 'H9222217F0069' } });
   const adS = ad.structuredContent;
   if (!adS) fail('award-detail: no structuredContent');
-  console.error(`✓ grounded=${adS._meta?.grounded} · degraded=${adS._meta?.degraded} · resolved_id=${adS._meta?.resolved_id}`);
-  // A PIID may or may not resolve on any given day; grounded=false is a valid honest miss.
-  // What must hold: when grounded, the award object carries the id we resolved (traceability).
-  if (adS._meta?.grounded && adS.award?.generatedId && adS._meta?.resolved_id && adS.award.generatedId !== adS._meta.resolved_id) {
+  console.error(`✓ grounded=${adS._meta?.grounded} · degraded=${adS._meta?.degraded} · resolved_id=${adS._meta?.resolved_id} · ceiling=${adS.award?.ceiling}`);
+  if (adS._meta?.degraded) fail('award-detail: degraded=true (USASpending unreachable)');
+  if (!adS._meta?.grounded) fail('award-detail: grounded=false for a known historical PIID (resolve regression?)');
+  // When grounded, the award object must carry the id we resolved (traceability).
+  if (adS.award?.generatedId && adS._meta?.resolved_id && adS.award.generatedId !== adS._meta.resolved_id) {
     fail('award-detail: returned award generatedId does not match resolved_id');
   }
 
