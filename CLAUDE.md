@@ -1630,7 +1630,7 @@ All of Phase 1 is merged to `main` + every migration run & verified live (PRs #1
 → data-core tools → dashboard. `_ai_hint` gated OFF by default (data-first — see below).
 
 **The billing model:**
-- **Free 25 credits on a user's FIRST key** (`grantSignupCreditsIfFirst`, env `MCP_SIGNUP_CREDITS`; re-minting can't farm — gated on "no balance row yet").
+- **Free 100 credits on a user's FIRST connect** (first key OR first keyless OAuth connect; `grantSignupCreditsIfFirst`, env `MCP_SIGNUP_CREDITS`, default 100 as of 2026-07-13; re-minting can't farm — gated on "no balance row yet"). One-time B2B trial (≈ one real evaluation), NOT a recurring grant.
 - **Debit-on-success only, atomic.** `runMeteredTool` (`src/lib/mcp/metered.ts`) pre-checks balance → runs the tool → debits on success / **0 on failure**; zero-balance is rejected with a top-up message before the tool runs.
 - **Atomicity is in Postgres**, not app code: `mcp_debit_credits` / `mcp_grant_credits` / `mcp_apply_credit` — the `UPDATE … WHERE balance >= amount RETURNING` (and `INSERT … ON CONFLICT DO NOTHING`) ARE the gates. 100 concurrent debits can't corrupt the balance (verified live); balance never < 0.
 - **Top-ups are exactly-once** by Stripe session id; **Pro monthly** allowance is exactly-once by `pro:<email>:<YYYY-MM>` — both via `applyCreditOnce` → `mcp_apply_credit`.
@@ -1749,7 +1749,7 @@ Revoke = RFC 7009 (`/oauth/revoke`).
 **Identity source:** the consent page reads the signed MI 2FA session
 (`mi_beta_auth_token`), so the approver's email is the token identity — the same
 server-verified path that fixed the /mcp 0-credits wrong-account bug
-(`/api/mcp/session`). First OAuth connect gets the 25-credit welcome grant via
+(`/api/mcp/session`). First OAuth connect gets the 100-credit welcome grant via
 `grantSignupCreditsIfFirst` (can't be farmed — gated on "no balance row yet").
 
 **Tokens (`src/lib/mcp/oauth/tokens.ts`):** stateless HS256 access JWTs, `aud`-bound to

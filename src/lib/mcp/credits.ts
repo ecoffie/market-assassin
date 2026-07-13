@@ -9,8 +9,15 @@
  */
 import { getWriteClient } from '@/lib/supabase/server-clients';
 
-/** Free credits granted on a user's FIRST API key (env-tunable). */
-export const SIGNUP_CREDITS = Math.max(0, Number(process.env.MCP_SIGNUP_CREDITS ?? '25') || 0);
+/**
+ * Free credits granted ONE-TIME on a user's FIRST connection (first key or first
+ * keyless OAuth connect), env-tunable via MCP_SIGNUP_CREDITS. Default 100 (decided
+ * 2026-07-13): a one-time B2B trial — ≈ 4 capable-scans / 20 profiles / 100 SAM
+ * searches, enough to run one real evaluation before buying a pack. NOT a recurring
+ * monthly grant (that would leak margin-heavy BQ scans to non-payers); paid Pro subs
+ * get a monthly allowance separately via PRO_MONTHLY_CREDITS.
+ */
+export const SIGNUP_CREDITS = Math.max(0, Number(process.env.MCP_SIGNUP_CREDITS ?? '100') || 0);
 
 /** Live balance for a user (0 if they have no balance row yet). */
 export async function getBalance(userEmail: string): Promise<number> {
