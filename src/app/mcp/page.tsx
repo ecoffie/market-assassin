@@ -251,6 +251,18 @@ export default function McpConsole() {
     const popularId = packs.length >= 2 ? packs[1].id : undefined;
     // Optional "N% bonus" pulled from the pack label, e.g. "Plus — 800 credits (7% bonus)".
     const bonusOf = (label: string) => label.match(/\(([^)]*bonus)\)/i)?.[1] ?? null;
+    // Concrete "recipes" — how credits map to real BD tasks, priced from the LIVE
+    // tool costs (repeat a tool name to charge it N times). Spread cheap → rich so a
+    // prospect sees credits go a long way on light lookups.
+    const examples: { title: string; desc: string; tools: string[] }[] = [
+      { title: 'Check today’s new opportunities', desc: 'One live SAM search across your NAICS and keywords.', tools: ['search_sam_opportunities'] },
+      { title: 'Draft a win strategy', desc: 'Generate a proprietary win playbook for an opportunity.', tools: ['get_winning_playbook'] },
+      { title: 'Price your bid', desc: 'GSA labor-rate intel plus regulatory demand signals.', tools: ['get_pricing_intel', 'get_regulatory_demand'] },
+      { title: 'Vet an incumbent', desc: 'Pull their SEC financials and a full contractor profile.', tools: ['get_incumbent_financials', 'get_contractor_profile'] },
+      { title: 'Full opportunity work-up', desc: 'Search it, read the incumbent, scan who can win, get the playbook.', tools: ['search_sam_opportunities', 'get_incumbent_financials', 'find_capable_contractors', 'get_winning_playbook'] },
+      { title: 'Build a teaming shortlist', desc: 'A who-can-win scan, then deep-profile your top three partners.', tools: ['find_capable_contractors', 'get_contractor_profile', 'get_contractor_profile', 'get_contractor_profile'] },
+    ];
+    const exampleCost = (names: string[]) => names.reduce((s, n) => s + toolCr(n, 1), 0);
     // Unified tier rows: free trial first, then the prepaid packs.
     const tierRows = [
       { id: 'free', name: 'Free trial', tag: 'one-time', highlight: false, price: '$0', priceSub: 'on first connect', credits: trial, cta: 'Start free' },
@@ -333,8 +345,33 @@ export default function McpConsole() {
             </p>
           </section>
 
+          {/* Example runs — how credits map to real BD work */}
+          {catTools.length > 0 && (
+            <section className="mt-12">
+              <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">What you can do with credits</h2>
+              <p className="mx-auto mt-2 max-w-lg text-center text-[13px] text-slate-400">Each call is priced on its own — chain a few and you&apos;ve run a real BD task. A handful of examples:</p>
+              <div className="mx-auto mt-6 grid max-w-3xl gap-3 sm:grid-cols-2">
+                {examples.map((ex) => {
+                  const cost = exampleCost(ex.tools);
+                  return (
+                    <div key={ex.title} className="flex items-start justify-between gap-3 rounded-xl border border-white/10 bg-white/[0.02] p-4">
+                      <div className="min-w-0">
+                        <div className="text-[14px] font-semibold text-slate-100">{ex.title}</div>
+                        <div className="mt-1 text-[12px] leading-relaxed text-slate-400">{ex.desc}</div>
+                      </div>
+                      <div className="shrink-0 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[12px] font-semibold tabular-nums text-emerald-300">{cost} cr</div>
+                    </div>
+                  );
+                })}
+              </div>
+              <p className="mx-auto mt-4 max-w-2xl text-center text-[12px] text-slate-500">
+                Your {trial} free credits alone cover ~{workups(trial)} full work-ups — or dozens of quick lookups. Credits never expire, so run them whenever a pursuit heats up.
+              </p>
+            </section>
+          )}
+
           {/* Pro cross-sell */}
-          <section className="mt-6">
+          <section className="mt-12">
             <div className="flex flex-col items-center justify-between gap-3 rounded-2xl border border-indigo-400/20 bg-indigo-400/[0.05] px-5 py-4 sm:flex-row">
               <p className="text-center text-[13px] text-slate-300 sm:text-left">
                 <span className="font-semibold text-indigo-200">Already a Mindy Pro member?</span> Your $149/mo plan includes <span className="font-semibold tabular-nums">{proCredits.toLocaleString()} MCP credits every month</span> — the best value if you use the agent daily.
