@@ -9,6 +9,11 @@
 #      we actually use, properly typed, partitioned by FY, clustered
 #      on recipient_uei + recipient_name for fast contractor queries)
 #
+# ORDER MATTERS: run THIS script first (it recreates awards_raw via
+# --replace), THEN build-derived.sql (which reads awards_raw to build the
+# typed tables and DROPs awards_raw as its last step). awards_raw only needs
+# to exist between these two steps — it is not kept between ingest runs.
+#
 # Why STRING-only in raw: USASpending CSVs have inconsistent types across
 # files. A "1" might be numeric in one row and "T" in another for boolean
 # fields like is_8a_program_participant. Loading everything as STRING
