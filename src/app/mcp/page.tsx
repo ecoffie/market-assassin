@@ -3,9 +3,10 @@
 /**
  * getmindy.ai/mcp — the Mindy MCP developer console (Higgsfield-style redesign).
  *
- * Structure: bold hero → per-client connect card (tabs rewrite the steps for
- * Claude Desktop / Claude Code / Cursor / any client) → connection key → credits →
- * pricing → usage.
+ * Structure: bold hero → per-client connect card (tabs rewrite the KEYLESS steps
+ * for Claude Desktop / Claude Code / Cursor / any client — copy URL, add connector,
+ * sign in through the browser via OAuth) → credits → pricing → usage → a collapsed
+ * "Advanced — API keys for headless / CI" section (the old key flow, demoted).
  *
  * Identity is server-verified: on load we ask /api/mcp/session who the signed
  * MI token proves we are, and render THAT account — never the stale plaintext
@@ -27,7 +28,7 @@ interface Tool { name: string; description: string; credits: number }
 interface Pkg { id: string; credits: number; usd: number; label: string; checkoutUrl?: string }
 interface Call { tool_name: string; status: string; credits_charged: number; created_at: string }
 
-const MCP_URL = 'https://mcp.getmindy.ai/mcp';
+const MCP_URL = 'https://getmindy.ai/mcp/mcp';
 const shortDate = (s: string | null) => (s ? new Date(s).toLocaleDateString(undefined, { month: 'short', day: 'numeric' }) : null);
 
 type ClientId = 'claude-desktop' | 'claude-code' | 'cursor' | 'other';
@@ -38,57 +39,49 @@ const CLIENTS: { id: ClientId; name: string }[] = [
   { id: 'other', name: 'Other agent' },
 ];
 
-const codeTag = (t: string) => <code className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-[12px] text-slate-300">{t}</code>;
+interface ConnectInfo { lead: React.ReactNode; code?: string; steps: React.ReactNode[] }
 
-/** The connect instructions for a client — all real methods for the same hosted URL. */
-function connectFor(client: ClientId, key: string) {
-  const json = `{
-  "mcpServers": {
-    "mindy": {
-      "url": "${MCP_URL}",
-      "headers": { "Authorization": "Bearer ${key}" }
-    }
-  }
-}`;
+/**
+ * Keyless connect instructions per client. You add the endpoint as a connector and
+ * sign in through the browser — no API key. (Headless/CI uses a key; see Advanced.)
+ */
+function connectFor(client: ClientId): ConnectInfo {
   switch (client) {
     case 'claude-code':
       return {
-        lead: <>Claude Code speaks remote MCP natively — one command in your terminal. Swap in your connection key.</>,
-        code: `claude mcp add --transport http mindy ${MCP_URL} \\\n  --header "Authorization: Bearer ${key}"`,
+        lead: <>Claude Code does the sign-in for you — one command, no key.</>,
+        code: `claude mcp add --transport http mindy ${MCP_URL}`,
         steps: [
-          'Create a connection key below and copy it.',
-          <>Run the command below in your terminal (paste your key in place of {codeTag('mcp_live_YOUR_KEY')}).</>,
-          <>In any project, ask: <span className="text-slate-300">“Use Mindy to find open SAM drone contracts.”</span></>,
+          <>Run the command below in your terminal.</>,
+          <>Claude Code opens a browser → <span className="text-slate-300">sign in with Mindy → Allow</span>.</>,
+          <>Ask: <span className="text-slate-300">“Use Mindy to find open SAM drone contracts.”</span></>,
         ],
       };
     case 'cursor':
       return {
-        lead: <>Add Mindy to Cursor&apos;s MCP config, then turn it on in Settings.</>,
-        code: json,
+        lead: <>Add Mindy as an MCP server in Cursor — it signs you in in the browser.</>,
         steps: [
-          'Create a connection key below and copy it.',
-          <>Paste the block below into {codeTag('~/.cursor/mcp.json')} (create the file if it&apos;s not there).</>,
-          <>Cursor → Settings → MCP → enable <span className="text-slate-300">mindy</span>, then ask Cursor to use it.</>,
+          <>Copy the endpoint URL above.</>,
+          <>Cursor → Settings → MCP → <span className="text-slate-300">Add new server</span> → paste the URL.</>,
+          <>Click <span className="text-slate-300">Connect</span> → sign in with Mindy → Allow.</>,
         ],
       };
     case 'other':
       return {
-        lead: <>Mindy works with any MCP-compatible agent — Windsurf, Cline, or your own. Point it at the endpoint with a Bearer header.</>,
-        code: json,
+        lead: <>Any MCP client with connector support — Windsurf, Cline, or your own.</>,
         steps: [
-          'Create a connection key below and copy it.',
-          <>Add the server block below to your client&apos;s MCP config, with {codeTag('Authorization: Bearer <your key>')}.</>,
-          'Restart the client and call any Mindy tool from your agent.',
+          <>Copy the endpoint URL above.</>,
+          <>Add it as a remote / custom MCP server in your client.</>,
+          <>Connect → sign in with Mindy → Allow.</>,
         ],
       };
     default: // claude-desktop
       return {
-        lead: <>Add Mindy as a custom MCP server in Claude Desktop&apos;s config file.</>,
-        code: json,
+        lead: <>Add a connector, sign in, done — no key to paste.</>,
         steps: [
-          'Create a connection key below and copy it.',
-          <>Claude Desktop → Settings → Developer → <span className="text-slate-300">Edit Config</span>, and paste the block below into {codeTag('claude_desktop_config.json')}.</>,
-          <>Fully quit &amp; reopen Claude Desktop, then ask: <span className="text-slate-300">“Use Mindy to find open SAM drone contracts.”</span></>,
+          <>Copy the endpoint URL above.</>,
+          <>Claude Desktop → Settings → Connectors → <span className="text-slate-300">Add custom connector</span> → paste the URL.</>,
+          <>Click <span className="text-slate-300">Connect</span> → sign in with Mindy → Allow. Then ask Claude to use Mindy.</>,
         ],
       };
   }
@@ -215,9 +208,16 @@ export default function McpConsole() {
     window.location.href = '/app';
   }
 
-  const activeKeys = useMemo(() => keys.filter((k) => !k.revoked_at), [keys]);
   const keyForSnippet = newKey || 'mcp_live_YOUR_KEY';
-  const conn = useMemo(() => connectFor(client, keyForSnippet), [client, keyForSnippet]);
+  const advancedSnippet = `{
+  "mcpServers": {
+    "mindy": {
+      "url": "${MCP_URL}",
+      "headers": { "X-Mindy-API-Key": "${keyForSnippet}" }
+    }
+  }
+}`;
+  const conn = useMemo(() => connectFor(client), [client]);
 
   // ---- Sign-in gate ----------------------------------------------------------
   if (authState !== 'in') {
@@ -234,7 +234,7 @@ export default function McpConsole() {
               <a href="/app" className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">
                 Sign in to Mindy
               </a>
-              <p className="mt-3 text-[12px] text-slate-500">Your first connection key comes with 25 free credits.</p>
+              <p className="mt-3 text-[12px] text-slate-500">Sign in once — your first connect comes with 25 free credits.</p>
             </>
           )}
         </div>
@@ -285,7 +285,7 @@ export default function McpConsole() {
             SAM opportunities, incumbent financials, GSA pricing, and win playbooks — piped straight into Claude, Cursor, or your own agent.
           </p>
           <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/[0.07] px-3.5 py-1.5 text-[13px] text-emerald-200">
-            <span aria-hidden>🎁</span> Your first connection key includes 25 free credits
+            <span aria-hidden>🎁</span> Sign in once — your first connect includes 25 free credits
           </div>
         </section>
 
@@ -334,55 +334,16 @@ export default function McpConsole() {
             ))}
           </ol>
 
-          {/* Snippet */}
+          {/* Lead + optional command (Claude Code) */}
           <p className="mt-4 text-sm text-slate-400">{conn.lead}</p>
-          <div className="relative mt-2">
-            <pre className="overflow-x-auto rounded-lg border border-white/[0.06] bg-[#070b16] p-3.5 font-mono text-[12px] leading-relaxed text-slate-300">{conn.code}</pre>
-            <button onClick={() => copy(conn.code, 'snippet')} className="absolute right-2.5 top-2.5 rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-[11px] text-slate-300 hover:bg-white/10">{copied === 'snippet' ? 'Copied' : 'Copy'}</button>
-          </div>
-          <p className="mt-2 text-[12px] text-slate-500">Replace <code className="font-mono text-slate-400">mcp_live_YOUR_KEY</code> with your connection key from below (shown once when you create it).</p>
-        </section>
-
-        {/* Connection key */}
-        <Panel eyebrow="Connection key" title="Your connection key">
-          <p className="-mt-1 mb-4 text-[13px] leading-relaxed text-slate-400">
-            This is how your AI agent proves the requests are yours. Create one, paste it into the config above, and each call draws from your credit balance. It&apos;s shown once at creation — store it somewhere safe.
-          </p>
-          {newKey && (
-            <div className="mb-4 rounded-lg border border-emerald-400/25 bg-emerald-400/[0.07] p-3">
-              <p className="mb-1.5 text-[13px] font-medium text-emerald-200">Copy your key now — it won&apos;t be shown again.</p>
-              <div className="flex items-center gap-2">
-                <code className="flex-1 overflow-x-auto rounded bg-[#070b16] px-2 py-1.5 font-mono text-[12px] text-emerald-300">{newKey}</code>
-                <button onClick={() => copy(newKey, 'newkey')} className="shrink-0 rounded-md bg-emerald-500 px-2.5 py-1.5 text-[12px] font-medium text-[#06120c] hover:bg-emerald-400">{copied === 'newkey' ? 'Copied' : 'Copy'}</button>
-              </div>
+          {conn.code && (
+            <div className="relative mt-2">
+              <pre className="overflow-x-auto rounded-lg border border-white/[0.06] bg-[#070b16] p-3.5 font-mono text-[12px] leading-relaxed text-slate-300">{conn.code}</pre>
+              <button onClick={() => copy(conn.code!, 'snippet')} className="absolute right-2.5 top-2.5 rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-[11px] text-slate-300 hover:bg-white/10">{copied === 'snippet' ? 'Copied' : 'Copy'}</button>
             </div>
           )}
-          <div className="mb-4 flex gap-2">
-            <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label (e.g. Claude Desktop)" className="min-w-0 flex-1 rounded-lg border border-white/[0.08] bg-[#070b16] px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:border-emerald-400/40 focus:outline-none" />
-            <button onClick={createKey} disabled={busy} className="shrink-0 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-[#06120c] hover:bg-emerald-400 disabled:opacity-50">{busy ? 'Creating…' : 'Create key'}</button>
-          </div>
-          {loading ? (
-            <p className="text-sm text-slate-500">Loading…</p>
-          ) : keys.length === 0 ? (
-            <p className="text-sm text-slate-500">No connection key yet. Create one to get started — your first key comes with 25 free credits.</p>
-          ) : (
-            <ul className="divide-y divide-white/[0.06]">
-              {keys.map((k) => (
-                <li key={k.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                      <code className="font-mono text-[13px] text-slate-200">{k.key_prefix}…</code>
-                      {k.label && <span className="truncate text-slate-500">{k.label}</span>}
-                      {k.revoked_at ? <Chip tone="rose">revoked</Chip> : <Chip tone="emerald">active</Chip>}
-                    </div>
-                    <div className="mt-0.5 text-[12px] text-slate-500">{k.last_used_at ? `last used ${shortDate(k.last_used_at)}` : 'never used'} · created {shortDate(k.created_at)}</div>
-                  </div>
-                  {!k.revoked_at && <button onClick={() => revokeKey(k.id)} className="shrink-0 text-[12px] text-slate-400 hover:text-rose-400">Revoke</button>}
-                </li>
-              ))}
-            </ul>
-          )}
-        </Panel>
+          <p className="mt-3 text-[12px] text-slate-500">🔑 No API key needed — you sign in through your browser. Running headless or in CI? Use a key under <span className="text-slate-400">Advanced</span> below.</p>
+        </section>
 
         {/* Credits */}
         <Panel eyebrow="Credits" title="Buy credits">
@@ -442,6 +403,57 @@ export default function McpConsole() {
             </div>
           </Panel>
         )}
+
+        {/* Advanced — API keys for headless / CI (browser sign-in can't run) */}
+        <details className="mt-5 rounded-2xl border border-white/[0.07] bg-white/[0.02] px-5 py-4">
+          <summary className="cursor-pointer select-none text-[13px] font-medium text-slate-300 marker:text-slate-600 hover:text-slate-100">
+            Advanced — API keys for headless / CI
+          </summary>
+          <div className="mt-4 border-t border-white/[0.06] pt-4">
+            <p className="mb-4 text-[13px] leading-relaxed text-slate-400">
+              Most people never need this. If your agent runs where a browser sign-in can&apos;t happen — a CI job, a server, a scripted pipeline — create a long-lived API key instead. Paste it into your MCP config as a header. It draws from the same credit balance and is shown once at creation, so store it somewhere safe.
+            </p>
+            {newKey && (
+              <div className="mb-4 rounded-lg border border-emerald-400/25 bg-emerald-400/[0.07] p-3">
+                <p className="mb-1.5 text-[13px] font-medium text-emerald-200">Copy your key now — it won&apos;t be shown again.</p>
+                <div className="flex items-center gap-2">
+                  <code className="flex-1 overflow-x-auto rounded bg-[#070b16] px-2 py-1.5 font-mono text-[12px] text-emerald-300">{newKey}</code>
+                  <button onClick={() => copy(newKey, 'newkey')} className="shrink-0 rounded-md bg-emerald-500 px-2.5 py-1.5 text-[12px] font-medium text-[#06120c] hover:bg-emerald-400">{copied === 'newkey' ? 'Copied' : 'Copy'}</button>
+                </div>
+              </div>
+            )}
+            <div className="mb-4 flex gap-2">
+              <input value={label} onChange={(e) => setLabel(e.target.value)} placeholder="Label (e.g. CI pipeline)" className="min-w-0 flex-1 rounded-lg border border-white/[0.08] bg-[#070b16] px-3 py-2 text-sm text-slate-200 placeholder:text-slate-500 focus:border-emerald-400/40 focus:outline-none" />
+              <button onClick={createKey} disabled={busy} className="shrink-0 rounded-lg bg-emerald-500 px-4 py-2 text-sm font-medium text-[#06120c] hover:bg-emerald-400 disabled:opacity-50">{busy ? 'Creating…' : 'Create key'}</button>
+            </div>
+            {loading ? (
+              <p className="text-sm text-slate-500">Loading…</p>
+            ) : keys.length === 0 ? (
+              <p className="text-sm text-slate-500">No API key yet. You only need one for headless / CI use.</p>
+            ) : (
+              <ul className="divide-y divide-white/[0.06]">
+                {keys.map((k) => (
+                  <li key={k.id} className="flex items-center justify-between gap-3 py-2.5 text-sm">
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2">
+                        <code className="font-mono text-[13px] text-slate-200">{k.key_prefix}…</code>
+                        {k.label && <span className="truncate text-slate-500">{k.label}</span>}
+                        {k.revoked_at ? <Chip tone="rose">revoked</Chip> : <Chip tone="emerald">active</Chip>}
+                      </div>
+                      <div className="mt-0.5 text-[12px] text-slate-500">{k.last_used_at ? `last used ${shortDate(k.last_used_at)}` : 'never used'} · created {shortDate(k.created_at)}</div>
+                    </div>
+                    {!k.revoked_at && <button onClick={() => revokeKey(k.id)} className="shrink-0 text-[12px] text-slate-400 hover:text-rose-400">Revoke</button>}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <p className="mb-2 mt-5 text-[12px] font-medium uppercase tracking-wide text-slate-500">mcp.json</p>
+            <div className="relative">
+              <pre className="overflow-x-auto rounded-lg border border-white/[0.06] bg-[#070b16] p-3.5 font-mono text-[12px] leading-relaxed text-slate-300">{advancedSnippet}</pre>
+              <button onClick={() => copy(advancedSnippet, 'json')} className="absolute right-2.5 top-2.5 rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-[11px] text-slate-300 hover:bg-white/10">{copied === 'json' ? 'Copied' : 'Copy'}</button>
+            </div>
+          </div>
+        </details>
 
         <footer className="mt-8 flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.06] pt-5 text-[12px] text-slate-500">
           <span>Signed in as <span className="text-slate-400">{email}</span> · <button onClick={switchAccount} className="underline underline-offset-2 hover:text-slate-300">Switch account</button></span>
