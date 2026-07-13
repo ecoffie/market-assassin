@@ -26,6 +26,8 @@ import { getRegulatoryDemand } from '@/mcp/tools/regulatory-demand';
 import { getAwardDetail } from '@/mcp/tools/award-detail';
 import { findPredecessor } from '@/mcp/tools/predecessor-award';
 import { lookupSamEntity } from '@/mcp/tools/sam-entity';
+import { searchContractors } from '@/mcp/tools/search-contractors';
+import { getAgencyIntel } from '@/mcp/tools/agency-intel';
 import { getBalance } from '@/lib/mcp/credits';
 import { tierFor } from '@/lib/mcp/entitlements';
 
@@ -54,6 +56,8 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   get_award_detail: 2, // USASpending resolve (PIID→id) + award-detail fetch (both free)
   find_predecessor_award: 2, // USASpending search + award-detail fetch (incumbent inference)
   lookup_sam_entity: 1, // SAM Entity Management API (single lookup/search)
+  search_contractors: 2, // live BigQuery recipients scan (competitive landscape)
+  get_agency_intel: 1, // agency resolve (local) + USASpending obligations (free)
   get_balance: 0, // meta tool — always free
 };
 
@@ -216,6 +220,50 @@ const SAM_ENTITY_TOOL_DEF = {
   },
 };
 
+const SEARCH_CONTRACTORS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'search_contractors',
+    description:
+      'The competitive landscape for a market: top federal contractors by total obligated dollars for a ' +
+      'keyword / NAICS / state, with award count and how many distinct agencies each sells to (a capture ' +
+      'signal — broad seller vs. single-buyer dependent). The "size up the competition / find teaming ' +
+      'partners" lookup. Dollars are cumulative historical USASpending obligations, not a bid list. Returns ' +
+      'grounded=false when nothing matches — broaden the NAICS prefix or drop the state; do not invent firms.',
+    parameters: {
+      type: 'object',
+      properties: {
+        keyword: { type: 'string', description: 'Free-text company-name match, e.g. "Booz".' },
+        naics: { type: 'string', description: 'NAICS code(s), comma/space separated; 2-6 digit prefixes allowed, e.g. "541512".' },
+        state: { type: 'string', description: 'Optional 2-letter state filter, e.g. "VA".' },
+        sort_by: { type: 'string', enum: ['total_obligated', 'award_count', 'recipient_name'], description: 'Ranking (default total_obligated).' },
+        limit: { type: 'number', description: 'Max rows (default 15, max 100).' },
+      },
+    },
+  },
+};
+
+const AGENCY_INTEL_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_agency_intel',
+    description:
+      'Target-research read on a federal agency: resolves it by name / abbreviation / CGAC code, then returns ' +
+      'identity + hierarchy, curated GovCon pain points & priorities, and (when available) live USASpending ' +
+      'obligations for the fiscal year with top NAICS. The "size up a buyer before I pursue them" lookup. Pain ' +
+      'points are curated intel, not an official statement. Returns grounded=false when no agency matches — ' +
+      'try the full name or a CGAC code; do not guess an agency.',
+    parameters: {
+      type: 'object',
+      properties: {
+        agency: { type: 'string', description: 'Agency name, abbreviation, or CGAC code, e.g. "VA", "Department of Defense", or "069".' },
+        fiscal_year: { type: 'number', description: 'Optional fiscal year for spending (defaults to current federal FY).' },
+      },
+      required: ['agency'],
+    },
+  },
+};
+
 /** All tools exposed over MCP in v1, each annotated with its credit price. */
 export function listMcpTools(): Array<Record<string, unknown>> {
   const defs = [
@@ -228,6 +276,8 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     AWARD_DETAIL_TOOL_DEF,
     PREDECESSOR_AWARD_TOOL_DEF,
     SAM_ENTITY_TOOL_DEF,
+    SEARCH_CONTRACTORS_TOOL_DEF,
+    AGENCY_INTEL_TOOL_DEF,
     GET_BALANCE_TOOL_DEF,
   ];
   return defs.map((d) => ({ ...d, _credits: TOOL_CREDITS[d.function.name] ?? 0, _tier: tierFor(d.function.name) }));
@@ -245,6 +295,8 @@ export function isMcpTool(name: string): boolean {
     name === 'get_award_detail' ||
     name === 'find_predecessor_award' ||
     name === 'lookup_sam_entity' ||
+    name === 'search_contractors' ||
+    name === 'get_agency_intel' ||
     name === 'get_balance'
   );
 }
@@ -347,6 +399,28 @@ export async function runMcpTool(
       name: typeof args.name === 'string' ? args.name : undefined,
       state: typeof args.state === 'string' ? args.state : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'search_contractors') {
+    const result = (await searchContractors({
+      keyword: typeof args.keyword === 'string' ? args.keyword : undefined,
+      naics: typeof args.naics === 'string' ? args.naics : undefined,
+      state: typeof args.state === 'string' ? args.state : undefined,
+      sort_by:
+        args.sort_by === 'total_obligated' || args.sort_by === 'award_count' || args.sort_by === 'recipient_name'
+          ? args.sort_by
+          : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_agency_intel') {
+    const result = (await getAgencyIntel({
+      agency: typeof args.agency === 'string' ? args.agency : '',
+      fiscal_year: typeof args.fiscal_year === 'number' ? args.fiscal_year : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
