@@ -13,6 +13,9 @@
 --   naics_summary         — per-NAICS totals
 --   agency_summary        — per-agency totals
 --
+-- Final step: DROPs awards_raw (the transient ~137 GB staging table) once all
+-- derived tables are built. Run AFTER load-to-bq.sh, never standalone.
+--
 -- Partitioning: fiscal_year (INT) — typical query filters by year window
 -- Clustering: recipient_uei, recipient_name — contractor-page lookups
 
@@ -528,3 +531,19 @@ FROM (
   WHERE award_id IS NOT NULL
   GROUP BY award_id
 );
+
+-- 8) Drop the raw staging table — it's a transient landing table (~137 GB)
+--    that only exists to build the typed `awards` table (step 1) and the
+--    rollups (steps 2-5) above. Nothing in the app/serving layer reads it.
+--    Dropping it here reclaims >half the dataset's storage (~$2.74/mo).
+--
+--    SAFE because: (a) this runs LAST, only after every derived table above
+--    has been rebuilt from it, and (b) the next ingest recreates it from the
+--    GCS source CSVs via `load-to-bq.sh` (bq load --replace) BEFORE this
+--    build script runs again. If any CREATE above fails, the run aborts and
+--    awards_raw is left intact for a re-run.
+--
+--    NOTE: always run the pipeline in order — load-to-bq.sh (recreates raw)
+--    THEN build-derived.sql. Never run this build standalone expecting raw
+--    to exist; a fresh load must precede it.
+DROP TABLE IF EXISTS `market-assasin.usaspending.awards_raw`;
