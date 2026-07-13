@@ -132,6 +132,8 @@ export default function McpConsole() {
   const [copied, setCopied] = useState<string | null>(null);
   const [justPurchased, setJustPurchased] = useState(false);
   const [client, setClient] = useState<ClientId>('claude-desktop');
+  // Public catalog (tools + packs + trial size) for the LOGGED-OUT pricing page.
+  const [catalog, setCatalog] = useState<{ tools: Tool[]; packages: Pkg[]; signupCredits: number; proMonthlyCredits: number } | null>(null);
 
   // Identity: ask the server who our signed token proves we are. Never trust
   // the client-side email for the account we render.
@@ -153,6 +155,12 @@ export default function McpConsole() {
         setAuthState('out');
       }
     })();
+    // Always fetch the public catalog so the logged-out pricing page has real
+    // tool costs + packs (data behind glass, never a blank wall).
+    fetch('/api/mcp/catalog')
+      .then((r) => r.json())
+      .then((j) => { if (j?.success) setCatalog({ tools: j.tools || [], packages: j.packages || [], signupCredits: j.signupCredits ?? 100, proMonthlyCredits: j.proMonthlyCredits ?? 1000 }); })
+      .catch(() => { /* pricing falls back to static copy */ });
   }, []);
 
   const copy = useCallback((text: string, tag: string) => {
@@ -219,24 +227,123 @@ export default function McpConsole() {
   const keyForSnippet = newKey || 'mcp_live_YOUR_KEY';
   const conn = useMemo(() => connectFor(client, keyForSnippet), [client, keyForSnippet]);
 
-  // ---- Sign-in gate ----------------------------------------------------------
+  // ---- Logged-out PRICING page (Higgsfield-style) ----------------------------
+  // A prospect sees the value + real prices BEFORE signing in — data behind glass,
+  // never a blank sign-in wall.
   if (authState !== 'in') {
+    const cat = catalog;
+    const trial = cat?.signupCredits ?? 100;
+    const proCredits = cat?.proMonthlyCredits ?? 1000;
+    const catTools = cat?.tools ?? [];
+    const packs = cat?.packages ?? [];
+    // Per-pack "what you can do" line, computed from the LIVE tool costs.
+    const packValue = (credits: number) => (catTools.length ? valueLine(credits, catTools) : `${credits.toLocaleString()} tool calls`);
+    // Order/annotate packs: mark the middle one "Most popular" (Higgsfield's highlighted tier).
+    const popularId = packs.length >= 2 ? packs[1].id : undefined;
+
     return (
-      <main className="grid min-h-dvh place-items-center bg-[#0a0f1e] px-6 text-slate-100 [color-scheme:dark]">
-        <div className="w-full max-w-sm text-center">
-          <div className="mx-auto mb-4 grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-emerald-400 text-lg font-bold text-[#0a0f1e]">M</div>
-          <h1 className="text-2xl font-semibold tracking-tight">Mindy MCP</h1>
-          <p className="mt-2 text-sm text-slate-400">Federal contracting intelligence for any AI agent.</p>
-          {authState === 'loading' ? (
-            <p className="mt-6 text-sm text-slate-500">Checking your session…</p>
-          ) : (
-            <>
-              <a href="/app" className="mt-6 inline-flex w-full items-center justify-center rounded-xl bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">
-                Sign in to Mindy
+      <main className="min-h-dvh bg-[#0a0f1e] text-slate-100 [color-scheme:dark]">
+        <div className="mx-auto max-w-5xl px-5 py-12 sm:px-6">
+          {/* Hero */}
+          <section className="text-center">
+            <div className="mx-auto mb-5 grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-emerald-400 text-lg font-bold text-[#0a0f1e]">M</div>
+            <h1 className="mx-auto max-w-2xl text-balance text-3xl font-bold tracking-tight sm:text-4xl">Federal contracting intelligence for any AI agent</h1>
+            <p className="mx-auto mt-3 max-w-xl text-balance text-sm text-slate-400 sm:text-[15px]">
+              SAM opportunities, incumbent financials, GSA pricing, and win playbooks — piped straight into Claude, Cursor, or your own agent. Pay only for what you call.
+            </p>
+            <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/[0.07] px-3.5 py-1.5 text-[13px] text-emerald-200">
+              <span aria-hidden>🎁</span> Start free — your first key includes {trial} credits (≈ {packValue(trial)})
+            </div>
+            <div className="mt-6">
+              <a href="/app" className="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">
+                Sign in to Mindy → get your key
               </a>
-              <p className="mt-3 text-[12px] text-slate-500">Your first connection key comes with 25 free credits.</p>
-            </>
+              {authState === 'loading' && <p className="mt-3 text-[12px] text-slate-500">Checking your session…</p>}
+            </div>
+          </section>
+
+          {/* Plans: Free trial → packs */}
+          <section className="mt-14">
+            <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">Credit plans</h2>
+            <p className="mx-auto mt-2 max-w-lg text-center text-[13px] text-slate-400">Prepaid credits, debited per call — on success only. No subscription required; the more you buy, the cheaper each credit.</p>
+            <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {/* Free trial card */}
+              <div className="flex flex-col rounded-2xl border border-white/10 bg-white/[0.02] p-5">
+                <div className="text-[13px] font-semibold uppercase tracking-wide text-slate-300">Free trial</div>
+                <div className="mt-1 text-[12px] text-slate-500">One-time, on your first key</div>
+                <div className="mt-4 text-3xl font-bold tabular-nums">{trial}<span className="ml-1 text-sm font-normal text-slate-400">credits</span></div>
+                <div className="mt-1 text-[12px] text-slate-500">$0</div>
+                <div className="mt-4 flex-1 text-[12px] leading-relaxed text-slate-400">≈ {packValue(trial)}</div>
+                <a href="/app" className="mt-5 inline-flex items-center justify-center rounded-lg border border-white/15 px-3 py-2 text-[13px] font-medium text-slate-200 hover:bg-white/5">Start free</a>
+              </div>
+              {/* Pack cards */}
+              {packs.map((p) => {
+                const popular = p.id === popularId;
+                return (
+                  <div key={p.id} className={`relative flex flex-col rounded-2xl border p-5 ${popular ? 'border-emerald-400/40 bg-emerald-400/[0.04]' : 'border-white/10 bg-white/[0.02]'}`}>
+                    {popular && <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-emerald-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#06120c]">Most popular</div>}
+                    <div className="text-[13px] font-semibold uppercase tracking-wide text-slate-200">{p.label.split('—')[0].trim()}</div>
+                    <div className="mt-1 text-[12px] text-slate-500">Prepaid pack</div>
+                    <div className="mt-4 text-3xl font-bold tabular-nums">{p.credits.toLocaleString()}<span className="ml-1 text-sm font-normal text-slate-400">credits</span></div>
+                    <div className="mt-1 text-[12px] text-slate-400">${p.usd} <span className="text-slate-600">·</span> ${(p.usd / p.credits).toFixed(3)}/credit</div>
+                    <div className="mt-4 flex-1 text-[12px] leading-relaxed text-slate-400">≈ {packValue(p.credits)}</div>
+                    <a href="/app" className={`mt-5 inline-flex items-center justify-center rounded-lg px-3 py-2 text-[13px] font-semibold ${popular ? 'bg-emerald-500 text-[#06120c] hover:bg-emerald-400' : 'border border-white/15 text-slate-200 hover:bg-white/5'}`}>Sign in to buy</a>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+
+          {/* Pro cross-sell */}
+          <section className="mt-6">
+            <div className="flex flex-col items-center justify-between gap-3 rounded-2xl border border-indigo-400/20 bg-indigo-400/[0.05] px-5 py-4 sm:flex-row">
+              <p className="text-center text-[13px] text-slate-300 sm:text-left">
+                <span className="font-semibold text-indigo-200">Already a Mindy Pro member?</span> Your $149/mo plan includes <span className="font-semibold tabular-nums">{proCredits.toLocaleString()} MCP credits every month</span> — the best value if you use the agent daily.
+              </p>
+              <a href="/premium" className="shrink-0 rounded-lg border border-indigo-400/30 px-3 py-2 text-[13px] font-medium text-indigo-100 hover:bg-indigo-400/10">See Pro</a>
+            </div>
+          </section>
+
+          {/* Tool / cost table */}
+          {catTools.length > 0 && (
+            <section className="mt-14">
+              <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">What your agent can call</h2>
+              <div className="mx-auto mt-5 max-w-2xl overflow-hidden rounded-2xl border border-white/10">
+                {catTools.filter((t) => t.credits > 0).map((t, i) => (
+                  <div key={t.name} className={`flex items-center justify-between gap-4 px-4 py-3 text-sm ${i % 2 ? 'bg-white/[0.015]' : ''}`}>
+                    <div className="min-w-0">
+                      <div className="font-medium text-slate-200">{TOOL_LABELS[t.name] ?? t.name}</div>
+                      <div className="truncate text-[12px] text-slate-500">{t.description}</div>
+                    </div>
+                    <div className="shrink-0 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[12px] font-semibold tabular-nums text-emerald-300">{t.credits} {t.credits === 1 ? 'credit' : 'credits'}</div>
+                  </div>
+                ))}
+              </div>
+              <p className="mx-auto mt-3 max-w-2xl text-center text-[12px] text-slate-500">Credits are debited only when a call succeeds. Repeat/cached reads are free.</p>
+            </section>
           )}
+
+          {/* Setup preview */}
+          <section className="mt-14">
+            <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">Two lines to connect</h2>
+            <p className="mx-auto mt-2 max-w-lg text-center text-[13px] text-slate-400">Drop the server into Claude, Cursor, or any MCP client. Sign in to generate your key.</p>
+            <div className="mx-auto mt-5 max-w-2xl overflow-x-auto rounded-2xl border border-white/10 bg-black/40 p-4">
+              <pre className="text-[12px] leading-relaxed text-slate-300"><code>{`{
+  "mcpServers": {
+    "mindy": {
+      "url": "${MCP_URL}",
+      "headers": { "Authorization": "Bearer mcp_live_YOUR_KEY" }
+    }
+  }
+}`}</code></pre>
+            </div>
+            <div className="mt-8 text-center">
+              <a href="/app" className="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">
+                Sign in to Mindy → get your key
+              </a>
+              <p className="mt-3 text-[12px] text-slate-500">Free to start — {trial} credits on your first key. No card required.</p>
+            </div>
+          </section>
         </div>
       </main>
     );
@@ -285,7 +392,7 @@ export default function McpConsole() {
             SAM opportunities, incumbent financials, GSA pricing, and win playbooks — piped straight into Claude, Cursor, or your own agent.
           </p>
           <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/[0.07] px-3.5 py-1.5 text-[13px] text-emerald-200">
-            <span aria-hidden>🎁</span> Your first connection key includes 25 free credits
+            <span aria-hidden>🎁</span> Your first connection key includes {catalog?.signupCredits ?? 100} free credits
           </div>
         </section>
 
@@ -364,7 +471,7 @@ export default function McpConsole() {
           {loading ? (
             <p className="text-sm text-slate-500">Loading…</p>
           ) : keys.length === 0 ? (
-            <p className="text-sm text-slate-500">No connection key yet. Create one to get started — your first key comes with 25 free credits.</p>
+            <p className="text-sm text-slate-500">No connection key yet. Create one to get started — your first key comes with {catalog?.signupCredits ?? 100} free credits.</p>
           ) : (
             <ul className="divide-y divide-white/[0.06]">
               {keys.map((k) => (

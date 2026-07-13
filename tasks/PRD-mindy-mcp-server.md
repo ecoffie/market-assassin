@@ -470,8 +470,22 @@ data project.)*
   web app? Likely NO — different buyer (dev/agent-native vs UI user), and MCP is a *new* revenue
   line + top-of-funnel (they discover Mindy via MCP, upgrade for the workspace). Frame as
   land-and-expand, not substitution.
-- **Q1 — Free tier?** Higgsfield gives 150 free credits/mo. A free allotment drives adoption +
-  content virality. Recommend a small monthly free grant. *Decision needed.*
+- **Q1 — Free tier? ✅ RESOLVED 2026-07-13: 100 credits, ONE-TIME trial (not monthly).**
+  Higgsfield gives 150/mo, but that's a *consumer* retention/virality engine. Mindy MCP is a
+  B2B intelligence tool — a perpetual monthly free grant just leaks margin-heavy BQ scans to
+  non-payers. B2B API norm (Twilio/Algolia/OpenAI) = one-time trial credits, then metered pay.
+  Free = 100cr on first connection key (≈ 4 capable-scans / 20 profiles / 100 SAM searches) —
+  enough to run one real evaluation, then buy a pack.
+
+  **⚠️ CORRECTION (2026-07-13):** the R1 "$1=100 credits / $10=1,000cr" table above was a
+  THEORETICAL peg written without checking that real Stripe packs already shipped 2026-07-12.
+  The LIVE packs (`src/lib/mcp/packages.ts`) are the source of truth and are priced RICHER:
+  **Starter $5=250cr · Plus $15=800cr (7% bonus) · Scale $40=2,400cr (20% bonus)** — ~$0.017–0.020/cr,
+  a 10–12× markup on the measured capable-scan. Keep the R1 table's *per-tool credit weights*
+  (1/1/5/25/2), but the $/credit and pack tiers are the LIVE packs, not the peg. Additionally,
+  **Pro ($149/mo) bundles 1,000 MCP credits/mo** (`PRO_MONTHLY_CREDITS`) — so the real model is
+  hybrid: free 100 one-time trial → prepaid packs (pay-as-you-go) → Pro sub includes a monthly
+  allowance. No monthly stipend for the FREE tier; Pro's monthly credits are a paid-sub perk.
 - **Q2 — Key scope model for phase 2.** When private data comes, scopes must be explicit
   (`read:opportunities`, `read:my_pipeline`, …). Design the `scopes[]` column now even if v1
   only issues public scopes.

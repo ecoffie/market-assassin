@@ -18,7 +18,7 @@ describe('mcp tool-registry — catalog + pricing', () => {
   it('credit prices match the table', () => {
     expect(creditsFor('search_sam_opportunities')).toBe(1);
     expect(creditsFor('get_contractor_profile')).toBe(5);
-    expect(creditsFor('find_capable_contractors')).toBe(8);
+    expect(creditsFor('find_capable_contractors')).toBe(25);
     expect(creditsFor('get_winning_playbook')).toBe(2);
     expect(creditsFor('nope')).toBe(0);
     // every priced tool is a real exposed tool
