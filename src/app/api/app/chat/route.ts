@@ -438,7 +438,83 @@ export async function POST(request: NextRequest) {
             model, messages, temperature: 0, max_tokens: 512,
             tools: ALL_TOOL_DEFS, tool_choice: 'auto',
           });
+
+          // ── Sonnet-5 reasoning on the tool round (2026-07-13) ──
+          // The tool round IS Chat v2's reasoning: it decides which Data Core
+          // tools to call and with what args. gpt-4o is a weak orchestrator; a
+          // real reasoning model (Sonnet 5, near-Opus on agentic work) makes the
+          // grounded answer materially better. We run Claude ONLY here — Phase 2
+          // (the streamed write-up) stays gpt-4o so streaming UX + Groq fallback
+          // are untouched. Env-tunable; disable by unsetting CHAT_CLAUDE_MODEL.
+          //
+          // Anthropic's Messages API uses a different tool schema + response
+          // shape than OpenAI, so we (a) translate the OpenAI tool defs to
+          // input_schema on the way in, and (b) translate Claude's tool_use
+          // blocks BACK into an OpenAI choices[0].message.tool_calls shape on the
+          // way out — so the consuming block below (append assistant+tool turns)
+          // is byte-for-byte unchanged and Phase 2 still speaks OpenAI.
+          //
+          // Margin guard: over-budget users skip the premium path (Claude round
+          // suppressed) exactly like they're downgraded off gpt-4o below.
+          const claudeToolModel = overBudgetEarly ? '' : (process.env.CHAT_CLAUDE_MODEL || 'claude-sonnet-5');
+          // Sonnet 5 / Opus 4.7+ REJECT a non-default temperature with a 400 —
+          // mirror call-llm.ts's guard so only legacy Claude models get temp.
+          const claudeAcceptsTemp = /haiku-4-5|sonnet-4-|opus-4-[0-5]|claude-3/i.test(claudeToolModel);
+          // OpenAI {type:'function',function:{name,description,parameters}} →
+          // Anthropic {name,description,input_schema}. parameters maps 1:1.
+          const anthropicTools = ALL_TOOL_DEFS.map((d) => {
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const fn = (d as any).function || {};
+            return { name: fn.name, description: fn.description, input_schema: fn.parameters };
+          });
+          // Translate an Anthropic response → OpenAI choices[0].message so the
+          // consumer downstream is provider-agnostic.
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const anthropicToOpenAiChoice = (j: any) => {
+            const blocks = Array.isArray(j?.content) ? j.content : [];
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            const textBlock = blocks.find((b: any) => b?.type === 'text');
+            const toolCalls = blocks
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .filter((b: any) => b?.type === 'tool_use')
+              // eslint-disable-next-line @typescript-eslint/no-explicit-any
+              .map((b: any) => ({ id: b.id, type: 'function', function: { name: b.name, arguments: JSON.stringify(b.input ?? {}) } }));
+            return {
+              choices: [{ message: { content: textBlock?.text ?? null, tool_calls: toolCalls.length ? toolCalls : undefined } }],
+              // Normalize Anthropic usage → OpenAI shape for cost attribution.
+              usage: j?.usage ? { prompt_tokens: j.usage.input_tokens, completion_tokens: j.usage.output_tokens } : undefined,
+            };
+          };
+
           const callToolRound = async (): Promise<{ provider: string; model: string; json: unknown } | null> => {
+            // 1) Sonnet 5 first (the reasoning upgrade), if funded + not over budget.
+            if (claudeToolModel && process.env.ANTHROPIC_API_KEY) {
+              try {
+                // Anthropic needs system + a clean user/assistant/tool transcript.
+                // Our `messages` leads with a system row; split it out and pass the
+                // rest as messages (only user/assistant present at tool-round time).
+                const sys = messages.find((m) => m.role === 'system')?.content || '';
+                const convo = messages
+                  .filter((m) => m.role === 'user' || m.role === 'assistant')
+                  .map((m) => ({ role: m.role, content: m.content }));
+                // eslint-disable-next-line @typescript-eslint/no-explicit-any
+                const cbody: Record<string, unknown> = {
+                  model: claudeToolModel, max_tokens: 512, system: sys,
+                  messages: convo, tools: anthropicTools, tool_choice: { type: 'auto' },
+                };
+                if (claudeAcceptsTemp) cbody.temperature = 0;
+                const cr = await fetch('https://api.anthropic.com/v1/messages', {
+                  method: 'POST',
+                  headers: { 'x-api-key': process.env.ANTHROPIC_API_KEY!, 'anthropic-version': '2023-06-01', 'content-type': 'application/json' },
+                  body: JSON.stringify(cbody),
+                });
+                if (cr.ok) return { provider: 'anthropic', model: claudeToolModel, json: anthropicToOpenAiChoice(await cr.json()) };
+                // Non-OK (429/400/5xx) → fall through to gpt-4o below.
+              } catch (e) {
+                console.error('[chat] Sonnet-5 tool round failed, falling back:', e);
+              }
+            }
+            // 2) gpt-4o fallback (today's behaviour).
             if (openaiKeyEarly) {
               const r = await fetch('https://api.openai.com/v1/chat/completions', {
                 method: 'POST', headers: { Authorization: `Bearer ${openaiKeyEarly}`, 'Content-Type': 'application/json' },
@@ -446,6 +522,7 @@ export async function POST(request: NextRequest) {
               });
               if (r.ok) return { provider: 'openai', model: chatModelEarly, json: await r.json() };
             }
+            // 3) Groq 8b last resort.
             const g = await fetch('https://api.groq.com/openai/v1/chat/completions', {
               method: 'POST', headers: { Authorization: `Bearer ${groqKey || ''}`, 'Content-Type': 'application/json' },
               body: toolReqBody(GROQ_MODEL),
