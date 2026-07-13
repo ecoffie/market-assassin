@@ -1726,6 +1726,61 @@ traceability) → add a `data_sources` seed row + a `DatasetEntry` (provenance '
 
 ---
 
+## Mindy MCP Server — Keyless OAuth 2.1 (2026-07-13)
+
+Agents connect to the hosted MCP transport by **signing in through their browser** —
+no API key to copy. This is the DEFAULT connect path on `getmindy.ai/mcp`; API keys
+still work and are demoted to a collapsed "Advanced — headless / CI" section.
+
+**Gated OFF by default.** Every OAuth route 404s unless `MCP_OAUTH_ENABLED` is truthy
+(`mcpFlags.oauth`, `src/lib/mcp/flags.ts` → `oauthGate()` in `src/lib/mcp/oauth/guard.ts`).
+The feature can sit on prod exposing nothing until the flag is flipped. It is currently
+**ON in prod** (verified: metadata endpoints 200, live smoke green, real Claude Desktop
+pulled a solicitation).
+
+**Flow (OAuth 2.1, public client, PKCE S256):**
+DCR (`/oauth/register`, RFC 7591) → authorize consent (`/oauth/authorize` page →
+`/api/oauth/authorize/approve`) → token (`/oauth/token`, authorization_code + refresh
+rotation) → the MCP client calls `getmindy.ai/mcp/mcp` with a Bearer JWT. Discovery via
+RFC 8414 (`/.well-known/oauth-authorization-server`) + RFC 9728 (protected-resource),
+served through `next.config.ts` rewrites (Next won't serve `.well-known` folders).
+Revoke = RFC 7009 (`/oauth/revoke`).
+
+**Identity source:** the consent page reads the signed MI 2FA session
+(`mi_beta_auth_token`), so the approver's email is the token identity — the same
+server-verified path that fixed the /mcp 0-credits wrong-account bug
+(`/api/mcp/session`). First OAuth connect gets the 25-credit welcome grant via
+`grantSignupCreditsIfFirst` (can't be farmed — gated on "no balance row yet").
+
+**Tokens (`src/lib/mcp/oauth/tokens.ts`):** stateless HS256 access JWTs, `aud`-bound to
+`OAUTH_RESOURCE=https://getmindy.ai/mcp/mcp` (1h TTL); opaque hashed refresh tokens
+(60d, rotated + revocable); single-use auth codes (5m). Signing secret =
+`MCP_OAUTH_SIGNING_SECRET` (falls back to `ADMIN_PASSWORD` — dedicated env var is a
+TODO). Persistence in `src/lib/mcp/oauth/store.ts` (atomic single-use code consume +
+refresh rotation).
+
+**⚠️ The billing seam still holds.** The transport verifier
+(`src/app/mcp/[transport]/route.ts` `withMcpAuth`) tries `verifyAccessToken` (OAuth JWT)
+first, then `verifyApiKey` — either way the call dispatches through **`runMeteredTool`**,
+never raw `runMcpTool`. Keyless calls debit credits exactly like keyed ones. The transport
+loops `mcpRegistrationList()` (`src/lib/mcp/tool-schemas.ts`) so **all 9 tools** are
+exposed (a prior bug exposed only 1 — caught by the live smoke).
+
+**Key files:** `src/lib/mcp/oauth/{tokens,store,guard}.ts`, `src/app/oauth/{register,token,revoke}/route.ts`,
+`src/app/api/oauth/metadata/{authorization-server,protected-resource}/route.ts`,
+`src/app/api/oauth/authorize/approve/route.ts`, `src/app/oauth/authorize/page.tsx`,
+`src/app/api/mcp/session/route.ts` (server-verified identity), `src/app/mcp/page.tsx`
+(keyless 3-step UI). Migration: `supabase/migrations/20260713_mcp_oauth.sql`
+(`mcp_oauth_clients` / `_codes` / `_tokens`, RLS service-role-only — hand-run + verified).
+Smoke: `scripts/mcp-oauth-smoke.mjs` (DCR→authorize→token→keyless-call→refresh→negatives;
+needs `MI_AUTH_TOKEN`).
+
+**Parked:** PR #135 (GitHub OAuth for app sign-in — Apple already merged); add
+`mcp.getmindy.ai` to the token `aud` allowlist once the subdomain is claimed; provision a
+dedicated `MCP_OAUTH_SIGNING_SECRET`.
+
+---
+
 ## Verification Recipes — how to PROVE each surface works (rule #2)
 
 The concrete "it works" evidence, centralized so skills/agents stop re-deriving it.
