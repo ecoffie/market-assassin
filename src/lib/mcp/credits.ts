@@ -73,7 +73,7 @@ export async function debitCredits(
   return { ok: Boolean(row?.ok), newBalance: Number(row?.new_balance ?? 0) };
 }
 
-export type CallStatus = 'success' | 'failed' | 'rejected_no_credits' | 'uncharged';
+export type CallStatus = 'success' | 'failed' | 'rejected_no_credits' | 'uncharged' | 'gated';
 
 /** Append a call-log row (audit/analytics/abuse). Best-effort — never throws. */
 export async function logCall(entry: {

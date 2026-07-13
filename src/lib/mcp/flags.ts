@@ -37,6 +37,16 @@ export const mcpFlags = {
     return on('MCP_OAUTH_ENABLED');
   },
 
+  /**
+   * Tier gating enforcement. OFF by default so Phase A ships with ZERO behavior
+   * change — every tool stays metered exactly as today. Flip on
+   * (`MCP_ENFORCE_TIERS=true`) to enforce Pro-only tools (`TOOL_TIER === 'pro'`,
+   * e.g. the winning playbook): a non-Pro caller gets `requires_pro` (no debit).
+   */
+  get enforceTiers(): boolean {
+    return on('MCP_ENFORCE_TIERS');
+  },
+
   // Future toggles plug in the same way, e.g.:
   //   get enrichedSam(): boolean { return on('MCP_ENABLE_ENRICHED_SAM'); }
 } as const;

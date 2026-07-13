@@ -20,7 +20,12 @@ export const revalidate = 3600;
 export function GET() {
   const tools = listMcpTools().map((t) => {
     const fn = t.function as { name: string; description?: string };
-    return { name: fn.name, description: fn.description ?? '', credits: (t._credits as number) ?? 0 };
+    return {
+      name: fn.name,
+      description: fn.description ?? '',
+      credits: (t._credits as number) ?? 0,
+      tier: (t._tier as string) ?? 'metered', // 'metered' | 'pro' — drives the pricing page's live/gated split
+    };
   });
 
   return NextResponse.json({
