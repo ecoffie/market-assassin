@@ -6,6 +6,8 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { registerClient } from '@/lib/mcp/oauth/store';
+import { oauthGate } from '@/lib/mcp/oauth/guard';
+import { checkRateLimit, getClientIP } from '@/lib/rate-limit';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -36,6 +38,20 @@ function isHttpsOrLocal(uri: string): boolean {
 }
 
 export async function POST(request: NextRequest) {
+  const gated = oauthGate();
+  if (gated) return gated;
+
+  // DCR is unauthenticated by spec — rate-limit by IP so it can't be spammed to
+  // fill the clients table. 20 registrations / hour / IP is ample for real clients.
+  const ip = getClientIP(request);
+  const rl = await checkRateLimit(`rl:oauth:register:${ip}`, 20, 3600);
+  if (!rl.allowed) {
+    return NextResponse.json(
+      { error: 'temporarily_unavailable', error_description: 'Too many registrations; try again later.' },
+      { status: 429, headers: { ...CORS, 'Retry-After': String(Math.max(1, rl.resetAt - Math.floor(Date.now() / 1000))) } },
+    );
+  }
+
   let body: Record<string, unknown>;
   try {
     body = await request.json();

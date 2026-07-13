@@ -12,11 +12,15 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserAuth } from '@/lib/api-auth';
 import { getClient, saveAuthCode } from '@/lib/mcp/oauth/store';
 import { MCP_SCOPE } from '@/lib/mcp/oauth/tokens';
+import { oauthGate } from '@/lib/mcp/oauth/guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function POST(request: NextRequest) {
+  const gated = oauthGate();
+  if (gated) return gated;
+
   const auth = await requireUserAuth(request);
   if (!auth.authenticated || !auth.email) {
     return NextResponse.json({ error: 'unauthorized', error_description: auth.error || 'Sign in required' }, { status: 401 });

@@ -10,6 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { consumeAuthCode, consumeRefreshToken, saveRefreshToken, getClient } from '@/lib/mcp/oauth/store';
 import { issueAccessToken, verifyPkceS256, MCP_SCOPE } from '@/lib/mcp/oauth/tokens';
 import { grantSignupCreditsIfFirst } from '@/lib/mcp/credits';
+import { oauthGate } from '@/lib/mcp/oauth/guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -42,6 +43,9 @@ async function parseBody(request: NextRequest): Promise<Record<string, string>> 
 }
 
 export async function POST(request: NextRequest) {
+  const gated = oauthGate();
+  if (gated) return gated;
+
   const body = await parseBody(request);
   const grantType = body.grant_type;
 

@@ -5,6 +5,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { revokeRefreshToken } from '@/lib/mcp/oauth/store';
+import { oauthGate } from '@/lib/mcp/oauth/guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,6 +21,9 @@ export function OPTIONS() {
 }
 
 export async function POST(request: NextRequest) {
+  const gated = oauthGate();
+  if (gated) return gated;
+
   const ct = request.headers.get('content-type') || '';
   let token: string | undefined;
   if (ct.includes('application/json')) {

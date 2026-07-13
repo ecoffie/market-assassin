@@ -5,6 +5,7 @@
  */
 import { NextResponse } from 'next/server';
 import { OAUTH_ISSUER, OAUTH_RESOURCE, MCP_SCOPE } from '@/lib/mcp/oauth/tokens';
+import { oauthGate } from '@/lib/mcp/oauth/guard';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -20,6 +21,8 @@ export function OPTIONS() {
 }
 
 export function GET() {
+  const gated = oauthGate();
+  if (gated) return gated;
   return NextResponse.json(
     {
       resource: OAUTH_RESOURCE,

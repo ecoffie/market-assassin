@@ -29,6 +29,7 @@ import { runMeteredTool } from '@/lib/mcp/metered';
 import { mcpRegistrationList } from '@/lib/mcp/tool-schemas';
 import { verifyApiKey } from '@/lib/mcp/api-keys';
 import { verifyAccessToken } from '@/lib/mcp/oauth/tokens';
+import { mcpFlags } from '@/lib/mcp/flags';
 
 // Node.js runtime: verifyApiKey uses node:crypto + the Supabase service-role
 // client (neither runs on Edge). force-dynamic: never cache an MCP response.
@@ -131,7 +132,12 @@ const handler = withMcpAuth(
       extra: { userEmail: verified.userEmail, keyId: verified.keyId },
     };
   },
-  { required: true, resourceMetadataPath: '/.well-known/oauth-protected-resource' },
+  {
+    required: true,
+    // Advertise the OAuth flow on 401 only when the flag is on — otherwise the
+    // 401 stays key-only, so existing key clients are unaffected until we go live.
+    ...(mcpFlags.oauth ? { resourceMetadataPath: '/.well-known/oauth-protected-resource' } : {}),
+  },
 );
 
 export { handler as GET, handler as POST, handler as DELETE };
