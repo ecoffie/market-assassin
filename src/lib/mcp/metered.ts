@@ -10,6 +10,8 @@
  */
 import { creditsFor, isMcpTool, runMcpTool, type McpToolContext } from './tool-registry';
 import { getBalance, debitCredits, logCall } from './credits';
+import { mcpFlags } from './flags';
+import { isProTool, isProForMcp } from './entitlements';
 
 export interface MeteredContext extends McpToolContext {
   /** The verified key id, for the call log / ledger attribution. */
@@ -30,6 +32,25 @@ export async function runMeteredTool(
   }
 
   const cost = creditsFor(name);
+
+  // 0) Tier gate — Pro-only tools require a Pro subscription. Flag-gated (off by
+  // default → zero behavior change). A denied call is NOT charged and does NOT throw:
+  // the agent gets a clear `requires_pro` message it can relay, not a mid-run crash.
+  // The `gated` log row is the upsell queue (who hit the wall = who to convert).
+  if (mcpFlags.enforceTiers && isProTool(name)) {
+    const pro = await isProForMcp(ctx.userEmail);
+    if (!pro) {
+      await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'gated', creditsCharged: 0, apiKeyId: ctx.apiKeyId });
+      return {
+        ok: false,
+        error: {
+          code: 'requires_pro',
+          message: `${name} is a Mindy Pro tool. Upgrade at getmindy.ai/app to use it — your credits for every other tool still work.`,
+        },
+        creditsCharged: 0,
+      };
+    }
+  }
 
   // 1) Pre-check — reject an empty balance before doing any work.
   if (cost > 0) {

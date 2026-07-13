@@ -24,6 +24,7 @@ import { getPricingIntel } from '@/mcp/tools/pricing-intel';
 import { getIncumbentFinancials } from '@/mcp/tools/incumbent-financials';
 import { getRegulatoryDemand } from '@/mcp/tools/regulatory-demand';
 import { getBalance } from '@/lib/mcp/credits';
+import { tierFor } from '@/lib/mcp/entitlements';
 
 export interface McpToolContext {
   /** The verified key owner — used for user-bound tools + (Slice 3) the debit. */
@@ -157,7 +158,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     REGULATORY_DEMAND_TOOL_DEF,
     GET_BALANCE_TOOL_DEF,
   ];
-  return defs.map((d) => ({ ...d, _credits: TOOL_CREDITS[d.function.name] ?? 0 }));
+  return defs.map((d) => ({ ...d, _credits: TOOL_CREDITS[d.function.name] ?? 0, _tier: tierFor(d.function.name) }));
 }
 
 /** Is `name` a tool this server exposes? (Fast reject for unknown calls.) */
