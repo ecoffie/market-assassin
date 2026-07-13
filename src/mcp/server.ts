@@ -23,6 +23,9 @@ import { getWinningPlaybook } from './tools/winning-playbook';
 import { getPricingIntel } from './tools/pricing-intel';
 import { getIncumbentFinancials } from './tools/incumbent-financials';
 import { getRegulatoryDemand } from './tools/regulatory-demand';
+import { getAwardDetail } from './tools/award-detail';
+import { findPredecessor } from './tools/predecessor-award';
+import { lookupSamEntity } from './tools/sam-entity';
 
 const server = new McpServer({
   name: 'mindy-govcon',
@@ -187,11 +190,83 @@ server.registerTool(
   },
 );
 
+server.registerTool(
+  'get_award_detail',
+  {
+    title: 'Get Award Detail (USASpending)',
+    description:
+      'Full USASpending detail for one federal award: obligated→ceiling (the real prize size), the ' +
+      'parent IDV/vehicle you must hold to compete, period of performance (recompete timing), recipient, ' +
+      'NAICS/PSC, funding account. Pass a contract number (PIID) OR a generated_internal_id. Returns ' +
+      'grounded=false when no award matches — do not invent figures.',
+    inputSchema: {
+      piid: z.string().optional().describe('Contract number (PIID), e.g. "140F0822D0024".'),
+      id: z.string().optional().describe('USASpending generated_internal_id, if already known (skips the resolve).'),
+    },
+  },
+  async ({ piid, id }) => {
+    const result = await getAwardDetail({ piid, id });
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
+  'find_predecessor_award',
+  {
+    title: 'Find Predecessor / Incumbent Award (USASpending)',
+    description:
+      'The LIKELY incumbent contract behind an open opportunity, inferred as the largest recent award ' +
+      'matching the NAICS + agency (+ title). Returns full award detail (incumbent, ceiling, expiry, ' +
+      'parent vehicle) plus a match-confidence. Best-match inference, NOT a certified link — present as ' +
+      '"likely". Returns grounded=false when no good match exists.',
+    inputSchema: {
+      naics_code: z.string().optional().describe('The opportunity NAICS (4-6 digit).'),
+      agency_name: z.string().optional().describe('Buying agency, e.g. "Department of Defense". Sharpens the match.'),
+      title: z.string().optional().describe('Opportunity title — raises match confidence when present.'),
+    },
+  },
+  async ({ naics_code, agency_name, title }) => {
+    const result = await findPredecessor({ naics_code, agency_name, title });
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
+  'lookup_sam_entity',
+  {
+    title: 'Lookup SAM Entity (SAM.gov)',
+    description:
+      'Live SAM.gov registration for a contractor: UEI/CAGE, legal name, registration status, NAICS, ' +
+      'certifications (8(a), HUBZone, …), location. Pass a UEI for an exact entity, or a company name to ' +
+      'search. The "is this vendor real, registered, and set-aside eligible?" check. Set-aside eligibility ' +
+      'depends on the CURRENT status shown, not past awards.',
+    inputSchema: {
+      uei: z.string().optional().describe('12-char SAM UEI for an exact lookup.'),
+      name: z.string().optional().describe('Company legal name to search (when no UEI given).'),
+      state: z.string().optional().describe('Optional 2-letter state filter for name search.'),
+      limit: z.number().int().min(1).max(25).optional().describe('Max name-search matches (default 10).'),
+    },
+  },
+  async ({ uei, name, state, limit }) => {
+    const result = await lookupSamEntity({ uei, name, state, limit });
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    '[mindy-mcp] stdio server ready — get_winning_playbook + get_pricing_intel + get_incumbent_financials + get_regulatory_demand registered',
+    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity registered',
   );
 }
 

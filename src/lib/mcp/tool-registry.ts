@@ -23,6 +23,9 @@ import { getWinningPlaybook } from '@/mcp/tools/winning-playbook';
 import { getPricingIntel } from '@/mcp/tools/pricing-intel';
 import { getIncumbentFinancials } from '@/mcp/tools/incumbent-financials';
 import { getRegulatoryDemand } from '@/mcp/tools/regulatory-demand';
+import { getAwardDetail } from '@/mcp/tools/award-detail';
+import { findPredecessor } from '@/mcp/tools/predecessor-award';
+import { lookupSamEntity } from '@/mcp/tools/sam-entity';
 import { getBalance } from '@/lib/mcp/credits';
 import { tierFor } from '@/lib/mcp/entitlements';
 
@@ -48,6 +51,9 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   get_pricing_intel: 1, // GSA CALC labor-rate intel (free upstream, multi-call; warm cache ~free)
   get_incumbent_financials: 2, // SEC EDGAR (multi-endpoint, all free)
   get_regulatory_demand: 1, // Federal Register (single free call, cacheable)
+  get_award_detail: 2, // USASpending resolve (PIID→id) + award-detail fetch (both free)
+  find_predecessor_award: 2, // USASpending search + award-detail fetch (incumbent inference)
+  lookup_sam_entity: 1, // SAM Entity Management API (single lookup/search)
   get_balance: 0, // meta tool — always free
 };
 
@@ -147,6 +153,69 @@ const REGULATORY_DEMAND_TOOL_DEF = {
   },
 };
 
+/** OpenAI-style def for the USASpending award-detail tool. */
+const AWARD_DETAIL_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_award_detail',
+    description:
+      'Full USASpending detail for one federal award: obligated→ceiling (the real prize size), the ' +
+      'parent IDV/vehicle you must hold to compete, period of performance (recompete timing), recipient, ' +
+      'NAICS/PSC, funding account. Pass a contract number (PIID) OR a generated_internal_id. Returns ' +
+      'grounded=false when no award matches — do not invent figures.',
+    parameters: {
+      type: 'object',
+      properties: {
+        piid: { type: 'string', description: 'Contract number (PIID), e.g. "140F0822D0024".' },
+        id: { type: 'string', description: 'USASpending generated_internal_id, if already known (skips the resolve).' },
+      },
+    },
+  },
+};
+
+/** OpenAI-style def for the incumbent/predecessor-award inference tool. */
+const PREDECESSOR_AWARD_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'find_predecessor_award',
+    description:
+      'The LIKELY incumbent contract behind an open opportunity, inferred as the largest recent award ' +
+      'matching the NAICS + agency (+ title). Returns full award detail (incumbent, ceiling, expiry, ' +
+      'parent vehicle) plus a match-confidence. Best-match inference, NOT a certified link — present as ' +
+      '"likely". Returns grounded=false when no good match exists.',
+    parameters: {
+      type: 'object',
+      properties: {
+        naics_code: { type: 'string', description: 'The opportunity NAICS (4-6 digit).' },
+        agency_name: { type: 'string', description: 'Buying agency, e.g. "Department of Defense". Sharpens the match.' },
+        title: { type: 'string', description: 'Opportunity title — raises match confidence when present.' },
+      },
+    },
+  },
+};
+
+/** OpenAI-style def for the SAM entity lookup tool. */
+const SAM_ENTITY_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'lookup_sam_entity',
+    description:
+      'Live SAM.gov registration for a contractor: UEI/CAGE, legal name, registration status, NAICS, ' +
+      'certifications (8(a), HUBZone, …), location. Pass a UEI for an exact entity, or a company name to ' +
+      'search. The "is this vendor real, registered, and set-aside eligible?" check. Set-aside eligibility ' +
+      'depends on the CURRENT status shown, not past awards.',
+    parameters: {
+      type: 'object',
+      properties: {
+        uei: { type: 'string', description: '12-char SAM UEI for an exact lookup.' },
+        name: { type: 'string', description: 'Company legal name to search (when no UEI given).' },
+        state: { type: 'string', description: 'Optional 2-letter state filter for name search.' },
+        limit: { type: 'number', description: 'Max name-search matches (default 10, max 25).' },
+      },
+    },
+  },
+};
+
 /** All tools exposed over MCP in v1, each annotated with its credit price. */
 export function listMcpTools(): Array<Record<string, unknown>> {
   const defs = [
@@ -156,6 +225,9 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     PRICING_INTEL_TOOL_DEF,
     INCUMBENT_FINANCIALS_TOOL_DEF,
     REGULATORY_DEMAND_TOOL_DEF,
+    AWARD_DETAIL_TOOL_DEF,
+    PREDECESSOR_AWARD_TOOL_DEF,
+    SAM_ENTITY_TOOL_DEF,
     GET_BALANCE_TOOL_DEF,
   ];
   return defs.map((d) => ({ ...d, _credits: TOOL_CREDITS[d.function.name] ?? 0, _tier: tierFor(d.function.name) }));
@@ -170,6 +242,9 @@ export function isMcpTool(name: string): boolean {
     name === 'get_pricing_intel' ||
     name === 'get_incumbent_financials' ||
     name === 'get_regulatory_demand' ||
+    name === 'get_award_detail' ||
+    name === 'find_predecessor_award' ||
+    name === 'lookup_sam_entity' ||
     name === 'get_balance'
   );
 }
@@ -244,6 +319,33 @@ export async function runMcpTool(
       agency: typeof args.agency === 'string' ? args.agency : undefined,
       document_type: (args.document_type as 'RULE' | 'PROPOSED_RULE' | 'NOTICE' | undefined) ?? undefined,
       days_back: typeof args.days_back === 'number' ? args.days_back : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_award_detail') {
+    const result = (await getAwardDetail({
+      piid: typeof args.piid === 'string' ? args.piid : undefined,
+      id: typeof args.id === 'string' ? args.id : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'find_predecessor_award') {
+    const result = (await findPredecessor({
+      naics_code: typeof args.naics_code === 'string' ? args.naics_code : undefined,
+      agency_name: typeof args.agency_name === 'string' ? args.agency_name : undefined,
+      title: typeof args.title === 'string' ? args.title : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'lookup_sam_entity') {
+    const result = (await lookupSamEntity({
+      uei: typeof args.uei === 'string' ? args.uei : undefined,
+      name: typeof args.name === 'string' ? args.name : undefined,
+      state: typeof args.state === 'string' ? args.state : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };

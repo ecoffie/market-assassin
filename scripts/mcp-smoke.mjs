@@ -178,7 +178,43 @@ try {
     if (!mentioned) fail(`regulatory-demand: _ai_hint agency not traceable to rules[0].agencies (${firstAgencies.join(', ')})`);
   }
 
-  console.error('\n✅ SMOKE PASSED — MCP transport + 4 tools (playbook, pricing-intel, EDGAR, Federal Register) all live + grounded + traceable');
+  // ── get_award_detail (USASpending) ─────────────────────────────────────────
+  // Stable historical DoD award (~$979M ceiling). USASpending retains historical
+  // awards indefinitely, so this PIID reliably resolves — the smoke actually
+  // exercises the grounded resolve+hydrate path, not just an honest miss.
+  console.error('\n→ calling get_award_detail({ piid: "H9222217F0069" })');
+  const ad = await client.callTool({ name: 'get_award_detail', arguments: { piid: 'H9222217F0069' } });
+  const adS = ad.structuredContent;
+  if (!adS) fail('award-detail: no structuredContent');
+  console.error(`✓ grounded=${adS._meta?.grounded} · degraded=${adS._meta?.degraded} · resolved_id=${adS._meta?.resolved_id} · ceiling=${adS.award?.ceiling}`);
+  if (adS._meta?.degraded) fail('award-detail: degraded=true (USASpending unreachable)');
+  if (!adS._meta?.grounded) fail('award-detail: grounded=false for a known historical PIID (resolve regression?)');
+  // When grounded, the award object must carry the id we resolved (traceability).
+  if (adS.award?.generatedId && adS._meta?.resolved_id && adS.award.generatedId !== adS._meta.resolved_id) {
+    fail('award-detail: returned award generatedId does not match resolved_id');
+  }
+
+  // ── find_predecessor_award (USASpending inference) ─────────────────────────
+  console.error('\n→ calling find_predecessor_award({ naics_code: "541512", agency_name: "Department of Defense" })');
+  const pa = await client.callTool({ name: 'find_predecessor_award', arguments: { naics_code: '541512', agency_name: 'Department of Defense' } });
+  const paS = pa.structuredContent;
+  if (!paS) fail('predecessor-award: no structuredContent');
+  console.error(`✓ grounded=${paS._meta?.grounded} · confidence=${paS._meta?.confidence}`);
+  if (paS._meta?.grounded && !paS.summary) fail('predecessor-award: grounded but no summary');
+
+  // ── lookup_sam_entity (SAM.gov) ────────────────────────────────────────────
+  console.error('\n→ calling lookup_sam_entity({ name: "Booz Allen Hamilton" })');
+  const se = await client.callTool({ name: 'lookup_sam_entity', arguments: { name: 'Booz Allen Hamilton' } });
+  const seS = se.structuredContent;
+  if (!seS) fail('sam-entity: no structuredContent');
+  console.error(`✓ grounded=${seS._meta?.grounded} · mode=${seS._meta?.mode} · matches=${seS._meta?.match_count}`);
+  // SAM name search needs a valid SAM_API_KEY; a degraded/empty result is non-fatal here
+  // (keyless local runs 400), but a grounded result must carry matches.
+  if (seS._meta?.grounded && seS._meta?.mode === 'name' && !(seS.matches?.length > 0)) {
+    fail('sam-entity: grounded name-search but empty matches');
+  }
+
+  console.error('\n✅ SMOKE PASSED — MCP transport + 7 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity) all live + honest');
   await client.close();
   process.exit(0);
 } catch (err) {
