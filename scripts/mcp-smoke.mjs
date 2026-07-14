@@ -78,6 +78,7 @@ try {
     'lookup_federal_osbp', 'search_agency_opps_by_office',
     'get_sblo_contact', 'search_federal_contacts', 'search_podcast_lessons',
     'get_agency_budget_trends', 'derive_company_keywords',
+    'get_agency_spending_detail',
   ]) {
     if (!names.includes(t)) fail(`${t} not registered`);
   }
@@ -515,7 +516,21 @@ try {
   if (ckMiss.structuredContent?._meta?.grounded !== false) fail('company-keywords: empty input should be grounded=false (no invented keywords)');
   console.error('✓ honest miss: empty input → grounded=false');
 
-  console.error('\n✅ SMOKE PASSED — MCP transport + 28 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth, solicitation-documents, federal-events, scan-compliance, bid-decision, federal-osbp, agency-opps-by-office, sblo-contact, federal-contacts, podcast-lessons, agency-budget-trends, company-keywords) all live + honest');
+  // ── get_agency_spending_detail (USASpending components + set-asides) ───────
+  console.error('\n→ calling get_agency_spending_detail({ agency: "Department of Defense" })');
+  const asd = await client.callTool({ name: 'get_agency_spending_detail', arguments: { agency: 'Department of Defense' } });
+  const asdS = asd.structuredContent;
+  if (!asdS) fail('agency-spending-detail: no structuredContent');
+  if (asdS._meta?.degraded) fail('agency-spending-detail: degraded=true (USASpending unreachable)');
+  if (!asdS._meta?.grounded) fail('agency-spending-detail: DoD should be grounded (USASpending has DoD contract obligations)');
+  if (!Array.isArray(asdS.sub_agencies) || asdS.sub_agencies.length < 3) fail('agency-spending-detail: DoD should split into multiple components (Army/Navy/AF…)');
+  if (!Array.isArray(asdS.set_aside_breakdown) || asdS.set_aside_breakdown.length !== 5) fail('agency-spending-detail: expected 5 set-aside buckets');
+  console.error(`✓ grounded=${asdS._meta.grounded} · ${asdS.agency} FY${asdS.fiscal_year} · total=$${(asdS.total_obligated/1e9).toFixed(0)}B · SB share=${asdS.small_business_share}% · top component=${asdS.sub_agencies[0]?.name} (${asdS.sub_agencies[0]?.pct_of_total}%)`);
+  const asdMiss = await client.callTool({ name: 'get_agency_spending_detail', arguments: { agency: 'Zzz Fake Agency' } });
+  if (asdMiss.structuredContent?._meta?.grounded !== false) fail('agency-spending-detail: unknown agency should be grounded=false (no invented figures)');
+  console.error('✓ honest miss: unknown agency → grounded=false');
+
+  console.error('\n✅ SMOKE PASSED — MCP transport + 29 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth, solicitation-documents, federal-events, scan-compliance, bid-decision, federal-osbp, agency-opps-by-office, sblo-contact, federal-contacts, podcast-lessons, agency-budget-trends, company-keywords, agency-spending-detail) all live + honest');
   await client.close();
   process.exit(0);
 } catch (err) {

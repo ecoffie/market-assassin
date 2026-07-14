@@ -47,6 +47,7 @@ import { searchFederalContacts } from '@/mcp/tools/federal-contacts';
 import { searchPodcastLessons } from '@/mcp/tools/podcast-lessons';
 import { getAgencyBudgetTrends } from '@/mcp/tools/agency-budget-trends';
 import { deriveCompanyKeywords } from '@/mcp/tools/company-keywords';
+import { getAgencySpendingDetailTool } from '@/mcp/tools/agency-spending-detail';
 import { getBalance } from '@/lib/mcp/credits';
 import { tierFor } from '@/lib/mcp/entitlements';
 
@@ -96,6 +97,7 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   search_podcast_lessons: 1, // proprietary podcast corpus (Supabase keyword search)
   get_agency_budget_trends: 1, // curated OMB/CBJ budget-authority JSON (static, no LLM/IO)
   derive_company_keywords: 1, // OpenAI-embedding keyword derivation (no BigQuery)
+  get_agency_spending_detail: 2, // multiple USASpending aggregates (total + subagency + set-aside buckets)
   get_balance: 0, // meta tool — always free
 };
 
@@ -716,6 +718,28 @@ const PODCAST_LESSONS_TOOL_DEF = {
   },
 };
 
+const AGENCY_SPENDING_DETAIL_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_agency_spending_detail',
+    description:
+      '"Who inside this department buys, and can a small business win here." Complements get_agency_intel with the ' +
+      'sub-agency (component) spending breakdown + the set-aside distribution (Small Business / 8(a) / SDVOSB / WOSB / ' +
+      'HUBZone shares + overall small-business share) — the small-business easy-entry read. Live USASpending contract ' +
+      'obligations (award types A/B/C/D) for a fiscal year. Pass an agency name/abbreviation. grounded=false = no ' +
+      'toptier agency matched (do NOT invent figures); degraded=true = USASpending errored (not $0). Contract ' +
+      'obligations only, NOT total agency budget.',
+    parameters: {
+      type: 'object',
+      properties: {
+        agency: { type: 'string', description: 'Agency name or abbreviation, e.g. "Department of Defense", "VA", "NASA".' },
+        fiscal_year: { type: 'number', description: 'Fiscal year (defaults to the latest complete FY).' },
+      },
+      required: ['agency'],
+    },
+  },
+};
+
 const AGENCY_BUDGET_TRENDS_TOOL_DEF = {
   type: 'function' as const,
   function: {
@@ -791,6 +815,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     PODCAST_LESSONS_TOOL_DEF,
     AGENCY_BUDGET_TRENDS_TOOL_DEF,
     COMPANY_KEYWORDS_TOOL_DEF,
+    AGENCY_SPENDING_DETAIL_TOOL_DEF,
     GET_BALANCE_TOOL_DEF,
   ];
   return defs.map((d) => ({ ...d, _credits: TOOL_CREDITS[d.function.name] ?? 0, _tier: tierFor(d.function.name) }));
@@ -829,6 +854,7 @@ export function isMcpTool(name: string): boolean {
     name === 'search_podcast_lessons' ||
     name === 'get_agency_budget_trends' ||
     name === 'derive_company_keywords' ||
+    name === 'get_agency_spending_detail' ||
     name === 'get_balance'
   );
 }
@@ -1145,6 +1171,14 @@ export async function runMcpTool(
       capabilities: Array.isArray(args.capabilities) ? (args.capabilities as string[]) : undefined,
       code_titles: Array.isArray(args.code_titles) ? (args.code_titles as string[]) : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_agency_spending_detail') {
+    const result = (await getAgencySpendingDetailTool({
+      agency: typeof args.agency === 'string' ? args.agency : '',
+      fiscal_year: typeof args.fiscal_year === 'number' ? args.fiscal_year : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
