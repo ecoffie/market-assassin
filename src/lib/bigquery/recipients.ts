@@ -10,8 +10,8 @@
  * Each function caches independently — top NAICS for Lockheed
  * doesn't have to recompute when only the awards list changed.
  */
-import { BQ_TABLES } from './client';
-import { queryCached } from './cache';
+import { BQ_TABLES, bqQuery } from './client';
+import { queryCached, cacheSet } from './cache';
 
 // Queries that scan the full `awards` table filtered by recipient_uei
 // can exceed the BQ client's 5 GiB default maximumBytesBilled for
@@ -966,6 +966,64 @@ export async function getTopRecipientsForSitemap(
     // by the route's `revalidate = 86400`, so a live cold-load is safe here.
     cacheOnly: false,
   });
+}
+
+/**
+ * Bulk-warm the `rollup:by-slug:*` header keys for the top `limit` contractors
+ * in ONE scan — the warm-seo-bq cron's contractor path.
+ *
+ * getRollupBySlug computes the slug per row (COMPUTED_SLUG_SQL, no pruning
+ * possible), so warming per-slug would be `limit` full recipients_rollup scans.
+ * This does a SINGLE scan of the top contractors by spend and writes each one's
+ * header key directly via cacheSet, in the exact shape getRollupBySlug reads
+ * (an array whose [0] is the RollupProfile). Warming just the HEADER lets a
+ * contractor overview page render 200 (name + total obligated + counts) instead
+ * of 404 while the SEO live-BQ switch is OFF; the ~GB sub-section charts are
+ * deliberately NOT warmed here (too expensive to bulk-warm) and fill in on a
+ * real visit if the switch is on.
+ *
+ * Returns { scanned, warmed }. One controlled scan, capped at 5 GiB.
+ */
+export async function bulkWarmRollupHeaders(
+  limit: number,
+): Promise<{ scanned: number; warmed: number }> {
+  const rows = await bqQuery<RollupProfile>({
+    maximumBytesBilled: String(5 * 1024 * 1024 * 1024),
+    query: `
+      WITH slugged AS (
+        SELECT
+          *,
+          ${COMPUTED_SLUG_SQL('rollup_name')} AS computed_slug
+        FROM ${BQ_TABLES.recipientsRollup}
+        WHERE rollup_name IS NOT NULL
+      )
+      SELECT
+        rollup_uei,
+        rollup_name,
+        computed_slug AS canonical_slug,
+        child_ueis,
+        child_count,
+        cage_code, address, city, state, zip, country,
+        total_obligated, award_count, transaction_count,
+        CAST(first_action_date AS STRING) AS first_action_date,
+        CAST(last_action_date AS STRING) AS last_action_date,
+        distinct_agency_count, distinct_naics_count
+      FROM slugged
+      ORDER BY total_obligated DESC
+      LIMIT @limit
+    `,
+    params: { limit },
+  });
+
+  let warmed = 0;
+  for (const r of rows) {
+    const slug = r.canonical_slug;
+    if (!slug) continue;
+    // Mirror getRollupBySlug's cacheKey + value shape exactly (reader does rows[0]).
+    const ok = await cacheSet<RollupProfile>(`rollup:by-slug:${slug}:v2-merged`, [r]);
+    if (ok) warmed++;
+  }
+  return { scanned: rows.length, warmed };
 }
 
 export async function getSimilarRecipients(

@@ -71,6 +71,30 @@ function buildKey(cacheKey: string): string {
   return `bq:${DATA_VERSION}:${cacheKey}`;
 }
 
+/**
+ * Directly write a value into the BQ result cache under the SAME key scheme
+ * queryCached reads (`bq:{DATA_VERSION}:{cacheKey}`). Used by the warm-seo-bq
+ * cron to bulk-populate many keys from a SINGLE scan — e.g. warm N contractor
+ * `rollup:by-slug:*` headers from one recipients_rollup scan instead of one
+ * full-table scan per slug. The value shape MUST match what the reader expects
+ * (queryCached always stores/returns T[], and readers do `rows[0]`), so pass an
+ * array. Defaults to the same 90d TTL. KV write errors are swallowed (a failed
+ * warm is a cache miss, not a crash) so a partial warm never throws mid-batch.
+ */
+export async function cacheSet<T>(
+  cacheKey: string,
+  value: T[],
+  ttlSeconds: number = DEFAULT_TTL_SECONDS,
+): Promise<boolean> {
+  try {
+    await kv.set(buildKey(cacheKey), value, { ex: ttlSeconds });
+    return true;
+  } catch (err) {
+    console.warn(`[bq-cache] cacheSet write failed for ${buildKey(cacheKey)}:`, err);
+    return false;
+  }
+}
+
 export async function queryCached<T = Record<string, unknown>>(
   opts: QueryCacheOptions<T>,
 ): Promise<T[]> {

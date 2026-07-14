@@ -121,7 +121,10 @@ export async function getLargestAwards(limit = 50): Promise<AwardListRow[]> {
  * One award detail by award_id.
  * Powers /awards/[id] page.
  */
-export async function getAwardById(awardId: string): Promise<AwardDetailRow | null> {
+export async function getAwardById(
+  awardId: string,
+  opts?: { force?: boolean },
+): Promise<AwardDetailRow | null> {
   if (!isValidAwardId(awardId)) return null;
   const rows = await queryCached<AwardDetailRow>({
     cacheKey: `awards:detail:${awardId}`,
@@ -132,7 +135,9 @@ export async function getAwardById(awardId: string): Promise<AwardDetailRow | nu
     // a cold award 404s instead of scanning. Warmed awards still serve from KV.
     // isValidAwardId() guards bot garbage, the bucket filter + 100 MiB cap bound
     // the cold read, and the result caches 90d. Re-enable with ENABLE_SEO_LIVE_BQ=1.
-    cacheOnly: !seoLiveBqEnabled(),
+    // opts.force lets the warm-seo-bq cron populate this key regardless of the
+    // public switch (a controlled server job, not crawler traffic).
+    cacheOnly: !(seoLiveBqEnabled() || opts?.force),
     // Reads the hash-partitioned award_detail_lookup table. The
     // `bucket = MOD(...)` filter prunes to ONE of 1024 partitions so a cold
     // lookup scans ~10-25 MB (measured 10 MB billed) instead of the ~27 GB an
@@ -197,7 +202,10 @@ export async function getAwardById(awardId: string): Promise<AwardDetailRow | nu
  * PIIDs are negatively cached (queryCached writes the empty [] to KV), so
  * a repeated bogus PIID costs nothing after the first miss.
  */
-export async function getAwardIdByPiid(piid: string): Promise<{
+export async function getAwardIdByPiid(
+  piid: string,
+  opts?: { force?: boolean },
+): Promise<{
   award_id: string;
   piid: string;
   recipient_name: string;
@@ -220,7 +228,8 @@ export async function getAwardIdByPiid(piid: string): Promise<{
     // after. It is not the 4.86 GB full-table scan that caused the cost spike.
     // Gated behind the SEO live-BQ switch (default OFF) so crawler cold-scans
     // don't drain the BQ daily quota; a cold PIID 404s until ENABLE_SEO_LIVE_BQ=1.
-    cacheOnly: !seoLiveBqEnabled(),
+    // opts.force lets the warm-seo-bq cron populate this key regardless.
+    cacheOnly: !(seoLiveBqEnabled() || opts?.force),
     // Hash-partitioned lookup: the `bucket = MOD(...)` filter prunes to ONE of
     // 1024 partitions so a cold read scans ~4.5 MB (measured 10 MB billed)
     // instead of the ~4.86 GB an unpartitioned scan cost. BQ computes the hash
@@ -270,9 +279,15 @@ function isValidAwardId(raw: string): boolean {
  * Slugs for the top 10K awards — fed to generateStaticParams so
  * each is prerendered as a stable URL in the sitemap.
  */
-export async function getTopAwardIdsForStatic(limit = 10000): Promise<string[]> {
+export async function getTopAwardIdsForStatic(
+  limit = 10000,
+  opts?: { force?: boolean },
+): Promise<string[]> {
   const rows = await queryCached<{ award_id: string }>({
     cacheKey: `awards:top-ids:${limit}`,
+    // cacheOnly by default (SEO-safe); the warm-seo-bq cron passes force to run
+    // the ~20GB ranking scan ONCE per cycle, then resume runs read it warm.
+    cacheOnly: !opts?.force,
     maximumBytesBilled: String(20 * 1024 * 1024 * 1024),
     ttlSeconds: 30 * 24 * 60 * 60, // 30d (this list is stable enough)
     query: `
