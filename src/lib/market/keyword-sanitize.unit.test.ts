@@ -88,4 +88,27 @@ describe('sanitize/searchable sanity', () => {
     expect(isSearchableKeyword('video')).toBe(true);
     expect(sanitizeKeywords(['video production', 'the', '  ', 'video production'])).toEqual(['video production']);
   });
+
+  it('collapses within-phrase repeated words and then de-dups the result', () => {
+    // The exact redundant set the CapabilityNudge emitted (Jul 14 2026):
+    // "janitorial services janitorial" → "janitorial services" (dup, dropped),
+    // "custodial janitorial janitorial" → "custodial janitorial".
+    expect(
+      sanitizeKeywords([
+        'janitorial services',
+        'janitorial services janitorial',
+        'janitorial janitorial',
+        'janitorial',
+        'custodial janitorial janitorial',
+        'custodial janitorial',
+      ]),
+    ).toEqual(['janitorial services', 'janitorial', 'custodial janitorial']);
+  });
+
+  it('leaves non-repeating phrases and single words untouched', () => {
+    expect(sanitizeKeywords(['program management', 'cybersecurity'])).toEqual([
+      'program management',
+      'cybersecurity',
+    ]);
+  });
 });
