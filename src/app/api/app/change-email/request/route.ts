@@ -77,7 +77,7 @@ export async function POST(request: NextRequest) {
 
   // Rate-limit: one in-flight/recent change per account per 24h.
   const dayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
-  const { data: recent } = await sb
+  const { data: recent, error: recentErr } = await sb
     .from('email_change_log')
     .select('id, status, created_at')
     .eq('old_email', currentEmail)
@@ -86,6 +86,12 @@ export async function POST(request: NextRequest) {
     .order('created_at', { ascending: false })
     .limit(1)
     .maybeSingle();
+  if (recentErr) {
+    // A renamed/missing column would null this out and silently let a user spam
+    // change-requests. Surface it rather than swallow (PostgREST-null trap).
+    console.error('[change-email/request] rate-limit lookup failed', recentErr);
+    return NextResponse.json({ success: false, error: 'Could not start the email change. Please try again.' }, { status: 500 });
+  }
   if (recent) {
     return NextResponse.json(
       { success: false, error: 'An email change was already requested recently. Please check your inbox or try again later.' },
