@@ -32,6 +32,8 @@ import { grantsSearch } from './tools/grants';
 import { agencyForecasts } from './tools/forecasts';
 import { sbirSearch } from './tools/sbir';
 import { expiringContracts } from './tools/expiring-contracts';
+import { lookupFederalOsbp } from './tools/federal-osbp';
+import { searchAgencyOppsByOffice } from './tools/agency-opps-by-office';
 
 const server = new McpServer({
   name: 'mindy-govcon',
@@ -423,11 +425,58 @@ server.registerTool(
   },
 );
 
+server.registerTool(
+  'lookup_federal_osbp',
+  {
+    title: 'Lookup Federal OSBP / Small Business Office',
+    description:
+      'The Office of Small Business Programs (OSBP/OSDBU) — the small-business front door — for a federal command ' +
+      'or agency. Pass a command/agency name or abbreviation ("NAVFAC", "USACE", "Department of the Navy"). Returns ' +
+      'the OSBP office, director (+ director_verified YYYY-MM stamp; names rotate, mailboxes are stable), contact ' +
+      'info, acquisition office, forecast URL, and key capabilities. A parent-agency input returns all its commands\' ' +
+      'offices. grounded=false = not in the curated (DoD/DLA/Navy/Army-weighted) directory — do NOT invent a contact.',
+    inputSchema: {
+      agency: z
+        .string()
+        .describe('Command/agency name or abbreviation, e.g. "NAVFAC", "USACE", "DLA Aviation", "Department of the Navy".'),
+    },
+  },
+  async ({ agency }) => {
+    const result = lookupFederalOsbp({ agency });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'search_agency_opps_by_office',
+  {
+    title: 'Search Agency Opps by Office (DoDAAC-anchored)',
+    description:
+      'Open SAM.gov solicitations anchored to a specific BUYING OFFICE, not the whole department. A DoD sub-agency ' +
+      '(a USACE district, DARPA, MDA) shares one department label, so a department filter returns the whole-DoD ' +
+      'firehose; this anchors on the 6-char DoDAAC prefixing the solicitation number (W912PL = USACE LA District) ' +
+      'for THAT office\'s open buys. Pass a command/agency name OR a 6-char DoDAAC, + optional NAICS/state. ' +
+      '_meta.anchor="dodaac" = office-precise; "department" = broad civilian preview. grounded=false + ' +
+      'anchor="dodaac" = genuinely nothing open now.',
+    inputSchema: {
+      agency: z.string().optional().describe('Command / agency / sub-agency name, e.g. "USACE", "Naval Sea Systems Command".'),
+      dodaac: z.string().optional().describe('A known 6-char DoDAAC (e.g. "W912PL"); takes precedence over agency.'),
+      naics: z.string().optional().describe('NAICS filter; ≤4 digits = prefix, 6 = exact.'),
+      state: z.string().optional().describe('2-letter place-of-performance state.'),
+      limit: z.number().int().min(1).max(100).optional().describe('Max results (default 25).'),
+    },
+  },
+  async ({ agency, dodaac, naics, state, limit }) => {
+    const result = await searchAgencyOppsByOffice({ agency, dodaac, naics, state, limit });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts registered',
+    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + federal-osbp + agency-opps-by-office registered',
   );
 }
 

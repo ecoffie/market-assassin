@@ -32,6 +32,8 @@ import { grantsSearch } from '@/mcp/tools/grants';
 import { agencyForecasts } from '@/mcp/tools/forecasts';
 import { sbirSearch } from '@/mcp/tools/sbir';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
+import { lookupFederalOsbp } from '@/mcp/tools/federal-osbp';
+import { searchAgencyOppsByOffice } from '@/mcp/tools/agency-opps-by-office';
 import { getBalance } from '@/lib/mcp/credits';
 import { tierFor } from '@/lib/mcp/entitlements';
 
@@ -66,6 +68,8 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   get_agency_forecasts: 1, // Supabase agency_forecasts read
   search_sbir: 1, // NIH RePORTER + multisite aggregate
   get_expiring_contracts: 1, // Supabase recompete_opportunities read
+  lookup_federal_osbp: 1, // curated DoD command / OSBP directory (static, no LLM/IO)
+  search_agency_opps_by_office: 1, // DoDAAC-anchored open SAM opps (Supabase read)
   get_balance: 0, // meta tool — always free
 };
 
@@ -367,6 +371,54 @@ const EXPIRING_CONTRACTS_TOOL_DEF = {
   },
 };
 
+const FEDERAL_OSBP_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'lookup_federal_osbp',
+    description:
+      'The Office of Small Business Programs (OSBP/OSDBU) — the small-business front door — for a federal ' +
+      'command or agency. Pass a command/agency name or abbreviation (e.g. "NAVFAC", "USACE", "Department of ' +
+      'the Navy"). Returns the OSBP office, director (with a director_verified YYYY-MM stamp — names rotate, ' +
+      'mailboxes are stable), email/phone/address, acquisition office, forecast URL, and key capabilities. ' +
+      'A parent-agency input returns all its commands\' offices. grounded=false = not in the curated directory ' +
+      '(DoD/DLA/Navy/Army-weighted) — do NOT invent a contact.',
+    parameters: {
+      type: 'object',
+      properties: {
+        agency: {
+          type: 'string',
+          description: 'Command/agency name or abbreviation, e.g. "NAVFAC", "USACE", "DLA Aviation", "Department of the Navy".',
+        },
+      },
+      required: ['agency'],
+    },
+  },
+};
+
+const AGENCY_OPPS_BY_OFFICE_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'search_agency_opps_by_office',
+    description:
+      'Open SAM.gov solicitations anchored to a specific BUYING OFFICE — not the whole department. A DoD ' +
+      'sub-agency (a USACE district, DARPA, MDA) shares one department label, so a department filter returns the ' +
+      'whole-DoD firehose; this anchors on the 6-char DoDAAC that prefixes the solicitation number (W912PL = USACE ' +
+      'LA District) for THAT office\'s real open buys. Pass a command/agency name OR a known 6-char DoDAAC, plus ' +
+      'optional NAICS/state. _meta.anchor="dodaac" = office-precise; "department" = a broad civilian preview (no ' +
+      'DoDAAC path). grounded=false with anchor="dodaac" = genuinely nothing open now, not an error.',
+    parameters: {
+      type: 'object',
+      properties: {
+        agency: { type: 'string', description: 'Command / agency / sub-agency name, e.g. "USACE", "Naval Sea Systems Command".' },
+        dodaac: { type: 'string', description: 'A known 6-char DoDAAC (e.g. "W912PL"); takes precedence over agency.' },
+        naics: { type: 'string', description: 'NAICS filter; ≤4 digits = prefix, 6 = exact.' },
+        state: { type: 'string', description: '2-letter place-of-performance state.' },
+        limit: { type: 'number', description: 'Max results (default 25, max 100).' },
+      },
+    },
+  },
+};
+
 /** All tools exposed over MCP in v1, each annotated with its credit price. */
 export function listMcpTools(): Array<Record<string, unknown>> {
   const defs = [
@@ -385,6 +437,8 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     FORECASTS_TOOL_DEF,
     SBIR_TOOL_DEF,
     EXPIRING_CONTRACTS_TOOL_DEF,
+    FEDERAL_OSBP_TOOL_DEF,
+    AGENCY_OPPS_BY_OFFICE_TOOL_DEF,
     GET_BALANCE_TOOL_DEF,
   ];
   return defs.map((d) => ({ ...d, _credits: TOOL_CREDITS[d.function.name] ?? 0, _tier: tierFor(d.function.name) }));
@@ -408,6 +462,8 @@ export function isMcpTool(name: string): boolean {
     name === 'get_agency_forecasts' ||
     name === 'search_sbir' ||
     name === 'get_expiring_contracts' ||
+    name === 'lookup_federal_osbp' ||
+    name === 'search_agency_opps_by_office' ||
     name === 'get_balance'
   );
 }
@@ -580,6 +636,24 @@ export async function runMcpTool(
       min_value: typeof args.min_value === 'number' ? args.min_value : undefined,
       max_value: typeof args.max_value === 'number' ? args.max_value : undefined,
       likelihood: args.likelihood === 'high' || args.likelihood === 'medium' || args.likelihood === 'low' ? args.likelihood : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'lookup_federal_osbp') {
+    const result = lookupFederalOsbp({
+      agency: typeof args.agency === 'string' ? args.agency : '',
+    }) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'search_agency_opps_by_office') {
+    const result = (await searchAgencyOppsByOffice({
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      dodaac: typeof args.dodaac === 'string' ? args.dodaac : undefined,
+      naics: typeof args.naics === 'string' ? args.naics : undefined,
+      state: typeof args.state === 'string' ? args.state : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
