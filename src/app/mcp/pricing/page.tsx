@@ -178,19 +178,8 @@ export default function McpPricing() {
               <span className="text-[13px] text-slate-500">pay-as-you-go</span>
             </div>
             <div className="mt-1 text-[13px] text-slate-400">Every tool, including the moat. No subscription.</div>
-            <div className="mt-4 space-y-1.5">
-              {packRows.map((p) => (
-                <a key={p.id} href="/app" className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2 transition hover:border-emerald-400/50 ${p.highlight ? 'border-emerald-400/40 bg-emerald-400/[0.07]' : 'border-emerald-400/15 bg-emerald-400/[0.03]'}`}>
-                  <span className="flex items-center gap-1.5">
-                    <span className="text-[13px] font-semibold text-slate-100">{p.name}</span>
-                    {p.tag && <span className="rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-300">{p.tag}</span>}
-                  </span>
-                  <span className="text-right leading-tight">
-                    <span className="block font-mono text-[13px] font-semibold tabular-nums text-emerald-100">{p.price}</span>
-                    <span className="block text-[10.5px] tabular-nums text-slate-400">{p.credits.toLocaleString()} cr · ~{workups(p.credits, workupCost)} work-ups</span>
-                  </span>
-                </a>
-              ))}
+            <div className="mt-4 rounded-xl border border-emerald-400/15 bg-emerald-400/[0.04] p-3 text-[12px] leading-relaxed text-slate-300">
+              <b className="font-semibold text-emerald-100">Three prepaid packs</b> from $5 to $40 — the bigger the pack, the more bonus credits. Pick your size below. ↓
             </div>
             <ul className="mt-5 flex-1 space-y-1.5 border-t border-emerald-400/15 pt-5 text-[13px]">
               <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span>Everything in the trial, <b className="font-semibold">plus the proprietary moat:</b></span></li>
@@ -202,7 +191,7 @@ export default function McpPricing() {
               ))}
               <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span>Charged on success only · credits never expire</span></li>
             </ul>
-            <a href="/app" className="mt-6 inline-flex items-center justify-center rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">Get credits</a>
+            <a href="#packs" className="mt-6 inline-flex items-center justify-center rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">See credit packs</a>
           </div>
 
           {/* Pro */}
@@ -306,6 +295,28 @@ export default function McpPricing() {
                 )}
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Credit packs — one card per amount */}
+        <section id="packs" className="mt-16 scroll-mt-8">
+          <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">Credit packs</h2>
+          <p className="mx-auto mt-2 max-w-lg text-center text-[13px] text-slate-400">Prepaid, pay-as-you-go. Every pack unlocks the same metered tools — including the proprietary moat — and credits never expire.</p>
+          <div className="mx-auto mt-8 grid max-w-4xl gap-4 sm:grid-cols-3">
+            {packRows.map((p) => (
+              <div key={p.id} className={`relative flex flex-col items-center rounded-2xl border p-6 text-center ${p.highlight ? 'border-emerald-400/40 bg-emerald-400/[0.05] shadow-[0_0_0_1px_rgba(16,185,129,0.15)]' : 'border-white/10 bg-white/[0.02]'}`}>
+                {p.tag && <span className={`absolute -top-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${p.highlight ? 'bg-emerald-500 text-[#06120c]' : 'border border-white/15 bg-[#0a0f1e] text-slate-400'}`}>{p.tag}</span>}
+                <div className="text-[12px] font-semibold uppercase tracking-wide text-emerald-300">{p.name}</div>
+                <div className="mt-3 font-mono text-4xl font-bold tabular-nums text-slate-100">{p.price}</div>
+                <div className="text-[12px] text-slate-500">prepaid, one-time</div>
+                <div className="mt-4 w-full border-t border-white/[0.06] pt-4">
+                  <div className="font-mono text-xl font-semibold tabular-nums text-emerald-100">{p.credits.toLocaleString()}</div>
+                  <div className="text-[12px] text-slate-400">credits</div>
+                  <div className="mt-2 text-[13px] text-slate-300">≈ {workups(p.credits, workupCost)} opportunity work-ups</div>
+                </div>
+                <a href="/app" className={`mt-6 inline-flex w-full items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold ${p.highlight ? 'bg-emerald-500 text-[#06120c] hover:bg-emerald-400' : 'border border-white/15 text-slate-200 hover:bg-white/5'}`}>Get {p.name}</a>
+              </div>
+            ))}
           </div>
         </section>
 
