@@ -27,8 +27,10 @@ export interface CreditPackage {
  * product carries metadata type=mcp_credit_topup + package=<id>). Credits here MUST
  * match each Stripe product's stated credit count.
  */
+// $15 Plus is the entry pack — the $5 Starter was retired 2026-07-14 (too small to
+// be worth the Stripe fee + anchors the product as cheap). Its Stripe product can be
+// archived; leaving it unlisted here means it's no longer sold or granted.
 export const CREDIT_PACKAGES: readonly CreditPackage[] = [
-  { id: 'starter', credits: 250, usd: 5, label: 'Starter — 250 credits', checkoutUrl: 'https://buy.stripe.com/00weVe7MGerw6h7clafnO0L' },
   { id: 'plus', credits: 800, usd: 15, label: 'Plus — 800 credits (7% bonus)', checkoutUrl: 'https://buy.stripe.com/00w5kE9UO1EK9tjdpefnO0K' },
   { id: 'scale', credits: 2400, usd: 40, label: 'Scale — 2,400 credits (20% bonus)', checkoutUrl: 'https://buy.stripe.com/14A7sMd703MS8pf4SIfnO0J' },
 ] as const;

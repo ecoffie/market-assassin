@@ -46,10 +46,10 @@ describe('handleMcpCreditTopup', () => {
   it('grants the package credits, keyed idempotently by session id', async () => {
     const r = await handleMcpCreditTopup(session({
       id: 'cs_abc',
-      metadata: { type: 'mcp_credit_topup', package: 'starter', user_email: 'U@X.com' },
+      metadata: { type: 'mcp_credit_topup', package: 'plus', user_email: 'U@X.com' },
     }));
-    expect(r).toMatchObject({ handled: true, applied: true, credits: 250, email: 'u@x.com' });
-    expect(credits.applyCreditOnce).toHaveBeenCalledWith('cs_abc', 'u@x.com', 250, 'stripe_topup');
+    expect(r).toMatchObject({ handled: true, applied: true, credits: 800, email: 'u@x.com' });
+    expect(credits.applyCreditOnce).toHaveBeenCalledWith('cs_abc', 'u@x.com', 800, 'stripe_topup');
   });
 
   it('resolves email from client_reference_id when metadata lacks it', async () => {
@@ -69,7 +69,7 @@ describe('handleMcpCreditTopup', () => {
   });
 
   it('errors cleanly when no email can be resolved', async () => {
-    const r = await handleMcpCreditTopup(session({ metadata: { type: 'mcp_credit_topup', package: 'starter' } }));
+    const r = await handleMcpCreditTopup(session({ metadata: { type: 'mcp_credit_topup', package: 'plus' } }));
     expect(r).toMatchObject({ handled: true, error: 'no_email' });
     expect(credits.applyCreditOnce).not.toHaveBeenCalled();
   });
