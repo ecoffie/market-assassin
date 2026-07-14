@@ -41,6 +41,13 @@ const PRO_INCLUDES: { label: string; note: string; status: 'live' | 'soon' }[] =
   { label: 'Full Mindy app', note: 'alerts, pipeline, forecasts, CRM at getmindy.ai/app', status: 'live' },
 ];
 
+/** Per-pack "who it's for" blurb — the only thing that differs pack to pack (capabilities are identical). */
+const PACK_BLURB: Record<string, string> = {
+  starter: 'A first taste — enough credits to work a handful of opportunities end to end.',
+  plus: 'The everyday pack for steady weekly BD. Includes a ~7% credit bonus.',
+  scale: 'Best rate for heavy users and teams — ~20% bonus credits, lowest cost per credit.',
+};
+
 /** Plan-finder activities — each a real BD workflow, priced per opportunity from the live catalog. */
 const ACTIVITIES: { id: string; label: string; note: string; tools: string[] }[] = [
   { id: 'find', label: 'Find & filter opportunities', note: 'live SAM search across your NAICS + keywords', tools: ['search_sam_opportunities'] },
@@ -78,6 +85,8 @@ export default function McpPricing() {
   const trial = cat?.signupCredits ?? 100;
   const proCredits = cat?.proMonthlyCredits ?? 1000;
   const workupCost = tools.length ? workupCostFrom(tools) : 30;
+  const toolCount = tools.filter((t) => t.credits > 0).length || 33;
+  const moatList = MOAT_TOOLS.map((m) => m.label).join(' · ');
   const searchCost = toolCr(tools, 'search_sam_opportunities', 1);
   const playbookCost = toolCr(tools, 'get_winning_playbook', 2);
   const popularId = packs.length >= 2 ? packs[1].id : undefined;
@@ -163,15 +172,20 @@ export default function McpPricing() {
                 <span className="font-mono text-4xl font-bold tabular-nums">{p.price}</span>
                 <span className="font-mono text-[15px] font-semibold tabular-nums text-emerald-100">{p.credits.toLocaleString()} cr</span>
               </div>
+              <div className="mt-1 min-h-[2.5rem] text-[13px] leading-relaxed text-slate-400">{PACK_BLURB[p.id] ?? 'Prepaid credits — every tool, including the moat.'}</div>
               <div className="mt-3 rounded-xl border border-emerald-400/15 bg-emerald-400/[0.04] p-3">
                 <div className="text-[12px] text-emerald-200/80">{p.credits.toLocaleString()} credits get you</div>
                 <ul className="mt-1.5 space-y-0.5 text-[12px] text-slate-300">
                   {outcomes(p.credits).map((o) => <li key={o} className="tabular-nums">· {o}</li>)}
                 </ul>
               </div>
-              <div className="mt-4 flex-1 border-t border-white/[0.06] pt-4 text-[12.5px] text-slate-400">
-                Every metered tool <b className="font-semibold text-slate-200">+ the proprietary moat</b> · charged on success only · credits never expire.
-              </div>
+              <ul className="mt-4 flex-1 space-y-2 border-t border-white/[0.06] pt-4 text-[12.5px]">
+                <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span><b className="font-semibold text-slate-200">All {toolCount} metered tools</b> — SAM, USASpending, EDGAR, GSA pricing, forecasts, recompetes, contractor scans</span></li>
+                <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span><b className="font-semibold text-slate-200">The proprietary moat</b> — {moatList}</span></li>
+                <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span>Proposal Assist 1.0 — metered drafts grounded in your Vault</span></li>
+                <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span>Keyless connect — sign in through your browser</span></li>
+                <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span>Charged on success only · credits never expire</span></li>
+              </ul>
               <a href="/app" className={`mt-5 inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold ${p.highlight ? 'bg-emerald-500 text-[#06120c] hover:bg-emerald-400' : 'border border-white/15 text-slate-200 hover:bg-white/5'}`}>Get {p.name}</a>
             </div>
           ))}
@@ -189,14 +203,16 @@ export default function McpPricing() {
               <span className="text-[13px] text-slate-400">/mo</span>
             </div>
             <div className="mt-1 h-4 text-[12px] text-emerald-300">{annual ? `billed annually ($${PRO_ANNUAL.toLocaleString()}/yr) · save $${ANNUAL_SAVE}` : ''}</div>
+            <div className="mt-1 min-h-[2.5rem] text-[13px] leading-relaxed text-slate-400">The whole platform, credits included — built for agents working federal BD every day.</div>
             <div className="mt-3 rounded-xl border border-indigo-400/15 bg-indigo-400/[0.05] p-3">
               <div className="text-[12px] text-indigo-200/80"><b className="font-mono text-[14px] tabular-nums text-indigo-100">{proCredits.toLocaleString()}</b> credits every month get you</div>
               <ul className="mt-1.5 space-y-0.5 text-[12px] text-slate-300">
                 {outcomes(proCredits).map((o) => <li key={o} className="tabular-nums">· {o}</li>)}
               </ul>
             </div>
-            <ul className="mt-4 flex-1 space-y-1.5 border-t border-indigo-400/15 pt-4 text-[13px]">
-              <li className="flex gap-2"><span className="text-indigo-300">◆</span> <span>Everything the packs unlock, <b className="font-semibold">included</b> + a monthly allowance</span></li>
+            <ul className="mt-4 flex-1 space-y-2 border-t border-indigo-400/15 pt-4 text-[12.5px]">
+              <li className="flex gap-2"><span className="text-indigo-300">◆</span> <span><b className="font-semibold">Everything in every pack</b> — all {toolCount} tools + the full moat</span></li>
+              <li className="flex gap-2"><span className="text-indigo-300">◆</span> <span><b className="font-semibold">{proCredits.toLocaleString()} credits / month</b> <span className="text-slate-500">— renews automatically, no top-ups</span></span></li>
               {PRO_INCLUDES.map((u) => (
                 <li key={u.label} className="flex items-start gap-2">
                   <span className="mt-px text-indigo-300">◆</span>
@@ -212,16 +228,9 @@ export default function McpPricing() {
           </div>
         </section>
 
-        {/* Moat inclusion strip */}
-        <div className="mx-auto mt-4 max-w-3xl rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-center">
-          <div className="text-[12px] font-medium uppercase tracking-wide text-slate-400">Every pack includes the proprietary moat</div>
-          <div className="mt-3 flex flex-wrap justify-center gap-2">
-            {MOAT_TOOLS.map((m) => (
-              <span key={m.label} title={m.note} className="rounded-full border border-emerald-400/20 bg-emerald-400/[0.05] px-3 py-1 text-[12px] text-emerald-100">{m.label}</span>
-            ))}
-          </div>
-          <p className="mx-auto mt-3 max-w-xl text-[11.5px] leading-relaxed text-slate-500">Mindy&apos;s un-copyable layer. The free trial runs public-data tools only; the moat unlocks with any pack. Every metered tool is charged on success.</p>
-        </div>
+        <p className="mx-auto mt-5 max-w-2xl text-center text-[12px] leading-relaxed text-slate-500">
+          The <b className="font-medium text-slate-300">moat</b> is Mindy&apos;s un-copyable layer — included with every pack. The free trial runs public-data tools only. Every metered tool is charged on success.
+        </p>
         <p className="mx-auto mt-2 max-w-2xl text-center text-[12px] leading-relaxed text-slate-500">
           A <span className="text-slate-400">work-up</span> ≈ search one opportunity, pull the incumbent&apos;s financials, run a who-can-win scan, and generate a win playbook (~{workupCost} credits). Bigger packs add bonus credits; lighter lookups cost far less.
         </p>
