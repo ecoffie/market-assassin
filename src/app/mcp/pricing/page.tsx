@@ -382,26 +382,6 @@ export default function McpPricing() {
           </div>
         </section>
 
-        {/* Full per-call rate list */}
-        {tools.length > 0 && (
-          <section className="mt-16">
-            <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">Metered tools · cost per call</h2>
-            <p className="mx-auto mt-2 max-w-lg text-center text-[13px] text-slate-400">Live today. Every tool your agent can call, priced by what it costs to run.</p>
-            <div className="mx-auto mt-5 max-w-2xl overflow-hidden rounded-2xl border border-white/10">
-              {tools.filter((t) => t.credits > 0).map((t, i) => (
-                <div key={t.name} className={`flex items-center justify-between gap-4 px-4 py-3 text-sm ${i % 2 ? 'bg-white/[0.015]' : ''}`}>
-                  <div className="min-w-0">
-                    <code className="font-mono text-[13px] text-slate-100">{t.name}</code>
-                    <div className="mt-0.5 truncate text-[12px] text-slate-500">{t.description}</div>
-                  </div>
-                  <div className="shrink-0 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2.5 py-1 text-[12px] font-semibold tabular-nums text-emerald-300">{t.credits} {t.credits === 1 ? 'credit' : 'credits'}</div>
-                </div>
-              ))}
-            </div>
-            <p className="mx-auto mt-3 max-w-2xl text-center text-[12px] text-slate-500">Debited only when a call succeeds. Repeat/cached reads are free.</p>
-          </section>
-        )}
-
         {/* FAQ */}
         <section className="mt-16">
           <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">Questions</h2>
