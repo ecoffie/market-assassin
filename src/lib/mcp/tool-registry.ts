@@ -28,6 +28,10 @@ import { findPredecessor } from '@/mcp/tools/predecessor-award';
 import { lookupSamEntity } from '@/mcp/tools/sam-entity';
 import { searchContractors } from '@/mcp/tools/search-contractors';
 import { getAgencyIntel } from '@/mcp/tools/agency-intel';
+import { grantsSearch } from '@/mcp/tools/grants';
+import { agencyForecasts } from '@/mcp/tools/forecasts';
+import { sbirSearch } from '@/mcp/tools/sbir';
+import { expiringContracts } from '@/mcp/tools/expiring-contracts';
 import { getBalance } from '@/lib/mcp/credits';
 import { tierFor } from '@/lib/mcp/entitlements';
 
@@ -58,6 +62,10 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   lookup_sam_entity: 1, // SAM Entity Management API (single lookup/search)
   search_contractors: 2, // live BigQuery recipients scan (competitive landscape)
   get_agency_intel: 1, // agency resolve (local) + USASpending obligations (free)
+  search_grants: 1, // Grants.gov search (single free upstream call)
+  get_agency_forecasts: 1, // Supabase agency_forecasts read
+  search_sbir: 1, // NIH RePORTER + multisite aggregate
+  get_expiring_contracts: 1, // Supabase recompete_opportunities read
   get_balance: 0, // meta tool — always free
 };
 
@@ -264,6 +272,101 @@ const AGENCY_INTEL_TOOL_DEF = {
   },
 };
 
+const GRANTS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'search_grants',
+    description:
+      'Federal GRANT opportunities from Grants.gov ($700B+ of assistance funding — a different lane than ' +
+      'SAM.gov contracts). Search by keyword / agency / funding category. Returns title, agency, close date, ' +
+      'award ceiling, CFDA, link. Grants are assistance (a different application path than contracts). ' +
+      'grounded=false when nothing matches — broaden the keyword; do not invent grants.',
+    parameters: {
+      type: 'object',
+      properties: {
+        keyword: { type: 'string', description: 'Search term, e.g. "broadband" or "veteran health".' },
+        agency: { type: 'string', description: 'Top-level agency code, e.g. "DOD" / "HHS" (client-side prefix filter).' },
+        category: { type: 'string', description: 'Grants.gov funding category code, e.g. "HL" (health), "ST" (science).' },
+        status: { type: 'string', enum: ['posted', 'forecasted', 'closed', 'archived'], description: 'Opportunity status (default posted).' },
+        limit: { type: 'number', description: 'Max results (default 25, max 100).' },
+      },
+    },
+  },
+};
+
+const FORECASTS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_agency_forecasts',
+    description:
+      'Upcoming federal procurement FORECASTS — planned buys 6-18 months before a solicitation posts (the ' +
+      '"get in early" signal, ~7,700 records across ~12 agencies). Filter by NAICS / agency / state / set-aside / ' +
+      'fiscal year / keyword. Returns title, agency, NAICS, fiscal year+quarter, estimated value, set-aside, ' +
+      'incumbent. A forecast is a PLAN, not a posted opportunity — dates slip and some cancel. grounded=false ' +
+      'when nothing matches (may be a coverage gap, not absence of demand).',
+    parameters: {
+      type: 'object',
+      properties: {
+        naics: { type: 'string', description: 'NAICS code(s), comma-separated; ≤4 digits = prefix.' },
+        agency: { type: 'string', description: 'Source agency, case-insensitive partial.' },
+        state: { type: 'string', description: 'Place-of-performance state (full name matches best).' },
+        set_aside: { type: 'string', description: 'Set-aside type, e.g. "8(a)", "SDVOSB".' },
+        fiscal_year: { type: 'string', description: 'Fiscal year, "FY2026" or "2026".' },
+        keyword: { type: 'string', description: 'Free-text over title + description.' },
+        limit: { type: 'number', description: 'Max results (default 25, max 200).' },
+      },
+    },
+  },
+};
+
+const SBIR_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'search_sbir',
+    description:
+      'SBIR/STTR small-business R&D opportunities from NIH RePORTER (awarded projects — competitive intel on ' +
+      'who won what) + a multisite aggregate of open notices. source="nih" = awarded NIH projects; ' +
+      'source="multisite"/"all" = open notices. Filter by keyword / agency / phase. Returns title, agency, ' +
+      'phase, amount, organization, dates. grounded=false when nothing matches — try source="all".',
+    parameters: {
+      type: 'object',
+      properties: {
+        keyword: { type: 'string', description: 'Search term, e.g. "machine learning" or "vaccine".' },
+        agency: { type: 'string', description: 'NIH institute (NCI, NIAID, …) or broad agency (NSF, DOD, …).' },
+        phase: { type: 'string', enum: ['1', '2', 'all'], description: 'SBIR/STTR phase (default all).' },
+        source: { type: 'string', enum: ['nih', 'multisite', 'all'], description: 'Data source (default nih = awarded NIH projects).' },
+        limit: { type: 'number', description: 'Max results (default 25, max 50).' },
+      },
+    },
+  },
+};
+
+const EXPIRING_CONTRACTS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_expiring_contracts',
+    description:
+      'Federal contracts EXPIRING soon — recompete targets ("who is about to lose their contract so I can ' +
+      'pursue it"). Filter by NAICS / agency / state / expiration window (months) / value / recompete-likelihood. ' +
+      'Returns incumbent, agency, NAICS, obligated + ceiling value, period-of-performance end, recompete date, ' +
+      'likelihood — soonest-expiring first. A multiple-award IDIQ appears as several rows (one per holder). ' +
+      'grounded=false when nothing matches — widen months_window.',
+    parameters: {
+      type: 'object',
+      properties: {
+        naics: { type: 'string', description: 'NAICS code; ≤5 digits = prefix, 6 = exact.' },
+        agency: { type: 'string', description: 'Agency name, case-insensitive partial.' },
+        state: { type: 'string', description: '2-letter place-of-performance state.' },
+        months_window: { type: 'number', description: 'Expiration window in months (default 18, max 60).' },
+        min_value: { type: 'number', description: 'Minimum obligated dollars.' },
+        max_value: { type: 'number', description: 'Maximum obligated dollars.' },
+        likelihood: { type: 'string', enum: ['high', 'medium', 'low'], description: 'Recompete-likelihood filter.' },
+        limit: { type: 'number', description: 'Max results (default 25, max 200).' },
+      },
+    },
+  },
+};
+
 /** All tools exposed over MCP in v1, each annotated with its credit price. */
 export function listMcpTools(): Array<Record<string, unknown>> {
   const defs = [
@@ -278,6 +381,10 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     SAM_ENTITY_TOOL_DEF,
     SEARCH_CONTRACTORS_TOOL_DEF,
     AGENCY_INTEL_TOOL_DEF,
+    GRANTS_TOOL_DEF,
+    FORECASTS_TOOL_DEF,
+    SBIR_TOOL_DEF,
+    EXPIRING_CONTRACTS_TOOL_DEF,
     GET_BALANCE_TOOL_DEF,
   ];
   return defs.map((d) => ({ ...d, _credits: TOOL_CREDITS[d.function.name] ?? 0, _tier: tierFor(d.function.name) }));
@@ -297,6 +404,10 @@ export function isMcpTool(name: string): boolean {
     name === 'lookup_sam_entity' ||
     name === 'search_contractors' ||
     name === 'get_agency_intel' ||
+    name === 'search_grants' ||
+    name === 'get_agency_forecasts' ||
+    name === 'search_sbir' ||
+    name === 'get_expiring_contracts' ||
     name === 'get_balance'
   );
 }
@@ -421,6 +532,55 @@ export async function runMcpTool(
     const result = (await getAgencyIntel({
       agency: typeof args.agency === 'string' ? args.agency : '',
       fiscal_year: typeof args.fiscal_year === 'number' ? args.fiscal_year : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'search_grants') {
+    const result = (await grantsSearch({
+      keyword: typeof args.keyword === 'string' ? args.keyword : undefined,
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      category: typeof args.category === 'string' ? args.category : undefined,
+      status: args.status === 'posted' || args.status === 'forecasted' || args.status === 'closed' || args.status === 'archived' ? args.status : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_agency_forecasts') {
+    const result = (await agencyForecasts({
+      naics: typeof args.naics === 'string' ? args.naics : undefined,
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      state: typeof args.state === 'string' ? args.state : undefined,
+      set_aside: typeof args.set_aside === 'string' ? args.set_aside : undefined,
+      fiscal_year: typeof args.fiscal_year === 'string' ? args.fiscal_year : undefined,
+      keyword: typeof args.keyword === 'string' ? args.keyword : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'search_sbir') {
+    const result = (await sbirSearch({
+      keyword: typeof args.keyword === 'string' ? args.keyword : undefined,
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      phase: args.phase === '1' || args.phase === '2' || args.phase === 'all' ? args.phase : undefined,
+      source: args.source === 'nih' || args.source === 'multisite' || args.source === 'all' ? args.source : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_expiring_contracts') {
+    const result = (await expiringContracts({
+      naics: typeof args.naics === 'string' ? args.naics : undefined,
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      state: typeof args.state === 'string' ? args.state : undefined,
+      months_window: typeof args.months_window === 'number' ? args.months_window : undefined,
+      min_value: typeof args.min_value === 'number' ? args.min_value : undefined,
+      max_value: typeof args.max_value === 'number' ? args.max_value : undefined,
+      likelihood: args.likelihood === 'high' || args.likelihood === 'medium' || args.likelihood === 'low' ? args.likelihood : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
