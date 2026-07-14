@@ -32,6 +32,8 @@ import { grantsSearch } from '@/mcp/tools/grants';
 import { agencyForecasts } from '@/mcp/tools/forecasts';
 import { sbirSearch } from '@/mcp/tools/sbir';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
+import { scanProposalCompliance } from '@/mcp/tools/scan-compliance';
+import { evaluateBidDecisionTool } from '@/mcp/tools/bid-decision';
 import { getBalance } from '@/lib/mcp/credits';
 import { tierFor } from '@/lib/mcp/entitlements';
 
@@ -66,6 +68,8 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   get_agency_forecasts: 1, // Supabase agency_forecasts read
   search_sbir: 1, // NIH RePORTER + multisite aggregate
   get_expiring_contracts: 1, // Supabase recompete_opportunities read
+  scan_proposal_compliance: 1, // pure deterministic DQ-risk scan (no LLM/IO)
+  evaluate_bid_decision: 1, // pure GovCon bid/no-bid framework + scorer (no LLM/IO)
   get_balance: 0, // meta tool — always free
 };
 
@@ -367,6 +371,74 @@ const EXPIRING_CONTRACTS_TOOL_DEF = {
   },
 };
 
+const SCAN_COMPLIANCE_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'scan_proposal_compliance',
+    description:
+      'Pre-submit disqualification check: given the RFP requirements + a proposal draft, flag what could get the ' +
+      'bid THROWN OUT — missed deadline (the #1 DQ), ineligible set-aside, page-limit overage, missing reps/certs ' +
+      'or required plans, unaddressed evaluation factors, un-acknowledged amendments. Returns findings with ' +
+      'severity dq/warning/info + an at_risk flag. Deterministic (no AI). Runs entirely on the inputs you pass — ' +
+      'pair with extract_compliance_matrix for the requirements list.',
+    parameters: {
+      type: 'object',
+      properties: {
+        requirements: {
+          type: 'array',
+          description: 'RFP requirements to check against (from extract_compliance_matrix or your own read).',
+          items: {
+            type: 'object',
+            properties: {
+              requirement: { type: 'string', description: 'The requirement text (a shall-statement).' },
+              category: { type: 'string', description: 'Category hint (submission/evaluation/technical/…); free-text is normalized.' },
+              section: { type: 'string', description: 'RFP section, e.g. "L.3.2", "M.2".' },
+              id: { type: 'string' },
+            },
+            required: ['requirement'],
+          },
+        },
+        draft_text: { type: 'string', description: 'The full proposal / response text (all sections concatenated).' },
+        sections: {
+          type: 'array',
+          description: 'Optional per-section drafts for finer page/coverage checks.',
+          items: { type: 'object', properties: { label: { type: 'string' }, text: { type: 'string' } }, required: ['label', 'text'] },
+        },
+        bidder_set_asides: { type: 'array', items: { type: 'string' }, description: 'Set-asides the bidder actually holds (e.g. ["8(a)","WOSB"]).' },
+      },
+      required: ['requirements', 'draft_text'],
+    },
+  },
+};
+
+const BID_DECISION_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'evaluate_bid_decision',
+    description:
+      "GovCon Giants' bid / no-bid framework. ALWAYS returns the framework — the 5 universal eliminator GATES " +
+      '(set-aside eligibility, licenses, past performance, bonding, deadline) + the 10-factor scorecard with its ' +
+      'positive/neutral/negative rubric — so you know exactly what to assess. When you also pass gate answers + ' +
+      'factor ratings, it SCORES the card: any failed gate = automatic No-Bid; otherwise pursue (≥70) / watch ' +
+      '(40–69) / skip (<40). Call it once with no args to learn the rubric, then again with your assessment.',
+    parameters: {
+      type: 'object',
+      properties: {
+        gates: {
+          type: 'object',
+          description: 'gateId → passed? (true/false), from the returned framework gates. A false on any = No-Bid.',
+          additionalProperties: { type: 'boolean' },
+        },
+        ratings: {
+          type: 'object',
+          description: 'factorId → 0-10, from the returned framework factors.',
+          additionalProperties: { type: 'number' },
+        },
+      },
+    },
+  },
+};
+
 /** All tools exposed over MCP in v1, each annotated with its credit price. */
 export function listMcpTools(): Array<Record<string, unknown>> {
   const defs = [
@@ -385,6 +457,8 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     FORECASTS_TOOL_DEF,
     SBIR_TOOL_DEF,
     EXPIRING_CONTRACTS_TOOL_DEF,
+    SCAN_COMPLIANCE_TOOL_DEF,
+    BID_DECISION_TOOL_DEF,
     GET_BALANCE_TOOL_DEF,
   ];
   return defs.map((d) => ({ ...d, _credits: TOOL_CREDITS[d.function.name] ?? 0, _tier: tierFor(d.function.name) }));
@@ -408,6 +482,8 @@ export function isMcpTool(name: string): boolean {
     name === 'get_agency_forecasts' ||
     name === 'search_sbir' ||
     name === 'get_expiring_contracts' ||
+    name === 'scan_proposal_compliance' ||
+    name === 'evaluate_bid_decision' ||
     name === 'get_balance'
   );
 }
@@ -582,6 +658,26 @@ export async function runMcpTool(
       likelihood: args.likelihood === 'high' || args.likelihood === 'medium' || args.likelihood === 'low' ? args.likelihood : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
     })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'scan_proposal_compliance') {
+    const result = scanProposalCompliance({
+      requirements: Array.isArray(args.requirements)
+        ? (args.requirements as Array<{ id?: string; requirement: string; category?: string; section?: string }>)
+        : [],
+      draft_text: typeof args.draft_text === 'string' ? args.draft_text : '',
+      sections: Array.isArray(args.sections) ? (args.sections as Array<{ label: string; text: string }>) : undefined,
+      bidder_set_asides: Array.isArray(args.bidder_set_asides) ? (args.bidder_set_asides as string[]) : undefined,
+    }) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'evaluate_bid_decision') {
+    const result = evaluateBidDecisionTool({
+      gates: args.gates && typeof args.gates === 'object' ? (args.gates as Record<string, boolean>) : undefined,
+      ratings: args.ratings && typeof args.ratings === 'object' ? (args.ratings as Record<string, number>) : undefined,
+    }) as unknown as Record<string, unknown>;
     return { result, credits };
   }
 

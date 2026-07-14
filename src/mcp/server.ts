@@ -32,6 +32,8 @@ import { grantsSearch } from './tools/grants';
 import { agencyForecasts } from './tools/forecasts';
 import { sbirSearch } from './tools/sbir';
 import { expiringContracts } from './tools/expiring-contracts';
+import { scanProposalCompliance } from './tools/scan-compliance';
+import { evaluateBidDecisionTool } from './tools/bid-decision';
 
 const server = new McpServer({
   name: 'mindy-govcon',
@@ -423,11 +425,64 @@ server.registerTool(
   },
 );
 
+server.registerTool(
+  'scan_proposal_compliance',
+  {
+    title: 'Scan Proposal Compliance (pre-submit DQ check)',
+    description:
+      'Pre-submit disqualification check: given the RFP requirements + a proposal draft, flag what could get the ' +
+      'bid thrown out — missed deadline, ineligible set-aside, page-limit overage, missing reps/certs or required ' +
+      'plans, unaddressed evaluation factors, un-acknowledged amendments. Deterministic (no AI); returns findings ' +
+      'with severity dq/warning/info + an at_risk flag.',
+    inputSchema: {
+      requirements: z
+        .array(
+          z.object({
+            requirement: z.string().describe('The requirement text (a shall-statement).'),
+            category: z.string().optional().describe('Category hint; free-text is normalized.'),
+            section: z.string().optional().describe('RFP section, e.g. "L.3.2".'),
+            id: z.string().optional(),
+          }),
+        )
+        .describe('RFP requirements to check against.'),
+      draft_text: z.string().describe('The full proposal / response text.'),
+      sections: z
+        .array(z.object({ label: z.string(), text: z.string() }))
+        .optional()
+        .describe('Optional per-section drafts for finer checks.'),
+      bidder_set_asides: z.array(z.string()).optional().describe('Set-asides the bidder holds, e.g. ["8(a)","WOSB"].'),
+    },
+  },
+  async ({ requirements, draft_text, sections, bidder_set_asides }) => {
+    const result = scanProposalCompliance({ requirements, draft_text, sections, bidder_set_asides });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'evaluate_bid_decision',
+  {
+    title: 'Evaluate Bid Decision (GovCon bid/no-bid framework)',
+    description:
+      "GovCon Giants' bid/no-bid framework. Always returns the 5 eliminator gates + 10-factor scorecard rubric; " +
+      'when you pass gate answers + factor ratings it scores the card (failed gate = No-Bid; else pursue ≥70 / ' +
+      'watch 40–69 / skip <40). Call with no args to learn the rubric, then again with your assessment.',
+    inputSchema: {
+      gates: z.record(z.string(), z.boolean()).optional().describe('gateId → passed? A false on any gate = No-Bid.'),
+      ratings: z.record(z.string(), z.number()).optional().describe('factorId → 0-10.'),
+    },
+  },
+  async ({ gates, ratings }) => {
+    const result = evaluateBidDecisionTool({ gates, ratings });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts registered',
+    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + scan-compliance + bid-decision registered',
   );
 }
 

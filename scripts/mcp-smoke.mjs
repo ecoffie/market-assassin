@@ -281,7 +281,52 @@ try {
   if (ecS._meta?.degraded) fail('expiring-contracts: degraded=true (Supabase recompete_opportunities unreachable)');
   if (!ecS._meta?.grounded) console.error('⚠ expiring-contracts: grounded=false for NAICS 541 in 24mo — NON-FATAL (may be a genuinely thin window)');
 
-  console.error('\n✅ SMOKE PASSED — MCP transport + 13 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts) all live + honest');
+  // ── scan_proposal_compliance (pure deterministic DQ scan) ──────────────────
+  console.error('\n→ calling scan_proposal_compliance({ 2 requirements + a thin draft })');
+  const scmp = await client.callTool({
+    name: 'scan_proposal_compliance',
+    arguments: {
+      requirements: [
+        { requirement: 'Proposals are due no later than 2:00 PM ET on the closing date.', category: 'deadline', section: 'L.2' },
+        { requirement: 'Volume I shall not exceed 20 pages.', category: 'page_limit', section: 'L.3' },
+      ],
+      draft_text: 'Our firm is pleased to submit this proposal. We bring deep past performance to the effort.',
+    },
+  });
+  const scmpS = scmp.structuredContent;
+  if (!scmpS) fail('scan-compliance: no structuredContent');
+  if (typeof scmpS.at_risk !== 'boolean') fail('scan-compliance: at_risk not a boolean');
+  if (!scmpS.counts || typeof scmpS.counts.dq !== 'number') fail('scan-compliance: counts.dq missing');
+  if (!scmpS._meta?.grounded) fail('scan-compliance: grounded=false with requirements + draft supplied');
+  console.error(`✓ grounded=${scmpS._meta?.grounded} · at_risk=${scmpS.at_risk} · dq=${scmpS.counts.dq} · warning=${scmpS.counts.warning} · findings=${scmpS.findings?.length}`);
+
+  // ── evaluate_bid_decision (framework-only, then scored) ─────────────────────
+  console.error('\n→ calling evaluate_bid_decision({}) — expect framework, no score');
+  const bd0 = await client.callTool({ name: 'evaluate_bid_decision', arguments: {} });
+  const bd0S = bd0.structuredContent;
+  if (!bd0S) fail('bid-decision: no structuredContent');
+  if (!Array.isArray(bd0S.framework?.gates) || bd0S.framework.gates.length !== 5) fail('bid-decision: expected 5 eliminator gates in framework');
+  if (!Array.isArray(bd0S.framework?.factors) || bd0S.framework.factors.length !== 10) fail('bid-decision: expected 10 scorecard factors in framework');
+  if (bd0S.decision !== null) fail('bid-decision: decision should be null when no gates/ratings supplied');
+  if (bd0S._meta?.scored !== false) fail('bid-decision: _meta.scored should be false for framework-only call');
+  console.error(`✓ framework: ${bd0S.framework.gates.length} gates · ${bd0S.framework.factors.length} factors · scored=${bd0S._meta.scored}`);
+
+  console.error('\n→ calling evaluate_bid_decision({ gates, ratings }) — expect a scored recommendation');
+  const bd1 = await client.callTool({
+    name: 'evaluate_bid_decision',
+    arguments: {
+      gates: Object.fromEntries(bd0S.framework.gates.map((g) => [g.id, true])),
+      ratings: Object.fromEntries(bd0S.framework.factors.map((f) => [f.id, 8])),
+    },
+  });
+  const bd1S = bd1.structuredContent;
+  if (!bd1S?.decision) fail('bid-decision: decision missing when gates + ratings supplied');
+  if (bd1S._meta?.scored !== true) fail('bid-decision: _meta.scored should be true when scored');
+  if (!['pursue', 'watch', 'skip', 'no-bid'].includes(bd1S.decision.recommendation)) fail('bid-decision: unexpected recommendation ' + bd1S.decision.recommendation);
+  if (bd1S.decision.blocked) fail('bid-decision: all gates passed but decision.blocked=true');
+  console.error(`✓ scored: recommendation=${bd1S.decision.recommendation} · score=${bd1S.decision.score}/100 · rated=${bd1S.decision.rated} · blocked=${bd1S.decision.blocked}`);
+
+  console.error('\n✅ SMOKE PASSED — MCP transport + 15 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, scan-compliance, bid-decision) all live + honest');
   await client.close();
   process.exit(0);
 } catch (err) {
