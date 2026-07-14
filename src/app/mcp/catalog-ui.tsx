@@ -7,6 +7,7 @@
  * the credit/work-up math live here so the two pages stay in sync. No auth, no PII.
  */
 import React from 'react';
+import Link from 'next/link';
 
 export interface Tool { name: string; description: string; credits: number }
 export interface Pkg { id: string; credits: number; usd: number; label: string; checkoutUrl?: string }
@@ -45,16 +46,16 @@ export function McpNav({ active }: { active: 'connect' | 'pricing' }) {
   const off = 'text-slate-400 hover:text-slate-200';
   return (
     <header className="flex items-center justify-between gap-4">
-      <a href="/mcp" className="flex items-center gap-3">
+      <Link href="/mcp" className="flex items-center gap-3">
         <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-emerald-400 text-sm font-bold text-[#0a0f1e]">M</div>
         <div className="hidden sm:block">
           <div className="text-[15px] font-semibold leading-tight">Mindy MCP</div>
           <div className="text-xs text-slate-400">Federal contracting intel for any AI agent</div>
         </div>
-      </a>
+      </Link>
       <nav className="flex items-center gap-1 text-[13px]">
-        <a href="/mcp" className={`${link} ${active === 'connect' ? on : off}`}>Connect</a>
-        <a href="/mcp/pricing" className={`${link} ${active === 'pricing' ? on : off}`}>Pricing</a>
+        <Link href="/mcp" className={`${link} ${active === 'connect' ? on : off}`}>Connect</Link>
+        <Link href="/mcp/pricing" className={`${link} ${active === 'pricing' ? on : off}`}>Pricing</Link>
         <a href="/app" className="ml-1 rounded-lg bg-emerald-500 px-3 py-1.5 font-semibold text-[#06120c] hover:bg-emerald-400">Sign in</a>
       </nav>
     </header>

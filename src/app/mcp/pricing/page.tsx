@@ -12,15 +12,25 @@
  * live/soon so the page never advertises a lock ahead of enforcement.
  */
 import { useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { Catalog, McpNav, workupCostFrom, workups } from '../catalog-ui';
 
-/** The Pro-gated moat set — what a subscription unlocks beyond the metered catalog. */
-const PRO_UNLOCKS: { label: string; note: string; status: 'live' | 'soon' }[] = [
-  { label: 'Winning playbook', note: 'coaching from the 8-yr teaching corpus', status: 'live' },
-  { label: 'Teaching + podcast search', note: '12,369 chunks · real win stories', status: 'soon' },
-  { label: 'Curated contact rosters', note: 'SBLO · DoDAAC offices · OSBP', status: 'soon' },
-  { label: 'Agency angles', note: 'pain points · SAT friendliness', status: 'soon' },
-  { label: 'Proposal Assist 2.0', note: 'RFP → compliance matrix → export', status: 'soon' },
+/**
+ * The proprietary "moat" tools — Mindy's un-copyable layer. Included with ANY paid
+ * credits (not the free trial, which runs the public-data tools). All live today.
+ */
+const MOAT_TOOLS: { label: string; note: string }[] = [
+  { label: 'Winning playbook', note: 'coaching from the 8-yr teaching corpus' },
+  { label: 'Podcast lessons', note: 'real win stories from contractor/agency guests' },
+  { label: 'Curated contact rosters', note: 'SBLO teaming · buying-office POCs · OSBP' },
+  { label: 'Agency angles', note: 'component spending breakdowns · budget trends · pain points' },
+  { label: 'Proposal tools', note: 'pre-submit compliance scan · bid / no-bid framework' },
+];
+
+/** What the Pro ($149/mo) subscription adds beyond the metered credit catalog. */
+const PRO_INCLUDES: { label: string; note: string; status: 'live' | 'soon' }[] = [
+  { label: 'Proposal Assist 2.0', note: 'RFP → compliance matrix → multi-section draft → .docx export', status: 'soon' },
+  { label: 'Full Mindy app', note: 'alerts, pipeline, forecasts, CRM at getmindy.ai/app', status: 'live' },
 ];
 
 export default function McpPricing() {
@@ -40,18 +50,15 @@ export default function McpPricing() {
   const workupCost = useMemo(() => (tools.length ? workupCostFrom(tools) : 30), [tools]);
   const popularId = packs.length >= 2 ? packs[1].id : undefined;
 
-  const packRows = [
-    { id: 'free', name: 'Free trial', tag: 'one-time', highlight: false, price: '$0', priceSub: 'on first connect', credits: trial },
-    ...packs.map((p) => ({
-      id: p.id,
-      name: p.label.split('—')[0].trim(),
-      tag: p.id === popularId ? 'Popular' : p.id === 'scale' ? 'Best rate' : null,
-      highlight: p.id === popularId,
-      price: `$${p.usd}`,
-      priceSub: 'prepaid',
-      credits: p.credits,
-    })),
-  ];
+  const packRows = packs.map((p) => ({
+    id: p.id,
+    name: p.label.split('—')[0].trim(),
+    tag: p.id === popularId ? 'Popular' : p.id === 'scale' ? 'Best rate' : null,
+    highlight: p.id === popularId,
+    price: `$${p.usd}`,
+    priceSub: 'prepaid',
+    credits: p.credits,
+  }));
 
   return (
     <main className="min-h-dvh bg-[#0a0f1e] text-slate-100 [color-scheme:dark]">
@@ -60,48 +67,71 @@ export default function McpPricing() {
 
         {/* Title */}
         <section className="mt-10 text-center">
-          <h1 className="text-balance text-3xl font-bold tracking-tight sm:text-4xl">Two ways to pay: credits or Pro</h1>
+          <h1 className="text-balance text-3xl font-bold tracking-tight sm:text-4xl">Start free. Pay as you grow.</h1>
           <p className="mx-auto mt-3 max-w-2xl text-balance text-sm text-slate-400 sm:text-[15px]">
-            Every tool is metered — buy credits and pay per successful call, nothing gated. Go Pro for a monthly credit allowance plus the premium layer: the winning playbook, curated contacts, and Proposal Assist 2.0.
+            A one-time free trial, pay-as-you-go credits, or a Pro subscription. Every tool is metered — you pay per successful call, never for a miss. {tools.length ? `${tools.filter((t) => t.credits > 0).length} tools` : 'Dozens of tools'} live today.
           </p>
         </section>
 
-        {/* Two axes — the primary decision */}
-        <section className="mt-10 grid gap-4 lg:grid-cols-2">
-          {/* Pay-as-you-go */}
+        {/* Three tiers — the ladder */}
+        <section className="mt-10 grid gap-4 lg:grid-cols-3">
+          {/* Free trial */}
           <div className="flex flex-col rounded-2xl border border-white/10 bg-white/[0.02] p-6">
-            <div className="text-[12px] font-semibold uppercase tracking-wide text-emerald-300">Pay-as-you-go</div>
+            <div className="text-[12px] font-semibold uppercase tracking-wide text-slate-300">Free trial</div>
             <div className="mt-2 flex items-baseline gap-2">
-              <span className="font-mono text-3xl font-bold tabular-nums">Credits</span>
-              <span className="text-[13px] text-slate-500">from $5</span>
+              <span className="font-mono text-3xl font-bold tabular-nums">$0</span>
+              <span className="text-[13px] text-slate-500">{trial} credits · one-time</span>
             </div>
-            <div className="mt-1 text-[13px] text-slate-400">No subscription. Best for occasional use.</div>
+            <div className="mt-1 text-[13px] text-slate-400">Kick the tires — no card needed.</div>
             <ul className="mt-5 flex-1 space-y-2 border-t border-white/[0.06] pt-5 text-[13px]">
-              <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span><b className="font-semibold">Every metered tool</b> — SAM, USASpending, EDGAR, GSA pricing, forecasts, recompetes, contractor scans</span></li>
-              <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span>Charged on success only · credits never expire</span></li>
-              <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span><b className="font-semibold">{trial} free credits</b> on your first connect</span></li>
-              <li className="flex gap-2 text-slate-500"><span>–</span> <span>Premium layer (playbook, contacts, Proposal&nbsp;2.0) is Pro</span></li>
+              <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span><b className="font-semibold">{trial} credits</b> on your first connect</span></li>
+              <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span><b className="font-semibold">Public-data tools</b> — SAM, USASpending, EDGAR, GSA pricing, forecasts, recompetes, contractor scans</span></li>
+              <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span>Keyless connect — sign in through your browser</span></li>
+              <li className="flex gap-2 text-slate-500"><span>–</span> <span>Proprietary tools need a credit pack (below)</span></li>
             </ul>
-            <a href="#packs" className="mt-6 inline-flex items-center justify-center rounded-lg border border-white/15 px-4 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/5">See credit packs</a>
+            <a href="/app" className="mt-6 inline-flex items-center justify-center rounded-lg border border-white/15 px-4 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/5">Start free</a>
+          </div>
+
+          {/* Credits */}
+          <div className="relative flex flex-col rounded-2xl border border-emerald-400/40 bg-emerald-400/[0.05] p-6">
+            <span className="absolute -top-2.5 left-6 rounded-full bg-emerald-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#06120c]">Most popular</span>
+            <div className="text-[12px] font-semibold uppercase tracking-wide text-emerald-300">Credits</div>
+            <div className="mt-2 flex items-baseline gap-2">
+              <span className="font-mono text-3xl font-bold tabular-nums">from $5</span>
+              <span className="text-[13px] text-slate-500">pay-as-you-go</span>
+            </div>
+            <div className="mt-1 text-[13px] text-slate-400">Every tool, including the moat. No subscription.</div>
+            <ul className="mt-5 flex-1 space-y-2 border-t border-emerald-400/15 pt-5 text-[13px]">
+              <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span>Everything in the free trial, <b className="font-semibold">plus the proprietary moat:</b></span></li>
+              {MOAT_TOOLS.map((m) => (
+                <li key={m.label} className="flex items-start gap-2 pl-4">
+                  <span className="mt-px text-emerald-300">◆</span>
+                  <span><b className="font-semibold">{m.label}</b> <span className="text-slate-500">— {m.note}</span></span>
+                </li>
+              ))}
+              <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span>Charged on success only · credits never expire</span></li>
+            </ul>
+            <a href="#packs" className="mt-6 inline-flex items-center justify-center rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">See credit packs</a>
           </div>
 
           {/* Pro */}
           <div className="relative flex flex-col rounded-2xl border border-indigo-400/40 bg-indigo-400/[0.06] p-6">
-            <span className="absolute -top-2.5 left-6 rounded-full bg-indigo-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#0a0f1e]">Full access</span>
+            <span className="absolute -top-2.5 left-6 rounded-full bg-indigo-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#0a0f1e]">Best for daily use</span>
             <div className="text-[12px] font-semibold uppercase tracking-wide text-indigo-300">Pro</div>
             <div className="mt-2 flex items-baseline gap-2">
               <span className="font-mono text-3xl font-bold tabular-nums">$149</span>
-              <span className="text-[13px] text-slate-400">/mo · {proCredits.toLocaleString()} credits/mo</span>
+              <span className="text-[13px] text-slate-400">/mo</span>
             </div>
-            <div className="mt-1 text-[13px] text-slate-400">Best value for daily use — the moat is here.</div>
+            <div className="mt-1 text-[13px] text-slate-400">The whole platform, credits included.</div>
             <ul className="mt-5 flex-1 space-y-2 border-t border-indigo-400/15 pt-5 text-[13px]">
-              <li className="flex gap-2"><span className="text-indigo-300">◆</span> <span>Everything in Pay-as-you-go, plus <b className="font-semibold">{proCredits.toLocaleString()} credits every month</b></span></li>
-              {PRO_UNLOCKS.map((u) => (
+              <li className="flex gap-2"><span className="text-indigo-300">◆</span> <span>Everything credits unlock, <b className="font-semibold">included</b></span></li>
+              <li className="flex gap-2"><span className="text-indigo-300">◆</span> <span><b className="font-semibold">{proCredits.toLocaleString()} credits every month</b> <span className="text-slate-500">— renews automatically, no top-up needed</span></span></li>
+              {PRO_INCLUDES.map((u) => (
                 <li key={u.label} className="flex items-start gap-2">
                   <span className="mt-px text-indigo-300">◆</span>
                   <span>
                     <b className="font-semibold">{u.label}</b> <span className="text-slate-500">— {u.note}</span>{' '}
-                    <span className={`ml-0.5 rounded-full px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide ${u.status === 'live' ? 'bg-emerald-400/15 text-emerald-300' : 'border border-white/15 text-slate-400'}`}>{u.status === 'live' ? 'live' : 'rolling out'}</span>
+                    {u.status === 'soon' && <span className="ml-0.5 rounded-full border border-white/15 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-slate-400">rolling out</span>}
                   </span>
                 </li>
               ))}
@@ -110,7 +140,7 @@ export default function McpPricing() {
           </div>
         </section>
         <p className="mx-auto mt-4 max-w-2xl text-center text-[12px] leading-relaxed text-slate-500">
-          Why both? <span className="text-slate-400">Credits meter usage so you only pay for calls that succeed; Pro adds a monthly allowance and unlocks the un-copyable layer — Mindy's teaching corpus, curated human contacts, and the Proposal Assist 2.0 build. Metered tools work on either.</span>
+          <span className="text-slate-400">The <b className="font-medium text-slate-300">moat</b> — winning playbook, curated contacts, podcast lessons, agency angles — is Mindy&apos;s un-copyable layer. It&apos;s included with <b className="font-medium text-slate-300">any credit pack</b> (the free trial runs the public-data tools). Pro adds a monthly allowance + Proposal Assist 2.0. Every metered tool is charged on success only.</span>
         </p>
 
         {/* Credit packs */}
@@ -191,7 +221,7 @@ export default function McpPricing() {
             <a href="/app" className="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">Start free with {trial} credits</a>
             <a href="/app" className="inline-flex items-center justify-center rounded-xl bg-indigo-500 px-5 py-2.5 text-sm font-semibold text-white hover:bg-indigo-400">Go Pro</a>
           </div>
-          <p className="mt-3 text-[12px] text-slate-500">No card required to start. <a href="/mcp" className="underline underline-offset-2 hover:text-slate-300">See it in action →</a></p>
+          <p className="mt-3 text-[12px] text-slate-500">No card required to start. <Link href="/mcp" className="underline underline-offset-2 hover:text-slate-300">See it in action →</Link></p>
         </section>
       </div>
     </main>
