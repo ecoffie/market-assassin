@@ -23,6 +23,15 @@ import { getWinningPlaybook } from './tools/winning-playbook';
 import { getPricingIntel } from './tools/pricing-intel';
 import { getIncumbentFinancials } from './tools/incumbent-financials';
 import { getRegulatoryDemand } from './tools/regulatory-demand';
+import { getAwardDetail } from './tools/award-detail';
+import { findPredecessor } from './tools/predecessor-award';
+import { lookupSamEntity } from './tools/sam-entity';
+import { searchContractors } from './tools/search-contractors';
+import { getAgencyIntel } from './tools/agency-intel';
+import { grantsSearch } from './tools/grants';
+import { agencyForecasts } from './tools/forecasts';
+import { sbirSearch } from './tools/sbir';
+import { expiringContracts } from './tools/expiring-contracts';
 
 const server = new McpServer({
   name: 'mindy-govcon',
@@ -187,11 +196,238 @@ server.registerTool(
   },
 );
 
+server.registerTool(
+  'get_award_detail',
+  {
+    title: 'Get Award Detail (USASpending)',
+    description:
+      'Full USASpending detail for one federal award: obligated→ceiling (the real prize size), the ' +
+      'parent IDV/vehicle you must hold to compete, period of performance (recompete timing), recipient, ' +
+      'NAICS/PSC, funding account. Pass a contract number (PIID) OR a generated_internal_id. Returns ' +
+      'grounded=false when no award matches — do not invent figures.',
+    inputSchema: {
+      piid: z.string().optional().describe('Contract number (PIID), e.g. "140F0822D0024".'),
+      id: z.string().optional().describe('USASpending generated_internal_id, if already known (skips the resolve).'),
+    },
+  },
+  async ({ piid, id }) => {
+    const result = await getAwardDetail({ piid, id });
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
+  'find_predecessor_award',
+  {
+    title: 'Find Predecessor / Incumbent Award (USASpending)',
+    description:
+      'The LIKELY incumbent contract behind an open opportunity, inferred as the largest recent award ' +
+      'matching the NAICS + agency (+ title). Returns full award detail (incumbent, ceiling, expiry, ' +
+      'parent vehicle) plus a match-confidence. Best-match inference, NOT a certified link — present as ' +
+      '"likely". Returns grounded=false when no good match exists.',
+    inputSchema: {
+      naics_code: z.string().optional().describe('The opportunity NAICS (4-6 digit).'),
+      agency_name: z.string().optional().describe('Buying agency, e.g. "Department of Defense". Sharpens the match.'),
+      title: z.string().optional().describe('Opportunity title — raises match confidence when present.'),
+    },
+  },
+  async ({ naics_code, agency_name, title }) => {
+    const result = await findPredecessor({ naics_code, agency_name, title });
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
+  'lookup_sam_entity',
+  {
+    title: 'Lookup SAM Entity (SAM.gov)',
+    description:
+      'Live SAM.gov registration for a contractor: UEI/CAGE, legal name, registration status, NAICS, ' +
+      'certifications (8(a), HUBZone, …), location. Pass a UEI for an exact entity, or a company name to ' +
+      'search. The "is this vendor real, registered, and set-aside eligible?" check. Set-aside eligibility ' +
+      'depends on the CURRENT status shown, not past awards.',
+    inputSchema: {
+      uei: z.string().optional().describe('12-char SAM UEI for an exact lookup.'),
+      name: z.string().optional().describe('Company legal name to search (when no UEI given).'),
+      state: z.string().optional().describe('Optional 2-letter state filter for name search.'),
+      limit: z.number().int().min(1).max(25).optional().describe('Max name-search matches (default 10).'),
+    },
+  },
+  async ({ uei, name, state, limit }) => {
+    const result = await lookupSamEntity({ uei, name, state, limit });
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
+  'search_contractors',
+  {
+    title: 'Search Contractors (USASpending / BigQuery)',
+    description:
+      'The competitive landscape for a market: top federal contractors by total obligated dollars for a ' +
+      'keyword / NAICS / state, with award count and distinct-agency breadth (broad seller vs. single-buyer ' +
+      'dependent). The "size up the competition / find teaming partners" lookup. Dollars are cumulative ' +
+      'historical obligations, NOT a bid list. grounded=false when nothing matches — broaden the NAICS prefix.',
+    inputSchema: {
+      keyword: z.string().optional().describe('Free-text company-name match, e.g. "Booz".'),
+      naics: z
+        .string()
+        .optional()
+        .describe('NAICS code(s), comma/space separated; 2-6 digit prefixes allowed, e.g. "541512".'),
+      state: z.string().optional().describe('Optional 2-letter state filter, e.g. "VA".'),
+      sort_by: z
+        .enum(['total_obligated', 'award_count', 'recipient_name'])
+        .optional()
+        .describe('Ranking (default total_obligated).'),
+      limit: z.number().int().min(1).max(100).optional().describe('Max rows (default 15).'),
+    },
+  },
+  async ({ keyword, naics, state, sort_by, limit }) => {
+    const result = await searchContractors({ keyword, naics, state, sort_by, limit });
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
+  'get_agency_intel',
+  {
+    title: 'Get Agency Intel (Hierarchy + USASpending)',
+    description:
+      'Target-research read on a federal agency: resolves it by name / abbreviation / CGAC code, then returns ' +
+      'identity + hierarchy, curated GovCon pain points & priorities, and (when available) live USASpending ' +
+      'obligations for the fiscal year with top NAICS. The "size up a buyer before I pursue them" lookup. Pain ' +
+      'points are curated intel, not an official statement. grounded=false when no agency matches — do not guess.',
+    inputSchema: {
+      agency: z
+        .string()
+        .min(1)
+        .describe('Agency name, abbreviation, or CGAC code, e.g. "VA", "Department of Defense", or "069".'),
+      fiscal_year: z
+        .number()
+        .int()
+        .optional()
+        .describe('Optional fiscal year for spending (defaults to current federal FY).'),
+    },
+  },
+  async ({ agency, fiscal_year }) => {
+    const result = await getAgencyIntel({ agency, fiscal_year });
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
+  'search_grants',
+  {
+    title: 'Search Grants (Grants.gov)',
+    description:
+      'Federal GRANT opportunities from Grants.gov ($700B+ assistance funding — a different lane than SAM.gov ' +
+      'contracts). Search by keyword / agency / funding category. Grants are assistance (different application ' +
+      'path than contracts). grounded=false when nothing matches — broaden the keyword.',
+    inputSchema: {
+      keyword: z.string().optional().describe('Search term, e.g. "broadband".'),
+      agency: z.string().optional().describe('Top-level agency code, e.g. "DOD"/"HHS" (client-side prefix filter).'),
+      category: z.string().optional().describe('Grants.gov funding category code, e.g. "HL"/"ST".'),
+      status: z.enum(['posted', 'forecasted', 'closed', 'archived']).optional().describe('Status (default posted).'),
+      limit: z.number().int().min(1).max(100).optional().describe('Max results (default 25).'),
+    },
+  },
+  async ({ keyword, agency, category, status, limit }) => {
+    const result = await grantsSearch({ keyword, agency, category, status, limit });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'get_agency_forecasts',
+  {
+    title: 'Get Agency Forecasts',
+    description:
+      'Upcoming federal procurement FORECASTS — planned buys 6-18 months before a solicitation posts (~7,700 ' +
+      'records, ~12 agencies). Filter by NAICS / agency / state / set-aside / fiscal year / keyword. A forecast ' +
+      'is a PLAN, not a posted opportunity — dates slip. grounded=false may be a coverage gap, not no demand.',
+    inputSchema: {
+      naics: z.string().optional().describe('NAICS code(s), comma-separated; ≤4 digits = prefix.'),
+      agency: z.string().optional().describe('Source agency, case-insensitive partial.'),
+      state: z.string().optional().describe('Place-of-performance state (full name matches best).'),
+      set_aside: z.string().optional().describe('Set-aside type, e.g. "8(a)".'),
+      fiscal_year: z.string().optional().describe('Fiscal year, "FY2026" or "2026".'),
+      keyword: z.string().optional().describe('Free-text over title + description.'),
+      limit: z.number().int().min(1).max(200).optional().describe('Max results (default 25).'),
+    },
+  },
+  async ({ naics, agency, state, set_aside, fiscal_year, keyword, limit }) => {
+    const result = await agencyForecasts({ naics, agency, state, set_aside, fiscal_year, keyword, limit });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'search_sbir',
+  {
+    title: 'Search SBIR/STTR',
+    description:
+      'SBIR/STTR small-business R&D from NIH RePORTER (awarded projects — who won what) + a multisite aggregate ' +
+      'of open notices. source="nih" = awarded NIH projects; source="multisite"/"all" = open notices. Filter by ' +
+      'keyword / agency / phase. grounded=false when nothing matches — try source="all".',
+    inputSchema: {
+      keyword: z.string().optional().describe('Search term, e.g. "machine learning".'),
+      agency: z.string().optional().describe('NIH institute (NCI, NIAID) or broad agency (NSF, DOD).'),
+      phase: z.enum(['1', '2', 'all']).optional().describe('SBIR/STTR phase (default all).'),
+      source: z.enum(['nih', 'multisite', 'all']).optional().describe('Data source (default nih = awarded NIH projects).'),
+      limit: z.number().int().min(1).max(50).optional().describe('Max results (default 25).'),
+    },
+  },
+  async ({ keyword, agency, phase, source, limit }) => {
+    const result = await sbirSearch({ keyword, agency, phase, source, limit });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'get_expiring_contracts',
+  {
+    title: 'Get Expiring Contracts (Recompetes)',
+    description:
+      'Federal contracts EXPIRING soon — recompete targets ("who is about to lose their contract"). Filter by ' +
+      'NAICS / agency / state / expiration window (months) / value / recompete-likelihood; soonest-expiring first. ' +
+      'A multiple-award IDIQ appears as several rows (one per holder). grounded=false — widen months_window.',
+    inputSchema: {
+      naics: z.string().optional().describe('NAICS code; ≤5 digits = prefix, 6 = exact.'),
+      agency: z.string().optional().describe('Agency name, case-insensitive partial.'),
+      state: z.string().optional().describe('2-letter place-of-performance state.'),
+      months_window: z.number().int().min(1).max(60).optional().describe('Expiration window in months (default 18).'),
+      min_value: z.number().optional().describe('Minimum obligated dollars.'),
+      max_value: z.number().optional().describe('Maximum obligated dollars.'),
+      likelihood: z.enum(['high', 'medium', 'low']).optional().describe('Recompete-likelihood filter.'),
+      limit: z.number().int().min(1).max(200).optional().describe('Max results (default 25).'),
+    },
+  },
+  async ({ naics, agency, state, months_window, min_value, max_value, likelihood, limit }) => {
+    const result = await expiringContracts({ naics, agency, state, months_window, min_value, max_value, likelihood, limit });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    '[mindy-mcp] stdio server ready — get_winning_playbook + get_pricing_intel + get_incumbent_financials + get_regulatory_demand registered',
+    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts registered',
   );
 }
 

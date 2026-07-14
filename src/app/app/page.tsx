@@ -7,6 +7,7 @@ import GlobalLookup from '@/components/app/GlobalLookup';
 import ProductTour from '@/components/app/ProductTour';
 import PanelContainer from '@/components/app/panels';
 import ClientWorkspaceBanner from '@/components/app/ClientWorkspaceBanner';
+import CapabilityNudge from '@/components/app/CapabilityNudge';
 import { reconcileActiveWorkspace, getActiveWorkspace } from '@/components/app/activeWorkspace';
 import VoiceCaptureModal from '@/components/app/voice/VoiceCaptureModal';
 import { Mic, Menu } from 'lucide-react';
@@ -1463,6 +1464,10 @@ function AppDashboard() {
           onPanelChange={handlePanelChange}
           activePanel={activePanel}
         />
+
+        {/* Thin-profile nudge: users on generic-only codes get a one-line describe
+            prompt → real keywords + sharper matches (reuses onboarding's describe path). */}
+        <CapabilityNudge email={email} />
 
         {/* Panel Content */}
         <PanelContainer
