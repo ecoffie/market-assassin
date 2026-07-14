@@ -23,7 +23,7 @@ SAM.gov and USASpending are free, public APIs. Any competitor can wrap them in a
 Mindy leads with those public-data tools because they're genuinely useful — but the reason an agent stays on Mindy is the layer competitors **cannot** copy:
 
 - **The winning-playbook corpus** — 8 years of course, proposal-template, and podcast-guest content that answers *"how do I actually win this,"* which no public API contains.
-- **DoDAAC-anchored buying-office contacts** — the named contracting officers and small-business POCs at a *specific* buying office, not the whole-department firehose.
+- **Office-level buying contacts** — the named contracting officers and small-business POCs at a *specific* buying office, not the whole-department firehose.
 - **A curated SBLO teaming roster** — the Small Business Liaison Officer at 200 primes, re-researched and verified, so an agent knows *who to call* to team.
 - **The podcast lesson corpus** — real lessons from real contractor and agency guests, matched by topic, agency, or set-aside.
 
@@ -75,7 +75,7 @@ The hosted server exposes **33 credit-metered tools** (plus a free `get_balance`
 | `get_regulatory_demand` | Federal Register signals — "demand before SAM," 6–18 months early |
 | `lookup_federal_osbp` | The small-business front door (OSBP office + director) for a command |
 | `search_agency_opps_by_office` | Open opportunities anchored to a *specific* buying office |
-| `search_federal_contacts` | Named POCs at a buying office, DoDAAC-anchored |
+| `search_federal_contacts` | Named POCs at a specific buying office |
 | `assess_market_depth` | Rule-of-Two capable-small-business count for a NAICS |
 
 ### Proprietary & proposal
@@ -102,11 +102,11 @@ An agent that confidently invents a contract number or an incumbent's revenue is
 
 ---
 
-## The DoDAAC anchor — the precision competitors miss
+## Office-level precision — the buying office beneath the department label
 
 Here's a concrete example of moat over commodity. A DoD sub-agency — a USACE district, DARPA, MDA — shares one department label, "Department of Defense." So a naïve "DoD contacts" lookup returns the whole-Pentagon firehose: thousands of irrelevant people and a generic `osd.osbp@mail.mil` mailbox.
 
-Mindy anchors on the **6-character DoDAAC** that prefixes every solicitation number. `W912PL` is the Army Corps of Engineers Los Angeles District. Ask for its contacts and Mindy returns *that office's own* people — eleven `@usace.army.mil` engineers with real email addresses — plus its eleven open solicitations, not the department-wide flood. That's the difference between "we wrap the API" and "we know how federal buying actually works."
+Mindy resolves the **real buying office** beneath that label. Ask for the contacts at the Army Corps of Engineers Los Angeles District and Mindy returns *that office's own* people — eleven `@usace.army.mil` engineers with real email addresses — plus its eleven open solicitations, not the department-wide flood. That precision comes from understanding how federal buying is actually structured, and it's the difference between "we wrap the API" and "we know how the money is actually spent."
 
 ---
 
@@ -166,7 +166,7 @@ Public data is labeled public; curated intelligence is labeled curated; an hones
 Mindy MCP is not "an API wrapper for federal contracting." It's a grounded intelligence layer for AI agents — **33 tools** spanning the public data any agent needs and the proprietary intelligence no competitor can copy, all under a contract that returns real data or honestly returns nothing.
 
 - **Commodity done right** — the public-data tools are fast, cached, and useful on call one.
-- **Moat where it counts** — winning playbooks, DoDAAC-anchored contacts, SBLO teaming, and podcast lessons that took eight years to build.
+- **Moat where it counts** — winning playbooks, office-level buying contacts, SBLO teaming, and podcast lessons that took eight years to build.
 - **Trustworthy by construction** — `grounded` and `degraded` on every response; `grounded = false` never invents.
 
 Point your agent at `getmindy.ai/mcp/mcp`, sign in, and the first 100 credits are on us.
