@@ -32,6 +32,10 @@ import { grantsSearch } from './tools/grants';
 import { agencyForecasts } from './tools/forecasts';
 import { sbirSearch } from './tools/sbir';
 import { expiringContracts } from './tools/expiring-contracts';
+import { getKeywordCoverage } from './tools/keyword-coverage';
+import { idvContracts } from './tools/idv-contracts';
+import { contractorAwardHistory } from './tools/contractor-award-history';
+import { assessMarketDepth } from './tools/market-depth';
 
 const server = new McpServer({
   name: 'mindy-govcon',
@@ -423,11 +427,99 @@ server.registerTool(
   },
 );
 
+server.registerTool(
+  'get_keyword_coverage',
+  {
+    title: 'Get Keyword Market Coverage',
+    description:
+      'Market coverage for a PRODUCT/SERVICE keyword (e.g. "drones"). Returns total federal market $, every NAICS ' +
+      'that bought it (ranked), the smallest NAICS set covering ~90%, and the top PSCs ("what was bought"). The ' +
+      'lesson: a single obvious NAICS is often ~28% of the market — search it alone and you miss the rest. ' +
+      'grounded=false when no spending matches.',
+    inputSchema: {
+      keyword: z.string().describe('Product/service term. Single significant words match best (exact-phrase search).'),
+      coverage_target: z.number().min(0.5).max(0.99).optional().describe('Fraction of market to cover (default 0.9).'),
+    },
+  },
+  async ({ keyword, coverage_target }) => {
+    const result = await getKeywordCoverage({ keyword, coverage_target });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'search_idv_contracts',
+  {
+    title: 'Search IDV Contracts & Task Orders',
+    description:
+      'Indefinite-Delivery Vehicles (IDIQ/GWAC/BPA) and the task orders flowing through them. search_type:"idv" = ' +
+      'base vehicles you must be ON; search_type:"task" = the orders being placed through them. Filter by NAICS / ' +
+      'PSC / agency / state / min value / date range. grounded=false when nothing matches.',
+    inputSchema: {
+      naics: z.string().optional().describe('NAICS code.'),
+      psc: z.string().optional().describe('Product/Service Code.'),
+      agency: z.string().optional().describe('Awarding agency name.'),
+      state: z.string().optional().describe('2-letter state.'),
+      min_value: z.number().optional().describe('Minimum award amount (dollars).'),
+      date_from: z.string().optional().describe('Action date lower bound (YYYY-MM-DD).'),
+      date_to: z.string().optional().describe('Action date upper bound (YYYY-MM-DD).'),
+      search_type: z.enum(['idv', 'task']).optional().describe('"idv" = base vehicles (default); "task" = task orders.'),
+      limit: z.number().int().min(1).max(100).optional().describe('Max results per page (default 25).'),
+      page: z.number().int().min(1).optional().describe('1-based page number.'),
+    },
+  },
+  async ({ naics, psc, agency, state, min_value, date_from, date_to, search_type, limit, page }) => {
+    const result = await idvContracts({ naics, psc, agency, state, min_value, date_from, date_to, search_type, limit, page });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'get_contractor_award_history',
+  {
+    title: 'Get Contractor Award History',
+    description:
+      "A named contractor's federal prime-award history: total obligations, award count, year-over-year trend, top " +
+      'agencies, top NAICS, recent awards. Size up a competitor, teammate, or incumbent. Name matching is fuzzy — ' +
+      'check match.confidence. grounded=false when no cached award history.',
+    inputSchema: {
+      company: z.string().describe('Contractor name (legal business name matches best).'),
+      award_limit: z.number().int().min(1).max(100).optional().describe('Max recent awards to return.'),
+    },
+  },
+  async ({ company, award_limit }) => {
+    const result = await contractorAwardHistory({ company, award_limit });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'assess_market_depth',
+  {
+    title: 'Assess Market Depth (Rule of Two)',
+    description:
+      'Rule-of-Two market-depth determination for a NAICS (+ optional set-aside / state): how many CAPABLE small ' +
+      'businesses exist, whether the Rule of Two is met (≥2 → set-aside supportable), a scored/tiered vendor list, ' +
+      'and memo-ready caveats. registered_only firms never inflate the count. grounded=false when none are capable.',
+    inputSchema: {
+      naics: z.string().describe('NAICS code (6-digit).'),
+      state: z.string().optional().describe('2-letter state to scope the market geographically.'),
+      set_aside: z.string().optional().describe("Normalized: '8(a)','HUBZone','SDVOSB','WOSB','EDWOSB','Small Business'."),
+      include_emerging: z.boolean().optional().describe('Include emerging (registered, not-yet-performed) firms (default true).'),
+      limit: z.number().int().min(1).max(200).optional().describe('Max businesses to return.'),
+    },
+  },
+  async ({ naics, state, set_aside, include_emerging, limit }) => {
+    const result = await assessMarketDepth({ naics, state, set_aside, include_emerging, limit });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts registered',
+    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + keyword-coverage + idv-contracts + contractor-award-history + market-depth registered',
   );
 }
 

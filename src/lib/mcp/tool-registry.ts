@@ -32,6 +32,10 @@ import { grantsSearch } from '@/mcp/tools/grants';
 import { agencyForecasts } from '@/mcp/tools/forecasts';
 import { sbirSearch } from '@/mcp/tools/sbir';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
+import { getKeywordCoverage } from '@/mcp/tools/keyword-coverage';
+import { idvContracts } from '@/mcp/tools/idv-contracts';
+import { contractorAwardHistory } from '@/mcp/tools/contractor-award-history';
+import { assessMarketDepth } from '@/mcp/tools/market-depth';
 import { getBalance } from '@/lib/mcp/credits';
 import { tierFor } from '@/lib/mcp/entitlements';
 
@@ -66,6 +70,10 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   get_agency_forecasts: 1, // Supabase agency_forecasts read
   search_sbir: 1, // NIH RePORTER + multisite aggregate
   get_expiring_contracts: 1, // Supabase recompete_opportunities read
+  get_keyword_coverage: 1, // USASpending spending-by-category (free upstream, cacheable)
+  search_idv_contracts: 2, // live USASpending IDV/task-order search
+  get_contractor_award_history: 2, // USASpending cache + contractor DB
+  assess_market_depth: 2, // Supabase sam_entities + BQ recipients activity enrich
   get_balance: 0, // meta tool — always free
 };
 
@@ -367,6 +375,97 @@ const EXPIRING_CONTRACTS_TOOL_DEF = {
   },
 };
 
+const KEYWORD_COVERAGE_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_keyword_coverage',
+    description:
+      'Market coverage for a PRODUCT/SERVICE keyword (e.g. "drones", "demolition"). Returns the TOTAL federal ' +
+      'market ($), EVERY NAICS that bought it (ranked), the smallest NAICS set covering ~90%, and the top PSCs ' +
+      '("what was actually bought"). The lesson: a single obvious NAICS is often only ~28% of the market — search ' +
+      'it alone and you MISS the rest. Use this to derive the RIGHT NAICS set for alerts/searches. grounded=false ' +
+      'when no spending matches the keyword.',
+    parameters: {
+      type: 'object',
+      properties: {
+        keyword: { type: 'string', description: 'Product/service term. Single significant words match best (USASpending keyword search is exact-phrase).' },
+        coverage_target: { type: 'number', description: 'Fraction of the market the returned NAICS set should cover (0.5–0.99, default 0.9).' },
+      },
+      required: ['keyword'],
+    },
+  },
+};
+
+const IDV_CONTRACTS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'search_idv_contracts',
+    description:
+      'Indefinite-Delivery Vehicles (IDIQ / GWAC / BPA) and the task orders flowing through them. search_type:"idv" ' +
+      'returns the base vehicles you must be ON to compete; search_type:"task" returns the delivery/task orders being ' +
+      'ordered through them (demand + typical order size). Filter by NAICS / PSC / agency / state / min value / date ' +
+      'range. grounded=false when nothing matches.',
+    parameters: {
+      type: 'object',
+      properties: {
+        naics: { type: 'string', description: 'NAICS code.' },
+        psc: { type: 'string', description: 'Product/Service Code.' },
+        agency: { type: 'string', description: 'Awarding agency name.' },
+        state: { type: 'string', description: '2-letter state (recipient or place-of-performance).' },
+        min_value: { type: 'number', description: 'Minimum award amount (dollars).' },
+        date_from: { type: 'string', description: 'Action date lower bound (YYYY-MM-DD).' },
+        date_to: { type: 'string', description: 'Action date upper bound (YYYY-MM-DD).' },
+        search_type: { type: 'string', enum: ['idv', 'task'], description: '"idv" = base vehicles (default); "task" = task/delivery orders.' },
+        limit: { type: 'number', description: 'Max results per page (default 25).' },
+        page: { type: 'number', description: '1-based page number.' },
+      },
+    },
+  },
+};
+
+const CONTRACTOR_AWARD_HISTORY_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_contractor_award_history',
+    description:
+      "A named contractor's federal prime-award history: total obligations, award count, year-over-year trend, top " +
+      'agencies, top NAICS, and recent awards. Use it to size up a competitor, teammate, or incumbent. Name matching ' +
+      'is fuzzy — always check match.confidence. grounded=false when the firm has no cached award history.',
+    parameters: {
+      type: 'object',
+      properties: {
+        company: { type: 'string', description: 'Contractor name (legal business name matches best).' },
+        award_limit: { type: 'number', description: 'Max recent awards to return.' },
+      },
+      required: ['company'],
+    },
+  },
+};
+
+const MARKET_DEPTH_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'assess_market_depth',
+    description:
+      'Rule-of-Two market-depth determination for a NAICS (+ optional set-aside / state): how many CAPABLE small ' +
+      'businesses exist, whether the Rule of Two is met (≥2 capable at a fair price → the requirement should be set ' +
+      'aside), a scored/tiered vendor list (active_performer > capable > emerging), and memo-ready caveats. ' +
+      'registered_only firms are shown separately and never inflate the count. grounded=false when no capable ' +
+      'businesses are found.',
+    parameters: {
+      type: 'object',
+      properties: {
+        naics: { type: 'string', description: 'NAICS code (6-digit).' },
+        state: { type: 'string', description: '2-letter state to scope the market geographically.' },
+        set_aside: { type: 'string', description: "Normalized label: '8(a)','HUBZone','SDVOSB','WOSB','EDWOSB','Small Business'." },
+        include_emerging: { type: 'boolean', description: 'Include emerging (registered, not-yet-performed) firms in the count (default true).' },
+        limit: { type: 'number', description: 'Max businesses to return in the list.' },
+      },
+      required: ['naics'],
+    },
+  },
+};
+
 /** All tools exposed over MCP in v1, each annotated with its credit price. */
 export function listMcpTools(): Array<Record<string, unknown>> {
   const defs = [
@@ -385,6 +484,10 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     FORECASTS_TOOL_DEF,
     SBIR_TOOL_DEF,
     EXPIRING_CONTRACTS_TOOL_DEF,
+    KEYWORD_COVERAGE_TOOL_DEF,
+    IDV_CONTRACTS_TOOL_DEF,
+    CONTRACTOR_AWARD_HISTORY_TOOL_DEF,
+    MARKET_DEPTH_TOOL_DEF,
     GET_BALANCE_TOOL_DEF,
   ];
   return defs.map((d) => ({ ...d, _credits: TOOL_CREDITS[d.function.name] ?? 0, _tier: tierFor(d.function.name) }));
@@ -408,6 +511,10 @@ export function isMcpTool(name: string): boolean {
     name === 'get_agency_forecasts' ||
     name === 'search_sbir' ||
     name === 'get_expiring_contracts' ||
+    name === 'get_keyword_coverage' ||
+    name === 'search_idv_contracts' ||
+    name === 'get_contractor_award_history' ||
+    name === 'assess_market_depth' ||
     name === 'get_balance'
   );
 }
@@ -580,6 +687,49 @@ export async function runMcpTool(
       min_value: typeof args.min_value === 'number' ? args.min_value : undefined,
       max_value: typeof args.max_value === 'number' ? args.max_value : undefined,
       likelihood: args.likelihood === 'high' || args.likelihood === 'medium' || args.likelihood === 'low' ? args.likelihood : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_keyword_coverage') {
+    const result = (await getKeywordCoverage({
+      keyword: typeof args.keyword === 'string' ? args.keyword : '',
+      coverage_target: typeof args.coverage_target === 'number' ? args.coverage_target : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'search_idv_contracts') {
+    const result = (await idvContracts({
+      naics: typeof args.naics === 'string' ? args.naics : undefined,
+      psc: typeof args.psc === 'string' ? args.psc : undefined,
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      state: typeof args.state === 'string' ? args.state : undefined,
+      min_value: typeof args.min_value === 'number' ? args.min_value : undefined,
+      date_from: typeof args.date_from === 'string' ? args.date_from : undefined,
+      date_to: typeof args.date_to === 'string' ? args.date_to : undefined,
+      search_type: args.search_type === 'idv' || args.search_type === 'task' ? args.search_type : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+      page: typeof args.page === 'number' ? args.page : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_contractor_award_history') {
+    const result = (await contractorAwardHistory({
+      company: typeof args.company === 'string' ? args.company : '',
+      award_limit: typeof args.award_limit === 'number' ? args.award_limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'assess_market_depth') {
+    const result = (await assessMarketDepth({
+      naics: typeof args.naics === 'string' ? args.naics : '',
+      state: typeof args.state === 'string' ? args.state : undefined,
+      set_aside: typeof args.set_aside === 'string' ? args.set_aside : undefined,
+      include_emerging: typeof args.include_emerging === 'boolean' ? args.include_emerging : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };

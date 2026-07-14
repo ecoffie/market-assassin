@@ -70,7 +70,10 @@ try {
   const names = tools.map((t) => t.name);
   console.error(`✓ tools/list → [${names.join(', ')}]`);
   if (!names.includes('get_winning_playbook')) fail('get_winning_playbook not registered');
-  for (const t of ['get_pricing_intel', 'get_incumbent_financials', 'get_regulatory_demand']) {
+  for (const t of [
+    'get_pricing_intel', 'get_incumbent_financials', 'get_regulatory_demand',
+    'get_keyword_coverage', 'search_idv_contracts', 'get_contractor_award_history', 'assess_market_depth',
+  ]) {
     if (!names.includes(t)) fail(`${t} not registered`);
   }
 
@@ -281,7 +284,44 @@ try {
   if (ecS._meta?.degraded) fail('expiring-contracts: degraded=true (Supabase recompete_opportunities unreachable)');
   if (!ecS._meta?.grounded) console.error('⚠ expiring-contracts: grounded=false for NAICS 541 in 24mo — NON-FATAL (may be a genuinely thin window)');
 
-  console.error('\n✅ SMOKE PASSED — MCP transport + 13 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts) all live + honest');
+  // ── get_keyword_coverage (USASpending spending-by-category) ────────────────
+  console.error('\n→ calling get_keyword_coverage({ keyword: "drones" })');
+  const kc = await client.callTool({ name: 'get_keyword_coverage', arguments: { keyword: 'drones' } });
+  const kcS = kc.structuredContent;
+  if (!kcS) fail('keyword-coverage: no structuredContent');
+  console.error(`✓ grounded=${kcS._meta?.grounded} · degraded=${kcS._meta?.degraded} · naics_count=${kcS._meta?.naics_count} · total_market=$${kcS._meta?.total_market}${kcS.coverage?.topPsc ? ` · topPSC=${kcS.coverage.topPsc.code} ${kcS.coverage.topPsc.name}` : ''}`);
+  if (kcS._meta?.degraded) console.error('⚠ keyword-coverage: degraded=true (USASpending unreachable/rate-limited) — NON-FATAL');
+  else if (!kcS._meta?.grounded) console.error('⚠ keyword-coverage: grounded=false for "drones" — NON-FATAL (upstream hiccup)');
+  else if (kcS.coverage && kcS.coverage.naicsCount < 2) fail('keyword-coverage: "drones" should span many NAICS but naicsCount < 2 — coverage math broken');
+
+  // ── search_idv_contracts (USASpending live IDV search) ─────────────────────
+  console.error('\n→ calling search_idv_contracts({ naics: "541512", search_type: "idv", limit: 5 })');
+  const idv = await client.callTool({ name: 'search_idv_contracts', arguments: { naics: '541512', search_type: 'idv', limit: 5 } });
+  const idvS = idv.structuredContent;
+  if (!idvS) fail('idv-contracts: no structuredContent');
+  console.error(`✓ grounded=${idvS._meta?.grounded} · degraded=${idvS._meta?.degraded} · count=${idvS._meta?.count} · total=${idvS._meta?.total} · type=${idvS.search_type}${idvS.contracts?.[0] ? ` · top=${String(idvS.contracts[0].recipientName).slice(0,40)}` : ''}`);
+  if (idvS._meta?.degraded) console.error('⚠ idv-contracts: degraded=true (USASpending unreachable/rate-limited) — NON-FATAL');
+  else if (!idvS._meta?.grounded) console.error('⚠ idv-contracts: grounded=false for NAICS 541512 IDVs — NON-FATAL');
+
+  // ── get_contractor_award_history (USASpending cache + contractor DB) ───────
+  console.error('\n→ calling get_contractor_award_history({ company: "Booz Allen Hamilton" })');
+  const cah = await client.callTool({ name: 'get_contractor_award_history', arguments: { company: 'Booz Allen Hamilton' } });
+  const cahS = cah.structuredContent;
+  if (!cahS) fail('contractor-award-history: no structuredContent');
+  console.error(`✓ grounded=${cahS._meta?.grounded} · degraded=${cahS._meta?.degraded} · award_count=${cahS._meta?.award_count} · total_obligations=$${cahS._meta?.total_obligations}${cahS.history?.match ? ` · match=${cahS.history.match.confidence}` : ''}`);
+  if (cahS._meta?.degraded) console.error('⚠ contractor-award-history: degraded=true (award cache/source unreachable) — NON-FATAL');
+  else if (!cahS._meta?.grounded) console.error('⚠ contractor-award-history: grounded=false for Booz Allen — NON-FATAL (no cached history)');
+
+  // ── assess_market_depth (Supabase sam_entities + BQ activity) ──────────────
+  console.error('\n→ calling assess_market_depth({ naics: "541512" })');
+  const md = await client.callTool({ name: 'assess_market_depth', arguments: { naics: '541512' } });
+  const mdS = md.structuredContent;
+  if (!mdS) fail('market-depth: no structuredContent');
+  console.error(`✓ grounded=${mdS._meta?.grounded} · degraded=${mdS._meta?.degraded} · market_depth=${mdS._meta?.market_depth} · rule_of_two_met=${mdS._meta?.rule_of_two_met} · registered_only=${mdS.registered_only_count} · as_of=${mdS.data_as_of}`);
+  if (mdS._meta?.degraded) fail('market-depth: degraded=true (Supabase sam_entities unreachable)');
+  if (!mdS._meta?.grounded) console.error('⚠ market-depth: grounded=false for NAICS 541512 — NON-FATAL (thin market / entities sync gap)');
+
+  console.error('\n✅ SMOKE PASSED — MCP transport + 17 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth) all live + honest');
   await client.close();
   process.exit(0);
 } catch (err) {
