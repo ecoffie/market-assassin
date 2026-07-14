@@ -281,7 +281,57 @@ try {
   if (ecS._meta?.degraded) fail('expiring-contracts: degraded=true (Supabase recompete_opportunities unreachable)');
   if (!ecS._meta?.grounded) console.error('⚠ expiring-contracts: grounded=false for NAICS 541 in 24mo — NON-FATAL (may be a genuinely thin window)');
 
-  console.error('\n✅ SMOKE PASSED — MCP transport + 13 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts) all live + honest');
+  // ── get_sblo_contact (curated SBLO roster + prime DB) ──────────────────────
+  console.error('\n→ calling get_sblo_contact({ company: "AECOM" })');
+  const sblo = await client.callTool({ name: 'get_sblo_contact', arguments: { company: 'AECOM' } });
+  const sbloS = sblo.structuredContent;
+  if (!sbloS) fail('sblo-contact: no structuredContent');
+  if (!sbloS._meta?.grounded || !sbloS.contact?.company) fail('sblo-contact: AECOM should resolve to a grounded contact');
+  console.error(`✓ grounded=${sbloS._meta.grounded} · from=${sbloS._meta.matched_from} · match=${sbloS._meta.match_type} · sblo=${sbloS.contact?.sblo_name || '—'} · ${sbloS.contact?.email || 'no-email'}`);
+  const sbloMiss = await client.callTool({ name: 'get_sblo_contact', arguments: { company: 'Totally Fake Co ZZZ' } });
+  if (sbloMiss.structuredContent?._meta?.grounded !== false) fail('sblo-contact: unknown company should be grounded=false (no invented contact)');
+  console.error('✓ honest miss: unknown company → grounded=false');
+
+  // ── search_federal_contacts (DoDAAC-anchored buying-office roster) ──────────
+  console.error('\n→ calling search_federal_contacts({ dodaac: "W912PL", limit: 6 })');
+  const fcon = await client.callTool({ name: 'search_federal_contacts', arguments: { dodaac: 'W912PL', limit: 6 } });
+  const fconS = fcon.structuredContent;
+  if (!fconS) fail('federal-contacts: no structuredContent');
+  if (fconS._meta?.degraded) fail('federal-contacts: degraded=true (federal_contacts unreachable)');
+  if (fconS._meta?.anchor !== 'dodaac') fail('federal-contacts: explicit DoDAAC should anchor=dodaac');
+  if (!fconS._meta?.grounded) {
+    console.error('⚠ federal-contacts: grounded=false for W912PL — NON-FATAL (that office may have no POCs cached)');
+  } else {
+    const emailed = fconS.contacts.find((c) => c.contact_email);
+    if (!emailed) fail('federal-contacts: expected at least one emailable contact for W912PL');
+    console.error(`✓ grounded=${fconS._meta.grounded} · anchor=${fconS._meta.anchor} · count=${fconS._meta.count} · emailable=${fconS._meta.emailable_count} · e.g. ${emailed.contact_fullname} @ ${String(emailed.derived_office).slice(0,32)}`);
+  }
+  // OSBP prepend + department preview for a civilian agency
+  const fcVa = await client.callTool({ name: 'search_federal_contacts', arguments: { agency: 'Department of Veterans Affairs', limit: 4 } });
+  if (fcVa.structuredContent?._meta?.anchor !== 'department') fail('federal-contacts: civilian agency should fall back to anchor=department');
+  console.error(`✓ VA → anchor=${fcVa.structuredContent._meta.anchor} · grounded=${fcVa.structuredContent._meta.grounded} · count=${fcVa.structuredContent._meta.count} (OSBP prepended)`);
+  // honest miss (generic SBA fallback must NOT make a nonsense agency look grounded)
+  const fcMiss = await client.callTool({ name: 'search_federal_contacts', arguments: { agency: 'Zzz Nope Nonexistent', limit: 3 } });
+  if (fcMiss.structuredContent?._meta?.grounded !== false) fail('federal-contacts: nonsense agency should be grounded=false (generic SBA fallback suppressed)');
+  console.error('✓ honest miss: nonsense agency → grounded=false (no generic fallback)');
+
+  // ── search_podcast_lessons (proprietary corpus) ────────────────────────────
+  console.error('\n→ calling search_podcast_lessons({ query: "8(a) construction", limit: 3 })');
+  const pl = await client.callTool({ name: 'search_podcast_lessons', arguments: { query: '8(a) construction', limit: 3 } });
+  const plS = pl.structuredContent;
+  if (!plS) fail('podcast-lessons: no structuredContent');
+  if (plS._meta?.degraded) fail('podcast-lessons: degraded=true (podcast_episode_metadata unreachable)');
+  if (!plS._meta?.grounded) {
+    console.error('⚠ podcast-lessons: grounded=false for "8(a) construction" — NON-FATAL (corpus may lack a match)');
+  } else {
+    if (!plS.episodes?.[0]?.episode_title) fail('podcast-lessons: grounded but no episode_title');
+    console.error(`✓ grounded=${plS._meta.grounded} · episodes=${plS._meta.episode_count} · lessons=${plS._meta.lesson_count} · top="${String(plS.episodes[0].episode_title).slice(0,45)}"`);
+  }
+  const plMiss = await client.callTool({ name: 'search_podcast_lessons', arguments: { query: 'zzzznomatchxyz', limit: 3 } });
+  if (plMiss.structuredContent?._meta?.grounded !== false) fail('podcast-lessons: no-match query should be grounded=false (no invented lesson)');
+  console.error('✓ honest miss: no-match query → grounded=false');
+
+  console.error('\n✅ SMOKE PASSED — MCP transport + 16 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, sblo-contact, federal-contacts, podcast-lessons) all live + honest');
   await client.close();
   process.exit(0);
 } catch (err) {

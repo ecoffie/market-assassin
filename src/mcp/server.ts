@@ -32,6 +32,9 @@ import { grantsSearch } from './tools/grants';
 import { agencyForecasts } from './tools/forecasts';
 import { sbirSearch } from './tools/sbir';
 import { expiringContracts } from './tools/expiring-contracts';
+import { getSbloContact } from './tools/sblo-contact';
+import { searchFederalContacts } from './tools/federal-contacts';
+import { searchPodcastLessons } from './tools/podcast-lessons';
 
 const server = new McpServer({
   name: 'mindy-govcon',
@@ -423,11 +426,76 @@ server.registerTool(
   },
 );
 
+server.registerTool(
+  'get_sblo_contact',
+  {
+    title: 'Get SBLO Contact (prime teaming front door)',
+    description:
+      'The Small Business Liaison Officer (SBLO) at a prime contractor — WHO to call to team on a subcontract. Pass a ' +
+      'company name ("AECOM", "Booz Allen Hamilton", "Leidos"). Curated data: the canonical 200-company Jun-2026 SBLO ' +
+      'roster first, then the broader 3,502-prime DB. Returns SBLO name, title, email, phone, supplier portal, source. ' +
+      'A matched company with a blank name/email means no public SBLO was found (surfaces the supplier portal instead) ' +
+      '— it NEVER invents a contact. grounded=false = company not in the curated set.',
+    inputSchema: {
+      company: z.string().describe('Prime contractor / company name, e.g. "AECOM", "Leidos".'),
+    },
+  },
+  async ({ company }) => {
+    const result = getSbloContact({ company });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'search_federal_contacts',
+  {
+    title: 'Search Federal Contacts (DoDAAC-anchored buying-office roster)',
+    description:
+      'The named PEOPLE at a federal buying office — contracting officers, contract specialists, small-business POCs — ' +
+      'anchored on the office\'s 6-char DoDAAC so a DoD sub-agency returns ITS people, not the whole-DoD firehose. Pass ' +
+      'an agency/command name OR a 6-char DoDAAC (+ optional office/role/search). The agency\'s OSBP contact is prepended ' +
+      'as the front door. _meta.anchor: "dodaac"/"agency-dodaac" = office-precise; "department" = broad civilian preview. ' +
+      'Overseas offices filtered out. grounded=false = no matching contacts (never an invented POC).',
+    inputSchema: {
+      agency: z.string().optional().describe('Agency / command / sub-agency name, e.g. "USACE", "Department of Veterans Affairs".'),
+      dodaac: z.string().optional().describe('A known 6-char DoDAAC (e.g. "W912PL") — most precise; anchors on the office.'),
+      office: z.string().optional().describe('Office name filter (SAM office column; often null for POCs).'),
+      role: z.string().optional().describe('role_category filter (e.g. "contracting_officer", "small_business").'),
+      search: z.string().optional().describe('Free-text match on contact name OR title.'),
+      limit: z.number().int().min(1).max(200).optional().describe('Max contacts (default 25).'),
+    },
+  },
+  async ({ agency, dodaac, office, role, search, limit }) => {
+    const result = await searchFederalContacts({ agency, dodaac, office, role, search, limit });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'search_podcast_lessons',
+  {
+    title: 'Search Podcast Lessons (proprietary corpus)',
+    description:
+      "The proprietary GovCon Giants podcast corpus — real lessons from real contractor/agency guests, matched by topic / " +
+      'agency / NAICS / set-aside / guest name. Un-copyable moat content. Returns episode cards with their key_lessons, ' +
+      'guest, agencies/NAICS mentioned. grounded=false when nothing matches — do NOT invent a lesson or attribute an ' +
+      'invented quote to a guest; every lesson must trace to a returned episode.',
+    inputSchema: {
+      query: z.string().describe('Free-text: topic, agency, NAICS, set-aside, or a guest name.'),
+      limit: z.number().int().min(1).max(12).optional().describe('Max episodes (default 4).'),
+    },
+  },
+  async ({ query, limit }) => {
+    const result = await searchPodcastLessons({ query, limit });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts registered',
+    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + sblo-contact + federal-contacts + podcast-lessons registered',
   );
 }
 
