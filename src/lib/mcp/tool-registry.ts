@@ -32,6 +32,7 @@ import { grantsSearch } from '@/mcp/tools/grants';
 import { agencyForecasts } from '@/mcp/tools/forecasts';
 import { sbirSearch } from '@/mcp/tools/sbir';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
+import { solicitationDocuments } from '@/mcp/tools/solicitation-documents';
 import { getBalance } from '@/lib/mcp/credits';
 import { tierFor } from '@/lib/mcp/entitlements';
 
@@ -66,6 +67,7 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   get_agency_forecasts: 1, // Supabase agency_forecasts read
   search_sbir: 1, // NIH RePORTER + multisite aggregate
   get_expiring_contracts: 1, // Supabase recompete_opportunities read
+  get_solicitation_documents: 3, // full-text + raw-file delivery (cold path downloads + extracts on demand)
   get_balance: 0, // meta tool — always free
 };
 
@@ -367,6 +369,30 @@ const EXPIRING_CONTRACTS_TOOL_DEF = {
   },
 };
 
+const SOLICITATION_DOCUMENTS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_solicitation_documents',
+    description:
+      'Get the FULL text + downloadable raw files for a SAM solicitation by notice_id — the SOW/PWS, the notice ' +
+      'body, and every attachment. Returns notice metadata + inline body/SOW text + a documents[] list, each with ' +
+      'inline extracted_text (capped; check *_truncated) AND a short-lived signed download_url (~1h) to the full raw ' +
+      'PDF/DOCX so an agent can hand it to a design tool (Canva) or re-parse it. Cold notices (never tracked) are ' +
+      'downloaded + extracted ON DEMAND. grounded=false when the notice has no text or attachments — verify the ' +
+      'notice_id. SAM attachments are public federal data.',
+    parameters: {
+      type: 'object',
+      properties: {
+        notice_id: {
+          type: 'string',
+          description: 'SAM notice id (UUID) or solicitation number. Get it from search_sam_opportunities results.',
+        },
+      },
+      required: ['notice_id'],
+    },
+  },
+};
+
 /** All tools exposed over MCP in v1, each annotated with its credit price. */
 export function listMcpTools(): Array<Record<string, unknown>> {
   const defs = [
@@ -385,6 +411,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     FORECASTS_TOOL_DEF,
     SBIR_TOOL_DEF,
     EXPIRING_CONTRACTS_TOOL_DEF,
+    SOLICITATION_DOCUMENTS_TOOL_DEF,
     GET_BALANCE_TOOL_DEF,
   ];
   return defs.map((d) => ({ ...d, _credits: TOOL_CREDITS[d.function.name] ?? 0, _tier: tierFor(d.function.name) }));
@@ -408,6 +435,7 @@ export function isMcpTool(name: string): boolean {
     name === 'get_agency_forecasts' ||
     name === 'search_sbir' ||
     name === 'get_expiring_contracts' ||
+    name === 'get_solicitation_documents' ||
     name === 'get_balance'
   );
 }
@@ -581,6 +609,13 @@ export async function runMcpTool(
       max_value: typeof args.max_value === 'number' ? args.max_value : undefined,
       likelihood: args.likelihood === 'high' || args.likelihood === 'medium' || args.likelihood === 'low' ? args.likelihood : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_solicitation_documents') {
+    const result = (await solicitationDocuments({
+      notice_id: typeof args.notice_id === 'string' ? args.notice_id : '',
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }

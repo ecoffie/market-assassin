@@ -32,6 +32,7 @@ import { grantsSearch } from './tools/grants';
 import { agencyForecasts } from './tools/forecasts';
 import { sbirSearch } from './tools/sbir';
 import { expiringContracts } from './tools/expiring-contracts';
+import { solicitationDocuments } from './tools/solicitation-documents';
 
 const server = new McpServer({
   name: 'mindy-govcon',
@@ -423,11 +424,30 @@ server.registerTool(
   },
 );
 
+server.registerTool(
+  'get_solicitation_documents',
+  {
+    title: 'Get Solicitation Documents (SOW + attachments)',
+    description:
+      'Full text + downloadable raw files for a SAM solicitation by notice_id — the SOW/PWS, notice body, and every ' +
+      'attachment. Returns inline extracted_text (capped; check *_truncated) + a short-lived signed download_url ' +
+      '(~1h) to the full raw PDF/DOCX so an agent can feed it to a design tool (Canva) or re-parse it. Cold notices ' +
+      'are downloaded + extracted on demand. grounded=false when the notice has no text/attachments.',
+    inputSchema: {
+      notice_id: z.string().describe('SAM notice id (UUID) or solicitation number — from search_sam_opportunities.'),
+    },
+  },
+  async ({ notice_id }) => {
+    const result = await solicitationDocuments({ notice_id });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts registered',
+    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + solicitation-documents registered',
   );
 }
 

@@ -119,7 +119,7 @@ function parseFilenameFromDisposition(cd: string | null): string | null {
  *     is the form SAM's 'noticeid' exact-match expects and our regex checks.
  * Leaves genuine solicitation numbers untouched.
  */
-function normalizeNoticeId(raw: string): string {
+export function normalizeNoticeId(raw: string): string {
   let id = (raw || '').trim();
   const prefix = id.match(/^(opp|deadline|alert|brief|item)-(.+)$/i);
   if (prefix) id = prefix[2];
@@ -739,4 +739,143 @@ export async function fetchPursuitDocs(opts: {
     downloadNulls,
     lastInsertError,
   };
+}
+
+/**
+ * NOTICE-LEVEL fetch+extract — the pursuit-free variant for the MCP
+ * `get_solicitation_documents` tool. Reuses the SAME discovery + download +
+ * extraction engine as fetchPursuitDocs (cache-first attachment discovery →
+ * live SAM discover fallback → download → pdf-parse/mammoth/xlsx), but:
+ *   - takes ONLY a notice_id (+ optional hints) — no pipeline_id, no user,
+ *   - writes NOTHING to pursuit_documents / user_pipeline,
+ *   - returns the extracted docs + raw buffers IN MEMORY so the caller can
+ *     upload blobs to Storage and cache metadata wherever IT chooses.
+ *
+ * This is the cold path for an external MCP caller asking about a notice that
+ * no user has tracked (so it isn't in the pursuit_documents dedup cache). The
+ * caller is responsible for persistence + signed-URL minting.
+ */
+export interface ExtractedNoticeFile {
+  fileId: string;
+  filename: string;
+  mime: string | null;
+  sizeBytes: number;
+  pageCount?: number;
+  docKind?: string;
+  extractedText: string;
+  extractionError: string | null;
+  /** Public SAM download URL — a best-effort fallback if our Storage copy fails. */
+  samUrl: string | null;
+  /** Raw bytes — for the caller to upload to Storage. Not persisted here. */
+  buffer: Buffer;
+}
+
+export async function fetchAndExtractNoticeFiles(opts: {
+  noticeId: string;
+  solicitationNumber?: string | null;
+  title?: string | null;
+  agency?: string | null;
+}): Promise<{
+  found: boolean; // notice positively located (cache or live)
+  documents: ExtractedNoticeFile[];
+  degraded: boolean; // SAM key missing OR a download/extraction errored
+  trace: string[];
+}> {
+  const noticeId = normalizeNoticeId(opts.noticeId);
+  if (!noticeId) return { found: false, documents: [], degraded: false, trace: ['empty notice_id'] };
+
+  const supabase = getSupabase();
+
+  // Discovery: cache-first (our own sync stored the attachment URLs), then live
+  // SAM discover — identical to the pursuit cold path.
+  let fileRefs: SamFileRef[] = [];
+  let noticeFound = false;
+  let trace: string[] = [];
+
+  const cached = await resolveFromCache(supabase, noticeId).catch(() => null);
+  if (cached && cached.attachments.length > 0) {
+    noticeFound = true;
+    trace = [`cache-hit uuid=${cached.uuid} attachments=${cached.attachments.length}`];
+    fileRefs = urlsToFileRefs(cached.attachments);
+  } else {
+    const apiKey = getRotatedSAMKey();
+    if (!apiKey) {
+      // No live discovery possible — but if the cache located the notice with 0
+      // attachments, that's an honest "none", not degraded.
+      return { found: !!cached, documents: [], degraded: !cached, trace: ['no SAM key; cache-only'] };
+    }
+    if (cached) trace.push(`cache-hit-empty uuid=${cached.uuid} → live discover`);
+    const discovered = await discoverFiles(noticeId, apiKey, {
+      solicitationNumber: opts.solicitationNumber,
+      title: opts.title,
+      agency: opts.agency,
+    });
+    fileRefs = discovered.refs;
+    noticeFound = discovered.foundNotice;
+    trace = [...trace, ...discovered.trace];
+  }
+
+  if (fileRefs.length === 0) {
+    return { found: noticeFound, documents: [], degraded: false, trace };
+  }
+
+  const apiKey = getRotatedSAMKey();
+  if (!apiKey) return { found: noticeFound, documents: [], degraded: true, trace: [...trace, 'no SAM key for download'] };
+
+  const documents: ExtractedNoticeFile[] = [];
+  let anyError = false;
+
+  for (const ref of fileRefs) {
+    try {
+      const dl = await downloadFile(ref, apiKey);
+      if (!dl) { anyError = true; continue; }
+      if (dl.realFilename) ref.filename = dl.realFilename;
+
+      const kind = inferKind(ref.filename, dl.mime, dl.buffer);
+      let extractedText = '';
+      let pageCount: number | undefined;
+      let extractionError: string | null = null;
+
+      try {
+        if (kind === 'pdf') {
+          const r = await extractPdf(dl.buffer);
+          extractedText = (r.text || '').slice(0, MAX_EXTRACTED_TEXT_CHARS);
+          pageCount = r.pageCount;
+          if (r.pdfTitle && ref.filename.startsWith('Document ')) {
+            ref.filename = /\.pdf$/i.test(r.pdfTitle) ? r.pdfTitle : `${r.pdfTitle}.pdf`;
+          }
+        } else if (kind === 'docx') {
+          extractedText = ((await extractDocx(dl.buffer)).text || '').slice(0, MAX_EXTRACTED_TEXT_CHARS);
+        } else if (kind === 'xlsx') {
+          extractedText = ((await extractXlsx(dl.buffer)).text || '').slice(0, MAX_EXTRACTED_TEXT_CHARS);
+        } else if (kind === 'txt') {
+          extractedText = (extractTxt(dl.buffer).text || '').slice(0, MAX_EXTRACTED_TEXT_CHARS);
+        } else {
+          extractionError = 'Unsupported file type';
+        }
+      } catch (err) {
+        extractionError = err instanceof Error ? err.message : 'extraction failed';
+      }
+      if (extractionError) anyError = true;
+
+      const cls = classifyDoc(ref.filename, extractedText);
+      documents.push({
+        fileId: ref.fileId,
+        filename: ref.filename,
+        mime: dl.mime,
+        sizeBytes: dl.size,
+        pageCount,
+        docKind: cls.kind,
+        extractedText,
+        extractionError,
+        samUrl: ref.url ?? null,
+        buffer: dl.buffer,
+      });
+    } catch (err) {
+      console.error('[fetch-notice-files] ref threw:', err);
+      anyError = true;
+    }
+  }
+
+  return { found: true, documents, degraded: anyError, trace };
 }
