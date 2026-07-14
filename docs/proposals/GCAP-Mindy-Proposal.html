@@ -28,7 +28,9 @@
     @media print {
       .page { padding: 24px 32px; }
       .no-print { display: none; }
+      .page-break-before { break-before: page; page-break-before: always; }
     }
+    .page-break-before table { break-inside: avoid; page-break-inside: avoid; }
     .header {
       display: flex;
       justify-content: space-between;
@@ -195,13 +197,13 @@
     <header class="header">
       <div class="logo-block">
         <h1>Mindy × GCAP</h1>
-        <p>Federal BD intelligence &amp; client-progression reporting — SBDC partner license</p>
+        <p>Federal BD intelligence &amp; client-progression reporting license</p>
       </div>
       <div class="meta">
         <strong>Prepared for</strong>
         Jacquie Spearman<br />
         Government Contractor Assistance Program<br />
-        July 13, 2026
+        July 14, 2026
       </div>
     </header>
 
@@ -270,7 +272,43 @@
         <td>—</td>
       </tr>
     </table>
-    <p class="note">Included in the license: the full platform above. Carved out: Proposal Assist (the one AI-token feature) is a metered add-on or bring-your-own-LLM — so the flat license price never moves with usage.</p>
+    <p class="note">Included in the license: the full platform above, plus Proposal Assist for every counselor seat. Carved out: for client workspaces, Proposal Assist is an optional $99/mo per-user add-on the client buys directly — so the flat license price never moves.</p>
+
+    <h3>Why this is a center license, not 12 logins</h3>
+    <p class="body">
+      The Center License is the admin tier — built for an organization managing a large caseload,
+      not a set of individual users. That's where the value lives:
+    </p>
+    <ul class="features" style="margin-top:6px;">
+      <li><strong>Unlimited client workspaces</strong> — every one of the ~1,000 businesses you serve gets its own, included; never capped, never re-quoted as clients cycle in and out.</li>
+      <li><strong>One org dashboard across all counselors</strong> — not 12 separate accounts; the director sees the whole caseload in one place.</li>
+      <li><strong>Reassign clients instantly when a counselor leaves</strong> — the book of business stays with GCAP, not locked in a departing person's login.</li>
+      <li><strong>GCAP-branded org tab</strong> — your counselors and clients work inside your program, not a generic tool.</li>
+      <li><strong>One-click quarterly SBTDC / SBA funder export</strong> — the report you hand your funder, produced by the system instead of hand-built every quarter.</li>
+      <li><strong>Onboarding &amp; support included</strong> — guided kickoff, done-for-you cohort load, a named contact, and quarterly office hours (detailed below).</li>
+    </ul>
+
+    <h3>What the $36,000 actually delivers</h3>
+    <p class="body">
+      Look at it per business instead of per seat. Each of the ~1,000 businesses you serve would
+      pay <strong>$149/mo — $1,788/yr</strong> to run this federal-intelligence platform on their
+      own. Delivered through your counselors, that's:
+    </p>
+    <table>
+      <tr>
+        <td style="width:50%;">1,000 businesses × Mindy Pro ($1,788/yr retail)</td>
+        <td><strong>≈ $1.78M/yr of platform value</strong></td>
+      </tr>
+      <tr>
+        <td>GCAP Center License</td>
+        <td><strong>$36,000/yr</strong></td>
+      </tr>
+      <tr>
+        <td>Cost per business you serve</td>
+        <td><strong>≈ $36/yr — about $3 per business per month</strong></td>
+      </tr>
+    </table>
+    <p class="note">You're delivering $149/mo federal market intelligence to every business in your portfolio for roughly $3 a month each — plus the quarterly funder report that used to be a second job. The license isn't 12 seats. It's your entire 1,000-business portfolio on one platform, priced at the team that runs it.</p>
 
     <h3>The reporting engine — the part we most want to get right</h3>
     <p class="body">
@@ -287,47 +325,102 @@
     </table>
     <p class="note">We'll confirm the exact fields against the report you hand SBTDC / SBA today, so the export matches your funder's format — not a generic dashboard.</p>
 
-    <h3>How we start — a two-step that fits a funded budget line</h3>
+    <h3>How we start — prove it, run a 6-month term, then decide together</h3>
+    <p class="body">
+      No one gets locked into a year sight-unseen. We start small, run a real 6-month term, and
+      both sides confirm the economics work before going further.
+    </p>
     <div class="step-row">
       <div class="step">
         <span class="n">1</span>
         <h5>Director pilot — $0, 30 days</h5>
-        <p>Director org-admin + up to 2 counselors onboard a first cohort of ~25 client workspaces from their capability statements (NAICS, keywords, target agencies auto-seeded). Prove the counselor workflow and the funder report on your own data. Converts to the full license at day 30 — or access pauses until it does.</p>
+        <p>Director org-admin + up to 2 counselors onboard a first cohort of ~25 client workspaces from their capability statements (NAICS, keywords, target agencies auto-seeded). Prove the counselor workflow and the funder report on your own data. Converts to the initial term at day 30 — or access pauses until it does.</p>
       </div>
       <div class="step">
         <span class="n">2</span>
-        <h5>Full center license</h5>
-        <p>Activate your counselor seats (8 today, 12 as the new hires land) and the ~1,000 client workspaces, GCAP-branded tab, and the quarterly funder export. Flat $250/seat/mo, annual prepaid — one line item procurement can budget.</p>
+        <h5>6-month initial term</h5>
+        <p>Activate your counselor seats (8 today, 12 as the new hires land), the ~1,000 client workspaces, GCAP-branded tab, and quarterly funder export. Billed at your $250/seat/mo rate for the 6-month term — one budgetable line, with a real exit if either side isn't delivering (see terms).</p>
+      </div>
+      <div class="step">
+        <span class="n">3</span>
+        <h5>Joint review, then continue</h5>
+        <p>At month 6 we sit down together: does the platform deliver the outcomes and the funder report, and do the economics work for both parties? If yes, we continue by mutual agreement — no automatic 12-month lock. If the fit isn't there, either side can walk.</p>
       </div>
     </div>
 
+    <h3>Support &amp; onboarding — you're not standing this up alone</h3>
+    <p class="body">
+      The difference between 12 people buying self-serve logins and a managed center license is
+      that a real person helps you launch it and keeps you moving. All of the following is
+      <strong>included in the license</strong>, not billed hourly:
+    </p>
+    <div class="step-row">
+      <div class="step">
+        <span class="n">1</span>
+        <h5>Guided kickoff + done-for-you cohort load</h5>
+        <p>We run a live onboarding with your director and counselors, set up the GCAP org and
+        seats, and <strong>load your first cohort of client workspaces for you</strong> — bulk-imported
+        from your client list, with NAICS, keywords, and target agencies auto-seeded from each
+        capability statement. You start with a working system, not an empty dashboard.</p>
+      </div>
+      <div class="step">
+        <span class="n">2</span>
+        <h5>Named onboarding contact</h5>
+        <p>One person is your point of contact through onboarding and your first quarter — the human
+        who knows your setup, so a counselor's question never goes to a generic queue.</p>
+      </div>
+      <div class="step">
+        <span class="n">3</span>
+        <h5>Ongoing support + quarterly office hours</h5>
+        <p>Email/ticket support for your whole team with a committed response time, plus a
+        <strong>quarterly office-hours session</strong> — group Q&amp;A timed to your funder-report
+        cadence, so counselors get help right when the report is due.</p>
+      </div>
+    </div>
+    <p class="note">Standing up a 1,000-business caseload isn't a set-it-yourself job — the kickoff, the cohort load, the named contact, and the office hours are part of what the center license is <em>for</em>.</p>
+
     <h3>Investment</h3>
     <p class="body">
-      One flat annual center license — <strong>$36,000/yr</strong>, built for your full funded team of
-      12 counselors ($250 per seat / month). All ~1,000 businesses you serve across the year get their
-      own workspace, <strong>included</strong> — not metered, not capped, and not re-quoted as clients
-      cycle in and out. The price tracks your team, not your caseload.
+      The Center License — the org/admin tier — lists at <strong>$400 per seat / month</strong>.
+      Your <strong>state-funded team of 8+ counselors</strong> qualifies for our volume &amp;
+      public-sector rate of <strong>$250 per seat / month</strong>. Every one of the ~1,000
+      businesses you serve across the year gets its own workspace, <strong>included</strong> — not
+      metered, not capped, not re-quoted as clients cycle in and out. The price tracks your team,
+      not your caseload.
     </p>
     <table>
-      <tr><th>Center license</th><th>Annual (prepaid)</th><th>What it covers</th></tr>
-      <tr><td><strong>Funded team — 12 counselors</strong></td><td><strong>$36,000/yr</strong></td><td>Your full team incl. the 4 new hires · ~1,000 client workspaces included</td></tr>
+      <tr><th>GCAP Center License</th><th>List ($400/seat)</th><th>Your rate ($250/seat)</th><th>What it covers</th></tr>
+      <tr>
+        <td><strong>Start now — 8 counselors</strong></td>
+        <td style="color:#94a3b8;text-decoration:line-through;">$38,400/yr</td>
+        <td><strong>$24,000/yr</strong></td>
+        <td>Today's team · ~1,000 client workspaces included</td>
+      </tr>
+      <tr>
+        <td><strong>Full funded team — 12 counselors</strong></td>
+        <td style="color:#94a3b8;text-decoration:line-through;">$57,600/yr</td>
+        <td><strong>$36,000/yr</strong></td>
+        <td>Incl. the 4 new hires · ~1,000 workspaces · <strong>saves $21,600/yr off list</strong></td>
+      </tr>
     </table>
-    <p class="note">Prefer to activate at today's 8 counselors and fold the 4 new hires in as they land? Same $250/seat rate — <strong>$24,000/yr</strong> now, stepping to $36,000/yr at 12, no re-quote. · ~1,000 managed client workspaces included · annual prepaid · Proposal Assist is a separate optional add-on (below).</p>
+    <p class="note">Same $250/seat rate whether you activate at 8 now (<strong>$24,000/yr</strong>) or your full 12 (<strong>$36,000/yr</strong>) — add the new hires as they land, no re-quote. · Proposal Assist is a separate optional add-on (below).</p>
+    <p class="note"><strong>6-month initial term — no annual lock.</strong> The annual rate above is the price basis; we commit for a <strong>6-month initial term</strong>, billed at the same $250/seat rate — <strong>$18,000 for the 6 months</strong> at 12 counselors ($12,000 at 8) — then a joint economics review before continuing. Either party can terminate the term in writing for non-performance or non-delivery (30-day cure), with a pro-rata refund of unused prepaid. Full terms below.</p>
+    <p class="note"><strong>How the rate works:</strong> the admin tier lists at $400/seat because it's a heavier product to build and maintain — cross-counselor dashboard, client reassignment, roll-up reporting, funder export, org branding, and support. Your <strong>$250/seat rate applies at 8+ seats</strong> as a combined volume and state-funded/public-sector discount — a <strong>37% saving off list</strong>. (The tier carries a 5-seat minimum; at 8 growing to 12 and ~1,000 businesses, GCAP is squarely in the volume band.)</p>
 
     <div class="grid-2" style="margin-top:16px;">
       <div class="option recommended">
         <span class="badge">Recommended</span>
-        <h4>Two-step — pilot then license</h4>
-        <p class="subtitle">Prove ROI on your own data first; activate the center when the budget line is set</p>
-        <div class="price">$0 <span>→ $36,000/yr</span></div>
-        <p class="retail">$0 30-day pilot, then the flat annual funded-team license — $36,000/yr for your full 12-counselor team</p>
+        <h4>Pilot → 6-month term → joint review</h4>
+        <p class="subtitle">Prove ROI on your own data, run a real 6-month term, then decide together — no annual lock</p>
+        <div class="price">$0 <span>→ $18,000 / 6 mo</span></div>
+        <p class="retail">$0 30-day pilot, then a 6-month term at your $250/seat rate — <strong>$18,000</strong> (12 counselors; $12,000 at 8). Annual-equivalent $36,000/yr, $21,600 under the $57,600 list.</p>
         <ul class="features">
           <li><strong>Phase 1 (30 days, $0):</strong> director org-admin + first client workspaces + the report on your data</li>
-          <li><strong>Phase 2:</strong> activate your counselor seats · manage ~1,000 client workspaces</li>
+          <li><strong>Phase 2 (6-month term):</strong> activate your counselor seats · manage ~1,000 client workspaces</li>
+          <li><strong>Phase 3 (month-6 review):</strong> confirm outcomes + economics, continue by mutual agreement — or either party exits</li>
           <li>Full intel suite: forecasts, expiring contracts, teaming, 317K contractor DB, market research</li>
-          <li>Capability-progression tracking + GCAP-branded org tab</li>
-          <li>Quarterly SBTDC / SBA funder export</li>
-          <li>Onboarding + monthly office-hours slot</li>
+          <li>Capability-progression tracking + GCAP-branded org tab + quarterly funder export</li>
+          <li>Guided kickoff + done-for-you cohort load, named contact, quarterly office hours</li>
         </ul>
       </div>
 
@@ -335,39 +428,67 @@
         <h4>Full license — day one</h4>
         <p class="subtitle">Best when the technology line is already approved</p>
         <div class="price">$36,000<span>/yr</span></div>
-        <p class="retail">Flat annual funded-team license (12 counselors) · Proposal Assist separate</p>
+        <p class="retail">12-counselor license at your $250/seat rate ($400 list) · Proposal Assist separate</p>
         <ul class="features">
           <li>Your counselor seats · ~1,000 managed client workspaces included</li>
           <li>Everything in the platform layer, live day one</li>
           <li>GCAP branding + quarterly funder report</li>
           <li>Named onboarding contact</li>
-          <li><strong>Multi-year (annual prepaid):</strong> 2-yr 8% off = <strong>$33,120/yr</strong> · 3-yr 12% off = <strong>$31,680/yr</strong></li>
+          <li><strong>After the 6-month review — optional multi-year lock-in savings:</strong> if you choose to commit for a longer run, 2-yr = 8% off (<strong>$33,120/yr</strong>) · 3-yr = 12% off (<strong>$31,680/yr</strong>). Never required — the default is a 6-month term with no annual lock.</li>
         </ul>
       </div>
     </div>
 
     <div class="option" style="margin-top:16px;border-style:dashed;">
       <h4>Optional add-on — Proposal Assist</h4>
-      <p class="subtitle">The one AI-drafting feature — metered so the flat license price never moves with usage</p>
+      <p class="subtitle">AI proposal drafting — a fixed monthly add-on, so the flat license price never moves</p>
       <ul class="features">
         <li>AI-assisted proposal drafting: compliance matrix, bid/no-bid gate, response drafts</li>
-        <li><strong>Metered credit-packs</strong> — a full proposal draft runs ~500 credits, so roughly <strong>$8–10 per proposal</strong> at pack rates ($15 / 800-credit pack up to $40 / 2,400-credit pack; larger packs lower the per-proposal cost). Buy only if/when counselors use it.</li>
-        <li>Or <strong>bring your own LLM key</strong> — counselors run it on their own tokens at <strong>$0 add-on</strong>.</li>
-        <li>Counselor tool only — buyable by the center for its counselors. Not part of the managed client workspaces.</li>
+        <li><strong>Included with every counselor seat</strong> — your counselors have Proposal Assist as part of their seat, at no extra charge, to help clients draft.</li>
+        <li><strong>For client workspaces: a $99/mo per-user add-on</strong>, purchased directly by the client who wants to draft on their own. Off by default; a client turns it on only if they want it. Not billed to GCAP.</li>
+        <li>Fixed monthly — no metering, no per-draft charges. A client can add or drop it any month.</li>
       </ul>
-      <p class="note">Carved out of the flat license on purpose: it's the only feature that consumes AI tokens, so metering it keeps your center license fixed and budgetable. Exact credits-per-draft confirmed against your proposal types at scoping.</p>
+      <p class="note">Kept out of the flat license on purpose: counselors are fully equipped, and a motivated client who wants to self-draft simply adds it for $99/mo on their own account — pure upside for the businesses you serve, with zero effect on GCAP's budget or price.</p>
     </div>
 
-    <p class="note" style="margin-top:14px;">Everything else is <strong>unlimited under the flat license</strong> — including your counselors running Mindy live in coaching sessions across all ~1,000 clients. Demos, opportunity scans, contractor lookups, and pipeline work don't meter and don't move the price. Only Proposal Assist (above) meters, because it's the one feature that consumes AI drafting tokens.</p>
+    <p class="note" style="margin-top:14px;">Everything your counselors do <strong>inside the Mindy platform is unlimited under the flat license</strong> — running Mindy live in coaching sessions across all ~1,000 clients, demos, opportunity scans, contractor lookups, capability searches, and pipeline work. None of it meters; none of it moves the price.</p>
 
-    <h3>Why this fits an SBDC / SBTDC budget</h3>
+    <h3>What's included — and the two things that aren't</h3>
+    <p class="body">
+      So there's no surprise at contracting, here is exactly where the flat license stops and the
+      two optional add-ons begin:
+    </p>
+    <div class="grid-2">
+      <div class="option" style="border-color:var(--green);background:#ecfdf5;">
+        <h4 style="color:var(--green);">✓ Included — unlimited</h4>
+        <ul class="features">
+          <li>Every in-platform tool: Today's Intel, forecasts, expiring contracts, teaming, market research</li>
+          <li>The full 317K-contractor database — profiles, lookups, and capability searches</li>
+          <li>Per-client workspaces, pipeline, capability-progression tracking</li>
+          <li>Org admin, GCAP-branded tab, quarterly funder export</li>
+          <li>Onboarding, named contact, support, quarterly office hours</li>
+        </ul>
+      </div>
+      <div class="option" style="border-style:dashed;">
+        <h4>✗ Not in the flat license — optional add-ons</h4>
+        <ul class="features">
+          <li><strong>Proposal Assist</strong> — the AI proposal-drafting feature. <strong>Included with every counselor seat.</strong> For client workspaces it's an optional <strong>$99/mo per-user add-on the client buys directly</strong> — off by default, never billed to GCAP.</li>
+          <li><strong>MCP / API credits</strong> — the programmatic credit system on our site (for connecting Mindy to outside AI tools) is a <strong>separate Pro-member product</strong>, sold as prepaid credit packs. The GCAP license is a seat license to work <em>inside</em> the platform; it does not include MCP/API credits. A counselor who wants the API channel buys credits like any Pro member.</li>
+        </ul>
+      </div>
+    </div>
+    <p class="note">Keeping both out of the flat license is exactly what lets the center price stay <strong>flat and budgetable</strong> — Proposal Assist is a simple $99/mo per-user add-on a client can turn on or off, and MCP/API credits are a separate Pro-member product. Neither ever changes what GCAP pays.</p>
+
+    <div class="page-break-before">
+    <h3>Why this fits your funder's budget</h3>
     <table>
       <tr><th>Funder need</th><th>How Mindy delivers</th></tr>
       <tr><td>Measurable client outcomes</td><td>Capability milestones + pursuits + awards, tracked per business, exported quarterly</td></tr>
       <tr><td>Hands-on federal BD capability</td><td>Live platform: SAM opportunities, forecasts, recompetes, teaming, 317K contractor database</td></tr>
-      <tr><td>Technology / platform line item</td><td>Flat annual funded-team license, <strong>$36K</strong> — one budgetable PO line, workspaces included, no caseload true-ups</td></tr>
+      <tr><td>Technology / platform line item</td><td>Flat funded-team license at the $36K/yr rate — billed as a 6-month initial term ($18K), one budgetable PO line, workspaces included, no caseload true-ups</td></tr>
       <tr><td>Counselor capacity as you grow to 12</td><td>One dashboard across all ~1,000 clients; new counselors onboard into the same system</td></tr>
     </table>
+    </div>
 
     <div class="cta">
       <h4>Next step</h4>
@@ -383,6 +504,23 @@
       <span>GovCon Giants · Mindy Federal Market Intelligence</span>
       <span>Proposal valid 90 days · Pricing for a single GCAP center; multi-site / network terms separate</span>
     </footer>
+    <p style="font-size:10px;color:#94a3b8;margin-top:12px;line-height:1.5;">
+      <strong>Terms &amp; scope.</strong> The Center License grants unlimited use of the Mindy platform <em>inside the application</em>
+      (getmindy.ai) for the licensed counselor seats and their managed client workspaces.
+      <strong>Term.</strong> Following the $0 30-day pilot, the initial commitment is a <strong>6-month term</strong> at the
+      $250/seat/mo rate, prepaid ($18,000 at 12 seats / $12,000 at 8). At month 6 the parties jointly review outcomes and
+      economics and continue by <strong>mutual written agreement</strong> — there is no automatic annual renewal or 12-month lock.
+      <strong>Termination for cause.</strong> Either party may terminate in writing for material non-performance or
+      non-delivery; the other party has <strong>30 days to cure</strong> after written notice, and if the default is not cured,
+      the agreement terminates with a <strong>pro-rata refund of any unused prepaid fees</strong>.
+      <strong>Not included in the license:</strong> (1) <strong>Proposal Assist</strong>, the AI proposal-drafting feature —
+      included with every counselor seat, and available to managed client workspaces only as an optional add-on the client
+      purchases directly at $99/mo per user (not billed to GCAP); and (2) <strong>MCP / API credits</strong> — the programmatic
+      credit system offered on our site is a separate Pro-member product sold as prepaid credit packs and is <em>not</em>
+      included in this seat license. In-application tool usage (including the contractor database and capability
+      searches) is unlimited and does not meter. Rate: $400/seat/mo list; $250/seat/mo at 8+ seats (volume &amp; public-sector).
+      Final terms set in the service agreement.
+    </p>
   </div>
   <p class="no-print" style="text-align:center;padding:16px;font-size:12px;color:#64748b;">
     Print to PDF: File → Print → Save as PDF (or open in Chrome and Ctrl+P)

@@ -13,9 +13,21 @@ metadata:
 - **GCAP's core value = "building capability"** — move a business from an opportunity → an honest assessment of its ability to win → close the gap. A **progression** model, not a lead firehose.
 - **Reporting is THE wedge:** "if Mindy produces the numbers you already have to report, it becomes the system that renews your funding, not just another tool." Progression milestones to track per business: SAM registration, certification (WOSB/HUBZone/8a), capability statement, first bid, first award.
 
-**Pricing (from locked ORG-ENTERPRISE-PRICING-MODEL.md §5):** GCAP = **Single band, $36,000/yr** (anchor: 12 counselors × mgmt power ≈ 1,000 workspaces × $2.50–3/mo, all converge ~$36K). Platform license EXCLUDES Proposal Assist (metered add-on). $0 **30-day** pilot is the land motion (shortened from 60d 2026-07-13 per Eric — 60d was too long a free runway; 30d still fits ~25-workspace onboarding + one funder-report cycle).
+> ## ⚡ 2026-07-14 UPDATE — FINAL send-ready model (SUPERSEDES the pricing/term/add-on lines below)
+> The GCAP proposal was substantially restructured 2026-07-14. Where this section conflicts with the list below, **the list wins.** The narrative facts above (8→12 counselors, ~1,000 businesses, SBTDC/SBA funder, capability-progression wedge) are unchanged.
+>
+> 1. **Per-seat pricing, NOT a flat number pulled from thin air.** List = **$400/seat/mo** (the honest admin-tier price — the org/admin layer costs more to build+maintain than the self-serve Coach add-on; matching Coach's price gave the expensive product away). Discounted rate = **$250/seat/mo at 8+ seats** (volume + **state-funded/PUBLIC-SECTOR** rate — SBDCs are state-run, NOT nonprofit). GCAP: 8 = **$24,000/yr**, 12 = **$36,000/yr** (shown as a discount off the $57,600 list). $36K survives as GCAP's number but is now a *derived* discounted price, not a floating anchor. **5-seat minimum**; under 8 = $400/seat.
+> 2. **TERM = 6-month initial, NO annual lock.** 3-stage: $0 30-day pilot → **6-month term** ($18K @ 12 / $12K @ 8, billed at $250/seat) → **month-6 joint economics review**, continue by mutual written agreement. Multi-year (2yr 8% / 3yr 12%) is now an OPTIONAL post-review lock-in, never required.
+> 3. **Mutual termination for cause:** either party, in writing, for material non-performance/non-delivery; **30-day cure**; **pro-rata refund of unused prepaid**.
+> 4. **Proposal Assist = FIXED $99/mo per-user add-on, NOT metered.** No credit-packs, no BYO-LLM (all that language removed). **Counselors get it INCLUDED with their seat**; **client workspaces don't have it by default — a client buys it directly at $99/mo/user** (client purchase, not billed to GCAP → add-on revenue outside the org license). NOTE: no fixed price was ever previously locked (this section + §4b said "metered/PENDING"); $99/mo/user is the 2026-07-14 decision of record.
+> 5. **MCP / API credits** explicitly excluded from the license (separate Pro-member prepaid-pack product). MCP is **LIVE in prod**, not a spike.
+> 6. **Recipient FILLED:** Jacquie Spearman (`jmspearm@ncsu.edu`), dated July 14, 2026. Send PDF = `docs/proposals/GCAP-Mindy-Proposal.pdf`.
+>
+> Full running log: [[project_gcap_proposal_sendready]] (memory).
 
-**Proposal doc:** `docs/proposals/GCAP-Mindy-Proposal.html` (built 2026-07-10, adapted from `USHCC-Atlanta-Mindy-Proposal.html`). Recipient name + date still `[fill]`. Lead option = $0 pilot → $36K two-step (mirrors USHCC's recommended path).
+**Pricing (ORIGINAL 2026-07-08 model — see the 2026-07-14 UPDATE above for the final version):** GCAP = **Single band, $36,000/yr** (anchor: 12 counselors × mgmt power ≈ 1,000 workspaces × $2.50–3/mo, all converge ~$36K). $0 **30-day** pilot is the land motion (shortened from 60d 2026-07-13 per Eric — 60d was too long a free runway; 30d still fits ~25-workspace onboarding + one funder-report cycle).
+
+**Proposal doc:** `docs/proposals/GCAP-Mindy-Proposal.html` (built 2026-07-10, adapted from `USHCC-Atlanta-Mindy-Proposal.html`).
 
 **Why:** GCAP validates or corrects the whole org pricing band when it closes — it's the first real deal. **How to apply:** never guess GCAP facts into a client-facing doc; the numbers above are confirmed, anything else is `[fill]`.
 
@@ -35,4 +47,4 @@ metadata:
 
 **Break-even at $500/hr = just 72 Eric-hours/yr (6 hrs/month). The moderate all-Eric estimate is 145 hrs = $72,500 = 2× the revenue.**
 
-**RULE for GCAP (and every future org): Eric LANDS + ONBOARDS it (worth it — flagship reference into the SBDC network), then RECURRING support MUST be delegated to a ~$50/hr team member/contractor.** The proposal promises "onboarding + monthly office-hours slot" — **that office-hours slot must NOT be run by Eric monthly** (make it quarterly, templated, or team-run) or it silently eats $6K+/yr of founder time. Do NOT price org #2/#3 assuming Eric delivers personally — the model proves it doesn't scale past one. Full margin numbers in [[project_gcap_proposal_sendready]].
+**RULE for GCAP (and every future org): Eric LANDS + ONBOARDS it (worth it — flagship reference into the SBDC network), then RECURRING support MUST be delegated to a ~$50/hr team member/contractor.** The proposal now promises **quarterly** office hours (fixed 2026-07-14 — was "monthly," which would have silently eaten $6K+/yr of founder time if Eric ran it) + email/ticket support + guided kickoff + done-for-you cohort load + named onboarding contact. **The recurring pieces (ticket support, quarterly office hours) MUST be team-run/templated, NOT Eric** — Eric's time is the kickoff/onboarding only. The **6-month term (2026-07-14)** further caps this risk: if the support economics don't work, the month-6 review is the exit — no locked year of delivery obligation. Do NOT price org #2/#3 assuming Eric delivers personally — the model proves it doesn't scale past one. Full margin numbers in [[project_gcap_proposal_sendready]].
