@@ -37,6 +37,7 @@ import { idvContracts } from './tools/idv-contracts';
 import { contractorAwardHistory } from './tools/contractor-award-history';
 import { assessMarketDepth } from './tools/market-depth';
 import { solicitationDocuments } from './tools/solicitation-documents';
+import { searchFederalEvents } from './tools/federal-events';
 
 const server = new McpServer({
   name: 'mindy-govcon',
@@ -535,11 +536,32 @@ server.registerTool(
   },
 );
 
+server.registerTool(
+  'search_federal_events',
+  {
+    title: 'Search Federal Events (industry days, matchmaking)',
+    description:
+      'Upcoming federal-contracting events for an agency — industry days, matchmaking, sources-sought, association ' +
+      'conferences. "Where do I show up to win this buyer?" Dated SAM.gov Special Notices (source="sam") + optional ' +
+      'web-discovered conferences (source="ai", verify before attending). grounded=false when none match.',
+    inputSchema: {
+      agency: z.string().describe('Agency name, e.g. "Department of Defense", "Navy", "GSA".'),
+      months_ahead: z.number().int().min(1).max(12).optional().describe('Look-ahead window in months (default 4).'),
+      include_ai_discovery: z.boolean().optional().describe('Also web-search for association conferences not in SAM (slower). Default false.'),
+      limit: z.number().int().min(1).max(100).optional().describe('Max SAM events (default 25).'),
+    },
+  },
+  async ({ agency, months_ahead, include_ai_discovery, limit }) => {
+    const result = await searchFederalEvents({ agency, months_ahead, include_ai_discovery, limit });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + keyword-coverage + idv-contracts + contractor-award-history + market-depth + solicitation-documents registered',
+    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + keyword-coverage + idv-contracts + contractor-award-history + market-depth + solicitation-documents + federal-events registered',
   );
 }
 

@@ -73,7 +73,7 @@ try {
   for (const t of [
     'get_pricing_intel', 'get_incumbent_financials', 'get_regulatory_demand',
     'get_keyword_coverage', 'search_idv_contracts', 'get_contractor_award_history', 'assess_market_depth',
-    'get_solicitation_documents',
+    'get_solicitation_documents', 'search_federal_events',
   ]) {
     if (!names.includes(t)) fail(`${t} not registered`);
   }
@@ -351,7 +351,19 @@ try {
     }
   }
 
-  console.error('\n✅ SMOKE PASSED — MCP transport + 18 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth, solicitation-documents) all live + honest');
+  // ── search_federal_events (sam_events + optional AI discovery) ─────────────
+  console.error('\n→ calling search_federal_events({ agency: "Department of Defense", months_ahead: 12 })');
+  const fe = await client.callTool({ name: 'search_federal_events', arguments: { agency: 'Department of Defense', months_ahead: 12 } });
+  const feS = fe.structuredContent;
+  if (!feS) fail('federal-events: no structuredContent');
+  if (!Array.isArray(feS.events)) fail('federal-events: events is not an array (shape contract broken)');
+  if (!['off', 'ran', 'unavailable'].includes(feS._meta?.ai_discovery)) fail(`federal-events: unexpected ai_discovery "${feS._meta?.ai_discovery}"`);
+  const fe0 = feS.events[0];
+  console.error(`✓ grounded=${feS._meta?.grounded} · degraded=${feS._meta?.degraded} · sam=${feS._meta?.sam_count} · ai=${feS._meta?.ai_count} · ai_discovery=${feS._meta?.ai_discovery}${fe0 ? ` · top=${String(fe0.title).slice(0,40)} (${fe0.source}, ${fe0.event_date}, office=${String(fe0.matched_office).slice(0,24)})` : ''}`);
+  if (feS._meta?.degraded) fail('federal-events: degraded=true (sam_events unreachable)');
+  if (!feS._meta?.grounded) console.error('⚠ federal-events: grounded=false for DoD in 12mo — NON-FATAL (this deployment\'s sam_events may be empty/stale)');
+
+  console.error('\n✅ SMOKE PASSED — MCP transport + 19 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth, solicitation-documents, federal-events) all live + honest');
   await client.close();
   process.exit(0);
 } catch (err) {
