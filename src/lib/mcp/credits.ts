@@ -73,7 +73,18 @@ export async function debitCredits(
   return { ok: Boolean(row?.ok), newBalance: Number(row?.new_balance ?? 0) };
 }
 
-export type CallStatus = 'success' | 'failed' | 'rejected_no_credits' | 'uncharged' | 'gated';
+export type CallStatus =
+  | 'success'
+  | 'failed'
+  | 'rejected_no_credits'
+  | 'uncharged'
+  | 'gated'
+  // Extraction guard (Layers A+B). Enforced blocks:
+  | 'requires_paid' // Layer A — free-only account hit a proprietary tool (blocked)
+  | 'throttled' // Layer B — per-account rolling cap exceeded (blocked)
+  // Log-only shadow rows (guard on, enforce off) — measure impact before enforcing:
+  | 'shadow_requires_paid'
+  | 'shadow_throttled';
 
 /** Append a call-log row (audit/analytics/abuse). Best-effort — never throws. */
 export async function logCall(entry: {

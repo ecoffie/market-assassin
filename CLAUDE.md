@@ -1639,6 +1639,18 @@ All of Phase 1 is merged to `main` + every migration run & verified live (PRs #1
 through **`runMeteredTool`**, NOT raw `runMcpTool`. Raw dispatch = tools run for free.
 Any new transport/entry point bills only if it goes through `runMeteredTool`.
 
+**Corpus extraction guard (Layers A+B, `src/lib/mcp/extraction-guard.ts`):** protects ONLY
+the proprietary tools (`PROPRIETARY_TOOLS` in `tool-registry.ts`: winning-playbook, podcast-
+lessons, sblo-contact, federal-osbp) from bulk export — the public-data wrappers stay ungated.
+Layer A = free signup credits can't buy proprietary calls (needs PAID standing: a ledger row
+with reason `stripe_topup`/`pro_monthly`/`admin_grant`). Layer B = per-account rolling caps
+(`MCP_PROPRIETARY_CAP_DAY`=40 / `_WEEK`=150). Wired in `runMeteredTool` right after the tier
+gate. **Both flag-gated + default OFF** (`MCP_EXTRACTION_GUARD`); with `MCP_EXTRACTION_ENFORCE`
+OFF it's **LOG-ONLY** (writes `shadow_requires_paid`/`shadow_throttled` call-log rows, call
+still runs) so you measure impact before enforcing. FAIL-OPEN: a guard-query error allows the
+call (never blocks a payer). No migration — `mcp_call_log.status` is unconstrained TEXT.
+Rollout: run log-only → read the shadow rows → set caps to the 99th pct of real use → enforce.
+
 **Key files:**
 | File | Role |
 |---|---|
