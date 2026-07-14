@@ -65,6 +65,13 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
   // phrase before "Start over" enables (GitHub/Stripe destructive-action convention).
   const [resetConfirmText, setResetConfirmText] = useState('');
   const RESET_CONFIRM_PHRASE = 'delete my profile';
+  // Change-email flow. Sends a verify link to the NEW address; the change only
+  // applies when that link is clicked (mandatory verify-click). 'sent' = the
+  // link is out and the current email keeps working until confirmed.
+  const [newEmail, setNewEmail] = useState('');
+  const [changeEmailStage, setChangeEmailStage] = useState<'idle' | 'sent'>('idle');
+  const [changeEmailBusy, setChangeEmailBusy] = useState(false);
+  const [changeEmailMsg, setChangeEmailMsg] = useState<{ text: string; kind: 'ok' | 'err' } | null>(null);
   // Unified "describe what you do → codes" box (the Market Research pattern):
   // one input → suggest NAICS + PSC together, tap to add. So users never have to
   // know which box (NAICS vs PSC) a thing goes in. The manual fields collapse
@@ -325,6 +332,43 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
       setSmsMsg('Could not turn off SMS.');
     } finally {
       setSmsBusy(false);
+    }
+  };
+
+  // Change email — sends a confirmation link to the NEW address. Nothing moves
+  // until that link is clicked (the /confirm route runs the actual re-key).
+  const requestEmailChange = async () => {
+    if (!email) return;
+    const target = newEmail.trim().toLowerCase();
+    if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(target)) {
+      setChangeEmailMsg({ text: 'Enter a valid email address.', kind: 'err' });
+      return;
+    }
+    if (target === email.toLowerCase()) {
+      setChangeEmailMsg({ text: 'That is already your email.', kind: 'err' });
+      return;
+    }
+    setChangeEmailBusy(true);
+    setChangeEmailMsg(null);
+    try {
+      const res = await authedFetch('/api/app/change-email/request', email, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, newEmail: target }),
+      });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok && data?.success) {
+        setChangeEmailStage('sent');
+        setChangeEmailMsg({ text: data.message || `Confirmation link sent to ${target}.`, kind: 'ok' });
+      } else if (data?.collision) {
+        setChangeEmailMsg({ text: data.error || 'That email already has a Mindy account. Contact support to merge them.', kind: 'err' });
+      } else {
+        setChangeEmailMsg({ text: data?.error || 'Could not start the email change. Please try again.', kind: 'err' });
+      }
+    } catch {
+      setChangeEmailMsg({ text: 'Could not start the email change. Please try again.', kind: 'err' });
+    } finally {
+      setChangeEmailBusy(false);
     }
   };
 
@@ -975,6 +1019,51 @@ export default function UnifiedSettingsPanel({ email, tier }: UnifiedSettingsPan
             <p className="text-sm text-muted">
               Your session is protected by a signed two-factor token and expires after 30 days.
             </p>
+          </div>
+
+          {/* Change email — moves the whole account (plan, saved work, settings)
+              to a new address. A confirmation link goes to the NEW email; nothing
+              changes until it's clicked, and the current email keeps working. */}
+          <div className="bg-ground border border-surface rounded-xl p-5">
+            <h2 className="font-semibold text-white mb-2">Change email</h2>
+            <p className="text-sm text-muted mb-3">
+              Your current email is <span className="text-white">{email}</span>. We&apos;ll send a
+              confirmation link to your new address — your plan and saved work move with you, and
+              your current email keeps working until you confirm.
+            </p>
+            {changeEmailStage === 'sent' ? (
+              <div className="text-sm text-emerald-400">
+                {changeEmailMsg?.text}
+                <button
+                  onClick={() => { setChangeEmailStage('idle'); setChangeEmailMsg(null); setNewEmail(''); }}
+                  className="ml-2 text-muted underline hover:text-white"
+                >
+                  Use a different email
+                </button>
+              </div>
+            ) : (
+              <div className="flex flex-col sm:flex-row gap-2">
+                <input
+                  type="email"
+                  value={newEmail}
+                  onChange={(e) => setNewEmail(e.target.value)}
+                  placeholder="new@email.com"
+                  className="flex-1 bg-surface border border-surface rounded-lg px-3 py-2 text-white text-sm placeholder:text-faint focus:outline-none focus:border-accent"
+                />
+                <button
+                  onClick={requestEmailChange}
+                  disabled={changeEmailBusy || !newEmail.trim()}
+                  className="bg-accent text-white text-sm font-semibold px-4 py-2 rounded-lg disabled:opacity-50 whitespace-nowrap"
+                >
+                  {changeEmailBusy ? 'Sending…' : 'Send confirmation'}
+                </button>
+              </div>
+            )}
+            {changeEmailStage === 'idle' && changeEmailMsg && (
+              <p className={`text-sm mt-2 ${changeEmailMsg.kind === 'err' ? 'text-red-400' : 'text-emerald-400'}`}>
+                {changeEmailMsg.text}
+              </p>
+            )}
           </div>
         </div>
       </div>
