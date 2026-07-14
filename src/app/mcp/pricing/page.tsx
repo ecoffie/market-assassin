@@ -123,10 +123,7 @@ export default function McpPricing() {
 
         {/* Hero */}
         <section className="mt-12 text-center">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-400/25 bg-emerald-400/10 px-3 py-1 text-[12px] font-semibold text-emerald-300">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400" /> {trial} free credits on your first connect — no card
-          </span>
-          <h1 className="mt-5 text-balance text-3xl font-bold tracking-tight sm:text-[2.6rem] sm:leading-[1.1]">Start free. Pay as you grow.</h1>
+          <h1 className="text-balance text-3xl font-bold tracking-tight sm:text-[2.6rem] sm:leading-[1.1]">Start free. Pay as you grow.</h1>
           <p className="mx-auto mt-4 max-w-2xl text-balance text-sm text-slate-400 sm:text-[15px]">
             Federal contracting intel for any AI agent. A one-time free trial, pay-as-you-go credits, or Pro — every tool is metered, so you pay per successful call and never for a miss. {tools.length ? `${tools.filter((t) => t.credits > 0).length} tools live today.` : 'Dozens of tools live today.'}
           </p>
@@ -145,77 +142,61 @@ export default function McpPricing() {
           </div>
         </div>
 
-        {/* Three tiers */}
-        <section className="mt-6 grid gap-4 lg:grid-cols-3">
-          {/* Free trial */}
-          <div className="flex flex-col rounded-2xl border border-white/10 bg-white/[0.02] p-6">
-            <div className="text-[12px] font-semibold uppercase tracking-wide text-slate-300">Free trial</div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="font-mono text-4xl font-bold tabular-nums">$0</span>
-              <span className="text-[13px] text-slate-500">one-time</span>
-            </div>
-            <div className="mt-1 text-[13px] text-slate-400">Kick the tires — no card needed.</div>
-            <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.02] p-3">
-              <div className="text-[12px] text-slate-400"><b className="font-mono text-[15px] tabular-nums text-slate-100">{trial}</b> signup credits get you</div>
-              <ul className="mt-1.5 space-y-0.5 text-[12px] text-slate-400">
-                {outcomes(trial).map((o) => <li key={o} className="tabular-nums">· {o}</li>)}
-              </ul>
-            </div>
-            <ul className="mt-5 flex-1 space-y-2 border-t border-white/[0.06] pt-5 text-[13px]">
-              <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span><b className="font-semibold">Public-data tools</b> — SAM, USASpending, EDGAR, GSA pricing, forecasts, recompetes, contractor scans</span></li>
-              <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span>Keyless connect — sign in through your browser</span></li>
-              <li className="flex gap-2 text-slate-500"><span>–</span> <span>Proprietary moat needs a credit pack</span></li>
-            </ul>
-            <a href="/app" className="mt-6 inline-flex items-center justify-center rounded-lg border border-white/15 px-4 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/5">Start free</a>
+        {/* Free trial — slim banner, no wasted column */}
+        <div className="mt-6 flex flex-col items-center justify-between gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.04] px-5 py-3.5 sm:flex-row">
+          <div className="text-center text-[13px] leading-relaxed text-slate-300 sm:text-left">
+            <b className="font-semibold text-emerald-200">Free trial</b> — <b className="font-mono tabular-nums text-emerald-100">{trial}</b> credits on your first connect, no card. Runs the public-data tools (SAM · USASpending · EDGAR · GSA · forecasts). <span className="text-slate-500">The moat unlocks with any pack.</span>
           </div>
+          <a href="/app" className="shrink-0 rounded-lg border border-emerald-400/30 px-4 py-2 text-[13px] font-semibold text-emerald-200 hover:bg-emerald-400/10">Start free →</a>
+        </div>
 
-          {/* Credits */}
-          <div className="relative flex flex-col rounded-2xl border border-emerald-400/40 bg-emerald-400/[0.05] p-6 shadow-[0_0_0_1px_rgba(16,185,129,0.15)]">
-            <span className="absolute -top-2.5 left-6 rounded-full bg-emerald-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#06120c]">Most popular</span>
-            <div className="text-[12px] font-semibold uppercase tracking-wide text-emerald-300">Credits</div>
-            <div className="mt-3 flex items-baseline gap-2">
-              <span className="font-mono text-4xl font-bold tabular-nums">from $5</span>
-              <span className="text-[13px] text-slate-500">pay-as-you-go</span>
+        {/* Paid options — $5 / $15 · $40 / $149 in a 2×2 */}
+        <section className="mt-4 grid gap-4 sm:grid-cols-2">
+          {packRows.map((p) => (
+            <div key={p.id} className={`relative flex flex-col rounded-2xl border p-6 ${p.highlight ? 'border-emerald-400/40 bg-emerald-400/[0.05] shadow-[0_0_0_1px_rgba(16,185,129,0.15)]' : 'border-white/10 bg-white/[0.02]'}`}>
+              {p.tag && <span className={`absolute -top-2.5 left-6 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${p.highlight ? 'bg-emerald-500 text-[#06120c]' : 'border border-white/15 bg-[#0a0f1e] text-slate-400'}`}>{p.tag}</span>}
+              <div className="flex items-baseline justify-between gap-2">
+                <span className="text-[12px] font-semibold uppercase tracking-wide text-emerald-300">{p.name}</span>
+                <span className="text-[11px] text-slate-500">one-time · prepaid</span>
+              </div>
+              <div className="mt-2 flex items-baseline gap-2">
+                <span className="font-mono text-4xl font-bold tabular-nums">{p.price}</span>
+                <span className="font-mono text-[15px] font-semibold tabular-nums text-emerald-100">{p.credits.toLocaleString()} cr</span>
+              </div>
+              <div className="mt-3 rounded-xl border border-emerald-400/15 bg-emerald-400/[0.04] p-3">
+                <div className="text-[12px] text-emerald-200/80">{p.credits.toLocaleString()} credits get you</div>
+                <ul className="mt-1.5 space-y-0.5 text-[12px] text-slate-300">
+                  {outcomes(p.credits).map((o) => <li key={o} className="tabular-nums">· {o}</li>)}
+                </ul>
+              </div>
+              <div className="mt-4 flex-1 border-t border-white/[0.06] pt-4 text-[12.5px] text-slate-400">
+                Every metered tool <b className="font-semibold text-slate-200">+ the proprietary moat</b> · charged on success only · credits never expire.
+              </div>
+              <a href="/app" className={`mt-5 inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold ${p.highlight ? 'bg-emerald-500 text-[#06120c] hover:bg-emerald-400' : 'border border-white/15 text-slate-200 hover:bg-white/5'}`}>Get {p.name}</a>
             </div>
-            <div className="mt-1 text-[13px] text-slate-400">Every tool, including the moat. No subscription.</div>
-            <div className="mt-4 rounded-xl border border-emerald-400/15 bg-emerald-400/[0.04] p-3 text-[12px] leading-relaxed text-slate-300">
-              <b className="font-semibold text-emerald-100">Three prepaid packs</b> from $5 to $40 — the bigger the pack, the more bonus credits. Pick your size below. ↓
-            </div>
-            <ul className="mt-5 flex-1 space-y-1.5 border-t border-emerald-400/15 pt-5 text-[13px]">
-              <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span>Everything in the trial, <b className="font-semibold">plus the proprietary moat:</b></span></li>
-              {MOAT_TOOLS.map((m) => (
-                <li key={m.label} className="flex items-start gap-2 pl-4">
-                  <span className="mt-px text-emerald-300">◆</span>
-                  <span><b className="font-semibold">{m.label}</b> <span className="text-slate-500">— {m.note}</span></span>
-                </li>
-              ))}
-              <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span>Charged on success only · credits never expire</span></li>
-            </ul>
-            <a href="#packs" className="mt-6 inline-flex items-center justify-center rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">See credit packs</a>
-          </div>
+          ))}
 
-          {/* Pro */}
+          {/* Pro — subscription (row 2, col 2) */}
           <div className="relative flex flex-col rounded-2xl border border-indigo-400/40 bg-indigo-400/[0.06] p-6">
             <span className="absolute -top-2.5 left-6 rounded-full bg-indigo-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Best for daily use</span>
-            <div className="text-[12px] font-semibold uppercase tracking-wide text-indigo-300">Pro</div>
-            <div className="mt-3 flex items-baseline gap-2">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-[12px] font-semibold uppercase tracking-wide text-indigo-300">Pro</span>
+              <span className="text-[11px] text-slate-500">subscription</span>
+            </div>
+            <div className="mt-2 flex items-baseline gap-2">
               {annual && <span className="font-mono text-xl font-semibold tabular-nums text-slate-500 line-through">${PRO_MONTHLY}</span>}
               <span className="font-mono text-4xl font-bold tabular-nums">${annual ? ANNUAL_PER_MO : PRO_MONTHLY}</span>
               <span className="text-[13px] text-slate-400">/mo</span>
             </div>
-            <div className="mt-1 h-4 text-[12px] text-emerald-300">
-              {annual ? `billed annually ($${PRO_ANNUAL.toLocaleString()}/yr) · save $${ANNUAL_SAVE}` : ''}
-            </div>
-            <div className="mt-1 text-[13px] text-slate-400">The whole platform, credits included.</div>
-            <div className="mt-4 rounded-xl border border-indigo-400/15 bg-indigo-400/[0.05] p-3">
-              <div className="text-[12px] text-indigo-200/80"><b className="font-mono text-[15px] tabular-nums text-indigo-100">{proCredits.toLocaleString()}</b> credits every month gets you</div>
+            <div className="mt-1 h-4 text-[12px] text-emerald-300">{annual ? `billed annually ($${PRO_ANNUAL.toLocaleString()}/yr) · save $${ANNUAL_SAVE}` : ''}</div>
+            <div className="mt-3 rounded-xl border border-indigo-400/15 bg-indigo-400/[0.05] p-3">
+              <div className="text-[12px] text-indigo-200/80"><b className="font-mono text-[14px] tabular-nums text-indigo-100">{proCredits.toLocaleString()}</b> credits every month get you</div>
               <ul className="mt-1.5 space-y-0.5 text-[12px] text-slate-300">
                 {outcomes(proCredits).map((o) => <li key={o} className="tabular-nums">· {o}</li>)}
               </ul>
             </div>
-            <ul className="mt-5 flex-1 space-y-1.5 border-t border-indigo-400/15 pt-5 text-[13px]">
-              <li className="flex gap-2"><span className="text-indigo-300">◆</span> <span>Everything credits unlock, <b className="font-semibold">included</b></span></li>
-              <li className="flex gap-2"><span className="text-indigo-300">◆</span> <span><b className="font-semibold">{proCredits.toLocaleString()} credits / month</b> <span className="text-slate-500">— renews automatically</span></span></li>
+            <ul className="mt-4 flex-1 space-y-1.5 border-t border-indigo-400/15 pt-4 text-[13px]">
+              <li className="flex gap-2"><span className="text-indigo-300">◆</span> <span>Everything the packs unlock, <b className="font-semibold">included</b> + a monthly allowance</span></li>
               {PRO_INCLUDES.map((u) => (
                 <li key={u.label} className="flex items-start gap-2">
                   <span className="mt-px text-indigo-300">◆</span>
@@ -226,13 +207,21 @@ export default function McpPricing() {
                 </li>
               ))}
             </ul>
-            <a href={proHref} className="mt-6 inline-flex items-center justify-center rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-400">Go Pro {annual ? 'annually' : 'monthly'}</a>
+            <a href={proHref} className="mt-5 inline-flex items-center justify-center rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-400">Go Pro {annual ? 'annually' : 'monthly'}</a>
             <div className="mt-2 h-4 text-center text-[11.5px] text-slate-500">{annual ? <><b className="font-semibold text-emerald-300">Save ${ANNUAL_SAVE}</b> compared to monthly</> : 'Switch to annual for 2 months free'}</div>
           </div>
         </section>
-        <p className="mx-auto mt-4 max-w-2xl text-center text-[12px] leading-relaxed text-slate-500">
-          The <b className="font-medium text-slate-300">moat</b> — winning playbook, curated contacts, podcast lessons, agency angles — is Mindy&apos;s un-copyable layer, included with <b className="font-medium text-slate-300">any credit pack</b>. The free trial runs the public-data tools. Every metered tool is charged on success only.
-        </p>
+
+        {/* Moat inclusion strip */}
+        <div className="mx-auto mt-4 max-w-3xl rounded-2xl border border-white/10 bg-white/[0.02] p-4 text-center">
+          <div className="text-[12px] font-medium uppercase tracking-wide text-slate-400">Every pack includes the proprietary moat</div>
+          <div className="mt-3 flex flex-wrap justify-center gap-2">
+            {MOAT_TOOLS.map((m) => (
+              <span key={m.label} title={m.note} className="rounded-full border border-emerald-400/20 bg-emerald-400/[0.05] px-3 py-1 text-[12px] text-emerald-100">{m.label}</span>
+            ))}
+          </div>
+          <p className="mx-auto mt-3 max-w-xl text-[11.5px] leading-relaxed text-slate-500">Mindy&apos;s un-copyable layer. The free trial runs public-data tools only; the moat unlocks with any pack. Every metered tool is charged on success.</p>
+        </div>
         <p className="mx-auto mt-2 max-w-2xl text-center text-[12px] leading-relaxed text-slate-500">
           A <span className="text-slate-400">work-up</span> ≈ search one opportunity, pull the incumbent&apos;s financials, run a who-can-win scan, and generate a win playbook (~{workupCost} credits). Bigger packs add bonus credits; lighter lookups cost far less.
         </p>
@@ -295,28 +284,6 @@ export default function McpPricing() {
                 )}
               </div>
             </div>
-          </div>
-        </section>
-
-        {/* Credit packs — one card per amount */}
-        <section id="packs" className="mt-16 scroll-mt-8">
-          <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">Credit packs</h2>
-          <p className="mx-auto mt-2 max-w-lg text-center text-[13px] text-slate-400">Prepaid, pay-as-you-go. Every pack unlocks the same metered tools — including the proprietary moat — and credits never expire.</p>
-          <div className="mx-auto mt-8 grid max-w-4xl gap-4 sm:grid-cols-3">
-            {packRows.map((p) => (
-              <div key={p.id} className={`relative flex flex-col items-center rounded-2xl border p-6 text-center ${p.highlight ? 'border-emerald-400/40 bg-emerald-400/[0.05] shadow-[0_0_0_1px_rgba(16,185,129,0.15)]' : 'border-white/10 bg-white/[0.02]'}`}>
-                {p.tag && <span className={`absolute -top-2.5 left-1/2 -translate-x-1/2 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${p.highlight ? 'bg-emerald-500 text-[#06120c]' : 'border border-white/15 bg-[#0a0f1e] text-slate-400'}`}>{p.tag}</span>}
-                <div className="text-[12px] font-semibold uppercase tracking-wide text-emerald-300">{p.name}</div>
-                <div className="mt-3 font-mono text-4xl font-bold tabular-nums text-slate-100">{p.price}</div>
-                <div className="text-[12px] text-slate-500">prepaid, one-time</div>
-                <div className="mt-4 w-full border-t border-white/[0.06] pt-4">
-                  <div className="font-mono text-xl font-semibold tabular-nums text-emerald-100">{p.credits.toLocaleString()}</div>
-                  <div className="text-[12px] text-slate-400">credits</div>
-                  <div className="mt-2 text-[13px] text-slate-300">≈ {workups(p.credits, workupCost)} opportunity work-ups</div>
-                </div>
-                <a href="/app" className={`mt-6 inline-flex w-full items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold ${p.highlight ? 'bg-emerald-500 text-[#06120c] hover:bg-emerald-400' : 'border border-white/15 text-slate-200 hover:bg-white/5'}`}>Get {p.name}</a>
-              </div>
-            ))}
           </div>
         </section>
 
