@@ -1,6 +1,17 @@
 # Org / Enterprise Pricing — Metering Model (canonical)
 
-**Status:** Model LOCKED 2026-07-08. Numbers = separate decision (see §5).
+> ## ⚡ 2026-07-14 — FIRST REAL DEAL (GCAP) DIVERGED FROM THIS MODEL — read before quoting
+> This doc is the 2026-07-08 *theoretical* model (flat scope-banded license, annual prepaid, Proposal Assist metered). The **GCAP proposal — the first real org deal — evolved past several of these assumptions** when it hit a live buyer. Where they conflict, **the GCAP proposal + [[project_gcap_proposal_sendready]] are the current source of truth for how we actually sell; this doc's *band anchors* ($36K Single / $75K Regional / $150K Statewide) still stand as scope anchors.** What changed:
+>
+> - **Per-seat, not a pure "flat scope band."** GCAP is priced **$400/seat list → $250/seat at 8+ seats** (volume + state-funded/public-sector rate). The $36K Single anchor survives, but as *12 seats × $250 × 12*, not an opaque flat number. §1/§3's "NOT per-seat" is superseded FOR THIS BUYER — the seat frame turned out to be what a funded SBDC's procurement understands. (Scope banding still governs Regional/Statewide.)
+> - **Term = 6-MONTH INITIAL, not annual-prepaid lock.** $0 30-day pilot → 6-month term → month-6 joint economics review → continue by mutual agreement. Multi-year is an OPTIONAL post-review concession. §1/§6's "annual prepaid" is superseded — a first-deal buyer (and Eric's own support-cost risk) both want the 6-month out. Pilot is **30-day**, not 60 (§2/§5 Pilot row stale).
+> - **Mutual termination for cause** (30-day cure, pro-rata refund) — new, wasn't in the model.
+> - **Proposal Assist = FIXED $99/mo per-user add-on, NOT metered/PENDING.** §4b's "metered credit-pack, credit price PENDING" and §5's client "$75/seat/mo member rate" are BOTH superseded: counselors get Proposal Assist included with their seat; clients optionally buy it at **$99/mo/user, direct** (no separate discounted client-platform SKU — that idea stays dropped per §4a). No BYO-LLM in client-facing terms.
+> - **MCP / API credits** are a separate live Pro-member prepaid-pack product, explicitly excluded from the org license (new carve-out; MCP is in prod).
+>
+> Net: the scope BANDS and the "flat, budgetable, institutional-SaaS" philosophy hold; the GCAP *mechanics* (per-seat rate card, 6-mo term, termination, $99 add-on) are the real-world refinement. Re-derive the model here once a second org closes and confirms the pattern.
+
+**Status:** Model LOCKED 2026-07-08 (theoretical). **First real deal (GCAP) refined it 2026-07-14 — see banner above.** Numbers = separate decision (see §5).
 **Supersedes the pricing structure scattered across:** `APEX-GROWTH-STRATEGY.md`,
 `PRD-apex-sbdc-funding-justification.md` §8, `USHCC-Atlanta-Mindy-Proposal.html`,
 `Association-Mindy-Proposal-Template.html`, `MI-SAAS-PRICING-STRATEGY.md`. Those had
@@ -118,10 +129,8 @@ a variable-cost metered layer, because Proposal Assist burns real LLM tokens and
   a distribution channel that drives discounted individual signups. (Channel/partner
   model — HubSpot Solutions Partners, Shopify Partners.)
 
-**Proposal Assist credit price = PENDING.** Must be `real per-proposal token cost ×
-margin`. Pull the actual cost from the Proposal Assist code/usage before setting it — do
-NOT guess (rule #1). Client discount rate (USHCC precedent = $75/seat/mo, half retail) is
-the reference for the client-side price; not yet locked.
+**Proposal Assist credit price = PENDING.** ⚠️ **SUPERSEDED 2026-07-14 (see top banner):** for GCAP this became a **FIXED $99/mo per-user add-on** (counselors included; clients buy direct), NOT a metered credit-pack. The "metered `real cost × margin`" model below was never adopted for the client-facing deal — keep only as the internal cost-justification, not the price. Client discount SKU ($75/seat/mo) also dropped — the client add-on is the $99 Proposal Assist, not a discounted platform seat.
+~~Must be `real per-proposal token cost × margin`. Pull the actual cost from the Proposal Assist code/usage before setting it. Client discount rate (USHCC precedent = $75/seat/mo, half retail) is the reference for the client-side price.~~
 
 ## 5. Numbers — the bands (SET 2026-07-08, updated 2026-07-09, list/offer prices)
 
@@ -150,7 +159,7 @@ clients lands in Regional, not Single.
 | Band | Annual (list) | What's included (platform layer — NO Proposal Assist) | Anchor logic |
 |---|---|---|---|
 | **Pilot** — 60-day eval | **$0** | 1 org_admin seat, ~20 client workspaces, branded Org Tab, core Mindy. MOU-closed. | Land motion; gov proves ROI before buying. |
-| **Single** — one center (~12 staff / ~1K clients) | **$36,000/yr** | 12 counselor seats, manage ~1,000 client workspaces, full intel/alerts/briefings/matching, white-label tab, quarterly report. | Convergence of seat-power / workspace / flat methods on the REAL center. ~1.7× the $21K seat floor. |
+| **Single** — one center (~12 staff / ~1K clients) | **$36,000/yr** *(GCAP: as $250/seat × 12 × 12; $24K at 8 seats — see banner)* | 12 counselor seats, manage ~1,000 client workspaces, full intel/alerts/briefings/matching, white-label tab, quarterly report. | Convergence of seat-power / workspace / flat methods on the REAL center. ~1.7× the $21K seat floor. GCAP quotes it per-seat ($400 list/$250 rate), billed as a 6-mo term. |
 | **Regional** — multi-site | **$75,000/yr** | Single × all sites + roll-up reporting + priority support + more counselor seats + higher workspace cap. | ~2× Single; multi-site = multi-license value. |
 | **Statewide / National** — state network or national HQ | **$150,000/yr** | Effectively uncapped seats/workspaces + named CSM + statewide roll-up. | ~2× Regional; matches the already-approved "$150K State Network" in `PRD-apex-sbdc-funding-justification.md` §8. |
 | **National HQ / custom** | **Contact Sales** | Negotiated national rollout. | Every enterprise ladder tops out in custom. |
