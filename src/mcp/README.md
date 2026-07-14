@@ -1,8 +1,15 @@
 # Mindy MCP Server
 
 Exposes Mindy's **GovCon intelligence** — proprietary teaching corpus + curated
-directories + live federal-data APIs — as **29 MCP tools** any MCP-capable agent
+directories + live federal-data APIs — as MCP tools any MCP-capable agent
 (Claude Desktop, Cursor, a customer's own agent) can call. Credit-metered, self-serve.
+
+**Tool count:** the hosted edge exposes **33 credit-metered tools** (+ the free
+`get_balance`). Of those, **29** are the purpose-built functions in `tools/*.ts`
+(registered on the stdio server too); the other **4** are the core public-data search
+tools (`search_sam_opportunities`, `get_market_vocabulary`, `get_contractor_profile`,
+`find_capable_contractors`) reused from Mindy's chat platform via the Tier-1/2 defs —
+hosted-edge only. Live catalog + prices: `GET /api/mcp/catalog`.
 
 **The thesis:** wrapping SAM/USASpending is the commodity layer any competitor can copy.
 The moat is what *no* public API has — 8 years of course + proposal + podcast content that
@@ -34,13 +41,13 @@ never dispatch a new entry point around the seam.
 
 | File | Purpose |
 |------|---------|
-| `tools/*.ts` | The 29 transport-agnostic tool functions (pure: no transport, no auth, no `console.log`). |
-| `server.ts` | stdio entrypoint — registers all 29 tools, speaks MCP over stdin/stdout. |
+| `tools/*.ts` | The 29 purpose-built transport-agnostic tool functions (pure: no transport, no auth, no `console.log`). |
+| `server.ts` | stdio entrypoint — registers those 29 tools, speaks MCP over stdin/stdout. |
 | `../lib/mcp/tool-registry.ts` | The catalog + dispatcher + `TOOL_CREDITS` (source of truth for the HTTP edge). |
 | `../../scripts/mcp-dev.mjs` | Launch runner — loads env, execs the server via `tsx`. |
 | `../../scripts/mcp-smoke.mjs` | End-to-end acceptance test — spawns the server, handshakes, calls every tool, asserts grounded + honest results. |
 
-## The tools (29)
+## The tools (33)
 
 Prices are in credits (debited **on success only**; repeat/cached reads are free). A first
 connect grants **100 free credits**. Live catalog + prices: `GET /api/mcp/catalog`.
@@ -52,7 +59,7 @@ connect grants **100 free credits**. Live catalog + prices: `GET /api/mcp/catalo
 
 **Competitive intel** — `get_contractor_profile` · `search_contractors` ·
 `find_capable_contractors` · `get_contractor_award_history` · `get_incumbent_financials`
-(SEC EDGAR) · `get_sblo_contact` · `lookup_sam_entity`
+(SEC EDGAR) · `get_pricing_intel` (GSA CALC) · `get_sblo_contact` · `lookup_sam_entity`
 
 **Agency & award intel** — `get_agency_intel` · `get_agency_spending_detail` ·
 `get_agency_budget_trends` · `get_award_detail` · `find_predecessor_award` ·
