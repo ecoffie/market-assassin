@@ -134,8 +134,11 @@ export default function McpPricing() {
           </p>
         </section>
 
-        {/* Billing toggle */}
-        <div className="mt-8 flex items-center justify-center">
+        {/* Billing toggle + plan-finder wayfinding */}
+        <div className="mt-8 flex flex-wrap items-center justify-center gap-3">
+          <a href="#find-plan" className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-[13px] font-medium text-slate-300 hover:border-white/20 hover:text-slate-100">
+            <span className="text-slate-500">⤳</span> Not sure which plan? <span className="rounded-full bg-indigo-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-indigo-300">Sizer</span>
+          </a>
           <div className="inline-flex items-center rounded-xl border border-white/10 bg-white/[0.03] p-1 text-[13px]">
             <button type="button" onClick={() => setAnnual(false)} className={`rounded-lg px-4 py-1.5 font-semibold transition ${!annual ? 'bg-white/[0.08] text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}>Monthly</button>
             <button type="button" onClick={() => setAnnual(true)} className={`flex items-center gap-2 rounded-lg px-4 py-1.5 font-semibold transition ${annual ? 'bg-white/[0.08] text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}>
@@ -201,11 +204,12 @@ export default function McpPricing() {
             <span className="absolute -top-2.5 left-6 rounded-full bg-indigo-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Best for daily use</span>
             <div className="text-[12px] font-semibold uppercase tracking-wide text-indigo-300">Pro</div>
             <div className="mt-3 flex items-baseline gap-2">
-              <span className="font-mono text-4xl font-bold tabular-nums">{proPrice}</span>
-              <span className="text-[13px] text-slate-400">{proUnit}</span>
+              {annual && <span className="font-mono text-xl font-semibold tabular-nums text-slate-500 line-through">${PRO_MONTHLY}</span>}
+              <span className="font-mono text-4xl font-bold tabular-nums">${annual ? ANNUAL_PER_MO : PRO_MONTHLY}</span>
+              <span className="text-[13px] text-slate-400">/mo</span>
             </div>
             <div className="mt-1 h-4 text-[12px] text-emerald-300">
-              {annual ? `≈ $${ANNUAL_PER_MO}/mo billed annually · save $${ANNUAL_SAVE}/yr` : ''}
+              {annual ? `billed annually ($${PRO_ANNUAL.toLocaleString()}/yr) · save $${ANNUAL_SAVE}` : ''}
             </div>
             <div className="mt-1 text-[13px] text-slate-400">The whole platform, credits included.</div>
             <div className="mt-4 rounded-xl border border-indigo-400/15 bg-indigo-400/[0.05] p-3">
@@ -228,6 +232,7 @@ export default function McpPricing() {
               ))}
             </ul>
             <a href={proHref} className="mt-6 inline-flex items-center justify-center rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-400">Go Pro {annual ? 'annually' : 'monthly'}</a>
+            <div className="mt-2 h-4 text-center text-[11.5px] text-slate-500">{annual ? <><b className="font-semibold text-emerald-300">Save ${ANNUAL_SAVE}</b> compared to monthly</> : 'Switch to annual for 2 months free'}</div>
           </div>
         </section>
         <p className="mx-auto mt-4 max-w-2xl text-center text-[12px] leading-relaxed text-slate-500">
@@ -235,7 +240,7 @@ export default function McpPricing() {
         </p>
 
         {/* Plan finder */}
-        <section className="mt-16">
+        <section id="find-plan" className="mt-16 scroll-mt-8">
           <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">Find your plan</h2>
           <p className="mx-auto mt-2 max-w-lg text-center text-[13px] text-slate-400">Tell us what your agent will do. We&apos;ll price it against the live catalog and point you at the right tier.</p>
           <div className="mx-auto mt-6 max-w-3xl overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02]">
