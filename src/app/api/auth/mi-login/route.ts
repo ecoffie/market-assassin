@@ -1,6 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createMIAuthSessionToken } from '@/lib/two-factor-session';
+import { hasProAccess } from '@/lib/access/resolve-access';
+import { sendTwoFactorCode } from '@/lib/mindy/two-factor-code';
+
+// Paid-MFA gate (P0). When ON, a PAID account that signs in with a password must
+// pass an email-OTP step before a session is minted (free accounts unaffected).
+// OAuth users satisfy MFA upstream at Google/Microsoft, so they never hit this
+// route. Default OFF (unset = off) → canary rollout. Fail-open: any error in the
+// paid check mints the session normally (never lock a paying user out).
+function mfaEnforcedForPaid(): boolean {
+  const v = (process.env.MFA_ENFORCED_PAID || '').trim().toLowerCase();
+  return ['on', 'true', '1', 'yes'].includes(v);
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _authSupabase: any = null;
@@ -103,6 +115,31 @@ export async function POST(request: NextRequest) {
         },
         { status: 401 }
       );
+    }
+
+    // PAID-MFA GATE. Password is verified at this point. If enforcement is on and
+    // this is a paid account, do NOT mint the session — issue an email OTP and tell
+    // the client to switch to the code step. mi-login already holds the verified
+    // password, so we send the code here (no need to re-send the password from the
+    // client). Fail-open: if the paid check throws, fall through and mint normally.
+    if (mfaEnforcedForPaid()) {
+      try {
+        if (await hasProAccess(email)) {
+          const sent = await sendTwoFactorCode(email, {
+            ip: request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || null,
+            userAgent: request.headers.get('user-agent'),
+          });
+          // Throttled = a code was already sent moments ago; still route to the code
+          // step (the user has a valid code in hand). Only a hard table/error failure
+          // falls open to a direct session, to avoid locking a paying user out.
+          if (sent.ok || sent.reason === 'throttled') {
+            return NextResponse.json({ success: true, mfaRequired: true, email });
+          }
+          console.error('[MI Login] OTP send failed, failing open to session:', sent);
+        }
+      } catch (err) {
+        console.error('[MI Login] paid-MFA check errored, failing open to session:', err);
+      }
     }
 
     const authenticatedAt = new Date().toISOString();

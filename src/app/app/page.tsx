@@ -629,6 +629,18 @@ function AppDashboard() {
       }
       setNeedsSetup(false);
 
+      // Paid-MFA gate: the server verified the password but requires a second
+      // factor for this paid account. It ALREADY emailed the code, so we just
+      // switch to the code step (no re-request → no double-send/throttle). The
+      // "Resend code" button reuses signInPassword if they need another.
+      if (data.mfaRequired) {
+        setPendingEmail(normalizedEmail);
+        setAuthStep('code');
+        setVerificationCode('');
+        setAuthMessage(`For your security, we sent a verification code to ${normalizedEmail}`);
+        return;
+      }
+
       if (typeof window !== 'undefined') {
         localStorage.setItem(MI_AUTH_TOKEN_KEY, data.sessionToken);
         localStorage.setItem('mi_beta_authenticated_at', data.authenticatedAt);

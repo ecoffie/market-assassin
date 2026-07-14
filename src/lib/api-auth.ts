@@ -30,6 +30,12 @@ export interface AuthResult {
   email: string | null;
   error?: string;
   method?: 'session' | 'token' | 'cookie';
+  // Populated only on the Supabase-session path (verifyUserSession). Lets a route
+  // tell an OAuth login (provider = 'google'|'azure'|'apple') from a password one
+  // (provider = 'email'), and read the assurance level. Used by the paid-MFA gate:
+  // an OAuth session already satisfied MFA upstream at Google/Microsoft.
+  provider?: string | null;   // app_metadata.provider
+  aal?: string | null;        // 'aal1' | 'aal2' from the session JWT, if present
 }
 
 export type MIAccessTier = 'free' | 'pro' | 'team' | 'enterprise' | 'none';
@@ -297,7 +303,15 @@ export async function verifyUserSession(request: NextRequest): Promise<AuthResul
       return { authenticated: false, email: null, error: 'Invalid or expired session' };
     }
 
-    return { authenticated: true, email: user.email.toLowerCase(), method: 'session' };
+    // Surface provider + AAL so the paid-MFA gate can distinguish an OAuth login
+    // (MFA already done upstream by Google/Microsoft) from a password login.
+    // app_metadata.provider is the primary provider; identities[] would hold all.
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const provider = ((user as any).app_metadata?.provider as string | undefined) ?? null;
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const aal = ((user as any).aal as string | undefined) ?? null;
+
+    return { authenticated: true, email: user.email.toLowerCase(), method: 'session', provider, aal };
   } catch {
     return { authenticated: false, email: null, error: 'Auth verification failed' };
   }
