@@ -11,7 +11,6 @@
  */
 
 import { kv } from '@vercel/kv';
-import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // ============================================
 // LRU Cache Implementation
@@ -193,20 +192,7 @@ const kvCircuitBreaker = new CircuitBreaker({
 // ============================================
 // Supabase Fallback Layer
 // ============================================
-
-let supabaseClient: SupabaseClient | null = null;
-
-function getSupabase(): SupabaseClient | null {
-  if (supabaseClient) return supabaseClient;
-
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !key) return null;
-
-  supabaseClient = createClient(url, key, { auth: { persistSession: false } });
-  return supabaseClient;
-}
+// (The Supabase access fallback is disabled — see getAccessFromSupabase below.)
 
 // Access entitlement types stored in Supabase
 interface UserAccessEntitlements {
@@ -222,47 +208,26 @@ interface UserAccessEntitlements {
 }
 
 /**
- * Get user access entitlements from Supabase
- * This is the source of truth for access control
+ * Supabase access fallback — DELIBERATELY DISABLED (always returns null).
+ *
+ * This backed the DR fallback for the six resilient access getters below (fired on
+ * a KV miss/failure). Its SELECT referenced FOUR columns that do not exist on
+ * user_profiles — `market_assassin_tier`, `market_assassin_expires`,
+ * `access_content_generator`, `access_oh_pro` (the real columns are `ma_tier`,
+ * `content_generator_access`, `access_hunter_pro`; there is no MA-expiry column).
+ * Postgres rejected the whole query with 42703 on EVERY KV miss — thousands of
+ * errors/day (the bulk of the project's Postgres error volume) — and the function
+ * returned null anyway. So KV has been the SOLE source of truth for access all along.
+ *
+ * We return null explicitly to stop the error storm while preserving that exact
+ * behavior (KV miss => no fallback grant). This is the "safe" fix (Eric, 2026-07-14).
+ *
+ * Restoring a REAL DR fallback is a separate, deliberate change: map to the correct
+ * columns AND reconcile KV vs user_profiles first, because a working fallback would
+ * start granting access from user_profiles on every KV miss across all six types.
  */
-async function getAccessFromSupabase(email: string): Promise<UserAccessEntitlements | null> {
-  const supabase = getSupabase();
-  if (!supabase) return null;
-
-  try {
-    const { data, error } = await supabase
-      .from('user_profiles')
-      .select(`
-        email,
-        market_assassin_tier,
-        market_assassin_expires,
-        access_content_generator,
-        access_contractor_db,
-        access_recompete,
-        access_briefings,
-        briefings_expires_at,
-        access_oh_pro
-      `)
-      .eq('email', email.toLowerCase())
-      .maybeSingle();
-
-    if (error || !data) return null;
-
-    return {
-      email: data.email,
-      market_assassin_tier: data.market_assassin_tier,
-      market_assassin_expires: data.market_assassin_expires,
-      content_generator_access: data.access_content_generator,
-      contractor_db_access: data.access_contractor_db,
-      recompete_access: data.access_recompete,
-      briefings_access: data.access_briefings,
-      briefings_expires_at: data.briefings_expires_at,
-      oh_pro_access: data.access_oh_pro,
-    };
-  } catch (error) {
-    console.warn('[Supabase Fallback] Failed to get access:', error);
-    return null;
-  }
+async function getAccessFromSupabase(_email: string): Promise<UserAccessEntitlements | null> {
+  return null;
 }
 
 // ============================================
