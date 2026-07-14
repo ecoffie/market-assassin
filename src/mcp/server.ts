@@ -45,6 +45,8 @@ import { searchAgencyOppsByOffice } from './tools/agency-opps-by-office';
 import { getSbloContact } from './tools/sblo-contact';
 import { searchFederalContacts } from './tools/federal-contacts';
 import { searchPodcastLessons } from './tools/podcast-lessons';
+import { getAgencyBudgetTrends } from './tools/agency-budget-trends';
+import { deriveCompanyKeywords } from './tools/company-keywords';
 
 const server = new McpServer({
   name: 'mindy-govcon',
@@ -730,11 +732,55 @@ server.registerTool(
   },
 );
 
+server.registerTool(
+  'get_agency_budget_trends',
+  {
+    title: 'Get Agency Budget Trends (OMB/CBJ)',
+    description:
+      "An agency's discretionary budget authority + the FY2025→FY2026 trend (growing / cut / stable) — where the money " +
+      'is moving BEFORE it becomes awards. Pass an agency name or abbreviation ("VA", "Department of Defense", "NASA", ' +
+      '"EPA"). Returns FY25 (enacted) + FY26 (President\'s request) budget authority, $ + % change, and the trend. ' +
+      'DISCRETIONARY budget authority only (not total obligations); FY26 is a request, not enacted. grounded=false = ' +
+      'agency not in the 47-agency toptier set — do NOT invent a number.',
+    inputSchema: {
+      agency: z.string().describe('Agency name or abbreviation, e.g. "VA", "Department of Defense", "NASA".'),
+    },
+  },
+  async ({ agency }) => {
+    const result = getAgencyBudgetTrends({ agency });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'derive_company_keywords',
+  {
+    title: 'Derive Company Keywords (semantic)',
+    description:
+      "Turn a company's OWN words (what they do + past performance) into the search keywords buyers actually use, ranked " +
+      'by MEANING. NAICS is the wrong discovery key; a company\'s real vocabulary finds the market its codes miss. Pass a ' +
+      'description and/or past-performance scope descriptions (the richest signal). Returns ranked keywords to feed an ' +
+      'opportunity search. Semantic embeddings (no BigQuery); fails soft to lexical order if embeddings are down ' +
+      '(_meta.ranked). grounded=false = not enough input text — do NOT invent keywords.',
+    inputSchema: {
+      description: z.string().optional().describe('What the company does — one-liner / pitch / capability summary.'),
+      past_performance: z.array(z.string()).optional().describe('Past-performance scope descriptions (richest signal).'),
+      capabilities: z.array(z.string()).optional().describe('Capability / service descriptions.'),
+      code_titles: z.array(z.string()).optional().describe('NAICS/PSC title text the caller already knows (optional).'),
+      limit: z.number().int().min(1).max(25).optional().describe('Max keywords (default 12).'),
+    },
+  },
+  async ({ description, past_performance, capabilities, code_titles, limit }) => {
+    const result = await deriveCompanyKeywords({ description, past_performance, capabilities, code_titles, limit });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + keyword-coverage + idv-contracts + contractor-award-history + market-depth + solicitation-documents + federal-events + scan-compliance + bid-decision + federal-osbp + agency-opps-by-office + sblo-contact + federal-contacts + podcast-lessons registered',
+    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + keyword-coverage + idv-contracts + contractor-award-history + market-depth + solicitation-documents + federal-events + scan-compliance + bid-decision + federal-osbp + agency-opps-by-office + sblo-contact + federal-contacts + podcast-lessons + agency-budget-trends + company-keywords registered',
   );
 }
 

@@ -77,6 +77,7 @@ try {
     'scan_proposal_compliance', 'evaluate_bid_decision',
     'lookup_federal_osbp', 'search_agency_opps_by_office',
     'get_sblo_contact', 'search_federal_contacts', 'search_podcast_lessons',
+    'get_agency_budget_trends', 'derive_company_keywords',
   ]) {
     if (!names.includes(t)) fail(`${t} not registered`);
   }
@@ -484,7 +485,37 @@ try {
   if (plMiss.structuredContent?._meta?.grounded !== false) fail('podcast-lessons: no-match query should be grounded=false (no invented lesson)');
   console.error('✓ honest miss: no-match query → grounded=false');
 
-  console.error('\n✅ SMOKE PASSED — MCP transport + 26 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth, solicitation-documents, federal-events, scan-compliance, bid-decision, federal-osbp, agency-opps-by-office, sblo-contact, federal-contacts, podcast-lessons) all live + honest');
+  // ── get_agency_budget_trends (curated OMB/CBJ JSON) ────────────────────────
+  console.error('\n→ calling get_agency_budget_trends({ agency: "NASA" })');
+  const bt = await client.callTool({ name: 'get_agency_budget_trends', arguments: { agency: 'NASA' } });
+  const btS = bt.structuredContent;
+  if (!btS) fail('budget-trends: no structuredContent');
+  if (!btS._meta?.grounded || !btS.agency) fail('budget-trends: NASA (acronym) should resolve to a grounded agency');
+  if (typeof btS.fy2026_budget_authority !== 'number') fail('budget-trends: expected an FY2026 budget-authority number');
+  console.error(`✓ grounded=${btS._meta.grounded} · match=${btS._meta.match_type} · ${btS.agency} · FY26=${btS.fy2026_budget_authority} · trend=${btS.trend}`);
+  const btMiss = await client.callTool({ name: 'get_agency_budget_trends', arguments: { agency: 'Zzz Fake Agency' } });
+  if (btMiss.structuredContent?._meta?.grounded !== false) fail('budget-trends: unknown agency should be grounded=false (no invented number)');
+  console.error('✓ honest miss: unknown agency → grounded=false');
+
+  // ── derive_company_keywords (semantic, no BigQuery) ────────────────────────
+  console.error('\n→ calling derive_company_keywords({ drone-imaging description + past perf })');
+  const ck = await client.callTool({
+    name: 'derive_company_keywords',
+    arguments: {
+      description: 'We provide UAS/drone-based aerial imaging, LiDAR survey, and photogrammetry for coastal infrastructure inspection.',
+      past_performance: ['Drone-based bridge inspection and 3D point-cloud mapping for a USACE levee system.', 'LiDAR shoreline survey and orthomosaic generation for a Navy waterfront facility.'],
+      limit: 10,
+    },
+  });
+  const ckS = ck.structuredContent;
+  if (!ckS) fail('company-keywords: no structuredContent');
+  if (!ckS._meta?.grounded || !Array.isArray(ckS.keywords) || ckS.keywords.length === 0) fail('company-keywords: expected grounded keywords from a rich description');
+  console.error(`✓ grounded=${ckS._meta.grounded} · ranked=${ckS._meta.ranked} · count=${ckS._meta.keyword_count} · e.g. ${ckS.keywords.slice(0, 4).join(', ')}`);
+  const ckMiss = await client.callTool({ name: 'derive_company_keywords', arguments: { description: '' } });
+  if (ckMiss.structuredContent?._meta?.grounded !== false) fail('company-keywords: empty input should be grounded=false (no invented keywords)');
+  console.error('✓ honest miss: empty input → grounded=false');
+
+  console.error('\n✅ SMOKE PASSED — MCP transport + 28 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth, solicitation-documents, federal-events, scan-compliance, bid-decision, federal-osbp, agency-opps-by-office, sblo-contact, federal-contacts, podcast-lessons, agency-budget-trends, company-keywords) all live + honest');
   await client.close();
   process.exit(0);
 } catch (err) {

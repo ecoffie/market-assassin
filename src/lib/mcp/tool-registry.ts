@@ -45,6 +45,8 @@ import { searchAgencyOppsByOffice } from '@/mcp/tools/agency-opps-by-office';
 import { getSbloContact } from '@/mcp/tools/sblo-contact';
 import { searchFederalContacts } from '@/mcp/tools/federal-contacts';
 import { searchPodcastLessons } from '@/mcp/tools/podcast-lessons';
+import { getAgencyBudgetTrends } from '@/mcp/tools/agency-budget-trends';
+import { deriveCompanyKeywords } from '@/mcp/tools/company-keywords';
 import { getBalance } from '@/lib/mcp/credits';
 import { tierFor } from '@/lib/mcp/entitlements';
 
@@ -92,6 +94,8 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   get_sblo_contact: 1, // curated SBLO roster + prime DB (static, no LLM/IO)
   search_federal_contacts: 2, // DoDAAC-anchored buying-office roster (Supabase read + decode)
   search_podcast_lessons: 1, // proprietary podcast corpus (Supabase keyword search)
+  get_agency_budget_trends: 1, // curated OMB/CBJ budget-authority JSON (static, no LLM/IO)
+  derive_company_keywords: 1, // OpenAI-embedding keyword derivation (no BigQuery)
   get_balance: 0, // meta tool — always free
 };
 
@@ -712,6 +716,48 @@ const PODCAST_LESSONS_TOOL_DEF = {
   },
 };
 
+const AGENCY_BUDGET_TRENDS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_agency_budget_trends',
+    description:
+      "An agency's discretionary budget authority and the FY2025→FY2026 trend (growing / cut / stable) — where the " +
+      'money is moving BEFORE it becomes awards. Pass an agency name or abbreviation ("VA", "Department of Defense", ' +
+      '"NASA", "EPA"). Returns FY25 (enacted) + FY26 (President\'s request) budget authority, the $ + % change, and the ' +
+      'trend. Figures are DISCRETIONARY budget authority only (not total obligations); FY26 is a request, not enacted. ' +
+      'grounded=false = agency not in the 47-agency toptier set — do NOT invent a number.',
+    parameters: {
+      type: 'object',
+      properties: {
+        agency: { type: 'string', description: 'Agency name or abbreviation, e.g. "VA", "Department of Defense", "NASA".' },
+      },
+      required: ['agency'],
+    },
+  },
+};
+const COMPANY_KEYWORDS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'derive_company_keywords',
+    description:
+      "Turn a company's OWN words (what they do + past performance) into the search keywords buyers actually use, " +
+      'ranked by MEANING. NAICS is the wrong discovery key; a company\'s real vocabulary finds the market its codes miss. ' +
+      'Pass a description and/or past-performance scope descriptions (the richest signal). Returns ranked keywords to ' +
+      'feed an opportunity search. Uses semantic embeddings (no BigQuery); fails soft to lexical order if embeddings are ' +
+      'down (_meta.ranked says which). grounded=false = not enough input text — do NOT invent keywords.',
+    parameters: {
+      type: 'object',
+      properties: {
+        description: { type: 'string', description: 'What the company does — one-liner / pitch / capability summary.' },
+        past_performance: { type: 'array', items: { type: 'string' }, description: 'Past-performance scope descriptions (richest signal).' },
+        capabilities: { type: 'array', items: { type: 'string' }, description: 'Capability / service descriptions.' },
+        code_titles: { type: 'array', items: { type: 'string' }, description: 'NAICS/PSC title text the caller already knows (optional).' },
+        limit: { type: 'number', description: 'Max keywords (default 12, max 25).' },
+      },
+    },
+  },
+};
+
 /** All tools exposed over MCP in v1, each annotated with its credit price. */
 export function listMcpTools(): Array<Record<string, unknown>> {
   const defs = [
@@ -743,6 +789,8 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     SBLO_CONTACT_TOOL_DEF,
     FEDERAL_CONTACTS_TOOL_DEF,
     PODCAST_LESSONS_TOOL_DEF,
+    AGENCY_BUDGET_TRENDS_TOOL_DEF,
+    COMPANY_KEYWORDS_TOOL_DEF,
     GET_BALANCE_TOOL_DEF,
   ];
   return defs.map((d) => ({ ...d, _credits: TOOL_CREDITS[d.function.name] ?? 0, _tier: tierFor(d.function.name) }));
@@ -779,6 +827,8 @@ export function isMcpTool(name: string): boolean {
     name === 'get_sblo_contact' ||
     name === 'search_federal_contacts' ||
     name === 'search_podcast_lessons' ||
+    name === 'get_agency_budget_trends' ||
+    name === 'derive_company_keywords' ||
     name === 'get_balance'
   );
 }
@@ -1076,6 +1126,24 @@ export async function runMcpTool(
   if (name === 'search_podcast_lessons') {
     const result = (await searchPodcastLessons({
       query: typeof args.query === 'string' ? args.query : '',
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_agency_budget_trends') {
+    const result = getAgencyBudgetTrends({
+      agency: typeof args.agency === 'string' ? args.agency : '',
+    }) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'derive_company_keywords') {
+    const result = (await deriveCompanyKeywords({
+      description: typeof args.description === 'string' ? args.description : undefined,
+      past_performance: Array.isArray(args.past_performance) ? (args.past_performance as string[]) : undefined,
+      capabilities: Array.isArray(args.capabilities) ? (args.capabilities as string[]) : undefined,
+      code_titles: Array.isArray(args.code_titles) ? (args.code_titles as string[]) : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
