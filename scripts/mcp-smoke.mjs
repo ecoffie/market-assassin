@@ -281,7 +281,21 @@ try {
   if (ecS._meta?.degraded) fail('expiring-contracts: degraded=true (Supabase recompete_opportunities unreachable)');
   if (!ecS._meta?.grounded) console.error('⚠ expiring-contracts: grounded=false for NAICS 541 in 24mo — NON-FATAL (may be a genuinely thin window)');
 
-  console.error('\n✅ SMOKE PASSED — MCP transport + 13 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts) all live + honest');
+  // ── get_agency_spending_detail (USASpending components + set-asides) ───────
+  console.error('\n→ calling get_agency_spending_detail({ agency: "Department of Defense" })');
+  const asd = await client.callTool({ name: 'get_agency_spending_detail', arguments: { agency: 'Department of Defense' } });
+  const asdS = asd.structuredContent;
+  if (!asdS) fail('agency-spending-detail: no structuredContent');
+  if (asdS._meta?.degraded) fail('agency-spending-detail: degraded=true (USASpending unreachable)');
+  if (!asdS._meta?.grounded) fail('agency-spending-detail: DoD should be grounded (USASpending has DoD contract obligations)');
+  if (!Array.isArray(asdS.sub_agencies) || asdS.sub_agencies.length < 3) fail('agency-spending-detail: DoD should split into multiple components (Army/Navy/AF…)');
+  if (!Array.isArray(asdS.set_aside_breakdown) || asdS.set_aside_breakdown.length !== 5) fail('agency-spending-detail: expected 5 set-aside buckets');
+  console.error(`✓ grounded=${asdS._meta.grounded} · ${asdS.agency} FY${asdS.fiscal_year} · total=$${(asdS.total_obligated/1e9).toFixed(0)}B · SB share=${asdS.small_business_share}% · top component=${asdS.sub_agencies[0]?.name} (${asdS.sub_agencies[0]?.pct_of_total}%)`);
+  const asdMiss = await client.callTool({ name: 'get_agency_spending_detail', arguments: { agency: 'Zzz Fake Agency' } });
+  if (asdMiss.structuredContent?._meta?.grounded !== false) fail('agency-spending-detail: unknown agency should be grounded=false (no invented figures)');
+  console.error('✓ honest miss: unknown agency → grounded=false');
+
+  console.error('\n✅ SMOKE PASSED — MCP transport + 14 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, agency-spending-detail) all live + honest');
   await client.close();
   process.exit(0);
 } catch (err) {

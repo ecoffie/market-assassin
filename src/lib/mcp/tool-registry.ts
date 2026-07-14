@@ -32,6 +32,7 @@ import { grantsSearch } from '@/mcp/tools/grants';
 import { agencyForecasts } from '@/mcp/tools/forecasts';
 import { sbirSearch } from '@/mcp/tools/sbir';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
+import { getAgencySpendingDetailTool } from '@/mcp/tools/agency-spending-detail';
 import { getBalance } from '@/lib/mcp/credits';
 import { tierFor } from '@/lib/mcp/entitlements';
 
@@ -66,6 +67,7 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   get_agency_forecasts: 1, // Supabase agency_forecasts read
   search_sbir: 1, // NIH RePORTER + multisite aggregate
   get_expiring_contracts: 1, // Supabase recompete_opportunities read
+  get_agency_spending_detail: 2, // multiple USASpending aggregates (total + subagency + set-aside buckets)
   get_balance: 0, // meta tool — always free
 };
 
@@ -367,6 +369,28 @@ const EXPIRING_CONTRACTS_TOOL_DEF = {
   },
 };
 
+const AGENCY_SPENDING_DETAIL_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_agency_spending_detail',
+    description:
+      '"Who inside this department buys, and can a small business win here." Complements get_agency_intel with the ' +
+      'sub-agency (component) spending breakdown + the set-aside distribution (Small Business / 8(a) / SDVOSB / WOSB / ' +
+      'HUBZone shares + overall small-business share) — the small-business easy-entry read. Live USASpending contract ' +
+      'obligations (award types A/B/C/D) for a fiscal year. Pass an agency name/abbreviation. grounded=false = no ' +
+      'toptier agency matched (do NOT invent figures); degraded=true = USASpending errored (not $0). Contract ' +
+      'obligations only, NOT total agency budget.',
+    parameters: {
+      type: 'object',
+      properties: {
+        agency: { type: 'string', description: 'Agency name or abbreviation, e.g. "Department of Defense", "VA", "NASA".' },
+        fiscal_year: { type: 'number', description: 'Fiscal year (defaults to the latest complete FY).' },
+      },
+      required: ['agency'],
+    },
+  },
+};
+
 /** All tools exposed over MCP in v1, each annotated with its credit price. */
 export function listMcpTools(): Array<Record<string, unknown>> {
   const defs = [
@@ -385,6 +409,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     FORECASTS_TOOL_DEF,
     SBIR_TOOL_DEF,
     EXPIRING_CONTRACTS_TOOL_DEF,
+    AGENCY_SPENDING_DETAIL_TOOL_DEF,
     GET_BALANCE_TOOL_DEF,
   ];
   return defs.map((d) => ({ ...d, _credits: TOOL_CREDITS[d.function.name] ?? 0, _tier: tierFor(d.function.name) }));
@@ -408,6 +433,7 @@ export function isMcpTool(name: string): boolean {
     name === 'get_agency_forecasts' ||
     name === 'search_sbir' ||
     name === 'get_expiring_contracts' ||
+    name === 'get_agency_spending_detail' ||
     name === 'get_balance'
   );
 }
@@ -581,6 +607,14 @@ export async function runMcpTool(
       max_value: typeof args.max_value === 'number' ? args.max_value : undefined,
       likelihood: args.likelihood === 'high' || args.likelihood === 'medium' || args.likelihood === 'low' ? args.likelihood : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_agency_spending_detail') {
+    const result = (await getAgencySpendingDetailTool({
+      agency: typeof args.agency === 'string' ? args.agency : '',
+      fiscal_year: typeof args.fiscal_year === 'number' ? args.fiscal_year : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }

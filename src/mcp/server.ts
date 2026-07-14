@@ -32,6 +32,7 @@ import { grantsSearch } from './tools/grants';
 import { agencyForecasts } from './tools/forecasts';
 import { sbirSearch } from './tools/sbir';
 import { expiringContracts } from './tools/expiring-contracts';
+import { getAgencySpendingDetailTool } from './tools/agency-spending-detail';
 
 const server = new McpServer({
   name: 'mindy-govcon',
@@ -423,11 +424,32 @@ server.registerTool(
   },
 );
 
+server.registerTool(
+  'get_agency_spending_detail',
+  {
+    title: 'Get Agency Spending Detail (components + set-asides)',
+    description:
+      '"Who inside this department buys, and can a small business win here." Complements get_agency_intel with the ' +
+      'sub-agency (component) spending breakdown + the set-aside distribution (Small Business / 8(a) / SDVOSB / WOSB / ' +
+      'HUBZone shares + overall small-business share) — the small-business easy-entry read. Live USASpending contract ' +
+      'obligations (award types A/B/C/D) for a fiscal year. grounded=false = no toptier agency matched; degraded=true = ' +
+      'USASpending errored (not $0). Contract obligations only, NOT total agency budget.',
+    inputSchema: {
+      agency: z.string().describe('Agency name or abbreviation, e.g. "Department of Defense", "VA", "NASA".'),
+      fiscal_year: z.number().int().optional().describe('Fiscal year (defaults to the latest complete FY).'),
+    },
+  },
+  async ({ agency, fiscal_year }) => {
+    const result = await getAgencySpendingDetailTool({ agency, fiscal_year });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts registered',
+    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + agency-spending-detail registered',
   );
 }
 
