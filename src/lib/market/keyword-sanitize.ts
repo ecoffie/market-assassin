@@ -198,14 +198,38 @@ export function isSearchableKeyword(term: string): boolean {
 }
 
 /**
+ * Collapse a phrase's REPEATED words: "janitorial services janitorial" →
+ * "janitorial services", "custodial janitorial janitorial" → "custodial
+ * janitorial". The semantic candidate-phrase builder stitches adjacent tokens and
+ * occasionally emits the same word twice; no real federal keyword phrase repeats a
+ * word, so drop the later occurrences (keep first, preserve order + original
+ * casing). Single words pass through untouched. Applied in sanitizeKeywords so the
+ * later dedup collapses the now-identical phrases into one. (Eric, Jul 14 2026 —
+ * caught the redundant janitorial phrases in the CapabilityNudge output.)
+ */
+function collapseRepeatedWords(term: string): string {
+  if (!term.includes(' ')) return term;
+  const seen = new Set<string>();
+  const kept: string[] = [];
+  for (const w of term.split(/\s+/)) {
+    const k = w.toLowerCase();
+    if (!w || seen.has(k)) continue;
+    seen.add(k);
+    kept.push(w);
+  }
+  return kept.join(' ');
+}
+
+/**
  * Filter a list of keywords to the ones safe to inject into a text search —
- * drops short/ambiguous abbreviations and stopwords that would yield noise.
+ * drops short/ambiguous abbreviations and stopwords that would yield noise, and
+ * collapses within-phrase repeated words before de-duplicating.
  */
 export function sanitizeKeywords(keywords: (string | null | undefined)[]): string[] {
   const out: string[] = [];
   const seen = new Set<string>();
   for (const raw of keywords) {
-    const t = (raw || '').trim();
+    const t = collapseRepeatedWords((raw || '').trim());
     if (!t || !isSearchableKeyword(t)) continue;
     const key = t.toLowerCase();
     if (seen.has(key)) continue;

@@ -49,7 +49,7 @@ export async function generateSetupLink(email: string, redirectTo: string): Prom
   throw new Error(recovery.error?.message || invite.error?.message || 'Unable to generate setup link');
 }
 
-// Mindy brand palette (matches the "M" mark #8b3cf6 + the other Mindy emails):
+// Mindy brand palette (matches the "M" mark #5928c2 + the other Mindy emails):
 // Navy #1e3a8a → Purple #7c3aed gradient, purple #7c3aed accents, blue→purple CTA.
 export function buildSetupEmailHtml(setupUrl: string): string {
   return `

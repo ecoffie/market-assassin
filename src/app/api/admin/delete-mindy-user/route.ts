@@ -19,40 +19,13 @@ import {
   deleteAllVaultData,
   listVaultStorageFiles,
 } from '@/lib/vault/vault-data';
+// Single source of truth for the user_email-keyed tables — shared with the
+// change-email re-key lib so the two can never drift (the 2026-07-05
+// vault-omission lesson). Behavior here is unchanged: same 19 tables, same order.
+import { USER_EMAIL_TABLES } from '@/lib/mindy/user-scoped-tables';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
-
-// Every NON-VAULT table that's keyed by user_email. Add to this list when new
-// user-scoped tables are added. The 5 VAULT tables + Storage files are handled
-// separately via the shared vault-data lib (VAULT_TABLES / deleteAllVaultData)
-// so this route and the self-serve delete can never diverge again — the audit
-// 2026-07-05 found these vault tables were silently omitted here, leaving a
-// deleted user's most sensitive PII (EIN, clearances, references) behind.
-const USER_EMAIL_TABLES = [
-  'user_notification_settings',
-  'user_business_profiles',
-  'user_pipeline',
-  'user_teaming_partners',
-  'user_referrals',
-  'user_engagement',
-  'user_engagement_scores',
-  // Kept deliberately: this is a PII-purge sweep, so it stays over-inclusive. Both are
-  // dead (user_alert_settings dropped; user_briefing_profile never existed) → deleteRows
-  // catches the per-table error and continues. If either is ever recreated, orphaned PII
-  // still gets purged. tasks/smart-profile-dead-table-findings.md.
-  'user_alert_settings',
-  'user_briefing_profile',
-  'mi_beta_user_settings',
-  'mi_beta_team_members',
-  'mi_beta_activity',
-  'alert_log',
-  'briefing_log',
-  'briefing_feedback',
-  'signup_events',
-  'opportunity_shares',
-  'purchases',
-] as const;
 
 function authorized(request: NextRequest): boolean {
   const password = new URL(request.url).searchParams.get('password');

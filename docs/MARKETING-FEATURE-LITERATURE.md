@@ -4262,3 +4262,31 @@ POPULATED feed — the gap the empty-state prompt missed. Verified targeting: fi
 that carries even one distinctive keyword (self-resolves on first real signal). Reinforced by the
 same-day keyword-precision fix — generic keywords no longer count as "set up," so the banner
 correctly reaches users a stale generic keyword used to hide. tsc clean; production build green.
+
+## Change your email without losing your account (2026-07-13)
+
+**What:** Settings → Security now has a self-serve "Change email." Enter a new address; Mindy
+sends a confirmation link to it, and only when you click that link does the change apply. Your
+plan, saved pursuits, Vault, targeting profile, and billing all move with you — your old email
+keeps working until you confirm, so you're never locked out. If the new email already has a Mindy
+account, we block the change and route you to support to merge, rather than silently overwriting.
+
+**Why:** Mindy keyed almost everything on the email string with no way to change it in-app, so a
+member who wanted a new address just signed up again — creating a SECOND, empty free account while
+their paid plan, workspace, and saved work stranded on the old email. That produced the exact
+support ticket that motivated this: a paying customer signed in, saw two identities, and got
+prompted to upgrade a plan she already paid for. Change-email fixes the root behavior: email is now
+an editable attribute of one account, not a second identity.
+
+**SEO / positioning:** "Change your email, keep your account — plan, pursuits, and history move
+with you."
+
+**Proof:** A shared `reKeyAccountEmail` sweep (single source of truth with the account-delete
+table list, so they can't drift) moves the Supabase Auth user in place (same account id), all 19
+user_email tables, the 5 Vault PII tables, ownership/collaborator columns, KV entitlement keys, and
+the Stripe customer email. Verified end-to-end on a throwaway account: account fully moved, internal
+account id preserved, old email freed, new email owns everything — 0 failed steps. Mandatory
+verify-click (GovCon-standard, satisfies re-verify-on-credential-change); collision→block+merge;
+1-change/24h rate limit; idempotent + resumable via an `email_change_log` audit row (RLS-locked to
+service-role). tsc clean across all new files. Admin merge for already-duplicated accounts is the
+next phase (docs/PRD-identity-model.md).

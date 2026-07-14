@@ -25,7 +25,7 @@ export function renderMindyEmailLogo(size = 48): string {
   return `
     <table role="presentation" align="center" cellspacing="0" cellpadding="0" border="0" style="margin:0 auto 12px auto; border-collapse:separate;">
       <tr>
-        <td width="${size}" height="${size}" align="center" valign="middle" bgcolor="#8b3cf6" style="width:${size}px; height:${size}px; border-radius:${radius}px; background:#8b3cf6; color:#ffffff; font-family:Arial,Helvetica,sans-serif; font-size:${fontSize}px; font-weight:800; line-height:${size}px; mso-line-height-rule:exactly; text-align:center;">
+        <td width="${size}" height="${size}" align="center" valign="middle" bgcolor="#5928c2" style="width:${size}px; height:${size}px; border-radius:${radius}px; background:#5928c2; color:#ffffff; font-family:Arial,Helvetica,sans-serif; font-size:${fontSize}px; font-weight:800; line-height:${size}px; mso-line-height-rule:exactly; text-align:center;">
           M
         </td>
       </tr>

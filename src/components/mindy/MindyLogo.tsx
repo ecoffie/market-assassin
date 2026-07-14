@@ -13,7 +13,9 @@ export function MindyLogo({
   showWordmark = false,
   wordmarkClassName = 'font-semibold text-white',
 }: MindyLogoProps) {
-  const logoHeight = Math.round(size * 0.799);
+  // The refreshed 3D mark is square (1:1) — the old flat mark was ~1.25:1, hence
+  // the previous 0.799 height factor. Keep width == height so it never squishes.
+  const logoHeight = size;
 
   return (
     <span className={`inline-flex items-center gap-2 ${className}`}>
