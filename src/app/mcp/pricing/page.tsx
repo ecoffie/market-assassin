@@ -81,8 +81,6 @@ export default function McpPricing() {
   const searchCost = toolCr(tools, 'search_sam_opportunities', 1);
   const playbookCost = toolCr(tools, 'get_winning_playbook', 2);
   const popularId = packs.length >= 2 ? packs[1].id : undefined;
-  const popularPack = packs.find((p) => p.id === popularId);
-  const creditsAnchor = popularPack?.credits ?? 800;
 
   /** Turn an abstract credit balance into concrete BD outcomes (the Higgsfield move, our way). */
   const outcomes = (n: number) => [
@@ -180,11 +178,19 @@ export default function McpPricing() {
               <span className="text-[13px] text-slate-500">pay-as-you-go</span>
             </div>
             <div className="mt-1 text-[13px] text-slate-400">Every tool, including the moat. No subscription.</div>
-            <div className="mt-4 rounded-xl border border-emerald-400/15 bg-emerald-400/[0.04] p-3">
-              <div className="text-[12px] text-emerald-200/80"><b className="font-mono text-[15px] tabular-nums text-emerald-100">{creditsAnchor.toLocaleString()}</b> credits (Plus pack) gets you</div>
-              <ul className="mt-1.5 space-y-0.5 text-[12px] text-slate-300">
-                {outcomes(creditsAnchor).map((o) => <li key={o} className="tabular-nums">· {o}</li>)}
-              </ul>
+            <div className="mt-4 space-y-1.5">
+              {packRows.map((p) => (
+                <a key={p.id} href="/app" className={`flex items-center justify-between gap-2 rounded-xl border px-3 py-2 transition hover:border-emerald-400/50 ${p.highlight ? 'border-emerald-400/40 bg-emerald-400/[0.07]' : 'border-emerald-400/15 bg-emerald-400/[0.03]'}`}>
+                  <span className="flex items-center gap-1.5">
+                    <span className="text-[13px] font-semibold text-slate-100">{p.name}</span>
+                    {p.tag && <span className="rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wide text-emerald-300">{p.tag}</span>}
+                  </span>
+                  <span className="text-right leading-tight">
+                    <span className="block font-mono text-[13px] font-semibold tabular-nums text-emerald-100">{p.price}</span>
+                    <span className="block text-[10.5px] tabular-nums text-slate-400">{p.credits.toLocaleString()} cr · ~{workups(p.credits, workupCost)} work-ups</span>
+                  </span>
+                </a>
+              ))}
             </div>
             <ul className="mt-5 flex-1 space-y-1.5 border-t border-emerald-400/15 pt-5 text-[13px]">
               <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span>Everything in the trial, <b className="font-semibold">plus the proprietary moat:</b></span></li>
@@ -196,7 +202,7 @@ export default function McpPricing() {
               ))}
               <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span>Charged on success only · credits never expire</span></li>
             </ul>
-            <a href="#packs" className="mt-6 inline-flex items-center justify-center rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">See credit packs</a>
+            <a href="/app" className="mt-6 inline-flex items-center justify-center rounded-lg bg-emerald-500 px-4 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">Get credits</a>
           </div>
 
           {/* Pro */}
@@ -237,6 +243,9 @@ export default function McpPricing() {
         </section>
         <p className="mx-auto mt-4 max-w-2xl text-center text-[12px] leading-relaxed text-slate-500">
           The <b className="font-medium text-slate-300">moat</b> — winning playbook, curated contacts, podcast lessons, agency angles — is Mindy&apos;s un-copyable layer, included with <b className="font-medium text-slate-300">any credit pack</b>. The free trial runs the public-data tools. Every metered tool is charged on success only.
+        </p>
+        <p className="mx-auto mt-2 max-w-2xl text-center text-[12px] leading-relaxed text-slate-500">
+          A <span className="text-slate-400">work-up</span> ≈ search one opportunity, pull the incumbent&apos;s financials, run a who-can-win scan, and generate a win playbook (~{workupCost} credits). Bigger packs add bonus credits; lighter lookups cost far less.
         </p>
 
         {/* Plan finder */}
@@ -298,31 +307,6 @@ export default function McpPricing() {
               </div>
             </div>
           </div>
-        </section>
-
-        {/* Credit packs */}
-        <section id="packs" className="mt-16 scroll-mt-8">
-          <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">Credit packs</h2>
-          <p className="mx-auto mt-2 max-w-lg text-center text-[13px] text-slate-400">Top up anytime. Bigger packs add bonus credits; every pack unlocks the same metered tools.</p>
-          <div className="mx-auto mt-6 max-w-3xl overflow-hidden rounded-2xl border border-white/10 bg-white/[0.02]">
-            <div className="hidden grid-cols-[1.5fr_0.7fr_1.4fr_auto] items-center gap-4 border-b border-white/10 px-5 py-2.5 text-[10px] font-medium uppercase tracking-wider text-slate-500 sm:grid">
-              <div>Pack</div><div>Price</div><div>What it gets you</div><div className="text-right" />
-            </div>
-            {packRows.map((t, i) => (
-              <div key={t.id} className={`grid grid-cols-1 items-center gap-x-4 gap-y-3 px-5 py-4 sm:grid-cols-[1.5fr_0.7fr_1.4fr_auto] ${i > 0 ? 'border-t border-white/10' : ''} ${t.highlight ? 'bg-emerald-400/[0.05]' : ''}`}>
-                <div className="flex flex-wrap items-center gap-2">
-                  <span className="text-[15px] font-semibold text-slate-100">{t.name}</span>
-                  {t.tag && <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide ${t.highlight ? 'bg-emerald-500 text-[#06120c]' : 'border border-white/15 text-slate-400'}`}>{t.tag}</span>}
-                </div>
-                <div className="tabular-nums"><span className="text-[15px] font-semibold text-slate-100">{t.price}</span><span className="ml-1.5 text-[11px] text-slate-500 sm:ml-0 sm:block">prepaid</span></div>
-                <div className="text-[13px] text-slate-400"><span className="font-medium tabular-nums text-slate-200">{t.credits.toLocaleString()} credits</span><span className="text-slate-600"> · </span>~{workups(t.credits, workupCost)} work-ups</div>
-                <a href="/app" className={`inline-flex items-center justify-center rounded-lg px-3.5 py-2 text-[13px] font-semibold sm:justify-self-end ${t.highlight ? 'bg-emerald-500 text-[#06120c] hover:bg-emerald-400' : 'border border-white/15 text-slate-200 hover:bg-white/5'}`}>Get credits</a>
-              </div>
-            ))}
-          </div>
-          <p className="mx-auto mt-3 max-w-2xl text-center text-[12px] leading-relaxed text-slate-500">
-            A <span className="text-slate-400">work-up</span> ≈ search one opportunity, pull the incumbent&apos;s financials, run a who-can-win scan, and generate a win playbook (~{workupCost} credits). Lighter lookups cost far less.
-          </p>
         </section>
 
         {/* Compare features */}
