@@ -9,6 +9,7 @@ export const COMP_TESTIMONIAL_EMAILS = new Set([
   'olga@olaexecutiveconsulting.com',
   'tavinalford@gmail.com',
   'ryan@radiumgovcon.com', // internal team — comp Pro, not a customer (Eric, Jul 2026)
+  'faldekurt@gmail.com', // friends & family try-it (Kurt Falde) — comp Pro, not a customer (Eric, Jul 2026)
 ]);
 
 /**
