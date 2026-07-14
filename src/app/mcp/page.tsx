@@ -89,11 +89,42 @@ function connectFor(client: ClientId): ConnectInfo {
 
 /** Friendly names for translating a credit balance into real usage. */
 const TOOL_LABELS: Record<string, string> = {
+  // Public data + search
   search_sam_opportunities: 'SAM opportunity searches',
-  get_incumbent_financials: 'incumbent financial reads',
-  find_capable_contractors: '“who can win this” scans',
-  get_winning_playbook: 'win playbooks',
+  get_market_vocabulary: 'market vocabulary lookups',
+  get_keyword_coverage: 'keyword market-coverage maps',
+  search_grants: 'federal grant searches',
+  get_agency_forecasts: 'agency forecast searches',
+  search_sbir: 'SBIR/STTR searches',
+  get_expiring_contracts: 'expiring-contract (recompete) pulls',
+  search_idv_contracts: 'IDIQ/GWAC vehicle searches',
+  get_solicitation_documents: 'solicitation SOW/doc pulls',
+  search_federal_events: 'industry-day & matchmaking finds',
+  // Competitive intel
   get_contractor_profile: 'contractor deep-dives',
+  search_contractors: 'competitive landscape scans',
+  find_capable_contractors: '“who can win this” scans',
+  get_contractor_award_history: 'contractor award-history reads',
+  get_incumbent_financials: 'incumbent financial reads',
+  get_sblo_contact: 'prime SBLO teaming contacts',
+  lookup_sam_entity: 'SAM entity registrations',
+  // Agency & award intel
+  get_agency_intel: 'agency intel briefs',
+  get_agency_spending_detail: 'agency component + set-aside breakdowns',
+  get_agency_budget_trends: 'agency budget-trend reads',
+  get_award_detail: 'award detail lookups',
+  find_predecessor_award: 'incumbent/predecessor traces',
+  get_regulatory_demand: 'regulatory-demand signals',
+  lookup_federal_osbp: 'OSBP small-business front-door lookups',
+  search_agency_opps_by_office: 'buying-office opportunity pulls',
+  search_federal_contacts: 'buying-office contact rosters',
+  assess_market_depth: 'Rule-of-Two market-depth checks',
+  // Proprietary + proposal
+  get_winning_playbook: 'win playbooks',
+  search_podcast_lessons: 'podcast lesson lookups',
+  scan_proposal_compliance: 'pre-submit compliance scans',
+  evaluate_bid_decision: 'bid/no-bid evaluations',
+  derive_company_keywords: 'company keyword derivations',
 };
 
 /** "≈ 250 SAM searches · 125 financial reads · 31 win scans" from the LIVE tool costs. */
@@ -250,7 +281,7 @@ export default function McpConsole() {
             <div className="mx-auto mb-5 grid h-12 w-12 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-emerald-400 text-lg font-bold text-[#0a0f1e]">M</div>
             <h1 className="mx-auto max-w-2xl text-balance text-3xl font-bold tracking-tight sm:text-4xl">Federal contracting intelligence for any AI agent</h1>
             <p className="mx-auto mt-3 max-w-xl text-balance text-sm text-slate-400 sm:text-[15px]">
-              SAM opportunities, incumbent financials, GSA pricing, and win playbooks — piped straight into Claude, Cursor, or your own agent. Pay only for what you call.
+              {catTools.length ? `${catTools.length} tools` : 'Dozens of tools'} — SAM opportunities, incumbent financials, GSA pricing, buying-office contacts, agency spending breakdowns, recompetes, and proprietary win playbooks — piped straight into Claude, Cursor, or your own agent. Pay only for what you call.
             </p>
             <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/[0.07] px-3.5 py-1.5 text-[13px] text-emerald-200">
               <span aria-hidden>🎁</span> Start free — {trial} credits on your first connect (≈ {packValue(trial)})
