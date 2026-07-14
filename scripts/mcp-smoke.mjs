@@ -75,6 +75,7 @@ try {
     'get_keyword_coverage', 'search_idv_contracts', 'get_contractor_award_history', 'assess_market_depth',
     'get_solicitation_documents', 'search_federal_events',
     'scan_proposal_compliance', 'evaluate_bid_decision',
+    'lookup_federal_osbp', 'search_agency_opps_by_office',
   ]) {
     if (!names.includes(t)) fail(`${t} not registered`);
   }
@@ -401,7 +402,38 @@ try {
   if (bdS.decision.recommendation !== 'no-bid') fail(`bid-decision: a failed gate must force no-bid (got ${bdS.decision.recommendation})`);
   console.error(`✓ framework gates=5 factors=10 · failed-gate → ${bdS.decision.recommendation}`);
 
-  console.error('\n✅ SMOKE PASSED — MCP transport + 21 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth, solicitation-documents, federal-events, scan-compliance, bid-decision) all live + honest');
+  // ── lookup_federal_osbp (curated DoD command / OSBP directory) ─────────────
+  console.error('\n→ calling lookup_federal_osbp({ agency: "NAVFAC" })');
+  const osbp = await client.callTool({ name: 'lookup_federal_osbp', arguments: { agency: 'NAVFAC' } });
+  const osbpS = osbp.structuredContent;
+  if (!osbpS) fail('federal-osbp: no structuredContent');
+  if (osbpS._meta?.match !== 'command' || !osbpS._meta?.grounded) fail('federal-osbp: NAVFAC should resolve to a grounded command match');
+  if (!osbpS.office?.email) fail('federal-osbp: NAVFAC office should carry an email');
+  console.error(`✓ grounded=${osbpS._meta.grounded} · match=${osbpS._meta.match} · office=${String(osbpS.office?.osbp_office).slice(0,40)} · ${osbpS.office?.email} · verified=${osbpS._meta.director_verified}`);
+  // honest-miss check
+  const osbpMiss = await client.callTool({ name: 'lookup_federal_osbp', arguments: { agency: 'A Fake Agency XYZ' } });
+  if (osbpMiss.structuredContent?._meta?.grounded !== false) fail('federal-osbp: unknown agency should be grounded=false (no invented contact)');
+  console.error('✓ honest miss: unknown agency → grounded=false');
+
+  // ── search_agency_opps_by_office (DoDAAC-anchored open opps) ────────────────
+  console.error('\n→ calling search_agency_opps_by_office({ dodaac: "W912PL", limit: 5 })');
+  const oo = await client.callTool({ name: 'search_agency_opps_by_office', arguments: { dodaac: 'W912PL', limit: 5 } });
+  const ooS = oo.structuredContent;
+  if (!ooS) fail('agency-opps-by-office: no structuredContent');
+  if (ooS._meta?.degraded) fail('agency-opps-by-office: degraded=true (sam_opportunities unreachable)');
+  if (ooS._meta?.anchor !== 'dodaac') fail('agency-opps-by-office: explicit DoDAAC should anchor=dodaac');
+  if (!ooS._meta?.grounded) {
+    console.error('⚠ agency-opps-by-office: grounded=false for W912PL — NON-FATAL (that office may have nothing open right now)');
+  } else {
+    if (!ooS.opportunities?.[0]?.solicitation_number?.toUpperCase().startsWith('W912PL')) fail('agency-opps-by-office: top result should be a W912PL solicitation');
+    console.error(`✓ grounded=${ooS._meta.grounded} · anchor=${ooS._meta.anchor} · count=${ooS._meta.count} · total=${ooS._meta.total} · top=${String(ooS.opportunities[0].solicitation_number)} ${String(ooS.opportunities[0].title).slice(0,40)}`);
+  }
+  // department preview (civilian) — should anchor=department and be honest about it
+  const ooVa = await client.callTool({ name: 'search_agency_opps_by_office', arguments: { agency: 'Department of Veterans Affairs', limit: 3 } });
+  if (ooVa.structuredContent?._meta?.anchor !== 'department') fail('agency-opps-by-office: civilian agency should fall back to anchor=department');
+  console.error(`✓ VA → anchor=${ooVa.structuredContent._meta.anchor} · grounded=${ooVa.structuredContent._meta.grounded} · total=${ooVa.structuredContent._meta.total} (broad preview, honest)`);
+
+  console.error('\n✅ SMOKE PASSED — MCP transport + 23 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth, solicitation-documents, federal-events, scan-compliance, bid-decision, federal-osbp, agency-opps-by-office) all live + honest');
   await client.close();
   process.exit(0);
 } catch (err) {
