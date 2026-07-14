@@ -281,7 +281,37 @@ try {
   if (ecS._meta?.degraded) fail('expiring-contracts: degraded=true (Supabase recompete_opportunities unreachable)');
   if (!ecS._meta?.grounded) console.error('⚠ expiring-contracts: grounded=false for NAICS 541 in 24mo — NON-FATAL (may be a genuinely thin window)');
 
-  console.error('\n✅ SMOKE PASSED — MCP transport + 13 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts) all live + honest');
+  // ── get_agency_budget_trends (curated OMB/CBJ JSON) ────────────────────────
+  console.error('\n→ calling get_agency_budget_trends({ agency: "NASA" })');
+  const bt = await client.callTool({ name: 'get_agency_budget_trends', arguments: { agency: 'NASA' } });
+  const btS = bt.structuredContent;
+  if (!btS) fail('budget-trends: no structuredContent');
+  if (!btS._meta?.grounded || !btS.agency) fail('budget-trends: NASA (acronym) should resolve to a grounded agency');
+  if (typeof btS.fy2026_budget_authority !== 'number') fail('budget-trends: expected an FY2026 budget-authority number');
+  console.error(`✓ grounded=${btS._meta.grounded} · match=${btS._meta.match_type} · ${btS.agency} · FY26=${btS.fy2026_budget_authority} · trend=${btS.trend}`);
+  const btMiss = await client.callTool({ name: 'get_agency_budget_trends', arguments: { agency: 'Zzz Fake Agency' } });
+  if (btMiss.structuredContent?._meta?.grounded !== false) fail('budget-trends: unknown agency should be grounded=false (no invented number)');
+  console.error('✓ honest miss: unknown agency → grounded=false');
+
+  // ── derive_company_keywords (semantic, no BigQuery) ────────────────────────
+  console.error('\n→ calling derive_company_keywords({ drone-imaging description + past perf })');
+  const ck = await client.callTool({
+    name: 'derive_company_keywords',
+    arguments: {
+      description: 'We provide UAS/drone-based aerial imaging, LiDAR survey, and photogrammetry for coastal infrastructure inspection.',
+      past_performance: ['Drone-based bridge inspection and 3D point-cloud mapping for a USACE levee system.', 'LiDAR shoreline survey and orthomosaic generation for a Navy waterfront facility.'],
+      limit: 10,
+    },
+  });
+  const ckS = ck.structuredContent;
+  if (!ckS) fail('company-keywords: no structuredContent');
+  if (!ckS._meta?.grounded || !Array.isArray(ckS.keywords) || ckS.keywords.length === 0) fail('company-keywords: expected grounded keywords from a rich description');
+  console.error(`✓ grounded=${ckS._meta.grounded} · ranked=${ckS._meta.ranked} · count=${ckS._meta.keyword_count} · e.g. ${ckS.keywords.slice(0, 4).join(', ')}`);
+  const ckMiss = await client.callTool({ name: 'derive_company_keywords', arguments: { description: '' } });
+  if (ckMiss.structuredContent?._meta?.grounded !== false) fail('company-keywords: empty input should be grounded=false (no invented keywords)');
+  console.error('✓ honest miss: empty input → grounded=false');
+
+  console.error('\n✅ SMOKE PASSED — MCP transport + 15 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, agency-budget-trends, company-keywords) all live + honest');
   await client.close();
   process.exit(0);
 } catch (err) {
