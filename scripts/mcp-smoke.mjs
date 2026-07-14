@@ -74,6 +74,7 @@ try {
     'get_pricing_intel', 'get_incumbent_financials', 'get_regulatory_demand',
     'get_keyword_coverage', 'search_idv_contracts', 'get_contractor_award_history', 'assess_market_depth',
     'get_solicitation_documents', 'search_federal_events',
+    'scan_proposal_compliance', 'evaluate_bid_decision',
   ]) {
     if (!names.includes(t)) fail(`${t} not registered`);
   }
@@ -363,7 +364,44 @@ try {
   if (feS._meta?.degraded) fail('federal-events: degraded=true (sam_events unreachable)');
   if (!feS._meta?.grounded) console.error('⚠ federal-events: grounded=false for DoD in 12mo — NON-FATAL (this deployment\'s sam_events may be empty/stale)');
 
-  console.error('\n✅ SMOKE PASSED — MCP transport + 19 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth, solicitation-documents, federal-events) all live + honest');
+  // ── scan_proposal_compliance (pure deterministic DQ scan) ─────────────────
+  console.error('\n→ calling scan_proposal_compliance({ page-limit overage + unaddressed factor })');
+  const cmp = await client.callTool({
+    name: 'scan_proposal_compliance',
+    arguments: {
+      requirements: [
+        { requirement: 'Technical proposal shall not exceed 10 pages.', section: 'L.3', category: 'submission' },
+        { requirement: 'Offeror shall address the Management Approach evaluation factor.', section: 'M.2', category: 'evaluation' },
+      ],
+      draft_text: 'Our technical approach is sound. '.repeat(20),
+    },
+  });
+  const cmpS = cmp.structuredContent;
+  if (!cmpS) fail('scan-compliance: no structuredContent');
+  if (typeof cmpS._meta?.grounded !== 'boolean') fail('scan-compliance: _meta.grounded missing');
+  if (!cmpS._meta?.grounded) fail('scan-compliance: grounded=false with real requirements + draft (should scan)');
+  if (!Array.isArray(cmpS.findings)) fail('scan-compliance: findings is not an array');
+  console.error(`✓ grounded=${cmpS._meta?.grounded} · findings=${cmpS.findings.length} · at_risk=${cmpS.at_risk}`);
+
+  // ── evaluate_bid_decision (framework-only, then scored) ────────────────────
+  console.error('\n→ calling evaluate_bid_decision() [framework] then with a failed gate');
+  const bdFramework = await client.callTool({ name: 'evaluate_bid_decision', arguments: {} });
+  const bdF = bdFramework.structuredContent;
+  if (!bdF) fail('bid-decision: no structuredContent (framework mode)');
+  if (!Array.isArray(bdF.framework?.gates) || bdF.framework.gates.length !== 5) fail('bid-decision: framework must expose 5 gates');
+  if (!Array.isArray(bdF.framework?.factors) || bdF.framework.factors.length !== 10) fail('bid-decision: framework must expose 10 factors');
+  if (bdF.decision !== null) fail('bid-decision: decision should be null with no assessment');
+  const firstGate = bdF.framework.gates[0].id;
+  const bdScored = await client.callTool({
+    name: 'evaluate_bid_decision',
+    arguments: { gates: { [firstGate]: false }, ratings: {} },
+  });
+  const bdS = bdScored.structuredContent;
+  if (!bdS?.decision) fail('bid-decision: decision missing when gates supplied');
+  if (bdS.decision.recommendation !== 'no-bid') fail(`bid-decision: a failed gate must force no-bid (got ${bdS.decision.recommendation})`);
+  console.error(`✓ framework gates=5 factors=10 · failed-gate → ${bdS.decision.recommendation}`);
+
+  console.error('\n✅ SMOKE PASSED — MCP transport + 21 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth, solicitation-documents, federal-events, scan-compliance, bid-decision) all live + honest');
   await client.close();
   process.exit(0);
 } catch (err) {

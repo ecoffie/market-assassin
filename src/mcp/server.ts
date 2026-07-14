@@ -38,6 +38,8 @@ import { contractorAwardHistory } from './tools/contractor-award-history';
 import { assessMarketDepth } from './tools/market-depth';
 import { solicitationDocuments } from './tools/solicitation-documents';
 import { searchFederalEvents } from './tools/federal-events';
+import { scanProposalCompliance } from './tools/scan-compliance';
+import { evaluateBidDecisionTool } from './tools/bid-decision';
 
 const server = new McpServer({
   name: 'mindy-govcon',
@@ -557,11 +559,65 @@ server.registerTool(
   },
 );
 
+server.registerTool(
+  'scan_proposal_compliance',
+  {
+    title: 'Scan Proposal Compliance (pre-submit DQ check)',
+    description:
+      'Pre-submit disqualification check: given the RFP requirements + a proposal draft, flag what could get the bid ' +
+      'THROWN OUT — missed deadline, ineligible set-aside, page-limit overage, missing reps/certs or required plans, ' +
+      'unaddressed evaluation factors. Returns findings with severity dq/warning/info + an at_risk flag. ' +
+      'Deterministic (no AI). Pair with extract_compliance_matrix for the requirements list.',
+    inputSchema: {
+      requirements: z
+        .array(
+          z.object({
+            requirement: z.string().describe('The requirement text (a shall-statement).'),
+            category: z.string().optional().describe('Category hint (submission/evaluation/technical/…).'),
+            section: z.string().optional().describe('RFP section, e.g. "L.3.2", "M.2".'),
+            id: z.string().optional(),
+          }),
+        )
+        .describe('RFP requirements to check against (from extract_compliance_matrix or your own read).'),
+      draft_text: z.string().describe('The full proposal / response text (all sections concatenated).'),
+      sections: z
+        .array(z.object({ label: z.string(), text: z.string() }))
+        .optional()
+        .describe('Optional per-section drafts for finer page/coverage checks.'),
+      bidder_set_asides: z.array(z.string()).optional().describe('Set-asides the bidder actually holds (e.g. ["8(a)","WOSB"]).'),
+    },
+  },
+  async ({ requirements, draft_text, sections, bidder_set_asides }) => {
+    const result = scanProposalCompliance({ requirements, draft_text, sections, bidder_set_asides });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'evaluate_bid_decision',
+  {
+    title: 'Evaluate Bid Decision (GovCon bid/no-bid framework)',
+    description:
+      "GovCon Giants' bid / no-bid framework. ALWAYS returns the framework — the 5 universal eliminator GATES + the " +
+      '10-factor scorecard — so you know exactly what to assess. When you also pass gate answers + factor ratings, it ' +
+      'SCORES the card: any failed gate = automatic No-Bid; otherwise pursue (≥70) / watch (40–69) / skip (<40). Call ' +
+      'once with no args to learn the rubric, then again with your assessment.',
+    inputSchema: {
+      gates: z.record(z.string(), z.boolean()).optional().describe('gateId → passed? (true/false). A false on any = No-Bid.'),
+      ratings: z.record(z.string(), z.number()).optional().describe('factorId → 0-10.'),
+    },
+  },
+  async ({ gates, ratings }) => {
+    const result = evaluateBidDecisionTool({ gates, ratings });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + keyword-coverage + idv-contracts + contractor-award-history + market-depth + solicitation-documents + federal-events registered',
+    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + keyword-coverage + idv-contracts + contractor-award-history + market-depth + solicitation-documents + federal-events + scan-compliance + bid-decision registered',
   );
 }
 
