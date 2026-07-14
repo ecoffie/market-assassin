@@ -101,6 +101,27 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   get_balance: 0, // meta tool — always free
 };
 
+/**
+ * Proprietary tools whose RESULTS are the un-copyable moat — they return curated /
+ * teaching content (corpus passages, extracted lessons, curated contact rows), NOT a
+ * public-API passthrough. These are the ONLY tools the extraction guard protects
+ * (Layers A+B, `src/lib/mcp/extraction-guard.ts`); the public-data wrappers wrap free
+ * APIs and are deliberately left ungated (nothing to steal + gating kills day-one
+ * utility). Curated-but-public-source tools (search_federal_contacts / get_agency_intel)
+ * are intentionally NOT here — their underlying data is public SAM/curated intel.
+ */
+export const PROPRIETARY_TOOLS: ReadonlySet<string> = new Set([
+  'get_winning_playbook', // the teaching corpus — the crown jewel
+  'search_podcast_lessons', // extracted key_lessons from the proprietary podcast corpus
+  'get_sblo_contact', // curated 200-prime SBLO teaming roster
+  'lookup_federal_osbp', // curated DoD command / OSBP directory
+]);
+
+/** True if `name` is a proprietary tool the extraction guard should protect. */
+export function isProprietaryTool(name: string): boolean {
+  return PROPRIETARY_TOOLS.has(name);
+}
+
 /** Free meta-tool: report the caller's live credit balance. */
 const GET_BALANCE_TOOL_DEF = {
   type: 'function' as const,

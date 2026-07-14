@@ -47,6 +47,28 @@ export const mcpFlags = {
     return on('MCP_ENFORCE_TIERS');
   },
 
+  /**
+   * Corpus extraction guard (Layers A+B). Master switch. OFF by default → the guard
+   * code never runs (zero added latency, zero behavior change). When ON, proprietary-
+   * tool calls are evaluated against Layer A (free credits can't unlock crown jewels)
+   * and Layer B (per-account rolling volume caps) — see src/lib/mcp/extraction-guard.ts.
+   * With `extractionEnforce` OFF this is LOG-ONLY: violations write a `shadow_*` call-log
+   * row but the call still runs, so we can measure real impact before enforcing.
+   */
+  get extractionGuard(): boolean {
+    return on('MCP_EXTRACTION_GUARD');
+  },
+
+  /**
+   * Extraction guard ENFORCEMENT. OFF by default → the guard runs in log-only/shadow
+   * mode (measure first). Flip ON (`MCP_EXTRACTION_ENFORCE=true`, requires
+   * `MCP_EXTRACTION_GUARD=true`) to actually block violating calls with a clean,
+   * non-charged error (`requires_paid_credits` / `rate_limited`), never a crash.
+   */
+  get extractionEnforce(): boolean {
+    return on('MCP_EXTRACTION_ENFORCE');
+  },
+
   // Future toggles plug in the same way, e.g.:
   //   get enrichedSam(): boolean { return on('MCP_ENABLE_ENRICHED_SAM'); }
 } as const;
