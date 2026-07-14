@@ -11,7 +11,8 @@
  *   4. Token — POST /oauth/token (authorization_code + PKCE verifier) returns an
  *      access_token + refresh_token.
  *   5. Keyless call — connect the MCP transport with the ACCESS TOKEN (no API key),
- *      initialize, tools/list = 9, call get_balance.
+ *      initialize, tools/list (>=9; essentials present), call get_balance, and
+ *      probe get_winning_playbook to observe tier gating (requires_pro vs allowed).
  *   6. Refresh — POST /oauth/token (refresh_token) rotates to new tokens.
  *   7. Negatives — replayed code rejected; wrong PKCE verifier rejected.
  *
@@ -93,11 +94,32 @@ async function main() {
   const client = new Client({ name: 'oauth-smoke', version: '1.0.0' });
   await client.connect(transport);
   const { tools } = await client.listTools();
-  if (tools.length !== 9) fail(`expected 9 tools, got ${tools.length}`);
+  // The catalog grows as tools are added — assert a floor + that the essentials
+  // are present, not an exact count (was hardcoded 9; now 14 after batches 1-2).
+  const names = new Set(tools.map((t) => t.name));
+  if (tools.length < 9) fail(`expected >=9 tools, got ${tools.length}`);
+  for (const need of ['get_balance', 'get_winning_playbook']) {
+    if (!names.has(need)) fail(`transport is missing ${need} (mcpRegistrationList out of sync?)`);
+  }
   const bal = await client.callTool({ name: 'get_balance', arguments: {} });
   const balance = JSON.parse(bal.content[0].text).balance;
-  await client.close();
   ok(`KEYLESS access token works → ${tools.length} tools, balance=${balance}`);
+
+  // 5b. Tier gating (informational — outcome depends on whether MI_EMAIL is Pro):
+  // call the Pro-gated get_winning_playbook and report whether it ran (Pro/flag
+  // off) or was rejected with requires_pro (non-Pro + MCP_ENFORCE_TIERS=true).
+  try {
+    const pb = await client.callTool({ name: 'get_winning_playbook', arguments: { topic: 'win an 8(a) construction recompete' } });
+    const txt = pb.content?.[0]?.text || '';
+    if (/requires_pro|Mindy Pro tool|Upgrade at/i.test(txt)) {
+      ok(`tier gating ENFORCED → get_winning_playbook rejected for a non-Pro caller (requires_pro)`);
+    } else {
+      ok(`get_winning_playbook ALLOWED for ${EMAIL} (Pro entitled, or gating off) — grounded call ran`);
+    }
+  } catch (e) {
+    console.log(`  (playbook probe errored: ${e?.message || e} — non-fatal)`);
+  }
+  await client.close();
 
   // 6. Refresh rotation
   const refreshed = await (await fetch(`${BASE}/oauth/token`, {

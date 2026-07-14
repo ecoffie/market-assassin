@@ -12,6 +12,7 @@ import { NextResponse } from 'next/server';
 import { listMcpTools } from '@/lib/mcp/tool-registry';
 import { CREDIT_PACKAGES, PRO_MONTHLY_CREDITS } from '@/lib/mcp/packages';
 import { SIGNUP_CREDITS } from '@/lib/mcp/credits';
+import { mcpFlags } from '@/lib/mcp/flags';
 
 export const runtime = 'nodejs';
 // Static config — safe to cache at the edge for an hour (revalidates on deploy anyway).
@@ -20,7 +21,12 @@ export const revalidate = 3600;
 export function GET() {
   const tools = listMcpTools().map((t) => {
     const fn = t.function as { name: string; description?: string };
-    return { name: fn.name, description: fn.description ?? '', credits: (t._credits as number) ?? 0 };
+    return {
+      name: fn.name,
+      description: fn.description ?? '',
+      credits: (t._credits as number) ?? 0,
+      tier: (t._tier as string) ?? 'metered', // 'metered' | 'pro' — drives the pricing page's live/gated split
+    };
   });
 
   return NextResponse.json({
@@ -29,5 +35,10 @@ export function GET() {
     packages: CREDIT_PACKAGES,
     signupCredits: SIGNUP_CREDITS,
     proMonthlyCredits: PRO_MONTHLY_CREDITS,
+    // Whether Pro-tier tools (tier === 'pro') are actually ENFORCED right now, i.e.
+    // the deployed runtime reads MCP_ENFORCE_TIERS as true. Lets the /mcp page show
+    // "Pro enforced" honestly and gives a public, no-auth way to confirm the flag
+    // bound (catches the MCP_ENFORCE_TIERS=1-vs-true silent no-op class of bug).
+    enforceTiers: mcpFlags.enforceTiers,
   });
 }

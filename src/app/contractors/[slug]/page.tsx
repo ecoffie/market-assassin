@@ -43,6 +43,7 @@ import {
   getTopSubawardeesForPrime,
   getTopPrimesForSubawardee,
 } from '@/lib/bigquery/subawards';
+import { seoLiveBqEnabled } from '@/lib/seo/live-bq';
 import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 
@@ -82,8 +83,12 @@ export async function generateMetadata({ params }: PageProps): Promise<Metadata>
   const { slug } = await params;
   // Cache-first; on miss, try live BQ + recipients fallback so small/orphan
   // contractors still get proper meta tags (must mirror the page resolver).
+  // The live fallback is gated by seoLiveBqEnabled() (default OFF) — crawler
+  // cold-scans of the contractor long tail drained the BQ daily quota, so an
+  // unwarmed contractor now 404s instead of scanning. Re-enable: ENABLE_SEO_LIVE_BQ=1.
   const recipient =
-    (await getRollupBySlug(slug)) ?? (await getRollupOrSingleBySlug(slug, true));
+    (await getRollupBySlug(slug)) ??
+    (seoLiveBqEnabled() ? await getRollupOrSingleBySlug(slug, true) : null);
   if (!recipient) {
     return { title: 'Contractor Not Found | Mindy' };
   }
@@ -155,9 +160,14 @@ export default async function ContractorPage({ params }: PageProps) {
     // small contractors and orphan UEIs that the warmed cache + rollup table
     // both missed). ISR caches the resulting page for 7 days, so each unique
     // cold slug pays at most a handful of live BQ queries once per window.
-    recipient = await getRollupOrSingleBySlug(slug, true);
+    // GATED (default OFF): crawler cold-scans of the long tail drained the BQ
+    // daily quota. When off, this fallback is cache-only → an unwarmed slug
+    // 404s (no scan), and needsLiveBq stays false so the ~10 sub-section
+    // queries below also stay cache-only. Re-enable: ENABLE_SEO_LIVE_BQ=1.
+    const liveBq = seoLiveBqEnabled();
+    recipient = await getRollupOrSingleBySlug(slug, liveBq);
     if (!recipient) notFound();
-    needsLiveBq = true;
+    needsLiveBq = liveBq;
   }
 
   // Same-name orphan that resolved to a higher-spend rollup with a different

@@ -329,13 +329,16 @@ export default function OnboardingPage() {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
 
-  // Setup mode. 'choose' = the door picker; 'uei' = paste UEI → SAM/USASpending
-  // pull → confirm; 'auto' = describe → confirm; 'manual' = the step wizard.
-  // UEI is the highest-quality path (identity + NAICS + certs + REAL award history
-  // → grounds the hidden-match capability vector), so it's the first/recommended
-  // door — but always skippable (Eric, Jun 2026; only 5 users had a UEI when it
-  // was a post-setup Vault afterthought).
-  const [mode, setMode] = useState<'choose' | 'uei' | 'auto' | 'manual'>('choose');
+  // Setup mode. 'choose' = the legacy door picker (kept as a harmless fallback,
+  // no longer the entry point); 'uei' = paste UEI → SAM/USASpending pull → confirm;
+  // 'auto' = describe → confirm; 'manual' = the step wizard.
+  // DEFAULT = 'auto' (describe your business). New users land straight on the
+  // describe box so they never fall into the generic-NAICS manual path and end up
+  // with a THIN, keyword-empty profile (that was the ~530-user problem the keyword
+  // fix surfaced; describe + UEI are the two paths that yield real keywords). The
+  // highest-quality UEI path and manual setup stay one tap away as secondary links
+  // (Eric, Jul 14 2026 — "make describe the onboarding default").
+  const [mode, setMode] = useState<'choose' | 'uei' | 'auto' | 'manual'>('auto');
   const [autoText, setAutoText] = useState('');
   const [ueiInput, setUeiInput] = useState('');
   const [autoLoading, setAutoLoading] = useState(false);
@@ -1076,7 +1079,7 @@ export default function OnboardingPage() {
 
           {mode === 'uei' && !autoProfile && scanPhase === 'idle' && (
             <div className="rounded-xl border border-emerald-500/30 bg-emerald-950/10 p-5">
-              <button onClick={() => { setMode('choose'); setError(''); }} className="text-xs text-muted hover:text-white mb-3">← Back</button>
+              <button onClick={() => { setMode('auto'); setError(''); }} className="text-xs text-muted hover:text-white mb-3">← Back</button>
               <label className="block text-sm font-medium text-white mb-2">Your SAM.gov UEI</label>
               <input
                 value={ueiInput}
@@ -1102,7 +1105,6 @@ export default function OnboardingPage() {
           {/* AUTO — paste, then a LIGHT confirm screen */}
           {mode === 'auto' && !autoProfile && scanPhase === 'idle' && (
             <div className="rounded-xl border border-purple-500/30 bg-purple-950/20 p-5">
-              <button onClick={() => setMode('choose')} className="text-xs text-muted hover:text-white mb-3">← Back</button>
               <label className="block text-sm font-medium text-white mb-2">Tell Mindy what you do</label>
               <textarea
                 value={autoText}
@@ -1126,6 +1128,24 @@ export default function OnboardingPage() {
                   Set it up manually instead →
                 </button>
               )}
+              {/* Secondary paths — describe is the default entry, but the two other
+                  setup routes stay one tap away: UEI (the most accurate, pulls real
+                  award history) and the manual step wizard for people who'd rather
+                  pick codes themselves. */}
+              <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-1 border-t border-hairline pt-3 text-xs">
+                <button
+                  onClick={() => { setError(''); setMode('uei'); }}
+                  className="text-muted hover:text-white underline underline-offset-2"
+                >
+                  Have a SAM.gov UEI? Set up from it →
+                </button>
+                <button
+                  onClick={() => { setError(''); setMode('manual'); setStep(1); }}
+                  className="text-muted hover:text-white underline underline-offset-2"
+                >
+                  Prefer to pick codes yourself? Manual setup →
+                </button>
+              </div>
             </div>
           )}
 

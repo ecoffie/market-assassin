@@ -10,6 +10,7 @@
  */
 import { BQ_TABLES } from './client';
 import { queryCached } from './cache';
+import { seoLiveBqEnabled } from '@/lib/seo/live-bq';
 
 export interface AwardListRow {
   award_id: string;
@@ -124,14 +125,14 @@ export async function getAwardById(awardId: string): Promise<AwardDetailRow | nu
   if (!isValidAwardId(awardId)) return null;
   const rows = await queryCached<AwardDetailRow>({
     cacheKey: `awards:detail:${awardId}`,
-    // Opt INTO live BQ on a cold miss (same reasoning as getAwardIdByPiid).
-    // Without this, the SEO-safe default (cacheOnly:true) returns [] on a miss
-    // → getAwardById returns null → the /awards/[id] page 404s for every award
-    // not already warm in KV. That silently 404'd the PIID-redirect targets and
-    // the whole long tail of award detail pages. isValidAwardId() guards bot
-    // garbage before BQ, the bucket filter + 100 MiB cap bound the cold read,
-    // and the result caches 90d — safe to resolve on demand.
-    cacheOnly: false,
+    // Opt INTO live BQ on a cold miss (same reasoning as getAwardIdByPiid) —
+    // BUT ONLY when the SEO live-BQ switch is on. Crawler cold-scans of the
+    // award long tail (×3 per page: metadata + body + OG image) drained the BQ
+    // daily quota, so this is gated OFF by default (seoLiveBqEnabled()===false):
+    // a cold award 404s instead of scanning. Warmed awards still serve from KV.
+    // isValidAwardId() guards bot garbage, the bucket filter + 100 MiB cap bound
+    // the cold read, and the result caches 90d. Re-enable with ENABLE_SEO_LIVE_BQ=1.
+    cacheOnly: !seoLiveBqEnabled(),
     // Reads the hash-partitioned award_detail_lookup table. The
     // `bucket = MOD(...)` filter prunes to ONE of 1024 partitions so a cold
     // lookup scans ~10-25 MB (measured 10 MB billed) instead of the ~27 GB an
@@ -217,7 +218,9 @@ export async function getAwardIdByPiid(piid: string): Promise<{
     // the case the guard is meant to permit: a hash-bucket-pruned ~4.5 MB
     // read, hard-capped at 100 MiB below, resolving ONE PIID and cached 90d
     // after. It is not the 4.86 GB full-table scan that caused the cost spike.
-    cacheOnly: false,
+    // Gated behind the SEO live-BQ switch (default OFF) so crawler cold-scans
+    // don't drain the BQ daily quota; a cold PIID 404s until ENABLE_SEO_LIVE_BQ=1.
+    cacheOnly: !seoLiveBqEnabled(),
     // Hash-partitioned lookup: the `bucket = MOD(...)` filter prunes to ONE of
     // 1024 partitions so a cold read scans ~4.5 MB (measured 10 MB billed)
     // instead of the ~4.86 GB an unpartitioned scan cost. BQ computes the hash

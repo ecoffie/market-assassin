@@ -23,7 +23,33 @@ import { getWinningPlaybook } from '@/mcp/tools/winning-playbook';
 import { getPricingIntel } from '@/mcp/tools/pricing-intel';
 import { getIncumbentFinancials } from '@/mcp/tools/incumbent-financials';
 import { getRegulatoryDemand } from '@/mcp/tools/regulatory-demand';
+import { getAwardDetail } from '@/mcp/tools/award-detail';
+import { findPredecessor } from '@/mcp/tools/predecessor-award';
+import { lookupSamEntity } from '@/mcp/tools/sam-entity';
+import { searchContractors } from '@/mcp/tools/search-contractors';
+import { getAgencyIntel } from '@/mcp/tools/agency-intel';
+import { grantsSearch } from '@/mcp/tools/grants';
+import { agencyForecasts } from '@/mcp/tools/forecasts';
+import { sbirSearch } from '@/mcp/tools/sbir';
+import { expiringContracts } from '@/mcp/tools/expiring-contracts';
+import { getKeywordCoverage } from '@/mcp/tools/keyword-coverage';
+import { idvContracts } from '@/mcp/tools/idv-contracts';
+import { contractorAwardHistory } from '@/mcp/tools/contractor-award-history';
+import { assessMarketDepth } from '@/mcp/tools/market-depth';
+import { solicitationDocuments } from '@/mcp/tools/solicitation-documents';
+import { searchFederalEvents } from '@/mcp/tools/federal-events';
+import { scanProposalCompliance } from '@/mcp/tools/scan-compliance';
+import { evaluateBidDecisionTool } from '@/mcp/tools/bid-decision';
+import { lookupFederalOsbp } from '@/mcp/tools/federal-osbp';
+import { searchAgencyOppsByOffice } from '@/mcp/tools/agency-opps-by-office';
+import { getSbloContact } from '@/mcp/tools/sblo-contact';
+import { searchFederalContacts } from '@/mcp/tools/federal-contacts';
+import { searchPodcastLessons } from '@/mcp/tools/podcast-lessons';
+import { getAgencyBudgetTrends } from '@/mcp/tools/agency-budget-trends';
+import { deriveCompanyKeywords } from '@/mcp/tools/company-keywords';
+import { getAgencySpendingDetailTool } from '@/mcp/tools/agency-spending-detail';
 import { getBalance } from '@/lib/mcp/credits';
+import { tierFor } from '@/lib/mcp/entitlements';
 
 export interface McpToolContext {
   /** The verified key owner — used for user-bound tools + (Slice 3) the debit. */
@@ -47,8 +73,54 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   get_pricing_intel: 1, // GSA CALC labor-rate intel (free upstream, multi-call; warm cache ~free)
   get_incumbent_financials: 2, // SEC EDGAR (multi-endpoint, all free)
   get_regulatory_demand: 1, // Federal Register (single free call, cacheable)
+  get_award_detail: 2, // USASpending resolve (PIID→id) + award-detail fetch (both free)
+  find_predecessor_award: 2, // USASpending search + award-detail fetch (incumbent inference)
+  lookup_sam_entity: 1, // SAM Entity Management API (single lookup/search)
+  search_contractors: 2, // live BigQuery recipients scan (competitive landscape)
+  get_agency_intel: 1, // agency resolve (local) + USASpending obligations (free)
+  search_grants: 1, // Grants.gov search (single free upstream call)
+  get_agency_forecasts: 1, // Supabase agency_forecasts read
+  search_sbir: 1, // NIH RePORTER + multisite aggregate
+  get_expiring_contracts: 1, // Supabase recompete_opportunities read
+  get_keyword_coverage: 1, // USASpending spending-by-category (free upstream, cacheable)
+  search_idv_contracts: 2, // live USASpending IDV/task-order search
+  get_contractor_award_history: 2, // USASpending cache + contractor DB
+  assess_market_depth: 2, // Supabase sam_entities + BQ recipients activity enrich
+  get_solicitation_documents: 3, // full-text + raw-file delivery (cold path downloads + extracts on demand)
+  search_federal_events: 2, // Supabase sam_events read + optional paid AI web discovery (Serper+Groq)
+  scan_proposal_compliance: 1, // pure deterministic DQ-risk scan (no LLM/IO)
+  evaluate_bid_decision: 1, // pure GovCon bid/no-bid framework + scorer (no LLM/IO)
+  lookup_federal_osbp: 1, // curated DoD command / OSBP directory (static, no LLM/IO)
+  search_agency_opps_by_office: 1, // DoDAAC-anchored open SAM opps (Supabase read)
+  get_sblo_contact: 1, // curated SBLO roster + prime DB (static, no LLM/IO)
+  search_federal_contacts: 2, // DoDAAC-anchored buying-office roster (Supabase read + decode)
+  search_podcast_lessons: 1, // proprietary podcast corpus (Supabase keyword search)
+  get_agency_budget_trends: 1, // curated OMB/CBJ budget-authority JSON (static, no LLM/IO)
+  derive_company_keywords: 1, // OpenAI-embedding keyword derivation (no BigQuery)
+  get_agency_spending_detail: 2, // multiple USASpending aggregates (total + subagency + set-aside buckets)
   get_balance: 0, // meta tool — always free
 };
+
+/**
+ * Proprietary tools whose RESULTS are the un-copyable moat — they return curated /
+ * teaching content (corpus passages, extracted lessons, curated contact rows), NOT a
+ * public-API passthrough. These are the ONLY tools the extraction guard protects
+ * (Layers A+B, `src/lib/mcp/extraction-guard.ts`); the public-data wrappers wrap free
+ * APIs and are deliberately left ungated (nothing to steal + gating kills day-one
+ * utility). Curated-but-public-source tools (search_federal_contacts / get_agency_intel)
+ * are intentionally NOT here — their underlying data is public SAM/curated intel.
+ */
+export const PROPRIETARY_TOOLS: ReadonlySet<string> = new Set([
+  'get_winning_playbook', // the teaching corpus — the crown jewel
+  'search_podcast_lessons', // extracted key_lessons from the proprietary podcast corpus
+  'get_sblo_contact', // curated 200-prime SBLO teaming roster
+  'lookup_federal_osbp', // curated DoD command / OSBP directory
+]);
+
+/** True if `name` is a proprietary tool the extraction guard should protect. */
+export function isProprietaryTool(name: string): boolean {
+  return PROPRIETARY_TOOLS.has(name);
+}
 
 /** Free meta-tool: report the caller's live credit balance. */
 const GET_BALANCE_TOOL_DEF = {
@@ -146,6 +218,591 @@ const REGULATORY_DEMAND_TOOL_DEF = {
   },
 };
 
+/** OpenAI-style def for the USASpending award-detail tool. */
+const AWARD_DETAIL_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_award_detail',
+    description:
+      'Full USASpending detail for one federal award: obligated→ceiling (the real prize size), the ' +
+      'parent IDV/vehicle you must hold to compete, period of performance (recompete timing), recipient, ' +
+      'NAICS/PSC, funding account. Pass a contract number (PIID) OR a generated_internal_id. Returns ' +
+      'grounded=false when no award matches — do not invent figures.',
+    parameters: {
+      type: 'object',
+      properties: {
+        piid: { type: 'string', description: 'Contract number (PIID), e.g. "140F0822D0024".' },
+        id: { type: 'string', description: 'USASpending generated_internal_id, if already known (skips the resolve).' },
+      },
+    },
+  },
+};
+
+/** OpenAI-style def for the incumbent/predecessor-award inference tool. */
+const PREDECESSOR_AWARD_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'find_predecessor_award',
+    description:
+      'The LIKELY incumbent contract behind an open opportunity, inferred as the largest recent award ' +
+      'matching the NAICS + agency (+ title). Returns full award detail (incumbent, ceiling, expiry, ' +
+      'parent vehicle) plus a match-confidence. Best-match inference, NOT a certified link — present as ' +
+      '"likely". Returns grounded=false when no good match exists.',
+    parameters: {
+      type: 'object',
+      properties: {
+        naics_code: { type: 'string', description: 'The opportunity NAICS (4-6 digit).' },
+        agency_name: { type: 'string', description: 'Buying agency, e.g. "Department of Defense". Sharpens the match.' },
+        title: { type: 'string', description: 'Opportunity title — raises match confidence when present.' },
+      },
+    },
+  },
+};
+
+/** OpenAI-style def for the SAM entity lookup tool. */
+const SAM_ENTITY_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'lookup_sam_entity',
+    description:
+      'Live SAM.gov registration for a contractor: UEI/CAGE, legal name, registration status, NAICS, ' +
+      'certifications (8(a), HUBZone, …), location. Pass a UEI for an exact entity, or a company name to ' +
+      'search. The "is this vendor real, registered, and set-aside eligible?" check. Set-aside eligibility ' +
+      'depends on the CURRENT status shown, not past awards.',
+    parameters: {
+      type: 'object',
+      properties: {
+        uei: { type: 'string', description: '12-char SAM UEI for an exact lookup.' },
+        name: { type: 'string', description: 'Company legal name to search (when no UEI given).' },
+        state: { type: 'string', description: 'Optional 2-letter state filter for name search.' },
+        limit: { type: 'number', description: 'Max name-search matches (default 10, max 25).' },
+      },
+    },
+  },
+};
+
+const SEARCH_CONTRACTORS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'search_contractors',
+    description:
+      'The competitive landscape for a market: top federal contractors by total obligated dollars for a ' +
+      'keyword / NAICS / state, with award count and how many distinct agencies each sells to (a capture ' +
+      'signal — broad seller vs. single-buyer dependent). The "size up the competition / find teaming ' +
+      'partners" lookup. Dollars are cumulative historical USASpending obligations, not a bid list. Returns ' +
+      'grounded=false when nothing matches — broaden the NAICS prefix or drop the state; do not invent firms.',
+    parameters: {
+      type: 'object',
+      properties: {
+        keyword: { type: 'string', description: 'Free-text company-name match, e.g. "Booz".' },
+        naics: { type: 'string', description: 'NAICS code(s), comma/space separated; 2-6 digit prefixes allowed, e.g. "541512".' },
+        state: { type: 'string', description: 'Optional 2-letter state filter, e.g. "VA".' },
+        sort_by: { type: 'string', enum: ['total_obligated', 'award_count', 'recipient_name'], description: 'Ranking (default total_obligated).' },
+        limit: { type: 'number', description: 'Max rows (default 15, max 100).' },
+      },
+    },
+  },
+};
+
+const AGENCY_INTEL_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_agency_intel',
+    description:
+      'Target-research read on a federal agency: resolves it by name / abbreviation / CGAC code, then returns ' +
+      'identity + hierarchy, curated GovCon pain points & priorities, and (when available) live USASpending ' +
+      'obligations for the fiscal year with top NAICS. The "size up a buyer before I pursue them" lookup. Pain ' +
+      'points are curated intel, not an official statement. Returns grounded=false when no agency matches — ' +
+      'try the full name or a CGAC code; do not guess an agency.',
+    parameters: {
+      type: 'object',
+      properties: {
+        agency: { type: 'string', description: 'Agency name, abbreviation, or CGAC code, e.g. "VA", "Department of Defense", or "069".' },
+        fiscal_year: { type: 'number', description: 'Optional fiscal year for spending (defaults to current federal FY).' },
+      },
+      required: ['agency'],
+    },
+  },
+};
+
+const GRANTS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'search_grants',
+    description:
+      'Federal GRANT opportunities from Grants.gov ($700B+ of assistance funding — a different lane than ' +
+      'SAM.gov contracts). Search by keyword / agency / funding category. Returns title, agency, close date, ' +
+      'award ceiling, CFDA, link. Grants are assistance (a different application path than contracts). ' +
+      'grounded=false when nothing matches — broaden the keyword; do not invent grants.',
+    parameters: {
+      type: 'object',
+      properties: {
+        keyword: { type: 'string', description: 'Search term, e.g. "broadband" or "veteran health".' },
+        agency: { type: 'string', description: 'Top-level agency code, e.g. "DOD" / "HHS" (client-side prefix filter).' },
+        category: { type: 'string', description: 'Grants.gov funding category code, e.g. "HL" (health), "ST" (science).' },
+        status: { type: 'string', enum: ['posted', 'forecasted', 'closed', 'archived'], description: 'Opportunity status (default posted).' },
+        limit: { type: 'number', description: 'Max results (default 25, max 100).' },
+      },
+    },
+  },
+};
+
+const FORECASTS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_agency_forecasts',
+    description:
+      'Upcoming federal procurement FORECASTS — planned buys 6-18 months before a solicitation posts (the ' +
+      '"get in early" signal, ~7,700 records across ~12 agencies). Filter by NAICS / agency / state / set-aside / ' +
+      'fiscal year / keyword. Returns title, agency, NAICS, fiscal year+quarter, estimated value, set-aside, ' +
+      'incumbent. A forecast is a PLAN, not a posted opportunity — dates slip and some cancel. grounded=false ' +
+      'when nothing matches (may be a coverage gap, not absence of demand).',
+    parameters: {
+      type: 'object',
+      properties: {
+        naics: { type: 'string', description: 'NAICS code(s), comma-separated; ≤4 digits = prefix.' },
+        agency: { type: 'string', description: 'Source agency, case-insensitive partial.' },
+        state: { type: 'string', description: 'Place-of-performance state (full name matches best).' },
+        set_aside: { type: 'string', description: 'Set-aside type, e.g. "8(a)", "SDVOSB".' },
+        fiscal_year: { type: 'string', description: 'Fiscal year, "FY2026" or "2026".' },
+        keyword: { type: 'string', description: 'Free-text over title + description.' },
+        limit: { type: 'number', description: 'Max results (default 25, max 200).' },
+      },
+    },
+  },
+};
+
+const SBIR_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'search_sbir',
+    description:
+      'SBIR/STTR small-business R&D opportunities from NIH RePORTER (awarded projects — competitive intel on ' +
+      'who won what) + a multisite aggregate of open notices. source="nih" = awarded NIH projects; ' +
+      'source="multisite"/"all" = open notices. Filter by keyword / agency / phase. Returns title, agency, ' +
+      'phase, amount, organization, dates. grounded=false when nothing matches — try source="all".',
+    parameters: {
+      type: 'object',
+      properties: {
+        keyword: { type: 'string', description: 'Search term, e.g. "machine learning" or "vaccine".' },
+        agency: { type: 'string', description: 'NIH institute (NCI, NIAID, …) or broad agency (NSF, DOD, …).' },
+        phase: { type: 'string', enum: ['1', '2', 'all'], description: 'SBIR/STTR phase (default all).' },
+        source: { type: 'string', enum: ['nih', 'multisite', 'all'], description: 'Data source (default nih = awarded NIH projects).' },
+        limit: { type: 'number', description: 'Max results (default 25, max 50).' },
+      },
+    },
+  },
+};
+
+const EXPIRING_CONTRACTS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_expiring_contracts',
+    description:
+      'Federal contracts EXPIRING soon — recompete targets ("who is about to lose their contract so I can ' +
+      'pursue it"). Filter by NAICS / agency / state / expiration window (months) / value / recompete-likelihood. ' +
+      'Returns incumbent, agency, NAICS, obligated + ceiling value, period-of-performance end, recompete date, ' +
+      'likelihood — soonest-expiring first. A multiple-award IDIQ appears as several rows (one per holder). ' +
+      'grounded=false when nothing matches — widen months_window.',
+    parameters: {
+      type: 'object',
+      properties: {
+        naics: { type: 'string', description: 'NAICS code; ≤5 digits = prefix, 6 = exact.' },
+        agency: { type: 'string', description: 'Agency name, case-insensitive partial.' },
+        state: { type: 'string', description: '2-letter place-of-performance state.' },
+        months_window: { type: 'number', description: 'Expiration window in months (default 18, max 60).' },
+        min_value: { type: 'number', description: 'Minimum obligated dollars.' },
+        max_value: { type: 'number', description: 'Maximum obligated dollars.' },
+        likelihood: { type: 'string', enum: ['high', 'medium', 'low'], description: 'Recompete-likelihood filter.' },
+        limit: { type: 'number', description: 'Max results (default 25, max 200).' },
+      },
+    },
+  },
+};
+
+const KEYWORD_COVERAGE_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_keyword_coverage',
+    description:
+      'Market coverage for a PRODUCT/SERVICE keyword (e.g. "drones", "demolition"). Returns the TOTAL federal ' +
+      'market ($), EVERY NAICS that bought it (ranked), the smallest NAICS set covering ~90%, and the top PSCs ' +
+      '("what was actually bought"). The lesson: a single obvious NAICS is often only ~28% of the market — search ' +
+      'it alone and you MISS the rest. Use this to derive the RIGHT NAICS set for alerts/searches. grounded=false ' +
+      'when no spending matches the keyword.',
+    parameters: {
+      type: 'object',
+      properties: {
+        keyword: { type: 'string', description: 'Product/service term. Single significant words match best (USASpending keyword search is exact-phrase).' },
+        coverage_target: { type: 'number', description: 'Fraction of the market the returned NAICS set should cover (0.5–0.99, default 0.9).' },
+      },
+      required: ['keyword'],
+    },
+  },
+};
+
+const IDV_CONTRACTS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'search_idv_contracts',
+    description:
+      'Indefinite-Delivery Vehicles (IDIQ / GWAC / BPA) and the task orders flowing through them. search_type:"idv" ' +
+      'returns the base vehicles you must be ON to compete; search_type:"task" returns the delivery/task orders being ' +
+      'ordered through them (demand + typical order size). Filter by NAICS / PSC / agency / state / min value / date ' +
+      'range. grounded=false when nothing matches.',
+    parameters: {
+      type: 'object',
+      properties: {
+        naics: { type: 'string', description: 'NAICS code.' },
+        psc: { type: 'string', description: 'Product/Service Code.' },
+        agency: { type: 'string', description: 'Awarding agency name.' },
+        state: { type: 'string', description: '2-letter state (recipient or place-of-performance).' },
+        min_value: { type: 'number', description: 'Minimum award amount (dollars).' },
+        date_from: { type: 'string', description: 'Action date lower bound (YYYY-MM-DD).' },
+        date_to: { type: 'string', description: 'Action date upper bound (YYYY-MM-DD).' },
+        search_type: { type: 'string', enum: ['idv', 'task'], description: '"idv" = base vehicles (default); "task" = task/delivery orders.' },
+        limit: { type: 'number', description: 'Max results per page (default 25).' },
+        page: { type: 'number', description: '1-based page number.' },
+      },
+    },
+  },
+};
+
+const CONTRACTOR_AWARD_HISTORY_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_contractor_award_history',
+    description:
+      "A named contractor's federal prime-award history: total obligations, award count, year-over-year trend, top " +
+      'agencies, top NAICS, and recent awards. Use it to size up a competitor, teammate, or incumbent. Name matching ' +
+      'is fuzzy — always check match.confidence. grounded=false when the firm has no cached award history.',
+    parameters: {
+      type: 'object',
+      properties: {
+        company: { type: 'string', description: 'Contractor name (legal business name matches best).' },
+        award_limit: { type: 'number', description: 'Max recent awards to return.' },
+      },
+      required: ['company'],
+    },
+  },
+};
+
+const MARKET_DEPTH_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'assess_market_depth',
+    description:
+      'Rule-of-Two market-depth determination for a NAICS (+ optional set-aside / state): how many CAPABLE small ' +
+      'businesses exist, whether the Rule of Two is met (≥2 capable at a fair price → the requirement should be set ' +
+      'aside), a scored/tiered vendor list (active_performer > capable > emerging), and memo-ready caveats. ' +
+      'registered_only firms are shown separately and never inflate the count. grounded=false when no capable ' +
+      'businesses are found.',
+    parameters: {
+      type: 'object',
+      properties: {
+        naics: { type: 'string', description: 'NAICS code (6-digit).' },
+        state: { type: 'string', description: '2-letter state to scope the market geographically.' },
+        set_aside: { type: 'string', description: "Normalized label: '8(a)','HUBZone','SDVOSB','WOSB','EDWOSB','Small Business'." },
+        include_emerging: { type: 'boolean', description: 'Include emerging (registered, not-yet-performed) firms in the count (default true).' },
+        limit: { type: 'number', description: 'Max businesses to return in the list.' },
+      },
+      required: ['naics'],
+    },
+  },
+};
+
+const SOLICITATION_DOCUMENTS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_solicitation_documents',
+    description:
+      'Get the FULL text + downloadable raw files for a SAM solicitation by notice_id — the SOW/PWS, the notice ' +
+      'body, and every attachment. Returns notice metadata + inline body/SOW text + a documents[] list, each with ' +
+      'inline extracted_text (capped; check *_truncated) AND a short-lived signed download_url (~1h) to the full raw ' +
+      'PDF/DOCX so an agent can hand it to a design tool (Canva) or re-parse it. Cold notices (never tracked) are ' +
+      'downloaded + extracted ON DEMAND. grounded=false when the notice has no text or attachments — verify the ' +
+      'notice_id. SAM attachments are public federal data.',
+    parameters: {
+      type: 'object',
+      properties: {
+        notice_id: {
+          type: 'string',
+          description: 'SAM notice id (UUID) or solicitation number. Get it from search_sam_opportunities results.',
+        },
+      },
+      required: ['notice_id'],
+    },
+  },
+};
+
+const FEDERAL_EVENTS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'search_federal_events',
+    description:
+      'Upcoming federal-contracting EVENTS for an agency — industry days, matchmaking, sources-sought, and ' +
+      'association conferences. "Where do I show up in person to win this buyer?" Returns dated SAM.gov Special ' +
+      'Notices (source="sam", DoDAAC-office-anchored, trust the date) and, when include_ai_discovery is set, ' +
+      'web-discovered conferences (source="ai", carry a confidence score — verify before attending). Each event ' +
+      'has title, type, date, location, registration URL, and the decoded buying office. grounded=false when no ' +
+      'events match — widen months_ahead or enable AI discovery.',
+    parameters: {
+      type: 'object',
+      properties: {
+        agency: { type: 'string', description: 'Agency name, e.g. "Department of Defense", "Navy", "GSA". Messy raw names resolve via normalization.' },
+        months_ahead: { type: 'number', description: 'Look-ahead window in months (default 4, max 12).' },
+        include_ai_discovery: { type: 'boolean', description: 'Also run a web search for association conferences not in SAM (slower, best-effort). Default false.' },
+        limit: { type: 'number', description: 'Max SAM events to return (default 25, max 100).' },
+      },
+      required: ['agency'],
+    },
+  },
+};
+
+const SCAN_COMPLIANCE_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'scan_proposal_compliance',
+    description:
+      'Pre-submit disqualification check: given the RFP requirements + a proposal draft, flag what could get the ' +
+      'bid THROWN OUT — missed deadline (the #1 DQ), ineligible set-aside, page-limit overage, missing reps/certs ' +
+      'or required plans, unaddressed evaluation factors, un-acknowledged amendments. Returns findings with ' +
+      'severity dq/warning/info + an at_risk flag. Deterministic (no AI). Runs entirely on the inputs you pass — ' +
+      'pair with extract_compliance_matrix for the requirements list.',
+    parameters: {
+      type: 'object',
+      properties: {
+        requirements: {
+          type: 'array',
+          description: 'RFP requirements to check against (from extract_compliance_matrix or your own read).',
+          items: {
+            type: 'object',
+            properties: {
+              requirement: { type: 'string', description: 'The requirement text (a shall-statement).' },
+              category: { type: 'string', description: 'Category hint (submission/evaluation/technical/…); free-text is normalized.' },
+              section: { type: 'string', description: 'RFP section, e.g. "L.3.2", "M.2".' },
+              id: { type: 'string' },
+            },
+            required: ['requirement'],
+          },
+        },
+        draft_text: { type: 'string', description: 'The full proposal / response text (all sections concatenated).' },
+        sections: {
+          type: 'array',
+          description: 'Optional per-section drafts for finer page/coverage checks.',
+          items: { type: 'object', properties: { label: { type: 'string' }, text: { type: 'string' } }, required: ['label', 'text'] },
+        },
+        bidder_set_asides: { type: 'array', items: { type: 'string' }, description: 'Set-asides the bidder actually holds (e.g. ["8(a)","WOSB"]).' },
+      },
+      required: ['requirements', 'draft_text'],
+    },
+  },
+};
+
+const BID_DECISION_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'evaluate_bid_decision',
+    description:
+      "GovCon Giants' bid / no-bid framework. ALWAYS returns the framework — the 5 universal eliminator GATES " +
+      '(set-aside eligibility, licenses, past performance, bonding, deadline) + the 10-factor scorecard with its ' +
+      'positive/neutral/negative rubric — so you know exactly what to assess. When you also pass gate answers + ' +
+      'factor ratings, it SCORES the card: any failed gate = automatic No-Bid; otherwise pursue (≥70) / watch ' +
+      '(40–69) / skip (<40). Call it once with no args to learn the rubric, then again with your assessment.',
+    parameters: {
+      type: 'object',
+      properties: {
+        gates: {
+          type: 'object',
+          description: 'gateId → passed? (true/false), from the returned framework gates. A false on any = No-Bid.',
+          additionalProperties: { type: 'boolean' },
+        },
+        ratings: {
+          type: 'object',
+          description: 'factorId → 0-10, from the returned framework factors.',
+          additionalProperties: { type: 'number' },
+        },
+      },
+    },
+  },
+};
+
+const FEDERAL_OSBP_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'lookup_federal_osbp',
+    description:
+      'The Office of Small Business Programs (OSBP/OSDBU) — the small-business front door — for a federal ' +
+      'command or agency. Pass a command/agency name or abbreviation (e.g. "NAVFAC", "USACE", "Department of ' +
+      'the Navy"). Returns the OSBP office, director (with a director_verified YYYY-MM stamp — names rotate, ' +
+      'mailboxes are stable), email/phone/address, acquisition office, forecast URL, and key capabilities. ' +
+      'A parent-agency input returns all its commands\' offices. grounded=false = not in the curated directory ' +
+      '(DoD/DLA/Navy/Army-weighted) — do NOT invent a contact.',
+    parameters: {
+      type: 'object',
+      properties: {
+        agency: {
+          type: 'string',
+          description: 'Command/agency name or abbreviation, e.g. "NAVFAC", "USACE", "DLA Aviation", "Department of the Navy".',
+        },
+      },
+      required: ['agency'],
+    },
+  },
+};
+
+const AGENCY_OPPS_BY_OFFICE_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'search_agency_opps_by_office',
+    description:
+      'Open SAM.gov solicitations anchored to a specific BUYING OFFICE — not the whole department. A DoD ' +
+      'sub-agency (a USACE district, DARPA, MDA) shares one department label, so a department filter returns the ' +
+      'whole-DoD firehose; this anchors on the 6-char DoDAAC that prefixes the solicitation number (W912PL = USACE ' +
+      'LA District) for THAT office\'s real open buys. Pass a command/agency name OR a known 6-char DoDAAC, plus ' +
+      'optional NAICS/state. _meta.anchor="dodaac" = office-precise; "department" = a broad civilian preview (no ' +
+      'DoDAAC path). grounded=false with anchor="dodaac" = genuinely nothing open now, not an error.',
+    parameters: {
+      type: 'object',
+      properties: {
+        agency: { type: 'string', description: 'Command / agency / sub-agency name, e.g. "USACE", "Naval Sea Systems Command".' },
+        dodaac: { type: 'string', description: 'A known 6-char DoDAAC (e.g. "W912PL"); takes precedence over agency.' },
+        naics: { type: 'string', description: 'NAICS filter; ≤4 digits = prefix, 6 = exact.' },
+        state: { type: 'string', description: '2-letter place-of-performance state.' },
+        limit: { type: 'number', description: 'Max results (default 25, max 100).' },
+      },
+    },
+  },
+};
+
+const SBLO_CONTACT_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_sblo_contact',
+    description:
+      'The Small Business Liaison Officer (SBLO) at a prime contractor — WHO to call to team on a subcontract. ' +
+      'Pass a company name (e.g. "AECOM", "Booz Allen Hamilton", "Leidos"). Curated data: the canonical 200-company ' +
+      'Jun-2026 SBLO roster first, then the broader 3,502-prime DB. Returns SBLO name, title, email, phone, supplier ' +
+      'portal, source. A matched company with a blank name/email means no public SBLO was found — the tool surfaces ' +
+      'the supplier portal instead; it NEVER invents a contact. grounded=false = company not in the curated set.',
+    parameters: {
+      type: 'object',
+      properties: {
+        company: { type: 'string', description: 'Prime contractor / company name, e.g. "AECOM", "Leidos".' },
+      },
+      required: ['company'],
+    },
+  },
+};
+const FEDERAL_CONTACTS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'search_federal_contacts',
+    description:
+      'The named PEOPLE at a federal buying office — contracting officers, contract specialists, small-business POCs — ' +
+      'anchored on the office\'s 6-char DoDAAC so a DoD sub-agency returns ITS people, not the whole-DoD firehose. Pass ' +
+      'an agency/command name OR a 6-char DoDAAC (+ optional office / role / free-text search). The agency\'s OSBP ' +
+      'small-business contact is prepended as the front door. _meta.anchor: "dodaac"/"agency-dodaac" = office-precise; ' +
+      '"department" = broad civilian preview (may mix offices). Overseas offices are filtered out. grounded=false = no ' +
+      'matching contacts (never an invented POC); email a contact only if it has a real address.',
+    parameters: {
+      type: 'object',
+      properties: {
+        agency: { type: 'string', description: 'Agency / command / sub-agency name, e.g. "USACE", "Department of Veterans Affairs".' },
+        dodaac: { type: 'string', description: 'A known 6-char DoDAAC (e.g. "W912PL"); most precise, anchors directly on the office.' },
+        office: { type: 'string', description: 'Office name filter (SAM office column; often null for POCs).' },
+        role: { type: 'string', description: 'role_category filter (e.g. "contracting_officer", "small_business").' },
+        search: { type: 'string', description: 'Free-text match on contact name OR title.' },
+        limit: { type: 'number', description: 'Max contacts (default 25, max 200).' },
+      },
+    },
+  },
+};
+const PODCAST_LESSONS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'search_podcast_lessons',
+    description:
+      "The proprietary GovCon Giants podcast corpus — real lessons from real contractor/agency guests, matched by " +
+      'topic / agency / NAICS / set-aside / guest name. Un-copyable moat content: no public API has "what a winning ' +
+      'SDVOSB actually learned breaking into VA construction." Returns episode cards with their key_lessons, guest, ' +
+      'agencies/NAICS mentioned. grounded=false when nothing matches — do NOT invent a lesson or attribute an invented ' +
+      'quote to a guest; every lesson must trace to a returned episode.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Free-text: topic, agency, NAICS, set-aside, or a guest name.' },
+        limit: { type: 'number', description: 'Max episodes (default 4, max 12).' },
+      },
+      required: ['query'],
+    },
+  },
+};
+
+const AGENCY_SPENDING_DETAIL_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_agency_spending_detail',
+    description:
+      '"Who inside this department buys, and can a small business win here." Complements get_agency_intel with the ' +
+      'sub-agency (component) spending breakdown + the set-aside distribution (Small Business / 8(a) / SDVOSB / WOSB / ' +
+      'HUBZone shares + overall small-business share) — the small-business easy-entry read. Live USASpending contract ' +
+      'obligations (award types A/B/C/D) for a fiscal year. Pass an agency name/abbreviation. grounded=false = no ' +
+      'toptier agency matched (do NOT invent figures); degraded=true = USASpending errored (not $0). Contract ' +
+      'obligations only, NOT total agency budget.',
+    parameters: {
+      type: 'object',
+      properties: {
+        agency: { type: 'string', description: 'Agency name or abbreviation, e.g. "Department of Defense", "VA", "NASA".' },
+        fiscal_year: { type: 'number', description: 'Fiscal year (defaults to the latest complete FY).' },
+      },
+      required: ['agency'],
+    },
+  },
+};
+
+const AGENCY_BUDGET_TRENDS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_agency_budget_trends',
+    description:
+      "An agency's discretionary budget authority and the FY2025→FY2026 trend (growing / cut / stable) — where the " +
+      'money is moving BEFORE it becomes awards. Pass an agency name or abbreviation ("VA", "Department of Defense", ' +
+      '"NASA", "EPA"). Returns FY25 (enacted) + FY26 (President\'s request) budget authority, the $ + % change, and the ' +
+      'trend. Figures are DISCRETIONARY budget authority only (not total obligations); FY26 is a request, not enacted. ' +
+      'grounded=false = agency not in the 47-agency toptier set — do NOT invent a number.',
+    parameters: {
+      type: 'object',
+      properties: {
+        agency: { type: 'string', description: 'Agency name or abbreviation, e.g. "VA", "Department of Defense", "NASA".' },
+      },
+      required: ['agency'],
+    },
+  },
+};
+const COMPANY_KEYWORDS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'derive_company_keywords',
+    description:
+      "Turn a company's OWN words (what they do + past performance) into the search keywords buyers actually use, " +
+      'ranked by MEANING. NAICS is the wrong discovery key; a company\'s real vocabulary finds the market its codes miss. ' +
+      'Pass a description and/or past-performance scope descriptions (the richest signal). Returns ranked keywords to ' +
+      'feed an opportunity search. Uses semantic embeddings (no BigQuery); fails soft to lexical order if embeddings are ' +
+      'down (_meta.ranked says which). grounded=false = not enough input text — do NOT invent keywords.',
+    parameters: {
+      type: 'object',
+      properties: {
+        description: { type: 'string', description: 'What the company does — one-liner / pitch / capability summary.' },
+        past_performance: { type: 'array', items: { type: 'string' }, description: 'Past-performance scope descriptions (richest signal).' },
+        capabilities: { type: 'array', items: { type: 'string' }, description: 'Capability / service descriptions.' },
+        code_titles: { type: 'array', items: { type: 'string' }, description: 'NAICS/PSC title text the caller already knows (optional).' },
+        limit: { type: 'number', description: 'Max keywords (default 12, max 25).' },
+      },
+    },
+  },
+};
+
 /** All tools exposed over MCP in v1, each annotated with its credit price. */
 export function listMcpTools(): Array<Record<string, unknown>> {
   const defs = [
@@ -155,9 +812,34 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     PRICING_INTEL_TOOL_DEF,
     INCUMBENT_FINANCIALS_TOOL_DEF,
     REGULATORY_DEMAND_TOOL_DEF,
+    AWARD_DETAIL_TOOL_DEF,
+    PREDECESSOR_AWARD_TOOL_DEF,
+    SAM_ENTITY_TOOL_DEF,
+    SEARCH_CONTRACTORS_TOOL_DEF,
+    AGENCY_INTEL_TOOL_DEF,
+    GRANTS_TOOL_DEF,
+    FORECASTS_TOOL_DEF,
+    SBIR_TOOL_DEF,
+    EXPIRING_CONTRACTS_TOOL_DEF,
+    KEYWORD_COVERAGE_TOOL_DEF,
+    IDV_CONTRACTS_TOOL_DEF,
+    CONTRACTOR_AWARD_HISTORY_TOOL_DEF,
+    MARKET_DEPTH_TOOL_DEF,
+    SOLICITATION_DOCUMENTS_TOOL_DEF,
+    FEDERAL_EVENTS_TOOL_DEF,
+    SCAN_COMPLIANCE_TOOL_DEF,
+    BID_DECISION_TOOL_DEF,
+    FEDERAL_OSBP_TOOL_DEF,
+    AGENCY_OPPS_BY_OFFICE_TOOL_DEF,
+    SBLO_CONTACT_TOOL_DEF,
+    FEDERAL_CONTACTS_TOOL_DEF,
+    PODCAST_LESSONS_TOOL_DEF,
+    AGENCY_BUDGET_TRENDS_TOOL_DEF,
+    COMPANY_KEYWORDS_TOOL_DEF,
+    AGENCY_SPENDING_DETAIL_TOOL_DEF,
     GET_BALANCE_TOOL_DEF,
   ];
-  return defs.map((d) => ({ ...d, _credits: TOOL_CREDITS[d.function.name] ?? 0 }));
+  return defs.map((d) => ({ ...d, _credits: TOOL_CREDITS[d.function.name] ?? 0, _tier: tierFor(d.function.name) }));
 }
 
 /** Is `name` a tool this server exposes? (Fast reject for unknown calls.) */
@@ -169,6 +851,31 @@ export function isMcpTool(name: string): boolean {
     name === 'get_pricing_intel' ||
     name === 'get_incumbent_financials' ||
     name === 'get_regulatory_demand' ||
+    name === 'get_award_detail' ||
+    name === 'find_predecessor_award' ||
+    name === 'lookup_sam_entity' ||
+    name === 'search_contractors' ||
+    name === 'get_agency_intel' ||
+    name === 'search_grants' ||
+    name === 'get_agency_forecasts' ||
+    name === 'search_sbir' ||
+    name === 'get_expiring_contracts' ||
+    name === 'get_keyword_coverage' ||
+    name === 'search_idv_contracts' ||
+    name === 'get_contractor_award_history' ||
+    name === 'assess_market_depth' ||
+    name === 'get_solicitation_documents' ||
+    name === 'search_federal_events' ||
+    name === 'scan_proposal_compliance' ||
+    name === 'evaluate_bid_decision' ||
+    name === 'lookup_federal_osbp' ||
+    name === 'search_agency_opps_by_office' ||
+    name === 'get_sblo_contact' ||
+    name === 'search_federal_contacts' ||
+    name === 'search_podcast_lessons' ||
+    name === 'get_agency_budget_trends' ||
+    name === 'derive_company_keywords' ||
+    name === 'get_agency_spending_detail' ||
     name === 'get_balance'
   );
 }
@@ -244,6 +951,255 @@ export async function runMcpTool(
       document_type: (args.document_type as 'RULE' | 'PROPOSED_RULE' | 'NOTICE' | undefined) ?? undefined,
       days_back: typeof args.days_back === 'number' ? args.days_back : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_award_detail') {
+    const result = (await getAwardDetail({
+      piid: typeof args.piid === 'string' ? args.piid : undefined,
+      id: typeof args.id === 'string' ? args.id : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'find_predecessor_award') {
+    const result = (await findPredecessor({
+      naics_code: typeof args.naics_code === 'string' ? args.naics_code : undefined,
+      agency_name: typeof args.agency_name === 'string' ? args.agency_name : undefined,
+      title: typeof args.title === 'string' ? args.title : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'lookup_sam_entity') {
+    const result = (await lookupSamEntity({
+      uei: typeof args.uei === 'string' ? args.uei : undefined,
+      name: typeof args.name === 'string' ? args.name : undefined,
+      state: typeof args.state === 'string' ? args.state : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'search_contractors') {
+    const result = (await searchContractors({
+      keyword: typeof args.keyword === 'string' ? args.keyword : undefined,
+      naics: typeof args.naics === 'string' ? args.naics : undefined,
+      state: typeof args.state === 'string' ? args.state : undefined,
+      sort_by:
+        args.sort_by === 'total_obligated' || args.sort_by === 'award_count' || args.sort_by === 'recipient_name'
+          ? args.sort_by
+          : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_agency_intel') {
+    const result = (await getAgencyIntel({
+      agency: typeof args.agency === 'string' ? args.agency : '',
+      fiscal_year: typeof args.fiscal_year === 'number' ? args.fiscal_year : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'search_grants') {
+    const result = (await grantsSearch({
+      keyword: typeof args.keyword === 'string' ? args.keyword : undefined,
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      category: typeof args.category === 'string' ? args.category : undefined,
+      status: args.status === 'posted' || args.status === 'forecasted' || args.status === 'closed' || args.status === 'archived' ? args.status : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_agency_forecasts') {
+    const result = (await agencyForecasts({
+      naics: typeof args.naics === 'string' ? args.naics : undefined,
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      state: typeof args.state === 'string' ? args.state : undefined,
+      set_aside: typeof args.set_aside === 'string' ? args.set_aside : undefined,
+      fiscal_year: typeof args.fiscal_year === 'string' ? args.fiscal_year : undefined,
+      keyword: typeof args.keyword === 'string' ? args.keyword : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'search_sbir') {
+    const result = (await sbirSearch({
+      keyword: typeof args.keyword === 'string' ? args.keyword : undefined,
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      phase: args.phase === '1' || args.phase === '2' || args.phase === 'all' ? args.phase : undefined,
+      source: args.source === 'nih' || args.source === 'multisite' || args.source === 'all' ? args.source : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_expiring_contracts') {
+    const result = (await expiringContracts({
+      naics: typeof args.naics === 'string' ? args.naics : undefined,
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      state: typeof args.state === 'string' ? args.state : undefined,
+      months_window: typeof args.months_window === 'number' ? args.months_window : undefined,
+      min_value: typeof args.min_value === 'number' ? args.min_value : undefined,
+      max_value: typeof args.max_value === 'number' ? args.max_value : undefined,
+      likelihood: args.likelihood === 'high' || args.likelihood === 'medium' || args.likelihood === 'low' ? args.likelihood : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_keyword_coverage') {
+    const result = (await getKeywordCoverage({
+      keyword: typeof args.keyword === 'string' ? args.keyword : '',
+      coverage_target: typeof args.coverage_target === 'number' ? args.coverage_target : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'search_idv_contracts') {
+    const result = (await idvContracts({
+      naics: typeof args.naics === 'string' ? args.naics : undefined,
+      psc: typeof args.psc === 'string' ? args.psc : undefined,
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      state: typeof args.state === 'string' ? args.state : undefined,
+      min_value: typeof args.min_value === 'number' ? args.min_value : undefined,
+      date_from: typeof args.date_from === 'string' ? args.date_from : undefined,
+      date_to: typeof args.date_to === 'string' ? args.date_to : undefined,
+      search_type: args.search_type === 'idv' || args.search_type === 'task' ? args.search_type : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+      page: typeof args.page === 'number' ? args.page : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_contractor_award_history') {
+    const result = (await contractorAwardHistory({
+      company: typeof args.company === 'string' ? args.company : '',
+      award_limit: typeof args.award_limit === 'number' ? args.award_limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'assess_market_depth') {
+    const result = (await assessMarketDepth({
+      naics: typeof args.naics === 'string' ? args.naics : '',
+      state: typeof args.state === 'string' ? args.state : undefined,
+      set_aside: typeof args.set_aside === 'string' ? args.set_aside : undefined,
+      include_emerging: typeof args.include_emerging === 'boolean' ? args.include_emerging : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'search_federal_events') {
+    const result = (await searchFederalEvents({
+      agency: typeof args.agency === 'string' ? args.agency : '',
+      months_ahead: typeof args.months_ahead === 'number' ? args.months_ahead : undefined,
+      include_ai_discovery: args.include_ai_discovery === true,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_solicitation_documents') {
+    const result = (await solicitationDocuments({
+      notice_id: typeof args.notice_id === 'string' ? args.notice_id : '',
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'scan_proposal_compliance') {
+    const result = scanProposalCompliance({
+      requirements: Array.isArray(args.requirements)
+        ? (args.requirements as Array<{ id?: string; requirement: string; category?: string; section?: string }>)
+        : [],
+      draft_text: typeof args.draft_text === 'string' ? args.draft_text : '',
+      sections: Array.isArray(args.sections) ? (args.sections as Array<{ label: string; text: string }>) : undefined,
+      bidder_set_asides: Array.isArray(args.bidder_set_asides) ? (args.bidder_set_asides as string[]) : undefined,
+    }) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'evaluate_bid_decision') {
+    const result = evaluateBidDecisionTool({
+      gates: args.gates && typeof args.gates === 'object' ? (args.gates as Record<string, boolean>) : undefined,
+      ratings: args.ratings && typeof args.ratings === 'object' ? (args.ratings as Record<string, number>) : undefined,
+    }) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'lookup_federal_osbp') {
+    const result = lookupFederalOsbp({
+      agency: typeof args.agency === 'string' ? args.agency : '',
+    }) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'search_agency_opps_by_office') {
+    const result = (await searchAgencyOppsByOffice({
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      dodaac: typeof args.dodaac === 'string' ? args.dodaac : undefined,
+      naics: typeof args.naics === 'string' ? args.naics : undefined,
+      state: typeof args.state === 'string' ? args.state : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_sblo_contact') {
+    const result = getSbloContact({
+      company: typeof args.company === 'string' ? args.company : '',
+    }) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'search_federal_contacts') {
+    const result = (await searchFederalContacts({
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      dodaac: typeof args.dodaac === 'string' ? args.dodaac : undefined,
+      office: typeof args.office === 'string' ? args.office : undefined,
+      role: typeof args.role === 'string' ? args.role : undefined,
+      search: typeof args.search === 'string' ? args.search : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'search_podcast_lessons') {
+    const result = (await searchPodcastLessons({
+      query: typeof args.query === 'string' ? args.query : '',
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_agency_budget_trends') {
+    const result = getAgencyBudgetTrends({
+      agency: typeof args.agency === 'string' ? args.agency : '',
+    }) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'derive_company_keywords') {
+    const result = (await deriveCompanyKeywords({
+      description: typeof args.description === 'string' ? args.description : undefined,
+      past_performance: Array.isArray(args.past_performance) ? (args.past_performance as string[]) : undefined,
+      capabilities: Array.isArray(args.capabilities) ? (args.capabilities as string[]) : undefined,
+      code_titles: Array.isArray(args.code_titles) ? (args.code_titles as string[]) : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_agency_spending_detail') {
+    const result = (await getAgencySpendingDetailTool({
+      agency: typeof args.agency === 'string' ? args.agency : '',
+      fiscal_year: typeof args.fiscal_year === 'number' ? args.fiscal_year : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }

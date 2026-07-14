@@ -8,8 +8,11 @@
  *   3. success → atomic debit; failure → debit 0
  * Every outcome writes a mcp_call_log row. Free tools (get_balance) skip billing.
  */
-import { creditsFor, isMcpTool, runMcpTool, type McpToolContext } from './tool-registry';
-import { getBalance, debitCredits, logCall } from './credits';
+import { creditsFor, isMcpTool, isProprietaryTool, PROPRIETARY_TOOLS, runMcpTool, type McpToolContext } from './tool-registry';
+import { getBalance, debitCredits, logCall, type CallStatus } from './credits';
+import { mcpFlags } from './flags';
+import { isProTool, isProForMcp } from './entitlements';
+import { evaluateExtractionGuard } from './extraction-guard';
 
 export interface MeteredContext extends McpToolContext {
   /** The verified key id, for the call log / ledger attribution. */
@@ -30,6 +33,49 @@ export async function runMeteredTool(
   }
 
   const cost = creditsFor(name);
+
+  // 0) Tier gate — Pro-only tools require a Pro subscription. Flag-gated (off by
+  // default → zero behavior change). A denied call is NOT charged and does NOT throw:
+  // the agent gets a clear `requires_pro` message it can relay, not a mid-run crash.
+  // The `gated` log row is the upsell queue (who hit the wall = who to convert).
+  if (mcpFlags.enforceTiers && isProTool(name)) {
+    const pro = await isProForMcp(ctx.userEmail);
+    if (!pro) {
+      await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'gated', creditsCharged: 0, apiKeyId: ctx.apiKeyId });
+      return {
+        ok: false,
+        error: {
+          code: 'requires_pro',
+          message: `${name} is a Mindy Pro tool. Upgrade at getmindy.ai/app to use it — your credits for every other tool still work.`,
+        },
+        creditsCharged: 0,
+      };
+    }
+  }
+
+  // 0.5) Extraction guard (Layers A+B) — protect the proprietary corpora from bulk
+  // export. Runs ONLY when flagged on AND only for proprietary tools (zero cost/latency
+  // otherwise). LOG-ONLY by default: a violation writes a `shadow_*` call-log row but the
+  // call still runs, so we measure real impact before enforcing. With extractionEnforce
+  // on, a violation is blocked with a clean, non-charged error (never a mid-run crash) —
+  // same shape as the tier gate above.
+  if (mcpFlags.extractionGuard && isProprietaryTool(name)) {
+    const verdict = await evaluateExtractionGuard(ctx.userEmail, Array.from(PROPRIETARY_TOOLS));
+    if (verdict) {
+      const enforce = mcpFlags.extractionEnforce;
+      await logCall({
+        userEmail: ctx.userEmail,
+        toolName: name,
+        status: (enforce ? verdict.status : `shadow_${verdict.status}`) as CallStatus,
+        creditsCharged: 0,
+        apiKeyId: ctx.apiKeyId,
+      });
+      if (enforce) {
+        return { ok: false, error: { code: verdict.code, message: verdict.message }, creditsCharged: 0 };
+      }
+      // log-only: fall through and run the call exactly as before.
+    }
+  }
 
   // 1) Pre-check — reject an empty balance before doing any work.
   if (cost > 0) {
