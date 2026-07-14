@@ -36,6 +36,7 @@ import { getKeywordCoverage } from '@/mcp/tools/keyword-coverage';
 import { idvContracts } from '@/mcp/tools/idv-contracts';
 import { contractorAwardHistory } from '@/mcp/tools/contractor-award-history';
 import { assessMarketDepth } from '@/mcp/tools/market-depth';
+import { solicitationDocuments } from '@/mcp/tools/solicitation-documents';
 import { getBalance } from '@/lib/mcp/credits';
 import { tierFor } from '@/lib/mcp/entitlements';
 
@@ -74,6 +75,7 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   search_idv_contracts: 2, // live USASpending IDV/task-order search
   get_contractor_award_history: 2, // USASpending cache + contractor DB
   assess_market_depth: 2, // Supabase sam_entities + BQ recipients activity enrich
+  get_solicitation_documents: 3, // full-text + raw-file delivery (cold path downloads + extracts on demand)
   get_balance: 0, // meta tool — always free
 };
 
@@ -466,6 +468,30 @@ const MARKET_DEPTH_TOOL_DEF = {
   },
 };
 
+const SOLICITATION_DOCUMENTS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_solicitation_documents',
+    description:
+      'Get the FULL text + downloadable raw files for a SAM solicitation by notice_id — the SOW/PWS, the notice ' +
+      'body, and every attachment. Returns notice metadata + inline body/SOW text + a documents[] list, each with ' +
+      'inline extracted_text (capped; check *_truncated) AND a short-lived signed download_url (~1h) to the full raw ' +
+      'PDF/DOCX so an agent can hand it to a design tool (Canva) or re-parse it. Cold notices (never tracked) are ' +
+      'downloaded + extracted ON DEMAND. grounded=false when the notice has no text or attachments — verify the ' +
+      'notice_id. SAM attachments are public federal data.',
+    parameters: {
+      type: 'object',
+      properties: {
+        notice_id: {
+          type: 'string',
+          description: 'SAM notice id (UUID) or solicitation number. Get it from search_sam_opportunities results.',
+        },
+      },
+      required: ['notice_id'],
+    },
+  },
+};
+
 /** All tools exposed over MCP in v1, each annotated with its credit price. */
 export function listMcpTools(): Array<Record<string, unknown>> {
   const defs = [
@@ -488,6 +514,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     IDV_CONTRACTS_TOOL_DEF,
     CONTRACTOR_AWARD_HISTORY_TOOL_DEF,
     MARKET_DEPTH_TOOL_DEF,
+    SOLICITATION_DOCUMENTS_TOOL_DEF,
     GET_BALANCE_TOOL_DEF,
   ];
   return defs.map((d) => ({ ...d, _credits: TOOL_CREDITS[d.function.name] ?? 0, _tier: tierFor(d.function.name) }));
@@ -515,6 +542,7 @@ export function isMcpTool(name: string): boolean {
     name === 'search_idv_contracts' ||
     name === 'get_contractor_award_history' ||
     name === 'assess_market_depth' ||
+    name === 'get_solicitation_documents' ||
     name === 'get_balance'
   );
 }
@@ -731,6 +759,13 @@ export async function runMcpTool(
       set_aside: typeof args.set_aside === 'string' ? args.set_aside : undefined,
       include_emerging: typeof args.include_emerging === 'boolean' ? args.include_emerging : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_solicitation_documents') {
+    const result = (await solicitationDocuments({
+      notice_id: typeof args.notice_id === 'string' ? args.notice_id : '',
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }

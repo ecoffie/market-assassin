@@ -73,6 +73,7 @@ try {
   for (const t of [
     'get_pricing_intel', 'get_incumbent_financials', 'get_regulatory_demand',
     'get_keyword_coverage', 'search_idv_contracts', 'get_contractor_award_history', 'assess_market_depth',
+    'get_solicitation_documents',
   ]) {
     if (!names.includes(t)) fail(`${t} not registered`);
   }
@@ -321,7 +322,36 @@ try {
   if (mdS._meta?.degraded) fail('market-depth: degraded=true (Supabase sam_entities unreachable)');
   if (!mdS._meta?.grounded) console.error('⚠ market-depth: grounded=false for NAICS 541512 — NON-FATAL (thin market / entities sync gap)');
 
-  console.error('\n✅ SMOKE PASSED — MCP transport + 17 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth) all live + honest');
+  // ── get_solicitation_documents (SAM cache docs + on-demand fetch) ──────────
+  // Pull a live notice ref from search first (shape-robust: parse the opp UUID
+  // from ui_link, else the solicitation_number), then fetch its documents.
+  console.error('\n→ resolving a live notice_id via search_sam_opportunities({ keyword: "construction" })');
+  const soRes = await client.callTool({ name: 'search_sam_opportunities', arguments: { keyword: 'construction', limit: 8 } });
+  const soBlob = JSON.stringify(soRes.structuredContent || soRes.content || soRes);
+  const oppMatch = soBlob.match(/\/opp\/([0-9a-fA-F]{32})/);
+  const solMatch = soBlob.match(/"solicitation_number"\s*:\s*"([^"]+)"/);
+  const noticeRef = oppMatch ? oppMatch[1] : solMatch ? solMatch[1] : null;
+  if (!noticeRef) {
+    console.error('⚠ solicitation-documents: search returned no notice ref (empty local cache?) — SKIPPING, NON-FATAL');
+  } else {
+    console.error(`\n→ calling get_solicitation_documents({ notice_id: "${noticeRef}" })`);
+    const sd = await client.callTool({ name: 'get_solicitation_documents', arguments: { notice_id: noticeRef } });
+    const sdS = sd.structuredContent;
+    if (!sdS) fail('solicitation-documents: no structuredContent');
+    if (!Array.isArray(sdS.documents)) fail('solicitation-documents: documents is not an array (shape contract broken)');
+    if (sdS._meta?.signed_url_ttl_seconds !== 3600) fail('solicitation-documents: signed_url_ttl_seconds != 3600');
+    if (!['cache', 'on_demand', 'none'].includes(sdS._meta?.source)) fail(`solicitation-documents: unexpected source "${sdS._meta?.source}"`);
+    const d0 = sdS.documents[0];
+    console.error(`✓ grounded=${sdS._meta?.grounded} · degraded=${sdS._meta?.degraded} · source=${sdS._meta?.source} · doc_count=${sdS._meta?.doc_count} · title=${String(sdS.title).slice(0, 50)}${d0 ? ` · top=${String(d0.filename).slice(0, 40)} (${d0.doc_kind}, ${d0.char_count}ch, url=${d0.download_url ? 'yes' : 'no'})` : ''}`);
+    if (sdS.documents.length > 0) {
+      const hasDelivery = sdS.documents.some((d) => d.download_url || (d.extracted_text && d.extracted_text.length > 0));
+      if (!hasDelivery) fail('solicitation-documents: documents present but NONE has a download_url or extracted_text (delivery broken)');
+    } else {
+      console.error('⚠ solicitation-documents: 0 documents for the picked notice — NON-FATAL (that notice may have no attachments; inline body/SOW text still returned if present)');
+    }
+  }
+
+  console.error('\n✅ SMOKE PASSED — MCP transport + 18 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth, solicitation-documents) all live + honest');
   await client.close();
   process.exit(0);
 } catch (err) {
