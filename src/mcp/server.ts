@@ -26,6 +26,8 @@ import { getRegulatoryDemand } from './tools/regulatory-demand';
 import { getAwardDetail } from './tools/award-detail';
 import { findPredecessor } from './tools/predecessor-award';
 import { lookupSamEntity } from './tools/sam-entity';
+import { searchContractors } from './tools/search-contractors';
+import { getAgencyIntel } from './tools/agency-intel';
 
 const server = new McpServer({
   name: 'mindy-govcon',
@@ -262,11 +264,73 @@ server.registerTool(
   },
 );
 
+server.registerTool(
+  'search_contractors',
+  {
+    title: 'Search Contractors (USASpending / BigQuery)',
+    description:
+      'The competitive landscape for a market: top federal contractors by total obligated dollars for a ' +
+      'keyword / NAICS / state, with award count and distinct-agency breadth (broad seller vs. single-buyer ' +
+      'dependent). The "size up the competition / find teaming partners" lookup. Dollars are cumulative ' +
+      'historical obligations, NOT a bid list. grounded=false when nothing matches — broaden the NAICS prefix.',
+    inputSchema: {
+      keyword: z.string().optional().describe('Free-text company-name match, e.g. "Booz".'),
+      naics: z
+        .string()
+        .optional()
+        .describe('NAICS code(s), comma/space separated; 2-6 digit prefixes allowed, e.g. "541512".'),
+      state: z.string().optional().describe('Optional 2-letter state filter, e.g. "VA".'),
+      sort_by: z
+        .enum(['total_obligated', 'award_count', 'recipient_name'])
+        .optional()
+        .describe('Ranking (default total_obligated).'),
+      limit: z.number().int().min(1).max(100).optional().describe('Max rows (default 15).'),
+    },
+  },
+  async ({ keyword, naics, state, sort_by, limit }) => {
+    const result = await searchContractors({ keyword, naics, state, sort_by, limit });
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
+  'get_agency_intel',
+  {
+    title: 'Get Agency Intel (Hierarchy + USASpending)',
+    description:
+      'Target-research read on a federal agency: resolves it by name / abbreviation / CGAC code, then returns ' +
+      'identity + hierarchy, curated GovCon pain points & priorities, and (when available) live USASpending ' +
+      'obligations for the fiscal year with top NAICS. The "size up a buyer before I pursue them" lookup. Pain ' +
+      'points are curated intel, not an official statement. grounded=false when no agency matches — do not guess.',
+    inputSchema: {
+      agency: z
+        .string()
+        .min(1)
+        .describe('Agency name, abbreviation, or CGAC code, e.g. "VA", "Department of Defense", or "069".'),
+      fiscal_year: z
+        .number()
+        .int()
+        .optional()
+        .describe('Optional fiscal year for spending (defaults to current federal FY).'),
+    },
+  },
+  async ({ agency, fiscal_year }) => {
+    const result = await getAgencyIntel({ agency, fiscal_year });
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity registered',
+    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel registered',
   );
 }
 
