@@ -42,6 +42,9 @@ import { scanProposalCompliance } from '@/mcp/tools/scan-compliance';
 import { evaluateBidDecisionTool } from '@/mcp/tools/bid-decision';
 import { lookupFederalOsbp } from '@/mcp/tools/federal-osbp';
 import { searchAgencyOppsByOffice } from '@/mcp/tools/agency-opps-by-office';
+import { getSbloContact } from '@/mcp/tools/sblo-contact';
+import { searchFederalContacts } from '@/mcp/tools/federal-contacts';
+import { searchPodcastLessons } from '@/mcp/tools/podcast-lessons';
 import { getBalance } from '@/lib/mcp/credits';
 import { tierFor } from '@/lib/mcp/entitlements';
 
@@ -86,6 +89,9 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   evaluate_bid_decision: 1, // pure GovCon bid/no-bid framework + scorer (no LLM/IO)
   lookup_federal_osbp: 1, // curated DoD command / OSBP directory (static, no LLM/IO)
   search_agency_opps_by_office: 1, // DoDAAC-anchored open SAM opps (Supabase read)
+  get_sblo_contact: 1, // curated SBLO roster + prime DB (static, no LLM/IO)
+  search_federal_contacts: 2, // DoDAAC-anchored buying-office roster (Supabase read + decode)
+  search_podcast_lessons: 1, // proprietary podcast corpus (Supabase keyword search)
   get_balance: 0, // meta tool — always free
 };
 
@@ -642,6 +648,70 @@ const AGENCY_OPPS_BY_OFFICE_TOOL_DEF = {
   },
 };
 
+const SBLO_CONTACT_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_sblo_contact',
+    description:
+      'The Small Business Liaison Officer (SBLO) at a prime contractor — WHO to call to team on a subcontract. ' +
+      'Pass a company name (e.g. "AECOM", "Booz Allen Hamilton", "Leidos"). Curated data: the canonical 200-company ' +
+      'Jun-2026 SBLO roster first, then the broader 3,502-prime DB. Returns SBLO name, title, email, phone, supplier ' +
+      'portal, source. A matched company with a blank name/email means no public SBLO was found — the tool surfaces ' +
+      'the supplier portal instead; it NEVER invents a contact. grounded=false = company not in the curated set.',
+    parameters: {
+      type: 'object',
+      properties: {
+        company: { type: 'string', description: 'Prime contractor / company name, e.g. "AECOM", "Leidos".' },
+      },
+      required: ['company'],
+    },
+  },
+};
+const FEDERAL_CONTACTS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'search_federal_contacts',
+    description:
+      'The named PEOPLE at a federal buying office — contracting officers, contract specialists, small-business POCs — ' +
+      'anchored on the office\'s 6-char DoDAAC so a DoD sub-agency returns ITS people, not the whole-DoD firehose. Pass ' +
+      'an agency/command name OR a 6-char DoDAAC (+ optional office / role / free-text search). The agency\'s OSBP ' +
+      'small-business contact is prepended as the front door. _meta.anchor: "dodaac"/"agency-dodaac" = office-precise; ' +
+      '"department" = broad civilian preview (may mix offices). Overseas offices are filtered out. grounded=false = no ' +
+      'matching contacts (never an invented POC); email a contact only if it has a real address.',
+    parameters: {
+      type: 'object',
+      properties: {
+        agency: { type: 'string', description: 'Agency / command / sub-agency name, e.g. "USACE", "Department of Veterans Affairs".' },
+        dodaac: { type: 'string', description: 'A known 6-char DoDAAC (e.g. "W912PL"); most precise, anchors directly on the office.' },
+        office: { type: 'string', description: 'Office name filter (SAM office column; often null for POCs).' },
+        role: { type: 'string', description: 'role_category filter (e.g. "contracting_officer", "small_business").' },
+        search: { type: 'string', description: 'Free-text match on contact name OR title.' },
+        limit: { type: 'number', description: 'Max contacts (default 25, max 200).' },
+      },
+    },
+  },
+};
+const PODCAST_LESSONS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'search_podcast_lessons',
+    description:
+      "The proprietary GovCon Giants podcast corpus — real lessons from real contractor/agency guests, matched by " +
+      'topic / agency / NAICS / set-aside / guest name. Un-copyable moat content: no public API has "what a winning ' +
+      'SDVOSB actually learned breaking into VA construction." Returns episode cards with their key_lessons, guest, ' +
+      'agencies/NAICS mentioned. grounded=false when nothing matches — do NOT invent a lesson or attribute an invented ' +
+      'quote to a guest; every lesson must trace to a returned episode.',
+    parameters: {
+      type: 'object',
+      properties: {
+        query: { type: 'string', description: 'Free-text: topic, agency, NAICS, set-aside, or a guest name.' },
+        limit: { type: 'number', description: 'Max episodes (default 4, max 12).' },
+      },
+      required: ['query'],
+    },
+  },
+};
+
 /** All tools exposed over MCP in v1, each annotated with its credit price. */
 export function listMcpTools(): Array<Record<string, unknown>> {
   const defs = [
@@ -670,6 +740,9 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     BID_DECISION_TOOL_DEF,
     FEDERAL_OSBP_TOOL_DEF,
     AGENCY_OPPS_BY_OFFICE_TOOL_DEF,
+    SBLO_CONTACT_TOOL_DEF,
+    FEDERAL_CONTACTS_TOOL_DEF,
+    PODCAST_LESSONS_TOOL_DEF,
     GET_BALANCE_TOOL_DEF,
   ];
   return defs.map((d) => ({ ...d, _credits: TOOL_CREDITS[d.function.name] ?? 0, _tier: tierFor(d.function.name) }));
@@ -703,6 +776,9 @@ export function isMcpTool(name: string): boolean {
     name === 'evaluate_bid_decision' ||
     name === 'lookup_federal_osbp' ||
     name === 'search_agency_opps_by_office' ||
+    name === 'get_sblo_contact' ||
+    name === 'search_federal_contacts' ||
+    name === 'search_podcast_lessons' ||
     name === 'get_balance'
   );
 }
@@ -973,6 +1049,33 @@ export async function runMcpTool(
       dodaac: typeof args.dodaac === 'string' ? args.dodaac : undefined,
       naics: typeof args.naics === 'string' ? args.naics : undefined,
       state: typeof args.state === 'string' ? args.state : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_sblo_contact') {
+    const result = getSbloContact({
+      company: typeof args.company === 'string' ? args.company : '',
+    }) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'search_federal_contacts') {
+    const result = (await searchFederalContacts({
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      dodaac: typeof args.dodaac === 'string' ? args.dodaac : undefined,
+      office: typeof args.office === 'string' ? args.office : undefined,
+      role: typeof args.role === 'string' ? args.role : undefined,
+      search: typeof args.search === 'string' ? args.search : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'search_podcast_lessons') {
+    const result = (await searchPodcastLessons({
+      query: typeof args.query === 'string' ? args.query : '',
       limit: typeof args.limit === 'number' ? args.limit : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
