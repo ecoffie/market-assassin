@@ -3,9 +3,12 @@ import { CREDIT_PACKAGES, creditsForPackage } from './packages';
 
 describe('mcp credit packages', () => {
   it('maps known package ids to their credit amounts', () => {
-    expect(creditsForPackage('starter')).toBe(250);
     expect(creditsForPackage('plus')).toBe(800);
     expect(creditsForPackage('scale')).toBe(2400);
+  });
+
+  it('retired $5 Starter pack is no longer granted (removed 2026-07-14)', () => {
+    expect(creditsForPackage('starter')).toBeNull();
   });
 
   it('TAMPER GUARD: unknown/forged/empty package grants nothing (null, not a default)', () => {

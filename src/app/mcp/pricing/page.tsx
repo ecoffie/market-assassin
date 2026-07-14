@@ -43,8 +43,7 @@ const PRO_INCLUDES: { label: string; note: string; status: 'live' | 'soon' }[] =
 
 /** Per-pack "who it's for" blurb — the only thing that differs pack to pack (capabilities are identical). */
 const PACK_BLURB: Record<string, string> = {
-  starter: 'A first taste — enough credits to work a handful of opportunities end to end.',
-  plus: 'The everyday pack for steady weekly BD. Includes a ~7% credit bonus.',
+  plus: 'The entry pack — enough for steady weekly BD, with a ~7% credit bonus.',
   scale: 'Best rate for heavy users and teams — ~20% bonus credits, lowest cost per credit.',
 };
 
@@ -89,7 +88,6 @@ export default function McpPricing() {
   const moatList = MOAT_TOOLS.map((m) => m.label).join(' · ');
   const searchCost = toolCr(tools, 'search_sam_opportunities', 1);
   const playbookCost = toolCr(tools, 'get_winning_playbook', 2);
-  const popularId = packs.length >= 2 ? packs[1].id : undefined;
 
   /** Turn an abstract credit balance into concrete BD outcomes (the Higgsfield move, our way). */
   const outcomes = (n: number) => [
@@ -101,8 +99,8 @@ export default function McpPricing() {
   const packRows = packs.map((p) => ({
     id: p.id,
     name: p.label.split('—')[0].trim(),
-    tag: p.id === popularId ? 'Popular' : p.id === 'scale' ? 'Best rate' : null,
-    highlight: p.id === popularId,
+    tag: p.id === 'plus' ? 'Popular' : p.id === 'scale' ? 'Best rate' : null,
+    highlight: p.id === 'plus',
     price: `$${p.usd}`,
     credits: p.credits,
   }));
@@ -159,8 +157,8 @@ export default function McpPricing() {
           <a href="/app" className="shrink-0 rounded-lg border border-emerald-400/30 px-4 py-2 text-[13px] font-semibold text-emerald-200 hover:bg-emerald-400/10">Start free →</a>
         </div>
 
-        {/* Paid options — $5 / $15 · $40 / $149 in a 2×2 */}
-        <section className="mt-4 grid gap-4 sm:grid-cols-2">
+        {/* Paid options — $15 Plus · $40 Scale · $149 Pro */}
+        <section className="mt-4 grid gap-4 md:grid-cols-3">
           {packRows.map((p) => (
             <div key={p.id} className={`relative flex flex-col rounded-2xl border p-6 ${p.highlight ? 'border-emerald-400/40 bg-emerald-400/[0.05] shadow-[0_0_0_1px_rgba(16,185,129,0.15)]' : 'border-white/10 bg-white/[0.02]'}`}>
               {p.tag && <span className={`absolute -top-2.5 left-6 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${p.highlight ? 'bg-emerald-500 text-[#06120c]' : 'border border-white/15 bg-[#0a0f1e] text-slate-400'}`}>{p.tag}</span>}
