@@ -27,6 +27,7 @@ import {
   resolveCanonicalSlug,
   getRecentAwardsForRecipient,
   getTopAgenciesForRecipient,
+  getExecutivesForRecipient,
   findCapableSmallBusinesses,
   recipientSlug,
   type RollupProfile,
@@ -72,6 +73,22 @@ export const TIER2_TOOL_DEFS = [
       },
     },
   },
+  {
+    type: 'function' as const,
+    function: {
+      name: 'get_contractor_executives',
+      description:
+        "Return a federal contractor's top-paid EXECUTIVES — leadership names plus total compensation — as reported to USASpending under FFATA. Call this when the user asks WHO runs or leads a company, who its executives/officers/leadership are, or wants named people at the top of a contractor (incumbent, competitor, teaming target). IMPORTANT: these are leadership NAMES + pay only — NOT direct contacts (no email/phone; the government redacts those). Pass the company name.",
+      parameters: {
+        type: 'object',
+        properties: {
+          company_name: { type: 'string', description: 'The contractor company name, e.g. "Leidos", "Booz Allen Hamilton".' },
+        },
+        required: ['company_name'],
+        additionalProperties: false,
+      },
+    },
+  },
 ];
 
 export const TIER2_TOOL_NAMES = new Set(TIER2_TOOL_DEFS.map((t) => t.function.name));
@@ -98,10 +115,15 @@ export function makeTier2Tools(email: string) {
     return true;
   }
 
-  async function getContractorProfile(args: { company_name?: unknown }): Promise<Record<string, unknown>> {
-    const name = typeof args?.company_name === 'string' ? args.company_name.trim() : '';
-    if (!name) return { ok: false, error: 'company_name_required' };
-
+  /**
+   * Resolve a company NAME → its BQ rollup profile, shared by every by-name
+   * Tier-2 tool. Two-pass: cache-only sweep across suffix variants (free), then
+   * ONE budget-gated cold sweep. `rateLimited` = the cold path was needed but
+   * the per-user/per-turn budget is spent (caller returns the slow-down note).
+   */
+  async function resolveProfileByName(
+    name: string,
+  ): Promise<{ profile: RollupProfile | null; resolvedCold: boolean; rateLimited: boolean }> {
     // Companies are stored WITH legal suffixes ("LEIDOS, INC." → slug leidos-inc),
     // so a bare-name slug ("leidos") misses. Try the bare slug plus common
     // suffix variants; dedupe. getRollupOrSingleBySlug also falls back to the
@@ -123,9 +145,7 @@ export function makeTier2Tools(email: string) {
     // budget. One cold budget unit covers the whole variant sweep.
     let resolvedCold = false;
     if (!profile) {
-      if (!(await allowColdLookup())) {
-        return { ok: false, error: 'rate_limited', note: OVER_LIMIT_NOTE };
-      }
+      if (!(await allowColdLookup())) return { profile: null, resolvedCold: false, rateLimited: true };
       resolvedCold = true;
       for (const s of slugVariants) {
         const canonical = await resolveCanonicalSlug(s).catch(() => null);
@@ -133,6 +153,15 @@ export function makeTier2Tools(email: string) {
         if (profile) break;
       }
     }
+    return { profile, resolvedCold, rateLimited: false };
+  }
+
+  async function getContractorProfile(args: { company_name?: unknown }): Promise<Record<string, unknown>> {
+    const name = typeof args?.company_name === 'string' ? args.company_name.trim() : '';
+    if (!name) return { ok: false, error: 'company_name_required' };
+
+    const { profile, resolvedCold, rateLimited } = await resolveProfileByName(name);
+    if (rateLimited) return { ok: false, error: 'rate_limited', note: OVER_LIMIT_NOTE };
     if (!profile) {
       return { ok: true, found: false, note: `I couldn't find a federal contractor matching "${name}".` };
     }
@@ -198,6 +227,46 @@ export function makeTier2Tools(email: string) {
     };
   }
 
+  async function getContractorExecutives(args: { company_name?: unknown }): Promise<Record<string, unknown>> {
+    const name = typeof args?.company_name === 'string' ? args.company_name.trim() : '';
+    if (!name) return { ok: false, error: 'company_name_required' };
+
+    const { profile, resolvedCold, rateLimited } = await resolveProfileByName(name);
+    if (rateLimited) return { ok: false, error: 'rate_limited', note: OVER_LIMIT_NOTE };
+    if (!profile) {
+      return { ok: true, found: false, note: `I couldn't find a federal contractor matching "${name}".` };
+    }
+
+    // FFATA top-5 executive compensation, rolled up across the parent's child
+    // UEIs. Cache-first (free); if empty, one budgeted live scan — unless the
+    // profile itself was just cold-resolved, in which case fetch live in the
+    // same breath (the exec table isn't warmed unless a SEO page rendered it).
+    const childUeis = profile.child_ueis?.length ? profile.child_ueis : [profile.rollup_uei];
+    let execs = await getExecutivesForRecipient(childUeis, profile.rollup_uei, resolvedCold).catch(() => []);
+    if (execs.length === 0 && !resolvedCold && (await allowColdLookup())) {
+      execs = await getExecutivesForRecipient(childUeis, profile.rollup_uei, true /* liveBq */).catch(() => []);
+    }
+    if (execs.length === 0) {
+      return {
+        ok: true,
+        found: true,
+        company: { name: profile.rollup_name, uei: profile.rollup_uei },
+        count: 0,
+        executives: [],
+        note: `No executive-compensation records are reported for ${profile.rollup_name}. Only entities meeting the FFATA threshold (>80% federal revenue / >$25M) disclose these — many primes and all privately-held firms do not.`,
+      };
+    }
+    return {
+      ok: true,
+      found: true,
+      company: { name: profile.rollup_name, uei: profile.rollup_uei },
+      count: execs.length,
+      // Be explicit so the model never presents these as reachable contacts.
+      note: 'FFATA top-paid executives — leadership NAMES and total compensation as reported to USASpending. These are not direct contacts (no email/phone).',
+      executives: execs.map((e, i) => ({ rank: i + 1, name: e.exec_name, compensation: e.exec_amount, reported: e.reported_at })),
+    };
+  }
+
   return {
     async execute(name: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
       switch (name) {
@@ -205,6 +274,8 @@ export function makeTier2Tools(email: string) {
           return getContractorProfile(args || {});
         case 'find_capable_contractors':
           return findCapable(args || {});
+        case 'get_contractor_executives':
+          return getContractorExecutives(args || {});
         default:
           return { ok: false, error: `unknown_tool:${name}` };
       }

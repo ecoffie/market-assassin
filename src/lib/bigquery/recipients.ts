@@ -867,8 +867,10 @@ export interface ExecutiveRow {
 export async function getExecutivesForRecipient(
   ueis: string[],
   rollupUei: string,
+  liveBq = false,
 ): Promise<ExecutiveRow[]> {
   return queryCached<ExecutiveRow>({
+    cacheOnly: !liveBq, // SEO pages call cache-only (crawler-safe); authenticated paths opt into a live scan
     cacheKey: `rollup:${rollupUei}:executives:v3-m`,
     // Executives are reported per-UEI in FFATA. For a parent rollup we take
     // the highest-ranked exec rows across the child set, then re-rank — the

@@ -51,6 +51,17 @@ export async function lookupSamEntity(input: SamEntityInput): Promise<SamEntityR
     } else if (mode === 'name') {
       const res = await searchEntities({ legalBusinessName: name, stateCode: state || undefined, size: limit });
       matches = res.entities || [];
+      // The name-search endpoint returns LIGHT records without the points-of-
+      // contact block, so a name query used to surface no registered POCs. Fetch
+      // the TOP match's full registration so the company's registered POC NAMES
+      // (government-business / electronic-business / past-performance) come back
+      // for "who do I contact at [company]". One extra call, best match only.
+      // NOTE: SAM redacts POC email/phone on the public API — NAMES only.
+      const topUei = String(matches[0]?.ueiSAM || '').trim();
+      if (topUei) {
+        const detail = await getEntityByUEI(topUei).catch(() => null);
+        if (detail) { entity = detail; matches[0] = detail; }
+      }
     }
   } catch (err) {
     degraded = true;
