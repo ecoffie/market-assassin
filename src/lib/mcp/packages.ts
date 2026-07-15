@@ -90,8 +90,12 @@ export interface SubscriptionPlan {
   annual: PlanPrice & { usdPerMonth: number };
 }
 
-const PLUS_CR_MO = Math.max(0, Number(process.env.MCP_PLUS_MONTHLY_CREDITS ?? '300') || 0);
-const SCALE_CR_MO = Math.max(0, Number(process.env.MCP_SCALE_MONTHLY_CREDITS ?? '800') || 0);
+// Credits/mo are anchored to the legacy one-time pack rate: Plus 800cr@$15 =
+// $0.01875/cr, Scale 2,400cr@$40 = $0.01667/cr. The ANNUAL-billed effective price
+// ($15/$40 per month) hits exactly that per-credit rate; monthly billing ($19/$50)
+// is the ~20% pay-as-you-go premium. Annual invoices grant 12× these.
+const PLUS_CR_MO = Math.max(0, Number(process.env.MCP_PLUS_MONTHLY_CREDITS ?? '800') || 0);
+const SCALE_CR_MO = Math.max(0, Number(process.env.MCP_SCALE_MONTHLY_CREDITS ?? '2400') || 0);
 
 export const SUBSCRIPTION_PLANS: readonly SubscriptionPlan[] = [
   {

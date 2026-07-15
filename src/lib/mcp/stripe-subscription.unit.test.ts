@@ -27,41 +27,41 @@ const invoice = (over: any) => ({
 
 beforeEach(() => {
   vi.clearAllMocks();
-  m(credits.applyCreditOnce).mockResolvedValue({ applied: true, newBalance: 3600 });
+  m(credits.applyCreditOnce).mockResolvedValue({ applied: true, newBalance: 9600 });
 });
 
 describe('handleMcpSubscriptionInvoice', () => {
   it('grants a full year of Plus credits on the annual invoice, keyed by invoice id', async () => {
     const r = await handleMcpSubscriptionInvoice(invoice({}));
-    expect(r).toMatchObject({ handled: true, applied: true, credits: 3600, email: 'buyer@x.com', plan: 'plus', interval: 'year' });
-    expect(credits.applyCreditOnce).toHaveBeenCalledWith('in_1', 'buyer@x.com', 3600, 'mcp_sub_annual');
+    expect(r).toMatchObject({ handled: true, applied: true, credits: 9600, email: 'buyer@x.com', plan: 'plus', interval: 'year' });
+    expect(credits.applyCreditOnce).toHaveBeenCalledWith('in_1', 'buyer@x.com', 9600, 'mcp_sub_annual');
   });
 
   it('grants ONE month of Plus credits on the monthly invoice', async () => {
-    m(credits.applyCreditOnce).mockResolvedValue({ applied: true, newBalance: 300 });
+    m(credits.applyCreditOnce).mockResolvedValue({ applied: true, newBalance: 800 });
     const r = await handleMcpSubscriptionInvoice(invoice({ lines: { data: [{ price: { id: PLUS_MONTHLY } }] } }));
-    expect(r).toMatchObject({ handled: true, credits: 300, plan: 'plus', interval: 'month' });
-    expect(credits.applyCreditOnce).toHaveBeenCalledWith('in_1', 'buyer@x.com', 300, 'mcp_sub_monthly');
+    expect(r).toMatchObject({ handled: true, credits: 800, plan: 'plus', interval: 'month' });
+    expect(credits.applyCreditOnce).toHaveBeenCalledWith('in_1', 'buyer@x.com', 800, 'mcp_sub_monthly');
   });
 
   it('grants again on renewal (subscription_cycle) — fresh invoice id, fresh credits', async () => {
     const r = await handleMcpSubscriptionInvoice(invoice({ id: 'in_2', billing_reason: 'subscription_cycle' }));
     expect(r).toMatchObject({ handled: true, plan: 'plus', interval: 'year' });
-    expect(credits.applyCreditOnce).toHaveBeenCalledWith('in_2', 'buyer@x.com', 3600, 'mcp_sub_annual');
+    expect(credits.applyCreditOnce).toHaveBeenCalledWith('in_2', 'buyer@x.com', 9600, 'mcp_sub_annual');
   });
 
   it('resolves Scale annual credits from its price id', async () => {
-    m(credits.applyCreditOnce).mockResolvedValue({ applied: true, newBalance: 9600 });
+    m(credits.applyCreditOnce).mockResolvedValue({ applied: true, newBalance: 28800 });
     const r = await handleMcpSubscriptionInvoice(invoice({ lines: { data: [{ price: { id: SCALE_ANNUAL } }] } }));
-    expect(r).toMatchObject({ handled: true, credits: 9600, plan: 'scale', interval: 'year' });
+    expect(r).toMatchObject({ handled: true, credits: 28800, plan: 'scale', interval: 'year' });
   });
 
   it('falls back to price metadata plan+interval when the price id is unrecognized', async () => {
-    m(credits.applyCreditOnce).mockResolvedValue({ applied: true, newBalance: 300 });
+    m(credits.applyCreditOnce).mockResolvedValue({ applied: true, newBalance: 800 });
     const r = await handleMcpSubscriptionInvoice(invoice({
       lines: { data: [{ price: { id: 'price_unknown', metadata: { plan: 'plus', interval: 'month' } } }] },
     }));
-    expect(r).toMatchObject({ handled: true, plan: 'plus', interval: 'month', credits: 300 });
+    expect(r).toMatchObject({ handled: true, plan: 'plus', interval: 'month', credits: 800 });
   });
 
   it('ignores non-subscription invoices (billing_reason=manual) — nothing granted', async () => {
@@ -79,7 +79,7 @@ describe('handleMcpSubscriptionInvoice', () => {
   it('retrieves the customer email when the invoice omits it', async () => {
     retrieve.mockResolvedValue({ email: 'FromCustomer@X.com' });
     await handleMcpSubscriptionInvoice(invoice({ customer_email: null, customer: 'cus_1' }));
-    expect(credits.applyCreditOnce).toHaveBeenCalledWith('in_1', 'fromcustomer@x.com', 3600, 'mcp_sub_annual');
+    expect(credits.applyCreditOnce).toHaveBeenCalledWith('in_1', 'fromcustomer@x.com', 9600, 'mcp_sub_annual');
   });
 
   it('errors cleanly (grants nothing) when no email can be resolved', async () => {

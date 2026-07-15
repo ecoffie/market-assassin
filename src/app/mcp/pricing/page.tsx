@@ -54,14 +54,14 @@ const PACK_BLURB: Record<string, string> = {
  */
 const PLANS_FALLBACK: SubPlan[] = [
   {
-    id: 'plus', label: 'Plus', creditsPerMonth: 300,
-    monthly: { priceId: 'price_1TtHbHK5zyiZ50PBGbmTn9mJ', usd: 19, credits: 300, checkoutUrl: 'https://buy.stripe.com/3cIeVe2sm83848Z98YfnO0O' },
-    annual: { priceId: 'price_1TtHCIK5zyiZ50PB6Lvi5NMo', usd: 180, usdPerMonth: 15, credits: 3600, checkoutUrl: 'https://buy.stripe.com/00weVec2Wbfk20RclafnO0M' },
+    id: 'plus', label: 'Plus', creditsPerMonth: 800,
+    monthly: { priceId: 'price_1TtHbHK5zyiZ50PBGbmTn9mJ', usd: 19, credits: 800, checkoutUrl: 'https://buy.stripe.com/3cIeVe2sm83848Z98YfnO0O' },
+    annual: { priceId: 'price_1TtHCIK5zyiZ50PB6Lvi5NMo', usd: 180, usdPerMonth: 15, credits: 9600, checkoutUrl: 'https://buy.stripe.com/00weVec2Wbfk20RclafnO0M' },
   },
   {
-    id: 'scale', label: 'Scale', creditsPerMonth: 800,
-    monthly: { priceId: 'price_1TtHbIK5zyiZ50PBhJ9MR9GE', usd: 50, credits: 800, checkoutUrl: 'https://buy.stripe.com/3cIfZi8QK0AG8pfetifnO0P' },
-    annual: { priceId: 'price_1TtHCJK5zyiZ50PB57BKa1OW', usd: 480, usdPerMonth: 40, credits: 9600, checkoutUrl: 'https://buy.stripe.com/6oU28s8QK5V048Zad2fnO0N' },
+    id: 'scale', label: 'Scale', creditsPerMonth: 2400,
+    monthly: { priceId: 'price_1TtHbIK5zyiZ50PBhJ9MR9GE', usd: 50, credits: 2400, checkoutUrl: 'https://buy.stripe.com/3cIfZi8QK0AG8pfetifnO0P' },
+    annual: { priceId: 'price_1TtHCJK5zyiZ50PB57BKa1OW', usd: 480, usdPerMonth: 40, credits: 28800, checkoutUrl: 'https://buy.stripe.com/6oU28s8QK5V048Zad2fnO0N' },
   },
 ];
 
@@ -76,7 +76,7 @@ const ACTIVITIES: { id: string; label: string; note: string; tools: string[] }[]
 
 const FAQ: { q: string; a: string }[] = [
   { q: 'How do credits work?', a: 'Every tool your agent calls costs a set number of credits — priced by what it costs us to run. You are debited only when a call succeeds; a failed or empty call costs nothing, and repeat/cached reads are free.' },
-  { q: 'How do the Plus and Scale plans work?', a: 'Each gives you a fixed monthly credit allowance (Plus 300/mo, Scale 800/mo) that stays the same whether you pay monthly or annually — annual just lowers the price. Monthly billing grants that month’s credits each cycle; annual billing grants the full year up front and saves ~20%.' },
+  { q: 'How do the Plus and Scale plans work?', a: 'Each gives you a fixed monthly credit allowance (Plus 800/mo, Scale 2,400/mo) that stays the same whether you pay monthly or annually — annual just lowers the price. Monthly billing grants that month’s credits each cycle; annual billing grants the full year up front and saves ~20%.' },
   { q: 'What is the "moat," and why is it paid-only?', a: 'The moat is Mindy’s un-copyable layer: the winning playbook, curated teaming/OSBP contacts, agency angles, and podcast lessons — built from an 8-year teaching corpus, not scraped from public APIs. The free trial runs the public-data tools (SAM, USASpending, EDGAR, GSA, forecasts); any paid plan or Pro unlocks the moat.' },
   { q: 'Plus/Scale or Pro — which do I need?', a: 'Plus and Scale are credit plans (billed monthly or annually) with a fixed monthly allowance — ideal for steady project use, and the best per-credit rate on annual billing. Pro is the best value if your agent works federal opportunities daily: a larger monthly allowance, plus Proposal Assist 2.0 and the full Mindy app.' },
   { q: 'Do I need a credit card to start?', a: 'No. You get signup credits free on your first connect — sign in through your browser, point your MCP client at Mindy, and start calling tools. Add a plan or go Pro only when you want more.' },
