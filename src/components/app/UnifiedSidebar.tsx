@@ -17,7 +17,6 @@ import {
   Telescope,
   Clock,
   Banknote,
-  Package,
   Building2,
   Landmark,
   BookOpen,
@@ -284,13 +283,8 @@ const NAV_SECTIONS: NavSection[] = [
         description: 'Grants.gov search',
         tier: ['pro', 'team', 'enterprise'],
       },
-      {
-        id: 'dibbs',
-        label: 'DIBBS',
-        icon: Package,
-        description: 'DLA small-buy RFQs (NSN/parts)',
-        tier: ['pro', 'team', 'enterprise'],
-      },
+      // DIBBS (DLA small-buy RFQs) hidden for now — pilot paused. Panel, API,
+      // and sync remain in place; re-add this nav item to restore it.
       {
         id: 'contractors',
         label: 'Contractors',
