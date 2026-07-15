@@ -33,6 +33,9 @@ export default function MarketCoverageBanner({ coverage, email }: { coverage: Ma
   const hiddenPct = 100 - coverage.top_code_pct;
   const keywords = coverage.keywords || [];
   const rankingLabel = coverage.ranking_label || `keyword "${coverage.keyword}"`;
+  // This market concentrates in one dominant NAICS, so rankings follow that code
+  // (not keyword/PSC award text). Keeps the lesson honest vs the actual chart.
+  const naicsRanked = coverage.ranking_mode === 'naics';
 
   async function addKeywords() {
     if (!email || keywords.length === 0) return;
@@ -58,12 +61,23 @@ export default function MarketCoverageBanner({ coverage, email }: { coverage: Ma
       <div className="rounded-lg border border-emerald-500/25 bg-emerald-950/30 px-3 py-2.5 mb-3">
         <div className="text-[10px] uppercase tracking-wider text-emerald-400/80 mb-1">How agency rankings work</div>
         <p className="text-xs text-slate-200 leading-relaxed">
-          Federal buyers categorize <b className="text-white">what they bought</b> (PSC / award title keywords) — not
-          who sold it (NAICS vendor industry). Your rankings follow{' '}
-          <b className="text-emerald-300">{rankingLabel}</b>.
-          {coverage.uses_psc_ranking && coverage.top_psc_pct
-            ? ` Top product code captures ${coverage.top_psc_pct}% of keyword spend.`
-            : ' NAICS codes below are for set-aside eligibility only — not ranking.'}
+          {naicsRanked ? (
+            <>
+              This market concentrates in <b className="text-white">one dominant NAICS</b> — so Mindy ranks
+              buyers by that code, which is the most accurate signal here. Your rankings follow{' '}
+              <b className="text-emerald-300">{rankingLabel}</b>. A broader, cross-cutting keyword would
+              instead rank by what was bought (PSC / award title).
+            </>
+          ) : (
+            <>
+              Federal buyers categorize <b className="text-white">what they bought</b> (PSC / award title keywords) — not
+              who sold it (NAICS vendor industry). Your rankings follow{' '}
+              <b className="text-emerald-300">{rankingLabel}</b>.
+              {coverage.uses_psc_ranking && coverage.top_psc_pct
+                ? ` Top product code captures ${coverage.top_psc_pct}% of keyword spend.`
+                : ' NAICS codes below are for set-aside eligibility only — not ranking.'}
+            </>
+          )}
         </p>
       </div>
 
@@ -123,7 +137,10 @@ export default function MarketCoverageBanner({ coverage, email }: { coverage: Ma
         💬 <b className="text-muted">Lesson:</b> &ldquo;{coverage.keyword}&rdquo; appears in{' '}
         <b className="text-muted">{coverage.naics_count} vendor NAICS</b>
         {coverage.psc_count ? ` and ${coverage.psc_count} PSC codes` : ''} — Mindy ranks agencies by{' '}
-        <b className="text-muted">{coverage.uses_psc_ranking ? 'keyword + top PSC' : 'keyword'}</b>, not NAICS.
+        <b className="text-muted">
+          {naicsRanked ? 'the dominant NAICS' : coverage.uses_psc_ranking ? 'keyword + top PSC' : 'keyword'}
+        </b>
+        {naicsRanked ? ' (this market concentrates there).' : ', not NAICS.'}
       </div>
     </div>
   );

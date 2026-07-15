@@ -78,6 +78,16 @@ export function pscLiteralProduct(keyword: string, pscName: string): boolean {
 }
 
 /**
+ * A keyword whose market is THIS concentrated in a single NAICS is treated as
+ * that NAICS: rank agencies by the code (authoritative spending_by_category),
+ * not the keyword/PSC award text. Below this share the keyword genuinely sprawls
+ * across many codes (memory: "drones" top code ~28%, $243M across 70+ codes) and
+ * keyword/PSC ranking wins. Matches the 0.40 "dominant" convention already used
+ * for topPscPct below.
+ */
+export const DOMINANT_NAICS_SHARE = 0.40;
+
+/**
  * Single source of truth for ranking + agency discovery filters.
  * Keyword = default; add top PSC when the market concentrates on one product code.
  * NAICS is never returned here — it is eligibility-only (set-aside / pain points).
@@ -90,6 +100,15 @@ export function buildMarketFilter(opts: {
   const { coverage, pscCode } = opts;
 
   if (coverage?.keyword) {
+    // DOMINANT-NAICS GUARD (Eric, Jul 15 2026): when one NAICS is the majority of
+    // the whole market, that market effectively IS that NAICS — rank by the code,
+    // not the keyword. A keyword search for "commercial & institutional building
+    // construction" concentrates in 236220 (~majority); ranking it by the derived
+    // airfield-structures PSC / award text surfaced NASA over DOD/USACE. Returning
+    // null makes the callers (target-market-research, fpds-top-n) fall through to
+    // their NAICS path and rank by the derived 90%-coverage set. A cross-cutting
+    // keyword like "drones" (top code ~28% < 0.40) keeps keyword/PSC ranking.
+    if (coverage.topCodePct >= DOMINANT_NAICS_SHARE) return null;
     const kw = coverage.keyword;
     const pscIsSpecific = Boolean(
       coverage.topPsc?.code
