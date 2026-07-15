@@ -7,12 +7,18 @@
  * panels. So these tools take normal query args from the model and are safe to
  * call for anyone.
  *
- * Two tools:
+ * Three tools:
  *   - search_sam_opportunities — live SAM opps via the existing `search_tsv`
  *     FTS (GIN-indexed, migration 20260703). Active + not-yet-closed only.
  *   - get_market_vocabulary — the buyer-words/phrases that win in a NAICS
  *     (naics_vocabulary, 25,252 terms mined from award text). Reuses the
  *     already-shipped src/lib/market/vocabulary lib.
+ *   - find_decision_makers (CHAT-ONLY, not in the shared MCP registry) — real
+ *     government decision-makers / POCs from the `federal_contacts` directory
+ *     (~112K rows, daily SAM-POC sync). Wraps queryFederalContacts() — the SAME
+ *     lib that powers the Decision Makers panel — so chat can answer "who do I
+ *     contact at [agency]" instead of punting. Public data, no per-user scoping.
+ *     Lazy-imported so the module's static deps (and the unit tests) stay light.
  *
  * Same no-fabrication contract as Tier 0: an empty result returns an explicit
  * `count: 0 / items: []` so the model has nothing to embellish (Rule #1).
@@ -87,6 +93,47 @@ export const TIER1_TOOL_DEFS = [
 
 export const TIER1_TOOL_NAMES = new Set(TIER1_TOOL_DEFS.map((t) => t.function.name));
 
+/**
+ * CHAT-ONLY Tier-1 tools — offered to Mindy chat but NOT spread into the MCP
+ * tool registry (which imports TIER1_TOOL_DEFS). `find_decision_makers` wraps
+ * the same federal_contacts directory the MCP already exposes via its own
+ * `search_federal_contacts` (DoDAAC-anchored); keeping it out of the shared
+ * array avoids a name/credit-pricing collision on the paid MCP surface while
+ * still giving the chat a people-lookup tool. The chat routes any non-Tier0/
+ * Tier2 tool name to makeTier1Tools().execute, which handles it.
+ */
+export const CHAT_ONLY_TOOL_DEFS = [
+  {
+    type: 'function' as const,
+    function: {
+      name: 'find_decision_makers',
+      description:
+        'Look up REAL federal government decision-makers / points of contact — names, titles, offices, and email/phone where available — from the SAM.gov contacts directory (~112K contacts). Call this whenever the user asks WHO to contact, who the contracting officer / contract specialist / small business specialist / OSBP director / program manager is, or wants "contacts", "decision-makers", or "who do I talk to" at a specific agency or sub-agency (e.g. "who are the contacts for the Forest Service", "who is the small business specialist at the Navy"). Pass the agency and/or a free-text name/office/role keyword — at least one is required.',
+      parameters: {
+        type: 'object',
+        properties: {
+          agency: {
+            type: 'string',
+            description: 'Agency, department, or command name, e.g. "Department of Agriculture", "Forest Service", "Navy", "GSA", "Army Corps of Engineers".',
+          },
+          search: {
+            type: 'string',
+            description: 'Optional free-text over contact name / title / office, e.g. "small business", "contracting officer", or a person\'s name.',
+          },
+          role: {
+            type: 'string',
+            description: 'Optional role filter, e.g. "Contracting Officer", "Small Business", "OSBP", "Program Manager".',
+          },
+        },
+        required: [],
+        additionalProperties: false,
+      },
+    },
+  },
+];
+
+export const CHAT_ONLY_TOOL_NAMES = new Set(CHAT_ONLY_TOOL_DEFS.map((t) => t.function.name));
+
 interface SamRow {
   title?: string;
   department?: string;
@@ -99,6 +146,7 @@ interface SamRow {
 }
 
 const SAM_LIMIT = 8; // chat answers are tight; a handful of live opps is plenty
+const CONTACTS_LIMIT = 10; // a short, usable roster — the model summarizes, it doesn't dump 200
 
 /**
  * Build the Tier-1 toolset. `db` is the service-role Supabase client (public
@@ -162,6 +210,51 @@ export function makeTier1Tools(db: Tier1Db) {
     };
   }
 
+  async function searchFederalContacts(args: { agency?: unknown; search?: unknown; role?: unknown }): Promise<Record<string, unknown>> {
+    const agency = typeof args?.agency === 'string' ? args.agency.trim() : '';
+    const search = typeof args?.search === 'string' ? args.search.trim() : '';
+    const role = typeof args?.role === 'string' ? args.role.trim() : '';
+    // Require at least one anchor — an unfiltered scan of 112K rows is neither
+    // useful to the model nor cheap. (JSON Schema can't express "one-of-required".)
+    if (!agency && !search && !role) {
+      return { ok: false, error: 'agency_or_search_required', count: 0, contacts: [] };
+    }
+    // Lazy import: keeps tier1-tools' static dep graph (and the unit tests)
+    // free of the gov-contacts loaders; only pulled when this tool actually fires.
+    const { queryFederalContacts } = await import('@/lib/gov-contacts/contact-roster');
+    const res = await queryFederalContacts({
+      agency: agency || undefined,
+      search: search || undefined,
+      role: role || undefined,
+      limit: CONTACTS_LIMIT,
+    });
+    const contacts = res.contacts || [];
+    if (contacts.length === 0) {
+      return {
+        ok: true,
+        count: 0,
+        contacts: [],
+        note: `No federal contacts found for ${agency || search || role}.`,
+      };
+    }
+    return {
+      ok: true,
+      total: res.total,
+      shown: contacts.length,
+      emailable: res.emailableCount,
+      contacts: contacts.map((c) => ({
+        name: c.contact_fullname ?? null,
+        title: c.role || c.contact_title || null,
+        role_category: c.role_category_label ?? null,
+        agency: c.department_ind_agency ?? null,
+        sub_agency: c.sub_agency ?? null,
+        office: c.derived_office ?? null,
+        email: c.contact_email ?? null,
+        phone: c.contact_phone ?? null,
+      })),
+    };
+  }
+
   return {
     async execute(name: string, args: Record<string, unknown>): Promise<Record<string, unknown>> {
       switch (name) {
@@ -169,6 +262,8 @@ export function makeTier1Tools(db: Tier1Db) {
           return searchSam(args || {});
         case 'get_market_vocabulary':
           return marketVocabulary(args || {});
+        case 'find_decision_makers':
+          return searchFederalContacts(args || {});
         default:
           return { ok: false, error: `unknown_tool:${name}` };
       }
