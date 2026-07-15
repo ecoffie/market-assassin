@@ -101,6 +101,27 @@ describe('buildMarketFilter — keyword-first, PSC only when literal', () => {
   it('returns null when there is nothing to filter on', () => {
     expect(buildMarketFilter({})).toBeNull();
   });
+
+  it('DOMINANT-NAICS: a keyword whose market concentrates in one code ranks by NAICS (null filter)', () => {
+    // "commercial & institutional building construction" → 236220 is the majority
+    // (>=40%) → suppress keyword/PSC ranking so callers fall through to NAICS.
+    // Fixes NASA-over-DOD for 236220 (airfield PSC would otherwise win).
+    const f = buildMarketFilter({ coverage: coverage({
+      keyword: 'commercial and institutional building construction',
+      topCodePct: 0.68,
+      topPsc: { code: 'Y1BZ', name: 'Construction of Other Airfield Structures' },
+      topPscPct: 0.45,
+    }) });
+    expect(f).toBeNull();
+  });
+
+  it('CROSS-CUTTING: a sprawling keyword (drones, top code ~28%) keeps keyword/PSC ranking', () => {
+    // Below DOMINANT_NAICS_SHARE (0.40) → still ranks by keyword/PSC, not NAICS.
+    const f = buildMarketFilter({ coverage: coverage() })!;
+    expect(f).not.toBeNull();
+    expect(f.mode).toBe('keyword'); // still keyword-ranked, NOT suppressed to NAICS
+    expect(f).not.toHaveProperty('naics_codes');
+  });
 });
 
 describe('marketFilterToUsaspending — merge into USAspending fields', () => {

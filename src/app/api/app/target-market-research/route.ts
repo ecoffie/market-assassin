@@ -408,6 +408,14 @@ export async function POST(request: NextRequest) {
     // ONCE here so it can be both returned live AND persisted to the cache — that
     // way a keyword search can be cached without the coverage vanishing on a hit
     // (the original reason keyword searches skipped the cache).
+    // A keyword search whose market concentrates in one NAICS ranks by that code
+    // (buildMarketFilter suppressed the keyword/PSC filter — DOMINANT_NAICS_SHARE).
+    // Reflect that in the lesson banner so it doesn't claim "ranks by keyword" while
+    // the chart is actually NAICS-ranked (Eric's NASA-for-236220 report, Jul 15).
+    const rankedByDominantNaics = Boolean(coverage?.keyword) && !marketFilter;
+    const dominantNaicsCode = rankedByDominantNaics
+      ? (coverage!.allNaics?.[0]?.code || coverage!.coverageCodes[0] || '')
+      : '';
     const keywordCoveragePayload = coverage ? {
       keyword: coverage.keyword,
       total_market: coverage.totalMarket,
@@ -418,8 +426,10 @@ export async function POST(request: NextRequest) {
       psc_count: coverage.pscCount,
       top_psc: coverage.topPsc,
       top_psc_pct: Math.round(coverage.topPscPct * 100),
-      ranking_mode: marketFilter?.mode || 'keyword',
-      ranking_label: marketFilter?.rankingLabel || `keyword "${coverage.keyword}"`,
+      ranking_mode: marketFilter?.mode || (rankedByDominantNaics ? 'naics' : 'keyword'),
+      ranking_label: marketFilter?.rankingLabel || (rankedByDominantNaics
+        ? `NAICS ${dominantNaicsCode} (${Math.round(coverage.topCodePct * 100)}% of this market)`
+        : `keyword "${coverage.keyword}"`),
       uses_psc_ranking: marketFilter?.mode === 'keyword_psc',
       keywords: deriveCoverageKeywords(coverage),
     } : null;
