@@ -8,6 +8,7 @@
     "start": "next start",
     "lint": "eslint",
     "build:whitepaper": "node scripts/build-whitepaper-docx.mjs",
+    "ingest:mcp-docs": "node scripts/ingest-mcp-docs.js",
     "test": "bash tests/run-all-tests.sh",
     "test:pre-deploy": "bash tests/test-pre-deploy.sh",
     "test:local": "bash tests/test-pre-deploy.sh --local",
