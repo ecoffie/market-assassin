@@ -13,6 +13,9 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchAwardsForUser } from '@/lib/briefings/pipelines/contract-awards';
 
+// Give the batched run headroom under Vercel's ceiling.
+export const maxDuration = 300;
+
 const CRON_SECRET = process.env.CRON_SECRET;
 
 // Fallback NAICS for users without codes
@@ -111,16 +114,17 @@ export async function GET(request: NextRequest) {
     let processed = 0;
     let errors = 0;
 
-    for (const user of allUsers) {
+    // Process one user: fetch awards + upsert snapshot. Isolated so we can run a
+    // bounded number of users concurrently — a sequential loop with a per-user
+    // delay can't clear ~700 users inside the function's 300s cap.
+    const processUser = async (user: (typeof allUsers)[number]) => {
       try {
-        // Fetch awards for this user's watchlist
         const result = await fetchAwardsForUser({
           naics_codes: user.naics_codes || [],
           agencies: user.agencies || [],
           watched_companies: user.watched_companies || [],
         });
 
-        // Store snapshot in database
         const { error: insertError } = await supabase
           .from('briefing_snapshots')
           .upsert({
@@ -143,16 +147,22 @@ export async function GET(request: NextRequest) {
           errors++;
         } else {
           processed++;
-          console.log(`[Cron] Saved ${result.awards.length} awards ($${(result.totalSpending / 1000000).toFixed(1)}M) for ${user.user_email}`);
         }
-
-        // Rate limiting
-        await new Promise(resolve => setTimeout(resolve, 500));
-
       } catch (err) {
         console.error(`[Cron] Error processing ${user.user_email}:`, err);
         errors++;
       }
+    };
+
+    // Bounded concurrency against USAspending (a tolerant public API). ~700 users
+    // at BATCH_SIZE=6 clears in ~2min, well under the 300s cap; the old 500ms-per-
+    // user sequential loop timed out at ~227 users.
+    const BATCH_SIZE = 6;
+    for (let i = 0; i < allUsers.length; i += BATCH_SIZE) {
+      const batch = allUsers.slice(i, i + BATCH_SIZE);
+      await Promise.all(batch.map(processUser));
+      // Small breather between batches to stay gentle on the API.
+      await new Promise(resolve => setTimeout(resolve, 200));
     }
 
     console.log(`[Cron: snapshot-awards] Complete: ${processed} processed, ${errors} errors`);
