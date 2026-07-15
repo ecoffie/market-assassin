@@ -424,6 +424,12 @@ export async function POST(request: NextRequest) {
         // this reliably (scripts/spike-chat-v2-toolcall.mjs).
         let toolProvider = ''; let toolModel = '';
         let toolUsageForCost: { prompt_tokens?: number; completion_tokens?: number } | null = null;
+        // Did a Data Core tool (contacts, live SAM, contractor intel, …) actually
+        // produce the answer? If so, the answer is grounded in LIVE DATA, not the
+        // RAG corpus — so the keyword-retrieved doc chunks are NOT its sources and
+        // must NOT be shown as "Documents referenced" (Eric QC: a Forest Service
+        // contact lookup was citing unrelated podcast episodes).
+        let toolsAnswered = false;
         try {
           const tier0 = makeTier0Tools(getSupabase(), auth.email!);
           // Mindy is the FLAGSHIP (paid, Pro-gated) surface, so it gets the FULL
@@ -551,6 +557,7 @@ export async function POST(request: NextRequest) {
           const toolCalls = choice?.tool_calls as Array<{ id?: string; function?: { name?: string; arguments?: string } }> | undefined;
           if (first && Array.isArray(toolCalls) && toolCalls.length > 0) {
             toolProvider = first.provider; toolModel = first.model;
+            toolsAnswered = true; // live-data answer → suppress RAG doc citations
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
             const u = (first.json as any)?.usage;
             if (u) toolUsageForCost = { prompt_tokens: u.prompt_tokens, completion_tokens: u.completion_tokens };
@@ -674,7 +681,10 @@ export async function POST(request: NextRequest) {
         const lowerResp = assistantContent.toLowerCase();
         const isRedirect = lowerResp.includes("i'm focused on federal contracting") ||
                            lowerResp.includes("i don't have that in my knowledge base");
-        const citedSources = isRedirect ? [] : buildCitationChips(chunks, podcastCards);
+        // Only show doc citations for KNOWLEDGE answers grounded in the corpus.
+        // A tool-driven (live-data) answer or an off-topic redirect gets none —
+        // the retrieved chunks weren't its sources, so chips would mislead.
+        const citedSources = (isRedirect || toolsAnswered) ? [] : buildCitationChips(chunks, podcastCards);
         send({ type: 'citations', sources: citedSources });
         send({ type: 'done' });
         controller.close();
