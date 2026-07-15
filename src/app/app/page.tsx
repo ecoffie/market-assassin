@@ -345,6 +345,22 @@ function AppDashboard() {
     }
   }, [getTwoFactorHeaders]);
 
+  // Peek the live Supabase (OAuth) session email WITHOUT doing the full bootstrap
+  // (no network call, no localStorage writes). Used at mount to decide whether a
+  // cached MI session is stale — the live OAuth session is the source of truth for
+  // identity, so a stored localStorage email that disagrees with it must be dropped.
+  const peekSupabaseSessionEmail = useCallback(async (): Promise<string | null> => {
+    const supabase = getSupabase();
+    if (!supabase) return null;
+    try {
+      const { data: { session } } = await supabase.auth.getSession();
+      const sessionEmail = session?.user?.email?.toLowerCase().trim();
+      return session?.access_token && sessionEmail ? sessionEmail : null;
+    } catch {
+      return null;
+    }
+  }, []);
+
   const bootstrapFromSupabaseSession = useCallback(async () => {
     const supabase = getSupabase();
     if (!supabase) {
@@ -862,9 +878,9 @@ function AppDashboard() {
       setPendingEmail(emailParam);
     }
 
-    // Check localStorage for an existing 2FA-verified session first.
+    // Existing cached MI session (localStorage fast-path).
     const storedEmail = typeof window !== 'undefined'
-      ? localStorage.getItem('mi_beta_email')
+      ? localStorage.getItem('mi_beta_email')?.toLowerCase().trim() || null
       : null;
     const verifiedAt = typeof window !== 'undefined'
       ? localStorage.getItem('mi_beta_authenticated_at') || localStorage.getItem('mi_beta_2fa_verified_at')
@@ -875,27 +891,52 @@ function AppDashboard() {
     const hasStoredToken = typeof window !== 'undefined'
       ? Boolean(localStorage.getItem(MI_AUTH_TOKEN_KEY) || localStorage.getItem(TWO_FACTOR_TOKEN_KEY))
       : false;
+    const hasCachedSession = Boolean(storedEmail && verifiedRecently && hasStoredToken);
 
-    if (storedEmail && verifiedRecently && hasStoredToken) {
-      loadUserProfile(storedEmail);
-      // Renew the MI token in the background if it's nearing its 30-day TTL so
-      // active users never get silently logged out mid-session.
-      maybeRefreshMIToken();
-      return;
-    }
+    // IDENTITY SOURCE OF TRUTH: the live Supabase (OAuth) session — NEVER the
+    // cached localStorage email and NEVER the ?email= URL param. A stale cached
+    // session (a different account signed in earlier on this browser) or a stale
+    // ?email= link must not silently render you as someone else. So: peek the live
+    // OAuth session first; the cached fast-path is only trusted when it MATCHES the
+    // live session, or when there is no live session at all (pure password users).
+    (async () => {
+      const liveEmail = await peekSupabaseSessionEmail();
 
-    // Always try to bootstrap from the Supabase session — covers the OAuth
-    // sign-up → onboarding → /app flow where the user has a valid Supabase
-    // session but no stored MI auth token yet. Without this, the post-
-    // onboarding redirect (which carries ?email= in the URL) used to drop
-    // the user on the sign-in screen even though they just finished signing
-    // up.
-    bootstrapFromSupabaseSession().then((bootstrapped) => {
+      // A live OAuth session that DISAGREES with the cached email → the cache is
+      // stale. Drop it and re-establish identity from the live session.
+      if (liveEmail && hasCachedSession && liveEmail !== storedEmail) {
+        console.warn(`[Mindy auth] cached session (${storedEmail}) != live OAuth session (${liveEmail}); using live session`);
+        clearStoredAppAuth();
+        // Also strip a stale ?email= that disagrees with who's really signed in,
+        // so a refresh/bookmark stops showing the misleading param.
+        if (typeof window !== 'undefined' && emailParam && emailParam !== liveEmail) {
+          const url = new URL(window.location.href);
+          url.searchParams.delete('email');
+          window.history.replaceState(null, '', url.pathname + url.search);
+        }
+        const ok = await bootstrapFromSupabaseSession();
+        if (!ok) { clearStoredAppAuth(); setIsLoading(false); }
+        return;
+      }
+
+      // Cached session present and consistent (or no live session to contradict it)
+      // → fast-path in, no network round-trip.
+      if (hasCachedSession) {
+        loadUserProfile(storedEmail!);
+        // Renew the MI token in the background if it's nearing its 30-day TTL so
+        // active users never get silently logged out mid-session.
+        maybeRefreshMIToken();
+        return;
+      }
+
+      // No usable cache → bootstrap from the Supabase session. Covers the OAuth
+      // sign-up → onboarding → /app flow (valid Supabase session, no MI token yet).
+      const bootstrapped = await bootstrapFromSupabaseSession();
       if (!bootstrapped) {
         clearStoredAppAuth();
         setIsLoading(false);
       }
-    });
+    })();
 
     const supabase = getSupabase();
     const hasAuthHash = typeof window !== 'undefined' && window.location.hash.includes('access_token');
@@ -917,7 +958,7 @@ function AppDashboard() {
     });
 
     return () => subscription.unsubscribe();
-  }, [searchParams, loadUserProfile, bootstrapFromSupabaseSession]);
+  }, [searchParams, loadUserProfile, bootstrapFromSupabaseSession, peekSupabaseSessionEmail, maybeRefreshMIToken]);
 
   // Loading state
   if (isLoading) {
