@@ -52,6 +52,9 @@ import { extractComplianceMatrix } from './tools/compliance-matrix';
 import { buildProposalStructureTool } from './tools/proposal-structure';
 import { refereeProposalCompliance } from './tools/referee-compliance';
 import { matchRecompeteSowTool } from './tools/recompete-sow';
+import { extractStatementOfWork } from './tools/statement-of-work';
+import { getFederalEventSeries } from './tools/event-series';
+import { getSbaGoalingShare } from './tools/sba-goaling';
 
 const server = new McpServer({
   name: 'mindy-govcon',
@@ -903,11 +906,71 @@ server.registerTool(
   },
 );
 
+server.registerTool(
+  'extract_statement_of_work',
+  {
+    title: 'Extract Statement of Work (SOW / PWS / SOO)',
+    description:
+      'Pull the Statement of Work / PWS / SOO out of a solicitation as clean text to brief subs or seed a technical ' +
+      'response. Detects the SOW block by heading boundaries over the combined/inline body (recovers scope buried in a ' +
+      'Section C blob) and falls back to a CLIN-derived scope from the pricing schedule. Pass ONE of notice_id or ' +
+      'rfp_text. grounded=false = no SOW block detected.',
+    inputSchema: {
+      notice_id: z.string().optional().describe('SAM notice id (UUID) or solicitation number — fetches the doc text server-side.'),
+      rfp_text: z.string().optional().describe('The solicitation text directly (use when you already have it).'),
+    },
+  },
+  async ({ notice_id, rfp_text }) => {
+    const result = await extractStatementOfWork({ notice_id, rfp_text });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'get_federal_event_series',
+  {
+    title: 'Federal Event Series (recurring calendar)',
+    description:
+      'The curated calendar of RECURRING federal-contracting event series (AFCEA, NDIA, SAME, APEX Accelerators, GSA…) ' +
+      'plus major annual conferences. Filter by agency, category (matchmaking / training / conference / industry_day…), ' +
+      'or keyword. Complements search_federal_events (dated one-off SAM notices) with the standing series to put on the ' +
+      'BD calendar.',
+    inputSchema: {
+      agency: z.string().optional().describe('Filter to series serving this agency (multi-agency/government-wide always included).'),
+      category: z.string().optional().describe('Category filter, e.g. matchmaking, training, conference, industry_day.'),
+      query: z.string().optional().describe('Free-text filter over name / notes / audience.'),
+    },
+  },
+  async ({ agency, category, query }) => {
+    const result = getFederalEventSeries({ agency, category, query });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'get_sba_goaling_share',
+  {
+    title: 'SBA Goaling Share (goals vs. actual set-asides)',
+    description:
+      'The statutory government-wide small-business goals (SB 23% · WOSB 5% · SDB/8(a) 5% · SDVOSB 3% · HUBZone 3%) set ' +
+      "against an agency's ACTUAL set-aside obligations from USASpending, per category, with the gap and a meets/below " +
+      'flag. Actuals measure set-aside CODE dollars — a floor on, not identical to, the official SBA Scorecard number.',
+    inputSchema: {
+      agency: z.string().describe('Agency name or abbreviation, e.g. "Department of Defense", "VA", "NASA".'),
+      fiscal_year: z.number().optional().describe('Fiscal year (defaults to the latest complete FY).'),
+    },
+  },
+  async ({ agency, fiscal_year }) => {
+    const result = await getSbaGoalingShare({ agency, fiscal_year });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + keyword-coverage + idv-contracts + contractor-award-history + market-depth + solicitation-documents + federal-events + scan-compliance + bid-decision + federal-osbp + agency-opps-by-office + sblo-contact + federal-contacts + podcast-lessons + agency-budget-trends + company-keywords + agency-spending-detail + compliance-matrix + proposal-structure + referee-compliance + recompete-sow registered',
+    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + keyword-coverage + idv-contracts + contractor-award-history + market-depth + solicitation-documents + federal-events + scan-compliance + bid-decision + federal-osbp + agency-opps-by-office + sblo-contact + federal-contacts + podcast-lessons + agency-budget-trends + company-keywords + agency-spending-detail + compliance-matrix + proposal-structure + referee-compliance + recompete-sow + statement-of-work + event-series + sba-goaling registered',
   );
 }
 

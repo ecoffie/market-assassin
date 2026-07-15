@@ -16,57 +16,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { Document, Packer, Paragraph, TextRun, HeadingLevel } from 'docx';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { createClient } from '@supabase/supabase-js';
+import { extractSow, buildClinScope } from '@/lib/proposal/sow-extraction';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
-
-// Headings that START a SOW/PWS/SOO block.
-const START_RE = /(STATEMENT\s+OF\s+WORK|PERFORMANCE\s+WORK\s+STATEMENT|STATEMENT\s+OF\s+OBJECTIVES|\bP\.?W\.?S\.?\b|\bS\.?O\.?W\.?\b|SECTION\s+C\b|^C\.\s)/im;
-// Headings that END it (the next major section).
-const END_RE = /(SECTION\s+[D-M]\b|^[D-M]\.\s|INSTRUCTIONS\s+TO\s+OFFERORS|EVALUATION\s+FACTORS|CONTRACT\s+CLAUSES|LIST\s+OF\s+ATTACHMENTS)/im;
-
-function extractSow(text: string): { found: boolean; title: string; body: string } {
-  const startM = START_RE.exec(text);
-  if (!startM) return { found: false, title: 'Statement of Work', body: '' };
-  const startIdx = startM.index;
-  // Look for the end heading AFTER the start.
-  const after = text.slice(startIdx + startM[0].length);
-  const endM = END_RE.exec(after);
-  const endIdx = endM ? startIdx + startM[0].length + endM.index : text.length;
-  const body = text.slice(startIdx, endIdx).trim();
-  const title = /performance\s+work/i.test(startM[0]) ? 'Performance Work Statement'
-    : /objectives/i.test(startM[0]) ? 'Statement of Objectives'
-    : 'Statement of Work';
-  // Guard: if the captured block is tiny, treat as not-found (likely a TOC ref).
-  if (body.length < 400) return { found: false, title, body: '' };
-  return { found: true, title, body };
-}
-
-/**
- * Build a "Scope at a Glance" from a CLIN/pricing schedule (Eric: the CLINs tell
- * you what the work is). Parses "CLIN, Description, …" rows into a readable scope
- * list a sub can act on. Returns null if no CLIN rows are found.
- */
-function buildClinScope(pricingText: string): string | null {
-  const lines = pricingText.split('\n');
-  const items: string[] = [];
-  for (const line of lines) {
-    // CLIN row: a 4-digit CLIN, then a description that may be QUOTED (with
-    // internal commas — room lists) or unquoted. Capture the quoted form first.
-    let m = line.match(/^[",\s]*(\d{4}[A-Z]?)\s*,\s*"([^"]{12,})"/);       // quoted desc
-    if (!m) m = line.match(/^[",\s]*(\d{4}[A-Z]?)\s*,\s*([^",][^,]{11,}?)\s*,/); // unquoted
-    if (m) {
-      const desc = m[2].replace(/\s+/g, ' ').trim();
-      if (desc && !/^\$?0?\.?0+$/.test(desc)) items.push(`CLIN ${m[1]}: ${desc}`);
-    }
-  }
-  if (items.length === 0) return null;
-  return [
-    'This scope is reconstructed from the solicitation’s pricing schedule (CLINs). Each line is a unit of work the contractor must price and perform. Use it to brief subcontractors — then confirm details against the full solicitation + drawings.',
-    '',
-    ...items,
-  ].join('\n');
-}
 
 function buildDocx(title: string, body: string, sourceName: string): Promise<Buffer> {
   const lines = body.split('\n');

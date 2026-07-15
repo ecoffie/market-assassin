@@ -52,6 +52,9 @@ import { extractComplianceMatrix } from '@/mcp/tools/compliance-matrix';
 import { buildProposalStructureTool, type ProposalStructureInputReq } from '@/mcp/tools/proposal-structure';
 import { refereeProposalCompliance, type RefereeInputReq } from '@/mcp/tools/referee-compliance';
 import { matchRecompeteSowTool } from '@/mcp/tools/recompete-sow';
+import { extractStatementOfWork } from '@/mcp/tools/statement-of-work';
+import { getFederalEventSeries } from '@/mcp/tools/event-series';
+import { getSbaGoalingShare } from '@/mcp/tools/sba-goaling';
 import { getBalance } from '@/lib/mcp/credits';
 import { tierFor } from '@/lib/mcp/entitlements';
 
@@ -106,6 +109,9 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   build_proposal_structure: 1, // pure shaping — compliance matrix → volume/section tree (no LLM/IO)
   referee_proposal_compliance: 4, // independent Claude referee (no-training/sensitive) — draft vs matrix, per-req verdicts
   match_recompete_sow: 2, // embed + vector scan over the sam_opportunities SOW corpus (Mindy embeddings moat)
+  extract_statement_of_work: 2, // SOW/PWS heading detection over solicitation text (+ notice fetch, CLIN fallback)
+  get_federal_event_series: 1, // curated recurring-event catalog (static read, no IO)
+  get_sba_goaling_share: 2, // statutory SB goals vs actual set-aside obligations (USASpending aggregates)
   get_balance: 0, // meta tool — always free
 };
 
@@ -928,6 +934,70 @@ const RECOMPETE_SOW_TOOL_DEF = {
   },
 };
 
+const STATEMENT_OF_WORK_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'extract_statement_of_work',
+    description:
+      'Pull the Statement of Work / PWS / SOO out of a solicitation as clean text to brief subcontractors or seed a ' +
+      'technical response. Complements extract_compliance_matrix (requirements) and get_solicitation_documents (raw ' +
+      'files): this detects the SOW block by heading boundaries over the COMBINED/inline body — so it recovers scope ' +
+      'buried in a Section C blob — and falls back to a CLIN-derived "scope at a glance" from the pricing schedule. Pass ' +
+      'ONE of: notice_id (fetches the doc text server-side) OR rfp_text. grounded=false = no SOW block detected — do NOT ' +
+      'invent scope.',
+    parameters: {
+      type: 'object',
+      properties: {
+        notice_id: { type: 'string', description: 'SAM notice id (UUID) or solicitation number — fetches the doc text server-side.' },
+        rfp_text: { type: 'string', description: 'The solicitation text directly (use when you already have it).' },
+      },
+    },
+  },
+};
+
+const EVENT_SERIES_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_federal_event_series',
+    description:
+      'The curated calendar of RECURRING federal-contracting event series (AFCEA, NDIA, SAME, APEX Accelerators, GSA…) ' +
+      'plus major annual conferences — "where do contractors network in my market year over year." Filter by agency, ' +
+      'category (matchmaking / training / conference / industry_day…), or keyword. Complements search_federal_events ' +
+      '(dated one-off SAM notices) with the standing series to put on the BD calendar. grounded=false = nothing matched ' +
+      'the filter.',
+    parameters: {
+      type: 'object',
+      properties: {
+        agency: { type: 'string', description: 'Filter to series serving this agency (multi-agency/government-wide series always included).' },
+        category: { type: 'string', description: 'Category filter, e.g. matchmaking, training, conference, industry_day.' },
+        query: { type: 'string', description: 'Free-text filter over name / notes / audience.' },
+      },
+    },
+  },
+};
+
+const SBA_GOALING_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_sba_goaling_share',
+    description:
+      'The "is this a good small-business market?" read: the STATUTORY government-wide small-business goals (Small ' +
+      'Business 23% · WOSB 5% · SDB/8(a) 5% · SDVOSB 3% · HUBZone 3%) set against an agency\'s ACTUAL set-aside ' +
+      'obligations from USASpending, per category, with the gap and a meets/below flag. NOTE: actuals measure dollars ' +
+      'through set-aside CODES — a floor on, not identical to, the official SBA Scorecard small-business achievement ' +
+      '(small firms also win full-and-open); it is not the Scorecard number and does not assert an agency\'s own ' +
+      'negotiated goals. grounded=false = no agency matched.',
+    parameters: {
+      type: 'object',
+      properties: {
+        agency: { type: 'string', description: 'Agency name or abbreviation, e.g. "Department of Defense", "VA", "NASA".' },
+        fiscal_year: { type: 'number', description: 'Fiscal year (defaults to the latest complete FY).' },
+      },
+      required: ['agency'],
+    },
+  },
+};
+
 /** All tools exposed over MCP in v1, each annotated with its credit price. */
 export function listMcpTools(): Array<Record<string, unknown>> {
   const defs = [
@@ -966,6 +1036,9 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     PROPOSAL_STRUCTURE_TOOL_DEF,
     REFEREE_COMPLIANCE_TOOL_DEF,
     RECOMPETE_SOW_TOOL_DEF,
+    STATEMENT_OF_WORK_TOOL_DEF,
+    EVENT_SERIES_TOOL_DEF,
+    SBA_GOALING_TOOL_DEF,
     GET_BALANCE_TOOL_DEF,
   ];
   return defs.map((d) => ({ ...d, _credits: TOOL_CREDITS[d.function.name] ?? 0, _tier: tierFor(d.function.name) }));
@@ -1009,6 +1082,9 @@ export function isMcpTool(name: string): boolean {
     name === 'build_proposal_structure' ||
     name === 'referee_proposal_compliance' ||
     name === 'match_recompete_sow' ||
+    name === 'extract_statement_of_work' ||
+    name === 'get_federal_event_series' ||
+    name === 'get_sba_goaling_share' ||
     name === 'get_balance'
   );
 }
@@ -1370,6 +1446,31 @@ export async function runMcpTool(
       naics: typeof args.naics === 'string' ? args.naics : undefined,
       agency: typeof args.agency === 'string' ? args.agency : undefined,
       piid: typeof args.piid === 'string' ? args.piid : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'extract_statement_of_work') {
+    const result = (await extractStatementOfWork({
+      notice_id: typeof args.notice_id === 'string' ? args.notice_id : undefined,
+      rfp_text: typeof args.rfp_text === 'string' ? args.rfp_text : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_federal_event_series') {
+    const result = getFederalEventSeries({
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      category: typeof args.category === 'string' ? args.category : undefined,
+      query: typeof args.query === 'string' ? args.query : undefined,
+    }) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_sba_goaling_share') {
+    const result = (await getSbaGoalingShare({
+      agency: typeof args.agency === 'string' ? args.agency : '',
+      fiscal_year: typeof args.fiscal_year === 'number' ? args.fiscal_year : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
