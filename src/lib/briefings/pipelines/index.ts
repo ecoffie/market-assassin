@@ -45,8 +45,6 @@ export type {
 
 // Contractor Database Pipeline
 export {
-  fetchContractors,
-  fetchContractorsForUser,
   diffContractors,
   scoreContractorForTeaming,
 } from './contractor-db';

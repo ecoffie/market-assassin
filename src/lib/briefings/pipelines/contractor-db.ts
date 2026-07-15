@@ -5,8 +5,6 @@
  * Returns SBLO changes, certification changes, subcontracting plans, new entrants.
  */
 
-import { createClient } from '@supabase/supabase-js';
-
 interface ContractorRecord {
   id: string;
   companyName: string;
@@ -74,117 +72,6 @@ interface ContractorSearchResult {
   contractors: ContractorRecord[];
   totalCount: number;
   fetchedAt: string;
-}
-
-/**
- * Fetch contractors matching criteria from local database
- */
-export async function fetchContractors(
-  params: ContractorSearchParams,
-  supabaseUrl: string,
-  supabaseKey: string
-): Promise<ContractorSearchResult> {
-  const {
-    naicsCodes = [],
-    companyNames = [],
-    certifications = [],
-    limit = 200,
-  } = params;
-
-  const supabase = createClient(supabaseUrl, supabaseKey);
-
-  console.log(`[Contractor DB] Fetching contractors for NAICS: ${naicsCodes.join(', ') || 'all'}`);
-
-  let query = supabase
-    .from('contractors')
-    .select('*')
-    .limit(limit);
-
-  // Add NAICS filter using array contains
-  if (naicsCodes.length > 0) {
-    // Check if any of the contractor's NAICS codes match
-    query = query.or(
-      naicsCodes.map(n => `naics_codes.cs.{${n}}`).join(',')
-    );
-  }
-
-  // Add company name filter
-  if (companyNames.length > 0) {
-    const nameFilters = companyNames.map(n => `company_name.ilike.%${n}%`).join(',');
-    query = query.or(nameFilters);
-  }
-
-  try {
-    const { data, error, count } = await query;
-
-    if (error) {
-      console.error('[Contractor DB] Query error:', error);
-      throw error;
-    }
-
-    // Map database records to ContractorRecord
-    const contractors: ContractorRecord[] = (data || []).map((row: Record<string, unknown>) => ({
-      id: row.id as string || '',
-      companyName: row.company_name as string || row.name as string || '',
-      uei: row.uei as string || null,
-      cage: row.cage as string || row.cage_code as string || null,
-
-      sbloName: row.sblo_name as string || row.contact_name as string || null,
-      sbloTitle: row.sblo_title as string || null,
-      sbloEmail: row.sblo_email as string || row.contact_email as string || null,
-      sbloPhone: row.sblo_phone as string || row.contact_phone as string || null,
-
-      certifications: row.certifications as string[] || [],
-      is8a: (row.certifications as string[] || []).some((c: string) => c.toLowerCase().includes('8(a)')),
-      isWosb: (row.certifications as string[] || []).some((c: string) => c.toLowerCase().includes('wosb')),
-      isSdvosb: (row.certifications as string[] || []).some((c: string) => c.toLowerCase().includes('sdvosb')),
-      isHubzone: (row.certifications as string[] || []).some((c: string) => c.toLowerCase().includes('hubzone')),
-      isSmallBusiness: (row.is_small_business as boolean) || (row.certifications as string[] || []).length > 0,
-
-      naicsCodes: row.naics_codes as string[] || [],
-      primaryNaics: (row.naics_codes as string[] || [])[0] || '',
-      employeeCount: row.employee_count as number || null,
-      annualRevenue: row.annual_revenue as number || null,
-
-      hasSubcontractingPlan: (row.has_subk_plan as boolean) || false,
-      subcontractingGoals: row.subk_goals as Record<string, number> || null,
-
-      website: row.website as string || null,
-      vendorPortalUrl: row.vendor_portal as string || row.vendor_portal_url as string || null,
-
-      lastUpdated: row.updated_at as string || row.last_updated as string || '',
-      createdAt: row.created_at as string || '',
-    }));
-
-    console.log(`[Contractor DB] Retrieved ${contractors.length} contractors`);
-
-    return {
-      contractors,
-      totalCount: count || contractors.length,
-      fetchedAt: new Date().toISOString(),
-    };
-  } catch (error) {
-    console.error('[Contractor DB] Error fetching contractors:', error);
-    throw error;
-  }
-}
-
-/**
- * Fetch contractors for a specific user's watchlist
- */
-export async function fetchContractorsForUser(
-  userProfile: {
-    naics_codes: string[];
-    watched_companies: string[];
-  },
-  supabaseUrl: string,
-  supabaseKey: string
-): Promise<ContractorSearchResult> {
-  return fetchContractors({
-    naicsCodes: userProfile.naics_codes?.slice(0, 10) || [],
-    companyNames: userProfile.watched_companies?.slice(0, 20) || [],
-    limit: 200,
-  }, supabaseUrl, supabaseKey);
 }
 
 /**
