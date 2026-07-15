@@ -1,9 +1,11 @@
-# AI for Federal Vendor Economic Dependency — DLA SBIR Partner Brief
+# AI for Federal Vendor Economic Dependency — DLA SBIR Teaming Brief (Technical Provider)
 
 **The opportunity:** DLA SBIR topic **DLA26BZ03-NV012** — *AI-Powered Tool for Automated Evaluation
 of Vendor Economic Dependency.* Phase I **$100K / 12 mo** → Phase II **$1M / 24 mo** → Phase III
 transitions DoD-wide. **Closes 22 July 2026.** Customer (DLA) is already attached.
-**Applicant:** GovCon Edu (for-profit small business) — we prime. **We're seeking one teaming partner.**
+**Us:** GovCon Edu, product **Mindy** — the **technical provider** (the AI/data engine). **We're
+looking for a prime** with **CMMC Level 2** + **agency-side SFFAS 47 / audit-readiness** expertise —
+the two pieces this topic hinges on. You prime; we bring the tech.
 
 ---
 
@@ -13,50 +15,63 @@ government — identifying **related parties and concentration risk per SFFAS 47
 readiness and supply-chain resilience. Today this is manual and can't scale across thousands of
 vendors and millions of transactions.
 
-The tool must: pull a vendor universe from contract data → retrieve public financials (SEC EDGAR,
-10-Ks, SAM.gov) → compute an economic-dependency criterion (e.g., % of a vendor's revenue from DLA) →
-flag related parties and risk by contract type → produce **auditable, traceable** results.
+The tool must: resolve a vendor universe from DLA's EBS transaction data → retrieve public financials
+(SEC EDGAR, 10-Ks, SAM.gov) plus alternatives for private vendors → compute economic dependency
+(vendor's **DLA Working Capital Fund revenue** ÷ its total consolidated revenue) against a
+**configurable** threshold → flag related-party/risk indicators by contract type → produce
+**auditable, independently re-computable** results a human analyst reviews (DLA makes the final call).
 
 ---
 
 ## ✅ What WE bring (built and proven)
-- **The data engine.** Our platform (Mindy) already computes **federal obligated $ per vendor by UEI**
-  across the entire USASpending universe (317K contractors) — the dependency *numerator* is a
-  production capability, not a research risk. *(e.g., it returns McKesson's $84B / Pfizer's $28B in
-  federal obligations instantly.)*
-- **The public-financial join.** Built to ingest SEC EDGAR 10-K revenue + SAM.gov — the exact sources
-  the topic names. Dependency % = federal $ ÷ total revenue.
-- **Provenance by default.** Every figure carries its source + as-of date — the "auditable, traceable"
-  the topic and SFFAS 47 require.
-- **The SBIR vehicle.** GovCon Edu is a registered for-profit small business; SAM active, DSIP ready.
-  We prime, write the proposal, and own the registration/ITAR/CMMC mechanics.
+- **The data engine + entity-resolution spine.** Our platform (Mindy) already resolves vendors across
+  **CAGE / UEI / DUNS** and computes **federal spend per vendor at scale** across the entire USASpending
+  universe (317K contractors) — the hard data-engineering (entity resolution, aggregation by parent
+  vendor, multi-source joins) is a production capability, not a research risk. *(e.g., it returns
+  McKesson's $84B / Pfizer's $28B in federal spend instantly.)* This same machinery computes the tool's
+  DLA-specific numerator from DLA's transaction data.
+- **The public-financial join (the denominator).** Built to ingest SEC EDGAR 10-K revenue + SAM.gov —
+  the exact sources the topic names — with a fallback path for private/foreign vendors (audited-statement
+  harvesting, OCR, commercial DBs).
+- **Provenance + explainability by default.** Every figure carries its source + as-of date, and our
+  calcs are deterministic and re-derivable — the "auditable, traceable, independently re-computable"
+  evidence the topic and SFFAS 47 require.
 
-## 🔲 What WE NEED from a partner (this is the ask)
-**Federal-agency audit-readiness / SFFAS-47 expertise.** Mindy is market-intelligence, not audit. We
-need a partner who knows **agency-side financial reporting** (FIAR, FASAB, SFFAS 47) to:
-- Define the economic-dependency / related-party **criterion** per SFFAS 47,
-- Anchor the proposal in DLA's audit-readiness language, and
-- Co-author the compliance memo.
+> **The dependency metric (per DLA's own Q&A):** economic dependency = a vendor's **DLA Working Capital
+> Fund revenue/disbursements** ÷ its **total consolidated revenue**. The DLA-specific numerator is
+> computed from DLA's transaction data (provided post-award); vendor-wide federal spend is the *secondary*
+> supply-chain layer. We bring the engine that does both.
 
-*Note: this is the **agency** audit side (helping DLA audit its own books), not contractor-side
-DCAA/FAR compliance.*
+## 🔲 What we need in a PRIME (this is the ask)
+This topic hinges on two things Mindy deliberately doesn't cover — so we want a prime who brings both:
+- **CMMC Level 2** (self-attestation + active SPRS score) — a **condition of award** for this topic, and
+  the CUI-compliant environment Phase I is performed in.
+- **Agency-side SFFAS 47 / audit-readiness expertise** (FIAR, FASAB — helping DLA audit its *own* books,
+  not contractor-side DCAA/FAR) — to define the dependency/related-party criterion, anchor the proposal
+  in DLA's audit language, and own the compliance methodology.
+
+We were originally set to prime this ourselves, but a prime with **both** of those puts the team in a
+far stronger position — so we'd rather come in as the technical provider (the "✅ What WE bring" engine
+above is our lane).
 
 ---
 
-## The deal
-- **Light lift for you.** A **named advisor** is enough to make Phase I credible — you don't have to
-  build anything. (Subcontractor role available if you want more.)
+## The deal (for the prime)
+- **You prime; we're the essential tech sub.** You hold the award, the customer relationship, and
+  Phase III; we deliver the engine that makes the tool work. Clean two-party structure.
 - **Real upside.** $100K Phase I → $1M Phase II → Phase III sole-source pathway, DoD-wide.
-- **Clean structure.** We bring the tech + prime the SBIR; you bring the standard. No IT/dev partner
-  needed — the engineering is ours.
+- **Light integration lift.** The AI/data pipeline is ours and largely built — you bring the CMMC posture
+  and the SFFAS-47 standard, not a from-scratch engineering effort.
 - **Fast.** Closes 22 July 2026 — we're moving now.
 
 ---
 
 ## Phase I in one breath
-A feasibility study: take sample DLA contract data → resolve the vendor universe → pull public
-financials → apply the SFFAS-47 dependency criterion → deliver a **proof-of-concept tool + a labeled
-"golden dataset" + a Phase II plan.** Not production — proving the concept works on real data.
+A feasibility study: take DLA's de-identified sample EBS data → resolve the vendor universe → compute
+the DLA WCF-dependency numerator → pull public + private financials for the denominator → apply the
+configurable SFFAS-47 criterion → deliver a **proof-of-concept tool + a "golden dataset" methodology +
+exportable audit evidence + a Phase II plan.** Not production, and not final determinations — proving
+the concept is feasible on real data.
 
 ---
 
