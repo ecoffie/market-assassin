@@ -51,6 +51,7 @@ import { getAgencySpendingDetailTool } from '@/mcp/tools/agency-spending-detail'
 import { extractComplianceMatrix } from '@/mcp/tools/compliance-matrix';
 import { buildProposalStructureTool, type ProposalStructureInputReq } from '@/mcp/tools/proposal-structure';
 import { refereeProposalCompliance, type RefereeInputReq } from '@/mcp/tools/referee-compliance';
+import { matchRecompeteSowTool } from '@/mcp/tools/recompete-sow';
 import { getBalance } from '@/lib/mcp/credits';
 import { tierFor } from '@/lib/mcp/entitlements';
 
@@ -104,6 +105,7 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   extract_compliance_matrix: 3, // LLM-backed RFP requirement extraction (chunked+parallel; shared cache warms public notices)
   build_proposal_structure: 1, // pure shaping — compliance matrix → volume/section tree (no LLM/IO)
   referee_proposal_compliance: 4, // independent Claude referee (no-training/sensitive) — draft vs matrix, per-req verdicts
+  match_recompete_sow: 2, // embed + vector scan over the sam_opportunities SOW corpus (Mindy embeddings moat)
   get_balance: 0, // meta tool — always free
 };
 
@@ -901,6 +903,31 @@ const REFEREE_COMPLIANCE_TOOL_DEF = {
   },
 };
 
+const RECOMPETE_SOW_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'match_recompete_sow',
+    description:
+      "Given an EXPIRING contract's scope, find the open solicitation that is likely its recompete — by semantic SOW " +
+      'similarity over Mindy\'s embedded sam_opportunities corpus. The payoff step of the recompete chain: ' +
+      'get_expiring_contracts → an expiring contract → match_recompete_sow → the open opp (pairs with ' +
+      'find_predecessor_award for who holds it now). Pass the expiring contract\'s `description` (title/scope/SOW text); ' +
+      'optionally `naics` + `agency` to scope candidates. Confidence is honest — it needs BOTH a high top score AND a ' +
+      'gap over the runner-up, so a cluster of similar SOWs returns no_confident_match (with candidates to review) rather ' +
+      'than a false single answer. grounded=false = no SOW-bearing candidates in scope. Always verify via the SAM link.',
+    parameters: {
+      type: 'object',
+      properties: {
+        description: { type: 'string', description: "The expiring contract's title / scope / SOW text to match against the corpus." },
+        naics: { type: 'string', description: 'Optional NAICS code to scope candidates (widens to 2-digit if the set is thin).' },
+        agency: { type: 'string', description: 'Optional agency/department to scope candidates (matched against the buying department).' },
+        piid: { type: 'string', description: 'Optional PIID of the expiring contract (telemetry only).' },
+      },
+      required: ['description'],
+    },
+  },
+};
+
 /** All tools exposed over MCP in v1, each annotated with its credit price. */
 export function listMcpTools(): Array<Record<string, unknown>> {
   const defs = [
@@ -938,6 +965,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     COMPLIANCE_MATRIX_TOOL_DEF,
     PROPOSAL_STRUCTURE_TOOL_DEF,
     REFEREE_COMPLIANCE_TOOL_DEF,
+    RECOMPETE_SOW_TOOL_DEF,
     GET_BALANCE_TOOL_DEF,
   ];
   return defs.map((d) => ({ ...d, _credits: TOOL_CREDITS[d.function.name] ?? 0, _tier: tierFor(d.function.name) }));
@@ -980,6 +1008,7 @@ export function isMcpTool(name: string): boolean {
     name === 'extract_compliance_matrix' ||
     name === 'build_proposal_structure' ||
     name === 'referee_proposal_compliance' ||
+    name === 'match_recompete_sow' ||
     name === 'get_balance'
   );
 }
@@ -1331,6 +1360,16 @@ export async function runMcpTool(
       requirements: Array.isArray(args.requirements) ? (args.requirements as RefereeInputReq[]) : [],
       draft: typeof args.draft === 'string' ? args.draft : '',
       userEmail: ctx.userEmail,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'match_recompete_sow') {
+    const result = (await matchRecompeteSowTool({
+      description: typeof args.description === 'string' ? args.description : '',
+      naics: typeof args.naics === 'string' ? args.naics : undefined,
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      piid: typeof args.piid === 'string' ? args.piid : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
