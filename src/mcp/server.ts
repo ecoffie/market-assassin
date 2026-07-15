@@ -48,6 +48,7 @@ import { searchPodcastLessons } from './tools/podcast-lessons';
 import { getAgencyBudgetTrends } from './tools/agency-budget-trends';
 import { deriveCompanyKeywords } from './tools/company-keywords';
 import { getAgencySpendingDetailTool } from './tools/agency-spending-detail';
+import { extractComplianceMatrix } from './tools/compliance-matrix';
 
 const server = new McpServer({
   name: 'mindy-govcon',
@@ -798,11 +799,32 @@ server.registerTool(
   },
 );
 
+server.registerTool(
+  'extract_compliance_matrix',
+  {
+    title: 'Extract Compliance Matrix (RFP requirements)',
+    description:
+      'Harvest EVERY explicit requirement from a federal solicitation into a structured compliance matrix — the ' +
+      'shall/must/required obligations plus Section L (instructions), M (evaluation factors), and C (SOW/PWS). Pass ONE ' +
+      'of: notice_id (fetches the SOW + body + attachment text server-side) OR rfp_text (the solicitation text directly). ' +
+      'Each row: {requirement, category, section, source_quote (verbatim)}. grounded=false = nothing extractable — do ' +
+      'NOT invent requirements. Single-doc only: it does not merge amendments over the base.',
+    inputSchema: {
+      notice_id: z.string().optional().describe('SAM notice id (UUID) or solicitation number — fetches the doc text server-side.'),
+      rfp_text: z.string().optional().describe('The solicitation text directly (use when you already have it).'),
+    },
+  },
+  async ({ notice_id, rfp_text }) => {
+    const result = await extractComplianceMatrix({ notice_id, rfp_text });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + keyword-coverage + idv-contracts + contractor-award-history + market-depth + solicitation-documents + federal-events + scan-compliance + bid-decision + federal-osbp + agency-opps-by-office + sblo-contact + federal-contacts + podcast-lessons + agency-budget-trends + company-keywords + agency-spending-detail registered',
+    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + keyword-coverage + idv-contracts + contractor-award-history + market-depth + solicitation-documents + federal-events + scan-compliance + bid-decision + federal-osbp + agency-opps-by-office + sblo-contact + federal-contacts + podcast-lessons + agency-budget-trends + company-keywords + agency-spending-detail + compliance-matrix registered',
   );
 }
 
