@@ -4,7 +4,15 @@ import { logToolError, ToolNames, AIProviders, classifyError } from '@/lib/tool-
 import { normalizeCategory } from '@/lib/proposal/section-alignment';
 import { createClient } from '@supabase/supabase-js';
 import crypto from 'node:crypto';
-import { callLLM } from '@/lib/llm/call-llm';
+import {
+  type ComplianceRequirement,
+  GROQ_MODEL,
+  MAX_INPUT_CHARS,
+  mapPool,
+  chunkText,
+  extractChunk,
+  extractComplianceMatrixFromText,
+} from '@/lib/proposal/compliance-matrix';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -13,133 +21,10 @@ export const dynamic = 'force-dynamic';
 // headroom AND parallelize the chunks below so it finishes in ~30-40s.
 export const maxDuration = 300;
 
-// Run an async fn over items with bounded concurrency, preserving input order.
-async function mapPool<T, R>(items: T[], concurrency: number, fn: (item: T, index: number) => Promise<R>): Promise<R[]> {
-  const results = new Array<R>(items.length);
-  let cursor = 0;
-  const workers = Array.from({ length: Math.min(concurrency, items.length) }, async () => {
-    while (cursor < items.length) {
-      const i = cursor++;
-      results[i] = await fn(items[i], i);
-    }
-  });
-  await Promise.all(workers);
-  return results;
-}
-
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = process.env.PROPOSAL_GROQ_MODEL || 'llama-3.3-70b-versatile';
-
-// Cap source text we send to the model. 50K chars ~ 12K tokens, well under llama 3.3's window
-// and lets us return useful coverage even on long RFPs without rate-limit pain.
-const MAX_INPUT_CHARS = 50000;
-
-interface ComplianceRequirement {
-  id: string;
-  requirement: string;
-  category: 'submission' | 'evaluation' | 'technical' | 'past_performance' | 'pricing' | 'admin' | 'other';
-  section?: string;
-  source_quote?: string;
-  source_doc?: string;   // which doc this came from (e.g. "Amendment 0004")
-  revised?: boolean;     // true when an amendment changed this requirement
-}
-
 interface RequestBody {
   text?: string;
   fileName?: string;
-  pipeline_id?: string;  // multi-doc mode: extract from base + amendments + Q&A
-}
-
-const SYSTEM_PROMPT = `You are a federal proposal compliance analyst. Read the solicitation excerpt and extract EVERY explicit requirement, instruction, or evaluation factor a bidder must address.
-
-Look for:
-- "shall", "must", "will", "required", "is required to" obligations
-- Section L (Instructions to Offerors), Section M (Evaluation Factors), Section C (SOW/PWS)
-- Submission deadlines, page limits, formatting rules, copies required, portal/method
-- Required certifications, representations, reps & certs
-- Past performance volume, technical volume, price volume requirements
-- Evaluation factors and their relative weights
-
-Return ONLY valid JSON in this exact shape, no prose, no markdown fences:
-{
-  "requirements": [
-    {
-      "id": "REQ-001",
-      "requirement": "Short one-line statement of what bidder must do",
-      "category": "submission" | "evaluation" | "technical" | "past_performance" | "pricing" | "admin" | "other",
-      "section": "L.3.2",        // optional, omit if unknown
-      "source_quote": "..."       // optional, ~12-25 words verbatim from the doc
-    }
-  ]
-}
-
-Rules:
-- Aim for 15-50 requirements. Skip vague or aspirational language.
-- One requirement per row. Split compound "shall" sentences into separate rows.
-- Use stable ids REQ-001, REQ-002, ... in document order.
-- Prefer crisp imperatives in "requirement" ("Submit Past Performance volume in PDF, max 25 pages").
-- If a section/clause label is visible nearby (L.3, M-2, 52.212-1), put it in "section".`;
-
-const GROQ_MODEL_FALLBACK = process.env.PROPOSAL_FALLBACK_MODEL || 'llama-3.1-8b-instant';
-
-/** Split text into chunks ≤ maxChars, breaking at paragraph boundaries so a
- *  requirement isn't sliced mid-sentence. */
-function chunkText(text: string, maxChars: number): string[] {
-  if (text.length <= maxChars) return [text];
-  const chunks: string[] = [];
-  const paras = text.split(/\n\s*\n/);
-  let cur = '';
-  for (const p of paras) {
-    if ((cur + '\n\n' + p).length > maxChars && cur) { chunks.push(cur); cur = ''; }
-    // a single huge paragraph (e.g. a wage table) — hard-split it.
-    if (p.length > maxChars) {
-      for (let i = 0; i < p.length; i += maxChars) chunks.push(p.slice(i, i + maxChars));
-    } else {
-      cur = cur ? `${cur}\n\n${p}` : p;
-    }
-  }
-  if (cur) chunks.push(cur);
-  return chunks;
-}
-
-// Amendments + Q&A don't use "shall" — they state CHANGES ("the purpose of this
-// amendment is to extend the closing date to X", "Question 5: … Answer: …").
-// A dedicated prompt catches those so revised deadlines/specs/answers aren't
-// missed (Eric QC: amendments touched the deadline but extracted 0).
-const AMENDMENT_PROMPT = `You are a federal proposal analyst reading an AMENDMENT or Q&A document. Extract every CHANGE or clarification a bidder must now follow:
-- Revised dates (new closing/response date, extended deadline)
-- Revised specifications, quantities, scope, or page limits
-- Questions & their answers that change or clarify a requirement
-- New documents/attachments that must be submitted
-Phrase each as the CURRENT requirement (e.g. "Submit offers by the revised closing date of June 30, 2026", "Q12: tile must be commercial-grade per the answer").
-Return ONLY JSON {"requirements":[{"id","requirement","category","section"}]} category in submission|evaluation|technical|past_performance|pricing|admin|other. Skip the SF30 boilerplate (copies, acknowledgment instructions). If the amendment makes no substantive change, return an empty array.`;
-
-/** Extract requirements from ONE chunk. Uses the amendment/Q&A prompt when
- *  isChange. PROVIDER-AGNOSTIC via callLLM: Groq 70B → 8B → Claude → OpenAI →
- *  Grok, so a throttle on any one provider (Eric: Groq's paid tier is closed)
- *  falls through to the next instead of returning an empty matrix. */
-async function extractChunk(_apiKey: string, fileName: string | undefined, chunk: string, isChange = false): Promise<ComplianceRequirement[] | null> {
-  const prompt = isChange ? AMENDMENT_PROMPT : SYSTEM_PROMPT;
-  try {
-    const { text: raw } = await callLLM({
-      system: prompt,
-      user: `${isChange ? 'Amendment/Q&A' : 'Solicitation'}: ${fileName || 'untitled'}\n\n--- SOURCE TEXT ---\n${chunk}`,
-      json: true,
-      maxTokens: 4000,
-      temperature: 0.2,
-      job: 'extraction', // high volume — Groq only, never Claude
-      tool: 'proposal_compliance',
-      // email isn't threaded into extractChunk (would require a signature
-      // refactor across the chunk pool); attribute at the tool level.
-      userEmail: null,
-    });
-    const cleaned = raw.replace(/```json\n?/g, '').replace(/```\n?/g, '').trim();
-    const parsed = JSON.parse(cleaned);
-    return Array.isArray(parsed.requirements) ? parsed.requirements : [];
-  } catch (err) {
-    console.warn('[compliance] chunk failed (all providers):', err instanceof Error ? err.message : err);
-    return null;
-  }
+  pipeline_id?: string; // multi-doc mode: extract from base + amendments + Q&A
 }
 
 /**
@@ -147,8 +32,10 @@ async function extractChunk(_apiKey: string, fileName: string | undefined, chunk
  * classified docs (base solicitation + Q&A + amendments in order), extract
  * requirements from each, then merge: a later amendment that revises a base
  * requirement WINS and is flagged `revised`. Returns the current, accurate set.
+ * (Stays in the route — it needs a logged-in user's private pursuit_documents; the
+ * shared single-doc engine lives in src/lib/proposal/compliance-matrix.ts.)
  */
-async function extractMultiDoc(apiKey: string, pipelineId: string, email: string): Promise<{ requirements: ComplianceRequirement[]; sources: string[]; cached?: boolean } | null> {
+async function extractMultiDoc(pipelineId: string): Promise<{ requirements: ComplianceRequirement[]; sources: string[]; cached?: boolean } | null> {
   const supabase = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
   const { data: docs, error: docsErr } = await supabase
     .from('pursuit_documents')
@@ -225,7 +112,7 @@ async function extractMultiDoc(apiKey: string, pipelineId: string, email: string
     }
   });
 
-  const taskResults = await mapPool(tasks, EXTRACT_CONCURRENCY, (t) => extractChunk(apiKey, t.filename, t.chunk, t.isChange));
+  const taskResults = await mapPool(tasks, EXTRACT_CONCURRENCY, (t) => extractChunk(t.filename, t.chunk, t.isChange));
 
   // Merge in task order (== precedence order) so amendments overwrite base.
   const perDocCount = new Map<number, number>();
@@ -278,55 +165,51 @@ export async function POST(request: NextRequest) {
   }
 
   // Any one provider key is enough — callLLM falls through the chain.
-  const apiKey = process.env.GROQ_API_KEY || '';
   if (!process.env.GROQ_API_KEY && !process.env.ANTHROPIC_API_KEY && !process.env.OPENAI_API_KEY && !process.env.GROK_API_KEY) {
-    return NextResponse.json(
-      { success: false, error: 'AI service not configured' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: 'AI service not configured' }, { status: 500 });
   }
 
   // MULTI-DOC mode (Eric QC: amendments revise the base — deadlines/specs — so a
   // base-only matrix is STALE and would pass a non-compliant bid). When a
   // pipeline_id is sent, extract from base solicitation + AMENDMENTS + Q&A, and
   // merge with AMENDMENT PRECEDENCE (later amendments win; flag what changed).
-  let sourceText = (body.text || '').trim();
+  const sourceText = (body.text || '').trim();
   let multiDocResult: { requirements: ComplianceRequirement[]; sources: string[]; cached?: boolean } | null = null;
-  if (body.pipeline_id && email) {
-    multiDocResult = await extractMultiDoc(apiKey, body.pipeline_id, email);
+  if (body.pipeline_id) {
+    multiDocResult = await extractMultiDoc(body.pipeline_id);
   }
   if (!multiDocResult && !sourceText) {
-    return NextResponse.json(
-      { success: false, error: 'No source text provided. Upload an RFP first.' },
-      { status: 400 }
-    );
+    return NextResponse.json({ success: false, error: 'No source text provided. Upload an RFP first.' }, { status: 400 });
   }
 
-  const wasTruncated = sourceText.length > MAX_INPUT_CHARS;
-  const inputText = wasTruncated ? sourceText.slice(0, MAX_INPUT_CHARS) : sourceText;
-
   try {
-    let merged: ComplianceRequirement[];
+    let requirements: ComplianceRequirement[];
     let anyOk: boolean;
-    let docSources: string[] = [];
-    if (multiDocResult) {
-      merged = multiDocResult.requirements;
-      anyOk = merged.length > 0;
-      docSources = multiDocResult.sources;
-    } else {
-      // Single-doc (legacy): chunk the flat text, extract IN PARALLEL, merge.
-      const chunks = chunkText(inputText, 14000).slice(0, 48);
-      merged = [];
-      anyOk = false;
-      const chunkResults = await mapPool(chunks, 6, (chunk) => extractChunk(apiKey, body.fileName, chunk));
-      for (const reqs of chunkResults) {
-        if (reqs !== null) { anyOk = true; merged.push(...reqs); }
-      }
-    }
-    void docSources;
-    const response = { ok: anyOk, status: anyOk ? 200 : 500 };
+    let truncated = false;
+    let inputChars = 0;
+    let originalChars = sourceText.length;
 
-    if (!response.ok) {
+    if (multiDocResult) {
+      // Multi-doc chunks each doc fully (no 50K slice) and re-ids; normalize the
+      // categories here to preserve the single downstream contract.
+      requirements = multiDocResult.requirements.map((r) => ({
+        ...r,
+        category: normalizeCategory(r.category as string | undefined, r.requirement),
+      }));
+      anyOk = requirements.length > 0;
+      originalChars = 0;
+    } else {
+      // Single-doc: the shared engine truncates, chunks, extracts in parallel,
+      // dedupes, normalizes categories, and re-ids.
+      const ex = await extractComplianceMatrixFromText(sourceText, { fileName: body.fileName, userEmail: email });
+      requirements = ex.requirements;
+      anyOk = ex.ok;
+      truncated = ex.truncated;
+      inputChars = ex.inputChars;
+      originalChars = ex.originalChars;
+    }
+
+    if (!anyOk) {
       await logToolError({
         tool: ToolNames.PROPOSAL_ASSIST,
         errorType: 'api_error',
@@ -335,40 +218,17 @@ export async function POST(request: NextRequest) {
         aiProvider: AIProviders.GROQ,
         aiModel: GROQ_MODEL,
       });
-      return NextResponse.json(
-        { success: false, error: 'AI service error. Try again.' },
-        { status: 500 }
-      );
+      return NextResponse.json({ success: false, error: 'AI service error. Try again.' }, { status: 500 });
     }
-
-    // Dedupe near-identical requirements across chunks; re-id in order.
-    const seen = new Set<string>();
-    const deduped = merged.filter(r => {
-      const k = (r.requirement || '').toLowerCase().replace(/\s+/g, ' ').slice(0, 80);
-      if (!k || seen.has(k)) return false; seen.add(k); return true;
-    }).map((r, i) => ({ ...r, id: `REQ-${String(i + 1).padStart(3, '0')}` }));
-    const parsed: { requirements?: ComplianceRequirement[] } = { requirements: deduped };
-
-    // Normalize categories — the model often ignores our enum and uses the
-    // doc's own headings ("Project Objectives") which broke alignment + would
-    // mislead the compliance referee (Eric's QC catch). Remap to our 7 so every
-    // requirement routes to a real section.
-    const rawReqs = Array.isArray(parsed.requirements) ? parsed.requirements : [];
-    const requirements = rawReqs.map((r) => ({
-      ...r,
-      category: normalizeCategory(r.category as string | undefined, r.requirement),
-    }));
 
     return NextResponse.json({
       success: true,
       requirements,
       meta: {
         model: GROQ_MODEL,
-        inputChars: inputText.length,
-        // Multi-doc mode chunks each doc fully (no 50K slice), so it's not
-        // truncated; the single-doc legacy path still reports its cap.
-        truncated: multiDocResult ? false : wasTruncated,
-        originalChars: sourceText.length,
+        inputChars,
+        truncated,
+        originalChars,
         count: requirements.length,
         sources: multiDocResult?.sources,
         multiDoc: !!multiDocResult,
@@ -386,9 +246,6 @@ export async function POST(request: NextRequest) {
       aiProvider: AIProviders.GROQ,
       aiModel: GROQ_MODEL,
     });
-    return NextResponse.json(
-      { success: false, error: 'Compliance extraction failed. Try again.' },
-      { status: 500 }
-    );
+    return NextResponse.json({ success: false, error: 'Compliance extraction failed. Try again.' }, { status: 500 });
   }
 }

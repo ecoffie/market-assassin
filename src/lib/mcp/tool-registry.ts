@@ -48,6 +48,7 @@ import { searchPodcastLessons } from '@/mcp/tools/podcast-lessons';
 import { getAgencyBudgetTrends } from '@/mcp/tools/agency-budget-trends';
 import { deriveCompanyKeywords } from '@/mcp/tools/company-keywords';
 import { getAgencySpendingDetailTool } from '@/mcp/tools/agency-spending-detail';
+import { extractComplianceMatrix } from '@/mcp/tools/compliance-matrix';
 import { getBalance } from '@/lib/mcp/credits';
 import { tierFor } from '@/lib/mcp/entitlements';
 
@@ -98,6 +99,7 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   get_agency_budget_trends: 1, // curated OMB/CBJ budget-authority JSON (static, no LLM/IO)
   derive_company_keywords: 1, // OpenAI-embedding keyword derivation (no BigQuery)
   get_agency_spending_detail: 2, // multiple USASpending aggregates (total + subagency + set-aside buckets)
+  extract_compliance_matrix: 3, // LLM-backed RFP requirement extraction (chunked+parallel; shared cache warms public notices)
   get_balance: 0, // meta tool — always free
 };
 
@@ -803,6 +805,29 @@ const COMPANY_KEYWORDS_TOOL_DEF = {
   },
 };
 
+const COMPLIANCE_MATRIX_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'extract_compliance_matrix',
+    description:
+      'Harvest EVERY explicit requirement from a federal solicitation into a structured compliance matrix — the ' +
+      'shall/must/required obligations plus Section L (instructions), M (evaluation factors), and C (SOW/PWS). The ' +
+      'foundation of a proposal: build the outline from it and check nothing is missed. Pass ONE of: notice_id (fetches ' +
+      "the notice's SOW + body + attachment text server-side — pairs with search_sam_opportunities) OR rfp_text (the " +
+      'solicitation text directly). Each row: {requirement, category (submission/evaluation/technical/past_performance/' +
+      'pricing/admin/other), section, source_quote (verbatim)}. grounded=false = nothing extractable (a synopsis, not ' +
+      'the L/M/C body, or a fetch miss) — do NOT invent requirements. Single-doc only: it does not merge amendments over ' +
+      'the base; pass amendment text too if dates/specs were revised.',
+    parameters: {
+      type: 'object',
+      properties: {
+        notice_id: { type: 'string', description: 'SAM notice id (UUID) or solicitation number — fetches the doc text server-side.' },
+        rfp_text: { type: 'string', description: 'The solicitation text directly (use when you already have it, or notice_id has no extractable text).' },
+      },
+    },
+  },
+};
+
 /** All tools exposed over MCP in v1, each annotated with its credit price. */
 export function listMcpTools(): Array<Record<string, unknown>> {
   const defs = [
@@ -837,6 +862,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     AGENCY_BUDGET_TRENDS_TOOL_DEF,
     COMPANY_KEYWORDS_TOOL_DEF,
     AGENCY_SPENDING_DETAIL_TOOL_DEF,
+    COMPLIANCE_MATRIX_TOOL_DEF,
     GET_BALANCE_TOOL_DEF,
   ];
   return defs.map((d) => ({ ...d, _credits: TOOL_CREDITS[d.function.name] ?? 0, _tier: tierFor(d.function.name) }));
@@ -876,6 +902,7 @@ export function isMcpTool(name: string): boolean {
     name === 'get_agency_budget_trends' ||
     name === 'derive_company_keywords' ||
     name === 'get_agency_spending_detail' ||
+    name === 'extract_compliance_matrix' ||
     name === 'get_balance'
   );
 }
@@ -1200,6 +1227,15 @@ export async function runMcpTool(
     const result = (await getAgencySpendingDetailTool({
       agency: typeof args.agency === 'string' ? args.agency : '',
       fiscal_year: typeof args.fiscal_year === 'number' ? args.fiscal_year : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'extract_compliance_matrix') {
+    const result = (await extractComplianceMatrix({
+      notice_id: typeof args.notice_id === 'string' ? args.notice_id : undefined,
+      rfp_text: typeof args.rfp_text === 'string' ? args.rfp_text : undefined,
+      userEmail: ctx.userEmail,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }

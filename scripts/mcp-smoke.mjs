@@ -78,7 +78,7 @@ try {
     'lookup_federal_osbp', 'search_agency_opps_by_office',
     'get_sblo_contact', 'search_federal_contacts', 'search_podcast_lessons',
     'get_agency_budget_trends', 'derive_company_keywords',
-    'get_agency_spending_detail',
+    'get_agency_spending_detail', 'extract_compliance_matrix',
   ]) {
     if (!names.includes(t)) fail(`${t} not registered`);
   }
@@ -530,7 +530,26 @@ try {
   if (asdMiss.structuredContent?._meta?.grounded !== false) fail('agency-spending-detail: unknown agency should be grounded=false (no invented figures)');
   console.error('✓ honest miss: unknown agency → grounded=false');
 
-  console.error('\n✅ SMOKE PASSED — MCP transport + 29 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth, solicitation-documents, federal-events, scan-compliance, bid-decision, federal-osbp, agency-opps-by-office, sblo-contact, federal-contacts, podcast-lessons, agency-budget-trends, company-keywords, agency-spending-detail) all live + honest');
+  // ── extract_compliance_matrix (LLM RFP requirement extraction) ─────────────
+  console.error('\n→ calling extract_compliance_matrix({ rfp_text: <Section L/M sample> })');
+  const CM_RFP = 'SECTION L - INSTRUCTIONS TO OFFERORS\nL.1 The offeror shall submit its proposal in three volumes: Technical, Past Performance, Price.\nL.2 The Technical volume shall not exceed 25 pages, 12-point font.\nL.3 Proposals must be submitted via SAM.gov no later than 2:00 PM EST on August 15, 2026.\nL.4 The offeror is required to provide three past performance references from the last five years.\n\nSECTION M - EVALUATION FACTORS\nM.1 Award will be made on best value; technical is more important than price.\nM.2 The Government will evaluate Technical Approach and Past Performance.';
+  const cm = await client.callTool({ name: 'extract_compliance_matrix', arguments: { rfp_text: CM_RFP } });
+  const cmS = cm.structuredContent;
+  if (!cmS) fail('compliance-matrix: no structuredContent');
+  if (cmS._meta?.degraded) fail('compliance-matrix: degraded=true (LLM providers unreachable — check GROQ_API_KEY)');
+  if (!cmS._meta?.grounded || !Array.isArray(cmS.requirements) || cmS.requirements.length < 3) {
+    fail(`compliance-matrix: expected ≥3 grounded requirements from a Section L/M RFP, got ${cmS.requirements?.length}`);
+  }
+  // Traceability: the page-limit requirement must trace to the RFP's "25 pages".
+  const hasPageLimit = cmS.requirements.some((r) => /25\s*pages?/i.test(`${r.requirement} ${r.source_quote || ''}`));
+  if (!hasPageLimit) fail('compliance-matrix: did not capture the "25 pages" limit stated in L.2 (fabrication/omission guard)');
+  const cats = new Set(cmS.requirements.map((r) => r.category));
+  console.error(`✓ grounded=${cmS._meta.grounded} · ${cmS.requirements.length} requirements · categories=[${[...cats].join(', ')}] · model=${cmS._meta.model}`);
+  const cmMiss = await client.callTool({ name: 'extract_compliance_matrix', arguments: { rfp_text: 'Thanks for your interest. The weather is nice today.' } });
+  if (cmMiss.structuredContent?._meta?.grounded !== false) fail('compliance-matrix: a cover memo should be grounded=false (no invented requirements)');
+  console.error('✓ honest miss: no requirements in filler text → grounded=false');
+
+  console.error('\n✅ SMOKE PASSED — MCP transport + 29 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth, solicitation-documents, federal-events, scan-compliance, bid-decision, federal-osbp, agency-opps-by-office, sblo-contact, federal-contacts, podcast-lessons, agency-budget-trends, company-keywords, agency-spending-detail, compliance-matrix) all live + honest');
   await client.close();
   process.exit(0);
 } catch (err) {
