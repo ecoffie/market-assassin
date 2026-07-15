@@ -104,6 +104,12 @@ export async function storeInCache(
     return;
   }
 
+  // query is NOT NULL in web_intelligence_cache; an empty/missing query makes
+  // PostgREST omit the column → 23502 not-null violation. Nothing to cache anyway.
+  if (!query || !query.trim()) {
+    return;
+  }
+
   const cacheKey = generateCacheKey(query);
   const now = new Date();
   const expiresAt = new Date(now.getTime() + CACHE_TTL_HOURS * 60 * 60 * 1000);
@@ -139,14 +145,21 @@ export async function batchStoreInCache(
   const now = new Date();
   const expiresAt = new Date(now.getTime() + CACHE_TTL_HOURS * 60 * 60 * 1000);
 
-  const entries = queryResults.map(({ query, results }) => ({
-    cache_key: generateCacheKey(query),
-    query: query,
-    results: results,
-    relevance_scores: {},
-    fetched_at: now.toISOString(),
-    expires_at: expiresAt.toISOString(),
-  }));
+  const entries = queryResults
+    // Skip entries with an empty/missing query — NOT NULL column, would 23502.
+    .filter(({ query }) => query && query.trim())
+    .map(({ query, results }) => ({
+      cache_key: generateCacheKey(query),
+      query: query,
+      results: results,
+      relevance_scores: {},
+      fetched_at: now.toISOString(),
+      expires_at: expiresAt.toISOString(),
+    }));
+
+  if (entries.length === 0) {
+    return;
+  }
 
   try {
     await supabase.from('web_intelligence_cache').upsert(entries, {
