@@ -16,7 +16,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { authedFetch, getMIApiHeaders } from '@/components/app/authHeaders';
-import { Tool, Pkg, Catalog, MCP_URL, McpNav, AppCluster, EXAMPLES, exampleCost } from './catalog-ui';
+import { Tool, Catalog, MCP_URL, McpNav, AppCluster, EXAMPLES, exampleCost } from './catalog-ui';
 
 interface KeyRow {
   id: string;
@@ -86,66 +86,12 @@ function connectFor(client: ClientId): ConnectInfo {
   }
 }
 
-/** Friendly names for translating a credit balance into real usage. */
-const TOOL_LABELS: Record<string, string> = {
-  // Public data + search
-  search_sam_opportunities: 'SAM opportunity searches',
-  get_market_vocabulary: 'market vocabulary lookups',
-  get_keyword_coverage: 'keyword market-coverage maps',
-  search_grants: 'federal grant searches',
-  get_agency_forecasts: 'agency forecast searches',
-  search_sbir: 'SBIR/STTR searches',
-  get_expiring_contracts: 'expiring-contract (recompete) pulls',
-  search_idv_contracts: 'IDIQ/GWAC vehicle searches',
-  get_solicitation_documents: 'solicitation SOW/doc pulls',
-  search_federal_events: 'industry-day & matchmaking finds',
-  // Competitive intel
-  get_contractor_profile: 'contractor deep-dives',
-  search_contractors: 'competitive landscape scans',
-  find_capable_contractors: '“who can win this” scans',
-  get_contractor_award_history: 'contractor award-history reads',
-  get_incumbent_financials: 'incumbent financial reads',
-  get_sblo_contact: 'prime SBLO teaming contacts',
-  lookup_sam_entity: 'SAM entity registrations',
-  // Agency & award intel
-  get_agency_intel: 'agency intel briefs',
-  get_agency_spending_detail: 'agency component + set-aside breakdowns',
-  get_agency_budget_trends: 'agency budget-trend reads',
-  get_award_detail: 'award detail lookups',
-  find_predecessor_award: 'incumbent/predecessor traces',
-  get_regulatory_demand: 'regulatory-demand signals',
-  lookup_federal_osbp: 'OSBP small-business front-door lookups',
-  search_agency_opps_by_office: 'buying-office opportunity pulls',
-  search_federal_contacts: 'buying-office contact rosters',
-  assess_market_depth: 'Rule-of-Two market-depth checks',
-  // Proprietary + proposal
-  get_winning_playbook: 'win playbooks',
-  search_podcast_lessons: 'podcast lesson lookups',
-  scan_proposal_compliance: 'pre-submit compliance scans',
-  evaluate_bid_decision: 'bid/no-bid evaluations',
-  derive_company_keywords: 'company keyword derivations',
-};
-
-/** "≈ 250 SAM searches · 125 financial reads · 31 win scans" from the LIVE tool costs. */
-function valueLine(credits: number, tools: Tool[]): string {
-  const picks = ['search_sam_opportunities', 'get_incumbent_financials', 'find_capable_contractors'];
-  const parts = picks
-    .map((name) => {
-      const t = tools.find((x) => x.name === name);
-      if (!t || t.credits <= 0) return null;
-      return `${Math.floor(credits / t.credits).toLocaleString()} ${TOOL_LABELS[name]}`;
-    })
-    .filter(Boolean) as string[];
-  return parts.length ? parts.join(' · ') : `${credits.toLocaleString()} tool calls`;
-}
-
 export default function McpConsole() {
   const [authState, setAuthState] = useState<'loading' | 'in' | 'out'>('loading');
   const [email, setEmail] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [balance, setBalance] = useState<number | null>(null);
   const [tools, setTools] = useState<Tool[]>([]);
-  const [packages, setPackages] = useState<Pkg[]>([]);
   const [calls, setCalls] = useState<Call[]>([]);
   const [keys, setKeys] = useState<KeyRow[]>([]);
   const [newKey, setNewKey] = useState<string | null>(null);
@@ -203,7 +149,6 @@ export default function McpConsole() {
       if (acc?.success) {
         setBalance(acc.balance);
         setTools(acc.tools || []);
-        setPackages(acc.packages || []);
         setCalls(acc.recentCalls || []);
       } else if (acc?.error) setError(acc.error);
       if (ks?.success) setKeys(ks.keys || []);
@@ -393,32 +338,15 @@ export default function McpConsole() {
           </div>
         </header>
 
-        {/* Hero */}
-        <section className="mt-8 text-center">
-          <div className="mb-6 flex items-center justify-center -space-x-2">
-            {[
-              { t: '✳', c: 'from-orange-400/80 to-rose-400/80' },
-              { t: '⌘', c: 'from-slate-300/80 to-slate-500/80' },
-            ].map((x, i) => (
-              <div key={i} className={`grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br ${x.c} text-base font-semibold text-[#0a0f1e] ring-4 ring-[#0a0f1e]`}>{x.t}</div>
-            ))}
-            <div className="z-10 grid h-14 w-14 place-items-center rounded-2xl bg-gradient-to-br from-indigo-500 to-emerald-400 text-xl font-bold text-[#0a0f1e] ring-4 ring-[#0a0f1e]">M</div>
-            {[
-              { t: '⌨', c: 'from-emerald-300/80 to-teal-500/80' },
-              { t: '❖', c: 'from-sky-300/80 to-indigo-400/80' },
-            ].map((x, i) => (
-              <div key={i} className={`grid h-11 w-11 place-items-center rounded-2xl bg-gradient-to-br ${x.c} text-base font-semibold text-[#0a0f1e] ring-4 ring-[#0a0f1e]`}>{x.t}</div>
-            ))}
-          </div>
+        {/* Hero — same AppCluster identity as the landing */}
+        <section className="mt-10 text-center">
+          <div className="mb-6"><AppCluster /></div>
           <h2 className="mx-auto max-w-2xl text-balance text-3xl font-bold uppercase leading-[1.05] tracking-tight sm:text-4xl">
             Mindy MCP for any AI agent
           </h2>
           <p className="mx-auto mt-3 max-w-xl text-balance text-sm text-slate-400 sm:text-[15px]">
             SAM opportunities, incumbent financials, GSA pricing, and win playbooks — piped straight into Claude, Cursor, or your own agent.
           </p>
-          <div className="mt-5 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/[0.07] px-3.5 py-1.5 text-[13px] text-emerald-200">
-            <span aria-hidden>🎁</span> Sign in once — your first connect includes {catalog?.signupCredits ?? 100} free credits
-          </div>
         </section>
 
         {justPurchased && (
@@ -477,28 +405,59 @@ export default function McpConsole() {
           <p className="mt-3 text-[12px] text-slate-500">🔑 No API key needed — you sign in through your browser. Running headless or in CI? Use a key under <span className="text-slate-400">Advanced</span> below.</p>
         </section>
 
-        {/* Credits */}
-        <Panel eyebrow="Credits" title="Buy credits">
-          <div className="grid gap-3 sm:grid-cols-3">
-            {packages.map((p) => (
-              <div key={p.id} className="flex flex-col rounded-xl border border-white/[0.08] bg-[#070b16] p-4 text-center">
-                <div className="text-2xl font-semibold tabular-nums">${p.usd}</div>
-                <div className="mt-0.5 text-sm font-medium tabular-nums text-emerald-300">{p.credits.toLocaleString()} credits</div>
-                <div className="mb-3 mt-2 flex-1 text-[12px] leading-relaxed text-slate-400">
-                  <span className="text-slate-500">≈ </span>{valueLine(p.credits, tools).split(' · ').map((part, i) => (
-                    <span key={i} className="block">{part}</span>
-                  ))}
+        {/* What you can do with credits — same demo grid as the landing */}
+        {tools.length > 0 && (
+          <section className="mt-8">
+            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">What you can do with credits</p>
+            <h2 className="mt-0.5 text-[15px] font-semibold text-slate-100">Each call is priced on its own</h2>
+            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {EXAMPLES.map((ex) => {
+                const cost = exampleCost(tools, ex.tools);
+                return (
+                  <div key={ex.title} className="overflow-hidden rounded-xl border border-white/10 bg-white/[0.02]">
+                    <div className="relative grid aspect-video place-items-center border-b border-white/10 bg-[#070b16]">
+                      <div className="grid h-11 w-11 place-items-center rounded-full bg-white/10 text-slate-300 ring-1 ring-white/10">
+                        <span className="ml-0.5 text-lg">▶</span>
+                      </div>
+                      <span className="absolute left-2 top-2 rounded-full border border-emerald-400/20 bg-emerald-400/10 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-emerald-300">{cost} cr</span>
+                      <span className="absolute bottom-2 right-2 text-[10px] uppercase tracking-wide text-slate-600">demo soon</span>
+                    </div>
+                    <div className="p-4">
+                      <div className="text-[14px] font-semibold text-slate-100">{ex.title}</div>
+                      <div className="mt-1 text-[12px] leading-relaxed text-slate-400">{ex.desc}</div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </section>
+        )}
+
+        {/* Plans — subscription credits (compact; the full monthly/annual toggle lives on /mcp/pricing) */}
+        {(catalog?.subscriptionPlans?.length ?? 0) > 0 && (
+          <Panel eyebrow="Plans" title="Add credits with a plan">
+            <div className="grid gap-3 sm:grid-cols-2">
+              {catalog!.subscriptionPlans.map((p) => (
+                <div key={p.id} className={`flex flex-col rounded-xl border p-4 ${p.id === 'plus' ? 'border-emerald-400/40 bg-emerald-400/[0.05]' : 'border-white/[0.08] bg-[#070b16]'}`}>
+                  <div className="flex items-baseline justify-between gap-2">
+                    <span className="text-[13px] font-semibold uppercase tracking-wide text-emerald-300">{p.label}</span>
+                    <span className="text-[11px] tabular-nums text-slate-500">{p.creditsPerMonth.toLocaleString()} cr/mo</span>
+                  </div>
+                  <div className="mt-2 flex items-baseline gap-1.5">
+                    <span className="font-mono text-3xl font-bold tabular-nums">${p.annual.usdPerMonth}</span>
+                    <span className="text-[12px] text-slate-400">/mo · billed annually</span>
+                  </div>
+                  <div className="mt-0.5 flex-1 text-[12px] text-slate-500">or ${p.monthly.usd}/mo month-to-month</div>
+                  <div className="mt-3 flex gap-2">
+                    <a href={`${p.annual.checkoutUrl}?client_reference_id=${encodeURIComponent(email || '')}`} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-lg bg-emerald-500 py-1.5 text-center text-sm font-medium text-[#06120c] hover:bg-emerald-400">Get {p.label}</a>
+                    <a href={`${p.monthly.checkoutUrl}?client_reference_id=${encodeURIComponent(email || '')}`} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-white/15 px-3 py-1.5 text-center text-sm font-medium text-slate-200 hover:bg-white/5">Monthly</a>
+                  </div>
                 </div>
-                {p.checkoutUrl ? (
-                  <a href={`${p.checkoutUrl}?client_reference_id=${encodeURIComponent(email || '')}`} target="_blank" rel="noopener noreferrer" className="rounded-lg bg-emerald-500 py-1.5 text-sm font-medium text-[#06120c] hover:bg-emerald-400">Buy</a>
-                ) : (
-                  <span className="text-[12px] text-slate-600">Coming soon</span>
-                )}
-              </div>
-            ))}
-          </div>
-          <p className="mt-3 text-[12px] text-slate-500">Credits never expire. Pro subscribers get a monthly credit allowance automatically.</p>
-        </Panel>
+              ))}
+            </div>
+            <p className="mt-3 text-[12px] text-slate-500">Compare plans and toggle monthly/annual on the <Link href="/mcp/pricing" className="text-emerald-300 underline underline-offset-2 hover:text-emerald-200">full pricing page →</Link> · Pro subscribers get a monthly allowance automatically.</p>
+          </Panel>
+        )}
 
         {/* Tools & pricing */}
         <Panel eyebrow="Pricing" title="Tools &amp; cost per call">
