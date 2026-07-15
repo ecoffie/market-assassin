@@ -294,7 +294,10 @@ export default function GlobalLookup({ email }: { email: string | null }) {
         )}
 
         {hint && (
-          <div className="absolute left-0 right-0 top-full mt-1 rounded-md border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs text-amber-200 z-50">
+          // SOLID background (was bg-amber-500/10 — 10% opacity let the stats bar
+          // behind it bleed through → illegible). Opaque amber-950 + bright text +
+          // shadow so it reads as a proper popover on top of the dashboard.
+          <div className="absolute left-0 right-0 top-full mt-1 rounded-lg border border-amber-500/40 bg-amber-950 px-3.5 py-2.5 text-xs text-amber-50 leading-relaxed shadow-xl z-50">
             {hint}
           </div>
         )}
