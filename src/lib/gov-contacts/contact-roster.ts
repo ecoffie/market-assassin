@@ -84,7 +84,33 @@ function normalizeTitle(title: string | null): { role: string | null; pocLabel: 
   const role = t.length <= 60 ? t : null;
   return { role, pocLabel: null, roleCategory: role ? classifyRole(role) : null };
 }
-function subAgencyToParent(name: string): string {
+// Civilian bureaus / sub-agencies whose people are tagged in federal_contacts
+// ONLY at the parent-department level (no sub_agency granularity for civilian
+// agencies — verified: USDA rows carry an empty sub_agency). Without this, a
+// query for a bureau name ("Forest Service") ilike-matches department_ind_agency
+// ("Department of Agriculture") → ZERO rows → the tool returned only the single
+// curated OSBP contact. Map the bureau the user names to its parent department
+// keyword so the full roster resolves. (DoD components anchor earlier via their
+// DoDAAC, so this list is civilian-focused.)
+const BUREAU_TO_DEPARTMENT: Array<[RegExp, string]> = [
+  [/forest service|\busfs\b|natural resources conservation|\bnrcs\b|farm service|\bfsa\b|rural development|\baphis\b|food safety|agricultural research|risk management agency/i, 'Agriculture'],
+  [/internal revenue|\birs\b|comptroller of the currency|\bocc\b|\bfincen\b|\bttb\b|bureau of engraving|\bmint\b|bureau of the fiscal service/i, 'Treasury'],
+  [/\bfbi\b|federal bureau of investigation|\bdea\b|drug enforcement|\batf\b|alcohol.*tobacco.*firearms|marshals service|bureau of prisons|\bbop\b|\beoir\b/i, 'Justice'],
+  [/\bfema\b|emergency management|\btsa\b|transportation security|customs and border|\bcbp\b|immigration and customs|\bice\b|coast guard|\buscg\b|secret service|\bcisa\b|cybersecurity and infrastructure|citizenship and immigration|\buscis\b|federal law enforcement training/i, 'Homeland Security'],
+  [/national park|\bnps\b|bureau of land management|\bblm\b|geological survey|\busgs\b|fish and wildlife|\bfws\b|bureau of reclamation|indian affairs|\bbia\b|ocean energy management|\bboem\b|surface mining/i, 'Interior'],
+  [/\bcdc\b|disease control|\bfda\b|food and drug|\bnih\b|national institutes of health|\bcms\b|medicare|medicaid services|indian health|\bihs\b|\bsamhsa\b|\bhrsa\b|\bahrq\b|administration for children/i, 'Health'],
+  [/\bfaa\b|federal aviation|federal highway|\bfhwa\b|federal railroad|\bfra\b|maritime administration|\bmarad\b|federal transit|\bfta\b|\bnhtsa\b|pipeline.*hazardous/i, 'Transportation'],
+  [/\bnoaa\b|oceanic and atmospheric|census bureau|patent and trademark|\buspto\b|\bnist\b|standards and technology|economic development administration/i, 'Commerce'],
+  [/\bnnsa\b|nuclear security|\bferc\b|energy regulatory|\bepa\b|environmental protection/i, 'Energy'],
+  [/\bosha\b|occupational safety|bureau of labor statistics|\bbls\b|mine safety|\bmsha\b|employment and training/i, 'Labor'],
+  [/veterans health|veterans benefits|\bvha\b|\bvba\b|national cemetery/i, 'Veterans'],
+];
+
+export function subAgencyToParent(name: string): string {
+  for (const [re, parent] of BUREAU_TO_DEPARTMENT) {
+    if (re.test(name)) return parent;
+  }
+  // No known bureau alias — strip filler words and match the department field directly.
   return name
     .replace(/\b(department|dept|of|the|agency|administration|us|u\.s\.|,)\b/gi, ' ')
     .replace(/\s{2,}/g, ' ')
