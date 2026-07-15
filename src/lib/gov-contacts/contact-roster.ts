@@ -74,6 +74,19 @@ function classifyRole(t: string): string | null {
   if (/director|chief|administrator|head/i.test(t)) return 'Leadership';
   return null;
 }
+// Map a caller/LLM role query ("contracting_officer", "small business", "CO") to a
+// canonical title bucket, or null if it maps to none. The DB `role_category` column is
+// a uniform coarse ingest tag ("contracting") — useless for filtering — so role
+// filtering happens IN MEMORY against the title-derived bucket (classifyRole) instead.
+export function roleQueryToBucket(role: string): string | null {
+  const q = role.replace(/[_-]+/g, ' ').trim();
+  if (!q) return null;
+  // Bare acronyms the title-classifier's word-boundary regexes won't catch on their own.
+  if (/^(co|ko|pco|aco)$/i.test(q)) return 'Contracting Officer';
+  if (/^cs$/i.test(q)) return 'Contract Specialist';
+  if (/^(osbp|sblo|sadbu)$/i.test(q)) return 'Small Business';
+  return classifyRole(q);
+}
 function normalizeTitle(title: string | null): { role: string | null; pocLabel: string | null; roleCategory: string | null } {
   const t = (title || '').trim();
   if (!t) return { role: null, pocLabel: null, roleCategory: null };
@@ -283,7 +296,8 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
       if (applySubTier && resolved.subTier) q = q.ilike('sub_tier', `%${resolved.subTier}%`);
     }
     if (office && !validDodaac) q = q.ilike('office', `%${office}%`);
-    if (role) q = q.eq('role_category', role);
+    // NOTE: role is a SOFT filter applied in-memory below (the DB role_category column
+    // is a uniform "contracting" tag; filtering on it here would zero-out every query).
     return q.order('posted_date', { ascending: false, nullsFirst: false }).range(0, limit * 4 - 1);
   };
 
@@ -344,6 +358,27 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
     })
     // second-pass foreign filter on the DECODED office name
     .filter((c) => !FOREIGN_OFFICE_RE.test(c.derived_office || ''));
+
+  // Soft role filter: prefer contacts whose title matches the requested role (by bucket
+  // or title substring), but NEVER return empty on a role miss — fall back to the full
+  // roster so "contracting officers at FEMA" still yields the office's people.
+  if (role) {
+    const wantBucket = roleQueryToBucket(role);
+    const words = role.replace(/[_-]+/g, ' ').trim().toLowerCase();
+    const matched = contacts.filter((c) => {
+      // SAM POC rows often carry the role in the NAME ("Jane Doe, Contracting Officer")
+      // while contact_title is just "Primary Contact" — search both.
+      const hay = `${c.contact_fullname || ''} ${c.contact_title || ''}`;
+      if (wantBucket && classifyRole(hay) === wantBucket) return true;
+      return words.length >= 3 && hay.toLowerCase().includes(words);
+    });
+    if (matched.length > 0) {
+      contacts = matched;
+      trace.push(`role "${role}"${wantBucket ? ` → ${wantBucket}` : ''}: ${matched.length} match`);
+    } else {
+      trace.push(`role "${role}" matched 0 → full roster`);
+    }
+  }
 
   // Prepend the OSBP small-business contact for the agency (the front door).
   const includeOsbp = input.includeOsbp ?? !!agency;

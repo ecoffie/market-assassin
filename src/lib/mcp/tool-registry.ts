@@ -730,7 +730,7 @@ const FEDERAL_CONTACTS_TOOL_DEF = {
         agency: { type: 'string', description: 'Agency / command / sub-agency name, e.g. "USACE", "Department of Veterans Affairs".' },
         dodaac: { type: 'string', description: 'A known 6-char DoDAAC (e.g. "W912PL"); most precise, anchors directly on the office.' },
         office: { type: 'string', description: 'Office name filter (SAM office column; often null for POCs).' },
-        role: { type: 'string', description: 'role_category filter (e.g. "contracting_officer", "small_business").' },
+        role: { type: 'string', description: 'Soft role filter matched against each contact\'s title bucket — one of: contracting officer, contract specialist, small business, program/technical, leadership (or a title substring / acronym like CO, KO, OSBP). If it matches nobody, the filter is dropped and the full roster is still returned.' },
         search: { type: 'string', description: 'Free-text match on contact name OR title.' },
         limit: { type: 'number', description: 'Max contacts (default 25, max 200).' },
       },
