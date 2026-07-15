@@ -402,22 +402,36 @@ async function searchUsasPendingAwards(opts: {
   return out;
 }
 
-export async function findPriorAwardsForNotice(notice: ResolvedNotice): Promise<PriorAwardHit[]> {
-  const keywords = titleKeywordCandidates(notice.title);
-  if (keywords.length === 0 && !notice.naics_code) return [];
+/**
+ * The shared incumbent/predecessor MATCHER — the single scoring engine behind both
+ * the solicitation-number flow (findPriorAwardsForNotice) and the generic
+ * opportunity flow (find-predecessor.ts `findPredecessorAward`, which used to have
+ * its own weaker copy). Best-matching recent USASpending award by title keywords +
+ * agency, relevance-scored (NAICS is soft — a big facility TO in the same NAICS can
+ * dwarf the true specialty recompete, so title overlap drives the match).
+ */
+export async function findLikelyPriorAwards(input: {
+  title?: string | null;
+  naics_code?: string | null;
+  agency?: string | null;
+  department?: string | null;
+}): Promise<PriorAwardHit[]> {
+  const keywords = titleKeywordCandidates(input.title);
+  if (keywords.length === 0 && !input.naics_code) return [];
 
-  const titleWords = (notice.title || '')
+  const titleWords = (input.title || '')
     .split(/\s+/)
     .map((w) => w.replace(/[^A-Za-z0-9]/g, ''))
     .filter((w) => w.length >= 4 && !STOP.has(w.toLowerCase()));
 
-  const agencyHint = toUsaSpendingAgency(notice.department) ||
-    toUsaSpendingAgency(notice.agency) ||
-    notice.department ||
-    notice.agency;
+  const agencyHint: string | null = toUsaSpendingAgency(input.department) ||
+    toUsaSpendingAgency(input.agency) ||
+    input.department ||
+    input.agency ||
+    null;
 
   const rows = await searchUsasPendingAwards({
-    keywords: keywords.length ? keywords : [notice.title || ''].filter(Boolean),
+    keywords: keywords.length ? keywords : [input.title || ''].filter(Boolean),
     // Prefer keyword-first discovery; NAICS alone over-selects huge facility awards.
     // Apply NAICS only as a soft preference later via scoring, not a hard filter —
     // a 115210 facility TO can dwarf the true specialty recompete.
@@ -453,6 +467,11 @@ export async function findPriorAwardsForNotice(notice: ResolvedNotice): Promise<
     }
   }
   return hits;
+}
+
+/** A ResolvedNotice is a superset of the matcher input — thin pass-through. */
+export async function findPriorAwardsForNotice(notice: ResolvedNotice): Promise<PriorAwardHit[]> {
+  return findLikelyPriorAwards(notice);
 }
 
 export function summarizeSolicitationIncumbent(
