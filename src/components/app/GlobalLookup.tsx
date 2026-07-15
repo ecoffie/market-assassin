@@ -90,7 +90,48 @@ export default function GlobalLookup({ email }: { email: string | null }) {
       return;
     }
     if (looksLikePiid(q)) {
-      setOpenPiid(q.toUpperCase());
+      // PIID-shaped strings are often SAM solicitation #s (RFQs), not awards.
+      // Try award first; on miss, fall back to solicitation → incumbent workflow.
+      setResolving(true);
+      setHint(null);
+      try {
+        const awardRes = await fetch(`/api/app/award-detail?piid=${encodeURIComponent(q)}`);
+        const awardData = await awardRes.json().catch(() => null);
+        if (awardData?.success && awardData?.detail) {
+          setOpenPiid(q.toUpperCase());
+          return;
+        }
+        const solRes = await fetch(`/api/app/solicitation-incumbent?q=${encodeURIComponent(q)}`);
+        const solData = await solRes.json().catch(() => null);
+        if (solData?.success && solData?.notice) {
+          const n = solData.notice;
+          const inc = solData.incumbent;
+          if (inc?.awardId) {
+            setHint(
+              `Open RFQ ${n.solicitation_number || q}: ${n.title || 'untitled'}. ` +
+              `Likely prior award → ${inc.recipientName} (${inc.awardId})` +
+              (inc.ceiling ? ` · $${Math.round(inc.ceiling).toLocaleString()}` : '') +
+              (inc.popPotentialEnd ? ` · expires ${inc.popPotentialEnd}` : '') +
+              '. Opening prior award…',
+            );
+            setOpenPiid(String(inc.awardId).toUpperCase());
+          } else {
+            setHint(
+              `Found open solicitation ${n.solicitation_number || q}` +
+              (n.title ? ` — "${n.title}"` : '') +
+              (n.agency ? ` (${n.agency})` : '') +
+              ', but no clear prior award on USASpending.' +
+              (n.ui_link ? ` SAM: ${n.ui_link}` : ''),
+            );
+          }
+          return;
+        }
+        setHint(`No award or open solicitation found for "${q}".`);
+      } catch {
+        setHint('Lookup failed — try again.');
+      } finally {
+        setResolving(false);
+      }
       return;
     }
     if (looksLikeCompany(q)) {
@@ -142,8 +183,8 @@ export default function GlobalLookup({ email }: { email: string | null }) {
           onChange={(e) => { setValue(e.target.value); setHint(null); setDisambig(null); }}
           onFocus={() => setFocused(true)}
           onBlur={() => setTimeout(() => { setFocused(false); }, 200)}
-          placeholder="Contract #, company, UEI, or a market like “drones”…"
-          aria-label="Look up a contract number, company, UEI, or research a market"
+          placeholder="Contract #, solicitation #, company, UEI, or market…"
+          aria-label="Look up a contract or solicitation number, company, UEI, or research a market"
           className="w-full rounded-lg border border-hairline bg-ground/80 pl-9 pr-9 py-2 text-sm text-white placeholder-faint focus:border-purple-500 focus:outline-none focus:ring-1 focus:ring-purple-500 disabled:opacity-60"
           disabled={resolving}
         />

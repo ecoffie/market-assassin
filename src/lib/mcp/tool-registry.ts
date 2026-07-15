@@ -25,6 +25,7 @@ import { getIncumbentFinancials } from '@/mcp/tools/incumbent-financials';
 import { getRegulatoryDemand } from '@/mcp/tools/regulatory-demand';
 import { getAwardDetail } from '@/mcp/tools/award-detail';
 import { findPredecessor } from '@/mcp/tools/predecessor-award';
+import { getSolicitationIncumbent } from '@/mcp/tools/solicitation-incumbent';
 import { lookupSamEntity } from '@/mcp/tools/sam-entity';
 import { searchContractors } from '@/mcp/tools/search-contractors';
 import { getAgencyIntel } from '@/mcp/tools/agency-intel';
@@ -82,6 +83,7 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   get_regulatory_demand: 1, // Federal Register (single free call, cacheable)
   get_award_detail: 2, // USASpending resolve (PIID→id) + award-detail fetch (both free)
   find_predecessor_award: 2, // USASpending search + award-detail fetch (incumbent inference)
+  get_solicitation_incumbent: 2, // SAM notice (sol#) + USASpending prior-award inference
   lookup_sam_entity: 1, // SAM Entity Management API (single lookup/search)
   search_contractors: 2, // live BigQuery recipients scan (competitive landscape)
   get_agency_intel: 1, // agency resolve (local) + USASpending obligations (free)
@@ -240,8 +242,9 @@ const AWARD_DETAIL_TOOL_DEF = {
     description:
       'Full USASpending detail for one federal award: obligated→ceiling (the real prize size), the ' +
       'parent IDV/vehicle you must hold to compete, period of performance (recompete timing), recipient, ' +
-      'NAICS/PSC, funding account. Pass a contract number (PIID) OR a generated_internal_id. Returns ' +
-      'grounded=false when no award matches — do not invent figures.',
+      'NAICS/PSC, funding account. Pass a contract number (PIID) OR a generated_internal_id. Do NOT pass a ' +
+      'SAM solicitation/RFQ number — use get_solicitation_incumbent for those. Returns grounded=false when ' +
+      'no award matches — do not invent figures.',
     parameters: {
       type: 'object',
       properties: {
@@ -261,7 +264,8 @@ const PREDECESSOR_AWARD_TOOL_DEF = {
       'The LIKELY incumbent contract behind an open opportunity, inferred as the largest recent award ' +
       'matching the NAICS + agency (+ title). Returns full award detail (incumbent, ceiling, expiry, ' +
       'parent vehicle) plus a match-confidence. Best-match inference, NOT a certified link — present as ' +
-      '"likely". Returns grounded=false when no good match exists.',
+      '"likely". Returns grounded=false when no good match exists. Prefer get_solicitation_incumbent when ' +
+      'the user only has a solicitation NUMBER (RFQ/sol#) — that tool resolves the notice first.',
     parameters: {
       type: 'object',
       properties: {
@@ -269,6 +273,34 @@ const PREDECESSOR_AWARD_TOOL_DEF = {
         agency_name: { type: 'string', description: 'Buying agency, e.g. "Department of Defense". Sharpens the match.' },
         title: { type: 'string', description: 'Opportunity title — raises match confidence when present.' },
       },
+    },
+  },
+};
+
+/** Sol # / notice UUID → open notice + likely prior award (Chat "who held this?" path). */
+const SOLICITATION_INCUMBENT_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_solicitation_incumbent',
+    description:
+      'PRIMARY tool when the user pastes a SAM solicitation number (e.g. 140L6226Q0013) or notice UUID ' +
+      'and asks who won the prior work, what it cost, or "was this awarded before." Resolves the OPEN ' +
+      'solicitation on SAM, then finds the LIKELY prior award on USASpending (recipient, PIID, ceiling, ' +
+      'expiry). Do NOT call get_award_detail with an RFQ/solicitation number — those are not award PIIDs. ' +
+      'grounded_notice=false = sol# not found; grounded_incumbent=false = notice found but no clear prior award.',
+    parameters: {
+      type: 'object',
+      properties: {
+        solicitation_number: {
+          type: 'string',
+          description: 'SAM solicitation number, e.g. "140L6226Q0013".',
+        },
+        notice_id: {
+          type: 'string',
+          description: 'Optional SAM notice UUID (32-char hex) if that is what the user pasted.',
+        },
+      },
+      required: [],
     },
   },
 };
@@ -1014,6 +1046,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     REGULATORY_DEMAND_TOOL_DEF,
     AWARD_DETAIL_TOOL_DEF,
     PREDECESSOR_AWARD_TOOL_DEF,
+    SOLICITATION_INCUMBENT_TOOL_DEF,
     SAM_ENTITY_TOOL_DEF,
     SEARCH_CONTRACTORS_TOOL_DEF,
     AGENCY_INTEL_TOOL_DEF,
@@ -1060,6 +1093,7 @@ export function isMcpTool(name: string): boolean {
     name === 'get_regulatory_demand' ||
     name === 'get_award_detail' ||
     name === 'find_predecessor_award' ||
+    name === 'get_solicitation_incumbent' ||
     name === 'lookup_sam_entity' ||
     name === 'search_contractors' ||
     name === 'get_agency_intel' ||
@@ -1182,6 +1216,14 @@ export async function runMcpTool(
       naics_code: typeof args.naics_code === 'string' ? args.naics_code : undefined,
       agency_name: typeof args.agency_name === 'string' ? args.agency_name : undefined,
       title: typeof args.title === 'string' ? args.title : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_solicitation_incumbent') {
+    const result = (await getSolicitationIncumbent({
+      solicitation_number: typeof args.solicitation_number === 'string' ? args.solicitation_number : undefined,
+      notice_id: typeof args.notice_id === 'string' ? args.notice_id : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }

@@ -214,6 +214,27 @@ try {
   console.error(`✓ grounded=${paS._meta?.grounded} · confidence=${paS._meta?.confidence}`);
   if (paS._meta?.grounded && !paS.summary) fail('predecessor-award: grounded but no summary');
 
+  // ── get_solicitation_incumbent (RFQ # → prior award) ────────────────────────
+  console.error('\n→ calling get_solicitation_incumbent({ solicitation_number: "140L6226Q0013" })');
+  const si = await client.callTool({
+    name: 'get_solicitation_incumbent',
+    arguments: { solicitation_number: '140L6226Q0013' },
+  });
+  const siS = si.structuredContent;
+  if (!siS) fail('solicitation-incumbent: no structuredContent');
+  console.error(
+    `✓ notice=${siS._meta?.grounded_notice} · incumbent=${siS._meta?.grounded_incumbent}` +
+    ` · awardee=${siS.incumbent?.recipientName || '—'} · piid=${siS.incumbent?.awardId || '—'}`,
+  );
+  if (siS._meta?.degraded && !siS._meta?.grounded_notice) {
+    console.error('⚠ solicitation-incumbent degraded (SAM unreachable) — non-fatal for smoke');
+  } else if (!siS._meta?.grounded_notice) {
+    fail('solicitation-incumbent: expected to resolve live BLM RFQ 140L6226Q0013');
+  } else if (siS._meta?.grounded_incumbent && !/KEIL/i.test(siS.incumbent?.recipientName || '')) {
+    // Soft: title match should prefer Matt Keil; if scoring drifts, still require a prior award.
+    console.error('⚠ incumbent not Matt Keil — check scoring; still grounded so continuing');
+  }
+
   // ── lookup_sam_entity (SAM.gov) ────────────────────────────────────────────
   console.error('\n→ calling lookup_sam_entity({ name: "Booz Allen Hamilton" })');
   const se = await client.callTool({ name: 'lookup_sam_entity', arguments: { name: 'Booz Allen Hamilton' } });

@@ -4320,3 +4320,26 @@ stored hashed (never plaintext), delivered through the verified Resend/getmindy.
 never actually created in prod (a dead `exec_migration` self-heal), which had left the whole
 email-OTP feature inert. Migration `20260714_two_factor_codes.sql` run + verified live. tsc
 clean. Go-live runbook: `tasks/paid-mfa-provider-linking-runbook.md`.
+
+---
+
+## Solicitation → prior awardee lookup — 2026-07-15
+
+**What:** Paste a SAM solicitation number (e.g. `140L6226Q0013`) into Chat, header Global
+Lookup, or Alerts search and Mindy returns the open notice plus the likely prior award
+(who won last time, PIID, ceiling/obligated $, PoP end). New MCP tool
+`get_solicitation_incumbent` (2 credits) + `GET /api/app/solicitation-incumbent?q=`.
+
+**Why:** Contractors ask "who had this before and for how much?" on every recompete /
+follow-on RFQ. Until now, solicitation numbers were treated like PIIDs → USASpending miss
+→ dead end. The sol#→notice→keyword-scored prior-award chain closes that loop without
+manual SAM + USASpending spelunking.
+
+**SEO / positioning:** "who won this solicitation before", "prior awardee lookup",
+"SAM solicitation incumbent", "government contract recompete intelligence".
+
+**Proof:** Live resolve of BLM Wheatland ORC hoof-trimming RFQ `140L6226Q0013` → notice
+grounded + incumbent **Matt L Keil / PIID 140L6221P0029 / ~$601K** (high confidence),
+not confused with the ~$6M facility awards at the same site. Wired across Chat prompt,
+MCP stdio+HTTP registry, Global Lookup award-miss fallback, and Alerts `solicitation_number`
+search.

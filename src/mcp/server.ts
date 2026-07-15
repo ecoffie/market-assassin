@@ -250,7 +250,8 @@ server.registerTool(
       'The LIKELY incumbent contract behind an open opportunity, inferred as the largest recent award ' +
       'matching the NAICS + agency (+ title). Returns full award detail (incumbent, ceiling, expiry, ' +
       'parent vehicle) plus a match-confidence. Best-match inference, NOT a certified link — present as ' +
-      '"likely". Returns grounded=false when no good match exists.',
+      '"likely". Returns grounded=false when no good match exists. Prefer get_solicitation_incumbent when ' +
+      'the user only has a solicitation NUMBER.',
     inputSchema: {
       naics_code: z.string().optional().describe('The opportunity NAICS (4-6 digit).'),
       agency_name: z.string().optional().describe('Buying agency, e.g. "Department of Defense". Sharpens the match.'),
@@ -259,6 +260,29 @@ server.registerTool(
   },
   async ({ naics_code, agency_name, title }) => {
     const result = await findPredecessor({ naics_code, agency_name, title });
+    return {
+      content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
+      structuredContent: result as unknown as Record<string, unknown>,
+    };
+  },
+);
+
+server.registerTool(
+  'get_solicitation_incumbent',
+  {
+    title: 'Get Solicitation + Prior Award (SAM → USASpending)',
+    description:
+      'PRIMARY tool when the user pastes a SAM solicitation number (e.g. 140L6226Q0013) or notice UUID ' +
+      'and asks who won the prior work / what it cost. Resolves the OPEN notice, then finds the LIKELY ' +
+      'prior award. Do NOT call get_award_detail with an RFQ number.',
+    inputSchema: {
+      solicitation_number: z.string().optional().describe('SAM solicitation number, e.g. "140L6226Q0013".'),
+      notice_id: z.string().optional().describe('SAM notice UUID if that is what was pasted.'),
+    },
+  },
+  async ({ solicitation_number, notice_id }) => {
+    const { getSolicitationIncumbent } = await import('@/mcp/tools/solicitation-incumbent');
+    const result = await getSolicitationIncumbent({ solicitation_number, notice_id });
     return {
       content: [{ type: 'text', text: JSON.stringify(result, null, 2) }],
       structuredContent: result as unknown as Record<string, unknown>,
