@@ -433,7 +433,11 @@ export async function POST(request: NextRequest) {
     // list); bump so any sv4 rows recompute with the full roster.
     // sv6 = anchored rows now carry authoritative Set-Aside $ + SAT $ columns.
     // sv7 = anchored rows now carry contract COUNT (bounded per-agency count calls).
-    const SPEND_SCHEMA_VERSION = 'sv7';
+    // sv8 = fleet-wide flush of any lingering pre-Jul-8 rows (the broadened-sample
+    // fallback that showed State #1 at $13.5B for NAICS 236220 vs its true $2.9B,
+    // and a $45.1B headline vs the real $94.4B). The compute has been correct since
+    // 40fb9413 (Jul 8); this bump orphans every old entry so no stale render survives.
+    const SPEND_SCHEMA_VERSION = 'sv8';
     // Stable cache token. KEYWORD searches key on the normalized phrase — the
     // derived NAICS coverage set can drift run-to-run (keywordCoverage re-queries
     // live), so keying on it would miss every repeat and recompute different
