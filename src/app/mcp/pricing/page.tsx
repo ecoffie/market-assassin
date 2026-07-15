@@ -161,7 +161,7 @@ export default function McpPricing() {
         <section className="mt-12 text-center">
           <h1 className="text-balance text-3xl font-bold tracking-tight sm:text-[2.6rem] sm:leading-[1.1]">Start free. Pay as you grow.</h1>
           <p className="mx-auto mt-4 max-w-2xl text-balance text-sm text-slate-400 sm:text-[15px]">
-            Federal contracting intel for any AI agent. A one-time free trial, pay-as-you-go credits, or Pro — every tool is metered, so you pay per successful call and never for a miss. {tools.length ? `${tools.filter((t) => t.credits > 0).length} tools live today.` : 'Dozens of tools live today.'}
+            Federal contracting intel for any AI agent. Start with a free trial, add a monthly or annual credit plan, or go Pro — every tool is metered, so you pay per successful call and never for a miss. {tools.length ? `${tools.filter((t) => t.credits > 0).length} tools live today.` : 'Dozens of tools live today.'}
           </p>
         </section>
 
@@ -351,9 +351,9 @@ export default function McpPricing() {
                 <CompareRow label="Proprietary moat (playbook · contacts · agency angles · lessons)" free="no" credits="yes" pro="yes" />
                 <CompareRow label="Charged on success only" free="yes" credits="yes" pro="yes" />
                 <CompareRow label="Signup credits" free={`${trial}`} credits="—" pro="—" />
-                <CompareRow label="Annual credit plans" free="no" credits="yes" pro="yes" />
+                <CompareRow label="Monthly &amp; annual credit plans" free="no" credits="yes" pro="yes" />
                 <CompareRow label="Monthly credit allowance" free="—" credits="—" pro={`${proCredits.toLocaleString()}/mo`} />
-                <CompareRow label="Credits expire" free="never" credits="never" pro="renews monthly" />
+                <CompareRow label="Credits roll over (never expire)" free="yes" credits="yes" pro="yes" />
                 <CompareRow label="Proposal Assist 1.0 (metered drafts)" free="no" credits="yes" pro="yes" />
                 <CompareRow label="Proposal Assist 2.0 (full RFP suite)" free="no" credits="no" pro="soon" />
                 <CompareRow label="Full Mindy app (alerts · pipeline · CRM)" free="no" credits="no" pro="yes" />
