@@ -405,12 +405,12 @@ export default function McpConsole() {
           <p className="mt-3 text-[12px] text-slate-500">🔑 No API key needed — you sign in through your browser. Running headless or in CI? Use a key under <span className="text-slate-400">Advanced</span> below.</p>
         </section>
 
-        {/* What you can do with credits — same demo grid as the landing */}
+        {/* What you can do with credits — the exact same demo grid + pricing link as the landing */}
         {tools.length > 0 && (
-          <section className="mt-8">
-            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">What you can do with credits</p>
-            <h2 className="mt-0.5 text-[15px] font-semibold text-slate-100">Each call is priced on its own</h2>
-            <div className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <section className="mt-16">
+            <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">What you can do with credits</h2>
+            <p className="mx-auto mt-2 max-w-lg text-center text-[13px] text-slate-400">Each call is priced on its own — chain a few and you&apos;ve run a real BD task. Watch each one in action:</p>
+            <div className="mx-auto mt-6 grid max-w-4xl gap-4 sm:grid-cols-2 lg:grid-cols-3">
               {EXAMPLES.map((ex) => {
                 const cost = exampleCost(tools, ex.tools);
                 return (
@@ -430,50 +430,11 @@ export default function McpConsole() {
                 );
               })}
             </div>
+            <p className="mx-auto mt-6 text-center text-[13px] text-slate-500">
+              See the full cost breakdown on the <Link href="/mcp/pricing" className="text-emerald-300 underline underline-offset-2 hover:text-emerald-200">pricing page →</Link>
+            </p>
           </section>
         )}
-
-        {/* Plans — subscription credits (compact; the full monthly/annual toggle lives on /mcp/pricing) */}
-        {(catalog?.subscriptionPlans?.length ?? 0) > 0 && (
-          <Panel eyebrow="Plans" title="Add credits with a plan">
-            <div className="grid gap-3 sm:grid-cols-2">
-              {catalog!.subscriptionPlans.map((p) => (
-                <div key={p.id} className={`flex flex-col rounded-xl border p-4 ${p.id === 'plus' ? 'border-emerald-400/40 bg-emerald-400/[0.05]' : 'border-white/[0.08] bg-[#070b16]'}`}>
-                  <div className="flex items-baseline justify-between gap-2">
-                    <span className="text-[13px] font-semibold uppercase tracking-wide text-emerald-300">{p.label}</span>
-                    <span className="text-[11px] tabular-nums text-slate-500">{p.creditsPerMonth.toLocaleString()} cr/mo</span>
-                  </div>
-                  <div className="mt-2 flex items-baseline gap-1.5">
-                    <span className="font-mono text-3xl font-bold tabular-nums">${p.annual.usdPerMonth}</span>
-                    <span className="text-[12px] text-slate-400">/mo · billed annually</span>
-                  </div>
-                  <div className="mt-0.5 flex-1 text-[12px] text-slate-500">or ${p.monthly.usd}/mo month-to-month</div>
-                  <div className="mt-3 flex gap-2">
-                    <a href={`${p.annual.checkoutUrl}?client_reference_id=${encodeURIComponent(email || '')}`} target="_blank" rel="noopener noreferrer" className="flex-1 rounded-lg bg-emerald-500 py-1.5 text-center text-sm font-medium text-[#06120c] hover:bg-emerald-400">Get {p.label}</a>
-                    <a href={`${p.monthly.checkoutUrl}?client_reference_id=${encodeURIComponent(email || '')}`} target="_blank" rel="noopener noreferrer" className="rounded-lg border border-white/15 px-3 py-1.5 text-center text-sm font-medium text-slate-200 hover:bg-white/5">Monthly</a>
-                  </div>
-                </div>
-              ))}
-            </div>
-            <p className="mt-3 text-[12px] text-slate-500">Compare plans and toggle monthly/annual on the <Link href="/mcp/pricing" className="text-emerald-300 underline underline-offset-2 hover:text-emerald-200">full pricing page →</Link> · Pro subscribers get a monthly allowance automatically.</p>
-          </Panel>
-        )}
-
-        {/* Tools & pricing */}
-        <Panel eyebrow="Pricing" title="Tools &amp; cost per call">
-          <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <tbody className="divide-y divide-white/[0.06]">
-                {tools.map((t) => (
-                  <tr key={t.name}>
-                    <td className="py-2 pr-3"><code className="font-mono text-[13px] text-slate-200">{t.name}</code></td>
-                    <td className="py-2 text-right tabular-nums text-slate-400">{t.credits === 0 ? 'free' : `${t.credits} cr`}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        </Panel>
 
         {/* Usage */}
         {calls.length > 0 && (
