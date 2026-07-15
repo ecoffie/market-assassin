@@ -79,7 +79,7 @@ The hosted server exposes **40 credit-metered tools** (plus a free `get_balance`
 | `get_regulatory_demand` | Federal Register signals — "demand before SAM," 6–18 months early |
 | `lookup_federal_osbp` | The small-business front door (OSBP office + director) for a command |
 | `search_agency_opps_by_office` | Open opportunities anchored to a *specific* buying office |
-| `search_federal_contacts` | Named POCs at a specific buying office |
+| `search_federal_contacts` | Named POCs at a specific buying office — from a ~167K-row directory (~85K emailable), DoDAAC-anchored |
 | `assess_market_depth` | Rule-of-Two capable-small-business count for a NAICS |
 
 ### Proprietary & proposal
