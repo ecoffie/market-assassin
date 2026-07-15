@@ -386,17 +386,28 @@ export async function GET(request: NextRequest) {
     .select(
       'id, contact_fullname, contact_title, contact_email, contact_phone, department_ind_agency, office, sub_tier, role_category, solicitation_number',
       { count: 'exact' },
-    );
+    )
+    // GOVERNMENT decision makers only. federal_contacts also holds ~82K
+    // private-entity registrant rows (a company name in sub_tier, NO federal
+    // agency, and — verified — ZERO of them carry an email). They surfaced junk
+    // like "DIANE FOREST → ASMPT NEXX, INC" on a name search. A real POC always
+    // has a department; requiring one drops the junk and loses no reachable
+    // contact.
+    .not('department_ind_agency', 'is', null);
 
   if (search) {
     // Strip PostgREST .or() metacharacters so a stray comma/paren can't break the
     // whole expression (or a value like "USDA-FAS" splitting on the dash is fine).
     const safe = search.replace(/[,()%]/g, ' ').trim();
-    // name OR title — PLUS the agency column, so typing an agency name works.
+    // name OR title — PLUS the agency AND the sub_tier (bureau) columns. sub_tier
+    // is how a bare bureau word actually lands: "forest" matches sub_tier
+    // "FOREST SERVICE" → the 585 real USDA Forest Service POCs (not just people
+    // surnamed Forest).
     const parts = [
       `contact_fullname.ilike.%${safe}%`,
       `contact_title.ilike.%${safe}%`,
       `department_ind_agency.ilike.%${safe}%`,
+      `sub_tier.ilike.%${safe}%`,
     ];
     // Acronym/sub-agency resolution: "usda" / "forest service" / "usfs" →
     // department_ind_agency ILIKE %Agriculture% (federal_contacts keys civilian
@@ -591,6 +602,7 @@ export async function GET(request: NextRequest) {
         `contact_fullname.ilike.%${safe}%`,
         `contact_title.ilike.%${safe}%`,
         `department_ind_agency.ilike.%${safe}%`,
+        `sub_tier.ilike.%${safe}%`,
       ];
       for (const kw of agencySearchKeywords(safe)) eqParts.push(`department_ind_agency.ilike.%${kw}%`);
       eq = eq.or(eqParts.join(','));
