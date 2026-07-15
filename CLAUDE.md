@@ -342,6 +342,50 @@ terms or you ground nothing → LLM fallback (defeats the whole point).
 
 ---
 
+### Market Map data sources & caching (memory: `mindy-market-map-tmr-cache`)
+
+The Market Research panel (`/app?panel=research`, `MarketResearchPanel.tsx`) has **two
+data paths that can disagree**:
+
+- **FPDS Leaderboards** (Top 10 Departments / Contracting Agencies / Vendors) →
+  live `spending_by_category` via `/api/usaspending/fpds-top-n`. Not cached at that
+  layer → always current & correct.
+- **"Spending by Agency" chart + stat cards** ("Relevant spending", "Agencies to
+  review") → `/api/app/target-market-research` (TMR), **cached 24h in Supabase
+  `agency_target_data_cache`**. The chart plots `rollupChartBuyers` = group rows by
+  `subAgency||parentAgency||name`, take MAX `metric_top_total`.
+
+**When the two panels disagree, it's a STALE TMR cache, not a live bug.** (Jul 2026:
+236220 showed Dept of State #1 at $13.5B — its all-NAICS total leaking via an old
+broadened-sample fallback — vs its true $2.9B; $45.1B headline vs the real $94.4B.
+The compute was already correct; the row was a pre-fix cache entry.)
+
+**Fix lever = bump `SPEND_SCHEMA_VERSION`** in `src/app/api/app/target-market-research/route.ts`
+(~line 436). The cache key embeds it (`${cacheToken}${stateSuffix}|${SPEND_SCHEMA_VERSION}`),
+so bumping **orphans every entry fleet-wide** → next access recomputes with current code,
+then re-caches 24h. **Now at `sv8`** (bumped sv7→sv8 in #235, Jul 15 2026); each bump is
+documented inline.
+
+**Ground truth for verification:** USASpending `spending_by_category` with
+`award_type_codes:['A','B','C','D']` (contracts only), **exact** 6-digit NAICS
+(`expandNAICSCodes(codes, false)` — do NOT sweep the 3-digit subsector), and the
+canonical 3-FY `MARKET_SPEND_WINDOW`. `fpds-top-n`, `find-agencies`, and TMR all share
+this filter so their dollars reconcile.
+
+**Verify TMR live WITHOUT a browser** (data-level; the app UI is Pro-login-gated):
+```bash
+curl -s -X POST https://getmindy.ai/api/app/target-market-research \
+  -H 'Content-Type: application/json' \
+  -d '{"naicsCode":"236220","email":"eric@govcongiants.com","businessType":"","veteranStatus":"Not Applicable"}'
+```
+`eric@govcongiants.com` is staff → append `"refresh":true` to **bypass the cache** for a
+fresh compute. The cache key also splits on `business_type` + `veteran_status` + states,
+so the form default `veteranStatus:'Not Applicable'` is a **different key** than an
+omitted one. Response: `agencies[]` (each with `metric_top_total`), `relevant_spending`,
+`cached`.
+
+---
+
 ### Rate Limits & Caching
 
 - **Standard tier:** 1,000 requests/day, 10/min
