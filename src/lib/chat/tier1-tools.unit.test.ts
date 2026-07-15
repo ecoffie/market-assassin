@@ -4,7 +4,7 @@
  * clean schema, arg validation.
  */
 import { describe, it, expect, vi } from 'vitest';
-import { makeTier1Tools, TIER1_TOOL_DEFS, TIER1_TOOL_NAMES, type Tier1Db } from './tier1-tools';
+import { makeTier1Tools, TIER1_TOOL_DEFS, TIER1_TOOL_NAMES, CHAT_ONLY_TOOL_DEFS, CHAT_ONLY_TOOL_NAMES, type Tier1Db } from './tier1-tools';
 
 // Mock the vocabulary lib.
 const vocabCalls: string[][] = [];
@@ -16,6 +16,26 @@ vi.mock('@/lib/market/vocabulary', () => ({
       { term: 'cybersecurity', kind: 'word', weight: 9.1, df: 420 },
       { term: 'incident response', kind: 'bigram', weight: 7.3, df: 130 },
     ];
+  }),
+}));
+
+// Mock the federal-contacts directory lib (lazy-imported inside the tool).
+const contactCalls: Array<Record<string, unknown>> = [];
+vi.mock('@/lib/gov-contacts/contact-roster', () => ({
+  queryFederalContacts: vi.fn(async (input: Record<string, unknown>) => {
+    contactCalls.push(input);
+    if (input.agency === 'EMPTYVILLE') {
+      return { contacts: [], anchor: 'none', total: 0, emailableCount: 0, degraded: false, trace: [] };
+    }
+    return {
+      contacts: [{
+        contact_fullname: 'Jane Buyer', contact_title: 'MS', contact_email: 'jane@usda.gov',
+        contact_phone: '202-555-0100', department_ind_agency: 'Department of Agriculture',
+        role: 'Contracting Officer', role_category_label: 'Contracting Officer',
+        poc_label: null, sub_agency: 'Forest Service', derived_office: 'R2 Acquisition', dodaac: null,
+      }],
+      anchor: 'department', total: 1, emailableCount: 1, degraded: false, trace: [],
+    };
   }),
 }));
 
@@ -36,11 +56,18 @@ function stubDb(rows: unknown[], captured: { table?: string; calls: Array<[strin
 }
 
 describe('Tier-1 tool definitions', () => {
-  it('registers exactly the two Phase-2 tools', () => {
+  it('registers exactly the two SHARED (MCP-safe) Tier-1 tools', () => {
     expect([...TIER1_TOOL_NAMES].sort()).toEqual(['get_market_vocabulary', 'search_sam_opportunities']);
   });
-  it('forbids extra properties on every tool', () => {
-    for (const def of TIER1_TOOL_DEFS) expect(def.function.parameters.additionalProperties).toBe(false);
+  it('keeps find_decision_makers CHAT-ONLY (out of the MCP-shared array)', () => {
+    // Must NOT leak into the shared defs the MCP registry spreads — that name
+    // collides with MCP's own search_federal_contacts.
+    expect([...CHAT_ONLY_TOOL_NAMES]).toEqual(['find_decision_makers']);
+    expect(TIER1_TOOL_NAMES.has('find_decision_makers')).toBe(false);
+    expect(TIER1_TOOL_NAMES.has('search_federal_contacts')).toBe(false);
+  });
+  it('forbids extra properties on every tool (shared + chat-only)', () => {
+    for (const def of [...TIER1_TOOL_DEFS, ...CHAT_ONLY_TOOL_DEFS]) expect(def.function.parameters.additionalProperties).toBe(false);
   });
   it('sam search requires a keyword; vocabulary requires naics', () => {
     const sam = TIER1_TOOL_DEFS.find((t) => t.function.name === 'search_sam_opportunities')!;
@@ -119,6 +146,41 @@ describe('get_market_vocabulary', () => {
     const none = await tools.execute('get_market_vocabulary', { naics: ['000000'] });
     expect(none.count).toBe(0);
     expect(String(none.note)).toMatch(/no market vocabulary/i);
+  });
+});
+
+describe('find_decision_makers', () => {
+  it('requires at least one anchor (never an unfiltered 112K scan)', async () => {
+    const tools = makeTier1Tools(stubDb([], { calls: [] }));
+    const res = await tools.execute('find_decision_makers', {});
+    expect(res.ok).toBe(false);
+    expect(res.error).toBe('agency_or_search_required');
+  });
+
+  it('passes agency/search/role through to the directory lib', async () => {
+    contactCalls.length = 0;
+    const tools = makeTier1Tools(stubDb([], { calls: [] }));
+    await tools.execute('find_decision_makers', { agency: 'Forest Service', role: 'Contracting Officer' });
+    expect(contactCalls[0]).toMatchObject({ agency: 'Forest Service', role: 'Contracting Officer' });
+  });
+
+  it('maps rows to the citable contact shape (name/title/office/email)', async () => {
+    const tools = makeTier1Tools(stubDb([], { calls: [] }));
+    const res = await tools.execute('find_decision_makers', { agency: 'Department of Agriculture' }) as { total: number; contacts: Array<Record<string, unknown>> };
+    expect(res.total).toBe(1);
+    expect(res.contacts[0]).toMatchObject({
+      name: 'Jane Buyer', title: 'Contracting Officer', agency: 'Department of Agriculture',
+      sub_agency: 'Forest Service', office: 'R2 Acquisition', email: 'jane@usda.gov',
+    });
+  });
+
+  it('no matches → honest note + count 0 (no fabricated contacts)', async () => {
+    const tools = makeTier1Tools(stubDb([], { calls: [] }));
+    const res = await tools.execute('find_decision_makers', { agency: 'EMPTYVILLE' });
+    expect(res.ok).toBe(true);
+    expect(res.count).toBe(0);
+    expect(res.contacts).toEqual([]);
+    expect(String(res.note)).toMatch(/no federal contacts/i);
   });
 });
 

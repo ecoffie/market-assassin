@@ -36,7 +36,7 @@ import { retrievePodcastEpisodes, formatPodcastCardsForPrompt, type PodcastEpiso
 import { loadBidderProfile, formatProfileForPrompt } from '@/lib/proposal/loaders';
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
-import { makeTier1Tools, TIER1_TOOL_DEFS } from '@/lib/chat/tier1-tools';
+import { makeTier1Tools, TIER1_TOOL_DEFS, CHAT_ONLY_TOOL_DEFS } from '@/lib/chat/tier1-tools';
 import { makeTier2Tools, TIER2_TOOL_DEFS, TIER2_TOOL_NAMES } from '@/lib/chat/tier2-tools';
 
 export const dynamic = 'force-dynamic';
@@ -119,9 +119,10 @@ Their OWN account (private):
 Live federal market (public):
 - search_sam_opportunities — currently-open SAM.gov opportunities by keyword (+ optional NAICS / set-aside). Call it when they ask what opportunities/RFPs/solicitations are open or available in a topic or their market.
 - get_market_vocabulary — the distinctive buyer words/phrases that win in a NAICS. Call it when they ask what keywords to search, how buyers describe a market, or how to phrase a capability statement for a NAICS.
+- find_decision_makers — REAL government decision-makers / points of contact (name, title, office, email/phone where available) from the SAM.gov contacts directory. Call it whenever they ask WHO to contact, who the contracting officer / small business specialist / OSBP director / program manager is, or want "contacts", "decision-makers", or "who do I talk to" at an agency (e.g. "who are the contacts for the Forest Service"). Pass the agency and/or a name/role keyword. This is the tool for PEOPLE — do NOT punt these to SAM.gov advice; we have the directory.
 Contractor / competitive intel (public):
 - get_contractor_profile — look up a specific company's federal award history, top agencies, and recent contracts. Call it when they name a company (incumbent, competitor, teaming target) and ask who they are or what they've won.
-- find_capable_contractors — find firms that have won work in a NAICS/PSC (teaming partners, subs, competition). Call it when they ask who does a kind of work or who to team with.
+- find_capable_contractors — find firms that have won work in a NAICS/PSC (teaming partners, subs, competition). Call it when they ask who does a kind of work, who the players/companies are in a market, who to team with, or what's "in the contractor database" for a market — infer the NAICS from their market if they don't give one.
 - If a contractor tool returns a "slow down"/rate_limited note, relay it briefly and suggest they try again shortly — do NOT retry it yourself.
 - When a tool returns count 0 / found false / has_any false, say so plainly — NEVER invent a pursuit, opportunity, contract, company, agency, deadline, dollar, or term. Ground every specific (title, agency, deadline, dollar, solicitation #) ONLY in what the tool actually returned.
 - The pipeline/Vault tools return only THIS signed-in user's data. Do not claim to see anyone else's.
@@ -133,6 +134,7 @@ SCOPE:
 WRITING STYLE:
 - NEVER use bracketed placeholders like "[Company Name]" or "[Your Business]" in responses. If you don't have the user's company name, write generic advice using "your company" or "your business" instead.
 - Default to second person ("you / your") — you're talking TO the user, not ABOUT a hypothetical bidder.
+- NEVER mention tool names, internal mechanics, or "the [X] tool" to the user. Just answer with what you found, or — if you need one more detail to search (e.g. which agency) — ask for it naturally ("Which agency did you have in mind?"). The user never sees the plumbing.
 
 USER PROFILE (use to personalize answers when relevant; if blank, write generically using "your company"):
 {userProfile}`;
@@ -433,7 +435,7 @@ export async function POST(request: NextRequest) {
             TIER0_TOOL_NAMES.has(name) ? tier0.execute(name, args)
               : TIER2_TOOL_NAMES.has(name) ? tier2.execute(name, args)
                 : tier1.execute(name, args);
-          const ALL_TOOL_DEFS = [...TIER0_TOOL_DEFS, ...TIER1_TOOL_DEFS, ...TIER2_TOOL_DEFS];
+          const ALL_TOOL_DEFS = [...TIER0_TOOL_DEFS, ...TIER1_TOOL_DEFS, ...CHAT_ONLY_TOOL_DEFS, ...TIER2_TOOL_DEFS];
           const toolReqBody = (model: string) => JSON.stringify({
             model, messages, temperature: 0, max_tokens: 512,
             tools: ALL_TOOL_DEFS, tool_choice: 'auto',
