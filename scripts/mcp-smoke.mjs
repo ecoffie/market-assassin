@@ -439,13 +439,27 @@ try {
   if (ooVa.structuredContent?._meta?.anchor !== 'department') fail('agency-opps-by-office: civilian agency should fall back to anchor=department');
   console.error(`✓ VA → anchor=${ooVa.structuredContent._meta.anchor} · grounded=${ooVa.structuredContent._meta.grounded} · total=${ooVa.structuredContent._meta.total} (broad preview, honest)`);
 
-  // ── get_sblo_contact (curated SBLO roster + prime DB) ──────────────────────
+  // ── get_sblo_contact (curated SBLO roster → prime DB → live BigQuery fallback) ─
   console.error('\n→ calling get_sblo_contact({ company: "AECOM" })');
   const sblo = await client.callTool({ name: 'get_sblo_contact', arguments: { company: 'AECOM' } });
   const sbloS = sblo.structuredContent;
   if (!sbloS) fail('sblo-contact: no structuredContent');
   if (!sbloS._meta?.grounded || !sbloS.contact?.company) fail('sblo-contact: AECOM should resolve to a grounded contact');
-  console.error(`✓ grounded=${sbloS._meta.grounded} · from=${sbloS._meta.matched_from} · match=${sbloS._meta.match_type} · sblo=${sbloS.contact?.sblo_name || '—'} · ${sbloS.contact?.email || 'no-email'}`);
+  if (sbloS._meta.matched_from !== 'roster') fail(`sblo-contact: AECOM should match the curated roster (the moat), got ${sbloS._meta.matched_from}`);
+  console.error(`✓ curated: grounded=${sbloS._meta.grounded} · from=${sbloS._meta.matched_from} · sblo=${sbloS.contact?.sblo_name || '—'} · ${sbloS.contact?.email || 'no-email'}`);
+  // BigQuery fallback: Radiance Technologies is a real federal prime NOT in the curated
+  // roster/prime DB → must resolve via the live BQ tier with award context but NO SBLO.
+  console.error('→ calling get_sblo_contact({ company: "Radiance Technologies" }) — expect BigQuery fallback');
+  const sbloBq = await client.callTool({ name: 'get_sblo_contact', arguments: { company: 'Radiance Technologies' } });
+  const sbloBqS = sbloBq.structuredContent;
+  if (!sbloBqS) fail('sblo-contact: no structuredContent (Radiance)');
+  if (sbloBqS._meta?.degraded) fail('sblo-contact: Radiance BigQuery fallback degraded (BQ unreachable?)');
+  if (!sbloBqS._meta?.grounded || sbloBqS._meta.matched_from !== 'bigquery') {
+    fail(`sblo-contact: Radiance should resolve via the BigQuery fallback, got grounded=${sbloBqS._meta?.grounded} from=${sbloBqS._meta?.matched_from}`);
+  }
+  if (sbloBqS._meta.has_named_sblo !== false) fail('sblo-contact: BigQuery tier must NOT carry a fabricated SBLO name (has_named_sblo must be false)');
+  if (!(sbloBqS.contact?.total_contract_value > 0)) fail('sblo-contact: BigQuery tier should carry live award context (total_contract_value > 0)');
+  console.error(`✓ BQ fallback: ${sbloBqS.contact.company} · $${Math.round((sbloBqS.contact.total_contract_value/1e9)*10)/10}B across ${sbloBqS.contact.distinct_agency_count} agencies · sblo=null (honest, no fabrication)`);
   const sbloMiss = await client.callTool({ name: 'get_sblo_contact', arguments: { company: 'Totally Fake Co ZZZ' } });
   if (sbloMiss.structuredContent?._meta?.grounded !== false) fail('sblo-contact: unknown company should be grounded=false (no invented contact)');
   console.error('✓ honest miss: unknown company → grounded=false');
