@@ -11,7 +11,15 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { fetchRecompetesForUser } from '@/lib/briefings/pipelines/fpds-recompete';
+import {
+  fetchExpiringForNaicsCode,
+  recompeteCodesForUser,
+  assembleRecompetesFromCache,
+  type RecompeteContract,
+} from '@/lib/briefings/pipelines/fpds-recompete';
+
+// Batched, NAICS-deduped run needs headroom under Vercel's ceiling.
+export const maxDuration = 300;
 
 const CRON_SECRET = process.env.CRON_SECRET;
 
@@ -115,51 +123,78 @@ export async function GET(request: NextRequest) {
     let processed = 0;
     let errors = 0;
 
+    // ── Phase 1: collect the UNIQUE NAICS codes across all users ──────────────
+    // The expiring-contracts query depends only on NAICS (not the user), so many
+    // users share the same codes. Precompute each user's queried codes once.
+    const userCodes = new Map<string, string[]>();
+    const uniqueCodes = new Set<string>();
     for (const user of allUsers) {
-      try {
-        // Fetch recompetes for this user's watchlist
-        const result = await fetchRecompetesForUser({
-          naics_codes: user.naics_codes || [],
-          agencies: user.agencies || [],
-          watched_companies: user.watched_companies || [],
-          watched_contracts: user.watched_contracts || [],
-        });
+      const codes = recompeteCodesForUser(user.naics_codes || []);
+      userCodes.set(user.user_email, codes);
+      codes.forEach(c => uniqueCodes.add(c));
+    }
+    const codeList = [...uniqueCodes];
+    console.log(`[Cron] ${allUsers.length} users → ${codeList.length} unique NAICS codes to fetch`);
 
-        // Store snapshot in database
-        const { error: insertError } = await supabase
-          .from('briefing_snapshots')
-          .upsert({
-            user_email: user.user_email,
-            snapshot_date: today,
-            tool: 'recompete',
-            raw_data: {
-              contracts: result.contracts,
-              totalCount: result.totalCount,
-              fetchedAt: result.fetchedAt,
-            },
-            item_count: result.contracts.length,
-          }, {
-            onConflict: 'user_email,snapshot_date,tool',
-          });
-
-        if (insertError) {
-          console.error(`[Cron] Error saving snapshot for ${user.user_email}:`, insertError);
-          errors++;
-        } else {
-          processed++;
-          console.log(`[Cron] Saved ${result.contracts.length} recompetes for ${user.user_email}`);
-        }
-
-        // Rate limiting
-        await new Promise(resolve => setTimeout(resolve, 500));
-
-      } catch (err) {
-        console.error(`[Cron] Error processing ${user.user_email}:`, err);
-        errors++;
-      }
+    // ── Phase 2: fetch each unique NAICS ONCE (bounded concurrency) ───────────
+    // This is where all the API cost lives now: ~hundreds of calls total instead
+    // of one-per-user-per-NAICS (thousands). USASpending is the primary source
+    // (searchContractAwards), so this stays well under any per-key rate limit.
+    const cache = new Map<string, RecompeteContract[]>();
+    const FETCH_BATCH = 6;
+    for (let i = 0; i < codeList.length; i += FETCH_BATCH) {
+      const batch = codeList.slice(i, i + FETCH_BATCH);
+      const results = await Promise.all(
+        batch.map(async (code): Promise<[string, RecompeteContract[]]> => {
+          try {
+            return [code, await fetchExpiringForNaicsCode(code, 12)];
+          } catch (err) {
+            console.error(`[Cron] Error fetching NAICS ${code}:`, err);
+            return [code, []];
+          }
+        })
+      );
+      for (const [code, contracts] of results) cache.set(code, contracts);
+      await new Promise(resolve => setTimeout(resolve, 150));
     }
 
-    console.log(`[Cron: snapshot-recompetes] Complete: ${processed} processed, ${errors} errors`);
+    // ── Phase 3: assemble + upsert each user's snapshot (no API calls) ────────
+    const UPSERT_BATCH = 10;
+    for (let i = 0; i < allUsers.length; i += UPSERT_BATCH) {
+      const batch = allUsers.slice(i, i + UPSERT_BATCH);
+      await Promise.all(batch.map(async (user) => {
+        try {
+          const result = assembleRecompetesFromCache(userCodes.get(user.user_email) || [], cache, 200);
+          const { error: insertError } = await supabase
+            .from('briefing_snapshots')
+            .upsert({
+              user_email: user.user_email,
+              snapshot_date: today,
+              tool: 'recompete',
+              raw_data: {
+                contracts: result.contracts,
+                totalCount: result.totalCount,
+                fetchedAt: result.fetchedAt,
+              },
+              item_count: result.contracts.length,
+            }, {
+              onConflict: 'user_email,snapshot_date,tool',
+            });
+
+          if (insertError) {
+            console.error(`[Cron] Error saving snapshot for ${user.user_email}:`, insertError);
+            errors++;
+          } else {
+            processed++;
+          }
+        } catch (err) {
+          console.error(`[Cron] Error processing ${user.user_email}:`, err);
+          errors++;
+        }
+      }));
+    }
+
+    console.log(`[Cron: snapshot-recompetes] Complete: ${processed} processed, ${errors} errors, ${codeList.length} NAICS fetched`);
 
     return NextResponse.json({
       success: true,
@@ -167,6 +202,7 @@ export async function GET(request: NextRequest) {
       processed,
       errors,
       totalUsers: allUsers.length,
+      naicsFetched: codeList.length,
       fromNotificationSettings: fromNotif,
       fromAlertSettings: fromAlert,
     });

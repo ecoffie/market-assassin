@@ -237,6 +237,77 @@ export async function fetchRecompetesForUser(
 }
 
 /**
+ * Fetch + filter expiring contracts for a SINGLE NAICS code.
+ *
+ * This is the unit of work that's actually user-independent: the result depends
+ * only on (naicsCode, monthsToExpiration), NOT on any user's agencies/watchlist
+ * (fetchExpiringContracts ignores those). That makes it safe to fetch each unique
+ * NAICS ONCE and share the result across every user who watches it — how the
+ * snapshot cron avoids one API call per user-NAICS (thousands) in favor of one
+ * per unique NAICS (hundreds). Same filter as fetchExpiringContracts.
+ */
+export async function fetchExpiringForNaicsCode(
+  naicsCode: string,
+  monthsToExpiration = 12
+): Promise<RecompeteContract[]> {
+  const samContracts = await getSAMExpiringContracts(naicsCode, monthsToExpiration);
+  const out: RecompeteContract[] = [];
+  for (const award of samContracts) {
+    const contract = samAwardToRecompete(award);
+    if (
+      contract.daysUntilExpiration > 0 &&
+      contract.daysUntilExpiration <= monthsToExpiration * 30 &&
+      contract.obligatedAmount >= 100000
+    ) {
+      out.push(contract);
+    }
+  }
+  return out;
+}
+
+/**
+ * The NAICS codes actually queried for a user — mirrors the slicing/prefix-
+ * expansion fetchRecompetesForUser + fetchExpiringContracts apply (first 5 raw
+ * codes → expand prefixes → cap at 10). Kept in lockstep so the deduped cron
+ * produces the same per-user result as the old per-user fetch.
+ */
+export function recompeteCodesForUser(naicsCodes: string[]): string[] {
+  let codes = (naicsCodes || []).slice(0, 5);
+  if (hasNaicsPrefixes(codes)) {
+    codes = expandNaicsPrefixes(codes);
+  }
+  return codes.slice(0, 10);
+}
+
+/**
+ * Assemble one user's RecompeteSearchResult from a prefetched per-NAICS cache —
+ * pure in-memory filtering, no API calls. Dedupes by PIID (a contract can surface
+ * under more than one of a user's codes), then sorts soonest-expiring first.
+ */
+export function assembleRecompetesFromCache(
+  userCodes: string[],
+  cache: Map<string, RecompeteContract[]>,
+  limit = 200
+): RecompeteSearchResult {
+  const seen = new Set<string>();
+  const all: RecompeteContract[] = [];
+  for (const code of userCodes) {
+    for (const contract of cache.get(code) || []) {
+      const key = contract.piid || contract.contractNumber || `${contract.incumbentName}:${contract.ultimateCompletionDate}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      all.push(contract);
+    }
+  }
+  all.sort((a, b) => a.daysUntilExpiration - b.daysUntilExpiration);
+  return {
+    contracts: all.slice(0, limit),
+    totalCount: all.length,
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+/**
  * Compare two snapshots and identify changes
  */
 export function diffRecompetes(
