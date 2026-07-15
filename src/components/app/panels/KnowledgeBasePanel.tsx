@@ -29,6 +29,11 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
   // Playable URL (YT Live / podcast / webinar) so the doc isn't a dead end.
   const [play, setPlay] = useState<{ url: string; label: string } | null>(null);
   const didInitialDoc = useRef(false);
+  // Monotonic request token: the preview body (docText/play) is fetched async, so
+  // a slow fetch for doc A can resolve AFTER the user (or the deep-link/auto-preview
+  // race) has moved to doc B — leaving B's title over A's body (Eric QC: webinar
+  // title showing an 82k-word book's text). Only the LATEST openDoc call may write.
+  const reqSeq = useRef(0);
 
   const load = useCallback(async () => {
     if (!email) return;
@@ -43,8 +48,10 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
         setDocs(d.docs || []);
         setFacets(d.facets || []);
         setTotal(d.total || 0);
-        // Auto-preview the top result (no dead pane) unless a doc is pinned.
-        if (!selected && d.docs?.[0]) openDoc(d.docs[0]);
+        // Auto-preview the top result (no dead pane) unless a doc is pinned or a
+        // ?doc=<id> deep-link is loading (else the auto-preview races the deep-link
+        // and the two can land title-of-one over body-of-the-other).
+        if (!selected && !initialDocId && d.docs?.[0]) openDoc(d.docs[0]);
       }
     } catch { /* ignore */ }
     setLoading(false);
@@ -52,17 +59,19 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
   }, [email, q, docType]);
 
   const openDoc = useCallback(async (doc: KbDoc) => {
+    const seq = ++reqSeq.current;          // claim this as the latest request
     setSelected(doc);
     setDocLoading(true); setDocText(''); setPlay(null);
     try {
       const res = await authedFetch(`/api/app/rag-doc?id=${doc.id}&email=${encodeURIComponent(email || '')}`, email);
       const d = await res.json();
+      if (reqSeq.current !== seq) return;   // a newer doc was opened — drop this stale body
       setDocText(d.full_text || d.text || 'No text available for this document.');
       if (d.play_url) setPlay({ url: d.play_url, label: d.play_label || '▶ Open source' });
     } catch {
-      setDocText('Could not load this document.');
+      if (reqSeq.current === seq) setDocText('Could not load this document.');
     }
-    setDocLoading(false);
+    if (reqSeq.current === seq) setDocLoading(false);
   }, [email]);
 
   useEffect(() => { load(); /* eslint-disable-next-line react-hooks/exhaustive-deps */ }, [docType]);
@@ -71,16 +80,18 @@ export default function KnowledgeBasePanel({ email, initialDocId }: { email: str
   useEffect(() => {
     if (didInitialDoc.current || !initialDocId || !email) return;
     didInitialDoc.current = true;
+    const seq = ++reqSeq.current;          // claim latest — beats a racing auto-preview
     (async () => {
       setDocLoading(true);
       try {
         const res = await authedFetch(`/api/app/rag-doc?id=${initialDocId}&email=${encodeURIComponent(email)}`, email);
         const d = await res.json();
+        if (reqSeq.current !== seq) return;
         setSelected({ id: initialDocId, title: d.title || 'Document', docType: d.doc_type || '', docTypeLabel: d.doc_type || '', summary: '', naics: null, words: d.word_count || 0, pages: null });
         setDocText(d.full_text || d.text || 'No text available.');
         if (d.play_url) setPlay({ url: d.play_url, label: d.play_label || '▶ Open source' });
       } catch { /* ignore */ }
-      setDocLoading(false);
+      if (reqSeq.current === seq) setDocLoading(false);
     })();
   }, [initialDocId, email]);
 
