@@ -294,7 +294,16 @@ export async function POST(request: NextRequest) {
     }
 
     if (keywords !== undefined) {
-      record.keywords = Array.isArray(keywords) ? keywords : [];
+      // Normalize on write (was storing the raw client array): trim, drop empties,
+      // drop bare NAICS numbers (the #239 pollution class — a code typed into the
+      // keyword box), and CASE-INSENSITIVE dedupe. This is the path that had let
+      // mixed-case duplicates ("ERP","ERP"...) accumulate across re-saves. Cap 40.
+      const seen = new Set<string>();
+      record.keywords = (Array.isArray(keywords) ? keywords : [])
+        .map((k: unknown) => String(k).trim())
+        .filter((k: string) => k.length > 0 && !/^\d{2,6}$/.test(k))
+        .filter((k: string) => { const lc = k.toLowerCase(); if (seen.has(lc)) return false; seen.add(lc); return true; })
+        .slice(0, 40);
     }
 
     // NAICS or keywords changed → the capability vector (hidden-match base-wide
