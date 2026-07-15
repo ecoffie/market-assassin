@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { Suspense, useEffect, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import { MindyLogo } from '@/components/mindy/MindyLogo';
-import { signInWithGoogle, signInWithMicrosoft, signInWithApple } from '@/lib/supabase/auth';
+import { signInWithGoogle, signInWithMicrosoft } from '@/lib/supabase/auth';
 import { capturePartnerRefFromSearchParams, getStoredPartnerRef } from '@/lib/mindy/partner-referral-client';
 import { getPartnerReferralByCode } from '@/lib/mindy/partner-referrals';
 
@@ -117,19 +117,8 @@ function MindySignupContent() {
     // If successful, user is redirected to Microsoft
   }
 
-  // Handle Apple OAuth
-  async function handleAppleSignup() {
-    setOauthLoading('apple');
-    setError('');
-
-    const result = await signInWithApple();
-
-    if (!result.success) {
-      setError(result.error || 'Failed to connect with Apple');
-      setOauthLoading(null);
-    }
-    // If successful, user is redirected to Apple
-  }
+  // Apple OAuth disabled until the Apple provider is connected — handler removed;
+  // restore it + signInWithApple import + the button when configured.
 
   return (
     <main className="min-h-screen bg-ground-deep flex items-center justify-center p-4">
@@ -201,21 +190,8 @@ function MindySignupContent() {
                   )}
                   Continue with Microsoft
                 </button>
-
-                <button
-                  onClick={handleAppleSignup}
-                  disabled={oauthLoading !== null}
-                  className="w-full flex items-center justify-center gap-3 px-4 py-3 bg-black hover:bg-black/80 text-white rounded-xl font-medium transition-colors disabled:opacity-50 disabled:cursor-not-allowed border border-surface"
-                >
-                  {oauthLoading === 'apple' ? (
-                    <div className="w-5 h-5 border-2 border-gray-400 border-t-transparent rounded-full animate-spin" />
-                  ) : (
-                    <svg className="w-5 h-5" viewBox="0 0 24 24" fill="white" aria-hidden="true">
-                      <path d="M17.05 12.04c-.03-2.85 2.33-4.22 2.44-4.28-1.33-1.95-3.4-2.22-4.13-2.25-1.76-.18-3.43 1.03-4.32 1.03-.89 0-2.26-1.01-3.72-.98-1.91.03-3.68 1.11-4.66 2.82-1.99 3.45-.51 8.55 1.42 11.35.94 1.37 2.06 2.9 3.53 2.85 1.42-.06 1.95-.92 3.66-.92 1.71 0 2.19.92 3.69.89 1.53-.03 2.49-1.39 3.42-2.77 1.08-1.58 1.52-3.12 1.55-3.2-.03-.01-2.98-1.14-3.01-4.54zM14.28 3.78c.78-.95 1.31-2.27 1.16-3.58-1.13.05-2.49.75-3.3 1.7-.72.83-1.36 2.18-1.19 3.46 1.26.1 2.55-.64 3.33-1.58z" />
-                    </svg>
-                  )}
-                  Continue with Apple
-                </button>
+                {/* Apple sign-in hidden until Apple OAuth provider is connected. Re-enable
+                    the button here + the handler/import once configured. */}
               </div>
 
               {/* Divider */}
