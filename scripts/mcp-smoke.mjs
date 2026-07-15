@@ -80,7 +80,8 @@ try {
     'get_agency_budget_trends', 'derive_company_keywords',
     'get_agency_spending_detail', 'extract_compliance_matrix',
     'build_proposal_structure', 'referee_proposal_compliance',
-    'match_recompete_sow',
+    'match_recompete_sow', 'extract_statement_of_work',
+    'get_federal_event_series', 'get_sba_goaling_share',
   ]) {
     if (!names.includes(t)) fail(`${t} not registered`);
   }
@@ -618,7 +619,57 @@ try {
   if (rcMiss.structuredContent?._meta?.grounded !== false) fail('recompete-sow: empty description should be grounded=false (no match attempted)');
   console.error('✓ honest miss: no description → grounded=false');
 
-  console.error('\n✅ SMOKE PASSED — MCP transport + 32 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth, solicitation-documents, federal-events, scan-compliance, bid-decision, federal-osbp, agency-opps-by-office, sblo-contact, federal-contacts, podcast-lessons, agency-budget-trends, company-keywords, agency-spending-detail, compliance-matrix, proposal-structure, referee-compliance, recompete-sow) all live + honest');
+  // ── extract_statement_of_work (SOW/PWS heading detection over solicitation text) ──
+  console.error('\n→ calling extract_statement_of_work({ rfp_text: <Section C SOW sample> })');
+  const SOW_RFP = 'SECTION B - SUPPLIES OR SERVICES\nThe contractor shall provide all labor and materials.\n\nSECTION C - STATEMENT OF WORK\nC.1 SCOPE. The contractor shall provide base operations support services at Fort Example, including facilities maintenance, custodial services, grounds maintenance, and refuse collection for approximately 1.2 million square feet of administrative and industrial space. The contractor shall furnish all management, supervision, labor, materials, supplies, and equipment necessary to perform the requirements described herein.\nC.2 The contractor shall maintain a Quality Control Plan and staff a full-time on-site project manager. All work shall comply with applicable OSHA and EM 385-1-1 safety standards.\nC.3 Period of performance is a base year plus four option years.\n\nSECTION D - PACKAGING AND MARKING\nStandard commercial packaging applies.';
+  const sow = await client.callTool({ name: 'extract_statement_of_work', arguments: { rfp_text: SOW_RFP } });
+  const sowS = sow.structuredContent;
+  if (!sowS) fail('statement-of-work: no structuredContent');
+  if (sowS._meta?.degraded) fail('statement-of-work: degraded=true (unexpected — pure text path)');
+  if (!sowS._meta?.grounded || !sowS.found || typeof sowS.sow_text !== 'string' || sowS.sow_text.length < 400) {
+    fail(`statement-of-work: expected a grounded SOW block ≥400 chars, got found=${sowS.found} chars=${sowS.sow_text?.length}`);
+  }
+  // Traceability: the captured SOW must contain the C.1 scope + stop before Section D.
+  if (!/base operations support/i.test(sowS.sow_text)) fail('statement-of-work: SOW body missing the C.1 scope text (detection guard)');
+  if (/PACKAGING AND MARKING/i.test(sowS.sow_text)) fail('statement-of-work: SOW body over-captured into Section D (boundary guard)');
+  console.error(`✓ grounded=true · method=${sowS._meta.method} · title="${sowS.title}" · ${sowS._meta.sow_chars} chars`);
+  const sowMiss = await client.callTool({ name: 'extract_statement_of_work', arguments: { rfp_text: 'Thanks for your interest. No scope here.' } });
+  if (sowMiss.structuredContent?._meta?.grounded !== false) fail('statement-of-work: filler text should be grounded=false (no invented scope)');
+  console.error('✓ honest miss: no SOW heading → grounded=false');
+
+  // ── get_federal_event_series (curated recurring-event catalog) ────────────────
+  console.error('\n→ calling get_federal_event_series({ category: "matchmaking" })');
+  const ev = await client.callTool({ name: 'get_federal_event_series', arguments: { category: 'matchmaking' } });
+  const evS = ev.structuredContent;
+  if (!evS) fail('event-series: no structuredContent');
+  if (evS._meta?.degraded) fail('event-series: degraded=true (static read should never degrade)');
+  if (!evS._meta?.grounded || !Array.isArray(evS.series) || evS.series.length === 0) {
+    fail(`event-series: expected grounded matchmaking series, got ${evS.series?.length}`);
+  }
+  if (!evS.series.every((s) => s.categories.some((c) => /matchmaking/i.test(c)))) fail('event-series: a row did not match the category filter');
+  console.error(`✓ grounded=true · returned=${evS._meta.returned}/${evS._meta.total_in_catalog} · recurring=${evS._meta.recurring} conf=${evS._meta.annual_conferences} · e.g. "${String(evS.series[0].name).slice(0, 48)}"`);
+  const evMiss = await client.callTool({ name: 'get_federal_event_series', arguments: { query: 'zzzznomatchxyz' } });
+  if (evMiss.structuredContent?._meta?.grounded !== false) fail('event-series: no-match query should be grounded=false');
+  console.error('✓ honest miss: no-match query → grounded=false');
+
+  // ── get_sba_goaling_share (statutory goals vs actual set-aside obligations) ────
+  console.error('\n→ calling get_sba_goaling_share({ agency: "Department of Defense" })');
+  const sba = await client.callTool({ name: 'get_sba_goaling_share', arguments: { agency: 'Department of Defense' } });
+  const sbaS = sba.structuredContent;
+  if (!sbaS) fail('sba-goaling: no structuredContent');
+  if (sbaS._meta?.degraded) fail('sba-goaling: degraded=true (USASpending unreachable)');
+  if (!sbaS._meta?.grounded || !Array.isArray(sbaS.goals) || sbaS.goals.length !== 5) {
+    fail(`sba-goaling: expected 5 grounded goal rows, got ${sbaS.goals?.length}`);
+  }
+  const sbGoal = sbaS.goals.find((g) => /prime/i.test(g.category));
+  if (!sbGoal || sbGoal.goal_pct !== 23) fail('sba-goaling: Small Business prime goal must be the statutory 23%');
+  if (typeof sbGoal.actual_setaside_pct !== 'number' || typeof sbGoal.gap_pct !== 'number') fail('sba-goaling: goal row missing actual/gap numbers');
+  console.error(`✓ grounded=true · FY${sbaS._meta.fiscal_year} · SB set-aside=${sbaS._meta.small_business_setaside_share}% vs 23% goal (meets=${sbaS._meta.meets_small_business_goal})`);
+  const sbaMiss = await client.callTool({ name: 'get_sba_goaling_share', arguments: { agency: 'Zzz Fake Agency Nonexistent' } });
+  if (sbaMiss.structuredContent?._meta?.grounded !== false) fail('sba-goaling: unknown agency should be grounded=false');
+  console.error('✓ honest miss: unknown agency → grounded=false');
+
+  console.error('\n✅ SMOKE PASSED — MCP transport + 35 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth, solicitation-documents, federal-events, scan-compliance, bid-decision, federal-osbp, agency-opps-by-office, sblo-contact, federal-contacts, podcast-lessons, agency-budget-trends, company-keywords, agency-spending-detail, compliance-matrix, proposal-structure, referee-compliance, recompete-sow, statement-of-work, event-series, sba-goaling) all live + honest');
   await client.close();
   process.exit(0);
 } catch (err) {
