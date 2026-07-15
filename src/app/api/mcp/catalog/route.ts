@@ -1,7 +1,7 @@
 /**
  * /api/mcp/catalog — PUBLIC (no auth) pricing/plan data for the logged-out /mcp page.
  *
- * GET → { tools[] (name+description+credits), packages[], signupCredits, proMonthlyCredits }.
+ * GET → { tools[] (name+description+credits), subscriptionPlans[], signupCredits, proMonthlyCredits }.
  *
  * This is the marketing counterpart to /api/mcp/account (which is auth-gated and adds the
  * user's balance + call history). Everything here is non-PII, server-trusted config so a
@@ -10,7 +10,7 @@
  */
 import { NextResponse } from 'next/server';
 import { listMcpTools } from '@/lib/mcp/tool-registry';
-import { CREDIT_PACKAGES, PRO_MONTHLY_CREDITS, SUBSCRIPTION_PLANS } from '@/lib/mcp/packages';
+import { PRO_MONTHLY_CREDITS, SUBSCRIPTION_PLANS } from '@/lib/mcp/packages';
 import { SIGNUP_CREDITS } from '@/lib/mcp/credits';
 import { mcpFlags } from '@/lib/mcp/flags';
 
@@ -32,8 +32,8 @@ export function GET() {
   return NextResponse.json({
     success: true,
     tools,
-    packages: CREDIT_PACKAGES,
-    // Annual credit subscriptions — the acquisition plans the /mcp/pricing page sells.
+    // Monthly & annual credit subscriptions — the acquisition plans the /mcp/pricing page sells.
+    // (One-time credit packs retired 2026-07-14 — Plus/Scale are subscriptions now.)
     subscriptionPlans: SUBSCRIPTION_PLANS,
     signupCredits: SIGNUP_CREDITS,
     proMonthlyCredits: PRO_MONTHLY_CREDITS,

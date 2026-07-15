@@ -1,14 +1,13 @@
 /**
  * /api/mcp/account — everything the getmindy.ai/mcp dashboard needs in one read.
  *
- * GET (requireUserAuth) → { balance, tools[] (name+credits), packages[], recentCalls[] }.
- * Keys themselves come from /api/mcp/keys; this is balance + usage + the price/pack tables.
+ * GET (requireUserAuth) → { balance, tools[] (name+credits), recentCalls[] }.
+ * Keys themselves come from /api/mcp/keys; this is balance + usage.
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { requireUserAuth } from '@/lib/api-auth';
 import { getBalance } from '@/lib/mcp/credits';
 import { listMcpTools } from '@/lib/mcp/tool-registry';
-import { CREDIT_PACKAGES } from '@/lib/mcp/packages';
 import { getWriteClient } from '@/lib/supabase/server-clients';
 
 export const runtime = 'nodejs';
@@ -40,7 +39,6 @@ export async function GET(request: NextRequest) {
     success: true,
     balance,
     tools,
-    packages: CREDIT_PACKAGES,
     recentCalls: callsRes.data ?? [],
   });
 }
