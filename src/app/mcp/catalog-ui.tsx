@@ -11,7 +11,17 @@ import Link from 'next/link';
 
 export interface Tool { name: string; description: string; credits: number }
 export interface Pkg { id: string; credits: number; usd: number; label: string; checkoutUrl?: string }
-export interface Catalog { tools: Tool[]; packages: Pkg[]; signupCredits: number; proMonthlyCredits: number }
+/** Annual credit subscription (the /mcp/pricing acquisition plans). */
+export interface SubPlan {
+  id: string;
+  usdPerYear: number;
+  usdPerMonth: number;
+  usdMonthlyAnchor: number;
+  creditsPerYear: number;
+  label: string;
+  checkoutUrl: string;
+}
+export interface Catalog { tools: Tool[]; packages: Pkg[]; subscriptionPlans: SubPlan[]; signupCredits: number; proMonthlyCredits: number }
 
 export const MCP_URL = 'https://getmindy.ai/mcp/mcp';
 

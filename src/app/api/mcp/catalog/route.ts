@@ -10,7 +10,7 @@
  */
 import { NextResponse } from 'next/server';
 import { listMcpTools } from '@/lib/mcp/tool-registry';
-import { CREDIT_PACKAGES, PRO_MONTHLY_CREDITS } from '@/lib/mcp/packages';
+import { CREDIT_PACKAGES, PRO_MONTHLY_CREDITS, SUBSCRIPTION_PLANS } from '@/lib/mcp/packages';
 import { SIGNUP_CREDITS } from '@/lib/mcp/credits';
 import { mcpFlags } from '@/lib/mcp/flags';
 
@@ -33,6 +33,8 @@ export function GET() {
     success: true,
     tools,
     packages: CREDIT_PACKAGES,
+    // Annual credit subscriptions — the acquisition plans the /mcp/pricing page sells.
+    subscriptionPlans: SUBSCRIPTION_PLANS,
     signupCredits: SIGNUP_CREDITS,
     proMonthlyCredits: PRO_MONTHLY_CREDITS,
     // Whether Pro-tier tools (tier === 'pro') are actually ENFORCED right now, i.e.
