@@ -75,6 +75,7 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   search_sam_opportunities: 1,
   get_market_vocabulary: 1,
   get_contractor_profile: 5,
+  get_contractor_executives: 5, // reuses the get_contractor_profile name→rollup resolve + a small FFATA exec read
   find_capable_contractors: 25,
   get_winning_playbook: 2,
   get_pricing_intel: 1, // GSA CALC labor-rate intel (free upstream, multi-call; warm cache ~free)
@@ -280,9 +281,12 @@ const SAM_ENTITY_TOOL_DEF = {
     name: 'lookup_sam_entity',
     description:
       'Live SAM.gov registration for a contractor: UEI/CAGE, legal name, registration status, NAICS, ' +
-      'certifications (8(a), HUBZone, …), location. Pass a UEI for an exact entity, or a company name to ' +
-      'search. The "is this vendor real, registered, and set-aside eligible?" check. Set-aside eligibility ' +
-      'depends on the CURRENT status shown, not past awards.',
+      'certifications (8(a), HUBZone, …), location, AND the company\'s registered points of contact ' +
+      '(government-business / electronic-business / past-performance POC NAMES). The "is this vendor real, ' +
+      'registered, set-aside eligible, and who is registered on their SAM profile?" check. Pass a UEI for an ' +
+      'exact entity, or a company name to search (the top match is auto-enriched with its POC block). ' +
+      'IMPORTANT: SAM redacts POC email/phone on the public API — you get POC NAMES only, never invent an ' +
+      'email/phone. Set-aside eligibility depends on the CURRENT status shown, not past awards.',
     parameters: {
       type: 'object',
       properties: {
