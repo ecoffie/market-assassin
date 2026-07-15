@@ -18,6 +18,7 @@ import { deriveSubAgency } from '@/lib/gov-contacts/derive-subagency';
 import { decodeDodaac } from '@/lib/gov-contacts/dodaac';
 import { normalizeOfficeName } from '@/lib/gov-contacts/office-name';
 import { loadDodaacNames, dodaacCodesForAgency } from '@/lib/gov-contacts/dodaac-directory';
+import { agencySearchKeywords } from '@/lib/gov-contacts/agency-search';
 import { getEnhancedAgencyInfo } from '@/lib/utils/command-info';
 
 export const dynamic = 'force-dynamic';
@@ -388,8 +389,22 @@ export async function GET(request: NextRequest) {
     );
 
   if (search) {
-    // name OR title match
-    q = q.or(`contact_fullname.ilike.%${search}%,contact_title.ilike.%${search}%`);
+    // Strip PostgREST .or() metacharacters so a stray comma/paren can't break the
+    // whole expression (or a value like "USDA-FAS" splitting on the dash is fine).
+    const safe = search.replace(/[,()%]/g, ' ').trim();
+    // name OR title — PLUS the agency column, so typing an agency name works.
+    const parts = [
+      `contact_fullname.ilike.%${safe}%`,
+      `contact_title.ilike.%${safe}%`,
+      `department_ind_agency.ilike.%${safe}%`,
+    ];
+    // Acronym/sub-agency resolution: "usda" / "forest service" / "usfs" →
+    // department_ind_agency ILIKE %Agriculture% (federal_contacts keys civilian
+    // POCs by PARENT department, so the acronym never matched the raw text).
+    for (const kw of agencySearchKeywords(safe)) {
+      parts.push(`department_ind_agency.ilike.%${kw}%`);
+    }
+    q = q.or(parts.join(','));
   }
   // DoDAAC ANCHORING (the factual fix): DoD POCs in federal_contacts are ALL
   // tagged "DEPT OF DEFENSE", so a sub-agency (DARPA, MDA, NAVAIR…) collapses to
