@@ -36,8 +36,7 @@ import { retrievePodcastEpisodes, formatPodcastCardsForPrompt, type PodcastEpiso
 import { loadBidderProfile, formatProfileForPrompt } from '@/lib/proposal/loaders';
 import { isUserOverBudget, recordLlmUsage } from '@/lib/llm/usage-cost';
 import { makeTier0Tools, TIER0_TOOL_DEFS, TIER0_TOOL_NAMES } from '@/lib/chat/tier0-tools';
-import { makeTier1Tools, TIER1_TOOL_DEFS, CHAT_ONLY_TOOL_DEFS } from '@/lib/chat/tier1-tools';
-import { makeTier2Tools, TIER2_TOOL_DEFS, TIER2_TOOL_NAMES } from '@/lib/chat/tier2-tools';
+import { listMcpTools, isMcpTool, runMcpTool } from '@/lib/mcp/tool-registry';
 
 export const dynamic = 'force-dynamic';
 export const runtime = 'nodejs';
@@ -113,19 +112,19 @@ GROUNDING:
 - If the context doesn't contain what's needed, say so directly: "I don't have that in my knowledge base — try the [X] panel for that." DO NOT invent federal programs, agency names, or contract values.
 
 YOUR DATA TOOLS:
-Their OWN account (private):
-- get_my_pipeline — the user's tracked pursuits (titles, agencies, deadlines, stages). Call it when they ask about THEIR pipeline, pursuits, deadlines, or what they're bidding/tracking.
-- search_my_vault — the user's OWN Vault: company identity, past performance (contracts/CPARS), capabilities. Call it when they ask about their own experience/past performance/capabilities, or want you to reference their real record.
-Live federal market (public):
-- search_sam_opportunities — currently-open SAM.gov opportunities by keyword (+ optional NAICS / set-aside). Call it when they ask what opportunities/RFPs/solicitations are open or available in a topic or their market.
-- get_market_vocabulary — the distinctive buyer words/phrases that win in a NAICS. Call it when they ask what keywords to search, how buyers describe a market, or how to phrase a capability statement for a NAICS.
-- find_decision_makers — REAL government decision-makers / points of contact (name, title, office, email/phone where available) from the SAM.gov contacts directory. Call it whenever they ask WHO to contact, who the contracting officer / small business specialist / OSBP director / program manager is, or want "contacts", "decision-makers", or "who do I talk to" at an agency (e.g. "who are the contacts for the Forest Service"). Pass the agency and/or a name/role keyword. This is the tool for PEOPLE — do NOT punt these to SAM.gov advice; we have the directory.
-Contractor / competitive intel (public):
-- get_contractor_profile — look up a specific company's federal award history, top agencies, and recent contracts. Call it when they name a company (incumbent, competitor, teaming target) and ask who they are or what they've won.
-- find_capable_contractors — find firms that have won work in a NAICS/PSC (teaming partners, subs, competition). Call it when they ask who does a kind of work, who the players/companies are in a market, who to team with, or what's "in the contractor database" for a market — infer the NAICS from their market if they don't give one.
-- If a contractor tool returns a "slow down"/rate_limited note, relay it briefly and suggest they try again shortly — do NOT retry it yourself.
-- When a tool returns count 0 / found false / has_any false, say so plainly — NEVER invent a pursuit, opportunity, contract, company, agency, deadline, dollar, or term. Ground every specific (title, agency, deadline, dollar, solicitation #) ONLY in what the tool actually returned.
-- The pipeline/Vault tools return only THIS signed-in user's data. Do not claim to see anyone else's.
+You have a LARGE toolset over the federal Data Core — each tool's own description says exactly when to use it. USE them instead of giving generic advice: if a tool can answer a question with real data, call it. Never tell the user to "go check SAM.gov / the panel" for something a tool covers. What you can reach, by category:
+- THEIR OWN account (private): get_my_pipeline (their tracked pursuits/deadlines/stages) and search_my_vault (their identity, past performance/CPARS, capabilities). These return ONLY this signed-in user's data — never anyone else's.
+- OPPORTUNITIES: open SAM.gov solicitations (general + by buying office), agency forecasts, expiring/recompete contracts, IDV/GWAC vehicles, grants, SBIR/STTR.
+- COMPETITORS: a company's award history + profile, the firms that win a NAICS/PSC (teaming or competition), incumbent financials, the likely incumbent behind an opp, SAM entity/registration.
+- MARKET & PRICING: price-to-win labor rates, small-business/Rule-of-Two depth, buyer keyword coverage, market vocabulary, regulatory demand signals, SBA goaling.
+- AGENCIES: an agency's pain points & priorities, spending detail, budget trend, single-award detail.
+- PEOPLE & EVENTS: the named contacts/decision-makers at a buying office (search_federal_contacts — use it whenever they ask WHO to contact; do NOT punt to SAM), the SBLO at a prime, agency OSBP, and federal events/series.
+- PROPOSAL HELP: bid/no-bid evaluation, compliance-matrix extraction, proposal structure, DQ-risk scan, independent compliance referee, SOW extraction, solicitation documents.
+- GOVCON GIANTS PLAYBOOKS: the winning playbook for a scenario + real podcast lessons (proprietary coaching, not on any public API).
+Tool-use rules:
+- Some tools take a notice_id or RFP text (proposal tools) — if the user hasn't given one, ask for the solicitation number/text rather than guessing.
+- If a tool returns a "slow down"/rate_limited note, relay it briefly and suggest they try again shortly — do NOT retry it yourself.
+- When a tool returns grounded=false / count 0 / found false, say so plainly — NEVER invent a pursuit, opportunity, contract, company, agency, deadline, dollar, contact, or term. Ground every specific ONLY in what the tool actually returned.
 
 SCOPE:
 - You answer questions about US federal contracting — set-asides, certifications, SAM.gov, capability statements, teaming, proposals, market intel, GovCon BD.
@@ -427,15 +426,28 @@ export async function POST(request: NextRequest) {
         let toolUsageForCost: { prompt_tokens?: number; completion_tokens?: number } | null = null;
         try {
           const tier0 = makeTier0Tools(getSupabase(), auth.email!);
-          const tier1 = makeTier1Tools(getSupabase());
-          const tier2 = makeTier2Tools(auth.email!); // email = rate-limit key only (public data)
-          // Route a called tool to the toolset that owns it, by name:
-          //   Tier-0 (private, session-scoped) → Tier-2 (BigQuery, cost-gated) → else Tier-1.
-          const execTool = (name: string, args: Record<string, unknown>) =>
-            TIER0_TOOL_NAMES.has(name) ? tier0.execute(name, args)
-              : TIER2_TOOL_NAMES.has(name) ? tier2.execute(name, args)
-                : tier1.execute(name, args);
-          const ALL_TOOL_DEFS = [...TIER0_TOOL_DEFS, ...TIER1_TOOL_DEFS, ...CHAT_ONLY_TOOL_DEFS, ...TIER2_TOOL_DEFS];
+          // Mindy is the FLAGSHIP (paid, Pro-gated) surface, so it gets the FULL
+          // Data Core toolset — every tool the MCP server exposes to external
+          // agents PLUS the private Vault/pipeline tools MCP can't offer. The MCP
+          // registry is the single source of truth: listMcpTools() yields all
+          // public + moat tools (already priced/tiered), runMcpTool() dispatches
+          // them with the SAME cost guards (BigQuery rate limits carry over). No
+          // per-call credit debit in chat — tools are included in the Pro plan
+          // (PRD: "users get a better experience in Mindy, not worse"). Since the
+          // route already Pro-gates above, moat tools are fine to expose here.
+          // get_balance is an MCP credit-meter tool — irrelevant in chat, dropped.
+          const mcpToolDefs = listMcpTools()
+            .filter((d) => (d.function as { name?: string })?.name !== 'get_balance')
+            .map((d) => ({ type: 'function' as const, function: d.function })); // strip _credits/_tier before the LLM call
+          // Route a called tool: Tier-0 (private, session-email-bound, NO email
+          // arg) stays local; everything else runs through the MCP registry with
+          // the authenticated email as the scope/rate-limit key.
+          const execTool = async (name: string, args: Record<string, unknown>): Promise<Record<string, unknown>> => {
+            if (TIER0_TOOL_NAMES.has(name)) return tier0.execute(name, args);
+            if (isMcpTool(name)) return (await runMcpTool(name, args, { userEmail: auth.email! })).result;
+            return { ok: false, error: `unknown_tool:${name}` };
+          };
+          const ALL_TOOL_DEFS = [...TIER0_TOOL_DEFS, ...mcpToolDefs];
           const toolReqBody = (model: string) => JSON.stringify({
             model, messages, temperature: 0, max_tokens: 512,
             tools: ALL_TOOL_DEFS, tool_choice: 'auto',
