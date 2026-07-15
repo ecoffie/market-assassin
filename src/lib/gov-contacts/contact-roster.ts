@@ -84,37 +84,120 @@ function normalizeTitle(title: string | null): { role: string | null; pocLabel: 
   const role = t.length <= 60 ? t : null;
   return { role, pocLabel: null, roleCategory: role ? classifyRole(role) : null };
 }
-// Civilian bureaus / sub-agencies whose people are tagged in federal_contacts
-// ONLY at the parent-department level (no sub_agency granularity for civilian
-// agencies — verified: USDA rows carry an empty sub_agency). Without this, a
-// query for a bureau name ("Forest Service") ilike-matches department_ind_agency
-// ("Department of Agriculture") → ZERO rows → the tool returned only the single
-// curated OSBP contact. Map the bureau the user names to its parent department
-// keyword so the full roster resolves. (DoD components anchor earlier via their
-// DoDAAC, so this list is civilian-focused.)
-const BUREAU_TO_DEPARTMENT: Array<[RegExp, string]> = [
-  [/forest service|\busfs\b|natural resources conservation|\bnrcs\b|farm service|\bfsa\b|rural development|\baphis\b|food safety|agricultural research|risk management agency/i, 'Agriculture'],
-  [/internal revenue|\birs\b|comptroller of the currency|\bocc\b|\bfincen\b|\bttb\b|bureau of engraving|\bmint\b|bureau of the fiscal service/i, 'Treasury'],
-  [/\bfbi\b|federal bureau of investigation|\bdea\b|drug enforcement|\batf\b|alcohol.*tobacco.*firearms|marshals service|bureau of prisons|\bbop\b|\beoir\b/i, 'Justice'],
-  [/\bfema\b|emergency management|\btsa\b|transportation security|customs and border|\bcbp\b|immigration and customs|\bice\b|coast guard|\buscg\b|secret service|\bcisa\b|cybersecurity and infrastructure|citizenship and immigration|\buscis\b|federal law enforcement training/i, 'Homeland Security'],
-  [/national park|\bnps\b|bureau of land management|\bblm\b|geological survey|\busgs\b|fish and wildlife|\bfws\b|bureau of reclamation|indian affairs|\bbia\b|ocean energy management|\bboem\b|surface mining/i, 'Interior'],
-  [/\bcdc\b|disease control|\bfda\b|food and drug|\bnih\b|national institutes of health|\bcms\b|medicare|medicaid services|indian health|\bihs\b|\bsamhsa\b|\bhrsa\b|\bahrq\b|administration for children/i, 'Health'],
-  [/\bfaa\b|federal aviation|federal highway|\bfhwa\b|federal railroad|\bfra\b|maritime administration|\bmarad\b|federal transit|\bfta\b|\bnhtsa\b|pipeline.*hazardous/i, 'Transportation'],
-  [/\bnoaa\b|oceanic and atmospheric|census bureau|patent and trademark|\buspto\b|\bnist\b|standards and technology|economic development administration/i, 'Commerce'],
-  [/\bnnsa\b|nuclear security|\bferc\b|energy regulatory|\bepa\b|environmental protection/i, 'Energy'],
-  [/\bosha\b|occupational safety|bureau of labor statistics|\bbls\b|mine safety|\bmsha\b|employment and training/i, 'Labor'],
-  [/veterans health|veterans benefits|\bvha\b|\bvba\b|national cemetery/i, 'Veterans'],
+// Civilian bureaus / sub-agencies. federal_contacts tags civilian people at the
+// parent-department level in `department_ind_agency` ("Department of Agriculture")
+// AND — for a subset of rows — the specific bureau in `sub_tier` ("FOREST
+// SERVICE"). So each bureau maps to TWO keywords:
+//   dept    — matches department_ind_agency (the anchor; always resolves a roster)
+//   subTier — matches sub_tier to NARROW to that bureau (undefined = no narrow)
+// The query narrows on sub_tier when present, and FALLS BACK to the department
+// roster if the narrow finds nothing (many rows have a null sub_tier), so a
+// bureau query is never empty. (DoD components anchor earlier via their DoDAAC.)
+const BUREAU_MAP: Array<[RegExp, string, string?]> = [
+  // USDA (sub_tier confirmed populated: FOREST SERVICE, AGRICULTURAL RESEARCH SERVICE, …)
+  [/forest service|\busfs\b/i, 'Agriculture', 'forest service'],
+  [/natural resources conservation|\bnrcs\b/i, 'Agriculture', 'natural resources conservation'],
+  [/farm service|\bfsa\b|farm production/i, 'Agriculture', 'farm'],
+  [/\baphis\b|animal and plant/i, 'Agriculture', 'animal and plant'],
+  [/agricultural research|\bars\b/i, 'Agriculture', 'agricultural research'],
+  [/agricultural marketing|\bams\b/i, 'Agriculture', 'agricultural marketing'],
+  [/food and nutrition|\bfns\b/i, 'Agriculture', 'food and nutrition'],
+  [/rural development/i, 'Agriculture', 'rural'],
+  [/food safety|\bfsis\b/i, 'Agriculture', 'food safety'],
+  // Treasury
+  [/internal revenue|\birs\b/i, 'Treasury', 'internal revenue'],
+  [/comptroller of the currency|\bocc\b/i, 'Treasury', 'comptroller'],
+  [/\bfincen\b|financial crimes/i, 'Treasury', 'financial crimes'],
+  [/\bttb\b|alcohol and tobacco tax/i, 'Treasury', 'alcohol and tobacco'],
+  [/\bmint\b/i, 'Treasury', 'mint'],
+  [/bureau of engraving/i, 'Treasury', 'engraving'],
+  [/fiscal service/i, 'Treasury', 'fiscal'],
+  // Justice
+  [/\bfbi\b|federal bureau of investigation/i, 'Justice', 'investigation'],
+  [/\bdea\b|drug enforcement/i, 'Justice', 'drug enforcement'],
+  [/\batf\b|alcohol.*tobacco.*firearms/i, 'Justice', 'firearms'],
+  [/marshals/i, 'Justice', 'marshals'],
+  [/bureau of prisons|\bbop\b/i, 'Justice', 'prisons'],
+  // Homeland Security
+  [/\bfema\b|emergency management/i, 'Homeland Security', 'emergency management'],
+  [/\btsa\b|transportation security/i, 'Homeland Security', 'transportation security'],
+  [/customs and border|\bcbp\b/i, 'Homeland Security', 'customs and border'],
+  [/immigration and customs|\bice\b/i, 'Homeland Security', 'immigration and customs'],
+  [/coast guard|\buscg\b/i, 'Homeland Security', 'coast guard'],
+  [/secret service/i, 'Homeland Security', 'secret service'],
+  [/\bcisa\b|cybersecurity and infrastructure/i, 'Homeland Security', 'cybersecurity'],
+  [/citizenship and immigration|\buscis\b/i, 'Homeland Security', 'citizenship'],
+  // Interior
+  [/national park|\bnps\b/i, 'Interior', 'national park'],
+  [/bureau of land management|\bblm\b/i, 'Interior', 'land management'],
+  [/geological survey|\busgs\b/i, 'Interior', 'geological'],
+  [/fish and wildlife|\bfws\b/i, 'Interior', 'fish and wildlife'],
+  [/bureau of reclamation/i, 'Interior', 'reclamation'],
+  [/indian affairs|\bbia\b/i, 'Interior', 'indian affairs'],
+  // Health & Human Services
+  [/\bcdc\b|disease control/i, 'Health', 'disease control'],
+  [/\bfda\b|food and drug/i, 'Health', 'food and drug'],
+  [/\bnih\b|national institutes of health/i, 'Health', 'national institutes of health'],
+  [/\bcms\b|medicare|medicaid services/i, 'Health', 'medicare'],
+  [/indian health|\bihs\b/i, 'Health', 'indian health'],
+  // Transportation
+  [/\bfaa\b|federal aviation/i, 'Transportation', 'aviation'],
+  [/federal highway|\bfhwa\b/i, 'Transportation', 'highway'],
+  [/federal railroad|\bfra\b/i, 'Transportation', 'railroad'],
+  [/maritime administration|\bmarad\b/i, 'Transportation', 'maritime'],
+  [/federal transit|\bfta\b/i, 'Transportation', 'transit'],
+  // Commerce
+  [/\bnoaa\b|oceanic and atmospheric/i, 'Commerce', 'oceanic'],
+  [/census bureau/i, 'Commerce', 'census'],
+  [/patent and trademark|\buspto\b/i, 'Commerce', 'patent'],
+  [/\bnist\b|standards and technology/i, 'Commerce', 'standards and technology'],
+  // Energy
+  [/\bnnsa\b|nuclear security/i, 'Energy', 'nuclear'],
+  [/\bferc\b|energy regulatory/i, 'Energy', 'energy regulatory'],
+  // EPA is its OWN department (not under Energy) — anchor on its own name, no narrow.
+  [/\bepa\b|environmental protection/i, 'Environmental Protection'],
+  // Labor
+  [/\bosha\b|occupational safety/i, 'Labor', 'occupational safety'],
+  [/bureau of labor statistics|\bbls\b/i, 'Labor', 'labor statistics'],
+  // Veterans Affairs
+  [/veterans health|\bvha\b/i, 'Veterans', 'veterans health'],
+  [/veterans benefits|\bvba\b/i, 'Veterans', 'veterans benefits'],
 ];
 
-export function subAgencyToParent(name: string): string {
-  for (const [re, parent] of BUREAU_TO_DEPARTMENT) {
-    if (re.test(name)) return parent;
+// Parent-department acronyms → department_ind_agency keyword. No sub_tier narrow:
+// these are the whole department, so they return the full roster like the spelled-out name.
+const DEPARTMENT_ACRONYMS: Array<[RegExp, string]> = [
+  [/\busda\b/i, 'Agriculture'],
+  [/\bdhs\b/i, 'Homeland Security'],
+  [/\bdod\b|\bd\.o\.d\.?\b/i, 'Defense'],
+  [/\bdoj\b/i, 'Justice'],
+  [/\bhhs\b/i, 'Health'],
+  [/\bdot\b/i, 'Transportation'],
+  [/\bdoe\b/i, 'Energy'],
+  [/\bhud\b/i, 'Housing'],
+  [/\bdoi\b/i, 'Interior'],
+  [/\bva\b/i, 'Veterans'],
+];
+
+/** Resolve an agency/bureau name to its parent-department keyword + optional sub_tier narrow keyword. */
+export function resolveAgency(name: string): { deptKeyword: string; subTier?: string } {
+  for (const [re, dept, subTier] of BUREAU_MAP) {
+    if (re.test(name)) return { deptKeyword: dept, subTier };
   }
-  // No known bureau alias — strip filler words and match the department field directly.
-  return name
+  for (const [re, dept] of DEPARTMENT_ACRONYMS) {
+    if (re.test(name)) return { deptKeyword: dept };
+  }
+  // No known bureau alias — strip filler words and match department_ind_agency directly.
+  const deptKeyword = name
     .replace(/\b(department|dept|of|the|agency|administration|us|u\.s\.|,)\b/gi, ' ')
     .replace(/\s{2,}/g, ' ')
     .trim();
+  return { deptKeyword };
+}
+
+/** Back-compat: the parent-department keyword only. */
+export function subAgencyToParent(name: string): string {
+  return resolveAgency(name).deptKeyword;
 }
 
 export interface FederalContact {
@@ -169,44 +252,57 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
   const search = (input.search || '').trim();
   const validDodaac = isValidDodaac(input.dodaac || '') ? (input.dodaac as string).toUpperCase().trim() : '';
 
-  let q = sb
-    .from('federal_contacts')
-    .select(
-      'id, contact_fullname, contact_title, contact_email, contact_phone, department_ind_agency, office, sub_tier, role_category, solicitation_number',
-      { count: 'exact' },
-    );
-
-  if (search) q = q.or(`contact_fullname.ilike.%${search}%,contact_title.ilike.%${search}%`);
-
+  // Resolve the agency ONCE: its DoD office codes (DoDAAC) and its civilian
+  // parent-department keyword + optional sub_tier narrow keyword.
+  const agencyDodaacCodes = agency && !validDodaac
+    ? (await dodaacCodesForAgency(agency)).filter(isValidDodaac).slice(0, 60)
+    : [];
+  const resolved = agency && !validDodaac && agencyDodaacCodes.length === 0 ? resolveAgency(agency) : null;
   let anchor: ContactRosterResult['anchor'] = search ? 'search' : 'none';
-  let anchoredByDodaac = false;
-  if (validDodaac) {
-    q = q.ilike('solicitation_number', `${validDodaac}%`);
-    anchoredByDodaac = true;
-    anchor = 'dodaac';
-    trace.push(`anchored on explicit dodaac ${validDodaac}`);
-  }
-  if (agency && !anchoredByDodaac) {
-    const dodaacCodes = (await dodaacCodesForAgency(agency)).filter(isValidDodaac);
-    if (dodaacCodes.length > 0) {
-      q = q.or(dodaacCodes.slice(0, 60).map((c) => `solicitation_number.ilike.${c}%`).join(','));
-      anchoredByDodaac = true;
-      anchor = 'agency-dodaac';
-      trace.push(`anchored on ${dodaacCodes.length} dodaac code(s) for "${agency}"`);
+  if (validDodaac) anchor = 'dodaac';
+  else if (agencyDodaacCodes.length > 0) anchor = 'agency-dodaac';
+  else if (agency) anchor = 'department';
+
+  // Build a fresh query each call so we can retry without sub_tier narrowing.
+  const buildQuery = (applySubTier: boolean) => {
+    let q = sb
+      .from('federal_contacts')
+      .select(
+        'id, contact_fullname, contact_title, contact_email, contact_phone, department_ind_agency, office, sub_tier, role_category, solicitation_number',
+        { count: 'exact' },
+      );
+    if (search) q = q.or(`contact_fullname.ilike.%${search}%,contact_title.ilike.%${search}%`);
+    if (validDodaac) {
+      q = q.ilike('solicitation_number', `${validDodaac}%`);
+    } else if (agencyDodaacCodes.length > 0) {
+      q = q.or(agencyDodaacCodes.map((c) => `solicitation_number.ilike.${c}%`).join(','));
+    } else if (agency && resolved) {
+      const kw = resolved.deptKeyword;
+      q = kw.length >= 3 ? q.ilike('department_ind_agency', `%${kw}%`) : q.ilike('department_ind_agency', `%${agency}%`);
+      // Narrow the department roster to the specific bureau (Forest Service, IRS…).
+      if (applySubTier && resolved.subTier) q = q.ilike('sub_tier', `%${resolved.subTier}%`);
     }
-  }
-  if (agency && !anchoredByDodaac) {
-    const keyword = subAgencyToParent(agency);
-    q = keyword.length >= 3 ? q.ilike('department_ind_agency', `%${keyword}%`) : q.ilike('department_ind_agency', `%${agency}%`);
-    anchor = 'department';
-    trace.push(`department preview on keyword "${keyword || agency}"`);
-  }
-  if (office && !validDodaac) q = q.ilike('office', `%${office}%`);
-  if (role) q = q.eq('role_category', role);
+    if (office && !validDodaac) q = q.ilike('office', `%${office}%`);
+    if (role) q = q.eq('role_category', role);
+    return q.order('posted_date', { ascending: false, nullsFirst: false }).range(0, limit * 4 - 1);
+  };
 
-  q = q.order('posted_date', { ascending: false, nullsFirst: false }).range(0, limit * 4 - 1);
-
-  const { data, error, count } = await q;
+  const wantNarrow = anchor === 'department' && !!resolved?.subTier;
+  let { data, error, count } = await buildQuery(wantNarrow);
+  let narrowedToBureau = wantNarrow;
+  // Many civilian rows carry a null sub_tier — if the narrow found nothing, fall
+  // back to the full department roster rather than returning empty.
+  if (!error && wantNarrow && (!data || data.length === 0)) {
+    ({ data, error, count } = await buildQuery(false));
+    narrowedToBureau = false;
+    trace.push(`sub_tier narrow "${resolved!.subTier}" empty → department fallback`);
+  }
+  if (agency && !trace.length) {
+    trace.push(narrowedToBureau
+      ? `narrowed to bureau via sub_tier "${resolved!.subTier}"`
+      : anchor === 'agency-dodaac' ? `anchored on ${agencyDodaacCodes.length} dodaac code(s)`
+      : `department preview on "${resolved?.deptKeyword || agency}"`);
+  }
   if (error) {
     return { contacts: [], anchor, total: 0, emailableCount: 0, degraded: true, trace: [...trace, `query error: ${error.message}`] };
   }
