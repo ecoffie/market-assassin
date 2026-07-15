@@ -202,6 +202,14 @@ export async function signInWithMicrosoft(redirectTo?: string): Promise<{ succes
       options: {
         redirectTo: redirectTo || `${window.location.origin}/app/onboarding`,
         scopes: 'email profile openid',
+        // Force Microsoft to show the account picker EVERY time. Without this,
+        // Microsoft silently reuses whichever account is already active in the
+        // browser (e.g. a shared alerts@ mailbox in the same tenant), so a user
+        // with multiple Microsoft accounts gets signed in as the wrong one with
+        // no chance to choose. select_account always surfaces the chooser.
+        queryParams: {
+          prompt: 'select_account',
+        },
       },
     });
 
