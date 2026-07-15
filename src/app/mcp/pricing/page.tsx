@@ -188,51 +188,46 @@ export default function McpPricing() {
             </div>
           ))}
 
-          {/* Pro — subscription, full-width below the two packs */}
-          <div className="relative rounded-2xl border border-indigo-400/40 bg-indigo-400/[0.06] p-6 md:col-span-2">
-            <span className="absolute -top-2.5 left-6 rounded-full bg-indigo-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Best for daily use</span>
-            <div className="md:flex md:items-stretch md:gap-8">
-              {/* Left: identity + price + CTA */}
-              <div className="flex flex-col md:w-[38%]">
-                <div className="flex items-baseline justify-between gap-2">
-                  <span className="text-[12px] font-semibold uppercase tracking-wide text-indigo-300">Pro</span>
-                  <span className="text-[11px] text-slate-500">subscription</span>
-                </div>
-                <div className="mt-2 flex items-baseline gap-2">
-                  {annual && <span className="font-mono text-xl font-semibold tabular-nums text-slate-500 line-through">${PRO_MONTHLY}</span>}
-                  <span className="font-mono text-4xl font-bold tabular-nums">${annual ? ANNUAL_PER_MO : PRO_MONTHLY}</span>
-                  <span className="text-[13px] text-slate-400">/mo</span>
-                </div>
-                <div className="mt-1 h-4 text-[12px] text-emerald-300">{annual ? `billed annually ($${PRO_ANNUAL.toLocaleString()}/yr) · save $${ANNUAL_SAVE}` : ''}</div>
-                <div className="mt-1 text-[13px] leading-relaxed text-slate-400">The whole platform, credits included — built for agents working federal BD every day.</div>
-                <a href={proHref} className="mt-5 inline-flex items-center justify-center rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-400 md:mt-auto">Go Pro {annual ? 'annually' : 'monthly'}</a>
-                <div className="mt-2 h-4 text-center text-[11.5px] text-slate-500">{annual ? <><b className="font-semibold text-emerald-300">Save ${ANNUAL_SAVE}</b> compared to monthly</> : 'Switch to annual for 2 months free'}</div>
-              </div>
-              {/* Right: what you get */}
-              <div className="mt-5 flex-1 border-t border-indigo-400/15 pt-5 md:mt-0 md:border-l md:border-t-0 md:pl-8 md:pt-0">
-                <div className="rounded-xl border border-indigo-400/15 bg-indigo-400/[0.05] p-3">
-                  <div className="text-[12px] text-indigo-200/80"><b className="font-mono text-[14px] tabular-nums text-indigo-100">{proCredits.toLocaleString()}</b> credits every month get you</div>
-                  <ul className="mt-1.5 grid gap-x-4 gap-y-0.5 text-[12px] text-slate-300 sm:grid-cols-3">
-                    {outcomes(proCredits).map((o) => <li key={o} className="tabular-nums">· {o}</li>)}
-                  </ul>
-                </div>
-                <ul className="mt-4 grid gap-x-6 gap-y-2 text-[12.5px] sm:grid-cols-2">
-                  <li className="flex gap-2"><span className="text-indigo-300">◆</span> <span><b className="font-semibold">Everything in every pack</b> — all {toolCount} tools + the full moat</span></li>
-                  <li className="flex gap-2"><span className="text-indigo-300">◆</span> <span><b className="font-semibold">{proCredits.toLocaleString()} credits / month</b> <span className="text-slate-500">— renews automatically, no top-ups</span></span></li>
-                  {PRO_INCLUDES.map((u) => (
-                    <li key={u.label} className="flex items-start gap-2">
-                      <span className="mt-px text-indigo-300">◆</span>
-                      <span>
-                        <b className="font-semibold">{u.label}</b> <span className="text-slate-500">— {u.note}</span>{' '}
-                        {u.status === 'soon' && <span className="ml-0.5 rounded-full border border-white/15 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-slate-400">rolling out</span>}
-                      </span>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-            </div>
-          </div>
         </section>
+
+        {/* Pro — subscription; same vertical format as the packs, centered below */}
+        <div className="mt-4 flex justify-center">
+          <div className="relative flex w-full flex-col rounded-2xl border border-indigo-400/40 bg-indigo-400/[0.06] p-6 md:w-[calc(50%-0.5rem)]">
+            <span className="absolute -top-2.5 left-6 rounded-full bg-indigo-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Best for daily use</span>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-[12px] font-semibold uppercase tracking-wide text-indigo-300">Pro</span>
+              <span className="text-[11px] text-slate-500">subscription</span>
+            </div>
+            <div className="mt-2 flex items-baseline gap-2">
+              {annual && <span className="font-mono text-xl font-semibold tabular-nums text-slate-500 line-through">${PRO_MONTHLY}</span>}
+              <span className="font-mono text-4xl font-bold tabular-nums">${annual ? ANNUAL_PER_MO : PRO_MONTHLY}</span>
+              <span className="text-[13px] text-slate-400">/mo</span>
+            </div>
+            <div className="mt-1 h-4 text-[12px] text-emerald-300">{annual ? `billed annually ($${PRO_ANNUAL.toLocaleString()}/yr) · save $${ANNUAL_SAVE}` : ''}</div>
+            <div className="mt-1 min-h-[2.5rem] text-[13px] leading-relaxed text-slate-400">The whole platform, credits included — built for agents working federal BD every day.</div>
+            <div className="mt-3 rounded-xl border border-indigo-400/15 bg-indigo-400/[0.05] p-3">
+              <div className="text-[12px] text-indigo-200/80"><b className="font-mono text-[14px] tabular-nums text-indigo-100">{proCredits.toLocaleString()}</b> credits every month get you</div>
+              <ul className="mt-1.5 space-y-0.5 text-[12px] text-slate-300">
+                {outcomes(proCredits).map((o) => <li key={o} className="tabular-nums">· {o}</li>)}
+              </ul>
+            </div>
+            <ul className="mt-4 flex-1 space-y-2 border-t border-indigo-400/15 pt-4 text-[12.5px]">
+              <li className="flex gap-2"><span className="text-indigo-300">◆</span> <span><b className="font-semibold">Everything in every pack</b> — all {toolCount} tools + the full moat</span></li>
+              <li className="flex gap-2"><span className="text-indigo-300">◆</span> <span><b className="font-semibold">{proCredits.toLocaleString()} credits / month</b> <span className="text-slate-500">— renews automatically, no top-ups</span></span></li>
+              {PRO_INCLUDES.map((u) => (
+                <li key={u.label} className="flex items-start gap-2">
+                  <span className="mt-px text-indigo-300">◆</span>
+                  <span>
+                    <b className="font-semibold">{u.label}</b> <span className="text-slate-500">— {u.note}</span>{' '}
+                    {u.status === 'soon' && <span className="ml-0.5 rounded-full border border-white/15 px-1.5 py-px text-[10px] font-semibold uppercase tracking-wide text-slate-400">rolling out</span>}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <a href={proHref} className="mt-5 inline-flex items-center justify-center rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-400">Go Pro {annual ? 'annually' : 'monthly'}</a>
+            <div className="mt-2 h-4 text-center text-[11.5px] text-slate-500">{annual ? <><b className="font-semibold text-emerald-300">Save ${ANNUAL_SAVE}</b> compared to monthly</> : 'Switch to annual for 2 months free'}</div>
+          </div>
+        </div>
 
         <p className="mx-auto mt-5 max-w-2xl text-center text-[12px] leading-relaxed text-slate-500">
           The <b className="font-medium text-slate-300">moat</b> is Mindy&apos;s un-copyable layer — included with every pack. The free trial runs public-data tools only. Every metered tool is charged on success.
