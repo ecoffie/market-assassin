@@ -583,7 +583,18 @@ export async function GET(request: NextRequest) {
   let emailableTotal: number | null = null;
   try {
     let eq = sb.from('federal_contacts').select('id', { count: 'exact', head: true }).not('contact_email', 'is', null);
-    if (search) eq = eq.or(`contact_fullname.ilike.%${search}%,contact_title.ilike.%${search}%`);
+    if (search) {
+      // Mirror the main query's agency-alias-aware search (name/title/agency +
+      // resolved acronym keywords) so the emailable count tracks the result set.
+      const safe = search.replace(/[,()%]/g, ' ').trim();
+      const eqParts = [
+        `contact_fullname.ilike.%${safe}%`,
+        `contact_title.ilike.%${safe}%`,
+        `department_ind_agency.ilike.%${safe}%`,
+      ];
+      for (const kw of agencySearchKeywords(safe)) eqParts.push(`department_ind_agency.ilike.%${kw}%`);
+      eq = eq.or(eqParts.join(','));
+    }
     // Mirror the main query's filters so the emailable count matches the result
     // set. A valid DoDAAC anchors on the solicitation prefix (skipping the agency
     // keyword + office ILIKE, which would otherwise broaden/exclude wrongly).
@@ -600,9 +611,19 @@ export async function GET(request: NextRequest) {
     emailableTotal = ec ?? null;
   } catch { /* non-fatal; UI falls back to total only */ }
 
+  // Did we fetch the ENTIRE matching set (so dedup gives the exact people count)?
+  // The raw `count` counts solicitation ROWS — the same POC appears on many, so
+  // 39 rows can dedupe to 5 people. When count ≤ what we fetched, the deduped
+  // `contacts` IS the whole truth → report THAT as the total (no misleading
+  // "showing 5 of ~39"). Only when there's genuinely more than one page do we
+  // fall back to the raw approximate count + the "narrow" hint.
+  const fetchedAll = (count ?? 0) <= fetchLimit;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  if (fetchedAll) emailableTotal = (contacts as any[]).filter((c) => c.contact_email).length;
+
   return NextResponse.json({
     success: true,
-    total: count ?? contacts.length, // pre-dedupe total (approx; for "X of N")
+    total: fetchedAll ? contacts.length : (count ?? contacts.length),
     emailableTotal,                  // contacts with an email on file (honest reachability)
     count: contacts.length,
     offset,
