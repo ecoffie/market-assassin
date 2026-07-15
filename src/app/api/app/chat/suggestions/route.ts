@@ -18,6 +18,7 @@ import { verifyUserOwnsEmail } from '@/lib/api-auth';
 import { loadBidderProfile } from '@/lib/proposal/loaders';
 import type { BidderProfile } from '@/lib/proposal/types';
 import { buildStarterPrompts, DEFAULT_STARTER_PROMPTS } from '@/lib/chat/starter-prompts';
+import { generateFollowups } from '@/lib/chat/followup-suggestions';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -65,4 +66,33 @@ export async function GET(request: NextRequest) {
     console.error('[chat/suggestions] failed, serving generic:', err);
     return NextResponse.json({ prompts: DEFAULT_STARTER_PROMPTS, personalized: false });
   }
+}
+
+/**
+ * POST — CONTEXTUAL follow-up chips shown UNDER an answer (vs the GET empty-state
+ * starters). Body: { email, message, answer }. Returns { suggestions: string[] }.
+ * The panel calls this after a response completes, so it's off the answer's
+ * critical path. Fails soft to [] — never blocks the chat.
+ */
+export async function POST(request: NextRequest) {
+  let body: { email?: string; message?: string; answer?: string };
+  try {
+    body = await request.json();
+  } catch {
+    return NextResponse.json({ error: 'Invalid JSON body' }, { status: 400 });
+  }
+  const email = (body.email || '').trim();
+  if (!email) return NextResponse.json({ error: 'email required' }, { status: 400 });
+
+  const auth = await verifyUserOwnsEmail(request, email);
+  if (!auth.authenticated || !auth.email) {
+    return NextResponse.json({ suggestions: [] }); // soft: no chips when unauthenticated
+  }
+
+  const message = (body.message || '').trim();
+  const answer = (body.answer || '').trim();
+  if (!message || !answer) return NextResponse.json({ suggestions: [] });
+
+  const suggestions = await generateFollowups(message, answer, { userEmail: auth.email });
+  return NextResponse.json({ suggestions });
 }

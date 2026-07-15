@@ -45,6 +45,7 @@ interface ChatMessage {
   citations?: CitedSource[];
   isStreaming?: boolean;
   errored?: boolean;
+  followups?: string[]; // contextual "what next?" chips, fetched after the answer completes
 }
 
 
@@ -189,6 +190,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
       const reader = res.body.getReader();
       const decoder = new TextDecoder();
       let leftover = '';
+      let finalContent = ''; // full answer text — used to fetch contextual follow-ups
 
       while (true) {
         const { done, value } = await reader.read();
@@ -206,6 +208,7 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
             if (evt.type === 'session' && evt.sessionId) {
               setSessionId(evt.sessionId);
             } else if (evt.type === 'token' && typeof evt.content === 'string') {
+              finalContent += evt.content;
               setMessages(prev => prev.map(m =>
                 m.id === assistantMsg.id ? { ...m, content: m.content + evt.content } : m
               ));
@@ -228,6 +231,23 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
             // Ignore unparseable lines — usually SSE keep-alive comments
           }
         }
+      }
+
+      // Contextual "what next?" chips — fetched AFTER the answer completes so
+      // they never add latency to the response. Fire-and-forget; no chips on any
+      // failure. Skipped for empty/errored answers.
+      if (finalContent.trim().length > 0) {
+        authedFetch('/api/app/chat/suggestions', email, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ email, message: text, answer: finalContent }),
+        })
+          .then(r => r.json())
+          .then(d => {
+            const s = Array.isArray(d?.suggestions) ? d.suggestions.filter((x: unknown): x is string => typeof x === 'string') : [];
+            if (s.length) setMessages(prev => prev.map(m => m.id === assistantMsg.id ? { ...m, followups: s } : m));
+          })
+          .catch(() => { /* no chips on failure */ });
       }
     } catch (err) {
       const errMsg = (err as Error)?.message || 'Stream failed';
@@ -574,6 +594,25 @@ export default function MindyChatPanel({ email, tier, onPanelChange }: MindyChat
                             </span>
                           );
                         })}
+                      </div>
+                    </div>
+                  )}
+                  {/* Contextual follow-up chips — "what next?" after an answer.
+                      Clicking sends the suggestion straight back to Mindy. */}
+                  {msg.role === 'assistant' && !!msg.followups?.length && !msg.isStreaming && (
+                    <div className="mt-3 pt-3 border-t border-surface/50">
+                      <div className="text-[10px] font-semibold tracking-wider text-faint mb-1.5">SUGGESTED NEXT STEPS</div>
+                      <div className="flex flex-wrap gap-1.5">
+                        {msg.followups.slice(0, 3).map((f, i) => (
+                          <button
+                            key={i}
+                            onClick={() => sendMessage(f)}
+                            disabled={isStreaming}
+                            className="inline-flex items-center gap-1 text-[11.5px] px-2.5 py-1 rounded-full bg-purple-500/10 border border-purple-500/30 text-purple-200 hover:bg-purple-500/20 hover:border-purple-400/50 disabled:opacity-50 disabled:cursor-default transition-colors text-left"
+                          >
+                            {f}
+                          </button>
+                        ))}
                       </div>
                     </div>
                   )}
