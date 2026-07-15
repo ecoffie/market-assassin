@@ -4290,3 +4290,33 @@ verify-click (GovCon-standard, satisfies re-verify-on-credential-change); collis
 1-change/24h rate limit; idempotent + resumable via an `email_change_log` audit row (RLS-locked to
 service-role). tsc clean across all new files. Admin merge for already-duplicated accounts is the
 next phase (docs/PRD-identity-model.md).
+
+---
+
+## Paid-account MFA (email verification code at sign-in) — 2026-07-14
+
+**What:** Paid Mindy accounts now get a second security factor on password sign-in. After
+the password is verified, Mindy emails a 6-digit code that must be entered before the
+session is granted. Free accounts are unaffected (opt-in only). OAuth (Google/Microsoft)
+sign-ins already carry the provider's MFA upstream, so they skip the extra step. Behind an
+env flag (`MFA_ENFORCED_PAID`), default off → canary → on, and **fail-open** by design: any
+error in the paid check or code send lets the paying user through rather than lock them out.
+
+**Why:** Mindy's paying users are government contractors handling sensitive pipeline,
+capability, and (in the Vault) CUI-adjacent data. A password alone is not enough. This adds
+replay-resistant-adjacent protection at the exact moment of account access, and maps to the
+CMMC / NIST 800-171 multi-factor-authentication control family (IA.L2-3.5.3) — reinforcing
+the "trustworthy CUI custodian" positioning (see the CMMC/CUI custody strategy). It also
+closes the "email-as-password-only" gap for the accounts that matter most.
+
+**SEO / positioning:** "multi-factor authentication for government contractors",
+"secure GovCon software login", "CMMC-aligned account security", "Mindy paid-account MFA".
+
+**Proof:** Gate is E2E-proven (`scripts/e2e-paid-mfa-gate.mjs`): a genuinely-paid account →
+`mfaRequired: true` + a hashed code row written to `two_factor_codes` (10-min TTL, 60s resend
+throttle, 5-attempt lockout); a free account → session minted directly (unchanged). Codes are
+stored hashed (never plaintext), delivered through the verified Resend/getmindy.ai pipeline
+(the same sender as daily briefings). Root-caused + fixed a latent bug where the OTP table was
+never actually created in prod (a dead `exec_migration` self-heal), which had left the whole
+email-OTP feature inert. Migration `20260714_two_factor_codes.sql` run + verified live. tsc
+clean. Go-live runbook: `tasks/paid-mfa-provider-linking-runbook.md`.
