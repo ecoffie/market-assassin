@@ -8,7 +8,7 @@
  * OSBP contact. These tests lock the mapping in.
  */
 import { describe, it, expect } from 'vitest';
-import { subAgencyToParent } from './contact-roster';
+import { subAgencyToParent, resolveAgency } from './contact-roster';
 
 describe('subAgencyToParent — civilian bureau aliases', () => {
   const cases: Array<[string, string]> = [
@@ -35,6 +35,28 @@ describe('subAgencyToParent — civilian bureau aliases', () => {
       expect(subAgencyToParent(input)).toBe(parent);
     });
   }
+});
+
+describe('resolveAgency — parent department + sub_tier narrow keyword', () => {
+  it('Forest Service resolves to a sub_tier narrow keyword (for bureau-specific roster)', () => {
+    expect(resolveAgency('Forest Service')).toEqual({ deptKeyword: 'Agriculture', subTier: 'forest service' });
+    expect(resolveAgency('USFS')).toEqual({ deptKeyword: 'Agriculture', subTier: 'forest service' });
+  });
+  it('IRS and FEMA carry their own sub_tier narrow keyword', () => {
+    expect(resolveAgency('IRS').subTier).toBe('internal revenue');
+    expect(resolveAgency('FEMA').subTier).toBe('emergency management');
+  });
+  it('EPA is its own department (not lumped under Energy) with no sub_tier narrow', () => {
+    expect(resolveAgency('EPA')).toEqual({ deptKeyword: 'Environmental Protection' });
+  });
+  it('an unknown agency has a deptKeyword but no sub_tier narrow', () => {
+    expect(resolveAgency('Department of Agriculture').subTier).toBeUndefined();
+  });
+  it('a parent-department acronym resolves to the department keyword, no sub_tier narrow', () => {
+    expect(resolveAgency('USDA')).toEqual({ deptKeyword: 'Agriculture' });
+    expect(resolveAgency('DHS')).toEqual({ deptKeyword: 'Homeland Security' });
+    expect(resolveAgency('HHS')).toEqual({ deptKeyword: 'Health' });
+  });
 });
 
 describe('subAgencyToParent — non-bureau fallback (filler-word strip)', () => {
