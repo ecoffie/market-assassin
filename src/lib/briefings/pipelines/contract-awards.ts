@@ -251,6 +251,70 @@ export async function fetchAwardsForUser(
 }
 
 /**
+ * Fetch recent awards for a SINGLE NAICS code (no agency/recipient filter).
+ *
+ * The snapshot cron dedupes by NAICS: instead of one combined query per user
+ * (~700 calls that blow USAspending's per-IP rate limit under any concurrency),
+ * it fetches each UNIQUE NAICS once and assembles users from the shared result.
+ * Same window ($25k+, last 7d) as fetchAwardsForUser.
+ */
+export async function fetchAwardsForNaicsCode(naicsCode: string): Promise<ContractAward[]> {
+  const result = await fetchContractAwards({
+    naicsCodes: [naicsCode],
+    awardedFrom: getDateDaysAgo(7),
+    minAmount: 25000,
+    limit: 100,
+  });
+  return result.awards;
+}
+
+/**
+ * Assemble one user's awards from a prefetched per-NAICS cache — no API calls.
+ * Gathers the user's NAICS' awards (dedup by awardId), then applies the user's
+ * watched-agency narrowing CLIENT-SIDE as a soft filter: if the filter would
+ * empty the list, fall back to the full NAICS results so no user is ever blank.
+ * (Watched-company narrowing can't be preserved without a per-user query — it
+ * degrades to the same fallback — so it's intentionally dropped here.)
+ */
+export function assembleAwardsForUser(
+  user: { naics_codes: string[]; agencies: string[] },
+  cache: Map<string, ContractAward[]>,
+  limit = 200
+): AwardsSearchResult {
+  const seen = new Set<string>();
+  const gathered: ContractAward[] = [];
+  for (const code of (user.naics_codes || []).slice(0, 10)) {
+    for (const award of cache.get(code) || []) {
+      const key = award.awardId || `${award.recipientName}:${award.awardAmount}`;
+      if (seen.has(key)) continue;
+      seen.add(key);
+      gathered.push(award);
+    }
+  }
+
+  let awards = gathered;
+  const agencies = (user.agencies || []).map(a => a.toLowerCase()).filter(Boolean);
+  if (agencies.length > 0) {
+    const filtered = gathered.filter(a =>
+      agencies.some(ag =>
+        (a.awardingSubAgency || '').toLowerCase().includes(ag) ||
+        (a.awardingAgency || '').toLowerCase().includes(ag)
+      )
+    );
+    if (filtered.length > 0) awards = filtered; // soft: keep full list if no match
+  }
+
+  awards = [...awards].sort((a, b) => b.awardAmount - a.awardAmount).slice(0, limit);
+  const totalSpending = awards.reduce((sum, a) => sum + a.awardAmount, 0);
+  return {
+    awards,
+    totalCount: awards.length,
+    totalSpending,
+    fetchedAt: new Date().toISOString(),
+  };
+}
+
+/**
  * Compare two snapshots and identify changes
  */
 export function diffAwards(

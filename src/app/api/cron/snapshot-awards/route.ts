@@ -11,9 +11,13 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { fetchAwardsForUser } from '@/lib/briefings/pipelines/contract-awards';
+import {
+  fetchAwardsForNaicsCode,
+  assembleAwardsForUser,
+  type ContractAward,
+} from '@/lib/briefings/pipelines/contract-awards';
 
-// Give the batched run headroom under Vercel's ceiling.
+// NAICS-deduped run needs headroom under Vercel's ceiling.
 export const maxDuration = 300;
 
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -114,58 +118,78 @@ export async function GET(request: NextRequest) {
     let processed = 0;
     let errors = 0;
 
-    // Process one user: fetch awards + upsert snapshot. Isolated so we can run a
-    // bounded number of users concurrently — a sequential loop with a per-user
-    // delay can't clear ~700 users inside the function's 300s cap.
-    const processUser = async (user: (typeof allUsers)[number]) => {
-      try {
-        const result = await fetchAwardsForUser({
-          naics_codes: user.naics_codes || [],
-          agencies: user.agencies || [],
-          watched_companies: user.watched_companies || [],
-        });
+    // ── Phase 1: collect the UNIQUE NAICS codes across all users ──────────────
+    // The awards query is deduped by NAICS: many users share codes, so we fetch
+    // each unique NAICS once instead of one combined query per user (~700 calls
+    // that trip USAspending's per-IP rate limit under any concurrency).
+    const uniqueCodes = new Set<string>();
+    for (const user of allUsers) {
+      (user.naics_codes || []).slice(0, 10).forEach(c => { if (c) uniqueCodes.add(c); });
+    }
+    const codeList = [...uniqueCodes];
+    console.log(`[Cron] ${allUsers.length} users → ${codeList.length} unique NAICS codes to fetch`);
 
-        const { error: insertError } = await supabase
-          .from('briefing_snapshots')
-          .upsert({
-            user_email: user.user_email,
-            snapshot_date: today,
-            tool: 'market_assassin',
-            raw_data: {
-              awards: result.awards,
-              totalCount: result.totalCount,
-              totalSpending: result.totalSpending,
-              fetchedAt: result.fetchedAt,
-            },
-            item_count: result.awards.length,
-          }, {
-            onConflict: 'user_email,snapshot_date,tool',
-          });
-
-        if (insertError) {
-          console.error(`[Cron] Error saving snapshot for ${user.user_email}:`, insertError);
-          errors++;
-        } else {
-          processed++;
-        }
-      } catch (err) {
-        console.error(`[Cron] Error processing ${user.user_email}:`, err);
-        errors++;
-      }
-    };
-
-    // Bounded concurrency against USAspending (a tolerant public API). ~700 users
-    // at BATCH_SIZE=6 clears in ~2min, well under the 300s cap; the old 500ms-per-
-    // user sequential loop timed out at ~227 users.
-    const BATCH_SIZE = 6;
-    for (let i = 0; i < allUsers.length; i += BATCH_SIZE) {
-      const batch = allUsers.slice(i, i + BATCH_SIZE);
-      await Promise.all(batch.map(processUser));
-      // Small breather between batches to stay gentle on the API.
-      await new Promise(resolve => setTimeout(resolve, 200));
+    // ── Phase 2: fetch each unique NAICS ONCE (bounded concurrency) ───────────
+    const cache = new Map<string, ContractAward[]>();
+    const FETCH_BATCH = 6;
+    for (let i = 0; i < codeList.length; i += FETCH_BATCH) {
+      const batch = codeList.slice(i, i + FETCH_BATCH);
+      const results = await Promise.all(
+        batch.map(async (code): Promise<[string, ContractAward[]]> => {
+          try {
+            return [code, await fetchAwardsForNaicsCode(code)];
+          } catch (err) {
+            console.error(`[Cron] Error fetching NAICS ${code}:`, err);
+            return [code, []];
+          }
+        })
+      );
+      for (const [code, awards] of results) cache.set(code, awards);
+      await new Promise(resolve => setTimeout(resolve, 150));
     }
 
-    console.log(`[Cron: snapshot-awards] Complete: ${processed} processed, ${errors} errors`);
+    // ── Phase 3: assemble + upsert each user's snapshot (no API calls) ────────
+    const UPSERT_BATCH = 10;
+    for (let i = 0; i < allUsers.length; i += UPSERT_BATCH) {
+      const batch = allUsers.slice(i, i + UPSERT_BATCH);
+      await Promise.all(batch.map(async (user) => {
+        try {
+          const result = assembleAwardsForUser(
+            { naics_codes: user.naics_codes || [], agencies: user.agencies || [] },
+            cache,
+            200
+          );
+          const { error: insertError } = await supabase
+            .from('briefing_snapshots')
+            .upsert({
+              user_email: user.user_email,
+              snapshot_date: today,
+              tool: 'market_assassin',
+              raw_data: {
+                awards: result.awards,
+                totalCount: result.totalCount,
+                totalSpending: result.totalSpending,
+                fetchedAt: result.fetchedAt,
+              },
+              item_count: result.awards.length,
+            }, {
+              onConflict: 'user_email,snapshot_date,tool',
+            });
+
+          if (insertError) {
+            console.error(`[Cron] Error saving snapshot for ${user.user_email}:`, insertError);
+            errors++;
+          } else {
+            processed++;
+          }
+        } catch (err) {
+          console.error(`[Cron] Error processing ${user.user_email}:`, err);
+          errors++;
+        }
+      }));
+    }
+
+    console.log(`[Cron: snapshot-awards] Complete: ${processed} processed, ${errors} errors, ${codeList.length} NAICS fetched`);
 
     return NextResponse.json({
       success: true,
@@ -173,6 +197,7 @@ export async function GET(request: NextRequest) {
       processed,
       errors,
       totalUsers: allUsers.length,
+      naicsFetched: codeList.length,
       fromNotificationSettings: fromNotif,
       fromAlertSettings: fromAlert,
     });
