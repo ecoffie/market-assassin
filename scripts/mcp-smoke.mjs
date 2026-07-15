@@ -79,7 +79,7 @@ try {
     'get_sblo_contact', 'search_federal_contacts', 'search_podcast_lessons',
     'get_agency_budget_trends', 'derive_company_keywords',
     'get_agency_spending_detail', 'extract_compliance_matrix',
-    'build_proposal_structure',
+    'build_proposal_structure', 'referee_proposal_compliance',
   ]) {
     if (!names.includes(t)) fail(`${t} not registered`);
   }
@@ -567,7 +567,29 @@ try {
   if (psMiss.structuredContent?._meta?.grounded !== false) fail('proposal-structure: empty requirements should be grounded=false (no invented outline)');
   console.error('✓ honest miss: no requirements → grounded=false');
 
-  console.error('\n✅ SMOKE PASSED — MCP transport + 30 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth, solicitation-documents, federal-events, scan-compliance, bid-decision, federal-osbp, agency-opps-by-office, sblo-contact, federal-contacts, podcast-lessons, agency-budget-trends, company-keywords, agency-spending-detail, compliance-matrix, proposal-structure) all live + honest');
+  // ── referee_proposal_compliance (independent draft vs matrix — closes the chain) ─
+  console.error('\n→ calling referee_proposal_compliance({ requirements: <matrix>, draft: <partial draft> })');
+  // A draft that clearly addresses SOME requirements (3-volume, page limit) but omits
+  // others (past performance refs, submission portal) → referee must find both met + gaps.
+  const REF_DRAFT = 'TECHNICAL VOLUME\nOur firm submits this proposal in three volumes: Technical, Past Performance, and Price. The Technical volume is 20 pages in 12-point Times New Roman font, within the 25-page limit. Our technical approach details staffing, quality control, and project schedule. PRICE VOLUME\nOur firm-fixed price is detailed in the attached schedule.';
+  const rf = await client.callTool({ name: 'referee_proposal_compliance', arguments: { requirements: cmS.requirements, draft: REF_DRAFT } });
+  const rfS = rf.structuredContent;
+  if (!rfS) fail('referee: no structuredContent');
+  if (rfS._meta?.degraded) fail('referee: degraded=true (referee model unreachable — check the sensitive/no-training provider key)');
+  if (!rfS._meta?.grounded || !Array.isArray(rfS.verdicts) || rfS.verdicts.length < 3) {
+    fail(`referee: expected ≥3 grounded verdicts from a real matrix+draft, got ${rfS.verdicts?.length}`);
+  }
+  const statuses = new Set(rfS.verdicts.map((v) => v.status));
+  // The draft is deliberately partial — a strict referee should NOT mark everything met.
+  if (!statuses.has('missing') && !statuses.has('partial')) {
+    fail('referee: a deliberately-incomplete draft should surface at least one missing/partial verdict (strictness guard)');
+  }
+  console.error(`✓ grounded=${rfS._meta.grounded} · ${rfS._meta.total} verdicts · met=${rfS._meta.met} partial=${rfS._meta.partial} missing=${rfS._meta.missing} · score=${rfS._meta.score}%`);
+  const rfMiss = await client.callTool({ name: 'referee_proposal_compliance', arguments: { requirements: cmS.requirements, draft: '' } });
+  if (rfMiss.structuredContent?._meta?.grounded !== false) fail('referee: no draft should be grounded=false (referee did not run)');
+  console.error('✓ honest miss: no draft → grounded=false (referee did not run)');
+
+  console.error('\n✅ SMOKE PASSED — MCP transport + 31 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth, solicitation-documents, federal-events, scan-compliance, bid-decision, federal-osbp, agency-opps-by-office, sblo-contact, federal-contacts, podcast-lessons, agency-budget-trends, company-keywords, agency-spending-detail, compliance-matrix, proposal-structure, referee-compliance) all live + honest');
   await client.close();
   process.exit(0);
 } catch (err) {
