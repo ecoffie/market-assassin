@@ -72,7 +72,7 @@ export default function PanelContainer({ activePanel, email, tier, onPanelChange
       case 'alerts':
         return <AlertsPanel email={email} tier={tier} onPanelChange={onPanelChange} />;
       case 'research':
-        return <MarketResearchPanel email={email} tier={tier} />;
+        return <MarketResearchPanel email={email} tier={tier} onNavigate={onPanelChange} />;
       case 'forecasts':
         return email && tier === 'free'
           ? <CatalogTeaserFree email={email} featureId="forecasts" onPanelChange={onPanelChange} />

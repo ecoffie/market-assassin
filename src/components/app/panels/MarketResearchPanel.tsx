@@ -3,12 +3,11 @@
 import { useState, useCallback, useEffect, useRef, useMemo, Fragment } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
-  BarChart, Bar,
   PieChart, Pie, Cell,
-  XAxis, YAxis, Tooltip, ResponsiveContainer,
+  Tooltip, ResponsiveContainer,
 } from 'recharts';
-import { Zap, Gauge, Loader2, BarChart3, Wallet, TrendingUp, User, Handshake, Target, LineChart, Building2, X, Check, CheckCircle2, Star, AlertTriangle, Landmark, Mail, Phone, type LucideIcon } from 'lucide-react';
-import type { AppTier } from '../UnifiedSidebar';
+import { Zap, Gauge, Loader2, BarChart3, Wallet, TrendingUp, User, Handshake, Target, LineChart, Building2, X, Check, CheckCircle2, Star, AlertTriangle, Landmark, Mail, Phone, Printer, type LucideIcon } from 'lucide-react';
+import type { AppTier, AppPanel } from '../UnifiedSidebar';
 import { getMIApiHeaders, authedFetch } from '../authHeaders';
 import MarketCoverageBanner, { type MarketCoverage } from '../market/MarketCoverageBanner';
 import { useAppTracker } from '../track';
@@ -25,7 +24,7 @@ import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 interface MarketResearchPanelProps {
   email: string | null;
   tier: AppTier;
-  onNavigate?: (panel: string, context?: Record<string, unknown>) => void;
+  onNavigate?: (panel: AppPanel, context?: Record<string, unknown>) => void;
 }
 
 type BusinessType = 'SDVOSB' | 'VOSB' | 'Women Owned' | 'HUBZone' | '8(a) Certified' | 'Small Business' | 'Native American/Tribal' | '';
@@ -1682,7 +1681,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
 
   const handleNavigateToRelationships = useCallback(() => {
     if (onNavigate) {
-      onNavigate('relationships', { tab: 'network' });
+      onNavigate('contacts', { tab: 'network' });
     }
   }, [onNavigate]);
 
@@ -1814,6 +1813,23 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
 
   return (
     <div className="p-6 space-y-6">
+      {/* Print / Save-as-PDF support (Eric, Jul 15 — restore the old MA "print
+          your report"). Prints ONLY #mr-print-region regardless of the app
+          shell via the classic visibility-hidden trick, and flattens the dark
+          theme to legible black-on-white for paper. */}
+      <style dangerouslySetInnerHTML={{ __html: `
+        .mr-print-only { display: none; }
+        @media print {
+          body * { visibility: hidden !important; }
+          #mr-print-region, #mr-print-region * { visibility: visible !important; }
+          #mr-print-region { position: absolute; left: 0; top: 0; width: 100%; }
+          #mr-print-region, #mr-print-region * { color: #111 !important; background: #fff !important; border-color: #d1d5db !important; box-shadow: none !important; }
+          #mr-print-region .overflow-x-auto, #mr-print-region .overflow-y-auto, #mr-print-region .overflow-auto { overflow: visible !important; max-height: none !important; }
+          .mr-no-print { display: none !important; }
+          .mr-print-only { display: block !important; }
+        }
+        @page { margin: 0.5in; }
+      ` }} />
       {/* Header: title + actions on top, full filter strip below (matches Source Feed) */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex items-center gap-3">
@@ -1918,6 +1934,16 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                 Reports →
               </button>
             </div>
+          )}
+          {reportData && (
+            <button
+              type="button"
+              onClick={() => window.print()}
+              className="mr-no-print mr-2 inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-surface/60 px-3 py-2 text-sm text-slate-200 transition-colors hover:border-emerald-500/50 hover:text-white"
+              title="Print or save this research as a PDF"
+            >
+              <Printer className="h-4 w-4" strokeWidth={2} /> Print / PDF
+            </button>
           )}
           <button
             onClick={() => {
@@ -2324,6 +2350,15 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           renders the 4 headline stat cards + 4 chart placeholder
           tiles + Mindy Says placeholder. Slices 2-5 fill in the
           real charts, AI narrative, and export. */}
+      <div id="mr-print-region" className="space-y-6">
+      {/* Print-only report header — hidden on screen, shown on paper/PDF. */}
+      <div className="mr-print-only" style={{ marginBottom: '12px', borderBottom: '2px solid #111', paddingBottom: '8px' }}>
+        <h1 style={{ fontSize: '20px', fontWeight: 700 }}>Market Research Report</h1>
+        <div style={{ fontSize: '12px', color: '#555' }}>
+          {formData.naicsCode ? `NAICS ${formData.naicsCode}` : (marketCoverage?.keyword || '')}
+          {' · GovCon Giants AI · Mindy'}
+        </div>
+      </div>
       {showResults && viewMode === 'map' && reportData && (
         <div className="space-y-6">
           {/* Market coverage lesson (#59) — Auto mode only; Sport renders this
@@ -2345,23 +2380,20 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                 : (chartBuyers.length || buyerSummary?.totalAgencies || buyers.length).toLocaleString()}
             />
             <MetricCard label={`Relevant spending${stateScopeLabel}`} value={formatCurrency(chartTotalSpending || buyerSummary?.totalSpending)} tone="green" hint={spendWindowLabel ? `Total federal contract obligations in this market${stateScopeLabel ? ` in ${formData.locationStates.join(', ')}` : ''}, ${spendWindowLabel}` : undefined} />
-            <MetricCard label="Competitors in your space" value={(primeSummary?.totalPrimes || vehicleSummary?.totalContracts || 0).toLocaleString()} hint="Incumbent primes already winning this work — who you'd compete against or could team with" onClick={() => primesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+            <MetricCard label="Incumbent primes" value={(primeSummary?.totalPrimes || vehicleSummary?.totalContracts || 0).toLocaleString()} hint="Companies already winning this work — compete against or team with them" onClick={() => primesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
             <MetricCard label="Upcoming opportunities" value={(forecastSummary?.totalForecasts || painSummary?.highOpportunityMatches || 0).toLocaleString()} tone="amber" hint="Forecasted procurements + agency needs coming 6–18 months out" onClick={() => onNavigate?.('forecasts')} />
           </section>
 
-          {/* Chart placeholders — Slice 2 fills these with Recharts
-              (Spending by Agency bar + Set-Aside donut), Slice 3
-              adds Trend line + Top 5 Primes. The slots are here
-              so the layout is visible/scannable from Slice 1. */}
-          <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <SpendingByAgencyChart
-              buyers={chartBuyers}
-              loading={agencySpendLoading}
-            />
-            {/* Small Business Mix is about YOUR profile's SBA goaling — not a
-                one-off industry exploration. Remove it in Sport (Eric: "serves a
-                different function"). */}
-            {researchMode === 'auto' && (
+          {/* Spending-by-Agency bar chart REMOVED (Eric, Jul 15) — its top-line
+              agency totals could not be reconciled with the accurate FPDS
+              leaderboards rendered below, so it created "numbers don't match"
+              confusion. The FPDS-sourced buyer/prime tables below are the
+              authoritative agency-spend surface now. */}
+          {/* Small Business Mix is about YOUR profile's SBA goaling — not a
+              one-off industry exploration. Shown in Auto only (Eric: "serves a
+              different function"); hidden in Sport. */}
+          {researchMode === 'auto' && (
+            <section className="grid grid-cols-1 lg:grid-cols-2 gap-4">
               <SetAsideMixChart
                 buyers={chartBuyers}
                 satTotal={chartSatTotal || (reportData?.simplifiedAcquisition?.summary?.totalSATSpending) || 0}
@@ -2370,30 +2402,25 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                 // Only fall back to the market total when the SB weighting didn't run.
                 totalSpend={chartSatBase || chartTotalSpending || buyerSummary?.totalSpending || 0}
               />
-            )}
-            {/* "Market Total" trend tile removed (Eric, Jun 23) — it duplicated
-                the "Relevant spending" headline card and showed an empty $0 +
-                placeholder text while loading, reading as broken. Re-add a real
-                year-over-year line once USASpending's annual breakdown is wired. */}
-            {/* col-span-2 on the GRID ITEM (this wrapper) — the lg:col-span-2 inside
-                TopPrimesChart had no effect (it's not the grid child), so the teaming
-                columns were stuck in one half-width cell with the other half blank
-                (Eric, Jun 26: "let them take up the rest of the page"). */}
-            <div ref={primesRef} className="lg:col-span-2">
-              <TopPrimesChart
-                primes={reportData?.primeContractor?.suggestedPrimes || []}
-                tier2={(reportData?.tier2Subcontracting?.suggestedPrimes || []).map(p => ({
-                  name: p.name, reason: p.reason, email: p.email, phone: p.phone,
-                }))}
-                tribal={(reportData?.tribalContracting?.suggestedTribes || []).map(t => ({
-                  name: t.name,
-                  reason: t.region || (t.capabilities && t.capabilities.length > 0 ? t.capabilities[0] : undefined),
-                  region: t.region,
-                }))}
-                email={email}
-              />
-            </div>
-          </section>
+            </section>
+          )}
+          {/* Teaming leaderboard — the primes / tier-2 / tribal partners already
+              winning this work. Full-width now that the chart grid above it
+              collapsed to a single donut (Spending-by-Agency bar removed Jul 15). */}
+          <div ref={primesRef}>
+            <TopPrimesChart
+              primes={reportData?.primeContractor?.suggestedPrimes || []}
+              tier2={(reportData?.tier2Subcontracting?.suggestedPrimes || []).map(p => ({
+                name: p.name, reason: p.reason, email: p.email, phone: p.phone,
+              }))}
+              tribal={(reportData?.tribalContracting?.suggestedTribes || []).map(t => ({
+                name: t.name,
+                reason: t.region || (t.capabilities && t.capabilities.length > 0 ? t.capabilities[0] : undefined),
+                region: t.region,
+              }))}
+              email={email}
+            />
+          </div>
 
           {/* FPDS-style top-10 leaderboards (Departments / Contracting
               Agencies / Vendors / Funding Agencies). Real award-
@@ -2482,7 +2509,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
                 : (chartBuyers.length || buyerSummary?.totalAgencies || buyers.length).toLocaleString()}
             />
             <MetricCard label={`Relevant spending${stateScopeLabel}`} value={formatCurrency(chartTotalSpending || buyerSummary?.totalSpending)} tone="green" hint={spendWindowLabel ? `Total federal contract obligations in this market${stateScopeLabel ? ` in ${formData.locationStates.join(', ')}` : ''}, ${spendWindowLabel}` : undefined} />
-            <MetricCard label="Competitors in your space" value={(primeSummary?.totalPrimes || vehicleSummary?.totalContracts || 0).toLocaleString()} hint="Incumbent primes already winning this work — who you'd compete against or could team with" onClick={() => primesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
+            <MetricCard label="Incumbent primes" value={(primeSummary?.totalPrimes || vehicleSummary?.totalContracts || 0).toLocaleString()} hint="Companies already winning this work — compete against or team with them" onClick={() => primesRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })} />
             <MetricCard label="Upcoming opportunities" value={(forecastSummary?.totalForecasts || painSummary?.highOpportunityMatches || 0).toLocaleString()} tone="amber" hint="Forecasted procurements + agency needs coming 6–18 months out" onClick={() => onNavigate?.('forecasts')} />
           </section>
 
@@ -2558,6 +2585,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
           </section>
         </>
       )}
+      </div>{/* /#mr-print-region */}
 
       {!reportData && !isGenerating && (
         <section className="rounded-xl border border-surface bg-ground p-8 text-center">
@@ -3061,102 +3089,6 @@ interface BuyerLike {
   spending?: number;
   contractCount?: number;
 }
-function SpendingByAgencyChart({ buyers, loading }: { buyers: BuyerLike[]; loading?: boolean }) {
-  // Map to chart-friendly shape, sort, slice. Truncate the office
-  // name for the Y axis so the chart bars don't get squeezed.
-  //
-  // IMPORTANT — earlier version filtered .spending > 0 which hid
-  // every row where the buyers report populated the name but not
-  // the spend (happens when the partial-data path of generate-all
-  // runs). Result was a single-bar chart that misrepresented the
-  // market. Now we keep ALL rows and sort spend desc; rows with
-  // 0 spend render as a thin "—" rather than disappearing. The
-  // chart trust-score depends on honesty about data gaps.
-  const data = useMemo(() => {
-    return [...(buyers || [])]
-      .filter(b => (b.contractingOffice || b.parentAgency || b.subAgency))
-      .sort((a, b) => (b.spending || 0) - (a.spending || 0))
-      .slice(0, 10)
-      .map(b => ({
-        name: ((b.contractingOffice || b.subAgency || b.parentAgency || '').slice(0, 28) || 'Unknown'),
-        spending: b.spending || 0,
-      }))
-      .reverse();
-  }, [buyers]);
-
-  if (loading) {
-    return (
-      <ChartShell title="Spending by Agency" subtitle="Searching federal spend for this market…">
-        <div className="flex flex-col items-center justify-center h-full gap-3 text-xs text-muted">
-          <div className="flex items-center gap-2">
-            <span className="inline-block h-4 w-4 animate-spin rounded-full border-2 border-emerald-400/30 border-t-emerald-400" />
-            <span className="text-ink-soft font-medium">Searching agency spend…</span>
-          </div>
-          <span className="text-[11px] text-faint">Pulling the full agency breakdown — this can take a few seconds. Numbers stay put once it lands.</span>
-        </div>
-      </ChartShell>
-    );
-  }
-
-  if (data.length === 0) {
-    return (
-      <ChartShell title="Spending by Agency" subtitle="Top 10 by tracked spend">
-        <div className="flex items-center justify-center h-full text-xs text-faint">
-          No agency spending data yet. Build the report to populate.
-        </div>
-      </ChartShell>
-    );
-  }
-
-  // Honesty footer — when most rows have $0 spend it's a data
-  // gap signal, not a market signal. Tell the user instead of
-  // letting them assume the market only has one buyer.
-  const withSpend = data.filter(d => d.spending > 0).length;
-  const footer = withSpend < data.length
-    ? `${withSpend} of ${data.length} agencies have tracked spend. Refresh to pull more.`
-    : undefined;
-
-  return (
-    <ChartShell
-      title="Spending by Agency"
-      subtitle={`Top ${data.length} by total spend in your market`}
-      footer={footer ? <p className="text-[11px] text-amber-300/80">{footer}</p> : undefined}
-    >
-      <ResponsiveContainer width="100%" height={Math.max(200, data.length * 22)}>
-        <BarChart data={data} layout="vertical" margin={{ top: 0, right: 30, left: 0, bottom: 0 }}>
-          <XAxis
-            type="number"
-            tick={{ fill: CHART_PALETTE.slate, fontSize: 10 }}
-            tickFormatter={chartMoney}
-            axisLine={false}
-            tickLine={false}
-          />
-          <YAxis
-            type="category"
-            dataKey="name"
-            tick={{ fill: CHART_PALETTE.slate, fontSize: 10 }}
-            width={120}
-            axisLine={false}
-            tickLine={false}
-          />
-          <Tooltip
-            cursor={{ fill: 'rgba(16, 185, 129, 0.08)' }}
-            contentStyle={{
-              backgroundColor: '#0f172a',
-              border: '1px solid #334155',
-              borderRadius: '6px',
-              fontSize: '11px',
-            }}
-            labelStyle={{ color: '#cbd5e1' }}
-            formatter={(value) => [chartMoney(Number(value) || 0), 'Spend'] as [string, string]}
-          />
-          <Bar dataKey="spending" fill={CHART_PALETTE.emerald} radius={[0, 4, 4, 0]} />
-        </BarChart>
-      </ResponsiveContainer>
-    </ChartShell>
-  );
-}
-
 // 2) Small Business Mix — donut. Splits this NAICS market into the
 // portion that goes to small businesses (per SBA Goaling Report
 // share applied to each agency's NAICS spend) vs. the portion that
