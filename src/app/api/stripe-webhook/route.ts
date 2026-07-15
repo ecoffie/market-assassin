@@ -500,6 +500,19 @@ export async function POST(request: NextRequest) {
   // checkout.session.completed already records the initial payment).
   if (event.type === 'invoice.paid') {
     const invoice = event.data.object as Stripe.Invoice;
+
+    // MCP annual subscription credit grant — runs on BOTH the initial charge
+    // (subscription_create) and each renewal (subscription_cycle), so it must be
+    // BEFORE the subscription_create early-return below. Idempotent by invoice id;
+    // handled=false for any non-MCP invoice so nothing else is affected.
+    try {
+      const { handleMcpSubscriptionInvoice } = await import('@/lib/mcp/stripe-subscription');
+      const sub = await handleMcpSubscriptionInvoice(invoice);
+      if (sub.handled) console.log('[stripe-webhook] MCP subscription invoice:', sub);
+    } catch (mcpSubErr) {
+      console.error('[stripe-webhook] MCP subscription grant failed (non-fatal):', mcpSubErr);
+    }
+
     if (invoice.billing_reason === 'subscription_create') {
       return NextResponse.json({ received: true, action: 'invoice_skipped_initial' });
     }
