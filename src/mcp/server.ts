@@ -51,6 +51,7 @@ import { getAgencySpendingDetailTool } from './tools/agency-spending-detail';
 import { extractComplianceMatrix } from './tools/compliance-matrix';
 import { buildProposalStructureTool } from './tools/proposal-structure';
 import { refereeProposalCompliance } from './tools/referee-compliance';
+import { matchRecompeteSowTool } from './tools/recompete-sow';
 
 const server = new McpServer({
   name: 'mindy-govcon',
@@ -880,11 +881,33 @@ server.registerTool(
   },
 );
 
+server.registerTool(
+  'match_recompete_sow',
+  {
+    title: 'Match Recompete SOW (expiring contract → open recompete)',
+    description:
+      "Given an EXPIRING contract's scope, find the open solicitation that is likely its recompete — by semantic SOW " +
+      'similarity over the sam_opportunities corpus. Pass the expiring contract\'s `description` (title/scope/SOW text); ' +
+      'optionally `naics` + `agency` to scope. Confidence needs both a high top score AND a gap over the runner-up, so a ' +
+      'cluster of similar SOWs returns no_confident_match with candidates to review. Always verify via the SAM link.',
+    inputSchema: {
+      description: z.string().describe("The expiring contract's title / scope / SOW text to match against the corpus."),
+      naics: z.string().optional().describe('Optional NAICS to scope candidates (widens to 2-digit if thin).'),
+      agency: z.string().optional().describe('Optional agency/department to scope candidates.'),
+      piid: z.string().optional().describe('Optional PIID of the expiring contract (telemetry only).'),
+    },
+  },
+  async ({ description, naics, agency, piid }) => {
+    const result = await matchRecompeteSowTool({ description, naics, agency, piid });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + keyword-coverage + idv-contracts + contractor-award-history + market-depth + solicitation-documents + federal-events + scan-compliance + bid-decision + federal-osbp + agency-opps-by-office + sblo-contact + federal-contacts + podcast-lessons + agency-budget-trends + company-keywords + agency-spending-detail + compliance-matrix + proposal-structure + referee-compliance registered',
+    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + keyword-coverage + idv-contracts + contractor-award-history + market-depth + solicitation-documents + federal-events + scan-compliance + bid-decision + federal-osbp + agency-opps-by-office + sblo-contact + federal-contacts + podcast-lessons + agency-budget-trends + company-keywords + agency-spending-detail + compliance-matrix + proposal-structure + referee-compliance + recompete-sow registered',
   );
 }
 

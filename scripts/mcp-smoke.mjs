@@ -80,6 +80,7 @@ try {
     'get_agency_budget_trends', 'derive_company_keywords',
     'get_agency_spending_detail', 'extract_compliance_matrix',
     'build_proposal_structure', 'referee_proposal_compliance',
+    'match_recompete_sow',
   ]) {
     if (!names.includes(t)) fail(`${t} not registered`);
   }
@@ -589,7 +590,35 @@ try {
   if (rfMiss.structuredContent?._meta?.grounded !== false) fail('referee: no draft should be grounded=false (referee did not run)');
   console.error('✓ honest miss: no draft → grounded=false (referee did not run)');
 
-  console.error('\n✅ SMOKE PASSED — MCP transport + 31 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth, solicitation-documents, federal-events, scan-compliance, bid-decision, federal-osbp, agency-opps-by-office, sblo-contact, federal-contacts, podcast-lessons, agency-budget-trends, company-keywords, agency-spending-detail, compliance-matrix, proposal-structure, referee-compliance) all live + honest');
+  // ── match_recompete_sow (semantic SOW match over the sam_opportunities corpus) ──
+  console.error('\n→ calling match_recompete_sow({ description: <expiring base-ops scope>, naics, agency })');
+  const rc = await client.callTool({
+    name: 'match_recompete_sow',
+    arguments: {
+      description: 'Base operations support services including facilities maintenance, custodial, grounds, and refuse collection at a military installation.',
+      naics: '561210',
+      agency: 'Department of Defense',
+    },
+  });
+  const rcS = rc.structuredContent;
+  if (!rcS) fail('recompete-sow: no structuredContent');
+  if (rcS._meta?.degraded) fail('recompete-sow: degraded=true (embedding or corpus query failed — check OPENAI/embedding key + Supabase)');
+  if (!['confident_match', 'no_confident_match'].includes(rcS.verdict)) fail(`recompete-sow: unexpected verdict ${rcS.verdict}`);
+  if (!Array.isArray(rcS.matches)) fail('recompete-sow: matches must be an array');
+  // Corpus-dependent (like pricing-intel): grounded may be false if no SOW-bearing
+  // candidate exists in scope — NON-FATAL. Assert shape + traceability when grounded.
+  if (rcS._meta?.grounded) {
+    const top = rcS.matches[0];
+    if (!top || typeof top.scorePct !== 'number' || !top.samUrl) fail('recompete-sow: grounded match missing scorePct/samUrl (traceability)');
+    console.error(`✓ grounded=true · verdict=${rcS.verdict} · candidates=${rcS._meta.candidate_count} · top=${top.scorePct}% "${String(top.title).slice(0, 60)}" · gap=${rcS._meta.score_gap}`);
+  } else {
+    console.error(`✓ ran clean · verdict=${rcS.verdict} · candidates=${rcS._meta.candidate_count} · grounded=false (no SOW-bearing candidate in scope — non-fatal, corpus-dependent)`);
+  }
+  const rcMiss = await client.callTool({ name: 'match_recompete_sow', arguments: { description: '' } });
+  if (rcMiss.structuredContent?._meta?.grounded !== false) fail('recompete-sow: empty description should be grounded=false (no match attempted)');
+  console.error('✓ honest miss: no description → grounded=false');
+
+  console.error('\n✅ SMOKE PASSED — MCP transport + 32 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth, solicitation-documents, federal-events, scan-compliance, bid-decision, federal-osbp, agency-opps-by-office, sblo-contact, federal-contacts, podcast-lessons, agency-budget-trends, company-keywords, agency-spending-detail, compliance-matrix, proposal-structure, referee-compliance, recompete-sow) all live + honest');
   await client.close();
   process.exit(0);
 } catch (err) {
