@@ -95,39 +95,9 @@ export async function GET(request: NextRequest) {
       }
     }
 
-    // Source 2: smart_user_profiles (users from search history aggregation)
-    const { data: smartProfiles, error: smartError } = await supabase
-      .from('smart_user_profiles')
-      .select('email, naics_codes, agencies')
-      .limit(200);
-
-    if (smartError) {
-      console.error('[Cron] Error fetching smart_user_profiles:', smartError);
-    }
-
-    if (smartProfiles) {
-      for (const u of smartProfiles) {
-        const email = u.email?.toLowerCase();
-        if (!email || seenEmails.has(email)) continue; // Skip duplicates
-        seenEmails.add(email);
-
-        let naics = Array.isArray(u.naics_codes) ? u.naics_codes : [];
-        // Add fallback if no NAICS
-        if (naics.length === 0) {
-          naics = FALLBACK_NAICS;
-          console.log(`[Cron] Using fallback NAICS for ${email} (smart_profiles)`);
-        }
-
-        allUsers.push({
-          user_email: email,
-          naics_codes: naics,
-          agencies: Array.isArray(u.agencies) ? u.agencies : [],
-          watched_companies: [],
-          watched_contracts: [],
-          source: 'alert_settings' as const, // Keep for type compat
-        });
-      }
-    }
+    // (Removed: Source 2 smart_user_profiles — table was dropped; querying it
+    // returned PGRST205 on every tick. user_notification_settings above is the
+    // sole audience source now, matching daily-alerts.)
 
     if (allUsers.length === 0) {
       console.log('[Cron] No users with briefing profiles found');

@@ -48,10 +48,6 @@ interface FallbackAudienceUser {
   hasAgencies: boolean;
 }
 
-function isIgnorableMissingTableError(message: string): boolean {
-  return message.includes('Could not find the table') || message.includes('schema cache');
-}
-
 function isConcurrencyLimitError(message: string): boolean {
   return message.includes('432 4.3.2') || message.toLowerCase().includes('concurrent connections limit exceeded');
 }
@@ -199,13 +195,9 @@ async function getBriefingFallbackAudience() {
     throw new Error(notificationError.message);
   }
 
-  const { data: smartProfiles, error: smartProfilesError } = await supabase
-    .from('smart_user_profiles')
-    .select('email, naics_codes, agencies');
-
-  if (smartProfilesError && !isIgnorableMissingTableError(smartProfilesError.message)) {
-    throw new Error(smartProfilesError.message);
-  }
+  // (Removed a smart_user_profiles query — that table was dropped, so it returned
+  // PGRST205. user_notification_settings is the sole audience source now.)
+  const smartProfiles: Array<{ email?: string; naics_codes?: unknown; agencies?: unknown }> = [];
 
   const seenEmails = new Set<string>();
   const fallbackUsers: FallbackAudienceUser[] = [];
