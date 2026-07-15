@@ -50,6 +50,7 @@ import { deriveCompanyKeywords } from '@/mcp/tools/company-keywords';
 import { getAgencySpendingDetailTool } from '@/mcp/tools/agency-spending-detail';
 import { extractComplianceMatrix } from '@/mcp/tools/compliance-matrix';
 import { buildProposalStructureTool, type ProposalStructureInputReq } from '@/mcp/tools/proposal-structure';
+import { refereeProposalCompliance, type RefereeInputReq } from '@/mcp/tools/referee-compliance';
 import { getBalance } from '@/lib/mcp/credits';
 import { tierFor } from '@/lib/mcp/entitlements';
 
@@ -102,6 +103,7 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   get_agency_spending_detail: 2, // multiple USASpending aggregates (total + subagency + set-aside buckets)
   extract_compliance_matrix: 3, // LLM-backed RFP requirement extraction (chunked+parallel; shared cache warms public notices)
   build_proposal_structure: 1, // pure shaping — compliance matrix → volume/section tree (no LLM/IO)
+  referee_proposal_compliance: 4, // independent Claude referee (no-training/sensitive) — draft vs matrix, per-req verdicts
   get_balance: 0, // meta tool — always free
 };
 
@@ -864,6 +866,41 @@ const PROPOSAL_STRUCTURE_TOOL_DEF = {
   },
 };
 
+const REFEREE_COMPLIANCE_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'referee_proposal_compliance',
+    description:
+      'The CLOSING step of a proposal: run an assembled draft past an INDEPENDENT compliance referee (a fresh model that ' +
+      'did NOT write the draft) and get a per-requirement verdict — met / partial / missing — with a one-line evidence ' +
+      'note and an overall compliance score. Pass the `requirements` from extract_compliance_matrix plus your `draft` ' +
+      'text. The point is independence: the drafter thinks it is done; the referee catches the unmet "shall" items before ' +
+      'submission. Fix every missing/partial item, then re-referee. grounded=false when no requirements OR no draft is ' +
+      'supplied (it does not run) — a high score confirms coverage, not competitiveness.',
+    parameters: {
+      type: 'object',
+      properties: {
+        requirements: {
+          type: 'array',
+          description: 'The compliance matrix to check the draft against — pass the requirements[] from extract_compliance_matrix.',
+          items: {
+            type: 'object',
+            properties: {
+              requirement: { type: 'string', description: 'The obligation text (required).' },
+              category: { type: 'string', description: 'submission | evaluation | technical | past_performance | pricing | admin | other (optional).' },
+              section: { type: 'string', description: 'The L/M/C clause label, e.g. "L.3.2" (optional).' },
+              id: { type: 'string', description: 'Stable id, e.g. "REQ-001" (optional).' },
+            },
+            required: ['requirement'],
+          },
+        },
+        draft: { type: 'string', description: 'The assembled proposal draft text to evaluate (read up to the first 24,000 chars).' },
+      },
+      required: ['requirements', 'draft'],
+    },
+  },
+};
+
 /** All tools exposed over MCP in v1, each annotated with its credit price. */
 export function listMcpTools(): Array<Record<string, unknown>> {
   const defs = [
@@ -900,6 +937,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     AGENCY_SPENDING_DETAIL_TOOL_DEF,
     COMPLIANCE_MATRIX_TOOL_DEF,
     PROPOSAL_STRUCTURE_TOOL_DEF,
+    REFEREE_COMPLIANCE_TOOL_DEF,
     GET_BALANCE_TOOL_DEF,
   ];
   return defs.map((d) => ({ ...d, _credits: TOOL_CREDITS[d.function.name] ?? 0, _tier: tierFor(d.function.name) }));
@@ -941,6 +979,7 @@ export function isMcpTool(name: string): boolean {
     name === 'get_agency_spending_detail' ||
     name === 'extract_compliance_matrix' ||
     name === 'build_proposal_structure' ||
+    name === 'referee_proposal_compliance' ||
     name === 'get_balance'
   );
 }
@@ -1284,6 +1323,15 @@ export async function runMcpTool(
         ? (args.requirements as ProposalStructureInputReq[])
         : [],
     }) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'referee_proposal_compliance') {
+    const result = (await refereeProposalCompliance({
+      requirements: Array.isArray(args.requirements) ? (args.requirements as RefereeInputReq[]) : [],
+      draft: typeof args.draft === 'string' ? args.draft : '',
+      userEmail: ctx.userEmail,
+    })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
 

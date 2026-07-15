@@ -50,6 +50,7 @@ import { deriveCompanyKeywords } from './tools/company-keywords';
 import { getAgencySpendingDetailTool } from './tools/agency-spending-detail';
 import { extractComplianceMatrix } from './tools/compliance-matrix';
 import { buildProposalStructureTool } from './tools/proposal-structure';
+import { refereeProposalCompliance } from './tools/referee-compliance';
 
 const server = new McpServer({
   name: 'mindy-govcon',
@@ -850,11 +851,40 @@ server.registerTool(
   },
 );
 
+server.registerTool(
+  'referee_proposal_compliance',
+  {
+    title: 'Referee Proposal Compliance (independent draft check)',
+    description:
+      'The closing step of a proposal: run an assembled draft past an INDEPENDENT compliance referee (a fresh model that ' +
+      'did not write it) and get a per-requirement verdict — met / partial / missing — with evidence and an overall ' +
+      'compliance score. Pass the `requirements` from extract_compliance_matrix plus your `draft` text. Fix every ' +
+      'missing/partial item, then re-referee. grounded=false when no requirements OR no draft is supplied.',
+    inputSchema: {
+      requirements: z
+        .array(
+          z.object({
+            requirement: z.string().describe('The obligation text (required).'),
+            category: z.string().optional().describe('submission|evaluation|technical|past_performance|pricing|admin|other (optional).'),
+            section: z.string().optional().describe('The L/M/C clause label, e.g. L.3.2 (optional).'),
+            id: z.string().optional().describe('Stable id, e.g. REQ-001 (optional).'),
+          }),
+        )
+        .describe('The compliance matrix — pass the requirements[] from extract_compliance_matrix.'),
+      draft: z.string().describe('The assembled proposal draft text to evaluate (read up to the first 24,000 chars).'),
+    },
+  },
+  async ({ requirements, draft }) => {
+    const result = await refereeProposalCompliance({ requirements, draft });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + keyword-coverage + idv-contracts + contractor-award-history + market-depth + solicitation-documents + federal-events + scan-compliance + bid-decision + federal-osbp + agency-opps-by-office + sblo-contact + federal-contacts + podcast-lessons + agency-budget-trends + company-keywords + agency-spending-detail + compliance-matrix + proposal-structure registered',
+    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + keyword-coverage + idv-contracts + contractor-award-history + market-depth + solicitation-documents + federal-events + scan-compliance + bid-decision + federal-osbp + agency-opps-by-office + sblo-contact + federal-contacts + podcast-lessons + agency-budget-trends + company-keywords + agency-spending-detail + compliance-matrix + proposal-structure + referee-compliance registered',
   );
 }
 
