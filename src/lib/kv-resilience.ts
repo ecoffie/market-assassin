@@ -11,6 +11,7 @@
  */
 
 import { kv } from '@vercel/kv';
+import { createClient, SupabaseClient } from '@supabase/supabase-js';
 
 // ============================================
 // LRU Cache Implementation
@@ -231,6 +232,140 @@ async function getAccessFromSupabase(_email: string): Promise<UserAccessEntitlem
 }
 
 // ============================================
+// Shadow-mode DR-fallback telemetry (additive, non-enforcing)
+// ============================================
+// Goal: measure — on live sampled traffic — how a CORRECTED Supabase read would
+// compare to what KV granted, WITHOUT changing any access decision. This tells us
+// whether a repaired Supabase DR fallback (see getAccessFromSupabase note above)
+// would agree with KV before we ever let it grant. Fully flag-gated: with
+// KV_FALLBACK_SHADOW unset/off this is a no-op (no Supabase client, no query, no log).
+//
+// Enforcement is UNCHANGED: the six getters below still return KV-only results.
+
+type ShadowAccessType =
+  | 'ma'
+  | 'briefings'
+  | 'contentgen'
+  | 'dbaccess'
+  | 'recompete'
+  | 'ospro';
+
+interface ShadowEntitlements {
+  ma: boolean;
+  briefings: boolean;
+  contentgen: boolean;
+  dbaccess: boolean;
+  recompete: boolean;
+  ospro: boolean;
+}
+
+let shadowClient: SupabaseClient | null | undefined;
+
+function getShadowSupabase(): SupabaseClient | null {
+  if (shadowClient !== undefined) return shadowClient;
+  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
+  const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+  if (!url || !key) {
+    shadowClient = null;
+    return null;
+  }
+  shadowClient = createClient(url, key, {
+    auth: { persistSession: false, autoRefreshToken: false },
+  });
+  return shadowClient;
+}
+
+// Small per-email cache so a request touching several access types issues at most
+// one Supabase read. Short TTL — this is telemetry, staleness is fine.
+const shadowEntCache = new LRUCache<ShadowEntitlements | null>(500);
+const SHADOW_ENT_TTL = 10; // seconds
+
+/**
+ * Read the REAL entitlement columns from user_profiles and normalize to booleans.
+ * Uses the corrected column names (the ones the broken fallback got wrong):
+ *   ma_tier, access_briefings, briefings_expires_at, content_generator_access,
+ *   access_contractor_db, access_recompete, access_hunter_pro
+ * Returns null on any error (missing client, query failure) — shadow must never throw.
+ */
+async function readSupabaseEntitlements(email: string): Promise<ShadowEntitlements | null> {
+  const cacheKey = email.toLowerCase();
+  const cached = shadowEntCache.get(cacheKey);
+  if (cached !== undefined) return cached;
+
+  const supabase = getShadowSupabase();
+  if (!supabase) {
+    shadowEntCache.set(cacheKey, null, SHADOW_ENT_TTL);
+    return null;
+  }
+
+  try {
+    const { data, error } = await supabase
+      .from('user_profiles')
+      .select(
+        'ma_tier, access_briefings, briefings_expires_at, content_generator_access, access_contractor_db, access_recompete, access_hunter_pro'
+      )
+      .eq('email', cacheKey)
+      .maybeSingle();
+
+    if (error || !data) {
+      shadowEntCache.set(cacheKey, null, SHADOW_ENT_TTL);
+      return null;
+    }
+
+    const row = data as Record<string, unknown>;
+    const briefingsFresh =
+      !row.briefings_expires_at ||
+      new Date(String(row.briefings_expires_at)).getTime() > Date.now();
+
+    const ent: ShadowEntitlements = {
+      ma: !!row.ma_tier && String(row.ma_tier).toLowerCase() !== 'free',
+      briefings: !!row.access_briefings && briefingsFresh,
+      contentgen: !!row.content_generator_access,
+      dbaccess: !!row.access_contractor_db,
+      recompete: !!row.access_recompete,
+      ospro: !!row.access_hunter_pro,
+    };
+    shadowEntCache.set(cacheKey, ent, SHADOW_ENT_TTL);
+    return ent;
+  } catch {
+    shadowEntCache.set(cacheKey, null, SHADOW_ENT_TTL);
+    return null;
+  }
+}
+
+/**
+ * Compare KV's grant against the corrected Supabase read for one access type and
+ * log the (dis)agreement. No-op unless KV_FALLBACK_SHADOW=on, and even then only on
+ * a sampled fraction (KV_FALLBACK_SHADOW_SAMPLE, default 0.05). Never throws, never
+ * affects the caller — enforcement stays KV-only.
+ */
+async function shadowCompareAccess(
+  email: string,
+  type: ShadowAccessType,
+  kvGranted: boolean
+): Promise<void> {
+  if (process.env.KV_FALLBACK_SHADOW !== 'on') return;
+  const sample = Number(process.env.KV_FALLBACK_SHADOW_SAMPLE ?? '0.05');
+  if (!(Math.random() < sample)) return;
+
+  try {
+    const ent = await readSupabaseEntitlements(email);
+    const supabaseGranted = ent ? ent[type] : null;
+    console.log(
+      '[kv-shadow] ' +
+        JSON.stringify({
+          type,
+          kv: kvGranted,
+          supabase: supabaseGranted,
+          agree: supabaseGranted === null ? null : supabaseGranted === kvGranted,
+        })
+    );
+  } catch {
+    // telemetry only — swallow everything
+  }
+}
+
+// ============================================
 // Resilient KV Operations
 // ============================================
 
@@ -384,7 +519,7 @@ export async function getMarketAssassinAccessResilient(
   const normalizedEmail = email.toLowerCase();
   const cacheKey = `ma:${normalizedEmail}`;
 
-  return resilientGet<MarketAssassinAccess>(cacheKey, {
+  const result = await resilientGet<MarketAssassinAccess>(cacheKey, {
     cache: accessCache,
     cacheTTL: 30, // 30 seconds
     fallback: async () => {
@@ -406,6 +541,9 @@ export async function getMarketAssassinAccessResilient(
       };
     },
   });
+
+  await shadowCompareAccess(normalizedEmail, 'ma', !!result);
+  return result;
 }
 
 /**
@@ -432,6 +570,7 @@ export async function hasBriefingsAccessResilient(email: string): Promise<boolea
     },
   });
 
+  await shadowCompareAccess(normalizedEmail, 'briefings', !!result);
   return !!result;
 }
 
@@ -451,6 +590,7 @@ export async function hasContentGeneratorAccessResilient(email: string): Promise
     },
   });
 
+  await shadowCompareAccess(normalizedEmail, 'contentgen', !!result);
   return !!result;
 }
 
@@ -470,6 +610,7 @@ export async function hasContractorDbAccessResilient(email: string): Promise<boo
     },
   });
 
+  await shadowCompareAccess(normalizedEmail, 'dbaccess', !!result);
   return !!result;
 }
 
@@ -489,6 +630,7 @@ export async function hasRecompeteAccessResilient(email: string): Promise<boolea
     },
   });
 
+  await shadowCompareAccess(normalizedEmail, 'recompete', !!result);
   return !!result;
 }
 
@@ -508,6 +650,7 @@ export async function hasOHProAccessResilient(email: string): Promise<boolean> {
     },
   });
 
+  await shadowCompareAccess(normalizedEmail, 'ospro', !!result);
   return !!result;
 }
 
