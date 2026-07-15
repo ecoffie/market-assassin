@@ -710,7 +710,7 @@ server.registerTool(
       agency: z.string().optional().describe('Agency / command / sub-agency name, e.g. "USACE", "Department of Veterans Affairs".'),
       dodaac: z.string().optional().describe('A known 6-char DoDAAC (e.g. "W912PL") — most precise; anchors on the office.'),
       office: z.string().optional().describe('Office name filter (SAM office column; often null for POCs).'),
-      role: z.string().optional().describe('role_category filter (e.g. "contracting_officer", "small_business").'),
+      role: z.string().optional().describe('Soft role filter matched against each contact\'s title bucket — one of: contracting officer, contract specialist, small business, program/technical, leadership (or a title substring / acronym like CO, KO, OSBP). If it matches nobody, the filter is dropped and the full roster is still returned.'),
       search: z.string().optional().describe('Free-text match on contact name OR title.'),
       limit: z.number().int().min(1).max(200).optional().describe('Max contacts (default 25).'),
     },

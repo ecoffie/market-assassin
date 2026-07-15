@@ -8,7 +8,7 @@
  * OSBP contact. These tests lock the mapping in.
  */
 import { describe, it, expect } from 'vitest';
-import { subAgencyToParent, resolveAgency } from './contact-roster';
+import { subAgencyToParent, resolveAgency, roleQueryToBucket } from './contact-roster';
 
 describe('subAgencyToParent — civilian bureau aliases', () => {
   const cases: Array<[string, string]> = [
@@ -56,6 +56,30 @@ describe('resolveAgency — parent department + sub_tier narrow keyword', () => 
     expect(resolveAgency('USDA')).toEqual({ deptKeyword: 'Agriculture' });
     expect(resolveAgency('DHS')).toEqual({ deptKeyword: 'Homeland Security' });
     expect(resolveAgency('HHS')).toEqual({ deptKeyword: 'Health' });
+  });
+});
+
+describe('roleQueryToBucket — soft role query → canonical title bucket', () => {
+  it('maps snake_case, spaces, and title-case to the same bucket', () => {
+    expect(roleQueryToBucket('contracting_officer')).toBe('Contracting Officer');
+    expect(roleQueryToBucket('contracting officer')).toBe('Contracting Officer');
+    expect(roleQueryToBucket('Contracting Officer')).toBe('Contracting Officer');
+  });
+  it('maps the other title buckets', () => {
+    expect(roleQueryToBucket('small_business')).toBe('Small Business');
+    expect(roleQueryToBucket('contract specialist')).toBe('Contract Specialist');
+    expect(roleQueryToBucket('program manager')).toBe('Program / Technical');
+    expect(roleQueryToBucket('director')).toBe('Leadership');
+  });
+  it('maps bare acronyms the title regexes would miss', () => {
+    expect(roleQueryToBucket('CO')).toBe('Contracting Officer');
+    expect(roleQueryToBucket('KO')).toBe('Contracting Officer');
+    expect(roleQueryToBucket('OSBP')).toBe('Small Business');
+  });
+  it('returns null for an unrecognized role (caller then drops the filter)', () => {
+    expect(roleQueryToBucket('contracting')).toBeNull();
+    expect(roleQueryToBucket('')).toBeNull();
+    expect(roleQueryToBucket('xyz')).toBeNull();
   });
 });
 
