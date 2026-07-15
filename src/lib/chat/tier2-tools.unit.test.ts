@@ -11,7 +11,6 @@ import { makeTier2Tools, TIER2_TOOL_DEFS, TIER2_TOOL_NAMES } from './tier2-tools
 const bqCalls: Array<{ fn: string; liveBq: boolean }> = [];
 let rollupWarm = false;          // when true, cache-only (liveBq=false) returns a profile
 let capableWarm = false;
-let execsEmpty = false;          // when true, the exec table returns no rows
 
 vi.mock('@/lib/bigquery/recipients', () => ({
   recipientSlug: (n: string) => n.toLowerCase().replace(/[^a-z0-9]+/g, '-'),
@@ -23,12 +22,6 @@ vi.mock('@/lib/bigquery/recipients', () => ({
   }),
   getRecentAwardsForRecipient: vi.fn(async (_ueis: string[], _rollupUei: string) => [{ piid: 'X', obligated: 1000 }]),
   getTopAgenciesForRecipient: vi.fn(async (_ueis: string[], _rollupUei: string) => [{ agency: 'DoD', total: 4e9 }]),
-  getExecutivesForRecipient: vi.fn(async (_ueis: string[], _rollupUei: string) =>
-    execsEmpty ? [] : [
-      { exec_name: 'Roger Krone', exec_amount: 5_400_000, reported_at: '2024' },
-      { exec_name: 'Chris Cage', exec_amount: 2_100_000, reported_at: '2024' },
-    ],
-  ),
   findCapableSmallBusinesses: vi.fn(async ({ liveBq = false }: { liveBq?: boolean }) => {
     bqCalls.push({ fn: 'findCapableSmallBusinesses', liveBq });
     if (!liveBq && !capableWarm) return { rows: [], total: 0 };
@@ -43,11 +36,11 @@ vi.mock('@/lib/rate-limit', () => ({
   checkRateLimit: vi.fn(async () => { rlCalls++; return { allowed: rlAllowed, remaining: rlAllowed ? 5 : 0, limit: 12, resetAt: 0 }; }),
 }));
 
-beforeEach(() => { bqCalls.length = 0; rollupWarm = false; capableWarm = false; execsEmpty = false; rlAllowed = true; rlCalls = 0; });
+beforeEach(() => { bqCalls.length = 0; rollupWarm = false; capableWarm = false; rlAllowed = true; rlCalls = 0; });
 
 describe('Tier-2 tool definitions', () => {
   it('registers the Tier-2 contractor-intel tools', () => {
-    expect([...TIER2_TOOL_NAMES].sort()).toEqual(['find_capable_contractors', 'get_contractor_executives', 'get_contractor_profile']);
+    expect([...TIER2_TOOL_NAMES].sort()).toEqual(['find_capable_contractors', 'get_contractor_profile']);
   });
   it('forbids extra properties on every tool', () => {
     for (const def of TIER2_TOOL_DEFS) expect(def.function.parameters.additionalProperties).toBe(false);
@@ -123,44 +116,6 @@ describe('find_capable_contractors', () => {
     const res = await tools.execute('find_capable_contractors', { naics: '999999' }) as { error: string };
     expect(res.error).toBe('rate_limited');
     expect(bqCalls.some((c) => c.fn === 'findCapableSmallBusinesses' && c.liveBq)).toBe(false);
-  });
-});
-
-describe('get_contractor_executives', () => {
-  it('requires a company_name', async () => {
-    const tools = makeTier2Tools('u@x.com');
-    const res = await tools.execute('get_contractor_executives', {});
-    expect(res.ok).toBe(false);
-    expect(res.error).toBe('company_name_required');
-  });
-
-  it('warm hit: returns named execs + comp, no live scan, no rate-limit consumed', async () => {
-    rollupWarm = true;
-    const tools = makeTier2Tools('u@x.com');
-    const res = await tools.execute('get_contractor_executives', { company_name: 'Leidos' }) as { found: boolean; count: number; executives: Array<Record<string, unknown>>; note: string };
-    expect(res.found).toBe(true);
-    expect(res.count).toBe(2);
-    expect(res.executives[0]).toMatchObject({ rank: 1, name: 'Roger Krone', compensation: 5_400_000 });
-    expect(String(res.note)).toMatch(/not .*direct contacts|no email\/phone/i); // never presented as reachable contacts
-    expect(bqCalls.some((c) => c.fn === 'getRollupBySlug' && c.liveBq)).toBe(false);
-    expect(rlCalls).toBe(0);
-  });
-
-  it('resolved company but no FFATA execs → honest empty note (no fabrication)', async () => {
-    rollupWarm = true; execsEmpty = true;
-    const tools = makeTier2Tools('u@x.com');
-    const res = await tools.execute('get_contractor_executives', { company_name: 'Leidos' }) as { found: boolean; count: number; note: string };
-    expect(res.found).toBe(true);
-    expect(res.count).toBe(0);
-    expect(String(res.note)).toMatch(/no executive-compensation records/i);
-  });
-
-  it('cold miss over budget → note, no scan (shares the profile cost guard)', async () => {
-    rollupWarm = false; rlAllowed = false;
-    const tools = makeTier2Tools('u@x.com');
-    const res = await tools.execute('get_contractor_executives', { company_name: 'Nobody Inc' }) as { error: string };
-    expect(res.error).toBe('rate_limited');
-    expect(bqCalls.some((c) => c.fn === 'getRollupBySlug' && c.liveBq)).toBe(false);
   });
 });
 

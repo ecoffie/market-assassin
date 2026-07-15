@@ -75,7 +75,6 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   search_sam_opportunities: 1,
   get_market_vocabulary: 1,
   get_contractor_profile: 5,
-  get_contractor_executives: 5, // reuses the get_contractor_profile name→rollup resolve + a small FFATA exec read
   find_capable_contractors: 25,
   get_winning_playbook: 2,
   get_pricing_intel: 1, // GSA CALC labor-rate intel (free upstream, multi-call; warm cache ~free)
