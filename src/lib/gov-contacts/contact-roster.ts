@@ -20,6 +20,7 @@ import { deriveSubAgency } from '@/lib/gov-contacts/derive-subagency';
 import { loadDodaacNames, dodaacCodesForAgency } from '@/lib/gov-contacts/dodaac-directory';
 import { getEnhancedAgencyInfo } from '@/lib/utils/command-info';
 import { isValidDodaac } from '@/lib/gov-contacts/agency-key';
+import { agencySearchKeywords } from '@/lib/gov-contacts/agency-search';
 
 // ── Lifted route-local classifiers (faithful copies of federal-contacts/route.ts) ──
 const FOREIGN_OFFICE_RE = /\b(yokosuka|okinawa|guam|sasebo|atsugi|japan|korea|seoul|osan|kunsan|europe|german|ramstein|kaiserslautern|italy|aviano|naples|sigonella|spain|rota|uk\b|united kingdom|england|raf\b|bahrain|qatar|kuwait|djibouti|far east|pacific command|africa command|european command|central command|overseas|apo\b|fpo\b)\b/i;
@@ -283,8 +284,27 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
       .select(
         'id, contact_fullname, contact_title, contact_email, contact_phone, department_ind_agency, office, sub_tier, role_category, solicitation_number',
         { count: 'exact' },
-      );
-    if (search) q = q.or(`contact_fullname.ilike.%${search}%,contact_title.ilike.%${search}%`);
+      )
+      // GOVERNMENT decision makers only — mirror the app route. federal_contacts
+      // also holds ~82K private-entity registrant rows (a company/foreign-NGO name
+      // in sub_tier, NO federal agency, and ZERO with an email). They leaked into
+      // a bare text search here (name surnames + junk); the app route already
+      // excludes them. A real POC always has a department.
+      .not('department_ind_agency', 'is', null);
+    if (search) {
+      // Mirror the app route's agency-aware search: name/title PLUS agency + the
+      // sub_tier (bureau) column, so "forest" finds sub_tier "FOREST SERVICE" (the
+      // real USDA Forest Service POCs), and acronyms resolve to their parent dept.
+      const safe = search.replace(/[,()%]/g, ' ').trim();
+      const parts = [
+        `contact_fullname.ilike.%${safe}%`,
+        `contact_title.ilike.%${safe}%`,
+        `department_ind_agency.ilike.%${safe}%`,
+        `sub_tier.ilike.%${safe}%`,
+      ];
+      for (const kw of agencySearchKeywords(safe)) parts.push(`department_ind_agency.ilike.%${kw}%`);
+      q = q.or(parts.join(','));
+    }
     if (validDodaac) {
       q = q.ilike('solicitation_number', `${validDodaac}%`);
     } else if (agencyDodaacCodes.length > 0) {
