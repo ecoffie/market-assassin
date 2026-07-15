@@ -208,7 +208,9 @@ export class CircuitBreaker {
       .is('resolved_at', null)
       .order('created_at', { ascending: false })
       .limit(1)
-      .single();
+      // maybeSingle (not single): the healthy case is "no unresolved trip", i.e.
+      // zero rows — .single() turns that into a 406 on every guardrail check.
+      .maybeSingle();
 
     if (data) {
       const trippedAt = new Date(data.created_at);
