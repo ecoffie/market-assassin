@@ -344,13 +344,26 @@ export async function POST(request: NextRequest) {
     // the user never manages codes. We attach coverage stats for the UI.
     let naicsCode = rawNaicsCode;
     let coverage: Awaited<ReturnType<typeof keywordCoverage>> | null = null;
-    if (keyword && keyword.trim()) {
+    // A "keyword" that is really NAICS code(s) (e.g. "236220" or "236220, 238220")
+    // must NOT be text-searched — keywordCoverage would run a USASpending keyword
+    // search for the literal number (matches nothing meaningful, then ranked NASA
+    // for 236220) and balloon it into related codes. Treat it as an exact NAICS
+    // input instead. Eric, Jul 15 2026 (defense-in-depth for any caller incl. MCP).
+    const kwTrim = (keyword || '').trim();
+    const kwTokens = kwTrim ? kwTrim.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean) : [];
+    const keywordIsNaics = kwTokens.length > 0 && kwTokens.every((t) => /^\d{2,6}$/.test(t));
+    const keywordForCoverage = keywordIsNaics && !(rawNaicsCode && rawNaicsCode.trim())
+      ? '' // a numeric NAICS keyword is not a discovery term — use the code path
+      : kwTrim;
+    if (keywordIsNaics && !(rawNaicsCode && rawNaicsCode.trim())) {
+      naicsCode = kwTokens.join(', '); // exact NAICS ranking, no coverage expansion
+    } else if (keywordForCoverage) {
       // Always compute coverage when a keyword is present — it powers the LESSON
       // banner (total market, code count, hidden %). Sport mode also pins
       // suggest-codes chips into formData for report generation — but the agency
       // search MUST use the full 90%-coverage set from the keyword, not those
       // top-8 chips (Eric: every keyword returned the same ~96 agencies).
-      coverage = await keywordCoverage(keyword.trim());
+      coverage = await keywordCoverage(keywordForCoverage);
       if (coverage && coverage.coverageCodes.length) {
         naicsCode = coverage.coverageCodes.join(', ');
       }
@@ -361,7 +374,7 @@ export async function POST(request: NextRequest) {
     const hasPsc = !!(pscCode && pscCode.trim());
     if (!hasNaics && !hasPsc) {
       return NextResponse.json({
-        error: keyword ? `Couldn't find a federal market for "${keyword}". Try a broader term.` : 'naicsCode, pscCode, or keyword is required',
+        error: keywordForCoverage ? `Couldn't find a federal market for "${keywordForCoverage}". Try a broader term.` : 'naicsCode, pscCode, or keyword is required',
       }, { status: 400 });
     }
     // Normalize to definite strings for all downstream uses (cache key
@@ -373,8 +386,8 @@ export async function POST(request: NextRequest) {
     const profileKeywords = Array.isArray(rawProfileKeywords)
       ? rawProfileKeywords.map((k) => String(k).trim()).filter((k) => k.length >= 3).slice(0, 5)
       : [];
-    const searchKeywords = buildSearchKeywords({ keyword, coverage, profileKeywords });
-    const marketFilter = buildMarketFilter({ coverage, pscCode: psc, keyword });
+    const searchKeywords = buildSearchKeywords({ keyword: keywordForCoverage, coverage, profileKeywords });
+    const marketFilter = buildMarketFilter({ coverage, pscCode: psc, keyword: keywordForCoverage });
 
     // Tier check. Free users still see data, just fewer rows.
     const access = await verifyMIAccess(email);
@@ -454,7 +467,7 @@ export async function POST(request: NextRequest) {
     // numbers each time (Eric: "different even using the same search terms").
     // Keying on the phrase makes repeats deterministic + instant. Code searches
     // key on the NAICS set, folding in any profile keywords that also scope it.
-    const kwNorm = (keyword || '').trim().toLowerCase();
+    const kwNorm = (keywordForCoverage || '').trim().toLowerCase();
     const cacheToken = kwNorm
       ? `kw:${kwNorm}`
       : `${naics}${searchKeywords.length ? `|sk:${searchKeywords.join(',').toLowerCase()}` : ''}`;

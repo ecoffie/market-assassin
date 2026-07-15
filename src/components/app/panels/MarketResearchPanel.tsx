@@ -1021,6 +1021,26 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   // real USASpending codes and build with them — no dead-end error.
   const handleSportBuild = useCallback(async (options?: { notifySuccess?: boolean }) => {
     setSportBuildActive(true);
+    // A NAICS code (or comma list of them) typed into the KEYWORD box is not a
+    // discovery keyword — it's an exact code. Route it through the NAICS path so we
+    // (a) don't text-search the number (searching "236220" ranked NASA, an airfield
+    // buyer) and (b) don't balloon it into "related" codes via suggest-codes
+    // (236220 → 236220, 238220 Plumbing/HVAC). Eric, Jul 15 2026. Flip to Auto so
+    // the keyword never gets sent and ranking uses the exact code.
+    const typedCodes = sportKeyword.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean);
+    const isCodeInput = typedCodes.length > 0 && typedCodes.every((c) => /^\d{2,6}$/.test(c));
+    if (isCodeInput) {
+      const nextFormData = {
+        ...formData,
+        naicsCode: typedCodes.join(', '),
+        businessType: formData.businessType || 'Small Business',
+      };
+      setFormData(nextFormData);
+      setResearchMode('auto');
+      setSportKeyword('');
+      handleGenerateAll({ nextFormData }, options);
+      return;
+    }
     const hasCodes = formData.naicsCode.trim() || formData.pscCode.trim();
     // If the user pinned codes, build with those. Otherwise build from the
     // KEYWORD — we leave naicsCode EMPTY so the target-market-research effect

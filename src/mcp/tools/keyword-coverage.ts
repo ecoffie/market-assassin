@@ -31,10 +31,17 @@ export async function getKeywordCoverage(input: KeywordCoverageToolInput): Promi
     ? Math.min(Math.max(Number(input.coverage_target), 0.5), 0.99)
     : 0.9;
 
+  // A NAICS code (or comma list) is not a discovery keyword — text-searching the
+  // literal number matches nothing meaningful (and ballooned "236220" into related
+  // codes / NASA in the app). Don't run coverage on it; tell the agent to use the
+  // number as a NAICS directly. Mirrors the app-route guard. Eric, Jul 15 2026.
+  const kwTokens = keyword ? keyword.split(/[,\s]+/).map((s) => s.trim()).filter(Boolean) : [];
+  const keywordIsNaics = kwTokens.length > 0 && kwTokens.every((t) => /^\d{2,6}$/.test(t));
+
   let coverage: KeywordCoverage | null = null;
   let degraded = false;
   try {
-    coverage = keyword ? await keywordCoverage(keyword, target) : null;
+    coverage = keyword && !keywordIsNaics ? await keywordCoverage(keyword, target) : null;
   } catch (err) {
     console.error('[mcp:keyword-coverage] failed:', err);
     degraded = true;
@@ -57,6 +64,8 @@ export async function getKeywordCoverage(input: KeywordCoverageToolInput): Promi
     result._ai_hint = {
       summary: degraded
         ? 'Keyword-coverage lookup errored — retry; do not state the market size.'
+        : keywordIsNaics
+        ? `"${keyword}" is a NAICS code, not a discovery keyword. This tool expects a product/service term (e.g. "drones"). Use ${kwTokens.join(', ')} directly as a NAICS filter instead.`
         : grounded
         ? `"${keyword}" = ~$${(coverage!.totalMarket / 1e6).toFixed(0)}M across ${coverage!.naicsCount} NAICS. The single biggest code is only ${topPct}% — searching it alone misses the rest. Cover ~${Math.round(coverage!.coveragePct * 100)}% with ${coverage!.coverageCodes.length} codes: ${coverage!.coverageCodes.join(', ')}. Top PSC (what was bought): ${coverage!.topPsc ? `${coverage!.topPsc.code} ${coverage!.topPsc.name}` : 'n/a'}.`
         : `No federal spending matched "${keyword}". Try a broader or differently-worded term.`,
