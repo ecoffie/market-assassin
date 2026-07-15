@@ -223,25 +223,11 @@ async function fetchNotificationSettings(supabase: SupabaseClient): Promise<Noti
   });
 }
 
-async function fetchSmartProfiles(supabase: SupabaseClient): Promise<SmartProfileRow[]> {
-  const rows = await fetchAllRows(async (from, to) => {
-    const { data, error } = await supabase
-      .from('smart_user_profiles')
-      .select('email, naics_codes, agencies, timezone')
-      .order('email')
-      .range(from, to);
-
-    if (error) {
-      if (error.message.includes('Could not find the table') || error.message.includes('schema cache')) {
-        return [];
-      }
-      throw error;
-    }
-
-    return (data || []) as SmartProfileRow[];
-  });
-
-  return rows;
+// smart_user_profiles was dropped; this always returned empty via the
+// missing-table guard. Kept as a no-op so the audience-merge call site is
+// unchanged, but no longer issues the (PGRST205-erroring) query.
+async function fetchSmartProfiles(_supabase: SupabaseClient): Promise<SmartProfileRow[]> {
+  return [];
 }
 
 async function fetchBriefingEntitlements(supabase: SupabaseClient): Promise<Set<string>> {

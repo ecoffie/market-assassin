@@ -189,23 +189,12 @@ export async function GET(request: NextRequest) {
       const alertLimit = isPro ? ALERT_LIMITS.pro : ALERT_LIMITS.free;
       const tier = isPro ? 'pro' : 'free';
 
-      // Get NAICS codes - use whichever source has MORE codes (broader coverage)
-      let userNaics = user.naics_codes || [];
+      // Get NAICS codes from the user's notification settings.
+      // (Removed a per-user smart_user_profiles lookup — that table was dropped,
+      // so the query returned PGRST205 once per user on every run.)
+      const userNaics = user.naics_codes || [];
 
-      // Always check smart_user_profiles for potentially better NAICS data
-      const { data: smartProfile } = await getSupabase()
-        .from('smart_user_profiles')
-        .select('naics_codes')
-        .eq('email', user.user_email.toLowerCase())
-        .single();
-
-      const smartNaics = smartProfile?.naics_codes || [];
-
-      // Use whichever has MORE NAICS codes for broader opportunity matching
-      if (smartNaics.length > userNaics.length) {
-        console.log(`[Alerts] Using smart profile NAICS for ${user.user_email} (${smartNaics.length} > ${userNaics.length}): ${smartNaics.join(', ')}`);
-        userNaics = smartNaics;
-      } else if (userNaics.length > 0) {
+      if (userNaics.length > 0) {
         console.log(`[Alerts] Using alert settings NAICS for ${user.user_email}: ${userNaics.join(', ')}`);
       }
 

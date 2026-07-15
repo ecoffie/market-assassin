@@ -26,10 +26,6 @@ function getSupabase() {
   );
 }
 
-function isIgnorableMissingTableError(message: string): boolean {
-  return message.includes('Could not find the table') || message.includes('schema cache');
-}
-
 interface PipelineStatus {
   component: string;
   status: 'healthy' | 'degraded' | 'failed';
@@ -141,14 +137,8 @@ async function checkBriefsStatus(supabase: ReturnType<typeof getSupabase>): Prom
     .select('user_email, naics_codes, agencies, aggregated_profile')
     .eq('is_active', true);
 
-  const { data: smartProfiles, error: smartProfilesError } = await supabase
-    .from('smart_user_profiles')
-    .select('email, naics_codes, agencies')
-;
-
-  if (smartProfilesError && !isIgnorableMissingTableError(smartProfilesError.message)) {
-    throw smartProfilesError;
-  }
+  // (Removed a smart_user_profiles query — table was dropped, returned PGRST205.)
+  const smartProfiles: Array<{ email?: string; naics_codes?: unknown; agencies?: unknown }> = [];
   const seenEmails = new Set<string>();
   let totalAudience = 0;
   let usersWithProfileData = 0;
