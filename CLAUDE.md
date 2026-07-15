@@ -350,12 +350,18 @@ data paths that can disagree**:
 - **FPDS Leaderboards** (Top 10 Departments / Contracting Agencies / Vendors) →
   live `spending_by_category` via `/api/usaspending/fpds-top-n`. Not cached at that
   layer → always current & correct.
-- **"Spending by Agency" chart + stat cards** ("Relevant spending", "Agencies to
-  review") → `/api/app/target-market-research` (TMR), **cached 24h in Supabase
-  `agency_target_data_cache`**. The chart plots `rollupChartBuyers` = group rows by
-  `subAgency||parentAgency||name`, take MAX `metric_top_total`.
+- **Stat cards** ("Relevant spending", "Agencies to review") → `/api/app/target-market-research`
+  (TMR), **cached 24h in Supabase `agency_target_data_cache`**, rolled up as
+  `rollupChartBuyers` = group rows by `subAgency||parentAgency||name`, take MAX `metric_top_total`.
 
-**When the two panels disagree, it's a STALE TMR cache, not a live bug.** (Jul 2026:
+**The "Spending by Agency" BAR CHART was REMOVED (PR #245, Jul 15 2026)** — its TMR-sourced
+agency totals could not be reconciled with the FPDS leaderboards, so it read as "numbers don't
+match." The FPDS leaderboards are now the sole agency-spend surface; the Small Business Mix donut
+(Auto mode) and the TMR stat cards remain. (`SpendingByAgencyChart` component + its recharts
+`BarChart`/`Bar`/`XAxis`/`YAxis` imports are gone from `MarketResearchPanel.tsx`.) The
+TMR-vs-FPDS reconciliation notes below still apply to the surviving **stat cards**.
+
+**When the stat cards disagree with FPDS, it's a STALE TMR cache, not a live bug.** (Jul 2026:
 236220 showed Dept of State #1 at $13.5B — its all-NAICS total leaking via an old
 broadened-sample fallback — vs its true $2.9B; $45.1B headline vs the real $94.4B.
 The compute was already correct; the row was a pre-fix cache entry.)
