@@ -36,6 +36,9 @@ export default function GlobalLookup({ email }: { email: string | null }) {
   const [resolving, setResolving] = useState(false);
   const [focused, setFocused] = useState(false);
   const [disambig, setDisambig] = useState<Disambiguation | null>(null);
+  // Context line shown in the contract drawer header when we land the user there
+  // from a solicitation lookup (explains "this award is the incumbent for RFQ X").
+  const [drawerContext, setDrawerContext] = useState<string | null>(null);
 
   // Auto-dismiss the result popover so it never lingers over the dashboard header
   // (Eric: "clean up the search bar"). A found-award opens the drawer immediately;
@@ -93,6 +96,7 @@ export default function GlobalLookup({ email }: { email: string | null }) {
     if (!q) return;
     setHint(null);
     setDisambig(null);
+    setDrawerContext(null);
 
     if (looksLikeUei(q)) {
       resolveContractor(q.toUpperCase());
@@ -116,12 +120,14 @@ export default function GlobalLookup({ email }: { email: string | null }) {
           const n = solData.notice;
           const inc = solData.incumbent;
           if (inc?.awardId) {
-            setHint(
-              `Open RFQ ${n.solicitation_number || q}: ${n.title || 'untitled'}. ` +
-              `Likely prior award → ${inc.recipientName} (${inc.awardId})` +
-              (inc.ceiling ? ` · $${Math.round(inc.ceiling).toLocaleString()}` : '') +
-              (inc.popPotentialEnd ? ` · expires ${inc.popPotentialEnd}` : '') +
-              '. Opening prior award…',
+            // Land the user ON the data: open the contract drawer for the likely
+            // incumbent's PRIOR award, with a context line so it's clear this is the
+            // predecessor to the open RFQ they searched. No lingering toast — the
+            // drawer IS the destination (Eric: "take you to another place").
+            setDrawerContext(
+              `Likely incumbent for open RFQ ${n.solicitation_number || q}` +
+              (n.title ? ` — ${n.title}` : '') +
+              (n.agency ? ` (${n.agency})` : ''),
             );
             setOpenPiid(String(inc.awardId).toUpperCase());
           } else {
@@ -327,9 +333,12 @@ export default function GlobalLookup({ email }: { email: string | null }) {
               <div>
                 <h2 className="text-base font-semibold text-white">Contract lookup</h2>
                 <p className="text-xs text-muted font-mono">{openPiid}</p>
+                {drawerContext && (
+                  <p className="mt-1 max-w-md text-xs text-amber-300 leading-snug">{drawerContext}</p>
+                )}
               </div>
               <button
-                onClick={() => { setOpenPiid(null); setValue(''); setHint(null); }}
+                onClick={() => { setOpenPiid(null); setValue(''); setHint(null); setDrawerContext(null); }}
                 className="p-1.5 text-muted hover:text-white hover:bg-surface rounded-lg transition-colors"
                 aria-label="Close"
               >
