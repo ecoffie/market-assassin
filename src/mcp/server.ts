@@ -681,16 +681,17 @@ server.registerTool(
     title: 'Get SBLO Contact (prime teaming front door)',
     description:
       'The Small Business Liaison Officer (SBLO) at a prime contractor — WHO to call to team on a subcontract. Pass a ' +
-      'company name ("AECOM", "Booz Allen Hamilton", "Leidos"). Curated data: the canonical 200-company Jun-2026 SBLO ' +
-      'roster first, then the broader 3,502-prime DB. Returns SBLO name, title, email, phone, supplier portal, source. ' +
-      'A matched company with a blank name/email means no public SBLO was found (surfaces the supplier portal instead) ' +
-      '— it NEVER invents a contact. grounded=false = company not in the curated set.',
+      'company name ("AECOM", "Booz Allen Hamilton", "Leidos"). Curated SBLO names first (the 200-company Jun-2026 ' +
+      'roster, then the 3,502-prime DB — the hand-verified moat), then a LIVE BigQuery fallback that confirms an ' +
+      'out-of-snapshot company is a real federal prime + returns live award context. A blank name/email (including ' +
+      'every BigQuery-tier match — BQ has award data, not SBLO contacts) means no public SBLO was found; it surfaces ' +
+      'the supplier portal and NEVER invents a contact. grounded=false = not curated and not a matching prime.',
     inputSchema: {
       company: z.string().describe('Prime contractor / company name, e.g. "AECOM", "Leidos".'),
     },
   },
   async ({ company }) => {
-    const result = getSbloContact({ company });
+    const result = await getSbloContact({ company });
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );

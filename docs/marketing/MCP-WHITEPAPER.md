@@ -63,7 +63,7 @@ The hosted server exposes **40 credit-metered tools** (plus a free `get_balance`
 | `get_contractor_award_history` | A named firm's obligations, trend, top agencies/NAICS |
 | `get_incumbent_financials` | Public-filer financials from SEC EDGAR (revenue, margin, 10-K) |
 | `get_pricing_intel` | GSA CALC price-to-win labor rates (p25/p50/p75, small-vs-large gap) |
-| `get_sblo_contact` | The Small Business Liaison Officer at a prime — the teaming front door |
+| `get_sblo_contact` | The Small Business Liaison Officer at a prime — the teaming front door (curated roster → live BigQuery prime-verification fallback) |
 | `lookup_sam_entity` | Live SAM registration (UEI/CAGE, status, certifications) |
 
 ### Agency & award intelligence
@@ -144,8 +144,8 @@ Representative prices (credits per successful call):
 
 | Price | Tools |
 |---|---|
-| **1 credit** | Most lookups — opportunity search, pricing intel, agency intel, OSBP + SBLO contacts, keyword coverage, compliance scan, bid/no-bid, proposal outline, event series |
-| **2 credits** | Deeper reads — incumbent financials, award detail, predecessor trace, competitive landscape, agency spending breakdown, buying-office roster, recompete match, SOW extraction, SBA goaling |
+| **1 credit** | Most lookups — opportunity search, pricing intel, agency intel, OSBP contacts, keyword coverage, compliance scan, bid/no-bid, proposal outline, event series |
+| **2 credits** | Deeper reads — incumbent financials, award detail, predecessor trace, competitive landscape, agency spending breakdown, buying-office roster, SBLO teaming lookup, recompete match, SOW extraction, SBA goaling |
 | **3 credits** | Solicitation documents + compliance-matrix extraction (fetches + extracts on demand) |
 | **4 credits** | Independent proposal referee (a separate model reviews your draft against the matrix) |
 | **5 credits** | Contractor deep-dive profile (live data scan) |

@@ -99,7 +99,7 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   evaluate_bid_decision: 1, // pure GovCon bid/no-bid framework + scorer (no LLM/IO)
   lookup_federal_osbp: 1, // curated DoD command / OSBP directory (static, no LLM/IO)
   search_agency_opps_by_office: 1, // DoDAAC-anchored open SAM opps (Supabase read)
-  get_sblo_contact: 1, // curated SBLO roster + prime DB (static, no LLM/IO)
+  get_sblo_contact: 2, // curated SBLO roster + prime DB, then a live BigQuery prime-verification fallback
   search_federal_contacts: 2, // DoDAAC-anchored buying-office roster (Supabase read + decode)
   search_podcast_lessons: 1, // proprietary podcast corpus (Supabase keyword search)
   get_agency_budget_trends: 1, // curated OMB/CBJ budget-authority JSON (static, no LLM/IO)
@@ -695,10 +695,12 @@ const SBLO_CONTACT_TOOL_DEF = {
     name: 'get_sblo_contact',
     description:
       'The Small Business Liaison Officer (SBLO) at a prime contractor — WHO to call to team on a subcontract. ' +
-      'Pass a company name (e.g. "AECOM", "Booz Allen Hamilton", "Leidos"). Curated data: the canonical 200-company ' +
-      'Jun-2026 SBLO roster first, then the broader 3,502-prime DB. Returns SBLO name, title, email, phone, supplier ' +
-      'portal, source. A matched company with a blank name/email means no public SBLO was found — the tool surfaces ' +
-      'the supplier portal instead; it NEVER invents a contact. grounded=false = company not in the curated set.',
+      'Pass a company name (e.g. "AECOM", "Booz Allen Hamilton", "Leidos"). Curated SBLO names first (the canonical ' +
+      '200-company Jun-2026 roster, then the broader 3,502-prime DB — the hand-verified moat), then a LIVE BigQuery ' +
+      'fallback (~317K recipients) that confirms an out-of-snapshot company is a real federal prime + returns live ' +
+      'award context. Returns SBLO name/title/email/phone/portal when curated; a blank name/email (including every ' +
+      'BigQuery-tier match — BQ has award data, NOT SBLO contacts) means no public SBLO was found, so it surfaces the ' +
+      'supplier portal and NEVER invents a contact. grounded=false = not curated and not a matching federal prime.',
     parameters: {
       type: 'object',
       properties: {
@@ -1361,9 +1363,9 @@ export async function runMcpTool(
   }
 
   if (name === 'get_sblo_contact') {
-    const result = getSbloContact({
+    const result = (await getSbloContact({
       company: typeof args.company === 'string' ? args.company : '',
-    }) as unknown as Record<string, unknown>;
+    })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
 
