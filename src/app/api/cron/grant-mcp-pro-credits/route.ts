@@ -1,15 +1,22 @@
 /**
- * /api/cron/grant-mcp-pro-credits — grant active Pro subscribers their monthly MCP
- * credit allowance (the hybrid model: $149/mo Pro includes credits).
+ * /api/cron/grant-mcp-pro-credits — grant Pro members their monthly MCP credit
+ * allowance (the hybrid model: Pro includes credits).
  *
  * Phase 1 Slice 4. Runs monthly. Idempotent per user per month via
  * applyCreditOnce(key='pro:<email>:<YYYY-MM>'), so re-runs (or a mid-month deploy
- * re-fire) never double-grant. Audience = briefings-enabled users in
- * user_notification_settings (the MI Pro / briefings cohort) — the same population the
- * briefing crons use. Read from the replica; grants go to the primary.
+ * re-fire) never double-grant.
+ *
+ * AUDIENCE = KV `briefings:<email>` grant holders — the REAL Pro-access gate
+ * (the same key `hasBriefingsAccess` / the tools read). Decided 2026-07-14 after
+ * the old `user_notification_settings.briefings_enabled` audience turned out to be
+ * the ~688-user beta cohort (NOT paid Pro) — granting them would give away ~688k
+ * metered credits/month. The KV gate is ~75 people and correctly includes
+ * lifetime/bundle Pro (who have the grant but no active $149 sub). We deliberately
+ * INCLUDE the handful of comp/staff/advocate holders: they already have Pro access,
+ * so a Pro-tier MCP allowance is consistent (per Eric).
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { getReadClient } from '@/lib/supabase/server-clients';
+import { kv } from '@vercel/kv';
 import { applyCreditOnce } from '@/lib/mcp/credits';
 import { PRO_MONTHLY_CREDITS } from '@/lib/mcp/packages';
 
@@ -17,7 +24,30 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 300;
 
-const PAGE = 1000;
+/**
+ * Enumerate the KV Pro-access population: `briefings:<email>` keys set to 'true'.
+ * Excludes `briefings:rollout:*` state keys and any non-email key. Fails closed
+ * (returns []) if KV is unavailable so a scan error grants nobody rather than throwing.
+ */
+async function proAudienceFromKv(): Promise<string[]> {
+  const emails: string[] = [];
+  let cursor = 0;
+  try {
+    do {
+      const [next, keys] = await kv.scan(cursor, { match: 'briefings:*', count: 500 });
+      cursor = Number(next);
+      for (const k of keys as string[]) {
+        if (!k.startsWith('briefings:') || k.startsWith('briefings:rollout:')) continue;
+        const email = k.slice('briefings:'.length);
+        if (email.includes('@')) emails.push(email.toLowerCase());
+      }
+    } while (cursor !== 0);
+  } catch (err) {
+    console.error('[mcp:pro-grant] KV scan failed — granting nobody this run', err);
+    return [];
+  }
+  return Array.from(new Set(emails));
+}
 
 export async function GET(request: NextRequest) {
   const isVercelCron = request.headers.get('x-vercel-cron') === '1';
@@ -31,23 +61,21 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ success: true, skipped: 'MCP_PRO_MONTHLY_CREDITS=0', granted: 0 });
   }
 
-  const month = new Date().toISOString().slice(0, 7); // YYYY-MM
-  const db = getReadClient();
+  // Dry-run: `?preview=1` reports the audience without granting (safe to run anytime).
+  const preview = request.nextUrl.searchParams.get('preview') === '1';
 
-  // Page through the whole Pro/briefings audience (past the 1000-row cap).
-  const emails: string[] = [];
-  for (let from = 0; ; from += PAGE) {
-    const { data, error } = await db
-      .from('user_notification_settings')
-      .select('user_email')
-      .eq('is_active', true)
-      .eq('briefings_enabled', true)
-      .order('user_email', { ascending: true })
-      .range(from, from + PAGE - 1);
-    if (error) return NextResponse.json({ error: error.message }, { status: 500 });
-    if (!data || data.length === 0) break;
-    emails.push(...data.map((r: { user_email: string }) => r.user_email));
-    if (data.length < PAGE) break;
+  const month = new Date().toISOString().slice(0, 7); // YYYY-MM
+  const emails = await proAudienceFromKv();
+
+  if (preview) {
+    return NextResponse.json({
+      success: true,
+      preview: true,
+      month,
+      audience: emails.length,
+      creditsEach: PRO_MONTHLY_CREDITS,
+      sample: emails.slice(0, 10),
+    });
   }
 
   let granted = 0;
@@ -55,7 +83,7 @@ export async function GET(request: NextRequest) {
   const errors: string[] = [];
   for (const email of emails) {
     try {
-      const { applied } = await applyCreditOnce(`pro:${email.toLowerCase()}:${month}`, email, PRO_MONTHLY_CREDITS, 'pro_monthly');
+      const { applied } = await applyCreditOnce(`pro:${email}:${month}`, email, PRO_MONTHLY_CREDITS, 'pro_monthly');
       if (applied) granted++;
       else alreadyHad++;
     } catch (err) {
