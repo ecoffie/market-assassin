@@ -155,7 +155,10 @@ export async function fetchContractAwards(
         filters,
         fields,
         page: 1,
-        limit,
+        // USAspending caps page size at 100; a larger value 422s the whole
+        // request (Field 'limit' value 'N' is above max '100'). Clamp so callers
+        // can still pass a larger logical limit without breaking the API call.
+        limit: Math.min(limit, 100),
         order: 'desc',
         sort: 'Award Amount',
       }),
