@@ -4,7 +4,7 @@
  * Global lookup bar — contract #, company, UEI, or market keyword.
  * Ambiguous single words (e.g. "Excel") disambiguate: contractor vs market.
  */
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Search, X, Building2, BarChart3, ChevronRight } from 'lucide-react';
 import AwardDetailDrawer from './awards/AwardDetailDrawer';
 import {
@@ -36,6 +36,18 @@ export default function GlobalLookup({ email }: { email: string | null }) {
   const [resolving, setResolving] = useState(false);
   const [focused, setFocused] = useState(false);
   const [disambig, setDisambig] = useState<Disambiguation | null>(null);
+  // Context line shown in the contract drawer header when we land the user there
+  // from a solicitation lookup (explains "this award is the incumbent for RFQ X").
+  const [drawerContext, setDrawerContext] = useState<string | null>(null);
+
+  // Auto-dismiss the result popover so it never lingers over the dashboard header
+  // (Eric: "clean up the search bar"). A found-award opens the drawer immediately;
+  // the "Opening prior award…" / not-found note is transient — 7s is enough to read.
+  useEffect(() => {
+    if (!hint) return;
+    const t = setTimeout(() => setHint(null), 7000);
+    return () => clearTimeout(t);
+  }, [hint]);
 
   async function resolveContractor(query: string) {
     setResolving(true);
@@ -84,6 +96,7 @@ export default function GlobalLookup({ email }: { email: string | null }) {
     if (!q) return;
     setHint(null);
     setDisambig(null);
+    setDrawerContext(null);
 
     if (looksLikeUei(q)) {
       resolveContractor(q.toUpperCase());
@@ -107,12 +120,14 @@ export default function GlobalLookup({ email }: { email: string | null }) {
           const n = solData.notice;
           const inc = solData.incumbent;
           if (inc?.awardId) {
-            setHint(
-              `Open RFQ ${n.solicitation_number || q}: ${n.title || 'untitled'}. ` +
-              `Likely prior award → ${inc.recipientName} (${inc.awardId})` +
-              (inc.ceiling ? ` · $${Math.round(inc.ceiling).toLocaleString()}` : '') +
-              (inc.popPotentialEnd ? ` · expires ${inc.popPotentialEnd}` : '') +
-              '. Opening prior award…',
+            // Land the user ON the data: open the contract drawer for the likely
+            // incumbent's PRIOR award, with a context line so it's clear this is the
+            // predecessor to the open RFQ they searched. No lingering toast — the
+            // drawer IS the destination (Eric: "take you to another place").
+            setDrawerContext(
+              `Likely incumbent for open RFQ ${n.solicitation_number || q}` +
+              (n.title ? ` — ${n.title}` : '') +
+              (n.agency ? ` (${n.agency})` : ''),
             );
             setOpenPiid(String(inc.awardId).toUpperCase());
           } else {
@@ -296,9 +311,17 @@ export default function GlobalLookup({ email }: { email: string | null }) {
         {hint && (
           // SOLID background (was bg-amber-500/10 — 10% opacity let the stats bar
           // behind it bleed through → illegible). Opaque amber-950 + bright text +
-          // shadow so it reads as a proper popover on top of the dashboard.
-          <div className="absolute left-0 right-0 top-full mt-1 rounded-lg border border-amber-500/40 bg-amber-950 px-3.5 py-2.5 text-xs text-amber-50 leading-relaxed shadow-xl z-50">
-            {hint}
+          // shadow so it reads as a proper popover. Auto-dismisses (7s) + a manual ×
+          // so it never lingers over the dashboard header.
+          <div className="absolute left-0 right-0 top-full mt-1 flex items-start gap-2 rounded-lg border border-amber-500/40 bg-amber-950 px-3.5 py-2.5 text-xs text-amber-50 leading-relaxed shadow-xl z-50">
+            <span className="flex-1">{hint}</span>
+            <button
+              onClick={() => setHint(null)}
+              className="-mr-1 shrink-0 rounded p-0.5 text-amber-300/70 hover:text-amber-100 hover:bg-amber-900/60 transition-colors"
+              aria-label="Dismiss"
+            >
+              <X className="h-3.5 w-3.5" strokeWidth={2} />
+            </button>
           </div>
         )}
       </form>
@@ -310,9 +333,12 @@ export default function GlobalLookup({ email }: { email: string | null }) {
               <div>
                 <h2 className="text-base font-semibold text-white">Contract lookup</h2>
                 <p className="text-xs text-muted font-mono">{openPiid}</p>
+                {drawerContext && (
+                  <p className="mt-1 max-w-md text-xs text-amber-300 leading-snug">{drawerContext}</p>
+                )}
               </div>
               <button
-                onClick={() => { setOpenPiid(null); setValue(''); }}
+                onClick={() => { setOpenPiid(null); setValue(''); setHint(null); setDrawerContext(null); }}
                 className="p-1.5 text-muted hover:text-white hover:bg-surface rounded-lg transition-colors"
                 aria-label="Close"
               >
