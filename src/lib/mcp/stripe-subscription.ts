@@ -17,7 +17,7 @@
  * top-up handler ignores it. The credit grant happens HERE on the paid invoice.
  */
 import type Stripe from 'stripe';
-import { creditsForSubscriptionPlan, subscriptionPlanForPriceId } from './packages';
+import { subscriptionGrantForPriceId, subscriptionGrantForMeta, type SubscriptionGrant } from './packages';
 import { applyCreditOnce } from './credits';
 import { getStripe } from '@/lib/stripe';
 
@@ -29,30 +29,36 @@ export interface McpSubInvoiceOutcome {
   credits?: number;
   email?: string;
   plan?: string;
+  interval?: 'month' | 'year';
   error?: string;
 }
 
 /**
- * Resolve the MCP subscription plan id from an invoice's line items. Tries the
- * Stripe price id first (authoritative — matched against SUBSCRIPTION_PLANS), then
- * price/product/line `plan` metadata as a fallback. Returns null if no line maps.
+ * Resolve the credit grant from an invoice's line items. Tries the Stripe price id
+ * first (authoritative — matched against SUBSCRIPTION_PLANS, which distinguishes
+ * monthly vs annual credits), then price/line `plan`+`interval` metadata as a
+ * fallback. Returns null if no line maps to an MCP subscription.
  */
-function planFromInvoice(invoice: Stripe.Invoice): string | null {
+function grantFromInvoice(invoice: Stripe.Invoice): SubscriptionGrant | null {
   const lines = invoice.lines?.data ?? [];
   for (const line of lines) {
     // The `price` field is present in API 2025-01-27; guard with `any` so a future
     // rename to `pricing` doesn't break the build (metadata fallback still catches it).
     const anyLine = line as unknown as {
-      price?: { id?: string; metadata?: Record<string, unknown>; product?: unknown };
+      price?: { id?: string; metadata?: Record<string, unknown> };
       metadata?: Record<string, unknown>;
     };
     const price = anyLine.price;
-    const byId = price?.id ? subscriptionPlanForPriceId(price.id) : null;
-    if (byId) return byId.id;
+    const byId = subscriptionGrantForPriceId(price?.id);
+    if (byId) return byId;
 
     for (const meta of [price?.metadata, anyLine.metadata]) {
       const plan = meta?.plan;
-      if (typeof plan === 'string' && creditsForSubscriptionPlan(plan) != null) return plan;
+      if (typeof plan === 'string') {
+        const interval = typeof meta?.interval === 'string' ? meta.interval : undefined;
+        const byMeta = subscriptionGrantForMeta(plan, interval);
+        if (byMeta) return byMeta;
+      }
     }
   }
   return null;
@@ -82,24 +88,20 @@ export async function handleMcpSubscriptionInvoice(invoice: Stripe.Invoice): Pro
   const reason = invoice.billing_reason;
   if (reason !== 'subscription_create' && reason !== 'subscription_cycle') return { handled: false };
 
-  const planId = planFromInvoice(invoice);
-  if (!planId) return { handled: false };
-
-  const credits = creditsForSubscriptionPlan(planId);
-  if (!credits) {
-    console.error('[mcp:sub] unknown/forged plan on invoice', invoice.id, planId);
-    return { handled: true, plan: planId, error: 'unknown_plan' };
-  }
+  const grant = grantFromInvoice(invoice);
+  if (!grant) return { handled: false };
 
   const email = await resolveInvoiceEmail(invoice);
   if (!email) {
     console.error('[mcp:sub] no email on invoice', invoice.id);
-    return { handled: true, plan: planId, error: 'no_email' };
+    return { handled: true, plan: grant.planId, interval: grant.interval, error: 'no_email' };
   }
 
-  const { applied, newBalance } = await applyCreditOnce(invoice.id as string, email, credits, 'mcp_sub_annual');
+  // Ledger reason encodes the interval so monthly vs annual grants are distinguishable.
+  const ledgerReason = grant.interval === 'year' ? 'mcp_sub_annual' : 'mcp_sub_monthly';
+  const { applied, newBalance } = await applyCreditOnce(invoice.id as string, email, grant.credits, ledgerReason);
   console.log(
-    `[mcp:sub] ${email} +${credits} (${planId}, ${reason}, applied=${applied}, balance=${newBalance}) invoice ${invoice.id}`,
+    `[mcp:sub] ${email} +${grant.credits} (${grant.planId}/${grant.interval}, ${reason}, applied=${applied}, balance=${newBalance}) invoice ${invoice.id}`,
   );
-  return { handled: true, applied, credits, email, plan: planId };
+  return { handled: true, applied, credits: grant.credits, email, plan: grant.planId, interval: grant.interval };
 }

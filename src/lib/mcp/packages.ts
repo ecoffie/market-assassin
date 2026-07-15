@@ -53,78 +53,124 @@ export const PRO_MONTHLY_CREDITS = Math.max(
 );
 
 /**
- * Annual credit subscriptions — the acquisition-surface plans on /mcp/pricing.
+ * Credit subscriptions — the acquisition-surface plans on /mcp/pricing.
  *
- * These are ANNUAL-ONLY (billed once/year, credits granted per invoice). The
- * per-month figures are the effective monthly rate WHEN billed annually — the
- * page shows "$15/mo · billed annually". Distinct from CREDIT_PACKAGES (one-time
- * dashboard top-ups) and from PRO_MONTHLY_CREDITS (the $149/mo app sub allowance).
+ * Each plan has a MONTHLY and an ANNUAL Stripe price. Following the Higgsfield
+ * pattern, the credit allowance is expressed per-month and stays CONSTANT across
+ * the billing toggle — only the price changes (annual discounts the effective
+ * monthly rate). The annual invoice grants a full year of credits up front
+ * (creditsPerMonth × 12); each monthly invoice grants creditsPerMonth.
  *
- * `priceId` is the Stripe recurring price; the webhook maps the paid invoice's
- * line-item price id → plan HERE (never trusting a client-set credit count).
- * `creditsPerYear` is env-overridable so the grant can be tuned without a Stripe
- * change. Products created 2026-07-14, each carrying metadata
- * type=mcp_subscription + plan=<id> + interval=year.
+ * The webhook maps a paid invoice's line-item Stripe price id → its credit grant
+ * HERE (never trusting a client-set credit count). creditsPerMonth is
+ * env-overridable so the grant can be tuned without a Stripe change. Distinct
+ * from CREDIT_PACKAGES (one-time dashboard top-ups) and PRO_MONTHLY_CREDITS
+ * (the $149/mo app sub allowance). Prices/links created 2026-07-14; each price
+ * carries metadata type=mcp_subscription + plan=<id> + interval=month|year.
  */
-export interface SubscriptionPlan {
-  /** Config key + Stripe product-metadata `plan` id. */
-  id: string;
-  /** Stripe recurring price id (annual). */
+export interface PlanPrice {
+  /** Stripe recurring price id. */
   priceId: string;
-  /** Total annual charge in USD (informational; real charge is the Stripe price). */
-  usdPerYear: number;
-  /** Effective monthly rate when billed annually (display only). */
-  usdPerMonth: number;
-  /** Month-to-month anchor price (display only — the struck-through "vs monthly" figure). */
-  usdMonthlyAnchor: number;
-  /** Credits granted per paid annual invoice (create + each renewal). */
-  creditsPerYear: number;
-  label: string;
+  /** Charge in USD for this interval (monthly = per month, annual = per year). */
+  usd: number;
+  /** Credits granted per paid invoice at this interval. */
+  credits: number;
   /** Stripe payment-link URL — append ?client_reference_id=<email> at checkout. */
   checkoutUrl: string;
 }
 
+export interface SubscriptionPlan {
+  /** Config key + Stripe product-metadata `plan` id. */
+  id: string;
+  label: string;
+  /** Credit allowance shown on the card — constant across the toggle. */
+  creditsPerMonth: number;
+  monthly: PlanPrice;
+  /** Annual price, plus the effective monthly rate to display ("$15/mo · billed annually"). */
+  annual: PlanPrice & { usdPerMonth: number };
+}
+
+const PLUS_CR_MO = Math.max(0, Number(process.env.MCP_PLUS_MONTHLY_CREDITS ?? '300') || 0);
+const SCALE_CR_MO = Math.max(0, Number(process.env.MCP_SCALE_MONTHLY_CREDITS ?? '800') || 0);
+
 export const SUBSCRIPTION_PLANS: readonly SubscriptionPlan[] = [
   {
     id: 'plus',
-    priceId: 'price_1TtHCIK5zyiZ50PB6Lvi5NMo',
-    usdPerYear: 180,
-    usdPerMonth: 15,
-    usdMonthlyAnchor: 19,
-    creditsPerYear: Math.max(0, Number(process.env.MCP_PLUS_ANNUAL_CREDITS ?? '3600') || 0),
-    label: 'Plus — annual',
-    checkoutUrl: 'https://buy.stripe.com/00weVec2Wbfk20RclafnO0M',
+    label: 'Plus',
+    creditsPerMonth: PLUS_CR_MO,
+    monthly: {
+      priceId: 'price_1TtHbHK5zyiZ50PBGbmTn9mJ',
+      usd: 19,
+      credits: PLUS_CR_MO,
+      checkoutUrl: 'https://buy.stripe.com/3cIeVe2sm83848Z98YfnO0O',
+    },
+    annual: {
+      priceId: 'price_1TtHCIK5zyiZ50PB6Lvi5NMo',
+      usd: 180,
+      usdPerMonth: 15,
+      credits: PLUS_CR_MO * 12,
+      checkoutUrl: 'https://buy.stripe.com/00weVec2Wbfk20RclafnO0M',
+    },
   },
   {
     id: 'scale',
-    priceId: 'price_1TtHCJK5zyiZ50PB57BKa1OW',
-    usdPerYear: 480,
-    usdPerMonth: 40,
-    usdMonthlyAnchor: 50,
-    creditsPerYear: Math.max(0, Number(process.env.MCP_SCALE_ANNUAL_CREDITS ?? '9600') || 0),
-    label: 'Scale — annual',
-    checkoutUrl: 'https://buy.stripe.com/6oU28s8QK5V048Zad2fnO0N',
+    label: 'Scale',
+    creditsPerMonth: SCALE_CR_MO,
+    monthly: {
+      priceId: 'price_1TtHbIK5zyiZ50PBhJ9MR9GE',
+      usd: 50,
+      credits: SCALE_CR_MO,
+      checkoutUrl: 'https://buy.stripe.com/3cIfZi8QK0AG8pfetifnO0P',
+    },
+    annual: {
+      priceId: 'price_1TtHCJK5zyiZ50PB57BKa1OW',
+      usd: 480,
+      usdPerMonth: 40,
+      credits: SCALE_CR_MO * 12,
+      checkoutUrl: 'https://buy.stripe.com/6oU28s8QK5V048Zad2fnO0N',
+    },
   },
 ] as const;
 
 const SUB_BY_ID = new Map(SUBSCRIPTION_PLANS.map((p) => [p.id, p]));
-const SUB_BY_PRICE = new Map(SUBSCRIPTION_PLANS.map((p) => [p.priceId, p]));
+
+/** The credit grant + interval for a paid subscription invoice. */
+export interface SubscriptionGrant {
+  planId: string;
+  credits: number;
+  interval: 'month' | 'year';
+}
 
 /** Plan by config/metadata id, or null if unknown. */
 export function subscriptionPlan(planId: string | null | undefined): SubscriptionPlan | null {
   return planId ? SUB_BY_ID.get(planId) ?? null : null;
 }
 
-/** Plan by Stripe price id (the webhook's primary resolver), or null if unknown. */
-export function subscriptionPlanForPriceId(priceId: string | null | undefined): SubscriptionPlan | null {
-  return priceId ? SUB_BY_PRICE.get(priceId) ?? null : null;
+/**
+ * Resolve the credit grant for a Stripe price id (the webhook's primary path).
+ * Returns null for any unrecognized price — the tamper guard: an unknown/forged
+ * price grants NOTHING.
+ */
+export function subscriptionGrantForPriceId(priceId: string | null | undefined): SubscriptionGrant | null {
+  if (!priceId) return null;
+  for (const p of SUBSCRIPTION_PLANS) {
+    if (p.monthly.priceId === priceId) return { planId: p.id, credits: p.monthly.credits, interval: 'month' };
+    if (p.annual.priceId === priceId) return { planId: p.id, credits: p.annual.credits, interval: 'year' };
+  }
+  return null;
 }
 
 /**
- * Credits for a subscription plan id, or null if unknown. Null (not a default) is
- * the tamper guard: an unrecognized/forged `plan` grants NOTHING.
+ * Resolve the credit grant from metadata `plan` + `interval` (the webhook's
+ * fallback when a line item lacks a recognized price id). Null if plan unknown.
  */
-export function creditsForSubscriptionPlan(planId: string | null | undefined): number | null {
+export function subscriptionGrantForMeta(
+  planId: string | null | undefined,
+  interval: string | null | undefined,
+): SubscriptionGrant | null {
   const p = subscriptionPlan(planId);
-  return p ? p.creditsPerYear : null;
+  if (!p) return null;
+  return interval === 'year'
+    ? { planId: p.id, credits: p.annual.credits, interval: 'year' }
+    : { planId: p.id, credits: p.monthly.credits, interval: 'month' };
 }

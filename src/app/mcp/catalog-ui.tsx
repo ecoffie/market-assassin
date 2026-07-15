@@ -11,15 +11,14 @@ import Link from 'next/link';
 
 export interface Tool { name: string; description: string; credits: number }
 export interface Pkg { id: string; credits: number; usd: number; label: string; checkoutUrl?: string }
-/** Annual credit subscription (the /mcp/pricing acquisition plans). */
+/** Credit subscription (the /mcp/pricing acquisition plans) — monthly + annual price. */
+export interface SubPlanPrice { priceId: string; usd: number; credits: number; checkoutUrl: string }
 export interface SubPlan {
   id: string;
-  usdPerYear: number;
-  usdPerMonth: number;
-  usdMonthlyAnchor: number;
-  creditsPerYear: number;
   label: string;
-  checkoutUrl: string;
+  creditsPerMonth: number;
+  monthly: SubPlanPrice;
+  annual: SubPlanPrice & { usdPerMonth: number };
 }
 export interface Catalog { tools: Tool[]; packages: Pkg[]; subscriptionPlans: SubPlan[]; signupCredits: number; proMonthlyCredits: number }
 
