@@ -49,6 +49,7 @@ import { getAgencyBudgetTrends } from '@/mcp/tools/agency-budget-trends';
 import { deriveCompanyKeywords } from '@/mcp/tools/company-keywords';
 import { getAgencySpendingDetailTool } from '@/mcp/tools/agency-spending-detail';
 import { extractComplianceMatrix } from '@/mcp/tools/compliance-matrix';
+import { buildProposalStructureTool, type ProposalStructureInputReq } from '@/mcp/tools/proposal-structure';
 import { getBalance } from '@/lib/mcp/credits';
 import { tierFor } from '@/lib/mcp/entitlements';
 
@@ -100,6 +101,7 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   derive_company_keywords: 1, // OpenAI-embedding keyword derivation (no BigQuery)
   get_agency_spending_detail: 2, // multiple USASpending aggregates (total + subagency + set-aside buckets)
   extract_compliance_matrix: 3, // LLM-backed RFP requirement extraction (chunked+parallel; shared cache warms public notices)
+  build_proposal_structure: 1, // pure shaping — compliance matrix → volume/section tree (no LLM/IO)
   get_balance: 0, // meta tool — always free
 };
 
@@ -828,6 +830,40 @@ const COMPLIANCE_MATRIX_TOOL_DEF = {
   },
 };
 
+const PROPOSAL_STRUCTURE_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'build_proposal_structure',
+    description:
+      'Turn a compliance matrix into the volume → section → subsection outline a federal proposal must follow. The ' +
+      'next step after extract_compliance_matrix: pass its `requirements` array and get back the volumes (Technical, ' +
+      'Past Performance, Price, Forms…), each section with the requirements it must satisfy, plus `critical` items ' +
+      '(deadlines / mandatory plans & certs) surfaced up front and `crossCutting` format/admin rules that apply to ' +
+      'every volume. Pure shaping — it neither invents requirements nor writes prose; it organizes what you pass. ' +
+      'grounded=false when no requirements are supplied.',
+    parameters: {
+      type: 'object',
+      properties: {
+        requirements: {
+          type: 'array',
+          description: 'The compliance matrix — pass the requirements[] from extract_compliance_matrix.',
+          items: {
+            type: 'object',
+            properties: {
+              requirement: { type: 'string', description: 'The obligation text (required).' },
+              category: { type: 'string', description: 'submission | evaluation | technical | past_performance | pricing | admin | other (coerced if omitted/unknown).' },
+              section: { type: 'string', description: 'The L/M/C clause label, e.g. "L.3.2" (optional).' },
+              id: { type: 'string', description: 'Stable id, e.g. "REQ-001" (optional).' },
+            },
+            required: ['requirement'],
+          },
+        },
+      },
+      required: ['requirements'],
+    },
+  },
+};
+
 /** All tools exposed over MCP in v1, each annotated with its credit price. */
 export function listMcpTools(): Array<Record<string, unknown>> {
   const defs = [
@@ -863,6 +899,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     COMPANY_KEYWORDS_TOOL_DEF,
     AGENCY_SPENDING_DETAIL_TOOL_DEF,
     COMPLIANCE_MATRIX_TOOL_DEF,
+    PROPOSAL_STRUCTURE_TOOL_DEF,
     GET_BALANCE_TOOL_DEF,
   ];
   return defs.map((d) => ({ ...d, _credits: TOOL_CREDITS[d.function.name] ?? 0, _tier: tierFor(d.function.name) }));
@@ -903,6 +940,7 @@ export function isMcpTool(name: string): boolean {
     name === 'derive_company_keywords' ||
     name === 'get_agency_spending_detail' ||
     name === 'extract_compliance_matrix' ||
+    name === 'build_proposal_structure' ||
     name === 'get_balance'
   );
 }
@@ -1237,6 +1275,15 @@ export async function runMcpTool(
       rfp_text: typeof args.rfp_text === 'string' ? args.rfp_text : undefined,
       userEmail: ctx.userEmail,
     })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'build_proposal_structure') {
+    const result = buildProposalStructureTool({
+      requirements: Array.isArray(args.requirements)
+        ? (args.requirements as ProposalStructureInputReq[])
+        : [],
+    }) as unknown as Record<string, unknown>;
     return { result, credits };
   }
 

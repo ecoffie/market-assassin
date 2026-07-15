@@ -49,6 +49,7 @@ import { getAgencyBudgetTrends } from './tools/agency-budget-trends';
 import { deriveCompanyKeywords } from './tools/company-keywords';
 import { getAgencySpendingDetailTool } from './tools/agency-spending-detail';
 import { extractComplianceMatrix } from './tools/compliance-matrix';
+import { buildProposalStructureTool } from './tools/proposal-structure';
 
 const server = new McpServer({
   name: 'mindy-govcon',
@@ -820,11 +821,40 @@ server.registerTool(
   },
 );
 
+server.registerTool(
+  'build_proposal_structure',
+  {
+    title: 'Build Proposal Structure (outline from compliance matrix)',
+    description:
+      'Turn a compliance matrix into the volume → section outline a federal proposal must follow — the next step after ' +
+      'extract_compliance_matrix. Pass its `requirements` array and get back the volumes (Technical, Past Performance, ' +
+      'Price, Forms), the sections under each, the critical deadline/cert items to handle first, and the cross-cutting ' +
+      'format/admin rules that apply across all volumes. Pure shaping (no AI): it neither invents requirements nor drafts ' +
+      'content. grounded=false = no requirements supplied — run extract_compliance_matrix first.',
+    inputSchema: {
+      requirements: z
+        .array(
+          z.object({
+            requirement: z.string().describe('The obligation text (required).'),
+            category: z.string().optional().describe('submission|evaluation|technical|past_performance|pricing|admin|other (coerced if free-form).'),
+            section: z.string().optional().describe('The L/M/C clause label, if known (e.g. L.3.2).'),
+            id: z.string().optional().describe('Stable id (e.g. REQ-001), if you have one.'),
+          }),
+        )
+        .describe('The compliance matrix — pass the requirements[] from extract_compliance_matrix.'),
+    },
+  },
+  async ({ requirements }) => {
+    const result = buildProposalStructureTool({ requirements });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + keyword-coverage + idv-contracts + contractor-award-history + market-depth + solicitation-documents + federal-events + scan-compliance + bid-decision + federal-osbp + agency-opps-by-office + sblo-contact + federal-contacts + podcast-lessons + agency-budget-trends + company-keywords + agency-spending-detail + compliance-matrix registered',
+    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + keyword-coverage + idv-contracts + contractor-award-history + market-depth + solicitation-documents + federal-events + scan-compliance + bid-decision + federal-osbp + agency-opps-by-office + sblo-contact + federal-contacts + podcast-lessons + agency-budget-trends + company-keywords + agency-spending-detail + compliance-matrix + proposal-structure registered',
   );
 }
 

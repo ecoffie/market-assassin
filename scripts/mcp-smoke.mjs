@@ -79,6 +79,7 @@ try {
     'get_sblo_contact', 'search_federal_contacts', 'search_podcast_lessons',
     'get_agency_budget_trends', 'derive_company_keywords',
     'get_agency_spending_detail', 'extract_compliance_matrix',
+    'build_proposal_structure',
   ]) {
     if (!names.includes(t)) fail(`${t} not registered`);
   }
@@ -549,7 +550,24 @@ try {
   if (cmMiss.structuredContent?._meta?.grounded !== false) fail('compliance-matrix: a cover memo should be grounded=false (no invented requirements)');
   console.error('✓ honest miss: no requirements in filler text → grounded=false');
 
-  console.error('\n✅ SMOKE PASSED — MCP transport + 29 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth, solicitation-documents, federal-events, scan-compliance, bid-decision, federal-osbp, agency-opps-by-office, sblo-contact, federal-contacts, podcast-lessons, agency-budget-trends, company-keywords, agency-spending-detail, compliance-matrix) all live + honest');
+  // ── build_proposal_structure (pure: compliance matrix → volume/section outline) ─
+  console.error('\n→ calling build_proposal_structure({ requirements: <matrix from compliance-matrix> })');
+  const ps = await client.callTool({ name: 'build_proposal_structure', arguments: { requirements: cmS.requirements } });
+  const psS = ps.structuredContent;
+  if (!psS) fail('proposal-structure: no structuredContent');
+  if (psS._meta?.degraded) fail('proposal-structure: degraded=true (pure fn — should never degrade)');
+  if (!psS._meta?.grounded || !Array.isArray(psS.volumes) || psS.volumes.length === 0) {
+    fail(`proposal-structure: expected grounded volumes from a real matrix, got ${psS.volumes?.length}`);
+  }
+  // Traceability: a Technical volume must exist (the RFP names a Technical volume in L.1).
+  const hasTechnical = psS.volumes.some((v) => /technical/i.test(v.title || v.name || ''));
+  if (!hasTechnical) fail('proposal-structure: expected a Technical volume from a matrix that names one (structure guard)');
+  console.error(`✓ grounded=${psS._meta.grounded} · volumes=${psS._meta.volumes} · sections=${psS._meta.sections} · critical=${psS._meta.critical} · cross_cutting=${psS._meta.cross_cutting}`);
+  const psMiss = await client.callTool({ name: 'build_proposal_structure', arguments: { requirements: [] } });
+  if (psMiss.structuredContent?._meta?.grounded !== false) fail('proposal-structure: empty requirements should be grounded=false (no invented outline)');
+  console.error('✓ honest miss: no requirements → grounded=false');
+
+  console.error('\n✅ SMOKE PASSED — MCP transport + 30 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth, solicitation-documents, federal-events, scan-compliance, bid-decision, federal-osbp, agency-opps-by-office, sblo-contact, federal-contacts, podcast-lessons, agency-budget-trends, company-keywords, agency-spending-detail, compliance-matrix, proposal-structure) all live + honest');
   await client.close();
   process.exit(0);
 } catch (err) {
