@@ -601,38 +601,10 @@ async function getWhoToTalkTo(
   state?: string
 ): Promise<MarketScannerResponse['whoToTalkTo']> {
   try {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-let _supabase: any = null;
-function getSupabase() {
-  if (!_supabase) {
-    _supabase = createClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY!
-    );
-  }
-  return _supabase;
-}
-
-    // OSDBU contacts from contractor database
+    // OSDBU contacts: the federal_contractors table was dropped (SBLO contacts
+    // now live in JSON files, not Supabase — see tool-health note), so this is
+    // empty. SB Specialists below come from the agency hierarchy.
     const osdubuContacts: Contact[] = [];
-    const { data: contractors, error: contractorsErr } = await getSupabase()
-      .from('federal_contractors')
-      .select('company, sblo_name, sblo_email, sblo_phone, agency')
-      .in('agency', topAgencies.slice(0, 5))
-      .limit(10);
-    if (contractorsErr) console.error('[market-scanner] contractors query error:', contractorsErr.message);
-
-    if (contractors) {
-      contractors.forEach((c: { company: string; sblo_name: string; sblo_email: string; sblo_phone: string; agency: string }) => {
-        osdubuContacts.push({
-          agency: c.agency,
-          name: c.sblo_name,
-          title: 'Small Business Liaison',
-          email: c.sblo_email,
-          phone: c.sblo_phone,
-        });
-      });
-    }
 
     // SB Specialists (using agency hierarchy)
     const sbSpecialists: Contact[] = topAgencies.slice(0, 5).map((agency) => ({
