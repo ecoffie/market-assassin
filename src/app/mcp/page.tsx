@@ -5,13 +5,14 @@
  *
  * ONE experience for everyone: bold hero → per-client keyless connect card →
  * "What you can do with credits" example grid (2 cols) → link to /mcp/pricing.
- * This page is deliberately marketing-only — NO credits/buy cards, NO per-tool
- * pricing table, NO API-key management. Pricing lives solely on /mcp/pricing;
- * headless/CI key management lives in the account area, not here.
+ * Per-tool pricing lives on /mcp/pricing; headless/CI key management in the account
+ * area — not here.
  *
- * Identity is server-verified: on load we ask /api/mcp/session who the signed
- * MI token proves we are. Signed-in visitors get a balance chip + account footer;
- * everyone else gets the sign-in CTA. The content in between is identical.
+ * Identity is server-verified: on load we ask /api/mcp/session who the signed MI
+ * token proves we are. Signed-in visitors also get a USAGE PANEL at the top —
+ * current balance + recent call history (tool · status · credits · when) from
+ * /api/mcp/account — so they can see spend against balance without leaving the
+ * page. Everyone else gets the sign-in CTA; the marketing content below is shared.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -74,6 +75,39 @@ function connectFor(client: ClientId): ConnectInfo {
   }
 }
 
+// ---- Usage panel (signed-in): balance + recent call history --------------------
+interface McpCall { tool_name: string; status: string; credits_charged: number | null; created_at: string }
+interface AccountData { balance: number; recentCalls: McpCall[] }
+
+/** snake_case tool name → "Title Case" (matches Claude Desktop's tool labels). */
+function prettifyTool(name: string): string {
+  return name.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).trim();
+}
+
+/** Compact "3m ago" / "2h ago" / "Jul 14" from an ISO timestamp. */
+function shortWhen(iso: string): string {
+  const then = new Date(iso).getTime();
+  const diff = Date.now() - then;
+  const min = Math.floor(diff / 60000);
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+/** Status → { label, className } for the activity row chip. */
+function statusStyle(status: string): { label: string; cls: string } {
+  switch (status) {
+    case 'success': return { label: 'success', cls: 'text-emerald-300' };
+    case 'uncharged': return { label: 'free (race)', cls: 'text-slate-400' };
+    case 'rejected_no_credits': return { label: 'no credits', cls: 'text-amber-300' };
+    case 'gated': return { label: 'Pro only', cls: 'text-amber-300' };
+    case 'failed': return { label: 'failed', cls: 'text-rose-300' };
+    default: return { label: status, cls: 'text-slate-400' };
+  }
+}
+
 export default function McpConsole() {
   const [authState, setAuthState] = useState<'loading' | 'in' | 'out'>('loading');
   const [email, setEmail] = useState<string | null>(null);
@@ -82,6 +116,19 @@ export default function McpConsole() {
   const [client, setClient] = useState<ClientId>('claude-desktop');
   // Public catalog (tool costs + trial size) for the example grid + hero copy.
   const [catalog, setCatalog] = useState<Catalog | null>(null);
+  // Signed-in balance + recent usage (from /api/mcp/account).
+  const [account, setAccount] = useState<AccountData | null>(null);
+  const [accountLoading, setAccountLoading] = useState(false);
+
+  const refreshAccount = useCallback(async () => {
+    setAccountLoading(true);
+    try {
+      const res = await fetch('/api/mcp/account', { headers: getMIApiHeaders() });
+      const j = await res.json().catch(() => null);
+      if (res.ok && j?.success) setAccount({ balance: j.balance ?? 0, recentCalls: j.recentCalls ?? [] });
+    } catch { /* leave prior state */ }
+    finally { setAccountLoading(false); }
+  }, []);
 
   // Identity: ask the server who our signed token proves we are. Never trust
   // the client-side email for the account we render.
@@ -101,6 +148,7 @@ export default function McpConsole() {
           try { localStorage.setItem('mi_beta_email', j.email); } catch { /* ignore */ }
           setEmail(j.email);
           setAuthState('in');
+          void refreshAccount(); // pull balance + usage for the signed-in panel
         } else {
           setAuthState('out');
         }
@@ -108,7 +156,7 @@ export default function McpConsole() {
         setAuthState('out');
       }
     })();
-  }, []);
+  }, [refreshAccount]);
 
   const copy = useCallback((text: string, tag: string) => {
     navigator.clipboard.writeText(text);
@@ -210,6 +258,63 @@ export default function McpConsole() {
     </section>
   );
 
+  // ---- Signed-in: balance + recent usage ------------------------------------
+  const spentRecent = (account?.recentCalls ?? []).reduce((s, c) => s + (c.credits_charged || 0), 0);
+  const usagePanel = account && (
+    <section className="mt-8 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 sm:p-6">
+      <div className="flex flex-wrap items-end justify-between gap-4">
+        <div>
+          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">Your balance</p>
+          <div className="mt-1 flex items-baseline gap-2">
+            <span className="text-3xl font-bold tabular-nums text-emerald-300">{account.balance.toLocaleString()}</span>
+            <span className="text-sm text-slate-400">credits remaining</span>
+          </div>
+        </div>
+        <div className="flex items-center gap-2.5">
+          <span className="text-[12px] text-slate-500">
+            {account.recentCalls.length ? `${spentRecent} used in last ${account.recentCalls.length} call${account.recentCalls.length === 1 ? '' : 's'}` : 'No calls yet'}
+          </span>
+          <button onClick={refreshAccount} disabled={accountLoading} className="rounded-lg border border-white/10 bg-white/[0.06] px-3 py-1.5 text-[12px] text-slate-300 hover:bg-white/10 disabled:opacity-60">{accountLoading ? 'Refreshing…' : 'Refresh'}</button>
+          <Link href="/mcp/pricing" className="rounded-lg bg-emerald-500 px-3 py-1.5 text-[12px] font-semibold text-[#06120c] hover:bg-emerald-400">Top up</Link>
+        </div>
+      </div>
+
+      {/* Recent activity — the same call log that also appears in-chat after each tool run. */}
+      <div className="mt-6">
+        <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">Recent activity</p>
+        {account.recentCalls.length === 0 ? (
+          <p className="mt-3 text-[13px] text-slate-500">No tool calls yet. Connect Mindy to your agent and run a tool — every call shows up here with its credit cost.</p>
+        ) : (
+          <div className="mt-3 overflow-x-auto">
+            <table className="w-full min-w-[420px] text-left text-[13px]">
+              <thead>
+                <tr className="text-[11px] uppercase tracking-wide text-slate-500">
+                  <th className="pb-2 pr-4 font-medium">Tool</th>
+                  <th className="pb-2 pr-4 font-medium">Status</th>
+                  <th className="pb-2 pr-4 text-right font-medium">Credits</th>
+                  <th className="pb-2 text-right font-medium">When</th>
+                </tr>
+              </thead>
+              <tbody>
+                {account.recentCalls.map((c, i) => {
+                  const st = statusStyle(c.status);
+                  return (
+                    <tr key={i} className="border-t border-white/[0.05]">
+                      <td className="py-2 pr-4 text-slate-200">{prettifyTool(c.tool_name)}</td>
+                      <td className={`py-2 pr-4 ${st.cls}`}>{st.label}</td>
+                      <td className="py-2 pr-4 text-right tabular-nums text-slate-300">{c.credits_charged || 0}</td>
+                      <td className="py-2 text-right tabular-nums text-slate-500">{shortWhen(c.created_at)}</td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    </section>
+  );
+
   // ---- Logged-out ------------------------------------------------------------
   if (authState !== 'in') {
     return (
@@ -266,6 +371,9 @@ export default function McpConsole() {
             <button onClick={() => setJustPurchased(false)} className="text-emerald-400/60 hover:text-emerald-300">Dismiss</button>
           </div>
         )}
+
+        {/* Balance + usage — what signed-in users came here to see. */}
+        {usagePanel}
 
         {/* Hero */}
         <section className="mt-10 text-center">
