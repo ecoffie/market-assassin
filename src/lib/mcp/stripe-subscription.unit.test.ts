@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('./credits', () => ({ applyCreditOnce: vi.fn() }));
+vi.mock('./credit-emails', () => ({ sendCreditReceiptEmail: vi.fn() }));
 // Stub the Stripe client so the customer-email fallback is testable offline.
 const retrieve = vi.fn();
 vi.mock('@/lib/stripe', () => ({ getStripe: () => ({ customers: { retrieve } }) }));

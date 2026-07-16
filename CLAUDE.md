@@ -1918,6 +1918,33 @@ read `shadow_*` rows → set caps to p99 → enforce. (Memory: `mcp-extraction-g
 
 ---
 
+## MCP credit emails — receipts + welcome (2026-07-16)
+
+Credits were granted SILENTLY (no email) on every purchase. Now every credit-add event
+that involves a customer sends a transactional email. Reference model: Perplexity's
+"Your API credits are ready" receipt.
+
+- **`src/lib/mcp/credit-emails.ts`** — ONE reusable branded receipt (`sendCreditReceiptEmail`,
+  kinds `topup` | `auto_recharge` | `subscription`) + a `sendCreditWelcomeEmail` for the free
+  signup grant. Mindy navy→purple header, line-item block (date · plan · credits · amount paid ·
+  reference · **new balance**), "Manage credits" → `getmindy.ai/mcp/account`. Clean RECEIPT style,
+  NOT the plain-letter marketing format (receipts should look like receipts). `transactional:true`
+  (bypasses the #58 marketing send cap); `renderCreditReceipt`/`renderCreditWelcome` exported for
+  tests + previews.
+- **Fires only on a REAL grant** (`applied===true` from `applyCreditOnce`) so Stripe re-deliveries
+  / idempotent no-ops don't re-send. **Never blocks the grant** — every send is try/caught +
+  swallowed (the ledger is the source of truth; the email is a courtesy).
+- **Wired at all four events:** top-up (`stripe-topup.ts`), subscription invoice
+  (`stripe-subscription.ts`), auto-recharge (BOTH the engine `autorecharge.ts` AND the webhook
+  backstop in `stripe-webhook` — each gated on `applied`, so exactly one receipt fires per
+  `pi.id`), and signup welcome (inside `grantSignupCreditsIfFirst`, covering both the oauth/token
+  and api/mcp/keys call sites). Pro-monthly refill + admin grants deliberately DON'T email
+  (recurring free / internal).
+- Tests: `credit-emails.unit.test.ts` (render + params + swallows failure); topup/subscription
+  tests mock `./credit-emails` to stay hermetic.
+
+---
+
 ## Location search for opportunities (2026-07-16)
 
 "Find all contracts in Florida" didn't work — Mindy matched agency/NAICS/DoDAAC but not

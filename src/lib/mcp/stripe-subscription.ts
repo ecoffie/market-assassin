@@ -17,8 +17,9 @@
  * top-up handler ignores it. The credit grant happens HERE on the paid invoice.
  */
 import type Stripe from 'stripe';
-import { subscriptionGrantForPriceId, subscriptionGrantForMeta, type SubscriptionGrant } from './packages';
+import { subscriptionGrantForPriceId, subscriptionGrantForMeta, subscriptionPlan, type SubscriptionGrant } from './packages';
 import { applyCreditOnce } from './credits';
+import { sendCreditReceiptEmail } from './credit-emails';
 import { getStripe } from '@/lib/stripe';
 
 export const MCP_SUBSCRIPTION_TYPE = 'mcp_subscription';
@@ -103,5 +104,19 @@ export async function handleMcpSubscriptionInvoice(invoice: Stripe.Invoice): Pro
   console.log(
     `[mcp:sub] ${email} +${grant.credits} (${grant.planId}/${grant.interval}, ${reason}, applied=${applied}, balance=${newBalance}) invoice ${invoice.id}`,
   );
+  // Receipt only on a real grant (not a Stripe re-delivery). Never blocks the grant.
+  if (applied) {
+    const amountPaid = (invoice as unknown as { amount_paid?: number }).amount_paid;
+    await sendCreditReceiptEmail({
+      email,
+      kind: 'subscription',
+      credits: grant.credits,
+      newBalance,
+      amountUsd: typeof amountPaid === 'number' ? amountPaid / 100 : null,
+      reference: invoice.number || (invoice.id as string),
+      planLabel: subscriptionPlan(grant.planId)?.label ?? null,
+      interval: grant.interval,
+    });
+  }
   return { handled: true, applied, credits: grant.credits, email, plan: grant.planId, interval: grant.interval };
 }

@@ -20,6 +20,7 @@ import { getStripe } from '@/lib/stripe';
 import { getWriteClient } from '@/lib/supabase/server-clients';
 import { getBalance, applyCreditOnce } from './credits';
 import { CREDIT_PACKAGES, creditsForPackage, type CreditPackage } from './packages';
+import { sendCreditReceiptEmail } from './credit-emails';
 import { sendEmail } from '@/lib/send-email';
 
 // Inline fast-path fires only when a debit leaves the balance under this floor; the
@@ -306,9 +307,21 @@ export async function maybeAutoRecharge(email: string): Promise<RechargeOutcome>
         await markFailure(user, settings, `status=${pi.status}`);
         return { charged: false, reason: pi.status };
       }
-      const { newBalance } = await applyCreditOnce(pi.id, user, pack.credits, 'auto_recharge');
+      const { applied, newBalance } = await applyCreditOnce(pi.id, user, pack.credits, 'auto_recharge');
       await markSuccess(user);
       console.log(`[mcp:autorecharge] ${user} +${pack.credits} → ${newBalance} (pi ${pi.id})`);
+      // Receipt only on the real grant (the webhook backstop grants the SAME pi.id →
+      // applied=false there, so exactly one receipt fires). Never blocks the grant.
+      if (applied) {
+        await sendCreditReceiptEmail({
+          email: user,
+          kind: 'auto_recharge',
+          credits: pack.credits,
+          newBalance,
+          amountUsd: pack.usd,
+          reference: pi.id,
+        });
+      }
       return { charged: true, credits: pack.credits, newBalance };
     } catch (err) {
       const detail = err instanceof Error ? err.message : String(err);

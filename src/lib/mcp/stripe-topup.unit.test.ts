@@ -1,6 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 
 vi.mock('./credits', () => ({ applyCreditOnce: vi.fn() }));
+vi.mock('./credit-emails', () => ({ sendCreditReceiptEmail: vi.fn() }));
 // Stub the Stripe client so the product-metadata fallback is testable offline.
 const listLineItems = vi.fn();
 vi.mock('@/lib/stripe', () => ({ getStripe: () => ({ checkout: { sessions: { listLineItems } } }) }));
