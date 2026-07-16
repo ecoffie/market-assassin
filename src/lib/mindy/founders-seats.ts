@@ -86,8 +86,17 @@ export async function refreshFoundersSeats(): Promise<FoundersSeats> {
     for (const r of data as { email: string }[]) if (r.email) ultimate.add(r.email.toLowerCase());
     if (data.length < 1000) break;
   }
+  // product_id, NOT bundle: this Supabase's `purchases` has no `bundle` column
+  // (that's govcon-shop's schema — separate instance). The slug we want lives in
+  // product_id, and it holds exactly the ULTIMATE_BUNDLES values
+  // ('ultimate-govcon-bundle'). Querying `bundle` returned 42703 every run, so
+  // `data` was null, the loop broke immediately, and the purchases ledger
+  // contributed ZERO Ultimate owners — undercounting `taken` and overstating
+  // `remaining` on a capped offer. Errors are surfaced (not swallowed) for the
+  // same reason: a stale seat count is recoverable, a confidently wrong one is not.
   for (let from = 0; from < 40000; from += 1000) {
-    const { data } = await supabase.from('purchases').select('user_email').in('bundle', ULTIMATE_BUNDLES).range(from, from + 999);
+    const { data, error } = await supabase.from('purchases').select('user_email').in('product_id', ULTIMATE_BUNDLES).range(from, from + 999);
+    if (error) throw new Error(`founders-seats: purchases lookup failed: ${error.message}`);
     if (!data || data.length === 0) break;
     for (const r of data as { user_email: string }[]) if (r.user_email) ultimate.add(r.user_email.toLowerCase());
     if (data.length < 1000) break;

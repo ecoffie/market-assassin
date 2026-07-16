@@ -123,7 +123,10 @@ export async function GET(request: NextRequest) {
       supabase.from('user_profiles').select('company_name, access_briefings, briefings_expires_at').eq('email', email).maybeSingle(),
       supabase.from('customer_classifications').select('classification, briefings_access, briefings_expiry, classification_version').eq('email', email),
       supabase.from('user_notification_settings').select('is_active, briefings_enabled, created_at, invitation_source, trial_source').eq('user_email', email).maybeSingle(),
-      supabase.from('purchases').select('bundle, product_name').eq('user_email', email),
+      // product_id, NOT bundle — no `bundle` column in this instance (see
+      // founders-seats.ts). Selecting it 400'd the whole query, so `data` came
+      // back null and BOTH ultimate signals below were silently lost.
+      supabase.from('purchases').select('product_id, product_name').eq('user_email', email),
     ]);
 
     const profile = (profileRes.data || {}) as { company_name?: string | null; access_briefings?: boolean | null; briefings_expires_at?: string | null };
@@ -144,9 +147,9 @@ export async function GET(request: NextRequest) {
     // Ultimate Giant ownership — the minimum requirement for permanent tool access,
     // shown ALONGSIDE spend (does NOT change the offer logic). Detected from the
     // purchases ledger, the classifier, or an Ultimate-named Stripe charge.
-    const purchases = (purchasesRes.data || []) as Array<{ bundle: string | null; product_name: string | null }>;
+    const purchases = (purchasesRes.data || []) as Array<{ product_id: string | null; product_name: string | null }>;
     const ultimateSignals: string[] = [];
-    if (purchases.some((p) => ULTIMATE_BUNDLE_VALUES.has((p.bundle || '').toLowerCase()))) ultimateSignals.push('purchases.bundle');
+    if (purchases.some((p) => ULTIMATE_BUNDLE_VALUES.has((p.product_id || '').toLowerCase()))) ultimateSignals.push('purchases.product_id');
     if (purchases.some((p) => /ultimate/i.test(p.product_name || ''))) ultimateSignals.push('purchase product name');
     if (latest?.classification === 'ultimate_giant') ultimateSignals.push('classification: ultimate_giant');
     if (paid.products.some((d) => /ultimate/i.test(d))) ultimateSignals.push('Stripe charge: "Ultimate"');
