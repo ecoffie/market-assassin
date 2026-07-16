@@ -15,7 +15,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getReadClient } from '@/lib/supabase/server-clients';
+import { getCountClient } from '@/lib/supabase/server-clients';
 import { bqQuery, BQ_TABLES } from '@/lib/bigquery/client';
 import { getRegistrySummary } from '@/lib/data-sources/registry';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -105,8 +105,10 @@ export async function GET(request: NextRequest) {
   if (!supabaseUrl || !supabaseKey) {
     return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 });
   }
-  // Pure read-only inventory counts (GET, no writes) → read replica.
-  const supabase = getReadClient();
+  // This route is head-counts ONLY (every query here is {count:'exact', head:true}),
+  // and the replica 400s every HEAD — so it must use the primary. Previously every
+  // count on this page silently rendered null via `if (error) return null`.
+  const supabase = getCountClient();
 
   const pp = painPointCounts();
 

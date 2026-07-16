@@ -53,6 +53,35 @@ describe('getWriteClient — always the primary', () => {
   });
 });
 
+describe('getCountClient — always the primary (the replica 400s every HEAD)', () => {
+  // Regression guard for the 2026-07-16 incident: the Supabase read-replica
+  // endpoint rejects EVERY HTTP HEAD request with a 400, and supabase-js issues a
+  // HEAD for `{ count: 'exact', head: true }`. Head-counts routed at the replica
+  // therefore always failed — and callers doing `count ?? 0` / `count || 0` turned
+  // that failure into a confident zero. cron/snapshot-metrics recorded
+  // setup_emails_sent = 0 for nine days (190 emails erased) before anyone noticed.
+  // If someone "optimizes" this to getReadClient(), that bug comes straight back.
+  it('uses the PRIMARY even when a replica IS configured', async () => {
+    process.env.SUPABASE_REPLICA_URL = REPLICA;
+    const { getCountClient } = await load();
+    getCountClient();
+    expect(created.map((c) => c.url)).toEqual([PRIMARY]); // NEVER the replica
+  });
+
+  it('uses the primary when no replica is configured', async () => {
+    const { getCountClient } = await load();
+    getCountClient();
+    expect(created.map((c) => c.url)).toEqual([PRIMARY]);
+  });
+
+  it('shares the write client (one pool, not a third connection)', async () => {
+    process.env.SUPABASE_REPLICA_URL = REPLICA;
+    const { getCountClient, getWriteClient } = await load();
+    expect(getCountClient()).toBe(getWriteClient());
+    expect(created).toHaveLength(1);
+  });
+});
+
 describe('getReadClient — safe-by-default', () => {
   it('falls back to the PRIMARY when no replica is configured (no-op)', async () => {
     const { getReadClient, isReplicaConfigured } = await load();

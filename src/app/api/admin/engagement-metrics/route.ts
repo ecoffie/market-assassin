@@ -13,7 +13,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getReadClient } from '@/lib/supabase/server-clients';
+import { getReadClient, getCountClient } from '@/lib/supabase/server-clients';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
@@ -30,6 +30,9 @@ export async function GET(request: NextRequest) {
 
   // Pure read-only analytics (GET, no writes) → read replica to keep off the primary.
   const supabase = getReadClient();
+  // Head-counts must go to the PRIMARY — the replica 400s every HEAD request, and
+  // these counts were silently coming back undefined. See getCountClient().
+  const counts = getCountClient();
 
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
@@ -38,7 +41,7 @@ export async function GET(request: NextRequest) {
   try {
     // If specific user requested
     if (userEmail) {
-      return await getUserMetrics(supabase, userEmail, startDateStr);
+      return await getUserMetrics(supabase, counts, userEmail, startDateStr);
     }
 
     // Get overall metrics
@@ -53,28 +56,28 @@ export async function GET(request: NextRequest) {
       hiddenMatchImpressions,
     ] = await Promise.all([
       // Total briefings sent
-      supabase
+      counts
         .from('briefing_log')
         .select('*', { count: 'exact', head: true })
         .eq('delivery_status', 'sent')
         .gte('email_sent_at', startDateStr),
 
       // Total alerts sent
-      supabase
+      counts
         .from('alert_log')
         .select('*', { count: 'exact', head: true })
         .eq('delivery_status', 'sent')
         .gte('sent_at', startDateStr),
 
       // Unique email opens
-      supabase
+      counts
         .from('user_engagement')
         .select('*', { count: 'exact', head: true })
         .eq('event_type', 'email_open')
         .gte('created_at', startDateStr),
 
       // Total link clicks
-      supabase
+      counts
         .from('user_engagement')
         .select('*', { count: 'exact', head: true })
         .eq('event_type', 'link_click')
@@ -243,6 +246,9 @@ export async function GET(request: NextRequest) {
 async function getUserMetrics(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   supabase: any,
+  // Head-counts go to the PRIMARY (replica 400s HEAD) — see getCountClient().
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  counts: any,
   userEmail: string,
   startDateStr: string
 ) {
@@ -252,7 +258,7 @@ async function getUserMetrics(
     recentActivity,
   ] = await Promise.all([
     // User's opens
-    supabase
+    counts
       .from('user_engagement')
       .select('*', { count: 'exact', head: true })
       .eq('user_email', userEmail.toLowerCase())
@@ -260,7 +266,7 @@ async function getUserMetrics(
       .gte('created_at', startDateStr),
 
     // User's clicks
-    supabase
+    counts
       .from('user_engagement')
       .select('*', { count: 'exact', head: true })
       .eq('user_email', userEmail.toLowerCase())
