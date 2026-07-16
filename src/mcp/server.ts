@@ -36,6 +36,7 @@ import { getKeywordCoverage } from './tools/keyword-coverage';
 import { idvContracts } from './tools/idv-contracts';
 import { searchPastContracts } from './tools/past-contracts';
 import { generateMarketReport } from './tools/market-report';
+import { addContactsToCrm } from './tools/crm-contacts';
 import { contractorAwardHistory } from './tools/contractor-award-history';
 import { assessMarketDepth } from './tools/market-depth';
 import { solicitationDocuments } from './tools/solicitation-documents';
@@ -571,6 +572,40 @@ server.registerTool(
   },
   async ({ keyword, naics, agency, state, set_aside, client_name }) => {
     const result = await generateMarketReport({ keyword, naics, agency, state, set_aside, client_name });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'add_contacts_to_crm',
+  {
+    title: 'Add Contacts to CRM (one-shot)',
+    description:
+      "Add contacts to the user's OWN connected GoHighLevel CRM in one call (dedupes by email/phone). Pairs with the " +
+      'contact-discovery tools. Requires the user to have connected GHL in Mindy MCP settings; if not, returns ' +
+      'connected:false and adds nothing. Over stdio there is no signed-in user, so this returns the not-connected path ' +
+      'unless MCP_STDIO_USER_EMAIL is set to a connected account.',
+    inputSchema: {
+      contacts: z
+        .array(
+          z.object({
+            name: z.string().optional(),
+            first_name: z.string().optional(),
+            last_name: z.string().optional(),
+            email: z.string().optional(),
+            phone: z.string().optional(),
+            company: z.string().optional(),
+            title: z.string().optional(),
+            tags: z.array(z.string()).optional(),
+          }),
+        )
+        .describe('Contacts to add (max 200). Each needs an email or phone.'),
+      tags: z.array(z.string()).optional().describe('Tags applied to every contact in this call.'),
+    },
+  },
+  async ({ contacts, tags }) => {
+    const userEmail = process.env.MCP_STDIO_USER_EMAIL || 'stdio@localhost';
+    const result = await addContactsToCrm({ userEmail, contacts, tags });
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );
