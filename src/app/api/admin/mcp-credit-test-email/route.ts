@@ -53,12 +53,19 @@ export async function GET(request: NextRequest) {
 
   const r = render(kind);
 
+  // Echo the sender identity this runtime will actually use (reads the live prod env),
+  // so a caller can verify the Mindy from/reply-to without inspecting an inbox.
+  const resolvedFrom = `${process.env.MINDY_FROM_NAME || 'Mindy'} <${process.env.EMAIL_FROM || 'alerts@mail.getmindy.ai'}>`;
+  const resolvedReplyTo = process.env.EMAIL_REPLY_TO || 'support@getmindy.ai';
+
   if (!doSend) {
     return NextResponse.json({
       success: true,
       mode: 'preview',
       kind,
       subject: r.subject,
+      resolvedFrom,
+      resolvedReplyTo,
       note: 'Add &to=<email>&send=true to actually send via the prod provider.',
       html: r.html,
     });
@@ -84,6 +91,8 @@ export async function GET(request: NextRequest) {
     kind,
     to,
     subject: r.subject,
+    resolvedFrom,
+    resolvedReplyTo,
     message: sent ? `Sent ${kind} test email to ${to}` : `Provider rejected the send to ${to} (check logs)`,
   });
 }
