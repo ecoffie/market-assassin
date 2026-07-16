@@ -736,7 +736,7 @@ async function sendAlertEmail(
 `;
 
   await sendEmail({
-    from: `"${MINDY_FROM_NAME}" <${process.env.EMAIL_FROM || 'alerts@govcongiants.com'}>`,
+    from: `"${MINDY_FROM_NAME}" <${process.env.EMAIL_FROM || 'alerts@mail.getmindy.ai'}>`,
     // Coach-managed client rows deliver to the client's real inbox; else user_email.
     to: user.alert_recipient_email || email,
     subject: `Mindy Weekly Alert: ${opportunities.length} New SAM.gov Matches - Week of ${formatDate(new Date().toISOString())}`,

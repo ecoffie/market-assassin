@@ -104,7 +104,7 @@ export async function sendAccessLinkEmail(email: string, destination: AccessDest
   const actionLabel = destination === 'briefings' ? 'Open Market Intelligence' : 'Manage Preferences';
 
   await getTransporter().sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@govcongiants.com'}>`,
+      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@getmindy.ai'}>`,
     to: normalizeEmail(email),
     subject: `${destinationLabel} secure access link | GovCon Giants`,
     html: `

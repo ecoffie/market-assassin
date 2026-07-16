@@ -31,7 +31,7 @@ const HOST_FILES = 'https://www.sec.gov';
 const HOST_DATA = 'https://data.sec.gov';
 
 function contactEmail(): string {
-  return (process.env.MCP_CONTACT_EMAIL || 'hello@govcongiants.com').trim();
+  return (process.env.MCP_CONTACT_EMAIL || 'hello@getmindy.ai').trim();
 }
 
 function userAgent(): string {

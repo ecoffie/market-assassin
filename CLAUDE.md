@@ -1495,11 +1495,24 @@ recordToolSuccess(ToolNames.CONTENT_REAPER).catch(() => {});
 
 ## Email Template Standard
 
-- **Footer branding:** "GovCon Giants AI"
-- **From address:** `hello@govcongiants.com`
-- **Support email:** `service@govcongiants.com`
-- **Phone:** 508-290-6692
-- **Include:** activation link, "Manage preferences", "Unsubscribe"
+**Everything from Mindy** (2026-07-16 — see memory `mindy-email-sender-architecture`). This
+repo sends TRANSACTIONAL email only; marketing/bulk is GHL (`send.getmindy.ai`).
+
+- **From address:** `Mindy <alerts@mail.getmindy.ai>` — set via `EMAIL_FROM` (the primary Resend
+  path default). Do NOT send from `*@govcongiants.com`.
+- **Reply-to:** `support@getmindy.ai` — `sendEmail` defaults `replyTo` to this (`EMAIL_REPLY_TO`
+  override) unless a caller sets an explicit reply-to.
+- **Support / contact in email bodies + pages:** `support@getmindy.ai` (bugs / account) ·
+  `hello@getmindy.ai` (general inquiries). All old `service@`/`support@`/`hello@govcongiants.com`
+  references were migrated 2026-07-16.
+- **Logo:** 3D Mindy logo header — hosted PNG `getmindy.ai/brand/mindy-logo-3d.png` (SVG isn't
+  rendered in Gmail/Outlook email).
+- **Footer branding:** "GovCon Giants AI" (the operating entity behind the Mindy product).
+- **Include:** activation link, "Manage preferences", "Unsubscribe".
+- **⚠️ Office365 FALLBACK caveat:** route-local O365 nodemailer transports authenticate as
+  `SMTP_USER` (a `govcongiants.com` O365 mailbox), so if Resend is down the FALLBACK still sends
+  from govcongiants. Making the fallback Mindy needs a `mail.getmindy.ai` SMTP mailbox (infra).
+  Resend (primary) is Mindy.
 
 ---
 

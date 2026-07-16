@@ -58,7 +58,7 @@ export default function TermsPage() {
           <h3 className="text-lg font-semibold text-white">Refund Policy</h3>
           <p>
             Due to the digital nature of our products, all sales are final. However, if you experience
-            technical issues preventing access to your purchase, please contact us at hello@govcongiants.com
+            technical issues preventing access to your purchase, please contact us at hello@getmindy.ai
             within 7 days of purchase.
           </p>
 
@@ -81,7 +81,7 @@ export default function TermsPage() {
             <li>Message and data rates may apply depending on your mobile carrier</li>
             <li>SMS is not required to purchase any products or services</li>
             <li>You can opt out at any time by replying STOP to any message</li>
-            <li>For help, reply HELP or contact hello@govcongiants.com</li>
+            <li>For help, reply HELP or contact hello@getmindy.ai</li>
           </ul>
           <p>
             We will not share your phone number with third parties for marketing purposes. See our{' '}
@@ -160,7 +160,7 @@ export default function TermsPage() {
             <li>
               <strong className="text-white">GovConEdu LLC</strong>
             </li>
-            <li>Email: hello@govcongiants.com</li>
+            <li>Email: hello@getmindy.ai</li>
           </ul>
         </div>
 

@@ -41,7 +41,7 @@ function getTransporter() {
     port: 587,
     secure: false,
     auth: {
-      user: process.env.SMTP_USER || 'hello@govcongiants.com',
+      user: process.env.SMTP_USER || 'hello@getmindy.ai',
       pass: process.env.SMTP_PASSWORD,
     },
   });

@@ -345,7 +345,7 @@ export default function HomeRedesign() {
               <h4 className="font-semibold text-white mb-4">Company</h4>
               <ul className="space-y-2 text-sm">
                 <li><a href="https://govcongiants.com" target="_blank" rel="noopener noreferrer" className="text-slate-400 hover:text-white transition">Main Website</a></li>
-                <li><a href="mailto:support@govcongiants.com" className="text-slate-400 hover:text-white transition">Contact</a></li>
+                <li><a href="mailto:support@getmindy.ai" className="text-slate-400 hover:text-white transition">Contact</a></li>
               </ul>
             </div>
           </div>

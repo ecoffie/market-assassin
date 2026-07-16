@@ -420,7 +420,7 @@ async function sendHealthAlert(metrics: HealthMetrics, date: string): Promise<vo
     to: ALERT_EMAIL,
     subject,
     html,
-        from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <hello@govcongiants.com>`,
+        from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <hello@getmindy.ai>`,
   });
 }
 
@@ -446,7 +446,7 @@ async function sendExhaustedAlert(count: number): Promise<void> {
     to: ALERT_EMAIL,
     subject,
     html,
-        from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <hello@govcongiants.com>`,
+        from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <hello@getmindy.ai>`,
   });
 }
 
@@ -472,6 +472,6 @@ async function sendWatchdogFailureAlert(error: unknown): Promise<void> {
     to: ALERT_EMAIL,
     subject,
     html,
-        from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <hello@govcongiants.com>`,
+        from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <hello@getmindy.ai>`,
   });
 }

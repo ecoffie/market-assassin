@@ -43,7 +43,7 @@ const DROP_THRESHOLD = 0.5;
 // Protects new alert types in their first week from false alarms.
 const MIN_BASELINE_FOR_ALERT = 50;
 
-const ADMIN_EMAIL = process.env.ALERT_HEALTH_RECIPIENT || 'hello@govcongiants.com';
+const ADMIN_EMAIL = process.env.ALERT_HEALTH_RECIPIENT || 'hello@getmindy.ai';
 
 function getAdminClient() {
   return createClient(
