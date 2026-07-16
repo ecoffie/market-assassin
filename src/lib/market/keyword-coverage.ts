@@ -107,8 +107,17 @@ export function buildMarketFilter(opts: {
     // airfield-structures PSC / award text surfaced NASA over DOD/USACE. Returning
     // null makes the callers (target-market-research, fpds-top-n) fall through to
     // their NAICS path and rank by the derived 90%-coverage set. A cross-cutting
-    // keyword like "drones" (top code ~28% < 0.40) keeps keyword/PSC ranking.
-    if (coverage.topCodePct >= DOMINANT_NAICS_SHARE) return null;
+    // keyword like "drones" (lead code ~28% < 0.40) keeps keyword/PSC ranking.
+    //
+    // ⚠️ Reads leadCodePct (the SEMANTICALLY-RIGHT code's share), NOT topCodePct (the
+    // biggest by $). The question this gate asks is "is the code this keyword MEANS
+    // dominant?" — not "is some code dominant?". They differ when the right-lead logic
+    // promotes a code: "hvac" leads 238220 Plumbing/HVAC Contractors (20.5%, the
+    // specialty trade Eric wants) while 236220 General Building holds 55.6% because big
+    // building contracts merely mention HVAC. Gating on the biggest would push hvac into
+    // NAICS ranking led by GENERAL CONSTRUCTION — surfacing general contractors for an
+    // HVAC search, the exact thing the lead promotion exists to prevent.
+    if (coverage.leadCodePct >= DOMINANT_NAICS_SHARE) return null;
     const kw = coverage.keyword;
     const pscIsSpecific = Boolean(
       coverage.topPsc?.code
@@ -158,10 +167,27 @@ export interface KeywordCoverage {
   keyword: string;
   totalMarket: number;            // $ total across all codes that bought this
   naicsCount: number;             // distinct NAICS that bought it
+  // NOTE: allNaics is NOT purely amount-sorted — the "right lead" logic promotes the
+  // semantically-correct code to the head (e.g. "hvac" leads 238220 Plumbing/HVAC
+  // Contractors, the specialty trade, even though 236220 General Building has more $).
+  // So allNaics[0] is the LEAD, not the biggest. Read the two pcts below deliberately.
   allNaics: { code: string; name: string; amount: number; pct: number }[];
-  coverageCodes: string[];        // smallest NAICS set covering ~coverageTarget
+  coverageCodes: string[];        // smallest NAICS set covering ~coverageTarget (amount-ranked)
   coveragePct: number;            // what the coverageCodes actually capture (~0.9)
-  topCodePct: number;             // % the single biggest NAICS is (the "you'd miss the rest")
+  /**
+   * % of the market held by the single BIGGEST NAICS by dollars — the displayed
+   * "the obvious code is only 28%, you'd miss the other 72%" teaching stat.
+   * ⚠️ Do NOT use this for the dominant-NAICS ranking gate — use leadCodePct.
+   */
+  topCodePct: number;
+  /**
+   * % held by the LEAD code (allNaics[0] — the semantically-right code after
+   * promotion). This is the ranking gate's input: "is the code this keyword actually
+   * MEANS dominant enough to trust NAICS ranking?" Splitting these two fixed a real
+   * bug — they were one field, so the report/banner showed "biggest code = only 0%"
+   * for drones (reading the promoted 0.2% sliver 339930 instead of 336411's 28.4%).
+   */
+  leadCodePct: number;
   // PSC view (the GovCon-expert lesson: PSC = what was BOUGHT, NAICS = who the
   // seller IS — PSC's top code is usually the literal product, e.g. "Unmanned
   // Aircraft" vs NAICS "Aircraft Manufacturing"). Surfaced to TEACH the user.
@@ -458,10 +484,14 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const allNaics = rows.map((r: any) => ({ code: r.code, name: r.name || r.code, amount: r.amount, pct: r.amount / total }));
 
-    // Smallest code set that captures coverageTarget of the spend.
+    // SMALLEST code set that captures coverageTarget of the spend — so it must walk
+    // the codes by DOLLARS, not by allNaics' display order (whose head is the promoted
+    // semantic lead, not the biggest). Walking display order spent a slot on a 0.2%
+    // sliver for "drones" and needed 10 codes where 9 reach 90%.
+    const byAmount = [...allNaics].sort((a, b) => b.amount - a.amount);
     const coverageCodes: string[] = [];
     let cum = 0;
-    for (const r of allNaics) {
+    for (const r of byAmount) {
       coverageCodes.push(r.code);
       cum += r.pct;
       if (cum >= coverageTarget) break;
@@ -485,7 +515,9 @@ async function keywordCoverageUncached(keyword: string, coverageTarget = 0.9): P
       allNaics,
       coverageCodes,
       coveragePct: cum,
-      topCodePct: allNaics[0].pct,
+      // Biggest by DOLLARS (the displayed stat) vs the promoted LEAD (the gate's input).
+      topCodePct: byAmount[0]?.pct ?? 0,
+      leadCodePct: allNaics[0].pct,
       pscCount: pscRows.length,
       topPsc,
       topPscPct: pscTotal > 0 && pscRows[0] ? pscRows[0].amount / pscTotal : 0,
