@@ -571,9 +571,10 @@ const MARKET_REPORT_TOOL_DEF = {
       'code, or an agency, and this assembles the ENTIRE market in a single call: total market $ + all buying NAICS + ' +
       'top PSC (what was bought), the top buying agencies, the competitive landscape (leading contractors), recompetes ' +
       'on the horizon, upcoming forecasts, and — when an agency is given — an agency deep-dive + set-aside gap. ' +
-      'Returns structured sections PLUS deliverable.html: a self-contained, client-ready Mindy-branded report you can ' +
-      'hand straight to a client. Prefer a keyword over a single NAICS (one code typically misses most of a market). ' +
-      'grounded=false only when nothing at all is found — do not invent figures.',
+      'Returns structured sections PLUS a client-ready Mindy-branded deliverable: deliverable.url is a hosted, ' +
+      'SHAREABLE report page (send that link straight to a client; it has a Save-as-PDF button), and deliverable.html ' +
+      'is the same report inline. Prefer a keyword over a single NAICS (one code typically misses most of a market). ' +
+      'grounded=false only when nothing at all is found — do not invent figures, and never invent a report URL.',
     parameters: {
       type: 'object',
       properties: {
@@ -1588,6 +1589,8 @@ export async function runMcpTool(
       state: typeof args.state === 'string' ? args.state : undefined,
       set_aside: typeof args.set_aside === 'string' ? args.set_aside : undefined,
       client_name: typeof args.client_name === 'string' ? args.client_name : undefined,
+      // Report OWNER comes from the VERIFIED caller (ctx.userEmail) — never from args.
+      userEmail: ctx.userEmail,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
