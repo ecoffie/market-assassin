@@ -30,6 +30,21 @@ function num(v: unknown): string {
 interface ReportLike {
   subject: string;
   generated_for: string | null;
+  basis?: {
+    scope: string;
+    label: string;
+    ranked_by_dominant_naics: boolean;
+    naics_sections_code: string | null;
+  } | null;
+  reconciliation?: {
+    single_naics: string;
+    single_naics_name: string;
+    single_naics_amount: number;
+    single_naics_pct: number;
+    total_market: number;
+    naics_count: number;
+    missed_pct: number;
+  } | null;
   summary: {
     total_market: number | null;
     naics_count: number | null;
@@ -41,7 +56,7 @@ interface ReportLike {
   };
   sections: {
     market_size: unknown;
-    top_agencies: Array<{ name: string; sub_agency: string; contract_count: number; unique_vendors: number }>;
+    top_agencies: Array<{ name: string; amount: number }>;
     competition: { contractors: unknown[] };
     recompetes: { contracts: unknown[] };
     forecasts: { forecasts: unknown[] };
@@ -72,6 +87,32 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   const { subject, summary, sections, generated_for } = report;
   const date = opts.date || new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
 
+  // Every section states WHAT IT MEASURED. An unlabelled figure loses the "your data is
+  // wrong" argument even when it's the more accurate one.
+  const basisNote = report.basis?.label ? ` — ranked by ${report.basis.label}` : '';
+
+  /**
+   * "How to reconcile this with a NAICS-based tool." Show THEIR number on OUR page and
+   * explain it, so a competitor's figure becomes evidence for us instead of an
+   * objection. Rendered only when there's genuinely something to reconcile.
+   */
+  const rec = report.reconciliation;
+  const reconcileHtml = rec
+    ? `<section class="sec rec">
+        <h2>How to reconcile this with a NAICS-based tool</h2>
+        <p class="sub">Other platforms search a single NAICS code. Here is exactly what that returns for
+        &ldquo;${esc(subject)}&rdquo;, and what it leaves out — so you can compare like for like.</p>
+        <div class="tw"><table><tbody>
+          <tr><td class="lead">Searching ${esc(rec.single_naics)} <span class="muted">${esc(rec.single_naics_name)}</span> alone</td>
+              <td>${money(rec.single_naics_amount)}</td><td>${Math.round(rec.single_naics_pct * 100)}% of the market</td></tr>
+          <tr><td class="lead">This report — ${num(rec.naics_count)} buying NAICS</td>
+              <td>${money(rec.total_market)}</td><td>100%</td></tr>
+        </tbody></table></div>
+        <p class="note">A single-code search misses <b>${Math.round(rec.missed_pct * 100)}%</b> of this market.
+        Both figures are real federal contract obligations over the same window — they differ only in how much of the market each one looks at.</p>
+      </section>`
+    : '';
+
   // ---- Market composition (keyword-coverage view) ----
   const cov = sections.market_size as { allNaics?: Array<Row>; topPscList?: Array<Row>; coveragePct?: number; topCodePct?: number } | null;
   const naicsRows = (cov?.allNaics || []).slice(0, 10).map((r) => [
@@ -86,11 +127,13 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   ]);
 
   // ---- Top buying agencies ----
+  // spending_by_category returns dollars, not contract/vendor counts — show what we
+  // actually have. Share is of the agencies SHOWN (top 10), stated as such below.
+  const agencyShown = sections.top_agencies.reduce((t, a) => t + (a.amount || 0), 0);
   const agencyRows = sections.top_agencies.map((a) => [
-    esc(a.sub_agency || a.name),
     esc(a.name),
-    num(a.contract_count),
-    num(a.unique_vendors),
+    money(a.amount),
+    agencyShown > 0 ? `${Math.round((a.amount / agencyShown) * 100)}%` : '—',
   ]);
 
   // ---- Competitive landscape ----
@@ -156,7 +199,12 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
             `<div><h3>What was bought (top PSC)</h3>${table(['PSC', 'Obligated', 'Share'], pscRows)}</div></div>`
         )
       : '',
-    section('Who is buying', 'Top federal buying agencies in this market.', table(['Sub-agency', 'Department', 'Contracts', 'Vendors'], agencyRows)),
+    reconcileHtml,
+    section(
+      'Who is buying',
+      `Top federal buying sub-agencies by obligated dollars${basisNote}. Share is of the top ${sections.top_agencies.length} shown, not of the whole market.`,
+      table(['Buying sub-agency', 'Obligated', 'Share of shown'], agencyRows)
+    ),
     section('Competitive landscape', 'Leading contractors by obligated dollars — the incumbents you would be up against.', table(['Contractor', 'Location', 'Obligated', 'Awards'], vendorRows)),
     section('Recompetes on the horizon', 'Expiring contracts likely to come back out for bid.', table(['Incumbent', 'Agency', 'NAICS', 'Value', 'Ends', 'Likelihood'], recompeteRows)),
     section('Upcoming forecasts', 'Planned procurements 6–18 months out.', table(['Title', 'Agency', 'NAICS', 'Value', 'FY', 'Set-aside'], forecastRows)),
@@ -197,6 +245,8 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   .muted { color:var(--muted); font-weight:400; }
   .empty { color:var(--muted); font-size:13px; font-style:italic; }
   .note { color:#b45309; font-size:12.5px; }
+  .rec { border-color:#c7b7f5; background:linear-gradient(180deg,#faf8ff,#fff); }
+  .rec h2 { color:var(--purple); }
   footer.rp { margin-top:28px; text-align:center; color:var(--muted); font-size:12px; }
   footer.rp b { color:var(--purple); }
   .pdfbtn { position:absolute; top:22px; right:22px; background:rgba(255,255,255,.16); color:#fff; border:1px solid rgba(255,255,255,.5);
