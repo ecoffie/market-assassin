@@ -52,10 +52,37 @@ function propToZod(prop: JsonSchemaProp): ZodTypeAny {
   return prop.description ? base.describe(prop.description) : base;
 }
 
+/**
+ * MCP tool annotations (the SDK's `ToolAnnotations`). Claude Desktop reads these
+ * to BUCKET tools in its "Tool permissions" UI — without them every tool lands in
+ * one flat "Other tools" pile (readOnlyHint absent → uncategorizable). Every Mindy
+ * MCP tool is a read-only intel/compute lookup: it queries gov/proprietary data or
+ * computes over a solicitation and returns it — it never mutates the user's Mindy
+ * account or any external system. So they all carry readOnlyHint:true and collapse
+ * into a single "Read-only tools — Always allow" bucket (one safe toggle).
+ *
+ * ⚠️ If a MUTATING tool is ever added (writes to the user's account, sends an email,
+ * etc.), it MUST override this with `readOnlyHint:false, destructiveHint:true` so it
+ * does NOT hide inside the always-allow read-only group.
+ */
+export interface McpToolAnnotations {
+  readOnlyHint?: boolean;
+  destructiveHint?: boolean;
+  idempotentHint?: boolean;
+  openWorldHint?: boolean;
+}
+
+const READ_ONLY_ANNOTATIONS: McpToolAnnotations = {
+  readOnlyHint: true,   // → Claude Desktop "Read-only tools" bucket
+  idempotentHint: true, // same args → same data (a query, not a mutation)
+  openWorldHint: true,  // hits live external data (SAM / USASpending / EDGAR / corpus)
+};
+
 export interface McpRegistrationEntry {
   name: string;
   description: string;
   inputSchema: ZodRawShape;
+  annotations: McpToolAnnotations;
 }
 
 /**
@@ -73,6 +100,11 @@ export function mcpRegistrationList(): McpRegistrationEntry[] {
       const zod = propToZod(prop);
       shape[key] = required.has(key) ? zod : zod.optional();
     }
-    return { name: fn.name, description: fn.description ?? '', inputSchema: shape as ZodRawShape };
+    return {
+      name: fn.name,
+      description: fn.description ?? '',
+      inputSchema: shape as ZodRawShape,
+      annotations: READ_ONLY_ANNOTATIONS,
+    };
   });
 }

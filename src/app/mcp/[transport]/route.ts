@@ -38,6 +38,34 @@ export const dynamic = 'force-dynamic';
 // Raise toward 800 once Vercel Fluid Compute is enabled, for long SSE sessions.
 export const maxDuration = 60;
 
+// Below this balance, the in-chat footer escalates from an FYI to a top-up nudge.
+const LOW_BALANCE_THRESHOLD = 20;
+
+/** snake_case tool name → "Title Case" for Claude Desktop's permission list. */
+function prettifyToolName(name: string): string {
+  return name
+    .replace(/[_-]+/g, ' ')
+    .replace(/\b\w/g, (c) => c.toUpperCase())
+    .trim();
+}
+
+/**
+ * The "credits remaining" line shown IN THE CHAT after a tool call (Higgsfield-style).
+ * Returns null for free tools (charged 0, no balance) so we don't add noise to
+ * get_balance et al. Escalates to a top-up nudge when the balance runs low.
+ */
+function creditFooter(charged: number, balance: number | null): string | null {
+  if (balance === null) return null; // free tool — nothing to meter
+  const used = charged > 0 ? ` · this call used ${charged} credit${charged === 1 ? '' : 's'}` : '';
+  if (balance <= 0) {
+    return `⚠️ Mindy credits: 0 left${used}. Top up to keep going → getmindy.ai/mcp`;
+  }
+  if (balance <= LOW_BALANCE_THRESHOLD) {
+    return `⚠️ Mindy credits: ${balance} left${used} — running low. Top up → getmindy.ai/mcp`;
+  }
+  return `Mindy credits: ${balance} remaining${used}.`;
+}
+
 const baseHandler = createMcpHandler(
   (server) => {
     // Register EVERY registry tool (not just the playbook) from the single source
@@ -47,7 +75,14 @@ const baseHandler = createMcpHandler(
     for (const tool of mcpRegistrationList()) {
       server.registerTool(
         tool.name,
-        { description: tool.description, inputSchema: tool.inputSchema },
+        {
+          title: prettifyToolName(tool.name),
+          description: tool.description,
+          inputSchema: tool.inputSchema,
+          // annotations → Claude Desktop groups these under "Read-only tools —
+          // Always allow" instead of one flat "Other tools" pile (see tool-schemas.ts).
+          annotations: tool.annotations,
+        },
         async (args: Record<string, unknown>, extra) => {
           // Identity resolved by withMcpAuth (below). Present because required:true.
           const identity = extra?.authInfo?.extra as
@@ -75,9 +110,25 @@ const baseHandler = createMcpHandler(
               content: [{ type: 'text', text: `${outcome.error.code}: ${outcome.error.message}` }],
             };
           }
+          // Balance-in-chat (like Higgsfield): surface the remaining balance right
+          // in the conversation. `outcome.balance` is the post-debit balance
+          // (null for free tools like get_balance). Kept as a SEPARATE text block
+          // so the first block stays pure JSON for agents that parse it, and
+          // mirrored into structuredContent._meta.credits for machine reads.
+          const content: { type: 'text'; text: string }[] = [
+            { type: 'text', text: JSON.stringify(outcome.result, null, 2) },
+          ];
+          const footer = creditFooter(outcome.creditsCharged, outcome.balance);
+          if (footer) content.push({ type: 'text', text: footer });
           return {
-            content: [{ type: 'text', text: JSON.stringify(outcome.result, null, 2) }],
-            structuredContent: outcome.result,
+            content,
+            structuredContent: {
+              ...outcome.result,
+              _meta: {
+                ...((outcome.result as { _meta?: Record<string, unknown> })._meta ?? {}),
+                credits: { charged: outcome.creditsCharged, remaining: outcome.balance },
+              },
+            },
           };
         },
       );
