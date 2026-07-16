@@ -78,6 +78,16 @@ function connectFor(client: ClientId): ConnectInfo {
 // ---- Usage panel (signed-in): balance + recent call history --------------------
 interface McpCall { tool_name: string; status: string; credits_charged: number | null; created_at: string }
 interface AccountData { balance: number; recentCalls: McpCall[] }
+interface AutoRecharge {
+  enabled: boolean; thresholdCredits: number; refillPackage: string;
+  hasCard: boolean; cardBrand: string | null; cardLast4: string | null;
+  paused: boolean; lastRechargeAt: string | null; thresholdMin: number; thresholdMax: number;
+}
+// Refill pack options — must match CREDIT_PACKAGES ids/credits in src/lib/mcp/packages.ts.
+const REFILL_PACKS: { id: string; label: string }[] = [
+  { id: 'plus', label: '800 credits ($15)' },
+  { id: 'scale', label: '2,400 credits ($40)' },
+];
 
 /** snake_case tool name → "Title Case" (matches Claude Desktop's tool labels). */
 function prettifyTool(name: string): string {
@@ -113,12 +123,17 @@ export default function McpConsole() {
   const [email, setEmail] = useState<string | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
   const [justPurchased, setJustPurchased] = useState(false);
+  const [justSavedCard, setJustSavedCard] = useState(false);
   const [client, setClient] = useState<ClientId>('claude-desktop');
   // Public catalog (tool costs + trial size) for the example grid + hero copy.
   const [catalog, setCatalog] = useState<Catalog | null>(null);
   // Signed-in balance + recent usage (from /api/mcp/account).
   const [account, setAccount] = useState<AccountData | null>(null);
   const [accountLoading, setAccountLoading] = useState(false);
+
+  // Auto-recharge settings (card on file, refill when low).
+  const [autoRecharge, setAutoRecharge] = useState<AutoRecharge | null>(null);
+  const [arBusy, setArBusy] = useState(false);
 
   const refreshAccount = useCallback(async () => {
     setAccountLoading(true);
@@ -130,12 +145,54 @@ export default function McpConsole() {
     finally { setAccountLoading(false); }
   }, []);
 
+  const refreshAutoRecharge = useCallback(async () => {
+    try {
+      const res = await fetch('/api/mcp/autorecharge', { headers: getMIApiHeaders() });
+      const j = await res.json().catch(() => null);
+      if (res.ok && j?.success) setAutoRecharge(j.settings);
+    } catch { /* leave prior state */ }
+  }, []);
+
+  // Save a card → Stripe setup Checkout (redirects out and back to ?autorecharge=saved).
+  const startCardSetup = useCallback(async () => {
+    setArBusy(true);
+    try {
+      const res = await fetch('/api/mcp/autorecharge', {
+        method: 'POST', headers: { ...getMIApiHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'setup' }),
+      });
+      const j = await res.json().catch(() => null);
+      if (res.ok && j?.url) { window.location.href = j.url; return; }
+    } catch { /* fall through */ }
+    setArBusy(false);
+  }, []);
+
+  const patchAutoRecharge = useCallback(async (patch: Record<string, unknown>) => {
+    setArBusy(true);
+    try {
+      const res = await fetch('/api/mcp/autorecharge', {
+        method: 'POST', headers: { ...getMIApiHeaders(), 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'update', ...patch }),
+      });
+      const j = await res.json().catch(() => null);
+      if (res.ok && j?.success) setAutoRecharge(j.settings);
+    } catch { /* leave prior state */ }
+    finally { setArBusy(false); }
+  }, []);
+
   // Identity: ask the server who our signed token proves we are. Never trust
   // the client-side email for the account we render.
   useEffect(() => {
     if (typeof window === 'undefined') return;
     // eslint-disable-next-line react-hooks/set-state-in-effect
-    if (new URLSearchParams(window.location.search).get('topup') === 'success') setJustPurchased(true);
+    const params = new URLSearchParams(window.location.search);
+    if (params.get('topup') === 'success') setJustPurchased(true);
+    // Returned from the card-setup Checkout. The webhook that persists the card lands a
+    // beat after the redirect, so re-pull settings shortly after the initial load too.
+    if (params.get('autorecharge') === 'saved') {
+      setJustSavedCard(true);
+      setTimeout(() => { void refreshAutoRecharge(); }, 3000);
+    }
     fetch('/api/mcp/catalog')
       .then((r) => r.json())
       .then((j) => { if (j?.success) setCatalog({ tools: j.tools || [], packages: j.packages || [], subscriptionPlans: j.subscriptionPlans || [], signupCredits: j.signupCredits ?? 100, proMonthlyCredits: j.proMonthlyCredits ?? 1000 }); })
@@ -149,6 +206,7 @@ export default function McpConsole() {
           setEmail(j.email);
           setAuthState('in');
           void refreshAccount(); // pull balance + usage for the signed-in panel
+          void refreshAutoRecharge();
         } else {
           setAuthState('out');
         }
@@ -156,7 +214,7 @@ export default function McpConsole() {
         setAuthState('out');
       }
     })();
-  }, [refreshAccount]);
+  }, [refreshAccount, refreshAutoRecharge]);
 
   const copy = useCallback((text: string, tag: string) => {
     navigator.clipboard.writeText(text);
@@ -279,6 +337,76 @@ export default function McpConsole() {
         </div>
       </div>
 
+      {/* Auto-recharge — card on file, refill when low. */}
+      <div className="mt-6 rounded-xl border border-white/[0.06] bg-white/[0.015] p-4">
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <p className="text-[13px] font-semibold text-slate-100">Auto-recharge</p>
+            <p className="mt-0.5 text-[12px] text-slate-500">Refill automatically when your balance runs low — no interruptions mid-task.</p>
+          </div>
+          {autoRecharge?.hasCard && (
+            <button
+              type="button"
+              onClick={() => patchAutoRecharge({ enabled: !autoRecharge.enabled })}
+              disabled={arBusy}
+              role="switch"
+              aria-checked={autoRecharge.enabled}
+              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition ${autoRecharge.enabled ? 'bg-emerald-500' : 'bg-white/15'} disabled:opacity-60`}
+            >
+              <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${autoRecharge.enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
+            </button>
+          )}
+        </div>
+
+        {!autoRecharge?.hasCard ? (
+          <button
+            type="button"
+            onClick={startCardSetup}
+            disabled={arBusy}
+            className="mt-3 rounded-lg bg-emerald-500 px-3.5 py-2 text-[13px] font-semibold text-[#06120c] hover:bg-emerald-400 disabled:opacity-60"
+          >
+            {arBusy ? 'Starting…' : 'Add a card to enable'}
+          </button>
+        ) : (
+          <>
+            {autoRecharge.paused && (
+              <div className="mt-3 rounded-lg border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-[12px] text-amber-200">
+                Paused after a declined charge. Update your card below to resume.
+              </div>
+            )}
+            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-3 text-[13px] text-slate-300">
+              <label className="flex items-center gap-2">
+                <span className="text-slate-400">When below</span>
+                <select
+                  value={autoRecharge.thresholdCredits}
+                  onChange={(e) => patchAutoRecharge({ thresholdCredits: Number(e.target.value) })}
+                  disabled={arBusy}
+                  className="rounded-lg border border-white/10 bg-[#070b16] px-2 py-1.5 text-slate-200 outline-none focus:border-emerald-500/50"
+                >
+                  {[50, 100, 200].map((n) => <option key={n} value={n}>{n} credits</option>)}
+                </select>
+              </label>
+              <label className="flex items-center gap-2">
+                <span className="text-slate-400">refill with</span>
+                <select
+                  value={autoRecharge.refillPackage}
+                  onChange={(e) => patchAutoRecharge({ refillPackage: e.target.value })}
+                  disabled={arBusy}
+                  className="rounded-lg border border-white/10 bg-[#070b16] px-2 py-1.5 text-slate-200 outline-none focus:border-emerald-500/50"
+                >
+                  {REFILL_PACKS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+                </select>
+              </label>
+              <span className="text-slate-500">
+                Card: <span className="text-slate-300">{autoRecharge.cardBrand ? `${autoRecharge.cardBrand} ····${autoRecharge.cardLast4}` : '—'}</span>
+                {' · '}
+                <button type="button" onClick={startCardSetup} disabled={arBusy} className="underline underline-offset-2 hover:text-slate-300 disabled:opacity-60">Update</button>
+              </span>
+            </div>
+          </>
+        )}
+      </div>
+
       {/* Recent activity — the same call log that also appears in-chat after each tool run. */}
       <div className="mt-6">
         <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">Recent activity</p>
@@ -369,6 +497,13 @@ export default function McpConsole() {
           <div className="mt-6 flex items-center justify-between gap-3 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">
             <span>Payment received — your credits have been added to your account.</span>
             <button onClick={() => setJustPurchased(false)} className="text-emerald-400/60 hover:text-emerald-300">Dismiss</button>
+          </div>
+        )}
+
+        {justSavedCard && (
+          <div className="mt-6 flex items-center justify-between gap-3 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">
+            <span>Card saved — auto-recharge is on. We&apos;ll refill automatically when your balance runs low.</span>
+            <button onClick={() => setJustSavedCard(false)} className="text-emerald-400/60 hover:text-emerald-300">Dismiss</button>
           </div>
         )}
 

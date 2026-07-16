@@ -25,7 +25,9 @@
  * mcp.getmindy.ai subdomain so clients use the clean https://mcp.getmindy.ai/mcp.
  */
 import { createMcpHandler, withMcpAuth } from 'mcp-handler';
+import { after } from 'next/server';
 import { runMeteredTool } from '@/lib/mcp/metered';
+import { maybeAutoRecharge } from '@/lib/mcp/autorecharge';
 import { mcpRegistrationList } from '@/lib/mcp/tool-schemas';
 import { verifyApiKey } from '@/lib/mcp/api-keys';
 import { verifyAccessToken } from '@/lib/mcp/oauth/tokens';
@@ -120,6 +122,13 @@ const baseHandler = createMcpHandler(
           ];
           const footer = creditFooter(outcome.creditsCharged, outcome.balance);
           if (footer) content.push({ type: 'text', text: footer });
+
+          // Auto-recharge: the balance dipped low → try to refill AFTER the response is
+          // sent (zero added latency to this call). maybeAutoRecharge no-ops unless the
+          // user enabled it with a saved card; a cron backstop retries any misses.
+          if (outcome.needsRecharge) {
+            after(() => maybeAutoRecharge(identity.userEmail!).catch((e) => console.error('[mcp:autorecharge] after() error', e)));
+          }
           return {
             content,
             structuredContent: {
