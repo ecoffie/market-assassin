@@ -72,16 +72,37 @@ async function withRetry<T>(label: string, fn: () => Promise<T>): Promise<T> {
 }
 function saveState(s: State) { writeFileSync(STATE_PATH, JSON.stringify(s, null, 2)); }
 
-/** Every NAICS currently represented in the table, most rows first. */
+/**
+ * Every NAICS currently represented in the table, most rows first.
+ *
+ * This scan previously stopped at a hardcoded 40,000-row cap. Once the sync
+ * pushed the table past that, it silently reported 395 NAICS where the true
+ * count was 477 -- an incomplete sweep that looked complete. The cap now
+ * throws instead of truncating.
+ *
+ * The explicit ORDER BY is defensive, not a fix for the above: .range()
+ * without ORDER BY is undefined in Postgres and this sweep INSERTS into the
+ * table it is scanning, so pages could overlap or skip. (Measured at 52,748
+ * rows, ordered and unordered scans happened to agree on all 477.)
+ */
 async function existingNaics(): Promise<string[]> {
+  const HARD_CAP = 2_000_000; // a bound that throws, not one that truncates
   const rows: { naics_code: string | null }[] = [];
-  for (let from = 0; from < 40000; from += 1000) {
-    const { data, error } = await sb.from('recompete_opportunities').select('naics_code').range(from, from + 999);
-    if (error) throw new Error(`naics scan failed: ${error.message}`);
+
+  for (let from = 0; ; from += 1000) {
+    if (from >= HARD_CAP) throw new Error(`naics scan exceeded ${HARD_CAP} rows — refusing to truncate silently`);
+    const { data, error } = await sb
+      .from('recompete_opportunities')
+      .select('naics_code')
+      .order('naics_code', { ascending: true, nullsFirst: false })
+      .order('id', { ascending: true }) // tie-break so the order is total
+      .range(from, from + 999);
+    if (error) throw new Error(`naics scan failed at offset ${from}: ${error.message}`);
     if (!data?.length) break;
     rows.push(...data);
     if (data.length < 1000) break;
   }
+
   const tally = new Map<string, number>();
   for (const r of rows) if (r.naics_code) tally.set(r.naics_code, (tally.get(r.naics_code) || 0) + 1);
   return [...tally.entries()].sort((a, b) => b[1] - a[1]).map(([code]) => code);
