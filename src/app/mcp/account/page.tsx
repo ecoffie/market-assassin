@@ -85,9 +85,12 @@ export default function McpAccountPage() {
     } catch { /* keep prior */ }
   }, []);
 
+  // NOTE: /api/mcp/keys is guarded by requireUserAuth, which reads the claimed email
+  // from ?email= (or the JSON body) — NOT the x-user-email header. So the email goes in
+  // the query string; getMIApiHeaders(email) still supplies the token that proves we own it.
   const refreshKeys = useCallback(async (forEmail: string) => {
     try {
-      const res = await fetch('/api/mcp/keys', { headers: getMIApiHeaders(forEmail) });
+      const res = await fetch(`/api/mcp/keys?email=${encodeURIComponent(forEmail)}`, { headers: getMIApiHeaders(forEmail) });
       const j = await res.json().catch(() => null);
       if (res.ok && j?.success) setKeys(j.keys ?? []);
     } catch { /* keep prior */ }
@@ -126,7 +129,7 @@ export default function McpAccountPage() {
     try {
       const headers = getMIApiHeaders(email);
       headers.set('Content-Type', 'application/json');
-      const res = await fetch('/api/mcp/keys', { method: 'POST', headers, body: JSON.stringify({ label: newKeyLabel.trim() || undefined }) });
+      const res = await fetch(`/api/mcp/keys?email=${encodeURIComponent(email)}`, { method: 'POST', headers, body: JSON.stringify({ label: newKeyLabel.trim() || undefined, email }) });
       const j = await res.json().catch(() => null);
       if (res.ok && j?.success && j.key) {
         setNewKey(j.key);
@@ -143,7 +146,7 @@ export default function McpAccountPage() {
     if (!window.confirm('Revoke this key? Any agent using it will stop working immediately.')) return;
     setKeyBusy(true);
     try {
-      const res = await fetch(`/api/mcp/keys?id=${encodeURIComponent(id)}`, { method: 'DELETE', headers: getMIApiHeaders(email) });
+      const res = await fetch(`/api/mcp/keys?id=${encodeURIComponent(id)}&email=${encodeURIComponent(email)}`, { method: 'DELETE', headers: getMIApiHeaders(email) });
       if (res.ok) await refreshKeys(email);
     } catch { /* leave */ }
     finally { setKeyBusy(false); }
