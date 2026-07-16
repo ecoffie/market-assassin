@@ -296,11 +296,15 @@ export async function checkCache(
   const cacheKey = generateCacheKey(apiType, params);
 
   try {
+    // maybeSingle, NOT single: a cache MISS is the normal path, but .single()
+    // turns "0 rows" into PGRST116 → HTTP 406, which the API gateway logs as a
+    // warning. That was ~12.6k gateway warnings/day — one per miss, all noise.
+    // maybeSingle returns {data: null, error: null} + 200 for the same miss.
     const { data, error } = await supabase
       .from('sam_api_cache')
       .select('response_data, expires_at, hit_count')
       .eq('cache_key', cacheKey)
-      .single();
+      .maybeSingle();
 
     if (error || !data) return null;
 
