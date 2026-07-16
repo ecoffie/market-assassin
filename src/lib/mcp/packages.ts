@@ -50,10 +50,17 @@ export function creditsForPackage(packageId: string | null | undefined): number 
   return p ? p.credits : null;
 }
 
-/** Credits included with an active Pro ($149/mo) subscription, granted monthly. */
+/**
+ * Credits included with an active Pro ($149/mo) subscription, granted monthly.
+ * Bumped 1,000 → 6,000 (2026-07-16) as the COUPLED half of the proposal-flagship
+ * reprice: a full proposal run now costs ~100 cr (draft 50 + matrix 8 + referee 12 + …),
+ * so Pro's old 1,000/mo would only cover ~10 proposals. 6,000/mo ≈ ~60 proposals + daily
+ * research. ⚠️ Env-overridable: if MCP_PRO_MONTHLY_CREDITS is set in Vercel (it may hold
+ * the old 1000), UPDATE it to 6000 too — the env wins over this default.
+ */
 export const PRO_MONTHLY_CREDITS = Math.max(
   0,
-  Number(process.env.MCP_PRO_MONTHLY_CREDITS ?? '1000') || 0,
+  Number(process.env.MCP_PRO_MONTHLY_CREDITS ?? '6000') || 0,
 );
 
 /**
