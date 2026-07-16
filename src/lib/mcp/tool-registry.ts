@@ -97,9 +97,9 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   search_idv_contracts: 2, // live USASpending IDV/task-order search
   get_contractor_award_history: 2, // USASpending cache + contractor DB
   assess_market_depth: 2, // Supabase sam_entities + BQ recipients activity enrich
-  get_solicitation_documents: 3, // full-text + raw-file delivery (cold path downloads + extracts on demand)
+  get_solicitation_documents: 5, // full-text + raw-file delivery (cold path downloads + extracts on demand). Repriced 3→5 (2026-07-16, proposal-flagship coupling)
   search_federal_events: 2, // Supabase sam_events read + optional paid AI web discovery (Serper+Groq)
-  scan_proposal_compliance: 1, // pure deterministic DQ-risk scan (no LLM/IO)
+  scan_proposal_compliance: 2, // pure deterministic DQ-risk scan (no LLM/IO). Repriced 1→2 (proposal-flagship coupling)
   evaluate_bid_decision: 1, // pure GovCon bid/no-bid framework + scorer (no LLM/IO)
   lookup_federal_osbp: 1, // curated DoD command / OSBP directory (static, no LLM/IO)
   search_agency_opps_by_office: 1, // DoDAAC-anchored open SAM opps (Supabase read)
@@ -109,11 +109,11 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   get_agency_budget_trends: 1, // curated OMB/CBJ budget-authority JSON (static, no LLM/IO)
   derive_company_keywords: 1, // OpenAI-embedding keyword derivation (no BigQuery)
   get_agency_spending_detail: 2, // multiple USASpending aggregates (total + subagency + set-aside buckets)
-  extract_compliance_matrix: 3, // LLM-backed RFP requirement extraction (chunked+parallel; shared cache warms public notices)
-  build_proposal_structure: 1, // pure shaping — compliance matrix → volume/section tree (no LLM/IO)
-  referee_proposal_compliance: 4, // independent Claude referee (no-training/sensitive) — draft vs matrix, per-req verdicts
-  match_recompete_sow: 2, // embed + vector scan over the sam_opportunities SOW corpus (Mindy embeddings moat)
-  extract_statement_of_work: 2, // SOW/PWS heading detection over solicitation text (+ notice fetch, CLIN fallback)
+  extract_compliance_matrix: 8, // LLM-backed RFP requirement extraction (chunked+parallel; shared cache warms public notices). Repriced 3→8 (proposal-flagship coupling)
+  build_proposal_structure: 2, // pure shaping — compliance matrix → volume/section tree (no LLM/IO). Repriced 1→2 (proposal-flagship coupling)
+  referee_proposal_compliance: 12, // independent Claude referee (no-training/sensitive) — draft vs matrix, per-req verdicts. Repriced 4→12 (Claude cost + proposal-flagship coupling)
+  match_recompete_sow: 4, // embed + vector scan over the sam_opportunities SOW corpus (Mindy embeddings moat). Repriced 2→4 (proposal-flagship coupling)
+  extract_statement_of_work: 4, // SOW/PWS heading detection over solicitation text (+ notice fetch, CLIN fallback). Repriced 2→4 (proposal-flagship coupling)
   get_federal_event_series: 1, // curated recurring-event catalog (static read, no IO)
   get_sba_goaling_share: 2, // statutory SB goals vs actual set-aside obligations (USASpending aggregates)
   draft_proposal: 50, // full multi-section proposal draft (two-pass outline + parallel per-section LLM generation, vault+RAG grounded)
