@@ -8,6 +8,7 @@
  * See migration 20260712_mcp_credit_ledger.sql.
  */
 import { getWriteClient } from '@/lib/supabase/server-clients';
+import { sendCreditWelcomeEmail } from './credit-emails';
 
 /**
  * Free credits granted ONE-TIME on a user's FIRST connection (first key or first
@@ -124,6 +125,8 @@ export async function grantSignupCreditsIfFirst(userEmail: string): Promise<numb
     .maybeSingle();
   if (data) return 0; // already has a balance row → not their first
   await grantCredits(userEmail, SIGNUP_CREDITS, 'signup_grant');
+  // Welcome email (free-credit onboarding). Never blocks the grant.
+  await sendCreditWelcomeEmail({ email: userEmail.toLowerCase(), credits: SIGNUP_CREDITS });
   return SIGNUP_CREDITS;
 }
 

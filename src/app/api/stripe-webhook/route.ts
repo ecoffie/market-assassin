@@ -4,6 +4,7 @@ import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
 import { handleMcpCreditTopup } from '@/lib/mcp/stripe-topup';
 import { handleAutoRechargeSetup, MCP_AUTORECHARGE_PI_TYPE } from '@/lib/mcp/autorecharge';
+import { sendCreditReceiptEmail } from '@/lib/mcp/credit-emails';
 import { applyCreditOnce } from '@/lib/mcp/credits';
 import { creditsForPackage } from '@/lib/mcp/packages';
 import {
@@ -519,6 +520,19 @@ export async function POST(request: NextRequest) {
       if (credits > 0) {
         const { applied, newBalance } = await applyCreditOnce(pi.id, meta.user_email, credits, 'auto_recharge');
         console.log(`[mcp:autorecharge] webhook backstop ${meta.user_email} pi=${pi.id} applied=${applied} balance=${newBalance}`);
+        // Only fires here in the rare case the engine died after charge before grant —
+        // then the engine's receipt never sent, so the backstop covers it. Normal path:
+        // engine already applied → applied=false here → no duplicate.
+        if (applied) {
+          await sendCreditReceiptEmail({
+            email: meta.user_email,
+            kind: 'auto_recharge',
+            credits,
+            newBalance,
+            amountUsd: typeof pi.amount === 'number' ? pi.amount / 100 : null,
+            reference: pi.id,
+          });
+        }
       }
       return NextResponse.json({ received: true, mcp_autorecharge: true });
     }

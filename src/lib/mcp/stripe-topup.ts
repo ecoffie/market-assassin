@@ -13,6 +13,7 @@
 import type Stripe from 'stripe';
 import { creditsForPackage } from './packages';
 import { applyCreditOnce } from './credits';
+import { sendCreditReceiptEmail } from './credit-emails';
 import { getStripe } from '@/lib/stripe';
 
 export const MCP_TOPUP_TYPE = 'mcp_credit_topup';
@@ -76,5 +77,16 @@ export async function handleMcpCreditTopup(session: Stripe.Checkout.Session): Pr
 
   const { applied, newBalance } = await applyCreditOnce(session.id, email, credits, 'stripe_topup');
   console.log(`[mcp:topup] ${email} +${credits} (applied=${applied}, balance=${newBalance}) session ${session.id}`);
+  // Receipt only on a real grant (not a Stripe re-delivery). Never blocks the grant.
+  if (applied) {
+    await sendCreditReceiptEmail({
+      email,
+      kind: 'topup',
+      credits,
+      newBalance,
+      amountUsd: typeof session.amount_total === 'number' ? session.amount_total / 100 : null,
+      reference: session.id,
+    });
+  }
   return { handled: true, applied, credits, email };
 }
