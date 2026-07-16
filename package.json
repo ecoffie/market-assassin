@@ -36,7 +36,10 @@
     "test:unit:watch": "vitest",
     "mcp:dev": "node scripts/mcp-dev.mjs",
     "mcp:smoke": "node scripts/mcp-smoke.mjs",
-    "mcp:smoke:http": "node scripts/mcp-http-smoke.mjs"
+    "mcp:smoke:http": "node scripts/mcp-http-smoke.mjs",
+    "verify:live": "node scripts/verify-live.mjs",
+    "db": "node scripts/db.mjs",
+    "db:check": "node scripts/db.mjs --check"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",

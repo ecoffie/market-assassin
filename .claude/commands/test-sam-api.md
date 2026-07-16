@@ -27,28 +27,28 @@ Based on the `$ARGUMENTS` provided:
 ### If `awards` or `all`:
 1. Call the admin test endpoint:
    ```bash
-   curl "https://tools.govcongiants.org/api/admin/test-sam-awards?password=$ADMIN_PASSWORD&naics=541512"
+   curl "https://getmindy.ai/api/admin/test-sam-awards?password=$ADMIN_PASSWORD&naics=541512"
    ```
 2. Report: number of contracts found, sample incumbents, bid counts
 
 ### If `entity` or `all`:
 1. Call the admin test endpoint:
    ```bash
-   curl "https://tools.govcongiants.org/api/admin/test-sam-entity?password=$ADMIN_PASSWORD&name=Booz"
+   curl "https://getmindy.ai/api/admin/test-sam-entity?password=$ADMIN_PASSWORD&name=Booz"
    ```
 2. Report: entities found, SAM status, certifications
 
 ### If `subaward` or `all`:
 1. Call the admin test endpoint:
    ```bash
-   curl "https://tools.govcongiants.org/api/admin/test-sam-subaward?password=$ADMIN_PASSWORD&naics=541512"
+   curl "https://getmindy.ai/api/admin/test-sam-subaward?password=$ADMIN_PASSWORD&naics=541512"
    ```
 2. Report: prime→sub relationships found, sample teaming data
 
 ### If `hierarchy` or `all`:
 1. Call the admin test endpoint:
    ```bash
-   curl "https://tools.govcongiants.org/api/admin/test-sam-hierarchy?password=$ADMIN_PASSWORD&agency=VA"
+   curl "https://getmindy.ai/api/admin/test-sam-hierarchy?password=$ADMIN_PASSWORD&agency=VA"
    ```
 2. Report: organizational structure, offices found
 

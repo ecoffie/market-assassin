@@ -2161,37 +2161,66 @@ Scope: `tasks/one-shot-tools-plan.md`. Collapse a hand-chained workflow into ONE
 ## Verification Recipes — how to PROVE each surface works (rule #2)
 
 The concrete "it works" evidence, centralized so skills/agents stop re-deriving it.
-"It compiles" ≠ "it works." A 200 with 0 rows is a FAIL, not a pass.
+"It compiles" ≠ "it works." **A 200 with 0 rows is a FAIL, not a pass.**
 
-**Page is live:** `curl -s -o /dev/null -w "%{http_code}\n" "https://getmindy.ai<route>"` → 200 (3xx to login = OK for gated, note it; 404/500 = fail).
+Two scripts encode these rules — prefer them over hand-rolled `curl` / inline `createClient`
+probes. They exit non-zero on failure, so an agent can't mistake a red run for a green one.
 
-**API returns real data (not just 200):**
+**Live surfaces** — `scripts/verify-live.mjs`:
 ```bash
-curl -s -o /tmp/v.json -w "%{http_code}\n" "https://getmindy.ai/api/<route>?<params>"
-node -e 'const d=require("/tmp/v.json");const r=d.results||d.data||d.rows||d.items||d;console.log("rows:",Array.isArray(r)?r.length:JSON.stringify(r).slice(0,200))'
+npm run verify:live -- /api/recompete /forecasts        # status + row count + timing
+npm run verify:live -- /api/<route> --min-rows 1        # 200 with 0 rows → FAIL
+npm run verify:live -- /pricing --expect-text "$149" --no-rows
+npm run verify:live -- /api/<route> --post --json       # POST + machine-readable out
+```
+Rows are found under `results`/`data`/`rows`/`items` or `_meta.grounded`. A 3xx to login on a
+gated page = OK, but note it. Default host is `https://getmindy.ai` (`--host` to override).
+
+**Database** — `scripts/db.mjs` (read-only):
+```bash
+npm run db -- <table> --count                            # how many rows
+npm run db -- <table> --eq owner_email=x@y.com --limit 5
+npm run db:check -- <table> <column>                     # did the migration REALLY land?
+```
+Never trust "Success. No rows returned" from the SQL editor — `db:check` is the proof.
+
+**Cron is registered** — it's a `cron_jobs` row, **NOT** `vercel.json`. The dispatcher ticks
+roughly HOURLY, so a `*/10` expression really fires ~once/hr. Columns are
+**`job_name` / `cron_expr` / `enabled`** (NOT `name`/`cron_expression`/`active`), and `enabled`
+is the *string* `'true'`:
+```bash
+npm run db -- cron_jobs --select job_name,cron_expr,enabled --eq enabled=true
 ```
 
-**Panel actually renders the data** (rendered rows == API rows): run `/verify-panel <name>`. Catches the facet-bug class (API 56, UI shows 3).
+**Env var is in prod:** `vercel env ls production | grep -i <VAR>`. Remember a var only binds on
+a build *after* `vercel env add` — trigger a fresh deploy.
 
-**Migration landed** (never trust "Success. No rows returned" alone):
-```bash
-npx tsx -e "import dotenv from 'dotenv';dotenv.config({path:'.env.local'});import {createClient} from '@supabase/supabase-js';const sb=createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.SUPABASE_SERVICE_ROLE_KEY!);(async()=>{const {error}=await sb.from('<table>').select('<new_col>').limit(1);console.log(error?'❌ NOT applied: '+error.message:'✅ column exists');})();"
-```
+**Panel renders what the API returns** (rendered rows == API rows): `/verify-panel <name>`.
 
-**Cron is registered** (it's a `cron_jobs` row, NOT vercel.json; dispatcher ticks HOURLY so `*/10` really fires ~once/hr):
-```bash
-npx tsx -e "import dotenv from 'dotenv';dotenv.config({path:'.env.local'});import {createClient} from '@supabase/supabase-js';const sb=createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!,process.env.SUPABASE_SERVICE_ROLE_KEY!);(async()=>{const {data}=await sb.from('cron_jobs').select('name,cron_expression,last_run,active').eq('active',true);console.table(data);})();"
-```
+**Backfill/drainer progress:** `/backfill-status <job>` (drained vs stalled vs progressing).
 
-**Env var is in prod:** `vercel env ls production | grep -i <VAR>`.
+**Full deploy proof** (everything a ship touched): `/verify-prod`.
 
-**Backfill/drainer progress:** run `/backfill-status` (drained vs stalled vs progressing).
+### What actually exists (keep this honest)
 
-**Full deploy proof (all of the above for what a ship touched):** run `/verify-prod`.
+Referencing a command that doesn't exist is worse than referencing none — the model burns turns
+looking for it. **If you add or remove one, update this table in the same commit.**
+
+| Invoke | Kind | Does |
+|---|---|---|
+| `/verify-prod` | command | Proves everything the latest ship touched is live |
+| `/verify-panel` | command | Rendered rows == API rows (the facet-bug class) |
+| `/backfill-status` | command | Drained vs progressing vs stalled |
+| `/ui-fix` | command | Render fixes — only after the data is proven right |
+| `/check-access` `/kv` `/admin-endpoint` `/email-template` `/stripe-handler` `/product-page` `/test-sam-api` | commands | Repo-specific recipes (`.claude/commands/`) |
+| `/deploy` `/rootcause` `/from-screenshot` `/email` `/plan-first` `/session-update` `/reconcile-todo` | commands | Global (`~/.claude/commands/`) |
+| **fix-and-ship** | agent | The whole loop: symptom → cause → fix → proof → live |
+| **ship** | agent | Working tree → deployed → confirmed on the live URL |
 
 ### The screenshot-debug decision tree (the 386-turn loop)
 A number/label on screen looks wrong → diagnose in THIS order before touching a component:
 1. **Wrong DATA?** Query the source table/API, compare to screen. A "No X found" when data exists, or a stale figure = a **query/wiring bug** → fix the backend, don't mask it in the UI. (Most "still shows X" loops are this.)
 2. **Stale CACHE?** DB is right but screen is old → fix the cache layer (KV / last-good / SWR), not the component.
 3. **UI RENDER?** Data is right, presentation wrong → the component. Apply standing UI standards (counts at top · names not codes · chips clickable · spinner on load · legible contrast · vertical bars · no dead empty-state · jargon defined).
-Then: `/ui-fix` (render) → `/verify-panel` (prove) → `/ship` → `/verify-prod`. Or hand the whole loop to the **fix-and-ship** agent.
+Then: `/ui-fix` (render) → `/verify-panel` (prove) → `/deploy` → `/verify-prod`. Or hand the whole
+loop to the **fix-and-ship** agent, which owns symptom → cause → fix → proof → live in one shot.
