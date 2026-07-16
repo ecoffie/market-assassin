@@ -226,25 +226,30 @@ export default function McpPricing() {
           {/* Pro — subscription; second column */}
           <div className="relative flex flex-col rounded-2xl border border-indigo-400/40 bg-indigo-400/[0.06] p-6">
             <span className="absolute -top-2.5 left-6 rounded-full bg-indigo-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Best for daily use</span>
-            <div className="flex items-baseline justify-between gap-2">
+            <div className="flex items-center justify-between gap-2">
               <span className="text-[12px] font-semibold uppercase tracking-wide text-indigo-300">Pro</span>
               <span className="text-[11px] text-slate-500">subscription</span>
             </div>
-            <div className="mt-2 flex items-baseline gap-2">
-              {annual && <span className="font-mono text-xl font-semibold tabular-nums text-slate-500 line-through">${PRO_MONTHLY}</span>}
-              <span className="font-mono text-4xl font-bold tabular-nums">${annual ? ANNUAL_PER_MO : PRO_MONTHLY}</span>
-              <span className="text-[13px] text-slate-400">/mo</span>
-            </div>
-            <div className="mt-1 h-4 text-[12px] text-emerald-300">{annual ? `billed annually ($${PRO_ANNUAL.toLocaleString()}/yr) · save $${ANNUAL_SAVE}` : ''}</div>
-            <div className="mt-1 min-h-[2.5rem] text-[13px] leading-relaxed text-slate-400">The whole platform, credits included — built for agents working federal BD every day.</div>
-            <div className="mt-3 rounded-xl border border-indigo-400/15 bg-indigo-400/[0.05] p-3">
-              <div className="text-[12px] text-indigo-200/80"><b className="font-mono text-[14px] tabular-nums text-indigo-100">{proCredits.toLocaleString()}</b> credits every month get you</div>
+            <div className="mt-1 min-h-[2.25rem] text-[13px] leading-relaxed text-slate-400">The whole platform, credits included — built for agents working federal BD every day.</div>
+            <div className="mt-2 rounded-xl border border-indigo-400/15 bg-indigo-400/[0.05] p-3">
+              <div className="flex items-baseline gap-1.5 text-indigo-100">
+                <span aria-hidden>✦</span>
+                <b className="font-mono text-[15px] font-semibold tabular-nums">{proCredits.toLocaleString()}</b>
+                <span className="text-[13px] font-semibold">credits/mo</span>
+              </div>
               <ul className="mt-1.5 space-y-0.5 text-[12px] text-slate-300">
-                {outcomes(proCredits).map((o) => <li key={o} className="tabular-nums">· {o}</li>)}
+                {outcomes(proCredits).map((o) => <li key={o} className="tabular-nums">· {o} <span className="text-slate-500">/mo</span></li>)}
               </ul>
             </div>
+            {/* Price — flips with the toggle, same position as the other cards */}
+            <div className="mt-4 flex items-baseline gap-2">
+              {annual && <span className="font-mono text-xl font-semibold tabular-nums text-slate-500 line-through">${PRO_MONTHLY}</span>}
+              <span className="font-mono text-4xl font-bold tabular-nums">${annual ? ANNUAL_PER_MO : PRO_MONTHLY}</span>
+              <span className="text-[13px] text-slate-400">{annual ? 'per month, billed annually' : 'billed monthly'}</span>
+            </div>
+            <div className="mt-1 h-4 text-[12px] text-emerald-300">{annual ? `Save $${ANNUAL_SAVE}/yr · billed $${PRO_ANNUAL.toLocaleString()}/yr` : ''}</div>
             <ul className="mt-4 flex-1 space-y-2 border-t border-indigo-400/15 pt-4 text-[12.5px]">
-              <li className="flex gap-2"><span className="text-indigo-300">◆</span> <span><b className="font-semibold">Everything in the annual plans</b> — all {toolCount} tools + the full moat</span></li>
+              <li className="flex gap-2"><span className="text-indigo-300">◆</span> <span><b className="font-semibold">Everything in Starter</b> — all {toolCount} tools + the full moat</span></li>
               <li className="flex gap-2"><span className="text-indigo-300">◆</span> <span><b className="font-semibold">{proCredits.toLocaleString()} credits / month</b> <span className="text-slate-500">— renews automatically, no top-ups</span></span></li>
               {PRO_INCLUDES.map((u) => (
                 <li key={u.label} className="flex items-start gap-2">
