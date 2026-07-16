@@ -182,8 +182,8 @@ export default function McpPricing() {
           <a href="/app" className="shrink-0 rounded-lg border border-emerald-400/30 px-4 py-2 text-[13px] font-semibold text-emerald-200 hover:bg-emerald-400/10">Start free →</a>
         </div>
 
-        {/* Paid credit plan — Starter (toggle-driven price), then Pro below */}
-        <section className={`mt-4 grid gap-4 ${planRows.length > 1 ? 'md:grid-cols-2' : 'mx-auto w-full max-w-md'}`}>
+        {/* Two paid plans side by side — Starter (metered credit plan) + Pro (subscription) */}
+        <section className="mt-4 grid items-stretch gap-4 md:grid-cols-2">
           {planRows.map((p) => (
             <div key={p.id} className={`relative flex flex-col rounded-2xl border p-6 ${p.highlight ? 'border-emerald-400/40 bg-emerald-400/[0.05] shadow-[0_0_0_1px_rgba(16,185,129,0.15)]' : 'border-white/10 bg-white/[0.02]'}`}>
               {p.tag && <span className={`absolute -top-2.5 left-6 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${p.highlight ? 'bg-emerald-500 text-[#06120c]' : 'border border-white/15 bg-[#0a0f1e] text-slate-400'}`}>{p.tag}</span>}
@@ -220,11 +220,8 @@ export default function McpPricing() {
             </div>
           ))}
 
-        </section>
-
-        {/* Pro — subscription; same vertical format as the packs, centered below */}
-        <div className="mt-4 flex justify-center">
-          <div className="relative flex w-full flex-col rounded-2xl border border-indigo-400/40 bg-indigo-400/[0.06] p-6 md:w-[calc(50%-0.5rem)]">
+          {/* Pro — subscription; sits beside Starter as the second column */}
+          <div className="relative flex flex-col rounded-2xl border border-indigo-400/40 bg-indigo-400/[0.06] p-6">
             <span className="absolute -top-2.5 left-6 rounded-full bg-indigo-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Best for daily use</span>
             <div className="flex items-baseline justify-between gap-2">
               <span className="text-[12px] font-semibold uppercase tracking-wide text-indigo-300">Pro</span>
@@ -259,7 +256,7 @@ export default function McpPricing() {
             <a href={proHref} className="mt-5 inline-flex items-center justify-center rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-400">Go Pro {annual ? 'annually' : 'monthly'}</a>
             <div className="mt-2 h-4 text-center text-[11.5px] text-slate-500">{annual ? <><b className="font-semibold text-emerald-300">Save ${ANNUAL_SAVE}</b> compared to monthly</> : 'Switch to annual for 2 months free'}</div>
           </div>
-        </div>
+        </section>
 
         <p className="mx-auto mt-5 max-w-2xl text-center text-[12px] leading-relaxed text-slate-500">
           The <b className="font-medium text-slate-300">moat</b> is Mindy&apos;s un-copyable layer — included with every paid plan. The free trial runs public-data tools only. Every metered tool is charged on success.
