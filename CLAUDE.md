@@ -1886,7 +1886,7 @@ page, not a home page").
 - **`/mcp/account`** (`src/app/mcp/account/page.tsx`) = left-rail console:
   **Usage** (balance · 7-day credits graph · KPI tiles · spend-by-tool) · **Activity**
   (raw call log) · **Billing** (top-up · plan · auto-recharge full controls · payment
-  method · billing-history placeholder) · **API keys** (create/label/revoke — first UI
+  method · **billing history**) · **API keys** (create/label/revoke — first UI
   for the existing `/api/mcp/keys`) · **Settings**. Deep-links: `?section=<id>`,
   `?autorecharge=saved`.
 - **Charts** live in `src/app/mcp/usage-charts.tsx` (`UsageKpis`/`UsageOverTime`/
@@ -1904,8 +1904,13 @@ in place. (2) `account`/`autorecharge` use token-only `resolveMcpEmail`, but `ke
 `requireUserAuth` which needs the email in **`?email=`** (or JSON body), NOT the
 `x-user-email` header.
 
-**Phase 2 (deferred):** a real Billing history / receipts list from `mcp_credit_ledger`
-+ `mcp_credit_topups`.
+**Phase 2 (SHIPPED, PR #255):** Billing history — `GET /api/mcp/billing-history`
+(token-only) lists every credit ADDITION (`mcp_credit_ledger` delta > 0) newest-first
+as dated receipts (reason → friendly label; a "free" badge only on signup/admin grants).
+**Credit-denominated, NOT dollars** — neither `mcp_credit_ledger` nor `mcp_credit_topups`
+stores a USD amount, and a credit count is ambiguous between a one-time pack and a
+subscription month; per-event USD would need capturing the amount at grant time (a later
+enhancement).
 
 **Extraction guard (2026-07-16):** flipped ON in prod in **log-only/shadow** mode
 (`MCP_EXTRACTION_GUARD=true`, `MCP_EXTRACTION_ENFORCE` unset). Verified live. Next:
