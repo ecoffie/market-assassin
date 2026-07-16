@@ -43,12 +43,32 @@ const key = (process.env.SUPABASE_SERVICE_ROLE_KEY || '').replace(/\\n$/, '').tr
 if (!url || !key) throw new Error('Missing NEXT_PUBLIC_SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY');
 const sb = createClient(url, key);
 
-interface State { done: string[]; inserted: number; truncated: string[] }
+interface State { done: string[]; inserted: number; truncated: string[]; failed?: Record<string, string> }
 
 function loadState(): State {
-  if (!existsSync(STATE_PATH)) return { done: [], inserted: 0, truncated: [] };
-  try { return JSON.parse(readFileSync(STATE_PATH, 'utf8')); }
-  catch { return { done: [], inserted: 0, truncated: [] }; }
+  if (!existsSync(STATE_PATH)) return { done: [], inserted: 0, truncated: [], failed: {} };
+  try {
+    const parsed = JSON.parse(readFileSync(STATE_PATH, 'utf8'));
+    return { failed: {}, ...parsed };
+  } catch { return { done: [], inserted: 0, truncated: [], failed: {} }; }
+}
+
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+/**
+ * Supabase writes go over fetch too, so they get the same transient treatment
+ * as the USASpending reads. Still throws once the budget is spent.
+ */
+async function withRetry<T>(label: string, fn: () => Promise<T>): Promise<T> {
+  const delays = [1_000, 5_000, 15_000];
+  for (let attempt = 0; ; attempt++) {
+    try { return await fn(); }
+    catch (error) {
+      if (attempt >= delays.length) throw error;
+      console.log(`      ${label} failed (${(error as Error).message}) — retry ${attempt + 1}/${delays.length}`);
+      await sleep(delays[attempt]);
+    }
+  }
 }
 function saveState(s: State) { writeFileSync(STATE_PATH, JSON.stringify(s, null, 2)); }
 
@@ -100,30 +120,46 @@ async function main() {
   for (const [idx, naics] of todo.entries()) {
     const t0 = Date.now();
     let pages = 0;
-    const { contracts, truncatedGroups } = await fetchExpiringForNaics({
-      naics, monthsAhead: MONTHS, minValue: MIN_VALUE, includeIdvs: INCLUDE_IDVS,
-      onPage: () => { pages++; },
-    });
 
-    const uei = contracts.filter((c) => c.incumbent_uei).length;
-    totalRows += contracts.length;
-    totalUei += uei;
+    // A single NAICS failing must not kill a multi-hour sweep -- but it must
+    // never pass silently either. Record it, keep going, and report every
+    // failure at the end with a non-zero exit.
+    try {
+      const { contracts, truncatedGroups } = await withRetry(`NAICS ${naics} fetch`, () =>
+        fetchExpiringForNaics({
+          naics, monthsAhead: MONTHS, minValue: MIN_VALUE, includeIdvs: INCLUDE_IDVS,
+          onPage: () => { pages++; },
+        })
+      );
 
-    if (truncatedGroups.length) truncated.push(`${naics}:${truncatedGroups.join('+')}`);
+      const uei = contracts.filter((c) => c.incumbent_uei).length;
+      totalRows += contracts.length;
+      totalUei += uei;
 
-    if (APPLY && contracts.length) await upsertBatch(contracts);
+      if (truncatedGroups.length) truncated.push(`${naics}:${truncatedGroups.join('+')}`);
 
-    state.done.push(naics);
-    state.inserted += APPLY ? contracts.length : 0;
-    state.truncated = truncated;
-    saveState(state);
+      if (APPLY && contracts.length) await withRetry(`NAICS ${naics} upsert`, () => upsertBatch(contracts));
 
-    const secs = ((Date.now() - t0) / 1000).toFixed(1);
-    console.log(
-      `[${String(idx + 1).padStart(3)}/${todo.length}] NAICS ${naics.padEnd(7)} ` +
-      `${String(contracts.length).padStart(5)} rows | UEI ${uei}/${contracts.length} | ${pages} pages | ${secs}s` +
-      (truncatedGroups.length ? `  *** TRUNCATED: ${truncatedGroups.join(',')} (incomplete)` : '')
-    );
+      state.done.push(naics);
+      state.inserted += APPLY ? contracts.length : 0;
+      state.truncated = truncated;
+      delete state.failed![naics];
+      saveState(state);
+
+      const secs = ((Date.now() - t0) / 1000).toFixed(1);
+      console.log(
+        `[${String(idx + 1).padStart(3)}/${todo.length}] NAICS ${naics.padEnd(7)} ` +
+        `${String(contracts.length).padStart(5)} rows | UEI ${uei}/${contracts.length} | ${pages} pages | ${secs}s` +
+        (truncatedGroups.length ? `  *** TRUNCATED: ${truncatedGroups.join(',')} (incomplete)` : '')
+      );
+    } catch (error) {
+      state.failed![naics] = (error as Error).message;
+      saveState(state);
+      console.log(
+        `[${String(idx + 1).padStart(3)}/${todo.length}] NAICS ${naics.padEnd(7)} ` +
+        `*** FAILED: ${(error as Error).message.slice(0, 90)}`
+      );
+    }
   }
 
   console.log('\n=== sweep summary ===');
@@ -137,6 +173,16 @@ async function main() {
   } else {
     console.log('truncation     : none — every NAICS walked back to today');
   }
+
+  const failed = Object.entries(state.failed || {});
+  if (failed.length) {
+    console.log(`\n*** ${failed.length} NAICS FAILED and were skipped — coverage is INCOMPLETE:`);
+    for (const [naics, msg] of failed.slice(0, 20)) console.log(`      ${naics}: ${msg.slice(0, 100)}`);
+    console.log('    Re-run the same command; completed NAICS are skipped and only these retry.');
+    process.exitCode = 1;
+  }
 }
 
-main().then(() => process.exit(0)).catch((e) => { console.error('SWEEP FAILED:', e.message); process.exit(1); });
+main()
+  .then(() => process.exit(process.exitCode ?? 0))
+  .catch((e) => { console.error('SWEEP FAILED:', e.message); process.exit(1); });
