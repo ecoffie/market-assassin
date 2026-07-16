@@ -83,6 +83,7 @@ try {
     'match_recompete_sow', 'extract_statement_of_work',
     'get_federal_event_series', 'get_sba_goaling_share',
     'draft_proposal', 'draft_proposal_section', 'export_proposal',
+    'generate_market_report',
   ]) {
     if (!names.includes(t)) fail(`${t} not registered`);
   }
@@ -347,6 +348,20 @@ try {
     // on the place-of-performance side (default scope="pop").
     const offPop = (pcS.awards || []).filter((a) => a.popState && a.popState !== 'FL');
     if (offPop.length) fail(`past-contracts: ${offPop.length} award(s) with popState != FL under scope=pop (location filter leaking)`);
+  }
+
+  // ── generate_market_report (one-shot composite: coverage+agencies+competition+…) ─
+  console.error('\n→ calling generate_market_report({ keyword: "drones" })');
+  const mr = await client.callTool({ name: 'generate_market_report', arguments: { keyword: 'drones' } });
+  const mrS = mr.structuredContent;
+  if (!mrS) fail('market-report: no structuredContent');
+  console.error(`✓ grounded=${mrS._meta?.grounded} · degraded=${mrS._meta?.degraded} · sections=${mrS._meta?.sections_grounded}/${mrS._meta?.sections_total} · $${mrS.summary?.total_market} · naics=${mrS.summary?.naics_count} · agencies=${mrS.summary?.buying_agencies} · html=${mrS.deliverable?.html?.length}b`);
+  if (!mrS._meta?.grounded) console.error('⚠ market-report: grounded=false for "drones" — NON-FATAL (upstream hiccup; USASpending/BQ cold)');
+  else {
+    // Traceability: a grounded report must carry a real deliverable + coverage figures.
+    if (!mrS.deliverable?.html || mrS.deliverable.html.length < 500) fail('market-report: grounded but deliverable.html missing/short');
+    if (!mrS.summary?.total_market) fail('market-report: grounded but no total_market (coverage math broken)');
+    if (!mrS.deliverable.html.includes('Powered by')) fail('market-report: deliverable missing Mindy branding footer');
   }
 
   // ── get_contractor_award_history (USASpending cache + contractor DB) ───────

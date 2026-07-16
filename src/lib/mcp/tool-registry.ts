@@ -36,6 +36,7 @@ import { expiringContracts } from '@/mcp/tools/expiring-contracts';
 import { getKeywordCoverage } from '@/mcp/tools/keyword-coverage';
 import { idvContracts } from '@/mcp/tools/idv-contracts';
 import { searchPastContracts } from '@/mcp/tools/past-contracts';
+import { generateMarketReport } from '@/mcp/tools/market-report';
 import { contractorAwardHistory } from '@/mcp/tools/contractor-award-history';
 import { assessMarketDepth } from '@/mcp/tools/market-depth';
 import { solicitationDocuments } from '@/mcp/tools/solicitation-documents';
@@ -97,6 +98,7 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   get_keyword_coverage: 1, // USASpending spending-by-category (free upstream, cacheable)
   search_idv_contracts: 2, // live USASpending IDV/task-order search
   search_past_contracts: 2, // live USASpending awarded-contract search by location
+  generate_market_report: 20, // one-shot composite: coverage+agencies+contractors+recompetes+forecasts+set-aside → client-ready report
   get_contractor_award_history: 2, // USASpending cache + contractor DB
   assess_market_depth: 2, // Supabase sam_entities + BQ recipients activity enrich
   get_solicitation_documents: 5, // full-text + raw-file delivery (cold path downloads + extracts on demand). Repriced 3→5 (2026-07-16, proposal-flagship coupling)
@@ -552,6 +554,32 @@ const PAST_CONTRACTS_TOOL_DEF = {
         date_to: { type: 'string', description: 'Action-date upper bound (YYYY-MM-DD).' },
         include_idv: { type: 'boolean', description: 'Also include IDV vehicles (IDIQ/GWAC/BPA), not just definitive contracts (default false).' },
         limit: { type: 'number', description: 'Max awards returned (default 25, max 100).' },
+      },
+    },
+  },
+};
+
+const MARKET_REPORT_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'generate_market_report',
+    description:
+      'ONE-SHOT full market report. Give a keyword (best — captures the whole market a product spans), or a NAICS ' +
+      'code, or an agency, and this assembles the ENTIRE market in a single call: total market $ + all buying NAICS + ' +
+      'top PSC (what was bought), the top buying agencies, the competitive landscape (leading contractors), recompetes ' +
+      'on the horizon, upcoming forecasts, and — when an agency is given — an agency deep-dive + set-aside gap. ' +
+      'Returns structured sections PLUS deliverable.html: a self-contained, client-ready Mindy-branded report you can ' +
+      'hand straight to a client. Prefer a keyword over a single NAICS (one code typically misses most of a market). ' +
+      'grounded=false only when nothing at all is found — do not invent figures.',
+    parameters: {
+      type: 'object',
+      properties: {
+        keyword: { type: 'string', description: 'What the market is about (e.g. "drones", "base operations support"). The best axis — captures the whole market.' },
+        naics: { type: 'string', description: 'NAICS code, if you want a code-anchored report instead of a keyword.' },
+        agency: { type: 'string', description: 'Agency name — adds an agency deep-dive + set-aside gap, and scopes recompetes/forecasts.' },
+        state: { type: 'string', description: 'Limit to a state — full name ("Florida") or 2-letter code ("FL").' },
+        set_aside: { type: 'string', description: 'Optional set-aside filter for the forecasts section.' },
+        client_name: { type: 'string', description: 'Optional label for the report header (e.g. the client you are preparing this for).' },
       },
     },
   },
@@ -1199,6 +1227,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     KEYWORD_COVERAGE_TOOL_DEF,
     IDV_CONTRACTS_TOOL_DEF,
     PAST_CONTRACTS_TOOL_DEF,
+    MARKET_REPORT_TOOL_DEF,
     CONTRACTOR_AWARD_HISTORY_TOOL_DEF,
     MARKET_DEPTH_TOOL_DEF,
     SOLICITATION_DOCUMENTS_TOOL_DEF,
@@ -1250,6 +1279,7 @@ export function isMcpTool(name: string): boolean {
     name === 'get_keyword_coverage' ||
     name === 'search_idv_contracts' ||
     name === 'search_past_contracts' ||
+    name === 'generate_market_report' ||
     name === 'get_contractor_award_history' ||
     name === 'assess_market_depth' ||
     name === 'get_solicitation_documents' ||
@@ -1503,6 +1533,18 @@ export async function runMcpTool(
       date_to: typeof args.date_to === 'string' ? args.date_to : undefined,
       include_idv: typeof args.include_idv === 'boolean' ? args.include_idv : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'generate_market_report') {
+    const result = (await generateMarketReport({
+      keyword: typeof args.keyword === 'string' ? args.keyword : undefined,
+      naics: typeof args.naics === 'string' ? args.naics : undefined,
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      state: typeof args.state === 'string' ? args.state : undefined,
+      set_aside: typeof args.set_aside === 'string' ? args.set_aside : undefined,
+      client_name: typeof args.client_name === 'string' ? args.client_name : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }

@@ -35,6 +35,7 @@ import { expiringContracts } from './tools/expiring-contracts';
 import { getKeywordCoverage } from './tools/keyword-coverage';
 import { idvContracts } from './tools/idv-contracts';
 import { searchPastContracts } from './tools/past-contracts';
+import { generateMarketReport } from './tools/market-report';
 import { contractorAwardHistory } from './tools/contractor-award-history';
 import { assessMarketDepth } from './tools/market-depth';
 import { solicitationDocuments } from './tools/solicitation-documents';
@@ -546,6 +547,30 @@ server.registerTool(
   },
   async ({ state, state_scope, naics, psc, agency, recipient, min_value, date_from, date_to, include_idv, limit }) => {
     const result = await searchPastContracts({ state, state_scope, naics, psc, agency, recipient, min_value, date_from, date_to, include_idv, limit });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'generate_market_report',
+  {
+    title: 'Generate Market Report (one-shot)',
+    description:
+      'ONE-SHOT full market report. Give a keyword (best), NAICS, or agency and get the entire market in one call: ' +
+      'total market $ + all buying NAICS + top PSC, top buying agencies, competitive landscape, recompetes, forecasts, ' +
+      'and (with an agency) an agency deep-dive + set-aside gap. Returns structured sections PLUS deliverable.html — a ' +
+      'client-ready Mindy-branded report. Prefer a keyword over one NAICS. grounded=false only when nothing is found.',
+    inputSchema: {
+      keyword: z.string().optional().describe('What the market is about (e.g. "drones"). Best axis — captures the whole market.'),
+      naics: z.string().optional().describe('NAICS code, for a code-anchored report instead of a keyword.'),
+      agency: z.string().optional().describe('Agency name — adds an agency deep-dive + set-aside gap.'),
+      state: z.string().optional().describe('Limit to a state — full name ("Florida") or code ("FL").'),
+      set_aside: z.string().optional().describe('Optional set-aside filter for the forecasts section.'),
+      client_name: z.string().optional().describe('Optional label for the report header (the client this is prepared for).'),
+    },
+  },
+  async ({ keyword, naics, agency, state, set_aside, client_name }) => {
+    const result = await generateMarketReport({ keyword, naics, agency, state, set_aside, client_name });
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );
