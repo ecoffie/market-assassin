@@ -174,16 +174,37 @@ export default function McpPricing() {
           </div>
         </div>
 
-        {/* Free trial — slim banner, no wasted column */}
-        <div className="mt-6 flex flex-col items-center justify-between gap-3 rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.04] px-5 py-3.5 sm:flex-row">
-          <div className="text-center text-[13px] leading-relaxed text-slate-300 sm:text-left">
-            <b className="font-semibold text-emerald-200">Free trial</b> — <b className="font-mono tabular-nums text-emerald-100">{trial}</b> credits on your first connect, no card. Runs the public-data tools (SAM · USASpending · EDGAR · GSA · forecasts). <span className="text-slate-500">The moat unlocks with any paid plan.</span>
+        {/* Top row: Free trial + Starter side by side; Pro featured below */}
+        <section className="mt-6 grid items-stretch gap-4 md:grid-cols-2">
+          {/* Free trial — now a full card, first column */}
+          <div className="relative flex flex-col rounded-2xl border border-emerald-400/20 bg-emerald-400/[0.04] p-6">
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-[12px] font-semibold uppercase tracking-wide text-emerald-300">Free trial</span>
+              <span className="text-[11px] text-slate-500">no card</span>
+            </div>
+            <div className="mt-1 min-h-[2.25rem] text-[13px] leading-relaxed text-slate-400">Kick the tires — sign in through your browser and start calling tools in minutes.</div>
+            <div className="mt-2 rounded-xl border border-emerald-400/15 bg-emerald-400/[0.04] p-3">
+              <div className="flex items-baseline gap-1.5 text-emerald-100">
+                <span aria-hidden>✦</span>
+                <b className="font-mono text-[15px] font-semibold tabular-nums">{trial.toLocaleString()}</b>
+                <span className="text-[13px] font-semibold">credits, one-time</span>
+              </div>
+              <div className="mt-1.5 text-[12px] text-slate-300">Enough for a first month of light use.</div>
+            </div>
+            <div className="mt-4 flex items-baseline gap-2">
+              <span className="font-mono text-4xl font-bold tabular-nums">$0</span>
+              <span className="text-[13px] text-slate-400">on your first connect</span>
+            </div>
+            <div className="mt-1 h-4 text-[12px] text-emerald-300" />
+            <ul className="mt-4 flex-1 space-y-2 border-t border-white/[0.06] pt-4 text-[12.5px]">
+              <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span><b className="font-semibold text-slate-200">Public-data tools</b> — SAM · USASpending · EDGAR · GSA · forecasts</span></li>
+              <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span>Keyless connect — sign in through your browser</span></li>
+              <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span>Charged on success only · repeat/cached reads free</span></li>
+              <li className="flex gap-2"><span className="text-slate-600">–</span> <span className="text-slate-500">The proprietary moat unlocks with any paid plan</span></li>
+            </ul>
+            <a href="/app" className="mt-5 inline-flex items-center justify-center rounded-lg border border-emerald-400/30 px-4 py-2.5 text-sm font-semibold text-emerald-200 hover:bg-emerald-400/10">Start free</a>
           </div>
-          <a href="/app" className="shrink-0 rounded-lg border border-emerald-400/30 px-4 py-2 text-[13px] font-semibold text-emerald-200 hover:bg-emerald-400/10">Start free →</a>
-        </div>
 
-        {/* Two paid plans side by side — Starter (metered credit plan) + Pro (subscription) */}
-        <section className="mt-4 grid items-stretch gap-4 md:grid-cols-2">
           {planRows.map((p) => (
             <div key={p.id} className={`relative flex flex-col rounded-2xl border p-6 ${p.highlight ? 'border-emerald-400/40 bg-emerald-400/[0.05] shadow-[0_0_0_1px_rgba(16,185,129,0.15)]' : 'border-white/10 bg-white/[0.02]'}`}>
               {p.tag && <span className={`absolute -top-2.5 left-6 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${p.highlight ? 'bg-emerald-500 text-[#06120c]' : 'border border-white/15 bg-[#0a0f1e] text-slate-400'}`}>{p.tag}</span>}
@@ -219,9 +240,11 @@ export default function McpPricing() {
               <a href={p.href} className={`mt-5 inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold ${p.highlight ? 'bg-emerald-500 text-[#06120c] hover:bg-emerald-400' : 'border border-white/15 text-slate-200 hover:bg-white/5'}`}>Get {p.name}</a>
             </div>
           ))}
+        </section>
 
-          {/* Pro — subscription; sits beside Starter as the second column */}
-          <div className="relative flex flex-col rounded-2xl border border-indigo-400/40 bg-indigo-400/[0.06] p-6">
+        {/* Pro — subscription; featured card centered below the two credit options */}
+        <div className="mt-4 flex justify-center">
+          <div className="relative flex w-full flex-col rounded-2xl border border-indigo-400/40 bg-indigo-400/[0.06] p-6 md:w-[calc(50%-0.5rem)]">
             <span className="absolute -top-2.5 left-6 rounded-full bg-indigo-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">Best for daily use</span>
             <div className="flex items-baseline justify-between gap-2">
               <span className="text-[12px] font-semibold uppercase tracking-wide text-indigo-300">Pro</span>
@@ -256,7 +279,7 @@ export default function McpPricing() {
             <a href={proHref} className="mt-5 inline-flex items-center justify-center rounded-lg bg-indigo-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-indigo-400">Go Pro {annual ? 'annually' : 'monthly'}</a>
             <div className="mt-2 h-4 text-center text-[11.5px] text-slate-500">{annual ? <><b className="font-semibold text-emerald-300">Save ${ANNUAL_SAVE}</b> compared to monthly</> : 'Switch to annual for 2 months free'}</div>
           </div>
-        </section>
+        </div>
 
         <p className="mx-auto mt-5 max-w-2xl text-center text-[12px] leading-relaxed text-slate-500">
           The <b className="font-medium text-slate-300">moat</b> is Mindy&apos;s un-copyable layer — included with every paid plan. The free trial runs public-data tools only. Every metered tool is charged on success.
