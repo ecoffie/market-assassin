@@ -1940,6 +1940,47 @@ uppercase 2-letter). Widens FL ~51–55% (1694→2553 all / 136→211 open).
   as an honest, idempotent no-op that would catch future recoverable rows. The sync already reads
   `placeOfPerformance.state.code` for new rows — unchanged.
 
+---
+
+## Mindy MCP Server — proposal WRITING tools (2026-07-16)
+
+The MCP surface can now **draft a proposal**, not just shred/scan/referee one — the
+competitive wedge (SweetSpot/Govly/GovWin are closed UIs; we're the only GovCon layer an
+agent can invoke, and now the only one that can *write*). Three tools wrap the EXISTING
+in-app engine (nothing new was built on the drafting side — it was already vault+RAG-grounded):
+
+| Tool | Credits | Wraps | Returns |
+|------|---------|-------|---------|
+| `draft_proposal` | 50 | `generateAllSections` (`src/lib/proposal/draft-all.ts`) | full multi-section vault-grounded draft + outline; heavy internal meta stripped |
+| `draft_proposal_section` | 12 | `generateV2Draft` (`src/lib/proposal/v2.ts`) | one section (`DraftResult`) |
+| `export_proposal` | 2 | self-contained `docx` build (NOT the auth-tied export route) | base64 `.docx` (`Packer.toBuffer`) |
+
+- Files: `src/mcp/tools/draft-proposal.ts` (both draft fns) + `src/mcp/tools/export-proposal.ts`.
+  Registered the two-path way (`tool-registry.ts` def+`TOOL_CREDITS`+`isMcpTool`+`runMcpTool`
+  dispatch AND `server.ts` zod) + smoke blocks in `scripts/mcp-smoke.mjs`. Billing is automatic
+  (the transport's `runMeteredTool` seam is untouched). `_ai_hint` OFF by default; honest-miss →
+  `grounded=false` + "do NOT fabricate".
+- **`proposal_chat` was deliberately NOT exposed on MCP** — an agent already has its own LLM to
+  "chat"; what it can't do is the vault+RAG draft. Kept app-only.
+- **Refactor:** `draft-all.ts` `generateOutline` now calls `callLLM({ job:'drafting' })` (was raw
+  Groq fetch) → the outline survives a Groq quota exhaustion (the old 70B→8B fallback died together)
+  + the $15/user cost cap applies. Verified end-to-end: 752-word Technical Approach + a 12KB PK-header
+  `.docx` generated locally.
+
+### Locked pricing model (2026-07-16) — PR 2, blocked on Stripe products
+Not yet wired (needs Eric to create the Stripe products, then wire price IDs in `packages.ts` +
+bump the existing-tool reprices TOGETHER so no user is squeezed):
+- **Base tiers:** Free $0 (100 cr one-time = ~1 proposal, then wall — the Higgsfield "one video"
+  model) · **Starter $59/mo** (~2,000 cr) · **Pro $149/mo** (~6,000 cr + community) · **Team
+  $499/mo** (~18,000 cr pool, group coaching) · Founders $4,997 lifetime.
+- **Add-ons:** Coaching (group in Team, 1:1 à-la-carte) · **Coach/Agency $99/mo up to 5 clients**
+  (raised from 3; per-client spend tracking for rebilling — credits self-regulate the marginal cost).
+- **Flagship credit sink:** a full proposal run ≈ ~100 cr (`draft_proposal`=50 + matrix/SOW/
+  structure/scan/referee/docs). PR-2 reprices: referee 4→12, compliance-matrix 3→8, SOW 2→4,
+  recompete-sow 2→4, sol-docs 3→5, structure/scan 1→2. Referral: +100 each.
+- Rationale: "not consumer-priced" comes from tier SIZE + the flagship sink, not per-credit gouging
+  (per-credit stays ~$0.025, market rate). Competitive positioning doc + full reasoning: this session.
+
 ## Verification Recipes — how to PROVE each surface works (rule #2)
 
 The concrete "it works" evidence, centralized so skills/agents stop re-deriving it.

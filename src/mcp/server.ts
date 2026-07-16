@@ -55,6 +55,8 @@ import { matchRecompeteSowTool } from './tools/recompete-sow';
 import { extractStatementOfWork } from './tools/statement-of-work';
 import { getFederalEventSeries } from './tools/event-series';
 import { getSbaGoalingShare } from './tools/sba-goaling';
+import { draftProposal, draftProposalSection } from './tools/draft-proposal';
+import { exportProposal } from './tools/export-proposal';
 
 const server = new McpServer({
   name: 'mindy-govcon',
@@ -991,11 +993,101 @@ server.registerTool(
   },
 );
 
+server.registerTool(
+  'draft_proposal',
+  {
+    title: 'Draft Proposal (full multi-section, vault-grounded)',
+    description:
+      'Draft a FULL multi-section federal proposal response from a solicitation — the writing step after ' +
+      'extract_compliance_matrix / build_proposal_structure. A two-pass engine (strategic outline → parallel ' +
+      'per-section write) grounded in the caller\'s Vault (real past performance, identity, team) + a curated ' +
+      'proposal-writing corpus. Auto-picks the section set (RFP: exec summary/technical/management/past ' +
+      'performance/pricing; Sources Sought/RFI: the cap-statement set) or pass `sections`. Provide ONE of ' +
+      'notice_id (fetches SOW + body + attachment text server-side) OR rfp_text. A DRAFT: every [placeholder] ' +
+      'is an unknown to fill with real data. grounded=false = nothing drafted — do NOT fabricate a proposal. ' +
+      'Feed the output to export_proposal (.docx) and referee_proposal_compliance before submission.',
+    inputSchema: {
+      notice_id: z.string().optional().describe('SAM notice id (UUID) or solicitation number — fetches the doc text server-side.'),
+      rfp_text: z.string().optional().describe('The solicitation text directly (use when you already have it).'),
+      sections: z
+        .array(z.string())
+        .optional()
+        .describe('Which sections to draft (exec_summary, technical, management, past_performance, pricing OR company_overview, cap_past_performance, capabilities, differentiators, poc). Omit to auto-pick.'),
+      agency: z.string().optional().describe('The buying agency (skips detection; grounds agency-specific framing).'),
+    },
+  },
+  async ({ notice_id, rfp_text, sections, agency }) => {
+    const result = await draftProposal({ notice_id, rfp_text, sections, agency });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'draft_proposal_section',
+  {
+    title: 'Draft Proposal Section (single section, vault-grounded)',
+    description:
+      'Draft ONE section of a federal proposal, vault+RAG grounded — for iterating on a single volume without ' +
+      're-running the whole proposal. Pass section_type (exec_summary | technical | management | past_performance | ' +
+      'pricing | company_overview | cap_past_performance | capabilities | differentiators | poc) and ONE of ' +
+      'notice_id OR rfp_text. Optionally pass requirements[] (from extract_compliance_matrix) so the section covers ' +
+      'its shall-statements one-to-one. A DRAFT: fill every [placeholder]. grounded=false = nothing drafted — do NOT fabricate.',
+    inputSchema: {
+      section_type: z.string().describe('The section to draft, e.g. "technical", "past_performance", "exec_summary".'),
+      notice_id: z.string().optional().describe('SAM notice id (UUID) or solicitation number — fetches the doc text server-side.'),
+      rfp_text: z.string().optional().describe('The solicitation text directly (use when you already have it).'),
+      agency: z.string().optional().describe('The buying agency (skips detection).'),
+      requirements: z
+        .array(
+          z.object({
+            requirement: z.string().describe('The obligation text (required).'),
+            category: z.string().optional().describe('submission|evaluation|technical|past_performance|pricing|admin|other (coerced if free-form).'),
+            section: z.string().optional().describe('The L/M/C clause label, e.g. L.3.2 (optional).'),
+            id: z.string().optional().describe('Stable id, e.g. REQ-001 (optional).'),
+          }),
+        )
+        .optional()
+        .describe('Optional compliance matrix — pass requirements[] from extract_compliance_matrix.'),
+    },
+  },
+  async ({ section_type, notice_id, rfp_text, agency, requirements }) => {
+    const result = await draftProposalSection({ section_type, notice_id, rfp_text, agency, requirements });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'export_proposal',
+  {
+    title: 'Export Proposal (.docx)',
+    description:
+      'Assemble supplied proposal sections into a downloadable Word (.docx) file — the delivery step after ' +
+      'draft_proposal (or your own drafted content). Pass sections[] (each { heading, text }) + an optional title; ' +
+      'returns the document as base64 (docx_base64) plus filename, mime, byte_size. Deterministic formatting only — ' +
+      'adds NOTHING, invents NOTHING; [placeholders] carry through verbatim. grounded=false when no sections are supplied.',
+    inputSchema: {
+      title: z.string().optional().describe('Optional document title rendered at the top.'),
+      sections: z
+        .array(
+          z.object({
+            heading: z.string().describe('The section heading (rendered as Heading 1).'),
+            text: z.string().describe('The section body; blank lines split it into paragraphs.'),
+          }),
+        )
+        .describe('The proposal sections to write into the document, in order.'),
+    },
+  },
+  async ({ title, sections }) => {
+    const result = await exportProposal({ title, sections });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
 async function main() {
   const transport = new StdioServerTransport();
   await server.connect(transport);
   console.error(
-    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + keyword-coverage + idv-contracts + contractor-award-history + market-depth + solicitation-documents + federal-events + scan-compliance + bid-decision + federal-osbp + agency-opps-by-office + sblo-contact + federal-contacts + podcast-lessons + agency-budget-trends + company-keywords + agency-spending-detail + compliance-matrix + proposal-structure + referee-compliance + recompete-sow + statement-of-work + event-series + sba-goaling registered',
+    '[mindy-mcp] stdio server ready — playbook + pricing-intel + incumbent-financials + regulatory-demand + award-detail + predecessor-award + sam-entity + search-contractors + agency-intel + grants + forecasts + sbir + expiring-contracts + keyword-coverage + idv-contracts + contractor-award-history + market-depth + solicitation-documents + federal-events + scan-compliance + bid-decision + federal-osbp + agency-opps-by-office + sblo-contact + federal-contacts + podcast-lessons + agency-budget-trends + company-keywords + agency-spending-detail + compliance-matrix + proposal-structure + referee-compliance + recompete-sow + statement-of-work + event-series + sba-goaling + draft-proposal + draft-proposal-section + export-proposal registered',
   );
 }
 

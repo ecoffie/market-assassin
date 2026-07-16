@@ -82,6 +82,7 @@ try {
     'build_proposal_structure', 'referee_proposal_compliance',
     'match_recompete_sow', 'extract_statement_of_work',
     'get_federal_event_series', 'get_sba_goaling_share',
+    'draft_proposal', 'draft_proposal_section', 'export_proposal',
   ]) {
     if (!names.includes(t)) fail(`${t} not registered`);
   }
@@ -704,7 +705,71 @@ try {
   if (sbaMiss.structuredContent?._meta?.grounded !== false) fail('sba-goaling: unknown agency should be grounded=false');
   console.error('✓ honest miss: unknown agency → grounded=false');
 
-  console.error('\n✅ SMOKE PASSED — MCP transport + 35 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth, solicitation-documents, federal-events, scan-compliance, bid-decision, federal-osbp, agency-opps-by-office, sblo-contact, federal-contacts, podcast-lessons, agency-budget-trends, company-keywords, agency-spending-detail, compliance-matrix, proposal-structure, referee-compliance, recompete-sow, statement-of-work, event-series, sba-goaling) all live + honest');
+  // ── draft_proposal (full multi-section, vault+RAG grounded — calls the LLM) ────
+  // A short Section L/M RFP → the engine outlines + drafts sections. This calls the
+  // drafting LLM chain, so grounded=false when the provider is unavailable is
+  // NON-FATAL (same class as pricing-intel's CALC 429s) — the _meta shape still gates.
+  console.error('\n→ calling draft_proposal({ rfp_text: <short RFP>, sections: ["exec_summary","technical"] })');
+  const DP_RFP = 'SECTION L - INSTRUCTIONS TO OFFERORS\nThe offeror shall submit a Technical and Management approach for base operations support services at Fort Example — facilities maintenance, custodial, grounds, and refuse collection for 1.2M sq ft. The Technical volume shall not exceed 25 pages.\n\nSECTION M - EVALUATION FACTORS\nAward is best value; the Government evaluates Technical Approach and Management Approach.\n\nSECTION C - STATEMENT OF WORK\nThe contractor shall furnish all management, supervision, labor, materials, and equipment. A Quality Control Plan and a full-time on-site project manager are required.';
+  const dp = await client.callTool({ name: 'draft_proposal', arguments: { rfp_text: DP_RFP, sections: ['exec_summary', 'technical'] } });
+  const dpS = dp.structuredContent;
+  if (!dpS) fail('draft-proposal: no structuredContent');
+  if (typeof dpS._meta?.grounded !== 'boolean') fail('draft-proposal: _meta.grounded missing');
+  if (!Array.isArray(dpS.sections)) fail('draft-proposal: sections is not an array (shape contract broken)');
+  if (dpS._meta?.section_count !== dpS.sections.length) fail('draft-proposal: _meta.section_count != sections length');
+  if (dpS._meta?.grounded) {
+    const s0 = dpS.sections[0];
+    if (!s0 || !String(s0.content || '').trim()) fail('draft-proposal: grounded but first section has no content');
+    console.error(`✓ grounded=true · source=${dpS._meta.source} · sections=${dpS._meta.section_count} · errors=${dpS._meta.error_count} · top="${String(s0.title).slice(0,30)}" (${s0.word_count}w)`);
+  } else {
+    console.error(`⚠ draft-proposal: grounded=false (degraded=${dpS._meta?.degraded}) — NON-FATAL (drafting LLM chain unavailable; shape verified). Re-verify when a provider key is funded.`);
+  }
+  const dpMiss = await client.callTool({ name: 'draft_proposal', arguments: {} });
+  if (dpMiss.structuredContent?._meta?.grounded !== false) fail('draft-proposal: no source should be grounded=false (no invented proposal)');
+  console.error('✓ honest miss: no rfp_text/notice_id → grounded=false');
+
+  // ── draft_proposal_section (single section) ───────────────────────────────────
+  console.error('\n→ calling draft_proposal_section({ section_type: "technical", rfp_text: <short RFP> })');
+  const dps = await client.callTool({ name: 'draft_proposal_section', arguments: { section_type: 'technical', rfp_text: DP_RFP } });
+  const dpsS = dps.structuredContent;
+  if (!dpsS) fail('draft-proposal-section: no structuredContent');
+  if (dpsS._meta?.section_type !== 'technical') fail('draft-proposal-section: _meta.section_type mismatch');
+  if (dpsS._meta?.grounded) {
+    if (!String(dpsS.draft?.draft || '').trim()) fail('draft-proposal-section: grounded but empty draft');
+    console.error(`✓ grounded=true · section=${dpsS._meta.section_type} · ${dpsS.draft?.wordCount}w · model=${dpsS.draft?.meta?.model}`);
+  } else {
+    console.error(`⚠ draft-proposal-section: grounded=false (degraded=${dpsS._meta?.degraded}) — NON-FATAL (drafting LLM chain unavailable; shape verified)`);
+  }
+  const dpsMiss = await client.callTool({ name: 'draft_proposal_section', arguments: { section_type: 'not_a_real_section', rfp_text: DP_RFP } });
+  if (dpsMiss.structuredContent?._meta?.grounded !== false) fail('draft-proposal-section: invalid section_type should be grounded=false');
+  console.error('✓ honest miss: invalid section_type → grounded=false');
+
+  // ── export_proposal (deterministic .docx assembly — no LLM) ───────────────────
+  console.error('\n→ calling export_proposal({ title, sections: [2] })');
+  const ex = await client.callTool({
+    name: 'export_proposal',
+    arguments: {
+      title: 'Proposal — Fort Example BOS',
+      sections: [
+        { heading: 'Executive Summary', text: 'Our firm is pleased to submit this proposal.\n\nWe bring proven base operations experience.' },
+        { heading: 'Technical Approach', text: 'Our technical approach covers facilities maintenance, custodial, grounds, and refuse.' },
+      ],
+    },
+  });
+  const exS = ex.structuredContent;
+  if (!exS) fail('export-proposal: no structuredContent');
+  if (!exS._meta?.grounded) fail('export-proposal: grounded=false with 2 real sections (deterministic — should always build)');
+  if (exS._meta?.section_count !== 2) fail('export-proposal: expected section_count=2');
+  if (exS.mime !== 'application/vnd.openxmlformats-officedocument.wordprocessingml.document') fail('export-proposal: wrong mime');
+  if (!exS.docx_base64 || !(exS.byte_size > 0)) fail('export-proposal: empty docx_base64/byte_size');
+  // The base64 must decode to a real .docx (zip magic "PK").
+  if (Buffer.from(exS.docx_base64, 'base64').slice(0, 2).toString() !== 'PK') fail('export-proposal: docx_base64 is not a valid .docx (no PK zip header)');
+  console.error(`✓ grounded=true · sections=${exS._meta.section_count} · ${exS.byte_size.toLocaleString()} bytes · valid .docx (PK header)`);
+  const exMiss = await client.callTool({ name: 'export_proposal', arguments: { sections: [] } });
+  if (exMiss.structuredContent?._meta?.grounded !== false) fail('export-proposal: no sections should be grounded=false (no invented document)');
+  console.error('✓ honest miss: no sections → grounded=false');
+
+  console.error('\n✅ SMOKE PASSED — MCP transport + 38 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth, solicitation-documents, federal-events, scan-compliance, bid-decision, federal-osbp, agency-opps-by-office, sblo-contact, federal-contacts, podcast-lessons, agency-budget-trends, company-keywords, agency-spending-detail, compliance-matrix, proposal-structure, referee-compliance, recompete-sow, statement-of-work, event-series, sba-goaling, draft-proposal, draft-proposal-section, export-proposal) all live + honest');
   await client.close();
   process.exit(0);
 } catch (err) {
