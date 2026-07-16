@@ -27,7 +27,11 @@ function coverage(over: Partial<KeywordCoverage> = {}): KeywordCoverage {
     ],
     coverageCodes: ['336411', '541715'],
     coveragePct: 0.9,
+    // For the drones fixture the lead IS the biggest (336411), so both read 0.28.
+    // They diverge only when the right-lead logic promotes a smaller code — see the
+    // "lead vs biggest" block below.
     topCodePct: 0.28,
+    leadCodePct: 0.28,
     pscCount: 12,
     topPsc: { code: '1550', name: 'Unmanned Aircraft' },
     topPscPct: 0.55,
@@ -109,10 +113,53 @@ describe('buildMarketFilter — keyword-first, PSC only when literal', () => {
     const f = buildMarketFilter({ coverage: coverage({
       keyword: 'commercial and institutional building construction',
       topCodePct: 0.68,
+      leadCodePct: 0.68, // the lead IS 236220 here — keyword and dominant code agree
       topPsc: { code: 'Y1BZ', name: 'Construction of Other Airfield Structures' },
       topPscPct: 0.45,
     }) });
     expect(f).toBeNull();
+  });
+
+  /**
+   * The lead-vs-biggest split. allNaics is NOT amount-sorted — the right-lead logic
+   * promotes the semantically-correct code — so topCodePct (biggest, DISPLAYED) and
+   * leadCodePct (the lead, the GATE's input) are different questions. They used to be
+   * one field, which printed "biggest NAICS = only 0%" on a client report for drones.
+   */
+  describe('lead vs biggest (the gate reads the LEAD)', () => {
+    // "hvac": lead 238220 Plumbing/HVAC Contractors 20.5% (the specialty trade) while
+    // 236220 General Building holds 55.6% — big building contracts merely MENTION hvac.
+    const hvac = (over: Partial<KeywordCoverage> = {}) => coverage({
+      keyword: 'hvac',
+      allNaics: [
+        { code: '238220', name: 'Plumbing, Heating, and Air-Conditioning Contractors', amount: 245_000_000, pct: 0.205 },
+        { code: '236220', name: 'Commercial and Institutional Building Construction', amount: 664_000_000, pct: 0.556 },
+      ],
+      topCodePct: 0.556,  // biggest by $ — 236220
+      leadCodePct: 0.205, // the lead — 238220
+      topPsc: { code: 'Z2AA', name: 'Repair or Alteration of Office Buildings' },
+      topPscPct: 0.30,
+      ...over,
+    });
+
+    it('does NOT fire the dominant gate when only a NON-lead code is dominant', () => {
+      // Gating on topCodePct (55.6%) would push hvac into NAICS ranking led by GENERAL
+      // CONSTRUCTION — surfacing general contractors for an HVAC search. Eric, Jul 16:
+      // "it should be 238 since it's a specialty trade."
+      const f = buildMarketFilter({ coverage: hvac() });
+      expect(f).not.toBeNull();
+      expect(f!.mode).toBe('keyword');
+    });
+
+    it('fires the gate when the LEAD itself is dominant', () => {
+      expect(buildMarketFilter({ coverage: hvac({ leadCodePct: 0.556 }) })).toBeNull();
+    });
+
+    it('a dominant biggest code cannot suppress ranking on its own', () => {
+      // Regression: the two fields must stay independent.
+      const f = buildMarketFilter({ coverage: hvac({ topCodePct: 0.99 }) });
+      expect(f).not.toBeNull();
+    });
   });
 
   it('CROSS-CUTTING: a sprawling keyword (drones, top code ~28%) keeps keyword/PSC ranking', () => {

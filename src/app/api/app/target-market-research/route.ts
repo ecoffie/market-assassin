@@ -440,8 +440,10 @@ export async function POST(request: NextRequest) {
       top_psc: coverage.topPsc,
       top_psc_pct: Math.round(coverage.topPscPct * 100),
       ranking_mode: marketFilter?.mode || (rankedByDominantNaics ? 'naics' : 'keyword'),
+      // Quotes leadCodePct, not topCodePct: dominantNaicsCode IS allNaics[0] (the lead),
+      // so the % must be the LEAD's share or the label misstates its own code.
       ranking_label: marketFilter?.rankingLabel || (rankedByDominantNaics
-        ? `NAICS ${dominantNaicsCode} (${Math.round(coverage.topCodePct * 100)}% of this market)`
+        ? `NAICS ${dominantNaicsCode} (${Math.round(coverage.leadCodePct * 100)}% of this market)`
         : `keyword "${coverage.keyword}"`),
       uses_psc_ranking: marketFilter?.mode === 'keyword_psc',
       keywords: deriveCoverageKeywords(coverage),
