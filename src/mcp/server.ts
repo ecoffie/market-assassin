@@ -559,8 +559,9 @@ server.registerTool(
     description:
       'ONE-SHOT full market report. Give a keyword (best), NAICS, or agency and get the entire market in one call: ' +
       'total market $ + all buying NAICS + top PSC, top buying agencies, competitive landscape, recompetes, forecasts, ' +
-      'and (with an agency) an agency deep-dive + set-aside gap. Returns structured sections PLUS deliverable.html — a ' +
-      'client-ready Mindy-branded report. Prefer a keyword over one NAICS. grounded=false only when nothing is found.',
+      'and (with an agency) an agency deep-dive + set-aside gap. Returns structured sections PLUS a client-ready ' +
+      'Mindy-branded deliverable: deliverable.url (hosted, shareable — send it to a client) + deliverable.html ' +
+      '(inline). Prefer a keyword over one NAICS. grounded=false only when nothing is found.',
     inputSchema: {
       keyword: z.string().optional().describe('What the market is about (e.g. "drones"). Best axis — captures the whole market.'),
       naics: z.string().optional().describe('NAICS code, for a code-anchored report instead of a keyword.'),
@@ -571,7 +572,10 @@ server.registerTool(
     },
   },
   async ({ keyword, naics, agency, state, set_aside, client_name }) => {
-    const result = await generateMarketReport({ keyword, naics, agency, state, set_aside, client_name });
+    // stdio has no auth — mirror the add_contacts_to_crm dev-identity convention so the
+    // report still saves + returns a link locally. The hosted edge uses ctx.userEmail.
+    const userEmail = process.env.MCP_STDIO_USER_EMAIL || 'stdio@localhost';
+    const result = await generateMarketReport({ keyword, naics, agency, state, set_aside, client_name, userEmail });
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );

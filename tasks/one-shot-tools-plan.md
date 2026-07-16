@@ -41,9 +41,24 @@ engines, mostly composition + packaging. All route through the untouched
 | Set-aside gap | `get_sba_goaling_share` lib |
 
 **Output:** structured JSON (all sections + `_meta.grounded/degraded/sections_count`) **plus**:
-- a **hosted shareable report** at `/reports/[id]` (Mindy-branded HTML; Sue emails the link),
-- a **base64 PDF** download.
-- Persist to a new `market_reports` table (id, owner_email, params, payload jsonb, created_at).
+- ✅ a **hosted shareable report** at `/reports/[id]` (Mindy-branded HTML; Sue emails the link),
+- ✅ persisted to `market_reports` (id, owner_email, subject, client_name, params, payload jsonb, created_at),
+- ⚠️ **PDF = the hosted page's "Save as PDF" button** (`window.print()` + the existing `@media print`
+  CSS), NOT a base64 binary. Server-side HTML→PDF needs Chromium in the lambda — `puppeteer` is a
+  **devDependency** (scrapers only), so shipping it would mean adding `@sparticuz/chromium` (~50MB +
+  cold starts) or an external render service. Deferred as its own call; the print path gives Sue a
+  real PDF today.
+
+**Shipped notes:**
+- The `id` is a 22-char random token (`crypto.randomBytes(16)` base64url) and **is** the access
+  control — `/reports/[id]` is deliberately PUBLIC so Sue's client can open it without a Mindy
+  login (capability URL, like an unlisted share link). `noindex` + `Cache-Control: private`;
+  malformed and missing ids return an identical 404 so it can't be probed.
+- Stored as the **payload**, not the rendered HTML → renderer fixes reach already-shared links.
+- Owner = the **verified MCP caller** (`ctx.userEmail`), never an agent-supplied field.
+- Saving is **best-effort**: storage down → `deliverable.url: null`, `_meta.saved: false`, and the
+  caller still gets the full JSON + inline HTML (they paid credits for it). The `_ai_hint` branches
+  on the link so an agent never invents a report URL.
 
 **Credits:** ~20 (flagship bundle sink, like `draft_proposal`).
 **Mirror bonus:** extract the composition into `lib/market/market-report.ts` so the in-app
@@ -91,6 +106,11 @@ Add an `ics` field to `get_federal_event_series` / `search_federal_events`: base
   landing in a GHL location.
 
 ## Open / deferred
-- GHL provision path gated on the agency-token + plan/cost confirm above.
+- **GHL provision path — DROPPED for now (Eric, 2026-07-16): "have the user put his information in
+  directly."** BYO (paste Private Integration Token + Location ID) is the only path. This also sidesteps
+  the agency-plan per-sub-account billing question. Revisit only if BYO friction shows up in real use.
 - Full GHL OAuth (one-click connect) = phase-2 after paste-token v1.
 - Report white-label (Sue's own brand) = deferred; Mindy footer for now.
+- **Binary PDF** (`@sparticuz/chromium` or a render service) — deferred; Save-as-PDF covers it today.
+- **"My reports" list** — `listMarketReports(ownerEmail)` exists in the store but has no UI yet;
+  natural next step is a section on `/mcp/account`.

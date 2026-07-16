@@ -199,13 +199,19 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
   .note { color:#b45309; font-size:12.5px; }
   footer.rp { margin-top:28px; text-align:center; color:var(--muted); font-size:12px; }
   footer.rp b { color:var(--purple); }
-  @media print { body { background:#fff; } .sec,.stat { break-inside:avoid; } }
+  .pdfbtn { position:absolute; top:22px; right:22px; background:rgba(255,255,255,.16); color:#fff; border:1px solid rgba(255,255,255,.5);
+            border-radius:8px; padding:7px 13px; font:600 12.5px/1 inherit; cursor:pointer; }
+  .pdfbtn:hover { background:rgba(255,255,255,.28); }
+  @media (max-width:560px){ .pdfbtn { display:none; } }
+  /* Print = the PDF path (server-side HTML→PDF needs Chromium, which isn't in the lambda). */
+  @media print { body { background:#fff; } .sec,.stat { break-inside:avoid; } .pdfbtn { display:none; } }
 </style></head>
 <body><div class="wrap">
-  <header class="rp">
+  <header class="rp" style="position:relative">
     <div class="kick">Federal Market Report</div>
     <h1>${esc(subject)}</h1>
     <div class="meta">${generated_for ? `Prepared for ${esc(generated_for)} · ` : ''}${esc(date)}</div>
+    <button class="pdfbtn" onclick="window.print()">Save as PDF</button>
   </header>
   ${degradedNote}
   ${body}

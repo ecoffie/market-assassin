@@ -15,7 +15,12 @@
  * Pattern: pure fn, `_meta` ALWAYS ships, `_ai_hint` OFF by default (data-first),
  * honest-miss = never fabricate. Credits handled by the transport (runMeteredTool).
  *
- * See tasks/one-shot-tools-plan.md. Hosted /reports/[id] page + PDF = follow-on PR.
+ * The report is PERSISTED (market_reports) and handed back as a shareable
+ * `deliverable.url` (/reports/<id>) — the link Sue actually sends a client. Saving is
+ * best-effort: if storage is down the caller still gets the full JSON + inline HTML,
+ * just without a link (they paid credits for this call — never lose the result).
+ * PDF = the hosted page's Save-as-PDF (server-side HTML→PDF would need Chromium in
+ * the lambda; puppeteer is a devDependency). See tasks/one-shot-tools-plan.md.
  */
 import { keywordCoverage, codeMarketSize, type KeywordCoverage } from '@/lib/market/keyword-coverage';
 import { fetchFPDSByNaics, mapFPDSToAgencies } from '@/lib/utils/fpds-api';
@@ -27,6 +32,9 @@ import { getSbaGoalingShare } from '@/mcp/tools/sba-goaling';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import { mcpFlags } from '@/lib/mcp/flags';
 import { renderMarketReportHtml } from '@/lib/market/market-report-html';
+import { saveMarketReport } from '@/lib/market/report-store';
+
+const SITE_URL = process.env.NEXT_PUBLIC_SITE_URL || 'https://getmindy.ai';
 
 export interface MarketReportInput {
   keyword?: string;
@@ -36,6 +44,8 @@ export interface MarketReportInput {
   set_aside?: string;
   /** Optional label for the deliverable header (e.g. Sue's client name). */
   client_name?: string;
+  /** The verified MCP caller (ctx.userEmail) — owns the saved report. Never from args. */
+  userEmail?: string;
 }
 
 interface TopAgency { name: string; sub_agency: string; contract_count: number; unique_vendors: number }
@@ -65,9 +75,14 @@ export interface MarketReportResult {
     agency_detail: unknown | null;
     set_aside_gap: unknown | null;
   };
-  /** Client-ready deliverable. `html` is a self-contained Mindy-branded report. */
-  deliverable: { html: string };
-  _meta: { grounded: boolean; degraded: boolean; sections_grounded: number; sections_total: number };
+  /**
+   * Client-ready deliverable. `html` is a self-contained Mindy-branded report;
+   * `url` is the hosted, shareable version of that same report — the link to send a
+   * client. `url` is null when the report could not be saved (storage unavailable or
+   * no verified caller); the html is still valid.
+   */
+  deliverable: { html: string; url: string | null; report_id: string | null };
+  _meta: { grounded: boolean; degraded: boolean; sections_grounded: number; sections_total: number; saved: boolean };
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string };
 }
 
@@ -167,12 +182,31 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     generated_for: input.client_name?.trim() || null,
     summary,
     sections,
-    deliverable: { html: '' },
-    _meta: { grounded: sectionsGrounded > 0, degraded, sections_grounded: sectionsGrounded, sections_total: groundedFlags.length },
+    deliverable: { html: '', url: null, report_id: null },
+    _meta: { grounded: sectionsGrounded > 0, degraded, sections_grounded: sectionsGrounded, sections_total: groundedFlags.length, saved: false },
   };
 
   // Client-ready deliverable (Mindy-branded, self-contained).
   result.deliverable.html = renderMarketReportHtml(result);
+
+  // Persist → shareable link. Only for a verified caller, and only when we actually
+  // found something (an empty report isn't a deliverable worth a client link).
+  // Best-effort: a storage failure must not lose the report the caller paid for.
+  if (input.userEmail && sectionsGrounded > 0) {
+    const { deliverable: _omit, ...payload } = result; // store the payload; HTML re-renders on view
+    const id = await saveMarketReport({
+      ownerEmail: input.userEmail,
+      subject,
+      clientName: input.client_name?.trim() || null,
+      params: { keyword, naics: naicsIn, agency, state, set_aside: setAside, client_name: input.client_name || null },
+      payload: payload as unknown as Record<string, unknown>,
+    });
+    if (id) {
+      result.deliverable.report_id = id;
+      result.deliverable.url = `${SITE_URL.replace(/\/$/, '')}/reports/${id}`;
+      result._meta.saved = true;
+    }
+  }
 
   if (mcpFlags.aiHint) {
     result._ai_hint = buildHint(result);
@@ -198,8 +232,12 @@ function buildHint(r: MarketReportResult): NonNullable<MarketReportResult['_ai_h
   }
   const dollars = r.summary.total_market ? `$${Math.round(r.summary.total_market).toLocaleString()}` : 'an unstated total';
   return {
-    summary: `Market report for "${r.subject}": ${dollars} across ${r.summary.naics_count ?? 'several'} NAICS, ${r.summary.buying_agencies} top buying agencies, ${r.summary.top_contractors} leading contractors, ${r.summary.recompetes} recompetes, ${r.summary.forecasts} forecasts.`,
-    how_to_use: 'Use the structured sections for facts; hand deliverable.html to the client as the report. Every figure traces to a returned section.',
+    summary: `Market report for "${r.subject}": ${dollars} across ${r.summary.naics_count ?? 'several'} NAICS, ${r.summary.buying_agencies} top buying agencies, ${r.summary.top_contractors} leading contractors, ${r.summary.recompetes} recompetes, ${r.summary.forecasts} forecasts.${
+      r.deliverable.url ? ` Shareable report: ${r.deliverable.url}` : ''
+    }`,
+    how_to_use: r.deliverable.url
+      ? `Use the structured sections for facts. Give the user deliverable.url (${r.deliverable.url}) — a hosted, client-ready page they can send straight to a client, with a Save-as-PDF button. deliverable.html is the same report inline. Every figure traces to a returned section.`
+      : 'Use the structured sections for facts; hand deliverable.html to the client as the report. No hosted link was created for this run — do NOT invent a report URL. Every figure traces to a returned section.',
     key_caveats: 'Only cite sections that returned rows. NAICS totals are contract obligations (FY window), not budget authority. Place-of-performance/agency filters are as labeled.',
   };
 }
