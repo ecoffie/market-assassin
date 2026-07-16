@@ -23,6 +23,7 @@
  */
 
 import { getVocabularyForCodes } from '@/lib/market/vocabulary';
+import { normalizeStateCode } from '@/lib/utils/us-states';
 
 // Structural subset of the Supabase query builder these tools use. Kept minimal
 // so tests can pass a stub without importing the real client.
@@ -34,6 +35,7 @@ interface SamQuery {
   eq(col: string, val: unknown): SamQuery;
   gte(col: string, val: unknown): SamQuery;
   ilike(col: string, val: string): SamQuery;
+  or(filters: string): SamQuery;
   textSearch(col: string, query: string, opts?: { type?: string }): SamQuery;
   order(col: string, opts: { ascending: boolean; nullsFirst?: boolean }): SamQuery;
   limit(n: number): Promise<{ data: unknown[] | null; error: { message?: string } | null }>;
@@ -60,6 +62,10 @@ export const TIER1_TOOL_DEFS = [
           set_aside: {
             type: 'string',
             description: 'Optional set-aside filter to match, e.g. "8(a)", "WOSB", "HUBZone", "SDVOSB".',
+          },
+          state: {
+            type: 'string',
+            description: 'Optional state to filter by location — matches place of performance OR the buying office (SAM often omits place-of-performance, so office state is included for coverage). Accepts a 2-letter code ("FL") or full name ("Florida").',
           },
         },
         required: ['keyword'],
@@ -100,6 +106,9 @@ interface SamRow {
   response_deadline?: string | null;
   ui_link?: string | null;
   solicitation_number?: string | null;
+  pop_state?: string | null;
+  pop_city?: string | null;
+  office_address?: { state?: string | null } | null;
 }
 
 const SAM_LIMIT = 8; // chat answers are tight; a handful of live opps is plenty
@@ -110,29 +119,34 @@ const SAM_LIMIT = 8; // chat answers are tight; a handful of live opps is plenty
  * model-supplied args (validated per-field; unknown fields ignored).
  */
 export function makeTier1Tools(db: Tier1Db) {
-  async function searchSam(args: { keyword?: unknown; naics?: unknown; set_aside?: unknown }): Promise<Record<string, unknown>> {
+  async function searchSam(args: { keyword?: unknown; naics?: unknown; set_aside?: unknown; state?: unknown }): Promise<Record<string, unknown>> {
     const keyword = typeof args?.keyword === 'string' ? args.keyword.trim() : '';
     if (!keyword) return { ok: false, error: 'keyword_required', count: 0, items: [] };
     const naics = typeof args?.naics === 'string' ? args.naics.trim() : '';
     const setAside = typeof args?.set_aside === 'string' ? args.set_aside.trim() : '';
+    // Location: match place-of-performance OR buying-office state. SAM omits
+    // pop_state on ~64% of rows, so office_address.state widens coverage. A
+    // state arg that doesn't resolve to a real code is ignored (still search).
+    const st = typeof args?.state === 'string' ? normalizeStateCode(args.state) : null;
 
     // Active + not-yet-closed, ranked by soonest deadline. FTS via the
     // GIN-indexed generated tsvector (websearch = supports quoted phrases / OR).
     const todayIso = new Date().toISOString();
     let q = db
       .from('sam_opportunities')
-      .select('title, department, naics_code, set_aside_description, notice_type, response_deadline, ui_link, solicitation_number')
+      .select('title, department, naics_code, set_aside_description, notice_type, response_deadline, ui_link, solicitation_number, pop_state, pop_city, office_address')
       .eq('active', true)
       .gte('response_deadline', todayIso)
       .textSearch('search_tsv', keyword, { type: 'websearch' });
     if (naics) q = q.eq('naics_code', naics);
     if (setAside) q = q.ilike('set_aside_description', `%${setAside}%`);
+    if (st) q = q.or(`pop_state.eq.${st},office_address->>state.eq.${st}`);
     const { data, error } = await q.order('response_deadline', { ascending: true, nullsFirst: false }).limit(SAM_LIMIT);
 
     if (error) return { ok: false, error: 'sam_unavailable', count: 0, items: [] };
     const rows = (data || []) as SamRow[];
     if (rows.length === 0) {
-      return { ok: true, count: 0, items: [], note: `No open SAM opportunities matched "${keyword}"${naics ? ` in NAICS ${naics}` : ''} right now.` };
+      return { ok: true, count: 0, items: [], note: `No open SAM opportunities matched "${keyword}"${naics ? ` in NAICS ${naics}` : ''}${st ? ` in ${st} (place of performance or buying office)` : ''} right now.` };
     }
     return {
       ok: true,
@@ -146,6 +160,11 @@ export function makeTier1Tools(db: Tier1Db) {
         deadline: r.response_deadline ?? null,
         solicitation: r.solicitation_number ?? null,
         link: r.ui_link ?? null,
+        location: {
+          pop_state: r.pop_state ?? null,
+          pop_city: r.pop_city ?? null,
+          office_state: r.office_address?.state ?? null,
+        },
       })),
     };
   }

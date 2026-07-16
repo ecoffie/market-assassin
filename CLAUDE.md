@@ -1918,6 +1918,30 @@ read `shadow_*` rows → set caps to p99 → enforce. (Memory: `mcp-extraction-g
 
 ---
 
+## Location search for opportunities (2026-07-16)
+
+"Find all contracts in Florida" didn't work — Mindy matched agency/NAICS/DoDAAC but not
+location. Root cause is a DATA gap, not just a missing filter: `sam_opportunities.pop_state`
+(place of performance) is only **~36% filled** (SAM omits it on ~64% of notices — and it's
+absent from `raw_data` too, so it's unrecoverable), while `office_address->>state` (the buying
+office) is **~100% filled**.
+
+**Fix = match place-of-performance OR buying-office state** (2-letter codes; both columns are
+uppercase 2-letter). Widens FL ~51–55% (1694→2553 all / 136→211 open).
+- `normalizeStateCode()` (`src/lib/utils/us-states.ts`) — full name ("Florida") or code → `FL`.
+- `search_sam_opportunities` (`src/lib/chat/tier1-tools.ts`, TIER1 → auto-exposed on MCP) gained a
+  `state` param + returns `location: {pop_state, pop_city, office_state}`. Filter:
+  `.or('pop_state.eq.FL,office_address->>state.eq.FL')`.
+- `mi-dashboard` state filter broadened to both columns (explicit + profile `location_states`),
+  now normalizes full names from the URL.
+- **Honest label:** location = "performed in — OR bought by an office in — <state>", because pure
+  place-of-performance is sparse in SAM. Don't present it as comprehensive PoP.
+- `/api/admin/backfill-pop-state` exists but recovers **~0** (SAM genuinely lacks the data); kept
+  as an honest, idempotent no-op that would catch future recoverable rows. The sync already reads
+  `placeOfPerformance.state.code` for new rows — unchanged.
+
+---
+
 ## Mindy MCP Server — proposal WRITING tools (2026-07-16)
 
 The MCP surface can now **draft a proposal**, not just shred/scan/referee one — the
