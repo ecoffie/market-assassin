@@ -21,12 +21,13 @@ import {
   type UsageSummary, type McpCall,
 } from '../usage-charts';
 
-type Section = 'usage' | 'activity' | 'billing' | 'keys' | 'settings';
+type Section = 'usage' | 'activity' | 'billing' | 'keys' | 'crm' | 'settings';
 const SECTIONS: { id: Section; label: string; icon: string }[] = [
   { id: 'usage', label: 'Usage', icon: '◧' },
   { id: 'activity', label: 'Activity', icon: '≡' },
   { id: 'billing', label: 'Billing', icon: '◈' },
   { id: 'keys', label: 'API keys', icon: '⚿' },
+  { id: 'crm', label: 'CRM', icon: '⇄' },
   { id: 'settings', label: 'Settings', icon: '⚙' },
 ];
 
@@ -65,6 +66,12 @@ export default function McpAccountPage() {
   const [billing, setBilling] = useState<BillingRow[] | null>(null);
   const [newKey, setNewKey] = useState<string | null>(null);
   const [newKeyLabel, setNewKeyLabel] = useState('');
+  // CRM (GoHighLevel) connection
+  const [crm, setCrm] = useState<{ connected: boolean; location_id?: string; provisioned?: boolean; label?: string | null } | null>(null);
+  const [crmToken, setCrmToken] = useState('');
+  const [crmLocation, setCrmLocation] = useState('');
+  const [crmBusy, setCrmBusy] = useState(false);
+  const [crmMsg, setCrmMsg] = useState<string | null>(null);
 
   const [justSavedCard, setJustSavedCard] = useState(false);
   const [justPurchased, setJustPurchased] = useState(false);
@@ -162,6 +169,41 @@ export default function McpAccountPage() {
     finally { setKeyBusy(false); }
   }, [email, refreshKeys]);
 
+  const refreshCrm = useCallback(async () => {
+    try {
+      const res = await fetch('/api/mcp/crm-connection', { headers: getMIApiHeaders() });
+      if (res.ok) setCrm(await res.json());
+    } catch { /* leave */ }
+  }, []);
+
+  const connectCrm = useCallback(async () => {
+    setCrmMsg(null);
+    const token = crmToken.trim();
+    const location_id = crmLocation.trim();
+    if (!token || !location_id) { setCrmMsg('Enter both your Private Integration Token and Location ID.'); return; }
+    setCrmBusy(true);
+    try {
+      // getMIApiHeaders() returns a Headers OBJECT — mutate in place, never spread (drops the token).
+      const headers = getMIApiHeaders();
+      headers.set('Content-Type', 'application/json');
+      const res = await fetch('/api/mcp/crm-connection', { method: 'POST', headers, body: JSON.stringify({ token, location_id }) });
+      const j = await res.json().catch(() => null);
+      if (res.ok) { setCrmToken(''); setCrmLocation(''); setCrmMsg('Connected — your CRM is ready. Agents can now add contacts to it.'); await refreshCrm(); }
+      else setCrmMsg(j?.error || 'Could not connect. Check the token scope and Location ID.');
+    } catch { setCrmMsg('Could not reach the server. Try again.'); }
+    finally { setCrmBusy(false); }
+  }, [crmToken, crmLocation, refreshCrm]);
+
+  const disconnectCrm = useCallback(async () => {
+    if (!window.confirm('Disconnect this CRM? Agents will no longer be able to add contacts to it.')) return;
+    setCrmBusy(true);
+    try {
+      const res = await fetch('/api/mcp/crm-connection', { method: 'DELETE', headers: getMIApiHeaders() });
+      if (res.ok) { setCrm({ connected: false }); setCrmMsg(null); }
+    } catch { /* leave */ }
+    finally { setCrmBusy(false); }
+  }, []);
+
   const copy = useCallback((text: string, tag: string) => {
     navigator.clipboard.writeText(text);
     setCopied(tag);
@@ -201,6 +243,7 @@ export default function McpAccountPage() {
           void refreshAutoRecharge();
           void refreshKeys(j.email);
           void refreshBilling();
+          void refreshCrm();
         } else {
           setAuthState('out');
         }
@@ -208,7 +251,7 @@ export default function McpAccountPage() {
         setAuthState('out');
       }
     })();
-  }, [refreshAccount, refreshAutoRecharge, refreshKeys, refreshBilling]);
+  }, [refreshAccount, refreshAutoRecharge, refreshKeys, refreshBilling, refreshCrm]);
 
   const refillLabel = useMemo(
     () => REFILL_PACKS.find((p) => p.id === autoRecharge?.refillPackage)?.label ?? autoRecharge?.refillPackage,
@@ -237,7 +280,7 @@ export default function McpAccountPage() {
 
   // ---- Section bodies --------------------------------------------------------
   const sectionTitle: Record<Section, string> = {
-    usage: 'Usage', activity: 'Activity', billing: 'Billing', keys: 'API keys', settings: 'Settings',
+    usage: 'Usage', activity: 'Activity', billing: 'Billing', keys: 'API keys', crm: 'CRM connection', settings: 'Settings',
   };
 
   const usageBody = (
@@ -451,8 +494,53 @@ export default function McpAccountPage() {
     </div>
   );
 
+  const crmBody = (
+    <div className="space-y-4">
+      <p className="text-[13px] text-slate-400">
+        Connect your <b className="font-semibold text-slate-200">GoHighLevel</b> and the <code className="rounded bg-white/[0.06] px-1 py-0.5 font-mono text-[12px] text-emerald-300">add_contacts_to_crm</code> tool can push contacts straight into your CRM — pair it with the contact-finder tools to build a list, then add them in one shot.
+      </p>
+
+      {crm?.connected ? (
+        <div className="rounded-xl border border-emerald-400/25 bg-emerald-400/[0.06] p-4">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <div className="flex items-center gap-2 text-[13px] font-semibold text-emerald-200">
+                <span aria-hidden>●</span> Connected — GoHighLevel
+                {crm.provisioned && <span className="rounded-full bg-white/[0.06] px-2 py-0.5 text-[11px] font-normal text-slate-400">provisioned</span>}
+              </div>
+              <p className="mt-0.5 truncate text-[12px] text-slate-400">Location <code className="font-mono text-slate-300">{crm.location_id}</code>{crm.label ? ` · ${crm.label}` : ''}</p>
+            </div>
+            <button onClick={disconnectCrm} disabled={crmBusy} className="shrink-0 rounded-lg border border-white/10 px-3 py-1.5 text-[12px] text-rose-300 hover:bg-rose-500/10 disabled:opacity-60">Disconnect</button>
+          </div>
+        </div>
+      ) : (
+        <div className="space-y-3 rounded-xl border border-white/[0.06] bg-white/[0.015] p-4">
+          <p className="text-[12px] text-slate-400">
+            Paste a GoHighLevel <b className="text-slate-200">Private Integration Token</b> (with the <span className="text-slate-300">contacts</span> scope) and your <b className="text-slate-200">Location ID</b>. Create one in GHL → Settings → Private Integrations. Your token is encrypted before it&apos;s stored and never shown again.
+          </p>
+          <input
+            value={crmToken}
+            onChange={(e) => setCrmToken(e.target.value)}
+            placeholder="Private Integration Token (pit-…)"
+            type="password"
+            className="w-full rounded-lg border border-white/10 bg-[#070b16] px-3 py-2 text-[13px] text-slate-200 outline-none placeholder:text-slate-600 focus:border-emerald-500/50"
+          />
+          <input
+            value={crmLocation}
+            onChange={(e) => setCrmLocation(e.target.value)}
+            placeholder="Location ID"
+            className="w-full rounded-lg border border-white/10 bg-[#070b16] px-3 py-2 text-[13px] text-slate-200 outline-none placeholder:text-slate-600 focus:border-emerald-500/50"
+          />
+          <button onClick={connectCrm} disabled={crmBusy} className="rounded-lg bg-emerald-500 px-3.5 py-1.5 text-[13px] font-semibold text-[#06120c] hover:bg-emerald-400 disabled:opacity-60">{crmBusy ? 'Connecting…' : 'Connect GoHighLevel'}</button>
+        </div>
+      )}
+
+      {crmMsg && <p className="text-[12px] text-slate-400">{crmMsg}</p>}
+    </div>
+  );
+
   const bodies: Record<Section, React.ReactNode> = {
-    usage: usageBody, activity: activityBody, billing: billingBody, keys: keysBody, settings: settingsBody,
+    usage: usageBody, activity: activityBody, billing: billingBody, keys: keysBody, crm: crmBody, settings: settingsBody,
   };
 
   return (
