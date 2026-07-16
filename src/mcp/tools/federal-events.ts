@@ -8,6 +8,7 @@
  * credits: 2. `_meta` always ships; `_ai_hint` OFF by default.
  */
 import { queryFederalEvents, type FederalEvent } from '@/lib/events/query';
+import { buildEventsIcs } from '@/lib/events/ics';
 import { mcpFlags } from '@/lib/mcp/flags';
 
 export interface FederalEventsToolInput {
@@ -15,11 +16,15 @@ export interface FederalEventsToolInput {
   months_ahead?: number;
   include_ai_discovery?: boolean;
   limit?: number;
+  /** Also return a base64 .ics of the DATED events, for one-shot calendar import. */
+  include_ics?: boolean;
 }
 
 export interface FederalEventsToolResult {
   queried: { agency: string; months_ahead: number };
   events: FederalEvent[];
+  /** base64 VCALENDAR — present only when include_ics is set AND ≥1 event has a real date. */
+  ics?: string;
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
   _meta: {
     grounded: boolean;
@@ -28,6 +33,10 @@ export interface FederalEventsToolResult {
     sam_count: number;
     ai_count: number;
     ai_discovery: 'off' | 'ran' | 'unavailable';
+    /** VEVENTs written. Only present when include_ics ran. */
+    ics_events?: number;
+    /** Events left OUT of the .ics for having no real date — never guessed onto a day. */
+    ics_skipped_undated?: number;
   };
 }
 
@@ -57,6 +66,21 @@ export async function searchFederalEvents(input: FederalEventsToolInput): Promis
     },
   };
 
+  if (input.include_ics === true) {
+    const cal = buildEventsIcs(
+      res.events.map((e) => ({
+        date: e.event_date,
+        title: e.title,
+        location: e.location,
+        description: e.description,
+        url: e.url,
+      })),
+    );
+    if (cal.base64) result.ics = cal.base64;
+    result._meta.ics_events = cal.eventCount;
+    result._meta.ics_skipped_undated = cal.skippedUndated;
+  }
+
   if (mcpFlags.aiHint) {
     const top = res.events[0];
     result._ai_hint = {
@@ -66,10 +90,21 @@ export async function searchFederalEvents(input: FederalEventsToolInput): Promis
         ? `${res.events.length} event(s) for "${agency}" in the next ${months} month(s) (${res.samCount} from SAM.gov, ${res.aiCount} AI-discovered), soonest first. Top: ${top.title}${top.event_date ? ` on ${top.event_date}` : ' (date TBD)'}${top.location ? ` — ${top.location}` : ''}.`
         : `No upcoming events found for "${agency}" in the next ${months} month(s). Widen months_ahead${res.aiDiscovery === 'off' ? ', or set include_ai_discovery to search the web for association conferences' : ''}.`,
       how_to_use: grounded
-        ? 'source="sam" events are grounded SAM.gov Special Notices (trust the date). source="ai" events are web-discovered — treat confidence as a verify-before-attending signal, and confirm the date/registration on the linked page. matched_office is the decoded buying office. registration_url is where to sign up.'
+        ? `source="sam" events are grounded SAM.gov Special Notices (trust the date). source="ai" events are web-discovered — treat confidence as a verify-before-attending signal, and confirm the date/registration on the linked page. matched_office is the decoded buying office. registration_url is where to sign up.${
+            result.ics
+              ? ' `ics` is a base64 .ics — decode it to a file the user imports into Google/Outlook/Apple Calendar to add every dated event at once.'
+              : ''
+          }`
         : 'No grounded events; tell the user none were found rather than inventing an industry day.',
       key_caveats: [
         'AI-discovered events (source="ai") can be misdated or loosely attributed — always verify via the URL before committing travel.',
+        ...(input.include_ics === true
+          ? [
+              result._meta.ics_skipped_undated
+                ? `The .ics covers only the ${result._meta.ics_events} event(s) carrying a real date; ${result._meta.ics_skipped_undated} undated event(s) were left out rather than guessed onto a day — track those manually.`
+                : 'The .ics covers only events carrying a real source date; undated events are never assigned a guessed day.',
+            ]
+          : []),
         res.aiDiscovery === 'unavailable'
           ? 'AI discovery was requested but web search is not configured on this deployment — only SAM.gov events were returned.'
           : 'SAM.gov event coverage skews toward DoD Special Notices; a civilian agency with few events may be a coverage gap, not a truly empty calendar.',

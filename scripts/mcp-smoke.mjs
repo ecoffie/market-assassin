@@ -433,6 +433,33 @@ try {
   console.error(`✓ grounded=${feS._meta?.grounded} · degraded=${feS._meta?.degraded} · sam=${feS._meta?.sam_count} · ai=${feS._meta?.ai_count} · ai_discovery=${feS._meta?.ai_discovery}${fe0 ? ` · top=${String(fe0.title).slice(0,40)} (${fe0.source}, ${fe0.event_date}, office=${String(fe0.matched_office).slice(0,24)})` : ''}`);
   if (feS._meta?.degraded) fail('federal-events: degraded=true (sam_events unreachable)');
   if (!feS._meta?.grounded) console.error('⚠ federal-events: grounded=false for DoD in 12mo — NON-FATAL (this deployment\'s sam_events may be empty/stale)');
+  if (feS.ics !== undefined) fail('federal-events: ics returned without include_ics (must be opt-in)');
+
+  // ── search_federal_events + include_ics (one-shot calendar import) ─────────
+  console.error('\n→ calling search_federal_events({ ...same, include_ics: true })');
+  const ical = await client.callTool({ name: 'search_federal_events', arguments: { agency: 'Department of Defense', months_ahead: 12, include_ics: true } });
+  const icalS = ical.structuredContent;
+  if (!icalS) fail('federal-events-ics: no structuredContent');
+  const dated = (icalS.events || []).filter((e) => e.event_date);
+  if (typeof icalS._meta?.ics_events !== 'number') fail('federal-events-ics: _meta.ics_events missing');
+  // The no-fabrication contract: exactly the DATED events become VEVENTs, no more.
+  if (icalS._meta.ics_events !== dated.length) fail(`federal-events-ics: ics_events=${icalS._meta.ics_events} but ${dated.length} events carry a date (undated must never be invented onto a day)`);
+  if (icalS._meta.ics_skipped_undated !== (icalS.events || []).length - dated.length) fail('federal-events-ics: ics_skipped_undated does not reconcile');
+  if (icalS._meta.ics_events > 0) {
+    if (!icalS.ics) fail('federal-events-ics: ics_events > 0 but no ics payload');
+    const cal = Buffer.from(icalS.ics, 'base64').toString('utf8');
+    if (!cal.startsWith('BEGIN:VCALENDAR') || !cal.includes('END:VCALENDAR')) fail('federal-events-ics: payload is not a VCALENDAR');
+    const vevents = (cal.match(/BEGIN:VEVENT/g) || []).length;
+    if (vevents !== icalS._meta.ics_events) fail(`federal-events-ics: ${vevents} VEVENTs vs ics_events=${icalS._meta.ics_events}`);
+    // Traceability: every VEVENT date must trace to a real returned event date.
+    for (const m of cal.matchAll(/DTSTART;VALUE=DATE:(\d{8})/g)) {
+      if (!dated.some((e) => e.event_date.replace(/-/g, '') === m[1])) fail(`federal-events-ics: VEVENT date ${m[1]} traces to no returned event`);
+    }
+    console.error(`✓ ics: ${vevents} VEVENT(s) · ${icalS._meta.ics_skipped_undated} undated skipped · ${cal.length}B VCALENDAR, all dates traceable`);
+  } else {
+    if (icalS.ics) fail('federal-events-ics: no dated events but an ics payload was returned');
+    console.error('⚠ federal-events-ics: 0 dated events — ics correctly omitted (NON-FATAL)');
+  }
 
   // ── scan_proposal_compliance (pure deterministic DQ scan) ─────────────────
   console.error('\n→ calling scan_proposal_compliance({ page-limit overage + unaddressed factor })');

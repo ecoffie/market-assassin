@@ -677,16 +677,21 @@ server.registerTool(
     description:
       'Upcoming federal-contracting events for an agency — industry days, matchmaking, sources-sought, association ' +
       'conferences. "Where do I show up to win this buyer?" Dated SAM.gov Special Notices (source="sam") + optional ' +
-      'web-discovered conferences (source="ai", verify before attending). grounded=false when none match.',
+      'web-discovered conferences (source="ai", verify before attending). grounded=false when none match. ' +
+      'include_ics also returns a base64 .ics calendar of the dated events.',
     inputSchema: {
       agency: z.string().describe('Agency name, e.g. "Department of Defense", "Navy", "GSA".'),
       months_ahead: z.number().int().min(1).max(12).optional().describe('Look-ahead window in months (default 4).'),
       include_ai_discovery: z.boolean().optional().describe('Also web-search for association conferences not in SAM (slower). Default false.'),
       limit: z.number().int().min(1).max(100).optional().describe('Max SAM events (default 25).'),
+      include_ics: z
+        .boolean()
+        .optional()
+        .describe('Return `ics`: base64 .ics of the matching events for one-shot calendar import. Dated events only. Default false.'),
     },
   },
-  async ({ agency, months_ahead, include_ai_discovery, limit }) => {
-    const result = await searchFederalEvents({ agency, months_ahead, include_ai_discovery, limit });
+  async ({ agency, months_ahead, include_ai_discovery, limit, include_ics }) => {
+    const result = await searchFederalEvents({ agency, months_ahead, include_ai_discovery, limit, include_ics });
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );
