@@ -1678,7 +1678,7 @@ passes `liveBq: true`. Also: name-search now matches exact UEI too. Diagnostic: 
 
 ---
 
-*Last Updated: June 24, 2026 — SEO crawl health + dep security: robots.txt now allows /_next/static + /_next/image (was blocking all JS/CSS → ~1,140 "Blocked by robots.txt"); 1,683 sitemap 404s already fixed in main (BigQuery-sourced, re-crawl pending); meta templates already optimized (PIID-in-title on /awards/[id]). npm audit 47→24 vulns, 0 critical: jspdf 4.2.1 + next 16.2.9 + overrides (fast-xml-parser/axios/ws/form-data); xlsx upload is 2FA-gated; nodemailer v9 (breaking) deferred. See "SEO crawl health + dependency security" section. Prev Jun 11 (PM) — Full-text search overhaul: bodies were EMPTY cache-wide (SAM returns description as a link; sync stored it) → notice-description lib + backfill-descriptions crons (active+inactive). 4-corpus search (title+description+sow_text+department), word-boundary ("M7"≠"M776"), Active/Inactive/All archive toggle, active-search escapes profile-NAICS filter. Global lookup bar (/app header): contract#→award detail, company/UEI→/contractors/[slug]. FIXED contractor search returning 0 (queryCached cacheOnly default → searchRecipients now liveBq:true; restored Contractors panel). Launch ops: setup-invite-batch + zero-alert-nudge + snapshot-metrics dispatcher jobs; onboarding persists real keywords + ends at Vault; semantic-keywords-from-UEI; emails green→navy/purple; sidebar account menu (mobile sign-out fix); demo-driven homepage (/mindy-landing, Vimeo reels); 2FA toggle removed (decorative). See "Full-text search + global lookup" + "Launch ops + onboarding" sections. Prev: Free alert email phased messaging (30-day setup nudges → Welcome/FREE forever; `profile-setup.ts`). Opportunity detail CTAs: profile setup before Pro upsell. SAM attachment real filenames (`SamAttachmentLinks`, metadata API; sync cron preserves attachment metadata). Prev Jun 8: Keyword-first market research (NAICS is the wrong primary key; "drones"=70+ codes, obvious code=28%/miss 72%; keyword auto-derives 90%-coverage NAICS; PSC=what's-bought lesson; Market Coverage banner; phrase-resilient; onboarding grounds day-1 codes so alerts aren't broken). Email send guard (#58 — global per-recipient daily cap + suppression, fixes 12-emails/day churn; emailType audit). Award Intelligence spine (award-detail + incumbent intel woven through task orders / Expiring Contracts / bid-no-bid / My Pursuits / Today's Intel), office contact rosters (#16, DoDAAC-decoded), Vault POC fields, SOW export tables, active-first pursuit picker, pipeline next-action + dedup, LLM cost discipline (gpt-4o-mini reasoning + $15 cap), quarterly data-refresh cron (honest stamp). See "Keyword-first market research" + "Award Intelligence + Office Rosters" sections. Prev Jun 3: Daily alerts free-daily permanent (DAILY_ALERT_BETA). Jun 2: purchase attribution → unified sales dashboard. May 20: OAuth custom domain (auth.getmindy.ai), Proposal Assist V2, mi-beta → app rename, session TTL 30d*
+*Last Updated: July 16, 2026 — Market spend reconciliation + one-shot tools. **ONE canonical market query** (`src/lib/market/spend-query.ts`) now shared by fpds-top-n + the market report — never hand-roll the filter (that split is what killed the Spending-by-Agency chart, #245). FIXED LIVE: fpds-top-n **404'd every dominant keyword** ("security guard" $6B / "janitorial" $1.9B / "roofing" $578M returned "No federal market found") — the gate's promised NAICS fall-through was never implemented; it uses the **LEAD code only** (roofing's coverage set dragged in 236220 → measured $77.7B of building construction, not $1.34B of roofing). FIXED LIVE: `topCodePct` measured the promoted LEAD not the biggest → report + Market Coverage banner rendered **"the biggest NAICS is only 0%"** for drones; split into `topCodePct` (biggest-by-$, DISPLAYED) vs `leadCodePct` (the ranking gate) — 8/10 keywords unchanged, hvac keeps 238220 specialty trade. Report gained `basis{}` + a **reconciliation line** ("336411 alone = $69M/28% vs $242.7M across 42 NAICS → misses 72%") — the answer to "your data is wrong". One-shot tools ALL 3 SHIPPED: market report + hosted `/reports/<id>` share link (#289), CRM push (#285/#286, BYO GHL — provision path DROPPED), calendar `include_ics` (#287, dated events only, never guessed). Pricing is **WIRED, not blocked** (that stale note cost a round-trip — grep `packages.ts` before stating a price). KNOWN/UNFIXED: keyword-coverage measures 1 FY vs the canonical 3 FY — a product decision (aligning moves "drones $243M"→$384M). See "Market spend: ONE shared query" + "One-Shot Composite Tools" sections. Prev Jun 24 — SEO crawl health + dep security: robots.txt now allows /_next/static + /_next/image; npm audit 47→24 vulns, 0 critical. Prev Jun 11 (PM) — Full-text search overhaul (bodies were EMPTY cache-wide), 4-corpus search, global lookup bar, contractor search 0-results fix, launch-ops crons, demo homepage. Prev Jun 8 — Keyword-first market research (NAICS is the wrong primary key; "drones"=70+ codes, obvious code=28%/miss 72%), Award Intelligence spine, office contact rosters, LLM cost discipline. Prev Jun 3 — Daily alerts free-daily permanent. Jun 2 — purchase attribution. May 20 — OAuth custom domain, mi-beta → app rename.*
 
 ---
 
@@ -2042,19 +2042,121 @@ in-app engine (nothing new was built on the drafting side — it was already vau
   + the $15/user cost cap applies. Verified end-to-end: 752-word Technical Approach + a 12KB PK-header
   `.docx` generated locally.
 
-### Locked pricing model (2026-07-16) — PR 2, blocked on Stripe products
-Not yet wired (needs Eric to create the Stripe products, then wire price IDs in `packages.ts` +
-bump the existing-tool reprices TOGETHER so no user is squeezed):
+### Locked pricing model (2026-07-16) — ✅ WIRED, not blocked
+**`packages.ts` is the source of truth — read it, not this table.** (This section previously said
+"blocked on Stripe products" long after the products existed; that staleness cost a whole
+round-trip on 2026-07-16. If you're about to state a pricing fact, grep the code first.)
+
 - **Base tiers:** Free $0 (100 cr one-time = ~1 proposal, then wall — the Higgsfield "one video"
-  model) · **Starter $59/mo** (~2,000 cr) · **Pro $149/mo** (~6,000 cr + community) · **Team
-  $499/mo** (~18,000 cr pool, group coaching) · Founders $4,997 lifetime.
-- **Add-ons:** Coaching (group in Team, 1:1 à-la-carte) · **Coach/Agency $99/mo up to 5 clients**
-  (raised from 3; per-client spend tracking for rebilling — credits self-regulate the marginal cost).
+  model) · **Starter $59/mo** (`SUBSCRIPTION_PLANS`, id stays `'scale'` so the Stripe
+  `plan=scale` metadata resolves; **2,400 cr/mo**, `MCP_SCALE_MONTHLY_CREDITS`; annual $590
+  ≈ $49/mo) · **Pro $149/mo** · **Team $499/mo** · Founders $4,997 lifetime.
+  - ⚠️ Pro/Team are **app** tiers — their MCP allowance is `PRO_MONTHLY_CREDITS` (**6,000/mo**,
+    bumped from 1,000 as the coupled half of the proposal reprice) **+** the app grant; they are
+    NOT sold through `SUBSCRIPTION_PLANS`.
+  - The **$19 'Plus' subscription was RETIRED** (0 subs ever → nothing to grandfather).
+- **One-time top-ups** (`CREDIT_PACKAGES`): Plus 2,000 cr / $49 · Scale 5,000 cr / $99.
 - **Flagship credit sink:** a full proposal run ≈ ~100 cr (`draft_proposal`=50 + matrix/SOW/
-  structure/scan/referee/docs). PR-2 reprices: referee 4→12, compliance-matrix 3→8, SOW 2→4,
-  recompete-sow 2→4, sol-docs 3→5, structure/scan 1→2. Referral: +100 each.
-- Rationale: "not consumer-priced" comes from tier SIZE + the flagship sink, not per-credit gouging
-  (per-credit stays ~$0.025, market rate). Competitive positioning doc + full reasoning: this session.
+  structure/scan/referee/docs). Reprices SHIPPED: referee 4→12, compliance-matrix 3→8, SOW 2→4,
+  recompete-sow 2→4, sol-docs 3→5, structure/scan 1→2.
+- **Add-ons (still unbuilt):** Coaching (group in Team, 1:1 à-la-carte) · Coach/Agency $99/mo up
+  to 5 clients (per-client spend tracking for rebilling).
+- `MCP_PRO_MONTHLY_CREDITS` is **not set in Vercel** (verified 2026-07-16) → the 6,000 default
+  applies. If it's ever set, **the env wins** — update it too or Pro silently under-grants.
+- Rationale: "not consumer-priced" comes from tier SIZE + the flagship sink, not per-credit
+  gouging (per-credit stays ~$0.025, market rate).
+
+---
+
+## Market spend: ONE shared query + the lead-vs-biggest split (2026-07-16, PRs #290/#293)
+
+Triggered by Eric: *"people who are comparing us to another platform that uses NAICS may say our
+data is incorrect."* Investigating that surfaced two real bugs and one architectural rule.
+
+### 🔑 `src/lib/market/spend-query.ts` is THE canonical market query — always use it
+The filter + scope decision used to live INSIDE route handlers, so every surface re-derived "what
+market is this" on its own. That is exactly how TMR and the FPDS leaderboards drifted until their
+agency totals couldn't be reconciled and the Spending-by-Agency chart had to be DELETED (#245,
+"the numbers don't match"). **Anything that ranks/aggregates a market MUST call
+`resolveMarketScope()` + `filtersForScope()` + `fetchSpendingCategory()`.** Never hand-roll the
+filter, never copy it — a client-facing report disagreeing with our own panel is far harder to
+defend than a delta against a competitor. Consumers today: `fpds-top-n`, `generate_market_report`.
+(`target-market-research` still has its own copy — a known follow-up.)
+
+### ⚠️ `allNaics[0]` is the LEAD, not the biggest — two different pcts
+`keyword-coverage` deliberately PROMOTES the semantically-right code to the head of `allNaics`
+("hvac" leads 238220 Plumbing/HVAC Contractors, the specialty trade, even though 236220 General
+Building has 2.7× the dollars). So one field can't answer both questions:
+
+| field | question | source |
+|---|---|---|
+| `topCodePct` | **displayed** — "the obvious code is only 28%, you'd miss 72%" | biggest by **dollars** |
+| `leadCodePct` | **the ranking gate** — "is the code this keyword MEANS dominant?" | `allNaics[0]` |
+
+They were ONE field, so the report and the Market Coverage banner rendered **"the single biggest
+NAICS is only 0%"** for drones (reading the promoted 0.2% sliver 339930 instead of 336411's 28.4%).
+`DOMINANT_NAICS_SHARE` reads **`leadCodePct`** — gating on the biggest would push "hvac" into NAICS
+ranking led by GENERAL CONSTRUCTION, surfacing general contractors for an HVAC search (Eric:
+*"it should be 238 since it's a specialty trade"*). Measured: 8/10 keywords have lead == biggest,
+so this changed **zero** ranking outcomes.
+
+### ⚠️ The dominant fall-through uses the LEAD CODE ONLY — never the coverage set
+`buildMarketFilter()` returning null means "rank by the code", **not** "no market". `fpds-top-n`
+treated null as an error and **404'd `security guard` ($6B), `janitorial services` ($1.9B) and
+`roofing` ($578M)** — three of the most common small-business searches, dead in prod until #293.
+And the fall-through must filter on the LEAD code alone: roofing's coverage set carries 236220,
+where roofing is a $79M sliver of a $60B+ code → filtering the SET measured all federal building
+construction (**top-3 $77.7B**) instead of roofing (**$1.34B**).
+
+### The reconciliation line (the answer to "your data is wrong")
+`generate_market_report` returns `basis{}` (what each section measured) + `reconciliation{}` —
+*"336411 alone = $68.9M (28%) vs $242.7M across 42 NAICS → misses 72%"*. Show THEIR number on OUR
+page and their figure becomes evidence for us. **Suppressed on the dominant path**, where we and
+the NAICS tool use the same code and the line would be a lie the report tells about itself.
+
+### 🐛 KNOWN, UNFIXED: keyword-coverage measures 1 FY, everything else measures 3
+`keywordCoverage`/`codeMarketSize` use `fiscalYearTimePeriod()` (**one** FY); `MARKET_SPEND_WINDOW`
+(fpds-top-n, TMR, find-agencies) is **three** FYs. So a report's headline total and its agency
+table sit on different windows (drones $243M vs agencies summing to $347M). Invisible unless
+someone sums the agency column — no single row contradicts the headline. Aligning would move every
+public keyword total **1.6–3.5×** ("drones = $243M" → **$384M**, a figure used in marketing), bust
+the TMR cache (`SPEND_SCHEMA_VERSION`), and regress `medical staffing`'s lead (561320 Temp Help →
+621999 catch-all). Measured across 10 keywords: 8/10 unchanged, 2 gate flips (demolition, medical
+staffing). **A product decision, not a bug to quietly fix.**
+
+---
+
+## One-Shot Composite Tools — ALL 3 SHIPPED (2026-07-16)
+
+Scope: `tasks/one-shot-tools-plan.md`. Collapse a hand-chained workflow into ONE agent call.
+
+| # | Tool | PR | Notes |
+|---|---|---|---|
+| 1 | `generate_market_report` | #283, #289, #293 | + hosted shareable link + basis/reconciliation |
+| 2 | `add_contacts_to_crm` | #285, #286 | BYO GoHighLevel token; Connect card on `/mcp/account` |
+| 3 | `include_ics` on `search_federal_events` | #287 | opt-in base64 VCALENDAR |
+
+- **Sue's deliverable:** `deliverable.url` → `/reports/<id>` (`src/app/reports/[id]/route.ts`, a
+  route handler because `renderMarketReportHtml` emits a full `<!doctype html>`). Stores the
+  **payload**, not the HTML, so renderer fixes reach already-shared links. The 22-char random id
+  **IS** the access control — the page is deliberately PUBLIC so a client opens it without a Mindy
+  login (capability URL); malformed and missing ids return an IDENTICAL 404 so it can't be probed.
+  Owner = the verified caller (`ctx.userEmail`), never args. Table: `market_reports`.
+  Saving is best-effort — storage down → `url:null`, `_meta.saved:false`, caller still gets the
+  full JSON (they paid 20 credits).
+- **PDF = the page's Save-as-PDF button**, NOT a base64 binary: server-side HTML→PDF needs Chromium
+  and `puppeteer` is a **devDependency**, so it'd mean `@sparticuz/chromium` (~50MB) or a render
+  service. Deferred.
+- **Calendar:** shipped as a flag on the existing tool, not a separate `export_events_ics` — the
+  events are already in hand. `src/lib/events/ics.ts` is RFC 5545 (CRLF, **75-OCTET** folding,
+  all-day `DTSTART;VALUE=DATE` + exclusive `DTEND`, stable UIDs so re-import updates).
+  **Undated events are SKIPPED and counted** (`_meta.ics_skipped_undated`), never guessed onto a
+  day — which is also why `get_federal_event_series` gets NO .ics (it holds cadence/typical_month,
+  not confirmed instances; VEVENTs from those would put wrong dates on a real calendar).
+- **GHL provision path DROPPED** (Eric, 2026-07-16): *"have the user put his information in
+  directly."* BYO token only — also sidesteps GHL's per-sub-account billing.
+
+---
 
 ## Verification Recipes — how to PROVE each surface works (rule #2)
 
