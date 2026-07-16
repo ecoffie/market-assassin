@@ -43,25 +43,21 @@ const PRO_INCLUDES: { label: string; note: string; status: 'live' | 'soon' }[] =
 
 /** Per-plan "who it's for" blurb — the only thing that differs plan to plan (capabilities are identical). */
 const PACK_BLURB: Record<string, string> = {
-  plus: 'The entry plan — enough for steady weekly BD all year, billed once annually.',
-  scale: 'Best rate for heavy users and teams — the lowest cost per credit, billed annually.',
+  scale: 'The entry paid plan — a fixed monthly allowance for steady federal BD, with the best per-credit rate on annual billing.',
 };
 
 /**
- * Static fallback for the two plans so the cards render even if the public
- * /api/mcp/catalog fetch is unavailable (bot-gated, SSR). Kept in sync with
- * SUBSCRIPTION_PLANS in src/lib/mcp/packages.ts — the live catalog wins when present.
+ * Static fallback so the plan card renders even if the public /api/mcp/catalog fetch
+ * is unavailable (bot-gated, SSR). MUST stay in sync with SUBSCRIPTION_PLANS in
+ * src/lib/mcp/packages.ts — the live catalog wins when present. Locked model
+ * (2026-07-16): the only MCP-native credit sub is Starter $59 (the 'scale' id); the
+ * $19 Plus + $50 Scale plans were retired. Pro $149 is the cross-sell (below).
  */
 const PLANS_FALLBACK: SubPlan[] = [
   {
-    id: 'plus', label: 'Plus', creditsPerMonth: 800,
-    monthly: { priceId: 'price_1TtHbHK5zyiZ50PBGbmTn9mJ', usd: 19, credits: 800, checkoutUrl: 'https://buy.stripe.com/3cIeVe2sm83848Z98YfnO0O' },
-    annual: { priceId: 'price_1TtHCIK5zyiZ50PB6Lvi5NMo', usd: 180, usdPerMonth: 15, credits: 9600, checkoutUrl: 'https://buy.stripe.com/00weVec2Wbfk20RclafnO0M' },
-  },
-  {
-    id: 'scale', label: 'Scale', creditsPerMonth: 2400,
-    monthly: { priceId: 'price_1TtHbIK5zyiZ50PBhJ9MR9GE', usd: 50, credits: 2400, checkoutUrl: 'https://buy.stripe.com/3cIfZi8QK0AG8pfetifnO0P' },
-    annual: { priceId: 'price_1TtHCJK5zyiZ50PB57BKa1OW', usd: 480, usdPerMonth: 40, credits: 28800, checkoutUrl: 'https://buy.stripe.com/6oU28s8QK5V048Zad2fnO0N' },
+    id: 'scale', label: 'Starter', creditsPerMonth: 2400,
+    monthly: { priceId: 'price_1TtpH5K5zyiZ50PBN6wo4IAs', usd: 59, credits: 2400, checkoutUrl: 'https://buy.stripe.com/3cIaEY6IC1EKgVLetifnO0S' },
+    annual: { priceId: 'price_1TtpHiK5zyiZ50PBcGOuLfnR', usd: 590, usdPerMonth: 49, credits: 28800, checkoutUrl: 'https://buy.stripe.com/9B628s8QKerwaxn0CsfnO0T' },
   },
 ];
 
@@ -76,9 +72,9 @@ const ACTIVITIES: { id: string; label: string; note: string; tools: string[] }[]
 
 const FAQ: { q: string; a: string }[] = [
   { q: 'How do credits work?', a: 'Every tool your agent calls costs a set number of credits — priced by what it costs us to run. You are debited only when a call succeeds; a failed or empty call costs nothing, and repeat/cached reads are free.' },
-  { q: 'How do the Plus and Scale plans work?', a: 'Each gives you a fixed monthly credit allowance (Plus 800/mo, Scale 2,400/mo) that stays the same whether you pay monthly or annually — annual just lowers the price. Monthly billing grants that month’s credits each cycle; annual billing grants the full year up front and saves ~20%.' },
+  { q: 'How does the Starter plan work?', a: 'Starter gives you a fixed monthly credit allowance (2,400/mo) that stays the same whether you pay monthly or annually — annual just lowers the price. Monthly billing grants that month’s credits each cycle; annual billing grants the full year up front and saves ~2 months.' },
   { q: 'What is the "moat," and why is it paid-only?', a: 'The moat is Mindy’s un-copyable layer: the winning playbook, curated teaming/OSBP contacts, agency angles, and podcast lessons — built from an 8-year teaching corpus, not scraped from public APIs. The free trial runs the public-data tools (SAM, USASpending, EDGAR, GSA, forecasts); any paid plan or Pro unlocks the moat.' },
-  { q: 'Plus/Scale or Pro — which do I need?', a: 'Plus and Scale are credit plans (billed monthly or annually) with a fixed monthly allowance — ideal for steady project use, and the best per-credit rate on annual billing. Pro is the best value if your agent works federal opportunities daily: a larger monthly allowance, plus Proposal Assist 2.0 and the full Mindy app.' },
+  { q: 'Starter or Pro — which do I need?', a: 'Starter is a credit plan (billed monthly or annually) with a fixed monthly allowance — ideal for steady project use, and the best per-credit rate on annual billing. Pro is the best value if your agent works federal opportunities daily: a larger monthly allowance, plus Proposal Assist 2.0 and the full Mindy app.' },
   { q: 'Do I need a credit card to start?', a: 'No. You get signup credits free on your first connect — sign in through your browser, point your MCP client at Mindy, and start calling tools. Add a plan or go Pro only when you want more.' },
   { q: 'I already pay for Mindy Pro. Do I get MCP credits?', a: 'Yes — your $149/mo Pro plan includes a monthly MCP credit allowance at no extra cost. Connect with the same account and the credits are already there.' },
   { q: 'What happens when I run out of credits?', a: 'The next tool call is declined with a top-up message before it runs — you are never charged into a negative balance. Upgrade your plan or wait for your renewal to add more.' },
@@ -120,8 +116,8 @@ export default function McpPricing() {
     return {
       id: p.id,
       name: p.label,
-      tag: p.id === 'plus' ? 'Popular' : p.id === 'scale' ? 'Best rate' : null,
-      highlight: p.id === 'plus',
+      tag: p.id === 'scale' ? 'Popular' : null,
+      highlight: p.id === 'scale',
       creditsPerMonth: p.creditsPerMonth,
       perMo: annual ? p.annual.usdPerMonth : p.monthly.usd,
       monthlyUsd: p.monthly.usd, // struck-through anchor when annual is active
@@ -186,8 +182,8 @@ export default function McpPricing() {
           <a href="/app" className="shrink-0 rounded-lg border border-emerald-400/30 px-4 py-2 text-[13px] font-semibold text-emerald-200 hover:bg-emerald-400/10">Start free →</a>
         </div>
 
-        {/* Paid options — Plus | Scale (2 cols, toggle-driven price), then Pro below */}
-        <section className="mt-4 grid gap-4 md:grid-cols-2">
+        {/* Paid credit plan — Starter (toggle-driven price), then Pro below */}
+        <section className={`mt-4 grid gap-4 ${planRows.length > 1 ? 'md:grid-cols-2' : 'mx-auto w-full max-w-md'}`}>
           {planRows.map((p) => (
             <div key={p.id} className={`relative flex flex-col rounded-2xl border p-6 ${p.highlight ? 'border-emerald-400/40 bg-emerald-400/[0.05] shadow-[0_0_0_1px_rgba(16,185,129,0.15)]' : 'border-white/10 bg-white/[0.02]'}`}>
               {p.tag && <span className={`absolute -top-2.5 left-6 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${p.highlight ? 'bg-emerald-500 text-[#06120c]' : 'border border-white/15 bg-[#0a0f1e] text-slate-400'}`}>{p.tag}</span>}
