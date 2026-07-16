@@ -15,6 +15,16 @@ const supabase = supabaseUrl && supabaseKey
 
 const COMPANY_SUFFIX_RE = /\b(incorporated|inc|llc|l\.l\.c|corp|corporation|co|company|ltd|limited|lp|llp|pllc|pc)\b/gi;
 
+// normalizeCompanyName rewrites "&" to the word "and", so "J & J MAINTENANCE"
+// normalizes to "j and j maintenance". Without this list "and" survives the
+// length filter in getQueryCandidates, becomes a bare candidate, and
+// `ilike '%and%'` then matches ANDURIL / STANDARD / HIGHLAND / GRAND.
+const CANDIDATE_STOPWORDS = new Set(['and', 'the', 'for', 'of', 'a', 'an']);
+
+// A bare one-word candidate is the broadest query we ever issue; keep it long
+// enough to be a real company token rather than a fragment.
+const MIN_BARE_CANDIDATE_LENGTH = 4;
+
 export interface ContractorAwardHistoryRow {
   award_id: string;
   recipient_name: string;
@@ -180,7 +190,7 @@ function toContractorSummary(contractor: Contractor) {
   };
 }
 
-function getQueryCandidates(company: string) {
+export function getQueryCandidates(company: string) {
   const trimmed = company.trim();
   const normalized = normalizeCompanyName(trimmed);
   const candidates = [trimmed];
@@ -189,17 +199,63 @@ function getQueryCandidates(company: string) {
     candidates.push(normalized);
   }
 
-  const words = normalized.split(' ').filter((word) => word.length > 2);
+  const words = normalized
+    .split(' ')
+    .filter((word) => word.length > 2 && !CANDIDATE_STOPWORDS.has(word));
   if (words.length >= 2) candidates.push(words.slice(0, 2).join(' '));
-  if (words.length >= 1) candidates.push(words[0]);
+  if (words.length >= 1 && words[0].length >= MIN_BARE_CANDIDATE_LENGTH) {
+    candidates.push(words[0]);
+  }
 
   return Array.from(new Set(candidates.filter(Boolean)));
+}
+
+function toTokens(normalized: string) {
+  return normalized.split(' ').filter(Boolean);
+}
+
+/**
+ * Does every token of `needle` appear as a whole token of `haystack`?
+ *
+ * Token-wise rather than substring: `"ace"` must not match `"pace industries"`,
+ * and `"j and j maintenance"` must not match `"anduril industries"`.
+ */
+function containsAllTokens(haystack: string[], needle: string[]) {
+  if (!needle.length) return false;
+  const pool = new Set(haystack);
+  return needle.every((token) => pool.has(token));
+}
+
+/**
+ * How well does a USASpending recipient_name correspond to the company we asked
+ * for? 'low' means "we cannot tell" — callers must treat it as no match rather
+ * than returning the row.
+ */
+export function scoreRecipientMatch(normalizedCompany: string, recipientName: string | null) {
+  const normalizedRecipient = normalizeCompanyName(recipientName || '');
+  if (!normalizedCompany || !normalizedRecipient) return 'low' as const;
+  if (normalizedCompany === normalizedRecipient) return 'high' as const;
+
+  const companyTokens = toTokens(normalizedCompany);
+  const recipientTokens = toTokens(normalizedRecipient);
+  // Either direction: "j and j maintenance" vs "j and j maintenance services
+  // of texas" is the same firm; a strict prefix/suffix relationship is not.
+  if (
+    containsAllTokens(recipientTokens, companyTokens)
+    || containsAllTokens(companyTokens, recipientTokens)
+  ) {
+    return 'medium' as const;
+  }
+
+  return 'low' as const;
 }
 
 async function fetchCachedAwards(company: string) {
   if (!supabase) {
     return { data: [] as ContractorAwardHistoryRow[], error: 'Database not configured' };
   }
+
+  const normalizedCompany = normalizeCompanyName(company);
 
   for (const candidate of getQueryCandidates(company)) {
     const { data, error } = await supabase
@@ -213,8 +269,18 @@ async function fetchCachedAwards(company: string) {
       return { data: [] as ContractorAwardHistoryRow[], error: error.message };
     }
 
-    if (data?.length) {
-      return { data: data as ContractorAwardHistoryRow[], error: null };
+    if (!data?.length) continue;
+
+    // `ilike '%candidate%'` is a substring scan: a single query can return rows
+    // for many unrelated recipients. Keep only the rows that actually resolve
+    // to this company — returning the raw result set is what surfaced
+    // ANDURIL's portfolio under "J & J MAINTENANCE INC" (issue #279).
+    const accepted = (data as ContractorAwardHistoryRow[]).filter((row) => (
+      scoreRecipientMatch(normalizedCompany, row.recipient_name) !== 'low'
+    ));
+
+    if (accepted.length) {
+      return { data: accepted, error: null };
     }
   }
 
@@ -232,21 +298,19 @@ function getMatchConfidence(company: string, awards: ContractorAwardHistoryRow[]
 
   const normalizedCompany = normalizeCompanyName(company);
   const recipientName = awards[0]?.recipient_name || company;
-  const normalizedRecipient = normalizeCompanyName(recipientName);
 
-  if (normalizedCompany && normalizedRecipient && normalizedCompany === normalizedRecipient) {
+  // fetchCachedAwards has already dropped every row that scores 'low', so any
+  // award reaching here corresponds to this company. Confidence is 'high' only
+  // when the set is unambiguous: one distinct recipient, matching exactly.
+  const distinctRecipients = new Set(
+    awards.map((award) => normalizeCompanyName(award.recipient_name || '')).filter(Boolean)
+  );
+
+  if (distinctRecipients.size === 1 && distinctRecipients.has(normalizedCompany)) {
     return { method: 'recipient_name' as const, confidence: 'high' as const, name: recipientName };
   }
 
-  if (
-    normalizedCompany
-    && normalizedRecipient
-    && (normalizedCompany.includes(normalizedRecipient) || normalizedRecipient.includes(normalizedCompany))
-  ) {
-    return { method: 'recipient_name' as const, confidence: 'medium' as const, name: recipientName };
-  }
-
-  return { method: 'recipient_name' as const, confidence: 'low' as const, name: recipientName };
+  return { method: 'recipient_name' as const, confidence: 'medium' as const, name: recipientName };
 }
 
 function buildHistory(
