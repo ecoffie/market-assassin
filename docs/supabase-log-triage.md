@@ -87,14 +87,23 @@ Status breakdown for one representative hour: `200` 910 · `01000` 142 · `400` 
 
 | signal | rate | cause | status |
 |---|---|---|---|
-| `01000` | 142/hr | Oregon read replica's host ICU (`153.121`) vs recorded (`153.120`). Supabase's local agent reconnects every minute; each startup warns. | Not fixable by us — see `supabase-ticket-replica-collation.md` |
+| `01000` | 142/hr | Oregon read replica's host ICU (`153.121`) vs recorded (`153.120`). Supabase's local agent reconnects every minute; each startup warns. | Not fixable by us — see `supabase-ticket-replica.md` |
 | `42P10` | was ~3k/day | `alert_log` upsert targeting a constraint that didn't exist | Fixed `20260715_alert_log_conflict_constraint.sql` (verified) |
 | `42703` | 1/hr | `purchases.bundle` — column doesn't exist in this instance; silently zeroed the Founders seat count | Fixed in PR #259 |
 | `406` | 1/hr | `.single()` on a `sam_api_cache` miss | Fixed (minor) in `src/lib/sam/utils.ts` |
-| `400` | 64/hr | HEAD/count queries on `agency_forecasts` + `sam_opportunities`, bursty | **Not yet investigated** |
+| `400` | 64/hr | **The read replica rejects EVERY HTTP HEAD with a 400.** supabase-js issues a HEAD for `{count:'exact',head:true}`, so every head-count via `getReadClient()` failed — and callers turned it into a confident `0`. Nine days of falsified metrics. | Fixed in PR #264 (`getCountClient`) + backfill applied |
 
-## Still open
+Both replica defects (`01000` ICU, `400` HEAD) date to its 06 Jul creation and are
+in one ticket: `supabase-ticket-replica.md`.
 
-**`400` @ ~64/hr.** HEAD requests are count queries (`{ count: 'exact', head: true }`).
-Bursty, which suggests a cron or an admin dashboard fanning out. Next step: filter
-`Status = 400`, click a row, read the DETAIL for the actual PostgREST error.
+## The lesson from the 400s
+
+They looked like the most boring signal on the board — a mid-volume 4xx that we
+nearly skipped in favour of the 10.9k warnings. They were the only one that had
+actually corrupted data. **Volume is not severity.** The 10,939/day turned out to
+be a cosmetic platform inconsistency; the quiet 64/hr had been silently writing
+zeros into metrics history for ten days.
+
+The tell was there from the first screenshot: `HEAD` requests 400ing. Worth asking
+early — *what would have to be true for this to be harmless?* — and then checking
+it, rather than ranking work by log volume.
