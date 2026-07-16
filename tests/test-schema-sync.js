@@ -56,6 +56,23 @@ const EXPECTED_SCHEMA = {
     'sent_at',
     'delivery_status',
   ],
+  // Added July 2026 after the purchases.bundle incident: founders-seats.ts and
+  // admin/member-lookup queried a `bundle` column that exists in govcon-shop's
+  // Supabase but NOT this one (separate instances — data-isolation rule). Both
+  // swallowed the resulting 42703, so the Founders seat count silently read 0
+  // Ultimate owners for months. The slug lives in product_id, not bundle.
+  // Keep product_id listed: if it ever disappears, fail loudly at pre-push
+  // instead of quietly undercounting a capped, revenue-bearing offer.
+  purchases: [
+    'id',
+    'user_email',
+    'product_id',      // holds the ULTIMATE_BUNDLES slugs — NOT `bundle`
+    'product_name',
+    'order_id',
+    'amount_paid',
+    'status',
+    'created_at',
+  ],
 };
 
 async function checkTable(tableName, expectedColumns) {
