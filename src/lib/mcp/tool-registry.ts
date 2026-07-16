@@ -35,6 +35,7 @@ import { sbirSearch } from '@/mcp/tools/sbir';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
 import { getKeywordCoverage } from '@/mcp/tools/keyword-coverage';
 import { idvContracts } from '@/mcp/tools/idv-contracts';
+import { searchPastContracts } from '@/mcp/tools/past-contracts';
 import { contractorAwardHistory } from '@/mcp/tools/contractor-award-history';
 import { assessMarketDepth } from '@/mcp/tools/market-depth';
 import { solicitationDocuments } from '@/mcp/tools/solicitation-documents';
@@ -95,6 +96,7 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   get_expiring_contracts: 1, // Supabase recompete_opportunities read
   get_keyword_coverage: 1, // USASpending spending-by-category (free upstream, cacheable)
   search_idv_contracts: 2, // live USASpending IDV/task-order search
+  search_past_contracts: 2, // live USASpending awarded-contract search by location
   get_contractor_award_history: 2, // USASpending cache + contractor DB
   assess_market_depth: 2, // Supabase sam_entities + BQ recipients activity enrich
   get_solicitation_documents: 5, // full-text + raw-file delivery (cold path downloads + extracts on demand). Repriced 3→5 (2026-07-16, proposal-flagship coupling)
@@ -510,13 +512,46 @@ const IDV_CONTRACTS_TOOL_DEF = {
         naics: { type: 'string', description: 'NAICS code.' },
         psc: { type: 'string', description: 'Product/Service Code.' },
         agency: { type: 'string', description: 'Awarding agency name.' },
-        state: { type: 'string', description: '2-letter state (recipient or place-of-performance).' },
+        state: { type: 'string', description: '2-letter state code.' },
+        state_scope: { type: 'string', enum: ['recipient', 'pop', 'both'], description: 'Which location the state filters: "recipient" HQ (default), "pop" place of performance, or "both" (union).' },
         min_value: { type: 'number', description: 'Minimum award amount (dollars).' },
         date_from: { type: 'string', description: 'Action date lower bound (YYYY-MM-DD).' },
         date_to: { type: 'string', description: 'Action date upper bound (YYYY-MM-DD).' },
         search_type: { type: 'string', enum: ['idv', 'task'], description: '"idv" = base vehicles (default); "task" = task/delivery orders.' },
         limit: { type: 'number', description: 'Max results per page (default 25).' },
         page: { type: 'number', description: '1-based page number.' },
+      },
+    },
+  },
+};
+
+const PAST_CONTRACTS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'search_past_contracts',
+    description:
+      'Search AWARDED federal prime contracts (past/historical, from USASpending) BY LOCATION plus NAICS / PSC / ' +
+      'agency / recipient / value / date. The "what contracts were awarded in <state>" lookup. state_scope controls ' +
+      'the geography: "pop" (place of performance — where the work is done, the default and usual meaning of ' +
+      '"contracts in Florida"), "recipient" (the awardee firm\'s HQ state), or "both" (union of the two). ' +
+      'Returns each award\'s recipient, amount, agency, NAICS/PSC, place-of-performance + recipient state, dates, ' +
+      'and a USASpending deep link. These are ALREADY-AWARDED contracts — for open solicitations use ' +
+      'search_sam_opportunities; for one firm\'s full history use get_contractor_award_history. grounded=false ' +
+      'when nothing matches — broaden the codes/date or try state_scope:"both"; do not invent awards.',
+    parameters: {
+      type: 'object',
+      properties: {
+        state: { type: 'string', description: 'State — full name ("Florida") or 2-letter code ("FL").' },
+        state_scope: { type: 'string', enum: ['pop', 'recipient', 'both'], description: 'Which location to match (default "pop" = place of performance).' },
+        naics: { type: 'string', description: 'NAICS code — 6-digit exact or 2-5 digit prefix.' },
+        psc: { type: 'string', description: 'Product/Service Code.' },
+        agency: { type: 'string', description: 'Awarding agency name (toptier).' },
+        recipient: { type: 'string', description: 'Recipient company-name keyword.' },
+        min_value: { type: 'number', description: 'Minimum award amount (dollars).' },
+        date_from: { type: 'string', description: 'Action-date lower bound (YYYY-MM-DD).' },
+        date_to: { type: 'string', description: 'Action-date upper bound (YYYY-MM-DD).' },
+        include_idv: { type: 'boolean', description: 'Also include IDV vehicles (IDIQ/GWAC/BPA), not just definitive contracts (default false).' },
+        limit: { type: 'number', description: 'Max awards returned (default 25, max 100).' },
       },
     },
   },
@@ -1163,6 +1198,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     EXPIRING_CONTRACTS_TOOL_DEF,
     KEYWORD_COVERAGE_TOOL_DEF,
     IDV_CONTRACTS_TOOL_DEF,
+    PAST_CONTRACTS_TOOL_DEF,
     CONTRACTOR_AWARD_HISTORY_TOOL_DEF,
     MARKET_DEPTH_TOOL_DEF,
     SOLICITATION_DOCUMENTS_TOOL_DEF,
@@ -1213,6 +1249,7 @@ export function isMcpTool(name: string): boolean {
     name === 'get_expiring_contracts' ||
     name === 'get_keyword_coverage' ||
     name === 'search_idv_contracts' ||
+    name === 'search_past_contracts' ||
     name === 'get_contractor_award_history' ||
     name === 'assess_market_depth' ||
     name === 'get_solicitation_documents' ||
@@ -1436,12 +1473,36 @@ export async function runMcpTool(
       psc: typeof args.psc === 'string' ? args.psc : undefined,
       agency: typeof args.agency === 'string' ? args.agency : undefined,
       state: typeof args.state === 'string' ? args.state : undefined,
+      state_scope:
+        args.state_scope === 'recipient' || args.state_scope === 'pop' || args.state_scope === 'both'
+          ? args.state_scope
+          : undefined,
       min_value: typeof args.min_value === 'number' ? args.min_value : undefined,
       date_from: typeof args.date_from === 'string' ? args.date_from : undefined,
       date_to: typeof args.date_to === 'string' ? args.date_to : undefined,
       search_type: args.search_type === 'idv' || args.search_type === 'task' ? args.search_type : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
       page: typeof args.page === 'number' ? args.page : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'search_past_contracts') {
+    const result = (await searchPastContracts({
+      state: typeof args.state === 'string' ? args.state : undefined,
+      state_scope:
+        args.state_scope === 'pop' || args.state_scope === 'recipient' || args.state_scope === 'both'
+          ? args.state_scope
+          : undefined,
+      naics: typeof args.naics === 'string' ? args.naics : undefined,
+      psc: typeof args.psc === 'string' ? args.psc : undefined,
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      recipient: typeof args.recipient === 'string' ? args.recipient : undefined,
+      min_value: typeof args.min_value === 'number' ? args.min_value : undefined,
+      date_from: typeof args.date_from === 'string' ? args.date_from : undefined,
+      date_to: typeof args.date_to === 'string' ? args.date_to : undefined,
+      include_idv: typeof args.include_idv === 'boolean' ? args.include_idv : undefined,
+      limit: typeof args.limit === 'number' ? args.limit : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }

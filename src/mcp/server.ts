@@ -34,6 +34,7 @@ import { sbirSearch } from './tools/sbir';
 import { expiringContracts } from './tools/expiring-contracts';
 import { getKeywordCoverage } from './tools/keyword-coverage';
 import { idvContracts } from './tools/idv-contracts';
+import { searchPastContracts } from './tools/past-contracts';
 import { contractorAwardHistory } from './tools/contractor-award-history';
 import { assessMarketDepth } from './tools/market-depth';
 import { solicitationDocuments } from './tools/solicitation-documents';
@@ -505,6 +506,7 @@ server.registerTool(
       psc: z.string().optional().describe('Product/Service Code.'),
       agency: z.string().optional().describe('Awarding agency name.'),
       state: z.string().optional().describe('2-letter state.'),
+      state_scope: z.enum(['recipient', 'pop', 'both']).optional().describe('Which location the state filters: "recipient" HQ (default), "pop" place of performance, or "both".'),
       min_value: z.number().optional().describe('Minimum award amount (dollars).'),
       date_from: z.string().optional().describe('Action date lower bound (YYYY-MM-DD).'),
       date_to: z.string().optional().describe('Action date upper bound (YYYY-MM-DD).'),
@@ -513,8 +515,37 @@ server.registerTool(
       page: z.number().int().min(1).optional().describe('1-based page number.'),
     },
   },
-  async ({ naics, psc, agency, state, min_value, date_from, date_to, search_type, limit, page }) => {
-    const result = await idvContracts({ naics, psc, agency, state, min_value, date_from, date_to, search_type, limit, page });
+  async ({ naics, psc, agency, state, state_scope, min_value, date_from, date_to, search_type, limit, page }) => {
+    const result = await idvContracts({ naics, psc, agency, state, state_scope, min_value, date_from, date_to, search_type, limit, page });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'search_past_contracts',
+  {
+    title: 'Search Past Contracts by Location',
+    description:
+      'Awarded federal prime contracts (past/historical, USASpending) BY LOCATION + NAICS / PSC / agency / recipient / ' +
+      'value / date. state_scope: "pop" (place of performance, default), "recipient" (awardee HQ), or "both" (union). ' +
+      'Already-awarded contracts — for open solicitations use search_sam_opportunities; for one firm use ' +
+      'get_contractor_award_history. grounded=false when nothing matches; do not invent awards.',
+    inputSchema: {
+      state: z.string().optional().describe('State — full name ("Florida") or 2-letter code ("FL").'),
+      state_scope: z.enum(['pop', 'recipient', 'both']).optional().describe('Which location to match (default "pop").'),
+      naics: z.string().optional().describe('NAICS — 6-digit exact or 2-5 digit prefix.'),
+      psc: z.string().optional().describe('Product/Service Code.'),
+      agency: z.string().optional().describe('Awarding agency name (toptier).'),
+      recipient: z.string().optional().describe('Recipient company-name keyword.'),
+      min_value: z.number().optional().describe('Minimum award amount (dollars).'),
+      date_from: z.string().optional().describe('Action-date lower bound (YYYY-MM-DD).'),
+      date_to: z.string().optional().describe('Action-date upper bound (YYYY-MM-DD).'),
+      include_idv: z.boolean().optional().describe('Also include IDV vehicles (default false).'),
+      limit: z.number().int().min(1).max(100).optional().describe('Max awards (default 25).'),
+    },
+  },
+  async ({ state, state_scope, naics, psc, agency, recipient, min_value, date_from, date_to, include_idv, limit }) => {
+    const result = await searchPastContracts({ state, state_scope, naics, psc, agency, recipient, min_value, date_from, date_to, include_idv, limit });
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );

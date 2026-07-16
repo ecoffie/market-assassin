@@ -72,7 +72,7 @@ try {
   if (!names.includes('get_winning_playbook')) fail('get_winning_playbook not registered');
   for (const t of [
     'get_pricing_intel', 'get_incumbent_financials', 'get_regulatory_demand',
-    'get_keyword_coverage', 'search_idv_contracts', 'get_contractor_award_history', 'assess_market_depth',
+    'get_keyword_coverage', 'search_idv_contracts', 'search_past_contracts', 'get_contractor_award_history', 'assess_market_depth',
     'get_solicitation_documents', 'search_federal_events',
     'scan_proposal_compliance', 'evaluate_bid_decision',
     'lookup_federal_osbp', 'search_agency_opps_by_office',
@@ -333,6 +333,21 @@ try {
   console.error(`✓ grounded=${idvS._meta?.grounded} · degraded=${idvS._meta?.degraded} · count=${idvS._meta?.count} · total=${idvS._meta?.total} · type=${idvS.search_type}${idvS.contracts?.[0] ? ` · top=${String(idvS.contracts[0].recipientName).slice(0,40)}` : ''}`);
   if (idvS._meta?.degraded) console.error('⚠ idv-contracts: degraded=true (USASpending unreachable/rate-limited) — NON-FATAL');
   else if (!idvS._meta?.grounded) console.error('⚠ idv-contracts: grounded=false for NAICS 541512 IDVs — NON-FATAL');
+
+  // ── search_past_contracts (USASpending awarded contracts by location) ──────
+  console.error('\n→ calling search_past_contracts({ state: "Florida", naics: "541512", limit: 5 })');
+  const pc = await client.callTool({ name: 'search_past_contracts', arguments: { state: 'Florida', naics: '541512', limit: 5 } });
+  const pcS = pc.structuredContent;
+  if (!pcS) fail('past-contracts: no structuredContent');
+  console.error(`✓ grounded=${pcS._meta?.grounded} · degraded=${pcS._meta?.degraded} · count=${pcS._meta?.count} · total=${pcS._meta?.total} · scope=${pcS._meta?.state_scope}${pcS.awards?.[0] ? ` · top=${String(pcS.awards[0].recipientName).slice(0,40)} (pop=${pcS.awards[0].popState})` : ''}`);
+  if (pcS._meta?.degraded) console.error('⚠ past-contracts: degraded=true (USASpending unreachable/rate-limited) — NON-FATAL');
+  else if (!pcS._meta?.grounded) console.error('⚠ past-contracts: grounded=false for FL/541512 — NON-FATAL (thin slice)');
+  else {
+    // Traceability: every returned award must actually sit in the queried state
+    // on the place-of-performance side (default scope="pop").
+    const offPop = (pcS.awards || []).filter((a) => a.popState && a.popState !== 'FL');
+    if (offPop.length) fail(`past-contracts: ${offPop.length} award(s) with popState != FL under scope=pop (location filter leaking)`);
+  }
 
   // ── get_contractor_award_history (USASpending cache + contractor DB) ───────
   console.error('\n→ calling get_contractor_award_history({ company: "Booz Allen Hamilton" })');
@@ -769,7 +784,7 @@ try {
   if (exMiss.structuredContent?._meta?.grounded !== false) fail('export-proposal: no sections should be grounded=false (no invented document)');
   console.error('✓ honest miss: no sections → grounded=false');
 
-  console.error('\n✅ SMOKE PASSED — MCP transport + 38 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, contractor-award-history, market-depth, solicitation-documents, federal-events, scan-compliance, bid-decision, federal-osbp, agency-opps-by-office, sblo-contact, federal-contacts, podcast-lessons, agency-budget-trends, company-keywords, agency-spending-detail, compliance-matrix, proposal-structure, referee-compliance, recompete-sow, statement-of-work, event-series, sba-goaling, draft-proposal, draft-proposal-section, export-proposal) all live + honest');
+  console.error('\n✅ SMOKE PASSED — MCP transport + 39 tools (playbook, pricing-intel, EDGAR, Federal Register, award-detail, predecessor-award, sam-entity, search-contractors, agency-intel, grants, forecasts, sbir, expiring-contracts, keyword-coverage, idv-contracts, past-contracts, contractor-award-history, market-depth, solicitation-documents, federal-events, scan-compliance, bid-decision, federal-osbp, agency-opps-by-office, sblo-contact, federal-contacts, podcast-lessons, agency-budget-trends, company-keywords, agency-spending-detail, compliance-matrix, proposal-structure, referee-compliance, recompete-sow, statement-of-work, event-series, sba-goaling, draft-proposal, draft-proposal-section, export-proposal) all live + honest');
   await client.close();
   process.exit(0);
 } catch (err) {

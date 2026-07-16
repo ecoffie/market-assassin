@@ -66,6 +66,7 @@ export const TIER2_TOOL_DEFS = [
           naics: { type: 'string', description: 'A 6-digit NAICS code, e.g. "541512".' },
           psc: { type: 'string', description: 'Optional Product/Service Code for a sharper match, e.g. "D307".' },
           small_business_only: { type: 'boolean', description: 'Optional: only return firms that have won set-aside work.' },
+          state: { type: 'string', description: 'Optional 2-letter state to scope to firms HQ\'d there, e.g. "FL".' },
         },
         required: ['naics'],
         additionalProperties: false,
@@ -178,22 +179,24 @@ export function makeTier2Tools(email: string) {
     };
   }
 
-  async function findCapable(args: { naics?: unknown; psc?: unknown; small_business_only?: unknown }): Promise<Record<string, unknown>> {
+  async function findCapable(args: { naics?: unknown; psc?: unknown; small_business_only?: unknown; state?: unknown }): Promise<Record<string, unknown>> {
     const naics = typeof args?.naics === 'string' ? args.naics.trim() : '';
     const psc = typeof args?.psc === 'string' ? args.psc.trim() : '';
     if (!naics && !psc) return { ok: false, error: 'naics_or_psc_required', count: 0, items: [] };
     const setAsideOnly = args?.small_business_only === true;
+    const state = typeof args?.state === 'string' ? args.state.trim().toUpperCase() : '';
+    const inState = state ? ` in ${state}` : '';
 
     // Pass 1: cache-only. Pass 2: cold only if under budget.
-    let res = await findCapableSmallBusinesses({ naics, psc, setAsideOnly, limit: 8, liveBq: false });
+    let res = await findCapableSmallBusinesses({ naics, psc, setAsideOnly, state, limit: 8, liveBq: false });
     if (res.rows.length === 0) {
       if (!(await allowColdLookup())) {
         return { ok: false, error: 'rate_limited', note: OVER_LIMIT_NOTE, count: 0, items: [] };
       }
-      res = await findCapableSmallBusinesses({ naics, psc, setAsideOnly, limit: 8, liveBq: true });
+      res = await findCapableSmallBusinesses({ naics, psc, setAsideOnly, state, limit: 8, liveBq: true });
     }
     if (res.rows.length === 0) {
-      return { ok: true, count: 0, items: [], note: `No contractors found for ${psc ? `PSC ${psc}` : `NAICS ${naics}`}${setAsideOnly ? ' (set-aside only)' : ''}.` };
+      return { ok: true, count: 0, items: [], note: `No contractors found for ${psc ? `PSC ${psc}` : `NAICS ${naics}`}${setAsideOnly ? ' (set-aside only)' : ''}${inState}.` };
     }
     return {
       ok: true,
@@ -202,6 +205,7 @@ export function makeTier2Tools(email: string) {
       items: res.rows.map((r) => ({
         name: r.recipient_name,
         uei: r.recipient_uei,
+        state: r.recipient_state ?? null,
         total_obligated: r.total_obligated,
         award_count: r.award_count,
         wins_set_asides: r.won_set_aside,
