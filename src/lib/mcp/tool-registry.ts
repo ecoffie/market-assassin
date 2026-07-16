@@ -704,7 +704,8 @@ const FEDERAL_EVENTS_TOOL_DEF = {
       'Notices (source="sam", DoDAAC-office-anchored, trust the date) and, when include_ai_discovery is set, ' +
       'web-discovered conferences (source="ai", carry a confidence score — verify before attending). Each event ' +
       'has title, type, date, location, registration URL, and the decoded buying office. grounded=false when no ' +
-      'events match — widen months_ahead or enable AI discovery.',
+      'events match — widen months_ahead or enable AI discovery. Set include_ics to also get a base64 .ics ' +
+      'calendar of the dated events — "put a year of federal events on my calendar" in one call.',
     parameters: {
       type: 'object',
       properties: {
@@ -712,6 +713,12 @@ const FEDERAL_EVENTS_TOOL_DEF = {
         months_ahead: { type: 'number', description: 'Look-ahead window in months (default 4, max 12).' },
         include_ai_discovery: { type: 'boolean', description: 'Also run a web search for association conferences not in SAM (slower, best-effort). Default false.' },
         limit: { type: 'number', description: 'Max SAM events to return (default 25, max 100).' },
+        include_ics: {
+          type: 'boolean',
+          description:
+            'Return `ics`: a base64 .ics (VCALENDAR) of the matching events for one-shot import into Google/Outlook/Apple Calendar. ' +
+            'Only events with a real source date are included (undated ones are counted in _meta.ics_skipped_undated, never guessed onto a day). Default false.',
+        },
       },
       required: ['agency'],
     },
@@ -1630,6 +1637,7 @@ export async function runMcpTool(
       months_ahead: typeof args.months_ahead === 'number' ? args.months_ahead : undefined,
       include_ai_discovery: args.include_ai_discovery === true,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
+      include_ics: args.include_ics === true,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }

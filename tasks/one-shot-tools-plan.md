@@ -1,6 +1,8 @@
 # One-Shot Composite Tools — scope & build plan
 
-**Status:** scoped + signed off (2026-07-16). Build order 1 → 2 → 3, each its own PR, verified live.
+**Status:** ✅ all three shipped (2026-07-16). 1) `generate_market_report` #283 · 2) `add_contacts_to_crm`
+#285 + the Connect-GoHighLevel card #286 · 3) calendar `.ics` (this PR). Remaining follow-ups are the
+GHL provision path + full OAuth (see Open / deferred).
 
 **The idea (Eric):** Mindy users are already chaining multiple tools by hand —
 Sue builds a whole-market report for clients, Branden puts a year of federal events
@@ -88,11 +90,31 @@ Market Research panel can get a one-shot "Build full report" button off the same
 
 ---
 
-## 3. `export_events_ics` — Branden's calendar, one-shot (bonus)
+## 3. Calendar `.ics` — Branden's calendar, one-shot (bonus) — ✅ SHIPPED
 
-Add an `ics` field to `get_federal_event_series` / `search_federal_events`: base64 `.ics`
-(VCALENDAR) of every matching event for the year → user imports once, whole calendar populated.
-**Credits:** ~1.
+**Shipped as an `include_ics` flag on `search_federal_events`, not a separate tool.** The events
+are already there; a second tool would just re-run the same query to repackage it. Opt-in
+(`include_ics: true`) → `ics` = base64 VCALENDAR + `_meta.ics_events` / `ics_skipped_undated`.
+No new credits — it's packaging on the existing 2-credit call.
+
+- Builder: `src/lib/events/ics.ts` (`buildEventsIcs`) — pure, dependency-free, RFC 5545
+  (CRLF, 75-octet folding on the byte budget, TEXT escaping, all-day `DTSTART;VALUE=DATE`
+  with the exclusive `DTEND`, stable UIDs so re-import updates instead of duplicating).
+
+**⚠️ Scope change from the original plan — `get_federal_event_series` gets NO .ics.**
+A calendar entry asserts "this happens on this day." The series catalog holds **cadence**
+("quarterly") and **typical_month** ("annual · March") — not confirmed instances. Emitting
+VEVENTs from those would invent dates, which the no-fabrication contract forbids, and would
+put wrong dates on a user's real calendar. Same rule inside `search_federal_events`: undated
+AI-discovered events are **skipped and counted** (`ics_skipped_undated`), never guessed onto
+a day. Only `search_federal_events`' real dated rows become calendar entries.
+*If we want the series on a calendar later, the honest path is sourcing real dates for the
+catalog (or TENTATIVE all-day entries the user opts into knowing they're approximate) —
+not deriving them from cadence.*
+
+**Verified:** 12 unit tests green; live DoD 12-month call → 23 events, 23 dated → 23 VEVENTs,
+0 untraceable dates, 0 over-long lines, opt-in guard holds; the generated file parses in an
+independent RFC 5545 parser (python `icalendar`) with 23 unique UIDs and correct all-day spans.
 
 ---
 
