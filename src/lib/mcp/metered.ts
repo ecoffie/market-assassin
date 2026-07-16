@@ -10,6 +10,7 @@
  */
 import { creditsFor, isMcpTool, isProprietaryTool, PROPRIETARY_TOOLS, runMcpTool, type McpToolContext } from './tool-registry';
 import { getBalance, debitCredits, logCall, type CallStatus } from './credits';
+import { AUTORECHARGE_SIGNAL_FLOOR } from './autorecharge';
 import { mcpFlags } from './flags';
 import { isProTool, isProForMcp } from './entitlements';
 import { evaluateExtractionGuard } from './extraction-guard';
@@ -20,7 +21,10 @@ export interface MeteredContext extends McpToolContext {
 }
 
 export type MeteredOutcome =
-  | { ok: true; result: Record<string, unknown>; creditsCharged: number; balance: number | null }
+  // `needsRecharge` = the post-debit balance dipped under AUTORECHARGE_SIGNAL_FLOOR, so
+  // the transport should fire maybeAutoRecharge() (post-response, via after()). It's just
+  // a numeric signal here — the engine decides whether the user actually has it enabled.
+  | { ok: true; result: Record<string, unknown>; creditsCharged: number; balance: number | null; needsRecharge: boolean }
   | { ok: false; error: { code: string; message: string }; creditsCharged: 0; balance?: number };
 
 export async function runMeteredTool(
@@ -107,22 +111,22 @@ export async function runMeteredTool(
   }
   const latencyMs = Date.now() - startedAt;
 
-  // 3) Free tool → success, no billing.
+  // 3) Free tool → success, no billing. (Free tools never trip auto-recharge.)
   if (cost <= 0) {
     await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'success', creditsCharged: 0, latencyMs, apiKeyId: ctx.apiKeyId });
-    return { ok: true, result, creditsCharged: 0, balance: null };
+    return { ok: true, result, creditsCharged: 0, balance: null, needsRecharge: false };
   }
 
   // 3) Priced tool → debit on success (atomic).
   const debit = await debitCredits(ctx.userEmail, cost, { reason: 'tool_call', toolName: name, apiKeyId: ctx.apiKeyId });
   if (debit.ok) {
     await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'success', creditsCharged: cost, latencyMs, apiKeyId: ctx.apiKeyId });
-    return { ok: true, result, creditsCharged: cost, balance: debit.newBalance };
+    return { ok: true, result, creditsCharged: cost, balance: debit.newBalance, needsRecharge: debit.newBalance < AUTORECHARGE_SIGNAL_FLOOR };
   }
 
   // Edge race: balance dropped below cost between pre-check and debit (concurrent
   // calls at a near-empty balance). The result is already produced — deliver it, but
   // charge 0 and mark it uncharged for reconciliation. Balance is never negative.
   await logCall({ userEmail: ctx.userEmail, toolName: name, status: 'uncharged', creditsCharged: 0, latencyMs, apiKeyId: ctx.apiKeyId });
-  return { ok: true, result, creditsCharged: 0, balance: debit.newBalance };
+  return { ok: true, result, creditsCharged: 0, balance: debit.newBalance, needsRecharge: debit.newBalance < AUTORECHARGE_SIGNAL_FLOOR };
 }

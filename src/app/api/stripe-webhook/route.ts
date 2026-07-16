@@ -3,6 +3,9 @@ import Stripe from 'stripe';
 import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
 import { handleMcpCreditTopup } from '@/lib/mcp/stripe-topup';
+import { handleAutoRechargeSetup, MCP_AUTORECHARGE_PI_TYPE } from '@/lib/mcp/autorecharge';
+import { applyCreditOnce } from '@/lib/mcp/credits';
+import { creditsForPackage } from '@/lib/mcp/packages';
 import {
   sendLicenseKeyEmail,
   sendOpportunityHunterProEmail,
@@ -110,6 +113,13 @@ export async function POST(request: NextRequest) {
     const mcpTopup = await handleMcpCreditTopup(session);
     if (mcpTopup.handled) {
       return NextResponse.json({ received: true, mcp_topup: mcpTopup });
+    }
+
+    // MCP auto-recharge CARD SAVE (setup-mode Checkout)? Persist the customer +
+    // payment method so future off-session refills can charge it. Return early.
+    if (session.mode === 'setup' || session.metadata?.type === 'mcp_autorecharge_setup') {
+      const handled = await handleAutoRechargeSetup(session);
+      if (handled) return NextResponse.json({ received: true, mcp_autorecharge_setup: true });
     }
 
     let tier = session.metadata?.tier;
@@ -494,6 +504,26 @@ export async function POST(request: NextRequest) {
       bundle,
       isFHCMembership,
     });
+  }
+
+  // MCP auto-recharge off-session charge — BACKSTOP grant. The engine
+  // (maybeAutoRecharge) already grants synchronously via applyCreditOnce(pi.id) after
+  // it confirms the PaymentIntent; this webhook grants the SAME key, so it's a no-op
+  // duplicate in the normal path but rescues the rare case where the engine's process
+  // died after the charge but before the grant. Idempotent by PaymentIntent id.
+  if (event.type === 'payment_intent.succeeded') {
+    const pi = event.data.object as Stripe.PaymentIntent;
+    const meta = (pi.metadata || {}) as Record<string, string>;
+    if (meta.type === MCP_AUTORECHARGE_PI_TYPE && meta.user_email) {
+      const credits = creditsForPackage(meta.package) ?? (Number(meta.credits) || 0);
+      if (credits > 0) {
+        const { applied, newBalance } = await applyCreditOnce(pi.id, meta.user_email, credits, 'auto_recharge');
+        console.log(`[mcp:autorecharge] webhook backstop ${meta.user_email} pi=${pi.id} applied=${applied} balance=${newBalance}`);
+      }
+      return NextResponse.json({ received: true, mcp_autorecharge: true });
+    }
+    // Not an auto-recharge PI → fall through (nothing else handles this event today).
+    return NextResponse.json({ received: true });
   }
 
   // Recurring affiliate commission on subscription renewals (not first checkout —
