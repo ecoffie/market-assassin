@@ -22,9 +22,34 @@ export interface UsageSummary {
   capped: boolean;
 }
 
+export interface McpCall { tool_name: string; status: string; credits_charged: number | null; created_at: string }
+
 /** snake_case tool name → "Title Case" (matches Claude Desktop's tool labels). */
 export function prettifyTool(name: string): string {
   return name.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).trim();
+}
+
+/** Compact "3m ago" / "2h ago" / "Jul 14" from an ISO timestamp. */
+export function shortWhen(iso: string): string {
+  const then = new Date(iso).getTime();
+  const min = Math.floor((Date.now() - then) / 60000);
+  if (min < 1) return 'just now';
+  if (min < 60) return `${min}m ago`;
+  const hr = Math.floor(min / 60);
+  if (hr < 24) return `${hr}h ago`;
+  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+}
+
+/** Call status → { label, className } for the activity row chip. */
+export function statusStyle(status: string): { label: string; cls: string } {
+  switch (status) {
+    case 'success': return { label: 'success', cls: 'text-emerald-300' };
+    case 'uncharged': return { label: 'free (race)', cls: 'text-slate-400' };
+    case 'rejected_no_credits': return { label: 'no credits', cls: 'text-amber-300' };
+    case 'gated': return { label: 'Pro only', cls: 'text-amber-300' };
+    case 'failed': return { label: 'failed', cls: 'text-rose-300' };
+    default: return { label: status, cls: 'text-slate-400' };
+  }
 }
 
 const TOP_TOOLS = 8;
@@ -80,17 +105,21 @@ export function UsageOverTime({ byDay, chartDays = 7 }: { byDay: DaySpend[]; cha
 
   return (
     <div>
-      <div className="flex items-end gap-1.5 h-28" role="img" aria-label={`Credits spent per day over the last ${chartDays} days`}>
+      <div className="flex items-end gap-1.5 h-32" role="img" aria-label={`Credits spent per day over the last ${chartDays} days`}>
         {days.map((d) => {
           const pct = (d.credits / max) * 100;
           return (
-            <div key={d.date} className="group flex h-full flex-1 flex-col items-center justify-end gap-1" title={`${shortDay(d.date)}: ${d.credits} cr · ${d.calls} call${d.calls === 1 ? '' : 's'}`}>
-              {d.credits > 0 && <span className="text-[11px] tabular-nums text-slate-400">{d.credits}</span>}
-              <div
-                className={`w-full rounded-t-[3px] transition-colors ${d.credits > 0 ? 'bg-emerald-400/70 group-hover:bg-emerald-300' : 'bg-white/[0.05] group-hover:bg-white/10'}`}
-                style={{ height: d.credits > 0 ? `${Math.max(pct, 6)}%` : '3px' }}
-              />
-              <span className="truncate text-[10px] text-slate-600">{shortDay(d.date)}</span>
+            <div key={d.date} className="group flex h-full flex-1 flex-col items-center gap-1" title={`${shortDay(d.date)}: ${d.credits} cr · ${d.calls} call${d.calls === 1 ? '' : 's'}`}>
+              {/* value label — fixed row so it never overlaps the bar */}
+              <span className="h-[14px] text-[11px] leading-none tabular-nums text-slate-400">{d.credits > 0 ? d.credits : ''}</span>
+              {/* bar track — the bar is sized as a % of THIS row only */}
+              <div className="flex w-full flex-1 items-end">
+                <div
+                  className={`w-full rounded-t-[3px] transition-colors ${d.credits > 0 ? 'bg-emerald-400/70 group-hover:bg-emerald-300' : 'bg-white/[0.05] group-hover:bg-white/10'}`}
+                  style={{ height: d.credits > 0 ? `${Math.max(pct, 6)}%` : '3px' }}
+                />
+              </div>
+              <span className="truncate text-[10px] leading-none text-slate-600">{shortDay(d.date)}</span>
             </div>
           );
         })}
@@ -132,6 +161,40 @@ export function SpendByTool({ byTool }: { byTool: ToolSpend[] }) {
           + {hidden.length} more tool{hidden.length === 1 ? '' : 's'} · {hiddenCredits} cr
         </p>
       )}
+    </div>
+  );
+}
+
+// ---- Activity log (raw call table) ---------------------------------------------
+export function ActivityLog({ calls }: { calls: McpCall[] }) {
+  if (calls.length === 0) {
+    return <p className="text-[13px] text-slate-500">No tool calls yet. Connect Mindy to your agent and run a tool — every call shows up here with its credit cost.</p>;
+  }
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[420px] text-left text-[13px]">
+        <thead>
+          <tr className="text-[11px] uppercase tracking-wide text-slate-500">
+            <th className="pb-2 pr-4 font-medium">Tool</th>
+            <th className="pb-2 pr-4 font-medium">Status</th>
+            <th className="pb-2 pr-4 text-right font-medium">Credits</th>
+            <th className="pb-2 text-right font-medium">When</th>
+          </tr>
+        </thead>
+        <tbody>
+          {calls.map((c, i) => {
+            const st = statusStyle(c.status);
+            return (
+              <tr key={i} className="border-t border-white/[0.05]">
+                <td className="py-2 pr-4 text-slate-200">{prettifyTool(c.tool_name)}</td>
+                <td className={`py-2 pr-4 ${st.cls}`}>{st.label}</td>
+                <td className="py-2 pr-4 text-right tabular-nums text-slate-300">{c.credits_charged || 0}</td>
+                <td className="py-2 text-right tabular-nums text-slate-500">{shortWhen(c.created_at)}</td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

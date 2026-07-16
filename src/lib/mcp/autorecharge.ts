@@ -170,8 +170,8 @@ export async function createSetupCheckout(email: string, baseUrl: string): Promi
     payment_method_types: ['card'],
     customer: customerId,
     metadata: { type: MCP_AUTORECHARGE_SETUP_TYPE, user_email: user },
-    success_url: `${baseUrl}/mcp?autorecharge=saved`,
-    cancel_url: `${baseUrl}/mcp?autorecharge=cancelled`,
+    success_url: `${baseUrl}/mcp/account?autorecharge=saved`,
+    cancel_url: `${baseUrl}/mcp/account?autorecharge=cancelled`,
   });
   if (!session.url) throw new Error('Stripe returned no Checkout URL');
   return session.url;

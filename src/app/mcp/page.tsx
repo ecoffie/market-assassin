@@ -5,20 +5,18 @@
  *
  * ONE experience for everyone: bold hero → per-client keyless connect card →
  * "What you can do with credits" example grid (2 cols) → link to /mcp/pricing.
- * Per-tool pricing lives on /mcp/pricing; headless/CI key management in the account
- * area — not here.
+ * Per-tool pricing lives on /mcp/pricing; balance, usage, billing and API-key
+ * management live in the ACCOUNT area (/mcp/account) — not here.
  *
  * Identity is server-verified: on load we ask /api/mcp/session who the signed MI
- * token proves we are. Signed-in visitors also get a USAGE PANEL at the top —
- * current balance + recent call history (tool · status · credits · when) from
- * /api/mcp/account — so they can see spend against balance without leaving the
- * page. Everyone else gets the sign-in CTA; the marketing content below is shared.
+ * token proves we are. Signed-in visitors get a balance chip in the nav that links
+ * to their account; everyone else gets the sign-in CTA. The marketing content is
+ * shared.
  */
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { getMIApiHeaders } from '@/components/app/authHeaders';
 import { Catalog, MCP_URL, McpNav, AppCluster, EXAMPLES, exampleCost } from './catalog-ui';
-import { UsageKpis, UsageOverTime, SpendByTool, prettifyTool, type UsageSummary } from './usage-charts';
 
 type ClientId = 'claude-desktop' | 'claude-code' | 'cursor' | 'other';
 const CLIENTS: { id: ClientId; name: string }[] = [
@@ -76,129 +74,20 @@ function connectFor(client: ClientId): ConnectInfo {
   }
 }
 
-// ---- Usage panel (signed-in): balance + recent call history --------------------
-interface McpCall { tool_name: string; status: string; credits_charged: number | null; created_at: string }
-interface AccountData { balance: number; recentCalls: McpCall[]; usage: UsageSummary | null }
-interface AutoRecharge {
-  enabled: boolean; thresholdCredits: number; refillPackage: string;
-  hasCard: boolean; cardBrand: string | null; cardLast4: string | null;
-  paused: boolean; lastRechargeAt: string | null; thresholdMin: number; thresholdMax: number;
-}
-// Refill pack options — must match CREDIT_PACKAGES ids/credits in src/lib/mcp/packages.ts.
-const REFILL_PACKS: { id: string; label: string }[] = [
-  { id: 'plus', label: '800 credits ($15)' },
-  { id: 'scale', label: '2,400 credits ($40)' },
-];
-
-/** Compact "3m ago" / "2h ago" / "Jul 14" from an ISO timestamp. */
-function shortWhen(iso: string): string {
-  const then = new Date(iso).getTime();
-  const diff = Date.now() - then;
-  const min = Math.floor(diff / 60000);
-  if (min < 1) return 'just now';
-  if (min < 60) return `${min}m ago`;
-  const hr = Math.floor(min / 60);
-  if (hr < 24) return `${hr}h ago`;
-  return new Date(iso).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-}
-
-/** Status → { label, className } for the activity row chip. */
-function statusStyle(status: string): { label: string; cls: string } {
-  switch (status) {
-    case 'success': return { label: 'success', cls: 'text-emerald-300' };
-    case 'uncharged': return { label: 'free (race)', cls: 'text-slate-400' };
-    case 'rejected_no_credits': return { label: 'no credits', cls: 'text-amber-300' };
-    case 'gated': return { label: 'Pro only', cls: 'text-amber-300' };
-    case 'failed': return { label: 'failed', cls: 'text-rose-300' };
-    default: return { label: status, cls: 'text-slate-400' };
-  }
-}
-
 export default function McpConsole() {
   const [authState, setAuthState] = useState<'loading' | 'in' | 'out'>('loading');
   const [email, setEmail] = useState<string | null>(null);
+  const [balance, setBalance] = useState<number | null>(null);
   const [copied, setCopied] = useState<string | null>(null);
-  const [justPurchased, setJustPurchased] = useState(false);
-  const [justSavedCard, setJustSavedCard] = useState(false);
   const [client, setClient] = useState<ClientId>('claude-desktop');
   // Public catalog (tool costs + trial size) for the example grid + hero copy.
   const [catalog, setCatalog] = useState<Catalog | null>(null);
-  // Signed-in balance + recent usage (from /api/mcp/account).
-  const [account, setAccount] = useState<AccountData | null>(null);
-  const [accountLoading, setAccountLoading] = useState(false);
 
-  // Auto-recharge settings (card on file, refill when low).
-  const [autoRecharge, setAutoRecharge] = useState<AutoRecharge | null>(null);
-  const [arBusy, setArBusy] = useState(false);
-  const [arOpen, setArOpen] = useState(false); // auto-recharge controls collapsed by default
-  // Usage panel view — Overview (charts) is the default; the raw log is a separate view.
-  const [usageView, setUsageView] = useState<'overview' | 'activity'>('overview');
-
-  const refreshAccount = useCallback(async () => {
-    setAccountLoading(true);
-    try {
-      const res = await fetch('/api/mcp/account', { headers: getMIApiHeaders() });
-      const j = await res.json().catch(() => null);
-      if (res.ok && j?.success) setAccount({ balance: j.balance ?? 0, recentCalls: j.recentCalls ?? [], usage: j.usage ?? null });
-    } catch { /* leave prior state */ }
-    finally { setAccountLoading(false); }
-  }, []);
-
-  const refreshAutoRecharge = useCallback(async () => {
-    try {
-      const res = await fetch('/api/mcp/autorecharge', { headers: getMIApiHeaders() });
-      const j = await res.json().catch(() => null);
-      if (res.ok && j?.success) setAutoRecharge(j.settings);
-    } catch { /* leave prior state */ }
-  }, []);
-
-  // Save a card → Stripe setup Checkout (redirects out and back to ?autorecharge=saved).
-  const startCardSetup = useCallback(async () => {
-    setArBusy(true);
-    try {
-      // getMIApiHeaders() returns a Headers OBJECT — spreading it drops every entry
-      // (a Headers' entries aren't own-enumerable), which silently stripped the auth
-      // token off these POSTs → 401 → the button did nothing. Mutate it in place.
-      const headers = getMIApiHeaders();
-      headers.set('Content-Type', 'application/json');
-      const res = await fetch('/api/mcp/autorecharge', {
-        method: 'POST', headers,
-        body: JSON.stringify({ action: 'setup' }),
-      });
-      const j = await res.json().catch(() => null);
-      if (res.ok && j?.url) { window.location.href = j.url; return; }
-    } catch { /* fall through */ }
-    setArBusy(false);
-  }, []);
-
-  const patchAutoRecharge = useCallback(async (patch: Record<string, unknown>) => {
-    setArBusy(true);
-    try {
-      const headers = getMIApiHeaders();
-      headers.set('Content-Type', 'application/json');
-      const res = await fetch('/api/mcp/autorecharge', {
-        method: 'POST', headers,
-        body: JSON.stringify({ action: 'update', ...patch }),
-      });
-      const j = await res.json().catch(() => null);
-      if (res.ok && j?.success) setAutoRecharge(j.settings);
-    } catch { /* leave prior state */ }
-    finally { setArBusy(false); }
-  }, []);
-
-  // Identity: ask the server who our signed token proves we are. Never trust
-  // the client-side email for the account we render.
+  // Identity: ask the server who our signed token proves we are. Never trust the
+  // client-side email for the account we render. A signed-in visitor also gets their
+  // balance (for the nav chip); the full usage/billing view lives at /mcp/account.
   useEffect(() => {
     if (typeof window === 'undefined') return;
-    // eslint-disable-next-line react-hooks/set-state-in-effect
-    const params = new URLSearchParams(window.location.search);
-    if (params.get('topup') === 'success') setJustPurchased(true);
-    // Returned from the card-setup Checkout. The webhook that persists the card lands a
-    // beat after the redirect, so re-pull settings shortly after the initial load too.
-    if (params.get('autorecharge') === 'saved') {
-      setJustSavedCard(true);
-      setTimeout(() => { void refreshAutoRecharge(); }, 3000);
-    }
     fetch('/api/mcp/catalog')
       .then((r) => r.json())
       .then((j) => { if (j?.success) setCatalog({ tools: j.tools || [], packages: j.packages || [], subscriptionPlans: j.subscriptionPlans || [], signupCredits: j.signupCredits ?? 100, proMonthlyCredits: j.proMonthlyCredits ?? 1000 }); })
@@ -211,8 +100,10 @@ export default function McpConsole() {
           try { localStorage.setItem('mi_beta_email', j.email); } catch { /* ignore */ }
           setEmail(j.email);
           setAuthState('in');
-          void refreshAccount(); // pull balance + usage for the signed-in panel
-          void refreshAutoRecharge();
+          // Light balance pull for the nav chip only.
+          fetch('/api/mcp/account', { headers: getMIApiHeaders() })
+            .then((r) => r.json()).then((a) => { if (a?.success) setBalance(a.balance ?? 0); })
+            .catch(() => { /* chip just omits the number */ });
         } else {
           setAuthState('out');
         }
@@ -220,22 +111,13 @@ export default function McpConsole() {
         setAuthState('out');
       }
     })();
-  }, [refreshAccount, refreshAutoRecharge]);
+  }, []);
 
   const copy = useCallback((text: string, tag: string) => {
     navigator.clipboard.writeText(text);
     setCopied(tag);
     setTimeout(() => setCopied((c) => (c === tag ? null : c)), 1600);
   }, []);
-
-  function switchAccount() {
-    try {
-      localStorage.removeItem('mi_beta_auth_token');
-      localStorage.removeItem('mi_beta_2fa_token');
-      localStorage.removeItem('mi_beta_email');
-    } catch { /* ignore */ }
-    window.location.href = '/app';
-  }
 
   const conn = useMemo(() => connectFor(client), [client]);
   const trial = catalog?.signupCredits ?? 100;
@@ -287,7 +169,7 @@ export default function McpConsole() {
           <button onClick={() => copy(conn.code!, 'snippet')} className="absolute right-2.5 top-2.5 rounded-md border border-white/10 bg-white/[0.06] px-2 py-1 text-[11px] text-slate-300 hover:bg-white/10">{copied === 'snippet' ? 'Copied' : 'Copy'}</button>
         </div>
       )}
-      <p className="mt-3 text-[12px] text-slate-500">🔑 No API key needed — you sign in through your browser.</p>
+      <p className="mt-3 text-[12px] text-slate-500">🔑 No API key needed — you sign in through your browser. Headless / CI? Grab a key in <Link href="/mcp/account?section=keys" className="text-slate-400 underline underline-offset-2 hover:text-slate-300">Account → API keys</Link>.</p>
     </section>
   );
 
@@ -322,251 +204,53 @@ export default function McpConsole() {
     </section>
   );
 
-  // ---- Signed-in: balance + usage (Overview charts / Activity log) -----------
-  const usage = account?.usage ?? null;
-  const hasCalls = (usage?.totalCalls ?? account?.recentCalls.length ?? 0) > 0;
-  const refillLabel = REFILL_PACKS.find((p) => p.id === autoRecharge?.refillPackage)?.label ?? autoRecharge?.refillPackage;
-  const usagePanel = account && (
-    <section className="mt-8 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 sm:p-6">
-      {/* Compact balance strip — the number, and the two actions. No tall block. */}
-      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
-        <div className="flex items-baseline gap-2.5">
-          <span className="text-2xl font-bold tabular-nums text-emerald-300">{account.balance.toLocaleString()}</span>
-          <span className="text-[13px] text-slate-400">credits remaining</span>
-          {usage && usage.totalCalls > 0 && (
-            <span className="hidden text-[12px] text-slate-600 sm:inline">· {usage.totalCredits.toLocaleString()} spent in {usage.windowDays}d</span>
-          )}
-        </div>
-        <div className="flex items-center gap-2">
-          <button onClick={refreshAccount} disabled={accountLoading} className="rounded-lg border border-white/10 bg-white/[0.06] px-3 py-1.5 text-[12px] text-slate-300 hover:bg-white/10 disabled:opacity-60">{accountLoading ? 'Refreshing…' : 'Refresh'}</button>
-          <Link href="/mcp/pricing" className="rounded-lg bg-emerald-500 px-3 py-1.5 text-[12px] font-semibold text-[#06120c] hover:bg-emerald-400">Top up</Link>
-        </div>
-      </div>
+  const signedIn = authState === 'in';
 
-      {/* Auto-recharge — collapsed to one status line; controls open on Manage. */}
-      <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.015] px-4 py-3">
-        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
-          <div className="flex min-w-0 items-center gap-2.5">
-            {autoRecharge?.hasCard && (
-              <button
-                type="button"
-                onClick={() => patchAutoRecharge({ enabled: !autoRecharge.enabled })}
-                disabled={arBusy}
-                role="switch"
-                aria-checked={autoRecharge.enabled}
-                aria-label="Toggle auto-recharge"
-                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition ${autoRecharge.enabled ? 'bg-emerald-500' : 'bg-white/15'} disabled:opacity-60`}
-              >
-                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${autoRecharge.enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
-              </button>
-            )}
-            <p className="min-w-0 truncate text-[13px] text-slate-300">
-              <span className="font-semibold text-slate-100">Auto-recharge</span>
-              {!autoRecharge?.hasCard ? (
-                <span className="text-slate-500"> · off — refill automatically so you never run dry mid-task</span>
-              ) : autoRecharge.enabled ? (
-                <span className="text-slate-500"> · on — refill {refillLabel} when below {autoRecharge.thresholdCredits} · {autoRecharge.cardBrand ? `${autoRecharge.cardBrand} ····${autoRecharge.cardLast4}` : 'card on file'}</span>
-              ) : (
-                <span className="text-slate-500"> · off · {autoRecharge.cardBrand ? `${autoRecharge.cardBrand} ····${autoRecharge.cardLast4}` : 'card on file'}</span>
-              )}
-            </p>
-          </div>
-          {!autoRecharge?.hasCard ? (
-            <button type="button" onClick={startCardSetup} disabled={arBusy} className="shrink-0 rounded-lg bg-emerald-500 px-3 py-1.5 text-[12px] font-semibold text-[#06120c] hover:bg-emerald-400 disabled:opacity-60">{arBusy ? 'Starting…' : 'Add a card'}</button>
-          ) : (
-            <button type="button" onClick={() => setArOpen((o) => !o)} className="shrink-0 text-[12px] text-slate-400 underline underline-offset-2 hover:text-slate-200">{arOpen ? 'Close' : 'Manage'}</button>
-          )}
-        </div>
-
-        {autoRecharge?.paused && (
-          <div className="mt-3 rounded-lg border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-[12px] text-amber-200">
-            Paused after a declined charge. Update your card below to resume.
-          </div>
-        )}
-
-        {autoRecharge?.hasCard && arOpen && (
-          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-white/[0.06] pt-3 text-[13px] text-slate-300">
-            <label className="flex items-center gap-2">
-              <span className="text-slate-400">When below</span>
-              <select
-                value={autoRecharge.thresholdCredits}
-                onChange={(e) => patchAutoRecharge({ thresholdCredits: Number(e.target.value) })}
-                disabled={arBusy}
-                className="rounded-lg border border-white/10 bg-[#070b16] px-2 py-1.5 text-slate-200 outline-none focus:border-emerald-500/50"
-              >
-                {[50, 100, 200].map((n) => <option key={n} value={n}>{n} credits</option>)}
-              </select>
-            </label>
-            <label className="flex items-center gap-2">
-              <span className="text-slate-400">refill with</span>
-              <select
-                value={autoRecharge.refillPackage}
-                onChange={(e) => patchAutoRecharge({ refillPackage: e.target.value })}
-                disabled={arBusy}
-                className="rounded-lg border border-white/10 bg-[#070b16] px-2 py-1.5 text-slate-200 outline-none focus:border-emerald-500/50"
-              >
-                {REFILL_PACKS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
-              </select>
-            </label>
-            <button type="button" onClick={startCardSetup} disabled={arBusy} className="text-slate-500 underline underline-offset-2 hover:text-slate-300 disabled:opacity-60">Update card</button>
-          </div>
-        )}
-      </div>
-
-      {/* Usage — Overview (charts) by default; Activity (raw log) is a separate view. */}
-      {!hasCalls ? (
-        <p className="mt-5 text-[13px] text-slate-500">No tool calls yet. Connect Mindy to your agent and run a tool — your spend shows up here, broken down by tool and by day.</p>
-      ) : (
-        <div className="mt-5">
-          <div className="flex items-center justify-between gap-3">
-            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">Usage</p>
-            <div className="inline-flex rounded-full border border-white/[0.08] bg-[#070b16] p-0.5">
-              {(['overview', 'activity'] as const).map((v) => (
-                <button
-                  key={v}
-                  onClick={() => setUsageView(v)}
-                  className={`rounded-full px-3 py-1 text-[12px] font-medium capitalize transition ${usageView === v ? 'bg-emerald-500 text-[#06120c]' : 'text-slate-400 hover:text-slate-200'}`}
-                >
-                  {v}
-                </button>
-              ))}
-            </div>
-          </div>
-
-          {usageView === 'overview' ? (
-            usage ? (
-              <div className="mt-4 space-y-6">
-                <UsageKpis usage={usage} />
-                <div>
-                  <p className="mb-2 text-[12px] font-medium text-slate-400">Credits per day · last 7 days</p>
-                  <UsageOverTime byDay={usage.byDay} chartDays={7} />
-                </div>
-                <div>
-                  <p className="mb-3 text-[12px] font-medium text-slate-400">Spend by tool</p>
-                  <SpendByTool byTool={usage.byTool} />
-                </div>
-                {usage.capped && <p className="text-[11px] text-slate-600">Showing your {usage.windowDays}-day window (most recent 2,000 calls).</p>}
-              </div>
-            ) : (
-              <p className="mt-4 text-[13px] text-slate-500">Loading usage…</p>
-            )
-          ) : (
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full min-w-[420px] text-left text-[13px]">
-                <thead>
-                  <tr className="text-[11px] uppercase tracking-wide text-slate-500">
-                    <th className="pb-2 pr-4 font-medium">Tool</th>
-                    <th className="pb-2 pr-4 font-medium">Status</th>
-                    <th className="pb-2 pr-4 text-right font-medium">Credits</th>
-                    <th className="pb-2 text-right font-medium">When</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {account.recentCalls.map((c, i) => {
-                    const st = statusStyle(c.status);
-                    return (
-                      <tr key={i} className="border-t border-white/[0.05]">
-                        <td className="py-2 pr-4 text-slate-200">{prettifyTool(c.tool_name)}</td>
-                        <td className={`py-2 pr-4 ${st.cls}`}>{st.label}</td>
-                        <td className="py-2 pr-4 text-right tabular-nums text-slate-300">{c.credits_charged || 0}</td>
-                        <td className="py-2 text-right tabular-nums text-slate-500">{shortWhen(c.created_at)}</td>
-                      </tr>
-                    );
-                  })}
-                </tbody>
-              </table>
-            </div>
-          )}
-        </div>
-      )}
-    </section>
-  );
-
-  // ---- Logged-out ------------------------------------------------------------
-  if (authState !== 'in') {
-    return (
-      <main className="min-h-dvh bg-[#0a0f1e] text-slate-100 [color-scheme:dark]">
-        <div className="mx-auto max-w-4xl px-5 py-8 sm:px-6">
-          <McpNav active="connect" />
-
-          {/* Hero */}
-          <section className="mt-12 text-center">
-            <div className="mb-7"><AppCluster /></div>
-            <h1 className="mx-auto max-w-2xl text-balance text-3xl font-bold uppercase leading-[1.05] tracking-tight sm:text-5xl">Mindy MCP for any AI agent</h1>
-            <p className="mx-auto mt-4 max-w-xl text-balance text-sm text-slate-400 sm:text-[15px]">
-              SAM opportunities, incumbent financials, GSA pricing, and win playbooks — piped straight into your agent. Connect keyless in under a minute.
-            </p>
-            <p className="mx-auto mt-3 text-[12px] text-slate-500">
-              Plug into <span className="text-slate-400">Claude · Claude Code · ChatGPT · Cursor · Copilot</span> — any MCP client.
-            </p>
-            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
-              <a href="/app" className="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">Sign in to connect</a>
-              <Link href="/mcp/pricing" className="inline-flex items-center justify-center rounded-xl border border-white/15 px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/5">See pricing</Link>
-            </div>
-            <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/[0.07] px-3.5 py-1.5 text-[13px] text-emerald-200">
-              <span aria-hidden>🎁</span> {trial} free credits on your first connect — no card required
-            </div>
-            {authState === 'loading' && <p className="mt-3 text-[12px] text-slate-500">Checking your session…</p>}
-          </section>
-
-          {connectCard}
-          {examplesSection}
-        </div>
-      </main>
-    );
-  }
-
-  // ---- Signed in — same page, plus a balance chip + account footer -----------
   return (
     <main className="min-h-dvh bg-[#0a0f1e] text-slate-100 [color-scheme:dark]">
       <div className="mx-auto max-w-4xl px-5 py-8 sm:px-6">
-        {/* Header */}
-        <header className="flex items-center justify-between gap-4">
-          <Link href="/mcp" className="flex items-center gap-3">
-            <div className="grid h-9 w-9 place-items-center rounded-xl bg-gradient-to-br from-indigo-500 to-emerald-400 text-sm font-bold text-[#0a0f1e]">M</div>
-            <div>
-              <div className="text-[15px] font-semibold leading-tight">Mindy MCP</div>
-              <div className="text-xs text-slate-400">Federal contracting intel for any AI agent</div>
-            </div>
-          </Link>
-          <Link href="/mcp/pricing" className="rounded-lg border border-white/15 px-3 py-1.5 text-[13px] font-medium text-slate-200 hover:bg-white/5">Pricing</Link>
-        </header>
-
-        {justPurchased && (
-          <div className="mt-6 flex items-center justify-between gap-3 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">
-            <span>Payment received — your credits have been added to your account.</span>
-            <button onClick={() => setJustPurchased(false)} className="text-emerald-400/60 hover:text-emerald-300">Dismiss</button>
-          </div>
-        )}
-
-        {justSavedCard && (
-          <div className="mt-6 flex items-center justify-between gap-3 rounded-xl border border-emerald-400/25 bg-emerald-400/10 px-4 py-3 text-sm text-emerald-200">
-            <span>Card saved — auto-recharge is on. We&apos;ll refill automatically when your balance runs low.</span>
-            <button onClick={() => setJustSavedCard(false)} className="text-emerald-400/60 hover:text-emerald-300">Dismiss</button>
-          </div>
-        )}
-
-        {/* Balance + usage — what signed-in users came here to see. */}
-        {usagePanel}
+        <McpNav active="connect" signedIn={signedIn} balance={signedIn ? balance : undefined} />
 
         {/* Hero */}
-        <section className="mt-10 text-center">
-          <div className="mb-6"><AppCluster /></div>
-          <h2 className="mx-auto max-w-2xl text-balance text-3xl font-bold uppercase leading-[1.05] tracking-tight sm:text-4xl">
-            Mindy MCP for any AI agent
-          </h2>
-          <p className="mx-auto mt-3 max-w-xl text-balance text-sm text-slate-400 sm:text-[15px]">
-            SAM opportunities, incumbent financials, GSA pricing, and win playbooks — piped straight into Claude, Cursor, or your own agent.
+        <section className="mt-12 text-center">
+          <div className="mb-7"><AppCluster /></div>
+          <h1 className="mx-auto max-w-2xl text-balance text-3xl font-bold uppercase leading-[1.05] tracking-tight sm:text-5xl">Mindy MCP for any AI agent</h1>
+          <p className="mx-auto mt-4 max-w-xl text-balance text-sm text-slate-400 sm:text-[15px]">
+            SAM opportunities, incumbent financials, GSA pricing, and win playbooks — piped straight into your agent. Connect keyless in under a minute.
           </p>
+          <p className="mx-auto mt-3 text-[12px] text-slate-500">
+            Plug into <span className="text-slate-400">Claude · Claude Code · ChatGPT · Cursor · Copilot</span> — any MCP client.
+          </p>
+          {signedIn ? (
+            <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+              <Link href="/mcp/account" className="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">
+                {typeof balance === 'number' ? `${balance.toLocaleString()} credits · Your account` : 'Your account'}
+              </Link>
+              <Link href="/mcp/pricing" className="inline-flex items-center justify-center rounded-xl border border-white/15 px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/5">See pricing</Link>
+            </div>
+          ) : (
+            <>
+              <div className="mt-6 flex flex-wrap items-center justify-center gap-3">
+                <a href="/app" className="inline-flex items-center justify-center rounded-xl bg-emerald-500 px-5 py-2.5 text-sm font-semibold text-[#06120c] hover:bg-emerald-400">Sign in to connect</a>
+                <Link href="/mcp/pricing" className="inline-flex items-center justify-center rounded-xl border border-white/15 px-5 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/5">See pricing</Link>
+              </div>
+              <div className="mt-4 inline-flex items-center gap-2 rounded-full border border-emerald-400/20 bg-emerald-400/[0.07] px-3.5 py-1.5 text-[13px] text-emerald-200">
+                <span aria-hidden>🎁</span> {trial} free credits on your first connect — no card required
+              </div>
+            </>
+          )}
+          {authState === 'loading' && <p className="mt-3 text-[12px] text-slate-500">Checking your session…</p>}
         </section>
 
         {connectCard}
         {examplesSection}
 
-        <footer className="mt-12 flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.06] pt-5 text-[12px] text-slate-500">
-          <span>Signed in as <span className="text-slate-400">{email}</span> · <button onClick={switchAccount} className="underline underline-offset-2 hover:text-slate-300">Switch account</button></span>
-          <span>endpoint <code className="font-mono text-slate-400">{MCP_URL}</code></span>
-        </footer>
+        {signedIn && (
+          <footer className="mt-12 flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.06] pt-5 text-[12px] text-slate-500">
+            <span>Signed in as <span className="text-slate-400">{email}</span> · <Link href="/mcp/account?section=settings" className="underline underline-offset-2 hover:text-slate-300">Account settings</Link></span>
+            <span>endpoint <code className="font-mono text-slate-400">{MCP_URL}</code></span>
+          </footer>
+        )}
       </div>
     </main>
   );
