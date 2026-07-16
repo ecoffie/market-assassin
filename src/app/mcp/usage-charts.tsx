@@ -60,12 +60,17 @@ export function UsageKpis({ usage }: { usage: UsageSummary }) {
 }
 
 // ---- Usage over time (vertical bars, one per day) ------------------------------
-export function UsageOverTime({ byDay, windowDays }: { byDay: DaySpend[]; windowDays: number }) {
-  // Build a continuous daily axis for the window so gaps read as real zero-usage days.
+/**
+ * `chartDays` (default 7) is the number of trailing days the bar chart shows — kept
+ * separate from the totals window so the graph stays dense/readable even when the
+ * KPI rollups span 30 days. Each bar is direct-labeled with its credit total.
+ */
+export function UsageOverTime({ byDay, chartDays = 7 }: { byDay: DaySpend[]; chartDays?: number }) {
+  // Build a continuous daily axis so gaps read as real zero-usage days.
   const spend = new Map(byDay.map((d) => [d.date, d]));
   const today = new Date();
   const days: DaySpend[] = [];
-  for (let i = windowDays - 1; i >= 0; i--) {
+  for (let i = chartDays - 1; i >= 0; i--) {
     const dt = new Date(today);
     dt.setDate(today.getDate() - i);
     const key = `${dt.getFullYear()}-${String(dt.getMonth() + 1).padStart(2, '0')}-${String(dt.getDate()).padStart(2, '0')}`;
@@ -75,22 +80,20 @@ export function UsageOverTime({ byDay, windowDays }: { byDay: DaySpend[]; window
 
   return (
     <div>
-      <div className="flex items-end gap-[2px] h-28" role="img" aria-label={`Credits spent per day over the last ${windowDays} days`}>
+      <div className="flex items-end gap-1.5 h-28" role="img" aria-label={`Credits spent per day over the last ${chartDays} days`}>
         {days.map((d) => {
           const pct = (d.credits / max) * 100;
           return (
-            <div key={d.date} className="group relative flex h-full flex-1 items-end" title={`${shortDay(d.date)}: ${d.credits} cr · ${d.calls} call${d.calls === 1 ? '' : 's'}`}>
+            <div key={d.date} className="group flex h-full flex-1 flex-col items-center justify-end gap-1" title={`${shortDay(d.date)}: ${d.credits} cr · ${d.calls} call${d.calls === 1 ? '' : 's'}`}>
+              {d.credits > 0 && <span className="text-[11px] tabular-nums text-slate-400">{d.credits}</span>}
               <div
                 className={`w-full rounded-t-[3px] transition-colors ${d.credits > 0 ? 'bg-emerald-400/70 group-hover:bg-emerald-300' : 'bg-white/[0.05] group-hover:bg-white/10'}`}
-                style={{ height: d.credits > 0 ? `${Math.max(pct, 5)}%` : '3px' }}
+                style={{ height: d.credits > 0 ? `${Math.max(pct, 6)}%` : '3px' }}
               />
+              <span className="truncate text-[10px] text-slate-600">{shortDay(d.date)}</span>
             </div>
           );
         })}
-      </div>
-      <div className="mt-1.5 flex justify-between text-[11px] text-slate-600">
-        <span>{shortDay(days[0].date)}</span>
-        <span>Today</span>
       </div>
     </div>
   );

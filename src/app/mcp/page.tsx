@@ -156,8 +156,13 @@ export default function McpConsole() {
   const startCardSetup = useCallback(async () => {
     setArBusy(true);
     try {
+      // getMIApiHeaders() returns a Headers OBJECT — spreading it drops every entry
+      // (a Headers' entries aren't own-enumerable), which silently stripped the auth
+      // token off these POSTs → 401 → the button did nothing. Mutate it in place.
+      const headers = getMIApiHeaders();
+      headers.set('Content-Type', 'application/json');
       const res = await fetch('/api/mcp/autorecharge', {
-        method: 'POST', headers: { ...getMIApiHeaders(), 'Content-Type': 'application/json' },
+        method: 'POST', headers,
         body: JSON.stringify({ action: 'setup' }),
       });
       const j = await res.json().catch(() => null);
@@ -169,8 +174,10 @@ export default function McpConsole() {
   const patchAutoRecharge = useCallback(async (patch: Record<string, unknown>) => {
     setArBusy(true);
     try {
+      const headers = getMIApiHeaders();
+      headers.set('Content-Type', 'application/json');
       const res = await fetch('/api/mcp/autorecharge', {
-        method: 'POST', headers: { ...getMIApiHeaders(), 'Content-Type': 'application/json' },
+        method: 'POST', headers,
         body: JSON.stringify({ action: 'update', ...patch }),
       });
       const j = await res.json().catch(() => null);
@@ -431,8 +438,8 @@ export default function McpConsole() {
               <div className="mt-4 space-y-6">
                 <UsageKpis usage={usage} />
                 <div>
-                  <p className="mb-2 text-[12px] font-medium text-slate-400">Credits per day · last {usage.windowDays} days</p>
-                  <UsageOverTime byDay={usage.byDay} windowDays={usage.windowDays} />
+                  <p className="mb-2 text-[12px] font-medium text-slate-400">Credits per day · last 7 days</p>
+                  <UsageOverTime byDay={usage.byDay} chartDays={7} />
                 </div>
                 <div>
                   <p className="mb-3 text-[12px] font-medium text-slate-400">Spend by tool</p>
