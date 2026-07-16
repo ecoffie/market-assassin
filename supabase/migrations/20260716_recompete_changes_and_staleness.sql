@@ -47,33 +47,63 @@ CREATE INDEX IF NOT EXISTS idx_recompete_changes_field_time
 CREATE UNIQUE INDEX IF NOT EXISTS uq_recompete_changes_event
   ON recompete_changes (contract_id, field, observed_at);
 
--- ── 2. NAICS ordered by staleness ─────────────────────────────────────────────
+-- ── 2. Per-NAICS attempt log ──────────────────────────────────────────────────
 --
--- The cron shards by NAICS. Rather than persist a cursor (which can drift, or
--- corrupt, or silently skip -- the failure mode this whole issue series is
--- about), derive the next batch from the data itself: the NAICS whose freshest
--- row is oldest is the NAICS most in need of a sync.
+-- "When did we last ATTEMPT this NAICS" is a DIFFERENT FACT from "when was a
+-- row of this NAICS last seen upstream", and conflating them starves the cron.
 --
--- Self-healing: a NAICS that fails mid-cycle stays stale, so the next run picks
--- it up first. Nothing to reset by hand.
+-- The first cut of this ranked NAICS by MAX(last_synced_at) over the rows
+-- themselves -- no extra state, derived from the data. It looked elegant and it
+-- was wrong. A NAICS with no real contracts (524130, 424450 and friends return
+-- 0 rows from USASpending; all that remains are leftover grouped rows) never
+-- gets a fresh row written, so its MAX stays pinned at the April import
+-- forever. It would sit at the head of the queue permanently, be re-claimed
+-- every run, sync nothing, and never let the cron reach the NAICS that need
+-- work -- a job reporting success while doing nothing.
 --
--- NOTE: this only returns NAICS ALREADY present in the table -- the same
--- semantics as the sweep's --all. A NAICS with zero rows can never enter this
+-- So record the attempt explicitly. This is not a cursor: there is no position
+-- to drift or reset, just a timestamp per NAICS. Still self-healing -- a NAICS
+-- that throws records the failure and its attempt time, so it rotates to the
+-- back rather than blocking the queue, and its rows stay stale for the data to
+-- show.
+
+CREATE TABLE IF NOT EXISTS recompete_naics_sync (
+  naics_code      TEXT PRIMARY KEY,
+  last_attempt_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  last_result     TEXT,        -- 'ok' | 'empty' | 'truncated' | 'error'
+  contracts_found INT,
+  last_error      TEXT
+);
+
+-- ── 3. NAICS ordered by staleness ─────────────────────────────────────────────
+--
+-- The NAICS list still comes from the data (every NAICS present in the table --
+-- same semantics as the sweep's --all); only the ORDERING comes from the
+-- attempt log. A NAICS never attempted has no row here and sorts first.
+--
+-- NOTE: a NAICS with zero rows in recompete_opportunities can never enter this
 -- way. That gap predates #288; see the issue's "not in scope".
 
+-- CREATE OR REPLACE cannot change a function's return type (42P13: "cannot
+-- change return type of existing function"). An earlier cut of this returned
+-- three columns; this one adds last_result. Drop first so the migration stays
+-- re-runnable across that signature change.
+DROP FUNCTION IF EXISTS recompete_naics_by_staleness(INT);
+
 CREATE OR REPLACE FUNCTION recompete_naics_by_staleness(lim INT DEFAULT 40)
-RETURNS TABLE (naics_code TEXT, row_count BIGINT, last_synced TIMESTAMPTZ)
+RETURNS TABLE (naics_code TEXT, row_count BIGINT, last_synced TIMESTAMPTZ, last_result TEXT)
 LANGUAGE sql
 STABLE
 AS $$
   SELECT
     o.naics_code,
     COUNT(*) AS row_count,
-    -- A NULL last_synced_at means never synced by the real per-contract sync
-    -- (e.g. a leftover grouped row). NULLS FIRST would be right, but MAX()
-    -- ignores NULLs, so coalesce to epoch to force those NAICS to the front.
-    COALESCE(MAX(o.last_synced_at), '1970-01-01'::TIMESTAMPTZ) AS last_synced
+    -- Never attempted -> epoch -> sorts first. NULLS FIRST would do the same,
+    -- but being explicit keeps the ORDER BY readable.
+    COALESCE(MAX(s.last_attempt_at), '1970-01-01'::TIMESTAMPTZ) AS last_synced,
+    MAX(s.last_result) AS last_result
   FROM recompete_opportunities o
+  LEFT JOIN recompete_naics_sync s ON s.naics_code = o.naics_code
   WHERE o.naics_code IS NOT NULL
   GROUP BY o.naics_code
   ORDER BY last_synced ASC, row_count DESC
@@ -86,6 +116,9 @@ CREATE INDEX IF NOT EXISTS idx_recompete_naics_synced
 
 -- Verification:
 --   SELECT * FROM recompete_naics_by_staleness(5);
---     -> expect 5 NAICS, oldest last_synced first
+--     -> expect 5 NAICS, least-recently-ATTEMPTED first (all NULL/epoch on a
+--        fresh install, since nothing has been attempted yet)
 --   SELECT field, count(*) FROM recompete_changes GROUP BY 1;
 --     -> empty until the sync observes its first real change
+--   SELECT last_result, count(*) FROM recompete_naics_sync GROUP BY 1;
+--     -> after a full cycle: mostly 'ok', some 'empty', no 'error'

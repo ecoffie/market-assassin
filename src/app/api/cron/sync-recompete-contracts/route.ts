@@ -11,9 +11,17 @@
  *
  * SHARDING. The full 477-NAICS sweep takes ~38 min; Vercel caps a function at
  * 300s. So each run drains NAICS under a wall-clock budget and stops cleanly.
- * There is no cursor: the next batch comes from recompete_naics_by_staleness(),
- * which reads the freshness of the data itself. A NAICS that fails stays stale
- * and is picked first next run -- self-healing, nothing to reset by hand.
+ * The next batch comes from recompete_naics_by_staleness(), ordered by
+ * least-recently-ATTEMPTED (recompete_naics_sync). Not a cursor -- no position
+ * to drift or reset, just a timestamp per NAICS -- and self-healing: a NAICS
+ * that fails records its attempt, rotates to the back, and retries next cycle
+ * instead of blocking the queue.
+ *
+ * Ordering by the DATA's freshness instead (MAX(last_synced_at) over the rows)
+ * was the first cut, and it starved: a NAICS with no real contracts never gets
+ * a fresh row, so it pins to the head of the queue forever and the cron spins
+ * on it. Hence the explicit attempt log.
+ *
  * Budget, not a fixed count: per-NAICS time is skewed 0.3s..65s, so "N per run"
  * would either overrun or waste the window.
  *
@@ -58,6 +66,36 @@ async function loadExisting(
   return rows;
 }
 
+/**
+ * Record that we tried this NAICS, whatever the outcome.
+ *
+ * This is what keeps the queue moving. An empty or failed NAICS MUST still be
+ * stamped -- if only successes were recorded, a NAICS that always returns 0
+ * rows would stay maximally stale forever and the cron would re-claim it every
+ * run without ever reaching the NAICS that need work.
+ */
+async function recordAttempt(
+  supabase: ReturnType<typeof sb>,
+  naics: string,
+  result: 'ok' | 'empty' | 'truncated' | 'error',
+  contractsFound: number,
+  lastError: string | null,
+) {
+  const { error } = await supabase.from('recompete_naics_sync').upsert(
+    {
+      naics_code: naics,
+      last_attempt_at: new Date().toISOString(),
+      last_result: result,
+      contracts_found: contractsFound,
+      last_error: lastError,
+    },
+    { onConflict: 'naics_code' },
+  );
+  // Don't throw: a failed bookkeeping write must not discard a completed sync.
+  // It only costs us one wasted re-claim next cycle, which is self-correcting.
+  if (error) console.error(`[sync-recompete] attempt log failed for ${naics}: ${error.message}`);
+}
+
 async function upsertContracts(supabase: ReturnType<typeof sb>, contracts: SyncedContract[]) {
   for (let i = 0; i < contracts.length; i += CHUNK) {
     const chunk = contracts.slice(i, i + CHUNK);
@@ -98,7 +136,12 @@ export async function GET(request: NextRequest) {
     );
   }
 
-  const naicsList = (targets ?? []) as { naics_code: string; row_count: number; last_synced: string }[];
+  const naicsList = (targets ?? []) as {
+    naics_code: string;
+    row_count: number;
+    last_synced: string;
+    last_result: string | null;
+  }[];
 
   if (mode === 'preview') {
     return NextResponse.json({
@@ -106,10 +149,11 @@ export async function GET(request: NextRequest) {
       mode,
       wouldSync: naicsList.length,
       budgetMs,
-      staleest: naicsList.slice(0, 10).map((t) => ({
+      stalest: naicsList.slice(0, 10).map((t) => ({
         naics: t.naics_code,
         rows: t.row_count,
-        lastSynced: t.last_synced,
+        lastAttempt: t.last_synced,
+        lastResult: t.last_result ?? 'never attempted',
       })),
     });
   }
@@ -139,7 +183,16 @@ export async function GET(request: NextRequest) {
 
       if (truncatedGroups.length) truncated.push(`${naics}:${truncatedGroups.join('+')}`);
 
-      if (contracts.length) {
+      if (!contracts.length) {
+        // Zero contracts is a legitimate outcome, not a failure -- plenty of
+        // NAICS genuinely have no expiring work in the window. Stamp it so it
+        // rotates out of the front of the queue instead of spinning forever.
+        await recordAttempt(supabase, naics, 'empty', 0, null);
+        synced.push(naics);
+        continue;
+      }
+
+      {
         // Diff BEFORE the upsert -- afterwards the old values are gone for good.
         const existing = await loadExisting(supabase, contracts.map((c) => c.contract_id));
         const changes = diffContracts(existing, contracts, new Date().toISOString());
@@ -159,11 +212,23 @@ export async function GET(request: NextRequest) {
         rowsWritten += contracts.length;
       }
 
+      await recordAttempt(
+        supabase,
+        naics,
+        truncatedGroups.length ? 'truncated' : 'ok',
+        contracts.length,
+        null,
+      );
       synced.push(naics);
     } catch (error) {
       // One NAICS failing must not kill the run -- but it must never pass
-      // silently either. It stays stale, so the next run retries it first.
-      failed[naics] = (error as Error).message;
+      // silently either: it's recorded here, reported in the response, and the
+      // run returns non-2xx. Stamping the attempt rotates it to the back rather
+      // than letting one poisoned NAICS block the queue every run; its rows
+      // stay stale, which is what the data should show.
+      const message = (error as Error).message;
+      failed[naics] = message;
+      await recordAttempt(supabase, naics, 'error', 0, message.slice(0, 500));
     }
   }
 
