@@ -18,7 +18,7 @@ export interface IDVSearchOptions {
   dateFrom?: string;
   dateTo?: string;
   state?: string;
-  stateFilterType?: 'recipient' | 'pop';
+  stateFilterType?: 'recipient' | 'pop' | 'both';
   limit?: number;
   page?: number;
   /** Explicit award-type slice (Eric: drive the toggle, not the state hack). */
@@ -70,6 +70,30 @@ export async function searchIDVContracts(options: IDVSearchOptions = {}): Promis
     page = 1,
     searchType
   } = options;
+
+  // stateFilterType 'both' = union of recipient-HQ and place-of-performance.
+  // USASpending ANDs its filters, so run each side as its own request and merge
+  // + dedupe by awardId (same parallel-request pattern as SAM.gov NAICS).
+  if (state && stateFilterType === 'both') {
+    const [recip, pop] = await Promise.all([
+      searchIDVContracts({ ...options, stateFilterType: 'recipient' }),
+      searchIDVContracts({ ...options, stateFilterType: 'pop' }),
+    ]);
+    const byId = new Map<string, IDVContract>();
+    for (const c of [...recip.contracts, ...pop.contracts]) {
+      const key = c.generatedId || c.awardId || `${c.recipientUei}:${c.awardAmount}`;
+      const prev = byId.get(key);
+      if (!prev || c.awardAmount > prev.awardAmount) byId.set(key, c);
+    }
+    const merged = [...byId.values()].sort((a, b) => b.awardAmount - a.awardAmount).slice(0, limit);
+    return {
+      contracts: merged,
+      totalCount: merged.length,
+      page,
+      hasNextPage: recip.hasNextPage || pop.hasNextPage,
+      searchType: recip.searchType,
+    };
+  }
 
   // Explicit searchType wins; legacy fallback = the old state+pop heuristic.
   const isTaskOrderSearch = searchType === 'task' || (!searchType && state && stateFilterType === 'pop');

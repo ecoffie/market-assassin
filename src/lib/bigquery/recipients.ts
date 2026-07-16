@@ -544,6 +544,7 @@ export interface CapableSmbRow {
   award_count: number;
   agency_count: number;
   set_asides: string;
+  recipient_state: string | null;
   won_set_aside: boolean;
   psc_exact: boolean;     // won the exact PSC
   psc_family: boolean;    // won a PSC in the same 2-char family
@@ -557,6 +558,7 @@ export async function findCapableSmallBusinesses(opts: {
   naics?: string;          // the industry (widens the net)
   maxObligated?: number;   // $ ceiling to bias toward smaller firms (default $25M)
   setAsideOnly?: boolean;
+  state?: string;          // 2-letter recipient (firm HQ) state — "capable SBs in <state>"
   limit?: number;
   offset?: number;
   liveBq?: boolean;
@@ -564,9 +566,13 @@ export async function findCapableSmallBusinesses(opts: {
   const psc = (opts.psc || '').trim().toUpperCase();
   const naics = (opts.naics || '').trim();
   if (!psc && !naics) return { rows: [], total: 0 };
+  const state = (opts.state || '').trim().toUpperCase();
   const limit = Math.min(opts.limit || 50, 200);
   const offset = Math.max(opts.offset || 0, 0);
   const maxObligated = opts.maxObligated ?? 25_000_000;
+  // Firm-HQ state filter (recipient_state on the awards row). Rule-of-Two market
+  // depth "in a state" = which capable businesses are located there.
+  const stateCond = state ? 'AND recipient_state = @state' : '';
 
   // Match predicates. We UNION (OR) so nothing real is filtered out; the score
   // (below) is what ranks PSC-exact above NAICS-only.
@@ -584,12 +590,13 @@ export async function findCapableSmallBusinesses(opts: {
       COUNT(DISTINCT award_id) AS award_count,
       COUNT(DISTINCT awarding_agency) AS agency_count,
       STRING_AGG(DISTINCT NULLIF(set_aside, ''), ', ') AS set_asides,
+      ANY_VALUE(recipient_state) AS recipient_state,
       ${setAsideExpr} AS won_set_aside,
       LOGICAL_OR(${pscExact}) AS psc_match_exact,
       LOGICAL_OR(${pscFamily}) AS psc_match_family,
       LOGICAL_OR(${naicsMatch}) AS naics_hit
     FROM ${BQ_TABLES.awards}
-    WHERE obligation_amount > 0 AND (${pscExact} OR ${pscFamily} OR ${naicsMatch})
+    WHERE obligation_amount > 0 AND (${pscExact} OR ${pscFamily} OR ${naicsMatch}) ${stateCond}
     GROUP BY recipient_uei
     HAVING SUM(obligation_amount) <= @maxObligated
       ${opts.setAsideOnly ? `AND ${setAsideExpr}` : ''}
@@ -600,7 +607,7 @@ export async function findCapableSmallBusinesses(opts: {
   const scored = `
     SELECT
       recipient_uei, recipient_name, total_obligated, award_count, agency_count,
-      set_asides, won_set_aside,
+      set_asides, recipient_state, won_set_aside,
       psc_match_exact AS psc_exact,
       psc_match_family AS psc_family,
       naics_hit AS naics_match,
@@ -618,8 +625,9 @@ export async function findCapableSmallBusinesses(opts: {
   const params: Record<string, unknown> = { maxObligated, limit, offset };
   if (psc) { params.psc = psc; params.pscFam = psc.slice(0, 2); }
   if (naics) params.naics = naics;
+  if (state) params.state = state;
 
-  const key = `smb-capable:${psc}:${naics}:${maxObligated}:${opts.setAsideOnly ? 'sa' : 'all'}:${limit}:${offset}:v1`;
+  const key = `smb-capable:${psc}:${naics}:${state}:${maxObligated}:${opts.setAsideOnly ? 'sa' : 'all'}:${limit}:${offset}:v2`;
   const rows = await queryCached<CapableSmbRow>({
     cacheOnly: !opts.liveBq,
     cacheKey: key,
@@ -630,9 +638,9 @@ export async function findCapableSmallBusinesses(opts: {
 
   const totalRows = await queryCached<{ n: number }>({
     cacheOnly: !opts.liveBq,
-    cacheKey: `smb-capable-count:${psc}:${naics}:${maxObligated}:${opts.setAsideOnly ? 'sa' : 'all'}:v1`,
+    cacheKey: `smb-capable-count:${psc}:${naics}:${state}:${maxObligated}:${opts.setAsideOnly ? 'sa' : 'all'}:v2`,
     query: `SELECT COUNT(*) AS n FROM (${inner})`,
-    params: { maxObligated, ...(psc ? { psc, pscFam: psc.slice(0, 2) } : {}), ...(naics ? { naics } : {}) },
+    params: { maxObligated, ...(psc ? { psc, pscFam: psc.slice(0, 2) } : {}), ...(naics ? { naics } : {}), ...(state ? { state } : {}) },
     maximumBytesBilled: AWARDS_SCAN_MAX_BYTES,
   });
 
@@ -1084,12 +1092,19 @@ export async function searchRecipients(opts: {
     const orderDir = sortBy === 'recipient_name' ? 'ASC' : 'DESC';
     // A recipient can appear under several NAICS in the list — aggregate to one
     // row (sum $ + awards) so the same firm isn't listed multiple times.
+    // State filter: the NAICS rollup has NO location column, but the recipients
+    // table (joined for agency breadth) carries the firm's HQ state. Filtering on
+    // r.state turns the LEFT JOIN into an inner match for that state — so
+    // "top contractors for a NAICS, in FL" finally honors FL (was silently
+    // dropped — the rollup ignored state entirely). Eric 2026-07-16.
+    const stateWhere = state ? 'WHERE r.state = @state' : '';
+    if (state) rp.state = state;
     const rolled = await queryCached<{
       recipient_uei: string; recipient_name: string; total_amount: number; award_count: number;
-      distinct_agency_count: number; total_rows: number;
+      distinct_agency_count: number; city: string | null; state: string | null; total_rows: number;
     }>({
       cacheOnly: !liveBq,
-      cacheKey: `recipient-search-naics:${naicsCodes.join('_')}:${search}:${sortBy}:${limit}:${offset}:v3`,
+      cacheKey: `recipient-search-naics:${naicsCodes.join('_')}:${search}:${state}:${sortBy}:${limit}:${offset}:v4`,
       query: `
         WITH matched AS (
           SELECT recipient_uei, ANY_VALUE(recipient_name) AS recipient_name,
@@ -1099,12 +1114,15 @@ export async function searchRecipients(opts: {
           GROUP BY recipient_uei
         )
         -- Join the recipients table for agency breadth ("works with N agencies"),
-        -- a strong capture signal — does this firm sell to many buyers or one?
+        -- a strong capture signal — does this firm sell to many buyers or one? —
+        -- and for the firm's HQ city/state (used by the optional state filter).
         SELECT m.recipient_uei, m.recipient_name, m.total_amount, m.award_count,
           COALESCE(r.distinct_agency_count, 0) AS distinct_agency_count,
+          r.city AS city, r.state AS state,
           COUNT(*) OVER() AS total_rows
         FROM matched m
         LEFT JOIN ${BQ_TABLES.recipients} r USING (recipient_uei)
+        ${stateWhere}
         ORDER BY ${orderCol === 'recipient_name' ? 'm.recipient_name' : orderCol === 'award_count' ? 'm.award_count' : 'm.total_amount'} ${orderDir}
         LIMIT @limit OFFSET @offset
       `,
@@ -1113,12 +1131,11 @@ export async function searchRecipients(opts: {
     const total = rolled.length ? Number(rolled[0].total_rows) : 0;
     return {
       total,
-      // The NAICS rollup has no location columns — city/state are null here.
       rows: rolled.map(r => ({
         recipient_uei: r.recipient_uei,
         recipient_name: r.recipient_name,
-        city: null,
-        state: null,
+        city: r.city ?? null,
+        state: r.state ?? null,
         total_obligated: Number(r.total_amount || 0),
         award_count: Number(r.award_count || 0),
         distinct_agency_count: Number(r.distinct_agency_count || 0),

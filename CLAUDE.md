@@ -1942,6 +1942,41 @@ uppercase 2-letter). Widens FL ~51–55% (1694→2553 all / 136→211 open).
 
 ---
 
+## Past-contracts (AWARDS) search by location — MCP + BigQuery + USASpending (2026-07-16)
+
+The opportunities fix above only covered OPEN notices. **Awarded/historical contracts** had no
+location index either (Mindy matched awards by agency/NAICS/company but not geography). Fixed
+across BOTH award data sources on the MCP surface. Unlike SAM opportunities, place-of-performance
+is an **FPDS-required field**, so it's well-populated on awards — no ~36% sparsity problem.
+
+- **A — new `search_past_contracts` MCP tool (USASpending).** The discoverable "what contracts
+  were awarded in \<state\>" lookup. `src/lib/usaspending/awards-search.ts` (`searchAwardsByLocation`)
+  hits `spending_by_award` (award types A/B/C/D + optional `include_idv`), `state_scope` =
+  `pop` (place of performance, default) | `recipient` (awardee HQ) | `both` (union). USASpending
+  ANDs its filters + forbids mixing contract/IDV type groups in one call, so `both` and IDV
+  inclusion fire parallel requests merged/deduped by award id (SAM-NAICS parallel pattern). Wrapper
+  `src/mcp/tools/past-contracts.ts` (2 cr, `_meta` always, `_ai_hint` gated, `normalizeStateCode`).
+  Registered the two-path way + `server.ts` zod + smoke. **Verified live:** FL/541512 → L3Harris
+  $1.8B pop=FL; `both` fires 2 requests, 0 off-state leaks.
+- **B — fixed `search_contractors` NAICS+state bug (BigQuery).** `searchRecipients` SILENTLY DROPPED
+  `state` on the NAICS path — that path reads the `topContractorsByDimension` rollup, which has no
+  state column. Now filters via the joined `recipients r.state` (turns the LEFT JOIN into an inner
+  match) + returns the firm's city/state. Cache key v3→v4. "Top 541512 firms in FL" finally honors FL.
+- **C — added `state` to `find_capable_contractors` (BigQuery).** `findCapableSmallBusinesses` gained a
+  `state` param (`recipient_state = @state` on the awards scan = firms HQ'd there) + returns
+  `recipient_state`. Rule-of-Two market depth "in a state." Threaded through the tier2 def/execute.
+  Cache key v1→v2.
+- **D — added `state_scope` to `search_idv_contracts`.** The MCP path only ever filtered recipient HQ
+  (never place of performance). `idv-search.ts` `stateFilterType` gained `'both'` (recursive
+  pop+recipient merge); `state_scope` exposed on the wrapper/def/zod. Default stays `recipient`
+  (backward compatible).
+- **Shared-lib wins:** B/C/D fix the BigQuery/idv libs that the **in-app panels use too**, so the app
+  and MCP both benefit (no separate mirror). B/C are best verified post-deploy via the live panels
+  (cold BQ scans hit the quota kill-switch locally). tsc clean; 55/55 MCP+tier2 unit tests pass;
+  stdio smoke = **39 tools**.
+
+---
+
 ## Mindy MCP Server — proposal WRITING tools (2026-07-16)
 
 The MCP surface can now **draft a proposal**, not just shred/scan/referee one — the

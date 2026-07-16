@@ -15,6 +15,8 @@ export interface IdvContractsToolInput {
   psc?: string;
   agency?: string;
   state?: string;
+  /** Which location the `state` filter targets: 'recipient' HQ (default), 'pop' place of performance, or 'both' (union). */
+  state_scope?: 'recipient' | 'pop' | 'both';
   min_value?: number;
   date_from?: string;
   date_to?: string;
@@ -42,6 +44,7 @@ export async function idvContracts(input: IdvContractsToolInput): Promise<IdvCon
       pscCode: input.psc,
       agency: input.agency,
       state: input.state,
+      stateFilterType: input.state_scope,
       minValue: input.min_value,
       dateFrom: input.date_from,
       dateTo: input.date_to,
