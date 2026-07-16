@@ -1874,6 +1874,45 @@ dispatch; nothing bills for free.
 
 ---
 
+## Mindy MCP Server — account area + usage charts (2026-07-16, PRs #251–253)
+
+The `/mcp` surface split into a **connect landing** and a dedicated **account area**,
+mirroring the OpenAI Platform / Anthropic Console layout (Eric's "make it a settings
+page, not a home page").
+
+- **`/mcp`** = Connect only (hero + keyless connect card + examples). Signed-in users get
+  a **balance chip → Account** in the nav (`McpNav` gained `signedIn`/`balance` + an
+  `account` active state). No usage/billing machinery here anymore.
+- **`/mcp/account`** (`src/app/mcp/account/page.tsx`) = left-rail console:
+  **Usage** (balance · 7-day credits graph · KPI tiles · spend-by-tool) · **Activity**
+  (raw call log) · **Billing** (top-up · plan · auto-recharge full controls · payment
+  method · billing-history placeholder) · **API keys** (create/label/revoke — first UI
+  for the existing `/api/mcp/keys`) · **Settings**. Deep-links: `?section=<id>`,
+  `?autorecharge=saved`.
+- **Charts** live in `src/app/mcp/usage-charts.tsx` (`UsageKpis`/`UsageOverTime`/
+  `SpendByTool`/`ActivityLog` + shared `shortWhen`/`statusStyle`). Magnitude-by-category →
+  ONE emerald hue, direct-labeled, no per-tool rainbow. Pure CSS/SVG bars (no chart lib).
+  The day chart gives each bar its own track so value/day labels never overlap.
+- **`/api/mcp/account`** returns a 30-day `usage` rollup `{ windowDays, totalCredits,
+  totalCalls, byTool[], byDay[], capped }` (additive); `shadow_*` guard rows excluded.
+- **Auto-recharge** Stripe return URLs repoint to `/mcp/account?autorecharge=...`.
+
+**⚠️ Two client-auth gotchas on the `/mcp` APIs** (both bit this work — memory
+`getmiapiheaders-returns-headers-object`): (1) `getMIApiHeaders()` returns a **Headers
+object** — spreading it (`{...getMIApiHeaders()}`) drops the auth token → 401; mutate it
+in place. (2) `account`/`autorecharge` use token-only `resolveMcpEmail`, but `keys` uses
+`requireUserAuth` which needs the email in **`?email=`** (or JSON body), NOT the
+`x-user-email` header.
+
+**Phase 2 (deferred):** a real Billing history / receipts list from `mcp_credit_ledger`
++ `mcp_credit_topups`.
+
+**Extraction guard (2026-07-16):** flipped ON in prod in **log-only/shadow** mode
+(`MCP_EXTRACTION_GUARD=true`, `MCP_EXTRACTION_ENFORCE` unset). Verified live. Next:
+read `shadow_*` rows → set caps to p99 → enforce. (Memory: `mcp-extraction-guard-logonly`.)
+
+---
+
 ## Verification Recipes — how to PROVE each surface works (rule #2)
 
 The concrete "it works" evidence, centralized so skills/agents stop re-deriving it.
