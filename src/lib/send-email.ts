@@ -202,10 +202,15 @@ export async function sendEmail({
     return false;
   }
 
-  // Use alerts@govcongiants.com (verified in Resend)
-  const fromEmail = process.env.EMAIL_FROM || 'alerts@govcongiants.com';
+  // Mindy transactional sender. mail.getmindy.ai is the verified Resend sending domain
+  // (proven in the Mindy Launch); EMAIL_FROM overrides in prod. Everything from Mindy.
+  const fromEmail = process.env.EMAIL_FROM || 'alerts@mail.getmindy.ai';
   const fromName = process.env.MINDY_FROM_NAME || "Mindy";
   const fromAddress = from || `${fromName} <${fromEmail}>`;
+  // Replies to transactional email route to the support Google Group unless the caller
+  // set an explicit reply-to (e.g. event follow-ups reply to the user). Marketing/bulk
+  // (reply-to hello@getmindy.ai) is sent via GHL, not this path.
+  const replyToAddress = replyTo || process.env.EMAIL_REPLY_TO || 'support@getmindy.ai';
 
   // Try Resend first (primary)
   if (resend) {
@@ -214,7 +219,7 @@ export async function sendEmail({
       const { data, error } = await resend.emails.send({
         from: fromAddress,
         to: [to],
-        replyTo: replyTo || undefined,
+        replyTo: replyToAddress,
         subject,
         html,
         text: text || html.replace(/<[^>]*>/g, ''),
@@ -255,7 +260,7 @@ export async function sendEmail({
     await transporter.sendMail({
       from: fromAddress,
       to,
-      replyTo: replyTo || undefined,
+      replyTo: replyToAddress,
       subject,
       html,
       text: text || html.replace(/<[^>]*>/g, ''),

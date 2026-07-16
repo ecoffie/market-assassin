@@ -14,7 +14,7 @@
 import { sendEmail } from '@/lib/send-email';
 
 const ACCOUNT_URL = 'https://getmindy.ai/mcp/account';
-const SUPPORT_EMAIL = 'service@govcongiants.com';
+const SUPPORT_EMAIL = 'support@getmindy.ai';
 
 export type CreditReceiptKind = 'topup' | 'auto_recharge' | 'subscription';
 
