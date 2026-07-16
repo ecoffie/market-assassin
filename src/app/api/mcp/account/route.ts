@@ -5,7 +5,7 @@
  * Keys themselves come from /api/mcp/keys; this is balance + usage.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { requireUserAuth } from '@/lib/api-auth';
+import { resolveMcpEmail } from '@/lib/mcp/session-identity';
 import { getBalance } from '@/lib/mcp/credits';
 import { listMcpTools } from '@/lib/mcp/tool-registry';
 import { getWriteClient } from '@/lib/supabase/server-clients';
@@ -14,11 +14,10 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 export async function GET(request: NextRequest) {
-  const auth = await requireUserAuth(request);
-  if (!auth.authenticated || !auth.email) {
-    return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
+  const email = await resolveMcpEmail(request);
+  if (!email) {
+    return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
   }
-  const email = auth.email.toLowerCase();
 
   const [balance, callsRes] = await Promise.all([
     getBalance(email),
