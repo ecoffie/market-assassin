@@ -4,6 +4,56 @@ This file contains detailed session history for the Market Assassin project. For
 
 ---
 
+## Session 45 (July 16, 2026)
+
+### Recompete: real per-contract data (#280/#284), scheduled + change log (#288/#291)
+
+**Goal:** `get_expiring_contracts` returned `incumbent_uei: null` on **every** row (93/9,481 = 0.98%). The literal ask was a UEI backfill; investigating showed a backfill would have made the data *look* trustworthy while staying structurally wrong.
+
+#### The rows weren't contracts (#280 → PR #284)
+
+- `build-recompete-data` grouped awards on **Recipient+Agency+NAICS**, set `Expiration` to the group's **earliest** end date, kept one representative PIID. So a row's PIID and its expiry date can describe **different contracts**, and none carry a UEI.
+- `sync-recompete` already did it correctly per-contract — it just had **no cron** and had only ever run at ~100 rows/NAICS.
+- **New:** `src/lib/recompete/usaspending-sync.ts` + `scripts/sync-recompete-full.ts` (dry-run default, resumable).
+- Four USASpending constraints, each a silent-corruption trap:
+  1. `award_type_codes` must come from **one group** per request — mixing returns an **error**, not an empty set (a `?? []` swallowed it and nearly produced "backfill infeasible")
+  2. Contracts vs IDVs have **different field schemas** — asking for a contract field on an IDV returns `undefined`, not an error
+  3. `Type of Set Aside` / `Extent Competed` / `Number of Offers` return **NULL from this endpoint** regardless — deliberately **not mapped** (a null that reads as "no set-aside" is worse than an untouched column)
+  4. **No period-of-performance-end filter exists** (`date_type: 'period_of_performance_current_end_date'` 500s their server) → window applied **client-side**
+
+#### Results (full 477-NAICS sweep, verified in prod)
+
+| | before | after |
+|---|---|---|
+| rows `get_expiring_contracts` returns | 9,481 | **129,249** |
+| with `incumbent_uei` | 93 (0.98%) | **129,249 (100.0%)** |
+| with no UEI | 9,388 | **0** |
+
+477/477 NAICS, **zero truncation**, ~38 min wall-clock (not the ~5h estimated from the first 8 — they're the largest; median NAICS < 20s).
+
+#### Migrations (hand-run)
+
+- `20260716_recompete_lead_time_and_grouped_flag.sql` — **`lead_time_months` was always wrong**: `EXTRACT(MONTH FROM AGE(...))` returns only the months component (0-11) and **discards the years**. A contract 18 months out stored `6`. `recompete_stats` buckets `expiring_6/12/18_months` off this field, so those were wrong for as long as the trigger existed. Also flags the 9,388 grouped rows `quality_flag='grouped_synthetic'` (flagged, not deleted — `query.ts` already filters `quality_flag IS NULL`).
+- `20260716_recompete_changes_and_staleness.sql` — `recompete_changes`, `recompete_naics_sync`, staleness RPC.
+
+#### Scheduler + change log (#288 → PR #291)
+
+- **`/api/cron/sync-recompete-contracts`** — sweep is ~38 min vs Vercel's 300s cap, so each run drains NAICS under a **wall-clock budget** (not a fixed count: per-NAICS time is skewed 0.3s..65s). Truncated/failed shard → **non-2xx** so the dispatcher records a failed job.
+- Registered via `cron_jobs` INSERT (no deploy): `25 * * * *`, `limit=40`, `budgetMs=240000`, `timeout_ms=290000`. Full cycle ≈ 13 runs (~half a day).
+- **`recompete_changes`** (append-only) — the sync upserts on `contract_id`, so every run **overwrites** the prior row, and USASpending serves only current state (no "as of" query). Any change not recorded **while it happens is gone permanently and cannot be backfilled at any price**. Tracks `period_of_performance_current_end` (slips predict slips), `potential_total_value` (raised ceiling = growing scope), `incumbent_uei` (changed UEI = novation).
+
+#### Corrections to my own claims (recorded)
+
+- `estimated_recompete_date` is **not** buggy — the trigger hardcodes `end − 12 months`, correct-per-design.
+- "Every `&` company is affected" (from #279) **never reproduced**.
+- `CREATE OR REPLACE FUNCTION` **cannot change a return type** (`42P13`) — "idempotent, safe to re-run" was wrong for a signature change; needs `DROP FUNCTION` first.
+
+#### Discovered, not fixed → **issue #292**
+
+Briefings **never read `recompete_opportunities`**. `fpds-recompete.ts:18` imports `@/data/contracts-data.json` — 2.8 MB bundled at build, last updated **2026-04-08**, 9,450 grouped records, **no UEI field**. It is the **PRIMARY** source and **shadows** the live USASpending path (`ai-briefing-generator.ts:264`), which is only reached on a local **miss** — and which doesn't request `'Recipient UEI'` (`usaspending-fallback.ts:418`) and uses a `date_signed` "proxy for expiring soon" filter. `snapshot-recompetes` has **never run** (no `cron_jobs` row by route, zero `cron_job_runs`) while three docs claim "7:15 AM daily". Not BigQuery — BQ backs `/agencies`, `/top`, `/awards`, tier2 chat; nothing under `src/lib/briefings/` imports it.
+
+---
+
 ## Session 44 (June 11, 2026)
 
 ### Free alert emails + opportunity CTAs + SAM attachment filenames
