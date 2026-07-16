@@ -12,6 +12,7 @@ import { createClient } from '@supabase/supabase-js';
 import { samHtmlToText, looksLikeHtml } from '@/lib/sam/description-text';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { saveSnapshot, readSnapshot, freshMeta, degradedMeta } from '@/lib/resilience/last-good';
+import { normalizeStateCode } from '@/lib/utils/us-states';
 
 // Lazy initialization to avoid build-time errors
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -310,13 +311,21 @@ export async function GET(request: NextRequest) {
         query = query.or(conditions.join(','));
       }
     }
-    if (state) {
+    // Location matching tests BOTH place-of-performance (pop_state, ~36% filled)
+    // AND the buying office (office_address->>state, ~100% filled) — SAM often
+    // omits place-of-performance, so office state widens coverage (~51% for FL).
+    const explicitState = state ? normalizeStateCode(state) : null;
+    if (explicitState) {
       // Explicit state filter from the URL always applies (deliberate).
-      query = query.eq('pop_state', state.toUpperCase());
+      query = query.or(`pop_state.eq.${explicitState},office_address->>state.eq.${explicitState}`);
     } else if (userStates.length > 0 && !isActiveSearch) {
       // Profile-states scope the default view, but an active search escapes them too.
-      const stateConditions = userStates.map(s => `pop_state.eq.${s.toUpperCase()}`);
-      query = query.or(stateConditions.join(','));
+      const stateConditions: string[] = [];
+      for (const s of userStates) {
+        const st = normalizeStateCode(String(s));
+        if (st) stateConditions.push(`pop_state.eq.${st}`, `office_address->>state.eq.${st}`);
+      }
+      if (stateConditions.length > 0) query = query.or(stateConditions.join(','));
     }
 
     // Stats mode - return aggregations (respects user profile filters)
