@@ -15,6 +15,21 @@ import { sendEmail } from '@/lib/send-email';
 
 const ACCOUNT_URL = 'https://getmindy.ai/mcp/account';
 const SUPPORT_EMAIL = 'support@getmindy.ai';
+// Hosted 3D Mindy logo (PNG — SVG isn't rendered by Gmail/Outlook in email).
+const LOGO_URL = 'https://getmindy.ai/brand/mindy-logo-3d.png';
+
+/** Shared white brand header: 3D logo + Mindy wordmark, with a right-aligned label. */
+function brandHeader(label: string): string {
+  return `<tr><td style="padding:22px 28px 20px;border-bottom:1px solid #eef0f4;">
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0"><tr>
+      <td style="vertical-align:middle;">
+        <img src="${LOGO_URL}" width="38" height="38" alt="Mindy" style="vertical-align:middle;border:0;display:inline-block;">
+        <span style="vertical-align:middle;color:#12161d;font-size:22px;font-weight:700;letter-spacing:-.01em;padding-left:10px;">Mindy</span>
+      </td>
+      <td style="vertical-align:middle;text-align:right;color:#7c3aed;font-size:11px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;">${label}</td>
+    </tr></table>
+  </td></tr>`;
+}
 
 export type CreditReceiptKind = 'topup' | 'auto_recharge' | 'subscription';
 
@@ -100,11 +115,8 @@ function receiptHtml(params: CreditReceiptParams): string {
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:28px 12px;">
     <tr><td align="center">
       <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e7e9ee;">
-        <tr><td style="background:linear-gradient(90deg,#1e3a8a,#7c3aed);padding:20px 28px;">
-          <span style="color:#ffffff;font-size:20px;font-weight:700;letter-spacing:-.01em;">Mindy</span>
-          <span style="color:#c7d2fe;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;float:right;padding-top:6px;">MCP Credits</span>
-        </td></tr>
-        <tr><td style="padding:30px 28px 8px;">
+        ${brandHeader('MCP Credits')}
+        <tr><td style="padding:28px 28px 8px;">
           <h1 style="margin:0 0 12px;font-size:23px;line-height:1.2;color:#12161d;">${subject}.</h1>
           <p style="margin:0 0 20px;font-size:15px;line-height:1.55;color:#3f4754;">${lead}</p>
           <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="border:1px solid #e7e9ee;border-radius:10px;padding:6px 16px;background:#fafbfc;">
@@ -170,10 +182,7 @@ export function renderCreditWelcome(params: { email?: string; credits: number })
 <body style="margin:0;background:#f4f5f7;font-family:-apple-system,'Segoe UI',Roboto,Helvetica,Arial,sans-serif;">
   <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f4f5f7;padding:28px 12px;"><tr><td align="center">
     <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:520px;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #e7e9ee;">
-      <tr><td style="background:linear-gradient(90deg,#1e3a8a,#7c3aed);padding:20px 28px;">
-        <span style="color:#ffffff;font-size:20px;font-weight:700;">Mindy</span>
-        <span style="color:#c7d2fe;font-size:12px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;float:right;padding-top:6px;">MCP Credits</span>
-      </td></tr>
+      ${brandHeader('MCP Credits')}
       <tr><td style="padding:30px 28px;">
         <h1 style="margin:0 0 12px;font-size:23px;line-height:1.2;color:#12161d;">You've got ${c} free credits.</h1>
         <p style="margin:0 0 16px;font-size:15px;line-height:1.55;color:#3f4754;">Welcome to Mindy — the GovCon intelligence layer your AI agent can call directly. We've dropped <strong>${c} credits</strong> in your account to try it out.</p>
