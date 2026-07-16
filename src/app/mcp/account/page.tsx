@@ -37,6 +37,7 @@ interface AutoRecharge {
   paused: boolean; lastRechargeAt: string | null; thresholdMin: number; thresholdMax: number;
 }
 interface ApiKeyRow { id: string; key_prefix: string; label: string | null; created_at: string; last_used_at: string | null; revoked_at: string | null }
+interface BillingRow { id: string; date: string; label: string; credits: number; balanceAfter: number; free: boolean }
 
 // Refill packs — must match CREDIT_PACKAGES ids/credits in src/lib/mcp/packages.ts.
 const REFILL_PACKS: { id: string; label: string }[] = [
@@ -61,6 +62,7 @@ export default function McpAccountPage() {
   const [arBusy, setArBusy] = useState(false);
   const [keys, setKeys] = useState<ApiKeyRow[] | null>(null);
   const [keyBusy, setKeyBusy] = useState(false);
+  const [billing, setBilling] = useState<BillingRow[] | null>(null);
   const [newKey, setNewKey] = useState<string | null>(null);
   const [newKeyLabel, setNewKeyLabel] = useState('');
 
@@ -88,6 +90,14 @@ export default function McpAccountPage() {
   // NOTE: /api/mcp/keys is guarded by requireUserAuth, which reads the claimed email
   // from ?email= (or the JSON body) — NOT the x-user-email header. So the email goes in
   // the query string; getMIApiHeaders(email) still supplies the token that proves we own it.
+  const refreshBilling = useCallback(async () => {
+    try {
+      const res = await fetch('/api/mcp/billing-history', { headers: getMIApiHeaders() });
+      const j = await res.json().catch(() => null);
+      if (res.ok && j?.success) setBilling(j.history ?? []);
+    } catch { /* keep prior */ }
+  }, []);
+
   const refreshKeys = useCallback(async (forEmail: string) => {
     try {
       const res = await fetch(`/api/mcp/keys?email=${encodeURIComponent(forEmail)}`, { headers: getMIApiHeaders(forEmail) });
@@ -190,6 +200,7 @@ export default function McpAccountPage() {
           void refreshAccount();
           void refreshAutoRecharge();
           void refreshKeys(j.email);
+          void refreshBilling();
         } else {
           setAuthState('out');
         }
@@ -197,7 +208,7 @@ export default function McpAccountPage() {
         setAuthState('out');
       }
     })();
-  }, [refreshAccount, refreshAutoRecharge, refreshKeys]);
+  }, [refreshAccount, refreshAutoRecharge, refreshKeys, refreshBilling]);
 
   const refillLabel = useMemo(
     () => REFILL_PACKS.find((p) => p.id === autoRecharge?.refillPackage)?.label ?? autoRecharge?.refillPackage,
@@ -333,10 +344,40 @@ export default function McpAccountPage() {
         <button type="button" onClick={startCardSetup} disabled={arBusy} className="rounded-lg border border-white/10 bg-white/[0.06] px-3 py-1.5 text-[12px] text-slate-300 hover:bg-white/10 disabled:opacity-60">{autoRecharge?.hasCard ? 'Update card' : 'Add card'}</button>
       </div>
 
-      {/* Billing history — Phase 2 */}
-      <div className="rounded-xl border border-dashed border-white/[0.08] px-4 py-3.5">
-        <p className="text-[13px] font-semibold text-slate-300">Billing history</p>
-        <p className="mt-0.5 text-[12px] text-slate-500">Dated receipts for every top-up and auto-recharge — coming soon.</p>
+      {/* Billing history — every credit addition (top-ups, auto-recharge, Pro, grants). */}
+      <div className="rounded-xl border border-white/[0.06] bg-white/[0.015] p-4">
+        <p className="text-[13px] font-semibold text-slate-100">Billing history</p>
+        {billing === null ? (
+          <p className="mt-2 text-[12px] text-slate-500">Loading…</p>
+        ) : billing.length === 0 ? (
+          <p className="mt-2 text-[12px] text-slate-500">No credits added yet. Top-ups, auto-recharges, and grants show up here as dated receipts.</p>
+        ) : (
+          <div className="mt-2 overflow-x-auto">
+            <table className="w-full min-w-[360px] text-left text-[13px]">
+              <thead>
+                <tr className="text-[11px] uppercase tracking-wide text-slate-500">
+                  <th className="pb-2 pr-4 font-medium">Date</th>
+                  <th className="pb-2 pr-4 font-medium">Description</th>
+                  <th className="pb-2 pr-4 text-right font-medium">Credits</th>
+                  <th className="pb-2 text-right font-medium">Balance</th>
+                </tr>
+              </thead>
+              <tbody>
+                {billing.map((b) => (
+                  <tr key={b.id} className="border-t border-white/[0.05]">
+                    <td className="py-2 pr-4 tabular-nums text-slate-400">{fmtDate(b.date)}</td>
+                    <td className="py-2 pr-4 text-slate-200">
+                      {b.label}
+                      {b.free && <span className="ml-2 rounded-full bg-white/[0.06] px-1.5 py-0.5 text-[10px] uppercase tracking-wide text-slate-500">free</span>}
+                    </td>
+                    <td className="py-2 pr-4 text-right tabular-nums text-emerald-300">+{b.credits.toLocaleString()}</td>
+                    <td className="py-2 text-right tabular-nums text-slate-500">{b.balanceAfter.toLocaleString()}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </div>
     </div>
   );
