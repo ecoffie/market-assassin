@@ -68,3 +68,4 @@ preview-*.html
 
 # Local test/fetch caches (keyword-derivation harness, etc.)
 .cache/
+.recompete-sweep-state.json

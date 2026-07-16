@@ -56,10 +56,11 @@ describe('fetchExpiringForNaics', () => {
       status: 500,
       text: async () => '<!doctype html><h1>Server Error (500)</h1>',
     }) as unknown as Response);
+    // A 500 is transient, so this exhausts the retry budget before throwing.
     await expect(
       fetchExpiringForNaics({ naics: '236220', monthsAhead: 18, minValue: 0, fetchImpl })
     ).rejects.toThrow(/HTTP 500/);
-  });
+  }, 30_000);
 
   it('requests only one award-type group per call', async () => {
     const bodies: any[] = [];
@@ -223,4 +224,62 @@ describe('truncation reporting', () => {
     expect(truncatedGroups).toEqual([]);
     vi.useRealTimers();
   });
+});
+
+describe('transient retry', () => {
+  it('retries a 500 and succeeds if it recovers', async () => {
+    vi.setSystemTime(TODAY);
+    let calls = 0;
+    const fetchImpl = vi.fn(async () => {
+      calls++;
+      if (calls === 1) {
+        return { ok: false, status: 500, text: async () => '<html>Server Error (500)</html>' } as unknown as Response;
+      }
+      return jsonResponse({ results: [contractAward()], page_metadata: { hasNext: false } });
+    });
+    const { contracts } = await fetchExpiringForNaics({
+      naics: '236220', monthsAhead: 18, minValue: 0, fetchImpl,
+    });
+    expect(calls).toBe(2);
+    expect(contracts).toHaveLength(1);
+    vi.useRealTimers();
+  }, 20_000);
+
+  it('does NOT retry a permanent 400 — it is not worth retrying', async () => {
+    const fetchImpl = vi.fn(async () =>
+      jsonResponse({ message: "'award_type_codes' must only contain types from one group." }, false, 400)
+    );
+    await expect(
+      fetchExpiringForNaics({ naics: '236220', monthsAhead: 18, minValue: 0, fetchImpl })
+    ).rejects.toThrow(/one group/);
+    expect(fetchImpl).toHaveBeenCalledTimes(1);
+  });
+
+  it('gives up after exhausting retries rather than returning a short list', async () => {
+    const fetchImpl = vi.fn(async () =>
+      ({ ok: false, status: 500, text: async () => 'boom' }) as unknown as Response
+    );
+    await expect(
+      fetchExpiringForNaics({ naics: '236220', monthsAhead: 18, minValue: 0, fetchImpl })
+    ).rejects.toThrow(/HTTP 500/);
+    expect(fetchImpl).toHaveBeenCalledTimes(4); // initial + 3 retries
+  }, 30_000);
+});
+
+describe('network-level failures', () => {
+  it('retries a raw "fetch failed" network error (untagged throw)', async () => {
+    vi.setSystemTime(TODAY);
+    let calls = 0;
+    const fetchImpl = vi.fn(async () => {
+      calls++;
+      if (calls === 1) throw new TypeError('fetch failed');
+      return jsonResponse({ results: [contractAward()], page_metadata: { hasNext: false } });
+    });
+    const { contracts } = await fetchExpiringForNaics({
+      naics: '236220', monthsAhead: 18, minValue: 0, fetchImpl, pageDelayMs: 0,
+    });
+    expect(calls).toBe(2);
+    expect(contracts).toHaveLength(1);
+    vi.useRealTimers();
+  }, 20_000);
 });

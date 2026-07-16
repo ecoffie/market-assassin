@@ -109,6 +109,11 @@ export interface FetchOptions {
    */
   maxPages?: number;
   fetchImpl?: typeof fetch;
+  /**
+   * Politeness delay between page requests. A full sweep is thousands of
+   * requests against a public API; hammering it earns connection resets.
+   */
+  pageDelayMs?: number;
   onPage?: (info: { naics: string; group: AwardGroupName; page: number; got: number; oldest: string | null }) => void;
 }
 
@@ -149,12 +154,50 @@ function fieldsFor(group: (typeof AWARD_GROUPS)[AwardGroupName]): string[] {
   ];
 }
 
+const RETRY_DELAYS_MS = [1_000, 4_000, 10_000];
+
+const sleep = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 /**
- * One page of one award-type group. Throws on API error rather than returning
- * [] -- an error coerced to an empty page is indistinguishable from "no more
- * results" and silently truncates the sync.
+ * USASpending intermittently 500s under load. Those are worth retrying; a 400
+ * ("must only contain types from one group") never is.
+ */
+function isTransient(status: number) {
+  return status >= 500 || status === 429;
+}
+
+/**
+ * One page of one award-type group, with bounded retries on transient
+ * failures. Throws on API error rather than returning [] -- an error coerced
+ * to an empty page is indistinguishable from "no more results" and silently
+ * truncates the sync.
  */
 async function fetchPage(params: {
+  naics: string;
+  group: (typeof AWARD_GROUPS)[AwardGroupName];
+  page: number;
+  fetchImpl: typeof fetch;
+}): Promise<{ results: Record<string, unknown>[]; hasNext: boolean }> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    try {
+      return await fetchPageOnce(params);
+    } catch (error) {
+      lastError = error as Error;
+      // Errors we raise are always tagged. An untagged throw came out of
+      // fetch itself -- a network/DNS/socket failure ("fetch failed"), which
+      // is transient by nature.
+      const transient = (error as { transient?: boolean }).transient ?? true;
+      if (!transient || attempt === RETRY_DELAYS_MS.length) throw error;
+      await sleep(RETRY_DELAYS_MS[attempt]);
+    }
+  }
+
+  throw lastError ?? new Error('fetchPage: unreachable');
+}
+
+async function fetchPageOnce(params: {
   naics: string;
   group: (typeof AWARD_GROUPS)[AwardGroupName];
   page: number;
@@ -190,9 +233,11 @@ async function fetchPage(params: {
 
   if (!response.ok || !payload || payload.message || payload.detail) {
     const reason = payload?.message || payload?.detail || `HTTP ${response.status}: ${raw.slice(0, 160)}`;
-    throw new Error(
+    const error = new Error(
       `USASpending failed for NAICS ${naics} [${group.codes.join(',')}] page ${page}: ${reason}`
-    );
+    ) as Error & { transient?: boolean };
+    error.transient = isTransient(response.status);
+    throw error;
   }
 
   return { results: payload.results || [], hasNext: !!payload.page_metadata?.hasNext };
@@ -211,6 +256,7 @@ export async function fetchExpiringForNaics(options: FetchOptions): Promise<Fetc
     includeIdvs = false,
     maxPages = 400,
     fetchImpl = fetch,
+    pageDelayMs = 150,
     onPage,
   } = options;
 
@@ -230,6 +276,7 @@ export async function fetchExpiringForNaics(options: FetchOptions): Promise<Fetc
     let reachedEnd = false;
 
     for (let page = 1; page <= maxPages; page++) {
+      if (page > 1 && pageDelayMs > 0) await sleep(pageDelayMs);
       const { results, hasNext } = await fetchPage({ naics, group, page, fetchImpl });
 
       let oldestOnPage: string | null = null;
