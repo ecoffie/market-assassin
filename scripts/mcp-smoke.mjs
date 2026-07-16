@@ -83,7 +83,7 @@ try {
     'match_recompete_sow', 'extract_statement_of_work',
     'get_federal_event_series', 'get_sba_goaling_share',
     'draft_proposal', 'draft_proposal_section', 'export_proposal',
-    'generate_market_report',
+    'generate_market_report', 'add_contacts_to_crm',
   ]) {
     if (!names.includes(t)) fail(`${t} not registered`);
   }
@@ -363,6 +363,17 @@ try {
     if (!mrS.summary?.total_market) fail('market-report: grounded but no total_market (coverage math broken)');
     if (!mrS.deliverable.html.includes('Powered by')) fail('market-report: deliverable missing Mindy branding footer');
   }
+
+  // ── add_contacts_to_crm (honest not-connected path over stdio: no signed-in user) ─
+  console.error('\n→ calling add_contacts_to_crm({ contacts: [1 test] }) — expect not-connected');
+  const cc = await client.callTool({ name: 'add_contacts_to_crm', arguments: { contacts: [{ name: 'Smoke Test', email: 'smoke@example.com' }] } });
+  const ccS = cc.structuredContent;
+  if (!ccS) fail('add-contacts-to-crm: no structuredContent');
+  console.error(`✓ connected=${ccS._meta?.connected} · grounded=${ccS._meta?.grounded} · added=${ccS.added} · message=${String(ccS.message || '').slice(0, 60)}`);
+  // Over stdio there is no connected user → must be the honest not-connected path (no fabricated write).
+  if (ccS._meta?.connected !== false) fail('add-contacts-to-crm: expected connected=false over stdio (no signed-in user)');
+  if (ccS._meta?.grounded !== false || ccS.added !== 0) fail('add-contacts-to-crm: not-connected must add nothing (no fabrication)');
+  if (!ccS.message) fail('add-contacts-to-crm: not-connected should tell the user to connect GHL');
 
   // ── get_contractor_award_history (USASpending cache + contractor DB) ───────
   console.error('\n→ calling get_contractor_award_history({ company: "Booz Allen Hamilton" })');

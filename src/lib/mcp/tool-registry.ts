@@ -37,6 +37,8 @@ import { getKeywordCoverage } from '@/mcp/tools/keyword-coverage';
 import { idvContracts } from '@/mcp/tools/idv-contracts';
 import { searchPastContracts } from '@/mcp/tools/past-contracts';
 import { generateMarketReport } from '@/mcp/tools/market-report';
+import { addContactsToCrm } from '@/mcp/tools/crm-contacts';
+import type { CrmContactInput } from '@/lib/ghl/contacts';
 import { contractorAwardHistory } from '@/mcp/tools/contractor-award-history';
 import { assessMarketDepth } from '@/mcp/tools/market-depth';
 import { solicitationDocuments } from '@/mcp/tools/solicitation-documents';
@@ -99,6 +101,7 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   search_idv_contracts: 2, // live USASpending IDV/task-order search
   search_past_contracts: 2, // live USASpending awarded-contract search by location
   generate_market_report: 20, // one-shot composite: coverage+agencies+contractors+recompetes+forecasts+set-aside → client-ready report
+  add_contacts_to_crm: 2, // batch upsert contacts into the user's OWN connected GHL location
   get_contractor_award_history: 2, // USASpending cache + contractor DB
   assess_market_depth: 2, // Supabase sam_entities + BQ recipients activity enrich
   get_solicitation_documents: 5, // full-text + raw-file delivery (cold path downloads + extracts on demand). Repriced 3→5 (2026-07-16, proposal-flagship coupling)
@@ -581,6 +584,44 @@ const MARKET_REPORT_TOOL_DEF = {
         set_aside: { type: 'string', description: 'Optional set-aside filter for the forecasts section.' },
         client_name: { type: 'string', description: 'Optional label for the report header (e.g. the client you are preparing this for).' },
       },
+    },
+  },
+};
+
+const CRM_CONTACTS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'add_contacts_to_crm',
+    description:
+      "Add contacts to the USER'S OWN connected CRM (GoHighLevel) in one call — dedupes by email/phone. Pairs with " +
+      'the contact-discovery tools (search_federal_contacts, get_sblo_contact, find_capable_contractors, ' +
+      'lookup_federal_osbp): find your teaming targets or buying-office POCs, then add them here. Each contact needs ' +
+      'at least an email or a phone. The user must have connected their GoHighLevel in Mindy MCP account settings ' +
+      'first — if not, this returns connected:false and adds nothing (do NOT claim a contact was added). Returns ' +
+      'per-contact created/updated/failed with the CRM contact_id.',
+    parameters: {
+      type: 'object',
+      properties: {
+        contacts: {
+          type: 'array',
+          description: 'Contacts to add (max 200 per call). Each needs an email or phone.',
+          items: {
+            type: 'object',
+            properties: {
+              name: { type: 'string', description: 'Full name (used if first/last not given).' },
+              first_name: { type: 'string' },
+              last_name: { type: 'string' },
+              email: { type: 'string' },
+              phone: { type: 'string' },
+              company: { type: 'string' },
+              title: { type: 'string', description: 'Job title (kept for reference).' },
+              tags: { type: 'array', items: { type: 'string' }, description: 'Per-contact tags.' },
+            },
+          },
+        },
+        tags: { type: 'array', items: { type: 'string' }, description: 'Tags applied to every contact in this call (e.g. a campaign or source label).' },
+      },
+      required: ['contacts'],
     },
   },
 };
@@ -1228,6 +1269,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     IDV_CONTRACTS_TOOL_DEF,
     PAST_CONTRACTS_TOOL_DEF,
     MARKET_REPORT_TOOL_DEF,
+    CRM_CONTACTS_TOOL_DEF,
     CONTRACTOR_AWARD_HISTORY_TOOL_DEF,
     MARKET_DEPTH_TOOL_DEF,
     SOLICITATION_DOCUMENTS_TOOL_DEF,
@@ -1280,6 +1322,7 @@ export function isMcpTool(name: string): boolean {
     name === 'search_idv_contracts' ||
     name === 'search_past_contracts' ||
     name === 'generate_market_report' ||
+    name === 'add_contacts_to_crm' ||
     name === 'get_contractor_award_history' ||
     name === 'assess_market_depth' ||
     name === 'get_solicitation_documents' ||
@@ -1545,6 +1588,16 @@ export async function runMcpTool(
       state: typeof args.state === 'string' ? args.state : undefined,
       set_aside: typeof args.set_aside === 'string' ? args.set_aside : undefined,
       client_name: typeof args.client_name === 'string' ? args.client_name : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'add_contacts_to_crm') {
+    // Identity comes from the VERIFIED caller (ctx.userEmail) — never from args.
+    const result = (await addContactsToCrm({
+      userEmail: ctx.userEmail,
+      contacts: Array.isArray(args.contacts) ? (args.contacts as CrmContactInput[]) : [],
+      tags: Array.isArray(args.tags) ? (args.tags as string[]) : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
