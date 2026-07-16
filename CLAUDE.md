@@ -1825,8 +1825,9 @@ refresh rotation).
 (`src/app/mcp/[transport]/route.ts` `withMcpAuth`) tries `verifyAccessToken` (OAuth JWT)
 first, then `verifyApiKey` — either way the call dispatches through **`runMeteredTool`**,
 never raw `runMcpTool`. Keyless calls debit credits exactly like keyed ones. The transport
-loops `mcpRegistrationList()` (`src/lib/mcp/tool-schemas.ts`) so **all 9 tools** are
-exposed (a prior bug exposed only 1 — caught by the live smoke).
+loops `mcpRegistrationList()` (`src/lib/mcp/tool-schemas.ts`) so **all tools** are
+exposed (a prior bug exposed only 1 — caught by the live smoke; now 42, each carrying
+read-only annotations — see the usage-visibility section below).
 
 **Key files:** `src/lib/mcp/oauth/{tokens,store,guard}.ts`, `src/app/oauth/{register,token,revoke}/route.ts`,
 `src/app/api/oauth/metadata/{authorization-server,protected-resource}/route.ts`,
@@ -1840,6 +1841,36 @@ needs `MI_AUTH_TOKEN`).
 **Parked:** PR #135 (GitHub OAuth for app sign-in — Apple already merged); add
 `mcp.getmindy.ai` to the token `aud` allowlist once the subdomain is claimed; provision a
 dedicated `MCP_OAUTH_SIGNING_SECRET`.
+
+---
+
+## Mindy MCP Server — usage visibility + tool grouping (2026-07-15, PR #247)
+
+Three additive UX fixes (from Eric's Higgsfield comparison) so users can see spend
+against balance and Claude Desktop groups the toolset. All verified live via
+`mcp-oauth-smoke.mjs` against prod (42 tools, a priced call debited 1223→1221).
+
+- **Usage panel** on `getmindy.ai/mcp` (`src/app/mcp/page.tsx`) — signed-in visitors get a
+  panel at the top: current balance + recent call history (tool · status · credits · when),
+  Refresh + Top up. Wires up the pre-existing `GET /api/mcp/account` (balance + last 20
+  `mcp_call_log` rows) that nothing rendered before. Front-end only.
+- **Balance IN THE CHAT** (Higgsfield-style) — the hosted transport appends a footer text
+  block to every PRICED tool result: `Mindy credits: N remaining · this call used X`,
+  escalating to a top-up nudge at ≤`LOW_BALANCE_THRESHOLD` (20) and at 0. Free tools
+  (`get_balance`) emit no footer. `runMeteredTool` already returns the post-debit
+  `balance`, so **NO billing change** — also mirrored into `structuredContent._meta.credits`.
+  Helpers `creditFooter` / `prettifyToolName` live in `src/app/mcp/[transport]/route.ts`.
+- **Read-only tool ANNOTATIONS** — tools carried no MCP annotations, so Claude Desktop
+  dumped all 42 into one flat "Other tools" bucket. Every Mindy tool is a read-only
+  intel/compute lookup (none mutate the user's account or any external system), so
+  `mcpRegistrationList()` (`src/lib/mcp/tool-schemas.ts`) now tags EVERY entry
+  `{ readOnlyHint:true, idempotentHint:true, openWorldHint:true }` + a Title-Case `title`,
+  passed into `server.registerTool`. Result: one clean "Read-only tools (42) — Always
+  allow" bucket. **⚠️ Guard:** any future MUTATING tool MUST override with
+  `readOnlyHint:false, destructiveHint:true` so it doesn't hide in the always-allow group.
+
+The billing seam is untouched — the footer/annotations wrap the SAME `runMeteredTool`
+dispatch; nothing bills for free.
 
 ---
 
