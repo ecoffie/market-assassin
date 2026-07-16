@@ -30,9 +30,17 @@ export interface CreditPackage {
 // $15 Plus is the entry pack — the $5 Starter was retired 2026-07-14 (too small to
 // be worth the Stripe fee + anchors the product as cheap). Its Stripe product can be
 // archived; leaving it unlisted here means it's no longer sold or granted.
+// Repriced 2026-07-16 to the locked model: the small pack mirrors the Starter
+// monthly rate (2,000 cr ≈ $49, ~$0.0245/cr) and the large pack adds a volume
+// discount (5,000 cr = $99, ~$0.0198/cr). The old $15/800 + $40/2,400 packs were
+// the consumer-priced entry we're moving off. ⚠️ Amounts changed → Stripe prices
+// are IMMUTABLE: each `checkoutUrl` below STILL charges the OLD amount ($15/$40) —
+// REPLACE with the new $49 / $99 payment links before deploy. `credits`/`usd`/
+// `label` are safe to set now (usd is display; credits is what the webhook grants
+// per the package id, so a buyer of the new $49 link correctly gets 2,000).
 export const CREDIT_PACKAGES: readonly CreditPackage[] = [
-  { id: 'plus', credits: 800, usd: 15, label: 'Plus — 800 credits (7% bonus)', checkoutUrl: 'https://buy.stripe.com/00w5kE9UO1EK9tjdpefnO0K' },
-  { id: 'scale', credits: 2400, usd: 40, label: 'Scale — 2,400 credits (20% bonus)', checkoutUrl: 'https://buy.stripe.com/14A7sMd703MS8pf4SIfnO0J' },
+  { id: 'plus', credits: 2000, usd: 49, label: 'Plus — 2,000 credits', checkoutUrl: 'https://buy.stripe.com/00w5kE9UO1EK9tjdpefnO0K' }, // TODO(pricing): swap → the $49 / 2,000-cr payment link
+  { id: 'scale', credits: 5000, usd: 99, label: 'Scale — 5,000 credits (best value)', checkoutUrl: 'https://buy.stripe.com/14A7sMd703MS8pf4SIfnO0J' }, // TODO(pricing): swap → the $99 / 5,000-cr payment link
 ] as const;
 
 const BY_ID = new Map(CREDIT_PACKAGES.map((p) => [p.id, p]));
@@ -90,48 +98,40 @@ export interface SubscriptionPlan {
   annual: PlanPrice & { usdPerMonth: number };
 }
 
-// Credits/mo are anchored to the legacy one-time pack rate: Plus 800cr@$15 =
-// $0.01875/cr, Scale 2,400cr@$40 = $0.01667/cr. The ANNUAL-billed effective price
-// ($15/$40 per month) hits exactly that per-credit rate; monthly billing ($19/$50)
-// is the ~20% pay-as-you-go premium. Annual invoices grant 12× these.
-const PLUS_CR_MO = Math.max(0, Number(process.env.MCP_PLUS_MONTHLY_CREDITS ?? '800') || 0);
+// Locked ladder (2026-07-16): the ONLY MCP-native credit sub is STARTER $59/mo
+// (the repurposed 'scale' plan below). Pro $149 / Team $499 are the app tiers
+// (their MCP allowance is PRO_MONTHLY_CREDITS + the app grant, not sold here). The
+// old $19 'Plus' sub was RETIRED — verified 0 mcp_sub_* purchases ever, so nothing
+// to grandfather. SCALE_CR_MO is the Starter allowance (2,400 cr ≈ $0.0246/cr @ $59).
 const SCALE_CR_MO = Math.max(0, Number(process.env.MCP_SCALE_MONTHLY_CREDITS ?? '2400') || 0);
 
 export const SUBSCRIPTION_PLANS: readonly SubscriptionPlan[] = [
+  // ($19 'Plus' sub RETIRED 2026-07-16 — folded into Starter $59; 0 subs to migrate.
+  //  Archive its Stripe products so the old $19/$180 links can't be hit.)
   {
-    id: 'plus',
-    label: 'Plus',
-    creditsPerMonth: PLUS_CR_MO,
-    monthly: {
-      priceId: 'price_1TtHbHK5zyiZ50PBGbmTn9mJ',
-      usd: 19,
-      credits: PLUS_CR_MO,
-      checkoutUrl: 'https://buy.stripe.com/3cIeVe2sm83848Z98YfnO0O',
-    },
-    annual: {
-      priceId: 'price_1TtHCIK5zyiZ50PB6Lvi5NMo',
-      usd: 180,
-      usdPerMonth: 15,
-      credits: PLUS_CR_MO * 12,
-      checkoutUrl: 'https://buy.stripe.com/00weVec2Wbfk20RclafnO0M',
-    },
-  },
-  {
+    // Repurposed 2026-07-16: the old "Scale" credit sub is now the $59/mo STARTER —
+    // the entry paid tier in the locked ladder (Free → Starter $59 → Pro $149 → Team
+    // $499). id stays 'scale' so the Stripe metadata `plan=scale` mapping + any live
+    // subs keep resolving; only the display + (pending) the $59 Stripe price change.
+    // ⚠️ Stripe prices are IMMUTABLE: $50→$59 needs a NEW price + payment link. The
+    // priceId/checkoutUrl below STILL transact $50/$480 — REPLACE them with the $59
+    // (monthly) + annual versions before this deploys, or the page says $59 and
+    // checkout charges $50. usd/label are display-only and safe to set now.
     id: 'scale',
-    label: 'Scale',
+    label: 'Starter',
     creditsPerMonth: SCALE_CR_MO,
     monthly: {
-      priceId: 'price_1TtHbIK5zyiZ50PBhJ9MR9GE',
-      usd: 50,
+      priceId: 'price_1TtHbIK5zyiZ50PBhJ9MR9GE', // TODO(pricing): swap → the $59/mo Starter price id
+      usd: 59,
       credits: SCALE_CR_MO,
-      checkoutUrl: 'https://buy.stripe.com/3cIfZi8QK0AG8pfetifnO0P',
+      checkoutUrl: 'https://buy.stripe.com/3cIfZi8QK0AG8pfetifnO0P', // TODO(pricing): swap → the $59/mo Starter payment link
     },
     annual: {
-      priceId: 'price_1TtHCJK5zyiZ50PB57BKa1OW',
-      usd: 480,
-      usdPerMonth: 40,
+      priceId: 'price_1TtHCJK5zyiZ50PB57BKa1OW', // TODO(pricing): swap → the $59-based annual price id
+      usd: 590,
+      usdPerMonth: 49, // ~2 months free vs $59/mo; adjust to taste
       credits: SCALE_CR_MO * 12,
-      checkoutUrl: 'https://buy.stripe.com/6oU28s8QK5V048Zad2fnO0N',
+      checkoutUrl: 'https://buy.stripe.com/6oU28s8QK5V048Zad2fnO0N', // TODO(pricing): swap → the $59-based annual payment link
     },
   },
 ] as const;
