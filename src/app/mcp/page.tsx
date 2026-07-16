@@ -18,6 +18,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import Link from 'next/link';
 import { getMIApiHeaders } from '@/components/app/authHeaders';
 import { Catalog, MCP_URL, McpNav, AppCluster, EXAMPLES, exampleCost } from './catalog-ui';
+import { UsageKpis, UsageOverTime, SpendByTool, prettifyTool, type UsageSummary } from './usage-charts';
 
 type ClientId = 'claude-desktop' | 'claude-code' | 'cursor' | 'other';
 const CLIENTS: { id: ClientId; name: string }[] = [
@@ -77,7 +78,7 @@ function connectFor(client: ClientId): ConnectInfo {
 
 // ---- Usage panel (signed-in): balance + recent call history --------------------
 interface McpCall { tool_name: string; status: string; credits_charged: number | null; created_at: string }
-interface AccountData { balance: number; recentCalls: McpCall[] }
+interface AccountData { balance: number; recentCalls: McpCall[]; usage: UsageSummary | null }
 interface AutoRecharge {
   enabled: boolean; thresholdCredits: number; refillPackage: string;
   hasCard: boolean; cardBrand: string | null; cardLast4: string | null;
@@ -88,11 +89,6 @@ const REFILL_PACKS: { id: string; label: string }[] = [
   { id: 'plus', label: '800 credits ($15)' },
   { id: 'scale', label: '2,400 credits ($40)' },
 ];
-
-/** snake_case tool name → "Title Case" (matches Claude Desktop's tool labels). */
-function prettifyTool(name: string): string {
-  return name.replace(/[_-]+/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase()).trim();
-}
 
 /** Compact "3m ago" / "2h ago" / "Jul 14" from an ISO timestamp. */
 function shortWhen(iso: string): string {
@@ -134,13 +130,16 @@ export default function McpConsole() {
   // Auto-recharge settings (card on file, refill when low).
   const [autoRecharge, setAutoRecharge] = useState<AutoRecharge | null>(null);
   const [arBusy, setArBusy] = useState(false);
+  const [arOpen, setArOpen] = useState(false); // auto-recharge controls collapsed by default
+  // Usage panel view — Overview (charts) is the default; the raw log is a separate view.
+  const [usageView, setUsageView] = useState<'overview' | 'activity'>('overview');
 
   const refreshAccount = useCallback(async () => {
     setAccountLoading(true);
     try {
       const res = await fetch('/api/mcp/account', { headers: getMIApiHeaders() });
       const j = await res.json().catch(() => null);
-      if (res.ok && j?.success) setAccount({ balance: j.balance ?? 0, recentCalls: j.recentCalls ?? [] });
+      if (res.ok && j?.success) setAccount({ balance: j.balance ?? 0, recentCalls: j.recentCalls ?? [], usage: j.usage ?? null });
     } catch { /* leave prior state */ }
     finally { setAccountLoading(false); }
   }, []);
@@ -316,130 +315,163 @@ export default function McpConsole() {
     </section>
   );
 
-  // ---- Signed-in: balance + recent usage ------------------------------------
-  const spentRecent = (account?.recentCalls ?? []).reduce((s, c) => s + (c.credits_charged || 0), 0);
+  // ---- Signed-in: balance + usage (Overview charts / Activity log) -----------
+  const usage = account?.usage ?? null;
+  const hasCalls = (usage?.totalCalls ?? account?.recentCalls.length ?? 0) > 0;
+  const refillLabel = REFILL_PACKS.find((p) => p.id === autoRecharge?.refillPackage)?.label ?? autoRecharge?.refillPackage;
   const usagePanel = account && (
     <section className="mt-8 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-5 sm:p-6">
-      <div className="flex flex-wrap items-end justify-between gap-4">
-        <div>
-          <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">Your balance</p>
-          <div className="mt-1 flex items-baseline gap-2">
-            <span className="text-3xl font-bold tabular-nums text-emerald-300">{account.balance.toLocaleString()}</span>
-            <span className="text-sm text-slate-400">credits remaining</span>
-          </div>
+      {/* Compact balance strip — the number, and the two actions. No tall block. */}
+      <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-3">
+        <div className="flex items-baseline gap-2.5">
+          <span className="text-2xl font-bold tabular-nums text-emerald-300">{account.balance.toLocaleString()}</span>
+          <span className="text-[13px] text-slate-400">credits remaining</span>
+          {usage && usage.totalCalls > 0 && (
+            <span className="hidden text-[12px] text-slate-600 sm:inline">· {usage.totalCredits.toLocaleString()} spent in {usage.windowDays}d</span>
+          )}
         </div>
-        <div className="flex items-center gap-2.5">
-          <span className="text-[12px] text-slate-500">
-            {account.recentCalls.length ? `${spentRecent} used in last ${account.recentCalls.length} call${account.recentCalls.length === 1 ? '' : 's'}` : 'No calls yet'}
-          </span>
+        <div className="flex items-center gap-2">
           <button onClick={refreshAccount} disabled={accountLoading} className="rounded-lg border border-white/10 bg-white/[0.06] px-3 py-1.5 text-[12px] text-slate-300 hover:bg-white/10 disabled:opacity-60">{accountLoading ? 'Refreshing…' : 'Refresh'}</button>
           <Link href="/mcp/pricing" className="rounded-lg bg-emerald-500 px-3 py-1.5 text-[12px] font-semibold text-[#06120c] hover:bg-emerald-400">Top up</Link>
         </div>
       </div>
 
-      {/* Auto-recharge — card on file, refill when low. */}
-      <div className="mt-6 rounded-xl border border-white/[0.06] bg-white/[0.015] p-4">
-        <div className="flex items-start justify-between gap-3">
-          <div>
-            <p className="text-[13px] font-semibold text-slate-100">Auto-recharge</p>
-            <p className="mt-0.5 text-[12px] text-slate-500">Refill automatically when your balance runs low — no interruptions mid-task.</p>
+      {/* Auto-recharge — collapsed to one status line; controls open on Manage. */}
+      <div className="mt-4 rounded-xl border border-white/[0.06] bg-white/[0.015] px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-x-3 gap-y-2">
+          <div className="flex min-w-0 items-center gap-2.5">
+            {autoRecharge?.hasCard && (
+              <button
+                type="button"
+                onClick={() => patchAutoRecharge({ enabled: !autoRecharge.enabled })}
+                disabled={arBusy}
+                role="switch"
+                aria-checked={autoRecharge.enabled}
+                aria-label="Toggle auto-recharge"
+                className={`relative inline-flex h-5 w-9 shrink-0 items-center rounded-full transition ${autoRecharge.enabled ? 'bg-emerald-500' : 'bg-white/15'} disabled:opacity-60`}
+              >
+                <span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${autoRecharge.enabled ? 'translate-x-4' : 'translate-x-0.5'}`} />
+              </button>
+            )}
+            <p className="min-w-0 truncate text-[13px] text-slate-300">
+              <span className="font-semibold text-slate-100">Auto-recharge</span>
+              {!autoRecharge?.hasCard ? (
+                <span className="text-slate-500"> · off — refill automatically so you never run dry mid-task</span>
+              ) : autoRecharge.enabled ? (
+                <span className="text-slate-500"> · on — refill {refillLabel} when below {autoRecharge.thresholdCredits} · {autoRecharge.cardBrand ? `${autoRecharge.cardBrand} ····${autoRecharge.cardLast4}` : 'card on file'}</span>
+              ) : (
+                <span className="text-slate-500"> · off · {autoRecharge.cardBrand ? `${autoRecharge.cardBrand} ····${autoRecharge.cardLast4}` : 'card on file'}</span>
+              )}
+            </p>
           </div>
-          {autoRecharge?.hasCard && (
-            <button
-              type="button"
-              onClick={() => patchAutoRecharge({ enabled: !autoRecharge.enabled })}
-              disabled={arBusy}
-              role="switch"
-              aria-checked={autoRecharge.enabled}
-              className={`relative inline-flex h-6 w-11 shrink-0 items-center rounded-full transition ${autoRecharge.enabled ? 'bg-emerald-500' : 'bg-white/15'} disabled:opacity-60`}
-            >
-              <span className={`inline-block h-5 w-5 transform rounded-full bg-white transition ${autoRecharge.enabled ? 'translate-x-5' : 'translate-x-0.5'}`} />
-            </button>
+          {!autoRecharge?.hasCard ? (
+            <button type="button" onClick={startCardSetup} disabled={arBusy} className="shrink-0 rounded-lg bg-emerald-500 px-3 py-1.5 text-[12px] font-semibold text-[#06120c] hover:bg-emerald-400 disabled:opacity-60">{arBusy ? 'Starting…' : 'Add a card'}</button>
+          ) : (
+            <button type="button" onClick={() => setArOpen((o) => !o)} className="shrink-0 text-[12px] text-slate-400 underline underline-offset-2 hover:text-slate-200">{arOpen ? 'Close' : 'Manage'}</button>
           )}
         </div>
 
-        {!autoRecharge?.hasCard ? (
-          <button
-            type="button"
-            onClick={startCardSetup}
-            disabled={arBusy}
-            className="mt-3 rounded-lg bg-emerald-500 px-3.5 py-2 text-[13px] font-semibold text-[#06120c] hover:bg-emerald-400 disabled:opacity-60"
-          >
-            {arBusy ? 'Starting…' : 'Add a card to enable'}
-          </button>
-        ) : (
-          <>
-            {autoRecharge.paused && (
-              <div className="mt-3 rounded-lg border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-[12px] text-amber-200">
-                Paused after a declined charge. Update your card below to resume.
-              </div>
-            )}
-            <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-3 text-[13px] text-slate-300">
-              <label className="flex items-center gap-2">
-                <span className="text-slate-400">When below</span>
-                <select
-                  value={autoRecharge.thresholdCredits}
-                  onChange={(e) => patchAutoRecharge({ thresholdCredits: Number(e.target.value) })}
-                  disabled={arBusy}
-                  className="rounded-lg border border-white/10 bg-[#070b16] px-2 py-1.5 text-slate-200 outline-none focus:border-emerald-500/50"
-                >
-                  {[50, 100, 200].map((n) => <option key={n} value={n}>{n} credits</option>)}
-                </select>
-              </label>
-              <label className="flex items-center gap-2">
-                <span className="text-slate-400">refill with</span>
-                <select
-                  value={autoRecharge.refillPackage}
-                  onChange={(e) => patchAutoRecharge({ refillPackage: e.target.value })}
-                  disabled={arBusy}
-                  className="rounded-lg border border-white/10 bg-[#070b16] px-2 py-1.5 text-slate-200 outline-none focus:border-emerald-500/50"
-                >
-                  {REFILL_PACKS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
-                </select>
-              </label>
-              <span className="text-slate-500">
-                Card: <span className="text-slate-300">{autoRecharge.cardBrand ? `${autoRecharge.cardBrand} ····${autoRecharge.cardLast4}` : '—'}</span>
-                {' · '}
-                <button type="button" onClick={startCardSetup} disabled={arBusy} className="underline underline-offset-2 hover:text-slate-300 disabled:opacity-60">Update</button>
-              </span>
-            </div>
-          </>
+        {autoRecharge?.paused && (
+          <div className="mt-3 rounded-lg border border-amber-400/25 bg-amber-400/10 px-3 py-2 text-[12px] text-amber-200">
+            Paused after a declined charge. Update your card below to resume.
+          </div>
         )}
-      </div>
 
-      {/* Recent activity — the same call log that also appears in-chat after each tool run. */}
-      <div className="mt-6">
-        <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">Recent activity</p>
-        {account.recentCalls.length === 0 ? (
-          <p className="mt-3 text-[13px] text-slate-500">No tool calls yet. Connect Mindy to your agent and run a tool — every call shows up here with its credit cost.</p>
-        ) : (
-          <div className="mt-3 overflow-x-auto">
-            <table className="w-full min-w-[420px] text-left text-[13px]">
-              <thead>
-                <tr className="text-[11px] uppercase tracking-wide text-slate-500">
-                  <th className="pb-2 pr-4 font-medium">Tool</th>
-                  <th className="pb-2 pr-4 font-medium">Status</th>
-                  <th className="pb-2 pr-4 text-right font-medium">Credits</th>
-                  <th className="pb-2 text-right font-medium">When</th>
-                </tr>
-              </thead>
-              <tbody>
-                {account.recentCalls.map((c, i) => {
-                  const st = statusStyle(c.status);
-                  return (
-                    <tr key={i} className="border-t border-white/[0.05]">
-                      <td className="py-2 pr-4 text-slate-200">{prettifyTool(c.tool_name)}</td>
-                      <td className={`py-2 pr-4 ${st.cls}`}>{st.label}</td>
-                      <td className="py-2 pr-4 text-right tabular-nums text-slate-300">{c.credits_charged || 0}</td>
-                      <td className="py-2 text-right tabular-nums text-slate-500">{shortWhen(c.created_at)}</td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
+        {autoRecharge?.hasCard && arOpen && (
+          <div className="mt-3 flex flex-wrap items-center gap-x-5 gap-y-3 border-t border-white/[0.06] pt-3 text-[13px] text-slate-300">
+            <label className="flex items-center gap-2">
+              <span className="text-slate-400">When below</span>
+              <select
+                value={autoRecharge.thresholdCredits}
+                onChange={(e) => patchAutoRecharge({ thresholdCredits: Number(e.target.value) })}
+                disabled={arBusy}
+                className="rounded-lg border border-white/10 bg-[#070b16] px-2 py-1.5 text-slate-200 outline-none focus:border-emerald-500/50"
+              >
+                {[50, 100, 200].map((n) => <option key={n} value={n}>{n} credits</option>)}
+              </select>
+            </label>
+            <label className="flex items-center gap-2">
+              <span className="text-slate-400">refill with</span>
+              <select
+                value={autoRecharge.refillPackage}
+                onChange={(e) => patchAutoRecharge({ refillPackage: e.target.value })}
+                disabled={arBusy}
+                className="rounded-lg border border-white/10 bg-[#070b16] px-2 py-1.5 text-slate-200 outline-none focus:border-emerald-500/50"
+              >
+                {REFILL_PACKS.map((p) => <option key={p.id} value={p.id}>{p.label}</option>)}
+              </select>
+            </label>
+            <button type="button" onClick={startCardSetup} disabled={arBusy} className="text-slate-500 underline underline-offset-2 hover:text-slate-300 disabled:opacity-60">Update card</button>
           </div>
         )}
       </div>
+
+      {/* Usage — Overview (charts) by default; Activity (raw log) is a separate view. */}
+      {!hasCalls ? (
+        <p className="mt-5 text-[13px] text-slate-500">No tool calls yet. Connect Mindy to your agent and run a tool — your spend shows up here, broken down by tool and by day.</p>
+      ) : (
+        <div className="mt-5">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-[11px] font-medium uppercase tracking-[0.12em] text-slate-500">Usage</p>
+            <div className="inline-flex rounded-full border border-white/[0.08] bg-[#070b16] p-0.5">
+              {(['overview', 'activity'] as const).map((v) => (
+                <button
+                  key={v}
+                  onClick={() => setUsageView(v)}
+                  className={`rounded-full px-3 py-1 text-[12px] font-medium capitalize transition ${usageView === v ? 'bg-emerald-500 text-[#06120c]' : 'text-slate-400 hover:text-slate-200'}`}
+                >
+                  {v}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {usageView === 'overview' ? (
+            usage ? (
+              <div className="mt-4 space-y-6">
+                <UsageKpis usage={usage} />
+                <div>
+                  <p className="mb-2 text-[12px] font-medium text-slate-400">Credits per day · last {usage.windowDays} days</p>
+                  <UsageOverTime byDay={usage.byDay} windowDays={usage.windowDays} />
+                </div>
+                <div>
+                  <p className="mb-3 text-[12px] font-medium text-slate-400">Spend by tool</p>
+                  <SpendByTool byTool={usage.byTool} />
+                </div>
+                {usage.capped && <p className="text-[11px] text-slate-600">Showing your {usage.windowDays}-day window (most recent 2,000 calls).</p>}
+              </div>
+            ) : (
+              <p className="mt-4 text-[13px] text-slate-500">Loading usage…</p>
+            )
+          ) : (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full min-w-[420px] text-left text-[13px]">
+                <thead>
+                  <tr className="text-[11px] uppercase tracking-wide text-slate-500">
+                    <th className="pb-2 pr-4 font-medium">Tool</th>
+                    <th className="pb-2 pr-4 font-medium">Status</th>
+                    <th className="pb-2 pr-4 text-right font-medium">Credits</th>
+                    <th className="pb-2 text-right font-medium">When</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {account.recentCalls.map((c, i) => {
+                    const st = statusStyle(c.status);
+                    return (
+                      <tr key={i} className="border-t border-white/[0.05]">
+                        <td className="py-2 pr-4 text-slate-200">{prettifyTool(c.tool_name)}</td>
+                        <td className={`py-2 pr-4 ${st.cls}`}>{st.label}</td>
+                        <td className="py-2 pr-4 text-right tabular-nums text-slate-300">{c.credits_charged || 0}</td>
+                        <td className="py-2 text-right tabular-nums text-slate-500">{shortWhen(c.created_at)}</td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
     </section>
   );
 
