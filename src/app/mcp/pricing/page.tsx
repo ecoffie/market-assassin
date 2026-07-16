@@ -86,6 +86,7 @@ const FAQ: { q: string; a: string }[] = [
   { q: 'How does the Starter plan work?', a: 'Starter gives you a fixed monthly credit allowance (2,400/mo) that stays the same whether you pay monthly or annually — annual just lowers the price. Monthly billing grants that month’s credits each cycle; annual billing grants the full year up front and saves ~2 months.' },
   { q: 'What is the "moat," and why is it paid-only?', a: 'The moat is Mindy’s un-copyable layer: the winning playbook, curated teaming/OSBP contacts, agency angles, and podcast lessons — built from an 8-year teaching corpus, not scraped from public APIs. The free trial runs the public-data tools (SAM, USASpending, EDGAR, GSA, forecasts); any paid plan or Pro unlocks the moat.' },
   { q: 'Starter, Pro, or Team — which do I need?', a: 'Starter is the entry credit plan (2,400 credits/mo) — ideal for steady project use. Pro is the best value if your agent works federal opportunities daily: a larger monthly allowance (6,000/mo), plus Proposal Assist 2.0 and the full Mindy app. Team is for a whole BD shop — 5 seats drawing from one shared 18,000-credit pool, group coaching, and client workspaces.' },
+  { q: 'Do you have an Enterprise plan?', a: 'Yes — Enterprise is for primes, agencies, and larger orgs that need more than 5 seats, a custom credit pool, SSO/SAML, a dedicated success manager, or an SLA. Pricing is bespoke (volume-based, annual invoicing). Email hello@getmindy.ai and we\'ll scope it with you.' },
   { q: 'Do I need a credit card to start?', a: 'No. You get signup credits free on your first connect — sign in through your browser, point your MCP client at Mindy, and start calling tools. Add a plan or go Pro only when you want more.' },
   { q: 'I already pay for Mindy Pro. Do I get MCP credits?', a: 'Yes — your $149/mo Pro plan includes a monthly MCP credit allowance at no extra cost. Connect with the same account and the credits are already there.' },
   { q: 'What happens when I run out of credits?', a: 'The next tool call is declined with a top-up message before it runs — you are never charged into a negative balance. Upgrade your plan or wait for your renewal to add more.' },
@@ -281,9 +282,9 @@ export default function McpPricing() {
           </div>
         </section>
 
-        {/* Team — multi-seat / agency tier; featured card centered below Starter + Pro */}
-        <div className="mt-4 flex justify-center">
-          <div className="relative flex w-full flex-col rounded-2xl border border-purple-400/40 bg-purple-400/[0.06] p-6 md:w-[calc(50%-0.5rem)]">
+        {/* Bottom row: Team + Enterprise (the organization tiers) */}
+        <section className="mt-4 grid items-stretch gap-4 md:grid-cols-2">
+          <div className="relative flex flex-col rounded-2xl border border-purple-400/40 bg-purple-400/[0.06] p-6">
             <span className="absolute -top-2.5 left-6 rounded-full bg-purple-500 px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-white">For teams &amp; agencies</span>
             <div className="flex items-baseline justify-between gap-2">
               <span className="text-[12px] font-semibold uppercase tracking-wide text-purple-300">Team</span>
@@ -317,7 +318,43 @@ export default function McpPricing() {
             <a href={annual ? TEAM_ANNUAL_URL : TEAM_MONTHLY_URL} className="mt-5 inline-flex items-center justify-center rounded-lg bg-purple-500 px-4 py-2.5 text-sm font-semibold text-white hover:bg-purple-400">Get Team {annual ? 'annually' : 'monthly'}</a>
             <div className="mt-2 h-4 text-center text-[11.5px] text-slate-500">{annual ? <><b className="font-semibold text-emerald-300">Save ${TEAM_ANNUAL_SAVE}</b> compared to monthly</> : 'Switch to annual for 2 months free'}</div>
           </div>
-        </div>
+
+          {/* Enterprise — custom, contact sales (bespoke tier for primes / large agencies) */}
+          <div className="relative flex flex-col rounded-2xl border border-amber-300/30 bg-amber-300/[0.04] p-6">
+            <span className="absolute -top-2.5 left-6 rounded-full border border-amber-300/40 bg-[#0a0f1e] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-200">For primes &amp; large orgs</span>
+            <div className="flex items-center justify-between gap-2">
+              <span className="text-[12px] font-semibold uppercase tracking-wide text-amber-200">Enterprise</span>
+              <span className="text-[11px] text-slate-500">custom</span>
+            </div>
+            <div className="mt-1 min-h-[2.5rem] text-[13px] leading-relaxed text-slate-400">For primes, agencies, and larger orgs that need more than {TEAM_SEATS} seats or a bespoke credit pool.</div>
+            <div className="mt-3 rounded-xl border border-amber-300/15 bg-amber-300/[0.05] p-3">
+              <div className="flex items-baseline gap-1.5 text-amber-100">
+                <span aria-hidden>✦</span>
+                <b className="font-mono text-[15px] font-semibold">Custom</b>
+                <span className="text-[13px] font-semibold">credit pool</span>
+              </div>
+              <ul className="mt-1.5 space-y-0.5 text-[12px] text-slate-300">
+                <li>· Sized to your team &amp; volume</li>
+                <li>· Pooled across every seat</li>
+                <li>· Annual invoicing available</li>
+              </ul>
+            </div>
+            {/* Price — bespoke; occupies the same row as the other cards for alignment */}
+            <div className="mt-4 flex items-baseline gap-2">
+              <span className="text-4xl font-bold">Let&apos;s talk</span>
+            </div>
+            <div className="mt-1 h-4 text-[12px] text-amber-200/80">Volume pricing · annual invoicing</div>
+            <ul className="mt-4 flex-1 space-y-2 border-t border-amber-300/15 pt-4 text-[12.5px]">
+              <li className="flex gap-2"><span className="text-amber-300">◆</span> <span><b className="font-semibold text-slate-200">Everything in Team</b> — plus a custom credit pool sized to you</span></li>
+              <li className="flex gap-2"><span className="text-amber-300">◆</span> <span><b className="font-semibold text-slate-200">Unlimited seats</b> <span className="text-slate-500">— more than {TEAM_SEATS} users, org-wide</span></span></li>
+              <li className="flex gap-2"><span className="text-amber-300">◆</span> <span><b className="font-semibold text-slate-200">SSO / SAML</b> <span className="text-slate-500">— managed provisioning</span></span></li>
+              <li className="flex gap-2"><span className="text-amber-300">◆</span> <span><b className="font-semibold text-slate-200">Dedicated success manager</b> <span className="text-slate-500">— onboarding, training, priority support</span></span></li>
+              <li className="flex gap-2"><span className="text-amber-300">◆</span> <span>Custom integrations &amp; SLA</span></li>
+            </ul>
+            <a href="mailto:hello@getmindy.ai?subject=Mindy%20Enterprise%20inquiry" className="mt-5 inline-flex items-center justify-center rounded-lg border border-amber-300/40 px-4 py-2.5 text-sm font-semibold text-amber-100 hover:bg-amber-300/10">Contact sales</a>
+            <div className="mt-2 h-4 text-center text-[11.5px] text-slate-500">Typically replies within a business day</div>
+          </div>
+        </section>
 
         <p className="mx-auto mt-5 max-w-2xl text-center text-[12px] leading-relaxed text-slate-500">
           The <b className="font-medium text-slate-300">moat</b> is Mindy&apos;s un-copyable layer — included with every paid plan. The free trial runs public-data tools only. Every metered tool is charged on success.
@@ -391,30 +428,32 @@ export default function McpPricing() {
         <section className="mt-16">
           <h2 className="text-center text-[13px] font-medium uppercase tracking-widest text-slate-500">Compare every plan</h2>
           <div className="mx-auto mt-6 max-w-3xl overflow-x-auto rounded-2xl border border-white/10 bg-white/[0.02]">
-            <table className="w-full min-w-[560px] border-collapse text-[13px]">
+            <table className="w-full min-w-[680px] border-collapse text-[13px]">
               <thead>
                 <tr className="border-b border-white/10 text-left">
                   <th className="p-4 font-medium text-slate-400">Feature</th>
                   <th className="p-4 text-center font-semibold text-emerald-300">Starter</th>
                   <th className="p-4 text-center font-semibold text-indigo-300">Pro</th>
                   <th className="p-4 text-center font-semibold text-purple-300">Team</th>
+                  <th className="p-4 text-center font-semibold text-amber-200">Enterprise</th>
                 </tr>
               </thead>
               <tbody className="[&_td]:p-4 [&_td:not(:first-child)]:text-center [&_tr]:border-t [&_tr]:border-white/[0.06]">
-                <CompareRow label="All metered tools (SAM · USASpending · EDGAR · GSA · forecasts)" starter="yes" pro="yes" team="yes" />
-                <CompareRow label="Proprietary moat (playbook · contacts · agency angles · lessons)" starter="yes" pro="yes" team="yes" />
-                <CompareRow label="Charged on success only" starter="yes" pro="yes" team="yes" />
-                <CompareRow label="Monthly credit allowance" starter={`${starterCredits.toLocaleString()}/mo`} pro={`${proCredits.toLocaleString()}/mo`} team={`${TEAM_CREDITS.toLocaleString()}/mo`} />
-                <CompareRow label="Monthly &amp; annual billing" starter="yes" pro="yes" team="yes" />
-                <CompareRow label="Credits roll over (never expire)" starter="yes" pro="yes" team="yes" />
-                <CompareRow label="Proposal Assist 1.0 (metered drafts)" starter="yes" pro="yes" team="yes" />
-                <CompareRow label="Proposal Assist 2.0 (full RFP suite)" starter="no" pro="soon" team="soon" />
-                <CompareRow label="Full Mindy app (alerts · pipeline · CRM)" starter="no" pro="yes" team="yes" />
-                <CompareRow label="Seats" starter="1" pro="1" team={`${TEAM_SEATS}`} />
-                <CompareRow label="Shared credit pool" starter="no" pro="no" team="yes" />
-                <CompareRow label="Group coaching" starter="no" pro="no" team="yes" />
-                <CompareRow label="Client workspaces" starter="no" pro="no" team={`up to ${TEAM_SEATS}`} />
-                <CompareRow label="Best for" starter="project / occasional" pro="daily BD" team="teams &amp; agencies" />
+                <CompareRow label="All metered tools (SAM · USASpending · EDGAR · GSA · forecasts)" starter="yes" pro="yes" team="yes" enterprise="yes" />
+                <CompareRow label="Proprietary moat (playbook · contacts · agency angles · lessons)" starter="yes" pro="yes" team="yes" enterprise="yes" />
+                <CompareRow label="Charged on success only" starter="yes" pro="yes" team="yes" enterprise="yes" />
+                <CompareRow label="Monthly credit allowance" starter={`${starterCredits.toLocaleString()}/mo`} pro={`${proCredits.toLocaleString()}/mo`} team={`${TEAM_CREDITS.toLocaleString()}/mo`} enterprise="custom" />
+                <CompareRow label="Monthly &amp; annual billing" starter="yes" pro="yes" team="yes" enterprise="yes" />
+                <CompareRow label="Credits roll over (never expire)" starter="yes" pro="yes" team="yes" enterprise="yes" />
+                <CompareRow label="Proposal Assist 1.0 (metered drafts)" starter="yes" pro="yes" team="yes" enterprise="yes" />
+                <CompareRow label="Proposal Assist 2.0 (full RFP suite)" starter="no" pro="soon" team="soon" enterprise="soon" />
+                <CompareRow label="Full Mindy app (alerts · pipeline · CRM)" starter="no" pro="yes" team="yes" enterprise="yes" />
+                <CompareRow label="Seats" starter="1" pro="1" team={`${TEAM_SEATS}`} enterprise="unlimited" />
+                <CompareRow label="Shared credit pool" starter="no" pro="no" team="yes" enterprise="yes" />
+                <CompareRow label="Group coaching" starter="no" pro="no" team="yes" enterprise="yes" />
+                <CompareRow label="Client workspaces" starter="no" pro="no" team={`up to ${TEAM_SEATS}`} enterprise="unlimited" />
+                <CompareRow label="SSO / SAML · dedicated CSM · SLA" starter="no" pro="no" team="no" enterprise="yes" />
+                <CompareRow label="Best for" starter="project / occasional" pro="daily BD" team="teams &amp; agencies" enterprise="primes / large orgs" />
               </tbody>
             </table>
           </div>
@@ -479,9 +518,9 @@ export default function McpPricing() {
 }
 
 /** One row of the compare matrix. Semantic cells: yes → colored check, no/— → muted, text → verbatim. */
-function CompareRow({ label, starter, pro, team }: { label: string; starter: string; pro: string; team: string }) {
-  const cell = (v: string, accent: 'emerald' | 'indigo' | 'purple') => {
-    if (v === 'yes') return <span className={accent === 'indigo' ? 'text-indigo-300' : accent === 'purple' ? 'text-purple-300' : 'text-emerald-400'}>✓</span>;
+function CompareRow({ label, starter, pro, team, enterprise }: { label: string; starter: string; pro: string; team: string; enterprise: string }) {
+  const cell = (v: string, accent: 'emerald' | 'indigo' | 'purple' | 'amber') => {
+    if (v === 'yes') return <span className={accent === 'indigo' ? 'text-indigo-300' : accent === 'purple' ? 'text-purple-300' : accent === 'amber' ? 'text-amber-300' : 'text-emerald-400'}>✓</span>;
     if (v === 'no') return <span className="text-slate-600">–</span>;
     if (v === 'soon') return <span className="rounded-full border border-white/15 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-slate-400">soon</span>;
     return <span className="text-[12px] tabular-nums text-slate-300">{v}</span>;
@@ -492,6 +531,7 @@ function CompareRow({ label, starter, pro, team }: { label: string; starter: str
       <td>{cell(starter, 'emerald')}</td>
       <td>{cell(pro, 'indigo')}</td>
       <td>{cell(team, 'purple')}</td>
+      <td>{cell(enterprise, 'amber')}</td>
     </tr>
   );
 }
