@@ -8,7 +8,7 @@
  *   { action: 'disable' } → turn it off (keeps the saved card for later).
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { requireUserAuth } from '@/lib/api-auth';
+import { resolveMcpEmail } from '@/lib/mcp/session-identity';
 import {
   getAutoRecharge,
   setAutoRecharge,
@@ -37,20 +37,19 @@ function publicView(s: Awaited<ReturnType<typeof getAutoRecharge>>) {
 }
 
 export async function GET(request: NextRequest) {
-  const auth = await requireUserAuth(request);
-  if (!auth.authenticated || !auth.email) {
-    return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
+  const email = await resolveMcpEmail(request);
+  if (!email) {
+    return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
   }
-  const settings = await getAutoRecharge(auth.email);
+  const settings = await getAutoRecharge(email);
   return NextResponse.json({ success: true, settings: publicView(settings) });
 }
 
 export async function POST(request: NextRequest) {
-  const auth = await requireUserAuth(request);
-  if (!auth.authenticated || !auth.email) {
-    return NextResponse.json({ error: auth.error || 'Unauthorized' }, { status: 401 });
+  const email = await resolveMcpEmail(request);
+  if (!email) {
+    return NextResponse.json({ error: 'Not signed in' }, { status: 401 });
   }
-  const email = auth.email;
   const body = await request.json().catch(() => ({}));
   const action = body?.action;
 
