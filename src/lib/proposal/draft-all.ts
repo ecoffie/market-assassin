@@ -27,11 +27,9 @@ import type { NoticePocSet } from './notice-poc';
 import type { ComplianceReq } from './section-alignment';
 import { getSectionMeta } from './sections';
 import { safeParseJSON } from '@/lib/utils/safe-parse-json';
-import { recordLlmUsage } from '@/lib/llm/usage-cost';
+import { callLLM } from '@/lib/llm/call-llm';
 import { isCapStatementSection, type SectionType, type DraftResult } from './types';
 
-const GROQ_API_URL = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = process.env.PROPOSAL_GROQ_MODEL || 'llama-3.3-70b-versatile';
 const MAX_INPUT_CHARS = 40000;
 const PARALLEL_BATCH_SIZE = 3;
 
@@ -85,11 +83,7 @@ async function generateOutline(
   sourceText: string,
   sectionTypes: SectionType[],
 ): Promise<SectionOutline[]> {
-  const apiKey = process.env.GROQ_API_KEY;
-  if (!apiKey) {
-    // Fallback: return empty outlines (sections will use their default lens)
-    return sectionTypes.map(s => ({ sectionType: s, emphasis: '', keyAngles: [] }));
-  }
+  const emptyOutlines = () => sectionTypes.map(s => ({ sectionType: s, emphasis: '', keyAngles: [] }));
 
   const inputText = sourceText.slice(0, MAX_INPUT_CHARS);
   const sectionsRequested = sectionTypes
@@ -116,38 +110,23 @@ ${inputText}
 JSON only.`;
 
   try {
-    const callOutline = (model: string) => fetch(GROQ_API_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-      body: JSON.stringify({
-        model,
-        messages: [
-          { role: 'system', content: systemPrompt },
-          { role: 'user', content: userPrompt },
-        ],
-        temperature: 0.5,
-        max_tokens: 1500,
-        response_format: { type: 'json_object' },
-      }),
-    });
-    // 70B has a small daily quota → fall back to 8B on 429 (same as v2).
-    const FALLBACK = process.env.PROPOSAL_FALLBACK_MODEL || 'llama-3.1-8b-instant';
-    let response = await callOutline(GROQ_MODEL);
-    if (response.status === 429 && GROQ_MODEL !== FALLBACK) response = await callOutline(FALLBACK);
-    if (!response.ok) {
-      console.warn(`[proposal/draft-all] outline ${response.status}`);
-      return sectionTypes.map(s => ({ sectionType: s, emphasis: '', keyAngles: [] }));
-    }
-    const data = await response.json();
-    void recordLlmUsage({
+    // Provider-agnostic outline call. The 'drafting' chain (Claude → Groq 70B →
+    // OpenAI → Grok) means the outline still comes back even when Groq's daily
+    // quota is exhausted — the old raw-Groq fetch + 70B→8B fallback both died
+    // together in that case. callLLM records the token cost itself when `tool`
+    // is set, so the manual recordLlmUsage is no longer needed. On total failure
+    // callLLM throws → the catch returns empty outlines (unchanged behavior).
+    const { text } = await callLLM({
+      system: systemPrompt,
+      user: userPrompt,
+      json: true,
+      temperature: 0.5,
+      maxTokens: 1500,
+      job: 'drafting',
       tool: 'proposal_draft',
       userEmail: null,
-      provider: 'groq',
-      model: data.model || GROQ_MODEL,
-      usage: data.usage,
     });
-    const content = data.choices?.[0]?.message?.content || '';
-    const parsed = safeParseJSON<{ outlines?: SectionOutline[] }>(content, {
+    const parsed = safeParseJSON<{ outlines?: SectionOutline[] }>(text || '', {
       fallback: { outlines: [] },
       source: 'proposal.draftAll.outline',
     });
@@ -160,7 +139,7 @@ JSON only.`;
     });
   } catch (err) {
     console.error('[proposal/draft-all] outline failed:', err);
-    return sectionTypes.map(s => ({ sectionType: s, emphasis: '', keyAngles: [] }));
+    return emptyOutlines();
   }
 }
 

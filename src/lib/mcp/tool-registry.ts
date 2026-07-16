@@ -56,6 +56,8 @@ import { matchRecompeteSowTool } from '@/mcp/tools/recompete-sow';
 import { extractStatementOfWork } from '@/mcp/tools/statement-of-work';
 import { getFederalEventSeries } from '@/mcp/tools/event-series';
 import { getSbaGoalingShare } from '@/mcp/tools/sba-goaling';
+import { draftProposal, draftProposalSection } from '@/mcp/tools/draft-proposal';
+import { exportProposal } from '@/mcp/tools/export-proposal';
 import { getBalance } from '@/lib/mcp/credits';
 import { tierFor } from '@/lib/mcp/entitlements';
 
@@ -114,6 +116,9 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   extract_statement_of_work: 2, // SOW/PWS heading detection over solicitation text (+ notice fetch, CLIN fallback)
   get_federal_event_series: 1, // curated recurring-event catalog (static read, no IO)
   get_sba_goaling_share: 2, // statutory SB goals vs actual set-aside obligations (USASpending aggregates)
+  draft_proposal: 50, // full multi-section proposal draft (two-pass outline + parallel per-section LLM generation, vault+RAG grounded)
+  draft_proposal_section: 12, // single-section vault+RAG-grounded draft (one LLM generation pass)
+  export_proposal: 2, // deterministic .docx assembly from supplied sections (docx lib, no LLM/IO)
   get_balance: 0, // meta tool — always free
 };
 
@@ -1035,6 +1040,108 @@ const SBA_GOALING_TOOL_DEF = {
   },
 };
 
+const DRAFT_PROPOSAL_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'draft_proposal',
+    description:
+      'Draft a FULL multi-section federal proposal response from a solicitation — the writing step after ' +
+      'extract_compliance_matrix / build_proposal_structure. A two-pass engine (strategic outline → parallel ' +
+      'per-section write) grounded in the caller\'s Vault (real past performance, identity, team) + a curated ' +
+      'proposal-writing corpus. Auto-picks the section set: an RFP gets Executive Summary / Technical / ' +
+      'Management / Past Performance / Pricing; a Sources Sought / RFI gets the cap-statement set — or pass ' +
+      '`sections` to choose. Provide ONE of notice_id (fetches the SOW + body + attachment text server-side) OR ' +
+      'rfp_text. Pass userEmail to load the caller\'s Vault (without it the draft leans generic and brackets ' +
+      'more). This is a DRAFT: every [placeholder] is an unknown to fill with real data — grounded=false means ' +
+      'nothing was drafted, so do NOT fabricate a proposal. Feed the output to export_proposal (.docx) and ' +
+      'referee_proposal_compliance before submission.',
+    parameters: {
+      type: 'object',
+      properties: {
+        notice_id: { type: 'string', description: 'SAM notice id (UUID) or solicitation number — fetches the doc text server-side.' },
+        rfp_text: { type: 'string', description: 'The solicitation text directly (use when you already have it, or notice_id has no extractable text).' },
+        sections: {
+          type: 'array',
+          items: { type: 'string' },
+          description: 'Which sections to draft. RFP: exec_summary, technical, management, past_performance, pricing. Cap statement: company_overview, cap_past_performance, capabilities, differentiators, poc. Omit to auto-pick.',
+        },
+        agency: { type: 'string', description: 'The buying agency (skips detection; grounds agency-specific framing).' },
+      },
+    },
+  },
+};
+
+const DRAFT_PROPOSAL_SECTION_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'draft_proposal_section',
+    description:
+      'Draft ONE section of a federal proposal, vault+RAG grounded — for iterating on a single volume without ' +
+      're-running the whole proposal. Pass section_type (RFP: exec_summary | technical | management | ' +
+      'past_performance | pricing; cap statement: company_overview | cap_past_performance | capabilities | ' +
+      'differentiators | poc) and ONE of notice_id (fetches the doc text server-side) OR rfp_text. Optionally pass ' +
+      'requirements[] (from extract_compliance_matrix) so the section addresses its shall-statements one-to-one. ' +
+      'Pass userEmail to ground it in the caller\'s Vault. A DRAFT: fill every [placeholder] with real data. ' +
+      'grounded=false = nothing was drafted (invalid section or no source) — do NOT fabricate.',
+    parameters: {
+      type: 'object',
+      properties: {
+        section_type: { type: 'string', description: 'The section to draft, e.g. "technical", "past_performance", "exec_summary".' },
+        notice_id: { type: 'string', description: 'SAM notice id (UUID) or solicitation number — fetches the doc text server-side.' },
+        rfp_text: { type: 'string', description: 'The solicitation text directly (use when you already have it).' },
+        agency: { type: 'string', description: 'The buying agency (skips detection).' },
+        requirements: {
+          type: 'array',
+          description: 'Optional compliance matrix — pass requirements[] from extract_compliance_matrix so the section covers its shalls.',
+          items: {
+            type: 'object',
+            properties: {
+              requirement: { type: 'string', description: 'The obligation text (required).' },
+              category: { type: 'string', description: 'submission | evaluation | technical | past_performance | pricing | admin | other (coerced if free-form).' },
+              section: { type: 'string', description: 'The L/M/C clause label, e.g. "L.3.2" (optional).' },
+              id: { type: 'string', description: 'Stable id, e.g. "REQ-001" (optional).' },
+            },
+            required: ['requirement'],
+          },
+        },
+      },
+      required: ['section_type'],
+    },
+  },
+};
+
+const EXPORT_PROPOSAL_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'export_proposal',
+    description:
+      'Assemble supplied proposal sections into a downloadable Word (.docx) file — the delivery step after ' +
+      'draft_proposal (or your own drafted content). Pass sections[] (each { heading, text }) and an optional ' +
+      'title; returns the document as base64 (docx_base64) plus filename, mime, and byte_size. Deterministic ' +
+      'formatting only — it adds NOTHING and invents NOTHING; [placeholders] in the text carry through verbatim. ' +
+      'grounded=false when no sections are supplied (empty document). Decode docx_base64 to save the file.',
+    parameters: {
+      type: 'object',
+      properties: {
+        title: { type: 'string', description: 'Optional document title rendered at the top.' },
+        sections: {
+          type: 'array',
+          description: 'The proposal sections to write into the document, in order.',
+          items: {
+            type: 'object',
+            properties: {
+              heading: { type: 'string', description: 'The section heading (rendered as Heading 1).' },
+              text: { type: 'string', description: 'The section body; blank lines split it into paragraphs.' },
+            },
+            required: ['heading', 'text'],
+          },
+        },
+      },
+      required: ['sections'],
+    },
+  },
+};
+
 /** All tools exposed over MCP in v1, each annotated with its credit price. */
 export function listMcpTools(): Array<Record<string, unknown>> {
   const defs = [
@@ -1077,6 +1184,9 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     STATEMENT_OF_WORK_TOOL_DEF,
     EVENT_SERIES_TOOL_DEF,
     SBA_GOALING_TOOL_DEF,
+    DRAFT_PROPOSAL_TOOL_DEF,
+    DRAFT_PROPOSAL_SECTION_TOOL_DEF,
+    EXPORT_PROPOSAL_TOOL_DEF,
     GET_BALANCE_TOOL_DEF,
   ];
   return defs.map((d) => ({ ...d, _credits: TOOL_CREDITS[d.function.name] ?? 0, _tier: tierFor(d.function.name) }));
@@ -1124,6 +1234,9 @@ export function isMcpTool(name: string): boolean {
     name === 'extract_statement_of_work' ||
     name === 'get_federal_event_series' ||
     name === 'get_sba_goaling_share' ||
+    name === 'draft_proposal' ||
+    name === 'draft_proposal_section' ||
+    name === 'export_proposal' ||
     name === 'get_balance'
   );
 }
@@ -1518,6 +1631,41 @@ export async function runMcpTool(
     const result = (await getSbaGoalingShare({
       agency: typeof args.agency === 'string' ? args.agency : '',
       fiscal_year: typeof args.fiscal_year === 'number' ? args.fiscal_year : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'draft_proposal') {
+    const result = (await draftProposal({
+      rfp_text: typeof args.rfp_text === 'string' ? args.rfp_text : undefined,
+      notice_id: typeof args.notice_id === 'string' ? args.notice_id : undefined,
+      sections: Array.isArray(args.sections) ? (args.sections as string[]) : undefined,
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      userEmail: ctx.userEmail,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'draft_proposal_section') {
+    const result = (await draftProposalSection({
+      section_type: typeof args.section_type === 'string' ? args.section_type : '',
+      rfp_text: typeof args.rfp_text === 'string' ? args.rfp_text : undefined,
+      notice_id: typeof args.notice_id === 'string' ? args.notice_id : undefined,
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      requirements: Array.isArray(args.requirements)
+        ? (args.requirements as Array<{ requirement: string; category?: string; section?: string; id?: string }>)
+        : undefined,
+      userEmail: ctx.userEmail,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'export_proposal') {
+    const result = (await exportProposal({
+      title: typeof args.title === 'string' ? args.title : undefined,
+      sections: Array.isArray(args.sections)
+        ? (args.sections as Array<{ heading: string; text: string }>)
+        : [],
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }
