@@ -41,7 +41,7 @@ export default function LindySetupPage() {
           <p className="text-gray-400 text-sm mb-3">Best for conversational Q&A with your briefings</p>
           <ol className="list-decimal list-inside space-y-2 text-gray-300">
             <li>In Lindy, create a new agent with an <strong className="text-white">&quot;Email Received&quot;</strong> trigger</li>
-            <li>Set it to watch for emails from <code className="text-amber-400 bg-gray-900 px-1.5 py-0.5 rounded">hello@govcongiants.com</code></li>
+            <li>Set it to watch for emails from <code className="text-amber-400 bg-gray-900 px-1.5 py-0.5 rounded">hello@getmindy.ai</code></li>
             <li>Lindy automatically reads your briefing email and adds it to your knowledge base</li>
             <li>Ask your Lindy agent questions about your briefings anytime</li>
           </ol>
@@ -123,8 +123,8 @@ export default function LindySetupPage() {
         <section className="border-t border-gray-800 pt-8">
           <p className="text-gray-400">
             Need help setting this up? Email{' '}
-            <a href="mailto:hello@govcongiants.com" className="text-amber-400 hover:underline">
-              hello@govcongiants.com
+            <a href="mailto:hello@getmindy.ai" className="text-amber-400 hover:underline">
+              hello@getmindy.ai
             </a>{' '}
             and we&apos;ll walk you through it.
           </p>

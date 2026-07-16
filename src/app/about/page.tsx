@@ -105,8 +105,8 @@ export default function AboutPage() {
               <span className="text-xl">📧</span>
               <div>
                 <p className="text-sm opacity-80">Email</p>
-                <a href="mailto:support@govcongiants.com" className="hover:text-amber-400 transition-colors">
-                  support@govcongiants.com
+                <a href="mailto:support@getmindy.ai" className="hover:text-amber-400 transition-colors">
+                  support@getmindy.ai
                 </a>
               </div>
             </div>

@@ -200,7 +200,7 @@ function generateInviteEmail(name: string): string {
           GovCon Giants | Federal Contract Intelligence
         </p>
         <p style="margin: 10px 0 0 0; color: #94a3b8; font-size: 12px;">
-          Questions? Reply to this email or contact hello@govcongiants.com
+          Questions? Reply to this email or contact hello@getmindy.ai
         </p>
       </td>
     </tr>

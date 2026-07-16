@@ -235,7 +235,7 @@ async function fromSamPublic(q: string): Promise<ResolvedNotice | null> {
   try {
     const url = `${SAM_PUBLIC}?index=opp&q=${encodeURIComponent(q.trim())}&page=0&size=5`;
     const res = await fetch(url, {
-      headers: { 'User-Agent': 'Mindy-GovConGiants (hello@govcongiants.com)' },
+      headers: { 'User-Agent': 'Mindy-GovConGiants (hello@getmindy.ai)' },
       signal: AbortSignal.timeout(12_000),
     });
     if (!res.ok) return null;

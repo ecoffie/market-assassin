@@ -719,7 +719,7 @@ export default function Home() {
               <h4 className="font-bold mb-4 text-white">Company</h4>
               <ul className="space-y-3 text-sm">
                 <li><Link href="/about" className="text-gray-400 hover:text-white">About Us</Link></li>
-                <li><a href="mailto:support@govcongiants.com" className="text-gray-400 hover:text-white">Contact</a></li>
+                <li><a href="mailto:support@getmindy.ai" className="text-gray-400 hover:text-white">Contact</a></li>
               </ul>
             </div>
             <div>

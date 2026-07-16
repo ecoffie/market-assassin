@@ -123,8 +123,8 @@ function SuccessContent() {
             )}
             <p className="text-sm text-gray-500">
               Need help? Contact us at{' '}
-              <a href="mailto:support@govcongiants.com" className="text-blue-600 hover:underline">
-                support@govcongiants.com
+              <a href="mailto:support@getmindy.ai" className="text-blue-600 hover:underline">
+                support@getmindy.ai
               </a>
             </p>
           </div>

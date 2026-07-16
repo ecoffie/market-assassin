@@ -1504,7 +1504,7 @@ function generateUpgradeNotificationEmail(
             <td style="background-color: #f9fafb; padding: 24px 40px; border-top: 1px solid #e5e7eb;">
               <p style="margin: 0; color: #6b7280; font-size: 12px; text-align: center;">
                 GovCon Giants • Federal Contracting Intelligence<br>
-                <a href="mailto:hello@govcongiants.com" style="color: #059669;">hello@govcongiants.com</a>
+                <a href="mailto:hello@getmindy.ai" style="color: #059669;">hello@getmindy.ai</a>
               </p>
             </td>
           </tr>

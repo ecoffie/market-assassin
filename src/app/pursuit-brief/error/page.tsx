@@ -67,7 +67,7 @@ function ErrorContent() {
             Manage Preferences
           </a>
           <a
-            href="mailto:hello@govcongiants.com"
+            href="mailto:hello@getmindy.ai"
             className="block text-gray-500 hover:text-gray-700 text-sm"
           >
             Contact Support

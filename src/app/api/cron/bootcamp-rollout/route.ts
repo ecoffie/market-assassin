@@ -202,7 +202,7 @@ export async function GET(request: NextRequest) {
       try {
         const delivered = await sendEmail({
           to: email,
-          from: `"${MINDY_FROM_NAME}" <alerts@govcongiants.com>`,
+          from: `"${MINDY_FROM_NAME}" <${process.env.EMAIL_FROM || 'alerts@mail.getmindy.ai'}>`,
           subject: 'Set Up Your Mindy Alerts Profile',
           html: generateEmailHtml(email),
           emailType: 'bootcamp_profile_setup',

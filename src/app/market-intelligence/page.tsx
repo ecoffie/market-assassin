@@ -570,7 +570,7 @@ function MarketIntelligenceContent() {
                 </td>
                 <td className="py-4 px-3 text-center bg-amber-900/10">
                   <a
-                    href="mailto:hello@govcongiants.com?subject=MI%20Enterprise%20Inquiry"
+                    href="mailto:hello@getmindy.ai?subject=MI%20Enterprise%20Inquiry"
                     className="inline-block px-4 py-2 bg-amber-600 hover:bg-amber-500 text-white rounded-lg font-semibold transition-colors text-xs"
                   >
                     Contact Sales
@@ -664,7 +664,7 @@ function MarketIntelligenceContent() {
               View Dashboard
             </Link>
             <span className="mx-4">•</span>
-            <a href="mailto:hello@govcongiants.com" className="text-muted hover:text-white">
+            <a href="mailto:hello@getmindy.ai" className="text-muted hover:text-white">
               Support
             </a>
           </p>

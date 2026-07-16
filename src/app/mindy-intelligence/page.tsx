@@ -457,7 +457,7 @@ export default function MindyIntelligencePage() {
           <div className="flex gap-5">
             <Link href="/" className="hover:text-white transition-colors">Home</Link>
             <Link href="/mindy-landing" className="hover:text-white transition-colors">Pricing</Link>
-            <a href="mailto:hello@govcongiants.com" className="hover:text-white transition-colors">Contact</a>
+            <a href="mailto:hello@getmindy.ai" className="hover:text-white transition-colors">Contact</a>
           </div>
         </div>
       </footer>

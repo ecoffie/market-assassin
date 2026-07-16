@@ -122,7 +122,7 @@ export async function fetchRegulatoryDocuments(
         const url = new URL(API_BASE);
         for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
         const res = await fetch(url, {
-          headers: { 'User-Agent': 'Mindy-MCP-GovConGiants (hello@govcongiants.com)', Accept: 'application/json' },
+          headers: { 'User-Agent': 'Mindy-MCP-GovConGiants (hello@getmindy.ai)', Accept: 'application/json' },
         });
         if (!res.ok) throw new Error(`Federal Register ${res.status}`);
         const j = (await res.json()) as FrApiResponse;
