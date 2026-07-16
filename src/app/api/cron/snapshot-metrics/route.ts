@@ -21,7 +21,7 @@
  * just-closed day captures a full day's alerts/engagement instead of zeros.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { getReadClient, getWriteClient } from '@/lib/supabase/server-clients';
+import { getReadClient, getWriteClient, getCountClient } from '@/lib/supabase/server-clients';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
 
 export const runtime = 'nodejs';
@@ -36,6 +36,11 @@ function sbRead() {
 }
 function sbWrite() {
   return getWriteClient();
+}
+// Head-counts MUST NOT go to the replica — it 400s every HEAD request, which this
+// file then recorded as a real 0 for nine days. See getCountClient().
+function sbCount() {
+  return getCountClient();
 }
 
 const DEFAULT_NAICS_SET = new Set(['541512', '541611', '541330', '541990', '561210']);
@@ -136,16 +141,21 @@ export async function GET(request: NextRequest) {
     // --- setup/onboarding emails sent today ---
     // Count-only: head+exact count transfers NO rows (was pulling every matching row
     // just to read .length). Same number, a fraction of the memory/IO.
-    try {
-      const { count } = await supabase
+    //
+    // sbCount(), NOT supabase(sbRead): the replica 400s every HEAD, and head:true
+    // IS a HEAD. This previously recorded a real 0 for nine days (07-07 → 07-15,
+    // 190 emails erased) because the 400 was swallowed and `count ?? 0` made it
+    // look like a genuine zero. Errors are surfaced now for the same reason: a
+    // missing metric is recoverable, a fabricated one silently isn't.
+    {
+      const { count, error } = await sbCount()
         .from('email_provider_sends')
         .select('id', { count: 'exact', head: true })
         .in('email_type', ['mi_account_setup', 'market_intelligence_welcome', 'profile_reminder', 'bootcamp_profile_setup'])
         .gte('sent_at', dayStart)
         .lte('sent_at', dayEnd);
+      if (error) throw new Error(`snapshot-metrics: setup_emails_sent count failed: ${error.message}`);
       metrics.setup_emails_sent = count ?? 0;
-    } catch {
-      metrics.setup_emails_sent = 0;
     }
 
     // --- upsert one row per metric for the day ---

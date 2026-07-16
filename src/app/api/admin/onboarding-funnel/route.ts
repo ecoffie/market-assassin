@@ -13,7 +13,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getReadClient } from '@/lib/supabase/server-clients';
+import { getReadClient, getCountClient } from '@/lib/supabase/server-clients';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -28,6 +28,8 @@ export async function GET(request: NextRequest) {
 
   // Pure read-only analytics (GET, no writes) → read replica to keep off the primary.
   const supabase = getReadClient();
+  // Head-counts → PRIMARY: the replica 400s every HEAD request (see getCountClient).
+  const counts = getCountClient();
 
   const startDate = new Date();
   startDate.setDate(startDate.getDate() - days);
@@ -45,12 +47,12 @@ export async function GET(request: NextRequest) {
       dropoffAnalysisResult,
     ] = await Promise.all([
       // 1. Total users signed up (all time)
-      supabase
+      counts
         .from('user_notification_settings')
         .select('*', { count: 'exact', head: true }),
 
       // 2. Users with profile complete (have NAICS codes)
-      supabase
+      counts
         .from('user_notification_settings')
         .select('*', { count: 'exact', head: true })
         .not('naics_codes', 'is', null)

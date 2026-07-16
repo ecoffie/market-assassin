@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { getReadClient } from '@/lib/supabase/server-clients';
+import { getReadClient, getCountClient } from '@/lib/supabase/server-clients';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
 import { fetchUpgradeEngagementRows } from '@/lib/mindy/upgrade-intent';
 
@@ -205,7 +205,9 @@ export async function GET(request: NextRequest) {
     try {
       const since = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
       const dripTypes = ['upgrade_drip_d1', 'upgrade_drip_d3', 'upgrade_drip_d7', 'upgrade_drip_d14'];
-      const { count } = await supabase
+      // getCountClient (PRIMARY): head:true is a HEAD and the replica 400s those,
+      // so `count || 0` below was silently reporting 0 sends. See getCountClient().
+      const { count } = await getCountClient()
         .from('email_provider_sends')
         .select('id', { count: 'exact', head: true })
         .in('email_type', dripTypes)
@@ -213,7 +215,7 @@ export async function GET(request: NextRequest) {
       dripSends30d = count || 0;
 
       // Bootcamp lifetime-offer blast (all-time — it's a one-time campaign).
-      const { count: bc } = await supabase
+      const { count: bc } = await getCountClient()
         .from('email_provider_sends')
         .select('id', { count: 'exact', head: true })
         .eq('email_type', 'bootcamp_lifetime_offer');

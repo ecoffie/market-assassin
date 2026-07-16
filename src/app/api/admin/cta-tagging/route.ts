@@ -3,7 +3,7 @@
  * Internal QA — CTA tag counts by area + confidence.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { getReadClient } from '@/lib/supabase/server-clients';
+import { getReadClient, getCountClient } from '@/lib/supabase/server-clients';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,8 +22,11 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Supabase not configured' }, { status: 500 });
   }
 
-  // Pure read-only analytics (GET, head-count queries, no writes) → read replica.
+  // Row reads → replica (the opportunity_cta_tags scan is the heavy one, worth
+  // offloading). Head-counts → primary: the replica 400s every HEAD request, and
+  // these two counts were silently returning undefined. See getCountClient().
   const supabase = getReadClient();
+  const counts = getCountClient();
 
   const [
     { data: ctas },
@@ -32,8 +35,8 @@ export async function GET(request: NextRequest) {
     { data: tagRows, error: tagErr },
   ] = await Promise.all([
     supabase.from('cta_codes').select('cta_id, name, short_name, priority_order').order('priority_order'),
-    supabase.from('opportunity_cta_tags').select('notice_id', { count: 'exact', head: true }),
-    supabase
+    counts.from('opportunity_cta_tags').select('notice_id', { count: 'exact', head: true }),
+    counts
       .from('sam_opportunities')
       .select('*', { count: 'exact', head: true })
       .eq('active', true)

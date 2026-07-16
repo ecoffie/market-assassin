@@ -8,7 +8,7 @@
  * PRD-trial-vs-paid-access.md §6.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { getReadClient } from '@/lib/supabase/server-clients';
+import { getCountClient } from '@/lib/supabase/server-clients';
 import { verifyAdminPassword } from '@/lib/admin-auth';
 import { isTrialOpen } from '@/lib/access/resolve-access';
 
@@ -19,8 +19,11 @@ function getSupabase() {
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) return null;
-  // Pure read-only analytics (GET, head-count queries, no writes) → read replica.
-  return getReadClient();
+  // PRIMARY, not the replica: this route is almost entirely head-counts (the `head`
+  // const below is reused 6×), and the replica 400s every HEAD request. Combined
+  // with `n()` doing `.count || 0`, every number on this page was silently 0.
+  // The one row read here is a limit(2000) sample — nothing worth offloading.
+  return getCountClient();
 }
 
 export async function GET(request: NextRequest) {

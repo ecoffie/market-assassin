@@ -6,7 +6,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
-import { getReadClient } from '@/lib/supabase/server-clients';
+import { getReadClient, getCountClient } from '@/lib/supabase/server-clients';
 import { kv } from '@vercel/kv';
 import { isExcludedFromMetrics } from '@/lib/mindy/campaign-exclusions';
 import { hasCustomProfile } from '@/lib/ghl/tag-sync';
@@ -1138,7 +1138,10 @@ function emptySowCatalog() {
 // and the recompete backlog separately so the bar doesn't look "stuck" once it
 // crosses into the ~55K inactive corpus.
 async function getSowCatalogStats() {
-  const sb = getSupabase();
+  // getCountClient (PRIMARY), not getSupabase (replica): every query in this
+  // function is a head:true count, and the replica 400s every HEAD request.
+  // With `count || 0` below, all 8 of these silently rendered 0.
+  const sb = getCountClient();
   // Accept any head:true count query (a PostgREST builder is awaitable/thenable and
   // resolves to { count }). Typed loosely on purpose so all the .eq()/.not() variants
   // below fit one helper.
@@ -1774,7 +1777,10 @@ async function getBetaHealth() {
           .select('user_email, naics_codes, alerts_enabled, is_active')
           .range(from, to)
       ),
-      supabase
+      // getCountClient (PRIMARY) — head:true is a HEAD request and the replica 400s
+      // those; this count silently rendered 0 (queueSize). Row reads around it stay
+      // on the replica.
+      getCountClient()
         .from('waitlist_queue')
         .select('id', { count: 'exact', head: true }),
       fetchAllRows<{
@@ -2279,7 +2285,8 @@ async function getForecastStats() {
 
   try {
     // Total forecast count (use count query to avoid 1000 row limit)
-    const { count: totalCount } = await getSupabase()
+    // getCountClient (PRIMARY) — head:true is a HEAD, and the replica 400s those.
+    const { count: totalCount } = await getCountClient()
       .from('agency_forecasts')
       .select('*', { count: 'exact', head: true });
 
@@ -2288,8 +2295,10 @@ async function getForecastStats() {
     // Forecast counts by agency - use individual COUNT queries to bypass 1000 row limit
     const knownAgencies = ['DHS', 'DOE', 'DOJ', 'DOI', 'NASA', 'VA', 'GSA', 'NRC', 'DOT', 'SSA', 'NSF', 'DOL', 'HHS', 'Treasury', 'EPA', 'USDA', 'DOD'];
 
+    // 17 agencies × one head-count each — this fan-out IS the 400 burst visible in
+    // the logs on agency_forecasts. getCountClient (PRIMARY): the replica 400s HEAD.
     const agencyCountPromises = knownAgencies.map(agency =>
-      getSupabase()
+      getCountClient()
         .from('agency_forecasts')
         .select('id', { count: 'exact', head: true })
         .eq('source_agency', agency)
