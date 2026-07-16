@@ -26,22 +26,17 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
-import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
+import { type MarketFilter } from '@/lib/market/keyword-coverage';
 import {
-  buildMarketFilter,
-  keywordCoverage,
-  marketFilterToUsaspending,
-  type MarketFilter,
-} from '@/lib/market/keyword-coverage';
-import { MARKET_SPEND_WINDOW, MARKET_SPEND_WINDOW_LABEL } from '@/lib/utils/usaspending-helpers';
+  resolveMarketScope,
+  buildSpendingFilters,
+  fetchSpendingCategory,
+  type SpendRow,
+} from '@/lib/market/spend-query';
+import { MARKET_SPEND_WINDOW_LABEL } from '@/lib/utils/usaspending-helpers';
 
-const USASPENDING_URL = 'https://api.usaspending.gov/api/v2/search/spending_by_category';
 const CACHE_TTL_MS = 24 * 60 * 60 * 1000; // 24h
 const DEFAULT_LIMIT = 10;
-
-// USASpending contract award type codes (FPDS scope).
-// We want contract obligations, not grants/loans/IDV-only.
-const CONTRACT_AWARD_TYPE_CODES = ['A', 'B', 'C', 'D'];
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 let _supabase: any = null;
@@ -53,114 +48,6 @@ function getSupabase() {
     );
   }
   return _supabase;
-}
-
-interface TopRow {
-  name: string;
-  amount: number;
-  count: number;
-  rank: number;
-}
-
-interface CategoryResult {
-  results: Array<{
-    id?: number | string | null;
-    name?: string | null;
-    code?: string | null;
-    amount?: number | null;
-  }>;
-  category?: string;
-  messages?: string[];
-}
-
-/**
- * Build the USASpending filter shared by all 4 category calls.
- * Keyword/PSC mode ranks by what was bought; NAICS mode is legacy profile search.
- */
-function buildSpendingFilters(opts: {
-  naicsCodes?: string[];
-  marketFilter?: MarketFilter | null;
-  state?: string;
-}) {
-  // Use the SAME canonical 3-FY window as the rest of the Market Research
-  // dashboard (find-agencies, TMR) so the FPDS leaderboard totals reconcile with
-  // the headline "Relevant spending" figure. Previously this used a single fiscal
-  // year, which is why "Tracked total $1.5B" looked tiny next to "$97.2B".
-  let filters: Record<string, unknown> = {
-    award_type_codes: CONTRACT_AWARD_TYPE_CODES,
-    time_period: [{ start_date: MARKET_SPEND_WINDOW.start_date, end_date: MARKET_SPEND_WINDOW.end_date }],
-  };
-
-  if (opts.marketFilter) {
-    // marketFilterToUsaspending RETURNS a merged object; it does NOT mutate in
-    // place. The old code ignored the return value, so keyword/PSC constraints
-    // were silently dropped → every keyword search queried ALL federal spend
-    // (drones showed $2.1T = the whole budget). Capture the return value.
-    filters = marketFilterToUsaspending(opts.marketFilter, filters);
-  } else if (opts.naicsCodes?.length) {
-    filters.naics_codes = opts.naicsCodes;
-  }
-
-  if (opts.state) {
-    filters.place_of_performance_locations = [{ country: 'USA', state: opts.state }];
-  }
-
-  return filters;
-}
-
-/**
- * Single-category USAspending call.
- *
- * USAspending category endpoints accept the same filter shape but
- * return aggregations keyed by the category. Rate-limited at ~1
- * req/sec; we call 4 in parallel which has worked fine empirically
- * (USAspending's rate limit appears per-IP per-minute, not strict
- * per-second).
- */
-async function fetchCategory(
-  category: 'awarding_agency' | 'awarding_subagency' | 'recipient' | 'funding_agency',
-  filters: Record<string, unknown>,
-  limit: number
-): Promise<TopRow[]> {
-  const body = {
-    category,
-    filters,
-    limit,
-    page: 1,
-    subawards: false,
-  };
-
-  let response: Response;
-  try {
-    response = await fetch(USASPENDING_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(body),
-      // USAspending occasionally hangs on very-broad queries.
-      // 25s cap matches Vercel's default function timeout buffer.
-      signal: AbortSignal.timeout(25_000),
-    });
-  } catch (err) {
-    console.warn(`[fpds-top-n] ${category} fetch failed:`, err);
-    return [];
-  }
-
-  if (!response.ok) {
-    console.warn(`[fpds-top-n] ${category} HTTP ${response.status}`);
-    return [];
-  }
-
-  const payload = (await response.json().catch(() => null)) as CategoryResult | null;
-  if (!payload?.results) return [];
-
-  return payload.results.slice(0, limit).map((row, idx) => ({
-    name: row.name || row.code || `Unknown ${category}`,
-    amount: typeof row.amount === 'number' ? row.amount : 0,
-    // USAspending category results don't always include count —
-    // we infer 0 here and the UI can show "—" for missing data.
-    count: 0,
-    rank: idx + 1,
-  }));
 }
 
 export async function GET(request: NextRequest) {
@@ -182,28 +69,32 @@ export async function GET(request: NextRequest) {
   // bust rows written before either fix.
   const fiscalYear = 2;
 
-  let marketFilter: MarketFilter | null = null;
-  let expandedNaics: string[] = [];
-  let filterKey: string;
-
-  if (keyword) {
-    const coverage = await keywordCoverage(keyword);
-    marketFilter = buildMarketFilter({ coverage, keyword, pscCode: pscParam || undefined });
-    if (!marketFilter) {
-      return NextResponse.json({ error: `No federal market found for keyword "${keyword}"` }, { status: 404 });
-    }
-    filterKey = `kw:${keyword}${marketFilter.psc_codes?.length ? `:psc:${marketFilter.psc_codes[0]}` : ''}`;
-  } else if (pscParam) {
-    marketFilter = buildMarketFilter({ pscCode: pscParam });
-    filterKey = `psc:${pscParam}`;
-  } else {
-    // expandFullCodes=false: a 6-digit code stays EXACT (don't sweep its whole
-    // 3-digit subsector — that inflated "Relevant spending" 7× by pulling in all
-    // of 541xxx for a 541512 search). Prefixes the user typed (2-4 digit) still
-    // expand. Mirrors find-agencies' 6-digit-exact behavior so widgets reconcile.
-    expandedNaics = expandNAICSCodes([naics], false);
-    filterKey = naics;
+  // ONE shared decision (src/lib/market/spend-query.ts) — the report, this leaderboard
+  // and any future surface must resolve "what market is this" the same way, or their
+  // dollars stop reconciling (the PR #245 lesson). A 6-digit NAICS stays EXACT inside
+  // resolveMarketScope (never sweep the 3-digit subsector — that inflated "Relevant
+  // spending" 7×).
+  const scope = await resolveMarketScope({ keyword, naics, pscCode: pscParam });
+  if (!scope) {
+    return NextResponse.json(
+      { error: `No federal market found for ${keyword ? `keyword "${keyword}"` : pscParam ? `PSC ${pscParam}` : `NAICS ${naics}`}` },
+      { status: 404 },
+    );
   }
+
+  // ⚠️ A dominant-NAICS keyword is NOT a 404. This route used to treat
+  // buildMarketFilter()'s null as "no market" and returned
+  // `No federal market found for keyword "security guard"` — for a $6B market
+  // (also janitorial services, roofing…). The gate always promised callers would
+  // "fall through to their NAICS path"; resolveMarketScope is that fall-through, so a
+  // dominant keyword now ranks by its ~90% coverage set and returns real leaderboards.
+  const marketFilter: MarketFilter | null = scope.marketFilter;
+  const expandedNaics: string[] = scope.naicsCodes;
+  const filterKey = keyword
+    ? `kw:${keyword}${marketFilter?.psc_codes?.length ? `:psc:${marketFilter.psc_codes[0]}` : ''}${scope.rankedByDominantNaics ? ':naics' : ''}`
+    : pscParam
+      ? `psc:${pscParam}`
+      : naics;
 
   const cacheKey = {
     naics_code: filterKey,
@@ -270,16 +161,16 @@ export async function GET(request: NextRequest) {
   });
 
   const [departments, contracting, vendors, funding] = await Promise.all([
-    fetchCategory('awarding_agency', filters, DEFAULT_LIMIT * 2), // pull 20 so post-DOD-exclusion still has 10
-    fetchCategory('awarding_subagency', filters, DEFAULT_LIMIT),
-    fetchCategory('recipient', filters, DEFAULT_LIMIT),
-    fetchCategory('funding_agency', filters, DEFAULT_LIMIT),
+    fetchSpendingCategory('awarding_agency', filters, DEFAULT_LIMIT * 2, 'fpds-top-n'), // pull 20 so post-DOD-exclusion still has 10
+    fetchSpendingCategory('awarding_subagency', filters, DEFAULT_LIMIT, 'fpds-top-n'),
+    fetchSpendingCategory('recipient', filters, DEFAULT_LIMIT, 'fpds-top-n'),
+    fetchSpendingCategory('funding_agency', filters, DEFAULT_LIMIT, 'fpds-top-n'),
   ]);
 
   // Post-filter: drop DOD from departments + contracting if excludeDOD.
   // USAspending doesn't accept negation filters, so we filter results
   // client-side. Cheap; we already have the data.
-  const isDodRow = (r: TopRow) =>
+  const isDodRow = (r: SpendRow) =>
     /department of defense|\bdod\b|\barmy\b|\bnavy\b|\bair force\b|\bmarine\b/i.test(r.name);
 
   const finalDepartments = (excludeDOD ? departments.filter(r => !isDodRow(r)) : departments)

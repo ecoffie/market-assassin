@@ -23,7 +23,7 @@
  * the lambda; puppeteer is a devDependency). See tasks/one-shot-tools-plan.md.
  */
 import { keywordCoverage, codeMarketSize, type KeywordCoverage } from '@/lib/market/keyword-coverage';
-import { fetchFPDSByNaics, mapFPDSToAgencies } from '@/lib/utils/fpds-api';
+import { resolveMarketScope, filtersForScope, fetchSpendingCategory } from '@/lib/market/spend-query';
 import { searchContractors } from '@/mcp/tools/search-contractors';
 import { expiringContracts } from '@/mcp/tools/expiring-contracts';
 import { agencyForecasts } from '@/mcp/tools/forecasts';
@@ -48,7 +48,14 @@ export interface MarketReportInput {
   userEmail?: string;
 }
 
-interface TopAgency { name: string; sub_agency: string; contract_count: number; unique_vendors: number }
+/**
+ * A buying sub-agency and its obligated dollars, from the SAME spending_by_category
+ * call the in-app FPDS leaderboards make — so the report and the panel reconcile.
+ * (The old FPDS ATOM path also carried contract/vendor counts; spending_by_category
+ * doesn't return counts, and inventing them would be fabrication. Dollars are the
+ * figure that reconciles, which is the whole point.)
+ */
+interface TopAgency { name: string; amount: number }
 
 export interface MarketReportSummary {
   subject: string;
@@ -62,10 +69,52 @@ export interface MarketReportSummary {
   forecasts: number;
 }
 
+/**
+ * How to reconcile this report against a NAICS-anchored tool (HigherGov, SweetSpot…).
+ *
+ * Eric, 2026-07-16: "people who are comparing us to another platform that uses NAICS
+ * may say our data is incorrect." An unlabelled number always loses that argument —
+ * even when it's the more accurate one. So we show THEIR number on OUR page and
+ * explain it: searching the single biggest code alone returns X (28% of drones); this
+ * report covers the whole keyword market. Their figure becomes evidence for us.
+ *
+ * Only meaningful for a keyword report whose market sprawls; null otherwise (a
+ * single-code market has nothing to reconcile — never manufacture a comparison).
+ */
+export interface MarketReconciliation {
+  /** The code a NAICS-anchored search would use — the biggest by dollars. */
+  single_naics: string;
+  single_naics_name: string;
+  /** What that one code returns, and its share of the real market. */
+  single_naics_amount: number;
+  single_naics_pct: number;
+  /** What this report covers. */
+  total_market: number;
+  naics_count: number;
+  /** The share a single-code search MISSES. */
+  missed_pct: number;
+}
+
+/** What each section measured — so the report can say it out loud. */
+export interface MarketReportBasis {
+  /** keyword | keyword_psc | psc | naics — how the market was scoped. */
+  scope: string;
+  /** Human-readable ranking label, identical to the in-app leaderboards'. */
+  label: string;
+  /** True when a dominant-NAICS keyword was ranked by its lead code. */
+  ranked_by_dominant_naics: boolean;
+  /** The NAICS the NAICS-keyed sections (contractors/recompetes/forecasts) used. */
+  naics_sections_code: string | null;
+}
+
 export interface MarketReportResult {
   subject: string;
   generated_for: string | null;
   summary: MarketReportSummary;
+  /** What was measured, so every section can state its basis. */
+  basis: MarketReportBasis | null;
+  /** The "their number vs ours" line. Null when there's nothing to reconcile. */
+  reconciliation: MarketReconciliation | null;
   sections: {
     market_size: KeywordCoverage | { basis: string; total_market: number; top_psc: unknown } | null;
     top_agencies: TopAgency[];
@@ -114,13 +163,38 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
       ? (await guard(codeMarketSize({ naics: naicsIn }))).value
       : null;
 
-  // Primary NAICS = explicit code, else the biggest buyer from coverage.
+  // Resolve the market scope through the SHARED decision (src/lib/market/spend-query),
+  // so this report's "Who is buying" is the IDENTICAL query the in-app FPDS
+  // leaderboards run. Computing our own answer here is how TMR and the leaderboards
+  // drifted until their totals couldn't be reconciled (PR #245) — a client-facing
+  // report that disagrees with our own panel is indefensible.
+  const scope = keyword || naicsIn ? (await guard(resolveMarketScope({ keyword, naics: naicsIn, coverage }))).value : null;
+
+  /**
+   * A DOMINANT keyword is ranked by its lead NAICS, so the headline total must be that
+   * code's market too — or the report contradicts itself. Measured on "roofing": the
+   * keyword total ($578M, awards whose TEXT says roofing) sat above a "Who is buying"
+   * table summing past $1.1B (ALL of 238160). Same market, two bases, no explanation —
+   * exactly the "numbers don't match" read we're trying to kill. Re-measure the total
+   * on the SAME basis the sections use.
+   */
+  const dominantSize = scope?.rankedByDominantNaics && scope.naicsCodes[0]
+    ? (await guard(codeMarketSize({ naics: scope.naicsCodes[0] }))).value
+    : null;
+
+  // NAICS-keyed sections still need ONE code: an explicit code, else the market's lead.
+  // (The lead is the semantically-right code after promotion — NOT necessarily the
+  // biggest; see keyword-coverage's lead-vs-biggest split.)
   const primaryNaics = naicsIn || coverage?.allNaics?.[0]?.code || coverage?.coverageCodes?.[0] || undefined;
 
   // Fan out the remaining sections in parallel — each independently guarded.
   const [agenciesR, competitionR, recompetesR, forecastsR, agencyDetailR, sbaR] = await Promise.all([
-    primaryNaics
-      ? guard(fetchFPDSByNaics(primaryNaics, { maxRecords: 300 }).then(mapFPDSToAgencies))
+    scope
+      ? guard(
+          fetchSpendingCategory('awarding_subagency', filtersForScope(scope, state), 10, 'market-report').then((rows) =>
+            rows.map((r) => ({ name: r.name, amount: r.amount })),
+          ),
+        )
       : Promise.resolve({ value: null, degraded: false }),
     guard(searchContractors({ keyword: keyword || undefined, naics: primaryNaics, state, limit: 15 })),
     guard(expiringContracts({ naics: primaryNaics, agency: agency || undefined, state, limit: 15 })),
@@ -130,12 +204,7 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   ]);
 
   const topAgencies: TopAgency[] = Array.isArray(agenciesR.value)
-    ? agenciesR.value.slice(0, 10).map((a) => ({
-        name: a.parentAgency || a.name,
-        sub_agency: a.subAgency || a.name,
-        contract_count: a.contractCount || 0,
-        unique_vendors: a.uniqueVendorCount || 0,
-      }))
+    ? (agenciesR.value as TopAgency[]).filter((a) => a.amount > 0).slice(0, 10)
     : [];
 
   const contractors = competitionR.value?.contractors ?? [];
@@ -145,7 +214,10 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   const summary: MarketReportSummary = {
     subject,
     axis,
-    total_market: coverage?.totalMarket ?? (marketSize && 'totalMarket' in marketSize ? marketSize.totalMarket : marketSize && 'total_market' in marketSize ? (marketSize as { total_market: number }).total_market : null),
+    // Dominant keyword → the lead code's total (same basis as every section below).
+    total_market: dominantSize?.totalMarket
+      ?? coverage?.totalMarket
+      ?? (marketSize && 'totalMarket' in marketSize ? marketSize.totalMarket : marketSize && 'total_market' in marketSize ? (marketSize as { total_market: number }).total_market : null),
     naics_count: coverage?.naicsCount ?? null,
     top_psc: coverage?.topPsc ?? (marketSize && 'topPsc' in marketSize ? (marketSize as { topPsc: { code: string; name: string } | null }).topPsc : null),
     buying_agencies: topAgencies.length,
@@ -153,6 +225,40 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     recompetes: contracts.length,
     forecasts: forecasts.length,
   };
+
+  const basis: MarketReportBasis | null = scope
+    ? {
+        scope: scope.basis,
+        label: scope.label,
+        ranked_by_dominant_naics: scope.rankedByDominantNaics,
+        naics_sections_code: primaryNaics ?? null,
+      }
+    : null;
+
+  // "Their number vs ours." Shown ONLY when this report genuinely ranks across the
+  // whole keyword market — i.e. we actually did the thing the line brags about.
+  //
+  // ⚠️ NOT on the dominant path: there we rank by the lead code, so we and the
+  // NAICS-anchored tool are using THE SAME code. Claiming "a single-code search misses
+  // 22%" while our own agencies section is that single code would be a lie the report
+  // tells about itself. Nothing to reconcile → null (an honest omission).
+  // Also skipped when the biggest code already IS ~the whole market (nothing missed).
+  const biggest = coverage?.allNaics?.length
+    ? [...coverage.allNaics].sort((a, b) => b.amount - a.amount)[0]
+    : null;
+  const reconciliation: MarketReconciliation | null =
+    coverage && biggest && !scope?.rankedByDominantNaics
+      && coverage.totalMarket > 0 && coverage.naicsCount > 1 && coverage.topCodePct < 0.9
+      ? {
+          single_naics: biggest.code,
+          single_naics_name: biggest.name,
+          single_naics_amount: biggest.amount,
+          single_naics_pct: coverage.topCodePct,
+          total_market: coverage.totalMarket,
+          naics_count: coverage.naicsCount,
+          missed_pct: Math.max(0, 1 - coverage.topCodePct),
+        }
+      : null;
 
   const sections: MarketReportResult['sections'] = {
     market_size: marketSize as MarketReportResult['sections']['market_size'],
@@ -181,6 +287,8 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     subject,
     generated_for: input.client_name?.trim() || null,
     summary,
+    basis,
+    reconciliation,
     sections,
     deliverable: { html: '', url: null, report_id: null },
     _meta: { grounded: sectionsGrounded > 0, degraded, sections_grounded: sectionsGrounded, sections_total: groundedFlags.length, saved: false },
