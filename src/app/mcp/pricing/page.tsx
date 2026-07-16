@@ -22,6 +22,7 @@ const PRO_MONTHLY_URL = 'https://buy.stripe.com/dRmfZi9UO3MS20RdpefnO0C';
 const PRO_ANNUAL_URL = 'https://buy.stripe.com/eVqfZi5Eydns0WNgBqfnO0D';
 const ANNUAL_SAVE = PRO_MONTHLY * 12 - PRO_ANNUAL; // $298
 const ANNUAL_PER_MO = Math.round(PRO_ANNUAL / 12); // $124
+const ANNUAL_DISCOUNT_PCT = Math.round((1 - ANNUAL_PER_MO / PRO_MONTHLY) * 100); // 2 months free ≈ 17%
 
 // Team — multi-seat / agency tier. Stripe links live in market-intelligence/page.tsx.
 const TEAM_MONTHLY = 499;
@@ -177,12 +178,26 @@ export default function McpPricing() {
           <a href="#find-plan" className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-[13px] font-medium text-slate-300 hover:border-white/20 hover:text-slate-100">
             <span className="text-slate-500">⤳</span> Not sure which plan? <span className="rounded-full bg-indigo-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-indigo-300">Sizer</span>
           </a>
-          <div className="inline-flex items-center rounded-xl border border-white/10 bg-white/[0.03] p-1 text-[13px]">
+          <div className={`inline-flex items-center rounded-xl border p-1 text-[13px] transition ${annual ? 'border-pink-500/40 bg-pink-500/[0.06]' : 'border-white/10 bg-white/[0.03]'}`}>
             <button type="button" onClick={() => setAnnual(false)} className={`rounded-lg px-4 py-1.5 font-semibold transition ${!annual ? 'bg-white/[0.08] text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}>Monthly</button>
             <button type="button" onClick={() => setAnnual(true)} className={`flex items-center gap-2 rounded-lg px-4 py-1.5 font-semibold transition ${annual ? 'bg-white/[0.08] text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}>
-              Annual <span className="rounded-full bg-emerald-500 px-1.5 py-0.5 text-[10px] font-bold text-[#06120c]">2 mo free</span>
+              Annual <span className="rounded-full bg-pink-500 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white shadow-sm shadow-pink-500/30">Save {ANNUAL_DISCOUNT_PCT}%</span>
             </button>
           </div>
+        </div>
+
+        {/* Prominent annual-savings nudge — clickable, flips the toggle */}
+        <div className="mt-3 flex justify-center">
+          {annual ? (
+            <span className="inline-flex items-center gap-2 rounded-full border border-emerald-400/30 bg-emerald-400/10 px-4 py-1.5 text-[13px] font-medium text-emerald-200">
+              <span aria-hidden>✓</span> Annual billing on — <b className="font-bold text-white">{ANNUAL_DISCOUNT_PCT}% off</b>, that&apos;s <b className="font-bold text-white">2 months free</b> on every plan
+            </span>
+          ) : (
+            <button type="button" onClick={() => setAnnual(true)} className="group inline-flex items-center gap-2 rounded-full border border-pink-500/40 bg-pink-500/10 px-4 py-1.5 text-[13px] font-medium text-pink-100 transition hover:bg-pink-500/20">
+              <span aria-hidden>💸</span> Pay yearly and <b className="font-bold text-white">save {ANNUAL_DISCOUNT_PCT}%</b> — 2 months free on every plan
+              <span className="text-pink-300 transition group-hover:translate-x-0.5">→</span>
+            </button>
+          )}
         </div>
 
         {/* Top row: Starter + Pro side by side; Team featured below */}
