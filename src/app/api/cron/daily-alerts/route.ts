@@ -12,7 +12,6 @@ import { searchGrantsByNAICS, scoreGrant, GrantOpportunity, GRANT_RELEVANCE_THRE
 import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
 import { getPSCsForNAICS } from '@/lib/utils/psc-crosswalk';
 import { getVocabularyForCodes } from '@/lib/market/vocabulary';
-import nodemailer from 'nodemailer';
 import Anthropic from '@anthropic-ai/sdk';
 import { getCapabilityVector } from '@/lib/alerts/capability-vector';
 import { fetchHiddenMatchPool, findHiddenMatches, type HiddenMatch } from '@/lib/alerts/hidden-match';
@@ -39,7 +38,7 @@ import {
   renderKeywordSetupNudgeHtml,
   renderMindyV10PromoHtml,
 } from '@/lib/alerts/email-promo';
-import { MINDY_APP_URL, MINDY_FROM_NAME, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
+import { MINDY_APP_URL, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 
 export const maxDuration = 300;
 
@@ -81,18 +80,6 @@ async function fetchAllPaged<T = any>(
     if (data.length < pageSize) break; // last page
   }
   return all;
-}
-
-function getTransporter() {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.office365.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: false,
-    auth: {
-      user: process.env.SMTP_USER || 'alerts@govcongiants.com',
-      pass: process.env.SMTP_PASSWORD,
-    },
-  });
 }
 
 // Map business type to SAM.gov set-aside code
@@ -1717,7 +1704,19 @@ async function sendDailyAlertEmail(
 `;
 
   return sendEmail({
-    from: `"${MINDY_FROM_NAME}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
+    // NO `from` — sendEmail defaults to `Mindy <${EMAIL_FROM || alerts@mail.getmindy.ai}>`,
+    // the domain Resend is actually verified for. This used to pass
+    // `SMTP_USER || alerts@govcongiants.com`, and the caller's `from` WINS
+    // (`const fromAddress = from || …`), so Resend rejected the unverified
+    // govcongiants.com sender on EVERY send and silently fell back to Office365:
+    // 1000/1000 recent daily_alert rows in email_provider_sends were office365 with
+    // msgid=null, while weekly_alert / magic_link / nudges (which don't override
+    // `from`) all went via resend. ~900 alerts/day were leaving from the wrong
+    // domain's SPF/DKIM — a spam-folder pattern, and the reason users reported
+    // "sent" alerts they never received.
+    // Deliberately omitting it rather than copying weekly-alerts' `EMAIL_FROM ||
+    // 'alerts@mail.getmindy.ai'` default: one source of truth, one less place to drift.
+    // (CLAUDE.md rule #13 + the mindy-email-sender-architecture memory.)
     // Coach-managed client rows deliver to the client's real inbox (alert_recipient_email);
     // everyone else falls back to their own address.
     to: user.alert_recipient_email || email,
