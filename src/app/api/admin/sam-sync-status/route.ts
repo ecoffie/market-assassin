@@ -238,7 +238,6 @@ export async function GET(request: NextRequest) {
     <p><a href="/api/cron/sync-sam-opportunities?type=delta&password=${password}">Trigger Delta Sync</a></p>
     <p><a href="/api/cron/sync-sam-opportunities?type=full&password=${password}">Trigger Full Sync</a></p>
     <p><a href="/api/cron/sam-sync-watchdog?password=${password}">Run Watchdog Check</a></p>
-    <p><a href="/api/admin/apply-sam-pipeline-migration?password=${password}">Apply Database Migration</a></p>
   </div>
 
   <div class="refresh">

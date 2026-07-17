@@ -129,7 +129,7 @@ export async function POST(request: NextRequest) {
   if (!hasTreatmentType && mode !== 'preview') {
     return NextResponse.json({
       error: 'Migration required',
-      message: 'Run POST /api/admin/apply-treatment-type-migration?password=xxx first',
+      message: 'The treatment_type column is missing — add it via a migration (npm run migrate -- --go) first',
     }, { status: 400 });
   }
 
