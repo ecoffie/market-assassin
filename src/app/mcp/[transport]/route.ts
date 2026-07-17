@@ -43,13 +43,9 @@ export const maxDuration = 60;
 // Below this balance, the in-chat footer escalates from an FYI to a top-up nudge.
 const LOW_BALANCE_THRESHOLD = 20;
 
-/** snake_case tool name → "Title Case" for Claude Desktop's permission list. */
-function prettifyToolName(name: string): string {
-  return name
-    .replace(/[_-]+/g, ' ')
-    .replace(/\b\w/g, (c) => c.toUpperCase())
-    .trim();
-}
+// (prettifyToolName removed 2026-07-17 — titles now come curated from TOOL_META in
+// tool-schemas.ts. A mechanical underscore split can't produce "Get Pricing Intel
+// (GSA CALC)", and leaving it here would imply titles are still generated.)
 
 /**
  * The "credits remaining" line shown IN THE CHAT after a tool call (Higgsfield-style).
@@ -78,11 +74,14 @@ const baseHandler = createMcpHandler(
       server.registerTool(
         tool.name,
         {
-          title: prettifyToolName(tool.name),
+          // Curated title from TOOL_META, not prettifyToolName's mechanical
+          // underscore split — "Get Pricing Intel (GSA CALC)" beats "Get Pricing Intel".
+          title: tool.title,
           description: tool.description,
           inputSchema: tool.inputSchema,
-          // annotations → Claude Desktop groups these under "Read-only tools —
-          // Always allow" instead of one flat "Other tools" pile (see tool-schemas.ts).
+          // Per-tool annotations (see tool-schemas.ts). NOT a blanket read-only:
+          // add_contacts_to_crm writes to the user's CRM and must declare
+          // destructiveHint so Claude prompts before running it.
           annotations: tool.annotations,
         },
         async (args: Record<string, unknown>, extra) => {
