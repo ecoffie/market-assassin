@@ -20,7 +20,7 @@ import { deriveSubAgency } from '@/lib/gov-contacts/derive-subagency';
 import { loadDodaacNames, dodaacCodesForAgency } from '@/lib/gov-contacts/dodaac-directory';
 import { getEnhancedAgencyInfo } from '@/lib/utils/command-info';
 import { isValidDodaac } from '@/lib/gov-contacts/agency-key';
-import { agencySearchKeywords } from '@/lib/gov-contacts/agency-search';
+import { agencySearchTargets } from '@/lib/gov-contacts/agency-search';
 
 // ── Lifted route-local classifiers (faithful copies of federal-contacts/route.ts) ──
 const FOREIGN_OFFICE_RE = /\b(yokosuka|okinawa|guam|sasebo|atsugi|japan|korea|seoul|osan|kunsan|europe|german|ramstein|kaiserslautern|italy|aviano|naples|sigonella|spain|rota|uk\b|united kingdom|england|raf\b|bahrain|qatar|kuwait|djibouti|far east|pacific command|africa command|european command|central command|overseas|apo\b|fpo\b)\b/i;
@@ -314,7 +314,9 @@ export async function queryFederalContacts(input: ContactRosterInput): Promise<C
         `department_ind_agency.ilike.%${safe}%`,
         `sub_tier.ilike.%${safe}%`,
       ];
-      for (const kw of agencySearchKeywords(safe)) parts.push(`department_ind_agency.ilike.%${kw}%`);
+      const targets = agencySearchTargets(safe);
+      for (const kw of targets.dept) parts.push(`department_ind_agency.ilike.%${kw}%`);
+      for (const kw of targets.subTier) parts.push(`sub_tier.ilike.%${kw}%`);
       q = q.or(parts.join(','));
     }
     if (validDodaac) {

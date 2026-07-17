@@ -18,7 +18,7 @@ import { deriveSubAgency } from '@/lib/gov-contacts/derive-subagency';
 import { decodeDodaac } from '@/lib/gov-contacts/dodaac';
 import { normalizeOfficeName } from '@/lib/gov-contacts/office-name';
 import { loadDodaacNames, dodaacCodesForAgency } from '@/lib/gov-contacts/dodaac-directory';
-import { agencySearchKeywords } from '@/lib/gov-contacts/agency-search';
+import { agencySearchTargets } from '@/lib/gov-contacts/agency-search';
 import { getEnhancedAgencyInfo } from '@/lib/utils/command-info';
 
 export const dynamic = 'force-dynamic';
@@ -419,9 +419,12 @@ export async function GET(request: NextRequest) {
     // Acronym/sub-agency resolution: "usda" / "forest service" / "usfs" →
     // department_ind_agency ILIKE %Agriculture% (federal_contacts keys civilian
     // POCs by PARENT department, so the acronym never matched the raw text).
-    for (const kw of agencySearchKeywords(safe)) {
-      parts.push(`department_ind_agency.ilike.%${kw}%`);
-    }
+    // dept AND sub_tier targets. A sub_tier hit (DLA/DHA/DISA) returns dept:[] on
+    // purpose — "dla" used to alias to "Department of Defense" -> keyword "Defense"
+    // -> ALL 56,521 DoD contacts (Air Force/Navy/Army rows for a DLA search).
+    const targets = agencySearchTargets(safe);
+    for (const kw of targets.dept) parts.push(`department_ind_agency.ilike.%${kw}%`);
+    for (const kw of targets.subTier) parts.push(`sub_tier.ilike.%${kw}%`);
     q = q.or(parts.join(','));
   }
   // DoDAAC ANCHORING (the factual fix): DoD POCs in federal_contacts are ALL
@@ -611,7 +614,9 @@ export async function GET(request: NextRequest) {
         `department_ind_agency.ilike.%${safe}%`,
         `sub_tier.ilike.%${safe}%`,
       ];
-      for (const kw of agencySearchKeywords(safe)) eqParts.push(`department_ind_agency.ilike.%${kw}%`);
+      const t2 = agencySearchTargets(safe);
+      for (const kw of t2.dept) eqParts.push(`department_ind_agency.ilike.%${kw}%`);
+      for (const kw of t2.subTier) eqParts.push(`sub_tier.ilike.%${kw}%`);
       eq = eq.or(eqParts.join(','));
     }
     // Mirror the main query's filters so the emailable count matches the result
