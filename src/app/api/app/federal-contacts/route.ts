@@ -629,7 +629,14 @@ export async function GET(request: NextRequest) {
   // `contacts` IS the whole truth → report THAT as the total (no misleading
   // "showing 5 of ~39"). Only when there's genuinely more than one page do we
   // fall back to the raw approximate count + the "narrow" hint.
-  const fetchedAll = (count ?? 0) <= fetchLimit;
+  //
+  // count === null means PostgREST gave us no count -- UNKNOWN, not zero. The old
+  // `(count ?? 0) <= fetchLimit` read that as 0 <= fetchLimit → TRUE, i.e. "we
+  // fetched everything", and then reported a partial page as the complete truth:
+  // "5 people" when there could be 500. Unknown must fall back to the approximate
+  // count + narrow hint, which is the honest answer. Same bug class as the
+  // reset-script silent zero (#307): never let "I don't know" render as a number.
+  const fetchedAll = count !== null && count <= fetchLimit;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   if (fetchedAll) emailableTotal = (contacts as any[]).filter((c) => c.contact_email).length;
 
