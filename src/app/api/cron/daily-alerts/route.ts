@@ -83,16 +83,60 @@ async function fetchAllPaged<T = any>(
 }
 
 // Map business type to SAM.gov set-aside code
-const businessTypeToSetAside: Record<string, string> = {
-  'SDVOSB': 'SDVOSBC',
-  'VOSB': 'VSB',
-  '8a': '8A',
-  '8(a)': '8A',
-  'WOSB': 'WOSB',
-  'EDWOSB': 'EDWOSB',
-  'HUBZone': 'HZC',
-  'SBA': 'SBA',
-  'Small Business': 'SBP',
+// What a business type makes you ELIGIBLE for — a SET, not one code.
+//
+// Two bugs lived in the old one-code map, and together they zeroed out real users:
+//
+//   1. 'Small Business' -> 'SBP' was simply the WRONG CODE. In SAM.gov
+//      SBA = Total Small Business Set-Aside (289 active in a 1,000-row sample)
+//      SBP = *PARTIAL* Small Business Set-Aside — vanishingly rare (36 active
+//      cache-wide). Every 'Small Business' user was filtered to a code that
+//      barely exists. 257 alert-enabled users carry that business_type.
+//   2. A certification is ADDITIVE. Holding SDVOSB status doesn't stop you
+//      bidding a Total Small Business set-aside — every one of these firms is a
+//      small business first. The old map replaced the base eligibility with the
+//      certification instead of adding to it.
+//
+// UNRESTRICTED work (null / 'NONE' set_aside_code) is handled in the query itself
+// (fetchSamOpportunitiesFromCache) — everyone can bid it, so it is always OR'd in.
+const SMALL_BUSINESS_SET_ASIDES = ['SBA', 'SBP'];
+
+/**
+ * business_type is free-ish text collected across several onboarding versions, so the
+ * SAME certification arrives spelled several ways: 'Small Business' (73 users) AND
+ * 'small-business' (41), 'WOSB' (23) AND 'women-owned' (10). An unrecognized key used
+ * to fall through to `set_aside_code.eq.small-business` — a code that matches NOTHING,
+ * zeroing those users out. Normalize before lookup: lowercase, strip non-alphanumerics.
+ */
+function normalizeBusinessType(t: string): string {
+  return t.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+const businessTypeToSetAsides: Record<string, string[]> = {
+  'SDVOSB': [...SMALL_BUSINESS_SET_ASIDES, 'SDVOSBC'],
+  'VOSB': [...SMALL_BUSINESS_SET_ASIDES, 'VSB'],
+  '8a': [...SMALL_BUSINESS_SET_ASIDES, '8A'],
+  '8(a)': [...SMALL_BUSINESS_SET_ASIDES, '8A'],
+  'WOSB': [...SMALL_BUSINESS_SET_ASIDES, 'WOSB'],
+  'EDWOSB': [...SMALL_BUSINESS_SET_ASIDES, 'EDWOSB'],
+  'HUBZone': [...SMALL_BUSINESS_SET_ASIDES, 'HZC'],
+  'SBA': SMALL_BUSINESS_SET_ASIDES,
+  'Small Business': SMALL_BUSINESS_SET_ASIDES,
+};
+
+/** Same map, keyed by normalized form — so every spelling of a cert resolves. */
+const NORMALIZED_SET_ASIDES: Record<string, string[]> = {
+  ...Object.fromEntries(
+    Object.entries(businessTypeToSetAsides).map(([k, v]) => [normalizeBusinessType(k), v]),
+  ),
+  // Spellings seen in real rows that don't normalize onto a canonical key above.
+  womenowned: [...SMALL_BUSINESS_SET_ASIDES, 'WOSB'],
+  womenownedsmallbusiness: [...SMALL_BUSINESS_SET_ASIDES, 'WOSB'],
+  veteranowned: [...SMALL_BUSINESS_SET_ASIDES, 'VSB'],
+  servicedisabledveteranowned: [...SMALL_BUSINESS_SET_ASIDES, 'SDVOSBC'],
+  hubzone: [...SMALL_BUSINESS_SET_ASIDES, 'HZC'],
+  smallbusiness: SMALL_BUSINESS_SET_ASIDES,
+  smalldisadvantagedbusiness: [...SMALL_BUSINESS_SET_ASIDES, '8A'],
 };
 
 // Timezone hour offsets (UTC offset for delivery at ~6 AM local)
@@ -631,8 +675,15 @@ async function runDailyAlertJob(options?: {
         const recentlySentIds = await getRecentlySentOpportunityIds(user.user_email);
 
         // Build search params
+        // An unrecognized business_type falls back to itself (a raw code the user
+        // may have entered) rather than to nothing — but unrestricted work is OR'd
+        // in by the query regardless, so a bad value can no longer zero a user out.
         const setAsides = user.business_type
-          ? [businessTypeToSetAside[user.business_type] || user.business_type]
+          ? NORMALIZED_SET_ASIDES[normalizeBusinessType(user.business_type)] ||
+            // Unknown value: treat it as a raw SAM code the user typed. Unrestricted
+            // work is OR'd in by the query regardless, so an unknown value can no
+            // longer zero anyone out — it just adds nothing.
+            [user.business_type]
           : [];
 
         // Get states to search (multi-state or single state with expansion)
