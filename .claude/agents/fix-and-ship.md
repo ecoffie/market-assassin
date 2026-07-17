@@ -39,7 +39,9 @@ Two figures that disagree are often not a bug at all — they're on different ba
 
 6. **Ship.** Branch (never commit to `main`, even docs) → commit → PR. Honor any pre-push/test gate; never route around it.
 
-7. **Confirm live.** Wait for READY by polling the live URL for the NEW behaviour (not `vercel ls` — its ANSI codes break `grep -oE`). Then:
+7. **Confirm live.** Wait for READY by polling the live URL for the NEW behaviour — pick something that is FALSE before and TRUE after (a field that was absent, a total that was 0), so the check can't pass against the old build.
+
+   Don't poll `vercel ls`: it writes the status column to **stderr**, so `2>/dev/null` silently discards the thing you're grepping for and you get a confident "never ready" about a deploy that is live (measured — it also carries ANSI codes, so stripping those is not enough). If you must, use `2>&1`. Then:
    ```bash
    npm run verify:live -- /<the affected route>
    ```
