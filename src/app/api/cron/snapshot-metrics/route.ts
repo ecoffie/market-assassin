@@ -158,6 +158,37 @@ export async function GET(request: NextRequest) {
       metrics.setup_emails_sent = count ?? 0;
     }
 
+    // --- the moat: the recompete change log ---
+    // USASpending has no "as of" query — the nightly sync UPSERTS, so yesterday's value
+    // is gone the moment it changes, upstream keeps no copy, and nothing can backfill it
+    // at any price. `recompete_changes` is therefore the one asset here that money cannot
+    // buy, only time. Capturing its SIZE and its DAILY RATE is what turns "trust us, it's
+    // accruing" into a chart — and it means the number is never hand-typed into a strategy
+    // doc, where it would go stale the next morning.
+    //
+    // This also makes a stalled recorder VISIBLE. An empty log because nothing drifted and
+    // an empty log because the cron died look identical, and the second one costs history
+    // that cannot be recovered. A flat `_total` across days is the alarm.
+    //
+    // Same discipline as setup_emails_sent above: throw on error, never coalesce an
+    // unknown to 0. A fabricated zero here would quietly assert "the moat stopped growing".
+    {
+      const { count, error } = await sbCount()
+        .from('recompete_changes')
+        .select('id', { count: 'exact', head: true });
+      if (error) throw new Error(`snapshot-metrics: recompete_changes_total count failed: ${error.message}`);
+      metrics.recompete_changes_total = count ?? 0;
+    }
+    {
+      const { count, error } = await sbCount()
+        .from('recompete_changes')
+        .select('id', { count: 'exact', head: true })
+        .gte('observed_at', dayStart)
+        .lte('observed_at', dayEnd);
+      if (error) throw new Error(`snapshot-metrics: recompete_changes_new count failed: ${error.message}`);
+      metrics.recompete_changes_new = count ?? 0;
+    }
+
     // --- upsert one row per metric for the day ---
     const rows = Object.entries(metrics).map(([metric_key, value]) => ({
       snapshot_date: today,
