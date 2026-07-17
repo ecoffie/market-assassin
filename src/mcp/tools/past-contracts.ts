@@ -30,6 +30,15 @@ export interface PastContractsToolInput {
 export interface PastContractsToolResult {
   queried: Record<string, string | number | boolean>;
   awards: AwardRow[];
+  /**
+   * What `awardAmount` IS. Measured 2026-07-17: an unlabelled number invites
+   * "your data is wrong" — and here it invites a wrong ACCOUNTING figure.
+   */
+  basis: {
+    award_amount: string;
+    date_filter: string;
+    do_not: string;
+  };
   _ai_hint?: { summary: string; how_to_use: string; key_caveats: string[] };
   _meta: {
     grounded: boolean;
@@ -77,6 +86,14 @@ export async function searchPastContracts(input: PastContractsToolInput): Promis
   const result: PastContractsToolResult = {
     queried,
     awards: res.awards,
+    basis: {
+      award_amount:
+        "The award's LIFETIME total to date — a stock, not an annual figure. NOT scoped to date_from/date_to.",
+      date_filter:
+        'date_from/date_to select WHICH awards return (by transaction activity); they do NOT scope awardAmount. An award can be returned for a year it was not performing.',
+      do_not:
+        'Do NOT sum awardAmount to derive annual revenue or a fiscal-year share — the same lifetime total comes back in every window, so it double-counts. Use get_recipient_annual_obligations for per-year flows.',
+    },
     _meta: {
       grounded,
       degraded: res.degraded,
@@ -103,7 +120,8 @@ export async function searchPastContracts(input: PastContractsToolInput): Promis
       key_caveats: [
         'Place-of-performance state is well-populated on awards, but a firm can perform in a state it is not HQ’d in — state_scope controls which side you match.',
         'These are AWARDED contracts (past), not open solicitations. For open opportunities use search_sam_opportunities.',
-        'awardAmount is the award’s current amount; multi-year ceilings live in get_award_detail.',
+        'awardAmount is the award’s LIFETIME total — NOT annual, and NOT scoped by date_from/date_to. The identical amount comes back in every window (measured), so summing these for a yearly figure double-counts. For per-fiscal-year flows use get_recipient_annual_obligations.',
+        'date_from/date_to select which awards return, by transaction activity — an award whose period of performance already ENDED can still appear in a later window.',
       ],
     };
   }

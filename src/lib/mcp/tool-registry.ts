@@ -36,6 +36,7 @@ import { expiringContracts } from '@/mcp/tools/expiring-contracts';
 import { getKeywordCoverage } from '@/mcp/tools/keyword-coverage';
 import { idvContracts } from '@/mcp/tools/idv-contracts';
 import { searchPastContracts } from '@/mcp/tools/past-contracts';
+import { getAnnualObligations } from '@/mcp/tools/annual-obligations';
 import { generateMarketReport } from '@/mcp/tools/market-report';
 import { addContactsToCrm } from '@/mcp/tools/crm-contacts';
 import type { CrmContactInput } from '@/lib/ghl/contacts';
@@ -100,6 +101,7 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   get_keyword_coverage: 1, // USASpending spending-by-category (free upstream, cacheable)
   search_idv_contracts: 2, // live USASpending IDV/task-order search
   search_past_contracts: 2, // live USASpending awarded-contract search by location
+  get_recipient_annual_obligations: 2, // 2 live USASpending calls (parent resolve + spending_over_time)
   generate_market_report: 20, // one-shot composite: coverage+agencies+contractors+recompetes+forecasts+set-aside → client-ready report
   add_contacts_to_crm: 2, // batch upsert contacts into the user's OWN connected GHL location
   get_contractor_award_history: 2, // USASpending cache + contractor DB
@@ -526,6 +528,37 @@ const IDV_CONTRACTS_TOOL_DEF = {
         limit: { type: 'number', description: 'Max results per page (default 25).' },
         page: { type: 'number', description: '1-based page number.' },
       },
+    },
+  },
+};
+
+const ANNUAL_OBLIGATIONS_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'get_recipient_annual_obligations',
+    description:
+      "A company's federal prime-contract obligations PER FISCAL YEAR (Oct 1 - Sep 30) - for revenue-share, " +
+      'segment-reporting (ASC 280) and customer-concentration work. Returns one row per FY with the dollars ' +
+      'obligated INSIDE that year: a FLOW you can compare year over year. Rolled up to the PARENT using ' +
+      "USASpending's own parent/child mapping, so subsidiaries and acquisitions are included; rolled_up_to_parent " +
+      'tells you whether a parent record existed. ' +
+      "USE THIS INSTEAD OF summing search_past_contracts: that returns each award's LIFETIME total, unchanged by " +
+      'its date filter, so the same dollars come back in every window and summing double-counts (measured: one ' +
+      'award returns an identical $2.09B in both an FY2023 and an FY2024 window, and its period of performance ' +
+      'ended in 2021). Optionally scope to one NAICS or awarding agency. ' +
+      'Obligations are NOT recognized revenue - timing can lead or lag, and this is prime-only, so subcontract ' +
+      'earnings never appear. grounded=false when nothing matches: try the exact legal entity name or the UEI ' +
+      'before concluding a company has no federal work; never report $0 as fact.',
+    parameters: {
+      type: 'object' as const,
+      properties: {
+        recipient: { type: 'string', description: 'Company name or UEI. Resolved to USASpending\'s parent recipient record.' },
+        from_fy: { type: 'number', description: 'First fiscal year, inclusive. Defaults to to_fy - 2 (a 3-year series). Max 10-year span.' },
+        to_fy: { type: 'number', description: 'Last fiscal year, inclusive. Defaults to the latest COMPLETE fiscal year.' },
+        naics: { type: 'string', description: 'Optional NAICS to scope the series to one line of business.' },
+        agency: { type: 'string', description: 'Optional awarding agency (toptier name, e.g. "Department of Defense").' },
+      },
+      required: ['recipient'],
     },
   },
 };
@@ -1276,6 +1309,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     KEYWORD_COVERAGE_TOOL_DEF,
     IDV_CONTRACTS_TOOL_DEF,
     PAST_CONTRACTS_TOOL_DEF,
+    ANNUAL_OBLIGATIONS_TOOL_DEF,
     MARKET_REPORT_TOOL_DEF,
     CRM_CONTACTS_TOOL_DEF,
     CONTRACTOR_AWARD_HISTORY_TOOL_DEF,
@@ -1329,6 +1363,7 @@ export function isMcpTool(name: string): boolean {
     name === 'get_keyword_coverage' ||
     name === 'search_idv_contracts' ||
     name === 'search_past_contracts' ||
+    name === 'get_recipient_annual_obligations' ||
     name === 'generate_market_report' ||
     name === 'add_contacts_to_crm' ||
     name === 'get_contractor_award_history' ||
@@ -1564,6 +1599,17 @@ export async function runMcpTool(
       search_type: args.search_type === 'idv' || args.search_type === 'task' ? args.search_type : undefined,
       limit: typeof args.limit === 'number' ? args.limit : undefined,
       page: typeof args.page === 'number' ? args.page : undefined,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'get_recipient_annual_obligations') {
+    const result = (await getAnnualObligations({
+      recipient: typeof args.recipient === 'string' ? args.recipient : '',
+      from_fy: typeof args.from_fy === 'number' ? args.from_fy : undefined,
+      to_fy: typeof args.to_fy === 'number' ? args.to_fy : undefined,
+      naics: typeof args.naics === 'string' ? args.naics : undefined,
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
   }

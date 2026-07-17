@@ -35,6 +35,7 @@ import { expiringContracts } from './tools/expiring-contracts';
 import { getKeywordCoverage } from './tools/keyword-coverage';
 import { idvContracts } from './tools/idv-contracts';
 import { searchPastContracts } from './tools/past-contracts';
+import { getAnnualObligations as annualObligations } from './tools/annual-obligations';
 import { generateMarketReport } from './tools/market-report';
 import { addContactsToCrm } from './tools/crm-contacts';
 import { contractorAwardHistory } from './tools/contractor-award-history';
@@ -535,6 +536,31 @@ server.registerTool(
   },
   async ({ naics, psc, agency, state, state_scope, min_value, date_from, date_to, search_type, limit, page }) => {
     const result = await idvContracts({ naics, psc, agency, state, state_scope, min_value, date_from, date_to, search_type, limit, page });
+    return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
+  },
+);
+
+server.registerTool(
+  'get_recipient_annual_obligations',
+  {
+    title: 'Recipient Annual Obligations by Fiscal Year',
+    description:
+      "A company's federal prime-contract obligations PER FISCAL YEAR (Oct 1 - Sep 30) - a FLOW you can compare " +
+      'year over year and set against a segment disclosure. Rolled up to the PARENT (subsidiaries + acquisitions ' +
+      "included). USE THIS INSTEAD OF summing search_past_contracts: that returns each award's LIFETIME total, " +
+      'unchanged by its date filter, so summing double-counts. Obligations are NOT recognized revenue, and this ' +
+      'is prime-only (subcontract earnings never appear). grounded=false when nothing matches - try the exact ' +
+      'legal name or UEI; never report $0 as fact.',
+    inputSchema: {
+      recipient: z.string().describe("Company name or UEI. Resolved to USASpending's parent recipient record."),
+      from_fy: z.number().optional().describe('First fiscal year, inclusive. Defaults to to_fy - 2. Max 10-year span.'),
+      to_fy: z.number().optional().describe('Last fiscal year, inclusive. Defaults to the latest COMPLETE fiscal year.'),
+      naics: z.string().optional().describe('Optional NAICS to scope the series to one line of business.'),
+      agency: z.string().optional().describe('Optional awarding agency (toptier name).'),
+    },
+  },
+  async ({ recipient, from_fy, to_fy, naics, agency }) => {
+    const result = await annualObligations({ recipient, from_fy, to_fy, naics, agency });
     return { content: [{ type: 'text', text: JSON.stringify(result, null, 2) }], structuredContent: result as unknown as Record<string, unknown> };
   },
 );
