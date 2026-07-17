@@ -8,7 +8,7 @@
  * src/lib/gov-contacts/event-office.ts) so the Target List Event Radar can scope
  * events to the actual command. Batched + resumable: processes the next chunk of
  * untagged rows per run, returns `remaining`, and the dispatcher re-fires until
- * drained. Requires /api/admin/apply-event-office-columns to have run first.
+ * drained. Requires the event-office columns migration to have run first (npm run migrate).
  *
  * "Attempted" is marked by setting solicitation_number (the looked-up value, or
  * '' when the notice has none) so civilian / no-DoDAAC rows aren't reprocessed.
