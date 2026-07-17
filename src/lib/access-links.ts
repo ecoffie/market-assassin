@@ -1,6 +1,6 @@
 import { kv } from '@vercel/kv';
-import nodemailer from 'nodemailer';
 import { hasBriefingsAccess } from '@/lib/briefings/access';
+import { sendEmail } from '@/lib/send-email';
 
 export type AccessDestination = 'briefings' | 'preferences';
 
@@ -30,18 +30,6 @@ function buildFallbackUrl(email: string, destination: AccessDestination): string
   }
 
   return `${baseUrl}/app?email=${encodeURIComponent(normalizedEmail)}`;
-}
-
-function getTransporter() {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.office365.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: false,
-    auth: {
-      user: process.env.SMTP_USER || 'alerts@govcongiants.com',
-      pass: process.env.SMTP_PASSWORD,
-    },
-  });
 }
 
 export async function validateAccessRequest(email: string, destination: AccessDestination): Promise<{ ok: boolean; error?: string }> {
@@ -103,10 +91,22 @@ export async function sendAccessLinkEmail(email: string, destination: AccessDest
   const destinationLabel = destination === 'briefings' ? 'Market Intelligence' : 'Email Preferences';
   const actionLabel = destination === 'briefings' ? 'Open Market Intelligence' : 'Manage Preferences';
 
-  await getTransporter().sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@getmindy.ai'}>`,
+  // Routed through the shared sendEmail() (was a route-local Office365 nodemailer
+  // transport sending as SMTP_USER). Three things that bypass bought us:
+  //   1. the getmindy.ai migration — no `from` here, so it inherits
+  //      `Mindy <${EMAIL_FROM}>`, the domain Resend is verified for;
+  //   2. VISIBILITY — a raw transport writes NO email_provider_sends row, so this
+  //      sender was invisible to the exact provider query that caught daily-alerts.
+  //      A send you cannot see is a send you cannot debug;
+  //   3. the #58 send guard + suppression list, which a raw transport skips entirely.
+  // `transactional: true` — a one-time secure access link the user just asked for must
+  // never be dropped by the marketing daily cap.
+  await sendEmail({
     to: normalizeEmail(email),
-    subject: `${destinationLabel} secure access link | GovCon Giants`,
+    subject: `${destinationLabel} secure access link`,
+    emailType: 'access_link',
+    eventSource: 'access_link',
+    transactional: true,
     html: `
       <div style="font-family: Arial, sans-serif; max-width: 600px; margin: 0 auto; padding: 24px; color: #0f172a;">
         <div style="background: linear-gradient(135deg, #1e293b, #0f172a); border-radius: 16px; padding: 28px; color: white;">
