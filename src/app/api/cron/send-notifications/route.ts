@@ -11,6 +11,7 @@
  */
 
 import { NextRequest, NextResponse } from 'next/server';
+import { eligibleSetAsides } from '@/lib/market/set-aside-eligibility';
 import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunities, scoreOpportunity, SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
 import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
@@ -84,17 +85,6 @@ function getTransporter() {
 const FALLBACK_NAICS = ['541512', '541611', '541330', '541990', '561210'];
 
 // Business type to SAM.gov set-aside mapping
-const businessTypeToSetAside: Record<string, string> = {
-  'SDVOSB': 'SDVOSBC',
-  'VOSB': 'VSB',
-  '8a': '8A',
-  '8(a)': '8A',
-  'WOSB': 'WOSB',
-  'EDWOSB': 'EDWOSB',
-  'HUBZone': 'HZC',
-  'SBA': 'SBA',
-  'Small Business': 'SBP',
-};
 
 interface NotificationUser {
   user_email: string;
@@ -130,9 +120,8 @@ async function fetchDataForUser(
   // industry-group widening, not a full 3-digit-family blow-out that re-adds noise.
   const expandedNaics = expandNAICSCodes(userNaics, false);
   const userKeywords = user.keywords || [];
-  const setAsides = user.business_type
-    ? [businessTypeToSetAside[user.business_type] || user.business_type]
-    : [];
+  // Canonical eligibility (src/lib/market/set-aside-eligibility.ts).
+  const setAsides = eligibleSetAsides(user.business_type);
 
   // Smart state expansion: automatically include border states for better coverage
   // 'borders' = selected state + all adjacent states + DC

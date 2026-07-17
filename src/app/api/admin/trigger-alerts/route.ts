@@ -51,10 +51,6 @@ const PRO_TIER_PRODUCTS = [
 ];
 
 // Business type to SAM set-aside mapping
-const businessTypeToSetAside: Record<string, string> = {
-  'SDVOSB': 'SDVOSBC', 'VOSB': 'VSB', '8a': '8A', '8(a)': '8A',
-  'WOSB': 'WOSB', 'EDWOSB': 'EDWOSB', 'HUBZone': 'HZC', 'SBA': 'SBA', 'Small Business': 'SBP',
-};
 
 interface AlertUser {
   user_email: string;

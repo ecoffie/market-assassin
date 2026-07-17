@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { eligibleSetAsides } from '@/lib/market/set-aside-eligibility';
 import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunitiesFromCache, scoreOpportunity, SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
 import { createSecureAccessUrl } from '@/lib/access-links';
@@ -28,17 +29,6 @@ function getSupabase() {
 }
 
 // Map business type to SAM.gov set-aside code
-const businessTypeToSetAside: Record<string, string> = {
-  'SDVOSB': 'SDVOSBC',
-  'VOSB': 'VSB',
-  '8a': '8A',
-  '8(a)': '8A',
-  'WOSB': 'WOSB',
-  'EDWOSB': 'EDWOSB',
-  'HUBZone': 'HZC',
-  'SBA': 'SBA',
-  'Small Business': 'SBP',
-};
 
 // Alert tier limits
 const ALERT_LIMITS = {
@@ -336,9 +326,11 @@ async function runWeeklyAlertJob(options: WeeklyAlertJobOptions = {}): Promise<N
         }
 
         // Build search params from user profile
-        const setAsides = user.business_type
-          ? [businessTypeToSetAside[user.business_type] || user.business_type]
-          : [];
+        // Canonical eligibility (src/lib/market/set-aside-eligibility.ts). Was
+        // 'Small Business' -> 'SBP' (PARTIAL small business, 36 active cache-wide)
+        // and non-additive, which zeroed real users out. Unrestricted work is OR'd
+        // in by fetchSamOpportunitiesFromCache.
+        const setAsides = eligibleSetAsides(user.business_type);
 
         // Fetch opportunities from the local SAM cache. The cache is synced by cron
         // and avoids per-user SAM.gov API calls in the weekly send hot path.
