@@ -236,6 +236,28 @@ async function cmdStatus(client: Client) {
   console.log(`  the schema is complete — anything missed before baseline stays missed.\n`);
 }
 
+/**
+ * Files to EXCLUDE from baseline: `--except a.sql,b.sql` (repeatable).
+ *
+ * This exists because baseline's core assumption -- "everything on disk already
+ * ran" -- turned out to be FALSE here. Ten migrations were authored, committed,
+ * and never applied, leaving 16 tables missing that live code still queries.
+ * Baselining those would have marked them applied forever and made three months
+ * of schema drift permanently invisible.
+ *
+ * So the excluded files stay PENDING and `migrate` can apply them normally. The
+ * ledger ends up describing what actually happened rather than what we assumed.
+ */
+function exceptList(): string[] {
+  const out: string[] = [];
+  for (let i = 0; i < process.argv.length; i++) {
+    if (process.argv[i] === '--except' && process.argv[i + 1]) {
+      out.push(...process.argv[i + 1].split(',').map((s) => s.trim()).filter(Boolean));
+    }
+  }
+  return out;
+}
+
 async function cmdBaseline(client: Client) {
   const files = loadMigrations();
   if (await ledgerExists(client)) {
@@ -244,18 +266,36 @@ async function cmdBaseline(client: Client) {
     console.error(`  Baseline is a ONE-TIME adoption. Use 'npm run migrate:status'.\n`);
     process.exit(1);
   }
+
+  const except = exceptList();
+  // A typo in --except would silently baseline a file we meant to keep pending,
+  // which is the exact irreversible mistake this flag exists to prevent.
+  const unknown = except.filter((e) => !files.some((f) => f.version === e));
+  if (unknown.length) {
+    console.error(`\n✗ --except names ${unknown.length} file(s) not in supabase/migrations/:`);
+    for (const u of unknown) console.error(`    • ${u}`);
+    console.error(`  Refusing to baseline — fix the names and re-run.\n`);
+    process.exit(1);
+  }
+
+  const adopt = files.filter((m) => !except.includes(m.version));
+  const hold = files.filter((m) => except.includes(m.version));
+
   console.log(`\n=== baseline — adopt existing history ===`);
-  console.log(`  ${files.length} files would be marked applied WITHOUT being executed.`);
-  console.log(`  NO SQL from any migration will run. Nothing in your schema changes.\n`);
+  console.log(`  ${adopt.length} files marked applied WITHOUT being executed.`);
+  console.log(`  NO SQL from any migration will run. Nothing in your schema changes.`);
+  if (hold.length) {
+    console.log(`\n  HELD BACK (${hold.length}) — left PENDING so 'migrate' can apply them:`);
+    for (const m of hold) console.log(`    • ${m.version}`);
+  }
   if (!GO) {
-    console.log(`  Dry run. Nothing written. To adopt:\n`);
-    console.log(`      npm run migrate:baseline -- --go\n`);
+    console.log(`\n  Dry run. Nothing written. To adopt, add --go\n`);
     return;
   }
   await ensureLedger(client);
   await client.query('BEGIN');
   try {
-    for (const m of files) {
+    for (const m of adopt) {
       await client.query(
         `INSERT INTO schema_migrations (version, checksum, baselined) VALUES ($1, $2, TRUE)
          ON CONFLICT (version) DO NOTHING`,
@@ -267,8 +307,9 @@ async function cmdBaseline(client: Client) {
     await client.query('ROLLBACK');
     throw e;
   }
-  console.log(`  ✓ Adopted ${files.length} migrations as history. Zero SQL executed.`);
-  console.log(`  From here, 'npm run migrate' runs only NEW files.\n`);
+  console.log(`\n  ✓ Adopted ${adopt.length} migrations as history. Zero SQL executed.`);
+  if (hold.length) console.log(`  ${hold.length} left pending — run 'npm run migrate' to review them.`);
+  console.log();
 }
 
 async function cmdApply(client: Client, pooled: boolean) {
