@@ -71,23 +71,23 @@ function ymd(d: Date): string {
 }
 
 async function distinctSentCount(client: ReturnType<typeof getAdminClient>, alertType: AlertType, date: string): Promise<number> {
-  // We can't use SELECT DISTINCT through PostgREST cleanly, so pull
-  // user_email and de-dupe in JS. At 1000s of rows/day this is fine.
-  const { data, error } = await client
+  // alert_log has a UNIQUE (user_email, alert_date, alert_type) constraint, so for a
+  // given type+date there is at most one row per user → count(*) == distinct users.
+  // Use a HEAD count so PostgREST returns the EXACT total (via Content-Range) instead
+  // of its default 1000-row page cap. The old fetch-and-dedupe silently undercounted a
+  // busy day (daily ~1468 read as 1000) and could hide a partial drop (1500→1050 both
+  // capping at 1000 = "100%").
+  const { count, error } = await client
     .from('alert_log')
-    .select('user_email')
+    .select('*', { count: 'exact', head: true })
     .eq('alert_type', alertType)
     .eq('alert_date', date)
     .eq('delivery_status', 'sent');
   if (error) {
-    console.error(`[throughput-check] read failed (${alertType} ${date}):`, error.message);
+    console.error(`[throughput-check] count failed (${alertType} ${date}):`, error.message);
     return 0;
   }
-  const set = new Set<string>();
-  for (const r of data || []) {
-    if (r.user_email) set.add(r.user_email);
-  }
-  return set.size;
+  return count ?? 0;
 }
 
 // Sum of distinct-per-day sends over the `days`-long window ending `startOffset` days
