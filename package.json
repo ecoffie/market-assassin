@@ -43,7 +43,8 @@
     "demo:reset": "npx tsx scripts/demo-reset.ts",
     "migrate": "npx tsx scripts/migrate.ts",
     "migrate:status": "npx tsx scripts/migrate.ts status",
-    "migrate:baseline": "npx tsx scripts/migrate.ts baseline"
+    "migrate:baseline": "npx tsx scripts/migrate.ts baseline",
+    "check:zero-alerts": "node scripts/check-zero-alert-drop.mjs"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
