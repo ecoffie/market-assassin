@@ -80,6 +80,13 @@ const SUBAGENCY_PARENT: Array<{ re: RegExp; parent: string }> = [
   { re: /centers for medicare|\bcms\b|\bnih\b|national institutes|\bfda\b|food (and|&) drug|\bcdc\b|disease control|indian health|\bihs\b|health (and|&) human/i, parent: 'HEALTH AND HUMAN' },
   { re: /federal aviation|\bfaa\b|federal highway|\bfhwa\b|federal transit|maritime administration|transportation/i, parent: 'TRANSPORTATION' },
   { re: /internal revenue|\birs\b|\bmint\b|engraving (and|&) printing|comptroller|treasury/i, parent: 'TREASURY' },
+  // Standalone agencies. Measured 2026-07-17: without these, 'GSA' and 'NASA' fell
+  // through to the filler-strip fallback and searched ILIKE %GSA% / %NASA% — matching
+  // only rows literally containing those letters. 18 contacts each, vs 1,094 (GSA) and
+  // 981 (NASA) under their real names. A 61x and 55x miss that never errored.
+  // (DLA needs no entry — it is already caught by the DEFENSE row above.)
+  { re: /\bgsa\b|general services/i, parent: 'GENERAL SERVICES' },
+  { re: /\bnasa\b|aeronautics|space administration/i, parent: 'AERONAUTICS' },
 ];
 function subAgencyToParent(name: string): string | null {
   for (const m of SUBAGENCY_PARENT) if (m.re.test(name)) return m.parent;
