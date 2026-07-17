@@ -165,8 +165,12 @@ async function fetchCategory(
 
 export async function GET(request: NextRequest) {
   const url = new URL(request.url);
-  const naics = url.searchParams.get('naics')?.trim() || '';
-  const keyword = url.searchParams.get('keyword')?.trim() || '';
+  let naics = url.searchParams.get('naics')?.trim() || '';
+  let keyword = url.searchParams.get('keyword')?.trim() || '';
+  // A bare NAICS code passed as a keyword is a CODE, not a phrase — route it as
+  // NAICS so we rank by the exact industry, not a text-match on the digits (which
+  // ranks NASA #1 on "airfield structures" and collapses the leaderboard to ~$70M).
+  if (keyword && !naics && /^\d{2,6}$/.test(keyword)) { naics = keyword; keyword = ''; }
   const pscParam = url.searchParams.get('psc')?.trim().toUpperCase() || '';
   const state = (url.searchParams.get('state') || '').trim().toUpperCase();
   const excludeDOD = url.searchParams.get('excludeDOD') === 'true';

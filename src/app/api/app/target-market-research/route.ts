@@ -300,7 +300,7 @@ export async function POST(request: NextRequest) {
 
     const {
       naicsCode: rawNaicsCode,
-      keyword,
+      keyword: rawKeyword,
       profileKeywords: rawProfileKeywords,
       businessType = '',
       veteranStatus = '',
@@ -326,6 +326,16 @@ export async function POST(request: NextRequest) {
     if (!email) {
       return NextResponse.json({ error: 'email is required' }, { status: 400 });
     }
+    // A bare NAICS code sent as a keyword is a CODE, not a phrase — route it as
+    // NAICS so we rank by the exact industry, not a text-match on the digits (which
+    // derives nonsense keywords and ranks the wrong agencies). Defense for any
+    // caller (MCP, deep-link, direct) that passes keyword="236220".
+    let keyword = rawKeyword;
+    let rawNaicsForMap = rawNaicsCode;
+    if (keyword && keyword.trim() && !(rawNaicsCode && rawNaicsCode.trim()) && /^\d{2,6}$/.test(keyword.trim())) {
+      rawNaicsForMap = keyword.trim();
+      keyword = undefined;
+    }
     const wantRefresh = Boolean((body as { refresh?: boolean }).refresh);
 
     // DEFAULT THE SET-ASIDE TO SMALL BUSINESS (Eric, Jun 23, 2026). With no
@@ -342,7 +352,7 @@ export async function POST(request: NextRequest) {
     // over-broad AND incomplete). When a keyword is given (and no explicit NAICS),
     // auto-derive the NAICS set that covers ~90% of that keyword's real market —
     // the user never manages codes. We attach coverage stats for the UI.
-    let naicsCode = rawNaicsCode;
+    let naicsCode = rawNaicsForMap;
     let coverage: Awaited<ReturnType<typeof keywordCoverage>> | null = null;
     if (keyword && keyword.trim()) {
       // Always compute coverage when a keyword is present — it powers the LESSON
