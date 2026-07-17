@@ -35,24 +35,38 @@
 import { readFileSync, readdirSync, statSync, existsSync, writeFileSync } from 'fs';
 import { join } from 'path';
 
-const SCAN_ROOTS = ['src'];
+// `scripts` added 2026-07-16: this audit was blind to admin/, cron/ AND scripts/ —
+// which is precisely where the unattended, destructive code lives, and precisely
+// where every scar came from:
+//   - scripts/reset-mindy-user-activity.ts deleted nothing for 5 phantom tables and
+//     reported a clean "0 rows" for months (#307).
+//   - src/app/api/cron/snapshot-metrics recorded a fabricated 0 for NINE DAYS
+//     (07-07 → 07-15, 190 emails erased) — a swallowed 400 + `count ?? 0`.
+// Nobody watches a cron's stdout, so a silent read there is worse than one on a page
+// a user would complain about. scripts/ was blind TWICE over: the EXCLUDE below AND
+// SCAN_ROOTS, which never walked the directory at all — so dropping the EXCLUDE alone
+// would have changed nothing.
+const SCAN_ROOTS = ['src', 'scripts'];
 const BASELINE_FILE = 'tests/fixtures/supabase-errors-baseline.json';
 
-// A path is user-facing if it's under one of these AND is not admin/cron/script.
-const USER_FACING = [
-  'src/app/api/app/',
-  'src/app/api/', // non-admin api routes (admin filtered below)
+// Paths worth auditing. NOT "user-facing" any more — a cron has no user and that is
+// the reason to audit it, not a reason to skip it.
+const AUDITED_PATHS = [
+  'src/app/api/',
   'src/lib/briefings/',
   'src/lib/proposal/',
   'src/lib/smart-profile/',
   'src/lib/rag/',
+  'scripts/',
 ];
-const EXCLUDE = /\/(admin|cron)\/|\.test\.|\.spec\.|scripts\//;
+// Tests only. Do NOT re-add admin|cron|scripts — the baseline ratchet below is what
+// keeps this honest: existing debt is accepted, anything NEW blocks.
+const EXCLUDE = /\.test\.|\.spec\./;
 
-function isUserFacing(p) {
+function isAudited(p) {
   const norm = p.replace(/\\/g, '/');
   if (EXCLUDE.test(norm)) return false;
-  return USER_FACING.some((r) => norm.includes(r));
+  return AUDITED_PATHS.some((r) => norm.includes(r));
 }
 
 function walk(dir, test, out = []) {
@@ -83,7 +97,7 @@ const findings = [];
 
 for (const root of SCAN_ROOTS) {
   for (const p of walk(root, (f) => /\.(ts|tsx)$/.test(f))) {
-    if (!isUserFacing(p)) continue;
+    if (!isAudited(p)) continue;
     const lines = readFileSync(p, 'utf8').split('\n');
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];

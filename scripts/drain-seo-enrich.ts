@@ -25,12 +25,22 @@ const CONC = arg('conc', 6);
 const MAX = arg('max', Infinity);
 const PAGE = 60;
 
-async function countRemaining(): Promise<number> {
-  const { count } = await sb
+// Returns null when the count is UNKNOWN — never a fabricated 0. `error` wasn't bound
+// at all, so a failed count became null and `count ?? 0` turned it into a confident
+// zero. Same shape that made five phantom tables read as "already reset" for months
+// (#307) and that recorded nine days of fake metrics in snapshot-metrics.
+const fmtCount = (n: number | null) => (n === null ? 'unknown' : n.toLocaleString());
+
+async function countRemaining(): Promise<number | null> {
+  const { count, error } = await sb
     .from('sam_opportunities')
     .select('*', { count: 'exact', head: true })
     .eq('active', true).is('seo_enriched_at', null).not('title', 'is', null);
-  return count ?? 0;
+  if (error) {
+    console.error(`⚠️  count failed: ${error.message} — reporting UNKNOWN, not 0`);
+    return null;
+  }
+  return count;
 }
 
 async function enrichOne(o: OppForEnrich): Promise<boolean> {
@@ -43,7 +53,8 @@ async function enrichOne(o: OppForEnrich): Promise<boolean> {
 
 async function main() {
   const start = await countRemaining();
-  console.log(`SEO enrich drain — ${Math.min(start, MAX).toLocaleString()} to process · concurrency ${CONC}`);
+  const toProcess = start === null ? 'unknown' : Math.min(start, MAX).toLocaleString();
+  console.log(`SEO enrich drain — ${toProcess} to process · concurrency ${CONC}`);
   let processed = 0, written = 0;
 
   while (processed < MAX) {
@@ -67,7 +78,7 @@ async function main() {
   }
 
   const remaining = await countRemaining();
-  console.log(`\n✅ Done. processed=${processed.toLocaleString()} · summaries=${written.toLocaleString()} · remaining=${remaining.toLocaleString()}`);
+  console.log(`\n✅ Done. processed=${processed.toLocaleString()} · summaries=${written.toLocaleString()} · remaining=${fmtCount(remaining)}`);
 }
 
 main().then(() => process.exit(0)).catch((e) => { console.error('❌', e.message || e); process.exit(1); });
