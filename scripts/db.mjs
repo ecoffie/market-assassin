@@ -74,16 +74,25 @@ if (!tbl) {
 
 const sb = createClient(url, key);
 
+// Filters MUST be applied to the count too. They weren't once, and `--count --eq
+// quality_flag=x` cheerfully reported the WHOLE table — a confidently wrong number,
+// which is worse than an error. Build the filters once, use them for both paths.
+const applyFilters = (q) => {
+  for (const f of all('eq')) { const [k, ...v] = f.split('='); q = q.eq(k, v.join('=')); }
+  for (const f of all('like')) { const [k, ...v] = f.split('='); q = q.ilike(k, v.join('=')); }
+  return q;
+};
+const filtered = all('eq').length + all('like').length > 0;
+
 if (has('count')) {
-  const { count, error } = await sb.from(tbl).select('*', { count: 'exact', head: true });
+  const { count, error } = await applyFilters(sb.from(tbl).select('*', { count: 'exact', head: true }));
   if (error) { console.error(`\x1b[31m✗\x1b[0m ${tbl}: ${error.message}`); process.exit(1); }
-  console.log(`${tbl}: \x1b[1m${(count ?? 0).toLocaleString()}\x1b[0m rows`);
+  const where = filtered ? ` matching ${[...all('eq'), ...all('like')].join(' & ')}` : '';
+  console.log(`${tbl}: \x1b[1m${(count ?? 0).toLocaleString()}\x1b[0m rows${where}`);
   process.exit(0);
 }
 
-let q = sb.from(tbl).select(flag('select', '*'));
-for (const f of all('eq')) { const [k, ...v] = f.split('='); q = q.eq(k, v.join('=')); }
-for (const f of all('like')) { const [k, ...v] = f.split('='); q = q.ilike(k, v.join('=')); }
+let q = applyFilters(sb.from(tbl).select(flag('select', '*')));
 if (flag('order')) q = q.order(flag('order'), { ascending: false });
 q = q.limit(Number(flag('limit', '5')));
 
