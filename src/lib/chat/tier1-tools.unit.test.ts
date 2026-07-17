@@ -25,6 +25,7 @@ function stubDb(rows: unknown[], captured: { table?: string; calls: Array<[strin
   const rec = (name: string, ...a: unknown[]) => { captured.calls.push([name, a[0]]); return chain; };
   chain.select = () => chain;
   chain.eq = (c: string, v: unknown) => rec(`eq:${c}`, v);
+  chain.in = (c: string, v: unknown) => rec(`in:${c}`, v);
   chain.gte = (c: string, v: unknown) => rec(`gte:${c}`, v);
   chain.ilike = (c: string, v: unknown) => rec(`ilike:${c}`, v);
   chain.textSearch = (c: string, q: unknown) => rec(`textSearch:${c}`, q);
@@ -69,7 +70,54 @@ describe('search_sam_opportunities', () => {
     const tools = makeTier1Tools(stubDb([], captured));
     await tools.execute('search_sam_opportunities', { keyword: 'it', naics: '541512', set_aside: 'WOSB' });
     expect(captured.calls).toContainEqual(['eq:naics_code', '541512']);
-    expect(captured.calls.some(([n]) => n === 'ilike:set_aside_description')).toBe(true);
+    // The CODE column, never an ILIKE over the free-text description.
+    expect(captured.calls).toContainEqual(['in:set_aside_code', ['WOSB', 'WOSBSS']]);
+    expect(captured.calls.some(([n]) => n === 'ilike:set_aside_description')).toBe(false);
+  });
+
+  // Regression: 2026-07-17. The filter was ilike('set_aside_description','%8(a)%')
+  // and the tool's own description told the model to send "8(a)". SAM writes the
+  // COMPETED notices as "8a Competed" (no parens), so that matched 66 rows and
+  // missed all 130 competed ones — returning ZERO for a state with only competed
+  // notices, with no error. Live data at the time: 66 vs 196.
+  it('"8(a)" matches BOTH competed (8A) and sole-source (8AN) — the substring never could', async () => {
+    const captured = { calls: [] as Array<[string, unknown]> };
+    const tools = makeTier1Tools(stubDb([], captured));
+    await tools.execute('search_sam_opportunities', { keyword: 'construction', set_aside: '8(a)' });
+    expect(captured.calls).toContainEqual(['in:set_aside_code', ['8A', '8AN']]);
+  });
+
+  it('accepts the human spellings and raw codes for the same program', async () => {
+    for (const term of ['8(a)', '8a', '8A']) {
+      const captured = { calls: [] as Array<[string, unknown]> };
+      const tools = makeTier1Tools(stubDb([], captured));
+      await tools.execute('search_sam_opportunities', { keyword: 'x', set_aside: term });
+      expect(captured.calls).toContainEqual(['in:set_aside_code', ['8A', '8AN']]);
+    }
+    // A raw code still resolves to exactly itself (precision when asked for).
+    const cap = { calls: [] as Array<[string, unknown]> };
+    await makeTier1Tools(stubDb([], cap)).execute('search_sam_opportunities', { keyword: 'x', set_aside: '8AN' });
+    expect(cap.calls).toContainEqual(['in:set_aside_code', ['8AN']]);
+  });
+
+  it('an unknown set-aside is an ERROR listing valid options — never a silent zero', async () => {
+    const captured = { calls: [] as Array<[string, unknown]> };
+    const tools = makeTier1Tools(stubDb([], captured));
+    const res = await tools.execute('search_sam_opportunities', { keyword: 'it', set_aside: 'banana' });
+    expect(res.ok).toBe(false);
+    expect(res.error).toBe('unknown_set_aside');
+    expect(String(res.message)).toContain('8(a)');
+    // and it must not have silently queried
+    expect(captured.calls.some(([n]) => n === 'in:set_aside_code')).toBe(false);
+  });
+
+  it('a zero-result note names the set-aside filter that produced it', async () => {
+    const tools = makeTier1Tools(stubDb([], { calls: [] }));
+    const res = await tools.execute('search_sam_opportunities', { keyword: 'roofing', set_aside: '8(a)' });
+    expect(res.count).toBe(0);
+    // "nothing exists" vs "nothing matched THIS filter" must be distinguishable.
+    expect(String(res.note)).toContain('8(a)');
+    expect(String(res.note)).toContain('8A/8AN');
   });
 
   it('empty keyword is rejected (never a bare all-SAM dump)', async () => {
