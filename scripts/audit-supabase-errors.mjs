@@ -10,19 +10,35 @@
  * loadBidderProfile returning {} for every user + the whole user_briefing_profile
  * dead-table cascade (tasks/smart-profile-dead-table-findings.md).
  *
- * A finding = ALL of:
+ * TWO rules, two different bugs:
+ *
+ * RULE A — swallowed-error read. ALL of:
  *   1. destructures `{ data }` / `{ data: X }` WITHOUT also binding `error`, AND
  *   2. the SAME statement has a hardcoded multi-column `.select('a, b, ...')`
  *      (>=2 columns; NOT `.select('*')`, NOT a single column) — the shape that
- *      silently breaks when one column drifts, AND
- *   3. is on a user-facing read path (src/app/api/app, src/lib/briefings,
- *      src/lib/proposal, src/lib/smart-profile, src/lib/rag, or a non-admin
- *      /api route). Admin/cron/scripts are excluded — they degrade loudly enough
- *      and aren't user-visible.
+ *      silently breaks when one column drifts.
  *
- * Baseline: the 15 pre-existing sites the hunt found are recorded as "known" so
- * they don't block a push; only NEW ones fail the gate. Fix a known one → it drops
- * out; add a new bad pattern → gate blocks. Drive the baseline toward zero.
+ * RULE B — a null count coalesced to zero (`count ?? 0`) with no `error` bound.
+ *   A table that does NOT exist returns count=null, error=null, HTTP 204 — no error
+ *   at all. `?? 0` turns "I don't know" into "zero" and destroys the only signal
+ *   separating missing from empty. Rule A is blind to this: a count query has no
+ *   multi-column select, and the error can be bound correctly 150 lines earlier and
+ *   still not consulted at the coalesce. Comment lines are skipped — several fixes
+ *   now quote the pattern while explaining it.
+ *
+ * Scope: src/ + scripts/, minus tests. Admin/cron/scripts are INCLUDED — they were
+ * excluded until 2026-07-16 on the theory that they "degrade loudly enough and
+ * aren't user-visible". That was backwards, and it is why every scar came from
+ * there: nobody reads a cron's stdout, so a silent read is worse, not better.
+ * scripts/reset-mindy-user-activity.ts reported a clean "0 rows" for five tables
+ * that never existed, for months (#307); cron/snapshot-metrics recorded a
+ * fabricated 0 for NINE DAYS (190 emails erased).
+ *
+ * Baseline: pre-existing sites are recorded as "known" so they don't block a push;
+ * only NEW ones fail the gate. Fix a known one → it drops out; add a new bad pattern
+ * → gate blocks. Drive the baseline toward zero. NOTE: the baseline keys on
+ * `path:line`, so an edit that shifts lines in a known file surfaces a false NEW
+ * finding — re-baseline deliberately, never reflexively.
  *
  * Exit codes:
  *   0 = no NEW findings (baseline-known allowed)
@@ -116,6 +132,43 @@ for (const root of SCAN_ROOTS) {
         findings.push(`${p}:${i + 1}${t ? ` (${t[1]})` : ''}`);
       }
     }
+
+    // ── RULE B: a null count coalesced to zero (`count ?? 0`) ────────────────
+    // Rule A cannot see this: a count query has no multi-column select, and the
+    // error may be bound correctly 150 lines away and still not consulted here.
+    //
+    // A table that does NOT exist returns count=null, error=null, HTTP 204 — no
+    // error at all. `?? 0` turns "I don't know" into "zero", and the zero is
+    // usually load-bearing (`if (n === 0) continue` cancelled a delete in #307;
+    // a swallowed 400 + `?? 0` recorded nine days of fake metrics in
+    // snapshot-metrics). null is the ONLY signal separating missing from empty.
+    for (let i = 0; i < lines.length; i++) {
+      const raw = lines[i];
+      // Comments quote this pattern while EXPLAINING the bug (several fixes now
+      // do). Flagging those is a false positive, and false positives are what
+      // make people reflexively --update-baseline and erode the ratchet.
+      const code = raw.replace(/\/\/.*$/, '');
+      const t = code.trim();
+      if (t.startsWith('*') || t.startsWith('/*')) continue;
+
+      if (!/(^|[^.\w])count\s*(\?\?|\|\|)\s*0|\.\s*count\s*(\?\?|\|\|)\s*0/.test(code)) continue;
+
+      // Where did this count come from? Skip only if `error` is genuinely BOUND from
+      // the query — `{ count, error } = await …` or a `res.error` read.
+      //
+      // Matching the bare token /\berror\b/ is not good enough: it let
+      // cron/pursuit-changes through, because an auth guard 5 lines up returns
+      // `NextResponse.json({ error: 'Unauthorized' })`. An unrelated error KEY is not
+      // error HANDLING — proximity to the word proves nothing, which is the same
+      // mistake in miniature as the bug this rule exists to catch.
+      const back = lines.slice(Math.max(0, i - 8), i + 1).join('\n');
+      const bindsError = /\{[^}]*\berror\b[^}]*\}\s*=\s*await/.test(back) || /\b\w+\.error\b/.test(back);
+      if (bindsError) continue;
+      if (!/\.from\(|supabase|getSupabase|sb\./.test(back)) continue; // not a supabase count
+
+      const tbl = back.match(/\.from\(\s*[`'"]([a-zA-Z0-9_]+)[`'"]/);
+      findings.push(`${p}:${i + 1}${tbl ? ` (${tbl[1]})` : ''} [count-null]`);
+    }
   }
 }
 
@@ -142,9 +195,29 @@ if (newViolations.length === 0) {
   process.exit(0);
 }
 
-console.error(`\n[supabase-errors] ✗ ${newViolations.length} NEW swallowed-error read(s) — a hardcoded multi-column .select() whose { error } is ignored:\n`);
-newViolations.forEach((f) => console.error('  ' + f));
-console.error(`\nWhy it matters: a bad/renamed column makes PostgREST fail the WHOLE query → data=null → silent generic/empty result for the user.`);
-console.error(`Fix: destructure { data, error } and surface the error (console.error / return 500). See tasks/smart-profile-dead-table-findings.md.`);
+// Two rules, two different fixes — say which one fired, or the message sends the
+// reader to the wrong repair.
+const newCountNull = newViolations.filter((f) => f.endsWith('[count-null]'));
+const newSwallowed = newViolations.filter((f) => !f.endsWith('[count-null]'));
+
+console.error(`\n[supabase-errors] ✗ ${newViolations.length} NEW finding(s):\n`);
+
+if (newSwallowed.length) {
+  console.error(`  ${newSwallowed.length} swallowed-error read(s) — a hardcoded multi-column .select() whose { error } is ignored:`);
+  newSwallowed.forEach((f) => console.error('    ' + f));
+  console.error(`\n  Why: a bad/renamed column makes PostgREST fail the WHOLE query → data=null → a silent generic/empty result for the user.`);
+  console.error(`  Fix: destructure { data, error } and surface the error (console.error / return 500). See tasks/smart-profile-dead-table-findings.md.\n`);
+}
+
+if (newCountNull.length) {
+  console.error(`  ${newCountNull.length} null count coalesced to zero (\`count ?? 0\`) with no { error } bound:`);
+  newCountNull.forEach((f) => console.error('    ' + f));
+  console.error(`\n  Why: a table that does not exist returns count=null, error=null, HTTP 204 — NO error.`);
+  console.error(`  \`?? 0\` turns "I don't know" into "zero" and destroys the only signal separating missing from empty.`);
+  console.error(`  It reads as defensive null-handling; it is data fabrication. #307: the fabricated 0 hit \`if (n === 0) continue\``);
+  console.error(`  and cancelled the delete for five tables that never existed. cron/snapshot-metrics: nine days of fake metrics.`);
+  console.error(`  Fix: bind { count, error }, surface the error, and return/render null as UNKNOWN — never 0.\n`);
+}
+
 console.error(`(If intentional, run: node scripts/audit-supabase-errors.mjs --update-baseline)\n`);
 process.exit(1);
