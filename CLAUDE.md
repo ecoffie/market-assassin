@@ -1560,6 +1560,44 @@ recordToolSuccess(ToolNames.CONTENT_REAPER).catch(() => {});
 
 ---
 
+## One fix = every surface — now a GATE (`scripts/audit-tool-catalog-drift.mjs`, Jul 17 2026)
+
+The MCP tool catalog lives on FOUR surfaces: **`tool-registry.ts` (source of truth)** ·
+`docs/marketing/MCP-WHITEPAPER.md` · its generated `.docx` · the **claude.ai Tool Map
+artifact**. The global CLAUDE.md rule *"changing one means changing all four in the same
+pass"* has existed since June. It kept drifting anyway:
+
+| surface | claimed | actual |
+|---|---|---|
+| `tool-registry.ts` | 49 | ✅ |
+| Tool Map artifact | 46 | 3 behind |
+| `MCP-CHANGELOG.md` | 41 | 8 behind |
+| `MCP-WHITEPAPER.md` | 40 | 9 behind |
+
+**A written rule did not stop it** — it was read and violated by the same session that had
+just quoted it. So it is step **5/7 of the pre-push gate** now. A wrong tool count ships to
+customers; that is not a docs nit.
+
+- **`listMcpTools()` is the authority — never a grep.** Tools register on TWO paths
+  (`tool-registry.ts` def + `server.ts` zod), and a grep has already made live tools look
+  missing.
+- The artifact can't be linted from here, so its contents are mirrored in
+  **`docs/mcp-tool-catalog.json`**. That mirror is the promise you keep by hand; a BROKEN
+  promise now fails the push instead of shipping.
+- **Workflow:** update the artifact + docs → `node scripts/audit-tool-catalog-drift.mjs --update`
+  → rerun `scripts/build-whitepaper-docx.mjs` (the `.docx` is generated from the `.md`).
+- `--list` prints the live names. Proved it blocks: a stale prose count AND an artifact
+  missing a tool both exit 1.
+
+⚠️ **A mutating tool must be visible as one.** `add_contacts_to_crm` writes to the user's
+own GoHighLevel CRM (upsert → can overwrite fields) and is annotated `destructiveHint` in
+`tool-schemas.ts`. The artifact claimed *"no tool mutates an external system"* long after
+that shipped. 48 of 49 are read-only; say so precisely, and re-check the claim when adding
+a tool. (`mcpRegistrationList()` auto-derives a `title` for tools absent from `TOOL_META`,
+so that surface self-heals — the annotation does NOT.)
+
+---
+
 ## The silent-failure gate (`scripts/audit-supabase-errors.mjs`, Jul 16-17 2026)
 
 Runs as step 3/6 of the pre-push gate. **Two rules, two different bugs:**
