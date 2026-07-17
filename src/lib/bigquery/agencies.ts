@@ -96,27 +96,41 @@ export interface AgencyOfficeRow {
  */
 // liveBq: authenticated Mindy callers pass true to allow a cold BQ scan; public
 // SEO callers omit it → cache-only (no cold scan). See bigquery/cache.ts cacheOnly.
-export async function getOfficesForAgency(agencyName: string, limit = 100, liveBq = false): Promise<AgencyOfficeRow[]> {
+/**
+ * The keyword `getOfficesForAgency` contains-matches `awarding_agency` on.
+ *
+ * The key is the FIRST distinctive token, via the shared `agencyKeyword()`.
+ *
+ * This used to take the LONGEST word, on the theory that longest == most
+ * distinctive. It is not — it is often the most GENERIC, and it put another
+ * agency's offices on the page (Eric's screenshot, 2026-07-17):
+ *
+ *   "HEALTH AND HUMAN SERVICES, DEPARTMENT OF" -> longest = "services"
+ *      -> LIKE %services% -> matches GENERAL *SERVICES* ADMINISTRATION
+ *      -> "Top contracting offices in HHS" listed GSA FAS AAS FEDSIM $64B,
+ *         GSA/FAS AUTOMOTIVE CENTER $19B, GSA FAS AAS REGION 4 $11B.
+ *   "GENERAL SERVICES ADMINISTRATION" -> longest = "administration"
+ *      -> matches NASA, SBA, FAA — every "...Administration".
+ *
+ * `agencyKeyword()` strips the filler ("department of", "administration",
+ * "agency"…) and takes the lead token: HHS -> "health", GSA -> "general",
+ * NASA -> "aeronautics". Same function the contact search already uses, so the
+ * office panel and the contact list now agree on what an agency IS.
+ *
+ * EXPORTED so the agreement gate can check it. It was inline and private, which
+ * is why nobody noticed it disagreed with every other agency resolver — you
+ * cannot gate what you cannot call. The collision gate found EIGHT bad pairs
+ * against the old logic, not just the one that was visible on screen.
+ */
+export function officeAgencyKey(agencyName: string): string {
   const needle = (agencyName || '').trim().toLowerCase();
-  if (!needle) return [];
-  // The key is the FIRST distinctive token, via the shared agencyKeyword().
-  //
-  // This used to take the LONGEST word, on the theory that longest == most
-  // distinctive. It is not — it is often the most GENERIC, and it put another
-  // agency's offices on the page (Eric's screenshot, 2026-07-17):
-  //
-  //   "HEALTH AND HUMAN SERVICES, DEPARTMENT OF" -> longest = "services"
-  //      -> LIKE %services% -> matches GENERAL *SERVICES* ADMINISTRATION
-  //      -> "Top contracting offices in HHS" listed GSA FAS AAS FEDSIM $64B,
-  //         GSA/FAS AUTOMOTIVE CENTER $19B, GSA FAS AAS REGION 4 $11B.
-  //   "GENERAL SERVICES ADMINISTRATION" -> longest = "administration"
-  //      -> matches NASA, SBA, FAA — every "...Administration".
-  //
-  // agencyKeyword() strips the filler ("department of", "administration",
-  // "agency"…) and takes the lead token: HHS -> "health", GSA -> "general",
-  // NASA -> "aeronautics". Same function the contact search already uses, so
-  // the office panel and the contact list now agree on what an agency IS.
-  const key = agencyKeyword(agencyName).toLowerCase() || needle;
+  if (!needle) return '';
+  return agencyKeyword(agencyName).toLowerCase() || needle;
+}
+
+export async function getOfficesForAgency(agencyName: string, limit = 100, liveBq = false): Promise<AgencyOfficeRow[]> {
+  const key = officeAgencyKey(agencyName);
+  if (!key) return [];
   return queryCached<AgencyOfficeRow>({
     cacheOnly: !liveBq,
     cacheKey: `agency-offices:${key}:${limit}:v2`,

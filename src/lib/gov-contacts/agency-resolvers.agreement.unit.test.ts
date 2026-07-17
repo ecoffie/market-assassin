@@ -38,6 +38,8 @@ import { describe, it, expect } from 'vitest';
 import { resolveAgency } from './contact-roster';
 import { agencySearchKeywords, agencySearchTargets } from './agency-search';
 import { subAgencyToParent, agencyToExpectedSubAgency } from '@/app/api/app/federal-contacts/route';
+import { agencyKeyword } from './agency-search';
+import { officeAgencyKey } from '@/lib/bigquery/agencies';
 
 /**
  * Where each term's contacts ACTUALLY live. Verified against federal_contacts.
@@ -131,5 +133,78 @@ describe('agency resolvers — all three must land on the same bureau', () => {
     // this is the constraint a naive "converge the three" would break.
     expect(agencySearchKeywords('smith')).toEqual([]);
     expect(agencySearchKeywords('forest')).toEqual([]);
+  });
+});
+
+/**
+ * Real `department_ind_agency` values, measured from federal_contacts
+ * (170,586 rows, 2026-07-17). The point is the COLLISIONS, so the list keeps the
+ * names that actually share words: three "…SERVICES", three "…ADMINISTRATION".
+ */
+const REAL_AGENCY_NAMES = [
+  'DEPT OF DEFENSE',
+  'VETERANS AFFAIRS, DEPARTMENT OF',
+  'INTERIOR, DEPARTMENT OF THE',
+  'HOMELAND SECURITY, DEPARTMENT OF',
+  'AGRICULTURE, DEPARTMENT OF',
+  'STATE, DEPARTMENT OF',
+  'COMMERCE, DEPARTMENT OF',
+  'HEALTH AND HUMAN SERVICES, DEPARTMENT OF',
+  'GENERAL SERVICES ADMINISTRATION',
+  'NATIONAL AERONAUTICS AND SPACE ADMINISTRATION',
+  'SMALL BUSINESS ADMINISTRATION',
+  'COURT SERVICES AND OFFENDER SUPERVISION AGENCY',
+  'ENVIRONMENTAL PROTECTION AGENCY',
+  'ENERGY, DEPARTMENT OF',
+];
+
+describe('an agency key must not match a DIFFERENT agency', () => {
+  /**
+   * THE PROPERTY, not a term list. Both real bugs were the same shape — a key
+   * that is a substring of some OTHER agency's name:
+   *
+   *   HHS -> "services"       -> matches GENERAL *SERVICES* ADMINISTRATION
+   *   GSA -> "administration" -> matches NASA, SBA, every "...Administration"
+   *
+   * A term list would have caught the two we knew about. This catches the next
+   * one — including an agency nobody has added yet.
+   */
+  const keyers: Array<[string, (n: string) => string]> = [
+    ['agencyKeyword (contacts search)', (n) => agencyKeyword(n).toLowerCase()],
+    ['officeAgencyKey (office facet)', (n) => officeAgencyKey(n).toLowerCase()],
+  ];
+
+  for (const [label, keyOf] of keyers) {
+    it(`${label} — every key is unique to its own agency`, () => {
+      const collisions: string[] = [];
+      for (const agency of REAL_AGENCY_NAMES) {
+        const key = keyOf(agency);
+        if (!key || key.length < 3) continue;
+        for (const other of REAL_AGENCY_NAMES) {
+          if (other === agency) continue;
+          if (other.toLowerCase().includes(key)) {
+            collisions.push(`"${agency}" -> key "${key}" also matches "${other}"`);
+          }
+        }
+      }
+      expect(
+        collisions,
+        `${label} produced keys that pull in ANOTHER agency's rows:\n  ${collisions.join('\n  ')}\n` +
+          `This is how "Top contracting offices in HHS" listed GSA FAS AAS FEDSIM $64B.`,
+      ).toEqual([]);
+    });
+  }
+
+  it('the office facet uses the SAME key as the contact search (no 4th resolver)', () => {
+    // The office facet had its own private heuristic — "longest word == most
+    // distinctive" — which is how it drifted from everything else unnoticed.
+    // Sharing the keyer is the fix; this is what stops a 5th one appearing.
+    const disagreements = REAL_AGENCY_NAMES.map((a) => ({
+      a, search: agencyKeyword(a).toLowerCase(), office: officeAgencyKey(a).toLowerCase(),
+    })).filter((r) => r.search !== r.office);
+    expect(
+      disagreements.map((d) => `"${d.a}": search="${d.search}" office="${d.office}"`),
+      'The office facet and the contact search disagree on what an agency IS. They must share one keyer.',
+    ).toEqual([]);
   });
 });
