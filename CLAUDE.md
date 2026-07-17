@@ -556,9 +556,10 @@ sells Free/Pro/Teams only — there is **no $397 standalone** any more (Eric, "n
   `<script src>`'s it and is live.
 - Legacy access is intact **on purpose**: the `recompete:{email}` KV grant and the
   webhook's `recompete` tier mapping (`api/webhooks/stripe`) still work.
-- ⚠️ Its Stripe payment link still exists in the **Stripe dashboard** and would still
-  provision. Removing `stripeUrl` from `products.ts` only stops US surfacing it —
-  deactivating the link is a manual Stripe step.
+- ✅ Its Stripe payment link was **DEACTIVATED** in the dashboard (2026-07-17) — verified,
+  the URL returns Stripe's "deactivated" page. Removing `stripeUrl` from `products.ts`
+  only ever stopped US surfacing it; the dashboard was the actual kill. The product is
+  fully retired: page redirects, code silent, link dead.
 
 **Vehicle rollup (`src/app/api/recompete/route.ts`):**
 Multiple-award IDIQs store N winner rows; we collapse them to ONE vehicle via
