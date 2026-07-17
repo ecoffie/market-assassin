@@ -548,17 +548,29 @@ curl "https://getmindy.ai/api/admin/test-sam-subaward?password=$ADMIN_PASSWORD&p
 **Price:** $397
 **Features:** Pagination, CSV/Excel/PDF export, location filtering, mobile responsive
 
-**Vehicle rollup — truthful global count (`src/app/api/recompete/route.ts`, Jun 29):**
+**Vehicle rollup (`src/app/api/recompete/route.ts`):**
 Multiple-award IDIQs store N winner rows; we collapse them to ONE vehicle via
 `recompeteVehicleKey` (IDV root + agency + NAICS — `src/lib/recompete/vehicle-grouping.ts`).
-To make `pagination.total` truthful the route must group the WHOLE filtered set, but
-Supabase hard-caps responses at **1000 rows**. So it: (1) head-counts the filtered set,
-(2) fires `ceil(N/1000)` LIGHT-column page reads **in parallel** (total-ordered by
-sort + `contract_id` so windows partition cleanly), groups all of it, then (3) hydrates
-FULL rows for only the page's vehicles via `.in('contract_id', …)`. The old fixed
-`GROUP_FETCH_CAP = 6000` under-counted once the set crossed ~6k (it was 6,191 on Jun 28).
-No schema change; the JS key is the single source of truth. `SCAN_ROW_CAP = 20000`
-guards a runaway filter. Verified live: 5,066 rows → 4,796 vehicles (270 collapsed).
+To group, the route pages the filtered set 1000 at a time (Supabase hard-caps responses
+at 1000 rows) in a **sequential loop** bounded by **`GROUP_FETCH_CAP = 6000`**.
+
+**⚠️ `pagination.total` is a FLOOR, not a global count.** Once the filtered set crosses
+6,000 rows the cap truncates it, so the total under-counts — and the whole table is
+129,249 rows, so any broad filter (no NAICS, `months=all`) hits it. `pagination.capped`
+(added #302) is TRUE when this happens; **any UI showing the count MUST render "6,000+"
+rather than a hard number** — otherwise it prints a confidently wrong figure, which is
+the bug this table already had once (#301: "9,450 total in database").
+
+*This paragraph previously described a head-count + `ceil(N/1000)` **parallel** page-read
+design with a `SCAN_ROW_CAP = 20000`, and said the 6000 cap was "old". None of that is in
+the code — no head-count, no parallel reads, no `SCAN_ROW_CAP`, and `GROUP_FETCH_CAP = 6000`
+is still live. It was documented as fixed while the bug was still shipping. Corrected
+2026-07-16; grep the route before trusting any of this.*
+
+**Multi-NAICS (#302):** the shared `queryExpiringContracts` takes `naicsCodes?: string[]`
+(OR across codes; `naics?: string` still works). `/api/recompete?naics=a,b` accepts
+comma-separated. <6-char code = prefix (`naics_code LIKE '236%'`), 6-digit = exact.
+Before this, comma-separated `naics` silently returned **0 rows** rather than erroring.
 
 ### 5. Opportunity Hunter
 **Location:** `/src/app/opportunity-hunter/`
