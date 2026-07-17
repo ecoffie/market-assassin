@@ -88,7 +88,10 @@ const SUBAGENCY_PARENT: Array<{ re: RegExp; parent: string }> = [
   { re: /\bgsa\b|general services/i, parent: 'GENERAL SERVICES' },
   { re: /\bnasa\b|aeronautics|space administration/i, parent: 'AERONAUTICS' },
 ];
-function subAgencyToParent(name: string): string | null {
+// EXPORTED so it can be tested. It was private, which is why the three agency
+// resolvers were never checked against each other — you cannot gate what you
+// cannot call. See agency-resolvers.agreement.unit.test.ts.
+export function subAgencyToParent(name: string): string | null {
   for (const m of SUBAGENCY_PARENT) if (m.re.test(name)) return m.parent;
   return null;
 }
@@ -114,7 +117,10 @@ const AGENCY_TO_SUBAGENCY: Array<{ re: RegExp; label: string }> = [
   { re: /\bcdc\b/i, label: 'CDC' },
   { re: /\bcms\b|medicare/i, label: 'CMS' },
 ];
-function agencyToExpectedSubAgency(name: string): string | null {
+// EXPORTED alongside subAgencyToParent: together they are the app dropdown's
+// FULL pipeline (resolve to parent, THEN narrow). Testing either half alone
+// misrepresents it — see agency-resolvers.agreement.unit.test.ts.
+export function agencyToExpectedSubAgency(name: string): string | null {
   for (const m of AGENCY_TO_SUBAGENCY) if (m.re.test(name)) return m.label;
   return null;
 }

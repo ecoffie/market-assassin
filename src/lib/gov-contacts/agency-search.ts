@@ -87,9 +87,25 @@ const DEPT_KEYWORD_OVERRIDE: Record<string, string> = {
  * on the spelled-out name.
  */
 const ACRONYM_TO_SUBTIER: Record<string, string> = {
+  // DoD
   DLA: 'Defense Logistics',
   DHA: 'Defense Health',
   DISA: 'Information Systems',
+  // Civilian. The parent-preference above was built on the belief that civilian
+  // POCs are keyed ONLY by parent department — that is not true for the big
+  // bureaus. Measured 2026-07-17: sub_tier "FOREST SERVICE" holds 800 contacts,
+  // yet "USFS" resolved to the parent keyword "Agriculture" and returned all
+  // 2,987 USDA contacts — you ask for the Forest Service, you get every USDA
+  // person. Same shape as the DLA firehose, milder (3.7x vs 7x). Found by the
+  // agreement gate, not by a customer.
+  USFS: 'Forest Service',
+  // ARS (Agricultural Research Service, 254 in sub_tier) deliberately NOT aliased.
+  // Measured: searching "ARS" already returns 1,413 rows because the route's raw
+  // `contact_fullname.ilike.%ars%` matches mARSha / cARSon / pARSons. The alias
+  // would add 254 real contacts to a result already dominated by name noise —
+  // it does not fix the term, and a 3-letter acronym is the wrong tool. Same
+  // hazard as `%EPA%` matching "dEPArtment" (28,733 rows). Fix the substring
+  // matching first, then revisit short acronyms.
 };
 
 /**
