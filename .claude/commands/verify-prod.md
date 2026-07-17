@@ -31,7 +31,8 @@ Prefer these over hand-rolled curl — they encode the rows rule and return a re
 
 ## 3. Rules
 
-- **Wait for READY first.** Never verify against the old build. Poll the live URL for the new behaviour (a route that 404s before and 200s after is the cleanest signal) rather than parsing `vercel ls` — its ANSI codes break `grep -oE`.
+- **Wait for READY first.** Never verify against the old build. Poll the live URL for the new behaviour, and pick a signal that is FALSE before and TRUE after — a route that 404s then 200s, a response field that was absent, a total that was 0. Capture that baseline BEFORE the deploy; a check that would pass against the old build proves nothing.
+- **Don't parse `vercel ls`.** It writes the status column to **stderr**, so `2>/dev/null` throws away exactly what you're grepping for and reports a confident "never ready" about a deploy that is live (measured, 2026-07-16). It also carries ANSI codes, so stripping those is not enough — use `2>&1` if you must, or just poll the URL.
 - **Beware the cache.** `cached: true` proves nothing about new compute. Note it, and find a path that forces a fresh result (a new cache key, an uncacheable route, `refresh: true` for staff on TMR).
 - **A pre-existing failure is not your failure.** If something's broken, check whether it's broken on `main` too before blaming the ship — then say which.
 
