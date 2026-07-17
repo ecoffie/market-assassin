@@ -12,7 +12,21 @@ import { createHmac, createHash, randomBytes, timingSafeEqual } from 'node:crypt
 /** Origin that issues + protects tokens. Same-origin AS+RS (scope decision #1). */
 export const OAUTH_ISSUER = (process.env.MCP_OAUTH_ISSUER || 'https://getmindy.ai').replace(/\/$/, '');
 /** The protected MCP resource these tokens are minted for (RFC 8707 audience). */
-export const OAUTH_RESOURCE = (process.env.MCP_OAUTH_RESOURCE || 'https://getmindy.ai/mcp/mcp').replace(/\/$/, '');
+/**
+ * The canonical MCP resource. Two jobs at once, which is why it must not drift:
+ *   1. the `resource` in /.well-known/oauth-protected-resource, which Anthropic
+ *      requires to match the URL "exactly as the user enters it in Claude", and
+ *   2. the access-token audience (`aud`) — verifyAccessToken rejects a mismatch.
+ *
+ * Default is the CANONICAL value, not a legacy one. It used to default to
+ * https://getmindy.ai/mcp/mcp while production overrode it via MCP_OAUTH_RESOURCE
+ * — so any environment without that env var (preview, local) silently advertised a
+ * resource that didn't match what the connect page tells users to paste, and
+ * deleting the env var would have reverted production to a broken URL.
+ *
+ * Keep byte-identical to MCP_URL in src/app/mcp/catalog-ui.tsx.
+ */
+export const OAUTH_RESOURCE = (process.env.MCP_OAUTH_RESOURCE || 'https://mcp.getmindy.ai/mcp').replace(/\/$/, '');
 export const ACCESS_TTL_SEC = 3600; // 1 hour — refresh tokens renew
 export const REFRESH_TTL_SEC = 60 * 60 * 24 * 60; // 60 days
 export const CODE_TTL_SEC = 300; // 5 minutes, single-use
