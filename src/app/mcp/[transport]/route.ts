@@ -30,6 +30,7 @@
  * authenticated call to the canonical subdomain. There is no /mcp/mcp any more.
  */
 import { createMcpHandler, withMcpAuth } from 'mcp-handler';
+import type { Implementation } from '@modelcontextprotocol/sdk/types.js';
 import { after } from 'next/server';
 import { runMeteredTool } from '@/lib/mcp/metered';
 import { maybeAutoRecharge } from '@/lib/mcp/autorecharge';
@@ -47,6 +48,31 @@ export const maxDuration = 60;
 
 // Below this balance, the in-chat footer escalates from an FYI to a top-up nudge.
 const LOW_BALANCE_THRESHOLD = 20;
+
+/**
+ * The server's identity in the MCP handshake.
+ *
+ * We never set this, so mcp-handler's DEFAULT went out to every client:
+ *   name: "mcp-typescript server on vercel", version: "0.1.0"   (dist/index.js:223)
+ * That is literally what `initialize` against mcp.getmindy.ai returned — and what a
+ * Connectors Directory reviewer would have seen. The stdio server has always said
+ * 'mindy-govcon'; the hosted edge, the one Claude actually connects to, was anonymous.
+ *
+ * `icons` is the spec's mechanism for a client to render a server's mark. With none
+ * advertised a client has nothing to draw, which is why tool calls showed as "Used
+ * Mindy integration" with no logo.
+ *
+ * The icon src MUST be absolute: the client fetches it itself and has no base URL to
+ * resolve against. /icon.png is a real 512x512 PNG served by both origins.
+ */
+const SERVER_INFO: Implementation = {
+  name: 'Mindy',
+  version: '1.0.0',
+  description:
+    'Federal contracting intelligence — SAM opportunities, incumbents, pricing, and win playbooks.',
+  websiteUrl: 'https://getmindy.ai/mcp',
+  icons: [{ src: 'https://getmindy.ai/icon.png', mimeType: 'image/png', sizes: ['512x512'] }],
+};
 
 // (prettifyToolName removed 2026-07-17 — titles now come curated from TOOL_META in
 // tool-schemas.ts. A mechanical underscore split can't produce "Get Pricing Intel
@@ -148,7 +174,32 @@ const baseHandler = createMcpHandler(
     }
   },
   // serverOptions — registerTool() manages the tools capability automatically.
+  // serverOptions.
+  //
+  // serverInfo IS the server's identity in the MCP handshake, and we were never
+  // setting it — so mcp-handler's default shipped to every client:
+  //
+  //     name: "mcp-typescript server on vercel", version: "0.1.0"   (dist/index.js:223)
+  //
+  // That is what an initialize against mcp.getmindy.ai actually returned, and it is
+  // what a directory reviewer would have seen. The stdio server has always said
+  // 'mindy-govcon'; the hosted edge — the one Claude connects to — was anonymous.
+  //
+  // `icons` is the MCP spec's mechanism for a client to render a server's mark
+  // (ImplementationSchema: name, version, websiteUrl, description, icons[{src,
+  // mimeType, sizes, theme}]). Without it a client has nothing to draw, which is
+  // why "Used Mindy integration" appeared with no logo.
+  //
+  // The icon must be an ABSOLUTE url on a public origin — the client fetches it
+  // itself and has no base to resolve against. /icon.png is a real 512x512 PNG
+  // served by both getmindy.ai and mcp.getmindy.ai.
   {
+    // Typed as the SDK's Implementation (the real contract) so a typo in `icons`
+    // still fails the build, then cast: mcp-handler DECLARES serverInfo as only
+    // { name, version } (dist/index.d.ts:116) while its runtime forwards the object
+    // verbatim — `new McpServer(serverInfo, mcpServerOptions)` (dist/index.js:323).
+    // The cast bypasses a stale type, not a missing capability.
+    serverInfo: SERVER_INFO as { name: string; version: string },
     capabilities: {
       tools: {},
     },
