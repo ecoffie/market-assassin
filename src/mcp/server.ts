@@ -70,6 +70,7 @@ server.registerTool(
   'get_winning_playbook',
   {
     title: 'Get Winning Playbook',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       "Retrieve GovCon Giants' proprietary coaching on HOW TO WIN a specific federal " +
       'contracting scenario — pulled from 8 years of course, proposal-template, and ' +
@@ -112,6 +113,7 @@ server.registerTool(
   'get_pricing_intel',
   {
     title: 'Get Pricing Intel (GSA CALC)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Price-to-win labor-rate intelligence from the GSA CALC+ API (~240K awarded labor ' +
       'categories, daily refresh). Pass a NAICS code OR a labor-category keyword (e.g. ' +
@@ -147,6 +149,7 @@ server.registerTool(
   'get_incumbent_financials',
   {
     title: 'Get Incumbent Financials (SEC EDGAR)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Turn an incumbent company name into a competitive financial read via SEC EDGAR (revenue, ' +
       'net income, gross margin, public float, employees, latest 10-K, recent filings). Public ' +
@@ -179,6 +182,7 @@ server.registerTool(
   'get_regulatory_demand',
   {
     title: 'Get Regulatory Demand (Federal Register)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Leading "demand before SAM" indicator: recent Federal Register rules/notices for a topic ' +
       'or agency. A proposed or final rule in a subject area often precedes agency solicitations ' +
@@ -228,6 +232,7 @@ server.registerTool(
   'get_award_detail',
   {
     title: 'Get Award Detail (USASpending)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Full USASpending detail for one federal award: obligated→ceiling (the real prize size), the ' +
       'parent IDV/vehicle you must hold to compete, period of performance (recompete timing), recipient, ' +
@@ -251,6 +256,7 @@ server.registerTool(
   'find_predecessor_award',
   {
     title: 'Find Predecessor / Incumbent Award (USASpending)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'The LIKELY incumbent contract behind an open opportunity, inferred as the largest recent award ' +
       'matching the NAICS + agency (+ title). Returns full award detail (incumbent, ceiling, expiry, ' +
@@ -276,6 +282,7 @@ server.registerTool(
   'get_solicitation_incumbent',
   {
     title: 'Get Solicitation + Prior Award (SAM → USASpending)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'PRIMARY tool when the user pastes a SAM solicitation number (e.g. 140L6226Q0013) or notice UUID ' +
       'and asks who won the prior work / what it cost. Resolves the OPEN notice, then finds the LIKELY ' +
@@ -299,6 +306,7 @@ server.registerTool(
   'lookup_sam_entity',
   {
     title: 'Lookup SAM Entity (SAM.gov)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Live SAM.gov registration for a contractor: UEI/CAGE, legal name, registration status, NAICS, ' +
       'certifications (8(a), HUBZone, …), location. Pass a UEI for an exact entity, or a company name to ' +
@@ -324,6 +332,7 @@ server.registerTool(
   'search_contractors',
   {
     title: 'Search Contractors (USASpending / BigQuery)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'The competitive landscape for a market: top federal contractors by total obligated dollars for a ' +
       'keyword / NAICS / state, with award count and distinct-agency breadth (broad seller vs. single-buyer ' +
@@ -356,6 +365,7 @@ server.registerTool(
   'get_agency_intel',
   {
     title: 'Get Agency Intel (Hierarchy + USASpending)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Target-research read on a federal agency: resolves it by name / abbreviation / CGAC code, then returns ' +
       'identity + hierarchy, curated GovCon pain points & priorities, and (when available) live USASpending ' +
@@ -386,6 +396,7 @@ server.registerTool(
   'search_grants',
   {
     title: 'Search Grants (Grants.gov)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Federal GRANT opportunities from Grants.gov ($700B+ assistance funding — a different lane than SAM.gov ' +
       'contracts). Search by keyword / agency / funding category. Grants are assistance (different application ' +
@@ -408,6 +419,7 @@ server.registerTool(
   'get_agency_forecasts',
   {
     title: 'Get Agency Forecasts',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Upcoming federal procurement FORECASTS — planned buys 6-18 months before a solicitation posts (~7,700 ' +
       'records, ~12 agencies). Filter by NAICS / agency / state / set-aside / fiscal year / keyword. A forecast ' +
@@ -432,6 +444,7 @@ server.registerTool(
   'search_sbir',
   {
     title: 'Search SBIR/STTR',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'SBIR/STTR small-business R&D from NIH RePORTER (awarded projects — who won what) + a multisite aggregate ' +
       'of open notices. source="nih" = awarded NIH projects; source="multisite"/"all" = open notices. Filter by ' +
@@ -454,6 +467,7 @@ server.registerTool(
   'get_expiring_contracts',
   {
     title: 'Get Expiring Contracts (Recompetes)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Federal contracts EXPIRING soon — recompete targets ("who is about to lose their contract"). Filter by ' +
       'NAICS / agency / state / expiration window (months) / value / recompete-likelihood; soonest-expiring first. ' +
@@ -479,6 +493,7 @@ server.registerTool(
   'get_keyword_coverage',
   {
     title: 'Get Keyword Market Coverage',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Market coverage for a PRODUCT/SERVICE keyword (e.g. "drones"). Returns total federal market $, every NAICS ' +
       'that bought it (ranked), the smallest NAICS set covering ~90%, and the top PSCs ("what was bought"). The ' +
@@ -499,6 +514,7 @@ server.registerTool(
   'search_idv_contracts',
   {
     title: 'Search IDV Contracts & Task Orders',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Indefinite-Delivery Vehicles (IDIQ/GWAC/BPA) and the task orders flowing through them. search_type:"idv" = ' +
       'base vehicles you must be ON; search_type:"task" = the orders being placed through them. Filter by NAICS / ' +
@@ -527,6 +543,7 @@ server.registerTool(
   'search_past_contracts',
   {
     title: 'Search Past Contracts by Location',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Awarded federal prime contracts (past/historical, USASpending) BY LOCATION + NAICS / PSC / agency / recipient / ' +
       'value / date. state_scope: "pop" (place of performance, default), "recipient" (awardee HQ), or "both" (union). ' +
@@ -556,6 +573,11 @@ server.registerTool(
   'generate_market_report',
   {
     title: 'Generate Market Report (one-shot)',
+    // Writes: persists the report to market_reports and mints a shareable /reports/{id}
+    // link. Additive only — it creates a new row per call and never updates or deletes,
+    // hence destructiveHint:false (which also matters: destructiveHint DEFAULTS to true
+    // when readOnlyHint is false, and this doesn't warrant an always-prompt).
+    annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     description:
       'ONE-SHOT full market report. Give a keyword (best), NAICS, or agency and get the entire market in one call: ' +
       'total market $ + all buying NAICS + top PSC, top buying agencies, competitive landscape, recompetes, forecasts, ' +
@@ -584,6 +606,10 @@ server.registerTool(
   'add_contacts_to_crm',
   {
     title: 'Add Contacts to CRM (one-shot)',
+    // Upserts into the user's GoHighLevel CRM (POST /contacts/upsert), which dedupes
+    // by email/phone — so it can OVERWRITE an existing contact's fields, not just add.
+    // destructiveHint keeps a per-call confirmation in front of writing to someone's CRM.
+    annotations: { readOnlyHint: false, destructiveHint: true, openWorldHint: true },
     description:
       "Add contacts to the user's OWN connected GoHighLevel CRM in one call (dedupes by email/phone). Pairs with the " +
       'contact-discovery tools. Requires the user to have connected GHL in Mindy MCP settings; if not, returns ' +
@@ -618,6 +644,7 @@ server.registerTool(
   'get_contractor_award_history',
   {
     title: 'Get Contractor Award History',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       "A named contractor's federal prime-award history: total obligations, award count, year-over-year trend, top " +
       'agencies, top NAICS, recent awards. Size up a competitor, teammate, or incumbent. Name matching is fuzzy — ' +
@@ -637,6 +664,7 @@ server.registerTool(
   'assess_market_depth',
   {
     title: 'Assess Market Depth (Rule of Two)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Rule-of-Two market-depth determination for a NAICS (+ optional set-aside / state): how many CAPABLE small ' +
       'businesses exist, whether the Rule of Two is met (≥2 → set-aside supportable), a scored/tiered vendor list, ' +
@@ -659,6 +687,7 @@ server.registerTool(
   'get_solicitation_documents',
   {
     title: 'Get Solicitation Documents (SOW + attachments)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Full text + downloadable raw files for a SAM solicitation by notice_id — the SOW/PWS, notice body, and every ' +
       'attachment. Returns inline extracted_text (capped; check *_truncated) + a short-lived signed download_url ' +
@@ -678,6 +707,7 @@ server.registerTool(
   'search_federal_events',
   {
     title: 'Search Federal Events (industry days, matchmaking)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Upcoming federal-contracting events for an agency — industry days, matchmaking, sources-sought, association ' +
       'conferences. "Where do I show up to win this buyer?" Dated SAM.gov Special Notices (source="sam") + optional ' +
@@ -704,6 +734,7 @@ server.registerTool(
   'scan_proposal_compliance',
   {
     title: 'Scan Proposal Compliance (pre-submit DQ check)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Pre-submit disqualification check: given the RFP requirements + a proposal draft, flag what could get the bid ' +
       'THROWN OUT — missed deadline, ineligible set-aside, page-limit overage, missing reps/certs or required plans, ' +
@@ -738,6 +769,7 @@ server.registerTool(
   'evaluate_bid_decision',
   {
     title: 'Evaluate Bid Decision (GovCon bid/no-bid framework)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       "GovCon Giants' bid / no-bid framework. ALWAYS returns the framework — the 5 universal eliminator GATES + the " +
       '10-factor scorecard — so you know exactly what to assess. When you also pass gate answers + factor ratings, it ' +
@@ -758,6 +790,7 @@ server.registerTool(
   'lookup_federal_osbp',
   {
     title: 'Lookup Federal OSBP / Small Business Office',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'The Office of Small Business Programs (OSBP/OSDBU) — the small-business front door — for a federal command ' +
       'or agency. Pass a command/agency name or abbreviation ("NAVFAC", "USACE", "Department of the Navy"). Returns ' +
@@ -780,6 +813,7 @@ server.registerTool(
   'search_agency_opps_by_office',
   {
     title: 'Search Agency Opps by Office (DoDAAC-anchored)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Open SAM.gov solicitations anchored to a specific BUYING OFFICE, not the whole department. A DoD sub-agency ' +
       '(a USACE district, DARPA, MDA) shares one department label, so a department filter returns the whole-DoD ' +
@@ -805,6 +839,7 @@ server.registerTool(
   'get_sblo_contact',
   {
     title: 'Get SBLO Contact (prime teaming front door)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'The Small Business Liaison Officer (SBLO) at a prime contractor — WHO to call to team on a subcontract. Pass a ' +
       'company name ("AECOM", "Booz Allen Hamilton", "Leidos"). Curated SBLO names first (the 200-company Jun-2026 ' +
@@ -826,6 +861,7 @@ server.registerTool(
   'search_federal_contacts',
   {
     title: 'Search Federal Contacts (DoDAAC-anchored buying-office roster)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'The named PEOPLE at a federal buying office — contracting officers, contract specialists, small-business POCs — ' +
       'anchored on the office\'s 6-char DoDAAC so a DoD sub-agency returns ITS people, not the whole-DoD firehose. Pass ' +
@@ -851,6 +887,7 @@ server.registerTool(
   'search_podcast_lessons',
   {
     title: 'Search Podcast Lessons (proprietary corpus)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       "The proprietary GovCon Giants podcast corpus — real lessons from real contractor/agency guests, matched by topic / " +
       'agency / NAICS / set-aside / guest name. Un-copyable moat content. Returns episode cards with their key_lessons, ' +
@@ -871,6 +908,7 @@ server.registerTool(
   'get_agency_budget_trends',
   {
     title: 'Get Agency Budget Trends (OMB/CBJ)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       "An agency's discretionary budget authority + the FY2025→FY2026 trend (growing / cut / stable) — where the money " +
       'is moving BEFORE it becomes awards. Pass an agency name or abbreviation ("VA", "Department of Defense", "NASA", ' +
@@ -891,6 +929,7 @@ server.registerTool(
   'derive_company_keywords',
   {
     title: 'Derive Company Keywords (semantic)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       "Turn a company's OWN words (what they do + past performance) into the search keywords buyers actually use, ranked " +
       'by MEANING. NAICS is the wrong discovery key; a company\'s real vocabulary finds the market its codes miss. Pass a ' +
@@ -915,6 +954,7 @@ server.registerTool(
   'get_agency_spending_detail',
   {
     title: 'Get Agency Spending Detail (components + set-asides)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       '"Who inside this department buys, and can a small business win here." Complements get_agency_intel with the ' +
       'sub-agency (component) spending breakdown + the set-aside distribution (Small Business / 8(a) / SDVOSB / WOSB / ' +
@@ -936,6 +976,7 @@ server.registerTool(
   'extract_compliance_matrix',
   {
     title: 'Extract Compliance Matrix (RFP requirements)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Harvest EVERY explicit requirement from a federal solicitation into a structured compliance matrix — the ' +
       'shall/must/required obligations plus Section L (instructions), M (evaluation factors), and C (SOW/PWS). Pass ONE ' +
@@ -957,6 +998,7 @@ server.registerTool(
   'build_proposal_structure',
   {
     title: 'Build Proposal Structure (outline from compliance matrix)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Turn a compliance matrix into the volume → section outline a federal proposal must follow — the next step after ' +
       'extract_compliance_matrix. Pass its `requirements` array and get back the volumes (Technical, Past Performance, ' +
@@ -986,6 +1028,7 @@ server.registerTool(
   'referee_proposal_compliance',
   {
     title: 'Referee Proposal Compliance (independent draft check)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'The closing step of a proposal: run an assembled draft past an INDEPENDENT compliance referee (a fresh model that ' +
       'did not write it) and get a per-requirement verdict — met / partial / missing — with evidence and an overall ' +
@@ -1015,6 +1058,7 @@ server.registerTool(
   'match_recompete_sow',
   {
     title: 'Match Recompete SOW (expiring contract → open recompete)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       "Given an EXPIRING contract's scope, find the open solicitation that is likely its recompete — by semantic SOW " +
       'similarity over the sam_opportunities corpus. Pass the expiring contract\'s `description` (title/scope/SOW text); ' +
@@ -1037,6 +1081,7 @@ server.registerTool(
   'extract_statement_of_work',
   {
     title: 'Extract Statement of Work (SOW / PWS / SOO)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Pull the Statement of Work / PWS / SOO out of a solicitation as clean text to brief subs or seed a technical ' +
       'response. Detects the SOW block by heading boundaries over the combined/inline body (recovers scope buried in a ' +
@@ -1057,6 +1102,7 @@ server.registerTool(
   'get_federal_event_series',
   {
     title: 'Federal Event Series (recurring calendar)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'The curated calendar of RECURRING federal-contracting event series (AFCEA, NDIA, SAME, APEX Accelerators, GSA…) ' +
       'plus major annual conferences. Filter by agency, category (matchmaking / training / conference / industry_day…), ' +
@@ -1078,6 +1124,7 @@ server.registerTool(
   'get_sba_goaling_share',
   {
     title: 'SBA Goaling Share (goals vs. actual set-asides)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'The statutory government-wide small-business goals (SB 23% · WOSB 5% · SDB/8(a) 5% · SDVOSB 3% · HUBZone 3%) set ' +
       "against an agency's ACTUAL set-aside obligations from USASpending, per category, with the gap and a meets/below " +
@@ -1097,6 +1144,7 @@ server.registerTool(
   'draft_proposal',
   {
     title: 'Draft Proposal (full multi-section, vault-grounded)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Draft a FULL multi-section federal proposal response from a solicitation — the writing step after ' +
       'extract_compliance_matrix / build_proposal_structure. A two-pass engine (strategic outline → parallel ' +
@@ -1126,6 +1174,7 @@ server.registerTool(
   'draft_proposal_section',
   {
     title: 'Draft Proposal Section (single section, vault-grounded)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Draft ONE section of a federal proposal, vault+RAG grounded — for iterating on a single volume without ' +
       're-running the whole proposal. Pass section_type (exec_summary | technical | management | past_performance | ' +
@@ -1160,6 +1209,7 @@ server.registerTool(
   'export_proposal',
   {
     title: 'Export Proposal (.docx)',
+    annotations: { readOnlyHint: true, openWorldHint: true },
     description:
       'Assemble supplied proposal sections into a downloadable Word (.docx) file — the delivery step after ' +
       'draft_proposal (or your own drafted content). Pass sections[] (each { heading, text }) + an optional title; ' +
