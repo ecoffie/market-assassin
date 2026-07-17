@@ -19,10 +19,15 @@
  * pre-checks the credit balance, debits on success, and logs every call. Stripe
  * credit top-ups are Slice 4.
  *
- * Route path: this file lives at src/app/mcp/[transport]/route.ts with
- * basePath '/mcp', so the raw endpoints are /mcp/mcp (Streamable HTTP) and
- * /mcp/sse + /mcp/message (SSE). A host rewrite in next.config.ts maps the
- * mcp.getmindy.ai subdomain so clients use the clean https://mcp.getmindy.ai/mcp.
+ * Route path: this file lives at src/app/mcp/[transport]/route.ts, and a host
+ * rewrite in next.config.ts maps mcp.getmindy.ai/{mcp,sse,message} onto it. The
+ * canonical endpoint is https://mcp.getmindy.ai/mcp.
+ *
+ * The adapter is configured with EXPLICIT endpoints ('/mcp', '/sse', '/message')
+ * rather than basePath — see the config block below. Short version: mcp-handler
+ * compares url.pathname by strict equality, a Next rewrite does NOT rewrite
+ * request.url, so basePath '/mcp' expected '/mcp/mcp' and 404'd every
+ * authenticated call to the canonical subdomain. There is no /mcp/mcp any more.
  */
 import { createMcpHandler, withMcpAuth } from 'mcp-handler';
 import { after } from 'next/server';
@@ -148,9 +153,36 @@ const baseHandler = createMcpHandler(
       tools: {},
     },
   },
-  // adapter config. basePath must match this route's parent dir.
+  // Adapter config.
+  //
+  // EXPLICIT ENDPOINTS, NOT basePath — and this is load-bearing. mcp-handler
+  // matches the request path by STRICT EQUALITY against these:
+  //
+  //     if (url.pathname === streamableHttpEndpoint) { … }
+  //     else { res.statusCode = 404; res.end("Not found"); }
+  //
+  // and `basePath: '/mcp'` derived them as '/mcp/mcp' | '/mcp/sse' | '/mcp/message'
+  // (deriveEndpointsFromBasePath). That matched the APEX (getmindy.ai/mcp/mcp) —
+  // and silently 404'd the canonical subdomain.
+  //
+  // Why: next.config.ts rewrites mcp.getmindy.ai/mcp → /mcp/mcp, but a Next rewrite
+  // does NOT rewrite `request.url`. The handler still saw pathname '/mcp', compared
+  // it to '/mcp/mcp', and fell through to the 404. So mcp.getmindy.ai/mcp NEVER
+  // worked for authenticated traffic — every token in the DB was minted against the
+  // apex, which is why nobody hit it until the canonical URL moved (2026-07-17).
+  //
+  // It was invisible to probing: withMcpAuth returns 401 BEFORE this handler runs,
+  // so an unauthenticated curl gets a healthy-looking 401 and never reaches the
+  // path match. Unauth 401 / auth 404 was the tell:
+  //     07:36:57  POST 200  /oauth/token   ← auth worked
+  //     07:36:58  POST 404  /mcp           ← then this
+  //
+  // These values match the pathname AS THE CLIENT SENDS IT on mcp.getmindy.ai.
+  // Changing them means changing the rewrites in next.config.ts too.
   {
-    basePath: '/mcp',
+    streamableHttpEndpoint: '/mcp',
+    sseEndpoint: '/sse',
+    sseMessageEndpoint: '/message',
     maxDuration: 60,
     // Production: enable Vercel Fluid Compute, bump maxDuration toward 800, and set
     // redisUrl (Upstash) so SSE sessions coordinate across instances:
