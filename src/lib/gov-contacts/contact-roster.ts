@@ -108,6 +108,13 @@ function normalizeTitle(title: string | null): { role: string | null; pocLabel: 
 // roster if the narrow finds nothing (many rows have a null sub_tier), so a
 // bureau query is never empty. (DoD components anchor earlier via their DoDAAC.)
 const BUREAU_MAP: Array<[RegExp, string, string?]> = [
+  // DoD components. Measured 2026-07-17: "DEFENSE LOGISTICS AGENCY" is the SINGLE
+  // LARGEST sub_tier in federal_contacts (7,890 rows) — but the acronym everyone
+  // actually types found only 52, because "DLA" appears nowhere in that text. A 152x
+  // miss that never errored: it resolved, searched, and returned almost nothing.
+  // (Army/Navy/Air Force need no alias — those words ARE in their sub_tier text, so
+  // the sub_tier ILIKE from #230 already finds them.)
+  [/\bdla\b|defense logistics/i, 'Defense', 'defense logistics'],
   // USDA (sub_tier confirmed populated: FOREST SERVICE, AGRICULTURAL RESEARCH SERVICE, …)
   [/forest service|\busfs\b/i, 'Agriculture', 'forest service'],
   [/natural resources conservation|\bnrcs\b/i, 'Agriculture', 'natural resources conservation'],
@@ -191,6 +198,11 @@ const DEPARTMENT_ACRONYMS: Array<[RegExp, string]> = [
   [/\bhud\b/i, 'Housing'],
   [/\bdoi\b/i, 'Interior'],
   [/\bva\b/i, 'Veterans'],
+  // Standalone agencies — their own department_ind_agency, sub_tier null or self-
+  // referential, so there is no bureau to narrow to. Measured 2026-07-17: the acronym
+  // found 18 contacts, the real name 1,094 (GSA) and 981 (NASA) — 61x and 55x misses.
+  [/\bgsa\b/i, 'General Services'],
+  [/\bnasa\b/i, 'Aeronautics'],
 ];
 
 /** Resolve an agency/bureau name to its parent-department keyword + optional sub_tier narrow keyword. */
