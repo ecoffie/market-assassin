@@ -2074,6 +2074,39 @@ dispatch; nothing bills for free.
 
 ---
 
+## Mindy MCP Server — the connector ICON, and why it vanished (2026-07-17, #341)
+
+The Mindy mark (purple "M" bubble) renders beside each tool row in Claude Desktop, from
+`SERVER_INFO.icons` in `src/app/mcp/[transport]/route.ts`. Verified live: Eric's Claude
+completed a real handshake and drew `/icon.png`. Rules, each one paid for:
+
+- **⚠️ A client caches connector metadata at ADD time. Re-auth does NOT refetch it.** Eric
+  added the connector while `mcp.getmindy.ai` 404'd every MCP call (#335): OAuth succeeded
+  (`POST 200 /oauth/token`) then `initialize` 404'd, so the entry SAVED with no metadata and
+  stayed bare — while the apex, which was answering, kept its icon. It reads as "the icon
+  broke when we moved hosts"; it is really "this connector has never handshaked". The fix is
+  **remove and re-add the connector** — nothing server-side reaches an already-cached entry.
+  Expect this on every endpoint/domain move.
+- **The icon `src` MUST be an absolute URL on a public origin** — the client fetches it with
+  no base to resolve against. `/icon.png` is a real 512x512 PNG served by getmindy.ai AND
+  mcp.getmindy.ai.
+- **The orange asterisk on the "Using Mindy… · 30s" row is CLAUDE'S OWN indicator**, not our
+  connector icon. It shows for every integration and no server change affects it. Don't chase it.
+- **You cannot make the icon bigger.** The slot is the client's fixed layout (~20px); the MCP
+  spec has no render-size field (`icons[].sizes` only tells a client which asset to PICK).
+  MEASURED: the glyph bbox is 508x406 in a 512x512 canvas — 99.2% of the WIDTH, with the 21%
+  empty margin all vertical. A square slot is width-bound, so **trimming that padding renders
+  identically** — the obvious "tighter crop" fix is a no-op. Only a squarer, simplified mark
+  (no gradient, no 3 dots — sub-pixel mush at 20px) would gain, ~25% linear. A logo decision.
+
+**⚠️ Do NOT trust `anthropics/claude-ai-mcp#152` ("custom connectors always display a generic
+globe icon, even when the MCP server provides an `icons` field") as applying here.** It is real
+and open, but it describes the **claude.ai connectors LIST**; Claude Desktop's **tool rows**
+render `serverInfo.icons` fine — ours is on screen. Citing it at Eric, over his direct
+observation that the icon HAD shown on the apex, produced a confidently wrong "no server-side
+fix exists" and nearly got #341's (correct) comment "corrected" into a false one. **A
+screenshot of the product outranks an issue tracker.**
+
 ## Mindy MCP Server — account area + usage charts (2026-07-16, PRs #251–253)
 
 The `/mcp` surface split into a **connect landing** and a dedicated **account area**,
