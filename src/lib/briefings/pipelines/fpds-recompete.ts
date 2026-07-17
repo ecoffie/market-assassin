@@ -14,8 +14,9 @@ import {
 } from '@/lib/sam';
 import { expandNaicsPrefixes, hasNaicsPrefixes } from '@/lib/industry-presets';
 
-// Direct import of contracts data - eliminates ~30-40s HTTP fetch latency on Vercel
-import contractsDataJson from '@/data/contracts-data.json';
+// The LIVE recompete source (Supabase `recompete_opportunities`, synced hourly).
+// ONE shared query — see src/lib/recompete/query.ts. Never hand-roll a second one.
+import { queryExpiringContracts, type ExpiringContract } from '@/lib/recompete/query';
 
 interface RecompeteContract {
   contractNumber: string;
@@ -464,149 +465,137 @@ export function scoreRecompete(
 }
 
 /**
- * Fetch expiring contracts from local pre-populated data (contracts-data.js)
- * This uses the same data as the Recompete Tracker - comprehensive FPDS dump
+ * Convert a `recompete_opportunities` row into the RecompeteContract shape the
+ * briefing generators consume. Fields the table doesn't carry stay null/false —
+ * we do NOT invent them (an absent set-aside is not "not a set-aside").
  */
-export async function fetchExpiringContractsFromLocal(
+function dbRowToRecompete(row: ExpiringContract): RecompeteContract {
+  const end = row.period_of_performance_current_end || '';
+  const daysUntilExpiration = calculateDaysUntilExpiration(end);
+  const piid = row.piid || row.contract_id || '';
+
+  return {
+    contractNumber: piid,
+    orderNumber: null,
+    piid,
+
+    incumbentName: row.incumbent_name || 'Unknown',
+    incumbentDuns: null, // DUNS deprecated
+    incumbentCage: null,
+    incumbentUei: row.incumbent_uei || null,
+
+    obligatedAmount: row.total_obligation ?? 0,
+    baseAndAllOptionsValue: row.potential_total_value ?? row.total_obligation ?? 0,
+    naicsCode: row.naics_code || '',
+    naicsDescription: row.naics_description || '',
+    psc: row.psc_code || '',
+
+    contractingOffice: row.awarding_sub_agency || '',
+    contractingOfficeName: row.awarding_sub_agency || '',
+    agency: row.awarding_agency || '',
+    department: row.awarding_agency || '',
+
+    signedDate: row.period_of_performance_start || '',
+    effectiveDate: row.period_of_performance_start || '',
+    currentCompletionDate: end,
+    ultimateCompletionDate: end,
+
+    setAsideType: row.set_aside_type || null,
+    isSmallBusiness: false, // not carried by the table — do not infer
+    isWomenOwned: false,
+    isVeteranOwned: false,
+    isServiceDisabledVeteranOwned: false,
+    is8aProgram: false,
+    isHubZone: false,
+
+    placeOfPerformanceState: row.place_of_performance_state || '',
+
+    daysUntilExpiration,
+    expirationRisk: getExpirationRisk(daysUntilExpiration),
+
+    numberOfBids: row.number_of_offers ?? undefined,
+    competitionLevel: undefined,
+    competitionType: row.competition_type || undefined,
+  };
+}
+
+/**
+ * Fetch expiring contracts from the LIVE `recompete_opportunities` table — the
+ * same indexed Supabase rows the MCP `get_expiring_contracts` tool and the
+ * Recompete Tracker read, synced hourly from USASpending.
+ *
+ * Replaces the old `contracts-data.json` build-time dump (issue #292): that file
+ * was frozen 2026-04-08, held grouped/synthetic rows whose PIID and expiry date
+ * could describe DIFFERENT contracts (#280), and carried no UEI at all. It was
+ * the PRIMARY source and shadowed every live path.
+ *
+ * Reuses the shared `queryExpiringContracts` (src/lib/recompete/query.ts) — it
+ * already filters `quality_flag IS NULL` (excludes the flagged grouped_synthetic
+ * rows) and applies the expiry window server-side. Do NOT hand-roll a second
+ * query against this table.
+ */
+export async function fetchExpiringContractsFromDb(
   params: RecompeteSearchParams & { baseUrl?: string }
 ): Promise<RecompeteSearchResult> {
   const {
     naicsCodes = [],
     monthsToExpiration = 12,
     limit = 200,
-    baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://getmindy.ai',
   } = params;
 
-  console.log(`[Recompete-Local] Fetching from contracts-data.json for NAICS: ${naicsCodes.join(', ') || 'all'}`);
+  // Mirrors the per-user cap the USASpending path applies (first 10 codes).
+  // No prefix expansion needed: queryExpiringContracts treats a <6-char code as
+  // a prefix (`naics_code LIKE '236%'`) and a 6-digit code as exact.
+  const codesToUse = (naicsCodes.length > 0 ? naicsCodes : ['']).slice(0, 10);
+
+  console.log(`[Recompete-DB] Querying recompete_opportunities for NAICS: ${naicsCodes.join(', ') || 'all'}`);
 
   try {
-    // Use direct import instead of HTTP fetch - eliminates ~30-40s latency on Vercel
-    const allContracts = contractsDataJson as LocalContract[];
-
-    console.log(`[Recompete-Local] Loaded ${allContracts.length} contracts from direct import`);
-
-    // Filter by NAICS codes (match prefix)
-    const naicsPrefixes = naicsCodes.map(code => code.slice(0, 3)); // First 3 digits
-    const matchingContracts = allContracts.filter(contract => {
-      if (!contract.NAICS) return false;
-      const contractNaics = contract.NAICS.split(' - ')[0].trim();
-      // Match full code or prefix
-      return naicsCodes.some(code => contractNaics.startsWith(code)) ||
-             naicsPrefixes.some(prefix => contractNaics.startsWith(prefix));
-    });
-
-    console.log(`[Recompete-Local] ${matchingContracts.length} contracts match NAICS filter`);
-
-    // Convert to RecompeteContract format
-    const recompeteContracts: RecompeteContract[] = matchingContracts.map(contract => {
-      const daysUntilExpiration = calculateDaysUntilExpiration(parseLocalDate(contract.Expiration));
-      const naicsParts = (contract.NAICS || '').split(' - ');
-      const naicsCode = naicsParts[0]?.trim() || '';
-      const naicsDescription = naicsParts.slice(1).join(' - ').trim() || '';
-
-      return {
-        contractNumber: contract['Award ID']?.split(' (')[0]?.trim() || '',
-        orderNumber: null,
-        piid: contract['Award ID']?.split(' (')[0]?.trim() || '',
-
-        incumbentName: contract.Recipient || 'Unknown',
-        incumbentDuns: null,
-        incumbentCage: null,
-        incumbentUei: null,
-
-        obligatedAmount: parseValue(contract['Total Value']),
-        baseAndAllOptionsValue: parseValue(contract['Total Value']),
-        naicsCode,
-        naicsDescription,
-        psc: '',
-
-        contractingOffice: contract.Office || '',
-        contractingOfficeName: contract.Office || '',
-        agency: contract.Agency || '',
-        department: contract.Agency || '',
-
-        signedDate: parseLocalDate(contract['Start Date']),
-        effectiveDate: parseLocalDate(contract['Start Date']),
-        currentCompletionDate: parseLocalDate(contract.Expiration),
-        ultimateCompletionDate: parseLocalDate(contract.Expiration),
-
-        setAsideType: null,
-        isSmallBusiness: false,
-        isWomenOwned: false,
-        isVeteranOwned: false,
-        isServiceDisabledVeteranOwned: false,
-        is8aProgram: false,
-        isHubZone: false,
-
-        placeOfPerformanceState: contract.State || '',
-
-        daysUntilExpiration,
-        expirationRisk: getExpirationRisk(daysUntilExpiration),
-
-        numberOfBids: undefined,
-        competitionLevel: undefined,
-        competitionType: undefined,
-      };
-    });
-
-    // Filter by expiration window (future contracts only, within monthsToExpiration)
-    const maxDays = monthsToExpiration * 30;
-    const filtered = recompeteContracts.filter(c =>
-      c.daysUntilExpiration > 0 && c.daysUntilExpiration <= maxDays
+    const results = await Promise.all(
+      codesToUse.map((naics) =>
+        queryExpiringContracts({
+          naics: naics || undefined,
+          monthsWindow: monthsToExpiration,
+          limit: Math.min(Math.max(limit, 1), 200),
+        })
+      )
     );
 
-    // Sort by days until expiration (soonest first)
-    filtered.sort((a, b) => a.daysUntilExpiration - b.daysUntilExpiration);
+    // A Supabase failure must NOT masquerade as "no contracts" — that would look
+    // like a clean empty briefing. Surface it as an error so the catch below
+    // falls back to the live API, same as the old implementation did on throw.
+    if (results.some((r) => r.degraded)) {
+      throw new Error('recompete_opportunities query degraded');
+    }
 
-    console.log(`[Recompete-Local] Returning ${Math.min(filtered.length, limit)} contracts (${filtered.length} in window)`);
+    // Dedupe: one contract can surface under more than one of a user's codes.
+    const seen = new Set<string>();
+    const contracts: RecompeteContract[] = [];
+    for (const result of results) {
+      for (const row of result.contracts) {
+        const key = row.contract_id || row.piid || '';
+        if (key && seen.has(key)) continue;
+        if (key) seen.add(key);
+        contracts.push(dbRowToRecompete(row));
+      }
+    }
+
+    // Soonest-expiring first (the window filter already ran in the query).
+    contracts.sort((a, b) => a.daysUntilExpiration - b.daysUntilExpiration);
+
+    console.log(`[Recompete-DB] Returning ${Math.min(contracts.length, limit)} contracts (${contracts.length} in window)`);
 
     return {
-      contracts: filtered.slice(0, limit),
-      totalCount: filtered.length,
+      contracts: contracts.slice(0, limit),
+      totalCount: contracts.length,
       fetchedAt: new Date().toISOString(),
     };
   } catch (error) {
-    console.error(`[Recompete-Local] Error:`, error);
-    // Fall back to USASpending API
-    console.log(`[Recompete-Local] Falling back to USASpending API...`);
+    console.error(`[Recompete-DB] Error:`, error);
+    // Fall back to the live USASpending API (unchanged behavior on failure).
+    console.log(`[Recompete-DB] Falling back to USASpending API...`);
     return fetchExpiringContracts(params);
   }
-}
-
-// Local contract format from contracts-data.js
-interface LocalContract {
-  Recipient: string;
-  Agency: string;
-  Office?: string;
-  NAICS: string;
-  State?: string;
-  'Total Value': string;
-  'Contract Count'?: number;
-  Expiration: string;
-  'Award ID': string;
-  'Start Date': string;
-  Contracts?: Array<{
-    'Award ID': string;
-    'Start Date': string;
-    Expiration: string;
-    Value: string;
-  }>;
-}
-
-// Parse "$1,234,567.89 " to number
-function parseValue(valueStr: string | undefined): number {
-  if (!valueStr) return 0;
-  const cleaned = valueStr.replace(/[$,\s]/g, '');
-  return parseFloat(cleaned) || 0;
-}
-
-// Parse "M/D/YYYY" to ISO date string
-function parseLocalDate(dateStr: string | undefined): string {
-  if (!dateStr) return '';
-  const parts = dateStr.split('/');
-  if (parts.length !== 3) return '';
-  const [month, day, year] = parts;
-  return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
 }
 
 export type { RecompeteContract, RecompeteSearchParams, RecompeteSearchResult };

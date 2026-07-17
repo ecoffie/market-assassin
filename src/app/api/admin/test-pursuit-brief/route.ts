@@ -10,7 +10,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { generatePursuitBrief, PursuitBrief } from '@/lib/briefings/delivery/pursuit-brief-generator';
 import { createClient } from '@supabase/supabase-js';
 import { sendEmail } from '@/lib/send-email';
-import { fetchExpiringContractsFromLocal, fetchExpiringContracts } from '@/lib/briefings/pipelines/fpds-recompete';
+import { fetchExpiringContractsFromDb, fetchExpiringContracts } from '@/lib/briefings/pipelines/fpds-recompete';
 import { prioritizeNaicsByIndustry } from '@/lib/industry-presets';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
@@ -89,8 +89,8 @@ function getSupabase() {
       const naicsCodes = prioritizeNaicsByIndustry(rawNaicsCodes, primaryIndustry);
       console.log(`[TestPursuitBrief] Primary industry: ${primaryIndustry || 'none'}, prioritized NAICS: ${naicsCodes.slice(0, 5).join(', ')}...`);
 
-      // PRIMARY: Use local FPDS data dump (contracts-data.js)
-      const recompeteResult = await fetchExpiringContractsFromLocal({
+      // PRIMARY: live recompete_opportunities (hourly USASpending sync, carries incumbent UEI)
+      const recompeteResult = await fetchExpiringContractsFromDb({
         naicsCodes,
         monthsToExpiration: 12,
         limit: 10,

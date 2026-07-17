@@ -8,7 +8,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { RecompeteContract, fetchExpiringContractsFromLocal, fetchExpiringContracts } from '../pipelines/fpds-recompete';
+import { RecompeteContract, fetchExpiringContractsFromDb, fetchExpiringContracts } from '../pipelines/fpds-recompete';
 import { ContractAward } from '../pipelines/contract-awards';
 import { ContractorRecord } from '../pipelines/contractor-db';
 import { WebSignal } from '../web-intel/types';
@@ -341,12 +341,12 @@ export async function generateWeeklyBriefing(
 
     // FALLBACK: If no snapshots, fetch from LOCAL FPDS data first (then USASpending as backup)
     if (organizedData.recompetes.length === 0 && organizedData.awards.length === 0) {
-      console.log(`[WeeklyBriefing] No snapshots found, fetching from LOCAL contracts-data.js (FPDS dump)...`);
+      console.log(`[WeeklyBriefing] No snapshots found, fetching from LIVE recompete_opportunities...`);
       try {
         // Use prioritized NAICS codes (primary industry first)
         const naicsToUse = prioritizedNaics.length > 0 ? prioritizedNaics : ['541512', '541611', '541330'];
-        // PRIMARY: Use local FPDS data dump (contracts-data.js) - comprehensive data including Construction
-        const recompeteResult = await fetchExpiringContractsFromLocal({
+        // PRIMARY: live recompete_opportunities (hourly USASpending sync, carries incumbent UEI)
+        const recompeteResult = await fetchExpiringContractsFromDb({
           naicsCodes: naicsToUse,
           monthsToExpiration: 12,
           limit: 50,
@@ -358,10 +358,10 @@ export async function generateWeeklyBriefing(
             contractors: [],
             webSignals: [],
           };
-          console.log(`[WeeklyBriefing] Found ${recompeteResult.contracts.length} recompete opportunities from LOCAL data`);
+          console.log(`[WeeklyBriefing] Found ${recompeteResult.contracts.length} recompete opportunities from recompete_opportunities`);
         } else {
           // BACKUP: Try USASpending API if no local matches
-          console.log(`[WeeklyBriefing] No local data matches, trying USASpending API...`);
+          console.log(`[WeeklyBriefing] No rows in recompete_opportunities, trying USASpending API...`);
           const usaResult = await fetchExpiringContracts({
             naicsCodes: naicsToUse,
             monthsToExpiration: 12,
