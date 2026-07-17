@@ -103,7 +103,19 @@ if (has('count')) {
   const where = filtered
     ? ` matching ${[...all('eq'), ...all('like'), ...all('is').map((f) => f.replace('=', ' IS '))].join(' & ')}`
     : '';
-  console.log(`${tbl}: \x1b[1m${(count ?? 0).toLocaleString()}\x1b[0m rows${where}`);
+  // A table that DOES NOT EXIST returns count=null, error=null, HTTP 204 — no error
+  // at all. `count ?? 0` would render that as a confident "0 rows", which is how five
+  // phantom vault_* tables passed as "already reset" for months. null means UNKNOWN,
+  // and unknown is not zero — say so and exit non-zero.
+  if (count === null || count === undefined) {
+    console.error(
+      `\x1b[31m✗ UNKNOWN\x1b[0m — ${tbl}: no count returned (HTTP 204, no error).\n` +
+      `  The table almost certainly DOES NOT EXIST. This is not "0 rows".\n` +
+      `  Check the name against supabase/migrations/ — do not trust a remembered name.`,
+    );
+    process.exit(1);
+  }
+  console.log(`${tbl}: \x1b[1m${count.toLocaleString()}\x1b[0m rows${where}`);
   process.exit(0);
 }
 

@@ -24,18 +24,30 @@ const ALL = process.argv.includes('--all');
 const ACTIVE_ONLY = !ALL;
 const BATCH = Number((process.argv.find(a => a.startsWith('--limit=')) || '').split('=')[1]) || 500;
 
-async function countRemaining(): Promise<number> {
+// Returns null when the count is UNKNOWN — never a fabricated 0. The error was being
+// dropped entirely (no `error` destructure) and `count ?? 0` turned a null into a
+// confident zero, so a failed/missing-table count printed "Untagged to start: 0" and
+// read as "nothing to do". The drain loop itself breaks on real rows, so this only
+// mis-REPORTED here — but it's the same shape that made five phantom tables look
+// already-reset for months (see reset-mindy-user-activity.ts, #307).
+const fmtCount = (n: number | null) => (n === null ? 'unknown' : n.toLocaleString());
+
+async function countRemaining(): Promise<number | null> {
   let q = sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).is('cta_tagged_at', null);
   if (ACTIVE_ONLY) q = q.eq('active', true);
-  const { count } = await q;
-  return count ?? 0;
+  const { count, error } = await q;
+  if (error) {
+    console.error(`⚠️  count failed: ${error.message} — reporting UNKNOWN, not 0`);
+    return null;
+  }
+  return count;
 }
 
 async function main() {
   const scope = ACTIVE_ONLY ? 'ACTIVE opps only' : 'ALL opps (active + archive)';
   const start = await countRemaining();
   console.log(`CTA drain — ${scope} · batch=${BATCH}`);
-  console.log(`Untagged to start: ${start.toLocaleString()}\n`);
+  console.log(`Untagged to start: ${fmtCount(start)}\n`);
 
   let totalProcessed = 0;
   let totalTags = 0;
@@ -81,12 +93,12 @@ async function main() {
     totalProcessed += rows.length;
     if (batchNum % 5 === 0 || rows.length < BATCH) {
       const remaining = await countRemaining();
-      console.log(`  batch ${batchNum}: +${rows.length} opps · ${totalTags.toLocaleString()} tags so far · ${remaining.toLocaleString()} remaining`);
+      console.log(`  batch ${batchNum}: +${rows.length} opps · ${totalTags.toLocaleString()} tags so far · ${fmtCount(remaining)} remaining`);
     }
   }
 
   const end = await countRemaining();
-  console.log(`\n✅ Done. processed=${totalProcessed.toLocaleString()} · tags written=${totalTags.toLocaleString()} · remaining=${end.toLocaleString()}`);
+  console.log(`\n✅ Done. processed=${totalProcessed.toLocaleString()} · tags written=${totalTags.toLocaleString()} · remaining=${fmtCount(end)}`);
 }
 
 main().then(() => process.exit(0)).catch(e => { console.error('❌', e.message || e); process.exit(1); });
