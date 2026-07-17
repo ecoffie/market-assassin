@@ -94,11 +94,11 @@ export const PRODUCTS = {
   // `recompete` tier mapping (api/webhooks/stripe) are deliberately UNTOUCHED, and
   // /recompete.html now redirects to the live in-app panel (next.config.ts, #303).
   //
-  // ⚠️ `stripeUrl` removed so we never surface a checkout for a dead product — but
-  // that ALONE does not disable it. The payment link lives in the STRIPE DASHBOARD
-  // and still works for anyone holding the URL (it was
-  // buy.stripe.com/7sYfZi9UOdnsaxnbh6fnO0k), and the webhook would still provision
-  // it. Deactivating it there is a manual step and the only real kill.
+  // `stripeUrl` removed so we never surface a checkout for a dead product. The
+  // payment link itself (buy.stripe.com/7sYfZi9UOdnsaxnbh6fnO0k) was DEACTIVATED
+  // in the Stripe dashboard by Eric on 2026-07-17 — verified: the URL now returns
+  // Stripe's "deactivated" page, so it cannot take money. Removing the constant was
+  // never the kill; the dashboard was.
   RECOMPETE_CONTRACTS: {
     id: 'recompete-contracts',
     name: 'Recompete Tracker',
