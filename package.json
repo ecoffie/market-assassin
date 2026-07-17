@@ -39,7 +39,8 @@
     "mcp:smoke:http": "node scripts/mcp-http-smoke.mjs",
     "verify:live": "node scripts/verify-live.mjs",
     "db": "node scripts/db.mjs",
-    "db:check": "node scripts/db.mjs --check"
+    "db:check": "node scripts/db.mjs --check",
+    "demo:reset": "npx tsx scripts/demo-reset.ts"
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.80.0",
