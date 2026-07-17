@@ -624,15 +624,27 @@ already filters `quality_flag IS NULL`).
   written **after** it succeeds. Callers MUST select every `TRACKED_FIELDS` column —
   `diffContracts` throws on an absent key rather than logging a phantom `null -> value`.
 
-**⚠️ Briefings do NOT read this table (issue #292).** `grep -rn "recompete_opportunities"
-src/lib/briefings/` returns nothing. `fpds-recompete.ts:18` imports
-`@/data/contracts-data.json` — 2.8 MB bundled at build, last updated **2026-04-08**, 9,450
-grouped records, **no UEI field** — and it is the **PRIMARY** source, shadowing the live
-USASpending path (`ai-briefing-generator.ts:264`) which only runs on a local **miss**.
-That live path doesn't request `'Recipient UEI'` (`usaspending-fallback.ts:418`) and filters
-on `date_signed` as a "proxy for expiring soon". `snapshot-recompetes` has **never run**
-(no `cron_jobs` row by route, zero `cron_job_runs`) though three docs claim "7:15 AM daily".
-Not BigQuery — nothing under `src/lib/briefings/` imports it.
+**Measured daily (#315):** `snapshot-metrics` records `recompete_changes_total` (the moat's
+size) + `recompete_changes_new` (daily accrual) into `daily_metric_snapshots` → the trend
+charts. **A flat `_total` across days is the ALARM** — an empty log because nothing drifted and
+an empty log because the cron died look IDENTICAL, and unlike every other bug here, that one
+cannot be repaired after the fact. You can re-run a query; you cannot re-run yesterday. Never
+hand-type this figure into a doc (it went stale by morning three times on Jul 16).
+
+**✅ FIXED — briefings now read the live table (#292 → #299).** They used to read
+`@/data/contracts-data.json` (2.8 MB bundled at build, frozen **2026-04-08**, 9,450 grouped
+records, **no UEI field**) as the **PRIMARY** source, shadowing the live path — it never
+missed, so the stale data won *because* it was populated. `fpds-recompete.ts` now calls the
+shared `queryExpiringContracts` (`src/lib/recompete/query.ts`) — the same lib the MCP
+`get_expiring_contracts` tool uses, so the mirror rule holds by construction. Verified live:
+**0/50 → 50/50** rows carry a real UEI. The same defect was then found on two MORE surfaces —
+the in-app panel (#301 → #302) and the $397 page (#303 → #306). **Grep for the pattern, not
+the instance:** a populated stale source beside a live one always wins.
+
+**Still open:** `snapshot-recompetes` has **never run** (confirmed — no `cron_jobs` row, zero
+`cron_job_runs`) though three docs claim "7:15 AM daily". The legacy USASpending fallback
+(`usaspending-fallback.ts:418`) still doesn't request `'Recipient UEI'` and filters on
+`date_signed` as a "proxy for expiring soon" — it only runs on a miss now, but it's still wrong.
 
 ### 5. Opportunity Hunter
 **Location:** `/src/app/opportunity-hunter/`
@@ -1531,6 +1543,68 @@ recordToolSuccess(ToolNames.CONTENT_REAPER).catch(() => {});
 8. **Always add fallback NAICS** — If user has no NAICS, use defaults: `541512, 541611, 541330, 541990, 561210`.
 9. **Supabase LIKE uses `%` not `*`** — For pattern matching, use `naics_code.like.236%` not `naics_code.like.236*`. The `*` wildcard returns 0 results.
 10. **All KV operations must have try-catch fallback** — KV quota can be exceeded (500K requests/month on free tier). Functions must gracefully degrade: rate limits allow requests, abuse checks return false, access checks return null. See `src/lib/abuse-detection.ts` and `src/lib/access-codes.ts` for patterns.
+11. **`count ?? 0` is DATA FABRICATION — a null count means UNKNOWN, never zero.** Measured:
+    a table that does NOT exist returns `count=null, error=null, HTTP 204` — **no error at all**
+    (a real empty table returns `count=0, 200`). So `?? 0` destroys the only signal separating
+    *missing* from *empty*, and the zero is usually load-bearing. Bind `{ count, error }`,
+    **throw/surface** on error, and render null as `unknown` — never `0`. It reads as defensive
+    null-handling; it is not. **What it has already cost:**
+    `scripts/reset-mindy-user-activity.ts` — a null count hit `if (n === 0) continue` and
+    **cancelled the delete** for five `vault_*` tables that never existed (the real ones are
+    `user_identity_profile` / `user_past_performance` / `user_capabilities_library` /
+    `user_team_members` / `user_boilerplate_docs` — names were guessed from the FEATURE name,
+    not read from `20260526_profile_vault.sql`). It reported a clean `0 rows` for months, and
+    `opportunity_shares` (keyed `sharer_email`, not `user_email`) survived every "reset" (#307).
+    `cron/snapshot-metrics` — a swallowed 400 + `?? 0` recorded a real 0 for **nine days**
+    (07-07 → 07-15, **190 emails erased**). The gate now blocks new instances (rule B below).
+
+---
+
+## The silent-failure gate (`scripts/audit-supabase-errors.mjs`, Jul 16-17 2026)
+
+Runs as step 3/6 of the pre-push gate. **Two rules, two different bugs:**
+
+| Rule | Fires on | Fix |
+|---|---|---|
+| **A** swallowed-error read | `const { data } = await` with **no `error` bound** AND a hardcoded **multi-column** `.select('a, b')` (≥2 cols; `*` and single-col are ignored by design — they don't drift) | bind `{ data, error }`, surface it |
+| **B** count-null | `count ?? 0` / `count \|\| 0` with no `error` bound **from the query** | see Bug Prevention Rule #11 |
+
+**Baseline ratchet:** existing debt is recorded in `tests/fixtures/supabase-errors-baseline.json`
+(**103** = 74 rule-A + 26 rule-B + 3 `.mjs`), so it blocks nothing today — anything **NEW** fails
+the push. `--list` prints every finding; `--update-baseline` accepts the current set.
+**Drive it toward zero; never re-baseline reflexively** (see the wart below).
+
+**⚠️ It was blind on FOUR independent axes, each individually reasonable.** Fixing one proved
+nothing about the others — every widening found the next one still hiding:
+
+1. `EXCLUDE` skipped `/(admin|cron)/` and `scripts/` — *"they degrade loudly enough and aren't
+   user-visible."* **Backwards.** Nobody reads a cron's stdout, so a silent read there is worse.
+   That exclusion is why every scar came from those directories (#311).
+2. `SCAN_ROOTS = ['src']` — never walked `scripts/` **at all**, so dropping the EXCLUDE alone
+   would have changed nothing (#311).
+3. No count-null rule — so unblinding still would NOT have caught #307. Rule A is structurally
+   blind to it: a count query has no multi-column select, and the error may be bound correctly
+   150 lines earlier and never consulted at the coalesce (#312).
+4. The walk matched `/\.(ts|tsx)$/` — every `scripts/*.mjs` stayed invisible **to both rules**
+   regardless (#314).
+
+**Two traps if you edit the rules** (both were real, both found by testing not assuming):
+- **Strip comments first.** Several fixes now QUOTE `count ?? 0` while explaining the bug.
+  Flagging those is a false positive, and false positives are what make people reflexively
+  `--update-baseline` and erode the ratchet.
+- **A bare `/\berror\b/` token is not error handling.** It let `cron/pursuit-changes` through
+  because an auth guard 5 lines up returns `NextResponse.json({ error: 'Unauthorized' })`.
+  Require error genuinely bound from an `await` (or a `.error` read). That alone hid 5 sites.
+
+**Prove a rule change, don't trust it:** inject the bad pattern into a real file → expect exit 1
+→ revert → expect exit 0. A first attempt at this looked like the ratchet was broken; the probe
+was a single-column select, which rule A ignores by design.
+
+**Known wart:** the baseline keys on `path:line`, so an edit that shifts lines in a known file
+surfaces a **false NEW finding**. Re-baseline deliberately, never reflexively.
+
+**Standout debt in the baseline (not fixed):** `admin/data-health` does `count || 0` with no
+error bound — the endpoint whose job is reporting data health would report a fabricated 0.
 
 ---
 
@@ -1752,7 +1826,7 @@ passes `liveBq: true`. Also: name-search now matches exact UEI too. Diagnostic: 
 
 ---
 
-*Last Updated: July 16, 2026 — Recompete: live data end-to-end + the stale-source sweep. Recompete real per-contract data + hourly sync. `get_expiring_contracts` returned `incumbent_uei: null` on EVERY row (93/9,481 = 0.98%); the 9,388 rows weren't contracts (grouped on Recipient+Agency+NAICS, group's EARLIEST end date, one representative PIID — so PIID and expiry could describe different contracts). Replaced with real USASpending per-contract rows: 129,249 rows, 100% UEI, 477/477 NAICS, zero truncation, ~38 min (#280 → PR #284). Grouped rows flagged `grouped_synthetic`. `lead_time_months` was ALWAYS wrong (EXTRACT(MONTH FROM AGE()) drops the years — 18mo stored as 6), so `recompete_stats` expiring_6/12/18 buckets were wrong for as long as the trigger existed. Then scheduled it: `/api/cron/sync-recompete-contracts` hourly via `cron_jobs` (sweep ~38min vs 300s cap → wall-clock-budget shards, ordered by least-recently-ATTEMPTED, not row freshness — a 0-contract NAICS pins the queue head forever otherwise), plus append-only `recompete_changes` (the sync overwrites on upsert and USASpending has no "as of" query, so unrecorded change = gone permanently) (#288 → PR #291). THEN FIXED the shadowing (issue #292, was "found, not fixed"): briefings never read `recompete_opportunities` at all — they read a frozen Apr-08 `contracts-data.json` (9,450 grouped rows, NO uei field) as PRIMARY, which shadowed the live path because it never missed. Briefings now use the shared `queryExpiringContracts` (#299 — verified live: 0/50 → 50/50 rows carry a real UEI). Same defect found on TWO more surfaces: the in-app Recompetes panel filtered a Jun-22 static file client-side and printed its length as "9,450 total in database" while `/api/recompete` sat unreachable behind an early return (#301 → #302; also added `naicsCodes?: string[]` to the shared query — profiles carry 3-5 codes, the lib took one; verified live 0 → 5,897); and the $397 Recompete Tracker page served the same snapshot, ungated — the product is DISCONTINUED (recompete is a Pro feature) so `/recompete.html` now 308s to the live panel (#303 → #306; its Stripe link is disabled manually — code can't). ⚠️ `public/contracts-data.js` must NOT be deleted: `prime-lookup.html` still loads it. CLAUDE.md's "truthful global count" paragraph described a head-count + PARALLEL page-read design with SCAN_ROW_CAP that DOES NOT EXIST — the route is a sequential loop still capped at GROUP_FETCH_CAP=6000, so `pagination.total` is a FLOOR (#304; `pagination.capped` flags it). Tooling: the five phantom skills CLAUDE.md told the model to run now exist, on `verify-live.mjs` (a 200 with 0 rows is a FAIL) + `db.mjs` (#296). Prev — Market spend reconciliation + one-shot tools. **ONE canonical market query** (`src/lib/market/spend-query.ts`) now shared by fpds-top-n + the market report — never hand-roll the filter (that split is what killed the Spending-by-Agency chart, #245). FIXED LIVE: fpds-top-n **404'd every dominant keyword** ("security guard" $6B / "janitorial" $1.9B / "roofing" $578M returned "No federal market found") — the gate's promised NAICS fall-through was never implemented; it uses the **LEAD code only** (roofing's coverage set dragged in 236220 → measured $77.7B of building construction, not $1.34B of roofing). FIXED LIVE: `topCodePct` measured the promoted LEAD not the biggest → report + Market Coverage banner rendered **"the biggest NAICS is only 0%"** for drones; split into `topCodePct` (biggest-by-$, DISPLAYED) vs `leadCodePct` (the ranking gate) — 8/10 keywords unchanged, hvac keeps 238220 specialty trade. Report gained `basis{}` + a **reconciliation line** ("336411 alone = $69M/28% vs $242.7M across 42 NAICS → misses 72%") — the answer to "your data is wrong". One-shot tools ALL 3 SHIPPED: market report + hosted `/reports/<id>` share link (#289), CRM push (#285/#286, BYO GHL — provision path DROPPED), calendar `include_ics` (#287, dated events only, never guessed). Pricing is **WIRED, not blocked** (that stale note cost a round-trip — grep `packages.ts` before stating a price). KNOWN/UNFIXED: keyword-coverage measures 1 FY vs the canonical 3 FY — a product decision (aligning moves "drones $243M"→$384M). See "Market spend: ONE shared query" + "One-Shot Composite Tools" sections. Prev Jun 24 — SEO crawl health + dep security: robots.txt now allows /_next/static + /_next/image; npm audit 47→24 vulns, 0 critical. Prev Jun 11 (PM) — Full-text search overhaul (bodies were EMPTY cache-wide), 4-corpus search, global lookup bar, contractor search 0-results fix, launch-ops crons, demo homepage. Prev Jun 8 — Keyword-first market research (NAICS is the wrong primary key; "drones"=70+ codes, obvious code=28%/miss 72%), Award Intelligence spine, office contact rosters, LLM cost discipline. Prev Jun 3 — Daily alerts free-daily permanent. Jun 2 — purchase attribution. May 20 — OAuth custom domain, mi-beta → app rename.
+*Last Updated: July 17, 2026 — The silent-failure sweep. **`count ?? 0` is data fabrication**: a table that does not exist returns `count=null, error=null, HTTP 204` — NO error — so `?? 0` turns "I don't know" into "zero" and destroys the only signal separating missing from empty. It cancelled a delete for five `vault_*` tables that never existed (names GUESSED from the feature, not read from the migration; real ones are `user_*`) and reported a clean 0 for months (#307); it recorded nine days of fake metrics in snapshot-metrics (190 emails erased). Now Bug Prevention Rule #11 + gate rule B (#309/#312). **The gate was blind on FOUR independent axes** — EXCLUDE skipped admin/cron/scripts (backwards: nobody reads a cron's stdout, so silent there is WORSE), SCAN_ROOTS never walked scripts/ at all, no count-null rule existed, and the walk matched only .ts/.tsx so every .mjs was invisible to BOTH rules (#311/#312/#314). Widening one axis proved nothing about the others — each fix found the next one still hiding. Baselined at 103; the ratchet blocks anything NEW. Two rule traps, both found by TESTING not assuming: strip comments (fixes now QUOTE the pattern while explaining it) and a bare /error/ token is NOT error handling (an auth guard's `{ error: 'Unauthorized' }` 5 lines up hid 5 sites). **The moat now counts itself** (#315): `recompete_changes_total`/`_new` snapshot daily — a FLAT total is the alarm, and that history cannot be backfilled at any price. Recompete chain all verified LIVE, not from green builds. Prev — Recompete real per-contract data + hourly sync. `get_expiring_contracts` returned `incumbent_uei: null` on EVERY row (93/9,481 = 0.98%); the 9,388 rows weren't contracts (grouped on Recipient+Agency+NAICS, group's EARLIEST end date, one representative PIID — so PIID and expiry could describe different contracts). Replaced with real USASpending per-contract rows: 129,249 rows, 100% UEI, 477/477 NAICS, zero truncation, ~38 min (#280 → PR #284). Grouped rows flagged `grouped_synthetic`. `lead_time_months` was ALWAYS wrong (EXTRACT(MONTH FROM AGE()) drops the years — 18mo stored as 6), so `recompete_stats` expiring_6/12/18 buckets were wrong for as long as the trigger existed. Then scheduled it: `/api/cron/sync-recompete-contracts` hourly via `cron_jobs` (sweep ~38min vs 300s cap → wall-clock-budget shards, ordered by least-recently-ATTEMPTED, not row freshness — a 0-contract NAICS pins the queue head forever otherwise), plus append-only `recompete_changes` (the sync overwrites on upsert and USASpending has no "as of" query, so unrecorded change = gone permanently) (#288 → PR #291). THEN FIXED the shadowing (issue #292, was "found, not fixed"): briefings never read `recompete_opportunities` at all — they read a frozen Apr-08 `contracts-data.json` (9,450 grouped rows, NO uei field) as PRIMARY, which shadowed the live path because it never missed. Briefings now use the shared `queryExpiringContracts` (#299 — verified live: 0/50 → 50/50 rows carry a real UEI). Same defect found on TWO more surfaces: the in-app Recompetes panel filtered a Jun-22 static file client-side and printed its length as "9,450 total in database" while `/api/recompete` sat unreachable behind an early return (#301 → #302; also added `naicsCodes?: string[]` to the shared query — profiles carry 3-5 codes, the lib took one; verified live 0 → 5,897); and the $397 Recompete Tracker page served the same snapshot, ungated — the product is DISCONTINUED (recompete is a Pro feature) so `/recompete.html` now 308s to the live panel (#303 → #306; its Stripe link is disabled manually — code can't). ⚠️ `public/contracts-data.js` must NOT be deleted: `prime-lookup.html` still loads it. CLAUDE.md's "truthful global count" paragraph described a head-count + PARALLEL page-read design with SCAN_ROW_CAP that DOES NOT EXIST — the route is a sequential loop still capped at GROUP_FETCH_CAP=6000, so `pagination.total` is a FLOOR (#304; `pagination.capped` flags it). Tooling: the five phantom skills CLAUDE.md told the model to run now exist, on `verify-live.mjs` (a 200 with 0 rows is a FAIL) + `db.mjs` (#296). Prev — Market spend reconciliation + one-shot tools. **ONE canonical market query** (`src/lib/market/spend-query.ts`) now shared by fpds-top-n + the market report — never hand-roll the filter (that split is what killed the Spending-by-Agency chart, #245). FIXED LIVE: fpds-top-n **404'd every dominant keyword** ("security guard" $6B / "janitorial" $1.9B / "roofing" $578M returned "No federal market found") — the gate's promised NAICS fall-through was never implemented; it uses the **LEAD code only** (roofing's coverage set dragged in 236220 → measured $77.7B of building construction, not $1.34B of roofing). FIXED LIVE: `topCodePct` measured the promoted LEAD not the biggest → report + Market Coverage banner rendered **"the biggest NAICS is only 0%"** for drones; split into `topCodePct` (biggest-by-$, DISPLAYED) vs `leadCodePct` (the ranking gate) — 8/10 keywords unchanged, hvac keeps 238220 specialty trade. Report gained `basis{}` + a **reconciliation line** ("336411 alone = $69M/28% vs $242.7M across 42 NAICS → misses 72%") — the answer to "your data is wrong". One-shot tools ALL 3 SHIPPED: market report + hosted `/reports/<id>` share link (#289), CRM push (#285/#286, BYO GHL — provision path DROPPED), calendar `include_ics` (#287, dated events only, never guessed). Pricing is **WIRED, not blocked** (that stale note cost a round-trip — grep `packages.ts` before stating a price). KNOWN/UNFIXED: keyword-coverage measures 1 FY vs the canonical 3 FY — a product decision (aligning moves "drones $243M"→$384M). See "Market spend: ONE shared query" + "One-Shot Composite Tools" sections. Prev Jun 24 — SEO crawl health + dep security: robots.txt now allows /_next/static + /_next/image; npm audit 47→24 vulns, 0 critical. Prev Jun 11 (PM) — Full-text search overhaul (bodies were EMPTY cache-wide), 4-corpus search, global lookup bar, contractor search 0-results fix, launch-ops crons, demo homepage. Prev Jun 8 — Keyword-first market research (NAICS is the wrong primary key; "drones"=70+ codes, obvious code=28%/miss 72%), Award Intelligence spine, office contact rosters, LLM cost discipline. Prev Jun 3 — Daily alerts free-daily permanent. Jun 2 — purchase attribution. May 20 — OAuth custom domain, mi-beta → app rename.
 
 ---
 
