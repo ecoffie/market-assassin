@@ -33,6 +33,8 @@ export interface Tier1Db {
 interface SamQuery {
   select(cols: string): SamQuery;
   eq(col: string, val: unknown): SamQuery;
+  /** Set-aside filtering matches a CODE against several variants (8(a) = 8A + 8AN). */
+  in(col: string, vals: readonly unknown[]): SamQuery;
   gte(col: string, val: unknown): SamQuery;
   ilike(col: string, val: string): SamQuery;
   or(filters: string): SamQuery;
@@ -61,7 +63,8 @@ export const TIER1_TOOL_DEFS = [
           },
           set_aside: {
             type: 'string',
-            description: 'Optional set-aside filter to match, e.g. "8(a)", "WOSB", "HUBZone", "SDVOSB".',
+            description:
+              'Optional set-aside filter. Accepts the plain-English program name — "8(a)", "SDVOSB", "WOSB", "EDWOSB", "HUBZone", "Small Business", "Veteran", "Buy Indian", "ISBEE", "IEE", "Local Area" — or a raw SAM code ("8A", "8AN", "SDVOSBC", "SBA"…). A program name matches BOTH its competed and sole-source variants (e.g. "8(a)" → 8A + 8AN). An unrecognized value returns an error listing the valid options, never an empty result.',
           },
           state: {
             type: 'string',
@@ -118,6 +121,79 @@ const SAM_LIMIT = 8; // chat answers are tight; a handful of live opps is plenty
  * data — no user binding). `execute(name, args)` runs the named tool with the
  * model-supplied args (validated per-field; unknown fields ignored).
  */
+/**
+ * Set-aside filtering. Resolve a caller's term to `set_aside_code` values.
+ *
+ * WHY THIS EXISTS. The old filter was:
+ *
+ *     q.ilike('set_aside_description', `%${setAside}%`)
+ *
+ * and the tool's own description told the model to send "8(a)". SAM writes the
+ * COMPETED 8(a) notices as "8a Competed" — no parentheses — and only the
+ * sole-source ones as "8(a) Sole Source". So `%8(a)%` silently matched 66 rows
+ * and missed all 130 competed ones, and a plain "8(a)" search for a state with
+ * only competed notices returned ZERO with no error. Observed live 2026-07-17:
+ * Claude asked for 8(a) work near MD, got nothing, and burned three tool calls
+ * doubting the API before discovering the token had to be "8A".
+ *
+ * There is NO single substring that finds all of 8(a) — which is why this maps to
+ * the CODE column instead. Codes below are the live distinct values of
+ * sam_opportunities.set_aside_code, not a guess. Note `BICiv`'s mixed case: `.in()`
+ * is exact.
+ *
+ * A program name resolves to BOTH variants (competed + sole source) because a user
+ * asking for "8(a) opportunities" means both. Raw codes pass through for precision.
+ */
+const SET_ASIDE_CODES = [
+  'SBA', 'SBP', 'NONE', 'SDVOSBC', 'SDVOSBS', 'WOSB', 'WOSBSS', 'EDWOSB',
+  '8A', '8AN', 'HZC', 'HZS', 'VSA', 'VSS', 'ISBEE', 'IEE', 'BICiv', 'LAS',
+] as const;
+
+/** Plain-English program name → the codes it covers. Keys are normalized (see normSetAside). */
+const SET_ASIDE_ALIASES: Record<string, readonly string[]> = {
+  '8a': ['8A', '8AN'], // "8(a)", "8a", "8A" — competed AND sole source
+  '8acompeted': ['8A'],
+  '8asolesource': ['8AN'],
+  sdvosb: ['SDVOSBC', 'SDVOSBS'],
+  servicedisabledveteranowned: ['SDVOSBC', 'SDVOSBS'],
+  wosb: ['WOSB', 'WOSBSS'],
+  womenowned: ['WOSB', 'WOSBSS'],
+  womenownedsmallbusiness: ['WOSB', 'WOSBSS'],
+  edwosb: ['EDWOSB'],
+  hubzone: ['HZC', 'HZS'],
+  hz: ['HZC', 'HZS'],
+  smallbusiness: ['SBA', 'SBP'],
+  sb: ['SBA', 'SBP'],
+  totalsmallbusiness: ['SBA'],
+  partialsmallbusiness: ['SBP'],
+  veteran: ['VSA', 'VSS'],
+  vosb: ['VSA', 'VSS'],
+  buyindian: ['BICiv'],
+  isbee: ['ISBEE'],
+  indiansmallbusiness: ['ISBEE'],
+  iee: ['IEE'],
+  localarea: ['LAS'],
+  none: ['NONE'],
+  nosetaside: ['NONE'],
+};
+
+/** "8(a)" / "8A" / "HUB-Zone" → "8a" / "8a" / "hubzone". */
+function normSetAside(s: string): string {
+  return s.toLowerCase().replace(/[^a-z0-9]/g, '');
+}
+
+/** Codes for a caller's term, or null if we don't recognize it (→ actionable error, never a silent zero). */
+export function resolveSetAsideCodes(input: string): readonly string[] | null {
+  const key = normSetAside(input);
+  if (SET_ASIDE_ALIASES[key]) return SET_ASIDE_ALIASES[key];
+  const exact = SET_ASIDE_CODES.find((c) => normSetAside(c) === key);
+  return exact ? [exact] : null;
+}
+
+/** The options we advertise when a caller's term doesn't resolve. */
+const SET_ASIDE_HELP =
+  '8(a), SDVOSB, WOSB, EDWOSB, HUBZone, Small Business, Veteran, Buy Indian, ISBEE, IEE, Local Area, None — or a raw SAM code (8A, 8AN, SDVOSBC, SBA, HZC…)';
+
 export function makeTier1Tools(db: Tier1Db) {
   async function searchSam(args: { keyword?: unknown; naics?: unknown; set_aside?: unknown; state?: unknown }): Promise<Record<string, unknown>> {
     const keyword = typeof args?.keyword === 'string' ? args.keyword.trim() : '';
@@ -139,14 +215,41 @@ export function makeTier1Tools(db: Tier1Db) {
       .gte('response_deadline', todayIso)
       .textSearch('search_tsv', keyword, { type: 'websearch' });
     if (naics) q = q.eq('naics_code', naics);
-    if (setAside) q = q.ilike('set_aside_description', `%${setAside}%`);
+    // Filter on the CODE, never an ILIKE over the free-text description — see
+    // SET_ASIDE_CODES above. An unrecognized term is an ERROR, not zero rows:
+    // "no 8(a) work in Maryland" and "you spelled the filter wrong" must not look
+    // identical to the caller.
+    let setAsideCodes: readonly string[] | null = null;
+    if (setAside) {
+      setAsideCodes = resolveSetAsideCodes(setAside);
+      if (!setAsideCodes) {
+        return {
+          ok: false,
+          error: 'unknown_set_aside',
+          message: `"${setAside}" is not a set-aside we recognize. Valid options: ${SET_ASIDE_HELP}.`,
+          count: 0,
+          items: [],
+        };
+      }
+      q = q.in('set_aside_code', setAsideCodes);
+    }
     if (st) q = q.or(`pop_state.eq.${st},office_address->>state.eq.${st}`);
     const { data, error } = await q.order('response_deadline', { ascending: true, nullsFirst: false }).limit(SAM_LIMIT);
 
     if (error) return { ok: false, error: 'sam_unavailable', count: 0, items: [] };
     const rows = (data || []) as SamRow[];
     if (rows.length === 0) {
-      return { ok: true, count: 0, items: [], note: `No open SAM opportunities matched "${keyword}"${naics ? ` in NAICS ${naics}` : ''}${st ? ` in ${st} (place of performance or buying office)` : ''} right now.` };
+      // Name EVERY filter that was applied. The old note omitted set_aside, so a
+      // zero caused by the set-aside filter read as "nothing exists" — which is
+      // how the 8(a) bug stayed invisible.
+      return {
+        ok: true,
+        count: 0,
+        items: [],
+        note: `No open SAM opportunities matched "${keyword}"${naics ? ` in NAICS ${naics}` : ''}${
+          setAsideCodes ? ` with set-aside ${setAside} (${setAsideCodes.join('/')})` : ''
+        }${st ? ` in ${st} (place of performance or buying office)` : ''} right now.`,
+      };
     }
     return {
       ok: true,
