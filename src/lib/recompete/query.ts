@@ -15,9 +15,43 @@ const SUPABASE_SERVICE_ROLE_KEY = process.env.SUPABASE_SERVICE_ROLE_KEY!;
 const COLUMNS =
   'contract_id,piid,incumbent_name,incumbent_uei,awarding_agency,awarding_sub_agency,naics_code,naics_description,psc_code,description,total_obligation,potential_total_value,period_of_performance_start,period_of_performance_current_end,place_of_performance_state,place_of_performance_city,set_aside_type,competition_type,number_of_offers,estimated_recompete_date,lead_time_months,recompete_likelihood';
 
+/**
+ * Digits-only NAICS codes, deduped, order preserved. Accepts a comma/space-separated
+ * string ("236220, 541512") or an array. Anything non-numeric is dropped — these
+ * values are interpolated into a PostgREST `.or()` expression, so they MUST be
+ * sanitized here.
+ */
+export function parseNaicsCodes(input?: string | string[] | null): string[] {
+  const raw = Array.isArray(input) ? input : String(input ?? '').split(/[,\s]+/);
+  const out: string[] = [];
+  for (const r of raw) {
+    const code = String(r ?? '').trim();
+    if (/^\d{2,6}$/.test(code) && !out.includes(code)) out.push(code);
+  }
+  return out;
+}
+
+/**
+ * PostgREST `.or()` expression OR-ing several NAICS codes, preserving the single-code
+ * rule: <6 chars = PREFIX match (`236` → `236%`), 6 digits = exact.
+ * Callers must pass codes through `parseNaicsCodes` first.
+ */
+export function naicsOrExpression(codes: string[]): string {
+  return codes
+    .map((c) => (c.length < 6 ? `naics_code.like.${c}%` : `naics_code.eq.${c}`))
+    .join(',');
+}
+
 export interface ExpiringContractsInput {
   /** NAICS code; ≤5 chars = prefix, 6 = exact. */
   naics?: string;
+  /**
+   * Multiple NAICS codes, OR'd together — same prefix/exact rule per code. A user
+   * profile carries 3-5 codes; `naics` alone could only ever express the first one.
+   * When present this takes precedence over `naics`; when absent `naics` behaves
+   * exactly as before (backward compatible).
+   */
+  naicsCodes?: string[];
   /** Agency name, case-insensitive partial. */
   agency?: string;
   /** 2-letter place-of-performance state. */
@@ -83,8 +117,18 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
       .lte('period_of_performance_current_end', maxStr);
     if (withQuality) q = q.is('quality_flag', null);
 
+    // NAICS: a sanitized `naicsCodes` list wins (OR across codes); otherwise the
+    // legacy single `naics` string is applied byte-for-byte as it always was.
+    const codes = parseNaicsCodes(input.naicsCodes);
     const naics = (input.naics || '').trim();
-    if (naics) q = naics.length < 6 ? q.like('naics_code', `${naics}%`) : q.eq('naics_code', naics);
+    if (codes.length > 1) {
+      q = q.or(naicsOrExpression(codes));
+    } else if (codes.length === 1) {
+      const c = codes[0];
+      q = c.length < 6 ? q.like('naics_code', `${c}%`) : q.eq('naics_code', c);
+    } else if (naics) {
+      q = naics.length < 6 ? q.like('naics_code', `${naics}%`) : q.eq('naics_code', naics);
+    }
     const agency = (input.agency || '').trim();
     if (agency) q = q.ilike('awarding_agency', `%${agency}%`);
     const state = (input.state || '').trim().toUpperCase();

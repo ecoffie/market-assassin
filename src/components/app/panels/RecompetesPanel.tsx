@@ -10,7 +10,10 @@ import ContractorLink from '../contractors/ContractorLink';
 import AwardDetailDrawer from '../awards/AwardDetailDrawer';
 import RecompeteSowMatch from '../awards/RecompeteSowMatch';
 import SaveContactButton from '../contacts/SaveContactButton';
-import { classifyLocation, MATCH_META, overseasRegionFromOffice, type LocationMatch } from '@/lib/geo/location-match';
+// overseasRegionFromOffice is no longer needed here: it existed to compensate for the
+// static file's `State` being the VENDOR's state (an overseas office would falsely match
+// the user's area). The API returns real place_of_performance_state.
+import { classifyLocation, MATCH_META, type LocationMatch } from '@/lib/geo/location-match';
 import { formatDodaacOffice } from '@/lib/gov-contacts/dodaac';
 import { useDodaacNames } from '@/components/app/useDodaacNames';
 import StaleDataBanner from '@/components/app/StaleDataBanner';
@@ -118,18 +121,6 @@ interface RecompeteApiContract {
   vocab?: string[];
 }
 
-interface StaticRecompeteContract {
-  'Award ID'?: string;
-  Agency?: string;
-  Office?: string;
-  Recipient?: string;
-  NAICS?: string;
-  'Total Value'?: string;
-  'Start Date'?: string;
-  Expiration?: string;
-  State?: string;
-}
-
 interface SavedProfileDefaults {
   naicsCodes: string[];
   agencies: string[];
@@ -161,18 +152,6 @@ function getDaysUntil(dateStr?: string | null): number {
   const today = new Date();
   today.setHours(0, 0, 0, 0);
   return Math.ceil((target.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
-}
-
-function parseCurrency(value?: string): number {
-  if (!value) return 0;
-  return parseFloat(value.replace(/[$,\s]/g, '')) || 0;
-}
-
-function parseStaticDate(dateStr?: string): string {
-  if (!dateStr) return '';
-  const parsed = new Date(dateStr);
-  if (Number.isNaN(parsed.getTime())) return dateStr;
-  return parsed.toISOString().split('T')[0];
 }
 
 function extractNaicsCode(value?: string | null): string {
@@ -215,41 +194,6 @@ function getRecompeteOverview(contract: ExpiringContract): string {
   return `${agency} has an expiring award held by ${incumbent}; ${daysText}. ${competitionText}`;
 }
 
-function mapStaticContract(contract: StaticRecompeteContract): ExpiringContract {
-  const expirationDate = parseStaticDate(contract.Expiration);
-  const naics = extractNaicsCode(contract.NAICS);
-  const value = parseCurrency(contract['Total Value']);
-
-  return {
-    piid: contract['Award ID'] || `${contract.Recipient || 'contract'}-${contract.Expiration || ''}`,
-    title: contract.NAICS || `${contract.Recipient || 'Incumbent'} recompete`,
-    incumbent: {
-      name: contract.Recipient || 'Unknown incumbent',
-      uei: '',
-    },
-    agency: contract.Agency || 'Unknown agency',
-    subAgency: contract.Office || undefined,
-    naics,
-    value,
-    potentialValue: value,
-    obligated: value,           // static file only has one value; treat as obligated
-    startDate: parseStaticDate(contract['Start Date']),
-    expirationDate,
-    daysUntilExpiration: getDaysUntil(expirationDate),
-    bidsReceived: 0,
-    competitionLevel: 'full',
-    competitionType: 'Expiring contract',
-    // The dataset's `State` is the VENDOR's state, not place of performance. For
-    // clearly-overseas buying offices (e.g. "ENDIST JAPAN"), that vendor state would
-    // falsely match the user's service area, so surface the real region instead —
-    // it classifies as "outside your area" and sorts down, not a green "HQ state".
-    location: (() => {
-      const overseas = overseasRegionFromOffice(contract.Office);
-      return overseas ? { state: overseas } : { state: contract.State || undefined };
-    })(),
-  };
-}
-
 function mapRecompeteContract(contract: RecompeteApiContract): ExpiringContract {
   const expirationDate = contract.period_of_performance_current_end || '';
   const piid = contract.piid || contract.award_id || contract.contract_id || '';
@@ -290,7 +234,11 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
   const dodaacNames = useDodaacNames();
   void tier;
   const [contracts, setContracts] = useState<ExpiringContract[]>([]);
-  const [allContracts, setAllContracts] = useState<ExpiringContract[]>([]);
+  // How many vehicles match the CURRENT filters server-side (pagination.total).
+  // The list below only holds a 200-row page, so this is the honest "of N" figure.
+  // `matchCapped` = the server's scan hit its cap → render as "N+", never a hard count.
+  const [matchTotal, setMatchTotal] = useState<number | null>(null);
+  const [matchCapped, setMatchCapped] = useState(false);
   const [summary, setSummary] = useState<ContractSummary | null>(null);
   const [profileDefaults, setProfileDefaults] = useState<SavedProfileDefaults | null>(null);
   const [usingProfileDefaults, setUsingProfileDefaults] = useState(false);
@@ -436,18 +384,29 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
     });
   }, []);
 
-  const searchContracts = useCallback(async (naics: string, months: string, competition: string) => {
+  // Search the LIVE recompete_opportunities table via /api/recompete.
+  //
+  // This used to filter a 3.4MB static `public/contracts-data.js` snapshot client-side
+  // (9,450 rows, no UEI, frozen at build time) and returned before ever reaching the
+  // API. The real table holds ~129k rows synced hourly, which cannot be shipped to the
+  // browser — so NAICS + expiry filtering is SERVER-side now. Agency/competition
+  // matching and the location badge still run client-side over the returned page
+  // (see applyFilters). Issue #301.
+  const searchContracts = useCallback(async (
+    naics: string,
+    months: string,
+    competition: string,
+    defaults?: SavedProfileDefaults | null,
+  ) => {
     setSearching(true);
     setError(null);
 
     try {
-      if (allContracts.length > 0) {
-        applyFilters(allContracts, naics, months, competition, usingProfileDefaults ? profileDefaults : null);
-        return;
-      }
-
       const params = new URLSearchParams();
-      if (naics) params.set('naics', naics.split(/[, ]+/)[0]);
+      // Send ALL of the profile's NAICS codes — the API ORs across them. Previously
+      // this sent `naics.split()[0]`, so a 5-code profile only ever saw code #1.
+      const codes = uniqueStrings(naics.split(/[, ]+/)).map(extractNaicsCode).filter(Boolean);
+      if (codes.length > 0) params.set('naics', codes.join(','));
       params.set('months', months === 'all' ? '60' : months);
       params.set('limit', '200');
       params.set('sort', 'value');
@@ -464,21 +423,29 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
       // "as of {time}" banner; otherwise clear it (we're back on live data).
       setDegraded(data._degraded ? { servedAt: data._servedAt ?? null } : null);
 
+      // The TRUTHFUL count of vehicles matching these filters server-side — the page
+      // below is capped at 200, so this is the only honest "how many are there".
+      // `capped` means the server's scan stopped early → the number is a floor ("N+").
+      setMatchTotal(typeof data.pagination?.total === 'number' ? data.pagination.total : null);
+      setMatchCapped(Boolean(data.pagination?.capped));
+
       // Prefer the VEHICLE-grouped view (1 card per IDIQ, awardees listed) over
       // raw awardee rows, so a 196-winner vehicle isn't 196 duplicate cards
       // (Eric, Jun 25). Falls back to contracts if vehicles isn't present.
       const source = (data.vehicles?.length ? data.vehicles : data.contracts) || [];
       const mappedContracts = (source as RecompeteApiContract[]).map(mapRecompeteContract);
-      applyFilters(mappedContracts, naics, months, competition, usingProfileDefaults ? profileDefaults : null);
+      applyFilters(mappedContracts, naics, months, competition, defaults ?? null);
     } catch (err) {
       console.error('Contract search error:', err);
       setError('Failed to connect to server');
       setContracts([]);
+      setMatchTotal(null);
+      setMatchCapped(false);
     } finally {
       setSearching(false);
       setLoading(false);
     }
-  }, [allContracts, applyFilters, email, profileDefaults, usingProfileDefaults]);
+  }, [applyFilters, email]);
 
   // Fetch task orders (subcontracting targets) on demand. limit=100 + the API
   // reports the TRUE total (Eric: "50 looks like a sample not the whole").
@@ -511,7 +478,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
     if (type === 'task') fetchIdv(naicsFilter);
   }, [fetchIdv, naicsFilter]);
 
-  // Load the shared profile defaults once, then apply them to the full recompete dataset.
+  // Load the shared profile defaults once, then search the live table with them.
   useEffect(() => {
     if (!email) return;
 
@@ -520,25 +487,15 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
       setError(null);
 
       try {
-        const [prefsResponse, workspaceResponse, contractsResponse] = await Promise.all([
+        const [prefsResponse, workspaceResponse] = await Promise.all([
           fetch(`/api/alerts/preferences?email=${encodeURIComponent(email as string)}`),
           authedFetch(`/api/app/workspace?email=${encodeURIComponent(email as string)}`, email),
-          fetch('/contracts-data.js'),
         ]);
 
-        const [prefs, workspace, contractsText] = await Promise.all([
+        const [prefs, workspace] = await Promise.all([
           prefsResponse.json().catch(() => null),
           workspaceResponse.json().catch(() => null),
-          contractsResponse.text(),
         ]);
-
-        const parsedStaticContracts = JSON.parse(
-          contractsText
-            .replace(/^var\s+expiringContractsData\s*=\s*/, '')
-            .replace(/;\s*$/, '')
-        ) as StaticRecompeteContract[];
-        const mappedContracts = parsedStaticContracts.map(mapStaticContract);
-        setAllContracts(mappedContracts);
 
         const workspaceSettings = workspace?.settings || {};
         const workspaceProfile = workspace?.profile || {};
@@ -576,29 +533,29 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
         const profileNaics = profileDefaultsNext.naicsCodes.join(', ');
         setNaicsFilter(profileNaics);
         setUsingProfileDefaults(profileDefaultsNext.naicsCodes.length > 0 || profileDefaultsNext.agencies.length > 0 || profileDefaultsNext.states.length > 0);
-        applyFilters(mappedContracts, profileNaics, '24', '', profileDefaultsNext);
+        // searchContracts clears `loading` in its own finally.
+        await searchContracts(profileNaics, '24', '', profileDefaultsNext);
       } catch (err) {
         console.error('Failed to load recompete defaults:', err);
         setError('Failed to load recompete dataset.');
-      } finally {
         setLoading(false);
       }
     }
 
     loadProfileAndContracts();
-  }, [applyFilters, email]);
+  }, [email, searchContracts]);
 
   const handleSearch = () => {
     if (awardType === 'task') { fetchIdv(naicsFilter); return; }
     setUsingProfileDefaults(false);
-    searchContracts(naicsFilter, monthsFilter, competitionFilter);
+    searchContracts(naicsFilter, monthsFilter, competitionFilter, null);
   };
 
   const useSavedProfile = () => {
     const profileNaics = profileDefaults?.naicsCodes.join(', ') || '';
     setNaicsFilter(profileNaics);
     setUsingProfileDefaults(true);
-    applyFilters(allContracts, profileNaics, monthsFilter, competitionFilter, profileDefaults);
+    searchContracts(profileNaics, monthsFilter, competitionFilter, profileDefaults);
   };
 
   const viewAllContracts = () => {
@@ -606,7 +563,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
     setMonthsFilter('all');
     setCompetitionFilter('');
     setUsingProfileDefaults(false);
-    applyFilters(allContracts, '', 'all', '', null);
+    searchContracts('', 'all', '', null);
   };
 
   const getCompetitionBadge = (level: string) => {
@@ -650,6 +607,16 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
   }, [summary, myStatesOnly, visibleContracts]);
 
   const shownContractsCount = (myStatesOnly ? visibleContracts.length : summary?.totalContracts) || 0;
+
+  // The honest count of what MATCHES the current filters server-side. Rendered "N+"
+  // when the server's scan was capped, because then it's a floor and not a total.
+  // This is deliberately NOT labelled "in database": it is scoped to the filters,
+  // and the panel never sees a whole-corpus count (issue #301).
+  const matchTotalLabel = matchTotal === null
+    ? null
+    : `${matchTotal.toLocaleString()}${matchCapped ? '+' : ''}`;
+  // Only claim there's more to see when we know there is.
+  const hasMoreThanShown = matchTotal !== null && (matchCapped || matchTotal > shownContractsCount);
 
   if (loading) {
     return (
@@ -708,10 +675,10 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
           <button
             type="button"
             onClick={viewAllContracts}
-            disabled={allContracts.length === 0}
+            disabled={searching}
             className="px-4 py-2 bg-surface hover:bg-input disabled:opacity-50 text-ink-soft text-sm rounded-lg transition-colors"
           >
-            View all {allContracts.length.toLocaleString()}
+            View all expiring awards
           </button>
         </div>
       </div>
@@ -723,9 +690,13 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
           <div className="bg-ground border border-surface rounded-xl p-4">
             <div className="text-2xl font-bold text-white">{visibleSummary.totalContracts}</div>
             <div className="text-xs text-faint">{myStatesOnly ? 'In Your States' : usingProfileDefaults ? 'Profile Matches' : 'Expiring Awards Shown'}</div>
-            {/* The static recompete dataset has no place-of-performance state, so the
-                "in your service area" count was always 0. Show the honest DB total. */}
-            <div className="text-[11px] text-slate-600 mt-1">{allContracts.length.toLocaleString()} total in database</div>
+            {/* Scoped to the CURRENT filters — this said "N total in database" off a
+                stale 9,450-row static file while the table held ~129k rows (#301).
+                The panel never loads the whole corpus, so it must not quote a
+                corpus-wide number it doesn't have. */}
+            {matchTotalLabel && (
+              <div className="text-[11px] text-slate-600 mt-1">of {matchTotalLabel} matching these filters</div>
+            )}
           </div>
           <div className="bg-ground border border-surface rounded-xl p-4">
             <div className="text-2xl font-bold text-emerald-400">{formatCurrency(visibleSummary.totalValue)}</div>
@@ -780,7 +751,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
           {profileDefaults && (
             <button
               onClick={useSavedProfile}
-              disabled={allContracts.length === 0}
+              disabled={searching}
               className="px-3 py-1.5 bg-emerald-500/15 hover:bg-emerald-500/25 disabled:opacity-50 text-emerald-300 text-sm rounded-lg transition-colors"
             >
               Use Saved Profile
@@ -865,9 +836,9 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
             </span>
           </label>
         )}
-        {awardType === 'definitive' && usingProfileDefaults && allContracts.length > shownContractsCount && (
+        {awardType === 'definitive' && usingProfileDefaults && hasMoreThanShown && (
           <div className="rounded-lg border border-hairline bg-ground-deep/50 p-3 text-sm text-muted">
-            Showing {shownContractsCount.toLocaleString()} matches{myStatesOnly ? ' in your states' : ' from your saved profile'}. The full database has {allContracts.length.toLocaleString()} expiring awards.
+            Showing {shownContractsCount.toLocaleString()} of {matchTotalLabel} expiring awards{myStatesOnly ? ' in your states' : ' matching your saved profile'}.
             <button
               type="button"
               onClick={viewAllContracts}
@@ -1066,6 +1037,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
           <div className="px-5 py-4 border-b border-surface">
             <h3 className="text-sm font-semibold text-muted uppercase tracking-wider">
               {visibleContracts.length.toLocaleString()} Expiring Awards{myStatesOnly ? ' · in your states' : ''}
+              {searching && <span className="ml-2 normal-case text-faint animate-pulse">updating…</span>}
             </h3>
           </div>
           {myStatesOnly && visibleContracts.length === 0 ? (
@@ -1378,8 +1350,17 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
         </div>
       )}
 
+      {/* Fetching a new filter set from the server. Filtering is server-side now, so
+          there IS a round-trip between filter changes — show it rather than briefly
+          rendering the "No recompetes found" empty state, which reads as "no data". */}
+      {awardType === 'definitive' && searching && contracts.length === 0 && (
+        <div className="bg-ground border border-surface rounded-xl p-6 text-center text-sm text-muted">
+          <div className="animate-pulse">Searching expiring awards…</div>
+        </div>
+      )}
+
       {/* Empty State */}
-      {!loading && contracts.length === 0 && !error && (
+      {!loading && !searching && contracts.length === 0 && !error && (
         <div className="bg-gradient-to-br from-amber-900/30 to-slate-900 border border-amber-500/30 rounded-xl p-6 text-center">
           <div className="text-5xl mb-4">⏰</div>
           <p className="text-ink-soft mb-2">
@@ -1393,7 +1374,7 @@ export default function RecompetesPanel({ email, tier }: RecompetesPanelProps) {
             onClick={viewAllContracts}
             className="inline-block px-6 py-2 bg-amber-600 hover:bg-amber-500 text-white text-sm font-medium rounded-lg transition-colors"
           >
-            View all {allContracts.length.toLocaleString()} expiring awards
+            View all expiring awards
           </button>
         </div>
       )}
