@@ -45,7 +45,29 @@ function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 }
 
-const CHUNK = 500;
+/** Upsert batch size. POST body — no URL length involved. */
+const WRITE_CHUNK = 500;
+
+/**
+ * Read batch size for the .in() lookup, and it must stay SMALL.
+ *
+ * PostgREST puts .in() values in the GET query string. contract_ids average ~47
+ * chars, so 500 of them built a ~24KB URL and the server rejected it:
+ *
+ *   541512 | existing-row read failed: Bad Request
+ *
+ * Deterministic, not transient: EVERY NAICS with >500 contracts failed on every
+ * cycle -- 541512 (5,922 rows), 236220 (6,936), 541611, 541715 -- i.e. exactly
+ * the biggest and most valuable ones, which would never have recorded a single
+ * change. Measured live: 500 -> ~23,847 chars (fails), 300 -> ~14,261 (works),
+ * 100 -> ~4,625 (works). 100 keeps ~3x headroom for longer-than-average ids.
+ *
+ * The cost is more round trips (60 instead of 12 for 5,922 rows), which the
+ * per-NAICS wall-clock budget absorbs. Correctness beats latency here: the
+ * alternative is a change log that is permanently blank for the NAICS that
+ * matter most.
+ */
+const READ_CHUNK = 100;
 
 /** Fetch stored copies of the contracts we're about to overwrite, for the diff. */
 async function loadExisting(
@@ -53,11 +75,11 @@ async function loadExisting(
   contractIds: string[],
 ): Promise<ExistingRow[]> {
   const rows: ExistingRow[] = [];
-  for (let i = 0; i < contractIds.length; i += CHUNK) {
+  for (let i = 0; i < contractIds.length; i += READ_CHUNK) {
     const { data, error } = await supabase
       .from('recompete_opportunities')
       .select(['contract_id', ...TRACKED_FIELDS].join(','))
-      .in('contract_id', contractIds.slice(i, i + CHUNK));
+      .in('contract_id', contractIds.slice(i, i + READ_CHUNK));
     // A failed read here means we cannot tell what changed. Throw rather than
     // diff against a partial "before" and silently log phantom transitions.
     if (error) throw new Error(`existing-row read failed: ${error.message}`);
@@ -97,8 +119,8 @@ async function recordAttempt(
 }
 
 async function upsertContracts(supabase: ReturnType<typeof sb>, contracts: SyncedContract[]) {
-  for (let i = 0; i < contracts.length; i += CHUNK) {
-    const chunk = contracts.slice(i, i + CHUNK);
+  for (let i = 0; i < contracts.length; i += WRITE_CHUNK) {
+    const chunk = contracts.slice(i, i + WRITE_CHUNK);
     const { error } = await supabase
       .from('recompete_opportunities')
       .upsert(chunk, { onConflict: 'contract_id', ignoreDuplicates: false });
