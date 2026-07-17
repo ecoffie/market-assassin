@@ -44,7 +44,7 @@ function getSupabase() {
 
 // In-memory cache for the agency facet (~56 values, changes ~daily with the
 // sync). Avoids re-scanning 112K rows on every panel mount.
-let _agencyCache: { list: string[]; at: number } | null = null;
+let _agencyCache: { list: string[]; detail: { name: string; count: number }[]; at: number } | null = null;
 const AGENCY_TTL_MS = 6 * 60 * 60 * 1000; // 6h
 
 // SAM's contact "title" is messy: ~25% is the generic POC designation
@@ -211,7 +211,7 @@ export async function GET(request: NextRequest) {
   // Facets: distinct agency list for the filter dropdown.
   if (sp.get('facets') === 'agencies') {
     if (_agencyCache && Date.now() - _agencyCache.at < AGENCY_TTL_MS) {
-      return NextResponse.json({ success: true, agencies: _agencyCache.list, cached: true });
+      return NextResponse.json({ success: true, agencies: _agencyCache.list, agencyDetail: _agencyCache.detail, cached: true });
     }
     // There are ~56 distinct agencies but they DON'T cluster in the first N
     // rows — the column is alphabetically ordered, so a single .limit(5000)
@@ -219,7 +219,13 @@ export async function GET(request: NextRequest) {
     // column: NO early-exit, because one agency (DoD) spans many consecutive
     // pages, which would falsely look "done" before reaching later-alphabet
     // agencies. The 6h cache above makes this full scan a once-per-6h cost.
-    const set = new Set<string>();
+    // COUNT while we page — the scan already touches every row, so the count is
+    // free. It used to build a Set and throw the tally away, then sort A-Z, which
+    // put DEPT OF DEFENSE (55,422 contacts) between COURT SERVICES (38) and
+    // COMMITTEE FOR PURCHASE FROM PEOPLE WHO ARE BLIND (2) — all looking equally
+    // useful. The sub-agency dropdown three lines down already renders
+    // "{name} ({count})"; the agency list just never did.
+    const counts = new Map<string, number>();
     const PAGE = 1000;
     for (let from = 0; from < 120_000; from += PAGE) {
       const { data, error } = await sb
@@ -229,13 +235,15 @@ export async function GET(request: NextRequest) {
         .range(from, from + PAGE - 1);
       if (error || !data || data.length === 0) break;
       for (const r of data as { department_ind_agency: string }[]) {
-        if (r.department_ind_agency) set.add(r.department_ind_agency);
+        if (r.department_ind_agency) counts.set(r.department_ind_agency, (counts.get(r.department_ind_agency) || 0) + 1);
       }
       if (data.length < PAGE) break;
     }
-    const list = Array.from(set).sort();
-    _agencyCache = { list, at: Date.now() };
-    return NextResponse.json({ success: true, agencies: list });
+    // Biggest first: where the contacts actually ARE is the useful ordering.
+    const detail = [...counts.entries()].map(([name, count]) => ({ name, count })).sort((a, b) => b.count - a.count);
+    const list = detail.map((d) => d.name);
+    _agencyCache = { list, detail, at: Date.now() };
+    return NextResponse.json({ success: true, agencies: list, agencyDetail: detail });
   }
 
   // Facet: contracting OFFICES for an agency (drill-down DoD → NAVAIR /

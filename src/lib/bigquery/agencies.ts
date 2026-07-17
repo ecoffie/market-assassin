@@ -2,6 +2,7 @@
  * Agency-level queries — powers /agencies/[slug] pages with BQ data.
  */
 import { BQ_TABLES } from './client';
+import { agencyKeyword } from '@/lib/gov-contacts/agency-search';
 import { queryCached } from './cache';
 
 export interface AgencyProfile {
@@ -98,14 +99,27 @@ export interface AgencyOfficeRow {
 export async function getOfficesForAgency(agencyName: string, limit = 100, liveBq = false): Promise<AgencyOfficeRow[]> {
   const needle = (agencyName || '').trim().toLowerCase();
   if (!needle) return [];
-  // Take the most distinctive word from the SAM agency name to contains-match
-  // (e.g. "AGRICULTURE, DEPARTMENT OF" → "agriculture"). Avoids matching on
-  // stopwords like "department"/"of" that appear in every agency.
-  const STOP = new Set(['department', 'of', 'the', 'and', 'for', 'u.s.', 'us', 'office']);
-  const key = needle.split(/[^a-z0-9]+/).filter(w => w.length > 2 && !STOP.has(w)).sort((a, b) => b.length - a.length)[0] || needle;
+  // The key is the FIRST distinctive token, via the shared agencyKeyword().
+  //
+  // This used to take the LONGEST word, on the theory that longest == most
+  // distinctive. It is not — it is often the most GENERIC, and it put another
+  // agency's offices on the page (Eric's screenshot, 2026-07-17):
+  //
+  //   "HEALTH AND HUMAN SERVICES, DEPARTMENT OF" -> longest = "services"
+  //      -> LIKE %services% -> matches GENERAL *SERVICES* ADMINISTRATION
+  //      -> "Top contracting offices in HHS" listed GSA FAS AAS FEDSIM $64B,
+  //         GSA/FAS AUTOMOTIVE CENTER $19B, GSA FAS AAS REGION 4 $11B.
+  //   "GENERAL SERVICES ADMINISTRATION" -> longest = "administration"
+  //      -> matches NASA, SBA, FAA — every "...Administration".
+  //
+  // agencyKeyword() strips the filler ("department of", "administration",
+  // "agency"…) and takes the lead token: HHS -> "health", GSA -> "general",
+  // NASA -> "aeronautics". Same function the contact search already uses, so
+  // the office panel and the contact list now agree on what an agency IS.
+  const key = agencyKeyword(agencyName).toLowerCase() || needle;
   return queryCached<AgencyOfficeRow>({
     cacheOnly: !liveBq,
-    cacheKey: `agency-offices:${key}:${limit}:v1`,
+    cacheKey: `agency-offices:${key}:${limit}:v2`,
     query: `
       SELECT awarding_office, awarding_office_code, total_amount, award_count
       FROM ${BQ_TABLES.agencyOfficeSummary}

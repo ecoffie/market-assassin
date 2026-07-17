@@ -38,7 +38,7 @@ interface Contact {
 
 export default function GovDecisionMakersPanel({ email }: Props) {
   const [contacts, setContacts] = useState<Contact[]>([]);
-  const [agencies, setAgencies] = useState<string[]>([]);
+  const [agencies, setAgencies] = useState<Array<{ name: string; count: number }>>([]);
   const [total, setTotal] = useState(0);
   const [emailableTotal, setEmailableTotal] = useState<number | null>(null);
   const [search, setSearch] = useState('');
@@ -109,7 +109,12 @@ export default function GovDecisionMakersPanel({ email }: Props) {
     if (!email) return;
     authedFetch(`/api/app/federal-contacts?facets=agencies&email=${encodeURIComponent(email)}`, email)
       .then(r => r.json())
-      .then(d => { if (d.success) setAgencies(d.agencies || []); })
+      .then(d => {
+        if (!d.success) return;
+        // agencyDetail carries counts (biggest first). Fall back to the bare
+        // name list if an older cached response is served.
+        setAgencies(d.agencyDetail?.length ? d.agencyDetail : (d.agencies || []).map((n: string) => ({ name: n, count: 0 })));
+      })
       .catch(() => {});
   }, [email]);
 
@@ -247,26 +252,53 @@ export default function GovDecisionMakersPanel({ email }: Props) {
               </button>
             </div>
           )}
+          {/* AGENCY › SUB-AGENCY › OFFICE — the drill-down path, always VISIBLE.
+              The sub-agency step used to render only once an agency was picked
+              (`agency && subAgencies.length > 1`), so nobody knew it existed:
+              you had to guess your way into a filter to discover the next one
+              (Eric: "no one would know that because they can't see the next
+              step"). The later steps now render disabled, which is what makes
+              the hierarchy legible BEFORE you commit to a guess. */}
           <select
             value={agency}
-            onChange={e => { setAgency(e.target.value); if (e.target.value) setScope('all'); }}
+            onChange={e => { setAgency(e.target.value); setSubAgency(''); if (e.target.value) setScope('all'); }}
             className="px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm focus:border-emerald-500 outline-none max-w-xs"
           >
-            <option value="">All Agencies</option>
-            {agencies.map(a => <option key={a} value={a}>{a}</option>)}
+            <option value="">All agencies</option>
+            {agencies.map(a => (
+              <option key={a.name} value={a.name}>
+                {a.name}{a.count ? ` (${a.count.toLocaleString()})` : ''}
+              </option>
+            ))}
           </select>
-          {/* Sub-agency / branch drill-down (DoD → Air Force / Navy / DLA…).
-              Only shows when the selected agency has derivable sub-agencies. */}
-          {agency && subAgencies.length > 1 && (
-            <select
-              value={subAgency}
-              onChange={e => setSubAgency(e.target.value)}
-              className="px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm focus:border-emerald-500 outline-none max-w-xs"
-            >
-              <option value="">All sub-agencies</option>
-              {subAgencies.map(s => <option key={s.name} value={s.name}>{s.name} ({s.count})</option>)}
-            </select>
-          )}
+
+          <span aria-hidden className="text-muted select-none">›</span>
+
+          <select
+            value={subAgency}
+            onChange={e => setSubAgency(e.target.value)}
+            disabled={!agency || subAgencies.length <= 1}
+            title={!agency ? 'Pick an agency first' : subAgencies.length <= 1 ? 'This agency has no sub-agencies' : undefined}
+            className="px-3 py-2 bg-surface border border-hairline rounded-lg text-white text-sm focus:border-emerald-500 outline-none max-w-xs disabled:opacity-40 disabled:cursor-not-allowed"
+          >
+            <option value="">
+              {!agency ? 'Sub-agency' : subAgencies.length <= 1 ? 'No sub-agencies' : 'All sub-agencies'}
+            </option>
+            {subAgencies.map(s => <option key={s.name} value={s.name}>{s.name} ({s.count.toLocaleString()})</option>)}
+          </select>
+
+          <span aria-hidden className="text-muted select-none">›</span>
+
+          {/* Office is not a filter — SAM POC rows carry no office, so it is
+              agency intelligence (which commands buy, by spend). The disabled
+              chip keeps the third step of the path visible and says where it
+              goes rather than pretending to filter. */}
+          <span
+            title={agency ? 'Contracting offices are listed below, by spend' : 'Pick an agency to see its contracting offices'}
+            className="px-3 py-2 border border-hairline rounded-lg text-sm text-muted opacity-40 cursor-not-allowed select-none"
+          >
+            {agency && officeDetail.length > 0 ? `${officeDetail.length} offices ↓` : 'Offices'}
+          </span>
         </div>
       </div>
 
