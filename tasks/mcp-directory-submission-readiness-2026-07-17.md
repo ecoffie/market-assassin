@@ -2,142 +2,126 @@
 
 ## TL;DR
 
-**Not ready.** Four blockers. The engineering is done — OAuth, transport, canonical URL — but **a reviewer would fail us for reasons that have nothing to do with the server working.**
+**Every technical gate is done and verified against production. One thing is left, and it isn't code: a Team or Enterprise seat** to reach the submission portal (admin settings don't exist on individual plans).
 
-The plan we started from was wrong on three points (verified against the live docs 2026-07-17, see [Corrections](#corrections-to-the-original-plan)). The real blockers are a **credit ceiling**, an **incomplete privacy policy**, and **annotations that aren't live**. One of them — a CRM write declared read-only — is a live safety bug, not a paperwork gap.
+Last night's four blockers are closed. This morning surfaced **three bugs that would each have sunk the submission on their own** — none of which any amount of unauthenticated probing could have found. All three are fixed and live.
 
----
-
-## Blockers
-
-### 1. 🔴 A reviewer runs out of credits halfway through
-
-Every tool is credit-gated. `route.ts` rejects at `balance <= 0`.
-
-| | credits |
-|---|---|
-| Run every tool once (48 priced tools) | **201** |
-| A fresh signup account got (`signup_grant`) | ~~100~~ → **300** (raised 2026-07-17, see below) |
-| A Pro account is entitled to (`PRO_MONTHLY_CREDITS`) | **6000** |
-
-Verified against the live catalog API and ledger: `signup_grant` had **4 entries ever, max +100**; `MCP_SIGNUP_CREDITS` was not set in Vercel, so the code default of 100 was what a new account received.
-
-**RESOLVED 2026-07-17:** `MCP_SIGNUP_CREDITS=300` set in Vercel Production and verified live (`/api/mcp/catalog` → `signupCredits: 300`). 300 covers one 201-credit pass with ~49% headroom. **This is TEMPORARY — revert to 100 once the review passes.** It applies to *every* new signup, not just the reviewer, and the revert has no fixed date (see [blocker 4](#4--team-or-enterprise-workspace-required) / the review-timing note).
-
-Why the global grant rather than hand-topping an account: `grantSignupCreditsIfFirst()` fires **once per account, only when no balance row exists**. A reviewer testing the real OAuth connect flow authenticates as *themselves* and lands a brand-new account — the signup grant is the only lever that reaches them.
-
-The priciest tools eat the grant immediately: `draft_proposal` **50**, `find_capable_contractors` **25**, `generate_market_report` **20**, `referee_proposal_compliance` **12**, `draft_proposal_section` **12**.
-
-**Why it fails review.** The portal requires *"credentials for a fully populated account"* and that you confirm *"you've run every tool yourself."* The criteria require *"Every tool must return a successful response when called with valid parameters."* A reviewer on a normal signup hits `insufficient_credits` at roughly the halfway mark and **every subsequent tool fails** — a rejection caused purely by metering.
-
-**Fixed 2026-07-17:** `MCP_SIGNUP_CREDITS=300`, live and verified. 201 is one clean pass with **zero** retries and reviewers do retry, so 300 leaves ~99 credits of slack — enough for a couple of re-runs, but **not** enough to re-run the proposal flagship path twice (`draft_proposal` 50 + `referee_proposal_compliance` 12 + `extract_compliance_matrix` 8 ≈ 70 a go). Bump to 500 if a reviewer reports running dry.
+> Every figure below was checked against the live endpoint, the live DB, or the live catalog API — not a build status.
 
 ---
 
-### 2. 🔴 The hosted edge declares a CRM write as read-only — LIVE NOW
+## Status
 
-`tool-schemas.ts` applied one blanket `READ_ONLY_ANNOTATIONS` to **every** tool on `mcp.getmindy.ai`:
+| gate | state | proof |
+|---|---|---|
+| Transport + canonical URL | ✅ | real MCP `initialize` → 200 on `mcp.getmindy.ai/mcp` |
+| OAuth end-to-end | ✅ | logs: `authorize → approve 200 → token 200 → tools` |
+| Server identity | ✅ | `name:"Mindy"`, described, iconned, `websiteUrl` |
+| Tool annotations (both surfaces) | ✅ | **47 read-only / 2 write** split visible in Claude |
+| Privacy policy | ✅ | retention + AI processing + MCP sections live |
+| Public documentation | ✅ | `getmindy.ai/mcp` |
+| Test credentials | ✅ | `demo@getmindy.ai` — login verified, `mfaRequired:false` |
+| Populated account | ✅ | Tantus vault, 5 NAICS, **CRM write proven** (`added:1`) |
+| Credits | ✅ | 498 on the demo account; **100** for everyone else |
+| **Team/Enterprise seat** | ⬜ | **the only thing left** |
 
-```ts
-readOnlyHint: true, idempotentHint: true   // ← on add_contacts_to_crm
+---
+
+## The three that would have sunk it
+
+### 1. The canonical subdomain 404'd every AUTHENTICATED call (#335)
+
+`mcp.getmindy.ai/mcp` had **never worked** for real MCP traffic. Every token in the DB was minted against the apex, so nobody hit it — until the canonical URL moved to the subdomain.
+
+```
+07:36:57  POST 200  /oauth/token   ← auth succeeded
+07:36:58  POST 404  /mcp           ← then this
 ```
 
-`add_contacts_to_crm` POSTs to the user's own GoHighLevel `/contacts/upsert`, which **dedupes by email/phone — so it can overwrite an existing contact's fields**. Anthropic's docs: these hints *"determine auto-permissions in Claude: read-only tools can run without per-call confirmation."* **Claude is currently told it may write to a customer's CRM unprompted.** `generate_market_report` is mislabelled the same way (persists a row, mints a public `/reports/{id}` link).
+`mcp-handler` matches the path by **strict equality** (`dist/index.js:676`). `basePath:'/mcp'` derived `'/mcp/mcp'`. A Next rewrite **does not rewrite `request.url`**, so the handler saw `/mcp`, compared it to `/mcp/mcp`, and 404'd.
 
-**Fix:** PR **#322** — per-tool `TOOL_META`. Unmerged ⇒ still live.
+**Why every probe missed it:** `withMcpAuth` returns **401 before the handler runs**. The 401, `WWW-Authenticate`, discovery, resource exact-match, TLS, HTTP/1.1 — all green, all structurally blind. **Unauth 401 / auth 404 was the only tell, and seeing it needs a real token.**
 
-**Why it was missed:** PR #318 annotated `src/mcp/server.ts` — the **stdio** server. The hosted edge builds tools via `route.ts → mcpRegistrationList() → listMcpTools() → tool-registry.ts`, a different path. **Two surfaces, one catalog** — the "one fix = every surface" rule. The registry also exposes **5 tools stdio doesn't** (`search_sam_opportunities`, `get_market_vocabulary`, `get_contractor_profile`, `find_capable_contractors`, `get_balance`) — **48 hosted vs 43 stdio** — so #318 could never have reached them.
+Fixed with explicit endpoints `'/mcp' | '/sse' | '/message'`.
+
+**Consequence: `/mcp/mcp` no longer exists.** The apex MCP path is retired (it was already dead — its tokens fail the `aud` check). Local dev has no reachable HTTP edge either; use `npm run mcp:dev` (stdio).
+
+### 2. The consent page polled forever for a key nothing sets (#330)
+
+The whole connect flow was dead. Three `/oauth/authorize` hits, **zero** `/approve`, zero errors — while Eric sat signed in with 2,000 credits on screen.
+
+The page gated on `localStorage.getItem('mi_beta_email')`, which **only the `/app` surfaces write**. A user signed in via `/mcp/*` holds a valid MI token and no such key → "Sign in to continue" → **polled every 1.5s for a value that would never appear**.
+
+`/api/mcp/session`'s own docstring already said that key was untrustworthy. The console was fixed; this page was left behind.
+
+**Self-concealing:** `/mcp/account` *backfills* the key, so anyone who visited the account page first could connect and anyone who didn't never could. It read as flaky, not broken. See `tasks/mi-beta-email-cleanup.md`.
+
+### 3. The hosted server had no identity (#341)
+
+`serverInfo` was never set, so **mcp-handler's default was our identity in every handshake**:
+
+```
+name: "mcp-typescript server on vercel", version: "0.1.0"
+```
+
+That's what a reviewer running `initialize` would have seen. The stdio server has always said `mindy-govcon`; the hosted edge — the one Claude actually connects to — was anonymous. No `icons` either, so clients had nothing to draw.
+
+Now: `name:"Mindy"`, description, `websiteUrl`, `icons:[512x512]`. **Ruled out first:** both origins serve byte-identical `/icon.png` and `<link rel="icon">`, so the apex→subdomain move was *not* the cause.
 
 ---
 
-### 3. 🔴 Privacy policy is incomplete → *immediate* rejection
+## The reviewer test account
 
-`getmindy.ai/privacy` returns 200 but is missing required coverage. The docs list five areas and state: **"Missing or incomplete privacy policies result in immediate rejection."**
+`demo@getmindy.ai` / password issued by `scripts/provision-reviewer-account.ts` (printed once, not stored here).
 
-| required | status |
+Two constraints make this non-obvious. **The script asserts both** rather than trusting memory:
+
+**It must be FREE.** `MFA_ENFORCED_PAID='on'`. A **paid** account signing in with a password gets `{mfaRequired:true}` and **no token** — the OTP goes to an inbox we control and the reviewer doesn't. **Do not grant this account Pro/Team/Enterprise.** `resolveAccess` treats `access_team` as Pro ("Team is a superset of Pro"), so a Team grant locks the reviewer out just as hard. It buys nothing anyway — see the tier note below.
+
+**It must have NO credit-balance row.** `grantSignupCreditsIfFirst()` grants only when no row exists. `demo@govcongiants.com` and `disa-demo@getmindy.ai` both sit at **0 with a row** → they'd grant nothing and every tool would fail `insufficient_credits`. This account was instead funded directly: **500 via `admin_grant`** (498 after the CRM write test), which is deterministic and independent of the signup grant.
+
+Populated via the existing `scripts/seed-demo-vault.ts` — TANTUS TECHNOLOGIES, real UEI `HG5EUM78L3Y9`, 3 real USASpending contracts, 5 NAICS / 6 keywords. CRM connected to GHL location `V4H04EQ2wl6n6fkvBzyM`; a real write is proven (`connected:true, added:1, failed:0`).
+
+**Access instructions must spell out the ordering:** sign in at `getmindy.ai/app` **first**, in the same browser, *then* add the connector. Claude Desktop opens the default browser and the consent page needs an existing session.
+
+---
+
+## Corrections — things I asserted and got wrong
+
+| I claimed | Actually |
 |---|---|
-| Data collection practices | ✅ |
-| Usage **and storage** | ⚠️ partial — usage yes, storage NOT FOUND |
-| Third-party sharing | ✅ |
-| **Data retention** | ❌ **NOT FOUND — no section at all** |
-| Contact information | ✅ (`hello@getmindy.ai`) |
+| A free account can't run `get_winning_playbook` (Pro-gated) | **False.** `MCP_ENFORCE_TIERS` is `''` and `on()` requires the literal `'true'` → `enforceTiers` is **false**, the gate never runs. I read that the env var *existed* and never read its **value**. **No tier change was needed.** |
+| Pro allowance is 1000/mo | **6000.** I read 1000 off the ledger — historical, pre-dating the 2026-07-16 bump. |
+| SSE is auto-rejected | The portal accepts *"streamable HTTP or SSE"*. |
+| OAuth **2.1** is the real lift | It's **OAuth 2.0** — and it was already built. Never the bottleneck. |
+| Review takes weeks before listing | Submission is **auto-scanned and listed as Community by default**. "Verified" is escalated by Anthropic automatically. |
+| "All tools are reads — quick pass" | **Two write.** That one was a safety bug, not paperwork. |
 
-It also never mentions **MCP, connectors, Claude, or AI assistants**, so it doesn't describe the connector's data flow.
-
-**Fix:** add a data-retention section + storage detail; add a paragraph covering the MCP connector data path.
-
----
-
-### 4. 🟠 Team or Enterprise workspace required
-
-The submission portal lives in org admin settings. *"Admin settings aren't available on individual plans."* Pro/Max can't submit. On Team, only Owners can; Enterprise can delegate via a **Directory management** custom role.
+**The pattern:** four of six were reading that a thing *existed* without reading what it *said*.
 
 ---
 
-## Also open (not submission blockers)
+## Loose ends with clocks
 
-- 🔴 **The proposal reprice is HALF-APPLIED, live right now.** `#263` ("coupled proposal-flagship reprices + Pro allowance 1,000→6,000") raised proposal prices *and* was supposed to raise the Pro allowance together. The price half is live; the allowance half is not, for July:
-
-  | | |
-  |---|---|
-  | last July `pro_monthly` grant ran | 2026-07-16 **09:00:24 UTC** |
-  | the 1,000→6,000 bump landed on main | 2026-07-16 **14:12 UTC** (`ea3a6e21`) |
-
-  All **713 grants were +1000**. `applyCreditOnce` is keyed `pro:{email}:{month}`, so **July will never be re-granted**. 713 Pro users are on the old 1,000 allowance against the new prices — a full proposal run is now ~100 credits (draft 50 + matrix 8 + referee 12 + …), so they get **~10 proposals this month**. That is *verbatim* the state `packages.ts` cites as the reason for the bump: *"Pro's old 1,000/mo would only cover ~10 proposals."*
-
-  Self-corrects at the August run. **Decision needed:** backfill the 5,000 difference to the 713 Pro accounts for July (`admin_grant`, or `applyCreditOnce` under a new key), or accept ~2 weeks of the old allowance at new prices. This is a money/customer call, not an engineering one.
-
-  Related: `PRO_MONTHLY_CREDITS` is env-overridable and `packages.ts` warns *"if `MCP_PRO_MONTHLY_CREDITS` is set in Vercel (it may hold the old 1000), UPDATE it to 6000 too — the env wins."* **Checked: it is NOT set**, so the 6000 default applies and the warning is moot. Live catalog confirms `proMonthlyCredits: 6000`.
-
-- **5 users are disconnected.** The `MCP_OAUTH_RESOURCE` flip changed the token audience; all 66 resource-bound tokens were minted against the apex and `tokens.ts` rejects `claims.aud !== OAUTH_RESOURCE`. They must re-add at `https://mcp.getmindy.ai/mcp`. Mostly internal (`bra***@`, `eri***@govcongiants.com`).
-- **The apex is a second, subtly-broken door.** `getmindy.ai/mcp/mcp` still 401s but now advertises the subdomain's `resource` → mismatch. Redirect or retire it before listing.
-- **Connect page shows the old URL** until PR **#319** merges.
-- **`tokens.ts` default** still pointed at the apex, with prod relying on the env var to override — meaning preview/local advertised a mismatched resource, and deleting the env var would silently revert prod. Fixed in #319.
-- **DCR client proliferation.** 24 registered clients for 5 users (**~5 per user**). Anthropic's docs: *"For servers expecting high traffic from the directory, prefer CIMD or `oauth_anthropic_creds` over DCR."* Not a blocker; will not scale.
-- **CIMD is NOT a one-field change.** Advertising `client_id_metadata_document_supported` makes Claude send `client_id` as a URL; `getClient()` does a DB lookup in `mcp_oauth_clients` and `approve` returns `invalid_client` when there's no row ⇒ **every new connection would 400**. Real CIMD = fetch + validate the client metadata document (~1 day). Don't ship the flag alone.
-- **Data handling declaration.** The portal asks whether the API is your own, proxied with permission, or a third party's. Mindy is a genuine mix — proprietary corpus (podcast, playbook, contractor DB) + public federal APIs (USASpending, SAM, Grants.gov, SEC EDGAR, GSA CALC, NIH RePORTER). Declare it accurately; *"your server must call your own first-party APIs, or APIs you legitimately proxy."*
-
----
-
-## Verified DONE
-
-| gate | evidence |
-|---|---|
-| Transport | `mcp.getmindy.ai/mcp` responds; portal accepts **streamable HTTP or SSE** |
-| OAuth 2.0 + PKCE + discovery | `401` + `WWW-Authenticate` w/ `resource_metadata`; `code_challenge_methods_supported:["S256"]`; `/oauth/register` → **201**; `/oauth/token` accepts form-urlencoded (**400, not 415**) |
-| Canonical URL | metadata `resource` == `https://mcp.getmindy.ai/mcp` — **exact match** to what a user types |
-| Cross-host AS | `authorization_servers:["https://getmindy.ai"]`, AS metadata 200 — explicitly supported |
-| Tool names ≤ 64 chars | max is 28 (`get_contractor_award_history`) |
-| No catch-all `api_request` tool | purpose-built tools only |
-| Public documentation | `getmindy.ai/mcp` + `/mcp/pricing` (200). `/docs` 404 — the connect page satisfies *"a blog post or help-center article is sufficient"* |
-| Terms | `getmindy.ai/terms` 200 |
-
----
-
-## Corrections to the original plan
-
-Verified against the live docs on 2026-07-17. The plan was wrong on three of five gates:
-
-| plan said | actually |
-|---|---|
-| "Streamable HTTP — **not** legacy SSE (auto-rejected)" | **False.** The portal's Connection step accepts *"streamable HTTP or SSE"*. |
-| "**OAuth 2.1** + PKCE — *the* real lift" | It's **OAuth 2.0** (`oauth_dcr` = "OAuth 2.0 with Dynamic Client Registration"). And it was **already built** — not the bottleneck. |
-| "Timeline: two weeks to a few months" | **Submission is auto-scanned and listed by default as a Community connector.** *"Verified"* is escalated by Anthropic automatically for connectors "flagged as highly useful" — *"you do not need to take any action."* You can't apply for it. |
-| "Mindy's tools are all reads — quick pass" | **False, and it's a safety issue.** Two write: `add_contacts_to_crm` (destructive) and `generate_market_report` (additive). |
-| "`getmindy.ai/mcp` is the endpoint" | That's a **prerendered marketing page** (405 on POST). The endpoint was `getmindy.ai/mcp/mcp`, now canonically `mcp.getmindy.ai/mcp`. |
-
-The plan was **right** on: `client_credentials` M2M is unsupported (*"Every connection requires user consent"*), tool annotations required, privacy policy required, populated test account required, Team/Enterprise required, `mcp-review@anthropic.com` for escalations, and **every silent killer** — WAF egress (`160.79.104.0/21`), form-encoded token endpoints, generic 500s, oversized payloads.
+- 🔴 **Rotate the GHL Private Integration Token.** It was pasted into a session transcript (2026-07-17). GHL PITs don't expire on their own. Location `V4H04EQ2wl6n6fkvBzyM`.
+- 🟠 **Delete the `Mindy ReviewerTest` contact** (`reviewer-test@example.com`, tag `mindy-directory-review`) written into that location by the write test. **A reviewer will create another one** — use a sandbox location, not a live pipeline.
+- 🟠 **`MCP_ENFORCE_TIERS` is off**, so `get_winning_playbook` — the "one LIVE moat tool" — is ungated for **everyone**, not just the reviewer. Turning it on before listing would make the reviewer's free account fail it. Decide *after* approval.
+- 🟡 **Per-tool icons aren't reachable.** `ToolSchema` supports `icons`, but the SDK's `registerTool` config accepts only `title/description/inputSchema/outputSchema/annotations/_meta`, and 1.29.0 is the latest published. Server-level icon works (renders in the grouped tool list + connectors panel); per-tool marks on each execution line do not. Worth an upstream issue on `modelcontextprotocol/typescript-sdk`; not worth patching around.
+- 🟡 **The July Pro allowance is half-applied** — 713 users on the old 1,000 against the new prices. Self-corrects in August. Backfill-or-accept is a money call (see #325).
 
 ---
 
 ## Order of operations
 
-1. Merge **#322** (hosted annotations — closes the live safety bug) and **#318** (stdio) and **#319** (connect-page URL).
-2. Verify the deployed `tools/list` on `mcp.getmindy.ai` shows per-tool hints — **not** the source, the live endpoint.
-3. Privacy policy: add data retention + storage + the MCP data-flow paragraph.
-4. Reviewer test account: Pro or **500+** credits, fully populated, with step-by-step access instructions.
-5. Redirect or retire the apex `getmindy.ai/mcp/mcp`.
-6. Tell the 5 users to re-add at `mcp.getmindy.ai/mcp`.
-7. Team seat → submit.
+1. **Buy a Team or Enterprise seat.** Nothing else blocks.
+2. Portal → Connection: `https://mcp.getmindy.ai/mcp`, transport **streamable HTTP**.
+3. Portal → Tools: they sync from the server. Expect **49**, grouped 47 read-only / 2 write.
+4. Portal → Listing: name, tagline (≤55), description (≤2000), categories, docs URL (`getmindy.ai/mcp`), privacy URL (`getmindy.ai/privacy`), support contact, icon, slug (**permanent once published**).
+5. Portal → Authentication: **OAuth with dynamic client registration** (DCR). See the caveat below.
+6. Portal → Data handling: Mindy is a **genuine mix** — proprietary corpus (podcast, playbook, contractor DB) *plus* public federal APIs (USASpending, SAM, Grants.gov, SEC EDGAR, GSA CALC, NIH RePORTER). Declare it accurately.
+7. Portal → Test & launch: the credentials above **and the sign-in-first ordering**.
+8. Submit.
 
-**Interim, and it needs no approval:** keep distributing Mindy as a **custom connector URL**. Per the docs, *"A connector does not need to be in the directory for you to use it"* and *"once connected, a community connector works the same way as a verified one."* Safe to say "works with Claude"; don't claim listing or endorsement until it's real.
+**DCR caveat for step 5:** Anthropic's docs say *"For servers expecting high traffic from the directory, prefer CIMD or `oauth_anthropic_creds` over DCR"* — DCR registers a new client on every fresh connection. We're already at **~5 clients per user** (24 clients / 5 users). **CIMD is NOT a one-field change**: advertising `client_id_metadata_document_supported` makes Claude send `client_id` as a URL, `getClient()` does a DB lookup, `approve` returns `invalid_client` → **every new connection 400s**. Real CIMD = fetch + validate the client metadata document (~1 day). `oauth_anthropic_creds` (email Anthropic a client_id/secret) is the cheaper path.
+
+**Interim, needs no approval:** keep distributing Mindy as a **custom connector URL**. Per the docs, *"A connector does not need to be in the directory for you to use it"* and *"once connected, a community connector works the same way as a verified one."* Safe to say "works with Claude"; don't claim listing or endorsement until it's real.
