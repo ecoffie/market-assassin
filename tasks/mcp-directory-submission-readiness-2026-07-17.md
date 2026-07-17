@@ -17,16 +17,20 @@ Every tool is credit-gated. `route.ts` rejects at `balance <= 0`.
 | | credits |
 |---|---|
 | Run every tool once (48 priced tools) | **201** |
-| A fresh signup account gets (`signup_grant`) | **100** |
-| A Pro account gets (`pro_monthly`) | **1000** |
+| A fresh signup account got (`signup_grant`) | ~~100~~ → **300** (raised 2026-07-17, see below) |
+| A Pro account is entitled to (`PRO_MONTHLY_CREDITS`) | **6000** |
 
-Verified against the live ledger: `signup_grant` has **4 entries ever, max +100**; the 709 accounts sitting at exactly 1000 are all `pro_monthly` grants. `MCP_SIGNUP_CREDITS` is **not set in Vercel**, so the code default of 100 is what a new account actually receives.
+Verified against the live catalog API and ledger: `signup_grant` had **4 entries ever, max +100**; `MCP_SIGNUP_CREDITS` was not set in Vercel, so the code default of 100 was what a new account received.
+
+**RESOLVED 2026-07-17:** `MCP_SIGNUP_CREDITS=300` set in Vercel Production and verified live (`/api/mcp/catalog` → `signupCredits: 300`). 300 covers one 201-credit pass with ~49% headroom. **This is TEMPORARY — revert to 100 once the review passes.** It applies to *every* new signup, not just the reviewer, and the revert has no fixed date (see [blocker 4](#4--team-or-enterprise-workspace-required) / the review-timing note).
+
+Why the global grant rather than hand-topping an account: `grantSignupCreditsIfFirst()` fires **once per account, only when no balance row exists**. A reviewer testing the real OAuth connect flow authenticates as *themselves* and lands a brand-new account — the signup grant is the only lever that reaches them.
 
 The priciest tools eat the grant immediately: `draft_proposal` **50**, `find_capable_contractors` **25**, `generate_market_report` **20**, `referee_proposal_compliance` **12**, `draft_proposal_section` **12**.
 
 **Why it fails review.** The portal requires *"credentials for a fully populated account"* and that you confirm *"you've run every tool yourself."* The criteria require *"Every tool must return a successful response when called with valid parameters."* A reviewer on a normal signup hits `insufficient_credits` at roughly the halfway mark and **every subsequent tool fails** — a rejection caused purely by metering.
 
-**Fix:** make the reviewer account **Pro** (1000/mo) or top it up to **500+**. 201 is one clean pass with zero retries; reviewers retry.
+**Fixed 2026-07-17:** `MCP_SIGNUP_CREDITS=300`, live and verified. 201 is one clean pass with **zero** retries and reviewers do retry, so 300 leaves ~99 credits of slack — enough for a couple of re-runs, but **not** enough to re-run the proposal flagship path twice (`draft_proposal` 50 + `referee_proposal_compliance` 12 + `extract_compliance_matrix` 8 ≈ 70 a go). Bump to 500 if a reviewer reports running dry.
 
 ---
 
@@ -71,6 +75,19 @@ The submission portal lives in org admin settings. *"Admin settings aren't avail
 ---
 
 ## Also open (not submission blockers)
+
+- 🔴 **The proposal reprice is HALF-APPLIED, live right now.** `#263` ("coupled proposal-flagship reprices + Pro allowance 1,000→6,000") raised proposal prices *and* was supposed to raise the Pro allowance together. The price half is live; the allowance half is not, for July:
+
+  | | |
+  |---|---|
+  | last July `pro_monthly` grant ran | 2026-07-16 **09:00:24 UTC** |
+  | the 1,000→6,000 bump landed on main | 2026-07-16 **14:12 UTC** (`ea3a6e21`) |
+
+  All **713 grants were +1000**. `applyCreditOnce` is keyed `pro:{email}:{month}`, so **July will never be re-granted**. 713 Pro users are on the old 1,000 allowance against the new prices — a full proposal run is now ~100 credits (draft 50 + matrix 8 + referee 12 + …), so they get **~10 proposals this month**. That is *verbatim* the state `packages.ts` cites as the reason for the bump: *"Pro's old 1,000/mo would only cover ~10 proposals."*
+
+  Self-corrects at the August run. **Decision needed:** backfill the 5,000 difference to the 713 Pro accounts for July (`admin_grant`, or `applyCreditOnce` under a new key), or accept ~2 weeks of the old allowance at new prices. This is a money/customer call, not an engineering one.
+
+  Related: `PRO_MONTHLY_CREDITS` is env-overridable and `packages.ts` warns *"if `MCP_PRO_MONTHLY_CREDITS` is set in Vercel (it may hold the old 1000), UPDATE it to 6000 too — the env wins."* **Checked: it is NOT set**, so the 6000 default applies and the warning is moot. Live catalog confirms `proMonthlyCredits: 6000`.
 
 - **5 users are disconnected.** The `MCP_OAUTH_RESOURCE` flip changed the token audience; all 66 resource-bound tokens were minted against the apex and `tokens.ts` rejects `claims.aud !== OAUTH_RESOURCE`. They must re-add at `https://mcp.getmindy.ai/mcp`. Mostly internal (`bra***@`, `eri***@govcongiants.com`).
 - **The apex is a second, subtly-broken door.** `getmindy.ai/mcp/mcp` still 401s but now advertises the subdomain's `resource` → mismatch. Redirect or retire it before listing.
