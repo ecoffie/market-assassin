@@ -8,7 +8,7 @@
  */
 
 import { createClient } from '@supabase/supabase-js';
-import { RecompeteContract, fetchExpiringContractsFromLocal } from '../pipelines/fpds-recompete';
+import { RecompeteContract, fetchExpiringContractsFromDb } from '../pipelines/fpds-recompete';
 import { ContractAward } from '../pipelines/contract-awards';
 import { prioritizeNaicsByIndustry } from '@/lib/industry-presets';
 import { extractAndParseJSON, generateBriefingJson } from './llm-router';
