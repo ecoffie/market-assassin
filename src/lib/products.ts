@@ -88,11 +88,22 @@ export const PRODUCTS = {
     price: 497,
     stripeUrl: 'https://buy.stripe.com/4gMaEY3wqcjo6h70CsfnO0g',
   },
+  // DISCONTINUED 2026-07-16 (Eric: "no that is gone") — recompete is a Pro feature
+  // now; the public pricing page sells Free/Pro/Teams only. Kept as a record so
+  // legacy buyers still resolve: the `recompete:{email}` KV grant and the webhook's
+  // `recompete` tier mapping (api/webhooks/stripe) are deliberately UNTOUCHED, and
+  // /recompete.html now redirects to the live in-app panel (next.config.ts, #303).
+  //
+  // ⚠️ `stripeUrl` removed so we never surface a checkout for a dead product — but
+  // that ALONE does not disable it. The payment link lives in the STRIPE DASHBOARD
+  // and still works for anyone holding the URL (it was
+  // buy.stripe.com/7sYfZi9UOdnsaxnbh6fnO0k), and the webhook would still provision
+  // it. Deactivating it there is a manual step and the only real kill.
   RECOMPETE_CONTRACTS: {
     id: 'recompete-contracts',
     name: 'Recompete Tracker',
     price: 397,
-    stripeUrl: 'https://buy.stripe.com/7sYfZi9UOdnsaxnbh6fnO0k',
+    discontinued: true,
   },
   MARKET_ASSASSIN_STANDARD: {
     id: 'market-assassin-standard',

@@ -272,6 +272,23 @@ const nextConfig: NextConfig = {
   // Redirects for legacy URLs and convenience
   async redirects() {
     return [
+      // The standalone $397 Recompete Tracker is DISCONTINUED (Eric, 2026-07-16) —
+      // recompete is a Pro feature now. Its page was still live and ungated, serving
+      // `public/contracts-data.js`: a Jun-22 snapshot, 9,450 grouped records, NO UEI —
+      // while `recompete_opportunities` holds 129,249 real per-contract rows with ~100%
+      // UEI (issue #303). Legacy buyers with a bookmark or a `recompete:{email}` KV
+      // grant now land on the live in-app panel instead of 4-week-old data.
+      //
+      // 308 (permanent) — the product isn't coming back. Redirects run BEFORE the
+      // filesystem in Next's routing order, so this wins over the static public/ file.
+      //
+      // ⚠️ Do NOT delete public/contracts-data.js — public/prime-lookup.html still
+      // <script src>'s it and is live (that's why #302 left it in place).
+      {
+        source: '/recompete.html',
+        destination: '/app?panel=recompetes',
+        permanent: true,
+      },
       // YouTube funnel entry — put getmindy.ai/youtube in every video description.
       // Redirects to the landing page with YouTube UTM baked in so AttributionTracker
       // captures the source into gca_attr (read at signup for source attribution).
