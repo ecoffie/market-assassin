@@ -4,15 +4,42 @@
  * /oauth/authorize — the consent screen an MCP client (Claude Desktop, Cursor)
  * opens in the browser during the keyless connect flow.
  *
- * Identity is the user's EXISTING Mindy session (localStorage MI token) — no new
- * login system. If signed in → one-click Allow. If not → we point them at /app to
- * sign in (new tab) and poll for the session to appear (localStorage is shared
- * across same-origin tabs), then show consent. Allow → POST the approve API →
+ * Identity is the user's EXISTING Mindy session, resolved SERVER-SIDE via
+ * /api/mcp/session — the same source of truth the /mcp console uses. If signed in
+ * → one-click Allow. If not → we point them at /app to sign in (new tab) and poll
+ * for the session to appear, then show consent. Allow → POST the approve API →
  * follow the returned redirect back to the client with ?code=…&state=…. Deny →
  * redirect with error=access_denied.
+ *
+ * DO NOT gate this page on `localStorage.mi_beta_email` again. It used to, and it
+ * silently broke the entire connect flow: that key is written only by the /app
+ * surfaces, so a user signed in via /mcp/* had a valid MI token and no key — this
+ * page showed a sign-in step and POLLED FOREVER for a value that would never
+ * appear, while /api/mcp/session would have identified them instantly. Observed
+ * live 2026-07-17: three /oauth/authorize hits, zero /approve, zero /token.
+ *
+ * That endpoint's own docstring already says why the key is untrustworthy: "The
+ * console must NOT trust the client-supplied `mi_beta_email` (a plaintext
+ * localStorage value that goes stale on account switch and made the dashboard
+ * show the WRONG account's zero balance)." The console was fixed; this page was
+ * left behind — the same "one fix = every surface" miss.
  */
 import { useCallback, useEffect, useState } from 'react';
 import { getMIApiHeaders } from '@/components/app/authHeaders';
+
+/**
+ * Who am I, per the server. Returns the email the MI token's signature PROVES,
+ * or null. Never trusts a client-claimed value.
+ */
+async function resolveSessionEmail(): Promise<string | null> {
+  try {
+    const res = await fetch('/api/mcp/session', { headers: getMIApiHeaders() });
+    const j = (await res.json().catch(() => null)) as { email?: string } | null;
+    return res.ok && j?.email ? j.email : null;
+  } catch {
+    return null;
+  }
+}
 
 interface AuthzParams {
   client_id: string;
@@ -54,26 +81,36 @@ export default function AuthorizePage() {
       setStage('error');
       return;
     }
-    const e = localStorage.getItem('mi_beta_email');
-    if (e) {
-      setEmail(e);
-      setStage('consent');
-    } else {
-      setStage('signin');
-    }
-  }, []);
-
-  // While on the sign-in step, poll for the session appearing in another tab.
-  useEffect(() => {
-    if (stage !== 'signin') return;
-    const id = setInterval(() => {
-      const e = localStorage.getItem('mi_beta_email');
+    void (async () => {
+      const e = await resolveSessionEmail();
       if (e) {
         setEmail(e);
         setStage('consent');
+      } else {
+        setStage('signin');
       }
-    }, 1500);
-    return () => clearInterval(id);
+    })();
+  }, []);
+
+  // While on the sign-in step, poll for the session appearing in another tab.
+  // Polls the SERVER, not localStorage: signing in elsewhere writes the MI token,
+  // and this is what proves it. 2s so a slow tab doesn't stack requests.
+  useEffect(() => {
+    if (stage !== 'signin') return;
+    let cancelled = false;
+    const id = setInterval(() => {
+      void (async () => {
+        const e = await resolveSessionEmail();
+        if (e && !cancelled) {
+          setEmail(e);
+          setStage('consent');
+        }
+      })();
+    }, 2000);
+    return () => {
+      cancelled = true;
+      clearInterval(id);
+    };
   }, [stage]);
 
   const deny = useCallback(() => {
