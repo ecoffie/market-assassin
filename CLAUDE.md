@@ -584,6 +584,56 @@ is still live. It was documented as fixed while the bug was still shipping. Corr
 comma-separated. <6-char code = prefix (`naics_code LIKE '236%'`), 6-digit = exact.
 Before this, comma-separated `naics` silently returned **0 rows** rather than erroring.
 
+**Real per-contract data + hourly sync (Jul 16 — #280/#284, #288/#291):**
+`recompete_opportunities` used to hold 9,388 rows that **were not contracts**:
+`build-recompete-data` grouped awards on Recipient+Agency+NAICS and took the group's
+EARLIEST end date, keeping one representative PIID — so a row's PIID and its expiry
+date could describe **different contracts**, and none carried a UEI (93/9,481 = 0.98%).
+Replaced with real per-contract rows from USASpending: **129,249 rows, 100% `incumbent_uei`**.
+The grouped rows are flagged `quality_flag='grouped_synthetic'` (reversible; `query.ts`
+already filters `quality_flag IS NULL`).
+
+- **Sync lib:** `src/lib/recompete/usaspending-sync.ts`. Four endpoint constraints, each a
+  silent-corruption trap: (1) `award_type_codes` must come from **ONE group** per request —
+  mixing returns an **error**, not an empty set; (2) contracts vs IDVs have **different field
+  schemas** — a contract field on an IDV query returns `undefined`, not an error; (3)
+  `Type of Set Aside`/`Extent Competed`/`Number of Offers` return **NULL from this endpoint**
+  no matter what — deliberately **not mapped**; (4) **no period-of-performance-end filter
+  exists** (that `date_type` 500s their server) → the window is applied **client-side**.
+  Running out of page budget reports `truncatedGroups` rather than a short list.
+- **Full sweep:** `scripts/sync-recompete-full.ts` (dry-run default, resumable). 477 NAICS,
+  ~38 min. NOTE: its summary prints `rows fetched` (this run) next to `written`
+  (**cumulative from the resume file**) — different scopes, easy to misread.
+- **Cron:** `/api/cron/sync-recompete-contracts`, `cron_jobs` row `25 * * * *`
+  (`limit=40&budgetMs=240000`, `timeout_ms=290000`). Sweep is ~38 min vs Vercel's 300s cap,
+  so each run drains NAICS under a **wall-clock budget** (not a fixed count — per-NAICS time
+  is skewed 0.3s..65s). Ordered by `recompete_naics_by_staleness()` = least-recently-**ATTEMPTED**
+  (`recompete_naics_sync`), **not** row freshness: a NAICS with no real contracts never gets a
+  fresh row, so ranking by `MAX(last_synced_at)` pins it at the head forever and the cron spins
+  on it. Every outcome is stamped (`ok`/`empty`/`truncated`/`error`) — stamping the **empty**
+  ones is what keeps the queue moving. Truncated/failed shard → **non-2xx** = failed job.
+- **`lead_time_months` was always wrong** until Jul 16: `EXTRACT(MONTH FROM AGE(...))` returns
+  only the months component (0-11) and **discards the years** — a contract 18 months out stored
+  `6`. `recompete_stats` buckets `expiring_6/12/18_months` off it, so those were wrong for as
+  long as the trigger existed.
+- **`recompete_changes`** (append-only): the sync upserts on `contract_id`, so every run
+  **overwrites** the prior row, and USASpending serves only current state — no "as of" query.
+  Any change not recorded **while it happens is gone permanently and cannot be backfilled at
+  any price**. Tracks `period_of_performance_current_end`, `potential_total_value`,
+  `incumbent_uei`. Diff is taken **before** the upsert (afterwards the old value is gone) and
+  written **after** it succeeds. Callers MUST select every `TRACKED_FIELDS` column —
+  `diffContracts` throws on an absent key rather than logging a phantom `null -> value`.
+
+**⚠️ Briefings do NOT read this table (issue #292).** `grep -rn "recompete_opportunities"
+src/lib/briefings/` returns nothing. `fpds-recompete.ts:18` imports
+`@/data/contracts-data.json` — 2.8 MB bundled at build, last updated **2026-04-08**, 9,450
+grouped records, **no UEI field** — and it is the **PRIMARY** source, shadowing the live
+USASpending path (`ai-briefing-generator.ts:264`) which only runs on a local **miss**.
+That live path doesn't request `'Recipient UEI'` (`usaspending-fallback.ts:418`) and filters
+on `date_signed` as a "proxy for expiring soon". `snapshot-recompetes` has **never run**
+(no `cron_jobs` row by route, zero `cron_job_runs`) though three docs claim "7:15 AM daily".
+Not BigQuery — nothing under `src/lib/briefings/` imports it.
+
 ### 5. Opportunity Hunter
 **Location:** `/src/app/opportunity-hunter/`
 **Purpose:** Find government buyers — agency spending analysis, NAICS targeting
@@ -1702,7 +1752,7 @@ passes `liveBq: true`. Also: name-search now matches exact UEI too. Diagnostic: 
 
 ---
 
-*Last Updated: July 16, 2026 — Market spend reconciliation + one-shot tools. **ONE canonical market query** (`src/lib/market/spend-query.ts`) now shared by fpds-top-n + the market report — never hand-roll the filter (that split is what killed the Spending-by-Agency chart, #245). FIXED LIVE: fpds-top-n **404'd every dominant keyword** ("security guard" $6B / "janitorial" $1.9B / "roofing" $578M returned "No federal market found") — the gate's promised NAICS fall-through was never implemented; it uses the **LEAD code only** (roofing's coverage set dragged in 236220 → measured $77.7B of building construction, not $1.34B of roofing). FIXED LIVE: `topCodePct` measured the promoted LEAD not the biggest → report + Market Coverage banner rendered **"the biggest NAICS is only 0%"** for drones; split into `topCodePct` (biggest-by-$, DISPLAYED) vs `leadCodePct` (the ranking gate) — 8/10 keywords unchanged, hvac keeps 238220 specialty trade. Report gained `basis{}` + a **reconciliation line** ("336411 alone = $69M/28% vs $242.7M across 42 NAICS → misses 72%") — the answer to "your data is wrong". One-shot tools ALL 3 SHIPPED: market report + hosted `/reports/<id>` share link (#289), CRM push (#285/#286, BYO GHL — provision path DROPPED), calendar `include_ics` (#287, dated events only, never guessed). Pricing is **WIRED, not blocked** (that stale note cost a round-trip — grep `packages.ts` before stating a price). KNOWN/UNFIXED: keyword-coverage measures 1 FY vs the canonical 3 FY — a product decision (aligning moves "drones $243M"→$384M). See "Market spend: ONE shared query" + "One-Shot Composite Tools" sections. Prev Jun 24 — SEO crawl health + dep security: robots.txt now allows /_next/static + /_next/image; npm audit 47→24 vulns, 0 critical. Prev Jun 11 (PM) — Full-text search overhaul (bodies were EMPTY cache-wide), 4-corpus search, global lookup bar, contractor search 0-results fix, launch-ops crons, demo homepage. Prev Jun 8 — Keyword-first market research (NAICS is the wrong primary key; "drones"=70+ codes, obvious code=28%/miss 72%), Award Intelligence spine, office contact rosters, LLM cost discipline. Prev Jun 3 — Daily alerts free-daily permanent. Jun 2 — purchase attribution. May 20 — OAuth custom domain, mi-beta → app rename.*
+*Last Updated: July 16, 2026 — Recompete: live data end-to-end + the stale-source sweep. Recompete real per-contract data + hourly sync. `get_expiring_contracts` returned `incumbent_uei: null` on EVERY row (93/9,481 = 0.98%); the 9,388 rows weren't contracts (grouped on Recipient+Agency+NAICS, group's EARLIEST end date, one representative PIID — so PIID and expiry could describe different contracts). Replaced with real USASpending per-contract rows: 129,249 rows, 100% UEI, 477/477 NAICS, zero truncation, ~38 min (#280 → PR #284). Grouped rows flagged `grouped_synthetic`. `lead_time_months` was ALWAYS wrong (EXTRACT(MONTH FROM AGE()) drops the years — 18mo stored as 6), so `recompete_stats` expiring_6/12/18 buckets were wrong for as long as the trigger existed. Then scheduled it: `/api/cron/sync-recompete-contracts` hourly via `cron_jobs` (sweep ~38min vs 300s cap → wall-clock-budget shards, ordered by least-recently-ATTEMPTED, not row freshness — a 0-contract NAICS pins the queue head forever otherwise), plus append-only `recompete_changes` (the sync overwrites on upsert and USASpending has no "as of" query, so unrecorded change = gone permanently) (#288 → PR #291). THEN FIXED the shadowing (issue #292, was "found, not fixed"): briefings never read `recompete_opportunities` at all — they read a frozen Apr-08 `contracts-data.json` (9,450 grouped rows, NO uei field) as PRIMARY, which shadowed the live path because it never missed. Briefings now use the shared `queryExpiringContracts` (#299 — verified live: 0/50 → 50/50 rows carry a real UEI). Same defect found on TWO more surfaces: the in-app Recompetes panel filtered a Jun-22 static file client-side and printed its length as "9,450 total in database" while `/api/recompete` sat unreachable behind an early return (#301 → #302; also added `naicsCodes?: string[]` to the shared query — profiles carry 3-5 codes, the lib took one; verified live 0 → 5,897); and the $397 Recompete Tracker page served the same snapshot, ungated — the product is DISCONTINUED (recompete is a Pro feature) so `/recompete.html` now 308s to the live panel (#303 → #306; its Stripe link is disabled manually — code can't). ⚠️ `public/contracts-data.js` must NOT be deleted: `prime-lookup.html` still loads it. CLAUDE.md's "truthful global count" paragraph described a head-count + PARALLEL page-read design with SCAN_ROW_CAP that DOES NOT EXIST — the route is a sequential loop still capped at GROUP_FETCH_CAP=6000, so `pagination.total` is a FLOOR (#304; `pagination.capped` flags it). Tooling: the five phantom skills CLAUDE.md told the model to run now exist, on `verify-live.mjs` (a 200 with 0 rows is a FAIL) + `db.mjs` (#296). Prev — Market spend reconciliation + one-shot tools. **ONE canonical market query** (`src/lib/market/spend-query.ts`) now shared by fpds-top-n + the market report — never hand-roll the filter (that split is what killed the Spending-by-Agency chart, #245). FIXED LIVE: fpds-top-n **404'd every dominant keyword** ("security guard" $6B / "janitorial" $1.9B / "roofing" $578M returned "No federal market found") — the gate's promised NAICS fall-through was never implemented; it uses the **LEAD code only** (roofing's coverage set dragged in 236220 → measured $77.7B of building construction, not $1.34B of roofing). FIXED LIVE: `topCodePct` measured the promoted LEAD not the biggest → report + Market Coverage banner rendered **"the biggest NAICS is only 0%"** for drones; split into `topCodePct` (biggest-by-$, DISPLAYED) vs `leadCodePct` (the ranking gate) — 8/10 keywords unchanged, hvac keeps 238220 specialty trade. Report gained `basis{}` + a **reconciliation line** ("336411 alone = $69M/28% vs $242.7M across 42 NAICS → misses 72%") — the answer to "your data is wrong". One-shot tools ALL 3 SHIPPED: market report + hosted `/reports/<id>` share link (#289), CRM push (#285/#286, BYO GHL — provision path DROPPED), calendar `include_ics` (#287, dated events only, never guessed). Pricing is **WIRED, not blocked** (that stale note cost a round-trip — grep `packages.ts` before stating a price). KNOWN/UNFIXED: keyword-coverage measures 1 FY vs the canonical 3 FY — a product decision (aligning moves "drones $243M"→$384M). See "Market spend: ONE shared query" + "One-Shot Composite Tools" sections. Prev Jun 24 — SEO crawl health + dep security: robots.txt now allows /_next/static + /_next/image; npm audit 47→24 vulns, 0 critical. Prev Jun 11 (PM) — Full-text search overhaul (bodies were EMPTY cache-wide), 4-corpus search, global lookup bar, contractor search 0-results fix, launch-ops crons, demo homepage. Prev Jun 8 — Keyword-first market research (NAICS is the wrong primary key; "drones"=70+ codes, obvious code=28%/miss 72%), Award Intelligence spine, office contact rosters, LLM cost discipline. Prev Jun 3 — Daily alerts free-daily permanent. Jun 2 — purchase attribution. May 20 — OAuth custom domain, mi-beta → app rename.
 
 ---
 
