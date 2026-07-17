@@ -1,14 +1,4 @@
-import nodemailer from 'nodemailer';
-
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.office365.com',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER || 'alerts@govcongiants.com',
-    pass: process.env.SMTP_PASSWORD,
-  },
-});
+import { sendEmail } from '@/lib/send-email';
 
 interface WeeklyDigestData {
   email: string;
@@ -148,14 +138,21 @@ Continue your plan: ${plannerUrl}
 - GovCon Giants Team`;
 
   try {
-    await transporter.sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
+    // Routed through the shared sendEmail() (was a module-scope Office365 nodemailer
+    // transport sending as SMTP_USER). No `from` — inherits `Mindy <${EMAIL_FROM}>`,
+    // the getmindy.ai sender Resend is verified for. A raw transport also wrote NO
+    // email_provider_sends row and skipped the #58 send guard, so this sender was
+    // invisible to the provider query that caught daily-alerts.
+    // NOT transactional: a weekly progress nudge is exactly what the daily cap is for.
+    const ok = await sendEmail({
       to: data.email,
       subject: `You're ${data.overallProgress}% done — Weekly Action Plan Update`,
       html: htmlContent,
       text: plainText,
+      emailType: 'planner_weekly_digest',
+      eventSource: 'planner_weekly_digest',
     });
-    return true;
+    return ok;
   } catch (error) {
     console.error(`Failed to send weekly digest to ${data.email}:`, error);
     return false;
