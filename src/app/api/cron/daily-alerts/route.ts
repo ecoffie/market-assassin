@@ -38,6 +38,7 @@ import {
   renderKeywordSetupNudgeHtml,
   renderMindyV10PromoHtml,
 } from '@/lib/alerts/email-promo';
+import { eligibleSetAsides } from '@/lib/market/set-aside-eligibility';
 import { MINDY_APP_URL, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 
 export const maxDuration = 300;
@@ -83,17 +84,6 @@ async function fetchAllPaged<T = any>(
 }
 
 // Map business type to SAM.gov set-aside code
-const businessTypeToSetAside: Record<string, string> = {
-  'SDVOSB': 'SDVOSBC',
-  'VOSB': 'VSB',
-  '8a': '8A',
-  '8(a)': '8A',
-  'WOSB': 'WOSB',
-  'EDWOSB': 'EDWOSB',
-  'HUBZone': 'HZC',
-  'SBA': 'SBA',
-  'Small Business': 'SBP',
-};
 
 // Timezone hour offsets (UTC offset for delivery at ~6 AM local)
 const TIMEZONE_OFFSETS: Record<string, number> = {
@@ -631,9 +621,12 @@ async function runDailyAlertJob(options?: {
         const recentlySentIds = await getRecentlySentOpportunityIds(user.user_email);
 
         // Build search params
-        const setAsides = user.business_type
-          ? [businessTypeToSetAside[user.business_type] || user.business_type]
-          : [];
+        // An unrecognized business_type falls back to itself (a raw code the user
+        // may have entered) rather than to nothing — but unrestricted work is OR'd
+        // in by the query regardless, so a bad value can no longer zero a user out.
+        // Canonical eligibility (src/lib/market/set-aside-eligibility.ts). A cert
+        // EXPANDS what you can bid; unrestricted work is OR'd in by the query.
+        const setAsides = eligibleSetAsides(user.business_type);
 
         // Get states to search (multi-state or single state with expansion)
         const userStates = user.location_states?.length

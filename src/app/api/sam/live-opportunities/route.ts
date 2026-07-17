@@ -20,17 +20,6 @@ interface LiveOpportunity {
 }
 
 // Map business type to SAM.gov set-aside code
-const businessTypeToSetAside: Record<string, string> = {
-  'SDVOSB': 'SDVOSBC',
-  'VOSB': 'VSB',
-  '8a': '8A',
-  '8(a)': '8A',
-  'WOSB': 'WOSB',
-  'EDWOSB': 'EDWOSB',
-  'HUBZone': 'HZC',
-  'SBA': 'SBA',
-  'Small Business': 'SBP',
-};
 
 /**
  * Calculate days until deadline
@@ -111,10 +100,23 @@ export async function POST(request: NextRequest) {
       queryParams.set('ncode', naicsCode.trim());
     }
 
-    // Add set-aside filter
-    if (businessType && businessTypeToSetAside[businessType]) {
-      queryParams.set('typeOfSetAside', businessTypeToSetAside[businessType]);
-    }
+    // NO set-aside filter — deliberately.
+    //
+    // This hits SAM's live API, whose `typeOfSetAside` param is EXCLUSIVE: it can
+    // list codes but cannot express "...or unrestricted". Unrestricted (full-and-open)
+    // work is the LARGEST pool and every one of these firms can bid it, so any value
+    // here HIDES eligible work rather than focusing the search — which is exactly the
+    // bug that skipped info@lcmanagementsolutions.com daily for six days (her profile
+    // matched 145 opportunities; the filter returned 0).
+    //
+    // It was also the wrong code: 'Small Business' -> 'SBP' is the PARTIAL small
+    // business set-aside (36 active cache-wide), not SBA (Total).
+    //
+    // Over-inclusion here is cheap (a few set-asides the firm can't win appear);
+    // under-inclusion cost real users every opportunity they had. Cached paths CAN
+    // express eligibility properly and do — see setAsideOrFilter() in
+    // src/lib/market/set-aside-eligibility.ts.
+    void businessType;
 
     const url = `https://api.sam.gov/opportunities/v2/search?${queryParams.toString()}`;
     console.log('[SAM Live] Request URL:', url.replace(apiKey, '[REDACTED]'));

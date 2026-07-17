@@ -1117,8 +1117,23 @@ function applySamCacheFilters(query: any, params: SAMSearchParams) {
   }
 
   if (setAsides.length > 0) {
-    const setAsideFilters = setAsides.map(s => `set_aside_code.eq.${s}`).join(',');
-    filteredQuery = filteredQuery.or(setAsideFilters);
+    // A certification EXPANDS what you may bid — it must never HIDE work you are
+    // already eligible for. Filtering to the set-aside code ALONE did exactly that:
+    // UNRESTRICTED (full-and-open) notices carry a NULL or 'NONE' set_aside_code and
+    // are the LARGEST pool in the cache (488 null + 145 NONE vs 289 SBA in a 1,000-row
+    // sample) — and every small business can bid them. Excluding them turned a helpful
+    // preference into a blindfold.
+    //
+    // Measured on info@lcmanagementsolutions.com (skipped 07-12 → 07-17 with
+    // "no_new_or_active_opportunities"): her profile matches 145 live opportunities.
+    // The code-only filter returned 0 of them.
+    //
+    // The state filter ~30 lines up already ORs in `.is.null` for exactly this reason
+    // (SAM omits pop_state on ~64% of notices). This filter never learned it.
+    const parts = setAsides.map((s) => `set_aside_code.eq.${s}`);
+    parts.push('set_aside_code.is.null', 'set_aside_code.eq.NONE');
+    filteredQuery = filteredQuery.or(parts.join(','));
+    console.log(`[SAM Cache] SET-ASIDE filter: eligible [${setAsides.join(', ')}] + unrestricted (null/NONE)`);
   }
 
   if (noticeTypes.length > 0) {
