@@ -19,7 +19,7 @@ fail=0
 echo -e "${BOLD}── pre-push gate ──${NC}"
 
 # 1) HARD BLOCK: TypeScript must compile. (Would have blocked today's Error deploy.)
-echo -e "  ${BOLD}1/6${NC} typecheck (tsc --noEmit)…"
+echo -e "  ${BOLD}1/7${NC} typecheck (tsc --noEmit)…"
 if npx tsc --noEmit > /tmp/mindy-prepush-tsc.log 2>&1; then
   echo -e "      ${GREEN}✓ typecheck clean${NC}"
 else
@@ -29,7 +29,7 @@ else
 fi
 
 # 2) HARD BLOCK: no NEW unauthenticated fetch to a 2FA-gated /api/app route.
-echo -e "  ${BOLD}2/6${NC} client auth-header audit…"
+echo -e "  ${BOLD}2/7${NC} client auth-header audit…"
 if node scripts/audit-client-auth.mjs > /tmp/mindy-prepush-auth.log 2>&1; then
   echo -e "      ${GREEN}✓ no new unauthenticated gated fetches${NC}"
 else
@@ -42,7 +42,7 @@ fi
 #    .select() whose { error } is ignored → a bad column silently nulls the whole
 #    query → generic/empty result for the user). This is the loadBidderProfile /
 #    user_briefing_profile dead-table class. Baseline-gated: only NEW ones block.
-echo -e "  ${BOLD}3/6${NC} supabase swallowed-error audit…"
+echo -e "  ${BOLD}3/7${NC} supabase swallowed-error audit…"
 if node scripts/audit-supabase-errors.mjs > /tmp/mindy-prepush-sberr.log 2>&1; then
   echo -e "      ${GREEN}✓ no new swallowed-error reads${NC}"
 else
@@ -53,7 +53,7 @@ fi
 
 # 4) HARD BLOCK: unit tests (Vitest). Fast (<1s) + deterministic, so safe to gate.
 #    Locks the $674B NAICS-inflation fix, win-probability scoring, authedFetch retry.
-echo -e "  ${BOLD}4/6${NC} unit tests (vitest run)…"
+echo -e "  ${BOLD}4/7${NC} unit tests (vitest run)…"
 if npm run --silent test:unit > /tmp/mindy-prepush-unit.log 2>&1; then
   echo -e "      ${GREEN}✓ unit tests pass${NC}"
 else
@@ -63,7 +63,20 @@ else
 fi
 
 # 5) WARN ONLY: schema-sync drift (slower, can lag DB; never blocks a hotfix).
-echo -e "  ${BOLD}5/6${NC} schema-sync (warn only)…"
+# 5) BLOCKING: MCP tool-catalog drift. The catalog lives on FOUR surfaces and
+#    CLAUDE.md's "one fix = every surface" rule was read and violated anyway
+#    (2026-07-17: registry 49, artifact 46, changelog 41, whitepaper 40). A wrong
+#    tool count ships to customers, so it is a gate now rather than a paragraph.
+echo -e "  ${BOLD}5/7${NC} MCP tool-catalog drift…"
+if node scripts/audit-tool-catalog-drift.mjs > /tmp/mindy-prepush-catalog.log 2>&1; then
+  echo -e "      ${GREEN}✓ all catalog surfaces agree${NC}"
+else
+  echo -e "      ${RED}✗ tool-catalog DRIFT — push blocked${NC}"
+  sed 's/^/        /' /tmp/mindy-prepush-catalog.log
+  fail=1
+fi
+
+echo -e "  ${BOLD}6/7${NC} schema-sync (warn only)…"
 if npm run --silent test:schema > /tmp/mindy-prepush-schema.log 2>&1; then
   echo -e "      ${GREEN}✓ schema in sync${NC}"
 else
@@ -75,7 +88,7 @@ fi
 #    so the count can only trend DOWN as later phases migrate. Warn-only — never
 #    blocks a hotfix; a false positive shouldn't gate a genuine fix while the large
 #    baseline still exists. Accept an intentional change with --update-baseline.
-echo -e "  ${BOLD}6/6${NC} design-token drift (warn only)…"
+echo -e "  ${BOLD}7/7${NC} design-token drift (warn only)…"
 if node scripts/audit-design-tokens.mjs > /tmp/mindy-prepush-tokens.log 2>&1; then
   echo -e "      ${GREEN}✓ no new color drift${NC}"
 else
