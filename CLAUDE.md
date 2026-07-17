@@ -542,11 +542,23 @@ curl "https://getmindy.ai/api/admin/test-sam-subaward?password=$ADMIN_PASSWORD&p
 **Purpose:** 3,500+ federal contractors with SBLO contacts, filtering, export
 **Price:** $497
 
-### 4. Recompete Tracker
-**Location:** `/public/recompete.html`
-**Purpose:** Track expiring federal contracts for recompete opportunities
-**Price:** $397
-**Features:** Pagination, CSV/Excel/PDF export, location filtering, mobile responsive
+### 4. Recompete Tracker — **DISCONTINUED as a standalone product (2026-07-16)**
+**Live surface:** the **Recompetes panel** in `/app` (`?panel=recompetes`), served by
+`GET /api/recompete` → shared `queryExpiringContracts` (`src/lib/recompete/query.ts`).
+**Sold as:** a **Pro feature** ("Recompete alerts, 12 mo out"). The public pricing page
+sells Free/Pro/Teams only — there is **no $397 standalone** any more (Eric, "no that is gone").
+
+- `/public/recompete.html` (the old $397 page) **308-redirects** to the panel
+  (`next.config.ts`). It was live + ungated, serving `public/contracts-data.js` — a
+  **Jun-22** snapshot, 9,450 grouped rows, **no UEI** — while the table holds 129,249 real
+  rows (issue #303).
+- **`public/contracts-data.js` must NOT be deleted** — `public/prime-lookup.html` still
+  `<script src>`'s it and is live.
+- Legacy access is intact **on purpose**: the `recompete:{email}` KV grant and the
+  webhook's `recompete` tier mapping (`api/webhooks/stripe`) still work.
+- ⚠️ Its Stripe payment link still exists in the **Stripe dashboard** and would still
+  provision. Removing `stripeUrl` from `products.ts` only stops US surfacing it —
+  deactivating the link is a manual Stripe step.
 
 **Vehicle rollup (`src/app/api/recompete/route.ts`):**
 Multiple-award IDIQs store N winner rows; we collapse them to ONE vehicle via
