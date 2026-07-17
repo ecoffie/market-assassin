@@ -5,7 +5,8 @@
  * Part of Federal Market Intelligence System - Phase 4.
  *
  * GET /api/recompete
- *   ?naics=541512           Filter by NAICS code
+ *   ?naics=541512           Filter by NAICS code. Comma-separated = OR across codes
+ *                           (?naics=236220,541512). <6 chars = prefix match.
  *   ?agency=DOD             Filter by agency (name or abbreviation)
  *   ?state=FL               Filter by place of performance state
  *   ?months=18              Contracts expiring within N months (default: 18)
@@ -29,6 +30,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { groupRecompetesByVehicle } from '@/lib/recompete/vehicle-grouping';
+import { parseNaicsCodes, naicsOrExpression } from '@/lib/recompete/query';
 import { saveSnapshot, readSnapshot, freshMeta, degradedMeta } from '@/lib/resilience/last-good';
 import { getVocabulary } from '@/lib/market/vocabulary';
 
@@ -221,6 +223,9 @@ async function handleRecompeteGet(request: NextRequest) {
 
   // Parse parameters
   const naicsParam = searchParams.get('naics');
+  // Comma/space-separated list → sanitized codes, OR'd below. Empty for a
+  // non-numeric value, which falls back to the legacy single-value path.
+  const naicsCodes = parseNaicsCodes(naicsParam);
   const agencyParam = searchParams.get('agency');
   const stateParam = searchParams.get('state');
   const monthsParam = searchParams.get('months') || '18';
@@ -313,14 +318,23 @@ async function handleRecompeteGet(request: NextRequest) {
   // and look fake on stage. Reversible; nothing deleted. (migration 20260619)
   if (applyQualityFilter) query = query.is('quality_flag', null);
 
-  // NAICS filter
-  if (naicsParam) {
-    // Support prefix matching (e.g., 541 matches 541512)
-    if (naicsParam.length < 6) {
-      query = query.like('naics_code', `${naicsParam}%`);
-    } else {
-      query = query.eq('naics_code', naicsParam);
-    }
+  // NAICS filter. Accepts a COMMA-SEPARATED list ("236220,541512") and ORs across
+  // the codes — a user profile carries 3-5 codes, and sending only the first one
+  // hid most of their market. Prefix rule per code is unchanged (541 matches 541512).
+  // Semantics live in the shared lib so this route, briefings and the MCP tool agree.
+  if (naicsCodes.length > 1) {
+    query = query.or(naicsOrExpression(naicsCodes));
+  } else if (naicsCodes.length === 1) {
+    const code = naicsCodes[0];
+    query = code.length < 6
+      ? query.like('naics_code', `${code}%`)
+      : query.eq('naics_code', code);
+  } else if (naicsParam) {
+    // Non-numeric value: preserve the previous (0-row) behaviour rather than
+    // silently widening an existing caller's result set.
+    query = naicsParam.length < 6
+      ? query.like('naics_code', `${naicsParam}%`)
+      : query.eq('naics_code', naicsParam);
   }
 
   // Agency filter
@@ -554,6 +568,11 @@ async function handleRecompeteGet(request: NextRequest) {
       total: vehicleTotal,
       hasMore: (offset + limit) < vehicleTotal,
       rawRowTotal: contracts?.length || 0,  // pre-rollup count (for transparency)
+      // TRUE if the filtered set hit GROUP_FETCH_CAP — then `total` is a FLOOR, not
+      // a count (the scan stopped early), and a client must render it as "N+".
+      // Without this a broad filter (e.g. no NAICS) reports the cap as if it were
+      // the whole market — the same class of lie as the old static-file count.
+      capped: (contracts?.length || 0) >= GROUP_FETCH_CAP,
     },
     summary: {
       resultCount: vehicles.length,         // vehicles on this page
