@@ -81,6 +81,36 @@ function walk(dir, test, out = []) {
   return out;
 }
 
+/**
+ * RULE 2 — SILENT ZERO.
+ *
+ * A `{ count }` bound from a Supabase call that does NOT bind `error`. The
+ * `count ?? 0` that follows renders "the query failed / I don't know" as the
+ * number 0 — a real figure, indistinguishable from a true zero.
+ *
+ * Same root as rule 1: a PostgREST failure rendered as a legitimate-looking
+ * value. Deliberately reuses SCAN_ROOTS/isAudited above rather than defining a
+ * second scope — the scope widened in #311 is exactly the right one here too,
+ * and for the same reason: nobody watches a cron's stdout.
+ *
+ * Matches:   const { count } = await sb.from('t').select('*', { count: 'exact' })
+ *            const { count: n } = await q
+ *            .then(({ count }) => count ?? 0)
+ * Ignores:   const { count, error } = ...     (error bound — the caller can check)
+ *            row.foo_count ?? 0                (a column value, not a query count)
+ *            const n = (count ?? 0) + 1        (usage site, not a destructure)
+ */
+function bindsCountWithoutError(line) {
+  // A comment can't have a bug. Without this the audit flags its OWN examples
+  // three lines up — they are, by design, exactly the shape it hunts for.
+  const t = line.trim();
+  if (t.startsWith('*') || t.startsWith('//') || t.startsWith('/*')) return false;
+
+  const destructure = /(?:const\s*)?\{\s*count(\s*:\s*[a-zA-Z0-9_]+)?\s*\}\s*(?:=\s*await|\)\s*=>)/.test(line);
+  if (!destructure) return false;
+  return !/\berror\b/.test(line);
+}
+
 // Extract the column list from a .select('...') on/near a line. Returns the number
 // of comma-separated columns, or -1 if it's `*` / dynamic / not a plain string.
 function selectColumnCount(block) {
@@ -94,11 +124,23 @@ function selectColumnCount(block) {
 }
 
 const findings = [];
+const countFindings = [];
 
 for (const root of SCAN_ROOTS) {
-  for (const p of walk(root, (f) => /\.(ts|tsx)$/.test(f))) {
+  for (const p of walk(root, (f) => /\.(ts|tsx|mjs)$/.test(f))) {
     if (!isAudited(p)) continue;
     const lines = readFileSync(p, 'utf8').split('\n');
+
+    // --- RULE 2 pass: count bound without error ---
+    for (let i = 0; i < lines.length; i++) {
+      if (!bindsCountWithoutError(lines[i])) continue;
+      // Confirm it's really a Supabase call, not some unrelated { count }.
+      const block = lines.slice(Math.max(0, i - 6), i + 6).join('\n');
+      if (!/\.from\(|supabase|getSupabase|\bsb\b|getCountClient/.test(block)) continue;
+      const t = block.match(/\.from\(\s*[`'"]([a-zA-Z0-9_]+)[`'"]/);
+      countFindings.push(`${p}:${i + 1}${t ? ` (${t[1]})` : ''}`);
+    }
+
     for (let i = 0; i < lines.length; i++) {
       const line = lines[i];
       // (1) a data-only destructure (no `error` on the same destructure line)
@@ -120,31 +162,59 @@ for (const root of SCAN_ROOTS) {
 }
 
 const args = process.argv.slice(2);
-const baseline = existsSync(BASELINE_FILE)
-  ? new Set(JSON.parse(readFileSync(BASELINE_FILE, 'utf8')).allowed || [])
-  : new Set();
+const baselineRaw = existsSync(BASELINE_FILE) ? JSON.parse(readFileSync(BASELINE_FILE, 'utf8')) : {};
+const baseline = new Set(baselineRaw.allowed || []);
+// Separate key so rule 1's existing entries keep matching untouched.
+const countBaseline = new Set(baselineRaw.allowedSilentZero || []);
 
 if (args.includes('--update-baseline')) {
-  writeFileSync(BASELINE_FILE, JSON.stringify({ allowed: findings.sort() }, null, 2) + '\n');
-  console.log(`[supabase-errors] baseline updated: ${findings.length} known finding(s) recorded.`);
+  writeFileSync(
+    BASELINE_FILE,
+    JSON.stringify({ allowed: findings.sort(), allowedSilentZero: countFindings.sort() }, null, 2) + '\n',
+  );
+  console.log(
+    `[supabase-errors] baseline updated: ${findings.length} swallowed-error + ${countFindings.length} silent-zero known.`,
+  );
   process.exit(0);
 }
 
 const newViolations = findings.filter((f) => !baseline.has(f));
+const newCountViolations = countFindings.filter((f) => !countBaseline.has(f));
 
 if (args.includes('--list')) {
-  console.log(`[supabase-errors] ${findings.length} total finding(s):`);
+  console.log(`[supabase-errors] ${findings.length} swallowed-error finding(s):`);
   findings.forEach((f) => console.log('  ' + (baseline.has(f) ? '(known) ' : 'NEW ') + f));
+  console.log(`[supabase-errors] ${countFindings.length} silent-zero finding(s):`);
+  countFindings.forEach((f) => console.log('  ' + (countBaseline.has(f) ? '(known) ' : 'NEW ') + f));
 }
 
-if (newViolations.length === 0) {
-  console.log(`[supabase-errors] OK — no new swallowed-error reads (${findings.length} baseline-known).`);
+if (newViolations.length === 0 && newCountViolations.length === 0) {
+  console.log(
+    `[supabase-errors] OK — no new swallowed-error reads (${findings.length} known), ` +
+      `no new silent-zero counts (${countFindings.length} known).`,
+  );
   process.exit(0);
 }
 
-console.error(`\n[supabase-errors] ✗ ${newViolations.length} NEW swallowed-error read(s) — a hardcoded multi-column .select() whose { error } is ignored:\n`);
-newViolations.forEach((f) => console.error('  ' + f));
-console.error(`\nWhy it matters: a bad/renamed column makes PostgREST fail the WHOLE query → data=null → silent generic/empty result for the user.`);
-console.error(`Fix: destructure { data, error } and surface the error (console.error / return 500). See tasks/smart-profile-dead-table-findings.md.`);
-console.error(`(If intentional, run: node scripts/audit-supabase-errors.mjs --update-baseline)\n`);
+if (newViolations.length) {
+  console.error(`\n[supabase-errors] ✗ ${newViolations.length} NEW swallowed-error read(s) — a hardcoded multi-column .select() whose { error } is ignored:\n`);
+  newViolations.forEach((f) => console.error('  ' + f));
+  console.error(`\nWhy it matters: a bad/renamed column makes PostgREST fail the WHOLE query → data=null → silent generic/empty result for the user.`);
+  console.error(`Fix: destructure { data, error } and surface the error (console.error / return 500). See tasks/smart-profile-dead-table-findings.md.`);
+}
+
+if (newCountViolations.length) {
+  console.error(`\n[supabase-errors] ✗ ${newCountViolations.length} NEW silent-zero count(s) — { count } bound without { error }:\n`);
+  newCountViolations.forEach((f) => console.error('  ' + f));
+  console.error(`\nWhy it matters: without \`error\`, a failed query returns count=null and the`);
+  console.error(`\`count ?? 0\` that follows renders "I don't know" as the number 0 — a real`);
+  console.error(`figure, indistinguishable from a true zero. It has already erased an admin`);
+  console.error(`dashboard (all 8 tiles showed 0), reported 0 email sends, fabricated a 0 for`);
+  console.error(`NINE DAYS in snapshot-metrics, and made a reset script skip 8 of 23 tables`);
+  console.error(`while reporting success (#307, #308, #309).`);
+  console.error(`Fix: destructure { count, error }, check error, and treat count===null as`);
+  console.error(`UNKNOWN — never as 0. For head-count reads see getCountClient().`);
+}
+
+console.error(`\n(If intentional, run: node scripts/audit-supabase-errors.mjs --update-baseline)\n`);
 process.exit(1);
