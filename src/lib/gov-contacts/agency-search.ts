@@ -53,6 +53,57 @@ const PHRASE_TO_DEPT: Array<{ re: RegExp; kw: string }> = [
 ];
 
 /**
+ * Acronyms whose alias does NOT resolve to the text in department_ind_agency.
+ * Measured 2026-07-17: NASA's entry in agency-aliases.json is literally "NASA"
+ * (self-referential), so agencyKeyword() returns "NASA" and we search
+ * `ILIKE %NASA%` — which finds **0** rows, because the column actually says
+ * "NATIONAL AERONAUTICS AND SPACE ADMINISTRATION" (977 contacts). Searching
+ * "nasa" in the app returned ONE person — the only one whose job TITLE happened
+ * to contain the word.
+ *
+ * agency-aliases.json is shared by 9 other files, so this overrides here rather
+ * than editing that data underneath them.
+ */
+const DEPT_KEYWORD_OVERRIDE: Record<string, string> = {
+  NASA: 'Aeronautics',
+};
+
+/**
+ * Acronyms whose contacts live under **sub_tier**, not a department keyword.
+ *
+ * Measured 2026-07-17: DLA's alias is "Department of Defense", so it collapsed to
+ * the keyword "Defense" and matched ALL **56,521** DoD contacts. Searching "dla"
+ * returned the entire DoD firehose — Air Force, Navy and Army rows — when the
+ * 7,890 actual DLA people are identified by sub_tier "DEFENSE LOGISTICS AGENCY".
+ * A parent alias is right for a parent lookup and catastrophic for a search.
+ *
+ * These return sub_tier ONLY, never the parent dept — re-admitting "Defense"
+ * would put the firehose straight back and defeat the point.
+ *
+ * Only DoD sub-tiers with real volume are listed; measured contact counts:
+ *   DLA 7,890 · DHA 410 · DISA 254.
+ * Deliberately omitted as too thin to be worth an alias: DCMA 5, MDA 20,
+ * DARPA 42, NGA 49, DTRA 20, DIA 63 — they already work via the sub_tier ILIKE
+ * on the spelled-out name.
+ */
+const ACRONYM_TO_SUBTIER: Record<string, string> = {
+  DLA: 'Defense Logistics',
+  DHA: 'Defense Health',
+  DISA: 'Information Systems',
+};
+
+/**
+ * Where a search term should be matched: department keyword(s) and/or a sub_tier
+ * keyword. A sub_tier hit is EXCLUSIVE — see ACRONYM_TO_SUBTIER.
+ */
+export function agencySearchTargets(term: string): { dept: string[]; subTier: string[] } {
+  const up = (term || '').trim().toUpperCase();
+  const sub = ACRONYM_TO_SUBTIER[up];
+  if (sub) return { dept: [], subTier: [sub] };
+  return { dept: agencySearchKeywords(term), subTier: [] };
+}
+
+/**
  * A free-text search term → distinctive DEPARTMENT keyword(s) to also match on
  * department_ind_agency when the term names or abbreviates a federal agency.
  *   "usda"          → ["Agriculture"]
@@ -67,10 +118,15 @@ export function agencySearchKeywords(term: string): string[] {
   const out = new Set<string>();
   // 1. Whole-term acronym/alias (USDA, USFS, HUD, EPA…) — prefer the PARENT dept
   //    so a sub-agency resolves to where its contacts actually live.
-  const mapped = PARENTS[up] || ALIASES[up];
-  if (mapped) {
-    const kw = agencyKeyword(mapped);
-    if (kw.length >= 3) out.add(kw);
+  const override = DEPT_KEYWORD_OVERRIDE[up];
+  if (override) {
+    out.add(override);
+  } else {
+    const mapped = PARENTS[up] || ALIASES[up];
+    if (mapped) {
+      const kw = agencyKeyword(mapped);
+      if (kw.length >= 3) out.add(kw);
+    }
   }
   // 2. Spelled-out sub-agency phrase (forest service, land management…).
   for (const p of PHRASE_TO_DEPT) if (p.re.test(t)) out.add(p.kw);
