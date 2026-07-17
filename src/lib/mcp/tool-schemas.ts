@@ -19,6 +19,8 @@ interface JsonSchemaProp {
   description?: string;
   items?: { type?: string };
   enum?: string[];
+  /** For `type:'object'` open-dictionary params — the value type (e.g. boolean, number). */
+  additionalProperties?: { type?: string };
 }
 interface JsonSchema {
   type?: string;
@@ -46,6 +48,14 @@ function propToZod(prop: JsonSchemaProp): ZodTypeAny {
     base = z.enum(prop.enum as [string, ...string[]]);
   } else if (prop.type === 'array') {
     base = z.array(scalar(prop.items?.type));
+  } else if (prop.type === 'object') {
+    // An open dictionary (e.g. gates: gateId→boolean, ratings: factorId→number).
+    // MUST be handled explicitly: scalar('object') falls to z.unknown(), which
+    // serializes to a schema with NO `type` field — and the Connectors Directory
+    // portal rejects that as "Parameters missing type". z.record emits a real
+    // { type: 'object', additionalProperties: … }. Value type comes from
+    // additionalProperties when the registry declares it, else unknown.
+    base = z.record(z.string(), scalar(prop.additionalProperties?.type));
   } else {
     base = scalar(prop.type);
   }
