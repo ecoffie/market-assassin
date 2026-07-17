@@ -22,7 +22,20 @@ export interface SubPlan {
 }
 export interface Catalog { tools: Tool[]; packages: Pkg[]; subscriptionPlans: SubPlan[]; signupCredits: number; proMonthlyCredits: number }
 
-export const MCP_URL = 'https://getmindy.ai/mcp/mcp';
+/**
+ * The connector URL users paste into Claude. Single source of truth — it feeds the
+ * `claude mcp add` command, both copy-to-clipboard blocks, and the endpoint line.
+ *
+ * MUST stay byte-identical to MCP_OAUTH_RESOURCE (Vercel env, and the `resource`
+ * field served at /.well-known/oauth-protected-resource). Anthropic's connector
+ * docs require the metadata `resource` to match the server URL "exactly as the user
+ * enters it in Claude, including any path component" — so if this page tells someone
+ * a URL that doesn't match the metadata, their OAuth flow fails on a mismatch.
+ *
+ * Was https://getmindy.ai/mcp/mcp until 2026-07-17. The apex still answers but now
+ * advertises this subdomain, so the old URL is a mismatch — don't put it back.
+ */
+export const MCP_URL = 'https://mcp.getmindy.ai/mcp';
 
 // ---- Credit / work-up math (priced from the LIVE catalog, never hardcoded) -----
 export const toolCr = (tools: Tool[], name: string, fallback: number) =>
