@@ -112,7 +112,13 @@ function selectColumnCount(block) {
 const findings = [];
 
 for (const root of SCAN_ROOTS) {
-  for (const p of walk(root, (f) => /\.(ts|tsx)$/.test(f))) {
+  // `.mjs` added 2026-07-17 — the third blind spot. #311 widened the DIRECTORIES
+  // (admin/, cron/, scripts/) and #312 added the count-null rule, but this walk
+  // still matched only .ts/.tsx — so every scripts/*.mjs stayed invisible to BOTH
+  // rules regardless. Same lesson #311 wrote down ("blind TWICE over: the EXCLUDE
+  // AND SCAN_ROOTS"), true once more: widening one axis proves nothing about the
+  // others. Verify the gate SEES a file before trusting that it passed.
+  for (const p of walk(root, (f) => /\.(ts|tsx|mjs)$/.test(f))) {
     if (!isAudited(p)) continue;
     const lines = readFileSync(p, 'utf8').split('\n');
     for (let i = 0; i < lines.length; i++) {
