@@ -355,6 +355,15 @@ function splitCodeList(value: string): string[] {
     .filter(Boolean);
 }
 
+// A bare NAICS/PSC-ish CODE typed into the "describe your market" box is NOT a
+// keyword — "236220" is the industry code, not a word to text-match in award
+// titles. Routing it through keywordCoverage derives nonsense ("236220" appears
+// in 2 vendor NAICS / 10 PSC → NASA airfield structures ranked #1). Treat a pure
+// 2–6 digit token as a NAICS code so it takes the exact-NAICS path instead.
+function isBareNaicsCode(value?: string | null): boolean {
+  return /^\d{2,6}$/.test((value || '').trim());
+}
+
 function opportunityAgencyName(opportunity: RecommendedOpportunity): string {
   return (opportunity.department || opportunity.subTier || opportunity.office || '').trim();
 }
@@ -1047,6 +1056,17 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     // set (not the top-3), and returns the coverage lesson banner. We still fetch
     // the suggestion chips for display so the user sees the codes Mindy is using.
     if (hasCodes || !sportKeyword.trim()) { handleGenerateAll(undefined, options); return; }
+    // A bare NAICS code typed into the describe box is a CODE, not a keyword —
+    // drop it into the NAICS field and build the exact-NAICS map (DOD/Army-led),
+    // NOT a keyword text-search that ranks NASA #1 on "airfield structures".
+    if (isBareNaicsCode(sportKeyword)) {
+      const code = sportKeyword.trim();
+      const nextFormData = { ...formData, naicsCode: code, businessType: formData.businessType || 'Small Business' };
+      setFormData(nextFormData);
+      setSportKeyword(''); // clear so TMR + FPDS run in NAICS mode, not keyword mode
+      handleGenerateAll({ nextFormData }, options);
+      return;
+    }
     setSportSuggesting(true);
     try {
       const res = await fetch('/api/suggest-codes', {
@@ -1141,6 +1161,8 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     if (!kw || !kw.trim()) return;
     deepLinkKeywordRef.current = true;
     setResearchMode('sport');
+    // A deep-linked bare NAICS code (?keyword=236220) auto-builds through
+    // handleSportBuild, which reroutes it into the NAICS field (exact-NAICS mode).
     setSportKeyword(kw.trim());
   }, [searchParams]);
 
@@ -1368,7 +1390,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
     // top-3, so the user doesn't silently miss 72% of their market). Only use the
     // keyword once a Sport build has started (parallel with generate-all) — not
     // only after sportReportRan (that waited ~60s and left charts on stale data).
-    const sportKw = (researchMode === 'sport' && (sportReportRan || sportBuildActive))
+    const sportKw = (researchMode === 'sport' && (sportReportRan || sportBuildActive) && !isBareNaicsCode(sportKeyword))
       ? sportKeyword.trim()
       : '';
     // Only fire when the NAICS field holds at least one PLAUSIBLE code (2-6 digits)
@@ -1731,7 +1753,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
   // chartBuyers — prefer the full TMR row set when it's loaded; fall
   // back to the legacy 7-row governmentBuyers ONLY in Auto mode (Sport
   // keyword searches must not show generate-all buyers — wrong market).
-  const sportKeywordActive = researchMode === 'sport' && !!(sportReportRan || sportBuildActive) && !!sportKeyword.trim();
+  const sportKeywordActive = researchMode === 'sport' && !!(sportReportRan || sportBuildActive) && !!sportKeyword.trim() && !isBareNaicsCode(sportKeyword);
   // chartRows — the single row set the charts render from. Prefer the
   // AUTHORITATIVE AgencyTable rows (tmrRows); fall back to the parent bootstrap
   // fetch ONLY before AgencyTable has reported. Once it reports, the chart and
@@ -2460,7 +2482,7 @@ export default function MarketResearchPanel({ email, tier, onNavigate }: MarketR
               veteranStatus={formData.veteranStatus}
               zipCode={formData.zipCode}
               excludeDOD={formData.excludeDOD}
-              keyword={researchMode === 'sport' && (sportReportRan || sportBuildActive) ? sportKeyword.trim() : undefined}
+              keyword={researchMode === 'sport' && (sportReportRan || sportBuildActive) && !isBareNaicsCode(sportKeyword) ? sportKeyword.trim() : undefined}
               profileKeywords={savedProfile?.keywords}
               onRowsChange={setTmrRows}
               onSelectedAgenciesChange={setStarredAgencies}
