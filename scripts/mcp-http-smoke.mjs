@@ -13,10 +13,18 @@
  * This is the Slice-2 acceptance test (PRD §7, HTTP edge).
  *
  * Usage:
- *   # against a local dev server (npm run dev in another shell):
- *   MCP_KEY=mcp_live_xxx node scripts/mcp-http-smoke.mjs --url http://localhost:3000/mcp/mcp
- *   # against production once the domain is live:
+ *   # against production (the canonical URL):
  *   MCP_KEY=mcp_live_xxx node scripts/mcp-http-smoke.mjs --url https://mcp.getmindy.ai/mcp
+ *
+ * LOCAL: there is no /mcp/mcp any more. mcp-handler matches the request pathname
+ * by strict equality against streamableHttpEndpoint, which is now '/mcp' so that
+ * the canonical mcp.getmindy.ai/mcp works (a Next rewrite does not rewrite
+ * request.url, so the handler sees '/mcp', not the rewritten '/mcp/mcp' — that
+ * mismatch 404'd every authenticated call to the subdomain; see route.ts).
+ *
+ * Locally, / mcp is the marketing page, so the HTTP edge has no reachable path
+ * without the host rewrite. Use the stdio server for local tool work:
+ *   npm run mcp:dev
  *
  * The key must be a real mcp_live_ key from the mcp_api_keys table (issue one via
  * /api/mcp/keys or api-keys.ts issueApiKey). Without --key/MCP_KEY only test 1 runs.
@@ -30,7 +38,7 @@ function argVal(name, fallback) {
   return i >= 0 ? args[i + 1] : fallback;
 }
 
-const rawUrl = argVal('--url', process.env.MCP_URL || 'http://localhost:3000/mcp/mcp');
+const rawUrl = argVal('--url', process.env.MCP_URL || 'https://mcp.getmindy.ai/mcp');
 const key = argVal('--key', process.env.MCP_KEY || '');
 const topic = argVal('--topic', 'how to win an 8(a) construction recompete at the VA');
 const url = new URL(rawUrl);
