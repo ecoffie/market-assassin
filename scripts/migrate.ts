@@ -113,8 +113,19 @@ function loadMigrations(): Migration[] {
     });
 }
 
-function connString(): string {
-  const url = process.env.SUPABASE_DB_URL || process.env.DATABASE_URL;
+/**
+ * Resolve the connection string.
+ *
+ * DATABASE_URL is the ESTABLISHED name in this repo -- scripts/lib/db-url.js
+ * already resolves it for the one-off migration scripts, and it's already set in
+ * Vercel. Don't invent a second name for the same thing; SUPABASE_DB_URL is
+ * accepted only as an alias so nobody who guessed it gets a confusing failure.
+ *
+ * NEVER hardcode this value. Per scripts/lib/db-url.js: on 2026-07-09 a plaintext
+ * prod password was found committed and had to be rotated.
+ */
+function connString(): { url: string; pooled: boolean } {
+  const url = process.env.DATABASE_URL || process.env.SUPABASE_DB_URL;
   if (!url) {
     console.error(`
 ✗ No database connection string.
@@ -122,26 +133,26 @@ function connString(): string {
   This runner needs a real Postgres connection -- the service-role key only
   reaches PostgREST, which cannot run DDL.
 
-  Add ONE line to .env.local:
+  Add ONE line to .env.local (gitignored -- never commit it):
 
-    SUPABASE_DB_URL="postgresql://postgres.<ref>:<password>@aws-0-<region>.pooler.supabase.com:5432/postgres"
+    DATABASE_URL="postgresql://postgres.<ref>:<password>@aws-0-us-west-2.pooler.supabase.com:5432/postgres"
 
-  Get it from: Supabase dashboard -> Project Settings -> Database ->
-  Connection string -> URI, and choose the SESSION pooler (port 5432).
+  Get it from: Supabase dashboard -> Connect -> Connection string -> URI.
+  This project's ref is krpyelfrbicmvsmwovti (region us-west-2).
 
-  NOT port 6543. That is the transaction pooler; it breaks the advisory lock
-  and prepared statements this runner relies on.
+  Port 5432 (session pooler) is PREFERRED -- it supports the advisory lock that
+  stops two runners from racing. Port 6543 (transaction pooler) also works; the
+  lock is skipped and you'll see a warning.
 
-  Then re-run. .env.local is gitignored -- do not commit this value anywhere.
+  Same variable scripts/lib/db-url.js already uses, so setting it once also fixes
+  the other migration scripts.
 `);
     process.exit(1);
   }
-  if (url.includes(':6543')) {
-    console.error('✗ SUPABASE_DB_URL points at port 6543 (transaction pooler).');
-    console.error('  Use the SESSION pooler on port 5432 — 6543 cannot hold the advisory lock.');
-    process.exit(1);
-  }
-  return url;
+  // Transaction pooler: sessions aren't pinned to a backend, so a session-scoped
+  // advisory lock could be acquired on one connection and released on another.
+  // Degrade to no lock rather than pretend we're serialized.
+  return { url, pooled: url.includes(':6543') };
 }
 
 async function ensureLedger(client: Client) {
@@ -260,7 +271,7 @@ async function cmdBaseline(client: Client) {
   console.log(`  From here, 'npm run migrate' runs only NEW files.\n`);
 }
 
-async function cmdApply(client: Client) {
+async function cmdApply(client: Client, pooled: boolean) {
   const files = loadMigrations();
   if (!(await ledgerExists(client))) {
     // Refuse rather than guess. Auto-baselining here would silently bless 138
@@ -296,7 +307,15 @@ async function cmdApply(client: Client) {
 
   // Serialize runners. Two concurrent applies would race on the ledger and could
   // run the same DDL twice. Session-scoped, so it releases if this process dies.
-  await client.query('SELECT pg_advisory_lock(hashtext($1))', ['ma:migrate']);
+  // Unavailable through the transaction pooler (see connString) -- say so out
+  // loud rather than take a lock that silently doesn't hold.
+  if (pooled) {
+    console.log(`\n  ⚠ Connected via the transaction pooler (6543) — advisory lock SKIPPED.`);
+    console.log(`    Concurrent runs are not serialized. Don't run two at once.`);
+    console.log(`    Use the session pooler (5432) to get the lock.`);
+  } else {
+    await client.query('SELECT pg_advisory_lock(hashtext($1))', ['ma:migrate']);
+  }
   try {
     for (const m of pending) {
       // Auto-detect the transaction hazard even when the directive is absent --
@@ -354,15 +373,19 @@ async function cmdApply(client: Client) {
       }
     }
   } finally {
-    await client.query('SELECT pg_advisory_unlock(hashtext($1))', ['ma:migrate']).catch(() => {});
+    if (!pooled) {
+      await client.query('SELECT pg_advisory_unlock(hashtext($1))', ['ma:migrate']).catch(() => {});
+    }
   }
   console.log(`\n  ✓ Applied ${pending.length} migration(s).\n`);
 }
 
 async function main() {
+  const { url, pooled } = connString();
   const client = new Client({
-    connectionString: connString(),
-    // Supabase requires TLS; its cert chain isn't in Node's default store.
+    connectionString: url,
+    // Supabase requires TLS and its chain isn't in Node's default store. Matches
+    // what scripts/lib/db-url.js consumers already do.
     ssl: { rejectUnauthorized: false },
     statement_timeout: 300_000,
   });
@@ -370,7 +393,7 @@ async function main() {
   try {
     if (cmd === 'status') await cmdStatus(client);
     else if (cmd === 'baseline') await cmdBaseline(client);
-    else await cmdApply(client);
+    else await cmdApply(client, pooled);
   } finally {
     await client.end();
   }
