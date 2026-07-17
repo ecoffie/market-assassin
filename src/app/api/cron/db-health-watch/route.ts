@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
-import { sendEmail } from '@/lib/send-email';
+import { sendOpsAlert } from '@/lib/ops-alert';
 
 /**
  * DB Health Watch — Layer 2 early warning (the "hear it first, not from users").
@@ -90,6 +90,18 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
+  // Alarm self-test: fire a real, clearly-labelled Slack alert without waiting for
+  // an actual outage — so "is the alarm even working?" is answerable on demand.
+  // GET /api/cron/db-health-watch?password=<ADMIN_PASSWORD>&test=1
+  if (new URL(request.url).searchParams.get('test') === '1') {
+    const r = await sendOpsAlert({
+      to: ALERT_TO,
+      subject: '✅ [Mindy DB] alarm self-test — NOT an incident',
+      html: `<p>db-health-watch → Slack alerting is live. If this reached your Slack, a real DB degradation/outage alert will too.</p><p>${new Date().toISOString()}</p>`,
+    });
+    return NextResponse.json({ test: true, delivered_to_slack: r.ok, error: r.error ?? null });
+  }
+
   const sb = createClient(SUPABASE_URL, SUPABASE_KEY);
   const probes: ProbeResult[] = [];
 
@@ -173,15 +185,19 @@ export async function GET(request: NextRequest) {
 
     if ((worsened || recovered) && now - lastAlertMs > ALERT_COOLDOWN_MS) {
       try {
-        await sendEmail({
+        // Ops alerts go to SLACK, not email (Eric moved all internal ops/health
+        // notifications off email onto Slack 2026-07-01 — the outage detector must
+        // land in the channel he actually watches). sendOpsAlert is a drop-in for
+        // sendEmail; `to` is ignored.
+        await sendOpsAlert({
           to: ALERT_TO,
-          subject: `[Mindy DB] ${status.toUpperCase()} — was ${prev} (${new Date().toISOString()})`,
+          subject: `🚨 [Mindy DB] ${status.toUpperCase()} — was ${prev} (${new Date().toISOString()})`,
           html: buildAlertHtml(status, prev, probes),
         });
         alerted = true;
         await kv.set(LAST_ALERT_KEY, new Date().toISOString());
       } catch (err) {
-        console.error('[db-health-watch] alert email failed:', (err as Error).message);
+        console.error('[db-health-watch] Slack alert failed:', (err as Error).message);
       }
     }
     try { await kv.set(STATE_KEY, status); } catch { /* ignore */ }
