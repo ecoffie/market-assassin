@@ -29,7 +29,9 @@
 import dotenv from 'dotenv';
 import { createClient } from '@supabase/supabase-js';
 
-dotenv.config({ path: '.env.local' });
+// quiet: dotenv v17+ prints an "injected env" banner to STDOUT, which corrupts --json
+// for anything piping us into jq/python. Machine-readable has to mean machine-readable.
+dotenv.config({ path: '.env.local', quiet: true });
 
 const args = process.argv.slice(2);
 const flag = (n, d = null) => { const i = args.indexOf(`--${n}`); return i === -1 ? d : args[i + 1]; };
@@ -60,7 +62,7 @@ if (has('check')) {
 
 const positional = (() => {
   const consumed = new Set();
-  for (const n of ['select', 'eq', 'like', 'order', 'limit']) {
+  for (const n of ['select', 'eq', 'like', 'is', 'order', 'limit']) {
     args.forEach((a, i) => { if (a === `--${n}`) { consumed.add(i); consumed.add(i + 1); } });
   }
   return args.filter((a, i) => !consumed.has(i) && !a.startsWith('--'));
@@ -80,14 +82,27 @@ const sb = createClient(url, key);
 const applyFilters = (q) => {
   for (const f of all('eq')) { const [k, ...v] = f.split('='); q = q.eq(k, v.join('=')); }
   for (const f of all('like')) { const [k, ...v] = f.split('='); q = q.ilike(k, v.join('=')); }
+  // `--is k=null|true|false`. NULL is not reachable via --eq (PostgREST needs IS), and
+  // "quality_flag IS NULL" is the real-vs-synthetic filter query.ts itself uses — without
+  // this you can only get the NULL count by subtracting, which assumes you know every
+  // other value. Ask directly instead.
+  for (const f of all('is')) {
+    const [k, ...v] = f.split('=');
+    const raw = v.join('=').toLowerCase();
+    const val = raw === 'null' ? null : raw === 'true' ? true : raw === 'false' ? false : undefined;
+    if (val === undefined) { console.error(`✗ --is ${f}: value must be null|true|false`); process.exit(2); }
+    q = q.is(k, val);
+  }
   return q;
 };
-const filtered = all('eq').length + all('like').length > 0;
+const filtered = all('eq').length + all('like').length + all('is').length > 0;
 
 if (has('count')) {
   const { count, error } = await applyFilters(sb.from(tbl).select('*', { count: 'exact', head: true }));
   if (error) { console.error(`\x1b[31m✗\x1b[0m ${tbl}: ${error.message}`); process.exit(1); }
-  const where = filtered ? ` matching ${[...all('eq'), ...all('like')].join(' & ')}` : '';
+  const where = filtered
+    ? ` matching ${[...all('eq'), ...all('like'), ...all('is').map((f) => f.replace('=', ' IS '))].join(' & ')}`
+    : '';
   console.log(`${tbl}: \x1b[1m${(count ?? 0).toLocaleString()}\x1b[0m rows${where}`);
   process.exit(0);
 }
