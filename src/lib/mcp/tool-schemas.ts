@@ -66,6 +66,8 @@ function propToZod(prop: JsonSchemaProp): ZodTypeAny {
  * does NOT hide inside the always-allow read-only group.
  */
 export interface McpToolAnnotations {
+  /** Human title, ALSO carried at Tool.title. The directory portal checks it here. */
+  title?: string;
   readOnlyHint?: boolean;
   destructiveHint?: boolean;
   idempotentHint?: boolean;
@@ -203,7 +205,13 @@ export function mcpRegistrationList(): McpRegistrationEntry[] {
       title,
       description: fn.description ?? '',
       inputSchema: shape as ZodRawShape,
-      annotations: hints,
+      // title goes in BOTH places on purpose. The top-level Tool.title (2025 spec,
+      // via BaseMetadata) is what most clients render; annotations.title is the
+      // ORIGINAL location (2024 spec, still in ToolAnnotationsSchema) and it is what
+      // the Connectors Directory submission portal checks — without it, every tool
+      // reports "Missing annotations: title" in the Tools step. Setting both
+      // satisfies old and new readers; they carry the same string.
+      annotations: { title, ...hints },
     };
   });
 }
