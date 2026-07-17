@@ -2,9 +2,16 @@
 
 ## TL;DR
 
-**Every technical gate is done and verified against production. One thing is left, and it isn't code: a Team or Enterprise seat** to reach the submission portal (admin settings don't exist on individual plans).
+**SUBMITTED to the Connectors Directory on 2026-07-17.** Team seat bought, 11-step
+portal wizard completed, `demo@getmindy.ai` handed over as the reviewer account.
+It now auto-scans and lists as a **Community** connector; **Verified** is escalated
+by Anthropic automatically (not applied-for) for connectors flagged as highly
+useful.
 
-Last night's four blockers are closed. This morning surfaced **three bugs that would each have sunk the submission on their own** — none of which any amount of unauthenticated probing could have found. All three are fixed and live.
+Getting here took **six bug fixes in one day** — three server-side and invisible
+to any unauthenticated probe (#330, #335, #341), two the portal's own schema
+checker caught (#350, #351), and one real product bug a live demo surfaced (#346).
+The through-line: **the layer I verified was never the layer that mattered.**
 
 > Every figure below was checked against the live endpoint, the live DB, or the live catalog API — not a build status.
 
@@ -27,7 +34,34 @@ Last night's four blockers are closed. This morning surfaced **three bugs that w
 
 ---
 
-## The three that would have sunk it
+## Submission-day timeline (2026-07-17)
+
+The whole thing shipped in one day, and the portal itself surfaced bugs that no
+amount of pre-checking had. The pattern, over and over: **the layer I verified was
+not the layer that mattered.** An unauthenticated probe passes while the
+authenticated path 404s; a title renders while `annotations.title` is absent; a
+demo works by API while the reviewer's exact UI flow is the untested one.
+
+Order the bugs surfaced and were fixed:
+
+| # | PR | Surfaced by | What |
+|---|---|---|---|
+| 1 | #330 | Eric's own connect attempt | consent page polled forever for a key nothing sets |
+| 2 | #335 | connecting to the new canonical URL | subdomain 404'd every AUTHENTICATED call |
+| 3 | #341 | a missing logo in the chat | hosted server was anonymous ("mcp-typescript server on vercel") |
+| 4 | #346 | a live demo asking for 8(a) work | set-aside filter hid 130 of 196 opportunities, silently |
+| 5 | #350 | the portal's Tools step | all 49 tools "Missing annotations: title" |
+| 6 | #351 | the portal's "1 to fix" | object params (`gates`/`ratings`) emitted no JSON-Schema type |
+
+Plus the groundwork earlier in the day: privacy policy rewrite (#328), tool
+annotations on both surfaces (#318/#322), the canonical-URL flip, and the reviewer
+account provisioner (#337).
+
+**Submitted through the portal the same day.** Team seat bought, 11-step wizard
+completed, auth declared as OAuth 2.0 + DCR, credentials handed over for
+`demo@getmindy.ai` with the sign-in-first ordering spelled out.
+
+## The three that would have sunk it (server-side, invisible to probing)
 
 ### 1. The canonical subdomain 404'd every AUTHENTICATED call (#335)
 
@@ -67,6 +101,47 @@ name: "mcp-typescript server on vercel", version: "0.1.0"
 That's what a reviewer running `initialize` would have seen. The stdio server has always said `mindy-govcon`; the hosted edge — the one Claude actually connects to — was anonymous. No `icons` either, so clients had nothing to draw.
 
 Now: `name:"Mindy"`, description, `websiteUrl`, `icons:[512x512]`. **Ruled out first:** both origins serve byte-identical `/icon.png` and `<link rel="icon">`, so the apex→subdomain move was *not* the cause.
+
+## The two the portal itself caught (schema, invisible until the wizard read it)
+
+### 4. Every tool: "Missing annotations: title" (#350)
+
+A tool title can live in two places: `Tool.title` (2025 spec, `BaseMetadata`) and
+`annotations.title` (2024 spec, still in `ToolAnnotationsSchema`). We set only the
+top-level one — so cards **rendered** a title while the portal's checker, which
+reads `annotations.title`, reported all 49 missing. `mcpRegistrationList`
+destructured title **out** of the annotations object. Fix: set it in both from the
+one curated `TOOL_META` string.
+
+### 5. `evaluate_bid_decision`: "Parameters missing type: gates, ratings" — the "1 to fix" (#351)
+
+The registry declared both correctly (`type:'object'` + `additionalProperties`),
+but the **converter** dropped it: `propToZod` handled enum/array/scalars only, so a
+`type:'object'` param fell to `scalar('object')` → `z.unknown()`, which serializes
+with **no `type` field**. `gates`/`ratings` are the only nested object params across
+49 tools — hence the lone "1 to fix." Fix: `object → z.record(z.string(), <value
+type>)`, reading the value type from `additionalProperties`.
+
+**Both were invisible to every local check** — the SDK uses its own zod→schema
+serializer, so a local `zod-to-json-schema` scan lied (it flagged even plain
+strings). Only the live `tools/list` — and the portal — showed the truth.
+
+**And a caching trap on top:** the submission draft froze the tool list captured at
+first-connect. A soft "Refresh" re-rendered the stale copy; only a full
+disconnect + re-add + **new draft** re-read the corrected schema. Same class as the
+logo cache.
+
+## The bug a live demo caught: the 8(a) filter (#346)
+
+Not a directory bug — a real product bug, found when Eric asked Claude for 8(a)
+work near MD mid-submission and got **zero**. The filter did
+`ilike('set_aside_description', '%8(a)%')`, but SAM writes competed notices as
+"8a Competed" (no parens), so it matched 66 rows and **hid 130**. And the tool's
+own description told the model to send "8(a)" — the value that fails. Now filters on
+`set_aside_code`, maps `8(a) → [8A, 8AN]` (competed + sole source), and returns an
+actionable error instead of a silent zero for an unknown token. Violated a stated
+review criterion verbatim: *"return actionable error messages rather than silently
+accepting invalid data."*
 
 ---
 
@@ -111,9 +186,9 @@ Populated via the existing `scripts/seed-demo-vault.ts` — TANTUS TECHNOLOGIES,
 
 ---
 
-## Order of operations
+## What was submitted (portal field reference — kept for the record / re-submission)
 
-1. **Buy a Team or Enterprise seat.** Nothing else blocks.
+1. **Team or Enterprise seat** — bought 2026-07-17.
 2. Portal → Connection: `https://mcp.getmindy.ai/mcp`, transport **streamable HTTP**.
 3. Portal → Tools: they sync from the server. Expect **49**, grouped 47 read-only / 2 write.
 4. Portal → Listing: name, tagline (≤55), description (≤2000), categories, docs URL (`getmindy.ai/mcp`), privacy URL (`getmindy.ai/privacy`), support contact, icon, slug (**permanent once published**).
