@@ -240,10 +240,10 @@ export default function MindyLandingPage() {
               <div>
                 <div className="text-2xl mb-2">🧭</div>
                 <h3 className="text-xl font-bold text-white group-hover:text-purple-300">Discover — the federal market, decoded</h3>
-                <p className="mt-2 text-sm text-muted max-w-2xl">This week&apos;s biggest contracts, the weirdest awards the government actually bought, and the top contractors ranked — all free, all verifiable.</p>
+                <p className="mt-2 text-sm text-muted max-w-2xl">The biggest recent contracts, contracts coming up for grabs, the weirdest awards the government actually bought, and the top contractors ranked — all free, all verifiable.</p>
               </div>
               <span className="inline-flex items-center gap-2 text-sm font-semibold text-purple-300">
-                <span className="rounded-full border border-hairline px-3 py-1">💸 Spending</span>
+                <span className="rounded-full border border-hairline px-3 py-1">⏳ Up For Grabs</span>
                 <span className="rounded-full border border-hairline px-3 py-1">🧐 Weird Awards</span>
                 <span className="text-purple-400">Explore →</span>
               </span>
