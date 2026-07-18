@@ -19,6 +19,26 @@
 
 ---
 
+## In-flight work — READ THIS FIRST before re-deriving anything
+
+Concise pointers to the living records so a new session doesn't spend an hour
+reconstructing state. When one of these is closed, update it here.
+
+### MCP Connectors Directory — SUBMITTED 2026-07-17
+Full record: **`tasks/mcp-directory-submission-readiness-2026-07-17.md`**. Don't re-investigate; read that file.
+- **Canonical connector URL:** `https://mcp.getmindy.ai/mcp` (NOT the apex `getmindy.ai/mcp/mcp` — that's retired; `/mcp/mcp` no longer routes).
+- **Auth:** OAuth 2.0 + DCR, and DCR is now **idempotent** (`registerClient` dedupes by signature — do not "fix" it back to minting per-call).
+- **Server identity:** hosted edge sets `serverInfo` (name "Mindy" + icons) in `src/app/mcp/[transport]/route.ts`. Tool titles/annotations/object-param types are curated in `src/lib/mcp/tool-schemas.ts` (`TOOL_META`, `annotationsFor`, `propToZod`). The portal reads `annotations.title` AND per-param `type` — both must be emitted.
+- **Reviewer account:** `demo@getmindy.ai` (free, funded, vault+CRM seeded). Built by `scripts/provision-reviewer-account.ts`. Must stay FREE — `MFA_ENFORCED_PAID='on'`, so granting it Pro/Team locks the reviewer out.
+- **OPEN — do soon:** rotate the GHL Private Integration Token (it was pasted into a transcript); delete the `Mindy ReviewerTest` contact in GHL location `V4H04EQ2wl6n6fkvBzyM`.
+- **OPEN — after approval only:** turn on `MCP_ENFORCE_TIERS` (off now so the reviewer's free account can run `get_winning_playbook`); decide the 713-Pro July allowance backfill (self-corrects in August).
+
+### Other active follow-ups
+- `tasks/silent-failure-followups-2026-07-16.md` — the recompete cron erroring on ~18% of NAICS (`fetch failed`, undiagnosed — log `error.cause`), plus 86 grandfathered silent-zero sites.
+- `tasks/mi-beta-email-cleanup.md` — `mi_beta_email` is a redundant unsigned localStorage key; deferred auth refactor (16 files).
+
+---
+
 ## Unified MI Platform Architecture (May 2026)
 
 **Decision:** All Market Intelligence tools are panels within `/briefings`, NOT separate routes.
