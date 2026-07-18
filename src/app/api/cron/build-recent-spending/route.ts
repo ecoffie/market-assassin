@@ -33,19 +33,20 @@ export async function GET() {
   let rows: Row[];
   try {
     rows = await bqQuery<Row>({
-      // Recent partitions only + a $1M floor keeps this bounded. 60 days (not 7) because
-      // award ingestion lags reporting; we still surface the biggest of what's landed.
+      // Filter by fiscal_year (like getLatestAwards) + order by action_date DESC to get the
+      // MOST RECENT big awards. A tight action_date window returned 0 — federal award data
+      // lags ingestion by weeks/months, so "last 60 calendar days" is often empty. FY does not.
       maximumBytesBilled: String(25 * 1024 * 1024 * 1024),
       query: `
         SELECT award_id, piid, recipient_name, awarding_agency, obligation_amount,
                description, naics_description, CAST(action_date AS STRING) AS action_date, recipient_state
         FROM ${BQ_TABLES.awards}
         WHERE obligation_amount >= 1000000
-          AND action_date >= DATE_SUB(CURRENT_DATE(), INTERVAL 60 DAY)
-        ORDER BY obligation_amount DESC
+          AND fiscal_year >= @minFy
+        ORDER BY action_date DESC
         LIMIT 300
       `,
-      params: {},
+      params: { minFy: new Date().getFullYear() - 1 },
     });
   } catch (e) {
     console.error('[build-recent-spending] BQ scan failed:', e);
