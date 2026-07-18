@@ -43,7 +43,12 @@ export async function GET() {
   // Weird = small-ish and specific; a $2B award is not "weird", it's just big. Recent-ish
   // so it feels current. One OR-clause per curated term.
   const likeClause = WEIRD_TERMS.map((_, i) => `UPPER(description) LIKE @t${i}`).join(' OR ');
-  const params: Record<string, string | number> = { minAmt: 500, maxAmt: 10_000_000, minFy: new Date().getFullYear() - 8 };
+  // ⚠️ CREDIBILITY CAP. The description only MENTIONS the item; the obligation is the whole
+  // award. A $1.6M "dunk tank" is really a festival-services contract that lists one — so
+  // attributing the full amount "to a dunk tank" is misleading, and misleading kills the
+  // "cited source" thesis. Cap at $100K so the shown figure plausibly IS the item itself.
+  // The small absurd ones ("$12K on a clown") are the unimpeachable, screenshot-proof gold.
+  const params: Record<string, string | number> = { minAmt: 500, maxAmt: 100_000, minFy: new Date().getFullYear() - 8 };
   WEIRD_TERMS.forEach((t, i) => { params[`t${i}`] = `%${t.like}%`; });
 
   let rows: Row[];
