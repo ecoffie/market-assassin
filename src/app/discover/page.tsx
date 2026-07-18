@@ -8,6 +8,7 @@ import Link from 'next/link';
 import ShareButton from '@/components/ShareButton';
 import { getRecentBigAwards } from '@/lib/discover/recent-spending';
 import { getWeirdAwards, WEIRD_TERMS } from '@/lib/discover/weird-awards';
+import { queryExpiringContracts, type ExpiringContract } from '@/lib/recompete/query';
 import { formatCompanyName as fmtName } from '@/lib/format-name';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 
@@ -42,10 +43,16 @@ export const metadata: Metadata = {
 };
 
 export default async function DiscoverHub() {
-  const [spending, weird] = await Promise.all([
+  const [spending, weird, expiring] = await Promise.all([
     getRecentBigAwards(4).catch(() => []),
     getWeirdAwards(4).catch(() => []),
+    queryExpiringContracts({ monthsWindow: 12, minValue: 10_000_000, limit: 60 })
+      .then((r) => r.contracts)
+      .catch(() => [] as ExpiringContract[]),
   ]);
+  const upForGrabs = [...expiring]
+    .sort((a, b) => Number(b.potential_total_value ?? b.total_obligation ?? 0) - Number(a.potential_total_value ?? a.total_obligation ?? 0))
+    .slice(0, 4);
 
   return (
     <main className="min-h-screen bg-slate-950 text-white">
@@ -66,15 +73,36 @@ export default async function DiscoverHub() {
         <div className="mt-5"><ShareButton url={`${SITE_URL}/discover`} title="The federal market, decoded — where the government spends its money" /></div>
       </section>
 
+      {/* Up For Grabs — the freshest, forward-looking feed (the proven teaser format) */}
+      <section className="mx-auto max-w-6xl px-6 pb-5">
+        <Link href="/up-for-grabs" className="group block rounded-2xl border border-purple-500/40 bg-gradient-to-br from-purple-900/30 to-slate-900 p-6 hover:border-purple-500/70 transition-colors">
+          <div className="flex items-center justify-between">
+            <h2 className="text-xl font-bold">⏳ Up For Grabs — contracts expiring soon</h2>
+            <span className="text-xs font-semibold text-purple-400 group-hover:text-purple-300">Open →</span>
+          </div>
+          <p className="mt-2 text-sm text-slate-400">The government has to re-buy this work — here&apos;s the biggest coming up for grabs, with the incumbent and when.</p>
+          <div className="mt-4 grid gap-2 sm:grid-cols-2">
+            {upForGrabs.length === 0 ? (
+              <div className="text-sm text-slate-500">Updating…</div>
+            ) : upForGrabs.map((c) => (
+              <div key={c.contract_id} className="flex items-center gap-3 text-sm">
+                <span className="w-16 shrink-0 font-bold tabular-nums text-purple-300">{fmtMoney(Number(c.potential_total_value ?? c.total_obligation ?? 0))}</span>
+                <span className="min-w-0 flex-1 truncate text-slate-300">{fmtName(c.incumbent_name || '')}</span>
+              </div>
+            ))}
+          </div>
+        </Link>
+      </section>
+
       {/* Feature grid */}
       <section className="mx-auto max-w-6xl px-6 pb-10 grid gap-5 lg:grid-cols-2">
         {/* This Week in Government Spending */}
         <Link href="/spending" className="group flex flex-col rounded-2xl border border-slate-800 bg-slate-900 p-6 hover:border-purple-500/50 transition-colors">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-bold">💸 This Week in Government Spending</h2>
+            <h2 className="text-xl font-bold">💸 The Latest Big Contracts</h2>
             <span className="text-xs font-semibold text-purple-400 group-hover:text-purple-300">Open →</span>
           </div>
-          <p className="mt-2 text-sm text-slate-400">The biggest federal contracts the government just awarded.</p>
+          <p className="mt-2 text-sm text-slate-400">The biggest federal contracts the government awarded recently.</p>
           <div className="mt-4 space-y-2">
             {spending.length === 0 ? (
               <div className="text-sm text-slate-500">Updating…</div>

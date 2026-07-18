@@ -14,21 +14,21 @@ const SITE_URL = 'https://getmindy.ai';
 export const revalidate = 86400; // 1d; the weekly build cron also revalidatePath()s this
 
 export const metadata: Metadata = {
-  title: 'This Week in Government Spending — The Biggest Federal Contracts | Mindy',
+  title: 'The Latest Big Federal Contracts — Government Spending | Mindy',
   description:
-    'The biggest federal contracts the U.S. government just awarded — real, verifiable, and updated weekly. See who got paid, how much, and for what, straight from USASpending.',
+    'The biggest federal contracts the U.S. government has awarded recently — real, verifiable, and refreshed weekly. See who got paid, how much, and for what, straight from USASpending.',
   alternates: { canonical: `${SITE_URL}/spending` },
   openGraph: {
-    title: 'This Week in Government Spending — The Biggest Federal Contracts',
-    description: 'The biggest federal contracts the government just awarded. Real, verifiable, weekly.',
+    title: 'The Latest Big Federal Contracts',
+    description: 'The biggest federal contracts the government has awarded recently. Real and verifiable.',
     url: `${SITE_URL}/spending`,
     type: 'website',
     siteName: 'Mindy',
   },
   twitter: {
     card: 'summary_large_image',
-    title: 'This Week in Government Spending',
-    description: 'The biggest federal contracts the government just awarded. Real, verifiable, weekly.',
+    title: 'The Latest Big Federal Contracts',
+    description: 'The biggest federal contracts the government has awarded recently. Real and verifiable.',
   },
 };
 
@@ -70,10 +70,10 @@ export default async function SpendingPage() {
 
       {/* Hero */}
       <section className="mx-auto max-w-5xl px-6 pt-6 pb-8">
-        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-400">Discover · Updated weekly</p>
-        <h1 className="mt-3 text-4xl md:text-5xl font-bold tracking-tight">This week in government spending</h1>
+        <p className="text-xs font-semibold uppercase tracking-[0.2em] text-purple-400">Discover · Refreshed weekly</p>
+        <h1 className="mt-3 text-4xl md:text-5xl font-bold tracking-tight">The latest big federal contracts</h1>
         <p className="mt-4 max-w-2xl text-lg text-slate-300">
-          The biggest federal contracts the government just awarded — who got paid, how much, and for what.
+          The biggest federal contracts the government has awarded recently — who got paid, how much, and for what.
           Every figure is real and verifiable. Click any to see the official record.
         </p>
         {awards.length > 0 && (
@@ -82,7 +82,7 @@ export default async function SpendingPage() {
               <div className="text-3xl font-extrabold text-purple-300 tabular-nums">{fmtMoney(total)}</div>
               <div className="text-xs uppercase tracking-wider text-slate-500">Across the top {awards.length} awards shown</div>
             </div>
-            <ShareButton url={`${SITE_URL}/spending`} title="This week in government spending — the biggest federal contracts" />
+            <ShareButton url={`${SITE_URL}/spending`} title="The latest big federal contracts the government awarded" />
           </div>
         )}
       </section>
