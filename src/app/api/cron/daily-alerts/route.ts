@@ -1443,7 +1443,7 @@ async function sendDailyAlertEmail(
   const fullMarketOpen = Math.max(allActiveOpportunities.length, opportunities.length);
   const moreInMarket = Math.max(0, fullMarketOpen - shownCount);
   const myMarketBannerHtml = (moreInMarket > 0 && shownCount > 0) ? `
-  <div style="margin: 16px 0; background: linear-gradient(135deg, #064e3b 0%, #065f46 100%); border-radius: 12px; padding: 18px 20px; text-align: center;">
+  <div style="margin: 16px 0; background: #064e3b; background: linear-gradient(135deg, #064e3b 0%, #065f46 100%); border-radius: 12px; padding: 18px 20px; text-align: center;">
     <p style="color: #6ee7b7; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; margin: 0 0 6px 0;">Your Market</p>
     <p style="color: #ffffff; font-size: 15px; margin: 0 0 12px 0; line-height: 1.5;">
       You're seeing <strong>${shownCount}</strong> of <strong>${fullMarketOpen}</strong> open opportunities matched to your profile — <strong style="color:#6ee7b7;">${moreInMarket} more</strong> plus expiring recompetes are assembled in My Market.
@@ -1497,7 +1497,7 @@ async function sendDailyAlertEmail(
   const escHtml = (s: string) => (s || '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
   const hiddenMatchHtml = hiddenMatches.length > 0 ? `
   <div style="margin-top: 24px;">
-    <div style="background: linear-gradient(135deg, #7c3aed 0%, #2563eb 100%); padding: 16px 20px; border-radius: 12px 12px 0 0;">
+    <div style="background: #7c3aed; background: linear-gradient(135deg, #7c3aed 0%, #2563eb 100%); padding: 16px 20px; border-radius: 12px 12px 0 0;">
       <h2 style="color: white; margin: 0; font-size: 18px; font-weight: 700;">💡 Hidden match — your kind of work</h2>
       <p style="color: #e9e3ff; margin: 4px 0 0 0; font-size: 13px;">Matched to your capabilities &amp; past performance — <b>not</b> your NAICS codes. Worth a look.</p>
     </div>
@@ -1538,7 +1538,7 @@ async function sendDailyAlertEmail(
   ${renderAlertTopBannerHtml(alertCta, trackedUrl)}
 
   <!-- Header -->
-  <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 28px 24px; text-align: center;">
+  <div style="background: #0f172a; background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); padding: 28px 24px; text-align: center;">
     ${renderMindyEmailLogo(52)}
     <h1 style="color: white; margin: 0; font-size: 22px; font-weight: 700;">
       🎯 Mindy Saved Search Alert
@@ -1602,7 +1602,7 @@ async function sendDailyAlertEmail(
   ${grants.length > 0 ? `
   <!-- Grants Section -->
   <div style="margin-top: 24px;">
-    <div style="background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%); padding: 16px 20px; border-radius: 12px 12px 0 0;">
+    <div style="background: #1e3a8a; background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%); padding: 16px 20px; border-radius: 12px 12px 0 0;">
       <h2 style="color: white; margin: 0; font-size: 18px; font-weight: 700;">
         🎓 Grant Opportunities
       </h2>
@@ -1663,7 +1663,7 @@ async function sendDailyAlertEmail(
 
   ${renderBootcampPromoHtml(trackedUrl)}
 
-  <div style="background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 100%); border-radius: 10px; padding: 24px; margin-top: 20px; text-align: center;">
+  <div style="background: #4c1d95; background: linear-gradient(135deg, #4c1d95 0%, #7c3aed 100%); border-radius: 10px; padding: 24px; margin-top: 20px; text-align: center;">
     <h3 style="color: white; margin: 0 0 8px 0; font-size: 17px; font-weight: 700;">
       ${alertCta.footerHeadline}
     </h3>
