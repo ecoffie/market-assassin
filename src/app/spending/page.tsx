@@ -54,7 +54,7 @@ export default async function SpendingPage() {
     itemListElement: awards.slice(0, 25).map((a, i) => ({
       '@type': 'ListItem',
       position: i + 1,
-      item: { '@type': 'GovernmentService', name: `${fmtMoney(a.obligation_amount)} — ${fmtName(a.recipient_name || '')}`, url: `${SITE_URL}/awards/${a.award_id}` },
+      item: { '@type': 'GovernmentService', name: `${fmtMoney(a.obligation_amount)} — ${fmtName(a.recipient_name || '')}`, url: `https://www.usaspending.gov/award/${a.award_id}` },
     })),
   };
 
@@ -95,9 +95,11 @@ export default async function SpendingPage() {
         <section className="mx-auto max-w-5xl px-6 pb-10">
           <div className="overflow-hidden rounded-2xl border border-slate-800 bg-slate-900 divide-y divide-slate-800">
             {awards.map((a) => (
-              <Link
+              <a
                 key={a.award_id}
-                href={`/awards/${a.award_id}`}
+                href={`https://www.usaspending.gov/award/${a.award_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="group flex items-center gap-4 px-5 py-4 hover:bg-slate-800/50 transition-colors"
               >
                 <div className="w-28 shrink-0 text-2xl font-extrabold tabular-nums text-purple-300">{fmtMoney(a.obligation_amount)}</div>
@@ -111,9 +113,9 @@ export default async function SpendingPage() {
                 <div className="hidden sm:block shrink-0 text-right text-xs text-slate-500">
                   <div>{fmtDate(a.action_date)}</div>
                   {a.recipient_state && <div className="mt-0.5">{a.recipient_state}</div>}
-                  <span className="mt-1 inline-block font-semibold text-purple-400 group-hover:text-purple-300">See the record →</span>
+                  <span className="mt-1 inline-block font-semibold text-purple-400 group-hover:text-purple-300">Official record →</span>
                 </div>
-              </Link>
+              </a>
             ))}
           </div>
           <p className="mt-4 text-xs text-slate-500">

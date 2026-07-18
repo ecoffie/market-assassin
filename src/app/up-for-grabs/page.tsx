@@ -75,7 +75,7 @@ export default async function UpForGrabsPage() {
     itemListElement: top.slice(0, 25).map((c, i) => ({
       '@type': 'ListItem',
       position: i + 1,
-      item: { '@type': 'GovernmentService', name: `${fmtMoney(sizeOf(c))} — ${fmtName(c.incumbent_name || '')}`, url: `${SITE_URL}/awards/${c.contract_id}` },
+      item: { '@type': 'GovernmentService', name: `${fmtMoney(sizeOf(c))} — ${fmtName(c.incumbent_name || '')}`, url: `https://www.usaspending.gov/award/${c.contract_id}` },
     })),
   };
 
@@ -121,7 +121,7 @@ export default async function UpForGrabsPage() {
               const m = monthsUntil(c.period_of_performance_current_end);
               const like = c.recompete_likelihood ? LIKELIHOOD[c.recompete_likelihood] : null;
               return (
-                <Link key={c.contract_id} href={`/awards/${c.contract_id}`} className="group flex items-center gap-4 px-5 py-4 hover:bg-slate-800/50 transition-colors">
+                <a key={c.contract_id} href={`https://www.usaspending.gov/award/${c.contract_id}`} target="_blank" rel="noopener noreferrer" className="group flex items-center gap-4 px-5 py-4 hover:bg-slate-800/50 transition-colors">
                   <div className="w-24 shrink-0 text-2xl font-extrabold tabular-nums text-purple-300">{fmtMoney(sizeOf(c))}</div>
                   <div className="min-w-0 flex-1">
                     <div className="truncate font-semibold text-white">{fmtName(c.incumbent_name || 'Unknown incumbent')}</div>
@@ -136,8 +136,8 @@ export default async function UpForGrabsPage() {
                       {c.set_aside_type && <span className="rounded px-2 py-0.5 bg-slate-800 text-slate-400">{c.set_aside_type}</span>}
                     </div>
                   </div>
-                  <span className="hidden sm:inline-block shrink-0 text-xs font-semibold text-purple-400 group-hover:text-purple-300">See the record →</span>
-                </Link>
+                  <span className="hidden sm:inline-block shrink-0 text-xs font-semibold text-purple-400 group-hover:text-purple-300">Official record →</span>
+                </a>
               );
             })}
           </div>
