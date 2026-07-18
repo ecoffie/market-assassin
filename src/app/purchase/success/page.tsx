@@ -106,6 +106,38 @@ function SuccessContent() {
             </ol>
           </div>
 
+          {isMindyProduct && (
+            <div className="bg-amber-50 border border-amber-200 rounded-xl p-6 mb-8 text-left">
+              <h2 className="font-bold text-gray-900 mb-2">Bonus included: Federal Help Center</h2>
+              <p className="text-gray-700 mb-3">
+                Your Mindy purchase also unlocks the <strong>Federal Help Center</strong> — our
+                coaching + training community — at no extra cost. Mindy finds you the contracts;
+                the Federal Help Center helps you <strong>win</strong> them.
+              </p>
+              <p className="text-gray-700 mb-3">
+                <strong>Check your inbox for two emails:</strong>
+              </p>
+              <ul className="space-y-2 text-gray-700 mb-4">
+                <li className="flex items-start gap-2">
+                  <span className="text-amber-500 font-bold">→</span>
+                  <span>Your <strong>Mindy login</strong> — that&apos;s your tool access</span>
+                </li>
+                <li className="flex items-start gap-2">
+                  <span className="text-amber-500 font-bold">→</span>
+                  <span>Your <strong>Federal Help Center access</strong> — coaching, training vault &amp; community</span>
+                </li>
+              </ul>
+              <a
+                href="https://federalhelpcenter.com"
+                target="_blank"
+                rel="noopener"
+                className="inline-block font-semibold text-blue-700 underline"
+              >
+                Access the Federal Help Center →
+              </a>
+            </div>
+          )}
+
           <div className="space-y-4">
             <Link
               href={isMindyProduct ? '/app' : '/'}

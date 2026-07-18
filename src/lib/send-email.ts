@@ -1538,6 +1538,85 @@ We're here to help you win federal contracts!
   }
 }
 
+// ============ Mindy → Federal Help Center bonus-access email ============
+// Sent to Mindy (Market Intelligence) buyers ON TOP OF their Mindy welcome.
+// Framed for someone who bought MINDY and is now told FHC is INCLUDED — the
+// opposite framing of sendFHCWelcomeEmail (which is for people who bought FHC).
+// Plain-letter (Brunson) style per the marketing-email standard: no gradient
+// header, no pill buttons, no images — lands in Primary, reads like a person.
+
+interface SendMindyFHCBonusEmailParams {
+  to: string;
+  customerName?: string;
+}
+
+export async function sendMindyFHCBonusEmail({
+  to,
+  customerName,
+}: SendMindyFHCBonusEmailParams): Promise<boolean> {
+  const fhcLink = 'https://federalhelpcenter.com';
+  const name = customerName ? ` ${customerName.split(' ')[0]}` : '';
+
+  const htmlContent = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #222; background: #ffffff; max-width: 560px; margin: 0 auto; padding: 24px;">
+  <p style="margin:0 0 16px;">Hi${name},</p>
+
+  <p style="margin:0 0 16px;">You just got <strong>Mindy</strong> — smart move. But there's something included that most people miss on day one.</p>
+
+  <p style="margin:0 0 16px;">Your purchase also unlocks the <strong><u>Federal Help Center</u></strong> — our coaching + training community — at no extra cost.</p>
+
+  <p style="margin:0 0 6px;">&rarr; <strong>Live coaching calls</strong> — bring your real deals, get unstuck</p>
+  <p style="margin:0 0 6px;">&rarr; <strong>Training vault</strong> — the courses and playbooks</p>
+  <p style="margin:0 0 20px;">&rarr; <strong>Community</strong> — contractors actually winning work</p>
+
+  <p style="margin:0 0 4px;">&rarr; <a href="${fhcLink}" style="color:#1a0dab; text-decoration: underline; font-weight: bold;">Access the Federal Help Center</a></p>
+  <p style="margin:0 0 20px; color:#888; font-size:13px;">(takes about a minute — you get in right from the website)</p>
+
+  <p style="margin:0 0 16px;">Mindy finds you the contracts. The Federal Help Center helps you <strong><u>win</u></strong> them. Use both.</p>
+
+  <p style="margin:0 0 4px;">— Eric</p>
+
+  <p style="margin:20px 0 0; color:#555; font-size:14px;"><strong>P.S.</strong> Watch for your Mindy login email too (separate message) — that's your tool access. This one's your coaching + community.</p>
+</body>
+</html>`;
+
+  const textContent = `Hi${name},
+
+You just got Mindy - smart move. But there's something included that most people miss on day one.
+
+Your purchase also unlocks the Federal Help Center - our coaching + training community - at no extra cost.
+
+-> Live coaching calls - bring your real deals, get unstuck
+-> Training vault - the courses and playbooks
+-> Community - contractors actually winning work
+
+-> Access the Federal Help Center: ${fhcLink}
+(takes about a minute - you get in right from the website)
+
+Mindy finds you the contracts. The Federal Help Center helps you win them. Use both.
+
+- Eric
+
+P.S. Watch for your Mindy login email too (separate message) - that's your tool access. This one's your coaching + community.`;
+
+  try {
+    await transporter.sendMail({
+      from: `"${process.env.MINDY_FROM_NAME || 'Eric Coffie'}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
+      to,
+      subject: 'One more thing — your Federal Help Center access (included)',
+      html: htmlContent,
+      text: textContent,
+    });
+    console.log(`✅ Mindy→FHC bonus email sent to ${to}`);
+    return true;
+  } catch (error) {
+    console.error('❌ Failed to send Mindy→FHC bonus email:', error);
+    return false;
+  }
+}
+
 // ============ Alert Pro Welcome Email ============
 
 interface SendAlertProWelcomeEmailParams {
