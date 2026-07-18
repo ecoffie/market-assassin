@@ -1601,20 +1601,21 @@ Mindy finds you the contracts. The Federal Help Center helps you win them. Use b
 
 P.S. Watch for your Mindy login email too (separate message) - that's your tool access. This one's your coaching + community.`;
 
-  try {
-    await transporter.sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || 'Eric Coffie'}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
-      to,
-      subject: 'One more thing — your Federal Help Center access (included)',
-      html: htmlContent,
-      text: textContent,
-    });
-    console.log(`✅ Mindy→FHC bonus email sent to ${to}`);
-    return true;
-  } catch (error) {
-    console.error('❌ Failed to send Mindy→FHC bonus email:', error);
-    return false;
-  }
+  // Send via the Resend-based sendEmail() helper on the VERIFIED Mindy domain
+  // (alerts@mail.getmindy.ai), NOT the legacy office365 transporter with
+  // alerts@govcongiants.com — office365 silently accepts-then-drops mail for
+  // Mindy, and the sender architecture forbids *@govcongiants.com for Mindy.
+  // transactional:true so the purchase access email bypasses the daily send cap.
+  return sendEmail({
+    to,
+    from: `Eric Coffie <${process.env.EMAIL_FROM || 'alerts@mail.getmindy.ai'}>`,
+    subject: 'One more thing — your Federal Help Center access (included)',
+    html: htmlContent,
+    text: textContent,
+    emailType: 'fhc_bonus_welcome',
+    eventSource: 'stripe-webhook',
+    transactional: true,
+  });
 }
 
 // ============ Alert Pro Welcome Email ============
