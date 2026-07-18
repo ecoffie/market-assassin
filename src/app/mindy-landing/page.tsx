@@ -37,9 +37,9 @@ const titleCase = (s?: string | null): string =>
 export default async function MindyLandingPage() {
   // Live Discover data — each degrades to empty so a dead upstream never blanks the page.
   const [expiring, weird, recent, panels] = await Promise.all([
-    // Default order = soonest-expiring first; we then floor at 60 days so the window is
-    // urgent BUT still has pursuit runway (a contract expiring today is already decided).
-    queryExpiringContracts({ monthsWindow: 12, minValue: 10_000_000, limit: 60 })
+    // Soonest-expiring first, but floored at 60 days out (in the query) so we skip the
+    // already-decided imminent contracts and show urgent-but-actionable recompetes.
+    queryExpiringContracts({ monthsWindow: 12, minDaysOut: 60, minValue: 10_000_000, limit: 4 })
       .then((r) => r.contracts)
       .catch(() => [] as ExpiringContract[]),
     getWeirdAwards(3).catch(() => []),
@@ -47,12 +47,7 @@ export default async function MindyLandingPage() {
     getMarketPanels().catch(() => ({ naicsLeaderboard: [], underserved: [], builtAt: null })),
   ]);
 
-  const upForGrabs = expiring
-    .filter((c) => {
-      const d = daysLeft(c.period_of_performance_current_end);
-      return d != null && d >= 60;
-    })
-    .slice(0, 4);
+  const upForGrabs = expiring.slice(0, 4);
   const recentBig = recent.slice(0, 4);
   const underserved = panels.underserved.slice(0, 4);
 
