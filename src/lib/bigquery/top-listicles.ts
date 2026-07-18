@@ -28,6 +28,11 @@ export interface TopContractorRow {
  */
 export async function getTopContractors(limit = 50): Promise<TopContractorRow[]> {
   return queryCached<TopContractorRow>({
+    // Cheap read (a few MB) — cold-scan on miss so the ranking page is NEVER empty.
+    // queryCached defaults cacheOnly:true (returns [] on a cold cache without scanning);
+    // that SEO-guard is for the expensive full-awards scans, not these rollup reads.
+    // With it on, /top pages rendered 0 rows on a cold cache and the snapshot cron wrote 0.
+    cacheOnly: false,
     cacheKey: `top:all-contractors:${limit}`,
     query: `
       SELECT
@@ -63,6 +68,7 @@ async function getTopFromRollup(
   values.forEach((v, i) => { params[`v${i}`] = v; });
 
   return queryCached<TopContractorRow>({
+    cacheOnly: false, // cheap rollup read — cold-scan on miss (see getTopContractors)
     cacheKey,
     query: `
       WITH merged AS (
@@ -167,6 +173,7 @@ export async function getTopContractorsBySetAside(
   setAsidePatterns.forEach((p, i) => { params[`pattern${i}`] = p; });
 
   return queryCached<TopContractorRow>({
+    cacheOnly: false, // cheap rollup read — cold-scan on miss (see getTopContractors)
     cacheKey: `top:set-aside:${setAsidePatterns.join('|')}:${limit}:rollup`,
     query: `
       WITH merged AS (
