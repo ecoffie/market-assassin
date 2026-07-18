@@ -32,9 +32,14 @@ import {
 import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 import { recipientSlug } from '@/lib/bigquery/recipients';
+import ShareButton from '@/components/ShareButton';
 
 const SITE_URL = 'https://getmindy.ai';
 const LIMIT = 50;
+
+// Medal for the podium — the small gamified touch that makes a ranking feel
+// like a leaderboard people want to share. Presentation only.
+const MEDALS = ['🥇', '🥈', '🥉'];
 
 export const revalidate = 604800; // 7d
 export const dynamicParams = false;
@@ -158,6 +163,9 @@ export default async function ListiclePage({ params }: PageProps) {
         </p>
         <h1 className="mt-3 text-4xl md:text-5xl font-bold tracking-tight">{listicle.title}</h1>
         <p className="mt-4 max-w-3xl text-lg text-slate-300">{listicle.intro}</p>
+        <div className="mt-5">
+          <ShareButton url={`${SITE_URL}/top/${slug}`} title={listicle.title} />
+        </div>
         <div className="mt-6 grid gap-3 sm:grid-cols-3 max-w-3xl">
           <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
             <div className="text-2xl font-bold text-purple-300">{rows.length}</div>
@@ -188,9 +196,20 @@ export default async function ListiclePage({ params }: PageProps) {
             </thead>
             <tbody className="divide-y divide-slate-800">
               {rows.map((row, idx) => (
-                <tr key={row.recipient_uei} className="hover:bg-slate-800/40">
-                  <td className="px-4 py-3 font-mono text-slate-400 text-base font-semibold">
-                    #{idx + 1}
+                <tr
+                  key={row.recipient_uei}
+                  className={
+                    idx < 3
+                      ? 'bg-amber-400/[0.04] hover:bg-amber-400/[0.08]'
+                      : 'hover:bg-slate-800/40'
+                  }
+                >
+                  <td className="px-4 py-3 text-base font-semibold whitespace-nowrap">
+                    {idx < 3 ? (
+                      <span className="text-xl" aria-label={`Rank ${idx + 1}`}>{MEDALS[idx]}</span>
+                    ) : (
+                      <span className="font-mono text-slate-400">#{idx + 1}</span>
+                    )}
                   </td>
                   <td className="px-4 py-3 text-slate-200">
                     <Link
