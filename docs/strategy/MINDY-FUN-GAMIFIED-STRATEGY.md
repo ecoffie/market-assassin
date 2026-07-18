@@ -94,6 +94,47 @@ Turn using Mindy into a game with visible progress:
 
 ---
 
+## 2b. The distribution engine — news-tied content (be *the source*)
+
+**The proof (Eric's own data, 2026-07-18):** one LinkedIn post — *"Navy just posted a
+$345M cybersecurity contract for small businesses only"* — did **34,737 impressions,
+23,431 members reached, 205 new followers, 395 clicks** off a SINGLE contract framed as
+news. Contract data tied to a news hook is the highest-leverage distribution we have —
+and it's the same Discover data, pointed at a mass audience instead of only contractors.
+
+**The goal:** make Mindy **the official data source people cite** when they talk about
+government spending — the place a journalist, creator, or podcaster (Tucker Carlson, Joe
+Rogan) quotes: *"did you see what the government spent last week — it was insane."* Be
+the citation, not the commentary.
+
+**Connect the data to what's already in the news:**
+- **War / conflict** → the defense contracts that just landed (Ukraine/Israel aid,
+  munitions, shipbuilding, drones). *"As the war in X escalates, here's what the Pentagon
+  just bought."*
+- **Shocking / big-ticket** → the biggest or most surprising awards this week (the $345M
+  format; "Weird Awards," but newsworthy).
+- **Trending topics** → AI, the border, disaster response — whatever's cycling — mapped to
+  the contracts that fund it.
+
+**Surfaces:**
+- **"This Week in Government Spending"** — a weekly, auto-drafted recap of the biggest /
+  most newsworthy awards. The "did you see what they spent last week" format, built to be
+  screenshot + shared.
+- **News tie-in cards** — headline + $ amount + agency + hook + **"Source: Mindy ·
+  getmindy.ai"** + a stable **citable public URL** backed by the raw contract
+  (PIID/agency/amount) so it verifies when someone checks. Screenshot-ready like the $345M
+  post. Lives under Discover; the persona posts it (proven), linking back → followers +
+  traffic + SEO, and over time journalists/creators find and cite it.
+
+**Why it compounds:** the moat doc's "creative monopoly / a new room" — the SAME federal
+data, aimed at the public and the media, not just contractors. **Distribution becomes the
+moat: be the source everyone quotes.**
+
+**⚠️ Non-negotiable — every figure real and verified.** Authority as "the source" dies the
+first time a number is wrong. Fact-check rule applies hard: the $345M, the agency, the
+PIID — all real, all traceable to SAM/USASpending, framed accurately and never falsely
+sensationalized. Credibility is the entire asset.
+
 ## 3. Audience categories — *in their own words*
 
 Don't speak one generic "small business" voice. Give each core segment **its own category/hub, in
