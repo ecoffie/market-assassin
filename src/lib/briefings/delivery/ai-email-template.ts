@@ -123,16 +123,18 @@ function generateHtmlBody(briefing: AIGeneratedBriefing, date: string, userEmail
     </div>
 
     <!-- Header (Mindy-branded) -->
-    <div class="header">
-      <div style="display:inline-block; vertical-align:middle;">
-        <img src="https://getmindy.ai/brand/mindy-logo-icon.png" width="40" height="40" alt="Mindy" style="vertical-align:middle; border-radius:8px; margin-right:10px;" />
-      </div>
-      <div style="display:inline-block; vertical-align:middle; text-align:left;">
-        <div style="font-size:13px; font-weight:600; letter-spacing:1px; opacity:0.85; text-transform:uppercase;">Mindy · Weekly Deep Dive</div>
-        <h1 style="margin:2px 0 0; font-size:26px;">Your recompete intel for the week</h1>
-      </div>
-      <p>${date}</p>
-    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BRAND_COLOR}" style="background:${BRAND_COLOR};background:linear-gradient(135deg, ${BRAND_COLOR} 0%, ${ACCENT_COLOR} 100%);">
+      <tr><td align="center" style="padding:32px 24px;text-align:center;">
+        <div style="display:inline-block; vertical-align:middle;">
+          <img src="https://getmindy.ai/brand/mindy-logo-icon.png" width="40" height="40" alt="Mindy" style="vertical-align:middle; border-radius:8px; margin-right:10px;" />
+        </div>
+        <div style="display:inline-block; vertical-align:middle; text-align:left;">
+          <div style="font-size:13px; font-weight:600; letter-spacing:1px; opacity:0.85; text-transform:uppercase; color:#ffffff;">Mindy · Weekly Deep Dive</div>
+          <h1 style="margin:2px 0 0; font-size:26px; color:#ffffff;">Your recompete intel for the week</h1>
+        </div>
+        <p style="color:#ffffff; opacity:0.9;">${date}</p>
+      </td></tr>
+    </table>
 
     <!-- Top 10 Opportunities -->
     <div class="section">

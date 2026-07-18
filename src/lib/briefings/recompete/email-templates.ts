@@ -130,11 +130,13 @@ function generateFullHtmlBody(briefing: RecompeteBriefing, dateStr: string, time
 <body>
   <div class="container">
     <!-- Header -->
-    <div class="header">
-      <h1>Recompete Alerts (Daily Displacement Intel)</h1>
-      <p class="subtitle">Your personalized recompete intelligence briefing</p>
-      <p class="date">As of ${dateStr}, ${timeStr}</p>
-    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#1a365d" style="background:#1a365d;background:linear-gradient(135deg, #1a365d 0%, #2d3748 100%);">
+      <tr><td style="padding:24px 28px;">
+        <h1 style="margin:0;font-size:22px;font-weight:700;color:#ffffff;">Recompete Alerts (Daily Displacement Intel)</h1>
+        <p style="margin:8px 0 0;font-size:13px;color:#ffffff;opacity:0.9;">Your personalized recompete intelligence briefing</p>
+        <p style="margin:4px 0 0;font-size:12px;color:#ffffff;opacity:0.7;">As of ${dateStr}, ${timeStr}</p>
+      </td></tr>
+    </table>
 
     <!-- Section 1: Top 10 Opportunities -->
     <div class="section">
@@ -404,12 +406,14 @@ function generateCondensedHtmlBody(briefing: CondensedBriefing, dateStr: string,
 </head>
 <body>
   <div class="container">
-    <div class="header">
-      <span class="header-badge">Daily Intel</span>
-      <h1>Displacement Briefing</h1>
-      <p class="subtitle">Top recompete opportunities ranked by vulnerability</p>
-      <p class="date">${dateStr} • ${timeStr}</p>
-    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#1e3a8a" style="background:#1e3a8a;background:linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%);">
+      <tr><td style="padding:28px 32px;">
+        <span style="display:inline-block;background:rgba(255,255,255,0.2);padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:12px;color:#ffffff;">Daily Intel</span>
+        <h1 style="margin:0;font-size:24px;font-weight:700;color:#ffffff;">Displacement Briefing</h1>
+        <p style="margin:8px 0 0;font-size:14px;color:#ffffff;opacity:0.9;">Top recompete opportunities ranked by vulnerability</p>
+        <p style="margin:4px 0 0;font-size:12px;color:#ffffff;opacity:0.7;">${dateStr} • ${timeStr}</p>
+      </td></tr>
+    </table>
 
     <div class="stats-bar">
       <div class="stat">

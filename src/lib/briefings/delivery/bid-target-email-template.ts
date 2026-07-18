@@ -148,11 +148,13 @@ function generateHtmlBody(data: BidTargetEmailData, date: string): string {
 <body>
   <div class="container">
     <!-- Header -->
-    <div class="header">
-      <h1>🎯 YOUR BID TARGET TODAY</h1>
-      <p class="greeting">Good morning${data.userName ? `, ${escapeHtml(data.userName)}` : ''}.</p>
-      <p class="date">${date}</p>
-    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BRAND_COLOR}" style="background:${BRAND_COLOR};background:linear-gradient(135deg, ${BRAND_COLOR} 0%, ${ACCENT_COLOR} 100%);">
+      <tr><td align="center" style="padding:32px 24px;text-align:center;">
+        <h1 style="margin:0;font-size:24px;font-weight:700;letter-spacing:-0.5px;color:#ffffff;">🎯 YOUR BID TARGET TODAY</h1>
+        <p style="margin:8px 0 0;font-size:16px;color:#ffffff;opacity:0.9;">Good morning${data.userName ? `, ${escapeHtml(data.userName)}` : ''}.</p>
+        <p style="margin:4px 0 0;font-size:14px;color:#ffffff;opacity:0.7;">${date}</p>
+      </td></tr>
+    </table>
 
     <!-- Main Bid Target -->
     <div class="section">

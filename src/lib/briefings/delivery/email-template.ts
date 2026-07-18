@@ -151,10 +151,12 @@ function generateHtmlBody(briefing: GeneratedBriefing, userEmail?: string, track
     </div>
 
     <!-- Header -->
-    <div class="header">
-      <h1>📊 Daily Market Intel</h1>
-      <p>${formatDate(briefing.briefingDate)}</p>
-    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="${BRAND_COLOR}" style="background:${BRAND_COLOR};">
+      <tr><td align="center" style="padding:24px;text-align:center;">
+        <h1 style="margin:0;font-size:24px;font-weight:600;color:#ffffff;">📊 Daily Market Intel</h1>
+        <p style="margin:8px 0 0;font-size:14px;color:#ffffff;opacity:0.9;">${formatDate(briefing.briefingDate)}</p>
+      </td></tr>
+    </table>
 
     <!-- Summary -->
     <div class="summary">

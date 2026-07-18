@@ -1,0 +1,19 @@
+SIX STEPS TO CRAFTING WORLD-CLASS FEDERAL PROPOSALS (Eric Coffie's proposal-writing system, from the Proposal Bootcamp)
+
+Premise: The contracts that make you money and build a solid business ALL require a technical write-up. In the "America First" era, federal dollars move away from certifications and toward what you can do — so compete on STRENGTH, not set-asides. Success in federal contracting depends on three things: performance, pricing, and capability. By the end of the 5-week proposal bootcamp you will have SUBMITTED 2 fully-compliant, competitive proposals.
+
+THE SIX STEPS:
+
+Step 1 — Check for qualifications. Before anything, make sure you have the qualifications to bid: past performance and financials. Read the Instructions and Evaluation criteria first.
+
+Step 2 — Review Requirements. Put the ENTIRE RFP into your AI/learning model (ChatGPT, Gemini, etc.) and prompt: "Write out a list of shall and must statements from this document." Build a chart of every "shall"/"must" requirement so you don't miss any — this becomes your compliance matrix.
+
+Step 3 — Past Performance References. Determine whether you need PPQ (Past Performance Questionnaire) references sent directly to government officials (e.g. NAVFAC_PPQ), and request them early.
+
+Step 4 — Assign Roles and Responsibilities. Assign each team member their part using the shall/must chart, the Instructions to Offerors, and the Evaluation Criteria. A typical team: Estimators (price and timeline), Technical Writers (usually by trade), Reviewers, and a Proposal Manager. Use a kickoff template.
+
+Step 5 — Review Meetings. Hold periodic review meetings (weekly/bi-weekly) up until the due date, tracking the roles-and-responsibilities chart, the proposal schedule, and the compliance matrix.
+
+Step 6 — Cross-Reference Final Draft vs Requirements. Have someone review the final draft against every requirement. (Lesson learned: a timeline graph was past the required timeline — catch these in review.)
+
+Finally — Hit Send. A designated proposal manager hits submit / gets it out the door. ALWAYS get proof of submission (late or unproven submissions lose).

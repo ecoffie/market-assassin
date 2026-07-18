@@ -1,0 +1,19 @@
+HOW I FOUND AN 8(a) COMPANY TO CONSULT FOR (step-by-step prospecting guide for a GovCon consultant)
+
+1. Find an active 8(a) firm in your state:
+   a. Go to the SBA DSBS / PRO-Net search (web.sba.gov/pro-net/search/dsp_dsbs.cfm).
+   b. Choose the state and make sure "Active 8(a)" is checked.
+   c. To narrow by industry, type the NAICS code in the proper field.
+   d. Under "Search Results Display Options" click Edit to open a new page.
+   e. Click the headings you want shown in results, then scroll up and Save.
+   f. Scroll down and click "Search Using These Criteria."
+   This gives a LIST. Look for companies with INCOMPLETE profiles (a sign they may not be actively doing government contracts). Pay attention to the 8(a) exit date — some expire this year. Click into each to see the full profile, including contact info to call and email. Call first!
+
+2. Confirm they're NOT currently doing contracts (so they're a good prospect):
+   - Go to FPDS (fpds.gov).
+   - Search by the company name as it appears on their profile, or better, by their DUNS/UEI number.
+   - If you get "No results found" → BOOM, you have a prospect. Pick up the phone and call.
+
+3. What to say when you call:
+   - Ask for the owner; introduce yourself as a government-contract consultant; note you saw they're 8(a) certified and you'd like to help them find opportunities. Ask if they have a minute, or prefer another time, or suggest an in-person meeting.
+   - If they accept, do homework first: look at how many contracting actions their NAICS code had in the past two years, review their SBA profile and highlight what they're missing, and even print a few real opportunities. Showing you did research about their company proves you know what you're talking about.
