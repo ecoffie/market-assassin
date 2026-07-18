@@ -14,7 +14,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { generateMABriefing } from '@/lib/briefings/market-assassin';
-import nodemailer from 'nodemailer';
+import { sendEmail } from '@/lib/send-email';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -58,22 +58,14 @@ export async function GET(request: NextRequest) {
     // Send email if requested
     if (send) {
       try {
-        const transporter = nodemailer.createTransport({
-          host: process.env.SMTP_HOST || 'smtp.office365.com',
-          port: parseInt(process.env.SMTP_PORT || '587'),
-          secure: false,
-          auth: {
-            user: process.env.SMTP_USER || 'alerts@govcongiants.com',
-            pass: process.env.SMTP_PASSWORD,
-          },
-        });
-
-        await transporter.sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
+        await sendEmail({
           to: email,
           subject: emailTemplate.subject,
           html: emailTemplate.htmlBody,
           text: emailTemplate.textBody,
+          emailType: 'ma_briefing',
+          eventSource: 'admin/generate-ma-briefing',
+          transactional: true,
         });
         console.log(`[AdminMABriefing] Email sent to ${email}`);
       } catch (emailError) {

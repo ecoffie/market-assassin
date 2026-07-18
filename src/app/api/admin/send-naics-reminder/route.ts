@@ -14,7 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { kv } from '@vercel/kv';
-import nodemailer from 'nodemailer';
+import { sendEmail } from '@/lib/send-email';
 import { createSecureAccessUrl } from '@/lib/access-links';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
@@ -65,18 +65,6 @@ function getSupabase() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
-}
-
-function getTransporter() {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.office365.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: false,
-    auth: {
-      user: process.env.SMTP_USER,
-      pass: process.env.SMTP_PASSWORD,
-    },
-  });
 }
 
 async function generateReminderEmail(email: string): Promise<{ subject: string; html: string; text: string }> {
@@ -336,7 +324,6 @@ export async function POST(request: NextRequest) {
     }, { status: 400 });
   }
 
-  const transporter = getTransporter();
   const audience = await getBriefingFallbackAudience();
   let emailsToSend = audience.fallbackUsers.map((user) => user.email);
   const lastRun = await kv.get<ReminderRunRecord>(LAST_RUN_KEY);
@@ -399,12 +386,14 @@ export async function POST(request: NextRequest) {
       try {
         const template = await generateReminderEmail(email);
 
-        await transporter.sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'hello@getmindy.ai'}>`,
+        await sendEmail({
           to: email,
           subject: template.subject,
           html: template.html,
           text: template.text,
+          emailType: 'naics_reminder',
+          eventSource: 'admin/send-naics-reminder',
+          transactional: true,
         });
 
         results.sent++;

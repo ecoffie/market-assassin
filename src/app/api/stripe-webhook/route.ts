@@ -16,6 +16,7 @@ import {
   sendRecompeteEmail,
   sendBundleEmail,
   sendFHCWelcomeEmail,
+  sendMindyFHCBonusEmail,
   sendAlertProWelcomeEmail,
   sendMarketIntelligenceWelcomeEmail,
 } from '@/lib/send-email';
@@ -486,6 +487,18 @@ export async function POST(request: NextRequest) {
       // (with "5 seats included" + "Invite teammates →" link)
       // is a Phase 2 polish; not blocking for v1 launch.
       await sendMarketIntelligenceWelcomeEmail({ to: email, customerName });
+
+      // Mindy buyers ALSO get Federal Help Center (coaching + training) included.
+      // Record the FHC grant in KV (our source of who has FHC access — they access
+      // it directly at federalhelpcenter.com) and send a SEPARATE, Mindy-framed FHC
+      // welcome. KV write is unconditional/non-fatal; the email never blocks the flow.
+      try {
+        await kv.set(`fhc:${email.toLowerCase()}`, 'true');
+        console.log(`✅ FHC access flag set for Mindy buyer: ${email}`);
+      } catch (kvError) {
+        console.error('KV error setting fhc flag (non-fatal):', kvError);
+      }
+      await sendMindyFHCBonusEmail({ to: email, customerName });
     } else if (profile?.license_key) {
       // Fallback to generic license key email
       await sendLicenseKeyEmail({

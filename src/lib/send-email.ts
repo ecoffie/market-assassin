@@ -381,13 +381,11 @@ export async function sendDatabaseAccessEmail({
 </html>
 `;
 
-  try {
-    await transporter.sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
-      to,
-      subject: 'Your Federal Contractor Database Access | GovCon Giants',
-      html: htmlContent,
-      text: `Thank You for Your Purchase!
+  return sendEmail({
+    to,
+    subject: 'Your Federal Contractor Database Access | GovCon Giants',
+    html: htmlContent,
+    text: `Thank You for Your Purchase!
 
 Hi${customerName ? ` ${customerName}` : ''},
 
@@ -412,14 +410,10 @@ Save this email for future access.
 Questions? Reply to this email for support.
 
 - GovCon Giants Team`,
-    });
-
-    console.log(`✅ Database access email sent to ${to}`);
-    return true;
-  } catch (error) {
-    console.error('❌ Failed to send database email:', error);
-    return false;
-  }
+    emailType: 'database_access',
+    eventSource: 'stripe-webhook',
+    transactional: true,
+  });
 }
 
 export async function sendAccessCodeEmail({
@@ -516,21 +510,15 @@ export async function sendAccessCodeEmail({
 </html>
 `;
 
-  try {
-    await transporter.sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
-      to,
-      subject: 'Your Federal Market Assassin Report Access | GovCon Giants',
-      html: htmlContent,
-      text: `Your Federal Market Assassin Report Access\n\nThank you for your purchase!\n\nYour one-time access code: ${accessCode}\n\nAccess your report here: ${accessLink}\n\nHow to Get Your Report:\n1. Click the link above\n2. Enter your business information (NAICS code, location, etc.)\n3. Select the government agencies you want to target\n4. Generate and download your personalized report\n5. Click "Print All (PDF)" to save a permanent copy\n\nWATCH THE TUTORIAL\nLearn how to get the most out of your report:\nhttps://vimeo.com/1150857756?fl=tl&fe=ec\n\nIMPORTANT: This link can only be used once. Make sure to download your report before leaving the page.\n\n- GovCon Giants Team`,
-    });
-
-    console.log(`✅ Access code email sent to ${to}`);
-    return true;
-  } catch (error) {
-    console.error('❌ Failed to send email:', error);
-    return false;
-  }
+  return sendEmail({
+    to,
+    subject: 'Your Federal Market Assassin Report Access | GovCon Giants',
+    html: htmlContent,
+    text: `Your Federal Market Assassin Report Access\n\nThank you for your purchase!\n\nYour one-time access code: ${accessCode}\n\nAccess your report here: ${accessLink}\n\nHow to Get Your Report:\n1. Click the link above\n2. Enter your business information (NAICS code, location, etc.)\n3. Select the government agencies you want to target\n4. Generate and download your personalized report\n5. Click "Print All (PDF)" to save a permanent copy\n\nWATCH THE TUTORIAL\nLearn how to get the most out of your report:\nhttps://vimeo.com/1150857756?fl=tl&fe=ec\n\nIMPORTANT: This link can only be used once. Make sure to download your report before leaving the page.\n\n- GovCon Giants Team`,
+    emailType: 'access_code',
+    eventSource: 'stripe-webhook',
+    transactional: true,
+  });
 }
 
 // Email for Opportunity Hunter Pro access
@@ -614,13 +602,11 @@ export async function sendOpportunityHunterProEmail({
 </html>
 `;
 
-  try {
-    await transporter.sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
-      to,
-      subject: 'Your Opportunity Hunter Pro Access is Ready! | GovCon Giants',
-      html: htmlContent,
-      text: `Welcome to Opportunity Hunter Pro!
+  return sendEmail({
+    to,
+    subject: 'Your Opportunity Hunter Pro Access is Ready! | GovCon Giants',
+    html: htmlContent,
+    text: `Welcome to Opportunity Hunter Pro!
 
 Hi${customerName ? ` ${customerName}` : ''},
 
@@ -645,14 +631,10 @@ Save this email for future reference.
 Questions? Reply to this email for support.
 
 - GovCon Giants Team`,
-    });
-
-    console.log(`✅ Opportunity Hunter Pro email sent to ${to}`);
-    return true;
-  } catch (error) {
-    console.error('❌ Failed to send Opportunity Hunter Pro email:', error);
-    return false;
-  }
+    emailType: 'opportunity_hunter_pro',
+    eventSource: 'stripe-webhook',
+    transactional: true,
+  });
 }
 
 // Interface for license key email
@@ -747,13 +729,11 @@ export async function sendFreeResourceEmail({
 </html>
 `;
 
-  try {
-    await transporter.sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
-      to,
-      subject: `Your Free Download: ${resourceName} | GovCon Giants`,
-      html: htmlContent,
-      text: `Your Free Resource is Ready!
+  return sendEmail({
+    to,
+    subject: `Your Free Download: ${resourceName} | GovCon Giants`,
+    html: htmlContent,
+    text: `Your Free Resource is Ready!
 
 Hi${name ? ` ${name}` : ''},
 
@@ -779,14 +759,10 @@ You received this email because you downloaded a free resource from GovCon Giant
 Access your resources anytime using this email: ${to}
 
 - GovCon Giants Team`,
-    });
-
-    console.log(`✅ Free resource email sent to ${to} for ${resourceName}`);
-    return true;
-  } catch (error) {
-    console.error('❌ Failed to send free resource email:', error);
-    return false;
-  }
+    emailType: 'free_resource',
+    eventSource: 'stripe-webhook',
+    transactional: true,
+  });
 }
 
 export async function sendLicenseKeyEmail({
@@ -862,13 +838,11 @@ export async function sendLicenseKeyEmail({
 </html>
 `;
 
-  try {
-    await transporter.sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
-      to,
-      subject: `Your ${productName} License Key | GovCon Giants`,
-      html: htmlContent,
-      text: `Thank You for Your Purchase!
+  return sendEmail({
+    to,
+    subject: `Your ${productName} License Key | GovCon Giants`,
+    html: htmlContent,
+    text: `Thank You for Your Purchase!
 
 Hi${customerName ? ` ${customerName}` : ''},
 
@@ -888,14 +862,10 @@ Keep this email safe! Your license key is your proof of purchase.
 Questions? Reply to this email or contact support@getmindy.ai
 
 - GovCon Giants Team`,
-    });
-
-    console.log(`✅ License key email sent to ${to} for ${productName}`);
-    return true;
-  } catch (error) {
-    console.error('❌ Failed to send license key email:', error);
-    return false;
-  }
+    emailType: 'license_key',
+    eventSource: 'stripe-webhook',
+    transactional: true,
+  });
 }
 
 // Email for Content Reaper access
@@ -989,13 +959,11 @@ export async function sendContentReaperEmail({
 </html>
 `;
 
-  try {
-    await transporter.sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
-      to,
-      subject: `Your Content Reaper${isFullFix ? ' Full Fix' : ''} Access is Ready! | GovCon Giants`,
-      html: htmlContent,
-      text: `Your Content Reaper${isFullFix ? ' Full Fix' : ''} Access is Ready!
+  return sendEmail({
+    to,
+    subject: `Your Content Reaper${isFullFix ? ' Full Fix' : ''} Access is Ready! | GovCon Giants`,
+    html: htmlContent,
+    text: `Your Content Reaper${isFullFix ? ' Full Fix' : ''} Access is Ready!
 
 Hi${customerName ? ` ${customerName}` : ''},
 
@@ -1020,14 +988,10 @@ Save this email for future reference.
 Questions? Reply to this email for support.
 
 - GovCon Giants Team`,
-    });
-
-    console.log(`✅ Content Reaper email sent to ${to}`);
-    return true;
-  } catch (error) {
-    console.error('❌ Failed to send Content Reaper email:', error);
-    return false;
-  }
+    emailType: 'content_reaper',
+    eventSource: 'stripe-webhook',
+    transactional: true,
+  });
 }
 
 // Email for Recompete Tracker access
@@ -1118,13 +1082,11 @@ export async function sendRecompeteEmail({
 </html>
 `;
 
-  try {
-    await transporter.sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
-      to,
-      subject: 'Your Recompete Tracker Access is Ready! | GovCon Giants',
-      html: htmlContent,
-      text: `Your Recompete Tracker Access is Ready!
+  return sendEmail({
+    to,
+    subject: 'Your Recompete Tracker Access is Ready! | GovCon Giants',
+    html: htmlContent,
+    text: `Your Recompete Tracker Access is Ready!
 
 Hi${customerName ? ` ${customerName}` : ''},
 
@@ -1150,14 +1112,10 @@ Save this email for future reference.
 Questions? Reply to this email for support.
 
 - GovCon Giants Team`,
-    });
-
-    console.log(`✅ Recompete Tracker email sent to ${to}`);
-    return true;
-  } catch (error) {
-    console.error('❌ Failed to send Recompete Tracker email:', error);
-    return false;
-  }
+    emailType: 'recompete',
+    eventSource: 'stripe-webhook',
+    transactional: true,
+  });
 }
 
 // Email for Bundle purchases
@@ -1322,13 +1280,11 @@ export async function sendBundleEmail({
 </html>
 `;
 
-  try {
-    await transporter.sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
-      to,
-      subject: `Your ${bundleInfo.name} is Ready! | GovCon Giants`,
-      html: htmlContent,
-      text: `Your ${bundleInfo.name} is Ready!
+  return sendEmail({
+    to,
+    subject: `Your ${bundleInfo.name} is Ready! | GovCon Giants`,
+    html: htmlContent,
+    text: `Your ${bundleInfo.name} is Ready!
 
 Hi${customerName ? ` ${customerName}` : ''},
 
@@ -1348,14 +1304,10 @@ Save this email - it's your receipt and access guide.
 Questions? Reply to this email for support.
 
 - GovCon Giants Team`,
-    });
-
-    console.log(`✅ Bundle email sent to ${to} for ${bundleInfo.name}`);
-    return true;
-  } catch (error) {
-    console.error('❌ Failed to send bundle email:', error);
-    return false;
-  }
+    emailType: 'bundle',
+    eventSource: 'stripe-webhook',
+    transactional: true,
+  });
 }
 
 export async function sendMarketIntelligenceWelcomeEmail({
@@ -1493,13 +1445,11 @@ export async function sendFHCWelcomeEmail({
 </html>
 `;
 
-  try {
-    await transporter.sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
-      to,
-      subject: 'Welcome to Federal Help Center! Your Membership is Active | GovCon Giants',
-      html: htmlContent,
-      text: `Welcome to Federal Help Center!
+  return sendEmail({
+    to,
+    subject: 'Welcome to Federal Help Center! Your Membership is Active | GovCon Giants',
+    html: htmlContent,
+    text: `Welcome to Federal Help Center!
 
 Hi${customerName ? ` ${customerName}` : ''},
 
@@ -1528,14 +1478,90 @@ Questions? Reply to this email or ask in the community.
 We're here to help you win federal contracts!
 
 - GovCon Giants Team`,
-    });
+    emailType: 'fhc_welcome',
+    eventSource: 'stripe-webhook',
+    transactional: true,
+  });
+}
 
-    console.log(`✅ FHC Welcome email sent to ${to}`);
-    return true;
-  } catch (error) {
-    console.error('❌ Failed to send FHC Welcome email:', error);
-    return false;
-  }
+// ============ Mindy → Federal Help Center bonus-access email ============
+// Sent to Mindy (Market Intelligence) buyers ON TOP OF their Mindy welcome.
+// Framed for someone who bought MINDY and is now told FHC is INCLUDED — the
+// opposite framing of sendFHCWelcomeEmail (which is for people who bought FHC).
+// Plain-letter (Brunson) style per the marketing-email standard: no gradient
+// header, no pill buttons, no images — lands in Primary, reads like a person.
+
+interface SendMindyFHCBonusEmailParams {
+  to: string;
+  customerName?: string;
+}
+
+export async function sendMindyFHCBonusEmail({
+  to,
+  customerName,
+}: SendMindyFHCBonusEmailParams): Promise<boolean> {
+  const fhcLink = 'https://federalhelpcenter.com';
+  const name = customerName ? ` ${customerName.split(' ')[0]}` : '';
+
+  const htmlContent = `<!DOCTYPE html>
+<html>
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1.0"></head>
+<body style="font-family: -apple-system, Segoe UI, Roboto, Helvetica, Arial, sans-serif; font-size: 16px; line-height: 1.6; color: #222; background: #ffffff; max-width: 560px; margin: 0 auto; padding: 24px;">
+  <p style="margin:0 0 16px;">Hi${name},</p>
+
+  <p style="margin:0 0 16px;">You just got <strong>Mindy</strong> — smart move. But there's something included that most people miss on day one.</p>
+
+  <p style="margin:0 0 16px;">Your purchase also unlocks the <strong><u>Federal Help Center</u></strong> — our coaching + training community — at no extra cost.</p>
+
+  <p style="margin:0 0 6px;">&rarr; <strong>Live coaching calls</strong> — bring your real deals, get unstuck</p>
+  <p style="margin:0 0 6px;">&rarr; <strong>Training vault</strong> — the courses and playbooks</p>
+  <p style="margin:0 0 20px;">&rarr; <strong>Community</strong> — contractors actually winning work</p>
+
+  <p style="margin:0 0 4px;">&rarr; <a href="${fhcLink}" style="color:#1a0dab; text-decoration: underline; font-weight: bold;">Access the Federal Help Center</a></p>
+  <p style="margin:0 0 20px; color:#888; font-size:13px;">(takes about a minute — you get in right from the website)</p>
+
+  <p style="margin:0 0 16px;">Mindy finds you the contracts. The Federal Help Center helps you <strong><u>win</u></strong> them. Use both.</p>
+
+  <p style="margin:0 0 4px;">— Eric</p>
+
+  <p style="margin:20px 0 0; color:#555; font-size:14px;"><strong>P.S.</strong> Watch for your Mindy login email too (separate message) — that's your tool access. This one's your coaching + community.</p>
+</body>
+</html>`;
+
+  const textContent = `Hi${name},
+
+You just got Mindy - smart move. But there's something included that most people miss on day one.
+
+Your purchase also unlocks the Federal Help Center - our coaching + training community - at no extra cost.
+
+-> Live coaching calls - bring your real deals, get unstuck
+-> Training vault - the courses and playbooks
+-> Community - contractors actually winning work
+
+-> Access the Federal Help Center: ${fhcLink}
+(takes about a minute - you get in right from the website)
+
+Mindy finds you the contracts. The Federal Help Center helps you win them. Use both.
+
+- Eric
+
+P.S. Watch for your Mindy login email too (separate message) - that's your tool access. This one's your coaching + community.`;
+
+  // Send via the Resend-based sendEmail() helper on the VERIFIED Mindy domain
+  // (alerts@mail.getmindy.ai), NOT the legacy office365 transporter with
+  // alerts@govcongiants.com — office365 silently accepts-then-drops mail for
+  // Mindy, and the sender architecture forbids *@govcongiants.com for Mindy.
+  // transactional:true so the purchase access email bypasses the daily send cap.
+  return sendEmail({
+    to,
+    from: `Eric Coffie <${process.env.EMAIL_FROM || 'alerts@mail.getmindy.ai'}>`,
+    subject: 'One more thing — your Federal Help Center access (included)',
+    html: htmlContent,
+    text: textContent,
+    emailType: 'fhc_bonus_welcome',
+    eventSource: 'stripe-webhook',
+    transactional: true,
+  });
 }
 
 // ============ Alert Pro Welcome Email ============
@@ -1611,13 +1637,11 @@ export async function sendAlertProWelcomeEmail({
 </html>
 `;
 
-  try {
-    await transporter.sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
-      to,
-      subject: '🎯 Alert Pro Activated - Daily Opportunities Start Tomorrow!',
-      html: htmlContent,
-      text: `Alert Pro Activated!
+  return sendEmail({
+    to,
+    subject: '🎯 Alert Pro Activated - Daily Opportunities Start Tomorrow!',
+    html: htmlContent,
+    text: `Alert Pro Activated!
 
 Hi${customerName ? ` ${customerName}` : ''},
 
@@ -1641,12 +1665,8 @@ Subscription: $19/month • Cancel anytime
 Questions? Reply to this email or contact hello@getmindy.ai
 
 - GovCon Giants Team`,
-    });
-
-    console.log(`✅ Alert Pro Welcome email sent to ${to}`);
-    return true;
-  } catch (error) {
-    console.error('❌ Failed to send Alert Pro Welcome email:', error);
-    return false;
-  }
+    emailType: 'alert_pro_welcome',
+    eventSource: 'stripe-webhook',
+    transactional: true,
+  });
 }
