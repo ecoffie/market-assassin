@@ -43,7 +43,7 @@ export async function GET() {
   // Weird = small-ish and specific; a $2B award is not "weird", it's just big. Recent-ish
   // so it feels current. One OR-clause per curated term.
   const likeClause = WEIRD_TERMS.map((_, i) => `UPPER(description) LIKE @t${i}`).join(' OR ');
-  const params: Record<string, string | number> = { minAmt: 1000, maxAmt: 5_000_000, minFy: new Date().getFullYear() - 4 };
+  const params: Record<string, string | number> = { minAmt: 500, maxAmt: 10_000_000, minFy: new Date().getFullYear() - 8 };
   WEIRD_TERMS.forEach((t, i) => { params[`t${i}`] = `%${t.like}%`; });
 
   let rows: Row[];
@@ -59,7 +59,7 @@ export async function GET() {
           AND description IS NOT NULL
           AND (${likeClause})
         ORDER BY obligation_amount DESC
-        LIMIT 400
+        LIMIT 800
       `,
       params,
     });
@@ -77,11 +77,11 @@ export async function GET() {
     const category = categorize(r.description);
     if (!category || !r.award_id || seen.has(r.award_id)) continue;
     const n = perCat.get(category) ?? 0;
-    if (n >= 4) continue;
+    if (n >= 5) continue;
     perCat.set(category, n + 1);
     seen.add(r.award_id);
     picked.push({ ...r, category });
-    if (picked.length >= 40) break;
+    if (picked.length >= 60) break;
   }
 
   if (!picked.length) {
