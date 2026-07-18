@@ -46,7 +46,7 @@ export default async function WeirdAwardsPage() {
     itemListElement: awards.slice(0, 25).map((a, i) => ({
       '@type': 'ListItem',
       position: i + 1,
-      item: { '@type': 'GovernmentService', name: `${fmtMoney(a.obligation_amount)} — ${a.category}`, url: `${SITE_URL}/awards/${a.award_id}` },
+      item: { '@type': 'GovernmentService', name: `${fmtMoney(a.obligation_amount)} — ${a.category}`, url: `https://www.usaspending.gov/award/${a.award_id}` },
     })),
   };
 
@@ -81,9 +81,11 @@ export default async function WeirdAwardsPage() {
         <section className="mx-auto max-w-6xl px-6 pb-10">
           <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
             {awards.map((a) => (
-              <Link
+              <a
                 key={a.award_id}
-                href={`/awards/${a.award_id}`}
+                href={`https://www.usaspending.gov/award/${a.award_id}`}
+                target="_blank"
+                rel="noopener noreferrer"
                 className="group flex flex-col rounded-2xl border border-slate-800 bg-slate-900 p-5 hover:border-purple-500/50 hover:bg-slate-800/60 transition-colors"
               >
                 <div className="text-3xl">{EMOJI.get(a.category ?? '') ?? '🎪'}</div>
@@ -103,7 +105,7 @@ export default async function WeirdAwardsPage() {
                     See the receipt →
                   </span>
                 </div>
-              </Link>
+              </a>
             ))}
           </div>
 
