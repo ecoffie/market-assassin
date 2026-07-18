@@ -31,6 +31,7 @@
     "hooks:install": "git config core.hooksPath .githooks",
     "prepush": "bash .githooks/pre-push",
     "audit:client-auth": "node scripts/audit-client-auth.mjs",
+    "audit:email-sender": "node scripts/audit-email-sender.mjs",
     "prepare": "git config core.hooksPath .githooks || true",
     "test:unit": "vitest run",
     "test:unit:watch": "vitest",

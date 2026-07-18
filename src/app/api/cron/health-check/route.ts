@@ -1,5 +1,4 @@
 import { NextRequest, NextResponse } from 'next/server';
-import nodemailer from 'nodemailer';
 import { createClient } from '@supabase/supabase-js';
 import { sendOpsAlert } from '@/lib/ops-alert';
 
@@ -32,19 +31,6 @@ interface HealthCheckReport {
   passRate: string;
   results: TestResult[];
   criticalFailures: TestResult[];
-}
-
-// Lazy init for email transport
-function getTransporter() {
-  return nodemailer.createTransport({
-    host: 'smtp.office365.com',
-    port: 587,
-    secure: false,
-    auth: {
-      user: process.env.SMTP_USER || 'hello@getmindy.ai',
-      pass: process.env.SMTP_PASSWORD,
-    },
-  });
 }
 
 function getNextMondayDate(): string {
