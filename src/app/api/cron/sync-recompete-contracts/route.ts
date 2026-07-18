@@ -248,7 +248,17 @@ export async function GET(request: NextRequest) {
       // run returns non-2xx. Stamping the attempt rotates it to the back rather
       // than letting one poisoned NAICS block the queue every run; its rows
       // stay stale, which is what the data should show.
-      const message = (error as Error).message;
+      // `fetch failed` is undici's generic wrapper — the actual reason (ECONNRESET,
+      // UND_ERR_CONNECT_TIMEOUT, DNS, an HTTP status) lives in error.cause, which the
+      // bare .message discards. Unwrap it so a recurrence is diagnosable instead of
+      // logging the same useless "fetch failed" 14 times (see the 2026-07-16 sweep).
+      const err = error as Error & { cause?: unknown; status?: number };
+      const cause = err.cause as (Error & { code?: string; errno?: string | number }) | undefined;
+      const causeBits = cause
+        ? ` | cause: ${cause.message || String(cause)}${cause.code ? ` (${cause.code})` : ''}`
+        : '';
+      const statusBit = typeof err.status === 'number' ? ` | status=${err.status}` : '';
+      const message = `${err.message}${causeBits}${statusBit}`;
       failed[naics] = message;
       await recordAttempt(supabase, naics, 'error', 0, message.slice(0, 500));
     }
