@@ -64,6 +64,12 @@ export interface ExpiringContractsInput {
   maxValue?: number;
   likelihood?: 'high' | 'medium' | 'low';
   limit?: number;
+  /**
+   * Sort order. Default 'expiry' (soonest-first) — the panel + MCP rely on this. Pass
+   * 'value' to get the BIGGEST across the whole window instead (so a caller showing a
+   * teaser can span the window rather than only see the imminent ones).
+   */
+  orderBy?: 'expiry' | 'value';
 }
 
 export interface ExpiringContract {
@@ -108,7 +114,6 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
   maxDate.setMonth(maxDate.getMonth() + months);
   const maxStr = maxDate.toISOString().split('T')[0];
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const build = (withQuality: boolean) => {
     let q = supabase
       .from('recompete_opportunities')
@@ -138,7 +143,10 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
     if (input.likelihood && ['high', 'medium', 'low'].includes(input.likelihood)) {
       q = q.eq('recompete_likelihood', input.likelihood);
     }
-    return q.order('period_of_performance_current_end', { ascending: true }).limit(limit);
+    const ordered = input.orderBy === 'value'
+      ? q.order('total_obligation', { ascending: false, nullsFirst: false })
+      : q.order('period_of_performance_current_end', { ascending: true });
+    return ordered.limit(limit);
   };
 
   let res = await build(true);
