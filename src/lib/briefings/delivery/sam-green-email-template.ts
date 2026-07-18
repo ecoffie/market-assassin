@@ -1020,11 +1020,21 @@ export function generateSamGreenEmailHtml(briefing: SamDailyBriefing, userEmail?
       </p>
     </div>
 
-    <div class="header">
-      <h1>📋 Your Daily Briefing</h1>
-      <p>${briefing.date}</p>
-      <div class="header-badge">✅ VERIFIED FROM SAM.gov</div>
-    </div>
+    <!-- HEADER — table + inline styles + bgcolor, NOT the .header class.
+         Outlook (Windows + new Outlook) strips <style> blocks and ignores
+         linear-gradient, so the old class-based header rendered a WHITE background
+         with white text = invisible in the inbox (Eric, 2026-07-18). bgcolor gives
+         Outlook a solid green; the gradient is a progressive enhancement for
+         clients that support it; every text color is set INLINE. -->
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#059669" style="background:#059669;background:linear-gradient(135deg,#059669 0%,#10b981 100%);">
+      <tr>
+        <td align="center" style="padding:32px 24px;text-align:center;font-family:-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;">
+          <h1 style="margin:0;font-size:26px;font-weight:700;color:#ffffff;">📋 Your Daily Briefing</h1>
+          <p style="margin:12px 0 0;font-size:15px;color:#ffffff;">${briefing.date}</p>
+          <div style="display:inline-block;background:#047857;padding:6px 14px;border-radius:20px;font-size:13px;margin-top:12px;color:#ffffff;">✅ VERIFIED FROM SAM.gov</div>
+        </td>
+      </tr>
+    </table>
 
     <div class="notice-summary">
       <div class="notice-summary-title">📊 Notice Type Summary (${briefing.noticeSummary.totalMatched} matched active)</div>
