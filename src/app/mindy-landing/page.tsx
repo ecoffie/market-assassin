@@ -3,6 +3,7 @@ import { MindySignupForm } from '@/components/mindy/MindySignupForm';
 import { MindyDayBar } from '@/components/mindy/MindyDayBar';
 import { queryExpiringContracts, type ExpiringContract } from '@/lib/recompete/query';
 import { getWeirdAwards } from '@/lib/discover/weird-awards';
+import { getRecentBigAwards } from '@/lib/discover/recent-spending';
 import { getMarketPanels } from '@/lib/discover/market-panels';
 import { contractScope } from '@/lib/discover/scope';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
@@ -24,20 +25,29 @@ function daysLeft(end?: string | null): number | null {
   return Math.max(0, Math.round((t - Date.now()) / 86_400_000));
 }
 
+// Gov award text is ALL-CAPS; soften + trim for readable panel context.
+const short = (s?: string | null, n = 66): string => {
+  if (!s) return '';
+  const t = s.trim();
+  return t.length > n ? `${t.slice(0, n - 1)}…` : t;
+};
+const titleCase = (s?: string | null): string =>
+  s ? s.toLowerCase().replace(/\b([a-z])/g, (_, c: string) => c.toUpperCase()) : '';
+
 export default async function MindyLandingPage() {
   // Live Discover data — each degrades to empty so a dead upstream never blanks the page.
-  const [expiring, weird, panels] = await Promise.all([
-    queryExpiringContracts({ monthsWindow: 12, minValue: 10_000_000, limit: 8, orderBy: 'value' })
+  const [expiring, weird, recent, panels] = await Promise.all([
+    // Default order = soonest-expiring first, so the recompete window feels urgent (not 200+ days out).
+    queryExpiringContracts({ monthsWindow: 12, minValue: 10_000_000, limit: 6 })
       .then((r) => r.contracts)
       .catch(() => [] as ExpiringContract[]),
     getWeirdAwards(3).catch(() => []),
+    getRecentBigAwards(4).catch(() => []),
     getMarketPanels().catch(() => ({ naicsLeaderboard: [], underserved: [], builtAt: null })),
   ]);
 
-  const upForGrabs = [...expiring]
-    .sort((a, b) => Number(b.potential_total_value ?? b.total_obligation ?? 0) - Number(a.potential_total_value ?? a.total_obligation ?? 0))
-    .slice(0, 4);
-  const naicsBoard = panels.naicsLeaderboard.slice(0, 5);
+  const upForGrabs = expiring.slice(0, 4);
+  const recentBig = recent.slice(0, 4);
   const underserved = panels.underserved.slice(0, 4);
 
   // JSON-LD — preserved from the prior landing (Organization + SoftwareApplication + FAQ).
@@ -81,13 +91,6 @@ export default async function MindyLandingPage() {
     ],
   };
 
-  const movementEl = (m: number | 'new' | null) => {
-    if (m === 'new') return <span className="mv new">NEW</span>;
-    if (typeof m === 'number' && m > 0) return <span className="mv up">▲ {m}</span>;
-    if (typeof m === 'number' && m < 0) return <span className="mv dn">▼ {Math.abs(m)}</span>;
-    return <span className="mv" style={{ color: 'var(--mut)' }}>—</span>;
-  };
-
   return (
     <div className="gland">
       <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd) }} />
@@ -122,7 +125,7 @@ export default async function MindyLandingPage() {
             <Link className="btn-lg" href={FREE_SIGNUP_URL}>Play free →</Link>
             <a className="btn-ghost2" href="#discover">▼ See the live data</a>
           </div>
-          <div className="under"><span>🎁 <b>Free daily alerts</b></span><span>🧭 <b>Public Discover data</b></span><span>🔒 <b>No card required</b></span></div>
+          <div className="under"><span>🎁 <b>100 free credits to start</b></span><span>🔔 <b>Free daily alerts</b></span><span>🔒 <b>No card required</b></span></div>
         </div>
 
         <div className="quest">
@@ -156,14 +159,14 @@ export default async function MindyLandingPage() {
         <div className="head"><div className="eyebrow">Discover · free &amp; public · live data</div><h2 className="disp">The federal market, decoded</h2><p>Real numbers nobody else packages — built to be screenshot, shared, and argued about. Every figure below is live from USASpending &amp; SAM.gov. Not a feature list.</p></div>
         <div className="discover">
 
-          {/* NAICS Leaderboard — live */}
+          {/* Latest Big Contracts — refreshed daily (the feed that actually moves) */}
           <div className="dpanel">
-            <div className="dh"><div className="t">📊 NAICS Leaderboard</div><Link className="share" href="/discover">↗ Share</Link></div>
-            <p className="sub">Top codes by federal spend · movement vs last year</p>
-            {naicsBoard.length === 0 ? <div className="empty">Updating…</div> : naicsBoard.map((r, i) => (
-              <div className="drow" key={r.code}><span className="rk">{i + 1}</span><span className="nm">{r.code} <small>{r.title}</small></span><span className="vl">{fmtMoney(r.amount)}</span>{movementEl(r.movement)}</div>
+            <div className="dh"><div className="t">💸 Latest Big Contracts</div><Link className="share" href="/spending">↗ Share</Link></div>
+            <p className="sub">The biggest awards that just dropped — refreshed daily</p>
+            {recentBig.length === 0 ? <div className="empty">Updating…</div> : recentBig.map((a, i) => (
+              <div className="drow" key={a.award_id}><span className="rk">{i + 1}</span><span className="nm">{titleCase(short(a.naics_description || a.description, 34)) || 'Federal contract'} <small>{a.awarding_agency}{a.recipient_name ? ` · ${titleCase(a.recipient_name)}` : ''}</small></span><span className="vl">{fmtMoney(a.obligation_amount)}</span><span className="mv" style={{ color: 'var(--mut)' }}>{a.recipient_state || ''}</span></div>
             ))}
-            <Link className="foot" href="/discover">See the full market →</Link>
+            <Link className="foot" href="/spending">See the latest awards →</Link>
           </div>
 
           {/* Up For Grabs — live */}
@@ -184,7 +187,7 @@ export default async function MindyLandingPage() {
             <div className="dh"><div className="t">🧐 Weird Awards</div><Link className="share" href="/weird">↗ Share</Link></div>
             <p className="sub">Your tax dollars, hard at work — the internet&apos;s favorite feed</p>
             {weird.length === 0 ? <div className="empty">Updating…</div> : weird.map((w) => (
-              <div className="weird" key={w.award_id}><span className="amt">{fmtMoney(w.obligation_amount)}</span><span className="wx">on <b>{w.category}</b></span></div>
+              <div className="weird" key={w.award_id}><span className="amt">{fmtMoney(w.obligation_amount)}</span><span className="wx"><b style={{ textTransform: 'capitalize' }}>{w.category}</b> — {titleCase(short(w.description, 62))}{w.awarding_agency ? <span className="wa"> · {w.awarding_agency}</span> : null}</span></div>
             ))}
             <Link className="foot" href="/weird">See the full Weird Awards feed →</Link>
           </div>
@@ -286,7 +289,7 @@ export default async function MindyLandingPage() {
       <section className="sec tint" id="rewards"><div className="wrap">
         <div className="head"><div className="eyebrow">Rewards</div><h2 className="disp">Play, refer, win real prizes</h2></div>
         <div className="rewards">
-          <div className="rw refer"><span className="pk">Refer &amp; earn</span><h4>Bring a contractor</h4><div className="amt num">+500</div><p>Credits for you <em>and</em> them the moment they run their first report. No cap.</p><Link className="go" href={FREE_SIGNUP_URL}>Grab your invite link →</Link></div>
+          <div className="rw refer"><span className="pk">Refer &amp; earn</span><h4>Bring a contractor</h4><div className="amt num">+100 &amp; +100</div><p><b>100 credits for you</b> and <b>100 for them</b> the moment they run their first report. No cap.</p><Link className="go" href={FREE_SIGNUP_URL}>Grab your invite link →</Link></div>
           <div className="rw grant"><span className="pk">Giveaway</span><h4>$10K Grant Giveaway</h4><div className="amt num">$10,000</div><p>One small business, one working-capital grant to chase its first federal award. Coming soon.</p><Link className="go" href={FREE_SIGNUP_URL}>Get notified →</Link></div>
           <div className="rw contest"><span className="pk">Live event</span><h4>Demo Day Pitch Contest</h4><p style={{ marginTop: 6 }}>Pitch how you&apos;d win a target contract on stage. Winner takes a year of Pro + a founder call.</p><Link className="go" href={FREE_SIGNUP_URL}>Save your seat →</Link></div>
         </div>
@@ -294,7 +297,7 @@ export default async function MindyLandingPage() {
 
       {/* SIGNUP */}
       <section className="sec"><div className="wrap">
-        <div className="head" style={{ textAlign: 'center' }}><h2 className="disp">Start your streak today</h2><p style={{ margin: '0 auto' }}>Play free — no card. Read one match, run one report, and see why 9,900+ contractors open Mindy every morning.</p></div>
+        <div className="head" style={{ textAlign: 'center' }}><h2 className="disp">Start free — 100 credits on us</h2><p style={{ margin: '0 auto' }}>No card required. Your first <b style={{ color: 'var(--ink)' }}>100 credits</b> are free the moment you sign up — enough to run your first market report and read your first matches. See why 9,900+ contractors open Mindy every morning.</p></div>
         <div className="signup-wrap"><MindySignupForm /></div>
       </div></section>
 
@@ -415,6 +418,7 @@ const GLAND_CSS = `
 .gland .weird .amt{font-size:22px;font-weight:850;color:var(--amber);font-variant-numeric:tabular-nums;white-space:nowrap}
 .gland .weird .wx{font-size:13.5px;color:var(--ink2);line-height:1.4}
 .gland .weird .wx b{color:var(--ink)}
+.gland .weird .wx .wa{color:var(--mut)}
 .gland .crews{display:grid;grid-template-columns:1.5fr 1fr;grid-auto-rows:1fr;gap:16px}
 @media(max-width:820px){.gland .crews{grid-template-columns:1fr}}
 .gland .crew{border-radius:20px;padding:24px;border:1px solid var(--line);position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--card)}
