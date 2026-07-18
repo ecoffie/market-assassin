@@ -267,7 +267,7 @@ function renderItem(item: BriefingItemFormatted): string {
       <p class="item-description">${escapeHtml(item.description)}</p>
       <div class="item-meta">
         ${item.amount ? `<span class="item-amount">${item.amount}</span>` : '<span></span>'}
-        <a href="${escapeHtml(item.actionUrl)}" class="item-cta">${escapeHtml(item.actionLabel)} →</a>
+        <a href="${escapeHtml(item.actionUrl)}" class="item-cta" style="background:#1e40af;color:#ffffff;text-decoration:none;padding:10px 18px;border-radius:4px;font-size:13px;font-weight:700;display:inline-block;">${escapeHtml(item.actionLabel)} →</a>
       </div>
     </div>
   `;
