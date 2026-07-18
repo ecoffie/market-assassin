@@ -33,6 +33,7 @@ import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 import { recipientSlug } from '@/lib/bigquery/recipients';
 import ShareButton from '@/components/ShareButton';
+import { getBaselineRankMap, rankMovement } from '@/lib/leaderboards/snapshots';
 
 const SITE_URL = 'https://getmindy.ai';
 const LIMIT = 50;
@@ -104,6 +105,10 @@ export default async function ListiclePage({ params }: PageProps) {
   if (!listicle) notFound();
 
   const rows = await fetchRows(listicle);
+
+  // Prior-period ranks for the ▲▼ movement badge. Defensive: a snapshot-table hiccup
+  // must NEVER break a ranking page that ranks in search — fall back to no movement.
+  const baseline = await getBaselineRankMap(slug).catch(() => null);
 
   // JSON-LD: ItemList schema for the ranked list + BreadcrumbList
   const jsonLd = {
@@ -205,11 +210,25 @@ export default async function ListiclePage({ params }: PageProps) {
                   }
                 >
                   <td className="px-4 py-3 text-base font-semibold whitespace-nowrap">
-                    {idx < 3 ? (
-                      <span className="text-xl" aria-label={`Rank ${idx + 1}`}>{MEDALS[idx]}</span>
-                    ) : (
-                      <span className="font-mono text-slate-400">#{idx + 1}</span>
-                    )}
+                    <div className="flex items-center gap-2">
+                      {idx < 3 ? (
+                        <span className="text-xl" aria-label={`Rank ${idx + 1}`}>{MEDALS[idx]}</span>
+                      ) : (
+                        <span className="font-mono text-slate-400">#{idx + 1}</span>
+                      )}
+                      {(() => {
+                        const mv = rankMovement(baseline, row.recipient_uei, idx + 1);
+                        if (!mv || mv.dir === 'same') return null;
+                        if (mv.dir === 'new')
+                          return <span className="rounded px-1.5 py-0.5 text-[10px] font-bold text-amber-300 bg-amber-400/10">NEW</span>;
+                        const up = mv.dir === 'up';
+                        return (
+                          <span className={`text-[11px] font-bold ${up ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {up ? '▲' : '▼'} {mv.delta}
+                          </span>
+                        );
+                      })()}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-slate-200">
                     <Link
