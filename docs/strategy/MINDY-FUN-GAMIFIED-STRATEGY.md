@@ -49,6 +49,35 @@ Grounding rule: **every number traces to real SAM/USASpending data** — a fabri
 trust (and, for a customer, loses a bid). Discover is the moat doc's *"federal data as content /
 creative monopoly"* made real.
 
+#### Demand-driven — build what people already search (GSC, not guesses)
+The Discover roadmap is **prioritized by real Google Search Console demand for getmindy.ai**, not a
+hunch. Run `npx tsx scripts/seo-report.ts` (GCP_SA_JSON already in `.env.local`; property
+`sc-domain:getmindy.ai`) to refresh. Trailing-28d snapshot (measured 2026-07-18) that set this order:
+
+1. **Contract-number (PIID) searches dominate impressions** — people search a specific contract to
+   find *the award amount, the incumbent, the subcontract plan* (one PIID `19aqmm19f2232` = 134
+   impressions; a whole `"<piid>" "current award amount"` pattern). → a PIID-keyed "notable contracts"
+   Discover feed + **award pages whose title/snippet LEAD with the contract number + "award amount ·
+   incumbent."**
+2. **`/top/sdvosb-contractors` is already a top page AND a top gainer.** The **"Top [category]
+   contractors" leaderboard format already ranks in production**, and **veteran/SDVOSB is a proven
+   organic winner** — real-data validation of the Veteran hub. → **lead Discover with `/top/*`
+   leaderboards**: veteran/SDVOSB, 8(a), women-owned, HUBZone, by-NAICS.
+3. **Company-name lookups** (MetroStar, Miquin, Anduril, HRL…) — contractor-intel demand → contractor
+   leaderboards / profile pages.
+4. **Fixable leak:** contractor-contract pages pull 300+ impressions at **~0% CTR** at position ~3-4 —
+   we rank for the contract-number searches and nobody clicks. Title/snippet rewrites = free traffic.
+
+**Reordered build priority:** (1) `/top/*` contractor leaderboards [proven], (2) contract-number
+surfaces + award-title fix, (3) contractor intel, then Weird Awards / Underserved / Expiring.
+
+#### Supplementary source — the DoW/DoD "$7M list" (cross-check only)
+DoD publicly announces every contract **$7M+** each business day (defense.gov). Mindy already holds
+that award data via USASpending, so it is **NOT** a primary source (and is not wired into the repo as
+of 2026-07-18). Keep it only for: (a) a **same-day freshness cross-check** (DoD announces before
+USASpending fully ingests — catches awards, occasionally ones not yet elsewhere), and (b) a "Today's
+big defense awards" Discover feed candidate. Low priority vs the GSC-proven work above.
+
 ### Engine 2 — THE GAME: personal progress (ENGAGEMENT / RETENTION)
 
 Turn using Mindy into a game with visible progress:
