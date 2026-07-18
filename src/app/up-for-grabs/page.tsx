@@ -124,9 +124,10 @@ export default async function UpForGrabsPage() {
                 <a key={c.contract_id} href={`https://www.usaspending.gov/award/${c.contract_id}`} target="_blank" rel="noopener noreferrer" className="group flex items-center gap-4 px-5 py-4 hover:bg-slate-800/50 transition-colors">
                   <div className="w-24 shrink-0 text-2xl font-extrabold tabular-nums text-purple-300">{fmtMoney(sizeOf(c))}</div>
                   <div className="min-w-0 flex-1">
-                    <div className="truncate font-semibold text-white">{fmtName(c.incumbent_name || 'Unknown incumbent')}</div>
+                    {/* Lead with WHAT the contract is for, not who holds it — people care about the work. */}
+                    <div className="truncate font-semibold text-white">{c.naics_description || c.description || 'Federal contract'}</div>
                     <div className="truncate text-sm text-slate-400">
-                      {c.awarding_agency}{c.naics_description ? ` · ${c.naics_description}` : ''}
+                      {c.awarding_agency}{c.incumbent_name ? ` · held by ${fmtName(c.incumbent_name)}` : ''}
                     </div>
                     <div className="mt-1 flex flex-wrap items-center gap-2 text-xs">
                       <span className={`rounded px-2 py-0.5 font-semibold ${m <= 6 ? 'bg-rose-400/10 text-rose-300' : 'bg-slate-700/40 text-slate-300'}`}>
