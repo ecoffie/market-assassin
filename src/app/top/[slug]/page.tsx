@@ -32,9 +32,15 @@ import {
 import { formatCompanyName as fmtCompanyName } from '@/lib/format-name';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 import { recipientSlug } from '@/lib/bigquery/recipients';
+import ShareButton from '@/components/ShareButton';
+import { getBaselineRankMap, rankMovement } from '@/lib/leaderboards/snapshots';
 
 const SITE_URL = 'https://getmindy.ai';
 const LIMIT = 50;
+
+// Medal for the podium — the small gamified touch that makes a ranking feel
+// like a leaderboard people want to share. Presentation only.
+const MEDALS = ['🥇', '🥈', '🥉'];
 
 export const revalidate = 604800; // 7d
 export const dynamicParams = false;
@@ -100,6 +106,10 @@ export default async function ListiclePage({ params }: PageProps) {
 
   const rows = await fetchRows(listicle);
 
+  // Prior-period ranks for the ▲▼ movement badge. Defensive: a snapshot-table hiccup
+  // must NEVER break a ranking page that ranks in search — fall back to no movement.
+  const baseline = await getBaselineRankMap(slug).catch(() => null);
+
   // JSON-LD: ItemList schema for the ranked list + BreadcrumbList
   const jsonLd = {
     '@context': 'https://schema.org',
@@ -158,6 +168,9 @@ export default async function ListiclePage({ params }: PageProps) {
         </p>
         <h1 className="mt-3 text-4xl md:text-5xl font-bold tracking-tight">{listicle.title}</h1>
         <p className="mt-4 max-w-3xl text-lg text-slate-300">{listicle.intro}</p>
+        <div className="mt-5">
+          <ShareButton url={`${SITE_URL}/top/${slug}`} title={listicle.title} />
+        </div>
         <div className="mt-6 grid gap-3 sm:grid-cols-3 max-w-3xl">
           <div className="rounded-lg border border-slate-800 bg-slate-900 p-4">
             <div className="text-2xl font-bold text-purple-300">{rows.length}</div>
@@ -188,9 +201,34 @@ export default async function ListiclePage({ params }: PageProps) {
             </thead>
             <tbody className="divide-y divide-slate-800">
               {rows.map((row, idx) => (
-                <tr key={row.recipient_uei} className="hover:bg-slate-800/40">
-                  <td className="px-4 py-3 font-mono text-slate-400 text-base font-semibold">
-                    #{idx + 1}
+                <tr
+                  key={row.recipient_uei}
+                  className={
+                    idx < 3
+                      ? 'bg-amber-400/[0.04] hover:bg-amber-400/[0.08]'
+                      : 'hover:bg-slate-800/40'
+                  }
+                >
+                  <td className="px-4 py-3 text-base font-semibold whitespace-nowrap">
+                    <div className="flex items-center gap-2">
+                      {idx < 3 ? (
+                        <span className="text-xl" aria-label={`Rank ${idx + 1}`}>{MEDALS[idx]}</span>
+                      ) : (
+                        <span className="font-mono text-slate-400">#{idx + 1}</span>
+                      )}
+                      {(() => {
+                        const mv = rankMovement(baseline, row.recipient_uei, idx + 1);
+                        if (!mv || mv.dir === 'same') return null;
+                        if (mv.dir === 'new')
+                          return <span className="rounded px-1.5 py-0.5 text-[10px] font-bold text-amber-300 bg-amber-400/10">NEW</span>;
+                        const up = mv.dir === 'up';
+                        return (
+                          <span className={`text-[11px] font-bold ${up ? 'text-emerald-400' : 'text-rose-400'}`}>
+                            {up ? '▲' : '▼'} {mv.delta}
+                          </span>
+                        );
+                      })()}
+                    </div>
                   </td>
                   <td className="px-4 py-3 text-slate-200">
                     <Link
