@@ -117,8 +117,8 @@ export default async function SpendingPage() {
             ))}
           </div>
           <p className="mt-4 text-xs text-slate-500">
-            Source: USAspending.gov. The biggest federal obligations of the past ~60 days. Click any row for the
-            official contract record, including the contract number and recipient.
+            Source: USAspending.gov. The most recent large federal obligations, refreshed weekly (award data lags
+            reporting by a few weeks). Click any row for the official contract record and recipient.
           </p>
         </section>
       )}
