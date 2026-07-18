@@ -42,7 +42,10 @@ const LIMIT = 50;
 // like a leaderboard people want to share. Presentation only.
 const MEDALS = ['🥇', '🥈', '🥉'];
 
-export const revalidate = 604800; // 7d
+// 1 day. Was 7d, which meant a stale/empty render (e.g. a cold-cache miss) stuck for a
+// WEEK. The snapshot-leaderboards cron also revalidatePath()s these on-demand after each
+// weekly snapshot, so this is just the self-heal backstop. Reads are cheap (rollup, warm).
+export const revalidate = 86400;
 export const dynamicParams = false;
 
 export async function generateStaticParams() {

@@ -14,6 +14,7 @@
  *   ?slug=<slug>  snapshot one listicle (manual/backfill of a single page)
  */
 import { NextRequest, NextResponse } from 'next/server';
+import { revalidatePath } from 'next/cache';
 import { LISTICLES } from '@/data/top-listicles';
 import { fetchTopForListicle } from '@/lib/bigquery/listicle-fetch';
 import { writeLeaderboardSnapshot } from '@/lib/leaderboards/snapshots';
@@ -43,6 +44,9 @@ export async function GET(request: NextRequest) {
     try {
       const top = await fetchTopForListicle(listicle, 50);
       rows += await writeLeaderboardSnapshot(listicle.slug, top, today);
+      // Refresh the ISR page now that its snapshot + warm cache exist, so the ▲▼ and
+      // fresh rankings appear without waiting out the revalidate window.
+      revalidatePath(`/top/${listicle.slug}`);
       ok++;
     } catch (e) {
       failed++;
