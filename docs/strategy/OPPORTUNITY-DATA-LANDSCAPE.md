@@ -56,6 +56,31 @@ migration `20260619_dibbs_rfqs.sql`. **Pilot paused in PR #234** (panel hidden).
 
 ---
 
+## Tier 1b — FFRDC / national-lab / prime supplier portals (the 80+ long tail)
+
+**Eric's point (correct):** there are **80+** distinct places to get contract data, and **the national
+labs each run their own site.** DOE labs — [Lawrence Livermore](https://procurement.llnl.gov/),
+[Savannah River](https://www.srnl.gov/procurement/), Sandia, Los Alamos, Oak Ridge, Argonne, PNNL,
+Brookhaven, NREL, Fermilab, etc. — are mostly **GOCO** (contractor-operated), so their purchases are
+**subcontracts**, posted on their **own supplier portals** and **invisible to SAM.gov**. Add NASA
+centers/JPL, other FFRDCs, and large-prime supplier portals and you're easily at 80+.
+
+- **Why it matters:** high value (labs award billions in subcontracts) AND it's **teaming/subcontracting**
+  — the *other* gap in our competitive positioning. SAM-only competitors can't see this.
+- **Access reality — same shape as SLED, often worse:** fragmented + **bot-blocked**. The example Eric
+  sent, `vp.vendormgmt.us` (a hosted vendor-management portal), returns **HTTP 403 to automated
+  requests** — same WAF/bot-block pattern as DIBBS. So each is a residential-proxy scrape, or a license.
+  Common platforms (Jaggaer, Ivalua, hosted vendor-mgmt) let one scraper template cover several.
+- **The list already exists:** GovCon Chamber's **[2025 Federal Directory of Vendor and Supplier
+  Portals](https://www.govconchamber.com/portals)** enumerates them — a ready seed for our registry.
+- **We already have a seed registry:** `src/data/agency-procurement-sources.json` (21 agencies mapped to
+  procurement portals beyond SAM; DOE → "National Labs" is listed but **not yet enumerated per lab**).
+
+**Move:** expand `agency-procurement-sources.json` into the full **80+ sourced registry** — per source:
+URL, platform, access method (API / scrape / bot-blocked), and current status. That artifact is *both*
+the ingestion roadmap **and** the on-brand transparency proof ("here are our exact N sources"). Then
+ingest the **highest-budget labs first** (LLNL, Sandia, ORNL, LANL), not all 80 at once.
+
 ## Tier 2 — SLED (state/local/education): a LICENSE decision, not a build
 
 **No US state exposes a documented public API/RSS for *live* bid opportunities** — verified across CA,
