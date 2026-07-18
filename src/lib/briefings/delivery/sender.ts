@@ -1,14 +1,20 @@
 /**
  * Briefing Delivery Sender
  *
- * Handles sending briefings via EMAIL (nodemailer).
+ * Handles sending briefings via EMAIL through the shared sendEmail() helper
+ * (Resend, verified sender mail.getmindy.ai) — the SAME transport the daily
+ * briefing crons use. The old nodemailer/Office365 SMTP path was removed
+ * 2026-07-18: prod EMAIL_FROM is a getmindy.ai address, but Office365
+ * authenticated as alerts@govcongiants.com, so every send here 554'd with
+ * SendAsDenied. Only the admin send-live-briefing test endpoint used this
+ * path, so it silently always failed.
+ *
  * SMS is NOT here — all outbound SMS goes through GoHighLevel
  * (src/lib/ghl/sms.ts, sendViaGHL), which is our A2P-10DLC-compliant sender.
  * The old Twilio SMS path was removed 2026-07-01 (it was dead code + an
  * unregistered number carriers would filter).
  */
 
-import nodemailer from 'nodemailer';
 import { createClient } from '@supabase/supabase-js';
 import {
   GeneratedBriefing,
@@ -17,46 +23,15 @@ import {
 } from './types';
 import { generateEmailTemplate } from './email-template';
 import { createEmailTrackingToken } from '@/lib/engagement';
-import { MINDY_FROM_NAME } from '@/lib/mindy/email-branding';
-
-const FROM_EMAIL = process.env.EMAIL_FROM || process.env.SMTP_USER || 'alerts@govcongiants.com';
-const FROM_NAME = MINDY_FROM_NAME;
+import { sendEmail } from '@/lib/send-email';
 
 /**
- * Create nodemailer transporter
- */
-function getTransporter() {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.office365.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: false,
-    auth: {
-      user: process.env.SMTP_USER || 'alerts@govcongiants.com',
-      pass: process.env.SMTP_PASSWORD,
-    },
-  });
-}
-
-/**
- * Send briefing via email
+ * Send briefing via email (Resend, through the shared sendEmail helper).
  */
 export async function sendBriefingEmail(
   briefing: GeneratedBriefing,
   toEmail: string
 ): Promise<DeliveryResult> {
-  const smtpPassword = process.env.SMTP_PASSWORD;
-
-  if (!smtpPassword) {
-    console.error('[BriefingSender] SMTP password not configured');
-    return {
-      success: false,
-      method: 'email',
-      error: 'Email service not configured',
-    };
-  }
-
-  const transporter = getTransporter();
-
   // Create email tracking token
   const tokenResult = await createEmailTrackingToken(toEmail, 'daily_briefing', briefing.briefingDate);
   const trackingToken = tokenResult?.token;
@@ -64,13 +39,27 @@ export async function sendBriefingEmail(
   const template = generateEmailTemplate(briefing, toEmail, trackingToken);
 
   try {
-    const info = await transporter.sendMail({
-      from: `"${FROM_NAME}" <${FROM_EMAIL}>`,
+    // transactional: this is the manual admin test path (send-live-briefing) —
+    // bypass the per-recipient daily cap so an admin can always fire a test copy,
+    // matching the daily-alerts fixture test behavior.
+    const sent = await sendEmail({
       to: toEmail,
       subject: template.subject,
       html: template.htmlBody,
       text: template.textBody,
+      emailType: 'daily_briefing',
+      eventSource: 'briefing',
+      transactional: true,
     });
+
+    if (!sent) {
+      console.error(`[BriefingSender] sendEmail returned false for ${toEmail}`);
+      return {
+        success: false,
+        method: 'email',
+        error: 'Email not sent (suppressed or provider error — see logs)',
+      };
+    }
 
     // Record the delivery
     await recordDelivery({
@@ -79,16 +68,14 @@ export async function sendBriefingEmail(
       briefingId: briefing.id,
       deliveryMethod: 'email',
       status: 'sent',
-      messageId: info.messageId,
       sentAt: new Date().toISOString(),
     });
 
-    console.log(`[BriefingSender] Email sent to ${toEmail}: ${info.messageId}`);
+    console.log(`[BriefingSender] Email sent to ${toEmail} via Resend`);
 
     return {
       success: true,
       method: 'email',
-      messageId: info.messageId,
       deliveredAt: new Date().toISOString(),
     };
   } catch (error) {
