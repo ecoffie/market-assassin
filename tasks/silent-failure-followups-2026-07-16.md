@@ -12,7 +12,13 @@ Every number below was checked against the live DB on 2026-07-16, not inferred.
 
 ## Open items, ranked
 
-### 1. 🔴 The recompete cron is failing on 18% of NAICS — undiagnosed
+### 1. ✅ ~~The recompete cron is failing on 18% of NAICS~~ — CLEARED (verified 2026-07-18)
+
+**Resolved.** Live `recompete_naics_sync` on 2026-07-18 (last run 19:29 UTC): `ok` 454, `empty` 23 (legitimately no recompetes), **`error` 0**. All 477 NAICS attempted, zero in error state. The 2026-07-16 cluster was a transient (one run's USASpending fetches died together ~16s apart); the retry queue rotated + healed them exactly as predicted below — no persistent bug.
+
+Instrumentation gap closed anyway so the *next* transient is diagnosable: the catch in `sync-recompete-contracts/route.ts` now unwraps `error.cause` (code/errno) and any HTTP status into the recorded message, instead of logging the bare useless `fetch failed`. Purely additive; can only prove out on a future failure.
+
+<details><summary>Original 2026-07-16 finding (kept for context)</summary>
 
 `recompete_naics_sync`, live:
 
@@ -31,6 +37,8 @@ Of the 14 errors:
 **The real blocker: the error message is useless.** `fetch failed` is Node/undici's generic wrapper; the actual reason lives in `error.cause`, which the route discards. **Next step:** log `error.cause` (and any HTTP status) in the catch in `src/app/api/cron/sync-recompete-contracts/route.ts`, let one cycle run, then diagnose. Do not guess at rate-limiting before the cause is visible.
 
 **Effort:** small change, then wait one cycle.
+
+</details>
 
 ---
 
