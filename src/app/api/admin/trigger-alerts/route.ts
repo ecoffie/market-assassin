@@ -10,10 +10,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunities, scoreOpportunity } from '@/lib/briefings/pipelines/sam-gov';
-import nodemailer from 'nodemailer';
+import { sendEmail } from '@/lib/send-email';
 import { createSecureAccessUrl } from '@/lib/access-links';
 import { persistSentAlert } from '@/lib/alerts/delivery-log';
-import { MINDY_APP_URL, MINDY_FROM_NAME, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
+import { MINDY_APP_URL, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 const SHOP_ADMIN_PASSWORD = 'admin123';
@@ -29,16 +29,6 @@ function getSupabase() {
   }
   return _supabase;
 }
-
-const transporter = nodemailer.createTransport({
-  host: process.env.SMTP_HOST || 'smtp.office365.com',
-  port: parseInt(process.env.SMTP_PORT || '587'),
-  secure: false,
-  auth: {
-    user: process.env.SMTP_USER || 'alerts@govcongiants.com',
-    pass: process.env.SMTP_PASSWORD,
-  },
-});
 
 // Alert tier limits
 const ALERT_LIMITS = { free: 5, pro: 15 };
@@ -362,10 +352,12 @@ async function sendAlertEmail(
 </html>
 `;
 
-  await transporter.sendMail({
-    from: `"${MINDY_FROM_NAME}" <${process.env.SMTP_USER || 'hello@getmindy.ai'}>`,
+  await sendEmail({
     to: email,
     subject: `Mindy Weekly Alert: ${opportunities.length} New SAM.gov Opportunities - Week of ${formatDate(new Date().toISOString())}`,
     html: htmlContent,
+    emailType: 'admin_alert_trigger',
+    eventSource: 'admin/trigger-alerts',
+    transactional: true,
   });
 }

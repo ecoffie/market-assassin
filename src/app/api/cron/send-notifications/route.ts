@@ -16,12 +16,12 @@ import { createClient } from '@supabase/supabase-js';
 import { fetchSamOpportunities, scoreOpportunity, SAMOpportunity } from '@/lib/briefings/pipelines/sam-gov';
 import { expandNAICSCodes } from '@/lib/utils/naics-expansion';
 import { expandStateForSearch } from '@/lib/utils/state-expansion';
-import nodemailer from 'nodemailer';
+import { sendEmail } from '@/lib/send-email';
 import { createSecureAccessUrl } from '@/lib/access-links';
 import agencySatData from '@/data/agency-sat-friendliness.json';
 import { persistSentAlert } from '@/lib/alerts/delivery-log';
 import { shouldShowAlertSetupNudges } from '@/lib/alerts/profile-setup';
-import { MINDY_APP_URL, MINDY_FROM_NAME, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
+import { MINDY_APP_URL, MINDY_SITE_URL, renderMindyEmailLogo } from '@/lib/mindy/email-branding';
 
 // SAT Badge helper
 interface SatAgencyInfo {
@@ -67,18 +67,6 @@ function getSupabase() {
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!
   );
-}
-
-function getTransporter() {
-  return nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.office365.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: false,
-    auth: {
-      user: process.env.SMTP_USER || 'alerts@govcongiants.com',
-      pass: process.env.SMTP_PASSWORD,
-    },
-  });
 }
 
 // Fallback NAICS if user has none
@@ -269,11 +257,13 @@ async function sendAlertEmail(
 </body>
 </html>`;
 
-  await getTransporter().sendMail({
-    from: `"${MINDY_FROM_NAME}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
+  await sendEmail({
     to: email,
     subject: `Mindy Alert: ${opportunities.length} New Opportunities - ${formatDate(new Date().toISOString())}`,
     html: htmlContent,
+    emailType: 'daily_notification',
+    eventSource: 'cron/send-notifications',
+    transactional: true,
   });
 }
 

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { generateRecompeteBriefing } from '@/lib/briefings/recompete';
-import nodemailer from 'nodemailer';
+import { sendEmail } from '@/lib/send-email';
 
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
@@ -113,30 +113,16 @@ async function sendBriefingEmail(
   to: string,
   template: { subject: string; htmlBody: string; textBody: string }
 ): Promise<{ success: boolean; error?: string }> {
-  const smtpUser = process.env.SMTP_ALERTS_USER || process.env.SMTP_USER;
-  const smtpPass = process.env.SMTP_ALERTS_PASSWORD || process.env.SMTP_PASSWORD;
-
-  if (!smtpUser || !smtpPass) {
-    return { success: false, error: 'SMTP not configured' };
-  }
-
+  // Sends via Resend (sendEmail), not office365 — no SMTP credential gate.
   try {
-    const transporter = nodemailer.createTransport({
-      host: 'smtp.office365.com',
-      port: 587,
-      secure: false,
-      auth: {
-        user: smtpUser,
-        pass: smtpPass,
-      },
-    });
-
-    await transporter.sendMail({
-      from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${smtpUser}>`,
+    await sendEmail({
       to,
       subject: template.subject,
       text: template.textBody,
       html: template.htmlBody,
+      emailType: 'recompete_briefing',
+      eventSource: 'admin/generate-recompete-briefing',
+      transactional: true,
     });
 
     console.log(`[Admin] Briefing email sent to ${to}`);

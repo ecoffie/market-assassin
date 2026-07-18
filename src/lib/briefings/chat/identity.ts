@@ -7,7 +7,7 @@
  */
 
 import { kv } from '@vercel/kv';
-import nodemailer from 'nodemailer';
+import { sendEmail } from '@/lib/send-email';
 import type { PhoneLinkRecord } from './types';
 import { hasBriefingsAccess } from '@/lib/briefings/access';
 
@@ -144,25 +144,9 @@ function generateVerificationCode(): string {
  * Send verification code via email
  */
 async function sendVerificationEmail(email: string, code: string): Promise<boolean> {
-  const smtpPassword = process.env.SMTP_PASSWORD;
-  if (!smtpPassword) {
-    console.error('[ChatIdentity] SMTP not configured');
-    return false;
-  }
-
-  const transporter = nodemailer.createTransport({
-    host: process.env.SMTP_HOST || 'smtp.office365.com',
-    port: parseInt(process.env.SMTP_PORT || '587'),
-    secure: false,
-    auth: {
-      user: process.env.SMTP_USER || 'alerts@govcongiants.com',
-      pass: smtpPassword,
-    },
-  });
-
+  // Sends via Resend (sendEmail), not office365 — no SMTP credential gate.
   try {
-    await transporter.sendMail({
-    from: `"${process.env.MINDY_FROM_NAME || "Mindy"}" <${process.env.SMTP_USER || 'alerts@govcongiants.com'}>`,
+    await sendEmail({
       to: email,
       subject: `Your GovCon Briefing Bot Code: ${code}`,
       text: `Your verification code is: ${code}\n\nText this code back to the GovCon Giants number to link your account.\n\nThis code expires in 15 minutes.\n\nIf you didn't request this, ignore this email.`,
@@ -177,6 +161,9 @@ async function sendVerificationEmail(email: string, code: string): Promise<boole
           <p style="color: #666; font-size: 13px;">This code expires in 15 minutes. If you didn't request this, ignore this email.</p>
         </div>
       `,
+      emailType: 'briefing_identity',
+      eventSource: 'briefings/chat/identity',
+      transactional: true,
     });
 
     console.log(`[ChatIdentity] Verification code sent to ${email}`);
