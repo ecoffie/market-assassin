@@ -9,7 +9,7 @@ import ShareButton from '@/components/ShareButton';
 import { getRecentBigAwards } from '@/lib/discover/recent-spending';
 import { getWeirdAwards, WEIRD_TERMS } from '@/lib/discover/weird-awards';
 import { queryExpiringContracts, type ExpiringContract } from '@/lib/recompete/query';
-import { formatCompanyName as fmtName } from '@/lib/format-name';
+import { contractScope } from '@/lib/discover/scope';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 
 const SITE_URL = 'https://getmindy.ai';
@@ -87,7 +87,7 @@ export default async function DiscoverHub() {
             ) : upForGrabs.map((c) => (
               <div key={c.contract_id} className="flex items-center gap-3 text-sm">
                 <span className="w-16 shrink-0 font-bold tabular-nums text-purple-300">{fmtMoney(Number(c.potential_total_value ?? c.total_obligation ?? 0))}</span>
-                <span className="min-w-0 flex-1 truncate text-slate-300">{fmtName(c.incumbent_name || '')}</span>
+                <span className="min-w-0 flex-1 truncate text-slate-300">{contractScope(c)}</span>
               </div>
             ))}
           </div>
@@ -109,7 +109,7 @@ export default async function DiscoverHub() {
             ) : spending.map((a) => (
               <div key={a.award_id} className="flex items-center gap-3 text-sm">
                 <span className="w-20 shrink-0 font-bold tabular-nums text-purple-300">{fmtMoney(a.obligation_amount)}</span>
-                <span className="min-w-0 flex-1 truncate text-slate-300">{fmtName(a.recipient_name || '')}</span>
+                <span className="min-w-0 flex-1 truncate text-slate-300">{contractScope(a)}</span>
               </div>
             ))}
           </div>

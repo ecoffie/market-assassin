@@ -7,6 +7,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import ShareButton from '@/components/ShareButton';
 import { getRecentBigAwards } from '@/lib/discover/recent-spending';
+import { contractScope } from '@/lib/discover/scope';
 import { formatCompanyName as fmtName } from '@/lib/format-name';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 
@@ -104,12 +105,11 @@ export default async function SpendingPage() {
               >
                 <div className="w-28 shrink-0 text-2xl font-extrabold tabular-nums text-purple-300">{fmtMoney(a.obligation_amount)}</div>
                 <div className="min-w-0 flex-1">
-                  {/* Lead with WHAT it's for, not who got paid. */}
-                  <div className="truncate font-semibold text-white">{a.naics_description || a.description || 'Federal contract'}</div>
+                  {/* Lead with WHAT it's for (real scope), not who got paid. */}
+                  <div className="truncate font-semibold text-white">{contractScope(a)}</div>
                   <div className="truncate text-sm text-slate-400">
                     {a.awarding_agency}{a.recipient_name ? ` · to ${fmtName(a.recipient_name)}` : ''}
                   </div>
-                  {a.description && a.naics_description && <div className="mt-0.5 truncate text-xs text-slate-500">{a.description}</div>}
                 </div>
                 <div className="hidden sm:block shrink-0 text-right text-xs text-slate-500">
                   <div>{fmtDate(a.action_date)}</div>

@@ -11,6 +11,7 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import ShareButton from '@/components/ShareButton';
 import { queryExpiringContracts, type ExpiringContract } from '@/lib/recompete/query';
+import { contractScope } from '@/lib/discover/scope';
 import { formatCompanyName as fmtName } from '@/lib/format-name';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 
@@ -138,7 +139,7 @@ export default async function UpForGrabsPage() {
                   <div className="w-24 shrink-0 text-2xl font-extrabold tabular-nums text-purple-300">{fmtMoney(sizeOf(c))}</div>
                   <div className="min-w-0 flex-1">
                     {/* Lead with WHAT the contract is for, not who holds it — people care about the work. */}
-                    <div className="truncate font-semibold text-white">{c.naics_description || c.description || 'Federal contract'}</div>
+                    <div className="truncate font-semibold text-white">{contractScope(c)}</div>
                     <div className="truncate text-sm text-slate-400">
                       {c.awarding_agency}{c.incumbent_name ? ` · held by ${fmtName(c.incumbent_name)}` : ''}
                     </div>
