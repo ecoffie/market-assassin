@@ -484,10 +484,12 @@ function generateCondensedHtmlBody(briefing: CondensedMABriefing, dateStr: strin
     </div>
     ` : ''}
 
-    <div class="cta-section">
-      <p class="cta-text">Get detailed analysis, action items, and more intel</p>
-      <a href="${MINDY_APP_URL}" class="cta-button">Open Mindy Dashboard →</a>
-    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#1e3a8a" style="background:#1e3a8a;background:linear-gradient(135deg, #1e3a8a 0%, #3b82f6 100%);">
+      <tr><td align="center" style="padding:20px 28px;text-align:center;">
+        <p style="color:#ffffff;font-size:13px;margin:0 0 12px;">Get detailed analysis, action items, and more intel</p>
+        <a href="${MINDY_APP_URL}" style="display:inline-block;background:#ffffff;color:#1e3a8a;padding:10px 24px;border-radius:6px;font-size:13px;font-weight:700;text-decoration:none;">Open Mindy Dashboard →</a>
+      </td></tr>
+    </table>
 
     <div class="footer">
       <p>

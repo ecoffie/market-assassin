@@ -392,10 +392,12 @@ function generateCondensedHtmlBody(briefing: CondensedContractorDBBriefing, date
     </div>
     ` : ''}
 
-    <div class="cta-section">
-      <p class="cta-text">Get full teaming analysis and all SBLO contacts</p>
-      <a href="https://getmindy.ai/briefings" class="cta-button">View Full Briefing</a>
-    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#059669" style="background:#059669;background:linear-gradient(135deg, #059669 0%, #10b981 100%);">
+      <tr><td align="center" style="padding:20px 28px;text-align:center;">
+        <p style="color:#ffffff;font-size:13px;margin:0 0 12px;">Get full teaming analysis and all SBLO contacts</p>
+        <a href="https://getmindy.ai/briefings" style="display:inline-block;background:#ffffff;color:#059669;padding:10px 24px;border-radius:6px;font-size:13px;font-weight:700;text-decoration:none;">View Full Briefing</a>
+      </td></tr>
+    </table>
 
     <div class="footer">
       <p>

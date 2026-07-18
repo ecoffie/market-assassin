@@ -460,10 +460,12 @@ function generateCondensedHtmlBody(briefing: CondensedBriefing, dateStr: string,
       `).join('')}
     </div>
 
-    <div class="cta-section">
-      <p class="cta-text">Want full displacement analysis with action plans?</p>
-      <a href="https://getmindy.ai/briefings" class="cta-button">View Full Briefing →</a>
-    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#7c3aed" style="background:#7c3aed;background:linear-gradient(135deg, #7c3aed 0%, #a855f7 100%);">
+      <tr><td align="center" style="padding:20px 32px;text-align:center;">
+        <p style="color:#ffffff;font-size:13px;margin:0 0 12px;opacity:0.9;">Want full displacement analysis with action plans?</p>
+        <a href="https://getmindy.ai/briefings" style="display:inline-block;background:#ffffff;color:#7c3aed;padding:10px 24px;border-radius:6px;font-size:13px;font-weight:700;text-decoration:none;">View Full Briefing →</a>
+      </td></tr>
+    </table>
 
     <div class="footer">
       <p>
