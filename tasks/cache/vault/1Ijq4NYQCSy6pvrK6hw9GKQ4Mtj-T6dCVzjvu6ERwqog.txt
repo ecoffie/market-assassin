@@ -1,0 +1,22 @@
+PROPOSAL 5-WEEK BOOTCAMP — outline and AI-assisted proposal formatting tips
+
+Bootcamp arc: (1) Proposal Overview, (2) Build Your Proposal, (3) Making it Pretty using AI, (4) Sample Proposal Demonstration, (5) Group/Peer Review.
+
+1. PROPOSAL OVERVIEW — importance; how to get the most of the class; the Six Steps to Crafting World-Class Proposals (Step 1 Check for qualifications; Step 2 Review Requirements; Step 3 Past Performance References; Step 4 Assign roles and responsibilities; Step 5 Review Meetings; Step 6 Cross-reference final draft vs requirements). Solicitation structure and rules: Parts I–IV, Section L (instructions to offerors) and Section M (evaluation factors).
+
+2. BUILDING YOUR PROPOSAL — extract every "shall" and "must"; review Sections L & M; leverage AI and prompts to generate a proposal outline and compliance matrix; reference past examples and templates to improve text quality and to actually answer the questions asked.
+
+3. MAKING IT PRETTY USING AI — cover page; table of contents; numbering system; project sheets/tables/graphs; header and footer.
+
+4. SAMPLE PROPOSAL DEMONSTRATION — Task Order Contracts (what they are, why they matter); IDIQ solicitations (MATOC, SATOC, MACC); the seed project; "important vs detrimental" factors (points vs eliminators); corporate vs small-business partners.
+
+5. GROUP / PEER REVIEW — bring proposals to class; live feedback; next steps.
+
+"MAKING IT PRETTY USING AI" — detailed tips:
+1. Include a cover page (unless told not to); include all pertinent info (POC); place the agency's logo on it.
+2. Add a table of contents — helps the reader with format/structure and makes the proposal easier to read.
+3. Follow THEIR numbering system — do not jump around.
+4. ANSWER THE QUESTIONS — a team member once used ChatGPT to write a proposal that read great but answered none of the government's questions. AI helps formatting, not compliance.
+5. Work plans and Quality Assurance plans are NOT a few paragraphs — they are thorough documents showing you thought through fail-safe scenarios; find examples from others and expand on what they leave unsaid.
+6. Use project data sheets, tables, and graphs to explain information — mixing visuals helps visual learners (we don't all learn the same way).
+7. Use headers and footers for titles, page count, RFQ#, and agency name.

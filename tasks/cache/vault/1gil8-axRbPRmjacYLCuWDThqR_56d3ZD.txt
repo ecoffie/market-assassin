@@ -1,0 +1,12 @@
+Top 10 Dangerous Subcontractor Clauses (GovCon teaching — what to watch for in a subcontract)
+
+1. Price Escalation & Covid-19 Clauses — Address material cost increases and disruptions to protect subcontractors from market volatility.
+2. Scope of Work Provisions — Defines specific tasks. Ambiguities can lead to unexpected responsibilities.
+3. Incorporation Clauses — Incorporates other contract documents, possibly unseen, into the subcontract.
+4. Liquidated Damages — Financial penalties for delays, potentially out of the subcontractor's control.
+5. Omission Provisions — Missing or vague specs may lead to additional uncompensated work.
+6. Schedule Change Clauses — Allow general contractors to change schedules without extra pay.
+7. Coordination Clauses — Require subs to coordinate with other trades, leading to logistical and legal issues.
+8. Indemnification Clauses — Extend liability to subcontractors for others' mistakes or conditions beyond their control.
+9. Right of Set-Off — Allows payment from one project to be withheld for issues on another.
+10. Exclusions in Bids — Failure to list what's excluded can imply full responsibility for unspecified tasks.

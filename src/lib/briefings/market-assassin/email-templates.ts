@@ -113,11 +113,13 @@ function generateFullHtmlBody(briefing: MABriefing, dateStr: string): string {
 <body>
   <div class="container">
     <!-- Header -->
-    <div class="header">
-      <h1>Market Intel Briefing</h1>
-      <p class="subtitle">Your personalized GovCon market intelligence</p>
-      <p class="date">${dateStr}</p>
-    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#7c3aed" style="background:#7c3aed;background:linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);">
+      <tr><td style="padding:24px 28px;">
+        <h1 style="margin:0;font-size:22px;font-weight:700;color:#ffffff;">Market Intel Briefing</h1>
+        <p style="margin:8px 0 0;font-size:13px;color:#ffffff;opacity:0.9;">Your personalized GovCon market intelligence</p>
+        <p style="margin:4px 0 0;font-size:12px;color:#ffffff;opacity:0.7;">${dateStr}</p>
+      </td></tr>
+    </table>
 
     <!-- Summary Stats -->
     <div class="summary">
@@ -421,11 +423,13 @@ function generateCondensedHtmlBody(briefing: CondensedMABriefing, dateStr: strin
 </head>
 <body>
   <div class="container">
-    <div class="header">
-      <span class="header-badge">Daily Snapshot</span>
-      <h1>Market Intel</h1>
-      <p class="date">${dateStr}</p>
-    </div>
+    <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0" bgcolor="#7c3aed" style="background:#7c3aed;background:linear-gradient(135deg, #7c3aed 0%, #4f46e5 100%);">
+      <tr><td align="center" style="padding:24px 28px;text-align:center;">
+        <span style="display:inline-block;background:rgba(255,255,255,0.2);padding:4px 12px;border-radius:20px;font-size:11px;font-weight:600;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:10px;color:#ffffff;">Daily Snapshot</span>
+        <h1 style="margin:0;font-size:22px;font-weight:700;color:#ffffff;">Market Intel</h1>
+        <p style="margin:6px 0 0;font-size:13px;color:#ffffff;opacity:0.85;">${dateStr}</p>
+      </td></tr>
+    </table>
 
     <div class="stats-row">
       <div class="stat-box">

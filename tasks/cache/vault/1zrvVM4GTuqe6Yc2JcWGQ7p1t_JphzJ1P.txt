@@ -1,0 +1,27 @@
+8(a) JOINT VENTURE AGREEMENT — completed example (managing 8(a) firm + non-8(a) partner, USACE construction set-aside). A model showing how every SBA-required JV provision is written.
+
+Recitals: This Joint Venture Agreement is between an 8(a) participant in good standing (the managing 8(a) firm) and a partner corporation. The Government (acting through the U.S. Army Corps of Engineers at Homestead Air Reserve Base) issued an RFP as a competitive Section 8(a) set-aside. The managing firm is certified in the SBA Section 8(a) program and is small under NAICS 236220 (Commercial and Institutional Building Construction, size standard $33.5M).
+
+1. JOINT VENTURE NAME — "[8(a) firm]-[Partner], JV."
+2. PURPOSE — bid on the named USACE solicitation and, if successful, perform the building additions/renovations for the base period plus options (>24 months from award).
+3. JOINT VENTURES — the Parties associate as JV partners for that purpose.
+4. MANAGING JOINT VENTURER — the 8(a) firm is the managing partner.
+5. PROJECT MANAGER — a named employee of the managing 8(a) firm is the PM, responsible for contract performance, overseeing the job-site, reporting to and implementing the Managing Director's instructions, and keeping a daily written log.
+6. PERCENTAGE OWNERSHIP — 8(a) firm 51%, partner 49%.
+7. RESPONSIBILITIES (negotiations, performance, labor) — the JV has full responsibility for performance with the 8(a) firm primarily responsible for managing the contract and delivering services; the exact division of work is defined in the proposal/contract/task orders consistent with SBA regulations; the 8(a) firm leads proposal development and contract negotiation, the partner supports.
+8. SPECIAL BANK ACCOUNT — an operating account in the JV's name; all receipts deposited there; all checks require two signatures, one from each venturer.
+9. WORKING CAPITAL FUND — established at contract onset (example $2,000), contributed per ownership split (51%/49%), maintained and added to throughout performance.
+10. DISTRIBUTION OF PROFITS — net operating income and loss allocated in proportion to Percentage Ownership (so the 8(a) firm receives at least 51%).
+11. MAJOR EQUIPMENT/FACILITIES/RESOURCES — upon award, the Managing Director purchases facilities/equipment in the JV's name; detailed cost schedule listed.
+12. RECORDS — all accounting/administrative records kept at the managing 8(a) firm's office unless SBA approves elsewhere; final original records retained by the managing venturer; quarterly financial statements (cumulative receipts/expenditures) to SBA within 45 days of each quarter; project-end profit-and-loss statement with final distribution to SBA within 90 days of completion.
+13. INSPECTION OF RECORDS — SBA may inspect the JV's records without notice at any time.
+14. PERFORMANCE OF WORK — the managing 8(a) firm performs at least 50% of the cost of the contract (exclusive of materials) with its own employees, per 13 CFR 124.513 and 125.6; "significant percentage" means the majority of direct labor dollars.
+15. CONTRACT EXECUTION — once SBA approves the JV, the managing venturer executes the contract in the JV's name and signs modifications/certifications; each Party may visit the site to evaluate performance.
+16. ALTERNATE DISPUTE RESOLUTION — reasonable efforts to settle; non-binding mediation before arbitration; unresolved disputes decided by the AAA under its Commercial Arbitration Rules; one arbitrator; venue Miami-Dade County, FL; award final and binding.
+17. CONTINUANCE OF PERFORMANCE — if a member withdraws (death, bankruptcy, dissolution), the other Party continues to ensure contract performance.
+18. JV AGREEMENT APPROVAL — SBA must approve the Agreement before contract award.
+19. AMENDMENTS — by written amendment; all amendments/modifications/deviations require prior SBA written approval.
+20. RIGHTS AND LIMITATIONS — no sale/assignment/encumbrance of a JV interest without the other Party's consent and SBA District Director approval; each Party may pursue other business/ventures for its own profit; the relationship is limited to performing this contract and is NOT a general partnership.
+21. TERMINATION — terminates when the JV exhausts its ability to pursue up to three contract opportunities in a two-year period, or on the second anniversary of execution, whichever is first.
+22. FEDERAL/STATE REQUIREMENTS — comply with all applicable federal/state/local law and the contract terms, including filings to establish the JV.
+23. GOVERNING LAW — State of Florida. EFFECTIVE DATE — upon SBA approval. NOTICES — registered/certified mail to each Party. WAIVERS/BINDING EFFECT, ENTIRE AGREEMENT, and signature blocks for each president follow.
