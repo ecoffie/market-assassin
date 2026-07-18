@@ -60,10 +60,23 @@ function sizeOf(c: ExpiringContract): number {
 }
 
 export default async function UpForGrabsPage() {
-  // Biggest contracts expiring within 12 months. minValue keeps it to real, sizable work;
-  // then sort by ceiling so the headliners lead. Snapshot only — no history.
-  const { contracts } = await queryExpiringContracts({ monthsWindow: 12, minValue: 10_000_000, limit: 200 }).catch(() => ({ contracts: [] as ExpiringContract[] }));
-  const top = [...contracts].sort((a, b) => sizeOf(b) - sizeOf(a)).slice(0, 40);
+  // The BIGGEST contracts across the whole 12-month window (orderBy:'value' — not the
+  // soonest-200, which were all "expiring now"). Then spread them: cap ~8 per 2-month
+  // bucket so the list shows a timeline, not a pile of same-month expirations. Snapshot
+  // only — no history.
+  const { contracts } = await queryExpiringContracts({ monthsWindow: 12, minValue: 10_000_000, limit: 200, orderBy: 'value' }).catch(() => ({ contracts: [] as ExpiringContract[] }));
+  const perBucket = new Map<number, number>();
+  const spread: ExpiringContract[] = [];
+  for (const c of [...contracts].sort((a, b) => sizeOf(b) - sizeOf(a))) {
+    const bucket = Math.min(5, Math.floor(monthsUntil(c.period_of_performance_current_end) / 2)); // 0..5 over 12mo
+    const n = perBucket.get(bucket) ?? 0;
+    if (n >= 8) continue;
+    perBucket.set(bucket, n + 1);
+    spread.push(c);
+    if (spread.length >= 40) break;
+  }
+  // Display as a timeline: soonest → furthest, so the countdown badges vary.
+  const top = spread.sort((a, b) => monthsUntil(a.period_of_performance_current_end) - monthsUntil(b.period_of_performance_current_end));
   const total = top.reduce((s, c) => s + sizeOf(c), 0);
 
   const jsonLd = {
