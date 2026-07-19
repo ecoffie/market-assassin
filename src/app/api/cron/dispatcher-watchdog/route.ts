@@ -44,6 +44,15 @@ const ALERT_TO = process.env.WATCHDOG_ALERT_EMAIL || 'eric@govcongiants.com';
 // absorbs). 150 min = 2.5h leaves margin for a single skipped tick.
 const LIVENESS_MINUTES = 150;
 
+// Grace before an enabled daily job counts as "overdue". The dispatcher ticks
+// hourly and runs a 06:00 job at ~06:01, but this watchdog runs on its own native
+// cron near the top of the hour — so without a grace it races the dispatcher and
+// flags a job overdue for the ~1 min before the tick runs it (a daily false alarm,
+// seen 2026-07-19: checked 06:00:46, jobs dispatched 06:01:18). 15 min comfortably
+// covers dispatcher/Vercel-cron jitter; a genuinely stuck dispatcher is caught by
+// the separate LIVENESS check, so a longer grace here costs no real detection.
+const OVERDUE_GRACE_MINUTES = 15;
+
 interface CronJob {
   job_name: string;
   cron_expr: string;
@@ -120,7 +129,7 @@ export async function GET(request: NextRequest) {
       // 3× the job's own timeout → the lock should have auto-expired long ago.
       if (lockAgeMs > j.timeout_ms * 3) stuck.push(j.job_name);
     }
-    if (isMissed(j.cron_expr, now, j.last_run_at ? new Date(j.last_run_at) : null)) {
+    if (isMissed(j.cron_expr, now, j.last_run_at ? new Date(j.last_run_at) : null, OVERDUE_GRACE_MINUTES)) {
       overdue.push(j.job_name);
     }
   }

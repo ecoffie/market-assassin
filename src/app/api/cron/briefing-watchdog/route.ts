@@ -200,12 +200,19 @@ async function checkBriefingHealth(briefingType: string, date: string): Promise<
   const usersSkipped = logs?.filter((l: LogRow) => l.delivery_status === 'skipped').length || 0;
 
   // Get no-template count from dead letter queue
-  const { count: usersNoTemplate } = await getSupabase()
+  const { count: usersNoTemplate, error: noTemplateErr } = await getSupabase()
     .from('briefing_dead_letter')
     .select('*', { count: 'exact', head: true })
     .eq('briefing_type', briefingType)
     .eq('briefing_date', date)
     .ilike('failure_reason', '%no template%');
+
+  // usersNoTemplate now drives a CRITICAL alert, so a failed query must not read
+  // as a clean "0 no-template" (false-negative). Surface it; the count coalesces
+  // for display but the error is logged, not swallowed. #307.
+  if (noTemplateErr) {
+    console.error('[Watchdog] no-template count failed:', noTemplateErr.message);
+  }
 
   // Calculate health score
   const totalProcessed = usersSent + usersFailed + usersSkipped;
@@ -219,10 +226,24 @@ async function checkBriefingHealth(briefingType: string, date: string): Promise<
     ? (templatesAvailable || 0) / templatesExpected
     : 1;
 
+  // Severity is driven by DELIVERY outcomes, not the precompute cache. The cache
+  // is a performance optimization: when it's empty, briefings generate on-demand
+  // and still go out (seen 2026-07-19: 0 templates but 1,540 sent, 0 failed). So a
+  // low/empty template cache alone is NOT critical — it screamed 🚨 CRITICAL on a
+  // fully-healthy send and buried real signals. CRITICAL now means users actually
+  // didn't get served (high failure rate, or someone genuinely got no template);
+  // a low cache with clean delivery is at most a WARNING, and the self-heal
+  // precompute below refills it regardless of alert level.
   let alertLevel: 'info' | 'warning' | 'critical' | null = null;
-  if (failureRate >= FAILURE_RATE_CRITICAL || templateCoverage < 0.5) {
+  if (failureRate >= FAILURE_RATE_CRITICAL || usersNoTemplate > 0) {
     alertLevel = 'critical';
-  } else if (failureRate >= FAILURE_RATE_WARNING || templateCoverage < MIN_TEMPLATE_COVERAGE) {
+  } else if (failureRate >= FAILURE_RATE_WARNING) {
+    alertLevel = 'warning';
+  } else if (templateCoverage < MIN_TEMPLATE_COVERAGE && totalProcessed === 0) {
+    // Cache is low AND nothing has sent yet this window → the precompute may not
+    // have run before the send; worth a heads-up (not critical — delivery may
+    // still succeed on-demand). Once delivery is underway with no failures, an
+    // empty cache is expected and silent.
     alertLevel = 'warning';
   }
 
@@ -358,12 +379,18 @@ async function processRetry(retry: RetryCandidate): Promise<boolean> {
 }
 
 async function checkExhaustedRetries(): Promise<number> {
-  const { count } = await getSupabase()
+  const { count, error } = await getSupabase()
     .from('briefing_dead_letter')
     .select('*', { count: 'exact', head: true })
     .eq('status', 'exhausted')
     .gte('created_at', new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString());
 
+  if (error) {
+    // Surface — don't let a query/table error masquerade as "0 exhausted" (a
+    // fabricated 0 would silently suppress the exhaustion alert). #307.
+    console.error('[Watchdog] exhausted-retries count failed:', error.message);
+    return 0;
+  }
   return count || 0;
 }
 
