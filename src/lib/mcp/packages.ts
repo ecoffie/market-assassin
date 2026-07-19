@@ -38,8 +38,11 @@ export const CREDIT_PACKAGES: readonly CreditPackage[] = [
   // Credits repriced 2026-07-18 (value-anchored model): the $ price is UNCHANGED (same
   // Stripe products) — we grant FEWER credits so top-ups are a PREMIUM "one more" valve
   // (priciest per credit) that never undercuts upgrading. Was 2,000/5,000.
-  { id: 'plus', credits: 300, usd: 49, label: 'Plus — 300 credits', checkoutUrl: 'https://buy.stripe.com/4gMdRa4Au2IO7lb70QfnO0U' },
-  { id: 'scale', credits: 700, usd: 99, label: 'Scale — 700 credits (best value)', checkoutUrl: 'https://buy.stripe.com/14AfZid703MS20R5WMfnO0V' },
+  // Repriced 2026-07-19 (premium "one more" valve): $79/$149 on FRESH Stripe products
+  // ("Mindy MCP — 300/700 credits", metadata type=mcp_credit_topup + package). Old $49/$99
+  // links deactivated in Stripe so they can't be bought at the wrong price.
+  { id: 'plus', credits: 300, usd: 79, label: 'Plus — 300 credits', checkoutUrl: 'https://buy.stripe.com/9B6dRad70bfk48Z98YfnO0W' },
+  { id: 'scale', credits: 700, usd: 149, label: 'Scale — 700 credits (best value)', checkoutUrl: 'https://buy.stripe.com/4gMaEYaYScjo6h770QfnO0X' },
 ] as const;
 
 const BY_ID = new Map(CREDIT_PACKAGES.map((p) => [p.id, p]));
