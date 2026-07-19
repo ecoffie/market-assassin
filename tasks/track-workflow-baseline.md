@@ -35,6 +35,44 @@ post-ship data is in the window — the runway/expired fixes (feed, alerts, best
 track baseline used a different denominator (whole 1,540 alert audience, all-time) than this
 script's in-window browsers — not comparable; use THIS script's numbers week-over-week.
 
+### Second read — 2026-07-19 (first TRUE post-ship read — behavior moved) ✅
+Enough post-ship days elapsed for behavioral metrics to move. The runway fix + keyword precision
++ "why fits you" nudge + "make it mine" banner WORKED on the two metrics they targeted.
+| Metric | prior 14d | last 14d | Δ | verdict |
+|---|---|---|---|---|
+| browsers (in-app) | 146 | 203 | +57 | more traffic |
+| distinct trackers | 30 | 74 | +44 | |
+| **browse→track rate** | 20.5% | **26.6%** | **+6.1 pts** | ✅ lift |
+| **give-up rate** (browsed, never tracked) | 79.5% | **73.4%** | **−6.1 pts** | ✅ the real test — dropped |
+| next_action fill (whale-capped, script window) | 24.9% | 22.0% | −2.9 pts | ⚠️ see below |
+
+- **profile_complete** (daily_metric_snapshots, `value` col — NOT `metric_value`): 1401 (07-11 ship)
+  → 1459 (07-18) = **+58 in 7d (~8/day), every day positive.** The "make it mine" banner did NOT
+  stall the funnel. Steady, not accelerated (historical ~13/day; last 7d ~8/day).
+
+**The next_action "dip" is a REAL gap, not just the whale.** Diagnosed 2026-07-19:
+- Capped fill on POST-SHIP rows only (created ≥07-11) = **30.6%** — right at the 31% target. The
+  script's 22% is dragged by the pre-ship half of its 14d window + the whale (gary.grant@scientic.com,
+  1,212 rows).
+- BUT fill is **bimodal by `source`**, because the write-time stamp only fires on SOME track paths:
+  | source | post-ship rows | next_action fill |
+  |---|---|---|
+  | mi_beta_expiring_contracts | 430 | **100%** ✅ |
+  | briefings_dashboard | 83 | 86% ✅ |
+  | interest_signal | 14 | 86% ✅ |
+  | market_intel_dashboard | 398 | **0%** ❌ |
+  | mi_beta_alerts | 385 | **0%** ❌ |
+  | daily_alert | 102 | **0%** ❌ |
+  | briefing | 12 | 0% ❌ |
+- **Root cause:** `api/actions/add-to-pipeline` stamps `next_action` via `computeNextAction()`
+  (`src/lib/pipeline/next-action.ts`) → 100%/86%. But `api/opportunities/save` + `save-redirect`
+  (and the alerts/dashboard track paths → sources `daily_alert`/`market_intel_dashboard`/`mi_beta_alerts`)
+  insert pipeline rows with `next_action = NULL`. ~900 of 1,424 post-ship rows (63%) come from these
+  unstamped paths — that's the aggregate drag.
+- **FIX (not yet done):** call `computeNextAction()` in the `opportunities/save` + `save-redirect`
+  (and any track.ts) insert paths so every source stamps a next_action at write time. Would lift
+  fill toward 100% for new tracks across all entry points.
+
 ## What "working" looks like (check ~2026-07-18)
 - `next_action` fill rate ↑ toward 100% for NEW tracks (write-time stamp) — legacy 920 nulls get a recomputed button at render but stay null in DB until re-touched.
 - `stage='tracking'` share ↓ off 93% — items advance because the button gives them somewhere to go.
