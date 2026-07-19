@@ -33,6 +33,27 @@ const PACK_BLURB: Record<string, string> = {
   agency: 'The agency plan — high volume for a shop running many pursuits at once.',
 };
 
+/** Per-tier visual theme for the 2×2 grid (full literal Tailwind strings so the JIT scanner sees them). */
+interface PlanTheme { tag: string; accent: string; card: string; badge: string; box: string; boxText: string; check: string; cta: string }
+const PLAN_THEME: Record<string, PlanTheme> = {
+  entry: {
+    tag: 'Popular', accent: 'text-emerald-300', card: 'border-emerald-400/40 bg-emerald-400/[0.05] shadow-[0_0_0_1px_rgba(16,185,129,0.15)]',
+    badge: 'bg-emerald-500 text-[#06120c]', box: 'border-emerald-400/15 bg-emerald-400/[0.04]', boxText: 'text-emerald-100',
+    check: 'text-emerald-400', cta: 'bg-emerald-500 text-[#06120c] hover:bg-emerald-400',
+  },
+  mid: {
+    tag: 'Best for daily use', accent: 'text-indigo-300', card: 'border-indigo-400/40 bg-indigo-400/[0.06] shadow-[0_0_0_1px_rgba(99,102,241,0.15)]',
+    badge: 'bg-indigo-500 text-white', box: 'border-indigo-400/15 bg-indigo-400/[0.05]', boxText: 'text-indigo-100',
+    check: 'text-indigo-300', cta: 'bg-indigo-500 text-white hover:bg-indigo-400',
+  },
+  agency: {
+    tag: 'For agencies · high volume', accent: 'text-purple-300', card: 'border-purple-400/40 bg-purple-400/[0.06]',
+    badge: 'bg-purple-500 text-white', box: 'border-purple-400/15 bg-purple-400/[0.05]', boxText: 'text-purple-100',
+    check: 'text-purple-300', cta: 'bg-purple-500 text-white hover:bg-purple-400',
+  },
+};
+const FALLBACK_THEME: PlanTheme = PLAN_THEME.entry;
+
 /**
  * Static fallback so the cards render even if the public /api/mcp/catalog fetch is
  * unavailable (bot-gated, SSR). MUST stay in sync with SUBSCRIPTION_PLANS in
@@ -147,83 +168,87 @@ export default function McpPricing() {
           </a>
         </div>
 
-        {/* Free + the 3 credit plans */}
-        <section className="mt-6 grid items-stretch gap-4 md:grid-cols-2 lg:grid-cols-4">
-          {/* Free trial */}
-          <div className="flex flex-col rounded-2xl border border-white/10 bg-white/[0.02] p-6">
-            <span className="text-[12px] font-semibold uppercase tracking-wide text-slate-300">Free trial</span>
-            <div className="mt-1 min-h-[2.5rem] text-[13px] leading-relaxed text-slate-400">Try Mindy on any MCP client — no card.</div>
-            <div className="mt-2 flex items-baseline gap-2">
-              <span className="font-mono text-4xl font-bold tabular-nums">$0</span>
-            </div>
-            <div className="mt-1 text-[12px] text-emerald-300">{trial} credits on first connect</div>
-            <ul className="mt-4 flex-1 space-y-2 border-t border-white/[0.06] pt-4 text-[12.5px]">
-              <li className="flex gap-2"><span className="text-emerald-400">✓</span> Public-data tools (SAM · USASpending · EDGAR · GSA · forecasts)</li>
-              <li className="flex gap-2"><span className="text-emerald-400">✓</span> Keyless connect — sign in through your browser</li>
-              <li className="flex gap-2"><span className="text-slate-600">–</span> <span className="text-slate-500">The proprietary moat is paid-only</span></li>
-            </ul>
-            <a href="/app" className="mt-5 inline-flex items-center justify-center rounded-lg border border-white/15 px-4 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/5">Start free</a>
-          </div>
-
-          {/* The 3 metered credit plans */}
-          {planRows.map((p) => (
-            <div key={p.id} className={`relative flex flex-col rounded-2xl border p-6 ${p.highlight ? 'border-emerald-400/40 bg-emerald-400/[0.05] shadow-[0_0_0_1px_rgba(16,185,129,0.15)]' : 'border-white/10 bg-white/[0.02]'}`}>
-              {p.tag && <span className={`absolute -top-2.5 left-6 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${p.highlight ? 'bg-emerald-500 text-[#06120c]' : 'border border-white/15 bg-[#0a0f1e] text-slate-400'}`}>{p.tag}</span>}
-              <span className="text-[12px] font-semibold uppercase tracking-wide text-emerald-300">{p.name}</span>
-              <div className="mt-1 min-h-[2.5rem] text-[13px] leading-relaxed text-slate-400">{PACK_BLURB[p.id] ?? 'Every tool, including the moat.'}</div>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="font-mono text-4xl font-bold tabular-nums">${p.perMo}</span>
-                <span className="text-[13px] text-slate-400">/mo</span>
-              </div>
-              <div className="mt-2 rounded-xl border border-emerald-400/15 bg-emerald-400/[0.04] p-3">
-                <div className="flex items-baseline gap-1.5 text-emerald-100">
-                  <span aria-hidden>✦</span>
-                  <b className="font-mono text-[15px] font-semibold tabular-nums">{p.creditsPerMonth.toLocaleString()}</b>
-                  <span className="text-[13px] font-semibold">credits/mo</span>
+        {/* The plans — the loved Higgsfield 2×2: Entry · Mid (top) / Agency · Enterprise (bottom).
+            No Free card here on purpose — free lives in the hero + Sign in. */}
+        <section className="mt-6 grid items-stretch gap-4 md:grid-cols-2">
+          {/* Entry · Mid · Agency — metered credit plans, each in its own color */}
+          {planRows.map((p) => {
+            const t = PLAN_THEME[p.id] ?? FALLBACK_THEME;
+            return (
+              <div key={p.id} className={`relative flex flex-col rounded-2xl border p-6 ${t.card}`}>
+                <span className={`absolute -top-2.5 left-6 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${t.badge}`}>{t.tag}</span>
+                <div className="flex items-baseline justify-between gap-2">
+                  <span className={`text-[12px] font-semibold uppercase tracking-wide ${t.accent}`}>{p.name}</span>
+                  <span className="text-[11px] text-slate-500">credits plan</span>
                 </div>
-                <ul className="mt-1.5 space-y-0.5 text-[12px] text-slate-300">
-                  {outcomes(p.creditsPerMonth).map((o) => <li key={o} className="tabular-nums">· {o} <span className="text-slate-500">/mo</span></li>)}
+                <div className="mt-1 min-h-[2.75rem] text-[13px] leading-relaxed text-slate-400">{PACK_BLURB[p.id] ?? 'Every tool, including the moat.'}</div>
+                <div className={`mt-2 rounded-xl border p-3 ${t.box}`}>
+                  <div className={`flex items-baseline gap-1.5 ${t.boxText}`}>
+                    <span aria-hidden>✦</span>
+                    <b className="font-mono text-[15px] font-semibold tabular-nums">{p.creditsPerMonth.toLocaleString()}</b>
+                    <span className="text-[13px] font-semibold">credits/mo</span>
+                  </div>
+                  <ul className="mt-1.5 space-y-0.5 text-[12px] text-slate-300">
+                    {outcomes(p.creditsPerMonth).map((o) => <li key={o} className="tabular-nums">· {o} <span className="text-slate-500">/mo</span></li>)}
+                  </ul>
+                </div>
+                <div className="mt-4 flex items-baseline gap-2">
+                  <span className="font-mono text-4xl font-bold tabular-nums">${p.perMo}</span>
+                  <span className="text-[13px] text-slate-400">billed monthly</span>
+                </div>
+                <ul className="mt-4 flex-1 space-y-2 border-t border-white/[0.06] pt-4 text-[12.5px]">
+                  <li className="flex gap-2"><span className={t.check}>✓</span> <span><b className="font-semibold text-slate-200">All {toolCount} metered tools</b> + the proprietary moat</span></li>
+                  <li className="flex gap-2"><span className={t.check}>✓</span> <span>Charged on success only · {p.creditsPerMonth.toLocaleString()} credits every month</span></li>
+                  <li className="flex gap-2"><span className={t.check}>✓</span> <span>Top up any time · optional auto-recharge</span></li>
+                  <li className="flex gap-2"><span className={t.check}>✓</span> <span>Keyless connect — sign in through your browser</span></li>
                 </ul>
+                <a href={p.href} className={`mt-5 inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold ${t.cta}`}>Get {p.name}</a>
               </div>
-              <ul className="mt-4 flex-1 space-y-2 border-t border-white/[0.06] pt-4 text-[12.5px]">
-                <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span><b className="font-semibold text-slate-200">All {toolCount} metered tools</b> + the proprietary moat</span></li>
-                <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span>Charged on success only · fixed {p.creditsPerMonth.toLocaleString()} credits every month</span></li>
-                <li className="flex gap-2"><span className="text-emerald-400">✓</span> <span>Top up any time · optional auto-recharge</span></li>
-              </ul>
-              <a href={p.href} className={`mt-5 inline-flex items-center justify-center rounded-lg px-4 py-2.5 text-sm font-semibold ${p.highlight ? 'bg-emerald-500 text-[#06120c] hover:bg-emerald-400' : 'border border-white/15 text-slate-200 hover:bg-white/5'}`}>Get {p.name}</a>
-            </div>
-          ))}
-        </section>
+            );
+          })}
 
-        {/* Top-up strip + Enterprise/API row */}
-        <section className="mt-4 grid items-stretch gap-4 md:grid-cols-2">
-          {/* One-time top-up */}
-          <div className="flex flex-col justify-center rounded-2xl border border-white/10 bg-white/[0.02] p-6 sm:flex-row sm:items-center sm:justify-between">
-            <div>
-              <span className="text-[12px] font-semibold uppercase tracking-wide text-slate-300">One-time top-up</span>
-              <div className="mt-1 text-[13px] text-slate-400">Ran out mid-month? A one-time refill — no plan change.</div>
-              <div className="mt-2 flex items-baseline gap-2">
-                <span className="font-mono text-2xl font-bold tabular-nums">${topup.usd}</span>
-                <span className="text-[13px] text-emerald-300">{topup.credits.toLocaleString()} credits</span>
-              </div>
-            </div>
-            <a href={topup.checkoutUrl} className="mt-4 inline-flex items-center justify-center rounded-lg border border-white/15 px-4 py-2.5 text-sm font-semibold text-slate-200 hover:bg-white/5 sm:mt-0">Buy top-up</a>
-          </div>
-
-          {/* Enterprise / API — inquiry only */}
+          {/* Enterprise / API — the 4th card in the 2×2 (inquiry-only, moat-doc feed buyers) */}
           <div className="relative flex flex-col rounded-2xl border border-amber-300/30 bg-amber-300/[0.04] p-6">
-            <span className="absolute -top-2.5 left-6 rounded-full border border-amber-300/40 bg-[#0a0f1e] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-200">Enterprise / API</span>
-            <div className="mt-1 text-[13px] leading-relaxed text-slate-400">For primes, agencies, funds, lenders &amp; partners who need the <b className="font-semibold text-slate-200">data as a feed or high-volume API</b> — not a seat.</div>
-            <ul className="mt-3 flex-1 space-y-2 border-t border-amber-300/15 pt-4 text-[12.5px]">
-              <li className="flex gap-2"><span className="text-amber-300">◆</span> <span>Custom credit pool / feed license · volume pricing · annual invoicing</span></li>
+            <span className="absolute -top-2.5 left-6 rounded-full border border-amber-300/40 bg-[#0a0f1e] px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-amber-200">For primes · funds · partners</span>
+            <div className="flex items-baseline justify-between gap-2">
+              <span className="text-[12px] font-semibold uppercase tracking-wide text-amber-200">Enterprise / API</span>
+              <span className="text-[11px] text-slate-500">custom</span>
+            </div>
+            <div className="mt-1 min-h-[2.75rem] text-[13px] leading-relaxed text-slate-400">For primes, agencies, funds, lenders &amp; partners who need the <b className="font-semibold text-slate-200">data as a feed or high-volume API</b> — not a seat.</div>
+            <div className="mt-2 rounded-xl border border-amber-300/15 bg-amber-300/[0.05] p-3">
+              <div className="flex items-baseline gap-1.5 text-amber-100">
+                <span aria-hidden>✦</span>
+                <b className="font-mono text-[15px] font-semibold">Custom</b>
+                <span className="text-[13px] font-semibold">credit pool</span>
+              </div>
+              <ul className="mt-1.5 space-y-0.5 text-[12px] text-slate-300">
+                <li>· Sized to your team &amp; volume</li>
+                <li>· Feed license / high-volume API</li>
+                <li>· Pooled across every seat</li>
+              </ul>
+            </div>
+            <div className="mt-4 flex items-baseline gap-2">
+              <span className="text-4xl font-bold">Let&apos;s talk</span>
+            </div>
+            <div className="mt-1 text-[12px] text-amber-200/80">Volume pricing · annual invoicing</div>
+            <ul className="mt-4 flex-1 space-y-2 border-t border-amber-300/15 pt-4 text-[12.5px]">
               <li className="flex gap-2"><span className="text-amber-300">◆</span> <span>High-volume programmatic API access</span></li>
               <li className="flex gap-2"><span className="text-amber-300">◆</span> <span>SSO / SAML · dedicated success manager · SLA</span></li>
+              <li className="flex gap-2"><span className="text-amber-300">◆</span> <span>Custom integrations · a data / feed license</span></li>
             </ul>
-            <div className="mt-4 flex items-center justify-between gap-3">
-              <span className="text-2xl font-bold">Let&apos;s talk</span>
-              <a href={ENTERPRISE_MAILTO} className="inline-flex items-center justify-center rounded-lg border border-amber-300/40 px-4 py-2.5 text-sm font-semibold text-amber-100 hover:bg-amber-300/10">Contact sales</a>
-            </div>
+            <a href={ENTERPRISE_MAILTO} className="mt-5 inline-flex items-center justify-center rounded-lg border border-amber-300/40 px-4 py-2.5 text-sm font-semibold text-amber-100 hover:bg-amber-300/10">Contact sales</a>
           </div>
+        </section>
+
+        {/* One-time top-up — slim full-width strip below the 2×2 */}
+        <section className="mt-4 flex flex-col items-center justify-between gap-3 rounded-2xl border border-white/10 bg-white/[0.02] px-6 py-4 sm:flex-row">
+          <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1">
+            <span className="text-[12px] font-semibold uppercase tracking-wide text-slate-300">One-time top-up</span>
+            <span className="font-mono text-2xl font-bold tabular-nums">${topup.usd}</span>
+            <span className="text-[13px] text-emerald-300">{topup.credits.toLocaleString()} credits</span>
+            <span className="text-[12px] text-slate-500">· ran out mid-month? a refill, no plan change · powers auto-recharge</span>
+          </div>
+          <a href={topup.checkoutUrl} className="inline-flex shrink-0 items-center justify-center rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-white/5">Buy top-up</a>
         </section>
 
         {/* App cross-sell note (taste) */}
