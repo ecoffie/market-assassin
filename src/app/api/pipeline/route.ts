@@ -17,6 +17,7 @@ import { fetchPursuitDocsAuto } from '@/lib/grants/fetch-grant-docs';
 import { isValidSamNoticeId } from '@/lib/sam/utils';
 import { isCleanValueEstimate } from '@/lib/pipeline/value-estimate';
 import { lookupSamOpportunityForPipeline } from '@/lib/pipeline/sam-opportunity-lookup';
+import { computeNextAction } from '@/lib/pipeline/next-action';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -279,9 +280,12 @@ export async function POST(request: NextRequest) {
     }
 
     // user_pipeline has no notice_type column; clients may still send the
-    // SAM type for display. Drop it before insert, then recover canonical SAM
-    // data from notice_id/solicitation/title so future reads and doc fetches
-    // have the strongest possible key.
+    // SAM type for display. Capture it for the write-time next_action stamp
+    // below, then drop it before insert, then recover canonical SAM data from
+    // notice_id/solicitation/title so future reads and doc fetches have the
+    // strongest possible key.
+    const clientNoticeType =
+      ((body as unknown as Record<string, unknown>).notice_type as string | null | undefined) ?? null;
     delete (body as unknown as Record<string, unknown>).notice_type;
 
     const samMatch = await lookupSamOpportunityForPipeline(getSupabase(), {
@@ -339,6 +343,38 @@ export async function POST(request: NextRequest) {
         // Non-fatal — a missing deadline just means the drawer shows
         // "No deadline", same as before this backfill existed.
         console.warn('[Pipeline POST] deadline backfill lookup failed:', e);
+      }
+    }
+
+    // Write-time next_action stamp — the SAME computeNextAction() the AlertsPanel
+    // uses, now applied to EVERY track path (market-intel dashboard, daily-alert,
+    // source-feed…), not just the ones that pre-send next_action. Measured
+    // 2026-07-19: ~63% of post-ship tracked rows (sources market_intel_dashboard /
+    // mi_beta_alerts / daily_alert) landed with next_action=NULL and no
+    // follow-through button, dragging fill to 22% while stamped sources hit 100%.
+    // Notice type comes from the client payload when present, else the SAM cache
+    // (market-intel/daily-alert omit it). Respect a client-supplied next_action.
+    if (!body.next_action) {
+      let noticeType: string | null = clientNoticeType;
+      if (!noticeType && body.notice_id && isValidSamNoticeId(body.notice_id)) {
+        try {
+          const { data: ntRow } = await getSupabase()
+            .from('sam_opportunities')
+            .select('notice_type')
+            .eq('notice_id', body.notice_id)
+            .maybeSingle();
+          noticeType = ntRow?.notice_type || null;
+        } catch (e) {
+          // Non-fatal — an unstamped row still tracks fine; the render-time
+          // fallback recomputes a button when it can.
+          console.warn('[Pipeline POST] next_action type lookup failed:', e);
+        }
+      }
+      const na = computeNextAction(noticeType, body.set_aside ?? null).key;
+      // 'track_only' = no actionable next step → keep NULL (honest: the fill
+      // metric then measures real next-actions, and no dead-end button renders).
+      if (na && na !== 'track_only') {
+        body.next_action = na;
       }
     }
 
