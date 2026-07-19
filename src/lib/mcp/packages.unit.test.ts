@@ -3,8 +3,8 @@ import { CREDIT_PACKAGES, creditsForPackage } from './packages';
 
 describe('mcp credit packages', () => {
   it('maps known package ids to their credit amounts', () => {
-    expect(creditsForPackage('plus')).toBe(2000);
-    expect(creditsForPackage('scale')).toBe(5000);
+    expect(creditsForPackage('plus')).toBe(300);
+    expect(creditsForPackage('scale')).toBe(700);
   });
 
   it('retired $5 Starter pack is no longer granted (removed 2026-07-14)', () => {

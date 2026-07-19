@@ -35,8 +35,11 @@ export interface CreditPackage {
  * briefings access + 0 credits; archived). The old $15/$40 links must stay archived.
  */
 export const CREDIT_PACKAGES: readonly CreditPackage[] = [
-  { id: 'plus', credits: 2000, usd: 49, label: 'Plus — 2,000 credits', checkoutUrl: 'https://buy.stripe.com/4gMdRa4Au2IO7lb70QfnO0U' },
-  { id: 'scale', credits: 5000, usd: 99, label: 'Scale — 5,000 credits (best value)', checkoutUrl: 'https://buy.stripe.com/14AfZid703MS20R5WMfnO0V' },
+  // Credits repriced 2026-07-18 (value-anchored model): the $ price is UNCHANGED (same
+  // Stripe products) — we grant FEWER credits so top-ups are a PREMIUM "one more" valve
+  // (priciest per credit) that never undercuts upgrading. Was 2,000/5,000.
+  { id: 'plus', credits: 300, usd: 49, label: 'Plus — 300 credits', checkoutUrl: 'https://buy.stripe.com/4gMdRa4Au2IO7lb70QfnO0U' },
+  { id: 'scale', credits: 700, usd: 99, label: 'Scale — 700 credits (best value)', checkoutUrl: 'https://buy.stripe.com/14AfZid703MS20R5WMfnO0V' },
 ] as const;
 
 const BY_ID = new Map(CREDIT_PACKAGES.map((p) => [p.id, p]));
@@ -52,15 +55,25 @@ export function creditsForPackage(packageId: string | null | undefined): number 
 
 /**
  * Credits included with an active Pro ($149/mo) subscription, granted monthly.
- * Bumped 1,000 → 6,000 (2026-07-16) as the COUPLED half of the proposal-flagship
- * reprice: a full proposal run now costs ~100 cr (draft 50 + matrix 8 + referee 12 + …),
- * so Pro's old 1,000/mo would only cover ~10 proposals. 6,000/mo ≈ ~60 proposals + daily
- * research. ⚠️ Env-overridable: if MCP_PRO_MONTHLY_CREDITS is set in Vercel (it may hold
- * the old 1000), UPDATE it to 6000 too — the env wins over this default.
+ * Set to 1,500 (2026-07-18 value-anchored model — see docs/strategy/PRICING-MODEL-2026-07-18.md).
+ * Sized to a realistic 2-person Pro month (daily research + a few of the flagship deliverables;
+ * a busy month overflows to a premium top-up, an agency overflows to Team). Was 6,000.
+ * ⚠️ Env-overridable: if MCP_PRO_MONTHLY_CREDITS is set in Vercel it WINS over this default —
+ * update it to 1500 (or unset it) or Pro silently keeps the old amount.
  */
 export const PRO_MONTHLY_CREDITS = Math.max(
   0,
-  Number(process.env.MCP_PRO_MONTHLY_CREDITS ?? '6000') || 0,
+  Number(process.env.MCP_PRO_MONTHLY_CREDITS ?? '1500') || 0,
+);
+
+/**
+ * Credits included with an active Team ($499/mo) subscription, granted monthly. Team is the
+ * agency tier (5 seats + per-client rebilling) — the cheapest per-credit rate, the upgrade
+ * an agency running multiple clients is forced into. Env-overridable like the others.
+ */
+export const TEAM_MONTHLY_CREDITS = Math.max(
+  0,
+  Number(process.env.MCP_TEAM_MONTHLY_CREDITS ?? '8000') || 0,
 );
 
 /**
