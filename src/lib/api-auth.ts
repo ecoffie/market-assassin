@@ -105,8 +105,10 @@ function parseEmailList(value: string | undefined): Set<string> {
   );
 }
 
-// Internal team members with non-govcongiants.com emails
-const INTERNAL_TEAM_EMAILS = new Set([
+// Internal team members with non-govcongiants.com emails.
+// Exported so the MCP monthly-credit grant can include the team (they get an ongoing comp
+// allowance) — the grant audience can't enumerate the @govcongiants.com domain from KV.
+export const INTERNAL_TEAM_EMAILS = new Set([
   'kashif6331@gmail.com',
   'kashifhameedvlogs@gmail.com',
   'evankoffdev@gmail.com',

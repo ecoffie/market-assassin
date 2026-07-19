@@ -83,7 +83,7 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   search_sam_opportunities: 1,
   get_market_vocabulary: 1,
   get_contractor_profile: 5,
-  find_capable_contractors: 25,
+  find_capable_contractors: 30, // repriced 25→30 (2026-07-18) — heavy live BigQuery scan
   get_winning_playbook: 2,
   get_pricing_intel: 1, // GSA CALC labor-rate intel (free upstream, multi-call; warm cache ~free)
   get_incumbent_financials: 2, // SEC EDGAR (multi-endpoint, all free)
@@ -102,11 +102,11 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   search_idv_contracts: 2, // live USASpending IDV/task-order search
   search_past_contracts: 2, // live USASpending awarded-contract search by location
   get_recipient_annual_obligations: 2, // 2 live USASpending calls (parent resolve + spending_over_time)
-  generate_market_report: 20, // one-shot composite: coverage+agencies+contractors+recompetes+forecasts+set-aside → client-ready report
+  generate_market_report: 100, // value-anchored (2026-07-18): replaces a ~$5,000 market research report. Composite: coverage+agencies+contractors+recompetes+forecasts+set-aside → client-ready report
   add_contacts_to_crm: 2, // batch upsert contacts into the user's OWN connected GHL location
   get_contractor_award_history: 2, // USASpending cache + contractor DB
   assess_market_depth: 2, // Supabase sam_entities + BQ recipients activity enrich
-  get_solicitation_documents: 5, // full-text + raw-file delivery (cold path downloads + extracts on demand). Repriced 3→5 (2026-07-16, proposal-flagship coupling)
+  get_solicitation_documents: 8, // full-text + raw-file delivery (cold path downloads + extracts on demand). Repriced 5→8 (2026-07-18, value-anchored)
   search_federal_events: 2, // Supabase sam_events read + optional paid AI web discovery (Serper+Groq)
   scan_proposal_compliance: 2, // pure deterministic DQ-risk scan (no LLM/IO). Repriced 1→2 (proposal-flagship coupling)
   evaluate_bid_decision: 1, // pure GovCon bid/no-bid framework + scorer (no LLM/IO)
@@ -120,13 +120,13 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   get_agency_spending_detail: 2, // multiple USASpending aggregates (total + subagency + set-aside buckets)
   extract_compliance_matrix: 8, // LLM-backed RFP requirement extraction (chunked+parallel; shared cache warms public notices). Repriced 3→8 (proposal-flagship coupling)
   build_proposal_structure: 2, // pure shaping — compliance matrix → volume/section tree (no LLM/IO). Repriced 1→2 (proposal-flagship coupling)
-  referee_proposal_compliance: 12, // independent Claude referee (no-training/sensitive) — draft vs matrix, per-req verdicts. Repriced 4→12 (Claude cost + proposal-flagship coupling)
+  referee_proposal_compliance: 15, // independent Claude referee (no-training/sensitive) — draft vs matrix, per-req verdicts. Repriced 12→15 (2026-07-18, Claude cost + value)
   match_recompete_sow: 4, // embed + vector scan over the sam_opportunities SOW corpus (Mindy embeddings moat). Repriced 2→4 (proposal-flagship coupling)
   extract_statement_of_work: 4, // SOW/PWS heading detection over solicitation text (+ notice fetch, CLIN fallback). Repriced 2→4 (proposal-flagship coupling)
   get_federal_event_series: 1, // curated recurring-event catalog (static read, no IO)
   get_sba_goaling_share: 2, // statutory SB goals vs actual set-aside obligations (USASpending aggregates)
-  draft_proposal: 50, // full multi-section proposal draft (two-pass outline + parallel per-section LLM generation, vault+RAG grounded)
-  draft_proposal_section: 12, // single-section vault+RAG-grounded draft (one LLM generation pass)
+  draft_proposal: 100, // value-anchored (2026-07-18): replaces a $3,500–$7,500 proposal. Full multi-section draft (two-pass outline + parallel per-section LLM generation, vault+RAG grounded)
+  draft_proposal_section: 15, // single-section vault+RAG-grounded draft (one LLM generation pass). Repriced 12→15 (2026-07-18)
   export_proposal: 2, // deterministic .docx assembly from supplied sections (docx lib, no LLM/IO)
   get_balance: 0, // meta tool — always free
 };
