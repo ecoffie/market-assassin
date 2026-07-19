@@ -77,6 +77,16 @@ export const TEAM_MONTHLY_CREDITS = Math.max(
 );
 
 /**
+ * Internal team (Eric, Branden, the dev team) monthly comp allowance — deliberately HIGH so
+ * internal never runs out while building/testing (Eric, 2026-07-19). Cost to us is ~$0 (the
+ * $15/user/mo LLM cap governs real spend regardless of balance). Env-overridable.
+ */
+export const INTERNAL_MONTHLY_CREDITS = Math.max(
+  0,
+  Number(process.env.MCP_INTERNAL_MONTHLY_CREDITS ?? '25000') || 0,
+);
+
+/**
  * Credit subscriptions — the acquisition-surface plans on /mcp/pricing.
  *
  * Each plan has a MONTHLY and an ANNUAL Stripe price. Following the Higgsfield
