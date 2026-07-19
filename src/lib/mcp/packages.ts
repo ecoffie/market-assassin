@@ -125,11 +125,15 @@ export interface SubscriptionPlan {
 
 // The MCP metered ladder (GOS Decision #015, 2026-07-19): a SEPARATE product from the App
 // ($149 Pro / $499 Team are app tiers — their MCP allowance is PRO/TEAM_MONTHLY_CREDITS, not
-// sold here). Three self-serve tiers, monthly-only for now (annual deferred). The Enterprise/
-// API tier (#016) is INQUIRY-ONLY — no Stripe product, so it's deliberately absent here.
+// sold here). Three self-serve tiers, each MONTHLY + ANNUAL (annual = 2 months free, and grants
+// credits 12× UPFRONT on the annual invoice — Eric 2026-07-19, "let them see it all at once").
+// ⚠️ MCP per-credit COST is its own economics (LLM tokens + BigQuery bytes + external APIs) — the
+// app's $15/user callLLM cap does NOT apply here. Real unit cost + BQ daily-quota isolation are
+// tracked in tasks/mcp-economics-2026-07-19.md; the credit prices must clear that cost.
+// The Enterprise/API tier (#016) is INQUIRY-ONLY — no Stripe product, deliberately absent here.
 // Products/prices/payment-links created live 2026-07-19; each price carries metadata
-// type=mcp_subscription + plan=<id>. The webhook grants by priceId (subscriptionGrantForPriceId),
-// so these IDs are the source of truth. The old $59 Starter + $19 Plus were archived same pass.
+// type=mcp_subscription + plan=<id> + interval. The webhook grants by priceId
+// (subscriptionGrantForPriceId), so these IDs are the source of truth.
 export const SUBSCRIPTION_PLANS: readonly SubscriptionPlan[] = [
   {
     id: 'entry',
@@ -140,6 +144,13 @@ export const SUBSCRIPTION_PLANS: readonly SubscriptionPlan[] = [
       usd: 99,
       credits: 500,
       checkoutUrl: 'https://buy.stripe.com/bJe5kEff8erw20R0CsfnO0Y',
+    },
+    annual: {
+      priceId: 'price_1TuyGyK5zyiZ50PBUfIkFbvD',
+      usd: 990, // 2 months free vs $99/mo
+      usdPerMonth: 83,
+      credits: 6000, // 12× upfront on the annual invoice
+      checkoutUrl: 'https://buy.stripe.com/9B6eVed70bfkdJz1GwfnO12',
     },
   },
   {
@@ -152,6 +163,13 @@ export const SUBSCRIPTION_PLANS: readonly SubscriptionPlan[] = [
       credits: 1500,
       checkoutUrl: 'https://buy.stripe.com/8x29AUgjcfvA5d30CsfnO0Z',
     },
+    annual: {
+      priceId: 'price_1TuyGyK5zyiZ50PBaBguu8be',
+      usd: 2490, // 2 months free vs $249/mo
+      usdPerMonth: 208,
+      credits: 18000, // 12× upfront
+      checkoutUrl: 'https://buy.stripe.com/bJeeVeaYSgzE8pf2KAfnO13',
+    },
   },
   {
     id: 'agency',
@@ -162,6 +180,13 @@ export const SUBSCRIPTION_PLANS: readonly SubscriptionPlan[] = [
       usd: 999,
       credits: 8000,
       checkoutUrl: 'https://buy.stripe.com/8x2eVe1oi6Z434VdpefnO10',
+    },
+    annual: {
+      priceId: 'price_1TuyGzK5zyiZ50PBkxhPLK5J',
+      usd: 9990, // 2 months free vs $999/mo
+      usdPerMonth: 833,
+      credits: 96000, // 12× upfront
+      checkoutUrl: 'https://buy.stripe.com/4gM00k6IC0AGcFvetifnO14',
     },
   },
 ] as const;

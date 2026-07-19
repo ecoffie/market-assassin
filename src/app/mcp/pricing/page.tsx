@@ -61,9 +61,9 @@ const FALLBACK_THEME: PlanTheme = PLAN_THEME.entry;
  * deferred, GOS #015). Live Stripe price ids + payment links (created 2026-07-19).
  */
 const PLANS_FALLBACK: SubPlan[] = [
-  { id: 'entry',  label: 'Entry',  creditsPerMonth: 500,  monthly: { priceId: 'price_1TuxApK5zyiZ50PB8iMg8WqG', usd: 99,  credits: 500,  checkoutUrl: 'https://buy.stripe.com/bJe5kEff8erw20R0CsfnO0Y' } },
-  { id: 'mid',    label: 'Mid',    creditsPerMonth: 1500, monthly: { priceId: 'price_1TuxApK5zyiZ50PBPV40eCvG', usd: 249, credits: 1500, checkoutUrl: 'https://buy.stripe.com/8x29AUgjcfvA5d30CsfnO0Z' } },
-  { id: 'agency', label: 'Agency', creditsPerMonth: 8000, monthly: { priceId: 'price_1TuxAqK5zyiZ50PBJUdzoobH', usd: 999, credits: 8000, checkoutUrl: 'https://buy.stripe.com/8x2eVe1oi6Z434VdpefnO10' } },
+  { id: 'entry',  label: 'Entry',  creditsPerMonth: 500,  monthly: { priceId: 'price_1TuxApK5zyiZ50PB8iMg8WqG', usd: 99,  credits: 500,  checkoutUrl: 'https://buy.stripe.com/bJe5kEff8erw20R0CsfnO0Y' }, annual: { priceId: 'price_1TuyGyK5zyiZ50PBUfIkFbvD', usd: 990,  usdPerMonth: 83,  credits: 6000,  checkoutUrl: 'https://buy.stripe.com/9B6eVed70bfkdJz1GwfnO12' } },
+  { id: 'mid',    label: 'Mid',    creditsPerMonth: 1500, monthly: { priceId: 'price_1TuxApK5zyiZ50PBPV40eCvG', usd: 249, credits: 1500, checkoutUrl: 'https://buy.stripe.com/8x29AUgjcfvA5d30CsfnO0Z' }, annual: { priceId: 'price_1TuyGyK5zyiZ50PBaBguu8be', usd: 2490, usdPerMonth: 208, credits: 18000, checkoutUrl: 'https://buy.stripe.com/bJeeVeaYSgzE8pf2KAfnO13' } },
+  { id: 'agency', label: 'Agency', creditsPerMonth: 8000, monthly: { priceId: 'price_1TuxAqK5zyiZ50PBJUdzoobH', usd: 999, credits: 8000, checkoutUrl: 'https://buy.stripe.com/8x2eVe1oi6Z434VdpefnO10' }, annual: { priceId: 'price_1TuyGzK5zyiZ50PBkxhPLK5J', usd: 9990, usdPerMonth: 833, credits: 96000, checkoutUrl: 'https://buy.stripe.com/4gM00k6IC0AGcFvetifnO14' } },
 ];
 const TOPUP_FALLBACK: Pkg = { id: 'refill', credits: 500, usd: 119, label: 'Top-up — 500 credits', checkoutUrl: 'https://buy.stripe.com/cNiaEYff8bfk8pfetifnO11' };
 
@@ -97,6 +97,7 @@ export default function McpPricing() {
   const [cat, setCat] = useState<Catalog | null>(null);
   const [picked, setPicked] = useState<Set<string>>(new Set(['find', 'incumbent', 'playbook']));
   const [oppsPerMonth, setOppsPerMonth] = useState(5);
+  const [annual, setAnnual] = useState(false);
 
   useEffect(() => {
     fetch('/api/mcp/catalog')
@@ -125,15 +126,26 @@ export default function McpPricing() {
     `${Math.floor(n / searchCost).toLocaleString()} opportunity searches`,
   ];
 
-  const planRows = plans.map((p) => ({
-    id: p.id,
-    name: p.label,
-    tag: p.id === 'mid' ? 'Popular' : null,
-    highlight: p.id === 'mid',
-    creditsPerMonth: p.creditsPerMonth,
-    perMo: p.monthly.usd,
-    href: p.monthly.checkoutUrl,
-  }));
+  // Higgsfield pattern: credits/mo stay constant across the toggle; only the price flips.
+  const planRows = plans.map((p) => {
+    const hasAnnual = !!p.annual;
+    const perMo = annual && p.annual ? p.annual.usdPerMonth : p.monthly.usd;
+    const pct = p.annual && p.monthly.usd > 0 ? Math.round((1 - p.annual.usdPerMonth / p.monthly.usd) * 100) : 0;
+    return {
+      id: p.id,
+      name: p.label,
+      creditsPerMonth: p.creditsPerMonth,
+      monthlyUsd: p.monthly.usd,
+      perMo,
+      perYear: p.annual?.usd ?? 0,
+      annualCredits: p.annual?.credits ?? 0,
+      pct,
+      hasAnnual,
+      href: annual && p.annual ? p.annual.checkoutUrl : p.monthly.checkoutUrl,
+    };
+  });
+  // Whole-ladder discount for the toggle badge (all tiers share the 2-months-free rate).
+  const annualPct = plans[0]?.annual ? Math.round((1 - plans[0].annual.usdPerMonth / plans[0].monthly.usd) * 100) : 0;
 
   // ---- Plan finder ----
   const perOppCost = ACTIVITIES.filter((a) => picked.has(a.id)).reduce((s, a) => s + exampleCost(tools, a.tools), 0);
@@ -161,7 +173,7 @@ export default function McpPricing() {
         <section className="mt-12 text-center">
           <h1 className="text-balance text-3xl font-bold tracking-tight sm:text-[2.6rem] sm:leading-[1.1]">Start free. Pay as you grow.</h1>
           <p className="mx-auto mt-4 max-w-2xl text-balance text-sm text-slate-400 sm:text-[15px]">
-            Metered federal-contracting credits for any AI agent. Start with a free trial, then pick a monthly plan — every tool is charged per successful call, so you never pay for a miss. {tools.length ? `${toolCount} tools live today.` : 'Dozens of tools live today.'}
+            Metered federal-contracting credits for any AI agent. Start with a free trial, then pick a monthly or annual plan — every tool is charged per successful call, so you never pay for a miss. {tools.length ? `${toolCount} tools live today.` : 'Dozens of tools live today.'}
           </p>
         </section>
 
@@ -170,6 +182,16 @@ export default function McpPricing() {
           <a href="#find-plan" className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-[13px] font-medium text-slate-300 hover:border-white/20 hover:text-slate-100">
             <span className="text-slate-500">⤳</span> Not sure which plan? <span className="rounded-full bg-emerald-500/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide text-emerald-300">Size it</span>
           </a>
+        </div>
+
+        {/* Billing toggle — Monthly / Annual (annual = 2 months free, credits granted 12× upfront) */}
+        <div className="mt-3 flex justify-center">
+          <div className={`inline-flex items-center rounded-xl border p-1 text-[13px] transition ${annual ? 'border-emerald-400/40 bg-emerald-400/[0.06]' : 'border-white/10 bg-white/[0.03]'}`}>
+            <button type="button" onClick={() => setAnnual(false)} className={`rounded-lg px-4 py-1.5 font-semibold transition ${!annual ? 'bg-white/[0.08] text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}>Monthly</button>
+            <button type="button" onClick={() => setAnnual(true)} className={`flex items-center gap-2 rounded-lg px-4 py-1.5 font-semibold transition ${annual ? 'bg-white/[0.08] text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}>
+              Annual {annualPct > 0 && <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-[#06120c]">Save {annualPct}%</span>}
+            </button>
+          </div>
         </div>
 
         {/* The plans — the loved Higgsfield 2×2: Entry · Mid (top) / Agency · Enterprise (bottom).
@@ -197,9 +219,11 @@ export default function McpPricing() {
                   </ul>
                 </div>
                 <div className="mt-4 flex items-baseline gap-2">
+                  {annual && p.hasAnnual && p.pct > 0 && <span className="font-mono text-xl font-semibold tabular-nums text-slate-500 line-through">${p.monthlyUsd}</span>}
                   <span className="font-mono text-4xl font-bold tabular-nums">${p.perMo}</span>
-                  <span className="text-[13px] text-slate-400">billed monthly</span>
+                  <span className="text-[13px] text-slate-400">{annual && p.hasAnnual ? 'per mo, billed annually' : 'billed monthly'}</span>
                 </div>
+                <div className="mt-1 h-4 text-[12px] text-emerald-300">{annual && p.hasAnnual ? `$${p.perYear.toLocaleString()}/yr · ${p.annualCredits.toLocaleString()} credits upfront · 2 months free` : ''}</div>
                 <ul className="mt-4 flex-1 space-y-2 border-t border-white/[0.06] pt-4 text-[12.5px]">
                   <li className="flex gap-2"><span className={t.check}>✓</span> <span><b className="font-semibold text-slate-200">All {toolCount} metered tools</b> + the proprietary moat</span></li>
                   <li className="flex gap-2"><span className={t.check}>✓</span> <span>Charged on success only · {p.creditsPerMonth.toLocaleString()} credits every month</span></li>
