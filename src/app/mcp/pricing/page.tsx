@@ -113,10 +113,14 @@ export default function McpPricing() {
   const toolCount = tools.filter((t) => t.credits > 0).length || 33;
   const searchCost = toolCr(tools, 'search_sam_opportunities', 1);
   const playbookCost = toolCr(tools, 'get_winning_playbook', 2);
+  // The flagship deliverable (a proposal draft / full market report) — the high-value unit
+  // that actually constrains a serious user. Live-priced from the catalog (100 cr today).
+  const flagshipCost = toolCr(tools, 'generate_market_report', 100);
 
   /** Turn an abstract credit balance into concrete BD outcomes (the Higgsfield move, our way). */
   const outcomes = (n: number) => [
     `≈ ${workups(n, workupCost)} full opportunity work-ups`,
+    `${Math.max(1, Math.floor(n / flagshipCost)).toLocaleString()} proposals or market reports`,
     `${Math.floor(n / playbookCost).toLocaleString()} win playbooks`,
     `${Math.floor(n / searchCost).toLocaleString()} opportunity searches`,
   ];
