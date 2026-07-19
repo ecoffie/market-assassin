@@ -56,18 +56,20 @@ Full record: **`tasks/mcp-directory-submission-readiness-2026-07-17.md`**. Don't
 
 | Tier | Price | Includes |
 |------|-------|----------|
-| **MI Free** | $0 | Market Research (4 reports, 5/mo) + Daily Alerts (simple list) |
+| **MI Free** | $0 | Daily Alerts (free for all) + public Discover pages + profile setup + a capped 10-row Market Research *taste* (⚠️ code-verified 2026-07-19 — full Market Research + all tool panels are Pro-gated; the old "4 reports, 5/mo" claim did NOT match the code) |
 | **MI Pro** | $149/mo | **Everything:** Market Research (10 reports, unlimited) + AI Briefings + Forecasts + Pipeline + CRM + FHC Training |
 
 **Public-facing = 2 tiers only: Free → Pro**
 
 No decision fatigue. Clear upgrade path.
 
-**MI Free Features:**
-- Market Research (4 Standard reports: Analytics, Budget Authority, Gov Buyers, OSBP Contacts)
-- 5 reports per month cap
-- Daily Alerts (simple opportunity list, no AI analysis)
-- Profile setup + NAICS preferences
+**MI Free Features (⚠️ code-verified 2026-07-19 — reconciled to the ACTUAL gating; the old "4 reports, 5/mo" line did NOT match the code):**
+- **Daily Alerts** (simple opportunity list, no AI analysis) — free for everyone, permanent (cron, not tier-gated)
+- **Public Discover pages** (leaderboards, Weird Awards, Up For Grabs, spending) — free, public, no login
+- **Profile setup + NAICS preferences** ("Getting Started" — the only `tier:'free'` sidebar section)
+- A **capped taste of Market Research only** — 10 rows (`FREE_TIER_ROW_LIMIT`, `target-market-research/route.ts`); market-dossier caps at 5 (`FREE_OPEN_CAP`)
+- **Everything else is Pro-gated** in `UnifiedSidebar.tsx`: the full Market Research panel, Dashboard, Forecasts, Recompetes, Contractors, SBIR, Grants, Pipeline, CRM, Content Reaper, Action Planner
+- ⚠️ **What App Free SHOULD include under the MCP-first bet is a PENDING decision** (GOS Decision Journal) — do NOT re-add "4 reports/5-mo" or change free gating without deciding it. See memory [[gos-operating-system]].
 
 **MI Pro Features ($149/mo):**
 - Market Research (all 10 reports, unlimited usage)
@@ -148,7 +150,7 @@ export type MIPanel =
 
 | Section | MI Free ($0) | MI Pro ($149/mo) |
 |---------|--------------|------------------|
-| **Market Research** | 4 reports, 5/mo cap | All 10 reports, unlimited |
+| **Market Research** | 10-row *taste* only (panel Pro-gated) | All 10 reports, unlimited |
 | **Daily Alerts** | Simple list (no AI) | ✅ |
 | **AI Briefings** | ❌ | Daily + Weekly + Pursuit |
 | **Forecasts** | ❌ | 7,700+ |
