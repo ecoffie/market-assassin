@@ -399,39 +399,42 @@ const tests = [
     },
   },
 
-  // Check briefing precompute ran
+  // Check briefing precompute ran. NOTE: this checks the precompute CRON's status,
+  // NOT a live count of `briefing_templates` dated today. Templates are keyed by
+  // NAICS profile and rolled forward to the next send date after each send, so the
+  // 5–9am send consumes/advances them — counting rows dated "today" false-fired
+  // every afternoon on a fully healthy system ("No briefing templates ... precompute
+  // may not have run" while precompute had in fact run and succeeded at 2am, and
+  // 1,500+ briefings delivered). Actual delivery is covered by the CRITICAL
+  // "Daily Briefings Delivery" test below.
   {
     name: 'Briefing Templates',
     category: 'Cron Health',
     critical: false,
     fn: async () => {
-      const today = new Date().toISOString().split('T')[0];
-      const dayOfWeek = new Date().getUTCDay();
-      const templateDate =
-        dayOfWeek === 4 || dayOfWeek === 5
-          ? getNextMondayDate()
-          : dayOfWeek === 6
-            ? getNextSaturdayDate()
-          : today;
       const { data, error } = await getSupabase()
-        .from('briefing_templates')
-        .select('id')
-        .eq('template_date', templateDate)
-        .limit(1);
+        .from('cron_jobs')
+        .select('last_status, last_run_at')
+        .eq('job_name', 'precompute-briefings')
+        .maybeSingle();
 
       if (error) {
-        return {
-          passed: false,
-          message: `DB error: ${error.message}`,
-        };
+        return { passed: false, message: `DB error: ${error.message}` };
+      }
+      if (!data) {
+        return { passed: false, message: 'precompute-briefings cron not registered' };
       }
 
-      const templatesExist = data && data.length > 0;
+      const ranAt = data.last_run_at ? new Date(data.last_run_at) : null;
+      const hoursAgo = ranAt ? (Date.now() - ranAt.getTime()) / 3_600_000 : Infinity;
+      // Daily 2am UTC cron; allow up to 26h so a check at any time of day still
+      // sees today's run before flagging it stale.
+      const ok = data.last_status === 'success' && hoursAgo <= 26;
       return {
-        passed: templatesExist,
-        message: templatesExist
-          ? `Briefing templates available for ${templateDate}`
-          : `No briefing templates for ${templateDate} (precompute may not have run)`,
+        passed: ok,
+        message: ok
+          ? `Precompute ran ${Math.round(hoursAgo)}h ago (${data.last_status})`
+          : `Precompute stale/failed: last_status=${data.last_status ?? 'none'}, last_run=${ranAt ? ranAt.toISOString() : 'never'}`,
       };
     },
   },
