@@ -132,7 +132,7 @@ export function isDue(expr: string, date: Date): boolean {
  * pick it up. Only applies to schedules with a SPECIFIC hour (single value); wildcard
  * or multi-hour/sub-hour schedules fire often enough not to need catch-up.
  */
-export function isMissed(expr: string, now: Date, lastRunAt: Date | null): boolean {
+export function isMissed(expr: string, now: Date, lastRunAt: Date | null, graceMinutes = 0): boolean {
   let p: ParsedCron;
   try { p = parseCron(expr); } catch { return false; }
 
@@ -156,10 +156,14 @@ export function isMissed(expr: string, now: Date, lastRunAt: Date | null): boole
   else if (dowRestricted) dayMatches = p.dow.has(dow);
   if (!dayMatches) return false;
 
-  // Has the scheduled time already passed today (UTC)?
+  // Has the scheduled time already passed today (UTC), by more than the grace
+  // window? graceMinutes lets a caller (the watchdog) wait for the hourly
+  // dispatcher tick to actually run the job before calling it "missed" — without
+  // a grace, a 0 6 * * * job reads as missed at 06:00:00, ~1 min before the
+  // dispatcher runs it at ~06:01, firing a daily false-positive overdue alert.
   const nowMins = now.getUTCHours() * 60 + now.getUTCMinutes();
   const schedMins = schedHour * 60 + schedMin;
-  if (nowMins < schedMins) return false; // not time yet today
+  if (nowMins < schedMins + graceMinutes) return false; // not time yet (within grace)
 
   // Already ran today (on/after the scheduled time)? Then not missed.
   if (lastRunAt) {
