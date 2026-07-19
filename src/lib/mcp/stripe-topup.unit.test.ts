@@ -22,11 +22,11 @@ beforeEach(() => {
 describe('handleMcpCreditTopup — PRODUCT metadata (Dashboard-set, the live path)', () => {
   it('reads type+package off the purchased product when the session has none', async () => {
     listLineItems.mockResolvedValue({
-      data: [{ price: { product: { metadata: { type: 'mcp_credit_topup', package: 'plus' } } } }],
+      data: [{ price: { product: { metadata: { type: 'mcp_credit_topup', package: 'refill' } } } }],
     });
     const r = await handleMcpCreditTopup(session({ metadata: {}, client_reference_id: 'buyer@x.com' }));
-    expect(r).toMatchObject({ handled: true, applied: true, credits: 300, email: 'buyer@x.com' });
-    expect(credits.applyCreditOnce).toHaveBeenCalledWith('cs_1', 'buyer@x.com', 300, 'stripe_topup');
+    expect(r).toMatchObject({ handled: true, applied: true, credits: 500, email: 'buyer@x.com' });
+    expect(credits.applyCreditOnce).toHaveBeenCalledWith('cs_1', 'buyer@x.com', 500, 'stripe_topup');
   });
 
   it('still ignores a non-MCP product (normal purchase) without granting', async () => {
@@ -47,18 +47,18 @@ describe('handleMcpCreditTopup', () => {
   it('grants the package credits, keyed idempotently by session id', async () => {
     const r = await handleMcpCreditTopup(session({
       id: 'cs_abc',
-      metadata: { type: 'mcp_credit_topup', package: 'plus', user_email: 'U@X.com' },
+      metadata: { type: 'mcp_credit_topup', package: 'refill', user_email: 'U@X.com' },
     }));
-    expect(r).toMatchObject({ handled: true, applied: true, credits: 300, email: 'u@x.com' });
-    expect(credits.applyCreditOnce).toHaveBeenCalledWith('cs_abc', 'u@x.com', 300, 'stripe_topup');
+    expect(r).toMatchObject({ handled: true, applied: true, credits: 500, email: 'u@x.com' });
+    expect(credits.applyCreditOnce).toHaveBeenCalledWith('cs_abc', 'u@x.com', 500, 'stripe_topup');
   });
 
   it('resolves email from client_reference_id when metadata lacks it', async () => {
     await handleMcpCreditTopup(session({
-      metadata: { type: 'mcp_credit_topup', package: 'plus' },
+      metadata: { type: 'mcp_credit_topup', package: 'refill' },
       client_reference_id: 'ref@x.com',
     }));
-    expect(credits.applyCreditOnce).toHaveBeenCalledWith('cs_1', 'ref@x.com', 300, 'stripe_topup');
+    expect(credits.applyCreditOnce).toHaveBeenCalledWith('cs_1', 'ref@x.com', 500, 'stripe_topup');
   });
 
   it('TAMPER: unknown package grants nothing', async () => {
@@ -70,7 +70,7 @@ describe('handleMcpCreditTopup', () => {
   });
 
   it('errors cleanly when no email can be resolved', async () => {
-    const r = await handleMcpCreditTopup(session({ metadata: { type: 'mcp_credit_topup', package: 'plus' } }));
+    const r = await handleMcpCreditTopup(session({ metadata: { type: 'mcp_credit_topup', package: 'refill' } }));
     expect(r).toMatchObject({ handled: true, error: 'no_email' });
     expect(credits.applyCreditOnce).not.toHaveBeenCalled();
   });
