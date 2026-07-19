@@ -34,9 +34,12 @@ Sizing rationale (realistic usage, not proposal count — the bulk of credits go
 reads, not proposals): a busy 2-person Pro shop burns ~1,500/mo (≈30 proposals/YEAR per Eric's
 real data point + daily research). An agency running 5 people + client work blows past it → Team.
 
-### STAGED — the price increase to TEST on new signups later (NOT shipped)
+### THE PRICE TEST — higher prices on NEW signups (Eric, 2026-07-19: "bump the price up again")
 Value gives huge room; these stay below every direct competitor (SweetSpot $300, GovWin
-$200/seat, BidSparq $249, HigherGov $150–500). Test on **new signups only, grandfather existing.**
+$200/seat, BidSparq $249, HigherGov $150–500). Rolled out as a **market test: new signups
+only, grandfather every existing customer** (Stripe doesn't touch an existing sub when new
+prices are added). Rides with the gamified landing (the new-visitor surface). Credit amounts
+UNCHANGED (env-tunable). **Needs new Stripe products (Eric's config) → wire the new price IDs.**
 | Plan | Test price | Credits | $/cr |
 |---|---|---|---|
 | Starter | $99 | 500 | $0.198 |
@@ -64,8 +67,7 @@ staff-by-domain (Branden). Three tiers:
 - **Paid Pro + Team + team/staff + advocates** → ongoing monthly (Pro rate 1,500; Team rate 8,000).
   Team/staff = `INTERNAL_TEAM_EMAILS` + `branden@govcongiants.com`. Advocates = Sue, AJ (kept
   ongoing on purpose — they're the marketing engine; capping them defeats the comp).
-- **Ryan** (`ryan@radiumgovcon.com`) → 1,000 one-time, no refill.
-- **Comp / testimonial** (Kurt, pa.joof, Olga, Tavin, dare2dream) → 500 one-time, no refill (runs out).
+- **Comp / testimonial** (Kurt, Ryan, pa.joof, Olga, Tavin, dare2dream) → 500 one-time, no refill (runs out). Ryan capped at 500 too (Eric, 2026-07-19).
 - **New signup** → 100 trial (unchanged).
 Existing comp balances reset to their cap (Kurt 911 → 500).
 
