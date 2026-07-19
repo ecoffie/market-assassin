@@ -11,55 +11,55 @@ import * as credits from './credits';
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const m = (fn: unknown) => fn as any;
 
-// Real price ids from SUBSCRIPTION_PLANS (packages.ts). The only MCP-native sub is
-// STARTER (id 'scale', $59/mo · $590/yr); the $19 'Plus' sub was retired 2026-07-16.
-const STARTER_MONTHLY = 'price_1TtpH5K5zyiZ50PBN6wo4IAs';
-const STARTER_ANNUAL = 'price_1TtpHiK5zyiZ50PBcGOuLfnR';
-// Credit allowance: 2,400/mo → 28,800/yr (SCALE_CR_MO default).
-const CR_MONTH = 2400;
-const CR_YEAR = 28800;
+// Real price ids from SUBSCRIPTION_PLANS (packages.ts). GOS #015 ladder: Entry $99/500,
+// Mid $249/1,500, Agency $999/8,000 — MONTHLY ONLY (annual deferred). The old $59 Starter
+// + $19 Plus subs were archived 2026-07-19.
+const ENTRY_MONTHLY = 'price_1TuxApK5zyiZ50PB8iMg8WqG';
+const MID_MONTHLY = 'price_1TuxApK5zyiZ50PBPV40eCvG';
+const ENTRY_CR = 500;
+const MID_CR = 1500;
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const invoice = (over: any) => ({
   id: 'in_1',
   billing_reason: 'subscription_create',
   customer_email: 'buyer@x.com',
-  lines: { data: [{ price: { id: STARTER_ANNUAL } }] },
+  lines: { data: [{ price: { id: ENTRY_MONTHLY } }] },
   ...over,
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
 }) as any;
 
 beforeEach(() => {
   vi.clearAllMocks();
-  m(credits.applyCreditOnce).mockResolvedValue({ applied: true, newBalance: CR_YEAR });
+  m(credits.applyCreditOnce).mockResolvedValue({ applied: true, newBalance: ENTRY_CR });
 });
 
 describe('handleMcpSubscriptionInvoice', () => {
-  it('grants a full year of Starter credits on the annual invoice, keyed by invoice id', async () => {
+  it('grants a month of Entry credits on the monthly invoice, keyed by invoice id', async () => {
     const r = await handleMcpSubscriptionInvoice(invoice({}));
-    expect(r).toMatchObject({ handled: true, applied: true, credits: CR_YEAR, email: 'buyer@x.com', plan: 'scale', interval: 'year' });
-    expect(credits.applyCreditOnce).toHaveBeenCalledWith('in_1', 'buyer@x.com', CR_YEAR, 'mcp_sub_annual');
+    expect(r).toMatchObject({ handled: true, applied: true, credits: ENTRY_CR, email: 'buyer@x.com', plan: 'entry', interval: 'month' });
+    expect(credits.applyCreditOnce).toHaveBeenCalledWith('in_1', 'buyer@x.com', ENTRY_CR, 'mcp_sub_monthly');
   });
 
-  it('grants ONE month of Starter credits on the monthly invoice', async () => {
-    m(credits.applyCreditOnce).mockResolvedValue({ applied: true, newBalance: CR_MONTH });
-    const r = await handleMcpSubscriptionInvoice(invoice({ lines: { data: [{ price: { id: STARTER_MONTHLY } }] } }));
-    expect(r).toMatchObject({ handled: true, credits: CR_MONTH, plan: 'scale', interval: 'month' });
-    expect(credits.applyCreditOnce).toHaveBeenCalledWith('in_1', 'buyer@x.com', CR_MONTH, 'mcp_sub_monthly');
+  it('grants the correct allowance for a different tier (Mid = 1,500)', async () => {
+    m(credits.applyCreditOnce).mockResolvedValue({ applied: true, newBalance: MID_CR });
+    const r = await handleMcpSubscriptionInvoice(invoice({ lines: { data: [{ price: { id: MID_MONTHLY } }] } }));
+    expect(r).toMatchObject({ handled: true, credits: MID_CR, plan: 'mid', interval: 'month' });
+    expect(credits.applyCreditOnce).toHaveBeenCalledWith('in_1', 'buyer@x.com', MID_CR, 'mcp_sub_monthly');
   });
 
   it('grants again on renewal (subscription_cycle) — fresh invoice id, fresh credits', async () => {
     const r = await handleMcpSubscriptionInvoice(invoice({ id: 'in_2', billing_reason: 'subscription_cycle' }));
-    expect(r).toMatchObject({ handled: true, plan: 'scale', interval: 'year' });
-    expect(credits.applyCreditOnce).toHaveBeenCalledWith('in_2', 'buyer@x.com', CR_YEAR, 'mcp_sub_annual');
+    expect(r).toMatchObject({ handled: true, plan: 'entry', interval: 'month' });
+    expect(credits.applyCreditOnce).toHaveBeenCalledWith('in_2', 'buyer@x.com', ENTRY_CR, 'mcp_sub_monthly');
   });
 
   it('falls back to price metadata plan+interval when the price id is unrecognized', async () => {
-    m(credits.applyCreditOnce).mockResolvedValue({ applied: true, newBalance: CR_MONTH });
+    m(credits.applyCreditOnce).mockResolvedValue({ applied: true, newBalance: ENTRY_CR });
     const r = await handleMcpSubscriptionInvoice(invoice({
-      lines: { data: [{ price: { id: 'price_unknown', metadata: { plan: 'scale', interval: 'month' } } }] },
+      lines: { data: [{ price: { id: 'price_unknown', metadata: { plan: 'entry', interval: 'month' } } }] },
     }));
-    expect(r).toMatchObject({ handled: true, plan: 'scale', interval: 'month', credits: CR_MONTH });
+    expect(r).toMatchObject({ handled: true, plan: 'entry', interval: 'month', credits: ENTRY_CR });
   });
 
   it('ignores non-subscription invoices (billing_reason=manual) — nothing granted', async () => {
@@ -68,7 +68,7 @@ describe('handleMcpSubscriptionInvoice', () => {
     expect(credits.applyCreditOnce).not.toHaveBeenCalled();
   });
 
-  it('ignores a subscription invoice whose lines map to no MCP plan (incl. the retired Plus prices)', async () => {
+  it('ignores a subscription invoice whose lines map to no MCP plan (incl. the retired Starter/Plus prices)', async () => {
     const r = await handleMcpSubscriptionInvoice(invoice({ lines: { data: [{ price: { id: 'price_other_product' } }] } }));
     expect(r.handled).toBe(false);
     expect(credits.applyCreditOnce).not.toHaveBeenCalled();
@@ -77,12 +77,12 @@ describe('handleMcpSubscriptionInvoice', () => {
   it('retrieves the customer email when the invoice omits it', async () => {
     retrieve.mockResolvedValue({ email: 'FromCustomer@X.com' });
     await handleMcpSubscriptionInvoice(invoice({ customer_email: null, customer: 'cus_1' }));
-    expect(credits.applyCreditOnce).toHaveBeenCalledWith('in_1', 'fromcustomer@x.com', CR_YEAR, 'mcp_sub_annual');
+    expect(credits.applyCreditOnce).toHaveBeenCalledWith('in_1', 'fromcustomer@x.com', ENTRY_CR, 'mcp_sub_monthly');
   });
 
   it('errors cleanly (grants nothing) when no email can be resolved', async () => {
     const r = await handleMcpSubscriptionInvoice(invoice({ customer_email: null, customer: null }));
-    expect(r).toMatchObject({ handled: true, plan: 'scale', error: 'no_email' });
+    expect(r).toMatchObject({ handled: true, plan: 'entry', error: 'no_email' });
     expect(credits.applyCreditOnce).not.toHaveBeenCalled();
   });
 });

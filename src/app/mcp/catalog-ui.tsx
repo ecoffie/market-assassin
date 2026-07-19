@@ -18,7 +18,8 @@ export interface SubPlan {
   label: string;
   creditsPerMonth: number;
   monthly: SubPlanPrice;
-  annual: SubPlanPrice & { usdPerMonth: number };
+  /** Annual price — OPTIONAL: annual MCP variants are deferred (GOS #015, monthly-only for now). */
+  annual?: SubPlanPrice & { usdPerMonth: number };
 }
 export interface Catalog { tools: Tool[]; packages: Pkg[]; subscriptionPlans: SubPlan[]; signupCredits: number; proMonthlyCredits: number }
 

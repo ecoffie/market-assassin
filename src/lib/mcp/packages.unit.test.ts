@@ -2,13 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { CREDIT_PACKAGES, creditsForPackage } from './packages';
 
 describe('mcp credit packages', () => {
-  it('maps known package ids to their credit amounts', () => {
-    expect(creditsForPackage('plus')).toBe(300);
-    expect(creditsForPackage('scale')).toBe(700);
+  it('maps the single top-up package id to its credit amount (GOS #015)', () => {
+    expect(creditsForPackage('refill')).toBe(500);
   });
 
-  it('retired $5 Starter pack is no longer granted (removed 2026-07-14)', () => {
+  it('retired packs are no longer granted (starter/plus/scale removed by 2026-07-19)', () => {
     expect(creditsForPackage('starter')).toBeNull();
+    expect(creditsForPackage('plus')).toBeNull();
+    expect(creditsForPackage('scale')).toBeNull();
   });
 
   it('TAMPER GUARD: unknown/forged/empty package grants nothing (null, not a default)', () => {
