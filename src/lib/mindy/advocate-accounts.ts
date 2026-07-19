@@ -7,7 +7,7 @@
  */
 export const ADVOCATE_ACCOUNTS: ReadonlyArray<{ email: string; name?: string }> = [
   { email: 'westover105@gmail.com', name: 'Sue Kranes' },
-  { email: 'aj@cypherintel.com', name: 'Andre Jerry' },
+  // AJ (Andre Jerry) moved to comp/testimonial (Eric, 2026-07-19) — see campaign-exclusions.ts
 ];
 
 const ADVOCATE_EMAIL_SET = new Set(
