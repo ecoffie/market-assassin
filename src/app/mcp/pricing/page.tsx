@@ -187,6 +187,16 @@ export default function McpPricing() {
           </div>
         </section>
 
+        {/* Refer-a-friend — prominent, right under the hero (paired with the free-signup offer) */}
+        <div className="mx-auto mt-5 flex max-w-2xl flex-col items-center justify-between gap-2 rounded-2xl border border-amber-300/30 bg-amber-300/[0.06] px-5 py-4 text-center sm:flex-row sm:text-left">
+          <span className="text-[14px] text-slate-200">
+            🎁 <b className="font-bold text-amber-100">Refer a friend — you both get 100 credits.</b> They sign up &amp; verify, you each earn 100.
+          </span>
+          <a href="/mcp/account?section=referrals" className="inline-flex shrink-0 items-center justify-center rounded-lg border border-amber-300/50 bg-amber-300/10 px-4 py-2 text-[13px] font-semibold text-amber-100 hover:bg-amber-300/20">
+            Get your link →
+          </a>
+        </div>
+
         {/* Wayfinding to the plan finder */}
         <div className="mt-8 flex justify-center">
           <a href="#find-plan" className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] px-4 py-2 text-[13px] font-medium text-slate-300 hover:border-white/20 hover:text-slate-100">
@@ -293,14 +303,6 @@ export default function McpPricing() {
           </div>
           <a href={topup.checkoutUrl} className="inline-flex shrink-0 items-center justify-center rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-white/5">Buy top-up</a>
         </section>
-
-        {/* Refer-a-friend offer */}
-        <div className="mt-4 flex justify-center">
-          <div className="flex max-w-2xl flex-col items-center gap-1 rounded-xl border border-amber-300/25 bg-amber-300/[0.05] px-5 py-3 text-center text-[13px] text-slate-300">
-            <span>🎁 <b className="font-semibold text-amber-100">Refer a friend — you both get 100 credits.</b> They sign up and verify, you each get 100.</span>
-            <a href="/mcp/account?section=referrals" className="text-[12px] font-semibold text-amber-200 underline underline-offset-2 hover:text-amber-100">Sign in to get your referral link →</a>
-          </div>
-        </div>
 
         {/* App cross-sell note (taste) */}
         <div className="mt-4 flex justify-center">
