@@ -72,63 +72,75 @@ export interface McpToolContext {
 }
 
 /**
- * Per-tool credit price. Debited on success in Slice 3; exposed as `_credits` now so
- * clients/docs can show the price. Prices set from MEASURED BigQuery scan cost (PRD §9 R1,
- * resolved 2026-07-13, $6.25/TB): cheap data lookups = 1, a live-BQ contractor profile = 5,
- * a capable-contractors scan = 25 (measured 6.93 GB / $0.042 per cold call — NAICS is not a
- * partition/cluster key so it scans ~7 GB; the earlier "8" was a guess at only ~1.9× cost,
- * bumped to 25 for a margin-safe ~6× markup), the proprietary playbook = 2.
+ * Per-tool credit price — VALUE-BASED ladder (locked 2026-07-20 with Eric + Branden).
+ * Debited on success; exposed as `_credits` so clients/docs show the price. Priced by the
+ * LEVERAGE each call gives a pursuit, not by infra cost. Floor lifted 1 → 5. Tiers:
+ *   5   scan (search/lookup)          10  profile (competitor/market reads + no-AI utils)
+ *   15  edge-light (single-op edge)   20  edge (intel that moves a specific bid)
+ *   40  multi-agent (draft_proposal — parallel section writers)
+ *   100 combination (generate_market_report — chains 6 tools into a client-ready report)
+ *   0   free meta (get_balance)
+ * The 100 tier grows as we ship more combination workflows (pursuit dossier, one-click
+ * proposal, recompete attack list, competitor war room). Supersedes the old cost-based
+ * model (measured BigQuery scan cost × markup, PRD §9 R1).
  */
 export const TOOL_CREDITS: Readonly<Record<string, number>> = {
-  search_sam_opportunities: 1,
-  get_market_vocabulary: 1,
-  get_contractor_profile: 5,
-  find_capable_contractors: 30, // repriced 25→30 (2026-07-18) — heavy live BigQuery scan
-  get_winning_playbook: 2,
-  get_pricing_intel: 1, // GSA CALC labor-rate intel (free upstream, multi-call; warm cache ~free)
-  get_incumbent_financials: 2, // SEC EDGAR (multi-endpoint, all free)
-  get_regulatory_demand: 1, // Federal Register (single free call, cacheable)
-  get_award_detail: 2, // USASpending resolve (PIID→id) + award-detail fetch (both free)
-  find_predecessor_award: 2, // USASpending search + award-detail fetch (incumbent inference)
-  get_solicitation_incumbent: 2, // SAM notice (sol#) + USASpending prior-award inference
-  lookup_sam_entity: 1, // SAM Entity Management API (single lookup/search)
-  search_contractors: 2, // live BigQuery recipients scan (competitive landscape)
-  get_agency_intel: 1, // agency resolve (local) + USASpending obligations (free)
-  search_grants: 1, // Grants.gov search (single free upstream call)
-  get_agency_forecasts: 1, // Supabase agency_forecasts read
-  search_sbir: 1, // NIH RePORTER + multisite aggregate
-  get_expiring_contracts: 1, // Supabase recompete_opportunities read
-  get_keyword_coverage: 1, // USASpending spending-by-category (free upstream, cacheable)
-  search_idv_contracts: 2, // live USASpending IDV/task-order search
-  search_past_contracts: 2, // live USASpending awarded-contract search by location
-  get_recipient_annual_obligations: 2, // 2 live USASpending calls (parent resolve + spending_over_time)
-  generate_market_report: 100, // value-anchored (2026-07-18): replaces a ~$5,000 market research report. Composite: coverage+agencies+contractors+recompetes+forecasts+set-aside → client-ready report
-  add_contacts_to_crm: 2, // batch upsert contacts into the user's OWN connected GHL location
-  get_contractor_award_history: 2, // USASpending cache + contractor DB
-  assess_market_depth: 2, // Supabase sam_entities + BQ recipients activity enrich
-  get_solicitation_documents: 8, // full-text + raw-file delivery (cold path downloads + extracts on demand). Repriced 5→8 (2026-07-18, value-anchored)
-  search_federal_events: 2, // Supabase sam_events read + optional paid AI web discovery (Serper+Groq)
-  scan_proposal_compliance: 2, // pure deterministic DQ-risk scan (no LLM/IO). Repriced 1→2 (proposal-flagship coupling)
-  evaluate_bid_decision: 1, // pure GovCon bid/no-bid framework + scorer (no LLM/IO)
-  lookup_federal_osbp: 1, // curated DoD command / OSBP directory (static, no LLM/IO)
-  search_agency_opps_by_office: 1, // DoDAAC-anchored open SAM opps (Supabase read)
-  get_sblo_contact: 2, // curated SBLO roster + prime DB, then a live BigQuery prime-verification fallback
-  search_federal_contacts: 2, // DoDAAC-anchored buying-office roster (Supabase read + decode)
-  search_podcast_lessons: 1, // proprietary podcast corpus (Supabase keyword search)
-  get_agency_budget_trends: 1, // curated OMB/CBJ budget-authority JSON (static, no LLM/IO)
-  derive_company_keywords: 1, // OpenAI-embedding keyword derivation (no BigQuery)
-  get_agency_spending_detail: 2, // multiple USASpending aggregates (total + subagency + set-aside buckets)
-  extract_compliance_matrix: 8, // LLM-backed RFP requirement extraction (chunked+parallel; shared cache warms public notices). Repriced 3→8 (proposal-flagship coupling)
-  build_proposal_structure: 2, // pure shaping — compliance matrix → volume/section tree (no LLM/IO). Repriced 1→2 (proposal-flagship coupling)
-  referee_proposal_compliance: 15, // independent Claude referee (no-training/sensitive) — draft vs matrix, per-req verdicts. Repriced 12→15 (2026-07-18, Claude cost + value)
-  match_recompete_sow: 4, // embed + vector scan over the sam_opportunities SOW corpus (Mindy embeddings moat). Repriced 2→4 (proposal-flagship coupling)
-  extract_statement_of_work: 4, // SOW/PWS heading detection over solicitation text (+ notice fetch, CLIN fallback). Repriced 2→4 (proposal-flagship coupling)
-  get_federal_event_series: 1, // curated recurring-event catalog (static read, no IO)
-  get_sba_goaling_share: 2, // statutory SB goals vs actual set-aside obligations (USASpending aggregates)
-  draft_proposal: 100, // value-anchored (2026-07-18): replaces a $3,500–$7,500 proposal. Full multi-section draft (two-pass outline + parallel per-section LLM generation, vault+RAG grounded)
-  draft_proposal_section: 15, // single-section vault+RAG-grounded draft (one LLM generation pass). Repriced 12→15 (2026-07-18)
-  export_proposal: 2, // deterministic .docx assembly from supplied sections (docx lib, no LLM/IO)
-  get_balance: 0, // meta tool — always free
+  // 5 — Scan: search & lookup (top-of-funnel retrieval)
+  search_sam_opportunities: 5,
+  search_agency_opps_by_office: 5,
+  get_agency_forecasts: 5,
+  get_expiring_contracts: 5,
+  search_grants: 5,
+  search_sbir: 5,
+  search_idv_contracts: 5,
+  search_past_contracts: 5,
+  get_keyword_coverage: 5,
+  get_market_vocabulary: 5,
+  get_regulatory_demand: 5,
+  get_agency_budget_trends: 5,
+  get_federal_event_series: 5,
+  search_federal_events: 5,
+  search_podcast_lessons: 5,
+  lookup_federal_osbp: 5,
+  lookup_sam_entity: 5,
+  get_pricing_intel: 5,
+  derive_company_keywords: 5,
+  evaluate_bid_decision: 5,
+  get_agency_intel: 5,
+  // 10 — Profile: synthesized read on a competitor / market / agency + no-AI proposal utilities
+  search_contractors: 10,
+  get_contractor_profile: 10,
+  get_contractor_award_history: 10,
+  get_recipient_annual_obligations: 10,
+  get_incumbent_financials: 10,
+  assess_market_depth: 10,
+  get_agency_spending_detail: 10,
+  get_sba_goaling_share: 10,
+  get_award_detail: 10,
+  add_contacts_to_crm: 10,
+  export_proposal: 10,
+  build_proposal_structure: 10,
+  scan_proposal_compliance: 10,
+  get_solicitation_documents: 10,
+  // 15 — Edge-light: lighter single-op edge tools
+  search_federal_contacts: 15,
+  extract_statement_of_work: 15,
+  referee_proposal_compliance: 15,
+  // 20 — Edge: the intel that moves a specific bid
+  get_solicitation_incumbent: 20,
+  find_predecessor_award: 20,
+  match_recompete_sow: 20,
+  get_sblo_contact: 20,
+  extract_compliance_matrix: 20,
+  find_capable_contractors: 20,
+  draft_proposal_section: 20,
+  get_winning_playbook: 20,
+  // 40 — Multi-agent: parallel per-section proposal writers
+  draft_proposal: 40,
+  // 100 — Combination: chains 6 tools into one saved, client-ready report
+  generate_market_report: 100,
+  // Free meta tool
+  get_balance: 0,
 };
 
 /**

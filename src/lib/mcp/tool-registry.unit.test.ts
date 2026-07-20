@@ -15,11 +15,14 @@ describe('mcp tool-registry — catalog + pricing', () => {
     for (const t of listMcpTools()) expect(typeof t._credits).toBe('number');
   });
 
-  it('credit prices match the table', () => {
-    expect(creditsFor('search_sam_opportunities')).toBe(1);
-    expect(creditsFor('get_contractor_profile')).toBe(5);
-    expect(creditsFor('find_capable_contractors')).toBe(30);
-    expect(creditsFor('get_winning_playbook')).toBe(2);
+  it('credit prices match the value-based ladder (locked 2026-07-20)', () => {
+    expect(creditsFor('search_sam_opportunities')).toBe(5); // scan floor
+    expect(creditsFor('get_contractor_profile')).toBe(10); // profile
+    expect(creditsFor('find_capable_contractors')).toBe(20); // edge
+    expect(creditsFor('get_winning_playbook')).toBe(20); // edge
+    expect(creditsFor('draft_proposal')).toBe(40); // multi-agent
+    expect(creditsFor('generate_market_report')).toBe(100); // combination
+    expect(creditsFor('get_balance')).toBe(0); // free meta
     expect(creditsFor('nope')).toBe(0);
     // every priced tool is a real exposed tool
     for (const name of Object.keys(TOOL_CREDITS)) expect(isMcpTool(name)).toBe(true);
