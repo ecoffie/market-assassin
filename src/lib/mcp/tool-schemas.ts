@@ -117,6 +117,7 @@ const TOOL_META: Readonly<Record<string, ToolMeta>> = {
   add_contacts_to_crm: { title: 'Add Contacts to CRM (one-shot)', write: 'destructive' },
   assess_market_depth: { title: 'Assess Market Depth (Rule of Two)' },
   build_proposal_structure: { title: 'Build Proposal Structure (outline from compliance matrix)' },
+  capability_market_match: { title: 'Capability-to-Market Match (your addressable market)' },
   derive_company_keywords: { title: 'Derive Company Keywords' },
   draft_proposal: { title: 'Draft Proposal (full, multi-section)' },
   draft_proposal_section: { title: 'Draft Proposal Section' },

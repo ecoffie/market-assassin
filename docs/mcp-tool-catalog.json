@@ -1,11 +1,12 @@
 {
   "_comment": "Mirror of the claude.ai Tool Map artifact. Update the artifact FIRST, then run: node scripts/audit-tool-catalog-drift.mjs --update. The gate fails if this disagrees with listMcpTools().",
   "artifact_url": "https://claude.ai/code/artifact/31ec6de1-1dcf-4a04-aa43-30289bfc6c7c",
-  "count": 49,
+  "count": 50,
   "tools": [
     "add_contacts_to_crm",
     "assess_market_depth",
     "build_proposal_structure",
+    "capability_market_match",
     "derive_company_keywords",
     "draft_proposal",
     "draft_proposal_section",
