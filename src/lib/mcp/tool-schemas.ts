@@ -118,6 +118,7 @@ const TOOL_META: Readonly<Record<string, ToolMeta>> = {
   assess_market_depth: { title: 'Assess Market Depth (Rule of Two)' },
   build_proposal_structure: { title: 'Build Proposal Structure (outline from compliance matrix)' },
   capability_market_match: { title: 'Capability-to-Market Match (your addressable market)' },
+  build_pursuit_dossier: { title: 'Build Pursuit Dossier (capture package for one opportunity)' },
   derive_company_keywords: { title: 'Derive Company Keywords' },
   draft_proposal: { title: 'Draft Proposal (full, multi-section)' },
   draft_proposal_section: { title: 'Draft Proposal Section' },
