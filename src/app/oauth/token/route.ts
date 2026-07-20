@@ -10,6 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { consumeAuthCode, consumeRefreshToken, saveRefreshToken, getClient } from '@/lib/mcp/oauth/store';
 import { issueAccessToken, verifyPkceS256, MCP_SCOPE } from '@/lib/mcp/oauth/tokens';
+import { qualifyReferralFromRequest } from '@/lib/mcp/referrals';
 import { grantSignupCreditsIfFirst } from '@/lib/mcp/credits';
 import { oauthGate } from '@/lib/mcp/oauth/guard';
 
@@ -72,6 +73,8 @@ export async function POST(request: NextRequest) {
     } catch {
       /* never block token issuance on the grant */
     }
+    // Referral: if this verified user arrived via a ?ref link, credit the referrer (fire-and-forget).
+    void qualifyReferralFromRequest(request, record.user_email);
 
     return NextResponse.json(
       { access_token: access.token, token_type: 'Bearer', expires_in: access.expiresIn, refresh_token: refresh, scope },

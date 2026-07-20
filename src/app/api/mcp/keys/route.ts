@@ -13,6 +13,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { requireUserAuth } from '@/lib/api-auth';
 import { issueApiKey, listApiKeys, revokeApiKey } from '@/lib/mcp/api-keys';
 import { grantSignupCreditsIfFirst } from '@/lib/mcp/credits';
+import { qualifyReferralFromRequest } from '@/lib/mcp/referrals';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -35,6 +36,8 @@ export async function POST(request: NextRequest) {
     const { key, row } = await issueApiKey(auth.email, { label });
     // Grant one-time free credits on the user's FIRST key (no balance row yet).
     const signupCredits = await grantSignupCreditsIfFirst(auth.email).catch(() => 0);
+    // Referral: if this verified user arrived via a ?ref link, credit the referrer (fire-and-forget).
+    void qualifyReferralFromRequest(request, auth.email);
     // `key` is returned exactly once here and never again.
     return NextResponse.json({ success: true, key, keyInfo: row, signupCredits });
   } catch (err) {

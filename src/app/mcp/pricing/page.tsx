@@ -294,6 +294,14 @@ export default function McpPricing() {
           <a href={topup.checkoutUrl} className="inline-flex shrink-0 items-center justify-center rounded-lg border border-white/15 px-4 py-2 text-sm font-semibold text-slate-200 hover:bg-white/5">Buy top-up</a>
         </section>
 
+        {/* Refer-a-friend offer */}
+        <div className="mt-4 flex justify-center">
+          <div className="flex max-w-2xl flex-col items-center gap-1 rounded-xl border border-amber-300/25 bg-amber-300/[0.05] px-5 py-3 text-center text-[13px] text-slate-300">
+            <span>🎁 <b className="font-semibold text-amber-100">Refer a friend — you both get 100 credits.</b> They sign up and verify, you each get 100.</span>
+            <a href="/mcp/account?section=referrals" className="text-[12px] font-semibold text-amber-200 underline underline-offset-2 hover:text-amber-100">Sign in to get your referral link →</a>
+          </div>
+        </div>
+
         {/* App cross-sell note (taste) */}
         <div className="mt-4 flex justify-center">
           <div className="max-w-2xl rounded-xl border border-indigo-400/25 bg-indigo-400/[0.05] px-5 py-3 text-center text-[13px] text-slate-300">

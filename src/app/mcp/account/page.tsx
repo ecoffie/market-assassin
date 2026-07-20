@@ -21,13 +21,14 @@ import {
   type UsageSummary, type McpCall,
 } from '../usage-charts';
 
-type Section = 'usage' | 'activity' | 'billing' | 'keys' | 'crm' | 'settings';
+type Section = 'usage' | 'activity' | 'billing' | 'keys' | 'crm' | 'referrals' | 'settings';
 const SECTIONS: { id: Section; label: string; icon: string }[] = [
   { id: 'usage', label: 'Usage', icon: '◧' },
   { id: 'activity', label: 'Activity', icon: '≡' },
   { id: 'billing', label: 'Billing', icon: '◈' },
   { id: 'keys', label: 'API keys', icon: '⚿' },
   { id: 'crm', label: 'CRM', icon: '⇄' },
+  { id: 'referrals', label: 'Refer & earn', icon: '🎁' },
   { id: 'settings', label: 'Settings', icon: '⚙' },
 ];
 
@@ -75,6 +76,16 @@ export default function McpAccountPage() {
 
   const [justSavedCard, setJustSavedCard] = useState(false);
   const [justPurchased, setJustPurchased] = useState(false);
+  const [referral, setReferral] = useState<{ link: string; qualified: number; creditsEarned: number; cap: number; reward: number } | null>(null);
+  const [refCopied, setRefCopied] = useState(false);
+
+  useEffect(() => {
+    if (section !== 'referrals' || referral) return;
+    fetch('/api/mcp/referral', { headers: getMIApiHeaders() })
+      .then((r) => r.json())
+      .then((j) => { if (j?.success) setReferral({ link: j.link, qualified: j.qualified, creditsEarned: j.creditsEarned, cap: j.cap, reward: j.reward }); })
+      .catch(() => {});
+  }, [section, referral]);
 
   const refreshAccount = useCallback(async () => {
     setAccountLoading(true);
@@ -280,7 +291,7 @@ export default function McpAccountPage() {
 
   // ---- Section bodies --------------------------------------------------------
   const sectionTitle: Record<Section, string> = {
-    usage: 'Usage', activity: 'Activity', billing: 'Billing', keys: 'API keys', crm: 'CRM connection', settings: 'Settings',
+    usage: 'Usage', activity: 'Activity', billing: 'Billing', keys: 'API keys', crm: 'CRM connection', referrals: 'Refer & earn', settings: 'Settings',
   };
 
   const usageBody = (
@@ -539,8 +550,50 @@ export default function McpAccountPage() {
     </div>
   );
 
+  const referralsBody = (
+    <div className="space-y-6">
+      <div className="rounded-2xl border border-amber-300/25 bg-amber-300/[0.05] p-6">
+        <div className="text-[15px] font-semibold text-amber-100">🎁 Refer a friend — you both get {referral?.reward ?? 100} credits</div>
+        <p className="mt-1 text-[13px] text-slate-400">
+          Share your link. When a friend signs up and completes a verified sign-in (OAuth or MFA),
+          you each earn {referral?.reward ?? 100} MCP credits. Up to {referral?.cap ?? 25} friends.
+        </p>
+        <div className="mt-4 flex flex-col gap-2 sm:flex-row">
+          <input
+            readOnly
+            value={referral?.link ?? 'Loading your link…'}
+            onFocus={(e) => e.currentTarget.select()}
+            className="min-w-0 flex-1 rounded-lg border border-white/15 bg-[#0a0f1e] px-3 py-2 font-mono text-[12.5px] text-slate-200"
+          />
+          <button
+            type="button"
+            disabled={!referral?.link}
+            onClick={() => { if (referral?.link) { navigator.clipboard?.writeText(referral.link).then(() => { setRefCopied(true); setTimeout(() => setRefCopied(false), 1500); }).catch(() => {}); } }}
+            className="shrink-0 rounded-lg bg-amber-400 px-4 py-2 text-sm font-semibold text-[#3a2a00] hover:bg-amber-300 disabled:opacity-50"
+          >
+            {refCopied ? '✓ Copied' : 'Copy link'}
+          </button>
+        </div>
+      </div>
+      <div className="grid grid-cols-2 gap-3">
+        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+          <div className="text-2xl font-bold tabular-nums text-emerald-300">{referral?.qualified ?? 0}</div>
+          <div className="mt-1 text-[12px] text-slate-500">Friends joined (of {referral?.cap ?? 25})</div>
+        </div>
+        <div className="rounded-xl border border-white/10 bg-white/[0.02] p-4">
+          <div className="text-2xl font-bold tabular-nums text-emerald-300">{(referral?.creditsEarned ?? 0).toLocaleString()}</div>
+          <div className="mt-1 text-[12px] text-slate-500">Credits earned from referrals</div>
+        </div>
+      </div>
+      <p className="text-[11.5px] leading-relaxed text-slate-600">
+        Credits have no cash value and are non-transferable. Rewards require a verified sign-in and may be
+        revoked for fraud or abuse. See the <a href="/legal/referral-terms" className="underline underline-offset-2 hover:text-slate-400">Referral Program Terms</a>.
+      </p>
+    </div>
+  );
+
   const bodies: Record<Section, React.ReactNode> = {
-    usage: usageBody, activity: activityBody, billing: billingBody, keys: keysBody, crm: crmBody, settings: settingsBody,
+    usage: usageBody, activity: activityBody, billing: billingBody, keys: keysBody, crm: crmBody, referrals: referralsBody, settings: settingsBody,
   };
 
   return (
