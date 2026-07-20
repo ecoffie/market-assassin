@@ -1,4 +1,5 @@
 import { createHash } from 'crypto';
+import { qualifyReferralFromRequest } from '@/lib/mcp/referrals';
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { createTwoFactorSessionToken } from '@/lib/two-factor-session';
@@ -102,6 +103,8 @@ export async function POST(request: NextRequest) {
     // Successful login — reset the per-account failure counter.
     await clearFailedLogins(email);
 
+    // Referral: if this verified user arrived via a ?ref link, credit the referrer (fire-and-forget).
+    void qualifyReferralFromRequest(request, email);
     return NextResponse.json({
       success: true,
       email,
