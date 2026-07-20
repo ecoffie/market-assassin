@@ -39,6 +39,7 @@ import { searchPastContracts } from '@/mcp/tools/past-contracts';
 import { getAnnualObligations } from '@/mcp/tools/annual-obligations';
 import { generateMarketReport } from '@/mcp/tools/market-report';
 import { capabilityMarketMatch } from '@/mcp/tools/capability-market-match';
+import { buildPursuitDossier } from '@/mcp/tools/pursuit-dossier';
 import { addContactsToCrm } from '@/mcp/tools/crm-contacts';
 import type { CrmContactInput } from '@/lib/ghl/contacts';
 import { contractorAwardHistory } from '@/mcp/tools/contractor-award-history';
@@ -141,6 +142,7 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   // 100 — Combination: chains multiple tools into one client-ready deliverable
   generate_market_report: 100,
   capability_market_match: 100,
+  build_pursuit_dossier: 100,
   // Free meta tool
   get_balance: 0,
 };
@@ -653,6 +655,28 @@ const CAPABILITY_MATCH_TOOL_DEF = {
         description: { type: 'string', description: "What the company does, in its own words." },
         capabilities: { type: 'array', items: { type: 'string' }, description: 'Capability statements / service lines.' },
         past_performance: { type: 'array', items: { type: 'string' }, description: 'Past-performance blurbs (work delivered, contracts won).' },
+        client_name: { type: 'string', description: 'Optional label for the deliverable header.' },
+      },
+    },
+  },
+};
+
+const PURSUIT_DOSSIER_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'build_pursuit_dossier',
+    description:
+      "COMBINATION — the capture package on ONE opportunity. Paste a solicitation number or notice_id and this " +
+      "assembles a full should-I-bid + how-to-win dossier in one call: the open notice, the LIKELY incumbent + " +
+      "their prior award and financial health, how crowded the market is (Rule of Two), the price-to-win labor " +
+      "rates, and the named buying-office contacts (COs / specialists) — plus the solicitation documents. A " +
+      "capture manager's day of research in one deliverable. grounded=false only when the solicitation number " +
+      "resolves to nothing; never invent a notice or an incumbent.",
+    parameters: {
+      type: 'object',
+      properties: {
+        solicitation_number: { type: 'string', description: 'Solicitation number (e.g. 140L6226Q0013) or 32-char notice UUID.' },
+        notice_id: { type: 'string', description: 'Alias for solicitation_number.' },
         client_name: { type: 'string', description: 'Optional label for the deliverable header.' },
       },
     },
@@ -1349,6 +1373,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     ANNUAL_OBLIGATIONS_TOOL_DEF,
     MARKET_REPORT_TOOL_DEF,
     CAPABILITY_MATCH_TOOL_DEF,
+    PURSUIT_DOSSIER_TOOL_DEF,
     CRM_CONTACTS_TOOL_DEF,
     CONTRACTOR_AWARD_HISTORY_TOOL_DEF,
     MARKET_DEPTH_TOOL_DEF,
@@ -1404,6 +1429,7 @@ export function isMcpTool(name: string): boolean {
     name === 'get_recipient_annual_obligations' ||
     name === 'generate_market_report' ||
     name === 'capability_market_match' ||
+    name === 'build_pursuit_dossier' ||
     name === 'add_contacts_to_crm' ||
     name === 'get_contractor_award_history' ||
     name === 'assess_market_depth' ||
@@ -1694,6 +1720,16 @@ export async function runMcpTool(
       past_performance: Array.isArray(args.past_performance) ? (args.past_performance as string[]) : undefined,
       client_name: typeof args.client_name === 'string' ? args.client_name : undefined,
       // Owner comes from the VERIFIED caller (ctx.userEmail) — never from args.
+      userEmail: ctx.userEmail,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'build_pursuit_dossier') {
+    const result = (await buildPursuitDossier({
+      solicitation_number: typeof args.solicitation_number === 'string' ? args.solicitation_number : undefined,
+      notice_id: typeof args.notice_id === 'string' ? args.notice_id : undefined,
+      client_name: typeof args.client_name === 'string' ? args.client_name : undefined,
       userEmail: ctx.userEmail,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
