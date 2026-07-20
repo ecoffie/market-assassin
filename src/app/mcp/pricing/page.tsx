@@ -179,6 +179,12 @@ export default function McpPricing() {
           <p className="mx-auto mt-4 max-w-2xl text-balance text-sm text-slate-400 sm:text-[15px]">
             Metered federal-contracting credits for any AI agent. Start with a free trial, then pick a monthly or annual plan — every tool is charged per successful call, so you never pay for a miss. {tools.length ? `${toolCount} tools live today.` : 'Dozens of tools live today.'}
           </p>
+          <div className="mt-6 flex flex-col items-center gap-2">
+            <a href="/app" className="inline-flex items-center justify-center gap-2 rounded-xl bg-emerald-500 px-5 py-3 text-[15px] font-bold text-[#06120c] shadow-lg shadow-emerald-500/20 hover:bg-emerald-400">
+              🎁 Sign up free — {trial} credits, no card
+            </a>
+            <span className="text-[12px] text-slate-500">Granted the moment you connect · no credit card required</span>
+          </div>
         </section>
 
         {/* Wayfinding to the plan finder */}
