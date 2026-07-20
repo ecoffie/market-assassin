@@ -41,9 +41,9 @@ interface ApiKeyRow { id: string; key_prefix: string; label: string | null; crea
 interface BillingRow { id: string; date: string; label: string; credits: number; balanceAfter: number; free: boolean }
 
 // Refill packs — must match CREDIT_PACKAGES ids/credits in src/lib/mcp/packages.ts.
+// Single premium top-up SKU (GOS #015); legacy 'plus'/'scale' were retired.
 const REFILL_PACKS: { id: string; label: string }[] = [
-  { id: 'plus', label: '800 credits ($15)' },
-  { id: 'scale', label: '2,400 credits ($40)' },
+  { id: 'refill', label: '500 credits ($119)' },
 ];
 
 function fmtDate(iso: string | null): string {

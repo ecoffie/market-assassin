@@ -97,7 +97,7 @@ export async function getAutoRecharge(email: string): Promise<AutoRechargeSettin
     userEmail: user,
     enabled: false,
     thresholdCredits: 100,
-    refillPackage: 'plus',
+    refillPackage: 'refill', // the single top-up SKU (GOS #015); legacy 'plus'/'scale' safely fall back to CREDIT_PACKAGES[0]
     hasCard: false,
     cardBrand: null,
     cardLast4: null,

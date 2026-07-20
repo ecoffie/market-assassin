@@ -23,26 +23,18 @@ export interface CreditPackage {
 }
 
 /**
- * Live one-time top-up packs. `checkoutUrl` = the Stripe payment link. Each backing
- * product carries metadata `type=mcp_credit_topup` + `package=<id>`; the webhook grants
- * credits SERVER-SIDE from the package id (never a raw credits number), so these credit
- * counts must match what each package id is worth.
+ * Live one-time top-up pack (SINGLE, GOS Decision #015). The backing product carries
+ * metadata `type=mcp_credit_topup` + `package=refill`; the webhook grants credits
+ * SERVER-SIDE from the package id (never a raw credits number).
  *
- * Locked model (2026-07-16): the small pack mirrors the Starter monthly rate
- * (2,000 cr / $49, ~$0.0245/cr); the large pack adds a volume discount (5,000 cr / $99,
- * ~$0.0198/cr). Links point at FRESH products created 2026-07-16 with correct metadata
- * (the first dashboard attempt was mis-tagged `tier=briefings` → would have granted
- * briefings access + 0 credits; archived). The old $15/$40 links must stay archived.
+ * Locked model (2026-07-19): ONE premium "ran out mid-month" valve — 500 cr / $119
+ * (~$0.238/cr, the priciest per-credit in the whole ladder ON PURPOSE, so it never
+ * undercuts subscribing). Also the SKU auto-recharge draws from. Product/link/price
+ * created live 2026-07-19; the 4 legacy top-ups ($79/300, $149/700, $99/5,000, $49/2,000)
+ * were ARCHIVED in Stripe the same pass (prices + payment links deactivated).
  */
 export const CREDIT_PACKAGES: readonly CreditPackage[] = [
-  // Credits repriced 2026-07-18 (value-anchored model): the $ price is UNCHANGED (same
-  // Stripe products) — we grant FEWER credits so top-ups are a PREMIUM "one more" valve
-  // (priciest per credit) that never undercuts upgrading. Was 2,000/5,000.
-  // Repriced 2026-07-19 (premium "one more" valve): $79/$149 on FRESH Stripe products
-  // ("Mindy MCP — 300/700 credits", metadata type=mcp_credit_topup + package). Old $49/$99
-  // links deactivated in Stripe so they can't be bought at the wrong price.
-  { id: 'plus', credits: 300, usd: 79, label: 'Plus — 300 credits', checkoutUrl: 'https://buy.stripe.com/9B6dRad70bfk48Z98YfnO0W' },
-  { id: 'scale', credits: 700, usd: 149, label: 'Scale — 700 credits (best value)', checkoutUrl: 'https://buy.stripe.com/4gMaEYaYScjo6h770QfnO0X' },
+  { id: 'refill', credits: 500, usd: 119, label: 'Top-up — 500 credits', checkoutUrl: 'https://buy.stripe.com/cNiaEYff8bfk8pfetifnO11' },
 ] as const;
 
 const BY_ID = new Map(CREDIT_PACKAGES.map((p) => [p.id, p]));
@@ -58,25 +50,26 @@ export function creditsForPackage(packageId: string | null | undefined): number 
 
 /**
  * Credits included with an active Pro ($149/mo) subscription, granted monthly.
- * Set to 1,500 (2026-07-18 value-anchored model — see docs/strategy/PRICING-MODEL-2026-07-18.md).
- * Sized to a realistic 2-person Pro month (daily research + a few of the flagship deliverables;
- * a busy month overflows to a premium top-up, an agency overflows to Team). Was 6,000.
+ * Set to 250 (GOS Decision #015, 2026-07-19). This is a TASTE, not a bundle: ≈2–3 flagship
+ * runs (a proposal/report ≈100 cr), then the wall → the user buys the separate $99/500 MCP
+ * product. Deliberately BELOW the $99/500 MCP entry so it can't substitute for it. Was 1,500.
  * ⚠️ Env-overridable: if MCP_PRO_MONTHLY_CREDITS is set in Vercel it WINS over this default —
- * update it to 1500 (or unset it) or Pro silently keeps the old amount.
+ * update it to 250 (or unset it) or Pro silently keeps the old amount.
  */
 export const PRO_MONTHLY_CREDITS = Math.max(
   0,
-  Number(process.env.MCP_PRO_MONTHLY_CREDITS ?? '1500') || 0,
+  Number(process.env.MCP_PRO_MONTHLY_CREDITS ?? '250') || 0,
 );
 
 /**
- * Credits included with an active Team ($499/mo) subscription, granted monthly. Team is the
- * agency tier (5 seats + per-client rebilling) — the cheapest per-credit rate, the upgrade
- * an agency running multiple clients is forced into. Env-overridable like the others.
+ * Credits included with an active Team ($499/mo) subscription, granted monthly. Set to 750
+ * (GOS Decision #015, 2026-07-19) — a small agency sampling (≈7–8 flagship runs), still a
+ * TASTE that pushes a real agency to a separate MCP sub ($249/$999), not the old bundle.
+ * Was 8,000. Env-overridable — update MCP_TEAM_MONTHLY_CREDITS to 750 or unset it.
  */
 export const TEAM_MONTHLY_CREDITS = Math.max(
   0,
-  Number(process.env.MCP_TEAM_MONTHLY_CREDITS ?? '8000') || 0,
+  Number(process.env.MCP_TEAM_MONTHLY_CREDITS ?? '750') || 0,
 );
 
 /**
@@ -123,41 +116,77 @@ export interface SubscriptionPlan {
   /** Credit allowance shown on the card — constant across the toggle. */
   creditsPerMonth: number;
   monthly: PlanPrice;
-  /** Annual price, plus the effective monthly rate to display ("$15/mo · billed annually"). */
-  annual: PlanPrice & { usdPerMonth: number };
+  /**
+   * Annual price + the effective monthly rate to display. OPTIONAL — annual MCP variants
+   * are DEFERRED (GOS Decision #015: monthly-only first, add annual once the model proves).
+   */
+  annual?: PlanPrice & { usdPerMonth: number };
 }
 
-// Locked ladder (2026-07-16): the ONLY MCP-native credit sub is STARTER $59/mo
-// (the repurposed 'scale' plan below). Pro $149 / Team $499 are the app tiers
-// (their MCP allowance is PRO_MONTHLY_CREDITS + the app grant, not sold here). The
-// old $19 'Plus' sub was RETIRED — verified 0 mcp_sub_* purchases ever, so nothing
-// to grandfather. SCALE_CR_MO is the Starter allowance (2,400 cr ≈ $0.0246/cr @ $59).
-const SCALE_CR_MO = Math.max(0, Number(process.env.MCP_SCALE_MONTHLY_CREDITS ?? '2400') || 0);
-
+// The MCP metered ladder (GOS Decision #015, 2026-07-19): a SEPARATE product from the App
+// ($149 Pro / $499 Team are app tiers — their MCP allowance is PRO/TEAM_MONTHLY_CREDITS, not
+// sold here). Three self-serve tiers, each MONTHLY + ANNUAL (annual = 2 months free, and grants
+// credits 12× UPFRONT on the annual invoice — Eric 2026-07-19, "let them see it all at once").
+// ⚠️ MCP per-credit COST is its own economics (LLM tokens + BigQuery bytes + external APIs) — the
+// app's $15/user callLLM cap does NOT apply here. Real unit cost + BQ daily-quota isolation are
+// tracked in tasks/mcp-economics-2026-07-19.md; the credit prices must clear that cost.
+// The Enterprise/API tier (#016) is INQUIRY-ONLY — no Stripe product, deliberately absent here.
+// Products/prices/payment-links created live 2026-07-19; each price carries metadata
+// type=mcp_subscription + plan=<id> + interval. The webhook grants by priceId
+// (subscriptionGrantForPriceId), so these IDs are the source of truth.
 export const SUBSCRIPTION_PLANS: readonly SubscriptionPlan[] = [
-  // ($19 'Plus' sub RETIRED 2026-07-16 — folded into Starter $59; 0 subs to migrate.
-  //  Archive its Stripe products so the old $19/$180 links can't be hit.)
   {
-    // The $59/mo STARTER — entry paid tier in the locked ladder (Free → Starter $59 →
-    // Pro $149 → Team $499). id stays 'scale' so the Stripe metadata `plan=scale`
-    // mapping resolves; the webhook grants by priceId (subscriptionGrantForPriceId), so
-    // these IDs are the source of truth. Prices/links created 2026-07-16 (product carries
-    // plan=scale, type=mcp_subscription). Old $50/$480 Scale + $19/$180 Plus links archived.
-    id: 'scale',
-    label: 'Starter',
-    creditsPerMonth: SCALE_CR_MO,
+    id: 'entry',
+    label: 'Entry',
+    creditsPerMonth: 500,
     monthly: {
-      priceId: 'price_1TtpH5K5zyiZ50PBN6wo4IAs',
-      usd: 59,
-      credits: SCALE_CR_MO,
-      checkoutUrl: 'https://buy.stripe.com/3cIaEY6IC1EKgVLetifnO0S',
+      priceId: 'price_1TuxApK5zyiZ50PB8iMg8WqG',
+      usd: 99,
+      credits: 500,
+      checkoutUrl: 'https://buy.stripe.com/bJe5kEff8erw20R0CsfnO0Y',
     },
     annual: {
-      priceId: 'price_1TtpHiK5zyiZ50PBcGOuLfnR',
-      usd: 590,
-      usdPerMonth: 49, // ~2 months free vs $59/mo
-      credits: SCALE_CR_MO * 12,
-      checkoutUrl: 'https://buy.stripe.com/9B628s8QKerwaxn0CsfnO0T',
+      priceId: 'price_1TuyGyK5zyiZ50PBUfIkFbvD',
+      usd: 990, // 2 months free vs $99/mo
+      usdPerMonth: 83,
+      credits: 6000, // 12× upfront on the annual invoice
+      checkoutUrl: 'https://buy.stripe.com/9B6eVed70bfkdJz1GwfnO12',
+    },
+  },
+  {
+    id: 'mid',
+    label: 'Mid',
+    creditsPerMonth: 1500,
+    monthly: {
+      priceId: 'price_1TuxApK5zyiZ50PBPV40eCvG',
+      usd: 249,
+      credits: 1500,
+      checkoutUrl: 'https://buy.stripe.com/8x29AUgjcfvA5d30CsfnO0Z',
+    },
+    annual: {
+      priceId: 'price_1TuyGyK5zyiZ50PBaBguu8be',
+      usd: 2490, // 2 months free vs $249/mo
+      usdPerMonth: 208,
+      credits: 18000, // 12× upfront
+      checkoutUrl: 'https://buy.stripe.com/bJeeVeaYSgzE8pf2KAfnO13',
+    },
+  },
+  {
+    id: 'agency',
+    label: 'Agency',
+    creditsPerMonth: 8000,
+    monthly: {
+      priceId: 'price_1TuxAqK5zyiZ50PBJUdzoobH',
+      usd: 999,
+      credits: 8000,
+      checkoutUrl: 'https://buy.stripe.com/8x2eVe1oi6Z434VdpefnO10',
+    },
+    annual: {
+      priceId: 'price_1TuyGzK5zyiZ50PBkxhPLK5J',
+      usd: 9990, // 2 months free vs $999/mo
+      usdPerMonth: 833,
+      credits: 96000, // 12× upfront
+      checkoutUrl: 'https://buy.stripe.com/4gM00k6IC0AGcFvetifnO14',
     },
   },
 ] as const;
@@ -185,7 +214,7 @@ export function subscriptionGrantForPriceId(priceId: string | null | undefined):
   if (!priceId) return null;
   for (const p of SUBSCRIPTION_PLANS) {
     if (p.monthly.priceId === priceId) return { planId: p.id, credits: p.monthly.credits, interval: 'month' };
-    if (p.annual.priceId === priceId) return { planId: p.id, credits: p.annual.credits, interval: 'year' };
+    if (p.annual && p.annual.priceId === priceId) return { planId: p.id, credits: p.annual.credits, interval: 'year' };
   }
   return null;
 }
@@ -200,7 +229,7 @@ export function subscriptionGrantForMeta(
 ): SubscriptionGrant | null {
   const p = subscriptionPlan(planId);
   if (!p) return null;
-  return interval === 'year'
+  return interval === 'year' && p.annual
     ? { planId: p.id, credits: p.annual.credits, interval: 'year' }
     : { planId: p.id, credits: p.monthly.credits, interval: 'month' };
 }
