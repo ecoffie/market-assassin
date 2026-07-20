@@ -19,10 +19,14 @@ import { applyCreditOnce } from '@/lib/mcp/credits';
 import { PRO_MONTHLY_CREDITS, TEAM_MONTHLY_CREDITS, INTERNAL_MONTHLY_CREDITS } from '@/lib/mcp/packages';
 import { INTERNAL_TEAM_EMAILS } from '@/lib/api-auth';
 import { ADVOCATE_ACCOUNTS } from '@/lib/mindy/advocate-accounts';
+import { sendEmail } from '@/lib/send-email';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
+
+// Where an anomaly alert lands (a monthly grant that ran but couldn't grant correctly).
+const MONITOR_EMAIL = process.env.MCP_GRANT_MONITOR_EMAIL || 'eric@govcongiants.com';
 
 // App-tier subscription price amounts (cents). MCP subs ($99/$249/$999) are NOT here — they
 // get MCP credits via the MCP subscription webhook, not this grant.
@@ -37,26 +41,33 @@ const ADVOCATES = Array.from(new Set(ADVOCATE_ACCOUNTS.map((a) => a.email.toLowe
 
 type Group = 'internal' | 'advocate' | 'pro-sub' | 'team-sub';
 
-/** Enumerate ACTIVE Stripe subscriptions → paying Pro/Team subscribers. */
-async function activeSubscribers(): Promise<Array<{ email: string; amount: number; group: Group }>> {
+type Target = { email: string; amount: number; group: Group };
+
+/** Enumerate ACTIVE Stripe subscriptions → paying Pro/Team subscribers. Surfaces (never swallows)
+ *  a Stripe failure so a monthly run that couldn't read subs is flagged, not silently a no-op. */
+async function activeSubscribers(): Promise<{ subs: Target[]; error: string | null }> {
   const key = process.env.STRIPE_SECRET_KEY;
-  if (!key) return [];
+  if (!key) return { subs: [], error: 'STRIPE_SECRET_KEY missing' };
   const stripe = new Stripe(key);
-  const out: Array<{ email: string; amount: number; group: Group }> = [];
-  for await (const s of stripe.subscriptions.list({ status: 'active', limit: 100, expand: ['data.customer'] })) {
-    const amt = s.items.data[0]?.price?.unit_amount ?? 0;
-    const cust = s.customer;
-    const email = (cust && typeof cust !== 'string' && !cust.deleted ? cust.email : null)?.toLowerCase();
-    if (!email) continue;
-    if (PRO_AMOUNTS.has(amt)) out.push({ email, amount: PRO_MONTHLY_CREDITS, group: 'pro-sub' });
-    else if (TEAM_AMOUNTS.has(amt)) out.push({ email, amount: TEAM_MONTHLY_CREDITS, group: 'team-sub' });
+  const subs: Target[] = [];
+  try {
+    for await (const s of stripe.subscriptions.list({ status: 'active', limit: 100, expand: ['data.customer'] })) {
+      const amt = s.items.data[0]?.price?.unit_amount ?? 0;
+      const cust = s.customer;
+      const email = (cust && typeof cust !== 'string' && !cust.deleted ? cust.email : null)?.toLowerCase();
+      if (!email) continue;
+      if (PRO_AMOUNTS.has(amt)) subs.push({ email, amount: PRO_MONTHLY_CREDITS, group: 'pro-sub' });
+      else if (TEAM_AMOUNTS.has(amt)) subs.push({ email, amount: TEAM_MONTHLY_CREDITS, group: 'team-sub' });
+    }
+  } catch (e) {
+    return { subs, error: (e as Error).message || 'stripe subscription enumeration failed' };
   }
-  return out;
+  return { subs, error: null };
 }
 
 /** Resolve final per-email targets (dedupe; keep the highest amount when an email matches twice). */
-async function buildTargets(): Promise<Array<{ email: string; amount: number; group: Group }>> {
-  const byEmail = new Map<string, { email: string; amount: number; group: Group }>();
+async function buildTargets(): Promise<{ targets: Target[]; subError: string | null }> {
+  const byEmail = new Map<string, Target>();
   const consider = (email: string, amount: number, group: Group) => {
     const e = email.toLowerCase().trim();
     const prev = byEmail.get(e);
@@ -64,8 +75,9 @@ async function buildTargets(): Promise<Array<{ email: string; amount: number; gr
   };
   for (const email of INTERNAL_TEAM) consider(email, INTERNAL_MONTHLY_CREDITS, 'internal');
   for (const email of ADVOCATES) consider(email, PRO_MONTHLY_CREDITS, 'advocate');
-  for (const s of await activeSubscribers()) consider(s.email, s.amount, s.group);
-  return [...byEmail.values()];
+  const { subs, error } = await activeSubscribers();
+  for (const s of subs) consider(s.email, s.amount, s.group);
+  return { targets: [...byEmail.values()], subError: error };
 }
 
 export async function GET(request: NextRequest) {
@@ -78,12 +90,12 @@ export async function GET(request: NextRequest) {
 
   const preview = request.nextUrl.searchParams.get('preview') === '1';
   const month = new Date().toISOString().slice(0, 7); // YYYY-MM
-  const targets = await buildTargets();
+  const { targets, subError } = await buildTargets();
   const byGroup = targets.reduce<Record<string, number>>((a, t) => { a[t.group] = (a[t.group] || 0) + 1; return a; }, {});
 
   if (preview) {
     return NextResponse.json({
-      success: true, preview: true, month, audience: targets.length, byGroup,
+      success: true, preview: true, month, audience: targets.length, byGroup, subError,
       rates: { pro: PRO_MONTHLY_CREDITS, team: TEAM_MONTHLY_CREDITS, internal: INTERNAL_MONTHLY_CREDITS },
       targets: targets.map((t) => ({ email: t.email, amount: t.amount, group: t.group })),
     });
@@ -101,5 +113,26 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.json({ success: true, month, audience: targets.length, byGroup, granted, alreadyHad, errors: errors.slice(0, 20) });
+  // ── Awareness: a run that couldn't grant correctly must fail LOUD (record 'error' + alert),
+  // not report success with 0 grants. The internal team is a static list, so the audience can
+  // never legitimately be below it — a smaller audience means the sub enumeration broke.
+  const nothingHappened = granted === 0 && alreadyHad === 0;
+  const tooSmall = targets.length < INTERNAL_TEAM.length;
+  const anomaly = Boolean(subError) || errors.length > 0 || nothingHappened || tooSmall;
+
+  const summary = { month, audience: targets.length, byGroup, granted, alreadyHad, subError, errors: errors.slice(0, 10) };
+  if (anomaly) {
+    await sendEmail({
+      to: MONITOR_EMAIL,
+      subject: `⚠️ MCP monthly credit grant ANOMALY — ${month}`,
+      html: `<p>The monthly MCP credit grant ran but looks wrong — check it did not silently skip paying subscribers.</p>`
+        + `<pre>${JSON.stringify(summary, null, 2)}</pre>`,
+      transactional: true,
+    }).catch(() => { /* alert is best-effort; the 500 below is the durable signal */ });
+    // Non-2xx → the dispatcher records status='error' in cron_job_runs, and the dispatcher-watchdog
+    // surfaces it. This is the "we are aware" hook, on top of the mcp_credit_ledger grant rows.
+    return NextResponse.json({ success: false, anomaly: true, ...summary }, { status: 500 });
+  }
+
+  return NextResponse.json({ success: true, ...summary });
 }
