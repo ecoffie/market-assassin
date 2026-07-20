@@ -111,7 +111,7 @@ export function renderAlertTopBannerHtml(
   if (cta.needsKeywordSetup) {
     return `
   <a href="${trackedUrl(cta.url, cta.trackingLabel, 'banner_keyword_setup')}" style="text-decoration: none; display: block;">
-    <div style="background: linear-gradient(135deg, #b91c1c 0%, #dc2626 100%); padding: 10px 20px; text-align: center; border-radius: 12px 12px 0 0;">
+    <div style="background-color: #b91c1c; background-image: linear-gradient(135deg, #b91c1c 0%, #dc2626 100%); padding: 10px 20px; text-align: center; border-radius: 12px 12px 0 0;">
       <p style="color: white; margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.5px; line-height: 1.4;">
         ⚠️ One NAICS code ≈ ${m.obviousCodePct}% of your market &nbsp;•&nbsp; <span style="text-decoration: underline;">You're missing the other ${m.missPct}% — fix your alert filters →</span>
       </p>
@@ -122,7 +122,7 @@ export function renderAlertTopBannerHtml(
   const v1 = MINDY_V1;
   return `
   <a href="${trackedUrl(v1.url, 'open_mindy_v1', 'top_banner_v1')}" style="text-decoration: none; display: block;">
-    <div style="background: linear-gradient(135deg, #7c3aed 0%, #2563eb 100%); padding: 10px 20px; text-align: center; border-radius: 12px 12px 0 0;">
+    <div style="background-color: #7c3aed; background-image: linear-gradient(135deg, #7c3aed 0%, #2563eb 100%); padding: 10px 20px; text-align: center; border-radius: 12px 12px 0 0;">
       <p style="color: white; margin: 0; font-size: 12px; font-weight: 600; letter-spacing: 0.5px;">
         ✨ NEW &nbsp;•&nbsp; <span style="text-decoration: underline;">Mindy ${v1.version} is live — AI BD analyst grounded in real federal data →</span>
       </p>
@@ -158,7 +158,7 @@ export function renderKeywordSetupNudgeHtml(
 export function renderMindyV10PromoHtml(trackedUrl: TrackedUrlFn): string {
   const v1 = MINDY_V1;
   return `
-  <div style="background: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-radius: 10px; padding: 20px 22px; margin-top: 20px; text-align: center; border: 1px solid #334155;">
+  <div style="background-color: #1e293b; background-image: linear-gradient(135deg, #0f172a 0%, #1e293b 100%); border-radius: 10px; padding: 20px 22px; margin-top: 20px; text-align: center; border: 1px solid #334155;">
     <p style="color: #a78bfa; margin: 0 0 4px 0; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;">
       Now Available
     </p>
@@ -181,7 +181,7 @@ export function renderBootcampPromoHtml(trackedUrl: TrackedUrlFn): string {
   const boot = ALERT_BOOTCAMP;
   const v1 = MINDY_V1;
   return `
-  <div style="background: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%); border-radius: 10px; padding: 20px 22px; margin-top: 20px; text-align: center;">
+  <div style="background-color: #4c1d95; background-image: linear-gradient(135deg, #1e3a8a 0%, #7c3aed 100%); border-radius: 10px; padding: 20px 22px; margin-top: 20px; text-align: center;">
     <p style="color: #c4b5fd; margin: 0 0 4px 0; font-size: 11px; font-weight: 700; letter-spacing: 0.5px; text-transform: uppercase;">
       Free Live · ${boot.shortDate}
     </p>
