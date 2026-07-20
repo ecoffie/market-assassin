@@ -3,9 +3,9 @@
  *
  * A signed-in user shares their referral link (`getmindy.ai/mcp?ref=<code>`). When a
  * REFERRED person completes their FIRST VERIFIED authenticated session (app OAuth/MFA or
- * MCP OAuth), `qualifyReferral` fires: the REFERRER earns REFERRAL_CREDITS. The referred
- * user's own 100 is their standard signup welcome grant (`grantSignupCreditsIfFirst`), so
- * "you both get 100" holds without double-stacking on the referred (lowest farming exposure).
+ * MCP OAuth), `qualifyReferral` fires: BOTH the referrer AND the referred friend earn
+ * REFERRAL_CREDITS. The friend's bonus is ON TOP of their standard signup welcome
+ * (`grantSignupCreditsIfFirst`), so a referred friend nets 200 — the stronger acquisition hook.
  *
  * Anti-abuse (GOS #009 / Eric's "700×1,000" scar): verified-identity trigger (OAuth/MFA is
  * expensive to fake), self-referral blocked, ONE reward per referred identity
@@ -122,13 +122,16 @@ export async function qualifyReferral(referredEmail: string, code: string | null
       return { granted: false, reason: 'over_cap' };
     }
 
-    // Grant the referrer, idempotently. Key is per (referrer, referred) so it can't double-pay.
+    // Grant BOTH sides, idempotently. Keys are unique per side so retries can't double-pay.
+    // The referred friend gets this bonus ON TOP of their signup welcome (200 total) — the
+    // stronger "use my link, get 2×" acquisition hook (Eric 2026-07-20).
     const { applied } = await applyCreditOnce(
       `referral:referrer:${referrer}:${referred}`,
       referrer,
       REFERRAL_CREDITS,
       'referral',
     );
+    await applyCreditOnce(`referral:referred:${referred}`, referred, REFERRAL_CREDITS, 'referral');
 
     // Record the granted referral (referred_email UNIQUE dedupes concurrent qualifies).
     await db.from('mcp_referrals').insert({
