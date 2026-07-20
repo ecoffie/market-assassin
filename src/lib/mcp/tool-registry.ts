@@ -38,6 +38,7 @@ import { idvContracts } from '@/mcp/tools/idv-contracts';
 import { searchPastContracts } from '@/mcp/tools/past-contracts';
 import { getAnnualObligations } from '@/mcp/tools/annual-obligations';
 import { generateMarketReport } from '@/mcp/tools/market-report';
+import { capabilityMarketMatch } from '@/mcp/tools/capability-market-match';
 import { addContactsToCrm } from '@/mcp/tools/crm-contacts';
 import type { CrmContactInput } from '@/lib/ghl/contacts';
 import { contractorAwardHistory } from '@/mcp/tools/contractor-award-history';
@@ -137,8 +138,9 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   get_winning_playbook: 20,
   // 40 — Multi-agent: parallel per-section proposal writers
   draft_proposal: 40,
-  // 100 — Combination: chains 6 tools into one saved, client-ready report
+  // 100 — Combination: chains multiple tools into one client-ready deliverable
   generate_market_report: 100,
+  capability_market_match: 100,
   // Free meta tool
   get_balance: 0,
 };
@@ -629,6 +631,29 @@ const MARKET_REPORT_TOOL_DEF = {
         state: { type: 'string', description: 'Limit to a state — full name ("Florida") or 2-letter code ("FL").' },
         set_aside: { type: 'string', description: 'Optional set-aside filter for the forecasts section.' },
         client_name: { type: 'string', description: 'Optional label for the report header (e.g. the client you are preparing this for).' },
+      },
+    },
+  },
+};
+
+const CAPABILITY_MATCH_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'capability_market_match',
+    description:
+      "COMBINATION — 'where do I fit?' in one call. Give a company's OWN words (what they do, " +
+      'capabilities, past performance) and this derives their buyer keywords, then assembles their ' +
+      'addressable market: total market $ + the real NAICS they sell into, the buyer vocabulary, the ' +
+      'top competitors already winning there, upcoming forecasts, and expiring/recompete opportunities ' +
+      'open to them now. The onboarding reveal — turns a plain-English description into a real market ' +
+      'map. grounded=false only when there is not enough company text to derive keywords; never invent.',
+    parameters: {
+      type: 'object',
+      properties: {
+        description: { type: 'string', description: "What the company does, in its own words." },
+        capabilities: { type: 'array', items: { type: 'string' }, description: 'Capability statements / service lines.' },
+        past_performance: { type: 'array', items: { type: 'string' }, description: 'Past-performance blurbs (work delivered, contracts won).' },
+        client_name: { type: 'string', description: 'Optional label for the deliverable header.' },
       },
     },
   },
@@ -1323,6 +1348,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     PAST_CONTRACTS_TOOL_DEF,
     ANNUAL_OBLIGATIONS_TOOL_DEF,
     MARKET_REPORT_TOOL_DEF,
+    CAPABILITY_MATCH_TOOL_DEF,
     CRM_CONTACTS_TOOL_DEF,
     CONTRACTOR_AWARD_HISTORY_TOOL_DEF,
     MARKET_DEPTH_TOOL_DEF,
@@ -1377,6 +1403,7 @@ export function isMcpTool(name: string): boolean {
     name === 'search_past_contracts' ||
     name === 'get_recipient_annual_obligations' ||
     name === 'generate_market_report' ||
+    name === 'capability_market_match' ||
     name === 'add_contacts_to_crm' ||
     name === 'get_contractor_award_history' ||
     name === 'assess_market_depth' ||
@@ -1655,6 +1682,18 @@ export async function runMcpTool(
       set_aside: typeof args.set_aside === 'string' ? args.set_aside : undefined,
       client_name: typeof args.client_name === 'string' ? args.client_name : undefined,
       // Report OWNER comes from the VERIFIED caller (ctx.userEmail) — never from args.
+      userEmail: ctx.userEmail,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'capability_market_match') {
+    const result = (await capabilityMarketMatch({
+      description: typeof args.description === 'string' ? args.description : undefined,
+      capabilities: Array.isArray(args.capabilities) ? (args.capabilities as string[]) : undefined,
+      past_performance: Array.isArray(args.past_performance) ? (args.past_performance as string[]) : undefined,
+      client_name: typeof args.client_name === 'string' ? args.client_name : undefined,
+      // Owner comes from the VERIFIED caller (ctx.userEmail) — never from args.
       userEmail: ctx.userEmail,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
