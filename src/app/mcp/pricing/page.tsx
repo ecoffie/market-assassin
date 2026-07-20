@@ -127,10 +127,12 @@ export default function McpPricing() {
   ];
 
   // Higgsfield pattern: credits/mo stay constant across the toggle; only the price flips.
+  // % off is computed from the real yearly price (annual vs 12× monthly) → the true "2 months
+  // free" = 17%, not the 16% you'd get from the rounded effective $/mo.
   const planRows = plans.map((p) => {
     const hasAnnual = !!p.annual;
     const perMo = annual && p.annual ? p.annual.usdPerMonth : p.monthly.usd;
-    const pct = p.annual && p.monthly.usd > 0 ? Math.round((1 - p.annual.usdPerMonth / p.monthly.usd) * 100) : 0;
+    const pct = p.annual && p.monthly.usd > 0 ? Math.round((1 - p.annual.usd / (p.monthly.usd * 12)) * 100) : 0;
     return {
       id: p.id,
       name: p.label,
@@ -139,13 +141,15 @@ export default function McpPricing() {
       perMo,
       perYear: p.annual?.usd ?? 0,
       annualCredits: p.annual?.credits ?? 0,
+      // Annual bonus = the 2 free months expressed as credits (creditsPerMonth × 2).
+      annualBonus: p.annual ? p.creditsPerMonth * 2 : 0,
       pct,
       hasAnnual,
       href: annual && p.annual ? p.annual.checkoutUrl : p.monthly.checkoutUrl,
     };
   });
   // Whole-ladder discount for the toggle badge (all tiers share the 2-months-free rate).
-  const annualPct = plans[0]?.annual ? Math.round((1 - plans[0].annual.usdPerMonth / plans[0].monthly.usd) * 100) : 0;
+  const annualPct = plans[0]?.annual ? Math.round((1 - plans[0].annual.usd / (plans[0].monthly.usd * 12)) * 100) : 0;
 
   // ---- Plan finder ----
   const perOppCost = ACTIVITIES.filter((a) => picked.has(a.id)).reduce((s, a) => s + exampleCost(tools, a.tools), 0);
@@ -189,7 +193,7 @@ export default function McpPricing() {
           <div className={`inline-flex items-center rounded-xl border p-1 text-[13px] transition ${annual ? 'border-emerald-400/40 bg-emerald-400/[0.06]' : 'border-white/10 bg-white/[0.03]'}`}>
             <button type="button" onClick={() => setAnnual(false)} className={`rounded-lg px-4 py-1.5 font-semibold transition ${!annual ? 'bg-white/[0.08] text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}>Monthly</button>
             <button type="button" onClick={() => setAnnual(true)} className={`flex items-center gap-2 rounded-lg px-4 py-1.5 font-semibold transition ${annual ? 'bg-white/[0.08] text-slate-100' : 'text-slate-400 hover:text-slate-200'}`}>
-              Annual {annualPct > 0 && <span className="rounded-full bg-emerald-500 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-[#06120c]">Save {annualPct}%</span>}
+              Annual {annualPct > 0 && <span className="rounded-full bg-pink-500 px-2 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-white shadow-sm shadow-pink-500/40">Save {annualPct}%</span>}
             </button>
           </div>
         </div>
@@ -203,6 +207,11 @@ export default function McpPricing() {
             return (
               <div key={p.id} className={`relative flex flex-col rounded-2xl border p-6 ${t.card}`}>
                 <span className={`absolute -top-2.5 left-6 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${t.badge}`}>{t.tag}</span>
+                {p.annualBonus > 0 && (
+                  <span className="absolute -top-3.5 right-4 rotate-3 rounded-full border-2 border-[#0a0f1e] bg-gradient-to-r from-amber-300 to-yellow-400 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-[#3a2a00] shadow-lg shadow-amber-500/20">
+                    🎁 +{p.annualBonus.toLocaleString()} {annual ? 'bonus credits' : 'on annual'}
+                  </span>
+                )}
                 <div className="flex items-baseline justify-between gap-2">
                   <span className={`text-[12px] font-semibold uppercase tracking-wide ${t.accent}`}>{p.name}</span>
                   <span className="text-[11px] text-slate-500">credits plan</span>
