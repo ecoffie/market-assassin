@@ -207,11 +207,15 @@ export default function McpPricing() {
             return (
               <div key={p.id} className={`relative flex flex-col rounded-2xl border p-6 ${t.card}`}>
                 <span className={`absolute -top-2.5 left-6 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wide ${t.badge}`}>{t.tag}</span>
-                {p.annualBonus > 0 && (
+                {p.annualBonus > 0 && (annual ? (
                   <span className="absolute -top-3.5 right-4 rotate-3 rounded-full border-2 border-[#0a0f1e] bg-gradient-to-r from-amber-300 to-yellow-400 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-[#3a2a00] shadow-lg shadow-amber-500/20">
-                    🎁 +{p.annualBonus.toLocaleString()} {annual ? 'bonus credits' : 'on annual'}
+                    🎁 +{p.annualBonus.toLocaleString()} bonus credits
                   </span>
-                )}
+                ) : (
+                  <span className="absolute -top-3.5 right-4 rotate-3 rounded-full border-2 border-[#0a0f1e] bg-red-500 px-2.5 py-1 text-[10px] font-extrabold uppercase tracking-wide text-white shadow-lg shadow-red-500/20">
+                    ▾ −{p.annualBonus.toLocaleString()} credits vs annual
+                  </span>
+                ))}
                 <div className="flex items-baseline justify-between gap-2">
                   <span className={`text-[12px] font-semibold uppercase tracking-wide ${t.accent}`}>{p.name}</span>
                   <span className="text-[11px] text-slate-500">credits plan</span>
