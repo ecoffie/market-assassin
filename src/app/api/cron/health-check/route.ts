@@ -515,6 +515,66 @@ const tests = [
     },
   },
 
+  // Recompete change-log ("the moat") health. recompete_changes is an append-only
+  // record of how tracked fields move over time — but it's EVENT-DRIVEN, so a broken
+  // diff/append and a genuinely quiet source both read as "0 new rows". This catches
+  // ONLY the broken case, without false-firing on quiet days: it fails only when the
+  // sync is DEMONSTRABLY pulling real data (recompete_naics_sync 'ok' + contracts
+  // found in the last 26h) AND the change-log has appended nothing for 3+ days. Award
+  // data across ~477 NAICS doesn't stay frozen that long, so that combination means
+  // diffContracts/upsert silently stopped. NOTE: recompete_opportunities.updated_at
+  // is a blind touch (~93% of rows bump daily), so it CAN'T be the signal — the NAICS
+  // sync results are.
+  {
+    name: 'Recompete Change-Log (Moat)',
+    category: 'Cron Health',
+    critical: false,
+    fn: async () => {
+      const supabase = getSupabase();
+      // 1) Is the sync demonstrably pulling real recompete data recently?
+      const { data: syncRows, error: syncErr } = await supabase
+        .from('recompete_naics_sync')
+        .select('last_attempt_at, last_result, contracts_found')
+        .order('last_attempt_at', { ascending: false })
+        .limit(200);
+      if (syncErr) return { passed: false, message: `DB error: ${syncErr.message}` };
+      if (!syncRows || syncRows.length === 0) {
+        return { passed: true, message: 'no recompete sync yet (skip)' };
+      }
+      const cutoff = Date.now() - 26 * 60 * 60 * 1000;
+      const pulling = syncRows.some(
+        (s: { last_attempt_at: string | null; last_result: string | null; contracts_found: number | null }) =>
+          !!s.last_attempt_at &&
+          new Date(s.last_attempt_at).getTime() >= cutoff &&
+          s.last_result === 'ok' &&
+          (s.contracts_found ?? 0) > 0,
+      );
+      if (!pulling) {
+        // The sync itself isn't pulling — a different (upstream) problem; a flat
+        // change-log is then EXPECTED, so don't blame the change-log for it.
+        return { passed: true, message: 'recompete sync not pulling data in 26h — flat change-log is expected (not a moat break)' };
+      }
+      // 2) How stale is the newest change-log append?
+      const { data: newest, error: chgErr } = await supabase
+        .from('recompete_changes')
+        .select('observed_at')
+        .order('observed_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (chgErr) return { passed: false, message: `DB error: ${chgErr.message}` };
+      const last = newest?.observed_at ? new Date(newest.observed_at) : null;
+      const days = last ? (Date.now() - last.getTime()) / 86_400_000 : Infinity;
+      const STALE_DAYS = 3;
+      const broken = days >= STALE_DAYS;
+      return {
+        passed: !broken,
+        message: broken
+          ? `Moat NOT accumulating: sync is pulling data but change-log has 0 appends for ${Number.isFinite(days) ? Math.round(days) + 'd' : 'ever'} — diffContracts/append may have stopped`
+          : `Change-log fresh — last append ${last ? Math.round(days * 24) + 'h ago' : 'n/a'}`,
+      };
+    },
+  },
+
   // Check for dead letter queue items (failed briefings awaiting retry)
   {
     name: 'Briefing Dead Letter Queue',
