@@ -69,3 +69,8 @@ preview-*.html
 # Local test/fetch caches (keyword-derivation harness, etc.)
 .cache/
 .recompete-sweep-state.json
+
+# Root-level scratch/debug scripts from ad-hoc sessions (referenced nowhere in src/)
+/*-tmp.ts
+/._*.cjs
+*.tmp
