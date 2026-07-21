@@ -40,6 +40,7 @@ import { getAnnualObligations } from '@/mcp/tools/annual-obligations';
 import { generateMarketReport } from '@/mcp/tools/market-report';
 import { capabilityMarketMatch } from '@/mcp/tools/capability-market-match';
 import { buildPursuitDossier } from '@/mcp/tools/pursuit-dossier';
+import { oneClickProposal } from '@/mcp/tools/one-click-proposal';
 import { addContactsToCrm } from '@/mcp/tools/crm-contacts';
 import type { CrmContactInput } from '@/lib/ghl/contacts';
 import { contractorAwardHistory } from '@/mcp/tools/contractor-award-history';
@@ -143,6 +144,8 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   generate_market_report: 100,
   capability_market_match: 100,
   build_pursuit_dossier: 100,
+  // 200 — full pipeline: chains several LLM-heavy tools end to end into a submittable .docx
+  one_click_proposal: 200,
   // Free meta tool
   get_balance: 0,
 };
@@ -678,6 +681,29 @@ const PURSUIT_DOSSIER_TOOL_DEF = {
         solicitation_number: { type: 'string', description: 'Solicitation number (e.g. 140L6226Q0013) or 32-char notice UUID.' },
         notice_id: { type: 'string', description: 'Alias for solicitation_number.' },
         client_name: { type: 'string', description: 'Optional label for the deliverable header.' },
+      },
+    },
+  },
+};
+
+const ONE_CLICK_PROPOSAL_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'one_click_proposal',
+    description:
+      "COMBINATION — solicitation in, submittable .docx out. Runs the ENTIRE proposal pipeline in one call: " +
+      "extract the compliance matrix, build the volume/section structure, draft every section (vault+RAG grounded), " +
+      "run an INDEPENDENT compliance referee (met/partial/missing score), and assemble the Word document. Returns " +
+      "the matrix, outline, full draft, the compliance score, and the .docx as base64. The heaviest tool in the " +
+      "catalog (multiple LLM passes) — it replaces the $3,500-7,500 proposal effort. grounded=false when there is " +
+      "no RFP to work from; each stage degrades honestly rather than fabricating.",
+    parameters: {
+      type: 'object',
+      properties: {
+        notice_id: { type: 'string', description: 'SAM notice UUID / solicitation number to respond to.' },
+        rfp_text: { type: 'string', description: 'Or paste the RFP text directly.' },
+        agency: { type: 'string', description: 'Agency name (helps the draft tone/positioning).' },
+        title: { type: 'string', description: 'Title for the exported .docx.' },
       },
     },
   },
@@ -1374,6 +1400,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     MARKET_REPORT_TOOL_DEF,
     CAPABILITY_MATCH_TOOL_DEF,
     PURSUIT_DOSSIER_TOOL_DEF,
+    ONE_CLICK_PROPOSAL_TOOL_DEF,
     CRM_CONTACTS_TOOL_DEF,
     CONTRACTOR_AWARD_HISTORY_TOOL_DEF,
     MARKET_DEPTH_TOOL_DEF,
@@ -1430,6 +1457,7 @@ export function isMcpTool(name: string): boolean {
     name === 'generate_market_report' ||
     name === 'capability_market_match' ||
     name === 'build_pursuit_dossier' ||
+    name === 'one_click_proposal' ||
     name === 'add_contacts_to_crm' ||
     name === 'get_contractor_award_history' ||
     name === 'assess_market_depth' ||
@@ -1730,6 +1758,17 @@ export async function runMcpTool(
       solicitation_number: typeof args.solicitation_number === 'string' ? args.solicitation_number : undefined,
       notice_id: typeof args.notice_id === 'string' ? args.notice_id : undefined,
       client_name: typeof args.client_name === 'string' ? args.client_name : undefined,
+      userEmail: ctx.userEmail,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'one_click_proposal') {
+    const result = (await oneClickProposal({
+      notice_id: typeof args.notice_id === 'string' ? args.notice_id : undefined,
+      rfp_text: typeof args.rfp_text === 'string' ? args.rfp_text : undefined,
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      title: typeof args.title === 'string' ? args.title : undefined,
       userEmail: ctx.userEmail,
     })) as unknown as Record<string, unknown>;
     return { result, credits };
