@@ -15,7 +15,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getReadClient } from '@/lib/supabase/server-clients';
 import { verifyApiKey } from '@/lib/mcp/api-keys';
-import { getIncumbentFinancialsFromEdgar } from '@/lib/edgar';
+import { getIncumbentFinancialsFromEdgar, getFinancialsByTicker } from '@/lib/edgar';
+import { primeTickerFor } from '@/lib/enterprise/prime-tickers';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -72,8 +73,14 @@ export async function POST(request: NextRequest) {
       const federal = { incumbent_name: name, contract_count: list.length, total_ceiling, revenue_at_risk_12mo: at_risk_12mo };
 
       if (!name) return { uei, ...federal, grounded: false, edgar: null };
-      let intel = null;
-      try { intel = await getIncumbentFinancialsFromEdgar(name); } catch { /* honest miss below */ }
+      // Curated ticker override first (fixes legacy/merged-name misses like Raytheon → RTX);
+      // fall back to the fuzzy EDGAR name match; genuinely private → grounded=false.
+      const override = primeTickerFor(name);
+      let intel = null, resolved_via = override ? 'ticker_override' : 'name_match';
+      try {
+        intel = override ? await getFinancialsByTicker(override) : null;
+        if (!intel) { intel = await getIncumbentFinancialsFromEdgar(name); if (override) resolved_via = 'name_match_fallback'; }
+      } catch { /* honest miss below */ }
       const latest = intel?.financials?.[0];
       const annualRevenue = latest?.revenue ?? null;
       const grounded = !!(intel && (intel.financials.length > 0 || intel.latest_10k_url));
@@ -81,7 +88,7 @@ export async function POST(request: NextRequest) {
         uei, ...federal, grounded,
         edgar: grounded && intel ? {
           matched_name: intel.company.name, ticker: intel.company.ticker, cik: intel.company.cik,
-          match_score: intel.company.match_score,
+          match_score: intel.company.match_score, resolved_via,
           latest_fy: latest?.fy ?? null, annual_revenue: annualRevenue, net_income: latest?.net_income ?? null,
           latest_10k_filed: intel.latest_10k_filed,
         } : null,

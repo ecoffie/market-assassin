@@ -304,8 +304,28 @@ function accessionToUrl(cik: number, accessionNumber: string): string {
  */
 export async function getIncumbentFinancialsFromEdgar(query: string): Promise<EdgarIntel | null> {
   const match = await resolveCompany(query);
-  if (!match) return null;
+  return match ? financialsForMatch(match) : null;
+}
 
+/** Resolve an EXACT ticker → CIK via the ticker index — the trustworthy override path
+ *  (skips fuzzy name matching, which misses legacy/merged names like Raytheon → RTX). */
+export async function resolveCompanyByTicker(ticker: string): Promise<EdgarCompanyMatch | null> {
+  const t = String(ticker || '').toUpperCase().trim();
+  if (!t) return null;
+  let entries: EdgartickerEntry[];
+  try { entries = await loadTickerIndex(); } catch { return null; }
+  const e = entries.find((x) => (x.ticker || '').toUpperCase() === t);
+  return e ? { cik: e.cik_str, ticker: e.ticker, title: e.title, matchScore: 1 } : null;
+}
+
+/** Full financial read for a known ticker (used by curated UEI/name → ticker overrides). */
+export async function getFinancialsByTicker(ticker: string): Promise<EdgarIntel | null> {
+  const match = await resolveCompanyByTicker(ticker);
+  return match ? financialsForMatch(match) : null;
+}
+
+/** Load the full financial read for an already-resolved company match. */
+async function financialsForMatch(match: EdgarCompanyMatch): Promise<EdgarIntel> {
   const [facts, submissions] = await Promise.all([loadCompanyFacts(match.cik), loadSubmissions(match.cik)]);
 
   // Assemble annual financials by joining revenue / net income / gross profit on fy.
