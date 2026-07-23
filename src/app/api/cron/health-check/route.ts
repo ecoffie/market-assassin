@@ -5,6 +5,20 @@ import { sendOpsAlert } from '@/lib/ops-alert';
 const BASE_URL = 'https://getmindy.ai';
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 
+// Health-check signup flows send a REAL welcome email. Historically they used
+// synthetic `healthcheck-*@test.govcongiants.com` addresses, which don't exist →
+// every run generated a delivery_delayed/bounce event (noise in the deliverability
+// monitor + a small sending-reputation drag). Point them at a real, MONITORED seed
+// mailbox so the send actually DELIVERS — that also makes this a genuine end-to-end
+// email-delivery check instead of a send-into-a-black-hole. Must be a real inbox on
+// getmindy.ai (Google Workspace); override via env if it moves.
+// A run-unique +tag keeps rows distinct without minting dead addresses.
+const HEALTH_CHECK_SEED_EMAIL = process.env.HEALTH_CHECK_SEED_EMAIL || 'seed@getmindy.ai';
+function seedEmail(tag: string): string {
+  const [local, domain] = HEALTH_CHECK_SEED_EMAIL.split('@');
+  return `${local}+${tag}-${Date.now()}@${domain}`;
+}
+
 // Lazy init Supabase
 function getSupabase() {
   return createClient(
@@ -91,7 +105,7 @@ const tests = [
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: `healthcheck-${Date.now()}@test.govcongiants.com`,
+          email: seedEmail('signup'),
           naicsCodes: ['541511'],
           businessType: 'SDVOSB',
           source: 'free-signup',
@@ -269,7 +283,7 @@ const tests = [
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          email: `healthcheck-lead-${Date.now()}@test.govcongiants.com`,
+          email: seedEmail('lead'),
           resourceId: 'ai-prompts', // Valid resource ID from FREE_RESOURCES
         }),
       });
