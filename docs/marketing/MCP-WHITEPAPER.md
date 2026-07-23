@@ -31,7 +31,7 @@ Wrapping a public API is the price of entry. The moat is the intelligence that t
 
 ---
 
-## What Mindy MCP gives an agent — 51 tools across four layers
+## What Mindy MCP gives an agent — 52 tools across four layers
 
 The hosted server exposes **40 credit-metered tools** (plus a free `get_balance` check). Thirty-six are purpose-built GovCon intelligence tools; four are the core public-data search tools reused from Mindy's own platform. They fall into four layers:
 
@@ -186,7 +186,7 @@ Public data is labeled public; curated intelligence is labeled curated; an hones
 
 ## The bottom line
 
-Mindy MCP is not "an API wrapper for federal contracting." It's a grounded intelligence layer for AI agents — **51 tools** spanning the public data any agent needs, a full proposal pipeline, and the proprietary intelligence no competitor can copy, all under a contract that returns real data or honestly returns nothing.
+Mindy MCP is not "an API wrapper for federal contracting." It's a grounded intelligence layer for AI agents — **52 tools** spanning the public data any agent needs, a full proposal pipeline, and the proprietary intelligence no competitor can copy, all under a contract that returns real data or honestly returns nothing.
 
 - **Commodity done right** — the public-data tools are fast, cached, and useful on call one.
 - **Moat where it counts** — winning playbooks, office-level buying contacts, SBLO teaming, and podcast lessons that took eight years to build.
