@@ -33,6 +33,17 @@ Full record: **`tasks/mcp-directory-submission-readiness-2026-07-17.md`**. Don't
 - **OPEN — do soon:** rotate the GHL Private Integration Token (it was pasted into a transcript); delete the `Mindy ReviewerTest` contact in GHL location `V4H04EQ2wl6n6fkvBzyM`.
 - **OPEN — after approval only:** turn on `MCP_ENFORCE_TIERS` (off now so the reviewer's free account can run `get_winning_playbook`); decide the 713-Pro July allowance backfill (self-corrects in August).
 
+### Off-SAM opportunity ingestion — PAUSED 2026-07-18 (resume here)
+Full plan + spike: **`tasks/offsam-ingestion-scope-2026-07-18.md`** · memory `offsam-ingestion-inflight`.
+Decision: **differentiate coverage, NOT raw count**. 30-portal registry shipped (PR #382).
+- **DIBBS revive = config only** (`ingest.ts` is already paid-tier ready) — **BLOCKED ON ERIC:**
+  set paid `APIFY_TOKEN` in Vercel prod + redeploy → run `/api/cron/sync-dibbs?maxItems=1000` →
+  add daily `cron_jobs` row. `dibbs_rfqs` should grow past 895.
+- **Ariba Discovery adapter = spike GREEN, ready to build** (~2-3 days). LANL profile ANID
+  `AN01460290704` = 31 public postings, no login. ORNL is NOT Discovery (own page). Reuse is the
+  whole discovery.ariba.com network. New `offsam_opportunities` table + change-tracking + a
+  **separate Teaming view first**. Also needs the paid Apify token.
+
 ### Other active follow-ups
 - `tasks/silent-failure-followups-2026-07-16.md` — the recompete cron erroring on ~18% of NAICS (`fetch failed`, undiagnosed — log `error.cause`), plus 86 grandfathered silent-zero sites.
 - `tasks/mi-beta-email-cleanup.md` — `mi_beta_email` is a redundant unsigned localStorage key; deferred auth refactor (16 files).
