@@ -201,6 +201,14 @@ async function fireJob(
     if (!res.ok) {
       status = 'error';
       errorMsg = `route returned ${res.status}`;
+    } else if ((res.headers.get('content-type') || '').includes('text/html')) {
+      // Cron routes return JSON. An HTML 200 means the fetch never reached a cron
+      // route at all — prod serves the homepage (200) to any request carrying an
+      // Authorization header on a path with no route, so a cron_jobs row pointing at
+      // a nonexistent route logs "success" forever. build-discover-panels did exactly
+      // that daily from Jul 19-23, 2026 while its route sat on an unmerged branch.
+      status = 'error';
+      errorMsg = `route returned HTML, not JSON — route likely does not exist on this deployment`;
     }
   } catch (e) {
     if ((e as Error)?.name === 'AbortError') {
