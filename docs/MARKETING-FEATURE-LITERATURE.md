@@ -4381,3 +4381,11 @@ model-context guards (don't dump thousands of rows into one tool result), explic
 data-cost guards. Verified: `tsc --noEmit` clean, 32 tier1/tier2/registry unit tests green
 including new limit-clamp coverage on both `search_sam_opportunities` and
 `find_capable_contractors`.
+
+**Follow-up (same day):** Made the remaining summary-tool caps HONEST rather than
+silent (CLAUDE.md Bug Prevention Rule #6). `capability_market_match` now reports
+`_meta.sections` as `{ shown, available }` per section, so an agent can tell "top 8
+of 40 NAICS" from "only 8 exist." `generate_market_report` adds `top_agencies_total`
+(count before the top-10 display cap) and the hosted report page now reads "Showing
+the top 10 of 37 with spend." No payload/behavior change — the truncation is just no
+longer invisible.

@@ -58,6 +58,8 @@ function buildHint(
   total: number,
   q: RegulatoryDemandInput,
 ): RegulatoryDemandResult['_ai_hint'] {
+  // Name up to 3 agencies IN THE PROSE HINT only — the full agency list stays on
+  // every returned rule. This is a sentence-length choice, not a data cap.
   const agencies = Array.from(new Set(rules.flatMap((r) => r.agencies))).slice(0, 3);
   const latest = rules[0];
   const scopeParts = [
