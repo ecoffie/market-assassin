@@ -1,91 +1,123 @@
 /**
- * /api/cron/build-recent-spending — weekly rebuild of the "This Week in Government
- * Spending" Discover feed (/spending).
+ * /api/cron/build-recent-spending — daily rebuild of the "latest big federal
+ * contracts" Discover feed (/spending).
  *
  * Dispatcher-fired (cron_jobs 'build-recent-spending', NOT vercel.json). Pulls the biggest
- * recent federal obligations into recent_big_awards; the page reads cheap from Supabase.
- * Every row is a real award (real amount, real award_id → /awards/[id] proof) — grounded.
+ * federal obligations of the LAST 14 DAYS from the live USASpending API into
+ * recent_big_awards; the page reads cheap from Supabase.
  *
- * Cost: one bounded scan of the recent action_date range per WEEK. Never per page-load.
+ * Source is the LIVE API, not the BigQuery snapshot: the BQ awards table is loaded by a
+ * manual bulk ingest (scripts/usaspending-ingest/) and goes months between refreshes —
+ * on 2026-07-23 its newest action_date was 2026-04-23, so a page titled "the latest"
+ * was showing April. The live transaction search is always current (~week ingest lag).
+ * Every row is a real transaction (real amount, real generated_internal_id →
+ * usaspending.gov/award/<id> proof) — grounded.
  */
 import { NextResponse } from 'next/server';
 import { revalidatePath } from 'next/cache';
-import { bqQuery, BQ_TABLES } from '@/lib/bigquery/client';
 import { getWriteClient } from '@/lib/supabase/server-clients';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 export const maxDuration = 120;
 
-interface Row {
-  award_id: string;
-  piid: string | null;
-  recipient_name: string | null;
-  awarding_agency: string | null;
-  obligation_amount: number;
-  description: string | null;
+const USASPENDING_TRANSACTIONS = 'https://api.usaspending.gov/api/v2/search/spending_by_transaction/';
+const WINDOW_DAYS = 14;
+const MIN_AMOUNT = 1_000_000;
+
+interface TxnRow {
+  'Award ID': string | null;
+  'Recipient Name': string | null;
+  'Transaction Amount': number | null;
+  'Action Date': string | null;
+  'Awarding Agency': string | null;
+  'Transaction Description': string | null;
   naics_description: string | null;
-  action_date: string | null;
-  recipient_state: string | null;
+  recipient_location_state_code: string | null;
+  generated_internal_id: string | null;
 }
 
 export async function GET() {
-  let rows: Row[];
+  const end = new Date();
+  const start = new Date(end.getTime() - WINDOW_DAYS * 86400_000);
+  const day = (d: Date) => d.toISOString().slice(0, 10);
+
+  let results: TxnRow[];
   try {
-    rows = await bqQuery<Row>({
-      // Filter by fiscal_year (like getLatestAwards) + order by action_date DESC to get the
-      // MOST RECENT big awards. A tight action_date window returned 0 — federal award data
-      // lags ingestion by weeks/months, so "last 60 calendar days" is often empty. FY does not.
-      maximumBytesBilled: String(25 * 1024 * 1024 * 1024),
-      query: `
-        SELECT award_id, piid, recipient_name, awarding_agency, obligation_amount,
-               description, naics_description, CAST(action_date AS STRING) AS action_date, recipient_state
-        FROM ${BQ_TABLES.awards}
-        WHERE obligation_amount >= 1000000
-          AND fiscal_year >= @minFy
-        ORDER BY action_date DESC
-        LIMIT 300
-      `,
-      params: { minFy: new Date().getFullYear() - 1 },
+    const res = await fetch(USASPENDING_TRANSACTIONS, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        filters: {
+          award_type_codes: ['A', 'B', 'C', 'D'],
+          time_period: [{ start_date: day(start), end_date: day(end) }],
+        },
+        fields: [
+          'Award ID', 'Recipient Name', 'Transaction Amount', 'Action Date',
+          'Awarding Agency', 'Transaction Description',
+          'naics_description', 'recipient_location_state_code',
+        ],
+        sort: 'Transaction Amount',
+        order: 'desc',
+        limit: 100,
+        page: 1,
+      }),
     });
+    if (!res.ok) {
+      const body = await res.text().catch(() => '');
+      throw new Error(`USASpending ${res.status}: ${body.slice(0, 200)}`);
+    }
+    results = (await res.json())?.results ?? [];
   } catch (e) {
-    console.error('[build-recent-spending] BQ scan failed:', e);
+    console.error('[build-recent-spending] USASpending fetch failed:', e);
     return NextResponse.json({ success: false, error: e instanceof Error ? e.message : String(e) }, { status: 500 });
   }
 
-  // Dedup by award_id (the table can carry multiple transactions per award); keep the
-  // biggest, cap ~50.
+  // Dedup by award (an award can have several transactions in the window); results are
+  // amount-desc, so first-seen is the biggest. Cap ~50, floor $1M.
   const seen = new Set<string>();
-  const picked: Row[] = [];
-  for (const r of rows) {
-    if (!r.award_id || seen.has(r.award_id)) continue;
-    seen.add(r.award_id);
+  const picked: TxnRow[] = [];
+  for (const r of results) {
+    const id = r.generated_internal_id;
+    if (!id || seen.has(id)) continue;
+    if ((Number(r['Transaction Amount']) || 0) < MIN_AMOUNT) continue;
+    seen.add(id);
     picked.push(r);
     if (picked.length >= 50) break;
   }
 
   if (!picked.length) {
-    return NextResponse.json({ success: true, scanned: rows.length, written: 0, note: 'no recent awards over $1M found' });
+    // An empty window would blank the page — keep yesterday's rows and say so loudly.
+    return NextResponse.json(
+      { success: false, scanned: results.length, written: 0, error: `no transactions over $1M in the last ${WINDOW_DAYS} days — kept existing rows` },
+      { status: 500 },
+    );
   }
+
+  const payload = picked.map((r) => ({
+    award_id: r.generated_internal_id,
+    piid: r['Award ID'],
+    recipient_name: r['Recipient Name'],
+    awarding_agency: r['Awarding Agency'],
+    obligation_amount: Number(r['Transaction Amount']) || 0,
+    description: r['Transaction Description'],
+    naics_description: r.naics_description,
+    action_date: r['Action Date'],
+    recipient_state: r.recipient_location_state_code,
+  }));
 
   const sb = getWriteClient();
   const del = await sb.from('recent_big_awards').delete().neq('award_id', '');
   if (del.error) return NextResponse.json({ success: false, error: `delete: ${del.error.message}` }, { status: 500 });
-
-  const payload = picked.map((r) => ({
-    award_id: r.award_id,
-    piid: r.piid,
-    recipient_name: r.recipient_name,
-    awarding_agency: r.awarding_agency,
-    obligation_amount: Number(r.obligation_amount) || 0,
-    description: r.description,
-    naics_description: r.naics_description,
-    action_date: r.action_date,
-    recipient_state: r.recipient_state,
-  }));
   const ins = await sb.from('recent_big_awards').insert(payload);
   if (ins.error) return NextResponse.json({ success: false, error: `insert: ${ins.error.message}` }, { status: 500 });
 
   revalidatePath('/spending');
-  return NextResponse.json({ success: true, scanned: rows.length, written: payload.length });
+  return NextResponse.json({
+    success: true,
+    scanned: results.length,
+    written: payload.length,
+    window: { start: day(start), end: day(end) },
+    newest_action_date: payload.reduce((m, p) => (p.action_date && p.action_date > m ? p.action_date : m), ''),
+  });
 }
