@@ -8,15 +8,17 @@ const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
 // Health-check signup flows send a REAL welcome email. Historically they used
 // synthetic `healthcheck-*@test.govcongiants.com` addresses, which don't exist →
 // every run generated a delivery_delayed/bounce event (noise in the deliverability
-// monitor + a small sending-reputation drag). Point them at a real, MONITORED seed
-// mailbox so the send actually DELIVERS — that also makes this a genuine end-to-end
-// email-delivery check instead of a send-into-a-black-hole. Must be a real inbox on
-// getmindy.ai (Google Workspace); override via env if it moves.
-// A run-unique +tag keeps rows distinct without minting dead addresses.
-const HEALTH_CHECK_SEED_EMAIL = process.env.HEALTH_CHECK_SEED_EMAIL || 'seed@getmindy.ai';
-function seedEmail(tag: string): string {
-  const [local, domain] = HEALTH_CHECK_SEED_EMAIL.split('@');
-  return `${local}+${tag}-${Date.now()}@${domain}`;
+// monitor + a small sending-reputation drag). Point them at a real, MONITORED
+// mailbox so the send actually DELIVERS — a genuine end-to-end email-delivery check.
+// MUST be a real USER mailbox that receives external mail (NOT an alias/group — a
+// seed@ alias HARD-BOUNCED external Resend/SES mail; and NOT plus-addressing on a
+// Workspace alias, which Google rejected). eric@getmindy.ai is a confirmed real
+// receiver (the DMARC contact). Override via env if it moves.
+const HEALTH_CHECK_SEED_EMAIL = process.env.HEALTH_CHECK_SEED_EMAIL || 'eric@getmindy.ai';
+function seedEmail(_tag: string): string {
+  // Plain address, no +tag: uniqueness isn't needed (each event has its own row id
+  // + timestamp), and +tag risks a bounce on mailboxes that don't honor it.
+  return HEALTH_CHECK_SEED_EMAIL;
 }
 
 // Lazy init Supabase
