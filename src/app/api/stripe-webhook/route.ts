@@ -345,6 +345,14 @@ export async function POST(request: NextRequest) {
     // This ensures every paying customer gets daily opportunity alerts
     // Note: Uses unified user_notification_settings table (not old user_alert_settings)
     if (supabase) {
+      // The Stripe customer id for this purchase — stamp it onto the settings row so
+      // paid_status/stripe_customer_id reflect reality. Historically this block set
+      // alerts flags but NEVER paid_status/stripe_customer_id, so those two fields
+      // drifted false/null for ~37 real payers (tasks/paid-status-drift-notification-settings.md).
+      const stripeCustomerId = typeof session.customer === 'string'
+        ? session.customer
+        : session.customer?.id || null;
+
       const { data: existingSettings } = await supabase
         .from('user_notification_settings')
         .select('user_email')
@@ -360,18 +368,22 @@ export async function POST(request: NextRequest) {
           alert_frequency: 'daily',
           is_active: true,
           subscription_status: 'beta', // Beta access for purchasers
+          paid_status: true,
+          stripe_customer_id: stripeCustomerId,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
         });
         console.log(`✅ Auto-enrolled purchaser in alerts: ${email}`);
       } else {
-        // Ensure existing users have alerts enabled
+        // Ensure existing users have alerts enabled + paid state reflects the purchase
         await supabase
           .from('user_notification_settings')
           .update({
             alerts_enabled: true,
             briefings_enabled: true,
             is_active: true,
+            paid_status: true,
+            stripe_customer_id: stripeCustomerId,
             updated_at: new Date().toISOString(),
           })
           .eq('user_email', email.toLowerCase());

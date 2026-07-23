@@ -399,6 +399,22 @@ export async function applyMemberGrant(opts: {
     }
   }
 
+  // 3.5) Reflect paid state on the settings row so metrics/MRR see this grant as
+  // paid (the Stripe webhook stamps this on real purchases; a manual/off-link grant
+  // must too, or it re-creates the paid_status drift — see
+  // tasks/paid-status-drift-notification-settings.md). Best-effort, UPDATE-only
+  // (don't create a settings row here); never blocks the grant.
+  if (granting) {
+    try {
+      await supabase
+        .from('user_notification_settings')
+        .update({ paid_status: true, updated_at: new Date().toISOString() })
+        .eq('user_email', email);
+    } catch (err) {
+      console.error('[member-grants] paid_status stamp failed (non-fatal):', err);
+    }
+  }
+
   // 4) Welcome email on grant (best-effort).
   let welcomeEmailSent = false;
   if (granting && opts.sendWelcome) {
