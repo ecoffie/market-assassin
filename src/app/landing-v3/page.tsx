@@ -251,7 +251,9 @@ const CSS = `
 
 .lv3 .hero{position:relative;overflow:hidden}
 .lv3 .hero .glow{position:absolute;inset:0;background:radial-gradient(55% 70% at 78% 0%,rgba(139,92,246,.4),transparent 60%),radial-gradient(45% 60% at 8% 100%,rgba(34,224,138,.14),transparent 60%)}
-.lv3 .hero-in{position:relative;display:grid;grid-template-columns:1.05fr .95fr;gap:44px;align-items:center;padding:64px 0 60px}
+.lv3 .hero-in{position:relative;display:grid;grid-template-columns:1.15fr .85fr;gap:30px;align-items:start;padding:56px 0 56px}
+.lv3 .hero-in>div:first-child{padding-top:8px}
+.lv3 .quest{max-width:420px;justify-self:end;width:100%}
 @media(max-width:900px){.lv3 .hero-in{grid-template-columns:1fr;padding:44px 0}}
 .lv3 .kick{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:800;color:#d8b4fe;background:rgba(139,92,246,.14);border:1px solid var(--line2);padding:6px 13px;border-radius:99px;margin-bottom:20px}
 .lv3 .hero h1{font-size:56px;line-height:.98;margin:0 0 16px}
