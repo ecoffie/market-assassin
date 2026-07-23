@@ -30,7 +30,7 @@ function stubDb(rows: unknown[], captured: { table?: string; calls: Array<[strin
   chain.ilike = (c: string, v: unknown) => rec(`ilike:${c}`, v);
   chain.textSearch = (c: string, q: unknown) => rec(`textSearch:${c}`, q);
   chain.order = () => chain;
-  chain.limit = async () => ({ data: rows, error: null });
+  chain.limit = async (n: number) => { captured.calls.push(['limit', n]); return { data: rows, error: null }; };
   return {
     from(table: string) { captured.table = table; return chain as unknown as ReturnType<Tier1Db['from']>; },
   };
@@ -63,6 +63,23 @@ describe('search_sam_opportunities', () => {
     expect(names).toContain('eq:active');            // active only
     expect(names).toContain('gte:response_deadline'); // not-yet-closed
     expect(names.some((n) => n === 'textSearch:search_tsv')).toBe(true); // FTS, not ILIKE
+  });
+
+  // We read the LOCAL sam_opportunities cache, not the rate-limited SAM API, so
+  // the old hardcoded 8 served no cost purpose. Default returns the full match set.
+  it('defaults to 100 results and clamps a caller-supplied limit to [1, 200]', async () => {
+    const limitFor = async (limit: unknown) => {
+      const captured = { calls: [] as Array<[string, unknown]> };
+      const tools = makeTier1Tools(stubDb([], captured));
+      await tools.execute('search_sam_opportunities', { keyword: 'it', limit });
+      const found = captured.calls.find(([n]) => n === 'limit');
+      return found?.[1];
+    };
+    expect(await limitFor(undefined)).toBe(100); // default — was a hardcoded 8
+    expect(await limitFor(40)).toBe(40);         // honored within range
+    expect(await limitFor(999)).toBe(200);       // clamped to the ceiling
+    expect(await limitFor(0)).toBe(1);           // floored to at least 1
+    expect(await limitFor('nope')).toBe(100);    // invalid → default
   });
 
   it('applies optional naics + set_aside filters when given', async () => {
