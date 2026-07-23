@@ -119,6 +119,7 @@ const TOOL_META: Readonly<Record<string, ToolMeta>> = {
   build_proposal_structure: { title: 'Build Proposal Structure (outline from compliance matrix)' },
   capability_market_match: { title: 'Capability-to-Market Match (your addressable market)' },
   build_pursuit_dossier: { title: 'Build Pursuit Dossier (capture package for one opportunity)' },
+  one_click_proposal: { title: 'One-Click Proposal (solicitation → submittable .docx)', write: 'additive' },
   derive_company_keywords: { title: 'Derive Company Keywords' },
   draft_proposal: { title: 'Draft Proposal (full, multi-section)' },
   draft_proposal_section: { title: 'Draft Proposal Section' },

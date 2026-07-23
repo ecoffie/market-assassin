@@ -8,7 +8,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { makeTier2Tools, TIER2_TOOL_DEFS, TIER2_TOOL_NAMES } from './tier2-tools';
 
 // --- mock the BQ lib: track liveBq usage so we can assert cold vs warm ---
-const bqCalls: Array<{ fn: string; liveBq: boolean }> = [];
+const bqCalls: Array<{ fn: string; liveBq: boolean; limit?: number }> = [];
 let rollupWarm = false;          // when true, cache-only (liveBq=false) returns a profile
 let capableWarm = false;
 
@@ -22,8 +22,8 @@ vi.mock('@/lib/bigquery/recipients', () => ({
   }),
   getRecentAwardsForRecipient: vi.fn(async (_ueis: string[], _rollupUei: string) => [{ piid: 'X', obligated: 1000 }]),
   getTopAgenciesForRecipient: vi.fn(async (_ueis: string[], _rollupUei: string) => [{ agency: 'DoD', total: 4e9 }]),
-  findCapableSmallBusinesses: vi.fn(async ({ liveBq = false }: { liveBq?: boolean }) => {
-    bqCalls.push({ fn: 'findCapableSmallBusinesses', liveBq });
+  findCapableSmallBusinesses: vi.fn(async ({ liveBq = false, limit }: { liveBq?: boolean; limit?: number }) => {
+    bqCalls.push({ fn: 'findCapableSmallBusinesses', liveBq, limit });
     if (!liveBq && !capableWarm) return { rows: [], total: 0 };
     return { rows: [{ recipient_name: 'Acme', recipient_uei: 'U9', total_obligated: 2e6, award_count: 10, won_set_aside: true, match_reason: 'won this NAICS' }], total: 1 };
   }),
@@ -108,6 +108,22 @@ describe('find_capable_contractors', () => {
     const res = await tools.execute('find_capable_contractors', {});
     expect(res.ok).toBe(false);
     expect(res.error).toBe('naics_or_psc_required');
+  });
+
+  // Reads a CACHED BQ rollup (the cold pass is budget-gated separately), so the
+  // result count is free. The old hardcoded limit:8 threw away 84% of the lib's
+  // own default; it's now caller-configurable, defaulting to 50, ceiling 200.
+  it('defaults to a 50-row limit and clamps a caller-supplied limit to [1, 200]', async () => {
+    const limitFor = async (limit: unknown) => {
+      capableWarm = true; bqCalls.length = 0;
+      const tools = makeTier2Tools('u@x.com');
+      await tools.execute('find_capable_contractors', { naics: '541512', limit });
+      return bqCalls.find((c) => c.fn === 'findCapableSmallBusinesses')?.limit;
+    };
+    expect(await limitFor(undefined)).toBe(50); // default — was a hardcoded 8
+    expect(await limitFor(120)).toBe(120);      // honored within range
+    expect(await limitFor(999)).toBe(200);      // clamped to the ceiling
+    expect(await limitFor(0)).toBe(1);          // floored to at least 1
   });
 
   it('cold miss over budget → note, no scan', async () => {

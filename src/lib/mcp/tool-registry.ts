@@ -40,6 +40,7 @@ import { getAnnualObligations } from '@/mcp/tools/annual-obligations';
 import { generateMarketReport } from '@/mcp/tools/market-report';
 import { capabilityMarketMatch } from '@/mcp/tools/capability-market-match';
 import { buildPursuitDossier } from '@/mcp/tools/pursuit-dossier';
+import { oneClickProposal } from '@/mcp/tools/one-click-proposal';
 import { addContactsToCrm } from '@/mcp/tools/crm-contacts';
 import type { CrmContactInput } from '@/lib/ghl/contacts';
 import { contractorAwardHistory } from '@/mcp/tools/contractor-award-history';
@@ -143,6 +144,8 @@ export const TOOL_CREDITS: Readonly<Record<string, number>> = {
   generate_market_report: 100,
   capability_market_match: 100,
   build_pursuit_dossier: 100,
+  // 200 — full pipeline: chains several LLM-heavy tools end to end into a submittable .docx
+  one_click_proposal: 200,
   // Free meta tool
   get_balance: 0,
 };
@@ -377,7 +380,7 @@ const SEARCH_CONTRACTORS_TOOL_DEF = {
         naics: { type: 'string', description: 'NAICS code(s), comma/space separated; 2-6 digit prefixes allowed, e.g. "541512".' },
         state: { type: 'string', description: 'Optional 2-letter state filter, e.g. "VA".' },
         sort_by: { type: 'string', enum: ['total_obligated', 'award_count', 'recipient_name'], description: 'Ranking (default total_obligated).' },
-        limit: { type: 'number', description: 'Max rows (default 15, max 100).' },
+        limit: { type: 'number', description: 'Max rows (default 50, max 100). Cached index — a larger set has no per-call cost.' },
       },
     },
   },
@@ -493,7 +496,7 @@ const EXPIRING_CONTRACTS_TOOL_DEF = {
         min_value: { type: 'number', description: 'Minimum obligated dollars.' },
         max_value: { type: 'number', description: 'Maximum obligated dollars.' },
         likelihood: { type: 'string', enum: ['high', 'medium', 'low'], description: 'Recompete-likelihood filter.' },
-        limit: { type: 'number', description: 'Max results (default 25, max 200).' },
+        limit: { type: 'number', description: 'Max results (default 50, max 200). Local table — a larger set has no per-call cost.' },
       },
     },
   },
@@ -683,6 +686,29 @@ const PURSUIT_DOSSIER_TOOL_DEF = {
   },
 };
 
+const ONE_CLICK_PROPOSAL_TOOL_DEF = {
+  type: 'function' as const,
+  function: {
+    name: 'one_click_proposal',
+    description:
+      "COMBINATION — solicitation in, submittable .docx out. Runs the ENTIRE proposal pipeline in one call: " +
+      "extract the compliance matrix, build the volume/section structure, draft every section (vault+RAG grounded), " +
+      "run an INDEPENDENT compliance referee (met/partial/missing score), and assemble the Word document. Returns " +
+      "the matrix, outline, full draft, the compliance score, and the .docx as base64. The heaviest tool in the " +
+      "catalog (multiple LLM passes) — it replaces the $3,500-7,500 proposal effort. grounded=false when there is " +
+      "no RFP to work from; each stage degrades honestly rather than fabricating.",
+    parameters: {
+      type: 'object',
+      properties: {
+        notice_id: { type: 'string', description: 'SAM notice UUID / solicitation number to respond to.' },
+        rfp_text: { type: 'string', description: 'Or paste the RFP text directly.' },
+        agency: { type: 'string', description: 'Agency name (helps the draft tone/positioning).' },
+        title: { type: 'string', description: 'Title for the exported .docx.' },
+      },
+    },
+  },
+};
+
 const CRM_CONTACTS_TOOL_DEF = {
   type: 'function' as const,
   function: {
@@ -806,7 +832,7 @@ const FEDERAL_EVENTS_TOOL_DEF = {
         agency: { type: 'string', description: 'Agency name, e.g. "Department of Defense", "Navy", "GSA". Messy raw names resolve via normalization.' },
         months_ahead: { type: 'number', description: 'Look-ahead window in months (default 4, max 12).' },
         include_ai_discovery: { type: 'boolean', description: 'Also run a web search for association conferences not in SAM (slower, best-effort). Default false.' },
-        limit: { type: 'number', description: 'Max SAM events to return (default 25, max 100).' },
+        limit: { type: 'number', description: 'Max SAM events to return (default 50, max 100). Local table — a larger set has no per-call cost.' },
         include_ics: {
           type: 'boolean',
           description:
@@ -975,7 +1001,7 @@ const FEDERAL_CONTACTS_TOOL_DEF = {
         office: { type: 'string', description: 'Office name filter (SAM office column; often null for POCs).' },
         role: { type: 'string', description: 'Soft role filter matched against each contact\'s title bucket — one of: contracting officer, contract specialist, small business, program/technical, leadership (or a title substring / acronym like CO, KO, OSBP). If it matches nobody, the filter is dropped and the full roster is still returned.' },
         search: { type: 'string', description: 'Free-text match on contact name OR title.' },
-        limit: { type: 'number', description: 'Max contacts (default 25, max 200).' },
+        limit: { type: 'number', description: 'Max contacts (default 50, max 200). Local table — a larger set has no per-call cost.' },
       },
     },
   },
@@ -1374,6 +1400,7 @@ export function listMcpTools(): Array<Record<string, unknown>> {
     MARKET_REPORT_TOOL_DEF,
     CAPABILITY_MATCH_TOOL_DEF,
     PURSUIT_DOSSIER_TOOL_DEF,
+    ONE_CLICK_PROPOSAL_TOOL_DEF,
     CRM_CONTACTS_TOOL_DEF,
     CONTRACTOR_AWARD_HISTORY_TOOL_DEF,
     MARKET_DEPTH_TOOL_DEF,
@@ -1430,6 +1457,7 @@ export function isMcpTool(name: string): boolean {
     name === 'generate_market_report' ||
     name === 'capability_market_match' ||
     name === 'build_pursuit_dossier' ||
+    name === 'one_click_proposal' ||
     name === 'add_contacts_to_crm' ||
     name === 'get_contractor_award_history' ||
     name === 'assess_market_depth' ||
@@ -1730,6 +1758,17 @@ export async function runMcpTool(
       solicitation_number: typeof args.solicitation_number === 'string' ? args.solicitation_number : undefined,
       notice_id: typeof args.notice_id === 'string' ? args.notice_id : undefined,
       client_name: typeof args.client_name === 'string' ? args.client_name : undefined,
+      userEmail: ctx.userEmail,
+    })) as unknown as Record<string, unknown>;
+    return { result, credits };
+  }
+
+  if (name === 'one_click_proposal') {
+    const result = (await oneClickProposal({
+      notice_id: typeof args.notice_id === 'string' ? args.notice_id : undefined,
+      rfp_text: typeof args.rfp_text === 'string' ? args.rfp_text : undefined,
+      agency: typeof args.agency === 'string' ? args.agency : undefined,
+      title: typeof args.title === 'string' ? args.title : undefined,
       userEmail: ctx.userEmail,
     })) as unknown as Record<string, unknown>;
     return { result, credits };

@@ -70,6 +70,10 @@ export const TIER1_TOOL_DEFS = [
             type: 'string',
             description: 'Optional state to filter by location — matches place of performance OR the buying office (SAM often omits place-of-performance, so office state is included for coverage). Accepts a 2-letter code ("FL") or full name ("Florida").',
           },
+          limit: {
+            type: 'number',
+            description: 'Optional max number of opportunities to return (1–200, default 100). Results come from a local cache, so returning more has no rate-limit cost — request a larger set to see more of the open market.',
+          },
         },
         required: ['keyword'],
         additionalProperties: false,
@@ -114,7 +118,19 @@ interface SamRow {
   office_address?: { state?: string | null } | null;
 }
 
-const SAM_LIMIT = 8; // chat answers are tight; a handful of live opps is plenty
+// We read the LOCAL sam_opportunities cache (~30K active rows, GIN-indexed), not
+// the rate-limited SAM API — so there's no cost reason to cap results tightly.
+// The default is the full matched set; the ceiling only exists to keep a single
+// tool result from dumping thousands of rows into the model's context at once.
+const SAM_LIMIT_DEFAULT = 100; // return the full useful match set by default
+const SAM_LIMIT_MAX = 200; // context guard, not a data-cost guard
+
+/** Clamp a caller-supplied limit to [1, SAM_LIMIT_MAX], defaulting when absent/invalid. */
+function resolveSamLimit(raw: unknown): number {
+  const n = typeof raw === 'number' ? raw : Number(raw);
+  if (!Number.isFinite(n)) return SAM_LIMIT_DEFAULT;
+  return Math.max(1, Math.min(SAM_LIMIT_MAX, Math.floor(n)));
+}
 
 /**
  * Build the Tier-1 toolset. `db` is the service-role Supabase client (public
@@ -195,11 +211,12 @@ const SET_ASIDE_HELP =
   '8(a), SDVOSB, WOSB, EDWOSB, HUBZone, Small Business, Veteran, Buy Indian, ISBEE, IEE, Local Area, None — or a raw SAM code (8A, 8AN, SDVOSBC, SBA, HZC…)';
 
 export function makeTier1Tools(db: Tier1Db) {
-  async function searchSam(args: { keyword?: unknown; naics?: unknown; set_aside?: unknown; state?: unknown }): Promise<Record<string, unknown>> {
+  async function searchSam(args: { keyword?: unknown; naics?: unknown; set_aside?: unknown; state?: unknown; limit?: unknown }): Promise<Record<string, unknown>> {
     const keyword = typeof args?.keyword === 'string' ? args.keyword.trim() : '';
     if (!keyword) return { ok: false, error: 'keyword_required', count: 0, items: [] };
     const naics = typeof args?.naics === 'string' ? args.naics.trim() : '';
     const setAside = typeof args?.set_aside === 'string' ? args.set_aside.trim() : '';
+    const limit = resolveSamLimit(args?.limit);
     // Location: match place-of-performance OR buying-office state. SAM omits
     // pop_state on ~64% of rows, so office_address.state widens coverage. A
     // state arg that doesn't resolve to a real code is ignored (still search).
@@ -234,7 +251,7 @@ export function makeTier1Tools(db: Tier1Db) {
       q = q.in('set_aside_code', setAsideCodes);
     }
     if (st) q = q.or(`pop_state.eq.${st},office_address->>state.eq.${st}`);
-    const { data, error } = await q.order('response_deadline', { ascending: true, nullsFirst: false }).limit(SAM_LIMIT);
+    const { data, error } = await q.order('response_deadline', { ascending: true, nullsFirst: false }).limit(limit);
 
     if (error) return { ok: false, error: 'sam_unavailable', count: 0, items: [] };
     const rows = (data || []) as SamRow[];

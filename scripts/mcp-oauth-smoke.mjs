@@ -87,8 +87,12 @@ async function main() {
   if (!tok.access_token || !tok.refresh_token) fail(`token exchange failed: ${JSON.stringify(tok)}`);
   ok(`token exchange → access_token + refresh_token (expires_in=${tok.expires_in})`);
 
-  // 5. Keyless MCP call with the ACCESS TOKEN (no API key)
-  const transport = new StreamableHTTPClientTransport(new URL(`${BASE}/mcp/mcp`), {
+  // 5. Keyless MCP call with the ACCESS TOKEN (no API key).
+  // Use the transport URL discovery advertises (prMeta.resource) rather than a
+  // hardcoded path — the connector URL moved to mcp.getmindy.ai/mcp and the old
+  // ${BASE}/mcp/mcp path was retired (404s).
+  const transportUrl = prMeta.resource || `${BASE}/mcp/mcp`;
+  const transport = new StreamableHTTPClientTransport(new URL(transportUrl), {
     requestInit: { headers: { Authorization: `Bearer ${tok.access_token}` } },
   });
   const client = new Client({ name: 'oauth-smoke', version: '1.0.0' });
@@ -104,6 +108,16 @@ async function main() {
   const bal = await client.callTool({ name: 'get_balance', arguments: {} });
   const balance = JSON.parse(bal.content[0].text).balance;
   ok(`KEYLESS access token works → ${tools.length} tools, balance=${balance}`);
+
+  // 5a. Result-cap proof: search_sam_opportunities used to hard-cap at 8. Prove
+  // the live tool now returns well past 8 for a common keyword (default 100).
+  {
+    const r = await client.callTool({ name: 'search_sam_opportunities', arguments: { keyword: 'cybersecurity' } });
+    const payload = JSON.parse(r.content[0].text);
+    const n = payload.count ?? payload.items?.length ?? 0;
+    if (n <= 8) fail(`search_sam_opportunities returned ${n} (still capped at 8?) — payload: ${JSON.stringify(payload).slice(0, 200)}`);
+    ok(`search_sam_opportunities returned ${n} results (>8 — the old cap is gone)`);
+  }
 
   // 5b. Tier gating (informational — outcome depends on whether MI_EMAIL is Pro):
   // call the Pro-gated get_winning_playbook and report whether it ran (Pro/flag

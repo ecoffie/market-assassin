@@ -104,7 +104,10 @@ export interface ExpiringContractsResult {
 }
 
 export async function queryExpiringContracts(input: ExpiringContractsInput): Promise<ExpiringContractsResult> {
-  const limit = Math.min(Math.max(Number(input.limit) || 25, 1), 200);
+  // Local recompete_opportunities table (not an external API), so a larger
+  // default costs nothing. Every real caller passes an explicit limit; this
+  // default only applies when omitted (the MCP get_expiring_contracts tool).
+  const limit = Math.min(Math.max(Number(input.limit) || 50, 1), 200);
   const months = Math.min(Math.max(Number(input.monthsWindow) || 18, 1), 60);
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 

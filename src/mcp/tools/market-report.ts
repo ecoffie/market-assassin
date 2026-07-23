@@ -118,6 +118,10 @@ export interface MarketReportResult {
   sections: {
     market_size: KeywordCoverage | { basis: string; total_market: number; top_psc: unknown } | null;
     top_agencies: TopAgency[];
+    /** Total buying agencies with spend BEFORE the top-10 display cap — so the
+     *  truncation is explicit, not a silent .slice(). Equals top_agencies.length
+     *  when nothing was cut. */
+    top_agencies_total: number;
     competition: { contractors: unknown[]; count: number };
     recompetes: { contracts: unknown[]; count: number };
     forecasts: { forecasts: unknown[]; count: number };
@@ -203,9 +207,11 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
     agency ? guard(getSbaGoalingShare({ agency })) : Promise.resolve({ value: null, degraded: false }),
   ]);
 
-  const topAgencies: TopAgency[] = Array.isArray(agenciesR.value)
-    ? (agenciesR.value as TopAgency[]).filter((a) => a.amount > 0).slice(0, 10)
+  const agenciesWithSpend: TopAgency[] = Array.isArray(agenciesR.value)
+    ? (agenciesR.value as TopAgency[]).filter((a) => a.amount > 0)
     : [];
+  const TOP_AGENCIES_CAP = 10;
+  const topAgencies = agenciesWithSpend.slice(0, TOP_AGENCIES_CAP);
 
   const contractors = competitionR.value?.contractors ?? [];
   const contracts = recompetesR.value?.contracts ?? [];
@@ -263,6 +269,7 @@ export async function generateMarketReport(input: MarketReportInput): Promise<Ma
   const sections: MarketReportResult['sections'] = {
     market_size: marketSize as MarketReportResult['sections']['market_size'],
     top_agencies: topAgencies,
+    top_agencies_total: agenciesWithSpend.length,
     competition: { contractors, count: contractors.length },
     recompetes: { contracts, count: contracts.length },
     forecasts: { forecasts, count: forecasts.length },

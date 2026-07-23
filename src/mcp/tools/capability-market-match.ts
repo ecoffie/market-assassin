@@ -52,7 +52,12 @@ export interface CapabilityMarketMatchResult {
     degraded: boolean;
     lead_keyword: string | null;
     lead_naics: string | null;
-    sections: { keywords: number; competitors: number; forecasts: number; recompetes: number };
+    // { shown, available } per capped section — truncation is explicit, never a
+    // silent .slice() on result data. shown === available means nothing was cut.
+    sections: Record<
+      'keywords' | 'top_naics' | 'top_psc' | 'buyer_vocabulary' | 'competitors' | 'forecasts' | 'recompetes',
+      { shown: number; available: number }
+    >;
     elapsed_ms: number;
     note?: string;
   };
@@ -79,7 +84,12 @@ function miss(note: string, started: number): CapabilityMarketMatchResult {
     recompete_opportunities: [],
     _meta: {
       grounded: false, degraded: false, lead_keyword: null, lead_naics: null,
-      sections: { keywords: 0, competitors: 0, forecasts: 0, recompetes: 0 },
+      sections: {
+        keywords: { shown: 0, available: 0 }, top_naics: { shown: 0, available: 0 },
+        top_psc: { shown: 0, available: 0 }, buyer_vocabulary: { shown: 0, available: 0 },
+        competitors: { shown: 0, available: 0 }, forecasts: { shown: 0, available: 0 },
+        recompetes: { shown: 0, available: 0 },
+      },
       elapsed_ms: Date.now() - started, note,
     },
   };
@@ -124,6 +134,19 @@ export async function capabilityMarketMatch(
 
   const degraded = [cov, vocab, competitors, forecasts, expiring].some((s) => s.degraded);
 
+  // This is a SUMMARY tool: each section is intentionally capped to a
+  // digestible size. The caps are made HONEST via _meta.sections below, which
+  // reports { shown, available } per section so a consumer can tell "top 8 of
+  // 40 NAICS" from "only 8 exist" — never a silent .slice() on result data.
+  const NAICS_CAP = 8, PSC_CAP = 6, VOCAB_CAP = 25, LIST_CAP = 10;
+  const allNaics = coverage?.allNaics ?? [];
+  const allPsc = coverage?.topPscList ?? [];
+  const vocabTerms = (vocab.value ?? []).map((t) => (t as { term?: string }).term ?? String(t));
+  const competitorRows = competitors.value?.contractors ?? [];
+  const forecastRows = forecasts.value?.forecasts ?? [];
+  const recompeteRows = expiring.value?.contracts ?? [];
+  const shownAvail = (shown: number, available: number) => ({ shown: Math.min(shown, available), available });
+
   return {
     subject: input.client_name || 'your company',
     keywords,
@@ -132,25 +155,30 @@ export async function capabilityMarketMatch(
           lead_keyword: lead,
           total_market: coverage.totalMarket,
           naics_count: coverage.naicsCount,
-          top_naics: coverage.allNaics.slice(0, 8),
-          top_psc: coverage.topPscList.slice(0, 6),
+          top_naics: allNaics.slice(0, NAICS_CAP),
+          top_psc: allPsc.slice(0, PSC_CAP),
           single_code_share_pct: coverage.topCodePct,
         }
       : null,
-    buyer_vocabulary: (vocab.value ?? []).map((t) => (t as { term?: string }).term ?? String(t)).slice(0, 25),
-    competitors: (competitors.value?.contractors ?? []).slice(0, 10),
-    upcoming_forecasts: (forecasts.value?.forecasts ?? []).slice(0, 10),
-    recompete_opportunities: (expiring.value?.contracts ?? []).slice(0, 10),
+    buyer_vocabulary: vocabTerms.slice(0, VOCAB_CAP),
+    competitors: competitorRows.slice(0, LIST_CAP),
+    upcoming_forecasts: forecastRows.slice(0, LIST_CAP),
+    recompete_opportunities: recompeteRows.slice(0, LIST_CAP),
     _meta: {
       grounded: !!coverage,
       degraded,
       lead_keyword: lead,
       lead_naics: leadNaics ?? null,
+      // { shown, available } per capped section — the truncation is explicit,
+      // not silent. keywords is uncapped in the payload so shown === available.
       sections: {
-        keywords: keywords.length,
-        competitors: competitors.value?._meta?.count ?? 0,
-        forecasts: forecasts.value?._meta?.count ?? 0,
-        recompetes: expiring.value?._meta?.count ?? 0,
+        keywords: shownAvail(keywords.length, keywords.length),
+        top_naics: shownAvail(NAICS_CAP, allNaics.length),
+        top_psc: shownAvail(PSC_CAP, allPsc.length),
+        buyer_vocabulary: shownAvail(VOCAB_CAP, vocabTerms.length),
+        competitors: shownAvail(LIST_CAP, competitors.value?._meta?.count ?? competitorRows.length),
+        forecasts: shownAvail(LIST_CAP, forecasts.value?._meta?.count ?? forecastRows.length),
+        recompetes: shownAvail(LIST_CAP, expiring.value?._meta?.count ?? recompeteRows.length),
       },
       elapsed_ms: Date.now() - started,
     },

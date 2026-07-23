@@ -57,6 +57,7 @@ interface ReportLike {
   sections: {
     market_size: unknown;
     top_agencies: Array<{ name: string; amount: number }>;
+    top_agencies_total?: number;
     competition: { contractors: unknown[] };
     recompetes: { contracts: unknown[] };
     forecasts: { forecasts: unknown[] };
@@ -202,7 +203,11 @@ export function renderMarketReportHtml(report: ReportLike, opts: { date?: string
     reconcileHtml,
     section(
       'Who is buying',
-      `Top federal buying sub-agencies by obligated dollars${basisNote}. Share is of the top ${sections.top_agencies.length} shown, not of the whole market.`,
+      `Top federal buying sub-agencies by obligated dollars${basisNote}. Showing the top ${sections.top_agencies.length}${
+        sections.top_agencies_total && sections.top_agencies_total > sections.top_agencies.length
+          ? ` of ${sections.top_agencies_total} with spend`
+          : ''
+      }. Share is of the shown agencies, not of the whole market.`,
       table(['Buying sub-agency', 'Obligated', 'Share of shown'], agencyRows)
     ),
     section('Competitive landscape', 'Leading contractors by obligated dollars — the incumbents you would be up against.', table(['Contractor', 'Location', 'Obligated', 'Awards'], vendorRows)),
