@@ -264,7 +264,10 @@ export interface ContactRosterResult {
 
 export async function queryFederalContacts(input: ContactRosterInput): Promise<ContactRosterResult> {
   const trace: string[] = [];
-  const limit = Math.min(Math.max(input.limit ?? 25, 1), 200);
+  // Local federal_contacts table (not an external API), so a larger default is
+  // free. The .slice(0, limit) below enforces this same cap after the OSBP
+  // prepend + 4× over-fetch; `total` still reports the true matched count.
+  const limit = Math.min(Math.max(input.limit ?? 50, 1), 200);
   const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
   const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
   if (!url || !key) {

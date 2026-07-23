@@ -4343,3 +4343,41 @@ grounded + incumbent **Matt L Keil / PIID 140L6221P0029 / ~$601K** (high confide
 not confused with the ~$6M facility awards at the same site. Wired across Chat prompt,
 MCP stdio+HTTP registry, Global Lookup award-miss fallback, and Alerts `solicitation_number`
 search.
+
+---
+
+## MCP result caps removed — agents now see the whole market, not a sample (2026-07-23)
+
+**What:** Five Mindy MCP tools that read Mindy's **local/cached data** were returning
+artificially tiny result sets. The biggest offender, `search_sam_opportunities`, capped
+every search at **8 opportunities**. Raised defaults across the board and made every cap
+caller-configurable:
+
+| Tool | Data source | Was | Now |
+|------|-------------|-----|-----|
+| `search_sam_opportunities` | local `sam_opportunities` cache (~30K active) | 8 (fixed) | 100 default, 1–200 configurable |
+| `find_capable_contractors` | cached BigQuery rollup | 8 (fixed, not configurable) | 50 default, 1–200 configurable |
+| `search_contractors` | cached BigQuery recipients index | 15 default | 50 default, max 100 |
+| `get_expiring_contracts` | local `recompete_opportunities` | 25 default | 50 default, max 200 |
+| `search_federal_events` | local `sam_events` | 25 default | 50 default, max 100 |
+| `search_federal_contacts` | local `federal_contacts` | 25 default | 50 default, max 200 |
+
+**Why:** These caps were justified only by "chat answers are tight" — never by cost. All
+six tools read a **local Supabase table or a pre-aggregated BigQuery cache**, not a
+rate-limited external API, so returning more rows is effectively free. An agent asking
+"what cybersecurity opportunities are open in Florida" was silently shown 8 of hundreds.
+External-API-backed tools (USASpending, SAM.gov Entity, Grants.gov, SBIR) keep their caps
+— those are genuine rate-limit guards and were left untouched.
+
+**SEO/positioning:** Mindy is the GovCon intelligence layer an AI agent can *actually
+query at scale* — no other GovCon platform (SweetSpot, Govly, GovWin) exposes an MCP
+surface at all, and now ours returns the real market depth instead of a teaser sample.
+
+**Proof:** `sam_opportunities` holds ~30,676 active rows (measured live); the old cap
+surfaced 0.03% of them per call. Post-fix, `search_sam_opportunities` defaults to 100 and
+accepts up to 200; `find_capable_contractors` went from a hardcoded 8 to a configurable
+50/200 against a rollup its own lib already supported at 200. Ceilings remain only as
+model-context guards (don't dump thousands of rows into one tool result), explicitly not
+data-cost guards. Verified: `tsc --noEmit` clean, 32 tier1/tier2/registry unit tests green
+including new limit-clamp coverage on both `search_sam_opportunities` and
+`find_capable_contractors`.

@@ -59,7 +59,8 @@ export interface FederalEventsResult {
 export async function queryFederalEvents(input: FederalEventsInput): Promise<FederalEventsResult> {
   const agency = (input.agency || '').trim();
   const months = Math.min(Math.max(Number(input.monthsAhead) || 4, 1), 12);
-  const limit = Math.min(Math.max(Number(input.limit) || 25, 1), 100);
+  // Local sam_events table (not an external API), so a larger default is free.
+  const limit = Math.min(Math.max(Number(input.limit) || 50, 1), 100);
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   const today = new Date();

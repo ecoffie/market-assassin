@@ -41,7 +41,10 @@ export async function searchContractors(input: SearchContractorsInput): Promise<
   const naics = String(input.naics ?? '').trim();
   const state = String(input.state ?? '').trim().toUpperCase();
   const sortBy = input.sort_by ?? 'total_obligated';
-  const limit = Math.min(Math.max(Number(input.limit) || 15, 1), 100);
+  // Reads the cached BigQuery recipients index (the same query the public site
+  // uses), so a larger set has no per-call cost. Default matches the lib's own
+  // default (50) rather than an arbitrarily low 15.
+  const limit = Math.min(Math.max(Number(input.limit) || 50, 1), 100);
 
   let contractors: RecipientSearchRow[] = [];
   let degraded = false;
