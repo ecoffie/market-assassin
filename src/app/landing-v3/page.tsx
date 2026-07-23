@@ -14,6 +14,25 @@
  */
 export const dynamic = 'force-static';
 
+// The quest card lives inside a Tailwind app; generic class names (ring/step/box…) collide
+// with Tailwind utilities (e.g. `.ring`), so the card's LAYOUT is inlined here — inline styles
+// beat any utility class and can't be overridden. Colors/visuals still come from the scoped CSS.
+const GRAD = 'linear-gradient(135deg,#8b5cf6,#a855f7 55%,#6d28d9)';
+const GWIN = 'linear-gradient(135deg,#22e08a,#10b981)';
+const BOX_BASE: React.CSSProperties = { width: 24, height: 24, borderRadius: 7, display: 'grid', placeItems: 'center', fontSize: 13, fontWeight: 800, flex: 'none' };
+const QUEST_STEPS: Array<{ state: 'done' | 'now' | 'lock'; mark: string; label: string; xp: string }> = [
+  { state: 'done', mark: '✓', label: 'Set up your profile', xp: '+50 XP' },
+  { state: 'done', mark: '✓', label: 'Read your first match', xp: '+30 XP' },
+  { state: 'done', mark: '✓', label: 'Run a market report', xp: '+40 XP' },
+  { state: 'now', mark: '4', label: 'Save your first pursuit', xp: '+60 XP' },
+  { state: 'lock', mark: '🔒', label: 'Submit your first bid', xp: '+150 XP' },
+];
+function boxStyle(state: 'done' | 'now' | 'lock'): React.CSSProperties {
+  if (state === 'done') return { ...BOX_BASE, background: GWIN, color: '#052e1c' };
+  if (state === 'now') return { ...BOX_BASE, background: GRAD, color: '#fff', boxShadow: '0 0 0 4px rgba(139,92,246,.2)' };
+  return { ...BOX_BASE, background: '#141021', border: '1px solid #342a52', color: '#7a7192' };
+}
+
 export default function LandingV3() {
   return (
     <div className="lv3">
@@ -43,19 +62,27 @@ export default function LandingV3() {
         </div>
 
         <div className="quest">
-          <div className="qh"><div className="t">Your first-contract quest</div><div className="lv">Lvl 2 · Hunter</div></div>
-          <div className="ring">
-            <svg width="72" height="72" viewBox="0 0 72 72">
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <div style={{ fontWeight: 800, fontSize: 15 }}>Your first-contract quest</div>
+            <div className="qlv">Lvl 2 · Hunter</div>
+          </div>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 18 }}>
+            <svg width="66" height="66" viewBox="0 0 72 72" style={{ flex: 'none' }}>
               <circle cx="36" cy="36" r="30" fill="none" stroke="#241d3a" strokeWidth="9" />
               <circle cx="36" cy="36" r="30" fill="none" stroke="#22e08a" strokeWidth="9" strokeLinecap="round" strokeDasharray="188.5" strokeDashoffset="75.4" transform="rotate(-90 36 36)" />
             </svg>
-            <div className="rt"><div className="n num">3 / 5 done</div><div className="s">2 steps to your first win badge</div></div>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 800 }}>3 / 5 done</div>
+              <div style={{ fontSize: 12.5, color: '#7a7192', marginTop: 2 }}>2 steps to your first win badge</div>
+            </div>
           </div>
-          <div className="step done"><div className="box">✓</div><div className="lab">Set up your profile</div><div className="rw">+50 XP</div></div>
-          <div className="step done"><div className="box">✓</div><div className="lab">Read your first match</div><div className="rw">+30 XP</div></div>
-          <div className="step done"><div className="box">✓</div><div className="lab">Run a market report</div><div className="rw">+40 XP</div></div>
-          <div className="step now"><div className="box">4</div><div className="lab">Save your first pursuit</div><div className="rw">+60 XP</div></div>
-          <div className="step lock"><div className="box">🔒</div><div className="lab">Submit your first bid</div><div className="rw">+150 XP</div></div>
+          {QUEST_STEPS.map((s) => (
+            <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderTop: '1px solid #241d3a' }}>
+              <div style={boxStyle(s.state)}>{s.mark}</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: s.state === 'lock' ? '#7a7192' : '#f4f1ff' }}>{s.label}</div>
+              <div style={{ marginLeft: 'auto', fontSize: '11.5px', fontWeight: 800, color: s.state === 'done' ? '#22e08a' : '#ffb020' }}>{s.xp}</div>
+            </div>
+          ))}
         </div>
       </div></section>
 
@@ -254,6 +281,7 @@ const CSS = `
 .lv3 .hero-in{position:relative;display:grid;grid-template-columns:1.15fr .85fr;gap:30px;align-items:start;padding:56px 0 56px}
 .lv3 .hero-in>div:first-child{padding-top:8px}
 .lv3 .quest{max-width:420px;justify-self:end;width:100%}
+.lv3 .qlv{font-size:11px;font-weight:800;color:var(--win);background:rgba(34,224,138,.12);border:1px solid rgba(34,224,138,.3);padding:4px 9px;border-radius:99px;white-space:nowrap}
 @media(max-width:900px){.lv3 .hero-in{grid-template-columns:1fr;padding:44px 0}}
 .lv3 .kick{display:inline-flex;align-items:center;gap:8px;font-size:12.5px;font-weight:800;color:#d8b4fe;background:rgba(139,92,246,.14);border:1px solid var(--line2);padding:6px 13px;border-radius:99px;margin-bottom:20px}
 .lv3 .hero h1{font-size:56px;line-height:.98;margin:0 0 16px}
