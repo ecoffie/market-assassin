@@ -76,8 +76,8 @@ export default async function LoggedInHomeV4({ searchParams }: { searchParams: P
         {/* MINIMAL HERO — one promise, one action (Robinhood-style top), welcome woven in */}
         <section className="chero">
           <p className="chero-eye">Welcome back{stats ? `, ${stats.codename}` : ''} · Government contracting for everyone</p>
-          <h1 className="disp chero-h1">Send your agent<br />to <span className="chero-ac">the government.</span></h1>
-          <p className="chero-sub">No $10K tools, no gurus. Connect the AI agent you already use — Mindy finds your contracts, sizes your market, and drafts your bids. Just ask.</p>
+          <h1 className="disp chero-h1">Win <span className="chero-ac">federal contracts.</span><br />Skip the $10K tools.</h1>
+          <p className="chero-sub">The U.S. government is legally required to buy. Mindy finds your contracts, sizes your market, and drafts your bids — just ask, in plain English.</p>
           <div className="chero-cta">
             <Link className="btn-primary" href="/mcp">Connect your agent →</Link>
             <a className="btn-ghost" href="#board">See your progress ↓</a>
