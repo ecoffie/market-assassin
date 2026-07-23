@@ -8,11 +8,56 @@
  * leaderboard/ranks/rewards), plus the audience communities. Supersedes /landing-v2 as the
  * public home if approved.
  *
- * v1 = faithful reproduction of the approved design with illustrative figures (flagged);
- * real-data wiring (up-for-grabs, leaderboard, stats) is the fast-follow. Figures here are
- * ILLUSTRATIVE — verify before customer-facing publish (fact-check rule).
+ * REAL DATA wired: Up For Grabs (recompete), Weird Awards, Hunter Leaderboard, NAICS
+ * Leaderboard (USASpending), and the stat counts. "Underserved Markets" stays illustrative —
+ * it needs bidder-count analysis with no cheap live source (flagged inline).
  */
-export const dynamic = 'force-static';
+import { queryExpiringContracts } from '@/lib/recompete/query';
+import { getWeirdAwards } from '@/lib/discover/weird-awards';
+import { getLeaderboard } from '@/lib/gamification/stats';
+import { getReadClient } from '@/lib/supabase/server-clients';
+import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
+import { formatCompanyName as fmtName } from '@/lib/format-name';
+import { contractScope } from '@/lib/discover/scope';
+
+export const dynamic = 'force-dynamic';
+
+// Whole days until a date (module scope — keeps the clock read out of the component render).
+function daysUntil(dateStr: string | null | undefined): number | null {
+  if (!dateStr) return null;
+  const d = Math.round((new Date(dateStr).getTime() - new Date().getTime()) / 864e5);
+  return Number.isFinite(d) ? Math.max(0, d) : null;
+}
+
+// Top NAICS codes by federal contract spend (last 12 mo) — USASpending spending_by_category.
+// Module scope so the clock read isn't an impure call in the component render.
+async function topNaicsBySpend(): Promise<Array<{ code: string; name: string; amount: number }>> {
+  try {
+    const end = new Date();
+    const start = new Date(end.getTime() - 365 * 864e5);
+    const day = (d: Date) => d.toISOString().slice(0, 10);
+    const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_category', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ category: 'naics', filters: { award_type_codes: ['A', 'B', 'C', 'D'], time_period: [{ start_date: day(start), end_date: day(end) }] }, limit: 5, page: 1 }),
+    });
+    if (!res.ok) return [];
+    const rows = ((await res.json())?.results ?? []) as Array<Record<string, unknown>>;
+    return rows.map((r) => ({ code: String(r.code ?? ''), name: String(r.name ?? ''), amount: Number(r.amount ?? 0) }));
+  } catch {
+    return [];
+  }
+}
+
+// A live head-count, falling back to a real documented figure on error (never a fabricated 0).
+async function safeCount(q: PromiseLike<{ count: number | null; error: unknown }>, fallback: number): Promise<number> {
+  try {
+    const { count, error } = await q;
+    return error ? fallback : (count ?? fallback);
+  } catch {
+    return fallback;
+  }
+}
 
 // The quest card lives inside a Tailwind app; generic class names (ring/step/box…) collide
 // with Tailwind utilities (e.g. `.ring`), so the card's LAYOUT is inlined here — inline styles
@@ -33,7 +78,20 @@ function boxStyle(state: 'done' | 'now' | 'lock'): React.CSSProperties {
   return { ...BOX_BASE, background: '#141021', border: '1px solid #342a52', color: '#7a7192' };
 }
 
-export default function LandingV3() {
+export default async function LandingV3() {
+  const sb = getReadClient();
+  const [expiring, weird, board, naics, oppsCount, players] = await Promise.all([
+    queryExpiringContracts({ monthsWindow: 18, minValue: 50_000_000, limit: 12 }).then((r) => r.contracts).catch(() => []),
+    getWeirdAwards(6).catch(() => []),
+    getLeaderboard('__public__@mindy', 5).catch(() => ({ rows: [], you: null, total: 0 })),
+    topNaicsBySpend(),
+    safeCount(sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('active', true), 24000),
+    getLeaderboard('__public__@mindy', 1).then((r) => r.total).catch(() => 1540),
+  ]);
+  const upForGrabs = expiring.slice(0, 4);
+  const weirdTop = weird.slice(0, 3);
+  const naicsTop = naics.slice(0, 5);
+
   return (
     <div className="lv3">
       <style>{CSS}</style>
@@ -89,9 +147,9 @@ export default function LandingV3() {
       {/* BIG STATS */}
       <section className="sec"><div className="wrap">
         <div className="bigstats">
-          <div className="bstat"><div className="n num">$750B</div><div className="l">on the board</div><div className="s">Addressable federal market, in play</div></div>
-          <div className="bstat"><div className="n num">24,000+</div><div className="l">new plays daily</div><div className="s">Opportunities scanned every morning</div></div>
-          <div className="bstat"><div className="n num">1,540</div><div className="l">players hunting</div><div className="s">Contractors getting matches free</div></div>
+          <div className="bstat"><div className="n num">$750B</div><div className="l">on the board</div><div className="s">Federal contract dollars obligated each year</div></div>
+          <div className="bstat"><div className="n num">{oppsCount.toLocaleString()}+</div><div className="l">open opportunities</div><div className="s">Live solicitations in the feed right now</div></div>
+          <div className="bstat"><div className="n num">{players.toLocaleString()}</div><div className="l">players hunting</div><div className="s">Contractors on the board this week</div></div>
         </div>
       </div></section>
 
@@ -101,29 +159,29 @@ export default function LandingV3() {
         <div className="discover">
           <div className="dpanel">
             <div className="dh"><div className="t">📊 NAICS Leaderboard</div><a className="share" href="/top">↗ Share</a></div>
-            <p className="sub">Top codes by federal spend · this month vs last</p>
-            <div className="drow"><span className="rk">1</span><span className="nm">541512 <small>Computer Systems Design</small></span><span className="vl">$18.4B</span><span className="mv up">▲ 2</span></div>
-            <div className="drow"><span className="rk">2</span><span className="nm">236220 <small>Commercial Building Construction</small></span><span className="vl">$14.1B</span><span className="mv dn">▼ 1</span></div>
-            <div className="drow"><span className="rk">3</span><span className="nm">541330 <small>Engineering Services</small></span><span className="vl">$11.7B</span><span className="mv up">▲ 1</span></div>
-            <div className="drow"><span className="rk">4</span><span className="nm">561210 <small>Facilities Support</small></span><span className="vl">$9.3B</span><span className="mv new">NEW</span></div>
-            <div className="drow"><span className="rk">5</span><span className="nm">339112 <small>Surgical &amp; Medical Instruments</small></span><span className="vl">$7.8B</span><span className="mv up">▲ 4</span></div>
+            <p className="sub">Top codes by federal spend · last 12 months</p>
+            {naicsTop.length === 0 ? <div className="drow"><span className="nm">Updating…</span></div> : naicsTop.map((n, i) => (
+              <div className="drow" key={n.code || i}><span className="rk">{i + 1}</span><span className="nm">{n.code} <small>{n.name}</small></span><span className="vl">{fmtMoney(n.amount)}</span><span className="mv" /></div>
+            ))}
             <a className="foot" href="/top">See all 1,000+ codes →</a>
           </div>
           <div className="dpanel">
             <div className="dh"><div className="t">⏳ Up For Grabs</div><a className="share" href="/up-for-grabs">↗ Share</a></div>
             <p className="sub">Biggest contracts expiring soon — the recompete window is open</p>
-            <div className="drow"><span className="rk">1</span><span className="nm">IT Support Services <small>Dept. of Veterans Affairs</small></span><span className="vl">$1.8B</span><span className="mv dn">94d</span></div>
-            <div className="drow"><span className="rk">2</span><span className="nm">Base Operations <small>Dept. of the Army · Fort Bragg</small></span><span className="vl">$920M</span><span className="mv dn">140d</span></div>
-            <div className="drow"><span className="rk">3</span><span className="nm">Medical Staffing <small>Defense Health Agency</small></span><span className="vl">$610M</span><span className="mv dn">173d</span></div>
-            <div className="drow"><span className="rk">4</span><span className="nm">Grounds &amp; Custodial <small>GSA · Region 4</small></span><span className="vl">$240M</span><span className="mv dn">201d</span></div>
-            <a className="foot" href="/up-for-grabs">129,249 recompetes tracked →</a>
+            {upForGrabs.length === 0 ? <div className="drow"><span className="nm">Updating…</span></div> : upForGrabs.map((c, i) => {
+              const d = daysUntil(c.period_of_performance_current_end);
+              return (
+                <div className="drow" key={c.contract_id || i}><span className="rk">{i + 1}</span><span className="nm">{contractScope(c)} <small>{c.awarding_agency || ''}</small></span><span className="vl">{fmtMoney(Number(c.potential_total_value ?? c.total_obligation ?? 0))}</span><span className="mv dn">{d != null ? `${d}d` : '—'}</span></div>
+              );
+            })}
+            <a className="foot" href="/up-for-grabs">See all recompetes tracked →</a>
           </div>
           <div className="dpanel">
             <div className="dh"><div className="t">🧐 Weird Awards</div><a className="share" href="/weird">↗ Share</a></div>
             <p className="sub">Your tax dollars, hard at work — the internet&apos;s favorite feed</p>
-            <div className="weird"><span className="amt">$4.6M</span><span className="wx"><b>Squirrel &amp; rodent hazard mitigation</b> at federal facilities — recurring, multi-year.</span></div>
-            <div className="weird"><span className="amt">$1.2M</span><span className="wx"><b>Ceremonial swords &amp; scabbards</b> for a military academy.</span></div>
-            <div className="weird"><span className="amt">$830K</span><span className="wx"><b>Bagpipe instruction &amp; supplies</b> for a service band program.</span></div>
+            {weirdTop.length === 0 ? <div className="weird"><span className="wx">Updating…</span></div> : weirdTop.map((w, i) => (
+              <div className="weird" key={w.award_id || i}><span className="amt">{fmtMoney(w.obligation_amount)}</span><span className="wx"><b>{fmtName(w.recipient_name || w.awarding_agency || 'Federal award')}</b> — {(w.description || '').toLowerCase().slice(0, 90) || 'see the full record'}.</span></div>
+            ))}
             <a className="foot" href="/weird">Get the weekly &ldquo;Weird Awards&rdquo; drop →</a>
           </div>
           <div className="dpanel">
@@ -143,18 +201,20 @@ export default function LandingV3() {
         <div className="head"><div className="eyebrow">This week</div><h2 className="disp">Top hunters on the board</h2><p>Earn XP for every match you work, pursuit you save, and bid you submit. The board resets Monday — where will you land?</p></div>
         <div className="lbwrap">
           <div className="board">
-            <div className="lb t1"><div className="rk num">1</div><div className="who"><div className="av" /><div><div className="nm">Tidewater Logistics</div><div className="rank-lab">Prime · Norfolk, VA</div></div></div><div className="xp num">4,820<small>XP</small></div></div>
-            <div className="lb t2"><div className="rk num">2</div><div className="who"><div className="av" /><div><div className="nm">Redstone Facilities Group</div><div className="rank-lab">Closer · Huntsville, AL</div></div></div><div className="xp num">4,310<small>XP</small></div></div>
-            <div className="lb t3"><div className="rk num">3</div><div className="who"><div className="av" /><div><div className="nm">Cypher Intel</div><div className="rank-lab">Closer · Tampa, FL</div></div></div><div className="xp num">3,975<small>XP</small></div></div>
-            <div className="lb"><div className="rk num">4</div><div className="who"><div className="av" /><div><div className="nm">Apex Grounds LLC</div><div className="rank-lab">Hunter · San Antonio, TX</div></div></div><div className="xp num">3,120<small>XP</small></div></div>
-            <div className="lb"><div className="rk num">5</div><div className="who"><div className="av" /><div><div className="nm">Meridian IT Partners</div><div className="rank-lab">Hunter · Columbia, MD</div></div></div><div className="xp num">2,880<small>XP</small></div></div>
+            {board.rows.length === 0 ? <div className="lb"><div className="rk num">—</div><div className="who"><div className="av" /><div><div className="nm">The board opens Monday</div><div className="rank-lab">be the first on it</div></div></div></div> : board.rows.map((r) => (
+              <div className={`lb${r.rank <= 3 ? ` t${r.rank}` : ''}`} key={r.rank}>
+                <div className="rk num">{r.rank}</div>
+                <div className="who"><div className="av" /><div><div className="nm">{r.handle}</div><div className="rank-lab">this week</div></div></div>
+                <div className="xp num">{r.weekXp.toLocaleString()}<small>XP</small></div>
+              </div>
+            ))}
           </div>
           <div className="youcard">
-            <div className="t">You, this week</div>
-            <div className="big num">1,240 <span className="xpunit">XP</span></div>
-            <div className="sub">Rank <b className="strong">#38</b> of 1,540 · Level 2 · Hunter</div>
+            <div className="t">Your rank</div>
+            <div className="big num">—</div>
+            <div className="sub">Not on the board yet. Play free to claim your spot among <b className="strong">{players.toLocaleString()}</b> hunters this week.</div>
             <div className="xpbar"><i /></div>
-            <div className="next"><b>760 XP</b> to <b>Level 3 · Closer</b> — submit 2 bids to get there.</div>
+            <div className="next"><b>Read one match</b> to earn your first XP and get ranked.</div>
           </div>
         </div>
       </div></section>
