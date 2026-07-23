@@ -1,9 +1,9 @@
 /**
- * /home-v4 — the HYBRID: a minimal, confident Robinhood-style hero on top (one promise,
- * one action, a single row of big tabular "Top Movers" numbers) that then scrolls into the
- * full gamification substance below (Today's intel, progress ring, leaderboard, Ideas,
- * events). Answers "v3 is too simple" — keeps the clean top, brings the sticky command
- * center back. Same real data as /home. A layout-comparison build, not the post-signin dest.
+ * /home-v4 — the INTERNAL (logged-in) home / command center. Robinhood-APP model: a
+ * personal welcome hero (greet you by codename, your rank + streak + this-week standing),
+ * then the full gamification substance (Today's intel, progress ring, leaderboard, Ideas,
+ * events). The ACQUISITION pitch ("Win federal contracts…") lives on the EXTERNAL landing
+ * (/landing-v2), NOT here — a logged-in member is already sold. Same real data as /home.
  *
  * Preview: pass ?email=<user> to render that user's real stats.
  */
@@ -49,9 +49,9 @@ export default async function LoggedInHomeV4({ searchParams }: { searchParams: P
   const pct = stats && nextAt ? Math.min(1, Math.max(0, (stats.xp - cur.min) / (nextAt - cur.min))) : 1;
   const C = 2 * Math.PI * 30;
 
-  // The single biggest live opportunity + the top hunter — the "Top Movers" proof numbers.
+  // The single biggest live opportunity — the market number in the personal proof row
+  // (your rank + streak come straight from stats/board.you).
   const biggest = opps.reduce((m, c) => Math.max(m, Number(c.potential_total_value ?? c.total_obligation ?? 0)), 0);
-  const leader = board.rows[0] ?? null;
 
   return (
     <div className="mhome">
@@ -73,19 +73,19 @@ export default async function LoggedInHomeV4({ searchParams }: { searchParams: P
       </div></header>
 
       <main className="wrap" id="top">
-        {/* MINIMAL HERO — one promise, one action (Robinhood-style top), welcome woven in */}
+        {/* PERSONAL HERO — command-center welcome (internal): greet you, show your standing, act */}
         <section className="chero">
-          <p className="chero-eye">Welcome back{stats ? `, ${stats.codename}` : ''} · Government contracting for everyone</p>
-          <h1 className="disp chero-h1">Win <span className="chero-ac">federal contracts.</span><br />Skip the $10K tools.</h1>
-          <p className="chero-sub">The U.S. government is legally required to buy. Mindy finds your contracts, sizes your market, and drafts your bids — just ask, in plain English.</p>
+          <p className="chero-eye">Welcome back</p>
+          <h1 className="disp chero-h1">Good to see you,<br /><span className="chero-ac">{stats?.codename ?? 'hunter'}.</span></h1>
+          <p className="chero-sub">You&apos;re a {stats?.rankName ?? 'Recruit'}{stats && stats.streak > 0 ? ` on a ${stats.streak}-day streak` : ''}. Here&apos;s what&apos;s moving in your market today — put Mindy to work and climb the board.</p>
           <div className="chero-cta">
-            <Link className="btn-primary" href="/mcp">Connect your agent →</Link>
+            <Link className="btn-primary" href="/mcp">Put Mindy to work →</Link>
             <a className="btn-ghost" href="#board">See your progress ↓</a>
           </div>
           <div className="chero-proof">
             <div className="cp"><div className="cp-n gain">{biggest ? fmtMoney(biggest) : '—'}</div><div className="cp-l">biggest contract up for grabs today</div></div>
-            <div className="cp"><div className="cp-n">{board.total.toLocaleString()}</div><div className="cp-l">hunters playing this week</div></div>
-            <div className="cp"><div className="cp-n">{leader ? leader.weekXp.toLocaleString() : '—'}</div><div className="cp-l">{leader ? `top score · ${leader.handle}` : 'top score this week'}</div></div>
+            <div className="cp"><div className="cp-n">{board.you ? `#${board.you.rank}` : '—'}</div><div className="cp-l">your rank this week</div></div>
+            <div className="cp"><div className="cp-n">{stats?.streak ?? 0}</div><div className="cp-l">day streak 🔥</div></div>
           </div>
         </section>
 
