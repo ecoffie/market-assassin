@@ -885,7 +885,7 @@ async function runDailyAlertJob(options?: {
         // Send email - now includes all active opportunities for deadline tracking and action tips
         try {
           metrics.recordEmailAttempted();
-          await sendDailyAlertEmail(
+          const emailDelivered = await sendDailyAlertEmail(
             user.user_email,
             scoredOpps,
             user,
@@ -895,6 +895,21 @@ async function runDailyAlertJob(options?: {
             noticeSummary,
             hiddenMatches
           );
+
+          // sendEmail() returns false (not throw) when the send GUARD blocks the
+          // recipient — suppression-list hit or the per-recipient daily email cap
+          // (EMAIL_DAILY_CAP). Ignoring that boolean recorded a phantom "sent"
+          // (last_alert_sent stamped, total_alerts_sent++, alert_log=sent) while
+          // NO email actually left — making a real non-delivery invisible to every
+          // "who didn't get an alert" query. Record it as a visible skip instead.
+          if (emailDelivered === false) {
+            await saveSkippedAlert(user.user_email, 'send_guard_blocked', {
+              opportunitiesCount: scoredOpps.length + scoredGrants.length,
+            });
+            console.warn(`[Daily Alerts] ⚠️ Send guard blocked ${user.user_email} (suppression or daily cap) — recorded as skipped, NOT sent`);
+            results.skipped++;
+            continue;
+          }
 
           // Track successful send
           metrics.recordEmailSent();
