@@ -1,7 +1,7 @@
 {
-  "version": "1.0.0",
-  "lastUpdated": "2026-04-05",
-  "description": "Maps federal agencies to their procurement portals and spending patterns beyond SAM.gov",
+  "version": "2.0.0",
+  "lastUpdated": "2026-07-18",
+  "description": "Maps federal agencies to their procurement portals and spending patterns beyond SAM.gov. v2 enumerates 13 public DOE national-lab bid boards + 4 SAM-routed labs, NASA/JPL, agency vendor portals, and prime-contractor supplier portals; new secondarySources carry platform/listsOpps/access. Companion strategy doc: docs/strategy/OPPORTUNITY-DATA-LANDSCAPE.md",
   "agencies": {
     "DEPARTMENT OF DEFENSE": {
       "abbreviation": "DOD",
@@ -179,7 +179,17 @@
       "abbreviation": "DHS",
       "cgac": "070",
       "primarySources": ["sam.gov", "gsa_schedule", "eagle_ii"],
-      "secondarySources": [],
+      "secondarySources": [
+        {
+          "name": "CBP Business Connection",
+          "url": "https://cbpbusinessconnection.cbp.dhs.gov/vmp?id=vmpindex",
+          "type": "vendor_portal",
+          "platform": "ServiceNow VMP",
+          "listsOpps": false,
+          "access": "registration",
+          "notes": "CBP vendor management portal — registration/market-research surface"
+        }
+      ],
       "spendingPatterns": {
         "samPosted": 22,
         "gsaSchedule": 35,
@@ -224,7 +234,17 @@
       "abbreviation": "Treasury",
       "cgac": "020",
       "primarySources": ["sam.gov", "gsa_schedule"],
-      "secondarySources": [],
+      "secondarySources": [
+        {
+          "name": "Treasury SBECS",
+          "url": "https://sbecs.treas.gov/",
+          "type": "vendor_portal",
+          "platform": "custom",
+          "listsOpps": false,
+          "access": "registration",
+          "notes": "Small Business Enterprise Contacts System — vendor registry"
+        }
+      ],
       "spendingPatterns": {
         "samPosted": 35,
         "gsaSchedule": 40,
@@ -299,10 +319,163 @@
       "primarySources": ["sam.gov", "lab_portals", "gsa_schedule"],
       "secondarySources": [
         {
-          "name": "DOE National Labs",
+          "name": "DOE National Labs (index)",
           "url": "https://www.energy.gov/national-laboratories",
           "type": "information",
-          "notes": "Labs have independent procurement"
+          "notes": "Labs have independent procurement — enumerated below"
+        },
+        {
+          "name": "Sandia (SNL) — Business Opportunities Website",
+          "url": "https://www.sandia.gov/working-with-sandia/prospective-suppliers/business-opportunities/",
+          "type": "lab_subcontracts",
+          "platform": "Oracle iSupplier",
+          "listsOpps": true,
+          "access": "view-register-to-bid",
+          "notes": "BOW public to view; iSupplier registration to respond"
+        },
+        {
+          "name": "Los Alamos (LANL) — Procurement Opportunities",
+          "url": "https://www.lanl.gov/engage/business/procurement-opportunities",
+          "type": "lab_subcontracts",
+          "platform": "SAP Ariba Discovery",
+          "listsOpps": true,
+          "access": "view-register-to-bid",
+          "notes": "Competitive opps >$250K on public Ariba Discovery profile"
+        },
+        {
+          "name": "Lawrence Livermore (LLNL) — Opportunities",
+          "url": "https://procurement.llnl.gov/opportunities",
+          "type": "lab_subcontracts",
+          "platform": "custom",
+          "listsOpps": true,
+          "access": "public",
+          "notes": "Construction opps table public; larger buys on SAM.gov"
+        },
+        {
+          "name": "Oak Ridge (ORNL) — Business Opportunities",
+          "url": "https://smallbusiness.ornl.gov/business-opportunities",
+          "type": "lab_subcontracts",
+          "platform": "SAP Ariba",
+          "listsOpps": true,
+          "access": "view-register-to-bid",
+          "notes": "Public to view + subscribe; Ariba/SAM registration to bid"
+        },
+        {
+          "name": "Pacific Northwest (PNNL) — Solicitations",
+          "url": "https://www.pnnl.gov/procurement",
+          "type": "lab_subcontracts",
+          "platform": "custom (Acquisition Supplier Portal)",
+          "listsOpps": true,
+          "access": "view-register-to-bid",
+          "notes": "Solicitations >$250K posted externally; ASP registration to bid"
+        },
+        {
+          "name": "Lawrence Berkeley (LBNL) — Project Opportunities",
+          "url": "https://procurement.lbl.gov/welcome-to-procurement-property/become-a-supplier/project-opportunities/",
+          "type": "lab_subcontracts",
+          "platform": "PeopleSoft",
+          "listsOpps": true,
+          "access": "public",
+          "notes": "Public project-opportunity listing"
+        },
+        {
+          "name": "Brookhaven (BNL) — Bid Specs",
+          "url": "https://www.bnl.gov/ppm/",
+          "type": "lab_subcontracts",
+          "platform": "custom eBuy",
+          "listsOpps": true,
+          "access": "view-register-to-bid",
+          "notes": "Bid Specs page public; major buys on SAM.gov; vendor registry to bid"
+        },
+        {
+          "name": "NREL — Purchasing & Subcontracting Opportunities",
+          "url": "https://www.nrel.gov/workingwithus/procurement-opps",
+          "type": "lab_subcontracts",
+          "platform": "custom",
+          "listsOpps": true,
+          "access": "public",
+          "notes": "Public RFP/RFQ/SSN/RFI/NOI table"
+        },
+        {
+          "name": "Ames Laboratory — Procurement",
+          "url": "https://www.ameslab.gov/about-ames-laboratory/procurement",
+          "type": "lab_subcontracts",
+          "platform": "custom",
+          "listsOpps": true,
+          "access": "public",
+          "notes": "Public current-solicitation list"
+        },
+        {
+          "name": "Princeton Plasma (PPPL) — Opportunities",
+          "url": "https://sites.google.com/pppl.gov/procurement/opportunities",
+          "type": "lab_subcontracts",
+          "platform": "Princeton supplier portal",
+          "listsOpps": true,
+          "access": "view-register-to-bid",
+          "notes": "RFPs listed publicly; Princeton supplier portal registration to bid"
+        },
+        {
+          "name": "SLAC — Upcoming Contract Opportunities",
+          "url": "https://suppliers.slac.stanford.edu/",
+          "type": "lab_subcontracts",
+          "platform": "Stanford PeopleSoft",
+          "listsOpps": true,
+          "access": "view-register-to-bid",
+          "notes": "Upcoming opps public; SAM + PeopleSoft registration to bid"
+        },
+        {
+          "name": "Jefferson Lab (JLab) — Solicitation Bulletin Board",
+          "url": "https://www.jlab.org/finance/procurement",
+          "type": "lab_subcontracts",
+          "platform": "custom bidder portal",
+          "listsOpps": true,
+          "access": "view-register-to-bid",
+          "notes": "Solicitation Bulletin Board public; bidder portal registration to bid"
+        },
+        {
+          "name": "Savannah River Nat'l Lab (SRNL) — Active Procurement Opportunities",
+          "url": "https://www.srnl.gov/procurement/",
+          "type": "lab_subcontracts",
+          "platform": "Oracle Fusion Cloud",
+          "listsOpps": true,
+          "access": "view-register-to-bid",
+          "notes": "Active opps public; Oracle Fusion account to transact"
+        },
+        {
+          "name": "Argonne (ANL) — Procurement & Contracts",
+          "url": "https://www.anl.gov/procurement-and-contracts-services",
+          "type": "lab_subcontracts",
+          "platform": "custom (posts to SAM.gov)",
+          "listsOpps": false,
+          "access": "sam-routed",
+          "notes": "Own site routes suppliers to SAM.gov for opps"
+        },
+        {
+          "name": "Fermilab (FNAL) — Supplier Portal",
+          "url": "https://procurement.fnal.gov/supplier-portal/",
+          "type": "lab_subcontracts",
+          "platform": "custom",
+          "listsOpps": false,
+          "access": "registration",
+          "notes": "Opportunities via SAM.gov; portal opps invite-only"
+        },
+        {
+          "name": "Idaho (INL) — Vendor Portal",
+          "url": "https://inl.gov/procurement/",
+          "type": "lab_subcontracts",
+          "platform": "custom (vendor.inl.gov)",
+          "listsOpps": false,
+          "access": "registration",
+          "notes": "Login-gated; opps via SAM.gov; SAM registration prerequisite"
+        },
+        {
+          "name": "NETL — Solicitations",
+          "url": "https://www.netl.doe.gov/business/solicitations",
+          "type": "lab_subcontracts",
+          "platform": "none (federal portals)",
+          "listsOpps": false,
+          "access": "sam-routed",
+          "notes": "GOGO lab — no private portal; routes to SAM.gov/FedConnect/eBuy/SEWP"
         }
       ],
       "spendingPatterns": {
@@ -312,13 +485,23 @@
         "directAwards": 15
       },
       "topVehicles": [],
-      "tips": "National Labs (ORNL, LANL, Sandia) have their own procurement. Energy focus."
+      "tips": "GOCO/FFRDC labs post SUBCONTRACTS on their own portals (not SAM.gov) — 13 of 17 have a public bid board. Argonne/Fermilab/INL/NETL route to SAM.gov. Identifiable platforms to normalize: SAP Ariba (LANL, ORNL), Oracle iSupplier (Sandia), Oracle Fusion (SRNL), PeopleSoft (SLAC, LBNL, PNNL)."
     },
     "DEPARTMENT OF EDUCATION": {
       "abbreviation": "ED",
       "cgac": "091",
       "primarySources": ["sam.gov", "gsa_schedule", "grants"],
-      "secondarySources": [],
+      "secondarySources": [
+        {
+          "name": "Dept. of Education — MySBCX",
+          "url": "https://mysbcx.ed.gov/#home",
+          "type": "vendor_portal",
+          "platform": "custom",
+          "listsOpps": false,
+          "access": "registration",
+          "notes": "Small business contact/market-research portal"
+        }
+      ],
       "spendingPatterns": {
         "samPosted": 25,
         "gsaSchedule": 30,
@@ -357,6 +540,24 @@
           "url": "https://www.sewp.nasa.gov/",
           "type": "it_products",
           "notes": "IT hardware and solutions"
+        },
+        {
+          "name": "NASA JPL — Acquisition Opportunities",
+          "url": "https://acquisition.jpl.nasa.gov/opportunities/",
+          "type": "lab_subcontracts",
+          "platform": "custom",
+          "listsOpps": true,
+          "access": "public",
+          "notes": "Caltech-operated FFRDC — subcontracts NOT on SAM.gov by default. Current RFI/RFP table + acquisition forecast"
+        },
+        {
+          "name": "NASA JPL — Small Business Opportunities",
+          "url": "https://www.jpl.nasa.gov/work-with-us/acquisition/small_business_opportunities/",
+          "type": "lab_subcontracts",
+          "platform": "custom",
+          "listsOpps": true,
+          "access": "public",
+          "notes": "RFI/RFP list + forecast for small business"
         }
       ],
       "spendingPatterns": {
@@ -398,6 +599,19 @@
       "topVehicles": [],
       "tips": "Large IT infrastructure needs. Disability determination services."
     }
+  },
+  "primeSupplierPortals": {
+    "description": "Prime-contractor supplier/subcontract portals — where teaming & subcontract opportunities on large primes live (outside SAM.gov). Registration-gated. Source: GovCon Chamber Federal Directory (~80 primes enumerated); representative set below.",
+    "sources": [
+      {"name": "Deloitte — VendorConnect", "url": "https://vendorconnect.gps.deloitte.com/", "access": "registration"},
+      {"name": "KBR — Supplier Portal", "url": "https://kbrsupplier.com/default.aspx", "access": "registration"},
+      {"name": "ADS (Atlantic Diving Supply) — Supplier Portal", "url": "https://supplierportal.adsinc.com/ords/f?p=133:2009", "access": "registration"},
+      {"name": "General Atomics Aeronautical (GA-ASI) — Supplier", "url": "https://supplier.ga.com/supply", "access": "registration"},
+      {"name": "L3Harris (Aerojet Rocketdyne) — SupplierNet", "url": "https://arsuppliernet.l3harris.com/suppliernet/doing-business-aerojet-rocketdyne", "access": "registration"},
+      {"name": "Boeing — Suppliers", "url": "https://www.boeingsuppliers.com/supplier_diversity.html", "access": "registration"},
+      {"name": "Northrop Grumman — Suppliers", "url": "https://www2.northropgrumman.com/suppliers/Pages/default.aspx", "access": "registration"},
+      {"name": "Jacobs — Supplier Registration", "url": "https://www.jacobs.com/suppliers/registration", "access": "registration"}
+    ]
   },
   "vehicleTypes": {
     "gsa_schedule": {
