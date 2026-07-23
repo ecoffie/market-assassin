@@ -58,6 +58,8 @@ export interface ExpiringContractsInput {
   state?: string;
   /** Expiration window in months (default 18). */
   monthsWindow?: number;
+  /** Floor: only contracts expiring at least this many days from now (default 0 = today). */
+  minDaysOut?: number;
   /** Obligation floor (dollars). */
   minValue?: number;
   /** Obligation ceiling (dollars). */
@@ -109,7 +111,12 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
   const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
   const today = new Date();
-  const todayStr = today.toISOString().split('T')[0];
+  // Floor the window at today + minDaysOut so callers can skip the imminent (already-decided)
+  // contracts and show only ones with real pursuit runway. Default 0 = today (unchanged).
+  const floorDays = Math.max(0, Number(input.minDaysOut) || 0);
+  const floorDate = new Date(today);
+  floorDate.setDate(floorDate.getDate() + floorDays);
+  const floorStr = floorDate.toISOString().split('T')[0];
   const maxDate = new Date(today);
   maxDate.setMonth(maxDate.getMonth() + months);
   const maxStr = maxDate.toISOString().split('T')[0];
@@ -118,7 +125,7 @@ export async function queryExpiringContracts(input: ExpiringContractsInput): Pro
     let q = supabase
       .from('recompete_opportunities')
       .select(COLUMNS, { count: 'exact' })
-      .gt('period_of_performance_current_end', todayStr)
+      .gt('period_of_performance_current_end', floorStr)
       .lte('period_of_performance_current_end', maxStr);
     if (withQuality) q = q.is('quality_flag', null);
 
