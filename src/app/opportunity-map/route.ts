@@ -36,6 +36,17 @@ function cleanAgency(dept: string): string {
 // all; the user opts to hide FSC micro-buys). Sits alongside the template's own filters.
 const FSC_TOGGLE = '<button class="fbtn" id="fscToggle" title="FSC parts/commodity micro-buys">Commodity buys: shown</button>';
 
+// Filter-sheet readability: grid items default to min-width:auto, so the nowrap labels
+// ("Professional & Technical", "Public Administration") overflow their 2-col cell and get
+// clipped at the panel edge. Let them WRAP so every service line is fully readable, and cap
+// the sheet height with scroll so long lists (19 service lines) stay contained.
+const SHEET_FIX_CSS = '<style>'
+  + '.opt{min-width:0;align-items:flex-start}'
+  + '.opt .cbx,.opt .swatch{margin-top:2px}'
+  + '.opt .lbl{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.25;word-break:break-word}'
+  + '.sheet{max-height:48vh;overflow-y:auto}'
+  + '</style>';
+
 // Viewport-driven data layer (Airbnb/Google): the template ships a static SSR pin set; this
 // swaps it for a live bbox fetch on every pan/zoom against /api/app/opportunity-map. Reuses
 // the template's own render()/markers/list-sync verbatim — only the DATA source changes.
@@ -101,7 +112,8 @@ export async function GET(request: NextRequest) {
     // Full page: add a way back to the app (the standalone template has none).
     html = html.replace('<div class="phead">',
       '<div class="phead"><a href="/home-v5" style="display:inline-flex;align-items:center;gap:5px;font:600 12.5px Inter,system-ui,sans-serif;color:#6b7787;text-decoration:none;margin-bottom:9px">← Back to Mindy</a>');
-    // Viewport-driven live data + the commodity-buys toggle (full page only).
+    // Viewport-driven live data + the commodity-buys toggle + sheet-readability fix (full page).
+    html = html.replace('</head>', SHEET_FIX_CSS + '</head>');
     html = html.replace('<button class="clr" id="clrAll">Clear all</button>',
       FSC_TOGGLE + '<button class="clr" id="clrAll">Clear all</button>');
     html = html.replace('</body>', VIEWPORT_JS + '</body>');
