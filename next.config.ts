@@ -84,7 +84,9 @@ const nextConfig: NextConfig = {
           has: [{ type: 'host', value: 'mcp.getmindy.ai' }],
           destination: '/mcp/message',
         },
-        // getmindy.ai root serves the Mindy landing page
+        // getmindy.ai root serves the focused public home (the FOCUSED /landing-v3 —
+        // data reveal + one door, GOS Decision #023). Superseded /mindy-landing as the
+        // front door 2026-07-24; /mindy-landing kept reachable for reference/rollback.
         {
           source: '/',
           has: [
@@ -93,7 +95,7 @@ const nextConfig: NextConfig = {
               value: 'getmindy.ai',
             },
           ],
-          destination: '/mindy-landing',
+          destination: '/landing-v3',
         },
       {
         source: '/signin',
