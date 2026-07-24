@@ -26,10 +26,17 @@ function cityJitter([lat, lng]: [number, number], seed: number): [number, number
 export function geocode(
   popCity: string, popState: string | null,
   office: { city?: string; state?: string; zipcode?: string } | null,
+  popZip?: string | null,
 ): { coord: [number, number] | null; city: string; state: string | null } {
   if (popCity && popState) {
     const c = CITY_COORDS[`${popCity.toUpperCase()}|${popState}`];
     if (c) return { coord: c, city: popCity, state: popState };
+  }
+  // Place-of-performance ZIP — more precise than the buying office, so it comes next.
+  if (popZip) {
+    const z = String(popZip).replace(/\D/g, '').slice(0, 5);
+    const c = ZIP_COORDS[z];
+    if (c) return { coord: c, city: popCity.trim(), state: popState };
   }
   const oState = normalizeStateCode(office?.state || '');
   if (office?.zipcode) {
@@ -42,6 +49,39 @@ export function geocode(
     if (c) return { coord: c, city: office.city.trim(), state: oState };
   }
   return { coord: null, city: '', state: popState || oState };
+}
+
+/** Stable small integer seed from a string (notice_id) — so a row's jittered coordinate is
+ *  DETERMINISTIC across backfill runs, not dependent on its position in a result set. */
+function stableSeed(s: string): number {
+  let h = 0;
+  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
+  return Math.abs(h);
+}
+
+/** Resolve the FINAL stored pin coordinate for a row (city/ZIP if placeable, else state
+ *  centroid, else null). Used by the backfill + sync-time stamp so map_lat/map_lng agree
+ *  with what getMapOpportunities would have drawn. Deterministic per notice_id. */
+export function resolvePinCoord(row: {
+  notice_id?: string | null; title?: string | null;
+  pop_city?: string | null; pop_state?: string | null; pop_zip?: string | null;
+  office_address?: { city?: string; state?: string; zipcode?: string } | null;
+}): { lat: number; lng: number; state: string; city: string } | null {
+  const popState = normalizeStateCode((row.pop_state as string) || '');
+  const popCity = ((row.pop_city as string) || '').trim();
+  const office = (row.office_address as { city?: string; state?: string; zipcode?: string } | null) || null;
+  const g = geocode(popCity, popState, office, row.pop_zip || null);
+  const state = g.state;
+  if (!state) return null;
+  const seed = stableSeed(String(row.notice_id ?? row.title ?? ''));
+  if (g.coord) {
+    const [lat, lng] = cityJitter(g.coord, seed);
+    return { lat, lng, state, city: g.city };
+  }
+  const base = STATE_CENTROIDS[state];
+  if (!base) return null;
+  const [lat, lng] = jitter(base, seed);
+  return { lat, lng, state, city: g.city };
 }
 
 /** Set-aside groups — key, display label, pin color. Colors mirror the prototype's palette. */
@@ -106,9 +146,9 @@ export async function getMapOpportunities(limit = 600): Promise<MapOpp[]> {
   const out: MapOpp[] = [];
   for (const r of (data || []) as Array<Record<string, unknown>>) {
     const title = String(r.title ?? '').trim();
-    // Skip FSC-coded commodity micro-buys ("48--VALVE,GLOBE") — real, but noise on the map;
-    // surface the named service/construction/professional work instead.
-    if (!title || /^\d{1,4}--/.test(title)) continue;
+    // No self-filtering — commodity buys are real opportunities and the goal is the most
+    // complete dataset. The explorer offers a user toggle to hide FSC micro-buys instead.
+    if (!title) continue;
     const office = r.office_address as { city?: string; state?: string; zipcode?: string } | null;
     const popState = normalizeStateCode((r.pop_state as string) || '');
     const popCity = ((r.pop_city as string) || '').trim();

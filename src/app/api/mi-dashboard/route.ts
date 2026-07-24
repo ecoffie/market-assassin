@@ -13,6 +13,7 @@ import { samHtmlToText, looksLikeHtml } from '@/lib/sam/description-text';
 import { resolveActiveWorkspace, clientNotificationEmail } from '@/lib/app/workspace';
 import { saveSnapshot, readSnapshot, freshMeta, degradedMeta } from '@/lib/resilience/last-good';
 import { normalizeStateCode } from '@/lib/utils/us-states';
+import { buildSearchOr } from '@/lib/mi-dashboard/search';
 
 // Lazy initialization to avoid build-time errors
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -154,36 +155,6 @@ function getUrgencyLevel(deadline: string | null): 'critical' | 'urgent' | 'norm
  * (M7 ≈ M-7 ≈ M 7). Normal phrases ("contractor shall", "solar") keep plain ILIKE —
  * substring is the right behavior there and regex-escaping free text is risky.
  */
-function buildSearchOr(search: string): string {
-  const term = search.trim();
-  // Search corpus, richest last: title + SAM description body + the extracted
-  // SOW/PWS scope text (sow_text, a column on sam_opportunities) + department.
-  // sow_text is the deepest layer — the actual requirements doc — so a term like
-  // "M7" buried in a Statement of Work surfaces even when neither title nor the
-  // short SAM description mentions it. Same row, so it's a plain column add.
-  const cols = ['title', 'description', 'sow_text', 'department', 'solicitation_number'];
-
-  // Code-like? e.g. M7, M-7, 1005, 53-1234, AN/PVS-7. Has a digit, no whitespace,
-  // short, and not a plain word.
-  const isCodeLike = /\d/.test(term) && !/\s/.test(term) && term.length <= 8;
-
-  if (isCodeLike) {
-    // Escape regex metachars, then allow an optional [-/ ._]? where the original had
-    // a separator OR at the letter→digit / digit→letter seam, so M7 matches M-7 etc.
-    const escaped = term.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    const flexible = escaped
-      .replace(/[-/_. ]+/g, '[-/_. ]?')                 // existing separators → optional
-      .replace(/([A-Za-z])(?=\d)/g, '$1[-/_. ]?')        // letter→digit seam
-      .replace(/(\d)(?=[A-Za-z])/g, '$1[-/_. ]?');       // digit→letter seam
-    // \m … \M = word boundaries. imatch = case-insensitive regex (PostgREST).
-    const pattern = `\\m${flexible}\\M`;
-    return cols.map((c) => `${c}.imatch.${pattern}`).join(',');
-  }
-
-  // Normal phrase → substring ILIKE.
-  return cols.map((c) => `${c}.ilike.%${term}%`).join(',');
-}
-
 export async function GET(request: NextRequest) {
   const { searchParams } = new URL(request.url);
 
@@ -193,7 +164,7 @@ export async function GET(request: NextRequest) {
   const agency = searchParams.get('agency') || '';
   const urgency = searchParams.get('urgency') || '';
   const setAside = searchParams.get('setAside') || '';
-  let naics = searchParams.get('naics') || '';
+  const naics = searchParams.get('naics') || '';
   const state = searchParams.get('state') || '';
   // status: 'active' (default — biddable now), 'inactive' (the archive — expired/
   // closed, for recompete intel + mining old SOW/PWS), or 'all'. Mirrors SAM.gov's

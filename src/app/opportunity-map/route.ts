@@ -32,6 +32,44 @@ function cleanAgency(dept: string): string {
   return d.replace(/\b([A-Z])([A-Z0-9'&./-]*)/g, (_, a, b) => a + b.toLowerCase()) || dept;
 }
 
+// A "Commodity buys" toggle injected into the filter bar (no self-filtering — default SHOWS
+// all; the user opts to hide FSC micro-buys). Sits alongside the template's own filters.
+const FSC_TOGGLE = '<button class="fbtn" id="fscToggle" title="FSC parts/commodity micro-buys">Commodity buys: shown</button>';
+
+// Viewport-driven data layer (Airbnb/Google): the template ships a static SSR pin set; this
+// swaps it for a live bbox fetch on every pan/zoom against /api/app/opportunity-map. Reuses
+// the template's own render()/markers/list-sync verbatim — only the DATA source changes.
+// OPPS is made `let` so this can replace it; render() is wrapped so the count updates on every
+// draw (pan AND client-side filter). Nothing here re-implements the map.
+const VIEWPORT_JS = `<script>
+(function(){
+  var SETMAP={SDVOSB:'SDVOSB',SB:'SB','8A':'8(a)',WOSB:'WOSB',HZ:'HUBZone',OTHER:'Other',NONE:'None'};
+  var HIDE_FSC=false, TOTAL=0, CAPPED=false, busy=false, t=null;
+  function clean(d){ return (d||'').replace(/,?\\s*DEPARTMENT OF( THE)?/i,'').replace(/DEPARTMENT OF( THE)?\\s*/i,'').trim().replace(/\\b([A-Z])([A-Z0-9'&.\\/-]*)/g,function(_,a,b){return a+b.toLowerCase();})||d; }
+  function toRow(p){ return {src:'SAM',naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng}; }
+  function bbox(){ var b=map.getBounds(); return [b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].map(function(n){return n.toFixed(4);}).join(','); }
+  function setCount(){ if(!TOTAL)return; var el=document.getElementById('rescount'); if(!el)return;
+    var shown=(typeof rows!=='undefined'&&rows)?rows.length:OPPS.length;
+    el.innerHTML=shown.toLocaleString()+' <span>in view'+(CAPPED?'+':'')+' \\u00b7 '+TOTAL.toLocaleString()+' active nationwide</span>'; }
+  // Wrap the template's render() so the headline count refreshes after every draw.
+  var _render=render; render=function(){ _render(); setCount(); };
+  function fetchView(){
+    if(busy)return; busy=true;
+    var url='/api/app/opportunity-map?bbox='+bbox()+'&status=active'+(HIDE_FSC?'&hideCommodity=1':'');
+    fetch(url).then(function(r){return r.json();}).then(function(d){ busy=false;
+      if(!d||!d.success)return;
+      TOTAL=d.totalForFilters||0; CAPPED=!!d.capped;
+      OPPS=(d.pins||[]).map(toRow);
+      render();
+    }).catch(function(){busy=false;});
+  }
+  map.on('moveend',function(){ clearTimeout(t); t=setTimeout(fetchView,450); });
+  var tg=document.getElementById('fscToggle');
+  if(tg)tg.onclick=function(){ HIDE_FSC=!HIDE_FSC; tg.classList.toggle('active',HIDE_FSC); tg.textContent=HIDE_FSC?'Commodity buys: hidden':'Commodity buys: shown'; fetchView(); };
+  setTimeout(fetchView,300); // first live load replaces the SSR set with the true viewport + real total
+})();
+</script>`;
+
 export async function GET(request: NextRequest) {
   const embed = new URL(request.url).searchParams.get('embed');
   let opps: unknown[] = [];
@@ -54,13 +92,19 @@ export async function GET(request: NextRequest) {
   } catch {
     opps = [];
   }
-  let html = OPPORTUNITY_MAP_TEMPLATE.replace('__OPPS_JSON__', JSON.stringify(opps));
+  // Make OPPS reassignable so the viewport layer can swap it (embed stays static SSR).
+  let html = OPPORTUNITY_MAP_TEMPLATE.replace('const OPPS = __OPPS_JSON__', 'let OPPS = __OPPS_JSON__');
+  html = html.replace('__OPPS_JSON__', JSON.stringify(opps));
   if (embed) {
     html = html.replace('</head>', EMBED_CSS + '</head>').replace('</body>', EMBED_JS + '</body>');
   } else {
     // Full page: add a way back to the app (the standalone template has none).
     html = html.replace('<div class="phead">',
       '<div class="phead"><a href="/home-v5" style="display:inline-flex;align-items:center;gap:5px;font:600 12.5px Inter,system-ui,sans-serif;color:#6b7787;text-decoration:none;margin-bottom:9px">← Back to Mindy</a>');
+    // Viewport-driven live data + the commodity-buys toggle (full page only).
+    html = html.replace('<button class="clr" id="clrAll">Clear all</button>',
+      FSC_TOGGLE + '<button class="clr" id="clrAll">Clear all</button>');
+    html = html.replace('</body>', VIEWPORT_JS + '</body>');
   }
   return new NextResponse(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }

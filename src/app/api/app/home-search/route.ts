@@ -56,10 +56,10 @@ async function oppsInNaics(codes: string[]) {
       .gte('response_deadline', today)
       .in('naics_code', uniq)
       .order('response_deadline', { ascending: true })
-      .limit(24);
+      .limit(8);
     if (error) throw error;
-    // Drop FSC commodity micro-buys ("66--INDICATOR…") — show named work.
-    return (data || []).filter((r) => { const t = String(r.title || '').trim(); return t && !/^\d{1,4}--/.test(t); }).slice(0, 8).map(mapOpp);
+    // No self-filtering — commodity buys are real opportunities in the firm's NAICS.
+    return (data || []).map(mapOpp);
   } catch {
     return [];
   }
