@@ -197,8 +197,8 @@ export default async function LoggedInHomeV5({ searchParams }: { searchParams: P
             <div className="kk"><span className="flag">Live event</span><span className="when">Coming soon</span></div>
             <h3 className="disp">Mindy Demo Day</h3>
             <p>Watch real contractors pitch live, see Mindy find their next award on stage, and get the exact playbook they used. Free to attend.</p>
-            <div className="act"><span className="soonbtn">Coming soon</span></div>
           </div>
+          <span className="soonbtn">Coming soon</span>
         </section>
         <section className="promos">
           <div className="promo contest"><span className="pk">Contest</span><h4>Demo Day Pitch Contest</h4><p>Pitch how you&apos;d win a target contract. Best entry takes a year of Pro + a founder strategy call.</p><span className="lnk soon-lnk">Coming soon</span></div>
@@ -367,8 +367,9 @@ const CSS = `
 .hv5 .shot .bd .t{font-size:14px;font-weight:700}
 .hv5 .shot .bd .d{font-size:12px;color:var(--mut);margin-top:4px;line-height:1.4}
 
-.hv5 .event{margin-top:6px;border-radius:var(--r);border:1px solid #3a2d5c;overflow:hidden;position:relative;background:radial-gradient(90% 160% at 88% 20%,rgba(168,85,247,.5),transparent 55%),radial-gradient(70% 140% at 100% 100%,rgba(245,158,11,.28),transparent 60%),linear-gradient(100deg,#1a1330,#241a44);padding:18px 22px;display:flex;align-items:center;gap:20px}
-.hv5 .event .cnt{position:relative;z-index:2;max-width:62%}
+.hv5 .event{margin-top:6px;border-radius:var(--r);border:1px solid #3a2d5c;overflow:hidden;position:relative;background:radial-gradient(90% 160% at 88% 20%,rgba(168,85,247,.5),transparent 55%),radial-gradient(70% 140% at 100% 100%,rgba(245,158,11,.28),transparent 60%),linear-gradient(100deg,#1a1330,#241a44);padding:16px 24px;display:flex;align-items:center;justify-content:space-between;gap:24px}
+.hv5 .event .cnt{position:relative;z-index:2;max-width:74%}
+.hv5 .event .soonbtn{position:relative;z-index:2;flex:none}
 .hv5 .event .kk{display:flex;align-items:center;gap:9px;margin-bottom:7px}
 .hv5 .event .flag{font-size:9.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;background:#dc2626;color:#fff;padding:3px 8px;border-radius:6px}
 .hv5 .event .when{font-size:11.5px;font-weight:700;color:#fbbf24}

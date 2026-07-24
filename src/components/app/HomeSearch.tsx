@@ -10,7 +10,7 @@ import { Search, X, Building2, ExternalLink } from 'lucide-react';
 import HeroOpportunityMap from './HeroOpportunityMap';
 
 type Opp = { notice_id: string; title: string; department: string; naics_code: string; response_deadline: string | null; set_aside_description: string | null; notice_type: string | null; ui_link: string | null; set: string; lat: number | null; lng: number | null };
-type Firm = { uei: string; company: string; slug: string; state: string; total_contract_value: number; award_count: number };
+type Firm = { uei: string; company: string; slug: string; state: string; total_contract_value: number; award_count: number; city?: string; cage?: string; since?: string; last?: string; agencies?: number; naics?: number };
 type Group = { key: string; label: string; color: string };
 type Results = { q: string; opportunities: Opp[]; contractors: Firm[]; contractPiid: string | null; setGroups: Group[] };
 
@@ -32,6 +32,12 @@ function dueLabel(d: string | null): string {
 }
 function firmProfileUrl(f: Firm) {
   return `/app?${new URLSearchParams({ panel: 'contractors', view: 'profile', slug: f.slug, company: f.company }).toString()}`;
+}
+function yr(d?: string) { return d ? d.slice(0, 4) : ''; }
+function monthYear(d?: string) {
+  if (!d) return '';
+  const x = new Date(d.slice(0, 10) + 'T00:00');
+  return isNaN(x.getTime()) ? '' : x.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
 }
 
 export default function HomeSearch({ children }: { children: React.ReactNode }) {
@@ -119,10 +125,16 @@ export default function HomeSearch({ children }: { children: React.ReactNode }) 
                   <a className="hs-know" href={firmProfileUrl(res.contractors[0])}>
                     <div className="hs-know-ic"><Building2 size={20} strokeWidth={1.75} /></div>
                     <div className="hs-know-t">{res.contractors[0].company}</div>
-                    <div className="hs-know-s">Federal contractor{res.contractors[0].state ? ` · ${res.contractors[0].state}` : ''}</div>
+                    <div className="hs-know-s">Federal contractor{(res.contractors[0].city || res.contractors[0].state) ? ` · ${[res.contractors[0].city, res.contractors[0].state].filter(Boolean).join(', ')}` : ''}</div>
                     <div className="hs-know-stats">
                       <div><div className="hs-n">{fmt$(res.contractors[0].total_contract_value)}</div><div className="hs-l">federal obligated</div></div>
                       <div><div className="hs-n">{(res.contractors[0].award_count || 0).toLocaleString()}</div><div className="hs-l">awards</div></div>
+                    </div>
+                    <div className="hs-know-facts">
+                      {res.contractors[0].since && <div className="hs-fact"><span className="hs-fk">Active since</span><span className="hs-fv">{yr(res.contractors[0].since)}</span></div>}
+                      {(res.contractors[0].agencies || res.contractors[0].naics) ? <div className="hs-fact"><span className="hs-fk">Reach</span><span className="hs-fv">{res.contractors[0].agencies || 0} agencies · {res.contractors[0].naics || 0} NAICS</span></div> : null}
+                      {res.contractors[0].last && <div className="hs-fact"><span className="hs-fk">Last award</span><span className="hs-fv">{monthYear(res.contractors[0].last)}</span></div>}
+                      {res.contractors[0].cage && <div className="hs-fact"><span className="hs-fk">CAGE</span><span className="hs-fv mono">{res.contractors[0].cage}</span></div>}
                     </div>
                     <div className="hs-know-go">View full profile →</div>
                   </a>
@@ -199,7 +211,12 @@ const CSS = `
 .hsearch .hs-know-stats{display:flex;gap:22px;margin:14px 0 4px}
 .hsearch .hs-know-stats .hs-n{font-size:18px;font-weight:800;color:var(--ink);letter-spacing:-.02em;font-variant-numeric:tabular-nums}
 .hsearch .hs-know-stats .hs-l{font-size:11px;color:var(--mut);margin-top:2px}
-.hsearch .hs-know-go{margin-top:12px;font-size:13px;font-weight:800;color:var(--violet2)}
+.hsearch .hs-know-facts{margin:13px 0 2px;border-top:1px solid var(--line2);padding-top:11px;display:flex;flex-direction:column;gap:7px}
+.hsearch .hs-fact{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:12.5px}
+.hsearch .hs-fk{color:var(--mut)}
+.hsearch .hs-fv{color:var(--ink2);font-weight:600;text-align:right}
+.hsearch .hs-fv.mono{font-variant-numeric:tabular-nums;letter-spacing:.02em}
+.hsearch .hs-know-go{margin-top:13px;font-size:13px;font-weight:800;color:var(--violet2)}
 .hsearch .hs-firm{display:flex;align-items:center;gap:9px;background:var(--s);border:1px solid var(--line);border-radius:11px;padding:10px 12px;text-decoration:none;color:var(--ink2)}
 .hsearch .hs-firm:hover{border-color:var(--line2);color:var(--ink)}
 .hsearch .hs-firm>svg{color:var(--mut);flex:none}
