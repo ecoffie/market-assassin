@@ -5,8 +5,9 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { getReadClient } from '@/lib/supabase/server-clients';
-import { searchRecipients, recipientSlug, getRecipientBySlug } from '@/lib/bigquery/recipients';
-import { looksLikePiid } from '@/lib/lookup-intent';
+import { searchRecipients, recipientSlug, getRecipientBySlug, getRecentAwardsForRecipient } from '@/lib/bigquery/recipients';
+import { looksLikePiid, looksLikeUei, looksLikeCompany } from '@/lib/lookup-intent';
+import { searchContractors } from '@/lib/contractor-database';
 import { geocode, setGroupKey, SET_GROUPS } from '@/lib/opportunities/map-data';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 
@@ -56,30 +57,88 @@ async function contractors(q: string): Promise<FirmOut[]> {
   }
 }
 
+// Recompetes HELD by a company — their expiring contracts (incumbent = the company).
+async function recompetes(company: string, uei: string) {
+  try {
+    const sb = getReadClient();
+    const like = `%${company.replace(/[%_]/g, '')}%`;
+    let qy = sb.from('recompete_opportunities')
+      .select('contract_id, piid, incumbent_name, awarding_agency, naics_code, potential_total_value, total_obligation, period_of_performance_current_end')
+      .is('quality_flag', null)
+      .order('period_of_performance_current_end', { ascending: true })
+      .limit(6);
+    qy = uei ? qy.or(`incumbent_uei.eq.${uei},incumbent_name.ilike.${like}`) : qy.ilike('incumbent_name', like);
+    const { data, error } = await qy;
+    if (error) throw error;
+    return (data || []).map((r: Record<string, unknown>) => ({
+      id: r.contract_id || r.piid, piid: r.piid, agency: r.awarding_agency, naics: r.naics_code,
+      value: Number(r.potential_total_value ?? r.total_obligation ?? 0), expires: r.period_of_performance_current_end,
+    }));
+  } catch { return []; }
+}
+
+// A company's recent federal awards (their won work).
+async function recentAwards(uei: string) {
+  if (!uei) return [];
+  try {
+    const rows = await getRecentAwardsForRecipient([uei], uei, 6);
+    return rows.map((r) => ({ id: r.award_id, piid: r.piid, agency: r.awarding_agency, naics: r.naics_description, desc: r.description, amount: r.obligation_amount, date: r.action_date }));
+  } catch { return []; }
+}
+
+// The company's own SBLO / teaming contact (how to reach them to team).
+function companyContact(company: string) {
+  try {
+    const { contractors } = searchContractors({ search: company, hasContact: true, limit: 1 });
+    const c = contractors?.[0];
+    if (c && c.has_contact) return { name: c.sblo_name, title: c.title, email: c.email, phone: c.phone };
+  } catch { /* none */ }
+  return null;
+}
+
+async function enrichTop(firms: FirmOut[]) {
+  if (!firms[0]) return;
+  try {
+    const p = await getRecipientBySlug(firms[0].slug, true);
+    if (p) firms[0] = {
+      ...firms[0],
+      city: p.city || '', cage: p.cage_code || '',
+      since: p.first_action_date || '', last: p.last_action_date || '',
+      agencies: p.distinct_agency_count || 0, naics: p.distinct_naics_count || 0,
+    };
+  } catch { /* keep basic fields */ }
+}
+
 export async function GET(request: NextRequest) {
   const q = (new URL(request.url).searchParams.get('q') || '').trim();
-  if (!q) return NextResponse.json({ success: true, q: '', opportunities: [], contractors: [], contractPiid: null });
+  if (!q) return NextResponse.json({ success: true, q: '', mode: 'market', opportunities: [], contractors: [], contractPiid: null });
 
-  const [opps, firms] = await Promise.all([opportunities(q), contractors(q)]);
-  // Enrich the TOP company with a richer profile so the knowledge panel has real detail
-  // (Google-style): location, CAGE, active-since, agencies/NAICS breadth, last award.
-  if (firms[0]) {
-    try {
-      const p = await getRecipientBySlug(firms[0].slug, true);
-      if (p) firms[0] = {
-        ...firms[0],
-        city: p.city || '', cage: p.cage_code || '',
-        since: p.first_action_date || '', last: p.last_action_date || '',
-        agencies: p.distinct_agency_count || 0, naics: p.distinct_naics_count || 0,
-      };
-    } catch { /* keep basic fields */ }
+  const setGroups = SET_GROUPS.map((g) => ({ key: g.key, label: g.label, color: g.color }));
+
+  // COMPANY branch (same intent classifier the app's search uses): show the company's
+  // recompetes + contacts + recent awards, not opportunities that merely name them.
+  if (looksLikeUei(q) || looksLikeCompany(q)) {
+    const firms = await contractors(q);
+    await enrichTop(firms);
+    const top = firms[0];
+    const [recomps, awards] = await Promise.all([
+      recompetes(top?.company || q, top?.uei || ''),
+      recentAwards(top?.uei || ''),
+    ]);
+    return NextResponse.json({
+      success: true, q, mode: 'company', contractors: firms, setGroups,
+      contact: companyContact(top?.company || q),
+      recompetes: recomps, recentAwards: awards,
+      opportunities: [], contractPiid: null,
+    });
   }
+
+  // MARKET branch — keyword: opportunities + market + contractors.
+  const [opps, firms] = await Promise.all([opportunities(q), contractors(q)]);
+  await enrichTop(firms);
   return NextResponse.json({
-    success: true,
-    q,
+    success: true, q, mode: 'market',
     contractPiid: looksLikePiid(q) ? q.toUpperCase() : null,
-    opportunities: opps,
-    contractors: firms,
-    setGroups: SET_GROUPS.map((g) => ({ key: g.key, label: g.label, color: g.color })),
+    opportunities: opps, contractors: firms, setGroups,
   });
 }

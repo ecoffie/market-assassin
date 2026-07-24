@@ -12,7 +12,10 @@ import HeroOpportunityMap from './HeroOpportunityMap';
 type Opp = { notice_id: string; title: string; department: string; naics_code: string; response_deadline: string | null; set_aside_description: string | null; notice_type: string | null; ui_link: string | null; set: string; lat: number | null; lng: number | null };
 type Firm = { uei: string; company: string; slug: string; state: string; total_contract_value: number; award_count: number; city?: string; cage?: string; since?: string; last?: string; agencies?: number; naics?: number };
 type Group = { key: string; label: string; color: string };
-type Results = { q: string; opportunities: Opp[]; contractors: Firm[]; contractPiid: string | null; setGroups: Group[] };
+type Recompete = { id: string; piid: string | null; agency: string | null; naics: string | null; value: number; expires: string | null };
+type Award = { id: string; piid: string | null; agency: string | null; naics: string | null; desc: string | null; amount: number; date: string | null };
+type Contact = { name: string; title: string; email: string; phone: string };
+type Results = { q: string; mode: 'company' | 'market'; opportunities: Opp[]; contractors: Firm[]; contractPiid: string | null; setGroups: Group[]; recompetes?: Recompete[]; recentAwards?: Award[]; contact?: Contact | null };
 
 const EXAMPLES = ['drones', 'Lockheed Martin', 'demolition', 'janitorial services'];
 
@@ -53,9 +56,9 @@ export default function HomeSearch({ children }: { children: React.ReactNode }) 
     try {
       const r = await fetch(`/api/app/home-search?q=${encodeURIComponent(q)}`);
       const data = await r.json();
-      setRes({ q, opportunities: data.opportunities || [], contractors: data.contractors || [], contractPiid: data.contractPiid || null, setGroups: data.setGroups || [] });
+      setRes({ q, mode: data.mode || 'market', opportunities: data.opportunities || [], contractors: data.contractors || [], contractPiid: data.contractPiid || null, setGroups: data.setGroups || [], recompetes: data.recompetes || [], recentAwards: data.recentAwards || [], contact: data.contact || null });
     } catch {
-      setRes({ q, opportunities: [], contractors: [], contractPiid: null, setGroups: [] });
+      setRes({ q, mode: 'market', opportunities: [], contractors: [], contractPiid: null, setGroups: [], recompetes: [], recentAwards: [], contact: null });
     } finally {
       setLoading(false);
     }
@@ -63,7 +66,10 @@ export default function HomeSearch({ children }: { children: React.ReactNode }) 
   function submit(e: React.FormEvent) { e.preventDefault(); doSearch(value.trim()); }
   function clear() { setRes(null); setValue(''); inputRef.current?.focus(); }
 
-  const total = res ? res.opportunities.length + res.contractors.length + (res.contractPiid ? 1 : 0) : 0;
+  const total = res ? (res.mode === 'company'
+    ? (res.recompetes?.length || 0) + (res.recentAwards?.length || 0) + res.contractors.length
+    : res.opportunities.length + res.contractors.length + (res.contractPiid ? 1 : 0)) : 0;
+  const companyLabel = res?.contractors[0]?.company || res?.q || '';
 
   return (
     <div className="hsearch">
@@ -95,26 +101,53 @@ export default function HomeSearch({ children }: { children: React.ReactNode }) 
           <div className="hs-head"><b>{total}</b> result{total === 1 ? '' : 's'} for <span className="hs-q">&ldquo;{res.q}&rdquo;</span><button className="hs-back" onClick={clear}>← back to my market</button></div>
           <div className="hs-grid">
             <div className="hs-main">
-              {res.contractPiid && (
-                <a className="hs-card hs-contract" href={`https://www.usaspending.gov/search/?keyword=${encodeURIComponent(res.contractPiid)}`} target="_blank" rel="noreferrer">
-                  <div className="hs-kick">Contract / solicitation</div>
-                  <div className="hs-ct-t">{res.contractPiid}</div>
-                  <div className="hs-ct-s">Look up this award on USASpending <ExternalLink size={12} /></div>
-                </a>
+              {res.mode === 'company' ? (
+                <>
+                  <div className="hs-sec">Recompetes held by {companyLabel}</div>
+                  {(res.recompetes || []).length === 0 ? (
+                    <div className="hs-empty">No expiring contracts on record for {companyLabel} — they may hold work under a parent entity, or nothing is coming up for recompete.</div>
+                  ) : (res.recompetes || []).map((rc) => (
+                    <a className="hs-card" key={String(rc.id)} href={rc.piid ? `https://www.usaspending.gov/search/?keyword=${encodeURIComponent(rc.piid)}` : 'https://www.usaspending.gov'} target="_blank" rel="noreferrer">
+                      <div className="hs-o-top"><span className="hs-badge">Recompete</span>{rc.expires && <span className="hs-due">expires {monthYear(rc.expires)}</span>}</div>
+                      <div className="hs-o-t">{rc.agency || 'Federal contract'}{rc.naics ? ` · NAICS ${rc.naics}` : ''}</div>
+                      <div className="hs-o-m">{fmt$(rc.value)} ceiling{rc.piid ? ` · ${rc.piid}` : ''}</div>
+                    </a>
+                  ))}
+                  {(res.recentAwards || []).length > 0 && <>
+                    <div className="hs-sec" style={{ marginTop: 18 }}>Recent awards</div>
+                    {(res.recentAwards || []).map((a) => (
+                      <a className="hs-card" key={String(a.id)} href={a.piid ? `https://www.usaspending.gov/search/?keyword=${encodeURIComponent(a.piid)}` : 'https://www.usaspending.gov'} target="_blank" rel="noreferrer">
+                        <div className="hs-o-top"><span className="hs-badge award">Award</span>{a.date && <span className="hs-due">{monthYear(a.date)}</span>}</div>
+                        <div className="hs-o-t">{a.desc || a.agency || 'Federal award'}</div>
+                        <div className="hs-o-m">{a.agency || ''}{a.naics ? ` · ${a.naics}` : ''} · {fmt$(a.amount)}</div>
+                      </a>
+                    ))}
+                  </>}
+                </>
+              ) : (
+                <>
+                  {res.contractPiid && (
+                    <a className="hs-card hs-contract" href={`https://www.usaspending.gov/search/?keyword=${encodeURIComponent(res.contractPiid)}`} target="_blank" rel="noreferrer">
+                      <div className="hs-kick">Contract / solicitation</div>
+                      <div className="hs-ct-t">{res.contractPiid}</div>
+                      <div className="hs-ct-s">Look up this award on USASpending <ExternalLink size={12} /></div>
+                    </a>
+                  )}
+                  {res.opportunities.length === 0 && !res.contractPiid && (
+                    <div className="hs-empty">No open opportunities match &ldquo;{res.q}&rdquo;. Try a broader term, a company name, or a contract number.</div>
+                  )}
+                  {res.opportunities.map((o) => (
+                    <a className="hs-card" key={o.notice_id} href={o.ui_link || 'https://sam.gov/search'} target="_blank" rel="noreferrer">
+                      <div className="hs-o-top">
+                        {o.notice_type && <span className="hs-badge">{o.notice_type.slice(0, 22)}</span>}
+                        {o.response_deadline && <span className={`hs-due${dueLabel(o.response_deadline) === 'due today' || /^[0-3]d/.test(dueLabel(o.response_deadline)) ? ' hot' : ''}`}>{dueLabel(o.response_deadline)}</span>}
+                      </div>
+                      <div className="hs-o-t">{o.title}</div>
+                      <div className="hs-o-m">{o.department}{o.naics_code ? ` · NAICS ${o.naics_code}` : ''}{o.set_aside_description ? ` · ${o.set_aside_description}` : ''}</div>
+                    </a>
+                  ))}
+                </>
               )}
-              {res.opportunities.length === 0 && !res.contractPiid && (
-                <div className="hs-empty">No open opportunities match &ldquo;{res.q}&rdquo;. Try a broader term, a company name, or a contract number.</div>
-              )}
-              {res.opportunities.map((o) => (
-                <a className="hs-card" key={o.notice_id} href={o.ui_link || 'https://sam.gov/search'} target="_blank" rel="noreferrer">
-                  <div className="hs-o-top">
-                    {o.notice_type && <span className="hs-badge">{o.notice_type.slice(0, 22)}</span>}
-                    {o.response_deadline && <span className={`hs-due${dueLabel(o.response_deadline) === 'due today' || /^[0-3]d/.test(dueLabel(o.response_deadline)) ? ' hot' : ''}`}>{dueLabel(o.response_deadline)}</span>}
-                  </div>
-                  <div className="hs-o-t">{o.title}</div>
-                  <div className="hs-o-m">{o.department}{o.naics_code ? ` · NAICS ${o.naics_code}` : ''}{o.set_aside_description ? ` · ${o.set_aside_description}` : ''}</div>
-                </a>
-              ))}
             </div>
 
             <aside className="hs-side">
@@ -146,6 +179,14 @@ export default function HomeSearch({ children }: { children: React.ReactNode }) 
                     </a>
                   ))}
                 </>
+              )}
+              {res.mode === 'company' && res.contact && (
+                <div className="hs-contact">
+                  <div className="hs-ct-k">Teaming contact</div>
+                  <div className="hs-ct-nm">{res.contact.name}{res.contact.title ? ` · ${res.contact.title}` : ''}</div>
+                  {res.contact.email && <a className="hs-ct-em" href={`mailto:${res.contact.email}`}>{res.contact.email}</a>}
+                  {res.contact.phone && <div className="hs-ct-ph">{res.contact.phone}</div>}
+                </div>
               )}
               {(() => {
                 const pins = res.opportunities.filter((o) => o.lat != null && o.lng != null).map((o) => ({ lat: o.lat as number, lng: o.lng as number, set: o.set, label: o.title }));
@@ -190,6 +231,13 @@ const CSS = `
 .hsearch .hs-grid{display:grid;grid-template-columns:1fr 320px;gap:18px;align-items:start}
 @media(max-width:900px){.hsearch .hs-grid{grid-template-columns:1fr}}
 .hsearch .hs-main{display:flex;flex-direction:column;gap:10px;min-width:0}
+.hsearch .hs-sec{font-size:11px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);margin:2px 0 2px}
+.hsearch .hs-badge.award{color:#6ee7b7;background:rgba(16,185,129,.16)}
+.hsearch .hs-contact{background:var(--s2);border:1px solid var(--line2);border-radius:14px;padding:15px 16px;margin-top:2px}
+.hsearch .hs-ct-k{font-size:10.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--mut);margin-bottom:6px}
+.hsearch .hs-ct-nm{font-size:14px;font-weight:700;color:var(--ink);line-height:1.3}
+.hsearch .hs-ct-em{display:block;font-size:12.5px;font-weight:600;color:var(--violet2);margin-top:6px;word-break:break-all}
+.hsearch .hs-ct-ph{font-size:12.5px;color:var(--ink2);margin-top:3px;font-variant-numeric:tabular-nums}
 .hsearch .hs-card{display:block;background:var(--s);border:1px solid var(--line);border-radius:14px;padding:15px 17px;text-decoration:none}
 .hsearch .hs-card:hover{border-color:var(--line2)}
 .hsearch .hs-o-top{display:flex;align-items:center;gap:8px;margin-bottom:7px}
