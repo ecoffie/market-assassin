@@ -78,7 +78,7 @@ export default async function LoggedInHomeV5({ searchParams }: { searchParams: P
     getReferralStats(email, 'https://getmindy.ai').catch(() => null),
     getMapOpportunities(250).catch(() => []),
   ]);
-  const mapPins = mapOpps.map((o) => ({ lat: o.lat, lng: o.lng, set: o.set }));
+  const mapPins = mapOpps.map((o) => ({ lat: o.lat, lng: o.lng, set: o.set, label: o.title }));
   const mapGroups = SET_GROUPS.map((g) => ({ key: g.key, label: g.label, color: g.color }));
   const today = (oppsRes.opportunities as Array<Record<string, unknown>>).slice(0, 3);
   const name = nameFromEmail(email);
@@ -298,6 +298,8 @@ const CSS = `
 .hv5 .heromap{position:absolute;inset:0;display:block}
 .hv5 .heromap-canvas{position:absolute;inset:0}
 .hv5 .heromap-canvas .leaflet-container{background:#e8eef2}
+.hv5 .heromap-open{position:absolute;top:10px;right:10px;z-index:1000;width:30px;height:30px;display:grid;place-items:center;border-radius:8px;background:rgba(17,20,32,.72);color:#fff;text-decoration:none}
+.hv5 .heromap-open:hover{background:var(--violet2)}
 .hv5 .enter h2{font-size:34px;margin:14px 0 8px;line-height:1.03}
 .hv5 .enter .sub{color:var(--ink2);font-size:15px;max-width:44ch;line-height:1.5}
 .hv5 .statline{display:flex;gap:26px;margin:22px 0 0;flex-wrap:wrap}
