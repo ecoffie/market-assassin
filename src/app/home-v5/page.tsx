@@ -14,7 +14,7 @@ import Link from 'next/link';
 import { fetchSamOpportunitiesFromCache } from '@/lib/briefings/pipelines/sam-gov';
 import { getReadClient } from '@/lib/supabase/server-clients';
 import CopyPrompt from '@/components/home/CopyPrompt';
-import { Flame, Trophy, Terminal, GraduationCap, LayoutGrid, BarChart3, Newspaper, Target, Handshake } from 'lucide-react';
+import { Flame, Trophy, Terminal, GraduationCap, LayoutGrid, BarChart3, Newspaper, Target, Handshake, TrendingUp, ChevronRight } from 'lucide-react';
 import { getGameStats, getLeaderboard } from '@/lib/gamification/stats';
 import { getBalance } from '@/lib/mcp/credits';
 import { getReferralStats } from '@/lib/mcp/referrals';
@@ -132,17 +132,28 @@ export default async function LoggedInHomeV5({ searchParams }: { searchParams: P
         <section className="hero">
           <div className="card enter">
             <div className="grid-tex" />
-            <div className="eyebrow" style={{ color: '#d8b4fe' }}>The App · Market Intelligence</div>
-            <h2 className="disp">Your 24/7 federal<br />market analyst.</h2>
-            <div className="sub">Daily alerts, AI briefings, forecasts, recompetes, contractor intel, pipeline &amp; CRM — the full tool suite, scored to your business.</div>
-            <div className="statline">
-              <div className="s"><div className="n tnum">{counts.opps.toLocaleString()}+</div><div className="l">opportunities in the feed</div></div>
-              <div className="s"><div className="n tnum">{counts.forecasts.toLocaleString()}</div><div className="l">agency forecasts</div></div>
-              <div className="s"><div className="n tnum">{counts.recompetes.toLocaleString()}</div><div className="l">recompetes tracked</div></div>
+            <div className="enter-l">
+              <div className="eyebrow" style={{ color: '#d8b4fe' }}>The App · Market Intelligence</div>
+              <h2 className="disp">Your 24/7 federal<br />market analyst.</h2>
+              <div className="sub">Daily alerts, AI briefings, forecasts, recompetes, contractor intel, pipeline &amp; CRM — the full tool suite, scored to your business.</div>
+              <div className="statline">
+                <div className="s"><div className="n tnum">{counts.opps.toLocaleString()}+</div><div className="l">opportunities in the feed</div></div>
+                <div className="s"><div className="n tnum">{counts.forecasts.toLocaleString()}</div><div className="l">agency forecasts</div></div>
+                <div className="s"><div className="n tnum">{counts.recompetes.toLocaleString()}</div><div className="l">recompetes tracked</div></div>
+              </div>
+              <div className="cta">
+                <Link className="btn-primary" href="/app">Enter the App →</Link>
+                <Link className="btn-ghost" href="/app">Take the tour</Link>
+              </div>
             </div>
-            <div className="cta">
-              <Link className="btn-primary" href="/app">Enter the App →</Link>
-              <Link className="btn-ghost" href="/app">Take the tour</Link>
+            <div className="enter-r">
+              <div className="qlh">Jump straight in</div>
+              <Link className="ql" href="/app?panel=research"><BarChart3 size={17} strokeWidth={1.9} /><span>Market Research</span><ChevronRight className="qlc" size={15} /></Link>
+              <Link className="ql" href="/app?panel=dashboard"><Newspaper size={17} strokeWidth={1.9} /><span>Daily Briefing</span><ChevronRight className="qlc" size={15} /></Link>
+              <Link className="ql" href="/app?panel=recompetes"><Target size={17} strokeWidth={1.9} /><span>Recompetes</span><ChevronRight className="qlc" size={15} /></Link>
+              <Link className="ql" href="/app?panel=forecasts"><TrendingUp size={17} strokeWidth={1.9} /><span>Forecasts</span><ChevronRight className="qlc" size={15} /></Link>
+              <Link className="ql" href="/app?panel=pipeline"><LayoutGrid size={17} strokeWidth={1.9} /><span>Pipeline</span><ChevronRight className="qlc" size={15} /></Link>
+              <Link className="ql" href="/app?panel=contacts"><Handshake size={17} strokeWidth={1.9} /><span>Teaming CRM</span><ChevronRight className="qlc" size={15} /></Link>
             </div>
           </div>
 
@@ -257,15 +268,6 @@ export default async function LoggedInHomeV5({ searchParams }: { searchParams: P
           </Link>
         </section>
 
-        {/* MAKE — real tool actions, not fake previews (Decision #024: drive the activation metric) */}
-        <div className="sec-h"><h3 className="disp">What will you make first?</h3><Link href="/app">Open the app →</Link></div>
-        <section className="makes">
-          <Link className="mk-card" href="/app?panel=research"><div className="mk-ic"><BarChart3 size={24} strokeWidth={1.75} /></div><div className="mk-t">Market report</div><div className="mk-d">Total market, top agencies &amp; NAICS coverage for any keyword.</div><span className="mk-go">Generate →</span></Link>
-          <Link className="mk-card" href="/app?panel=dashboard"><div className="mk-ic"><Newspaper size={24} strokeWidth={1.75} /></div><div className="mk-t">Today&apos;s briefing</div><div className="mk-d">Your top opportunities, scored by win-fit.</div><span className="mk-go">See yours →</span></Link>
-          <Link className="mk-card" href="/app?panel=recompetes"><div className="mk-ic"><Target size={24} strokeWidth={1.75} /></div><div className="mk-t">Find a recompete</div><div className="mk-d">Who holds it now, the ceiling, and when it&apos;s up for grabs.</div><span className="mk-go">Hunt →</span></Link>
-          <Link className="mk-card" href="/app?panel=contractors"><div className="mk-ic"><Handshake size={24} strokeWidth={1.75} /></div><div className="mk-t">Teaming targets</div><div className="mk-d">3,500+ contractors with small-business-liaison contacts.</div><span className="mk-go">Browse →</span></Link>
-        </section>
-
         {/* UPGRADE — single contextual nudge for free users (Decision #024: not a pricing brochure) */}
         {!isPaid && (
           <section className="upgrade">
@@ -330,9 +332,19 @@ const CSS = `
 @media(max-width:900px){.hv5 .hero{grid-template-columns:1fr}}
 
 .hv5 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);position:relative;overflow:hidden}
-.hv5 .enter{padding:30px;background:radial-gradient(120% 140% at 82% 12%,rgba(124,58,237,.42),transparent 55%),radial-gradient(90% 120% at 100% 100%,rgba(168,85,247,.22),transparent 60%),var(--surface2);border-color:#342a4d;display:flex;flex-direction:column;min-height:280px}
+.hv5 .enter{padding:30px;background:radial-gradient(120% 140% at 82% 12%,rgba(124,58,237,.42),transparent 55%),radial-gradient(90% 120% at 100% 100%,rgba(168,85,247,.22),transparent 60%),var(--surface2);border-color:#342a4d;display:grid;grid-template-columns:1fr 292px;gap:30px;align-items:stretch;min-height:280px}
+.hv5 .enter-l{display:flex;flex-direction:column;min-width:0}
+.hv5 .enter-r{display:flex;flex-direction:column;gap:5px;align-self:center;background:rgba(8,6,14,.3);border:1px solid var(--line2);border-radius:14px;padding:14px}
+.hv5 .qlh{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);padding:2px 8px 9px}
+.hv5 .ql{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;font-size:14px;font-weight:600;color:var(--ink2)}
+.hv5 .ql>span{flex:1;min-width:0}
+.hv5 .ql>svg:first-child{color:var(--violet2)}
+.hv5 .ql .qlc{color:var(--mut);opacity:.55}
+.hv5 .ql:hover{background:var(--surface);color:var(--ink)}
+.hv5 .ql:hover .qlc{opacity:1;color:var(--violet2)}
+@media(max-width:900px){.hv5 .enter{grid-template-columns:1fr}.hv5 .enter-r{align-self:stretch}}
 .hv5 .grid-tex{position:absolute;inset:0;opacity:.5;background-image:linear-gradient(rgba(168,85,247,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.06) 1px,transparent 1px);background-size:34px 34px;mask-image:radial-gradient(80% 80% at 80% 10%,#000,transparent 70%)}
-.hv5 .enter>*{position:relative}
+.hv5 .enter>*:not(.grid-tex){position:relative}
 .hv5 .enter h2{font-size:34px;margin:14px 0 8px;line-height:1.03}
 .hv5 .enter .sub{color:var(--ink2);font-size:15px;max-width:44ch;line-height:1.5}
 .hv5 .statline{display:flex;gap:26px;margin:22px 0 0;flex-wrap:wrap}
