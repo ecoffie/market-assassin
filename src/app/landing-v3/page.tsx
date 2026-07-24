@@ -67,7 +67,7 @@ function boxStyle(state: 'done' | 'now' | 'lock'): React.CSSProperties {
 export default async function LandingV3() {
   const sb = getReadClient();
   const [expiringRaw, weird, board, recentAwards, oppsCount, players] = await Promise.all([
-    queryExpiringContracts({ monthsWindow: 18, minValue: 10_000_000, limit: 80 }).then((r) => r.contracts).catch(() => []),
+    queryExpiringContracts({ monthsWindow: 12, minValue: 10_000_000, limit: 200, orderBy: 'value' }).then((r) => r.contracts).catch(() => []),
     getWeirdAwards(8).catch(() => []),
     getLeaderboard('__public__@mindy', 5).catch(() => ({ rows: [], you: null, total: 0 })),
     getRecentBigAwards(40).catch(() => []),
