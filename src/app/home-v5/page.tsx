@@ -13,6 +13,10 @@
 import Link from 'next/link';
 import { fetchSamOpportunitiesFromCache } from '@/lib/briefings/pipelines/sam-gov';
 import { getReadClient } from '@/lib/supabase/server-clients';
+import CopyPrompt from '@/components/home/CopyPrompt';
+import { getGameStats, getLeaderboard } from '@/lib/gamification/stats';
+import { getBalance } from '@/lib/mcp/credits';
+import { getReferralStats } from '@/lib/mcp/referrals';
 
 export const dynamic = 'force-dynamic';
 
@@ -42,19 +46,19 @@ function badgeFor(noticeType: string): { label: string; cls: string } {
   return { label: noticeType ? noticeType.slice(0, 14) : 'Notice', cls: 'b-rfp' };
 }
 
-async function getUserNaics(email: string): Promise<string[]> {
+async function getUserContext(email: string): Promise<{ naics: string[]; isPaid: boolean }> {
   try {
     const sb = getReadClient();
     const { data, error } = await sb
       .from('user_notification_settings')
-      .select('naics_codes')
+      .select('naics_codes, paid_status')
       .eq('user_email', email)
       .maybeSingle();
     if (error) throw error;
     const codes = (data?.naics_codes as string[] | null || []).filter(Boolean);
-    return codes.length ? codes : DEFAULT_NAICS;
+    return { naics: codes.length ? codes : DEFAULT_NAICS, isPaid: data?.paid_status === true };
   } catch {
-    return DEFAULT_NAICS;
+    return { naics: DEFAULT_NAICS, isPaid: false };
   }
 }
 
@@ -83,10 +87,14 @@ export default async function LoggedInHomeV5({ searchParams }: { searchParams: P
   const sp = await searchParams;
   const email = (sp.email || 'eric@govcongiants.com').toLowerCase().trim();
 
-  const naics = await getUserNaics(email);
-  const [oppsRes, counts] = await Promise.all([
+  const { naics, isPaid } = await getUserContext(email);
+  const [oppsRes, counts, game, board, balance, referral] = await Promise.all([
     fetchSamOpportunitiesFromCache({ naicsCodes: naics, limit: 8 }).catch(() => ({ opportunities: [] as Array<Record<string, unknown>> })),
     getCounts(),
+    getGameStats(email).catch(() => null),
+    getLeaderboard(email, 5).catch(() => ({ rows: [] as Array<{ handle: string; weekXp: number; rank: number; isYou: boolean }>, you: null as { handle: string; weekXp: number; rank: number; isYou: boolean } | null, total: 0 })),
+    getBalance(email).catch(() => 0),
+    getReferralStats(email, 'https://getmindy.ai').catch(() => null),
   ]);
   const today = (oppsRes.opportunities as Array<Record<string, unknown>>).slice(0, 3);
   const name = nameFromEmail(email);
@@ -105,7 +113,7 @@ export default async function LoggedInHomeV5({ searchParams }: { searchParams: P
           <Link href="/pricing">Pricing</Link>
         </nav>
         <div className="nav-r">
-          <Link className="pill" href="/mcp/account"><span className="dot" />Credits <b className="tnum">—</b></Link>
+          <Link className="pill" href="/mcp/account"><span className="dot" />Credits <b className="tnum">{balance.toLocaleString()}</b></Link>
           <span className="avatar" />
         </div>
       </div></header>
@@ -157,20 +165,70 @@ export default async function LoggedInHomeV5({ searchParams }: { searchParams: P
           </div>
         </section>
 
-        {/* EVENTS */}
-        <div className="sec-h"><h3 className="disp">Happening on Mindy</h3><Link href="/signup">All events →</Link></div>
+        {/* ENGINE — real progress + credits + refer (Decision #024 band 2: the return + virality engines) */}
+        <section className="engine">
+          <div className="gcard">
+            <div className="gh"><span className="glabel">Your streak</span>{game && game.streak > 0 && <span className="fire">🔥 {game.streak}d</span>}</div>
+            <div className="gbig tnum">{(game?.xp ?? 0).toLocaleString()}<span className="gu">XP</span></div>
+            <div className="grank">{game?.rankName ?? 'Recruit'} · Level {game?.level ?? 1}</div>
+            {game && game.nextAt != null ? (
+              <>
+                <div className="gbar"><i style={{ width: `${Math.min(100, Math.round((game.xp / game.nextAt) * 100))}%` }} /></div>
+                <div className="gnext">{(game.nextAt - game.xp).toLocaleString()} XP to {game.nextName}</div>
+              </>
+            ) : <div className="gnext" style={{ marginTop: 12 }}>{game ? 'Top rank reached 🏆' : 'Use Mindy to start earning XP.'}</div>}
+            <div className="gmeta">{game?.toolUseWeek ?? 0} tool actions · {game?.activeDaysWeek ?? 0} active days this week</div>
+          </div>
+
+          <div className="gcard">
+            <div className="gh"><span className="glabel">This week&apos;s board</span><Link className="glink" href="/app">Play →</Link></div>
+            {board.rows.length === 0 ? (
+              <div className="lbempty">Use Mindy this week to land on the board.</div>
+            ) : board.rows.map((r) => (
+              <div className={`lbrow${r.isYou ? ' you' : ''}`} key={r.rank}>
+                <span className="lrk tnum">{r.rank}</span>
+                <span className="lhandle">{r.handle}{r.isYou && <span className="ytag">you</span>}</span>
+                <span className="lxp tnum">{r.weekXp.toLocaleString()}</span>
+              </div>
+            ))}
+            {board.you && board.you.rank > 5 && (
+              <div className="lbrow you">
+                <span className="lrk tnum">{board.you.rank}</span>
+                <span className="lhandle">{board.you.handle}<span className="ytag">you</span></span>
+                <span className="lxp tnum">{board.you.weekXp.toLocaleString()}</span>
+              </div>
+            )}
+          </div>
+
+          <div className="gcard">
+            <div className="gh"><span className="glabel">Mindy credits</span><Link className="glink" href="/mcp/account">Manage →</Link></div>
+            <div className="gbig tnum">{balance.toLocaleString()}<span className="gu">cr</span></div>
+            <div className="gnext">100 free on signup · earn +{referral?.reward ?? 100} for every friend</div>
+            {referral && (
+              <div className="refbox">
+                <input className="reflink" readOnly value={referral.link} aria-label="Your referral link" />
+                <CopyPrompt text={referral.link} />
+              </div>
+            )}
+            <div className="gmeta">{referral ? `You've earned ${referral.creditsEarned.toLocaleString()} cr from ${referral.qualified} friend${referral.qualified === 1 ? '' : 's'}` : 'Invite a friend — you both get +100.'}</div>
+          </div>
+        </section>
+
+        {/* EVENTS — surfaced here per Eric; real destinations are being built, so honest
+            "coming soon" states instead of dead /signup links (a signed-in user → signup). */}
+        <div className="sec-h"><h3 className="disp">Happening on Mindy</h3><span className="soon">Coming soon</span></div>
         <section className="event">
           <div className="cnt">
             <div className="kk"><span className="flag">Live event</span><span className="when">Coming soon</span></div>
             <h3 className="disp">Mindy Demo Day</h3>
             <p>Watch real contractors pitch live, see Mindy find their next award on stage, and get the exact playbook they used. Free to attend.</p>
-            <div className="act"><Link className="seat" href="/signup">Save your seat →</Link></div>
+            <div className="act"><span className="soonbtn">Coming soon</span></div>
           </div>
         </section>
         <section className="promos">
-          <Link className="promo contest" href="/signup"><span className="pk">Contest</span><h4>Demo Day Pitch Contest</h4><p>Pitch how you&apos;d win a target contract. Best entry takes a year of Pro + a founder strategy call.</p><span className="lnk">Enter the contest →</span></Link>
-          <Link className="promo grant" href="/signup"><span className="pk">Giveaway</span><h4>Grant Giveaway</h4><div className="amt tnum">$10,000</div><p>One small business, one working-capital grant to go after its first federal award.</p><span className="lnk">Apply now →</span></Link>
-          <Link className="promo challenge" href="/signup"><span className="pk">Challenge</span><h4>First-Contract Challenge</h4><p>30 days, guided by Mindy, from profile to your first submitted bid. Finish it, unlock bonus credits.</p><span className="lnk">Join the challenge →</span></Link>
+          <div className="promo contest"><span className="pk">Contest</span><h4>Demo Day Pitch Contest</h4><p>Pitch how you&apos;d win a target contract. Best entry takes a year of Pro + a founder strategy call.</p><span className="lnk soon-lnk">Coming soon</span></div>
+          <div className="promo grant"><span className="pk">Giveaway</span><h4>Grant Giveaway</h4><div className="amt tnum">$10,000</div><p>One small business, one working-capital grant to go after its first federal award.</p><span className="lnk soon-lnk">Coming soon</span></div>
+          <div className="promo challenge"><span className="pk">Challenge</span><h4>First-Contract Challenge</h4><p>30 days, guided by Mindy, from profile to your first submitted bid. Finish it, unlock bonus credits.</p><span className="lnk soon-lnk">Coming soon</span></div>
         </section>
 
         {/* CAPABILITIES */}
@@ -198,22 +256,30 @@ export default async function LoggedInHomeV5({ searchParams }: { searchParams: P
           </Link>
         </section>
 
-        {/* SHOWCASE */}
-        <div className="sec-h"><h3 className="disp">See what Mindy makes</h3><Link href="/app">Sample outputs →</Link></div>
-        <section className="show">
-          <div className="shot"><div className="pv pv-report"><div className="mini"><i style={{ height: '40%' }} /><i style={{ height: '70%' }} /><i style={{ height: '55%' }} /><i style={{ height: '95%' }} /><i style={{ height: '48%' }} /><i style={{ height: '80%' }} /><i style={{ height: '62%' }} /></div><div className="lb">Market Report</div></div><div className="bd"><div className="t">One-shot market map</div><div className="d">Total market, top agencies &amp; NAICS coverage for any keyword.</div></div></div>
-          <div className="shot"><div className="pv pv-brief"><div className="lb">Daily Briefing</div></div><div className="bd"><div className="t">Scored daily brief</div><div className="d">Your top opportunities, ranked by win-fit and delivered at 7am.</div></div></div>
-          <div className="shot"><div className="pv pv-recompete"><div className="lb">Recompete Alert</div></div><div className="bd"><div className="t">Incumbent &amp; expiry</div><div className="d">Who holds it now, the ceiling, and when it comes up for grabs.</div></div></div>
-          <div className="shot"><div className="pv pv-contractor"><div className="lb">Contractor Intel</div></div><div className="bd"><div className="t">Teaming targets</div><div className="d">3,500+ contractors with small-business-liaison contacts.</div></div></div>
+        {/* MAKE — real tool actions, not fake previews (Decision #024: drive the activation metric) */}
+        <div className="sec-h"><h3 className="disp">What will you make first?</h3><Link href="/app">Open the app →</Link></div>
+        <section className="makes">
+          <Link className="mk-card" href="/app?panel=research"><div className="mk-ic">📊</div><div className="mk-t">Market report</div><div className="mk-d">Total market, top agencies &amp; NAICS coverage for any keyword.</div><span className="mk-go">Generate →</span></Link>
+          <Link className="mk-card" href="/app?panel=dashboard"><div className="mk-ic">🗞️</div><div className="mk-t">Today&apos;s briefing</div><div className="mk-d">Your top opportunities, scored by win-fit.</div><span className="mk-go">See yours →</span></Link>
+          <Link className="mk-card" href="/app?panel=recompetes"><div className="mk-ic">🎯</div><div className="mk-t">Find a recompete</div><div className="mk-d">Who holds it now, the ceiling, and when it&apos;s up for grabs.</div><span className="mk-go">Hunt →</span></Link>
+          <Link className="mk-card" href="/app?panel=contractors"><div className="mk-ic">🤝</div><div className="mk-t">Teaming targets</div><div className="mk-d">3,500+ contractors with small-business-liaison contacts.</div><span className="mk-go">Browse →</span></Link>
         </section>
 
-        {/* PRICING */}
-        <section className="price">
-          <div className="cell lead"><h3 className="disp">Simple pricing</h3><p>Start free. Upgrade when Mindy is finding you work worth bidding.</p></div>
-          <div className="cell tier"><div className="nm">Free</div><div className="amt tnum">$0</div><Link className="b" href="/pricing">Daily alerts + research →</Link></div>
-          <div className="cell tier pro"><div className="nm">Pro</div><div className="amt tnum">$149<small>/mo</small></div><Link className="b" href="/pricing">Everything, unlimited →</Link></div>
-          <div className="cell tier"><div className="nm">Teams</div><div className="amt tnum">$499<small>/mo</small></div><Link className="b" href="/pricing">Whole BD department →</Link></div>
-        </section>
+        {/* UPGRADE — single contextual nudge for free users (Decision #024: not a pricing brochure) */}
+        {!isPaid && (
+          <section className="upgrade">
+            <div className="up-l">
+              <div className="eyebrow" style={{ color: '#d8b4fe' }}>You&apos;re on Free</div>
+              <h3 className="disp">Unlock the full BD department.</h3>
+              <p>AI briefings, 7,700+ forecasts, recompete tracking, pipeline, teaming CRM, proposal drafting &amp; the MCP — everything, unlimited.</p>
+            </div>
+            <div className="up-r">
+              <div className="up-price tnum">$149<small>/mo</small></div>
+              <Link className="btn-primary" href="/pricing">Upgrade to Pro →</Link>
+              <Link className="up-teams" href="/pricing">or Teams for a whole BD team →</Link>
+            </div>
+          </section>
+        )}
       </main>
 
       <footer className="f"><div className="wrap f-in">
@@ -370,4 +436,58 @@ const CSS = `
 
 .hv5 .f{border-top:1px solid var(--line);margin-top:60px;padding:26px 0;color:var(--mut2);font-size:12px}
 .hv5 .f-in{display:flex;justify-content:space-between;gap:16px;flex-wrap:wrap}
+
+/* ENGINE — real progress + credits + refer (#024 band 2) */
+.hv5 .engine{display:grid;grid-template-columns:1fr 1fr 1fr;gap:18px;margin-top:18px}
+@media(max-width:900px){.hv5 .engine{grid-template-columns:1fr}}
+.hv5 .gcard{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px;display:flex;flex-direction:column;min-height:190px}
+.hv5 .gh{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.hv5 .glabel{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--mut)}
+.hv5 .glink{font-size:12px;font-weight:700;color:var(--violet2)}
+.hv5 .fire{font-size:13px;font-weight:800;color:var(--amber)}
+.hv5 .gbig{font-size:34px;font-weight:800;letter-spacing:-.03em;line-height:1}
+.hv5 .gbig .gu{font-size:14px;color:var(--mut);font-weight:700;margin-left:6px;letter-spacing:0}
+.hv5 .grank{font-size:13px;font-weight:700;color:var(--ink2);margin-top:7px}
+.hv5 .gbar{height:7px;border-radius:99px;background:var(--bg2);border:1px solid var(--line);margin:12px 0 6px;overflow:hidden}
+.hv5 .gbar i{display:block;height:100%;background:var(--grad)}
+.hv5 .gnext{font-size:12px;color:var(--mut)}
+.hv5 .gmeta{margin-top:auto;padding-top:12px;font-size:12px;color:var(--mut2)}
+.hv5 .lbrow{display:grid;grid-template-columns:22px 1fr auto;gap:10px;align-items:center;padding:8px 0;border-top:1px solid var(--line);font-size:13px;color:var(--ink2)}
+.hv5 .lbrow:first-of-type{border-top:0}
+.hv5 .lbrow.you{color:var(--ink);font-weight:600}
+.hv5 .lrk{color:var(--mut);font-weight:800;text-align:center}
+.hv5 .lhandle{font-weight:600;display:flex;align-items:center;gap:8px;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hv5 .ytag{font-size:9px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;padding:2px 6px;border-radius:5px;background:var(--violet-deep);color:#e9d5ff}
+.hv5 .lxp{font-weight:800;color:var(--emerald)}
+.hv5 .lbempty{color:var(--mut);font-size:13px;padding:8px 0}
+.hv5 .refbox{display:flex;gap:8px;margin:12px 0 4px}
+.hv5 .reflink{flex:1;min-width:0;background:var(--bg2);border:1px solid var(--line);border-radius:9px;padding:8px 10px;font-size:12px;color:var(--ink2);font-family:inherit}
+.hv5 .copybtn{background:var(--grad);color:#fff;border:0;border-radius:9px;padding:8px 13px;font-size:12px;font-weight:800;cursor:pointer;white-space:nowrap}
+.hv5 .copybtn:hover{filter:brightness(1.08)}
+
+/* Coming-soon states (no dead /signup links) */
+.hv5 .soon{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mut2);border:1px solid var(--line);padding:4px 9px;border-radius:99px}
+.hv5 .soonbtn{background:var(--surface2);color:var(--mut);font-weight:800;font-size:14px;padding:11px 20px;border-radius:11px;border:1px solid var(--line)}
+.hv5 .soon-lnk{color:var(--mut2)!important}
+
+/* MAKE — real tool actions (#024) */
+.hv5 .makes{display:grid;grid-template-columns:repeat(4,1fr);gap:16px}
+@media(max-width:980px){.hv5 .makes{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:560px){.hv5 .makes{grid-template-columns:1fr}}
+.hv5 .mk-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;min-height:162px}
+.hv5 .mk-card:hover{border-color:var(--line2)}
+.hv5 .mk-ic{font-size:24px;margin-bottom:10px}
+.hv5 .mk-t{font-size:15px;font-weight:800}
+.hv5 .mk-d{font-size:12.5px;color:var(--ink2);line-height:1.45;margin-top:5px}
+.hv5 .mk-go{margin-top:auto;padding-top:14px;font-size:13px;font-weight:800;color:var(--violet2)}
+
+/* UPGRADE — single contextual nudge (#024, replaces the pricing brochure) */
+.hv5 .upgrade{margin-top:40px;border:1px solid #342a4d;border-radius:var(--r);padding:28px 30px;display:flex;align-items:center;justify-content:space-between;gap:24px;flex-wrap:wrap;background:radial-gradient(90% 160% at 88% 10%,rgba(124,58,237,.34),transparent 55%),var(--surface2)}
+.hv5 .upgrade .up-l h3{font-size:24px;margin:8px 0 8px}
+.hv5 .upgrade .up-l p{margin:0;color:var(--ink2);font-size:14px;max-width:62ch;line-height:1.5}
+.hv5 .upgrade .up-r{display:flex;flex-direction:column;align-items:flex-end;gap:8px}
+.hv5 .up-price{font-size:30px;font-weight:800;letter-spacing:-.02em}
+.hv5 .up-price small{font-size:14px;color:var(--mut);font-weight:600}
+.hv5 .up-teams{font-size:12px;color:var(--mut);font-weight:600}
+@media(max-width:640px){.hv5 .upgrade .up-r{align-items:flex-start}}
 `;
