@@ -55,6 +55,12 @@ export async function GET(request: NextRequest) {
     opps = [];
   }
   let html = OPPORTUNITY_MAP_TEMPLATE.replace('__OPPS_JSON__', JSON.stringify(opps));
-  if (embed) html = html.replace('</head>', EMBED_CSS + '</head>').replace('</body>', EMBED_JS + '</body>');
+  if (embed) {
+    html = html.replace('</head>', EMBED_CSS + '</head>').replace('</body>', EMBED_JS + '</body>');
+  } else {
+    // Full page: add a way back to the app (the standalone template has none).
+    html = html.replace('<div class="phead">',
+      '<div class="phead"><a href="/home-v5" style="display:inline-flex;align-items:center;gap:5px;font:600 12.5px Inter,system-ui,sans-serif;color:#6b7787;text-decoration:none;margin-bottom:9px">← Back to Mindy</a>');
+  }
   return new NextResponse(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }
