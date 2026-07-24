@@ -63,35 +63,13 @@ async function getUserContext(email: string): Promise<{ naics: string[]; isPaid:
   }
 }
 
-// Await a head-count query, falling back to a real documented figure on error — NEVER 0
-// (a null count is unknown, and a fabricated 0 would be a wrong platform stat). Binds error.
-async function safeCount(q: PromiseLike<{ count: number | null; error: unknown }>, fallback: number): Promise<number> {
-  try {
-    const { count, error } = await q;
-    return error ? fallback : (count ?? fallback);
-  } catch {
-    return fallback;
-  }
-}
-
-async function getCounts(): Promise<{ opps: number; forecasts: number; recompetes: number }> {
-  const sb = getReadClient();
-  const [opps, forecasts, recompetes] = await Promise.all([
-    safeCount(sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('active', true), 24000),
-    safeCount(sb.from('agency_forecasts').select('*', { count: 'exact', head: true }), 7764),
-    safeCount(sb.from('recompete_opportunities').select('*', { count: 'exact', head: true }).is('quality_flag', null), 129249),
-  ]);
-  return { opps, forecasts, recompetes };
-}
-
 export default async function LoggedInHomeV5({ searchParams }: { searchParams: Promise<Record<string, string | undefined>> }) {
   const sp = await searchParams;
   const email = (sp.email || 'eric@govcongiants.com').toLowerCase().trim();
 
   const { naics, isPaid } = await getUserContext(email);
-  const [oppsRes, counts, game, board, balance, referral] = await Promise.all([
+  const [oppsRes, game, board, balance, referral] = await Promise.all([
     fetchSamOpportunitiesFromCache({ naicsCodes: naics, limit: 8 }).catch(() => ({ opportunities: [] as Array<Record<string, unknown>> })),
-    getCounts(),
     getGameStats(email).catch(() => null),
     getLeaderboard(email, 5).catch(() => ({ rows: [] as Array<{ handle: string; weekXp: number; rank: number; isYou: boolean }>, you: null as { handle: string; weekXp: number; rank: number; isYou: boolean } | null, total: 0 })),
     getBalance(email).catch(() => 0),
@@ -131,27 +109,10 @@ export default async function LoggedInHomeV5({ searchParams }: { searchParams: P
         {/* HERO — Enter the App (left) + Today's matched opps (right) */}
         <section className="hero">
           <div className="card enter">
-            <div className="grid-tex" />
-            <div className="enter-l">
-              <div className="eyebrow" style={{ color: '#d8b4fe' }}>The App · Market Intelligence</div>
-              <h2 className="disp">Your 24/7 federal<br />market analyst.</h2>
-              <div className="sub">Daily alerts, AI briefings, forecasts, recompetes, contractor intel, pipeline &amp; CRM — the full tool suite, scored to your business.</div>
-              <div className="statline">
-                <div className="s"><div className="n tnum">{counts.opps.toLocaleString()}+</div><div className="l">opportunities in the feed</div></div>
-                <div className="s"><div className="n tnum">{counts.forecasts.toLocaleString()}</div><div className="l">agency forecasts</div></div>
-                <div className="s"><div className="n tnum">{counts.recompetes.toLocaleString()}</div><div className="l">recompetes tracked</div></div>
-              </div>
-              <div className="cta">
-                <Link className="btn-primary" href="/app">Enter the App →</Link>
-                <Link className="btn-ghost" href="/app">Take the tour</Link>
-              </div>
-            </div>
-            <div className="enter-r">
-              <iframe className="heromap-frame" src="/opportunity-map?embed=1" title="Federal opportunity map" loading="lazy" />
-              <a className="heromap-open" href="/opportunity-map" aria-label="Open the full opportunity map">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M10 14 21 3M21 14v7H3V3h7" /></svg>
-              </a>
-            </div>
+            <iframe className="heromap-frame" src="/opportunity-map?embed=1" title="Federal opportunity map" loading="lazy" />
+            <a className="heromap-open" href="/opportunity-map" aria-label="Open the full opportunity map">
+              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M10 14 21 3M21 14v7H3V3h7" /></svg>
+            </a>
           </div>
 
           <div className="card today">
@@ -329,7 +290,7 @@ const CSS = `
 @media(max-width:900px){.hv5 .hero{grid-template-columns:1fr}}
 
 .hv5 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);position:relative;overflow:hidden}
-.hv5 .enter{padding:30px;background:radial-gradient(120% 140% at 82% 12%,rgba(124,58,237,.42),transparent 55%),radial-gradient(90% 120% at 100% 100%,rgba(168,85,247,.22),transparent 60%),var(--surface2);border-color:#342a4d;display:grid;grid-template-columns:1fr 292px;gap:30px;align-items:stretch;min-height:280px}
+.hv5 .enter{position:relative;padding:0;overflow:hidden;min-height:440px;border-color:#342a4d;background:#e8eef2}
 .hv5 .enter-l{display:flex;flex-direction:column;min-width:0}
 .hv5 .enter-r{align-self:stretch;position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--line2);min-height:300px;background:#e8eef2}
 .hv5 .heromap-frame{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}

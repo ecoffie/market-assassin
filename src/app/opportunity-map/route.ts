@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic';
 
 // ?embed=1 → map only (hide the sidebar/rail/scoreboard) so the SAME map can be dropped
 // full-bleed into the /home-v5 hero box. It's the real map, not a preview.
-const EMBED_CSS = '<style>.app{grid-template-columns:0 minmax(0,1fr)!important}.panel,.railbtn,.sbtoggle,.sb{display:none!important}.mapwrap{border:0}</style>';
+const EMBED_CSS = '<style>.app{grid-template-columns:0 minmax(0,1fr)!important}.panel,.railbtn,.sbtoggle,.sb,.maptop{display:none!important}.mapwrap{border:0}</style>';
 
 // Our set-aside group key → the token the prototype's setKey()/cardHTML expect.
 const SET_TO_EVC: Record<string, string> = {
