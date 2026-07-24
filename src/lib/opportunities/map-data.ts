@@ -6,6 +6,43 @@
 import { getReadClient } from '@/lib/supabase/server-clients';
 import { STATE_CENTROIDS, jitter } from '@/lib/geo/state-centroids';
 import { normalizeStateCode } from '@/lib/utils/us-states';
+import cityCoordsRaw from '@/data/us-city-coords.json';
+import zipCoordsRaw from '@/data/us-zip-coords.json';
+
+// Real coords from GeoNames (public domain). ZIP is the cleanest, most-complete key
+// (office zip ~99.5% filled); city covers place-of-performance where we only have a name.
+const CITY_COORDS = cityCoordsRaw as unknown as Record<string, [number, number]>;
+const ZIP_COORDS = zipCoordsRaw as unknown as Record<string, [number, number]>;
+
+// Tiny deterministic offset (~1km) so multiple opps at the same point don't perfectly stack.
+function cityJitter([lat, lng]: [number, number], seed: number): [number, number] {
+  const s = seed % 12;
+  return [lat + (s - 6) * 0.011, lng + (((s * 5) % 12) - 6) * 0.011];
+}
+
+/** Resolve a real coordinate for an opp, most-precise source first:
+ *  place-of-performance city → buying-office ZIP → buying-office city. Returns the
+ *  matched city label + state so the pin's text agrees with its location. */
+function geocode(
+  popCity: string, popState: string | null,
+  office: { city?: string; state?: string; zipcode?: string } | null,
+): { coord: [number, number] | null; city: string; state: string | null } {
+  if (popCity && popState) {
+    const c = CITY_COORDS[`${popCity.toUpperCase()}|${popState}`];
+    if (c) return { coord: c, city: popCity, state: popState };
+  }
+  const oState = normalizeStateCode(office?.state || '');
+  if (office?.zipcode) {
+    const z = String(office.zipcode).replace(/\D/g, '').slice(0, 5);
+    const c = ZIP_COORDS[z];
+    if (c) return { coord: c, city: (office.city || '').trim(), state: oState };
+  }
+  if (office?.city && oState) {
+    const c = CITY_COORDS[`${office.city.trim().toUpperCase()}|${oState}`];
+    if (c) return { coord: c, city: office.city.trim(), state: oState };
+  }
+  return { coord: null, city: '', state: popState || oState };
+}
 
 /** Set-aside groups — key, display label, pin color. Colors mirror the prototype's palette. */
 export const SET_GROUPS: Array<{ key: string; label: string; color: string; codes: string[] }> = [
@@ -72,14 +109,21 @@ export async function getMapOpportunities(limit = 600): Promise<MapOpp[]> {
     // Skip FSC-coded commodity micro-buys ("48--VALVE,GLOBE") — real, but noise on the map;
     // surface the named service/construction/professional work instead.
     if (!title || /^\d{1,4}--/.test(title)) continue;
-    const office = r.office_address as { state?: string } | null;
-    const stateRaw = (r.pop_state as string) || office?.state || '';
-    const state = normalizeStateCode(stateRaw);
+    const office = r.office_address as { city?: string; state?: string; zipcode?: string } | null;
+    const popState = normalizeStateCode((r.pop_state as string) || '');
+    const popCity = ((r.pop_city as string) || '').trim();
+    const g = geocode(popCity, popState, office);
+    const state = g.state;
     if (!state) continue; // no location → no pin (honest; not placed at 0,0)
-    const base = STATE_CENTROIDS[state];
-    if (!base) continue;
-    const [lat, lng] = jitter(base, out.length + 1);
-    const city = (r.pop_city as string) || '';
+    let lat: number, lng: number;
+    if (g.coord) {
+      [lat, lng] = cityJitter(g.coord, out.length + 1); // real city/ZIP coordinate
+    } else {
+      const base = STATE_CENTROIDS[state];
+      if (!base) continue;
+      [lat, lng] = jitter(base, out.length + 1); // state centroid fallback
+    }
+    const city = g.city;
     out.push({
       id: String(r.notice_id ?? ''),
       title: String(r.title ?? 'Untitled opportunity'),
