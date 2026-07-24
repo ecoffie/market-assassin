@@ -488,10 +488,11 @@ const CSS = `
 .lv3 .badge .bd{font-size:11px;color:var(--mut);margin-top:2px}
 .lv3 .badge.unlocked{box-shadow:0 0 0 1px rgba(34,224,138,.25),0 8px 24px rgba(34,224,138,.08)}
 
-.lv3 .crews{display:grid;grid-template-columns:1.5fr 1fr;grid-auto-rows:1fr;gap:16px}
+.lv3 .crews{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 @media(max-width:820px){.lv3 .crews{grid-template-columns:1fr}}
 .lv3 .crew{border-radius:20px;padding:24px;border:1px solid var(--line);position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--card)}
-.lv3 .crew.vet{grid-row:1 / span 3;border-color:var(--line2);background:radial-gradient(120% 80% at 88% 0%,rgba(255,176,32,.16),transparent 52%),radial-gradient(80% 90% at 0% 100%,rgba(139,92,246,.16),transparent 58%),var(--card2)}
+.lv3 .crew.vet{grid-column:1 / -1;border-color:var(--line2);background:radial-gradient(120% 80% at 88% 0%,rgba(255,176,32,.16),transparent 52%),radial-gradient(80% 90% at 0% 100%,rgba(139,92,246,.16),transparent 58%),var(--card2)}
+.lv3 .crew.vet .cl,.lv3 .crew.vet h3,.lv3 .crew.vet p{max-width:680px}
 .lv3 .crew .cl{font-size:11.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
 .lv3 .crew.vet .cl{color:#ffce6e}
 .lv3 .crew h3{margin:9px 0 8px;font-size:20px;line-height:1.12}
