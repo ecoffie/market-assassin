@@ -109,33 +109,38 @@ async function enrichTop(firms: FirmOut[]) {
   } catch { /* keep basic fields */ }
 }
 
+const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9 ]/g, '').replace(/\s+/g, ' ').trim();
+
 export async function GET(request: NextRequest) {
   const q = (new URL(request.url).searchParams.get('q') || '').trim();
   if (!q) return NextResponse.json({ success: true, q: '', mode: 'market', opportunities: [], contractors: [], contractPiid: null });
 
   const setGroups = SET_GROUPS.map((g) => ({ key: g.key, label: g.label, color: g.color }));
 
-  // COMPANY branch (same intent classifier the app's search uses): show the company's
-  // recompetes + contacts + recent awards, not opportunities that merely name them.
-  if (looksLikeUei(q) || looksLikeCompany(q)) {
-    const firms = await contractors(q);
-    await enrichTop(firms);
-    const top = firms[0];
+  // Decide COMPANY vs MARKET by the DATA, not just the string. A multi-word query is only a
+  // company when it IS the leading part of a specific company's name ("Lockheed Martin" →
+  // "Lockheed Martin Corporation"); a generic term that merely appears inside many company
+  // names ("janitorial services" → "Americlean Janitorial Services Corp") is a MARKET.
+  const firms = await contractors(q);
+  await enrichTop(firms);
+  const top = firms[0];
+  const isCompany = !!top && (looksLikeUei(q) || (looksLikeCompany(q) && norm(q).length >= 4 && norm(top.company).startsWith(norm(q))));
+
+  if (isCompany && top) {
     const [recomps, awards] = await Promise.all([
-      recompetes(top?.company || q, top?.uei || ''),
-      recentAwards(top?.uei || ''),
+      recompetes(top.company, top.uei || ''),
+      recentAwards(top.uei || ''),
     ]);
     return NextResponse.json({
       success: true, q, mode: 'company', contractors: firms, setGroups,
-      contact: companyContact(top?.company || q),
+      contact: companyContact(top.company),
       recompetes: recomps, recentAwards: awards,
       opportunities: [], contractPiid: null,
     });
   }
 
-  // MARKET branch — keyword: opportunities + market + contractors.
-  const [opps, firms] = await Promise.all([opportunities(q), contractors(q)]);
-  await enrichTop(firms);
+  // MARKET — keyword: opportunities + market + contractors (companies shown in the sidebar).
+  const opps = await opportunities(q);
   return NextResponse.json({
     success: true, q, mode: 'market',
     contractPiid: looksLikePiid(q) ? q.toUpperCase() : null,
