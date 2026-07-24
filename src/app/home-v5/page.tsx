@@ -14,6 +14,7 @@ import Link from 'next/link';
 import { fetchSamOpportunitiesFromCache } from '@/lib/briefings/pipelines/sam-gov';
 import { getReadClient } from '@/lib/supabase/server-clients';
 import CopyPrompt from '@/components/home/CopyPrompt';
+import { Flame, Trophy, Terminal, GraduationCap, LayoutGrid, BarChart3, Newspaper, Target, Handshake } from 'lucide-react';
 import { getGameStats, getLeaderboard } from '@/lib/gamification/stats';
 import { getBalance } from '@/lib/mcp/credits';
 import { getReferralStats } from '@/lib/mcp/referrals';
@@ -168,7 +169,7 @@ export default async function LoggedInHomeV5({ searchParams }: { searchParams: P
         {/* ENGINE — real progress + credits + refer (Decision #024 band 2: the return + virality engines) */}
         <section className="engine">
           <div className="gcard">
-            <div className="gh"><span className="glabel">Your streak</span>{game && game.streak > 0 && <span className="fire">🔥 {game.streak}d</span>}</div>
+            <div className="gh"><span className="glabel">Your streak</span>{game && game.streak > 0 && <span className="fire"><Flame size={13} strokeWidth={2.25} /> {game.streak}d</span>}</div>
             <div className="gbig tnum">{(game?.xp ?? 0).toLocaleString()}<span className="gu">XP</span></div>
             <div className="grank">{game?.rankName ?? 'Recruit'} · Level {game?.level ?? 1}</div>
             {game && game.nextAt != null ? (
@@ -176,7 +177,7 @@ export default async function LoggedInHomeV5({ searchParams }: { searchParams: P
                 <div className="gbar"><i style={{ width: `${Math.min(100, Math.round((game.xp / game.nextAt) * 100))}%` }} /></div>
                 <div className="gnext">{(game.nextAt - game.xp).toLocaleString()} XP to {game.nextName}</div>
               </>
-            ) : <div className="gnext" style={{ marginTop: 12 }}>{game ? 'Top rank reached 🏆' : 'Use Mindy to start earning XP.'}</div>}
+            ) : <div className="gnext" style={{ marginTop: 12, display: 'flex', alignItems: 'center', gap: 6 }}>{game ? <>Top rank reached <Trophy size={13} strokeWidth={2} /></> : 'Use Mindy to start earning XP.'}</div>}
             <div className="gmeta">{game?.toolUseWeek ?? 0} tool actions · {game?.activeDaysWeek ?? 0} active days this week</div>
           </div>
 
@@ -236,20 +237,20 @@ export default async function LoggedInHomeV5({ searchParams }: { searchParams: P
         <section className="row3">
           <Link className="card cap mcp" href="/mcp">
             <span className="tag newtag">New</span>
-            <div className="ic ic-mcp">⌘</div>
+            <div className="ic ic-mcp"><Terminal size={20} strokeWidth={1.75} /></div>
             <h4>MCP &amp; Plugin</h4>
             <p>Turn Claude — or any AI agent — into a GovCon analyst. 49 tools: opportunities, incumbents, pricing, win playbooks.</p>
             <div className="foot"><span className="go">Connect at mcp.getmindy.ai →</span></div>
           </Link>
           <Link className="card cap" href="/academy">
             <span className="tag newtag">Free</span>
-            <div className="ic ic-aca">🎓</div>
+            <div className="ic ic-aca"><GraduationCap size={20} strokeWidth={1.75} /></div>
             <h4>Academy</h4>
             <p>Short how-to lessons from us — using the app, building market reports, finding opportunities, and bidding contracts with Mindy.</p>
             <div className="foot"><span className="go">Start learning →</span></div>
           </Link>
           <Link className="card cap" href="/app">
-            <div className="ic ic-tool">◱</div>
+            <div className="ic ic-tool"><LayoutGrid size={20} strokeWidth={1.75} /></div>
             <h4>The Tool Suite</h4>
             <p>Market Research, Forecasts, Recompetes, Contractor DB, Pipeline, Teaming CRM, Content Reaper, SBIR &amp; Grants.</p>
             <div className="foot"><span className="go">Open the app →</span></div>
@@ -259,10 +260,10 @@ export default async function LoggedInHomeV5({ searchParams }: { searchParams: P
         {/* MAKE — real tool actions, not fake previews (Decision #024: drive the activation metric) */}
         <div className="sec-h"><h3 className="disp">What will you make first?</h3><Link href="/app">Open the app →</Link></div>
         <section className="makes">
-          <Link className="mk-card" href="/app?panel=research"><div className="mk-ic">📊</div><div className="mk-t">Market report</div><div className="mk-d">Total market, top agencies &amp; NAICS coverage for any keyword.</div><span className="mk-go">Generate →</span></Link>
-          <Link className="mk-card" href="/app?panel=dashboard"><div className="mk-ic">🗞️</div><div className="mk-t">Today&apos;s briefing</div><div className="mk-d">Your top opportunities, scored by win-fit.</div><span className="mk-go">See yours →</span></Link>
-          <Link className="mk-card" href="/app?panel=recompetes"><div className="mk-ic">🎯</div><div className="mk-t">Find a recompete</div><div className="mk-d">Who holds it now, the ceiling, and when it&apos;s up for grabs.</div><span className="mk-go">Hunt →</span></Link>
-          <Link className="mk-card" href="/app?panel=contractors"><div className="mk-ic">🤝</div><div className="mk-t">Teaming targets</div><div className="mk-d">3,500+ contractors with small-business-liaison contacts.</div><span className="mk-go">Browse →</span></Link>
+          <Link className="mk-card" href="/app?panel=research"><div className="mk-ic"><BarChart3 size={24} strokeWidth={1.75} /></div><div className="mk-t">Market report</div><div className="mk-d">Total market, top agencies &amp; NAICS coverage for any keyword.</div><span className="mk-go">Generate →</span></Link>
+          <Link className="mk-card" href="/app?panel=dashboard"><div className="mk-ic"><Newspaper size={24} strokeWidth={1.75} /></div><div className="mk-t">Today&apos;s briefing</div><div className="mk-d">Your top opportunities, scored by win-fit.</div><span className="mk-go">See yours →</span></Link>
+          <Link className="mk-card" href="/app?panel=recompetes"><div className="mk-ic"><Target size={24} strokeWidth={1.75} /></div><div className="mk-t">Find a recompete</div><div className="mk-d">Who holds it now, the ceiling, and when it&apos;s up for grabs.</div><span className="mk-go">Hunt →</span></Link>
+          <Link className="mk-card" href="/app?panel=contractors"><div className="mk-ic"><Handshake size={24} strokeWidth={1.75} /></div><div className="mk-t">Teaming targets</div><div className="mk-d">3,500+ contractors with small-business-liaison contacts.</div><span className="mk-go">Browse →</span></Link>
         </section>
 
         {/* UPGRADE — single contextual nudge for free users (Decision #024: not a pricing brochure) */}
@@ -366,7 +367,10 @@ const CSS = `
 @media(max-width:900px){.hv5 .row3{grid-template-columns:1fr}}
 .hv5 .cap{padding:22px;min-height:186px;display:flex;flex-direction:column;overflow:hidden}
 .hv5 .cap:hover{border-color:var(--line2)}
-.hv5 .cap .ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;margin-bottom:14px;font-size:20px}
+.hv5 .cap .ic{width:42px;height:42px;border-radius:12px;display:grid;place-items:center;margin-bottom:14px}
+.hv5 .ic-mcp{color:#93c5fd}
+.hv5 .ic-aca{color:#d8b4fe}
+.hv5 .ic-tool{color:#6ee7b7}
 .hv5 .cap h4{font-size:18px;margin:0 0 6px}
 .hv5 .cap p{color:var(--ink2);font-size:13.5px;line-height:1.5;margin:0}
 .hv5 .cap .foot{margin-top:auto;padding-top:16px;display:flex;align-items:center;gap:8px;font-size:13px;font-weight:700}
@@ -444,7 +448,7 @@ const CSS = `
 .hv5 .gh{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .hv5 .glabel{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--mut)}
 .hv5 .glink{font-size:12px;font-weight:700;color:var(--violet2)}
-.hv5 .fire{font-size:13px;font-weight:800;color:var(--amber)}
+.hv5 .fire{display:inline-flex;align-items:center;gap:4px;font-size:13px;font-weight:800;color:var(--amber)}
 .hv5 .gbig{font-size:34px;font-weight:800;letter-spacing:-.03em;line-height:1}
 .hv5 .gbig .gu{font-size:14px;color:var(--mut);font-weight:700;margin-left:6px;letter-spacing:0}
 .hv5 .grank{font-size:13px;font-weight:700;color:var(--ink2);margin-top:7px}
@@ -476,7 +480,7 @@ const CSS = `
 @media(max-width:560px){.hv5 .makes{grid-template-columns:1fr}}
 .hv5 .mk-card{background:var(--surface);border:1px solid var(--line);border-radius:14px;padding:18px;display:flex;flex-direction:column;min-height:162px}
 .hv5 .mk-card:hover{border-color:var(--line2)}
-.hv5 .mk-ic{font-size:24px;margin-bottom:10px}
+.hv5 .mk-ic{margin-bottom:10px;line-height:0;color:var(--violet2)}
 .hv5 .mk-t{font-size:15px;font-weight:800}
 .hv5 .mk-d{font-size:12.5px;color:var(--ink2);line-height:1.45;margin-top:5px}
 .hv5 .mk-go{margin-top:auto;padding-top:14px;font-size:13px;font-weight:800;color:var(--violet2)}
