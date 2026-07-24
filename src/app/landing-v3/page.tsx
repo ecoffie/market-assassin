@@ -78,9 +78,14 @@ async function closingSoon(): Promise<Array<{ title: string; dept: string; days:
       .lte('response_deadline', in30)
       .or('notice_type.ilike.%combined%,notice_type.ilike.%solicitation%,notice_type.ilike.%rfp%,notice_type.ilike.%rfq%')
       .order('response_deadline', { ascending: true })
-      .limit(5);
+      .limit(30);
     if (error || !data) return [];
-    return (data as Array<Record<string, unknown>>).map((r) => ({ title: String(r.title ?? ''), dept: String(r.department ?? ''), days: daysUntil(r.response_deadline as string) }));
+    // Skip FSC-coded commodity micro-buys (titles like "59--CABLE ASSEMBLY") — they're real but
+    // not compelling; surface the named service/construction/professional work instead.
+    return (data as Array<Record<string, unknown>>)
+      .map((r) => ({ title: String(r.title ?? '').trim(), dept: String(r.department ?? ''), days: daysUntil(r.response_deadline as string) }))
+      .filter((r) => r.title && !/^\d{1,4}--/.test(r.title))
+      .slice(0, 5);
   } catch {
     return [];
   }
