@@ -20,6 +20,7 @@ import { getBalance } from '@/lib/mcp/credits';
 import { getReferralStats } from '@/lib/mcp/referrals';
 import { getMapOpportunities, SET_GROUPS } from '@/lib/opportunities/map-data';
 import HeroOpportunityMap from '@/components/app/HeroOpportunityMap';
+import HomeSearch from '@/components/app/HomeSearch';
 
 export const dynamic = 'force-dynamic';
 
@@ -111,7 +112,8 @@ export default async function LoggedInHomeV5({ searchParams }: { searchParams: P
           </div>
         </div>
 
-        {/* HERO — Enter the App (left) + Today's matched opps (right) */}
+        {/* SEARCH — wraps the top section; a query swaps map+today for blended results */}
+        <HomeSearch>
         <section className="hero">
           <div className="card enter">
             <HeroOpportunityMap pins={mapPins} setGroups={mapGroups} />
@@ -136,6 +138,7 @@ export default async function LoggedInHomeV5({ searchParams }: { searchParams: P
             <Link className="all" href="/app?panel=alerts">See all your matches →</Link>
           </div>
         </section>
+        </HomeSearch>
 
         {/* ENGINE — real progress + credits + refer (Decision #024 band 2: the return + virality engines) */}
         <section className="engine">
