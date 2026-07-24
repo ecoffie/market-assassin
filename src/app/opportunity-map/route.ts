@@ -39,10 +39,8 @@ const FSC_TOGGLE = '<button class="fbtn" id="fscToggle" title="FSC parts/commodi
 // Full-page CSS overrides (kept out of the verbatim template): (1) sheet-label readability
 // — grid items default to min-width:auto so nowrap labels overflow their cell; let them wrap.
 // (2) filter bar WRAPS to a 2nd row instead of hiding filters off-screen behind a scroll.
-// (3) markercluster styles + a set-aside color legend on the map.
-const PAGE_CSS = '<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css"/>'
-  + '<link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css"/>'
-  + '<style>'
+// (3) a set-aside color legend on the map.
+const PAGE_CSS = '<style>'
   + '.opt{min-width:0;align-items:flex-start}'
   + '.opt .cbx,.opt .swatch{margin-top:2px}'
   + '.opt .lbl{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.25;word-break:break-word}'
@@ -58,13 +56,12 @@ const PAGE_CSS = '<link rel="stylesheet" href="https://unpkg.com/leaflet.markerc
   + '.setlegend i{width:9px;height:9px;border-radius:50%;display:inline-block}'
   + '</style>';
 
-// Loaded right after leaflet.js (before the template's map script): the markercluster plugin +
-// setColorFor(). setColorFor MUST be a hoisted global here because the template's render() (which
-// we rewrite to call it) runs before the </body> viewport script; its body reads SETGROUPS/cv,
-// which exist by call time. Pins now encode SET-ASIDE eligibility (the GovCon bid axis), not the
-// old service-line category that never matched our NAICS-sector names (→ everything was gray).
-const EARLY_INJECT = '<script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>'
-  + '<script>function setColorFor(o){if(o&&o.set===\'HUBZone\')return \'#f59e0b\';'
+// Loaded right after leaflet.js (before the template's map script): setColorFor(). It MUST be a
+// hoisted global here because the template's render() (which we rewrite to call it) runs before
+// the </body> viewport script; its body reads SETGROUPS/cv, which exist by call time. Pins now
+// encode SET-ASIDE eligibility (the GovCon bid axis), not the old service-line category that
+// never matched our NAICS-sector names (→ everything was gray).
+const EARLY_INJECT = '<script>function setColorFor(o){if(o&&o.set===\'HUBZone\')return \'#f59e0b\';'
   + 'try{for(var i=0;i<SETGROUPS.length;i++){if(SETGROUPS[i].match(o.set))return cv(SETGROUPS[i].col);}}catch(e){}'
   + 'return (typeof cv===\'function\')?cv(\'--sec\'):\'#64748b\';}</script>';
 
@@ -102,10 +99,6 @@ const VIEWPORT_JS = `<script>
   }
   // Wrap render() so the header refreshes after every draw (pan AND client-side filter).
   var _render=render; render=function(){ _render(); updateHeader(); };
-  // Cluster-aware select: if a card's pin sits inside a cluster, zoom to reveal it first.
-  if(typeof select==='function'){ var _sel=select; select=function(sol,fly){ var m=markers.get(sol);
-    if(m&&layer&&layer.zoomToShowLayer&&typeof map!=='undefined'&&!map.hasLayer(m)){ try{layer.zoomToShowLayer(m,function(){_sel(sol,fly);});return;}catch(e){} }
-    _sel(sol,fly); }; }
   function fetchView(){
     if(busy)return; busy=true;
     var url='/api/app/opportunity-map?bbox='+bbox()+'&status=active'+(HIDE_FSC?'&hideCommodity=1':'');
@@ -155,14 +148,11 @@ export async function GET(request: NextRequest) {
     html = html.replace('<div class="phead">',
       '<div class="phead"><a href="/home-v5" style="display:inline-flex;align-items:center;gap:5px;font:600 12.5px Inter,system-ui,sans-serif;color:#6b7787;text-decoration:none;margin-bottom:9px">← Back to Mindy</a>');
     html = html.replace('</head>', PAGE_CSS + '</head>');
-    // Load markercluster + setColorFor right after leaflet.js (before the template's map script).
+    // Load setColorFor right after leaflet.js (before the template's map script).
     html = html.replace('<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>',
       '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>' + EARLY_INJECT);
     // Color pins by SET-ASIDE eligibility (fixes the all-gray category mismatch).
     html = html.split('catColor(o.cat)').join('setColorFor(o)');
-    // Cluster markers when zoomed out (guarded: falls back to a plain layer if the plugin fails).
-    html = html.replace('const layer=L.layerGroup().addTo(map);',
-      "const layer=((typeof L!=='undefined'&&L.markerClusterGroup)?L.markerClusterGroup({maxClusterRadius:48,showCoverageOnHover:false,chunkedLoading:true,disableClusteringAtZoom:9,spiderfyOnMaxZoom:false}):L.layerGroup()).addTo(map);");
     // Set-aside color legend on the map.
     html = html.replace('<div id="map"></div>', '<div id="map"></div>' + LEGEND_HTML);
     // Commodity-buys toggle in the filter bar.
