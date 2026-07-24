@@ -4,11 +4,15 @@
  * We only adapt our data into the shape the prototype's JS expects; nothing about the design
  * is rebuilt.
  */
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { getMapOpportunities } from '@/lib/opportunities/map-data';
 import { OPPORTUNITY_MAP_TEMPLATE } from './template-html';
 
 export const dynamic = 'force-dynamic';
+
+// ?embed=1 → map only (hide the sidebar/rail/scoreboard) so the SAME map can be dropped
+// full-bleed into the /home-v5 hero box. It's the real map, not a preview.
+const EMBED_CSS = '<style>.app{grid-template-columns:0 minmax(0,1fr)!important}.panel,.railbtn,.sbtoggle,.sb{display:none!important}.mapwrap{border:0}</style>';
 
 // Our set-aside group key → the token the prototype's setKey()/cardHTML expect.
 const SET_TO_EVC: Record<string, string> = {
@@ -21,7 +25,8 @@ function cleanAgency(dept: string): string {
   return d.replace(/\b([A-Z])([A-Z0-9'&./-]*)/g, (_, a, b) => a + b.toLowerCase()) || dept;
 }
 
-export async function GET() {
+export async function GET(request: NextRequest) {
+  const embed = new URL(request.url).searchParams.get('embed');
   let opps: unknown[] = [];
   try {
     const rows = await getMapOpportunities(600);
@@ -42,6 +47,7 @@ export async function GET() {
   } catch {
     opps = [];
   }
-  const html = OPPORTUNITY_MAP_TEMPLATE.replace('__OPPS_JSON__', JSON.stringify(opps));
+  let html = OPPORTUNITY_MAP_TEMPLATE.replace('__OPPS_JSON__', JSON.stringify(opps));
+  if (embed) html = html.replace('</head>', EMBED_CSS + '</head>');
   return new NextResponse(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }
