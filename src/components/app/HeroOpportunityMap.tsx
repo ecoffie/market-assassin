@@ -12,7 +12,7 @@ import 'leaflet/dist/leaflet.css';
 type Pin = { lat: number; lng: number; set: string };
 type Group = { key: string; label: string; color: string };
 
-export default function HeroOpportunityMap({ pins, setGroups, total }: { pins: Pin[]; setGroups: Group[]; total: number }) {
+export default function HeroOpportunityMap({ pins, setGroups }: { pins: Pin[]; setGroups: Group[] }) {
   const el = useRef<HTMLDivElement | null>(null);
   const mapRef = useRef<Leaflet.Map | null>(null);
 
@@ -38,12 +38,6 @@ export default function HeroOpportunityMap({ pins, setGroups, total }: { pins: P
   return (
     <Link className="heromap" href="/opportunity-map" aria-label="Open the federal opportunity map">
       <div ref={el} className="heromap-canvas" />
-      <div className="heromap-grad" />
-      <div className="heromap-cap">
-        <div className="heromap-t"><span className="live-dot" /> Opportunity map</div>
-        <div className="heromap-s">{total.toLocaleString()} open, mapped by set-aside</div>
-      </div>
-      <div className="heromap-go">Open the full map →</div>
     </Link>
   );
 }

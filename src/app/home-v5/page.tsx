@@ -152,7 +152,7 @@ export default async function LoggedInHomeV5({ searchParams }: { searchParams: P
               </div>
             </div>
             <div className="enter-r">
-              <HeroOpportunityMap pins={mapPins} setGroups={mapGroups} total={counts.opps} />
+              <HeroOpportunityMap pins={mapPins} setGroups={mapGroups} />
             </div>
           </div>
 
@@ -336,13 +336,6 @@ const CSS = `
 .hv5 .enter-r{align-self:stretch;position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--line2);min-height:250px}
 .hv5 .heromap{position:absolute;inset:0;display:block}
 .hv5 .heromap-canvas{position:absolute;inset:0}
-.hv5 .heromap-grad{position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(8,6,14,.72) 100%);pointer-events:none}
-.hv5 .heromap-cap{position:absolute;left:14px;bottom:12px;z-index:2}
-.hv5 .heromap-t{display:flex;align-items:center;gap:7px;font-size:14px;font-weight:800;color:#fff}
-.hv5 .heromap-t .live-dot{width:7px;height:7px;border-radius:50%;background:var(--emerald);box-shadow:0 0 8px var(--emerald)}
-.hv5 .heromap-s{font-size:12px;color:var(--ink2);margin-top:2px}
-.hv5 .heromap-go{position:absolute;right:12px;top:12px;z-index:2;font-size:12px;font-weight:800;color:#fff;background:rgba(124,58,237,.85);padding:6px 11px;border-radius:9px;backdrop-filter:blur(4px)}
-.hv5 .heromap:hover .heromap-go{background:var(--violet2)}
 @media(max-width:900px){.hv5 .enter{grid-template-columns:1fr}.hv5 .enter-r{align-self:stretch;min-height:220px}}
 .hv5 .grid-tex{position:absolute;inset:0;opacity:.5;background-image:linear-gradient(rgba(168,85,247,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.06) 1px,transparent 1px);background-size:34px 34px;mask-image:radial-gradient(80% 80% at 80% 10%,#000,transparent 70%)}
 .hv5 .enter>*:not(.grid-tex){position:relative}
