@@ -17,8 +17,21 @@ import { queryExpiringContracts } from '@/lib/recompete/query';
 import { contractScope } from '@/lib/discover/scope';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 import { formatCompanyName as fmtName } from '@/lib/format-name';
+import { Medal, Award, Laptop, Satellite, TrendingUp, BarChart3, HardHat, Building2, Target, Hourglass, Check } from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
+
+// Icon keys → lucide components (no emoji as UI icons; matches the app's lucide-react convention).
+const ICONS: Record<string, LucideIcon> = {
+  medal: Medal, award: Award, laptop: Laptop, satellite: Satellite,
+  trending: TrendingUp, chart: BarChart3, hardhat: HardHat, building: Building2,
+  target: Target, hourglass: Hourglass,
+};
+function Ico({ k, size = 16, sw = 2 }: { k: string; size?: number; sw?: number }) {
+  const C = ICONS[k];
+  return C ? <C size={size} strokeWidth={sw} /> : null;
+}
 
 function daysUntil(dateStr: string | null | undefined): number | null {
   if (!dateStr) return null;
@@ -34,9 +47,9 @@ type Row = { rank: string; name: string; sub?: string; value: string; move?: str
 type HubConfig = {
   title: string; theme: string; acc: string; acc2: string; ctaInk: string; crumb: string; ctaLabel: string;
   kicker: string; h1a: string; h1em: string; lead: string; ctaBtn: string;
-  profile: { emoji: string; title: string; sub: string; cells: Array<{ n: string; l: string }> };
+  profile: { icon: string; title: string; sub: string; cells: Array<{ n: string; l: string }> };
   stats: Array<{ n: string; l: string; s: string }>;
-  spot: { eyebrow: string; head: string; emoji: string; clabel: string; name: string; who: string; story: string; nominate: string; read: string };
+  spot: { eyebrow: string; head: string; icon: string; clabel: string; name: string; who: string; story: string; nominate: string; read: string };
   feeds: Array<{ head: string; icon: string; sub: string; rows: Row[]; foot: string }>;
   cardsHead: { eyebrow: string; head: string; sub: string };
   cards: Array<{ amt?: string; h4: string; p: string; meta: string[]; go: string }>;
@@ -49,27 +62,27 @@ const HUBS: Record<string, HubConfig> = {
   veterans: {
     title: 'Mindy — Veteran Hub', theme: 'gold', acc: '#ffb020', acc2: '#ffce6e', ctaInk: '#3a2a08',
     crumb: 'Community › Veteran Hub', ctaLabel: 'Join the squad →',
-    kicker: '🎖️ For those who served', h1a: 'You served the mission.', h1em: 'Now go win it.',
+    kicker: 'For those who served', h1a: 'You served the mission.', h1em: 'Now go win it.',
     lead: 'The government sets aside billions every year for veteran-owned businesses — work most contractors can’t even bid on. Mindy finds your share, tracks veteran grants, and stands you up on a board with your fellow vets. Same discipline that got the job done in uniform — pointed at federal contracts.',
     ctaBtn: 'Join the squad — free →',
-    profile: { emoji: '🎖️', title: 'Your service record', sub: 'SDVOSB · Rank: Hunter', cells: [
+    profile: { icon: 'medal', title: 'Your service record', sub: 'SDVOSB · Rank: Hunter', cells: [
       { n: '$4.2B', l: 'Veteran set-asides in your NAICS' }, { n: '37', l: 'Open SDVOSB opps that fit you' },
       { n: '12', l: 'Veteran grants you qualify for' }, { n: '#9', l: 'Your rank on the vet board' } ] },
     stats: [
       { n: '$28B+', l: 'reserved for veterans / yr', s: 'SDVOSB & VOSB set-aside dollars' },
       { n: '3%+', l: 'of every federal dollar', s: 'The government-wide SDVOSB goal — money earmarked for you' },
       { n: '1 tap', l: 'to certify with the SBA', s: 'We walk you through VetCert step by step' } ],
-    spot: { eyebrow: 'The Mindy Hero Award', head: 'Honoring the veterans winning the mission', emoji: '🏅', clabel: 'This month’s Hero',
+    spot: { eyebrow: 'The Mindy Hero Award', head: 'Honoring the veterans winning the mission', icon: 'award', clabel: 'This month’s Hero',
       name: 'Tidewater Logistics Group', who: 'Marcus B. · U.S. Navy veteran · Norfolk, VA',
       story: 'Went from a first alert to a $6.4M base-logistics award in 14 months — SDVOSB set-aside, no primes in the way. His playbook is this month’s featured story for the whole Mindy community.',
       nominate: 'Nominate a veteran →', read: 'Read Marcus’s playbook' },
     feeds: [
-      { head: 'Recompetes on the clock', icon: '🎯', sub: 'Big contracts in veteran-heavy trades — the incumbent’s time is running out', foot: 'See all recompetes →', rows: [
+      { head: 'Recompetes on the clock', icon: 'target', sub: 'Big contracts in veteran-heavy trades — the incumbent’s time is running out', foot: 'See all recompetes →', rows: [
         { rank: '1', name: 'Tidewater Logistics', sub: 'Dept. of Veterans Affairs', value: '$920M', move: '', moveCls: '' },
         { rank: '2', name: 'Redstone Facilities', sub: 'Dept. of the Army', value: '$410M', move: '', moveCls: '' },
         { rank: '3', name: 'Bravo Zulu IT', sub: 'DHS', value: '$210M', move: '', moveCls: '' },
         { rank: '4', name: 'Frontline Grounds', sub: 'GSA', value: '$96M', move: '', moveCls: '' } ] },
-      { head: 'Veteran set-asides · up for grabs', icon: '⏳', sub: 'SDVOSB / VOSB opportunities open now', foot: 'Match my profile to veteran set-asides →', rows: [
+      { head: 'Veteran set-asides · up for grabs', icon: 'hourglass', sub: 'SDVOSB / VOSB opportunities open now', foot: 'Match my profile to veteran set-asides →', rows: [
         { rank: '1', name: 'Base Operations Support', sub: 'Army · Fort Liberty · SDVOSB', value: '$920M', move: '44d', moveCls: 'dn' },
         { rank: '2', name: 'Facilities Maintenance', sub: 'VA · West Palm Beach · SDVOSB', value: '$180M', move: '27d', moveCls: 'dn' },
         { rank: '3', name: 'IT Help Desk', sub: 'DHS · VOSB set-aside', value: '$74M', move: '19d', moveCls: 'dn' },
@@ -81,7 +94,7 @@ const HUBS: Record<string, HubConfig> = {
       { amt: '$100K', h4: 'Veteran Innovation (SBIR)', p: 'R&D funding for veteran-led tech ventures — DoD & VA topics.', meta: ['Open cycles', 'SBIR/STTR'], go: 'Check eligibility →' } ],
     mission: { clabel: 'Veteran mission · 30 days', title: 'The First-Contract Mission',
       p: 'A guided 30-day mission built for vets — from certifying your SDVOSB status to submitting your first bid. Complete it and earn the First Bid badge, bonus credits, and a shot at the Hero Award.',
-      steps: [{ done: true, n: '✓', label: 'Certify SDVOSB' }, { done: true, n: '✓', label: 'Set your NAICS' }, { n: '3', label: 'Save 3 set-aside pursuits' }, { n: '4', label: 'Run a market report' }, { n: '5', label: 'Submit your first bid' }], cta: 'Start the mission →' },
+      steps: [{ done: true, n: '', label: 'Certify SDVOSB' }, { done: true, n: '', label: 'Set your NAICS' }, { n: '3', label: 'Save 3 set-aside pursuits' }, { n: '4', label: 'Run a market report' }, { n: '5', label: 'Submit your first bid' }], cta: 'Start the mission →' },
     voicesHead: 'Vets who are winning with Mindy',
     voices: [
       { p: '"I spent 20 years in the Army. Mindy translated all the contracting alphabet soup into something I could actually run at. First SDVOSB win in four months."', name: 'James R.', br: 'Army · Facilities · GA' },
@@ -92,24 +105,24 @@ const HUBS: Record<string, HubConfig> = {
   itcyber: {
     title: 'Mindy — IT & Cyber Hub', theme: 'blue', acc: '#3b82f6', acc2: '#93c5fd', ctaInk: '#08183a',
     crumb: 'Community › IT & Cyber', ctaLabel: 'Find my next contract →',
-    kicker: '💻 For IT & cybersecurity firms', h1a: 'The government runs', h1em: 'on your code.',
+    kicker: 'For IT & cybersecurity firms', h1a: 'The government runs', h1em: 'on your code.',
     lead: 'Federal IT and cyber spending is enormous and never stops recompeting — modernization, cloud, zero-trust, help desk, managed services. Mindy tracks the task orders and recompetes in your NAICS, scopes the incumbent, and drafts the technical volume. Stop refreshing SAM.gov.',
     ctaBtn: 'Find my next contract — free →',
-    profile: { emoji: '💻', title: 'Your IT profile', sub: 'NAICS 541512 · Cleared', cells: [
+    profile: { icon: 'laptop', title: 'Your IT profile', sub: 'NAICS 541512 · Cleared', cells: [
       { n: '$120B+', l: 'Federal IT & cyber spend / yr' }, { n: '40%+', l: 'Of it comes up for recompete' },
       { n: '18 mo', l: 'Recompete runway we watch' }, { n: 'Zero', l: 'Time wasted refreshing SAM' } ] },
     stats: [
       { n: '$120B+', l: 'federal IT spend / yr', s: 'Software, cloud, cyber, managed services & help desk' },
       { n: '40%+', l: 'is recompetes', s: 'Incumbent-held work that comes back around — where you break in' },
       { n: '1 place', l: 'task orders + recompetes', s: 'Every vehicle and IDIQ, tracked to your codes' } ],
-    spot: { eyebrow: 'Firm of the month', head: 'The small IT shop that unseated a prime', emoji: '🛰️', clabel: 'This month’s spotlight',
+    spot: { eyebrow: 'Firm of the month', head: 'The small IT shop that unseated a prime', icon: 'satellite', clabel: 'This month’s spotlight',
       name: 'Cipher Systems', who: 'A 12-person cyber firm · Huntsville, AL',
       story: 'Spotted a $40M zero-trust recompete 14 months early, teamed smart, and took it off an $8B integrator. Mindy flagged the incumbent’s expiry before the RFP ever posted.',
       nominate: 'Nominate a firm →', read: 'Read the capture story' },
     feeds: [
-      { head: 'IT recompetes on the clock', icon: '🎯', sub: 'Big IT contracts expiring — the incumbent’s window is closing', foot: 'See all IT recompetes →', rows: [
+      { head: 'IT recompetes on the clock', icon: 'target', sub: 'Big IT contracts expiring — the incumbent’s window is closing', foot: 'See all IT recompetes →', rows: [
         { rank: '1', name: 'Loading…', value: '', move: '', moveCls: '' } ] },
-      { head: 'IT opps up for grabs', icon: '⏳', sub: 'Open IT & cyber solicitations right now', foot: 'Match my profile to IT opps →', rows: [
+      { head: 'IT opps up for grabs', icon: 'hourglass', sub: 'Open IT & cyber solicitations right now', foot: 'Match my profile to IT opps →', rows: [
         { rank: '1', name: 'Loading…', value: '', move: '', moveCls: '' } ] } ],
     cardsHead: { eyebrow: 'What you’ll need', head: 'The certs that open doors', sub: 'Federal IT buyers gate work behind compliance. Mindy tracks which opportunities require what — and helps you get there.' },
     cards: [
@@ -118,7 +131,7 @@ const HUBS: Record<string, HubConfig> = {
       { h4: 'Set-aside IT', p: 'IT work reserved for 8(a), SDVOSB & HUBZone firms — competition the big integrators can’t touch.', meta: ['Set-aside', 'Small biz'], go: 'See set-aside IT →' } ],
     mission: { clabel: 'IT capture mission · 30 days', title: 'From cold to first submitted bid',
       p: 'A guided 30-day run: pin your NAICS and clearances, find a recompete with runway, scope the incumbent, and draft the technical volume with Mindy. Finish it and unlock bonus credits.',
-      steps: [{ done: true, n: '✓', label: 'Set your NAICS & clearances' }, { done: true, n: '✓', label: 'Find a recompete' }, { n: '3', label: 'Scope the incumbent' }, { n: '4', label: 'Draft the technical volume' }, { n: '5', label: 'Submit your bid' }], cta: 'Start the mission →' },
+      steps: [{ done: true, n: '', label: 'Set your NAICS & clearances' }, { done: true, n: '', label: 'Find a recompete' }, { n: '3', label: 'Scope the incumbent' }, { n: '4', label: 'Draft the technical volume' }, { n: '5', label: 'Submit your bid' }], cta: 'Start the mission →' },
     voicesHead: 'IT firms winning with Mindy',
     voices: [
       { p: '"We used to find out about recompetes when the RFP dropped — too late to team. Now Mindy shows me 12–18 months out. Game changer."', name: 'Priya N.', br: 'Cloud · Reston, VA' },
@@ -129,24 +142,24 @@ const HUBS: Record<string, HubConfig> = {
   professional: {
     title: 'Mindy — Professional Services Hub', theme: 'teal', acc: '#14b8a6', acc2: '#5eead4', ctaInk: '#04211d',
     crumb: 'Community › Professional Services', ctaLabel: 'Find my next contract →',
-    kicker: '📈 For consultants & program-support firms', h1a: 'Win the work behind', h1em: 'every agency.',
+    kicker: 'For consultants & program-support firms', h1a: 'Win the work behind', h1em: 'every agency.',
     lead: 'Management consulting, program support, advisory, admin services — the biggest small-business award base in the federal market, and almost all of it recompetes. Mindy tracks your codes, scopes the incumbent, and drafts the proposal so you spend your time winning, not searching.',
     ctaBtn: 'Find my next contract — free →',
-    profile: { emoji: '📈', title: 'Your services profile', sub: 'NAICS 541611', cells: [
+    profile: { icon: 'trending', title: 'Your services profile', sub: 'NAICS 541611', cells: [
       { n: '#1', l: 'Small-biz award base (541611)' }, { n: 'High', l: 'Share that recompetes' },
       { n: '18 mo', l: 'Recompete runway we watch' }, { n: 'All', l: 'Agencies, one feed' } ] },
     stats: [
       { n: 'Largest', l: 'small-business award base', s: 'Management consulting & program support — 541611 and friends' },
       { n: 'Recurring', l: 'contract structure', s: 'Support work recompetes on a cycle — plan your capture early' },
       { n: '1 feed', l: 'every agency', s: 'Your codes across DoD, civilian & the IC in one place' } ],
-    spot: { eyebrow: 'Firm of the month', head: 'The two-person shop that scaled on recompetes', emoji: '📊', clabel: 'This month’s spotlight',
+    spot: { eyebrow: 'Firm of the month', head: 'The two-person shop that scaled on recompetes', icon: 'chart', clabel: 'This month’s spotlight',
       name: 'Meridian Advisory', who: 'A boutique consultancy · Columbia, MD',
       story: 'Built a pipeline entirely from recompetes Mindy surfaced 12+ months out, teamed as a sub, then primed a $22M program-support win. No cold outreach — just showing up early and prepared.',
       nominate: 'Nominate a firm →', read: 'Read the growth story' },
     feeds: [
-      { head: 'Recompetes on the clock', icon: '🎯', sub: 'Big support contracts expiring — the incumbent’s time is running out', foot: 'See all recompetes →', rows: [
+      { head: 'Recompetes on the clock', icon: 'target', sub: 'Big support contracts expiring — the incumbent’s time is running out', foot: 'See all recompetes →', rows: [
         { rank: '1', name: 'Loading…', value: '', move: '', moveCls: '' } ] },
-      { head: 'Consulting opps open now', icon: '⏳', sub: 'Open professional-services solicitations', foot: 'Match my profile to opps →', rows: [
+      { head: 'Consulting opps open now', icon: 'hourglass', sub: 'Open professional-services solicitations', foot: 'Match my profile to opps →', rows: [
         { rank: '1', name: 'Loading…', value: '', move: '', moveCls: '' } ] } ],
     cardsHead: { eyebrow: 'The edge', head: 'Win before the RFP', sub: 'Support contracts are won in the 6–18 months before the solicitation. Mindy gives you that head start.' },
     cards: [
@@ -155,7 +168,7 @@ const HUBS: Record<string, HubConfig> = {
       { h4: 'Proposal drafting', p: 'AI first drafts of your technical and management volumes, grounded in your past performance.', meta: ['AI · vault'], go: 'Draft a proposal →' } ],
     mission: { clabel: 'Capture mission · 30 days', title: 'From search to submitted',
       p: 'A guided 30-day run: set your codes, find a recompete with runway, scope the incumbent, and draft the proposal with Mindy. Finish it and unlock bonus credits.',
-      steps: [{ done: true, n: '✓', label: 'Set your NAICS' }, { done: true, n: '✓', label: 'Find a recompete' }, { n: '3', label: 'Scope the incumbent' }, { n: '4', label: 'Draft the proposal' }, { n: '5', label: 'Submit your bid' }], cta: 'Start the mission →' },
+      steps: [{ done: true, n: '', label: 'Set your NAICS' }, { done: true, n: '', label: 'Find a recompete' }, { n: '3', label: 'Scope the incumbent' }, { n: '4', label: 'Draft the proposal' }, { n: '5', label: 'Submit your bid' }], cta: 'Start the mission →' },
     voicesHead: 'Services firms winning with Mindy',
     voices: [
       { p: '"Recompete visibility is the whole game in support services. Mindy hands it to me 18 months out — I show up already teamed."', name: 'Angela R.', br: 'Program support · VA' },
@@ -166,24 +179,24 @@ const HUBS: Record<string, HubConfig> = {
   construction: {
     title: 'Mindy — Construction Hub', theme: 'orange', acc: '#f97316', acc2: '#fdba74', ctaInk: '#3a1e05',
     crumb: 'Community › Construction', ctaLabel: 'Find my next project →',
-    kicker: '🏗️ For federal builders', h1a: 'Build for the biggest', h1em: 'client on earth.',
+    kicker: 'For federal builders', h1a: 'Build for the biggest', h1em: 'client on earth.',
     lead: 'The federal government is the #1 construction buyer in America — $57B+ a year in building, renovation, and civil work. Design-build, MATOC, IDIQ, and set-asides for small builders. Mindy tracks the solicitations and recompetes in your trade, scopes the incumbent, and drafts the bid.',
     ctaBtn: 'Find my next project — free →',
-    profile: { emoji: '🏗️', title: 'Your build profile', sub: 'NAICS 236220', cells: [
+    profile: { icon: 'hardhat', title: 'Your build profile', sub: 'NAICS 236220', cells: [
       { n: '$57B+', l: 'Federal construction / yr' }, { n: '#1', l: 'Federal NAICS by spend' },
       { n: 'Set-aside', l: 'Small-builder work reserved' }, { n: '18 mo', l: 'Recompete runway we watch' } ] },
     stats: [
       { n: '$57B+', l: 'federal construction / yr', s: 'The #1 NAICS in the entire federal market (236220)' },
       { n: 'Design-build', l: 'MATOC & IDIQ', s: 'Multiple-award vehicles where small builders win task orders' },
       { n: 'Set-asides', l: 'reserved for you', s: 'SDVOSB, 8(a), HUBZone & small-business construction work' } ],
-    spot: { eyebrow: 'Builder of the month', head: 'The regional GC that went federal', emoji: '🏢', clabel: 'This month’s spotlight',
+    spot: { eyebrow: 'Builder of the month', head: 'The regional GC that went federal', icon: 'building', clabel: 'This month’s spotlight',
       name: 'Cornerstone Builders', who: 'A regional GC · Killeen, TX',
       story: 'Moved from commercial into federal on a MATOC, then landed a $30M VA facilities renovation. Mindy tracked the recompete and the incumbent, so they walked in already knowing the shape of the job.',
       nominate: 'Nominate a builder →', read: 'Read the story' },
     feeds: [
-      { head: 'Recompetes on the clock', icon: '🎯', sub: 'Big builds expiring — the incumbent’s window is closing', foot: 'See all recompetes →', rows: [
+      { head: 'Recompetes on the clock', icon: 'target', sub: 'Big builds expiring — the incumbent’s window is closing', foot: 'See all recompetes →', rows: [
         { rank: '1', name: 'Loading…', value: '', move: '', moveCls: '' } ] },
-      { head: 'Construction opps up for grabs', icon: '⏳', sub: 'Open federal construction solicitations', foot: 'Match my trade to opps →', rows: [
+      { head: 'Construction opps up for grabs', icon: 'hourglass', sub: 'Open federal construction solicitations', foot: 'Match my trade to opps →', rows: [
         { rank: '1', name: 'Loading…', value: '', move: '', moveCls: '' } ] } ],
     cardsHead: { eyebrow: 'How federal building works', head: 'The vehicles that carry the work', sub: 'Most federal construction flows through a few contract types. Mindy tracks all of them to your trade.' },
     cards: [
@@ -192,7 +205,7 @@ const HUBS: Record<string, HubConfig> = {
       { h4: 'Set-aside builds', p: 'Construction reserved for SDVOSB, 8(a), and HUBZone firms — competition you can actually win.', meta: ['Small biz'], go: 'See set-aside builds →' } ],
     mission: { clabel: 'Builder mission · 30 days', title: 'From trade to first federal bid',
       p: 'A guided 30-day run: set your trade and region, find a project with runway, scope the incumbent, and draft the bid with Mindy. Finish it and unlock bonus credits.',
-      steps: [{ done: true, n: '✓', label: 'Set your trade & region' }, { done: true, n: '✓', label: 'Find a project' }, { n: '3', label: 'Scope the incumbent' }, { n: '4', label: 'Draft the bid' }, { n: '5', label: 'Submit' }], cta: 'Start the mission →' },
+      steps: [{ done: true, n: '', label: 'Set your trade & region' }, { done: true, n: '', label: 'Find a project' }, { n: '3', label: 'Scope the incumbent' }, { n: '4', label: 'Draft the bid' }, { n: '5', label: 'Submit' }], cta: 'Start the mission →' },
     voicesHead: 'Builders winning with Mindy',
     voices: [
       { p: '"Federal construction felt like a black box. Mindy showed me the vehicles, the set-asides, and which recompetes were coming. First VA job inside a year."', name: 'Carlos M.', br: 'GC · TX' },
@@ -323,13 +336,13 @@ export default async function CommunityHub({ params }: { params: Promise<{ segme
       {/* HERO */}
       <section className="hero"><div className="glow" /><div className="tex" /><div className="wrap hero-in">
         <div>
-          <div className="kick">{cfg.kicker}</div>
+          <div className="kick"><Ico k={cfg.profile.icon} size={14} sw={2.25} /> {cfg.kicker}</div>
           <h1 className="disp">{cfg.h1a}<br /><em>{cfg.h1em}</em></h1>
           <p className="lead">{cfg.lead}</p>
           <div className="cta"><a className="btn-lg" href="/signup">{cfg.ctaBtn}</a><a className="btn-ghost2" href="#how">▶ How it works</a></div>
         </div>
         <div className="tag">
-          <div className="th"><div className="badge">{cfg.profile.emoji}</div><div><div className="nm">{cfg.profile.title}</div><div className="rk">{cfg.profile.sub}</div></div></div>
+          <div className="th"><div className="badge"><Ico k={cfg.profile.icon} size={22} sw={1.75} /></div><div><div className="nm">{cfg.profile.title}</div><div className="rk">{cfg.profile.sub}</div></div></div>
           <div className="grid">
             {cfg.profile.cells.map((c) => (<div className="cell" key={c.l}><div className="n">{c.n}</div><div className="l">{c.l}</div></div>))}
           </div>
@@ -345,7 +358,7 @@ export default async function CommunityHub({ params }: { params: Promise<{ segme
       <section className="sec"><div className="wrap">
         <div className="head"><div className="eyebrow">{cfg.spot.eyebrow}</div><h2 className="disp">{cfg.spot.head}</h2></div>
         <div className="award">
-          <div className="spot">{cfg.spot.emoji}</div>
+          <div className="spot"><Ico k={cfg.spot.icon} size={40} sw={1.5} /></div>
           <div className="cnt">
             <div className="cl">{cfg.spot.clabel}</div>
             <h3 className="disp">{cfg.spot.name}</h3>
@@ -364,7 +377,7 @@ export default async function CommunityHub({ params }: { params: Promise<{ segme
             const rows = realFeeds && realFeeds[fi] && realFeeds[fi].length ? realFeeds[fi] : f.rows;
             return (
             <div className="panel" key={f.head}>
-              <div className="ph"><div className="t">{f.icon} {f.head}</div><span className="share">↗ Share</span></div>
+              <div className="ph"><div className="t"><Ico k={f.icon} size={16} sw={2} /> {f.head}</div><span className="share">↗ Share</span></div>
               <p className="sub">{f.sub}</p>
               {rows.map((r) => (
                 <div className={`row${r.rank === '1' ? ' t1' : ''}`} key={r.rank + r.name}>
@@ -403,7 +416,7 @@ export default async function CommunityHub({ params }: { params: Promise<{ segme
         <h3 className="disp">{cfg.mission.title}</h3>
         <p>{cfg.mission.p}</p>
         <div className="steps">
-          {cfg.mission.steps.map((s) => (<div className={`mstep${s.done ? ' done' : ''}`} key={s.label}><span className="n2">{s.n}</span> {s.label}</div>))}
+          {cfg.mission.steps.map((s) => (<div className={`mstep${s.done ? ' done' : ''}`} key={s.label}><span className="n2">{s.done ? <Check size={13} strokeWidth={3} /> : s.n}</span> {s.label}</div>))}
         </div>
         <a className="btn-lg" href="/signup">{cfg.mission.cta}</a>
       </div></div></section>
@@ -508,6 +521,10 @@ const CSS = `
 .chub .panel{background:var(--card);border:1px solid var(--line);border-radius:20px;padding:18px}
 .chub .panel .ph{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px}
 .chub .panel .ph .t{font-weight:850;font-size:16px;display:flex;gap:9px;align-items:center}
+.chub svg{vertical-align:-0.14em}
+.chub .tag .badge svg{color:var(--ctaink)}
+.chub .award .spot svg{color:var(--acc2)}
+.chub .panel .ph .t svg{color:var(--acc2)}
 .chub .panel .sub{font-size:12.5px;color:var(--mut);margin:0 0 10px}
 .chub .share{font-size:11.5px;font-weight:800;color:var(--acc2);border:1px solid color-mix(in srgb,var(--acc) 35%,transparent);padding:5px 11px;border-radius:99px;background:color-mix(in srgb,var(--acc) 8%,transparent);white-space:nowrap}
 .chub .row{display:grid;grid-template-columns:26px 1fr auto auto;gap:11px;align-items:center;padding:11px 0;border-top:1px solid var(--line);font-size:13.5px}

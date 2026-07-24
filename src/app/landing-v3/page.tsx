@@ -22,6 +22,7 @@ import { getReadClient } from '@/lib/supabase/server-clients';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 import { formatCompanyName as fmtName } from '@/lib/format-name';
 import { contractScope } from '@/lib/discover/scope';
+import { Target, Play, Plus, Telescope, Hourglass, Search, AlarmClock, Medal, Laptop, TrendingUp, HardHat, ShieldCheck, MessageSquare } from 'lucide-react';
 
 export const dynamic = 'force-dynamic';
 
@@ -131,18 +132,18 @@ export default async function LandingV3() {
       {/* HERO — NEW benefit-first words */}
       <section className="hero" id="top"><div className="glow" /><div className="wrap hero-in">
         <div>
-          <div className="kick">🎯 Government contracting for everyone</div>
+          <div className="kick"><Target size={14} strokeWidth={2.25} /> Government contracting for everyone</div>
           <h1 className="disp">Win your first<br /><em>federal contract.</em></h1>
           <p className="lead">The government is legally required to buy — and can&apos;t ghost you. Match opportunities, save pursuits, submit bids, and climb the board. Mindy turns the GovCon grind into something you&apos;ll actually open every morning.</p>
           <div className="cta">
             <a className="btn-lg" href="/signup">Play free →</a>
-            <a className="btn-ghost2" href="#discover">▶ See what&apos;s open</a>
+            <a className="btn-ghost2" href="#discover"><Play size={13} strokeWidth={2.5} /> See what&apos;s open</a>
           </div>
         </div>
 
         <div className="quest">
           <div className="qh">
-            <div className="t">🎯 Open on the board right now</div>
+            <div className="t"><Target size={15} strokeWidth={2.25} /> Open on the board right now</div>
             <div className="lv">Live</div>
           </div>
           {upForGrabs.length === 0 ? (
@@ -155,7 +156,7 @@ export default async function LandingV3() {
               <span className="mv dn">{x.d}d</span>
             </div>
           ))}
-          <a className="foot" href="/signup">＋ {oppsCount.toLocaleString()} more open right now — play free →</a>
+          <a className="foot" href="/signup"><Plus size={13} strokeWidth={2.5} /> {oppsCount.toLocaleString()} more open right now — play free →</a>
         </div>
       </div></section>
 
@@ -173,7 +174,7 @@ export default async function LandingV3() {
         <div className="head"><div className="eyebrow">Discover · free &amp; public</div><h2 className="disp">The federal market, decoded</h2><p>Live data nobody else packages — built to be screenshot, shared, and argued about. This is the stuff people send each other, not a feature list.</p></div>
         <div className="discover">
           <div className="dpanel">
-            <div className="dh"><div className="t">🔭 Shaping up</div><a className="share" href="/discover">↗ Share</a></div>
+            <div className="dh"><div className="t"><Telescope size={16} strokeWidth={2} /> Shaping up</div><a className="share" href="/discover">↗ Share</a></div>
             <p className="sub">Sources sought &amp; pre-RFPs — agencies testing the market before the RFP drops</p>
             {shaping.length === 0 ? <div className="drow"><span className="nm">Updating…</span></div> : shaping.map((s, i) => (
               <div className="drow" key={s.title + i}><span className="rk">{i + 1}</span><span className="nm">{s.title.slice(0, 42)} <small>{s.dept}</small></span><span className="vl" /><span className="mv new">EARLY</span></div>
@@ -181,7 +182,7 @@ export default async function LandingV3() {
             <a className="foot" href="/discover">Get in before the RFP →</a>
           </div>
           <div className="dpanel">
-            <div className="dh"><div className="t">⏳ Up For Grabs</div><a className="share" href="/up-for-grabs">↗ Share</a></div>
+            <div className="dh"><div className="t"><Hourglass size={16} strokeWidth={2} /> Up For Grabs</div><a className="share" href="/up-for-grabs">↗ Share</a></div>
             <p className="sub">Biggest contracts expiring soon — the recompete window is open</p>
             {upForGrabs.length === 0 ? <div className="drow"><span className="nm">Updating…</span></div> : upForGrabs.map((x, i) => (
               <div className="drow" key={x.c.contract_id || i}><span className="rk">{i + 1}</span><span className="nm">{contractScope(x.c)} <small>{x.c.awarding_agency || ''}</small></span><span className="vl">{fmtMoney(x.val)}</span><span className="mv dn">{x.d}d</span></div>
@@ -189,7 +190,7 @@ export default async function LandingV3() {
             <a className="foot" href="/up-for-grabs">See all recompetes tracked →</a>
           </div>
           <div className="dpanel">
-            <div className="dh"><div className="t">🧐 Weird Awards</div><a className="share" href="/weird">↗ Share</a></div>
+            <div className="dh"><div className="t"><Search size={16} strokeWidth={2} /> Weird Awards</div><a className="share" href="/weird">↗ Share</a></div>
             <p className="sub">Your tax dollars, hard at work — the internet&apos;s favorite feed</p>
             {weirdTop.length === 0 ? <div className="weird"><span className="wx">Updating…</span></div> : weirdTop.map((w, i) => (
               <div className="weird" key={w.award_id || i}><span className="amt">{fmtMoney(w.obligation_amount)}</span><span className="wx"><b>{snippet(w.description) || 'Federal award'}</b> — {w.awarding_agency || fmtName(w.recipient_name || '')}.</span></div>
@@ -197,7 +198,7 @@ export default async function LandingV3() {
             <a className="foot" href="/weird">Get the weekly &ldquo;Weird Awards&rdquo; drop →</a>
           </div>
           <div className="dpanel">
-            <div className="dh"><div className="t">⏰ Closing soon</div><a className="share" href="/up-for-grabs">↗ Share</a></div>
+            <div className="dh"><div className="t"><AlarmClock size={16} strokeWidth={2} /> Closing soon</div><a className="share" href="/up-for-grabs">↗ Share</a></div>
             <p className="sub">Live solicitations with the nearest deadlines — bid now or miss it</p>
             {closing.length === 0 ? <div className="drow"><span className="nm">Updating…</span></div> : closing.map((c, i) => (
               <div className="drow" key={c.title + i}><span className="rk">{i + 1}</span><span className="nm">{c.title.slice(0, 42)} <small>{c.dept}</small></span><span className="vl" /><span className="mv dn">{c.days != null ? `${c.days}d` : ''}</span></div>
@@ -212,29 +213,29 @@ export default async function LandingV3() {
         <div className="head"><div className="eyebrow">Find your crew</div><h2 className="disp">Built for how <em className="you">you</em> serve</h2><p>Government contracting isn&apos;t one-size-fits-all — so Mindy speaks your language, tracks the money set aside for you, and puts you on a board with your own people.</p></div>
         <div className="crews">
           <a className="crew vet" href="/community/veterans">
-            <div className="em">🎖️</div>
+            <div className="em"><Medal size={34} strokeWidth={1.75} /></div>
             <div className="cl">For those who served</div>
             <h3 className="disp">You served the mission.<br />Now go win it.</h3>
             <p>The government sets aside <b className="w">billions</b> for veteran-owned businesses — SDVOSB &amp; VOSB work most contractors can&apos;t even bid. Mindy finds your share, surfaces veteran grants, and stands you up on the board next to your fellow vets.</p>
             <div className="chips"><span className="chip">SDVOSB / VOSB set-asides</span><span className="chip">Veteran grants</span><span className="chip">VA &amp; DoD focus</span><span className="chip">Veteran leaderboard</span></div>
-            <div className="cta2"><span className="gold">🎖️ Nominate a vet for the Hero Award →</span></div>
+            <div className="cta2"><span className="gold"><Medal size={13} strokeWidth={2} /> Nominate a vet for the Hero Award →</span></div>
           </a>
           <a className="crew" href="/community/itcyber">
-            <div className="em">💻</div>
+            <div className="em"><Laptop size={28} strokeWidth={1.75} /></div>
             <div className="cl">For IT &amp; cybersecurity firms</div>
             <h3>The government runs on your code.</h3>
             <p>Federal IT and cyber never stop recompeting — cloud, zero-trust, help desk, managed services. Track the task orders in your NAICS and draft the technical volume.</p>
             <div className="cta2"><span className="vlt">See IT opportunities →</span></div>
           </a>
           <a className="crew" href="/community/professional">
-            <div className="em">📈</div>
+            <div className="em"><TrendingUp size={28} strokeWidth={1.75} /></div>
             <div className="cl">For consultants &amp; program support</div>
             <h3>Win the work behind every agency.</h3>
             <p>Management consulting and program support — the biggest small-business award base, almost all of it recompetes. Show up 18 months early, already teamed.</p>
             <div className="cta2"><span className="vlt">See consulting opps →</span></div>
           </a>
           <a className="crew" href="/community/construction">
-            <div className="em">🏗️</div>
+            <div className="em"><HardHat size={28} strokeWidth={1.75} /></div>
             <div className="cl">For federal builders</div>
             <h3>Build for the biggest client on earth.</h3>
             <p>The #1 federal buyer — $57B+ a year. Design-build, MATOC, IDIQ, and set-asides for small builders. Track the projects in your trade and draft the bid.</p>
@@ -247,9 +248,9 @@ export default async function LandingV3() {
       <section className="sec tint"><div className="wrap">
         <div className="head"><div className="eyebrow">Why contractors open Mindy every morning</div><h2 className="disp">A customer that can&apos;t ghost you.</h2></div>
         <div className="why">
-          <div className="wy"><div className="wi">🛡️</div><h4>Legally required to buy</h4><p>The U.S. government is the one customer that can&apos;t ghost you or stiff you — just slower and more paperwork. Slower, but bulletproof.</p></div>
-          <div className="wy"><div className="wi">🔭</div><h4>Get in before the RFP</h4><p>See recompetes and Sources Sought 6–18 months early — while the agency is still shaping the buy, not after everyone else has seen it.</p></div>
-          <div className="wy"><div className="wi">💬</div><h4>Plain English, no acronyms</h4><p>The $150K capture analyst and the $25K research seat, turned into a few dollars in plain words a five-person shop can actually use.</p></div>
+          <div className="wy"><div className="wi"><ShieldCheck size={24} strokeWidth={1.75} /></div><h4>Legally required to buy</h4><p>The U.S. government is the one customer that can&apos;t ghost you or stiff you — just slower and more paperwork. Slower, but bulletproof.</p></div>
+          <div className="wy"><div className="wi"><Telescope size={24} strokeWidth={1.75} /></div><h4>Get in before the RFP</h4><p>See recompetes and Sources Sought 6–18 months early — while the agency is still shaping the buy, not after everyone else has seen it.</p></div>
+          <div className="wy"><div className="wi"><MessageSquare size={24} strokeWidth={1.75} /></div><h4>Plain English, no acronyms</h4><p>The $150K capture analyst and the $25K research seat, turned into a few dollars in plain words a five-person shop can actually use.</p></div>
         </div>
       </div></section>
 
@@ -274,6 +275,7 @@ const CSS = `
   font-family:"SF Pro Text",-apple-system,BlinkMacSystemFont,"Segoe UI",system-ui,sans-serif;-webkit-font-smoothing:antialiased}
 .lv3 *{box-sizing:border-box}
 .lv3 a{color:inherit;text-decoration:none;cursor:pointer}
+.lv3 svg{vertical-align:-0.14em}
 .lv3 .wrap{max-width:var(--maxw);margin:0 auto;padding:0 22px}
 .lv3 .disp{font-weight:850;letter-spacing:-.03em;text-wrap:balance}
 .lv3 .num{font-weight:850;letter-spacing:-.04em;font-variant-numeric:tabular-nums}
@@ -368,7 +370,7 @@ const CSS = `
 .lv3 .why{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
 @media(max-width:760px){.lv3 .why{grid-template-columns:1fr}}
 .lv3 .wy{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px}
-.lv3 .wy .wi{font-size:26px;margin-bottom:10px}
+.lv3 .wy .wi{margin-bottom:10px;color:var(--violet2);line-height:0}
 .lv3 .wy h4{margin:0 0 7px;font-size:16.5px;font-weight:800}
 .lv3 .wy p{margin:0;font-size:13.5px;color:var(--ink2);line-height:1.5}
 .lv3 .weird{border-top:1px solid var(--line);padding:14px 0;display:flex;gap:12px;align-items:flex-start}
@@ -430,8 +432,8 @@ const CSS = `
 .lv3 .crew .cta2{margin-top:auto;padding-top:16px;font-size:14px;font-weight:850}
 .lv3 .crew .cta2 .gold{color:var(--amber)}
 .lv3 .crew .cta2 .vlt{color:var(--violet2)}
-.lv3 .crew .em{font-size:30px;margin-bottom:2px}
-.lv3 .crew.vet .em{position:absolute;top:20px;right:22px;font-size:38px;margin:0}
+.lv3 .crew .em{margin-bottom:2px;color:var(--violet2);line-height:0}
+.lv3 .crew.vet .em{position:absolute;top:20px;right:22px;color:#ffce6e;margin:0;line-height:0}
 
 .lv3 .hero-award{position:relative;overflow:hidden;border-radius:22px;padding:32px;display:flex;gap:28px;align-items:center;background:radial-gradient(80% 150% at 86% 12%,rgba(255,176,32,.26),transparent 52%),linear-gradient(100deg,#191227,#2c1e12);border:1px solid #4a3a1c}
 @media(max-width:720px){.lv3 .hero-award{flex-direction:column;text-align:center}}
