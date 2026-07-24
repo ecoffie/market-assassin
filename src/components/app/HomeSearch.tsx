@@ -12,6 +12,8 @@ type Opp = { notice_id: string; title: string; department: string; naics_code: s
 type Firm = { uei: string; company: string; slug: string; state: string; total_contract_value: number; award_count: number };
 type Results = { q: string; opportunities: Opp[]; contractors: Firm[]; contractPiid: string | null };
 
+const EXAMPLES = ['drones', 'Lockheed Martin', 'demolition', 'janitorial services'];
+
 function fmt$(n: number) {
   if (!n) return '$0';
   if (n >= 1e9) return `$${(n / 1e9).toFixed(1)}B`;
@@ -36,10 +38,9 @@ export default function HomeSearch({ children }: { children: React.ReactNode }) 
   const [res, setRes] = useState<Results | null>(null);
   const inputRef = useRef<HTMLInputElement | null>(null);
 
-  async function submit(e: React.FormEvent) {
-    e.preventDefault();
-    const q = value.trim();
+  async function doSearch(q: string) {
     if (!q) return;
+    setValue(q);
     setLoading(true);
     try {
       const r = await fetch(`/api/app/home-search?q=${encodeURIComponent(q)}`);
@@ -51,6 +52,7 @@ export default function HomeSearch({ children }: { children: React.ReactNode }) 
       setLoading(false);
     }
   }
+  function submit(e: React.FormEvent) { e.preventDefault(); doSearch(value.trim()); }
   function clear() { setRes(null); setValue(''); inputRef.current?.focus(); }
 
   const total = res ? res.opportunities.length + res.contractors.length + (res.contractPiid ? 1 : 0) : 0;
@@ -59,18 +61,26 @@ export default function HomeSearch({ children }: { children: React.ReactNode }) 
     <div className="hsearch">
       <style>{CSS}</style>
 
-      <form className="hs-bar" onSubmit={submit}>
-        <Search className="hs-ic" size={18} strokeWidth={2} />
-        <input
-          ref={inputRef}
-          value={value}
-          onChange={(e) => setValue(e.target.value)}
-          placeholder="Search contracts, companies, UEIs, or a market…"
-          aria-label="Search opportunities, companies, contracts, or a market"
-        />
-        {loading && <span className="hs-spin" />}
-        {res && !loading && <button type="button" className="hs-clear" onClick={clear} aria-label="Clear search"><X size={16} strokeWidth={2.2} /></button>}
-      </form>
+      <div className="hs-top">
+        <form className="hs-bar" onSubmit={submit}>
+          <Search className="hs-ic" size={17} strokeWidth={2.25} />
+          <input
+            ref={inputRef}
+            value={value}
+            onChange={(e) => setValue(e.target.value)}
+            placeholder="Search a company, contract #, UEI, or market…"
+            aria-label="Search opportunities, companies, contracts, or a market"
+          />
+          {res && !loading && <button type="button" className="hs-clear" onClick={clear} aria-label="Clear search"><X size={15} strokeWidth={2.4} /></button>}
+          <button type="submit" className="hs-go" disabled={loading}>{loading ? <span className="hs-spin" /> : 'Search'}</button>
+        </form>
+        {!res && (
+          <div className="hs-chips">
+            <span className="hs-try">Try</span>
+            {EXAMPLES.map((x) => <button key={x} type="button" className="hs-chip" onClick={() => doSearch(x)}>{x}</button>)}
+          </div>
+        )}
+      </div>
 
       {res ? (
         <section className="hs-results">
@@ -134,15 +144,25 @@ export default function HomeSearch({ children }: { children: React.ReactNode }) 
 const CSS = `
 .hsearch{--s:#17141f;--s2:#1e1a2b;--line:#2a2438;--line2:#372f4d;--ink:#f6f4ff;--ink2:#c5bfd8;--mut:#8a8399;--violet2:#a855f7;--emerald:#10b981;--grad:linear-gradient(135deg,#7c3aed,#a855f7 55%,#6d28d9)}
 .hsearch *{box-sizing:border-box}
-.hsearch .hs-bar{position:relative;display:flex;align-items:center;margin:0 0 18px}
-.hsearch .hs-bar input{width:100%;height:52px;border-radius:14px;background:var(--s2);border:1px solid var(--line2);padding:0 44px;font-size:15.5px;color:var(--ink);font-family:inherit}
+.hsearch .hs-top{margin:0 0 18px}
+.hsearch .hs-bar{position:relative;display:flex;align-items:center;gap:0;height:48px;border-radius:13px;background:linear-gradient(180deg,#211c31,#191527);border:1px solid var(--line2);padding-left:42px;padding-right:6px;box-shadow:0 1px 0 rgba(255,255,255,.03) inset,0 8px 24px -12px rgba(0,0,0,.6);transition:border-color .15s,box-shadow .15s}
+.hsearch .hs-bar:focus-within{border-color:var(--violet2);box-shadow:0 0 0 3px rgba(168,85,247,.16),0 8px 24px -12px rgba(0,0,0,.6)}
+.hsearch .hs-ic{position:absolute;left:15px;color:var(--mut)}
+.hsearch .hs-bar:focus-within .hs-ic{color:var(--violet2)}
+.hsearch .hs-bar input{flex:1;min-width:0;height:100%;background:transparent;border:0;outline:none;font-size:15px;color:var(--ink);font-family:inherit}
 .hsearch .hs-bar input::placeholder{color:var(--mut)}
-.hsearch .hs-bar input:focus{outline:none;border-color:var(--violet2);box-shadow:0 0 0 3px rgba(168,85,247,.18)}
-.hsearch .hs-ic{position:absolute;left:16px;color:var(--mut)}
-.hsearch .hs-spin{position:absolute;right:16px;width:16px;height:16px;border:2px solid var(--violet2);border-top-color:transparent;border-radius:50%;animation:hspin .7s linear infinite}
-@keyframes hspin{to{transform:rotate(360deg)}}
-.hsearch .hs-clear{position:absolute;right:12px;width:28px;height:28px;display:grid;place-items:center;border:0;background:var(--s);color:var(--mut);border-radius:8px;cursor:pointer}
+.hsearch .hs-clear{width:30px;height:30px;display:grid;place-items:center;border:0;background:transparent;color:var(--mut);border-radius:8px;cursor:pointer;flex:none}
 .hsearch .hs-clear:hover{color:var(--ink);background:var(--line)}
+.hsearch .hs-go{flex:none;height:36px;min-width:88px;display:grid;place-items:center;border:0;border-radius:9px;background:var(--grad);color:#fff;font-size:13.5px;font-weight:800;font-family:inherit;cursor:pointer;box-shadow:0 6px 16px -6px rgba(124,58,237,.7)}
+.hsearch .hs-go:hover{filter:brightness(1.08)}
+.hsearch .hs-go:disabled{cursor:default}
+.hsearch .hs-spin{width:15px;height:15px;border:2px solid rgba(255,255,255,.55);border-top-color:transparent;border-radius:50%;animation:hspin .7s linear infinite}
+@keyframes hspin{to{transform:rotate(360deg)}}
+.hsearch .hs-chips{display:flex;align-items:center;gap:7px;flex-wrap:wrap;margin-top:11px;padding-left:2px}
+.hsearch .hs-try{font-size:12px;color:var(--mut);font-weight:600}
+.hsearch .hs-chip{font-size:12.5px;font-weight:600;color:var(--ink2);background:var(--s);border:1px solid var(--line);border-radius:99px;padding:5px 12px;cursor:pointer}
+.hsearch .hs-chip:hover{border-color:var(--violet2);color:var(--ink)}
+
 .hsearch .hs-head{display:flex;align-items:center;gap:10px;font-size:14px;color:var(--ink2);margin-bottom:14px}
 .hsearch .hs-head b{color:var(--ink)}
 .hsearch .hs-q{color:var(--violet2);font-weight:600}
