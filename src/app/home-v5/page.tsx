@@ -18,6 +18,8 @@ import { Flame, Trophy, Terminal, GraduationCap, LayoutGrid } from 'lucide-react
 import { getGameStats, getLeaderboard } from '@/lib/gamification/stats';
 import { getBalance } from '@/lib/mcp/credits';
 import { getReferralStats } from '@/lib/mcp/referrals';
+import { getMapOpportunities, SET_GROUPS } from '@/lib/opportunities/map-data';
+import HeroOpportunityMap from '@/components/app/HeroOpportunityMap';
 
 export const dynamic = 'force-dynamic';
 
@@ -68,13 +70,16 @@ export default async function LoggedInHomeV5({ searchParams }: { searchParams: P
   const email = (sp.email || 'eric@govcongiants.com').toLowerCase().trim();
 
   const { naics, isPaid } = await getUserContext(email);
-  const [oppsRes, game, board, balance, referral] = await Promise.all([
+  const [oppsRes, game, board, balance, referral, mapOpps] = await Promise.all([
     fetchSamOpportunitiesFromCache({ naicsCodes: naics, limit: 8 }).catch(() => ({ opportunities: [] as Array<Record<string, unknown>> })),
     getGameStats(email).catch(() => null),
     getLeaderboard(email, 5).catch(() => ({ rows: [] as Array<{ handle: string; weekXp: number; rank: number; isYou: boolean }>, you: null as { handle: string; weekXp: number; rank: number; isYou: boolean } | null, total: 0 })),
     getBalance(email).catch(() => 0),
     getReferralStats(email, 'https://getmindy.ai').catch(() => null),
+    getMapOpportunities(250).catch(() => []),
   ]);
+  const mapPins = mapOpps.map((o) => ({ lat: o.lat, lng: o.lng, set: o.set }));
+  const mapGroups = SET_GROUPS.map((g) => ({ key: g.key, label: g.label, color: g.color }));
   const today = (oppsRes.opportunities as Array<Record<string, unknown>>).slice(0, 3);
   const name = nameFromEmail(email);
 
@@ -109,10 +114,7 @@ export default async function LoggedInHomeV5({ searchParams }: { searchParams: P
         {/* HERO — Enter the App (left) + Today's matched opps (right) */}
         <section className="hero">
           <div className="card enter">
-            <iframe className="heromap-frame" src="/opportunity-map?embed=1" title="Federal opportunity map" />
-            <a className="heromap-open" href="/opportunity-map" aria-label="Open the full opportunity map">
-              <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M10 14 21 3M21 14v7H3V3h7" /></svg>
-            </a>
+            <HeroOpportunityMap pins={mapPins} setGroups={mapGroups} />
           </div>
 
           <div className="card today">
@@ -293,10 +295,9 @@ const CSS = `
 .hv5 .enter{position:relative;padding:0;overflow:hidden;min-height:440px;border-color:#342a4d;background:#e8eef2}
 .hv5 .enter-l{display:flex;flex-direction:column;min-width:0}
 .hv5 .enter-r{align-self:stretch;position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--line2);min-height:300px;background:#e8eef2}
-.hv5 .heromap-frame{position:absolute;inset:0;width:100%;height:100%;border:0;display:block}
-.hv5 .heromap-open{position:absolute;top:10px;right:10px;z-index:2;width:30px;height:30px;display:grid;place-items:center;border-radius:8px;background:rgba(17,20,32,.72);color:#fff;backdrop-filter:blur(4px)}
-.hv5 .heromap-open:hover{background:var(--violet2)}
-@media(max-width:900px){.hv5 .enter{grid-template-columns:1fr}.hv5 .enter-r{align-self:stretch;min-height:220px}}
+.hv5 .heromap{position:absolute;inset:0;display:block}
+.hv5 .heromap-canvas{position:absolute;inset:0}
+.hv5 .heromap-canvas .leaflet-container{background:#e8eef2}
 .hv5 .grid-tex{position:absolute;inset:0;opacity:.5;background-image:linear-gradient(rgba(168,85,247,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.06) 1px,transparent 1px);background-size:34px 34px;mask-image:radial-gradient(80% 80% at 80% 10%,#000,transparent 70%)}
 .hv5 .enter>*:not(.grid-tex){position:relative}
 .hv5 .enter h2{font-size:34px;margin:14px 0 8px;line-height:1.03}
