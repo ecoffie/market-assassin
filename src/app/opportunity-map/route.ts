@@ -12,7 +12,14 @@ export const dynamic = 'force-dynamic';
 
 // ?embed=1 → map only (hide the sidebar/rail/scoreboard) so the SAME map can be dropped
 // full-bleed into the /home-v5 hero box. It's the real map, not a preview.
-const EMBED_CSS = '<style>.app{grid-template-columns:0 minmax(0,1fr)!important}.panel,.railbtn,.sbtoggle,.sb,.maptop{display:none!important}.mapwrap{border:0}</style>';
+// Embed = map only, sized to the iframe (kill the 100vh/min-height:560 chain that leaves the
+// map zero-height inside a shorter iframe → blank box), controls hidden.
+const EMBED_CSS = '<style>html,body{height:100%!important;min-height:0!important}'
+  + '.app{grid-template-columns:0 minmax(0,1fr)!important;height:100%!important;min-height:0!important}'
+  + '.mapwrap{height:100%!important;border:0}#map{height:100%!important}'
+  + '.panel,.railbtn,.sbtoggle,.sb,.maptop{display:none!important}</style>';
+// Force Leaflet to re-measure once the iframe has its real size (else tiles render blank).
+const EMBED_JS = "<script>window.addEventListener('load',function(){[200,600,1200].forEach(function(t){setTimeout(function(){try{map.invalidateSize();fitView();}catch(e){}},t);});});</script>";
 
 // Our set-aside group key → the token the prototype's setKey()/cardHTML expect.
 const SET_TO_EVC: Record<string, string> = {
@@ -48,6 +55,6 @@ export async function GET(request: NextRequest) {
     opps = [];
   }
   let html = OPPORTUNITY_MAP_TEMPLATE.replace('__OPPS_JSON__', JSON.stringify(opps));
-  if (embed) html = html.replace('</head>', EMBED_CSS + '</head>');
+  if (embed) html = html.replace('</head>', EMBED_CSS + '</head>').replace('</body>', EMBED_JS + '</body>');
   return new NextResponse(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }

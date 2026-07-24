@@ -109,7 +109,7 @@ export default async function LoggedInHomeV5({ searchParams }: { searchParams: P
         {/* HERO — Enter the App (left) + Today's matched opps (right) */}
         <section className="hero">
           <div className="card enter">
-            <iframe className="heromap-frame" src="/opportunity-map?embed=1" title="Federal opportunity map" loading="lazy" />
+            <iframe className="heromap-frame" src="/opportunity-map?embed=1" title="Federal opportunity map" />
             <a className="heromap-open" href="/opportunity-map" aria-label="Open the full opportunity map">
               <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><path d="M15 3h6v6M10 14 21 3M21 14v7H3V3h7" /></svg>
             </a>
