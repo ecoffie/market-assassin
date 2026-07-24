@@ -1,5 +1,3 @@
-/* eslint-disable @next/next/no-html-link-for-pages -- design-preview page; internal links use
-   full-nav <a> for now. Convert to next/link in the production pass. */
 /**
  * /landing-v3 — the GAMIFIED public home (Robinhood × Higgsfield), Option A: the approved
  * gamified direction (artifact 3c1ac291) becomes the logged-out front door. NEW benefit-first
@@ -14,6 +12,7 @@
  */
 import { queryExpiringContracts } from '@/lib/recompete/query';
 import { getWeirdAwards } from '@/lib/discover/weird-awards';
+import { getRecentBigAwards } from '@/lib/discover/recent-spending';
 import { getLeaderboard } from '@/lib/gamification/stats';
 import { getReadClient } from '@/lib/supabase/server-clients';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
@@ -29,24 +28,11 @@ function daysUntil(dateStr: string | null | undefined): number | null {
   return Number.isFinite(d) ? Math.max(0, d) : null;
 }
 
-// Top NAICS codes by federal contract spend (last 12 mo) — USASpending spending_by_category.
-// Module scope so the clock read isn't an impure call in the component render.
-async function topNaicsBySpend(): Promise<Array<{ code: string; name: string; amount: number }>> {
-  try {
-    const end = new Date();
-    const start = new Date(end.getTime() - 365 * 864e5);
-    const day = (d: Date) => d.toISOString().slice(0, 10);
-    const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_category', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ category: 'naics', filters: { award_type_codes: ['A', 'B', 'C', 'D'], time_period: [{ start_date: day(start), end_date: day(end) }] }, limit: 5, page: 1 }),
-    });
-    if (!res.ok) return [];
-    const rows = ((await res.json())?.results ?? []) as Array<Record<string, unknown>>;
-    return rows.map((r) => ({ code: String(r.code ?? ''), name: String(r.name ?? ''), amount: Number(r.amount ?? 0) }));
-  } catch {
-    return [];
-  }
+// Sentence-case a raw contract description snippet (they arrive ALL-CAPS / messy).
+function snippet(s: string | null, n = 74): string {
+  const t = (s || '').trim().toLowerCase();
+  if (!t) return '';
+  return t.charAt(0).toUpperCase() + t.slice(1, n) + (t.length > n ? '…' : '');
 }
 
 // A live head-count, falling back to a real documented figure on error (never a fabricated 0).
@@ -80,17 +66,37 @@ function boxStyle(state: 'done' | 'now' | 'lock'): React.CSSProperties {
 
 export default async function LandingV3() {
   const sb = getReadClient();
-  const [expiring, weird, board, naics, oppsCount, players] = await Promise.all([
-    queryExpiringContracts({ monthsWindow: 18, minValue: 50_000_000, limit: 12 }).then((r) => r.contracts).catch(() => []),
-    getWeirdAwards(6).catch(() => []),
+  const [expiringRaw, weird, board, recentAwards, oppsCount, players] = await Promise.all([
+    queryExpiringContracts({ monthsWindow: 18, minValue: 10_000_000, limit: 80 }).then((r) => r.contracts).catch(() => []),
+    getWeirdAwards(8).catch(() => []),
     getLeaderboard('__public__@mindy', 5).catch(() => ({ rows: [], you: null, total: 0 })),
-    topNaicsBySpend(),
+    getRecentBigAwards(40).catch(() => []),
     safeCount(sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('active', true), 24000),
     getLeaderboard('__public__@mindy', 1).then((r) => r.total).catch(() => 1540),
   ]);
-  const upForGrabs = expiring.slice(0, 4);
+
+  // Up For Grabs — biggest recompetes with real runway (30–540 days), biggest FIRST.
+  const upForGrabs = expiringRaw
+    .map((c) => ({ c, val: Number(c.potential_total_value ?? c.total_obligation ?? 0), d: daysUntil(c.period_of_performance_current_end) }))
+    .filter((x) => x.d != null && x.d >= 30 && x.d <= 540 && x.val > 0)
+    .sort((a, b) => b.val - a.val)
+    .slice(0, 4);
+
+  // Just Awarded — this week's biggest individual awards (moves daily). Replaces the static
+  // NAICS-by-spend board, whose ranking barely changes month to month.
+  const justAwarded = [...recentAwards].sort((a, b) => (b.obligation_amount || 0) - (a.obligation_amount || 0)).slice(0, 4);
+
+  // Top Winners — who banked the most this week (aggregate recent awards by recipient; moves
+  // weekly). Replaces "Underserved Markets" — avg-bidders data (number_of_offers) is null in
+  // our sources, so that board can't be made live without fabricating figures.
+  const winnerMap = new Map<string, number>();
+  for (const a of recentAwards) {
+    const name = fmtName(a.recipient_name || '').trim();
+    if (name) winnerMap.set(name, (winnerMap.get(name) || 0) + (a.obligation_amount || 0));
+  }
+  const topWinners = [...winnerMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([name, amount]) => ({ name, amount }));
+
   const weirdTop = weird.slice(0, 3);
-  const naicsTop = naics.slice(0, 5);
 
   return (
     <div className="lv3">
@@ -158,40 +164,36 @@ export default async function LandingV3() {
         <div className="head"><div className="eyebrow">Discover · free &amp; public</div><h2 className="disp">The federal market, decoded</h2><p>Live data nobody else packages — built to be screenshot, shared, and argued about. This is the stuff people send each other, not a feature list.</p></div>
         <div className="discover">
           <div className="dpanel">
-            <div className="dh"><div className="t">📊 NAICS Leaderboard</div><a className="share" href="/top">↗ Share</a></div>
-            <p className="sub">Top codes by federal spend · last 12 months</p>
-            {naicsTop.length === 0 ? <div className="drow"><span className="nm">Updating…</span></div> : naicsTop.map((n, i) => (
-              <div className="drow" key={n.code || i}><span className="rk">{i + 1}</span><span className="nm">{n.code} <small>{n.name}</small></span><span className="vl">{fmtMoney(n.amount)}</span><span className="mv" /></div>
+            <div className="dh"><div className="t">💰 Just Awarded</div><a className="share" href="/spending">↗ Share</a></div>
+            <p className="sub">The biggest federal contracts signed this week</p>
+            {justAwarded.length === 0 ? <div className="drow"><span className="nm">Updating…</span></div> : justAwarded.map((a, i) => (
+              <div className="drow" key={a.award_id || i}><span className="rk">{i + 1}</span><span className="nm">{fmtName(a.recipient_name || 'Recipient')} <small>{a.awarding_agency || a.naics_description || ''}</small></span><span className="vl">{fmtMoney(a.obligation_amount)}</span><span className="mv new">NEW</span></div>
             ))}
-            <a className="foot" href="/top">See all 1,000+ codes →</a>
+            <a className="foot" href="/spending">See this week&apos;s spending →</a>
           </div>
           <div className="dpanel">
             <div className="dh"><div className="t">⏳ Up For Grabs</div><a className="share" href="/up-for-grabs">↗ Share</a></div>
             <p className="sub">Biggest contracts expiring soon — the recompete window is open</p>
-            {upForGrabs.length === 0 ? <div className="drow"><span className="nm">Updating…</span></div> : upForGrabs.map((c, i) => {
-              const d = daysUntil(c.period_of_performance_current_end);
-              return (
-                <div className="drow" key={c.contract_id || i}><span className="rk">{i + 1}</span><span className="nm">{contractScope(c)} <small>{c.awarding_agency || ''}</small></span><span className="vl">{fmtMoney(Number(c.potential_total_value ?? c.total_obligation ?? 0))}</span><span className="mv dn">{d != null ? `${d}d` : '—'}</span></div>
-              );
-            })}
+            {upForGrabs.length === 0 ? <div className="drow"><span className="nm">Updating…</span></div> : upForGrabs.map((x, i) => (
+              <div className="drow" key={x.c.contract_id || i}><span className="rk">{i + 1}</span><span className="nm">{contractScope(x.c)} <small>{x.c.awarding_agency || ''}</small></span><span className="vl">{fmtMoney(x.val)}</span><span className="mv dn">{x.d}d</span></div>
+            ))}
             <a className="foot" href="/up-for-grabs">See all recompetes tracked →</a>
           </div>
           <div className="dpanel">
             <div className="dh"><div className="t">🧐 Weird Awards</div><a className="share" href="/weird">↗ Share</a></div>
             <p className="sub">Your tax dollars, hard at work — the internet&apos;s favorite feed</p>
             {weirdTop.length === 0 ? <div className="weird"><span className="wx">Updating…</span></div> : weirdTop.map((w, i) => (
-              <div className="weird" key={w.award_id || i}><span className="amt">{fmtMoney(w.obligation_amount)}</span><span className="wx"><b>{fmtName(w.recipient_name || w.awarding_agency || 'Federal award')}</b> — {(w.description || '').toLowerCase().slice(0, 90) || 'see the full record'}.</span></div>
+              <div className="weird" key={w.award_id || i}><span className="amt">{fmtMoney(w.obligation_amount)}</span><span className="wx"><b>{snippet(w.description) || 'Federal award'}</b> — {w.awarding_agency || fmtName(w.recipient_name || '')}.</span></div>
             ))}
             <a className="foot" href="/weird">Get the weekly &ldquo;Weird Awards&rdquo; drop →</a>
           </div>
           <div className="dpanel">
-            <div className="dh"><div className="t">🎯 Underserved Markets</div><a className="share" href="/discover">↗ Share</a></div>
-            <p className="sub">Real money, barely any bidders — where to point your next pursuit</p>
-            <div className="drow"><span className="rk">1</span><span className="nm">Marine Vessel Repair <small>336611 · avg 1.8 bidders</small></span><span className="vl">$3.1B</span><span className="mv up">HOT</span></div>
-            <div className="drow"><span className="rk">2</span><span className="nm">Hazmat Remediation <small>562910 · avg 2.1 bidders</small></span><span className="vl">$2.4B</span><span className="mv up">HOT</span></div>
-            <div className="drow"><span className="rk">3</span><span className="nm">Language &amp; Translation <small>541930 · avg 2.3 bidders</small></span><span className="vl">$1.6B</span><span className="mv up">HOT</span></div>
-            <div className="drow"><span className="rk">4</span><span className="nm">Diesel Generator Maint. <small>811310 · avg 2.4 bidders</small></span><span className="vl">$980M</span><span className="mv up">HOT</span></div>
-            <a className="foot" href="/discover">Find your underserved market →</a>
+            <div className="dh"><div className="t">🏆 Top Winners This Week</div><a className="share" href="/spending">↗ Share</a></div>
+            <p className="sub">Contractors banking the most federal dollars right now</p>
+            {topWinners.length === 0 ? <div className="drow"><span className="nm">Updating…</span></div> : topWinners.map((w, i) => (
+              <div className="drow" key={w.name}><span className="rk">{i + 1}</span><span className="nm">{w.name}</span><span className="vl">{fmtMoney(w.amount)}</span><span className="mv" /></div>
+            ))}
+            <a className="foot" href="/spending">See the full board →</a>
           </div>
         </div>
       </div></section>
