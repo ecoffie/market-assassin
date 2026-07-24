@@ -12,6 +12,21 @@
  */
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
+import { getReadClient } from '@/lib/supabase/server-clients';
+import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
+import { formatCompanyName as fmtName } from '@/lib/format-name';
+
+export const dynamic = 'force-dynamic';
+
+function daysUntil(dateStr: string | null | undefined): number | null {
+  if (!dateStr) return null;
+  const d = Math.round((new Date(dateStr).getTime() - new Date().getTime()) / 864e5);
+  return Number.isFinite(d) ? Math.max(0, d) : null;
+}
+function trunc(s: string | null, n = 40): string {
+  const t = (s || '').trim();
+  return t.length > n ? t.slice(0, n) + '…' : t;
+}
 
 type Row = { rank: string; name: string; sub?: string; value: string; move?: string; moveCls?: string };
 type HubConfig = {
@@ -47,12 +62,11 @@ const HUBS: Record<string, HubConfig> = {
       story: 'Went from a first alert to a $6.4M base-logistics award in 14 months — SDVOSB set-aside, no primes in the way. His playbook is this month’s featured story for the whole Mindy community.',
       nominate: 'Nominate a veteran →', read: 'Read Marcus’s playbook' },
     feeds: [
-      { head: 'Veteran leaderboard', icon: '🎖️', sub: 'Resets Monday · SDVOSB & VOSB firms', foot: 'See the full veteran board →', rows: [
-        { rank: '1', name: 'Tidewater Logistics', sub: 'Navy · Norfolk, VA', value: '4,820', move: '🏅', moveCls: 'g' },
-        { rank: '2', name: 'Redstone Facilities', sub: 'Army · Huntsville, AL', value: '4,310', move: '▲2', moveCls: 'up' },
-        { rank: '3', name: 'Bravo Zulu IT', sub: 'Marines · San Diego, CA', value: '3,975', move: '▲1', moveCls: 'up' },
-        { rank: '4', name: 'Frontline Grounds', sub: 'Army · Killeen, TX', value: '3,120', move: '▼1', moveCls: 'dn' },
-        { rank: '9', name: 'You', sub: 'Hunter · climbing', value: '1,240', move: '▲3', moveCls: 'up' } ] },
+      { head: 'Biggest SDVOSB wins', icon: '🎖️', sub: 'Top veteran-set-aside contracts · last 12 months', foot: 'See all SDVOSB awards →', rows: [
+        { rank: '1', name: 'Tidewater Logistics', sub: 'Dept. of Veterans Affairs', value: '$920M', move: '', moveCls: '' },
+        { rank: '2', name: 'Redstone Facilities', sub: 'Dept. of the Army', value: '$410M', move: '', moveCls: '' },
+        { rank: '3', name: 'Bravo Zulu IT', sub: 'DHS', value: '$210M', move: '', moveCls: '' },
+        { rank: '4', name: 'Frontline Grounds', sub: 'GSA', value: '$96M', move: '', moveCls: '' } ] },
       { head: 'Veteran set-asides · up for grabs', icon: '⏳', sub: 'SDVOSB / VOSB opportunities open now', foot: 'Match my profile to veteran set-asides →', rows: [
         { rank: '1', name: 'Base Operations Support', sub: 'Army · Fort Liberty · SDVOSB', value: '$920M', move: '44d', moveCls: 'dn' },
         { rank: '2', name: 'Facilities Maintenance', sub: 'VA · West Palm Beach · SDVOSB', value: '$180M', move: '27d', moveCls: 'dn' },
@@ -161,6 +175,54 @@ const HUBS: Record<string, HubConfig> = {
   },
 };
 
+// ── Real feed loaders (per segment). Return [feedA rows, feedB rows]; an empty array for a
+// feed means "keep the config fallback rows". Veterans is wired; other segments hold their
+// illustrative feeds until the audience mix is finalized. ──
+
+async function sdvosbAwards(): Promise<Row[]> {
+  try {
+    const end = new Date();
+    const start = new Date(end.getTime() - 365 * 864e5);
+    const day = (d: Date) => d.toISOString().slice(0, 10);
+    const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_award/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filters: { award_type_codes: ['A', 'B', 'C', 'D'], set_aside_type_codes: ['SDVOSBC', 'SDVOSBS'], time_period: [{ start_date: day(start), end_date: day(end) }] }, fields: ['Recipient Name', 'Award Amount', 'Awarding Agency'], sort: 'Award Amount', order: 'desc', limit: 5, page: 1, subawards: false }),
+    });
+    if (!res.ok) return [];
+    const rows = ((await res.json())?.results ?? []) as Array<Record<string, unknown>>;
+    return rows.map((r, i) => ({ rank: String(i + 1), name: fmtName(String(r['Recipient Name'] ?? '')), sub: String(r['Awarding Agency'] ?? ''), value: fmtMoney(Number(r['Award Amount'] ?? 0)), move: '', moveCls: '' }));
+  } catch {
+    return [];
+  }
+}
+
+async function sdvosbOpps(): Promise<Row[]> {
+  try {
+    const sb = getReadClient();
+    const { data, error } = await sb
+      .from('sam_opportunities')
+      .select('notice_id, title, department, response_deadline, set_aside_code')
+      .in('set_aside_code', ['SDVOSBC', 'VSB', 'SDVOSB', 'VOSB'])
+      .eq('active', true)
+      .not('response_deadline', 'is', null)
+      .order('response_deadline', { ascending: true })
+      .limit(5);
+    if (error || !data) return [];
+    return (data as Array<Record<string, unknown>>).map((r, i) => {
+      const d = daysUntil(r.response_deadline as string);
+      return { rank: String(i + 1), name: trunc(String(r.title ?? ''), 38), sub: String(r.department ?? ''), value: '', move: d != null ? `${d}d` : '', moveCls: 'dn' };
+    });
+  } catch {
+    return [];
+  }
+}
+
+async function loadFeeds(segment: string): Promise<Row[][] | null> {
+  if (segment === 'veterans') return Promise.all([sdvosbAwards(), sdvosbOpps()]);
+  return null;
+}
+
 export function generateStaticParams() {
   return Object.keys(HUBS).map((segment) => ({ segment }));
 }
@@ -176,6 +238,7 @@ export default async function CommunityHub({ params }: { params: Promise<{ segme
   const cfg = HUBS[segment];
   if (!cfg) notFound();
 
+  const realFeeds = await loadFeeds(segment);
   const rootStyle = { ['--acc']: cfg.acc, ['--acc2']: cfg.acc2, ['--ctaink']: cfg.ctaInk } as React.CSSProperties;
 
   return (
