@@ -14,10 +14,12 @@ import Link from 'next/link';
 import { fetchSamOpportunitiesFromCache } from '@/lib/briefings/pipelines/sam-gov';
 import { getReadClient } from '@/lib/supabase/server-clients';
 import CopyPrompt from '@/components/home/CopyPrompt';
-import { Flame, Trophy, Terminal, GraduationCap, LayoutGrid, BarChart3, Newspaper, Target, Handshake, TrendingUp, ChevronRight } from 'lucide-react';
+import { Flame, Trophy, Terminal, GraduationCap, LayoutGrid } from 'lucide-react';
 import { getGameStats, getLeaderboard } from '@/lib/gamification/stats';
 import { getBalance } from '@/lib/mcp/credits';
 import { getReferralStats } from '@/lib/mcp/referrals';
+import { getMapOpportunities, SET_GROUPS } from '@/lib/opportunities/map-data';
+import HeroOpportunityMap from '@/components/app/HeroOpportunityMap';
 
 export const dynamic = 'force-dynamic';
 
@@ -89,14 +91,17 @@ export default async function LoggedInHomeV5({ searchParams }: { searchParams: P
   const email = (sp.email || 'eric@govcongiants.com').toLowerCase().trim();
 
   const { naics, isPaid } = await getUserContext(email);
-  const [oppsRes, counts, game, board, balance, referral] = await Promise.all([
+  const [oppsRes, counts, game, board, balance, referral, mapOpps] = await Promise.all([
     fetchSamOpportunitiesFromCache({ naicsCodes: naics, limit: 8 }).catch(() => ({ opportunities: [] as Array<Record<string, unknown>> })),
     getCounts(),
     getGameStats(email).catch(() => null),
     getLeaderboard(email, 5).catch(() => ({ rows: [] as Array<{ handle: string; weekXp: number; rank: number; isYou: boolean }>, you: null as { handle: string; weekXp: number; rank: number; isYou: boolean } | null, total: 0 })),
     getBalance(email).catch(() => 0),
     getReferralStats(email, 'https://getmindy.ai').catch(() => null),
+    getMapOpportunities(220).catch(() => []),
   ]);
+  const mapPins = mapOpps.map((o) => ({ lat: o.lat, lng: o.lng, set: o.set }));
+  const mapGroups = SET_GROUPS.map((g) => ({ key: g.key, label: g.label, color: g.color }));
   const today = (oppsRes.opportunities as Array<Record<string, unknown>>).slice(0, 3);
   const name = nameFromEmail(email);
 
@@ -147,13 +152,7 @@ export default async function LoggedInHomeV5({ searchParams }: { searchParams: P
               </div>
             </div>
             <div className="enter-r">
-              <div className="qlh">Jump straight in</div>
-              <Link className="ql" href="/app?panel=research"><BarChart3 size={17} strokeWidth={1.9} /><span>Market Research</span><ChevronRight className="qlc" size={15} /></Link>
-              <Link className="ql" href="/app?panel=dashboard"><Newspaper size={17} strokeWidth={1.9} /><span>Daily Briefing</span><ChevronRight className="qlc" size={15} /></Link>
-              <Link className="ql" href="/app?panel=recompetes"><Target size={17} strokeWidth={1.9} /><span>Recompetes</span><ChevronRight className="qlc" size={15} /></Link>
-              <Link className="ql" href="/app?panel=forecasts"><TrendingUp size={17} strokeWidth={1.9} /><span>Forecasts</span><ChevronRight className="qlc" size={15} /></Link>
-              <Link className="ql" href="/app?panel=pipeline"><LayoutGrid size={17} strokeWidth={1.9} /><span>Pipeline</span><ChevronRight className="qlc" size={15} /></Link>
-              <Link className="ql" href="/app?panel=contacts"><Handshake size={17} strokeWidth={1.9} /><span>Teaming CRM</span><ChevronRight className="qlc" size={15} /></Link>
+              <HeroOpportunityMap pins={mapPins} setGroups={mapGroups} total={counts.opps} />
             </div>
           </div>
 
@@ -334,15 +333,17 @@ const CSS = `
 .hv5 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);position:relative;overflow:hidden}
 .hv5 .enter{padding:30px;background:radial-gradient(120% 140% at 82% 12%,rgba(124,58,237,.42),transparent 55%),radial-gradient(90% 120% at 100% 100%,rgba(168,85,247,.22),transparent 60%),var(--surface2);border-color:#342a4d;display:grid;grid-template-columns:1fr 292px;gap:30px;align-items:stretch;min-height:280px}
 .hv5 .enter-l{display:flex;flex-direction:column;min-width:0}
-.hv5 .enter-r{display:flex;flex-direction:column;gap:5px;align-self:center;background:rgba(8,6,14,.3);border:1px solid var(--line2);border-radius:14px;padding:14px}
-.hv5 .qlh{font-size:11px;font-weight:800;letter-spacing:.12em;text-transform:uppercase;color:var(--mut);padding:2px 8px 9px}
-.hv5 .ql{display:flex;align-items:center;gap:11px;padding:10px 12px;border-radius:10px;font-size:14px;font-weight:600;color:var(--ink2)}
-.hv5 .ql>span{flex:1;min-width:0}
-.hv5 .ql>svg:first-child{color:var(--violet2)}
-.hv5 .ql .qlc{color:var(--mut);opacity:.55}
-.hv5 .ql:hover{background:var(--surface);color:var(--ink)}
-.hv5 .ql:hover .qlc{opacity:1;color:var(--violet2)}
-@media(max-width:900px){.hv5 .enter{grid-template-columns:1fr}.hv5 .enter-r{align-self:stretch}}
+.hv5 .enter-r{align-self:stretch;position:relative;border-radius:14px;overflow:hidden;border:1px solid var(--line2);min-height:250px}
+.hv5 .heromap{position:absolute;inset:0;display:block}
+.hv5 .heromap-canvas{position:absolute;inset:0}
+.hv5 .heromap-grad{position:absolute;inset:0;background:linear-gradient(180deg,transparent 40%,rgba(8,6,14,.72) 100%);pointer-events:none}
+.hv5 .heromap-cap{position:absolute;left:14px;bottom:12px;z-index:2}
+.hv5 .heromap-t{display:flex;align-items:center;gap:7px;font-size:14px;font-weight:800;color:#fff}
+.hv5 .heromap-t .live-dot{width:7px;height:7px;border-radius:50%;background:var(--emerald);box-shadow:0 0 8px var(--emerald)}
+.hv5 .heromap-s{font-size:12px;color:var(--ink2);margin-top:2px}
+.hv5 .heromap-go{position:absolute;right:12px;top:12px;z-index:2;font-size:12px;font-weight:800;color:#fff;background:rgba(124,58,237,.85);padding:6px 11px;border-radius:9px;backdrop-filter:blur(4px)}
+.hv5 .heromap:hover .heromap-go{background:var(--violet2)}
+@media(max-width:900px){.hv5 .enter{grid-template-columns:1fr}.hv5 .enter-r{align-self:stretch;min-height:220px}}
 .hv5 .grid-tex{position:absolute;inset:0;opacity:.5;background-image:linear-gradient(rgba(168,85,247,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.06) 1px,transparent 1px);background-size:34px 34px;mask-image:radial-gradient(80% 80% at 80% 10%,#000,transparent 70%)}
 .hv5 .enter>*:not(.grid-tex){position:relative}
 .hv5 .enter h2{font-size:34px;margin:14px 0 8px;line-height:1.03}
