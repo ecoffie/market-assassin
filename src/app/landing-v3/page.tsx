@@ -246,19 +246,26 @@ export default async function LandingV3() {
             <div className="chips"><span className="chip">SDVOSB / VOSB set-asides</span><span className="chip">Veteran grants</span><span className="chip">VA &amp; DoD focus</span><span className="chip">Veteran leaderboard</span></div>
             <div className="cta2"><span className="gold">🎖️ Nominate a vet for the Hero Award →</span></div>
           </a>
-          <a className="crew" href="/community/research">
-            <div className="em">🎓</div>
-            <div className="cl">For researchers &amp; universities</div>
-            <h3>Turn your research into federal funding.</h3>
-            <p>SBIR/STTR and research grants, in plain English — fund the work without giving up equity. Made for university labs, PIs, and spinouts.</p>
-            <div className="cta2"><span className="vlt">Explore research funding →</span></div>
+          <a className="crew" href="/community/itcyber">
+            <div className="em">💻</div>
+            <div className="cl">For IT &amp; cybersecurity firms</div>
+            <h3>The government runs on your code.</h3>
+            <p>Federal IT and cyber never stop recompeting — cloud, zero-trust, help desk, managed services. Track the task orders in your NAICS and draft the technical volume.</p>
+            <div className="cta2"><span className="vlt">See IT opportunities →</span></div>
           </a>
-          <a className="crew" href="/community/sbir">
-            <div className="em">🔬</div>
-            <div className="cl">For builders &amp; innovators</div>
-            <h3>The coolest stuff the government&apos;s buying.</h3>
-            <p>An SBIR feed of the weird, ambitious tech Uncle Sam is funding right now — drones, AI, biotech, space. Find the program that fits what you build.</p>
-            <div className="cta2"><span className="vlt">See what&apos;s funded →</span></div>
+          <a className="crew" href="/community/professional">
+            <div className="em">📈</div>
+            <div className="cl">For consultants &amp; program support</div>
+            <h3>Win the work behind every agency.</h3>
+            <p>Management consulting and program support — the biggest small-business award base, almost all of it recompetes. Show up 18 months early, already teamed.</p>
+            <div className="cta2"><span className="vlt">See consulting opps →</span></div>
+          </a>
+          <a className="crew" href="/community/construction">
+            <div className="em">🏗️</div>
+            <div className="cl">For federal builders</div>
+            <h3>Build for the biggest client on earth.</h3>
+            <p>The #1 federal buyer — $57B+ a year. Design-build, MATOC, IDIQ, and set-asides for small builders. Track the projects in your trade and draft the bid.</p>
+            <div className="cta2"><span className="vlt">See construction opps →</span></div>
           </a>
         </div>
       </div></section>
@@ -451,7 +458,7 @@ const CSS = `
 .lv3 .crews{display:grid;grid-template-columns:1.5fr 1fr;grid-auto-rows:1fr;gap:16px}
 @media(max-width:820px){.lv3 .crews{grid-template-columns:1fr}}
 .lv3 .crew{border-radius:20px;padding:24px;border:1px solid var(--line);position:relative;overflow:hidden;display:flex;flex-direction:column;background:var(--card)}
-.lv3 .crew.vet{grid-row:1 / span 2;border-color:var(--line2);background:radial-gradient(120% 80% at 88% 0%,rgba(255,176,32,.16),transparent 52%),radial-gradient(80% 90% at 0% 100%,rgba(139,92,246,.16),transparent 58%),var(--card2)}
+.lv3 .crew.vet{grid-row:1 / span 3;border-color:var(--line2);background:radial-gradient(120% 80% at 88% 0%,rgba(255,176,32,.16),transparent 52%),radial-gradient(80% 90% at 0% 100%,rgba(139,92,246,.16),transparent 58%),var(--card2)}
 .lv3 .crew .cl{font-size:11.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;color:var(--mut)}
 .lv3 .crew.vet .cl{color:#ffce6e}
 .lv3 .crew h3{margin:9px 0 8px;font-size:20px;line-height:1.12}
