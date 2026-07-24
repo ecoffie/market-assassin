@@ -87,91 +87,116 @@ const HUBS: Record<string, HubConfig> = {
       { p: '"Getting spotlighted for the Hero Award put my company in front of thousands of contractors. Best marketing I never paid for."', name: 'Marcus B.', br: 'Navy · Logistics · VA' } ],
     final: { h2: 'Fall in. The mission’s waiting.', p: 'Join free — see the billions set aside for veterans, claim your rank, and get on the board with your squad.', cta: 'Join the squad — free →' },
   },
-  research: {
-    title: 'Mindy — University & Research Hub', theme: 'blue', acc: '#4f8ef7', acc2: '#8fb8ff', ctaInk: '#0a1a33',
-    crumb: 'Community › University & Research', ctaLabel: 'Fund my research →',
-    kicker: '🎓 For researchers & universities', h1a: 'Turn your research into', h1em: 'federal funding.',
-    lead: 'The government pours billions into university R&D every year — SBIR/STTR awards, research contracts, and grants. Mindy translates the alphabet soup, matches it to your field, and helps you fund the work without giving up equity.',
-    ctaBtn: 'Find my funding — free →',
-    profile: { emoji: '🎓', title: 'Your research profile', sub: 'Field: Biomedical Engineering', cells: [
-      { n: '$3.9B', l: 'SBIR/STTR in your field' }, { n: '24', l: 'Open topics that match' },
-      { n: '11', l: 'Agencies funding your area' }, { n: '$0', l: 'Equity given up' } ] },
+  itcyber: {
+    title: 'Mindy — IT & Cyber Hub', theme: 'blue', acc: '#3b82f6', acc2: '#93c5fd', ctaInk: '#08183a',
+    crumb: 'Community › IT & Cyber', ctaLabel: 'Find my next contract →',
+    kicker: '💻 For IT & cybersecurity firms', h1a: 'The government runs', h1em: 'on your code.',
+    lead: 'Federal IT and cyber spending is enormous and never stops recompeting — modernization, cloud, zero-trust, help desk, managed services. Mindy tracks the task orders and recompetes in your NAICS, scopes the incumbent, and drafts the technical volume. Stop refreshing SAM.gov.',
+    ctaBtn: 'Find my next contract — free →',
+    profile: { emoji: '💻', title: 'Your IT profile', sub: 'NAICS 541512 · Cleared', cells: [
+      { n: '$120B+', l: 'Federal IT & cyber spend / yr' }, { n: '40%+', l: 'Of it comes up for recompete' },
+      { n: '18 mo', l: 'Recompete runway we watch' }, { n: 'Zero', l: 'Time wasted refreshing SAM' } ] },
     stats: [
-      { n: '$4.5B+', l: 'in SBIR/STTR each year', s: 'Non-dilutive R&D funding for small biz & university partners' },
-      { n: '11', l: 'federal agencies fund it', s: 'DoD, NIH, NSF, DOE, NASA & more — each with its own topics' },
-      { n: '3 phases', l: 'idea → prototype → scale', s: 'Phase I feasibility, Phase II development, Phase III commercialization' } ],
-    spot: { eyebrow: 'Funded Founder of the month', head: 'From the lab to a federal award', emoji: '🔬', clabel: 'This month’s spotlight',
-      name: 'Helix Neuro Labs', who: 'Dr. Priya S. · PI, State University spinout',
-      story: 'Turned a grad-school prototype into a $1.7M NIH SBIR Phase II — no VC, no dilution. Mindy matched her thesis to the right topic and tracked the deadline. Her path is this month’s featured story.',
-      nominate: 'Nominate a researcher →', read: 'Read Priya’s path' },
+      { n: '$120B+', l: 'federal IT spend / yr', s: 'Software, cloud, cyber, managed services & help desk' },
+      { n: '40%+', l: 'is recompetes', s: 'Incumbent-held work that comes back around — where you break in' },
+      { n: '1 place', l: 'task orders + recompetes', s: 'Every vehicle and IDIQ, tracked to your codes' } ],
+    spot: { eyebrow: 'Firm of the month', head: 'The small IT shop that unseated a prime', emoji: '🛰️', clabel: 'This month’s spotlight',
+      name: 'Cipher Systems', who: 'A 12-person cyber firm · Huntsville, AL',
+      story: 'Spotted a $40M zero-trust recompete 14 months early, teamed smart, and took it off an $8B integrator. Mindy flagged the incumbent’s expiry before the RFP ever posted.',
+      nominate: 'Nominate a firm →', read: 'Read the capture story' },
     feeds: [
-      { head: 'Hottest SBIR topics', icon: '🔥', sub: 'By funding, this cycle · ▲▼ vs last', foot: 'See all funded topics →', rows: [
-        { rank: '1', name: 'AI / Autonomy', sub: 'DoD · multiple topics', value: '$1.2B', move: '▲2', moveCls: 'up' },
-        { rank: '2', name: 'Biotech & Health', sub: 'NIH · HHS', value: '$940M', move: '▼1', moveCls: 'dn' },
-        { rank: '3', name: 'Clean Energy', sub: 'DOE', value: '$610M', move: '▲3', moveCls: 'up' },
-        { rank: '4', name: 'Space & Sensors', sub: 'NASA · Space Force', value: '$480M', move: 'NEW', moveCls: 'g' } ] },
-      { head: 'Open topics · closing soon', icon: '⏳', sub: 'Apply before the window shuts', foot: 'Match my research to open topics →', rows: [
-        { rank: '1', name: 'Wearable Neuro Sensors', sub: 'NIH · Phase I', value: '$314K', move: '21d', moveCls: 'dn' },
-        { rank: '2', name: 'Autonomous ISR', sub: 'Air Force · Phase II', value: '$1.7M', move: '33d', moveCls: 'dn' },
-        { rank: '3', name: 'Grid Resilience AI', sub: 'DOE · Phase I', value: '$200K', move: '40d', moveCls: 'dn' },
-        { rank: '4', name: 'Advanced Materials', sub: 'NSF · STTR', value: '$275K', move: '54d', moveCls: 'dn' } ] } ],
-    cardsHead: { eyebrow: 'Beyond SBIR', head: 'Research grants & contracts', sub: 'Federal money that funds university work — grants that don’t need to be paid back and research contracts you can actually staff.' },
+      { head: 'Biggest IT wins', icon: '💻', sub: 'Top IT/cyber contracts · last 12 months', foot: 'See all IT awards →', rows: [
+        { rank: '1', name: 'Loading…', value: '', move: '', moveCls: '' } ] },
+      { head: 'IT opps up for grabs', icon: '⏳', sub: 'Open IT & cyber solicitations right now', foot: 'Match my profile to IT opps →', rows: [
+        { rank: '1', name: 'Loading…', value: '', move: '', moveCls: '' } ] } ],
+    cardsHead: { eyebrow: 'What you’ll need', head: 'The certs that open doors', sub: 'Federal IT buyers gate work behind compliance. Mindy tracks which opportunities require what — and helps you get there.' },
     cards: [
-      { amt: '$500K', h4: 'NSF Research Grant', p: 'Basic & applied research across science and engineering fields.', meta: ['Rolling', 'Universities'], go: 'Check eligibility →' },
-      { amt: '$2M', h4: 'NIH R01', p: 'Multi-year health research funding for established PIs and labs.', meta: ['3 cycles/yr', 'Biomedical'], go: 'Check eligibility →' },
-      { amt: '$1M+', h4: 'DoD Research Contract', p: 'University-affiliated research the military funds directly — "contracts for people in University."', meta: ['Open BAAs', 'All fields'], go: 'Check eligibility →' } ],
-    mission: { clabel: 'Research mission · 30 days', title: 'Idea to Phase I',
-      p: 'A guided mission from research idea to a submitted SBIR/STTR proposal — Mindy matches your topic, tracks the deadline, and preps the pieces. Finish it to earn the First Submission badge + bonus credits.',
-      steps: [{ done: true, n: '✓', label: 'Set your research field' }, { done: true, n: '✓', label: 'Match to a topic' }, { n: '3', label: 'Confirm eligibility' }, { n: '4', label: 'Draft the proposal' }, { n: '5', label: 'Submit Phase I' }], cta: 'Start the mission →' },
-    voicesHead: 'Researchers funding their work with Mindy',
+      { h4: 'FedRAMP', p: 'The bar for selling cloud to the government. We flag the opps that require it — and the ones that don’t.', meta: ['Cloud', 'SaaS'], go: 'See FedRAMP opps →' },
+      { h4: 'CMMC', p: 'Cybersecurity Maturity Model Certification — now gating DoD work. Know which bids demand which level.', meta: ['DoD', 'Cyber'], go: 'See CMMC opps →' },
+      { h4: 'Set-aside IT', p: 'IT work reserved for 8(a), SDVOSB & HUBZone firms — competition the big integrators can’t touch.', meta: ['Set-aside', 'Small biz'], go: 'See set-aside IT →' } ],
+    mission: { clabel: 'IT capture mission · 30 days', title: 'From cold to first submitted bid',
+      p: 'A guided 30-day run: pin your NAICS and clearances, find a recompete with runway, scope the incumbent, and draft the technical volume with Mindy. Finish it and unlock bonus credits.',
+      steps: [{ done: true, n: '✓', label: 'Set your NAICS & clearances' }, { done: true, n: '✓', label: 'Find a recompete' }, { n: '3', label: 'Scope the incumbent' }, { n: '4', label: 'Draft the technical volume' }, { n: '5', label: 'Submit your bid' }], cta: 'Start the mission →' },
+    voicesHead: 'IT firms winning with Mindy',
     voices: [
-      { p: '"I’m a scientist, not a contracting expert. Mindy pointed me to the exact NIH topic my thesis fit — and I landed a Phase I without hiring a consultant."', name: 'Dr. Amara O.', br: 'Bioengineering · PI' },
-      { p: '"Non-dilutive was the whole point. We kept 100% of our spinout and let the DoD fund the R&D."', name: 'Leo M.', br: 'Robotics · Founder' },
-      { p: '"The ‘hottest topics’ board told us where the money was moving before our department did. We pivoted our proposal and won."', name: 'Dr. Chen W.', br: 'Materials Science' } ],
-    final: { h2: 'Your research deserves funding.', p: 'Join free — see what’s open in your field, match your work to real topics, and fund it without giving up a thing.', cta: 'Find my funding — free →' },
+      { p: '"We used to find out about recompetes when the RFP dropped — too late to team. Now Mindy shows me 12–18 months out. Game changer."', name: 'Priya N.', br: 'Cloud · Reston, VA' },
+      { p: '"The AI draft got our technical volume 80% of the way there. We spent the saved week actually reviewing it."', name: 'Marcus T.', br: 'Cyber · San Antonio, TX' },
+      { p: '"As a small SDVOSB IT shop, the set-aside filter is everything. I only see work I can actually win."', name: 'Dave K.', br: 'Managed services · FL' } ],
+    final: { h2: 'The task orders are dropping. Be early.', p: 'Join free — track the IT recompetes in your codes, scope the incumbent, and draft the bid.', cta: 'Find my next contract — free →' },
   },
-  sbir: {
-    title: 'Mindy — SBIR & Innovators Hub', theme: 'cyan', acc: '#22c9e0', acc2: '#7fe9f5', ctaInk: '#04262c',
-    crumb: 'Community › SBIR & Innovators', ctaLabel: 'Get funded →',
-    kicker: '🔬 For builders & innovators', h1a: 'The coolest stuff', h1em: 'the government’s buying.',
-    lead: 'Uncle Sam funds wild R&D — drones, AI, biotech, space, materials. Billions in SBIR/STTR, non-dilutive, no VC required. Mindy surfaces the topics that fit what you build and gets you to Phase I without the paperwork headache.',
-    ctaBtn: 'Find my topic — free →',
-    profile: { emoji: '🔬', title: 'Your build profile', sub: 'Domain: Autonomy & AI', cells: [
-      { n: '$1.2B', l: 'Open funding in your domain' }, { n: '18', l: 'Topics that fit your build' },
-      { n: 'Phase I', l: 'Your next step · $50–300K' }, { n: '$0', l: 'Equity given up' } ] },
+  professional: {
+    title: 'Mindy — Professional Services Hub', theme: 'teal', acc: '#14b8a6', acc2: '#5eead4', ctaInk: '#04211d',
+    crumb: 'Community › Professional Services', ctaLabel: 'Find my next contract →',
+    kicker: '📈 For consultants & program-support firms', h1a: 'Win the work behind', h1em: 'every agency.',
+    lead: 'Management consulting, program support, advisory, admin services — the biggest small-business award base in the federal market, and almost all of it recompetes. Mindy tracks your codes, scopes the incumbent, and drafts the proposal so you spend your time winning, not searching.',
+    ctaBtn: 'Find my next contract — free →',
+    profile: { emoji: '📈', title: 'Your services profile', sub: 'NAICS 541611', cells: [
+      { n: '#1', l: 'Small-biz award base (541611)' }, { n: 'High', l: 'Share that recompetes' },
+      { n: '18 mo', l: 'Recompete runway we watch' }, { n: 'All', l: 'Agencies, one feed' } ] },
     stats: [
-      { n: '$4.5B+', l: 'in SBIR/STTR a year', s: 'America’s largest source of non-dilutive startup R&D funding' },
-      { n: 'Phase I→III', l: 'feasibility to contract', s: '$50–300K to prove it, $1–2M to build it, then sole-source scale' },
-      { n: '11 agencies', l: 'buying innovation', s: 'DoD, NASA, DOE, NIH, NSF, DHS & more — each with open topics' } ],
-    spot: { eyebrow: 'Build of the month', head: 'Wild idea → funded prototype', emoji: '🚀', clabel: 'This month’s spotlight',
-      name: 'Vantablack Robotics', who: 'Sam & Wei · two-person garage startup',
-      story: 'Built a scrappy autonomous-inspection drone, matched it to an Air Force topic, and turned it into a $1.9M Phase II — no investors, no board. Mindy found the topic; they built the thing.',
-      nominate: 'Nominate a builder →', read: 'Read their build log' },
+      { n: 'Largest', l: 'small-business award base', s: 'Management consulting & program support — 541611 and friends' },
+      { n: 'Recurring', l: 'contract structure', s: 'Support work recompetes on a cycle — plan your capture early' },
+      { n: '1 feed', l: 'every agency', s: 'Your codes across DoD, civilian & the IC in one place' } ],
+    spot: { eyebrow: 'Firm of the month', head: 'The two-person shop that scaled on recompetes', emoji: '📊', clabel: 'This month’s spotlight',
+      name: 'Meridian Advisory', who: 'A boutique consultancy · Columbia, MD',
+      story: 'Built a pipeline entirely from recompetes Mindy surfaced 12+ months out, teamed as a sub, then primed a $22M program-support win. No cold outreach — just showing up early and prepared.',
+      nominate: 'Nominate a firm →', read: 'Read the growth story' },
     feeds: [
-      { head: 'Hottest domains', icon: '🔥', sub: 'SBIR funding by domain · ▲▼ vs last cycle', foot: 'See all funded domains →', rows: [
-        { rank: '1', name: 'Autonomy & Drones', sub: 'DoD · multi-service', value: '$1.2B', move: '▲3', moveCls: 'up' },
-        { rank: '2', name: 'AI / ML', sub: 'across agencies', value: '$980M', move: '▲1', moveCls: 'up' },
-        { rank: '3', name: 'Space & Sensors', sub: 'NASA · Space Force', value: '$640M', move: 'NEW', moveCls: 'g' },
-        { rank: '4', name: 'Biotech & Med Devices', sub: 'NIH · DHA', value: '$520M', move: '▼2', moveCls: 'dn' } ] },
-      { head: 'Open topics · closing soon', icon: '⏳', sub: 'Jump on these before the window shuts', foot: 'Match my build to open topics →', rows: [
-        { rank: '1', name: 'Counter-UAS Autonomy', sub: 'Army · Phase II', value: '$1.7M', move: '18d', moveCls: 'dn' },
-        { rank: '2', name: 'Edge AI for ISR', sub: 'Air Force · Phase I', value: '$250K', move: '26d', moveCls: 'dn' },
-        { rank: '3', name: 'In-Space Manufacturing', sub: 'NASA · Phase I', value: '$150K', move: '39d', moveCls: 'dn' },
-        { rank: '4', name: 'Battery Chemistry', sub: 'DOE · STTR', value: '$200K', move: '47d', moveCls: 'dn' } ] } ],
-    cardsHead: { eyebrow: 'The ladder', head: 'How the money actually works', sub: 'SBIR isn’t one grant — it’s a ladder. Prove it, build it, then sell it to the government at scale.' },
+      { head: 'Biggest consulting wins', icon: '📈', sub: 'Top professional-services contracts · last 12 months', foot: 'See all services awards →', rows: [
+        { rank: '1', name: 'Loading…', value: '', move: '', moveCls: '' } ] },
+      { head: 'Consulting opps open now', icon: '⏳', sub: 'Open professional-services solicitations', foot: 'Match my profile to opps →', rows: [
+        { rank: '1', name: 'Loading…', value: '', move: '', moveCls: '' } ] } ],
+    cardsHead: { eyebrow: 'The edge', head: 'Win before the RFP', sub: 'Support contracts are won in the 6–18 months before the solicitation. Mindy gives you that head start.' },
     cards: [
-      { amt: '$50–300K', h4: 'Phase I · Feasibility', p: 'Prove the concept works. 6 months, non-dilutive, no strings on your IP.', meta: ['Open cycles', 'All domains'], go: 'Find a Phase I →' },
-      { amt: '$1–2M', h4: 'Phase II · Development', p: 'Build the prototype. 2 years of funding to turn feasibility into a product.', meta: ['By invitation', 'After Phase I'], go: 'Plan your Phase II →' },
-      { amt: 'Sole-source', h4: 'Phase III · Scale', p: 'Sell it to the government — no full competition. This is where SBIR pays off.', meta: ['Direct award', 'Commercialize'], go: 'See Phase III paths →' } ],
-    mission: { clabel: 'Builder mission · 30 days', title: 'Garage to Phase I',
-      p: 'A guided sprint from "cool idea" to a submitted SBIR proposal — Mindy matches your build to a topic, checks fit, and preps the pieces. Finish it to earn the First Submission badge + bonus credits.',
-      steps: [{ done: true, n: '✓', label: 'Describe what you build' }, { done: true, n: '✓', label: 'Match to a topic' }, { n: '3', label: 'Check topic fit' }, { n: '4', label: 'Draft the proposal' }, { n: '5', label: 'Submit Phase I' }], cta: 'Start the mission →' },
-    voicesHead: 'Founders funding their build with Mindy',
+      { h4: 'Recompete radar', p: 'Every support contract in your codes, with its incumbent and expiry — so you can team and shape early.', meta: ['12–18 mo out'], go: 'See recompetes →' },
+      { h4: 'Capability match', p: 'The opportunities your past performance actually qualifies you for — not a firehose.', meta: ['Fit-scored'], go: 'See your matches →' },
+      { h4: 'Proposal drafting', p: 'AI first drafts of your technical and management volumes, grounded in your past performance.', meta: ['AI · vault'], go: 'Draft a proposal →' } ],
+    mission: { clabel: 'Capture mission · 30 days', title: 'From search to submitted',
+      p: 'A guided 30-day run: set your codes, find a recompete with runway, scope the incumbent, and draft the proposal with Mindy. Finish it and unlock bonus credits.',
+      steps: [{ done: true, n: '✓', label: 'Set your NAICS' }, { done: true, n: '✓', label: 'Find a recompete' }, { n: '3', label: 'Scope the incumbent' }, { n: '4', label: 'Draft the proposal' }, { n: '5', label: 'Submit your bid' }], cta: 'Start the mission →' },
+    voicesHead: 'Services firms winning with Mindy',
     voices: [
-      { p: '"We were bootstrapping in a garage. SBIR let us build the prototype and keep 100% of the company. Mindy found the topic in an afternoon."', name: 'Wei L.', br: 'Autonomy · Founder' },
-      { p: '"The ‘hottest domains’ board is basically a map of where the government’s about to spend. We aimed our proposal at it and won Phase I."', name: 'Sam R.', br: 'Robotics · CTO' },
-      { p: '"Phase III was the unlock — sole-source contracts with no dilution. I didn’t even know that path existed until Mindy walked me up the ladder."', name: 'Nadia K.', br: 'Space Tech · Founder' } ],
-    final: { h2: 'Build the future. Let them fund it.', p: 'Join free — match what you build to open topics, climb the SBIR ladder, and keep every share of your company.', cta: 'Find my topic — free →' },
+      { p: '"Recompete visibility is the whole game in support services. Mindy hands it to me 18 months out — I show up already teamed."', name: 'Angela R.', br: 'Program support · VA' },
+      { p: '"I stopped paying $2K/mo for a bloated tool. Mindy does the part I actually used — for a fraction."', name: 'Tom H.', br: 'Consulting · DC' },
+      { p: '"The fit-scored matches saved my BD time. I only chase work I can actually win."', name: 'Lena P.', br: 'Advisory · TX' } ],
+    final: { h2: 'The recompetes are coming. Be ready.', p: 'Join free — track the support work in your codes, scope the incumbent, and draft the proposal.', cta: 'Find my next contract — free →' },
+  },
+  construction: {
+    title: 'Mindy — Construction Hub', theme: 'orange', acc: '#f97316', acc2: '#fdba74', ctaInk: '#3a1e05',
+    crumb: 'Community › Construction', ctaLabel: 'Find my next project →',
+    kicker: '🏗️ For federal builders', h1a: 'Build for the biggest', h1em: 'client on earth.',
+    lead: 'The federal government is the #1 construction buyer in America — $57B+ a year in building, renovation, and civil work. Design-build, MATOC, IDIQ, and set-asides for small builders. Mindy tracks the solicitations and recompetes in your trade, scopes the incumbent, and drafts the bid.',
+    ctaBtn: 'Find my next project — free →',
+    profile: { emoji: '🏗️', title: 'Your build profile', sub: 'NAICS 236220', cells: [
+      { n: '$57B+', l: 'Federal construction / yr' }, { n: '#1', l: 'Federal NAICS by spend' },
+      { n: 'Set-aside', l: 'Small-builder work reserved' }, { n: '18 mo', l: 'Recompete runway we watch' } ] },
+    stats: [
+      { n: '$57B+', l: 'federal construction / yr', s: 'The #1 NAICS in the entire federal market (236220)' },
+      { n: 'Design-build', l: 'MATOC & IDIQ', s: 'Multiple-award vehicles where small builders win task orders' },
+      { n: 'Set-asides', l: 'reserved for you', s: 'SDVOSB, 8(a), HUBZone & small-business construction work' } ],
+    spot: { eyebrow: 'Builder of the month', head: 'The regional GC that went federal', emoji: '🏢', clabel: 'This month’s spotlight',
+      name: 'Cornerstone Builders', who: 'A regional GC · Killeen, TX',
+      story: 'Moved from commercial into federal on a MATOC, then landed a $30M VA facilities renovation. Mindy tracked the recompete and the incumbent, so they walked in already knowing the shape of the job.',
+      nominate: 'Nominate a builder →', read: 'Read the story' },
+    feeds: [
+      { head: 'Biggest construction wins', icon: '🏗️', sub: 'Top federal construction contracts · last 12 months', foot: 'See all construction awards →', rows: [
+        { rank: '1', name: 'Loading…', value: '', move: '', moveCls: '' } ] },
+      { head: 'Construction opps up for grabs', icon: '⏳', sub: 'Open federal construction solicitations', foot: 'Match my trade to opps →', rows: [
+        { rank: '1', name: 'Loading…', value: '', move: '', moveCls: '' } ] } ],
+    cardsHead: { eyebrow: 'How federal building works', head: 'The vehicles that carry the work', sub: 'Most federal construction flows through a few contract types. Mindy tracks all of them to your trade.' },
+    cards: [
+      { h4: 'Design-Build', p: 'Single award for design + construction. Big, competitive, and Mindy flags them by trade and region.', meta: ['USACE', 'NAVFAC'], go: 'See design-build →' },
+      { h4: 'MATOC / IDIQ', p: 'Multiple-award vehicles that feed task orders for years. Get on one, then win the orders.', meta: ['Multi-year'], go: 'See vehicles →' },
+      { h4: 'Set-aside builds', p: 'Construction reserved for SDVOSB, 8(a), and HUBZone firms — competition you can actually win.', meta: ['Small biz'], go: 'See set-aside builds →' } ],
+    mission: { clabel: 'Builder mission · 30 days', title: 'From trade to first federal bid',
+      p: 'A guided 30-day run: set your trade and region, find a project with runway, scope the incumbent, and draft the bid with Mindy. Finish it and unlock bonus credits.',
+      steps: [{ done: true, n: '✓', label: 'Set your trade & region' }, { done: true, n: '✓', label: 'Find a project' }, { n: '3', label: 'Scope the incumbent' }, { n: '4', label: 'Draft the bid' }, { n: '5', label: 'Submit' }], cta: 'Start the mission →' },
+    voicesHead: 'Builders winning with Mindy',
+    voices: [
+      { p: '"Federal construction felt like a black box. Mindy showed me the vehicles, the set-asides, and which recompetes were coming. First VA job inside a year."', name: 'Carlos M.', br: 'GC · TX' },
+      { p: '"The recompete tracking is gold. I know when a facilities contract is ending before the RFP hits."', name: 'Sarah B.', br: 'Facilities · GA' },
+      { p: '"As an 8(a) builder the set-aside filter means I don’t waste a minute on full-and-open work I’d lose."', name: 'Andre W.', br: 'SDVOSB GC · VA' } ],
+    final: { h2: 'The biggest client on earth is building. Bid it.', p: 'Join free — track the construction work in your trade, scope the incumbent, and draft the bid.', cta: 'Find my next project — free →' },
   },
 };
 
@@ -218,8 +243,56 @@ async function sdvosbOpps(): Promise<Row[]> {
   }
 }
 
+// NAICS sets per industry hub — awards (USASpending) + open opps (sam_opportunities).
+const SEGMENT_NAICS: Record<string, string[]> = {
+  itcyber: ['541512', '541519', '541511', '541513', '541690'],
+  professional: ['541611', '541618', '541990', '541614', '561110'],
+  construction: ['236220', '236210', '237310', '238210', '238220', '238160'],
+};
+
+async function awardsByNaics(naics: string[]): Promise<Row[]> {
+  try {
+    const end = new Date();
+    const start = new Date(end.getTime() - 365 * 864e5);
+    const day = (d: Date) => d.toISOString().slice(0, 10);
+    const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_award/', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ filters: { award_type_codes: ['A', 'B', 'C', 'D'], naics_codes: naics, time_period: [{ start_date: day(start), end_date: day(end) }] }, fields: ['Recipient Name', 'Award Amount', 'Awarding Agency'], sort: 'Award Amount', order: 'desc', limit: 5, page: 1, subawards: false }),
+    });
+    if (!res.ok) return [];
+    const rows = ((await res.json())?.results ?? []) as Array<Record<string, unknown>>;
+    return rows.map((r, i) => ({ rank: String(i + 1), name: fmtName(String(r['Recipient Name'] ?? '')), sub: String(r['Awarding Agency'] ?? ''), value: fmtMoney(Number(r['Award Amount'] ?? 0)), move: '', moveCls: '' }));
+  } catch {
+    return [];
+  }
+}
+
+async function oppsByNaics(naics: string[]): Promise<Row[]> {
+  try {
+    const sb = getReadClient();
+    const { data, error } = await sb
+      .from('sam_opportunities')
+      .select('notice_id, title, department, response_deadline, naics_code')
+      .in('naics_code', naics)
+      .eq('active', true)
+      .not('response_deadline', 'is', null)
+      .order('response_deadline', { ascending: true })
+      .limit(5);
+    if (error || !data) return [];
+    return (data as Array<Record<string, unknown>>).map((r, i) => {
+      const d = daysUntil(r.response_deadline as string);
+      return { rank: String(i + 1), name: trunc(String(r.title ?? ''), 38), sub: String(r.department ?? ''), value: '', move: d != null ? `${d}d` : '', moveCls: 'dn' };
+    });
+  } catch {
+    return [];
+  }
+}
+
 async function loadFeeds(segment: string): Promise<Row[][] | null> {
   if (segment === 'veterans') return Promise.all([sdvosbAwards(), sdvosbOpps()]);
+  const naics = SEGMENT_NAICS[segment];
+  if (naics) return Promise.all([awardsByNaics(naics), oppsByNaics(naics)]);
   return null;
 }
 
