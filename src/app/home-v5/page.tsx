@@ -298,8 +298,6 @@ const CSS = `
 .hv5 .heromap{position:absolute;inset:0;display:block}
 .hv5 .heromap-canvas{position:absolute;inset:0}
 .hv5 .heromap-canvas .leaflet-container{background:#e8eef2}
-.hv5 .grid-tex{position:absolute;inset:0;opacity:.5;background-image:linear-gradient(rgba(168,85,247,.06) 1px,transparent 1px),linear-gradient(90deg,rgba(168,85,247,.06) 1px,transparent 1px);background-size:34px 34px;mask-image:radial-gradient(80% 80% at 80% 10%,#000,transparent 70%)}
-.hv5 .enter>*:not(.grid-tex){position:relative}
 .hv5 .enter h2{font-size:34px;margin:14px 0 8px;line-height:1.03}
 .hv5 .enter .sub{color:var(--ink2);font-size:15px;max-width:44ch;line-height:1.5}
 .hv5 .statline{display:flex;gap:26px;margin:22px 0 0;flex-wrap:wrap}
