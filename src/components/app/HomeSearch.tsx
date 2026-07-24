@@ -67,7 +67,7 @@ export default function HomeSearch({ children }: { children: React.ReactNode }) 
   function clear() { setRes(null); setValue(''); inputRef.current?.focus(); }
 
   const total = res ? (res.mode === 'company'
-    ? (res.recompetes?.length || 0) + (res.recentAwards?.length || 0) + res.contractors.length
+    ? res.opportunities.length + (res.recompetes?.length || 0) + (res.recentAwards?.length || 0) + res.contractors.length
     : res.opportunities.length + res.contractors.length + (res.contractPiid ? 1 : 0)) : 0;
   const companyLabel = res?.contractors[0]?.company || res?.q || '';
 
@@ -103,7 +103,20 @@ export default function HomeSearch({ children }: { children: React.ReactNode }) 
             <div className="hs-main">
               {res.mode === 'company' ? (
                 <>
-                  <div className="hs-sec">Recompetes held by {companyLabel}</div>
+                  {res.opportunities.length > 0 && <>
+                    <div className="hs-sec">Open opportunities in {companyLabel}&apos;s space</div>
+                    {res.opportunities.map((o) => (
+                      <a className="hs-card" key={o.notice_id} href={o.ui_link || 'https://sam.gov/search'} target="_blank" rel="noreferrer">
+                        <div className="hs-o-top">
+                          {o.notice_type && <span className="hs-badge">{o.notice_type.slice(0, 22)}</span>}
+                          {o.response_deadline && <span className={`hs-due${dueLabel(o.response_deadline) === 'due today' || /^[0-3]d/.test(dueLabel(o.response_deadline)) ? ' hot' : ''}`}>{dueLabel(o.response_deadline)}</span>}
+                        </div>
+                        <div className="hs-o-t">{o.title}</div>
+                        <div className="hs-o-m">{o.department}{o.naics_code ? ` · NAICS ${o.naics_code}` : ''}{o.set_aside_description ? ` · ${o.set_aside_description}` : ''}</div>
+                      </a>
+                    ))}
+                  </>}
+                  <div className="hs-sec" style={res.opportunities.length > 0 ? { marginTop: 18 } : undefined}>Recompetes held by {companyLabel}</div>
                   {(res.recompetes || []).length === 0 ? (
                     <div className="hs-empty">No expiring contracts on record for {companyLabel} — they may hold work under a parent entity, or nothing is coming up for recompete.</div>
                   ) : (res.recompetes || []).map((rc) => (

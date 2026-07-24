@@ -13,28 +13,53 @@ import { normalizeStateCode } from '@/lib/utils/us-states';
 
 export const dynamic = 'force-dynamic';
 
+const OPP_COLS = 'notice_id, title, department, naics_code, response_deadline, set_aside_code, set_aside_description, notice_type, ui_link, pop_state, pop_city, office_address';
+
+function mapOpp(r: Record<string, unknown>) {
+  const g = geocode((r.pop_city as string) || '', normalizeStateCode((r.pop_state as string) || ''), r.office_address as { city?: string; state?: string; zipcode?: string } | null);
+  return {
+    notice_id: r.notice_id, title: r.title, department: r.department, naics_code: r.naics_code,
+    response_deadline: r.response_deadline, set_aside_description: r.set_aside_description,
+    notice_type: r.notice_type, ui_link: r.ui_link,
+    set: setGroupKey(r.set_aside_code as string),
+    lat: g.coord ? g.coord[0] : null, lng: g.coord ? g.coord[1] : null,
+  };
+}
+
 async function opportunities(q: string) {
   try {
     const sb = getReadClient();
     const like = `%${q.replace(/[%_]/g, '')}%`;
     const { data, error } = await sb
-      .from('sam_opportunities')
-      .select('notice_id, title, department, naics_code, response_deadline, set_aside_code, set_aside_description, notice_type, ui_link, pop_state, pop_city, office_address')
+      .from('sam_opportunities').select(OPP_COLS)
       .eq('active', true)
       .or(`title.ilike.${like},department.ilike.${like}`)
       .order('response_deadline', { ascending: true })
       .limit(12);
     if (error) throw error;
-    return (data || []).map((r: Record<string, unknown>) => {
-      const g = geocode((r.pop_city as string) || '', normalizeStateCode((r.pop_state as string) || ''), r.office_address as { city?: string; state?: string; zipcode?: string } | null);
-      return {
-        notice_id: r.notice_id, title: r.title, department: r.department, naics_code: r.naics_code,
-        response_deadline: r.response_deadline, set_aside_description: r.set_aside_description,
-        notice_type: r.notice_type, ui_link: r.ui_link,
-        set: setGroupKey(r.set_aside_code as string),
-        lat: g.coord ? g.coord[0] : null, lng: g.coord ? g.coord[1] : null,
-      };
-    });
+    return (data || []).map(mapOpp);
+  } catch {
+    return [];
+  }
+}
+
+// Open opportunities in a set of NAICS codes — "what this company could bid on next".
+async function oppsInNaics(codes: string[]) {
+  const uniq = [...new Set(codes.filter(Boolean))].slice(0, 8);
+  if (!uniq.length) return [];
+  try {
+    const sb = getReadClient();
+    const today = new Date().toISOString().slice(0, 10);
+    const { data, error } = await sb
+      .from('sam_opportunities').select(OPP_COLS)
+      .eq('active', true)
+      .gte('response_deadline', today)
+      .in('naics_code', uniq)
+      .order('response_deadline', { ascending: true })
+      .limit(24);
+    if (error) throw error;
+    // Drop FSC commodity micro-buys ("66--INDICATOR…") — show named work.
+    return (data || []).filter((r) => { const t = String(r.title || '').trim(); return t && !/^\d{1,4}--/.test(t); }).slice(0, 8).map(mapOpp);
   } catch {
     return [];
   }
@@ -82,7 +107,7 @@ async function recentAwards(uei: string) {
   if (!uei) return [];
   try {
     const rows = await getRecentAwardsForRecipient([uei], uei, 6);
-    return rows.map((r) => ({ id: r.award_id, piid: r.piid, agency: r.awarding_agency, naics: r.naics_description, desc: r.description, amount: r.obligation_amount, date: r.action_date }));
+    return rows.map((r) => ({ id: r.award_id, piid: r.piid, agency: r.awarding_agency, naics: r.naics_description, naicsCode: r.naics_code, desc: r.description, amount: r.obligation_amount, date: r.action_date }));
   } catch { return []; }
 }
 
@@ -131,11 +156,14 @@ export async function GET(request: NextRequest) {
       recompetes(top.company, top.uei || ''),
       recentAwards(top.uei || ''),
     ]);
+    // Open opportunities they could bid on next — from the NAICS they actually work in.
+    const naics = [...recomps.map((r) => String(r.naics || '')), ...awards.map((a) => String(a.naicsCode || ''))];
+    const naicsOpps = await oppsInNaics(naics);
     return NextResponse.json({
       success: true, q, mode: 'company', contractors: firms, setGroups,
       contact: companyContact(top.company),
       recompetes: recomps, recentAwards: awards,
-      opportunities: [], contractPiid: null,
+      opportunities: naicsOpps, contractPiid: null,
     });
   }
 
