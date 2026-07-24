@@ -63,16 +63,20 @@ async function sourcesSought(): Promise<Array<{ title: string; dept: string }>> 
   }
 }
 
-// Closing soon — active solicitations with the nearest deadlines: bid now or miss it.
+// Closing soon — biddable solicitations closing in the next 1–30 days (exclude today's
+// same-day micro-buys). Filter to real solicitation types, not award notices / commodity dregs.
 async function closingSoon(): Promise<Array<{ title: string; dept: string; days: number | null }>> {
   try {
     const sb = getReadClient();
-    const today = new Date().toISOString().slice(0, 10);
+    const tomorrow = new Date(Date.now() + 864e5).toISOString().slice(0, 10);
+    const in30 = new Date(Date.now() + 30 * 864e5).toISOString().slice(0, 10);
     const { data, error } = await sb
       .from('sam_opportunities')
       .select('notice_id, title, department, response_deadline')
       .eq('active', true)
-      .gte('response_deadline', today)
+      .gte('response_deadline', tomorrow)
+      .lte('response_deadline', in30)
+      .or('notice_type.ilike.%combined%,notice_type.ilike.%solicitation%,notice_type.ilike.%rfp%,notice_type.ilike.%rfq%')
       .order('response_deadline', { ascending: true })
       .limit(5);
     if (error || !data) return [];
