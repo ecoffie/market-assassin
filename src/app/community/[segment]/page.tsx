@@ -13,6 +13,8 @@
 import type { Metadata } from 'next';
 import { notFound } from 'next/navigation';
 import { getReadClient } from '@/lib/supabase/server-clients';
+import { queryExpiringContracts } from '@/lib/recompete/query';
+import { contractScope } from '@/lib/discover/scope';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
 import { formatCompanyName as fmtName } from '@/lib/format-name';
 
@@ -62,7 +64,7 @@ const HUBS: Record<string, HubConfig> = {
       story: 'Went from a first alert to a $6.4M base-logistics award in 14 months — SDVOSB set-aside, no primes in the way. His playbook is this month’s featured story for the whole Mindy community.',
       nominate: 'Nominate a veteran →', read: 'Read Marcus’s playbook' },
     feeds: [
-      { head: 'Biggest SDVOSB wins', icon: '🎖️', sub: 'Top veteran-set-aside contracts · last 12 months', foot: 'See all SDVOSB awards →', rows: [
+      { head: 'Recompetes on the clock', icon: '🎯', sub: 'Big contracts in veteran-heavy trades — the incumbent’s time is running out', foot: 'See all recompetes →', rows: [
         { rank: '1', name: 'Tidewater Logistics', sub: 'Dept. of Veterans Affairs', value: '$920M', move: '', moveCls: '' },
         { rank: '2', name: 'Redstone Facilities', sub: 'Dept. of the Army', value: '$410M', move: '', moveCls: '' },
         { rank: '3', name: 'Bravo Zulu IT', sub: 'DHS', value: '$210M', move: '', moveCls: '' },
@@ -105,7 +107,7 @@ const HUBS: Record<string, HubConfig> = {
       story: 'Spotted a $40M zero-trust recompete 14 months early, teamed smart, and took it off an $8B integrator. Mindy flagged the incumbent’s expiry before the RFP ever posted.',
       nominate: 'Nominate a firm →', read: 'Read the capture story' },
     feeds: [
-      { head: 'Biggest IT wins', icon: '💻', sub: 'Top IT/cyber contracts · last 12 months', foot: 'See all IT awards →', rows: [
+      { head: 'IT recompetes on the clock', icon: '🎯', sub: 'Big IT contracts expiring — the incumbent’s window is closing', foot: 'See all IT recompetes →', rows: [
         { rank: '1', name: 'Loading…', value: '', move: '', moveCls: '' } ] },
       { head: 'IT opps up for grabs', icon: '⏳', sub: 'Open IT & cyber solicitations right now', foot: 'Match my profile to IT opps →', rows: [
         { rank: '1', name: 'Loading…', value: '', move: '', moveCls: '' } ] } ],
@@ -142,7 +144,7 @@ const HUBS: Record<string, HubConfig> = {
       story: 'Built a pipeline entirely from recompetes Mindy surfaced 12+ months out, teamed as a sub, then primed a $22M program-support win. No cold outreach — just showing up early and prepared.',
       nominate: 'Nominate a firm →', read: 'Read the growth story' },
     feeds: [
-      { head: 'Biggest consulting wins', icon: '📈', sub: 'Top professional-services contracts · last 12 months', foot: 'See all services awards →', rows: [
+      { head: 'Recompetes on the clock', icon: '🎯', sub: 'Big support contracts expiring — the incumbent’s time is running out', foot: 'See all recompetes →', rows: [
         { rank: '1', name: 'Loading…', value: '', move: '', moveCls: '' } ] },
       { head: 'Consulting opps open now', icon: '⏳', sub: 'Open professional-services solicitations', foot: 'Match my profile to opps →', rows: [
         { rank: '1', name: 'Loading…', value: '', move: '', moveCls: '' } ] } ],
@@ -179,7 +181,7 @@ const HUBS: Record<string, HubConfig> = {
       story: 'Moved from commercial into federal on a MATOC, then landed a $30M VA facilities renovation. Mindy tracked the recompete and the incumbent, so they walked in already knowing the shape of the job.',
       nominate: 'Nominate a builder →', read: 'Read the story' },
     feeds: [
-      { head: 'Biggest construction wins', icon: '🏗️', sub: 'Top federal construction contracts · last 12 months', foot: 'See all construction awards →', rows: [
+      { head: 'Recompetes on the clock', icon: '🎯', sub: 'Big builds expiring — the incumbent’s window is closing', foot: 'See all recompetes →', rows: [
         { rank: '1', name: 'Loading…', value: '', move: '', moveCls: '' } ] },
       { head: 'Construction opps up for grabs', icon: '⏳', sub: 'Open federal construction solicitations', foot: 'Match my trade to opps →', rows: [
         { rank: '1', name: 'Loading…', value: '', move: '', moveCls: '' } ] } ],
@@ -203,24 +205,6 @@ const HUBS: Record<string, HubConfig> = {
 // ── Real feed loaders (per segment). Return [feedA rows, feedB rows]; an empty array for a
 // feed means "keep the config fallback rows". Veterans is wired; other segments hold their
 // illustrative feeds until the audience mix is finalized. ──
-
-async function sdvosbAwards(): Promise<Row[]> {
-  try {
-    const end = new Date();
-    const start = new Date(end.getTime() - 365 * 864e5);
-    const day = (d: Date) => d.toISOString().slice(0, 10);
-    const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_award/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filters: { award_type_codes: ['A', 'B', 'C', 'D'], set_aside_type_codes: ['SDVOSBC', 'SDVOSBS'], time_period: [{ start_date: day(start), end_date: day(end) }] }, fields: ['Recipient Name', 'Award Amount', 'Awarding Agency'], sort: 'Award Amount', order: 'desc', limit: 5, page: 1, subawards: false }),
-    });
-    if (!res.ok) return [];
-    const rows = ((await res.json())?.results ?? []) as Array<Record<string, unknown>>;
-    return rows.map((r, i) => ({ rank: String(i + 1), name: fmtName(String(r['Recipient Name'] ?? '')), sub: String(r['Awarding Agency'] ?? ''), value: fmtMoney(Number(r['Award Amount'] ?? 0)), move: '', moveCls: '' }));
-  } catch {
-    return [];
-  }
-}
 
 async function sdvosbOpps(): Promise<Row[]> {
   try {
@@ -250,19 +234,27 @@ const SEGMENT_NAICS: Record<string, string[]> = {
   construction: ['236220', '236210', '237310', '238210', '238220', '238160'],
 };
 
-async function awardsByNaics(naics: string[]): Promise<Row[]> {
+// The STORY feed: big contracts EXPIRING in these NAICS — who holds it now + how long left.
+// Names a vulnerable incumbent + a countdown + a real opportunity (beats a static "biggest wins" list).
+async function recompetesByNaics(naics: string[]): Promise<Row[]> {
   try {
-    const end = new Date();
-    const start = new Date(end.getTime() - 365 * 864e5);
-    const day = (d: Date) => d.toISOString().slice(0, 10);
-    const res = await fetch('https://api.usaspending.gov/api/v2/search/spending_by_award/', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ filters: { award_type_codes: ['A', 'B', 'C', 'D'], naics_codes: naics, time_period: [{ start_date: day(start), end_date: day(end) }] }, fields: ['Recipient Name', 'Award Amount', 'Awarding Agency'], sort: 'Award Amount', order: 'desc', limit: 5, page: 1, subawards: false }),
-    });
-    if (!res.ok) return [];
-    const rows = ((await res.json())?.results ?? []) as Array<Record<string, unknown>>;
-    return rows.map((r, i) => ({ rank: String(i + 1), name: fmtName(String(r['Recipient Name'] ?? '')), sub: String(r['Awarding Agency'] ?? ''), value: fmtMoney(Number(r['Award Amount'] ?? 0)), move: '', moveCls: '' }));
+    const { contracts } = await queryExpiringContracts({ naicsCodes: naics, monthsWindow: 18, minValue: 5_000_000, limit: 150, orderBy: 'value' });
+    return contracts
+      .map((c) => ({ c, val: Number(c.potential_total_value ?? c.total_obligation ?? 0), d: daysUntil(c.period_of_performance_current_end) }))
+      .filter((x) => x.d != null && x.d >= 30 && x.d <= 540 && x.val > 0)
+      .sort((a, b) => b.val - a.val)
+      .slice(0, 5)
+      .map((x, i) => {
+        const dd = x.d ?? 0;
+        return {
+          rank: String(i + 1),
+          name: trunc(contractScope(x.c), 34),
+          sub: x.c.incumbent_name ? `held by ${trunc(fmtName(x.c.incumbent_name), 26)}` : (x.c.awarding_agency || ''),
+          value: fmtMoney(x.val),
+          move: dd >= 60 ? `${Math.round(dd / 30)}mo` : `${dd}d`,
+          moveCls: 'dn',
+        };
+      });
   } catch {
     return [];
   }
@@ -289,10 +281,14 @@ async function oppsByNaics(naics: string[]): Promise<Row[]> {
   }
 }
 
+// Veteran-heavy trades (facilities, IT, construction, janitorial, consulting, civil) — the
+// markets SDVOSBs actually compete in — for the recompete story feed.
+const VET_NAICS = ['561210', '541512', '236220', '561720', '541611', '237310'];
+
 async function loadFeeds(segment: string): Promise<Row[][] | null> {
-  if (segment === 'veterans') return Promise.all([sdvosbAwards(), sdvosbOpps()]);
+  if (segment === 'veterans') return Promise.all([recompetesByNaics(VET_NAICS), sdvosbOpps()]);
   const naics = SEGMENT_NAICS[segment];
-  if (naics) return Promise.all([awardsByNaics(naics), oppsByNaics(naics)]);
+  if (naics) return Promise.all([recompetesByNaics(naics), oppsByNaics(naics)]);
   return null;
 }
 
