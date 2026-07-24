@@ -87,10 +87,6 @@ export default function HomeSearch({ children }: { children: React.ReactNode }) 
       {res ? (
         <section className="hs-results">
           <div className="hs-head"><b>{total}</b> result{total === 1 ? '' : 's'} for <span className="hs-q">&ldquo;{res.q}&rdquo;</span><button className="hs-back" onClick={clear}>← back to my market</button></div>
-          {(() => {
-            const pins = res.opportunities.filter((o) => o.lat != null && o.lng != null).map((o) => ({ lat: o.lat as number, lng: o.lng as number, set: o.set, label: o.title }));
-            return pins.length > 0 ? <div className="hs-resultmap"><HeroOpportunityMap pins={pins} setGroups={res.setGroups} /></div> : null;
-          })()}
           <div className="hs-grid">
             <div className="hs-main">
               {res.contractPiid && (
@@ -139,6 +135,10 @@ export default function HomeSearch({ children }: { children: React.ReactNode }) 
                   ))}
                 </>
               )}
+              {(() => {
+                const pins = res.opportunities.filter((o) => o.lat != null && o.lng != null).map((o) => ({ lat: o.lat as number, lng: o.lng as number, set: o.set, label: o.title }));
+                return pins.length > 0 ? <div className="hs-sidemap"><HeroOpportunityMap pins={pins} setGroups={res.setGroups} /></div> : null;
+              })()}
             </aside>
           </div>
         </section>
@@ -174,7 +174,7 @@ const CSS = `
 .hsearch .hs-q{color:var(--violet2);font-weight:600}
 .hsearch .hs-back{margin-left:auto;background:none;border:0;color:var(--mut);font-size:13px;font-weight:600;cursor:pointer}
 .hsearch .hs-back:hover{color:var(--ink)}
-.hsearch .hs-resultmap{position:relative;height:260px;border-radius:16px;overflow:hidden;border:1px solid var(--line);margin-bottom:16px}
+.hsearch .hs-sidemap{position:relative;height:230px;border-radius:14px;overflow:hidden;border:1px solid var(--line);margin-top:9px}
 .hsearch .hs-grid{display:grid;grid-template-columns:1fr 320px;gap:18px;align-items:start}
 @media(max-width:900px){.hsearch .hs-grid{grid-template-columns:1fr}}
 .hsearch .hs-main{display:flex;flex-direction:column;gap:10px;min-width:0}
