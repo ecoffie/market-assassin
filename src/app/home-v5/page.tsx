@@ -367,14 +367,14 @@ const CSS = `
 .hv5 .shot .bd .t{font-size:14px;font-weight:700}
 .hv5 .shot .bd .d{font-size:12px;color:var(--mut);margin-top:4px;line-height:1.4}
 
-.hv5 .event{margin-top:6px;border-radius:var(--r);border:1px solid #3a2d5c;overflow:hidden;position:relative;background:radial-gradient(90% 160% at 88% 20%,rgba(168,85,247,.5),transparent 55%),radial-gradient(70% 140% at 100% 100%,rgba(245,158,11,.28),transparent 60%),linear-gradient(100deg,#1a1330,#241a44);padding:26px 30px;display:flex;align-items:center;gap:24px;min-height:150px}
-.hv5 .event .cnt{position:relative;z-index:2;max-width:60%}
-.hv5 .event .kk{display:flex;align-items:center;gap:10px;margin-bottom:10px}
-.hv5 .event .flag{font-size:10px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;background:#dc2626;color:#fff;padding:3px 9px;border-radius:6px}
-.hv5 .event .when{font-size:12px;font-weight:700;color:#fbbf24}
-.hv5 .event h3{font-size:27px;margin:0 0 6px;line-height:1.05}
-.hv5 .event p{margin:0;color:var(--ink2);font-size:14px;max-width:48ch;line-height:1.5}
-.hv5 .event .act{margin-top:16px;display:flex;align-items:center;gap:14px}
+.hv5 .event{margin-top:6px;border-radius:var(--r);border:1px solid #3a2d5c;overflow:hidden;position:relative;background:radial-gradient(90% 160% at 88% 20%,rgba(168,85,247,.5),transparent 55%),radial-gradient(70% 140% at 100% 100%,rgba(245,158,11,.28),transparent 60%),linear-gradient(100deg,#1a1330,#241a44);padding:18px 22px;display:flex;align-items:center;gap:20px}
+.hv5 .event .cnt{position:relative;z-index:2;max-width:62%}
+.hv5 .event .kk{display:flex;align-items:center;gap:9px;margin-bottom:7px}
+.hv5 .event .flag{font-size:9.5px;font-weight:800;letter-spacing:.1em;text-transform:uppercase;background:#dc2626;color:#fff;padding:3px 8px;border-radius:6px}
+.hv5 .event .when{font-size:11.5px;font-weight:700;color:#fbbf24}
+.hv5 .event h3{font-size:20px;margin:0 0 4px;line-height:1.1}
+.hv5 .event p{margin:0;color:var(--ink2);font-size:13px;max-width:52ch;line-height:1.45}
+.hv5 .event .act{margin-top:12px;display:flex;align-items:center;gap:14px}
 .hv5 .event .seat{background:#fff;color:#1a1330;font-weight:800;font-size:14px;padding:11px 20px;border-radius:11px}
 .hv5 .event .seat:hover{filter:brightness(.94)}
 @media(max-width:760px){.hv5 .event{flex-wrap:wrap}.hv5 .event .cnt{max-width:100%}}
@@ -441,7 +441,7 @@ const CSS = `
 
 /* Coming-soon states (no dead /signup links) */
 .hv5 .soon{font-size:11px;font-weight:800;letter-spacing:.06em;text-transform:uppercase;color:var(--mut2);border:1px solid var(--line);padding:4px 9px;border-radius:99px}
-.hv5 .soonbtn{background:var(--surface2);color:var(--mut);font-weight:800;font-size:14px;padding:11px 20px;border-radius:11px;border:1px solid var(--line)}
+.hv5 .soonbtn{background:var(--surface2);color:var(--mut);font-weight:800;font-size:13px;padding:9px 16px;border-radius:10px;border:1px solid var(--line)}
 .hv5 .soon-lnk{color:var(--mut2)!important}
 
 /* MAKE — real tool actions (#024) */
