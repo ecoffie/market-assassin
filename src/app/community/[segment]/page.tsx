@@ -291,11 +291,13 @@ export default async function CommunityHub({ params }: { params: Promise<{ segme
       <section className="sec tint"><div className="wrap">
         <div className="head"><div className="eyebrow">Discover</div><h2 className="disp">What&apos;s funded right now</h2><p>Live feeds nobody else packages — the hottest areas and the open opportunities you can actually go after.</p></div>
         <div className="cols">
-          {cfg.feeds.map((f) => (
+          {cfg.feeds.map((f, fi) => {
+            const rows = realFeeds && realFeeds[fi] && realFeeds[fi].length ? realFeeds[fi] : f.rows;
+            return (
             <div className="panel" key={f.head}>
               <div className="ph"><div className="t">{f.icon} {f.head}</div><span className="share">↗ Share</span></div>
               <p className="sub">{f.sub}</p>
-              {f.rows.map((r) => (
+              {rows.map((r) => (
                 <div className={`row${r.rank === '1' ? ' t1' : ''}`} key={r.rank + r.name}>
                   <span className="rk num">{r.rank}</span>
                   <span className="who2"><span className="nm">{r.name}{r.sub && <small>{r.sub}</small>}</span></span>
@@ -305,7 +307,8 @@ export default async function CommunityHub({ params }: { params: Promise<{ segme
               ))}
               <div className="foot">{f.foot}</div>
             </div>
-          ))}
+            );
+          })}
         </div>
       </div></section>
 
