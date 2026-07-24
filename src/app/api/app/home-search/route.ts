@@ -7,6 +7,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { getReadClient } from '@/lib/supabase/server-clients';
 import { searchRecipients, recipientSlug } from '@/lib/bigquery/recipients';
 import { looksLikePiid } from '@/lib/lookup-intent';
+import { geocode, setGroupKey, SET_GROUPS } from '@/lib/opportunities/map-data';
+import { normalizeStateCode } from '@/lib/utils/us-states';
 
 export const dynamic = 'force-dynamic';
 
@@ -16,13 +18,22 @@ async function opportunities(q: string) {
     const like = `%${q.replace(/[%_]/g, '')}%`;
     const { data, error } = await sb
       .from('sam_opportunities')
-      .select('notice_id, title, department, naics_code, response_deadline, set_aside_description, notice_type, ui_link')
+      .select('notice_id, title, department, naics_code, response_deadline, set_aside_code, set_aside_description, notice_type, ui_link, pop_state, pop_city, office_address')
       .eq('active', true)
       .or(`title.ilike.${like},department.ilike.${like}`)
       .order('response_deadline', { ascending: true })
       .limit(12);
     if (error) throw error;
-    return (data || []) as Array<Record<string, unknown>>;
+    return (data || []).map((r: Record<string, unknown>) => {
+      const g = geocode((r.pop_city as string) || '', normalizeStateCode((r.pop_state as string) || ''), r.office_address as { city?: string; state?: string; zipcode?: string } | null);
+      return {
+        notice_id: r.notice_id, title: r.title, department: r.department, naics_code: r.naics_code,
+        response_deadline: r.response_deadline, set_aside_description: r.set_aside_description,
+        notice_type: r.notice_type, ui_link: r.ui_link,
+        set: setGroupKey(r.set_aside_code as string),
+        lat: g.coord ? g.coord[0] : null, lng: g.coord ? g.coord[1] : null,
+      };
+    });
   } catch {
     return [];
   }
@@ -51,5 +62,6 @@ export async function GET(request: NextRequest) {
     contractPiid: looksLikePiid(q) ? q.toUpperCase() : null,
     opportunities: opps,
     contractors: firms,
+    setGroups: SET_GROUPS.map((g) => ({ key: g.key, label: g.label, color: g.color })),
   });
 }

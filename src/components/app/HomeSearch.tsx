@@ -7,10 +7,12 @@
  */
 import { useRef, useState } from 'react';
 import { Search, X, Building2, ExternalLink } from 'lucide-react';
+import HeroOpportunityMap from './HeroOpportunityMap';
 
-type Opp = { notice_id: string; title: string; department: string; naics_code: string; response_deadline: string | null; set_aside_description: string | null; notice_type: string | null; ui_link: string | null };
+type Opp = { notice_id: string; title: string; department: string; naics_code: string; response_deadline: string | null; set_aside_description: string | null; notice_type: string | null; ui_link: string | null; set: string; lat: number | null; lng: number | null };
 type Firm = { uei: string; company: string; slug: string; state: string; total_contract_value: number; award_count: number };
-type Results = { q: string; opportunities: Opp[]; contractors: Firm[]; contractPiid: string | null };
+type Group = { key: string; label: string; color: string };
+type Results = { q: string; opportunities: Opp[]; contractors: Firm[]; contractPiid: string | null; setGroups: Group[] };
 
 const EXAMPLES = ['drones', 'Lockheed Martin', 'demolition', 'janitorial services'];
 
@@ -45,9 +47,9 @@ export default function HomeSearch({ children }: { children: React.ReactNode }) 
     try {
       const r = await fetch(`/api/app/home-search?q=${encodeURIComponent(q)}`);
       const data = await r.json();
-      setRes({ q, opportunities: data.opportunities || [], contractors: data.contractors || [], contractPiid: data.contractPiid || null });
+      setRes({ q, opportunities: data.opportunities || [], contractors: data.contractors || [], contractPiid: data.contractPiid || null, setGroups: data.setGroups || [] });
     } catch {
-      setRes({ q, opportunities: [], contractors: [], contractPiid: null });
+      setRes({ q, opportunities: [], contractors: [], contractPiid: null, setGroups: [] });
     } finally {
       setLoading(false);
     }
@@ -85,6 +87,10 @@ export default function HomeSearch({ children }: { children: React.ReactNode }) 
       {res ? (
         <section className="hs-results">
           <div className="hs-head"><b>{total}</b> result{total === 1 ? '' : 's'} for <span className="hs-q">&ldquo;{res.q}&rdquo;</span><button className="hs-back" onClick={clear}>← back to my market</button></div>
+          {(() => {
+            const pins = res.opportunities.filter((o) => o.lat != null && o.lng != null).map((o) => ({ lat: o.lat as number, lng: o.lng as number, set: o.set, label: o.title }));
+            return pins.length > 0 ? <div className="hs-resultmap"><HeroOpportunityMap pins={pins} setGroups={res.setGroups} /></div> : null;
+          })()}
           <div className="hs-grid">
             <div className="hs-main">
               {res.contractPiid && (
@@ -144,16 +150,16 @@ export default function HomeSearch({ children }: { children: React.ReactNode }) 
 const CSS = `
 .hsearch{--s:#17141f;--s2:#1e1a2b;--line:#2a2438;--line2:#372f4d;--ink:#f6f4ff;--ink2:#c5bfd8;--mut:#8a8399;--violet2:#a855f7;--emerald:#10b981;--grad:linear-gradient(135deg,#7c3aed,#a855f7 55%,#6d28d9)}
 .hsearch *{box-sizing:border-box}
-.hsearch .hs-top{margin:0 0 18px}
-.hsearch .hs-bar{position:relative;display:flex;align-items:center;gap:0;height:48px;border-radius:13px;background:linear-gradient(180deg,#211c31,#191527);border:1px solid var(--line2);padding-left:42px;padding-right:6px;box-shadow:0 1px 0 rgba(255,255,255,.03) inset,0 8px 24px -12px rgba(0,0,0,.6);transition:border-color .15s,box-shadow .15s}
+.hsearch .hs-top{max-width:600px;margin:0 0 20px}
+.hsearch .hs-bar{position:relative;display:flex;align-items:center;gap:0;height:42px;border-radius:11px;background:linear-gradient(180deg,#211c31,#191527);border:1px solid var(--line2);padding-left:38px;padding-right:5px;box-shadow:0 1px 0 rgba(255,255,255,.03) inset,0 6px 18px -12px rgba(0,0,0,.6);transition:border-color .15s,box-shadow .15s}
 .hsearch .hs-bar:focus-within{border-color:var(--violet2);box-shadow:0 0 0 3px rgba(168,85,247,.16),0 8px 24px -12px rgba(0,0,0,.6)}
-.hsearch .hs-ic{position:absolute;left:15px;color:var(--mut)}
+.hsearch .hs-ic{position:absolute;left:13px;color:var(--mut)}
 .hsearch .hs-bar:focus-within .hs-ic{color:var(--violet2)}
-.hsearch .hs-bar input{flex:1;min-width:0;height:100%;background:transparent;border:0;outline:none;font-size:15px;color:var(--ink);font-family:inherit}
+.hsearch .hs-bar input{flex:1;min-width:0;height:100%;background:transparent;border:0;outline:none;font-size:14px;color:var(--ink);font-family:inherit}
 .hsearch .hs-bar input::placeholder{color:var(--mut)}
-.hsearch .hs-clear{width:30px;height:30px;display:grid;place-items:center;border:0;background:transparent;color:var(--mut);border-radius:8px;cursor:pointer;flex:none}
+.hsearch .hs-clear{width:28px;height:28px;display:grid;place-items:center;border:0;background:transparent;color:var(--mut);border-radius:7px;cursor:pointer;flex:none}
 .hsearch .hs-clear:hover{color:var(--ink);background:var(--line)}
-.hsearch .hs-go{flex:none;height:36px;min-width:88px;display:grid;place-items:center;border:0;border-radius:9px;background:var(--grad);color:#fff;font-size:13.5px;font-weight:800;font-family:inherit;cursor:pointer;box-shadow:0 6px 16px -6px rgba(124,58,237,.7)}
+.hsearch .hs-go{flex:none;height:32px;min-width:76px;display:grid;place-items:center;border:0;border-radius:8px;background:var(--grad);color:#fff;font-size:13px;font-weight:800;font-family:inherit;cursor:pointer;box-shadow:0 6px 16px -6px rgba(124,58,237,.7)}
 .hsearch .hs-go:hover{filter:brightness(1.08)}
 .hsearch .hs-go:disabled{cursor:default}
 .hsearch .hs-spin{width:15px;height:15px;border:2px solid rgba(255,255,255,.55);border-top-color:transparent;border-radius:50%;animation:hspin .7s linear infinite}
@@ -168,6 +174,7 @@ const CSS = `
 .hsearch .hs-q{color:var(--violet2);font-weight:600}
 .hsearch .hs-back{margin-left:auto;background:none;border:0;color:var(--mut);font-size:13px;font-weight:600;cursor:pointer}
 .hsearch .hs-back:hover{color:var(--ink)}
+.hsearch .hs-resultmap{position:relative;height:260px;border-radius:16px;overflow:hidden;border:1px solid var(--line);margin-bottom:16px}
 .hsearch .hs-grid{display:grid;grid-template-columns:1fr 320px;gap:18px;align-items:start}
 @media(max-width:900px){.hsearch .hs-grid{grid-template-columns:1fr}}
 .hsearch .hs-main{display:flex;flex-direction:column;gap:10px;min-width:0}

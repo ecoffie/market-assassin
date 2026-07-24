@@ -23,7 +23,7 @@ function cityJitter([lat, lng]: [number, number], seed: number): [number, number
 /** Resolve a real coordinate for an opp, most-precise source first:
  *  place-of-performance city → buying-office ZIP → buying-office city. Returns the
  *  matched city label + state so the pin's text agrees with its location. */
-function geocode(
+export function geocode(
   popCity: string, popState: string | null,
   office: { city?: string; state?: string; zipcode?: string } | null,
 ): { coord: [number, number] | null; city: string; state: string | null } {
