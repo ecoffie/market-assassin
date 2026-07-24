@@ -13,7 +13,6 @@
  */
 import { queryExpiringContracts } from '@/lib/recompete/query';
 import { getWeirdAwards } from '@/lib/discover/weird-awards';
-import { getRecentBigAwards } from '@/lib/discover/recent-spending';
 import { getLeaderboard } from '@/lib/gamification/stats';
 import { getReadClient } from '@/lib/supabase/server-clients';
 import { formatMoneyCompact as fmtMoney } from '@/lib/format-money';
@@ -46,6 +45,43 @@ async function safeCount(q: PromiseLike<{ count: number | null; error: unknown }
   }
 }
 
+// Shaping up — Sources Sought / pre-solicitation notices: the earliest signal, before the RFP.
+async function sourcesSought(): Promise<Array<{ title: string; dept: string }>> {
+  try {
+    const sb = getReadClient();
+    const { data, error } = await sb
+      .from('sam_opportunities')
+      .select('notice_id, title, department, notice_type, posted_date')
+      .or('notice_type.ilike.%sources sought%,notice_type.ilike.%presol%')
+      .eq('active', true)
+      .order('posted_date', { ascending: false })
+      .limit(5);
+    if (error || !data) return [];
+    return (data as Array<Record<string, unknown>>).map((r) => ({ title: String(r.title ?? ''), dept: String(r.department ?? '') }));
+  } catch {
+    return [];
+  }
+}
+
+// Closing soon — active solicitations with the nearest deadlines: bid now or miss it.
+async function closingSoon(): Promise<Array<{ title: string; dept: string; days: number | null }>> {
+  try {
+    const sb = getReadClient();
+    const today = new Date().toISOString().slice(0, 10);
+    const { data, error } = await sb
+      .from('sam_opportunities')
+      .select('notice_id, title, department, response_deadline')
+      .eq('active', true)
+      .gte('response_deadline', today)
+      .order('response_deadline', { ascending: true })
+      .limit(5);
+    if (error || !data) return [];
+    return (data as Array<Record<string, unknown>>).map((r) => ({ title: String(r.title ?? ''), dept: String(r.department ?? ''), days: daysUntil(r.response_deadline as string) }));
+  } catch {
+    return [];
+  }
+}
+
 // The quest card lives inside a Tailwind app; generic class names (ring/step/box…) collide
 // with Tailwind utilities (e.g. `.ring`), so the card's LAYOUT is inlined here — inline styles
 // beat any utility class and can't be overridden. Colors/visuals still come from the scoped CSS.
@@ -67,11 +103,12 @@ function boxStyle(state: 'done' | 'now' | 'lock'): React.CSSProperties {
 
 export default async function LandingV3() {
   const sb = getReadClient();
-  const [expiringRaw, weird, board, recentAwards, oppsCount, players] = await Promise.all([
+  const [expiringRaw, weird, board, shaping, closing, oppsCount, players] = await Promise.all([
     queryExpiringContracts({ monthsWindow: 12, minValue: 10_000_000, limit: 200, orderBy: 'value' }).then((r) => r.contracts).catch(() => []),
     getWeirdAwards(8).catch(() => []),
     getLeaderboard('__public__@mindy', 5).catch(() => ({ rows: [], you: null, total: 0 })),
-    getRecentBigAwards(40).catch(() => []),
+    sourcesSought(),
+    closingSoon(),
     safeCount(sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('active', true), 24000),
     getLeaderboard('__public__@mindy', 1).then((r) => r.total).catch(() => 1540),
   ]);
@@ -82,20 +119,6 @@ export default async function LandingV3() {
     .filter((x) => x.d != null && x.d >= 30 && x.d <= 540 && x.val > 0)
     .sort((a, b) => b.val - a.val)
     .slice(0, 4);
-
-  // Just Awarded — this week's biggest individual awards (moves daily). Replaces the static
-  // NAICS-by-spend board, whose ranking barely changes month to month.
-  const justAwarded = [...recentAwards].sort((a, b) => (b.obligation_amount || 0) - (a.obligation_amount || 0)).slice(0, 4);
-
-  // Top Winners — who banked the most this week (aggregate recent awards by recipient; moves
-  // weekly). Replaces "Underserved Markets" — avg-bidders data (number_of_offers) is null in
-  // our sources, so that board can't be made live without fabricating figures.
-  const winnerMap = new Map<string, number>();
-  for (const a of recentAwards) {
-    const name = fmtName(a.recipient_name || '').trim();
-    if (name) winnerMap.set(name, (winnerMap.get(name) || 0) + (a.obligation_amount || 0));
-  }
-  const topWinners = [...winnerMap.entries()].sort((a, b) => b[1] - a[1]).slice(0, 4).map(([name, amount]) => ({ name, amount }));
 
   const weirdTop = weird.slice(0, 3);
 
@@ -165,12 +188,12 @@ export default async function LandingV3() {
         <div className="head"><div className="eyebrow">Discover · free &amp; public</div><h2 className="disp">The federal market, decoded</h2><p>Live data nobody else packages — built to be screenshot, shared, and argued about. This is the stuff people send each other, not a feature list.</p></div>
         <div className="discover">
           <div className="dpanel">
-            <div className="dh"><div className="t">💰 Just Awarded</div><a className="share" href="/spending">↗ Share</a></div>
-            <p className="sub">The biggest federal contracts signed this week</p>
-            {justAwarded.length === 0 ? <div className="drow"><span className="nm">Updating…</span></div> : justAwarded.map((a, i) => (
-              <div className="drow" key={a.award_id || i}><span className="rk">{i + 1}</span><span className="nm">{fmtName(a.recipient_name || 'Recipient')} <small>{a.awarding_agency || a.naics_description || ''}</small></span><span className="vl">{fmtMoney(a.obligation_amount)}</span><span className="mv new">NEW</span></div>
+            <div className="dh"><div className="t">🔭 Shaping up</div><a className="share" href="/discover">↗ Share</a></div>
+            <p className="sub">Sources sought &amp; pre-RFPs — agencies testing the market before the RFP drops</p>
+            {shaping.length === 0 ? <div className="drow"><span className="nm">Updating…</span></div> : shaping.map((s, i) => (
+              <div className="drow" key={s.title + i}><span className="rk">{i + 1}</span><span className="nm">{s.title.slice(0, 42)} <small>{s.dept}</small></span><span className="vl" /><span className="mv new">EARLY</span></div>
             ))}
-            <a className="foot" href="/spending">See this week&apos;s spending →</a>
+            <a className="foot" href="/discover">Get in before the RFP →</a>
           </div>
           <div className="dpanel">
             <div className="dh"><div className="t">⏳ Up For Grabs</div><a className="share" href="/up-for-grabs">↗ Share</a></div>
@@ -189,12 +212,12 @@ export default async function LandingV3() {
             <a className="foot" href="/weird">Get the weekly &ldquo;Weird Awards&rdquo; drop →</a>
           </div>
           <div className="dpanel">
-            <div className="dh"><div className="t">🏆 Top Winners This Week</div><a className="share" href="/spending">↗ Share</a></div>
-            <p className="sub">Contractors banking the most federal dollars right now</p>
-            {topWinners.length === 0 ? <div className="drow"><span className="nm">Updating…</span></div> : topWinners.map((w, i) => (
-              <div className="drow" key={w.name}><span className="rk">{i + 1}</span><span className="nm">{w.name}</span><span className="vl">{fmtMoney(w.amount)}</span><span className="mv" /></div>
+            <div className="dh"><div className="t">⏰ Closing soon</div><a className="share" href="/up-for-grabs">↗ Share</a></div>
+            <p className="sub">Live solicitations with the nearest deadlines — bid now or miss it</p>
+            {closing.length === 0 ? <div className="drow"><span className="nm">Updating…</span></div> : closing.map((c, i) => (
+              <div className="drow" key={c.title + i}><span className="rk">{i + 1}</span><span className="nm">{c.title.slice(0, 42)} <small>{c.dept}</small></span><span className="vl" /><span className="mv dn">{c.days != null ? `${c.days}d` : ''}</span></div>
             ))}
-            <a className="foot" href="/spending">See the full board →</a>
+            <a className="foot" href="/up-for-grabs">See what&apos;s closing →</a>
           </div>
         </div>
       </div></section>
