@@ -1,19 +1,15 @@
 /* eslint-disable @next/next/no-html-link-for-pages -- marketing page uses full-nav <a>; convert to next/link in the production pass. */
 /**
- * /landing-v3 — the FOCUSED public home (GOS Decision #023, 2026-07-24). The cold front door
- * is the DATA REVEAL + one door, NOT the full game. First principles: a first visit must
- * answer "what is this / is it for me / what now" fast; the Robinhood-thesis filter requires
- * EASY (one obvious action). So the earned game layer — streaks, the first-contract quest,
- * achievement badges, the user-activity leaderboard, and the Recruit→Prime ranks — moved to
- * the LOGGED-IN home (/home-v5), where it's earned and therefore real (enforces Decision #012;
- * fixes the #017 earned→paid conflation). Showing a logged-IN state (fake streak/quest/badges)
- * to a logged-OUT visitor was a trust-before-traffic leak.
+ * /landing-v3 — the GAMIFIED public home (Robinhood × Higgsfield), Option A: the approved
+ * gamified direction (artifact 3c1ac291) becomes the logged-out front door. NEW benefit-first
+ * hero (the old "Winning contracts, turned into a game" headlined the mechanic, not the
+ * payoff). Two engines: Discover (shareable federal data) + the personal game (quest/XP/
+ * leaderboard/ranks/rewards), plus the audience communities. Supersedes /landing-v2 as the
+ * public home if approved.
  *
- * The full gamified version is preserved at /landing-v3-full for side-by-side comparison.
- *
- * FOUR real things only: (1) hero + a live "on the board right now" reveal card,
- * (2) the Discover boards + real stats, (3) an honest positioning proof strip, (4) one door.
- * All feeds are live (recompetes, Sources Sought, Weird Awards, Closing soon) — no fabrication.
+ * REAL DATA wired: Up For Grabs (recompete), Weird Awards, Hunter Leaderboard, NAICS
+ * Leaderboard (USASpending), and the stat counts. "Underserved Markets" stays illustrative —
+ * it needs bidder-count analysis with no cheap live source (flagged inline).
  */
 import { queryExpiringContracts } from '@/lib/recompete/query';
 import { getWeirdAwards } from '@/lib/discover/weird-awards';
@@ -95,11 +91,31 @@ async function closingSoon(): Promise<Array<{ title: string; dept: string; days:
   }
 }
 
+// The quest card lives inside a Tailwind app; generic class names (ring/step/box…) collide
+// with Tailwind utilities (e.g. `.ring`), so the card's LAYOUT is inlined here — inline styles
+// beat any utility class and can't be overridden. Colors/visuals still come from the scoped CSS.
+const GRAD = 'linear-gradient(135deg,#8b5cf6,#a855f7 55%,#6d28d9)';
+const GWIN = 'linear-gradient(135deg,#22e08a,#10b981)';
+const BOX_BASE: React.CSSProperties = { width: 24, height: 24, borderRadius: 7, display: 'grid', placeItems: 'center', fontSize: 13, fontWeight: 800, flex: 'none' };
+const QUEST_STEPS: Array<{ state: 'done' | 'now' | 'lock'; mark: string; label: string; xp: string }> = [
+  { state: 'done', mark: '✓', label: 'Set up your profile', xp: '+50 XP' },
+  { state: 'done', mark: '✓', label: 'Read your first match', xp: '+30 XP' },
+  { state: 'done', mark: '✓', label: 'Run a market report', xp: '+40 XP' },
+  { state: 'now', mark: '4', label: 'Save your first pursuit', xp: '+60 XP' },
+  { state: 'lock', mark: '🔒', label: 'Submit your first bid', xp: '+150 XP' },
+];
+function boxStyle(state: 'done' | 'now' | 'lock'): React.CSSProperties {
+  if (state === 'done') return { ...BOX_BASE, background: GWIN, color: '#052e1c' };
+  if (state === 'now') return { ...BOX_BASE, background: GRAD, color: '#fff', boxShadow: '0 0 0 4px rgba(139,92,246,.2)' };
+  return { ...BOX_BASE, background: '#141021', border: '1px solid #342a52', color: '#7a7192' };
+}
+
 export default async function LandingV3() {
   const sb = getReadClient();
-  const [expiringRaw, weird, shaping, closing, oppsCount, players] = await Promise.all([
+  const [expiringRaw, weird, board, shaping, closing, oppsCount, players] = await Promise.all([
     queryExpiringContracts({ monthsWindow: 12, minValue: 10_000_000, limit: 200, orderBy: 'value' }).then((r) => r.contracts).catch(() => []),
     getWeirdAwards(8).catch(() => []),
+    getLeaderboard('__public__@mindy', 5).catch(() => ({ rows: [], you: null, total: 0 })),
     sourcesSought(),
     closingSoon(),
     safeCount(sb.from('sam_opportunities').select('*', { count: 'exact', head: true }).eq('active', true), 24000),
@@ -121,8 +137,9 @@ export default async function LandingV3() {
 
       <header className="nav"><div className="wrap nav-in">
         <a className="brand" href="#top"><span className="mk"><span>M</span></span> Mindy</a>
-        <nav className="links"><a href="#discover">Discover</a><a href="#crews">Community</a><a href="/pricing">Pricing</a></nav>
+        <nav className="links"><a href="/discover">Discover</a><a href="#crews">Community</a><a href="#board">Leaderboard</a><a href="#rewards">Rewards</a><a href="/academy">Academy</a><a href="/pricing">Pricing</a></nav>
         <div className="nav-r">
+          <div className="streakpill">🔥 <span className="num">7</span>-day streak</div>
           <a className="btn-login" href="/app">Log in</a>
           <a className="btn-cta" href="/signup">Play free →</a>
         </div>
@@ -136,26 +153,33 @@ export default async function LandingV3() {
           <p className="lead">The government is legally required to buy — and can&apos;t ghost you. Match opportunities, save pursuits, submit bids, and climb the board. Mindy turns the GovCon grind into something you&apos;ll actually open every morning.</p>
           <div className="cta">
             <a className="btn-lg" href="/signup">Play free →</a>
-            <a className="btn-ghost2" href="#discover">▶ See what&apos;s open</a>
+            <a className="btn-ghost2" href="#board">▶ See how it works</a>
           </div>
+          <div className="under"><span>🔥 <b>Daily streaks</b></span><span>🏆 <b>Weekly leaderboard</b></span><span>🎁 <b>Refer &amp; earn credits</b></span></div>
         </div>
 
         <div className="quest">
-          <div className="qh">
-            <div className="t">🎯 Open on the board right now</div>
-            <div className="lv">Live</div>
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+            <div style={{ fontWeight: 800, fontSize: 15 }}>Your first-contract quest</div>
+            <div className="qlv">Lvl 2 · Hunter</div>
           </div>
-          {upForGrabs.length === 0 ? (
-            <div className="drow"><span className="rk">•</span><span className="nm">Loading live contracts…</span><span className="vl" /><span className="mv" /></div>
-          ) : upForGrabs.slice(0, 3).map((x, i) => (
-            <div className="drow" key={x.c.contract_id || i}>
-              <span className="rk">{i + 1}</span>
-              <span className="nm">{contractScope(x.c)} <small>held by {fmtName(x.c.incumbent_name || '') || x.c.awarding_agency || 'incumbent'}</small></span>
-              <span className="vl">{fmtMoney(x.val)}</span>
-              <span className="mv dn">{x.d}d</span>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 16, marginBottom: 18 }}>
+            <svg width="66" height="66" viewBox="0 0 72 72" style={{ flex: 'none' }}>
+              <circle cx="36" cy="36" r="30" fill="none" stroke="#241d3a" strokeWidth="9" />
+              <circle cx="36" cy="36" r="30" fill="none" stroke="#22e08a" strokeWidth="9" strokeLinecap="round" strokeDasharray="188.5" strokeDashoffset="75.4" transform="rotate(-90 36 36)" />
+            </svg>
+            <div>
+              <div style={{ fontSize: 15, fontWeight: 800 }}>3 / 5 done</div>
+              <div style={{ fontSize: 12.5, color: '#7a7192', marginTop: 2 }}>2 steps to your first win badge</div>
+            </div>
+          </div>
+          {QUEST_STEPS.map((s) => (
+            <div key={s.label} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '9px 0', borderTop: '1px solid #241d3a' }}>
+              <div style={boxStyle(s.state)}>{s.mark}</div>
+              <div style={{ fontSize: 14, fontWeight: 600, color: s.state === 'lock' ? '#7a7192' : '#f4f1ff' }}>{s.label}</div>
+              <div style={{ marginLeft: 'auto', fontSize: '11.5px', fontWeight: 800, color: s.state === 'done' ? '#22e08a' : '#ffb020' }}>{s.xp}</div>
             </div>
           ))}
-          <a className="foot" href="/signup">＋ {oppsCount.toLocaleString()} more open right now — play free →</a>
         </div>
       </div></section>
 
@@ -169,7 +193,7 @@ export default async function LandingV3() {
       </div></section>
 
       {/* DISCOVER */}
-      <section className="sec" id="discover"><div className="wrap">
+      <section className="sec"><div className="wrap">
         <div className="head"><div className="eyebrow">Discover · free &amp; public</div><h2 className="disp">The federal market, decoded</h2><p>Live data nobody else packages — built to be screenshot, shared, and argued about. This is the stuff people send each other, not a feature list.</p></div>
         <div className="discover">
           <div className="dpanel">
@@ -204,6 +228,42 @@ export default async function LandingV3() {
             ))}
             <a className="foot" href="/up-for-grabs">See what&apos;s closing →</a>
           </div>
+        </div>
+      </div></section>
+
+      {/* LEADERBOARD */}
+      <section className="sec tint" id="board"><div className="wrap">
+        <div className="head"><div className="eyebrow">This week</div><h2 className="disp">Top hunters on the board</h2><p>Earn XP for every match you work, pursuit you save, and bid you submit. The board resets Monday — where will you land?</p></div>
+        <div className="lbwrap">
+          <div className="board">
+            {board.rows.length === 0 ? <div className="lb"><div className="rk num">—</div><div className="who"><div className="av" /><div><div className="nm">The board opens Monday</div><div className="rank-lab">be the first on it</div></div></div></div> : board.rows.map((r) => (
+              <div className={`lb${r.rank <= 3 ? ` t${r.rank}` : ''}`} key={r.rank}>
+                <div className="rk num">{r.rank}</div>
+                <div className="who"><div className="av" /><div><div className="nm">{r.handle}</div><div className="rank-lab">this week</div></div></div>
+                <div className="xp num">{r.weekXp.toLocaleString()}<small>XP</small></div>
+              </div>
+            ))}
+          </div>
+          <div className="youcard">
+            <div className="t">Your rank</div>
+            <div className="big num">—</div>
+            <div className="sub">Not on the board yet. Play free to claim your spot among <b className="strong">{players.toLocaleString()}</b> hunters this week.</div>
+            <div className="xpbar"><i /></div>
+            <div className="next"><b>Read one match</b> to earn your first XP and get ranked.</div>
+          </div>
+        </div>
+      </div></section>
+
+      {/* ACHIEVEMENTS */}
+      <section className="sec"><div className="wrap">
+        <div className="head"><div className="eyebrow">Achievements</div><h2 className="disp">Collect the wins</h2><p>Every milestone in your BD journey earns a badge — and unlocks the next tier of Mindy.</p></div>
+        <div className="badges">
+          <div className="badge unlocked"><div className="em">🎯</div><div className="bn">First Fit</div><div className="bd">92%+ match</div></div>
+          <div className="badge unlocked"><div className="em">🗺️</div><div className="bn">Market Maker</div><div className="bd">First report</div></div>
+          <div className="badge unlocked"><div className="em">🔥</div><div className="bn">On a Roll</div><div className="bd">7-day streak</div></div>
+          <div className="badge lock"><div className="em">📌</div><div className="bn">Pursuer</div><div className="bd">Save 10 pursuits</div></div>
+          <div className="badge lock"><div className="em">📝</div><div className="bn">First Bid</div><div className="bd">Submit a bid</div></div>
+          <div className="badge lock"><div className="em">🏆</div><div className="bn">First Win</div><div className="bd">Win a contract</div></div>
         </div>
       </div></section>
 
@@ -243,24 +303,48 @@ export default async function LandingV3() {
         </div>
       </div></section>
 
-      {/* PROOF — honest positioning, no invented metrics */}
+      {/* HERO AWARD */}
+      <section className="sec"><div className="wrap">
+        <div className="hero-award">
+          <div className="medal">🎖️</div>
+          <div className="cnt">
+            <div className="cl">The Mindy Hero Award</div>
+            <h2 className="disp">Honoring the veterans winning the mission.</h2>
+            <p>Every month we spotlight a veteran-owned business crushing it in federal contracting — their story, their wins, their playbook — in front of the whole Mindy community. Nominate a vet who&apos;s earned it (or throw your own hat in). Winners get featured, celebrated, and a year of Mindy Prime.</p>
+            <div className="act"><a className="btn-gold" href="/community/veterans">Nominate a veteran →</a><a className="btn-goldout" href="/community/veterans">Meet this month&apos;s Hero</a></div>
+          </div>
+        </div>
+      </div></section>
+
+      {/* LEVELS */}
       <section className="sec tint"><div className="wrap">
-        <div className="head"><div className="eyebrow">Why contractors open Mindy every morning</div><h2 className="disp">A customer that can&apos;t ghost you.</h2></div>
-        <div className="why">
-          <div className="wy"><div className="wi">🛡️</div><h4>Legally required to buy</h4><p>The U.S. government is the one customer that can&apos;t ghost you or stiff you — just slower and more paperwork. Slower, but bulletproof.</p></div>
-          <div className="wy"><div className="wi">🔭</div><h4>Get in before the RFP</h4><p>See recompetes and Sources Sought 6–18 months early — while the agency is still shaping the buy, not after everyone else has seen it.</p></div>
-          <div className="wy"><div className="wi">💬</div><h4>Plain English, no acronyms</h4><p>The $150K capture analyst and the $25K research seat, turned into a few dollars in plain words a five-person shop can actually use.</p></div>
+        <div className="head"><div className="eyebrow">Ranks</div><h2 className="disp">From Recruit to Prime</h2><p>Level up as you work the market. Every rank unlocks more of Mindy — and more of the market you can see.</p></div>
+        <div className="ladder">
+          <div className="rank"><div className="tier">Level 1</div><div className="rn">Recruit</div><p>Free daily alerts + market search. Learn the board.</p></div>
+          <div className="rank cur"><div className="youare">You&apos;re here</div><div className="tier">Level 2</div><div className="rn">Hunter</div><p>AI briefings, forecasts &amp; recompetes unlocked. Start scoring fits.</p></div>
+          <div className="rank"><div className="tier">Level 3</div><div className="rn">Closer</div><p>Pipeline, CRM &amp; proposal drafting. Turn pursuits into bids.</p></div>
+          <div className="rank"><div className="tier">Level 4</div><div className="rn g">Prime</div><p>The whole platform + MCP. You&apos;re running a BD department.</p></div>
+        </div>
+      </div></section>
+
+      {/* REWARDS */}
+      <section className="sec" id="rewards"><div className="wrap">
+        <div className="head"><div className="eyebrow">Rewards</div><h2 className="disp">Play, refer, win real prizes</h2></div>
+        <div className="rewards">
+          <div className="rw refer"><span className="pk">Refer &amp; earn</span><h4>Bring a contractor</h4><div className="amt num win">+500</div><p>Credits for you and them the moment they run their first report. No cap.</p><span className="go">Grab your invite link →</span></div>
+          <div className="rw grant"><span className="pk">Giveaway</span><h4>$10K Grant Giveaway</h4><div className="amt num amber">$10,000</div><p>One small business, one working-capital grant to chase its first federal award. Monthly draw.</p><span className="go">Enter this month →</span></div>
+          <div className="rw contest"><span className="pk">Live event</span><h4>Demo Day Pitch Contest</h4><p className="mt">Pitch how you&apos;d win a target contract on stage. Winner takes a year of Prime + a founder call.</p><span className="go">Save your seat →</span></div>
         </div>
       </div></section>
 
       {/* FINAL */}
       <section className="final"><div className="glow" /><div className="wrap final-in">
-        <h2 className="disp">Your first contract is on the board.</h2>
-        <p>Play free — no card. See what&apos;s open for a business like yours, and get in before the RFP drops.</p>
+        <h2 className="disp">Your streak starts today.</h2>
+        <p>Play free — no card. Read one match, earn your first badge, and see why 1,540 contractors open Mindy every morning.</p>
         <a className="btn-lg" href="/signup">Play free →</a>
       </div></section>
 
-      <footer className="f"><div className="wrap f-in"><span>© 2026 GovCon Giants AI · Mindy</span><span>Discover · Community · Pricing</span></div></footer>
+      <footer className="f"><div className="wrap f-in"><span>© 2026 GovCon Giants AI · Mindy</span><span>Play · Leaderboard · Rewards · Academy · Pricing</span></div></footer>
     </div>
   );
 }
@@ -363,14 +447,6 @@ const CSS = `
 .lv3 .drow .mv{font-size:12px;font-weight:850;text-align:right}
 .lv3 .mv.up{color:var(--win)}.lv3 .mv.dn{color:var(--rose)}.lv3 .mv.new{color:var(--amber)}
 .lv3 .dpanel .foot{margin-top:auto;padding-top:12px;font-size:12.5px;font-weight:800;color:var(--violet2)}
-.lv3 .quest .foot{display:block;margin-top:14px;padding-top:13px;border-top:1px solid var(--line);font-size:12.5px;font-weight:800;color:var(--win)}
-.lv3 .quest .drow{grid-template-columns:20px 1fr auto 46px}
-.lv3 .why{display:grid;grid-template-columns:repeat(3,1fr);gap:16px}
-@media(max-width:760px){.lv3 .why{grid-template-columns:1fr}}
-.lv3 .wy{background:var(--card);border:1px solid var(--line);border-radius:18px;padding:22px}
-.lv3 .wy .wi{font-size:26px;margin-bottom:10px}
-.lv3 .wy h4{margin:0 0 7px;font-size:16.5px;font-weight:800}
-.lv3 .wy p{margin:0;font-size:13.5px;color:var(--ink2);line-height:1.5}
 .lv3 .weird{border-top:1px solid var(--line);padding:14px 0;display:flex;gap:12px;align-items:flex-start}
 .lv3 .weird .amt{font-size:22px;font-weight:850;color:var(--amber);font-variant-numeric:tabular-nums;white-space:nowrap}
 .lv3 .weird .wx{font-size:13.5px;color:var(--ink2);line-height:1.4}
