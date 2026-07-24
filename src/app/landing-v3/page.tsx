@@ -1,3 +1,4 @@
+/* eslint-disable @next/next/no-html-link-for-pages -- marketing page uses full-nav <a>; convert to next/link in the production pass. */
 /**
  * /landing-v3 — the GAMIFIED public home (Robinhood × Higgsfield), Option A: the approved
  * gamified direction (artifact 3c1ac291) becomes the logged-out front door. NEW benefit-first
