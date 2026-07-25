@@ -419,17 +419,30 @@ const VIEWPORT_JS = `<script>
   function syncValueVis(){ var show=(MODE==='recompete'); document.querySelectorAll('.mf-value').forEach(function(e){e.style.display=show?'':'none';}); }
   syncValueVis();
 
-  // Save search — captures the current filters + viewport into a shareable URL (the
-  // full "save + alert me on new matches" backend lands next). For now it copies a
-  // deep-link and confirms, so the button is real, not dead.
+  // Save search — persist the FULL active filter set + viewport + mode as a named saved
+  // search that alerts on new matches (Zillow's retention move). Needs a signed-in user
+  // (same MI token the save-to-pursuits flow uses).
   var _ss=document.getElementById('saveSearchBtn');
+  function _ssReset(){ if(_ss)_ss.innerHTML='<svg viewBox="0 0 24 24"><path d="M19 21l-7-4-7 4V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>Save search'; }
+  function _ssMsg(t){ if(_ss)_ss.textContent=t; setTimeout(_ssReset,1900); }
   if(_ss)_ss.onclick=function(){
-    var qp=[]; for(var k in FILT){ if(FILT[k]&&FILT[k]!=='all')qp.push(k+'='+encodeURIComponent(FILT[k])); }
-    if(Q)qp.push('q='+encodeURIComponent(Q));
-    qp.push('mode='+MODE);
-    var link=location.origin+location.pathname+'?'+qp.join('&');
-    try{ navigator.clipboard.writeText(link); }catch(e){}
-    var o=_ss.textContent; _ss.textContent='✓ Link copied'; setTimeout(function(){_ss.innerHTML='<svg viewBox="0 0 24 24"><path d="M19 21l-7-4-7 4V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>Save search';},1600);
+    var t=null; try{ t=localStorage.getItem('mi_beta_auth_token'); }catch(e){}
+    var em=_uemail();
+    if(!t||!em){ _ssMsg('Sign in to save'); return; }
+    var name=window.prompt('Name this saved search (you\\'ll get alerts on new matches):',
+      (FILT.setAside||FILT.naics||Q||'My opportunities')+' — '+(MODE==='recompete'?'Recompetes':'Open'));
+    if(!name)return;
+    // Snapshot the active filters (skip empties + scope=all) + the current viewport.
+    var filters={}; for(var k in FILT){ if(FILT[k]&&FILT[k]!=='all')filters[k]=FILT[k]; }
+    if(Q)filters.q=Q;
+    var b=null; try{ var mb2=map.getBounds(); b={w:mb2.getWest(),s:mb2.getSouth(),e:mb2.getEast(),n:mb2.getNorth()}; }catch(e){}
+    _ss.textContent='Saving…';
+    fetch('/api/app/saved-searches',{method:'POST',
+      headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
+      body:JSON.stringify({email:em,name:name.slice(0,80),mode:MODE,filters:filters,bbox:b})})
+      .then(function(r){return r.json();}).then(function(d){
+        _ssMsg(d&&d.success?'✓ Saved — we\\'ll alert you':'Couldn\\'t save');
+      }).catch(function(){ _ssMsg('Couldn\\'t save'); });
   };
 
   // Clear all: reset the server filters + their controls, then refetch. (Runs in

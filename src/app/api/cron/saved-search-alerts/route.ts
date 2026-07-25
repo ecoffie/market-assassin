@@ -1,0 +1,145 @@
+/**
+ * /api/cron/saved-search-alerts — the Opportunity Map "Save search" alert dispatcher.
+ *
+ * For each ENABLED saved search due today, re-run its saved filter set against fresh
+ * active opportunities (via the SHARED applyMapFilters — identical to what the user saw
+ * on the map), diff against last_seen_notice_ids, and email the NEW matches. Stamps
+ * last_alerted_at + the seen ids so nothing double-sends. Batched + resumable.
+ *
+ * Registered as a cron_jobs row (dispatcher-fired) — NOT vercel.json.
+ * ?mode=preview lists what WOULD send without sending. ?limit=N caps the batch.
+ */
+import { NextRequest, NextResponse } from 'next/server';
+import { createClient } from '@supabase/supabase-js';
+import { applyMapFilters, parseMapFilters } from '@/lib/opportunities/map-filters';
+import { sendEmail } from '@/lib/send-email';
+
+export const runtime = 'nodejs';
+export const dynamic = 'force-dynamic';
+export const maxDuration = 300;
+
+function sb() {
+  return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+}
+
+const MINDY_URL = 'https://getmindy.ai';
+const PIN_COLS = 'notice_id, title, department, naics_code, set_aside_code, response_deadline, ui_link, solicitation_number, pop_state, pop_city';
+
+type SavedSearch = {
+  id: string; user_email: string; name: string; mode: string;
+  filters: Record<string, unknown>; alert_frequency: string;
+  last_seen_notice_ids: string[]; total_alerts_sent: number;
+};
+
+// Weekly searches fire only on Mondays (UTC); daily every run; paused never.
+function isDue(freq: string): boolean {
+  if (freq === 'paused') return false;
+  if (freq === 'weekly') return new Date().getUTCDay() === 1;
+  return true; // daily (default)
+}
+
+function esc(s: unknown): string {
+  return String(s ?? '').replace(/[&<>"]/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[c] as string));
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function buildEmail(search: SavedSearch, opps: any[]): { subject: string; html: string; text: string } {
+  const n = opps.length;
+  const subject = `${n} new ${n === 1 ? 'match' : 'matches'} for “${search.name}”`;
+  const rows = opps.slice(0, 25).map((o) => {
+    const loc = [o.pop_city, o.pop_state].filter(Boolean).join(', ');
+    const deadline = o.response_deadline ? new Date(o.response_deadline).toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '';
+    const link = o.ui_link || `${MINDY_URL}/opportunity-map`;
+    return `<tr>
+      <td style="padding:12px 0;border-bottom:1px solid #eef1f5">
+        <a href="${esc(link)}" style="font-weight:700;color:#111c26;text-decoration:none;font-size:15px">${esc(o.title)}</a><br>
+        <span style="color:#6b7787;font-size:13px">${esc(o.department || '')}${loc ? ' · ' + esc(loc) : ''}${deadline ? ' · due ' + deadline : ''}${o.naics_code ? ' · NAICS ' + esc(o.naics_code) : ''}</span>
+      </td></tr>`;
+  }).join('');
+  const html = `<div style="font-family:-apple-system,Segoe UI,Roboto,Arial,sans-serif;max-width:600px;margin:0 auto;color:#111c26">
+    <p style="font-size:15px">New opportunities matched your saved search <strong>“${esc(search.name)}”</strong>:</p>
+    <table style="width:100%;border-collapse:collapse">${rows}</table>
+    ${n > 25 ? `<p style="color:#6b7787;font-size:13px">+ ${n - 25} more — <a href="${MINDY_URL}/opportunity-map" style="color:#006aff">view on the map</a></p>` : ''}
+    <p style="margin-top:20px"><a href="${MINDY_URL}/opportunity-map" style="display:inline-block;background:#006aff;color:#fff;font-weight:700;padding:10px 18px;border-radius:8px;text-decoration:none">Open the map</a></p>
+    <p style="color:#9aa5b3;font-size:12px;margin-top:24px">You saved this search on Mindy. Manage or turn off alerts from the map. Reply to this email for help.</p>
+  </div>`;
+  const text = `New opportunities matched your saved search "${search.name}":\n\n`
+    + opps.slice(0, 25).map((o) => `• ${o.title} (${o.department || ''})`).join('\n')
+    + `\n\nOpen the map: ${MINDY_URL}/opportunity-map`;
+  return { subject, html, text };
+}
+
+export async function GET(request: NextRequest) {
+  const preview = request.nextUrl.searchParams.get('mode') === 'preview';
+  const limit = Math.min(200, Math.max(1, parseInt(request.nextUrl.searchParams.get('limit') || '50', 10) || 50));
+  const db = sb();
+
+  // Enabled searches, least-recently-alerted first (fair drain, resumable).
+  const { data: searches, error } = await db
+    .from('saved_searches')
+    .select('id, user_email, name, mode, filters, alert_frequency, last_seen_notice_ids, total_alerts_sent')
+    .eq('alerts_enabled', true)
+    .order('last_alerted_at', { ascending: true, nullsFirst: true })
+    .limit(limit);
+
+  if (error) {
+    if (error.code === '42P01') return NextResponse.json({ success: true, note: 'saved_searches table not present yet', processed: 0 });
+    return NextResponse.json({ success: false, error: error.message }, { status: 500 });
+  }
+
+  const results = { processed: 0, sent: 0, noMatches: 0, skippedNotDue: 0, failed: 0 };
+  const previewRows: Array<{ email: string; name: string; newCount: number }> = [];
+
+  for (const s of (searches || []) as SavedSearch[]) {
+    results.processed++;
+    if (!isDue(s.alert_frequency)) { results.skippedNotDue++; continue; }
+
+    try {
+      // Only the OPEN mode is wired here (recompete alerts are a follow-up — different table).
+      if (s.mode !== 'open') continue;
+
+      // Run the SAME filters the user saved. Recent active opps only (posted last 30d as a
+      // sane ceiling — new matches are what matter for an alert).
+      const f = parseMapFilters((k) => (s.filters as Record<string, string>)[k] ?? null);
+      f.postedDays = f.postedDays || 30;
+      let q = db.from('sam_opportunities').select(PIN_COLS).limit(200);
+      q = applyMapFilters(q, f);
+      const { data: opps, error: qErr } = await q.order('posted_date', { ascending: false });
+      if (qErr) { results.failed++; continue; }
+
+      const seen = new Set(Array.isArray(s.last_seen_notice_ids) ? s.last_seen_notice_ids : []);
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const fresh = (opps || []).filter((o: any) => o.notice_id && !seen.has(o.notice_id));
+
+      if (fresh.length === 0) { results.noMatches++; continue; }
+
+      if (preview) {
+        previewRows.push({ email: s.user_email, name: s.name, newCount: fresh.length });
+        continue;
+      }
+
+      const { subject, html, text } = buildEmail(s, fresh);
+      const ok = await sendEmail({
+        to: s.user_email, subject, html, text,
+        emailType: 'saved_search_alert', eventSource: 'saved_search',
+      });
+
+      // Stamp seen ids (cap the stored list so it can't grow unbounded) + timestamps.
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const allIds = [...(opps || []).map((o: any) => o.notice_id).filter(Boolean), ...seen];
+      const cappedSeen = [...new Set(allIds)].slice(0, 500);
+      await db.from('saved_searches').update({
+        last_alerted_at: new Date().toISOString(),
+        last_seen_notice_ids: cappedSeen,
+        total_alerts_sent: (s.total_alerts_sent || 0) + (ok ? 1 : 0),
+        updated_at: new Date().toISOString(),
+      }).eq('id', s.id);
+
+      if (ok) results.sent++; else results.failed++;
+    } catch {
+      results.failed++;
+    }
+  }
+
+  return NextResponse.json({ success: true, ...results, ...(preview ? { preview: previewRows } : {}) });
+}
