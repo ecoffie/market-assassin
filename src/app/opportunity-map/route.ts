@@ -158,7 +158,7 @@ const ZHEAD_HTML = '<header class="zhead">'
   + '<a class="zh-mode" data-mode="recompete" onclick="setMapMode(\'recompete\')">Recompetes</a>'
   + '<a class="zh-mode" data-mode="contractor" onclick="setMapMode(\'contractor\')">Contractors</a>'
   + '</nav>'
-  + '<a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.svg" alt=""/><span>Mindy</span></a>'
+  + '<a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>'
   + '<nav class="zh-right">'
   + '<a href="/pricing">Pricing</a>'
   + '<a href="/app?panel=pursuits">My Pursuits</a>'
@@ -511,9 +511,17 @@ export async function GET(request: NextRequest) {
       '<span class="loc">${o.loc}${o.locSrc===\'office\'?\' · office\':\'\'}</span>');
     // Set-aside color legend on the map.
     html = html.replace('<div id="map"></div>', '<div id="map"></div>' + LEGEND_HTML);
-    // Commodity-buys toggle in the filter bar.
+    // "More filters" dropdown in the filter bar; drop the redundant standalone "SDVOSB only"
+    // pill (the Set-aside dropdown already covers every set-aside, SDVOSB included).
     html = html.replace('<button class="clr" id="clrAll">Clear all</button>',
       MORE_FILTERS + '<button class="clr" id="clrAll">Clear all</button>');
+    html = html.replace('<button class="fbtn" id="f-sd">SDVOSB only</button>', '');
+    // Recompete cards/popups showed a "Win odds"/"Win probability" column — that's win-probability
+    // scoring, which is permanently killed. Replace with the Set-aside (a real, unscored fact).
+    html = html.replace('<div class="st"><div class="k">Win odds</div><div class="v ${o.prob===\'high\'?\'hi\':\'med\'}">${(o.prob||\'—\').replace(/^./,c=>c.toUpperCase())}</div></div>',
+      '<div class="st"><div class="k">Set-aside</div><div class="v">${o.set===\'None\'?\'Open\':o.set}</div></div>');
+    html = html.replace('<div class="fld"><div class="k">Win probability</div><div class="v ${o.prob===\'high\'?\'sd\':\'\'}">${(o.prob||\'—\').replace(/^./,c=>c.toUpperCase())}</div></div>',
+      '<div class="fld"><div class="k">Set-aside</div><div class="v">${o.set===\'None\'?\'Open\':o.set}</div></div>');
     // CARD (#1 Snapshot): NO action buttons on the card face (Eric). The card is the clickable
     // snapshot; Save/Draft live in the detail drawer. Card actions → a "View details →" hint.
     html = html.replace('<a class="act" href="${samURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">SAM.gov</a>',
