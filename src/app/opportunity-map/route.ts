@@ -266,14 +266,11 @@ const DRAWER_JS = `<script>
   function snapshot(o){
     var n=o.deadline?Math.ceil((new Date(o.deadline)-new Date())/86400000):null;
     var cls=(n!=null&&n<=7)?'badge-dl':'badge-dl cool';
-    var loc=(o.location.city?o.location.city+', ':'')+(o.location.state||o.location.country||'');
-    var cue=o.location.source==='office'?' <span style="color:#94a3b8">\\u00b7 buying office (PoP not specified)</span>':'';
     return '<div class="snaphero">'
       + (o.noticeType?'<span class="badge-nt">'+esc(o.noticeType)+'</span>':'')
       + (o.deadline?'<span class="'+cls+'">'+esc(due(o.deadline))+'</span>':'')
       + '</div>'
       + '<div class="snapt">'+esc(o.title)+'</div>'
-      + '<div class="snapmeta"><b>'+esc(o.department||'')+'</b>'+(o.subTier?' \\u00b7 '+esc(o.subTier):'')+(loc.trim()?' \\u00b7 '+esc(loc):'')+cue+'</div>'
       + '<div class="snapgrid">'
       + '<div><div class="k">Set-aside</div><div class="v">'+esc(o.setAsideLabel||'Open')+'</div></div>'
       + '<div><div class="k">NAICS</div><div class="v">'+esc(o.naics||'\\u2014')+(o.category?' \\u00b7 '+esc(o.category):'')+'</div></div>'
@@ -283,10 +280,22 @@ const DRAWER_JS = `<script>
       + '<div><div class="k">Solicitation</div><div class="v" style="font-family:var(--mono,monospace);font-size:12.5px">'+esc(o.solicitation||'\\u2014')+'</div></div>'
       + '</div>';
   }
+  // Buying organization — the agency hierarchy + place of performance, in its OWN section
+  // (SAM shows this as a prominent block; it was easy to miss as a grey line under the title).
+  function orgSec(o){
+    var loc=(o.location.city?o.location.city+', ':'')+(o.location.state||o.location.country||'');
+    var cue=o.location.source==='office'?' <span style="color:#94a3b8;font-weight:400;font-size:11px">(buying office)</span>':'';
+    return sec('Buying organization','<div class="snapgrid">'
+      + '<div><div class="k">Department / agency</div><div class="v">'+esc(o.department||'\\u2014')+'</div></div>'
+      + '<div><div class="k">Sub-tier</div><div class="v">'+esc(o.subTier||'\\u2014')+'</div></div>'
+      + (o.office?'<div><div class="k">Office</div><div class="v">'+esc(o.office)+'</div></div>':'')
+      + '<div><div class="k">Place of performance</div><div class="v">'+esc(loc||'Not specified')+cue+'</div></div>'
+      + '</div>');
+  }
   function clamp(id,text){
     var long=text.length>620;
     return '<div class="osec-b'+(long?' clamp':'')+'" id="'+id+'">'+esc(text)+'</div>'
-      + (long?'<button class="osec-more" onclick="var b=document.getElementById(\\''+id+'\\');b.classList.remove(\\'clamp\\');this.remove()">Show more</button>':'');
+      + (long?'<button class="osec-more" onclick="var b=document.getElementById(\\''+id+'\\');var c=b.classList.toggle(\\'clamp\\');this.textContent=c?\\'Show more\\':\\'Show less\\';if(c)b.scrollIntoView({block:\\'nearest\\'});">Show more</button>':'');
   }
   function descSec(o){
     if(!o.synopsis)return sec('Description',empty('No description has been added to this opportunity.'));
@@ -320,7 +329,7 @@ const DRAWER_JS = `<script>
     if(o.additionalInfo&&o.additionalInfo.link)links.push('<div class="odoc">\\ud83d\\udd17 <a href="'+esc(o.additionalInfo.link)+'" target="_blank" rel="noopener">Additional information</a></div>');
     if(o.uiLink)links.push('<div class="odoc">\\ud83d\\udd17 <a href="'+esc(o.uiLink)+'" target="_blank" rel="noopener">View the full notice on SAM.gov</a></div>');
     (o.attachments||[]).slice(0,20).forEach(function(a){
-      var name=(a&&(a.name||a.filename))||'Attachment', url=(a&&(a.url||a.link))||'';
+      var name=(a&&a.name)||'Attachment', url=(a&&a.url)||'';
       atts.push('<div class="odoc">\\ud83d\\udcc4 '+(url?'<a href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(name)+'</a>':esc(name))+'</div>');
     });
     var inner='<div class="osec-sub">Links</div>'+(links.length?links.join(''):empty('No links have been added to this opportunity.'))
@@ -359,7 +368,7 @@ const DRAWER_JS = `<script>
   }
   function render(o){
     CUR=o;
-    return snapshot(o)+descSec(o)+sowSec(o)+contactsSec(o)+docsSec(o)+vendorsSec(o)
+    return snapshot(o)+orgSec(o)+descSec(o)+sowSec(o)+contactsSec(o)+docsSec(o)+vendorsSec(o)
       + '<div class="oppsoon">Coming next to this view: AI Pursuit Brief \\u00b7 past-contract history \\u00b7 expected value range \\u00b7 agency intel \\u00b7 likely teaming partners.</div>'
       + actions(o);
   }

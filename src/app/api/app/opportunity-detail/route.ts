@@ -10,8 +10,20 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { setGroupKey, SET_LABEL, naicsCategory } from '@/lib/opportunities/map-data';
 import { normalizeStateCode } from '@/lib/utils/us-states';
+import { parseSamAttachment, fetchSamAttachmentFilename, labelSamAttachment, samAttachmentDownloadHref } from '@/lib/sam/attachment-metadata';
 
 export const dynamic = 'force-dynamic';
+
+// Attachments are stored as bare SAM resource URLs (no filename), so resolve the real filename
+// via SAM's Content-Disposition (parallel, capped) — else they all show as "Attachment".
+async function resolveAttachments(raw: unknown): Promise<Array<{ url: string; name: string }>> {
+  const refs = (Array.isArray(raw) ? raw : []).map(parseSamAttachment).filter((r): r is NonNullable<typeof r> => !!r).slice(0, 10);
+  return Promise.all(refs.map(async (ref, i) => {
+    let resolved: string | null = null;
+    if (!ref.name) { try { resolved = await fetchSamAttachmentFilename(ref.url); } catch { /* keep generic */ } }
+    return { url: samAttachmentDownloadHref(ref.url), name: labelSamAttachment(ref, i, resolved) };
+  }));
+}
 
 const COLS = 'notice_id, solicitation_number, title, description, seo_summary, naics_code, psc_code, '
   + 'department, sub_tier, office, agency_hierarchy, posted_date, response_deadline, last_modified, '
@@ -81,7 +93,9 @@ export async function GET(request: NextRequest) {
     const { data, error } = await sb().from('sam_opportunities').select(COLS).eq('notice_id', id).maybeSingle();
     if (error) throw error;
     if (!data) return NextResponse.json({ success: false, error: 'not found' }, { status: 404 });
-    return NextResponse.json({ success: true, opp: shape(data) });
+    const opp = shape(data);
+    opp.attachments = await resolveAttachments((data as unknown as Record<string, unknown>).attachments) as never;
+    return NextResponse.json({ success: true, opp });
   } catch (e) {
     return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });
   }
