@@ -73,8 +73,27 @@ customer's own agent writes. That boundary keeps private data private.
 
 ### Roadmap decisions (do NOT re-propose)
 
-- **`score_win_probability` — KILLED** (2026-07-15). Deliberately cut: low signal for the
-  credit cost. Not on the build list.
+- **`score_win_probability` — UN-KILLED** (2026-07-25, supersedes the 2026-07-15 kill and
+  the 3× rejection). Originally cut as low signal for the credit cost, under an app framing
+  that required the number to be *accurate*. That constraint no longer applies: under the
+  Zillow framing it ships as a **Zestimate-class labeled estimate**, not a factual score.
+  **Canonical name: `M-Win`** — named off the industry's existing P-Win (Probability of
+  Win), so it borrows native capture-management vocabulary. Use `M-Win` everywhere (UI,
+  docs, marketing, code); the old `score_win_probability` string is the internal mechanism
+  name only.
+  **Hard rules before any build** — full text in
+  `govcon-giants-os/04_rnd/decision-journal.md` → **Decision #026**:
+  1. Estimate-labeled everywhere; the label IS the license to ship it.
+  2. Show the comps (incumbent status, agency buying history, set-aside fit, competition
+     density) — visible inputs, like Zillow's comparables.
+  3. Publish the methodology / accuracy page.
+  4. Never gates anything; never marketed until shipped.
+  5. **Render as a bare score — `M-Win 72`, NEVER `M-Win 72%`.** A `%` is a falsifiable
+     claim about outcomes, and we can't calibrate it: a real probability needs labeled
+     losers (who bid AND lost) and USASpending gives winners only. The `%` is a "not yet,"
+     earned only by running a backtest against actual awards and publishing the calibration
+     curve — never asserted from the fact that our formula computed it.
+  **Next gate:** M-Win design doc before build (not a re-propose — this is approved).
 - **`get_agency_component_rules` — PARKED.** Genuinely new; needs a curated
   agency-supplement + command-instruction rules DB before any wrap. A minimal first cut =
   DoD (DFARS + a few commands) + VA (VAAR). Not scoped.
