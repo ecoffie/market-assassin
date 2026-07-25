@@ -222,7 +222,23 @@ const DRAWER_CSS = '<style>'
   + '.snapgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;border:1px solid var(--line);border-radius:12px;padding:15px 17px}'
   + '.snapgrid .k{font:700 10.5px Inter,system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}'
   + '.snapgrid .v{font-size:14px;font-weight:600;color:var(--ink);margin-top:2px}'
-  + '.oppsoon{margin-top:22px;color:var(--faint);font-size:12px;border-top:1px dashed var(--line);padding-top:14px}'
+  + '.oppsoon{margin-top:26px;color:var(--faint);font-size:12px;border-top:1px dashed var(--line);padding-top:14px}'
+  // detail sections
+  + '.osec{margin-top:26px}'
+  + '.osec-h{font:700 15px "Space Grotesk",Inter,system-ui,sans-serif;color:var(--ink);margin-bottom:11px}'
+  + '.osec-b{font-size:13.5px;line-height:1.6;color:#374151;white-space:pre-wrap;word-break:break-word}'
+  + '.osec-b.clamp{max-height:210px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 74%,transparent);mask-image:linear-gradient(#000 74%,transparent)}'
+  + '.osec-more{margin-top:9px;font:600 12.5px Inter,system-ui,sans-serif;color:var(--jan);background:none;border:0;cursor:pointer;padding:0}'
+  + '.ocontact{border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-top:9px}'
+  + '.ocontact .nm{font-weight:700;color:var(--ink);font-size:13.5px}'
+  + '.ocontact .ti{color:var(--sub);font-size:12px;margin-top:1px}'
+  + '.ocontact .row{margin-top:7px;font-size:12.5px}.ocontact a{color:var(--jan);text-decoration:none}'
+  + '.odoc{display:flex;align-items:center;gap:8px;padding:9px 0;border-bottom:1px solid var(--hair);font-size:13px}'
+  + '.odoc a{color:var(--jan);text-decoration:none;font-weight:600}'
+  + '.oact{position:sticky;bottom:0;display:flex;gap:9px;flex-wrap:wrap;margin-top:26px;padding:14px 0 4px;background:linear-gradient(transparent,#fff 22%);border-top:1px solid var(--line)}'
+  + '.oact .b{flex:1;min-width:130px;text-align:center;padding:11px 12px;border-radius:10px;font:700 13px Inter,system-ui,sans-serif;cursor:pointer;text-decoration:none;border:1px solid var(--line);background:#fff;color:var(--ink)}'
+  + '.oact .b.pri{background:var(--ink);color:#fff;border-color:var(--ink)}'
+  + '.oact .b.saved{color:#22a06b;border-color:#22a06b;background:#f0fdf7}'
   + '</style>';
 
 const DRAWER_HTML = '<div class="oppbd" id="oppBd"></div>'
@@ -232,12 +248,15 @@ const DRAWER_HTML = '<div class="oppbd" id="oppBd"></div>'
 const DRAWER_JS = `<script>
 (function(){
   var bd=document.getElementById('oppBd'), dr=document.getElementById('oppDrawer'), body=document.getElementById('oppBody'), xb=document.getElementById('oppX');
+  var CUR=null;
   function close(){ dr.classList.remove('show'); bd.classList.remove('show'); }
   if(xb)xb.onclick=close; if(bd)bd.onclick=close;
   document.addEventListener('keydown',function(e){ if(e.key==='Escape')close(); });
   function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
   function due(d){ if(!d)return ''; var n=Math.ceil((new Date(d)-new Date())/86400000); if(n<0)return 'closed'; if(n===0)return 'due today'; if(n===1)return '1 day left'; return n+' days left'; }
   function longDate(d){ if(!d)return '\\u2014'; try{ return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }catch(e){return d;} }
+  function sec(title,inner){ return '<div class="osec"><div class="osec-h">'+title+'</div>'+inner+'</div>'; }
+
   function snapshot(o){
     var n=o.deadline?Math.ceil((new Date(o.deadline)-new Date())/86400000):null;
     var cls=(n!=null&&n<=7)?'badge-dl':'badge-dl cool';
@@ -256,15 +275,79 @@ const DRAWER_JS = `<script>
       + '<div><div class="k">Response due</div><div class="v">'+longDate(o.deadline)+'</div></div>'
       + '<div><div class="k">Posted</div><div class="v">'+longDate(o.posted)+'</div></div>'
       + '<div><div class="k">Solicitation</div><div class="v" style="font-family:var(--mono,monospace);font-size:12.5px">'+esc(o.solicitation||'\\u2014')+'</div></div>'
-      + '</div>'
-      + '<div class="oppsoon">Synopsis, AI Pursuit Brief, Points of Contact, Scope of Work, past-contract history & more coming to this view.</div>';
+      + '</div>';
+  }
+  function synopsisSec(o){
+    if(!o.synopsis)return '';
+    var long=o.synopsis.length>620;
+    return sec('Synopsis','<div class="osec-b'+(long?' clamp':'')+'" id="synBody">'+esc(o.synopsis)+'</div>'
+      + (long?'<button class="osec-more" onclick="var b=document.getElementById(\\'synBody\\');b.classList.remove(\\'clamp\\');this.remove()">Show more</button>':''));
+  }
+  function sowSec(o){
+    if(!(o.sow&&o.sow.text))return '';
+    var long=o.sow.text.length>620;
+    return sec('Scope of work'+(o.sow.filename?' \\u00b7 <span style="font-weight:400;color:var(--sub);font-size:12px">'+esc(o.sow.filename)+'</span>':''),
+      '<div class="osec-b'+(long?' clamp':'')+'" id="sowBody">'+esc(o.sow.text)+'</div>'
+      + (long?'<button class="osec-more" onclick="var b=document.getElementById(\\'sowBody\\');b.classList.remove(\\'clamp\\');this.remove()">Show more</button>':''));
+  }
+  function contactsSec(o){
+    if(!o.contacts||!o.contacts.length)return '';
+    var rows=o.contacts.map(function(c){
+      return '<div class="ocontact"><div class="nm">'+esc(c.name||'Contact')+'</div>'
+        + (c.title?'<div class="ti">'+esc(c.title)+'</div>':'')
+        + '<div class="row">'
+        + (c.email?'\\u2709\\ufe0f <a href="mailto:'+esc(c.email)+'">'+esc(c.email)+'</a>':'')
+        + (c.email&&c.phone?' \\u00b7 ':'')+(c.phone?'\\u260e\\ufe0f '+esc(c.phone):'')
+        + '</div></div>';
+    }).join('');
+    return sec('Points of contact',rows);
+  }
+  function docsSec(o){
+    var items=[];
+    (o.attachments||[]).slice(0,12).forEach(function(a){
+      var name=(a&&(a.name||a.filename))||'Attachment', url=(a&&(a.url||a.link))||'';
+      items.push('<div class="odoc">\\ud83d\\udcc4 '+(url?'<a href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(name)+'</a>':esc(name))+'</div>');
+    });
+    if(o.uiLink)items.push('<div class="odoc">\\ud83d\\udd17 <a href="'+esc(o.uiLink)+'" target="_blank" rel="noopener">View the full notice on SAM.gov</a></div>');
+    if(o.additionalInfo&&o.additionalInfo.link)items.push('<div class="odoc">\\ud83d\\udd17 <a href="'+esc(o.additionalInfo.link)+'" target="_blank" rel="noopener">Additional information</a></div>');
+    if(!items.length)return '';
+    return sec('Documents & links',items.join(''));
+  }
+  // Save to pursuits (detail) — mirrors the popup save, using the currently-open opp.
+  function tok(){ try{return localStorage.getItem('mi_beta_auth_token');}catch(e){return null;} }
+  function email(t){ try{ var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase():''; }catch(e2){return '';} }
+  window.saveCurrentOpp=function(btn){
+    if(!CUR||btn.dataset.saved==='1')return;
+    var t=tok(), em=t?email(t):'';
+    if(!t||!em){ btn.textContent='Sign in to save'; return; }
+    btn.textContent='Saving\\u2026';
+    fetch('/api/pipeline',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
+      body:JSON.stringify({user_email:em,title:CUR.title,notice_id:CUR.id,solicitation_number:CUR.solicitation,agency:CUR.department,naics_code:CUR.naics,response_deadline:CUR.deadline,source:'opportunity_map'})})
+    .then(function(r){return r.json().catch(function(){return {};});}).then(function(d){
+      var dup=d&&d.error&&/alread|exist|duplicate/i.test(d.error);
+      if((d&&!d.error)||dup){ btn.textContent=dup?'\\u2713 In pursuits':'\\u2713 Saved'; btn.classList.add('saved'); btn.dataset.saved='1'; }
+      else btn.textContent='Try again';
+    }).catch(function(){ btn.textContent='Try again'; });
+  };
+  function actions(o){
+    return '<div class="oact">'
+      + '<button class="b pri" onclick="saveCurrentOpp(this)">Save to pursuits</button>'
+      + '<a class="b" href="/app?panel=proposal&notice='+encodeURIComponent(o.id)+'" target="_blank" rel="noopener">Draft proposal</a>'
+      + (o.uiLink?'<a class="b" href="'+esc(o.uiLink)+'" target="_blank" rel="noopener">View on SAM \\u2197</a>':'')
+      + '</div>';
+  }
+  function render(o){
+    CUR=o;
+    return snapshot(o)+synopsisSec(o)+sowSec(o)+contactsSec(o)+docsSec(o)
+      + '<div class="oppsoon">Coming next to this view: AI Pursuit Brief \\u00b7 past-contract history \\u00b7 expected value range \\u00b7 agency intel \\u00b7 likely teaming partners.</div>'
+      + actions(o);
   }
   window.openOppDrawer=function(nid){
     if(!nid)return;
     body.innerHTML='<div class="oppload">Loading\\u2026</div>';
     bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
     fetch('/api/app/opportunity-detail?id='+encodeURIComponent(nid)).then(function(r){return r.json();}).then(function(d){
-      body.innerHTML=(d&&d.success&&d.opp)?snapshot(d.opp):'<div class="oppload">Couldn\\u2019t load this opportunity.</div>';
+      body.innerHTML=(d&&d.success&&d.opp)?render(d.opp):'<div class="oppload">Couldn\\u2019t load this opportunity.</div>';
     }).catch(function(){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; });
   };
 })();
