@@ -29,7 +29,12 @@ function sb() {
 // via ?intel=1 so the base detail stays fast. Every field is real data from those tools.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function buildIntel(naics: string | null, agency: string | null, title: string | null) {
-  const guard = <T>(p: Promise<T>): Promise<T | null> => p.then((v) => v).catch(() => null);
+  // Guard = catch → null AND time-box each tool (a slow USASpending/CALC call must not hang
+  // the whole intel request; it just yields that one section empty). 14s ceiling per tool.
+  const guard = <T>(p: Promise<T>, ms = 14000): Promise<T | null> => Promise.race([
+    p.then((v) => v).catch(() => null),
+    new Promise<null>((res) => setTimeout(() => res(null), ms)),
+  ]);
   // Agency intel matches on the CORE agency word ("DEPT OF DEFENSE" → "DEFENSE"); the raw
   // uppercase-comma form doesn't match the maintained list.
   const agencyKey = agency ? normalizeAgencyKey(agency) : '';
