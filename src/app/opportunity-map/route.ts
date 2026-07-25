@@ -231,6 +231,7 @@ const DRAWER_CSS = '<style>'
   + '.osec-h{font:700 15px "Space Grotesk",Inter,system-ui,sans-serif;color:var(--ink);margin-bottom:11px}'
   + '.osec-b{font-size:13.5px;line-height:1.6;color:#374151;white-space:pre-wrap;word-break:break-word}'
   + '.osec-empty{font-size:13px;color:var(--faint)}'
+  + '.osec-sub{font:700 11px Inter,system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase;color:var(--sub);margin-bottom:7px}'
   + '.osec-b.clamp{max-height:210px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 74%,transparent);mask-image:linear-gradient(#000 74%,transparent)}'
   + '.osec-more{margin-top:9px;font:600 12.5px Inter,system-ui,sans-serif;color:var(--jan);background:none;border:0;cursor:pointer;padding:0}'
   + '.ocontact{border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-top:9px}'
@@ -282,41 +283,56 @@ const DRAWER_JS = `<script>
       + '<div><div class="k">Solicitation</div><div class="v" style="font-family:var(--mono,monospace);font-size:12.5px">'+esc(o.solicitation||'\\u2014')+'</div></div>'
       + '</div>';
   }
-  function synopsisSec(o){
-    if(!o.synopsis)return sec('Synopsis',empty('No synopsis was included in this notice.'));
-    var long=o.synopsis.length>620;
-    return sec('Synopsis','<div class="osec-b'+(long?' clamp':'')+'" id="synBody">'+esc(o.synopsis)+'</div>'
-      + (long?'<button class="osec-more" onclick="var b=document.getElementById(\\'synBody\\');b.classList.remove(\\'clamp\\');this.remove()">Show more</button>':''));
+  function clamp(id,text){
+    var long=text.length>620;
+    return '<div class="osec-b'+(long?' clamp':'')+'" id="'+id+'">'+esc(text)+'</div>'
+      + (long?'<button class="osec-more" onclick="var b=document.getElementById(\\''+id+'\\');b.classList.remove(\\'clamp\\');this.remove()">Show more</button>':'');
+  }
+  function descSec(o){
+    if(!o.synopsis)return sec('Description',empty('No description has been added to this opportunity.'));
+    return sec('Description',clamp('synBody',o.synopsis));
   }
   function sowSec(o){
-    if(!(o.sow&&o.sow.text))return sec('Scope of work',empty('No statement of work is attached to this notice.'));
-    var long=o.sow.text.length>620;
-    return sec('Scope of work'+(o.sow.filename?' \\u00b7 <span style="font-weight:400;color:var(--sub);font-size:12px">'+esc(o.sow.filename)+'</span>':''),
-      '<div class="osec-b'+(long?' clamp':'')+'" id="sowBody">'+esc(o.sow.text)+'</div>'
-      + (long?'<button class="osec-more" onclick="var b=document.getElementById(\\'sowBody\\');b.classList.remove(\\'clamp\\');this.remove()">Show more</button>':''));
+    if(!(o.sow&&o.sow.text))return '';
+    return sec('Scope of work'+(o.sow.filename?' \\u00b7 <span style="font-weight:400;color:var(--sub);font-size:12px">'+esc(o.sow.filename)+'</span>':''),clamp('sowBody',o.sow.text));
+  }
+  function pocCard(c){
+    return '<div class="ocontact"><div class="nm">'+esc(c.name||'Contact')+'</div>'
+      + (c.title?'<div class="ti">'+esc(c.title)+'</div>':'')
+      + '<div class="row">'
+      + (c.email?'\\u2709\\ufe0f <a href="mailto:'+esc(c.email)+'">'+esc(c.email)+'</a>':'')
+      + (c.email&&c.phone?' \\u00b7 ':'')+(c.phone?'\\u260e\\ufe0f '+esc(c.phone):'')
+      + '</div></div>';
   }
   function contactsSec(o){
-    if(!o.contacts||!o.contacts.length)return sec('Points of contact',empty('No point of contact was listed on this notice.'));
-    var rows=o.contacts.map(function(c){
-      return '<div class="ocontact"><div class="nm">'+esc(c.name||'Contact')+'</div>'
-        + (c.title?'<div class="ti">'+esc(c.title)+'</div>':'')
-        + '<div class="row">'
-        + (c.email?'\\u2709\\ufe0f <a href="mailto:'+esc(c.email)+'">'+esc(c.email)+'</a>':'')
-        + (c.email&&c.phone?' \\u00b7 ':'')+(c.phone?'\\u260e\\ufe0f '+esc(c.phone):'')
-        + '</div></div>';
-    }).join('');
-    return sec('Points of contact',rows);
+    var cs=o.contacts||[];
+    if(!cs.length)return sec('Contact information',empty('No contact information has been added to this opportunity.'));
+    var prim=cs.filter(function(c){return (c.type||'').toLowerCase()==='primary';});
+    var alt=cs.filter(function(c){return (c.type||'').toLowerCase()!=='primary';});
+    var inner='';
+    if(prim.length)inner+='<div class="osec-sub">Primary point of contact</div>'+prim.map(pocCard).join('');
+    if(alt.length)inner+='<div class="osec-sub" style="margin-top:14px">Alternative point of contact</div>'+alt.map(pocCard).join('');
+    if(!prim.length&&!alt.length)inner=cs.map(pocCard).join('');
+    return sec('Contact information',inner);
   }
   function docsSec(o){
-    var items=[];
-    (o.attachments||[]).slice(0,12).forEach(function(a){
+    var links=[], atts=[];
+    if(o.additionalInfo&&o.additionalInfo.link)links.push('<div class="odoc">\\ud83d\\udd17 <a href="'+esc(o.additionalInfo.link)+'" target="_blank" rel="noopener">Additional information</a></div>');
+    if(o.uiLink)links.push('<div class="odoc">\\ud83d\\udd17 <a href="'+esc(o.uiLink)+'" target="_blank" rel="noopener">View the full notice on SAM.gov</a></div>');
+    (o.attachments||[]).slice(0,20).forEach(function(a){
       var name=(a&&(a.name||a.filename))||'Attachment', url=(a&&(a.url||a.link))||'';
-      items.push('<div class="odoc">\\ud83d\\udcc4 '+(url?'<a href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(name)+'</a>':esc(name))+'</div>');
+      atts.push('<div class="odoc">\\ud83d\\udcc4 '+(url?'<a href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(name)+'</a>':esc(name))+'</div>');
     });
-    if(o.uiLink)items.push('<div class="odoc">\\ud83d\\udd17 <a href="'+esc(o.uiLink)+'" target="_blank" rel="noopener">View the full notice on SAM.gov</a></div>');
-    if(o.additionalInfo&&o.additionalInfo.link)items.push('<div class="odoc">\\ud83d\\udd17 <a href="'+esc(o.additionalInfo.link)+'" target="_blank" rel="noopener">Additional information</a></div>');
-    if(!items.length)return '';
-    return sec('Documents & links',items.join(''));
+    var inner='<div class="osec-sub">Links</div>'+(links.length?links.join(''):empty('No links have been added to this opportunity.'))
+      + '<div class="osec-sub" style="margin-top:16px">Attachments</div>'+(atts.length?atts.join(''):empty('No attachments have been added to this opportunity.'));
+    return sec('Attachments / links',inner);
+  }
+  function vendorsSec(o){
+    // SAM's Interested Vendors List. We don't cache it (SAM's IVL isn't in the opportunities API
+    // and is usually empty), so mirror SAM's empty state and link to the live list.
+    return sec('Interested vendors',
+      empty('No interested vendors have been added to this opportunity.')
+      + (o.uiLink?'<div class="odoc" style="border-bottom:0;margin-top:4px">\\ud83d\\udd17 <a href="'+esc(o.uiLink)+'" target="_blank" rel="noopener">See the interested vendors list on SAM.gov</a></div>':''));
   }
   // Save to pursuits (detail) — mirrors the popup save, using the currently-open opp.
   function tok(){ try{return localStorage.getItem('mi_beta_auth_token');}catch(e){return null;} }
@@ -343,7 +359,7 @@ const DRAWER_JS = `<script>
   }
   function render(o){
     CUR=o;
-    return snapshot(o)+synopsisSec(o)+sowSec(o)+contactsSec(o)+docsSec(o)
+    return snapshot(o)+descSec(o)+sowSec(o)+contactsSec(o)+docsSec(o)+vendorsSec(o)
       + '<div class="oppsoon">Coming next to this view: AI Pursuit Brief \\u00b7 past-contract history \\u00b7 expected value range \\u00b7 agency intel \\u00b7 likely teaming partners.</div>'
       + actions(o);
   }
