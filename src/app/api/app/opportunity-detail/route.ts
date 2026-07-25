@@ -11,10 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { setGroupKey, SET_LABEL } from '@/lib/opportunities/map-data';
-import { findPredecessorAward } from '@/lib/usaspending/find-predecessor';
-import { getUnifiedAgencyIntelligence } from '@/lib/agency-intelligence';
-import { getPricingIntel } from '@/mcp/tools/pricing-intel';
-import { normalizeAgencyKey } from '@/lib/gov-contacts/agency-key';
+import { buildOppIntel, intelHasContent } from '@/lib/opportunities/opp-intel';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,65 +21,9 @@ function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 }
 
-// Reused-intelligence block for the drawer — runs the existing engines in PARALLEL and
-// FAIL-SOFT (a slow/failed tool returns null, never blocks the drawer). Loaded on-demand
-// via ?intel=1 so the base detail stays fast. Every field is real data from those tools.
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-async function buildIntel(naics: string | null, agency: string | null, title: string | null) {
-  // Guard = catch → null AND time-box each tool (a slow USASpending/CALC call must not hang
-  // the whole intel request; it just yields that one section empty). 14s ceiling per tool.
-  const guard = <T>(p: Promise<T>, ms = 14000): Promise<T | null> => Promise.race([
-    p.then((v) => v).catch(() => null),
-    new Promise<null>((res) => setTimeout(() => res(null), ms)),
-  ]);
-  // Agency intel matches on the CORE agency word ("DEPT OF DEFENSE" → "DEFENSE"); the raw
-  // uppercase-comma form doesn't match the maintained list.
-  const agencyKey = agency ? normalizeAgencyKey(agency) : '';
-  const [predecessor, agencyIntel, pricing] = await Promise.all([
-    guard(findPredecessorAward({ naicsCode: naics || undefined, agencyName: agency || undefined, keyword: title || undefined })),
-    agencyKey ? guard(getUnifiedAgencyIntelligence(agencyKey)) : Promise.resolve(null),
-    naics ? guard(getPricingIntel({ naics })) : Promise.resolve(null),
-  ]);
+// buildOppIntel now lives in the shared lib (reused by the precompute backfill/cron).
 
-  const fmt = (n?: number | null) => (typeof n === 'number' && n > 0)
-    ? (n >= 1e9 ? `$${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : `$${Math.round(n).toLocaleString()}`) : null;
-
-  // Field names validated against real tool output (see intel-probe).
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pred = predecessor as any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const ai = agencyIntel as any;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const pr = pricing as any;
-  const topVendors = (pr && pr._meta?.grounded && pr.pricing?.topVendors) ? pr.pricing.topVendors : [];
-  const asText = (x: unknown): string | null => (typeof x === 'string' ? x : (x && typeof x === 'object' ? ((x as Record<string, string>).text || (x as Record<string, string>).title || (x as Record<string, string>).description) : null)) || null;
-
-  return {
-    predecessor: (pred && pred.recipientName) ? {
-      incumbent: pred.recipientName || null,
-      incumbentState: pred.recipientState || null,
-      value: fmt(pred.ceiling ?? pred.currentValue ?? pred.obligated),
-      expires: (pred.popPotentialEnd || pred.popEnd) ? String(pred.popPotentialEnd || pred.popEnd).slice(0, 10) : null,
-      vehicle: pred.parentIdvPiid || null,
-      confidence: pred.matchConfidence || null,
-    } : null,
-    agency: ai ? {
-      painPoints: (ai.painPoints || []).slice(0, 4).map(asText).filter(Boolean),
-      priorities: (ai.priorities || []).slice(0, 3).map(asText).filter(Boolean),
-    } : null,
-    pricing: topVendors.length ? {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      rates: topVendors.slice(0, 4).map((v: any) => ({
-        labor_category: v.name,
-        hourly_rate: (typeof v.avgRate === 'number') ? Math.round(v.avgRate) : null,
-        size: v.businessSize || null,
-      })),
-      summary: `${pr.pricing.topVendors.length} vendors analyzed via GSA CALC`,
-    } : null,
-  };
-}
-
-const DETAIL_COLS = 'notice_id, solicitation_number, title, description, naics_code, psc_code, department, sub_tier, office, agency_hierarchy, posted_date, response_deadline, set_aside_code, set_aside_description, notice_type, pop_city, pop_state, pop_country, ui_link, attachments, points_of_contact, office_address, has_sow_doc, sow_text, sow_filename, additional_info_link, additional_info_text, map_loc_source';
+const DETAIL_COLS = 'notice_id, solicitation_number, title, description, naics_code, psc_code, department, sub_tier, office, agency_hierarchy, posted_date, response_deadline, set_aside_code, set_aside_description, notice_type, pop_city, pop_state, pop_country, ui_link, attachments, points_of_contact, office_address, has_sow_doc, sow_text, sow_filename, additional_info_link, additional_info_text, map_loc_source, intel_predecessor, intel_agency, intel_pricing, intel_computed_at';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function shapeOpp(r: any) {
@@ -131,11 +72,28 @@ export async function GET(request: NextRequest) {
 
   const opp = shapeOpp(data);
 
-  // ?intel=1 → return ONLY the reused-intelligence block (predecessor/agency/pricing).
-  // Loaded on-demand by the drawer as a SECOND fetch so the base detail stays instant.
+  // ?intel=1 → the reused-intelligence block. READ the precomputed columns first (instant);
+  // only fall back to live tools when this opp hasn't been computed yet — and self-warm by
+  // storing the result so the next open is instant too. (The backfill/cron precompute the rest.)
   if (request.nextUrl.searchParams.get('intel') === '1') {
-    const intel = await buildIntel(opp.naics, opp.department, opp.title);
-    return NextResponse.json({ success: true, intel });
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const row = data as any;
+    if (row.intel_computed_at) {
+      return NextResponse.json({ success: true, cached: true, intel: {
+        predecessor: row.intel_predecessor || null,
+        agency: row.intel_agency || null,
+        pricing: row.intel_pricing || null,
+      } });
+    }
+    // Not precomputed yet → compute live, return it, and store it (best-effort).
+    const intel = await buildOppIntel(opp.naics, opp.department, opp.title);
+    if (intelHasContent(intel)) {
+      db.from('sam_opportunities').update({
+        intel_predecessor: intel.predecessor, intel_agency: intel.agency,
+        intel_pricing: intel.pricing, intel_computed_at: new Date().toISOString(),
+      }).eq('notice_id', opp.id).then(() => {}, () => {});
+    }
+    return NextResponse.json({ success: true, cached: false, intel });
   }
 
   // Bid Facts — the "Facts & features" grid. All real columns.
