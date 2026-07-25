@@ -87,7 +87,9 @@ const ZLAYOUT_CSS = '<style>'
   + '.app.collapsed{grid-template-columns:50px minmax(0,1fr) 0px!important}'
   // Mindy header bar
   + '.zhead{grid-area:zhead;display:flex;align-items:center;gap:12px;padding:0 18px;border-bottom:1px solid var(--line);background:#fff;z-index:20}'
-  + '.zhead img{height:27px;width:auto;display:block}'
+  + '.zh-logo{display:flex;align-items:center;gap:8px;text-decoration:none}'
+  + '.zh-logo img{height:25px;width:auto;display:block}'
+  + '.zh-logo span{font:700 18px "Inter",system-ui,sans-serif;color:var(--ink);letter-spacing:-.02em}'
   + '.zhead .zh-sep{width:1px;height:22px;background:var(--line)}'
   + '.zhead .zh-t{font:600 14px "Inter",system-ui,sans-serif;color:var(--ink)}'
   + '.zhead .zh-live{margin-left:auto;font:600 11px "Inter",system-ui,sans-serif;color:#22a06b;display:inline-flex;align-items:center;gap:6px;letter-spacing:.02em}'
@@ -95,9 +97,9 @@ const ZLAYOUT_CSS = '<style>'
   // The 50px grid column stays as its reserved space (kept empty; the fixed rail sits over it).
   + '.zrail{position:fixed;left:0;top:52px;width:50px;height:calc(100vh - 52px);height:calc(100dvh - 52px);'
   + 'background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:2px;padding:14px 0;z-index:30;overflow:hidden}'
-  + '.zrail a{display:flex;flex-direction:column;align-items:center;gap:3px;font:600 9px/1.1 Inter,system-ui,sans-serif;color:var(--sub);text-decoration:none;padding:9px 3px;border-radius:9px;width:48px;text-align:center}'
-  + '.zrail a:hover{background:var(--wash);color:var(--ink)}.zrail a.on{color:var(--ink)}'
-  + '.zrail svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}'
+  + '.zrail a{display:flex;align-items:center;justify-content:center;color:var(--sub);text-decoration:none;padding:11px;border-radius:11px;width:40px;height:40px}'
+  + '.zrail a:hover{background:var(--wash);color:var(--ink)}.zrail a.on{color:var(--ink);background:var(--wash)}'
+  + '.zrail svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}'
   // top bar (search + the moved filters)
   + '.ztop{grid-area:ztop;position:relative;display:flex;align-items:center;gap:10px;padding:10px 18px;border-bottom:1px solid var(--line);background:#fff;z-index:9;min-width:0}'
   + '.zsearch{flex:0 1 330px;min-width:170px;max-width:32vw;display:flex;align-items:center;gap:8px;border:1.5px solid var(--line);border-radius:11px;padding:0 12px;height:42px;background:#fff}'
@@ -119,18 +121,20 @@ const ZLAYOUT_CSS = '<style>'
   + '</style>';
 
 // Icon rail + top search bar. The template's .fbar (filters) is appended into .ztop by JS.
+// Icon-only rail (reduced — no text labels, which were wider than the rail and clipped).
+// Names live in the title tooltip.
 const ZRAIL_HTML = '<nav class="zrail">'
-  + '<a href="/app" title="Back to Mindy"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>Mindy</a>'
-  + '<a class="on" title="Opportunity Map"><svg viewBox="0 0 24 24"><path d="M9 4L3 6.5v14L9 18l6 2.5 6-2.5v-14L15 6.5 9 4z"/><path d="M9 4v14M15 6.5v14"/></svg>Map</a>'
-  + '<a href="/app?panel=pursuits" title="My Pursuits"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>Pursuits</a>'
-  + '<a href="/app?panel=alerts" title="Alerts"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>Alerts</a>'
+  + '<a href="/app" title="Back to Mindy"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg></a>'
+  + '<a class="on" title="Opportunity Map"><svg viewBox="0 0 24 24"><path d="M9 4L3 6.5v14L9 18l6 2.5 6-2.5v-14L15 6.5 9 4z"/><path d="M9 4v14M15 6.5v14"/></svg></a>'
+  + '<a href="/app?panel=pursuits" title="My Pursuits"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg></a>'
+  + '<a href="/app?panel=alerts" title="Alerts"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg></a>'
   + '</nav>';
 const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
   + '<svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>'
   + '<input id="zsearchInput" placeholder="Search opportunities, agencies, keywords…" autocomplete="off"></div></div>';
 // Mindy brand header bar (top, full width) — the wordmark + product name, Zillow-style.
 const ZHEAD_HTML = '<header class="zhead">'
-  + '<a href="/app" title="Mindy"><img src="/brand/mindy-logo-wordmark.svg" alt="Mindy AI"/></a>'
+  + '<a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.svg" alt=""/><span>Mindy</span></a>'
   + '<span class="zh-sep"></span><span class="zh-t">Federal Opportunity Map</span>'
   + '<span class="zh-live">● Live · SAM.gov</span></header>';
 
