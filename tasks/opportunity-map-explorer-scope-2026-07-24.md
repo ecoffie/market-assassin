@@ -185,3 +185,29 @@ just carry any active search/filter context through.)
 3. Explorer UI (split + filters + sync interactions + clustering).
 4. Home teaser link-through.
 5. Remove the FSC self-filter from `getMapOpportunities` (+ revisit `home-search` oppsInNaics).
+
+---
+## 🗂️ DATASET SWITCHER TAXONOMY (Eric, 2026-07-25) — "looks like Zillow" grouping
+
+Two MORE databases exist to fold in: **Federal Grants** (Grants.gov, /app?panel=grants) and
+**Government Decision Makers** (97,646 SAM contacts, /app?panel=decision-makers). Rather than a
+flat 5 map modes, Eric's grouping (Zillow doesn't list every subtype as a top tab — it groups):
+
+| Map switcher tab | Folds in | Concept |
+|---|---|---|
+| **Open Opportunities** | + **Grants** | everything you can pursue NOW (SAM opps + Grants.gov) |
+| **Recompetes** | (unchanged; rename still open — "gov-speak", candidates: Renewals/Expiring/Future Bids) |
+| **Contacts** (was "Contractors") | Decision Makers + **Companies** (contractors) | who you'd reach out to — buyers (people) + competitors/partners (companies) |
+
+**DONE now (this slice):** map top-nav tab "Contractors" → **"Contacts"** (label + MODES title/unit
++ coming-soon copy). Internal mode KEY stays `contractor` (wired through the JS) — only the display
+changed.
+
+**FOLLOW-UPS (not built):**
+- Fold **Grants** data into the Open-Opportunities map mode (grants have some place-of-performance;
+  needs a grants→pin adapter + a source toggle/badge so opps vs grants are distinguishable).
+- Build the **Contacts** map mode for real: merge Decision Makers (SAM POCs, agency/office location)
+  + Companies (contractor HQ) into one mode. Currently a "coming next" stub.
+- **Recompetes rename** — Eric thinking about a non-gov-speak name; NOT decided.
+- Per robinhood-thesis Article VI (Decision #025, 2026-07-25): "Mindy looks like Zillow, acts like
+  Robinhood" — all switcher naming must be PLAIN ENGLISH, no jargon, fun/easy.

@@ -288,7 +288,7 @@ const ZHEAD_HTML = '<header class="zhead">'
   + '<nav class="zh-left">'
   + '<a class="zh-mode on" data-mode="open" onclick="setMapMode(\'open\')">Open Opportunities</a>'
   + '<a class="zh-mode" data-mode="recompete" onclick="setMapMode(\'recompete\')">Recompetes</a>'
-  + '<a class="zh-mode" data-mode="contractor" onclick="setMapMode(\'contractor\')">Contractors</a>'
+  + '<a class="zh-mode" data-mode="contractor" onclick="setMapMode(\'contractor\')">Contacts</a>'
   + '</nav>'
   + '<a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>'
   + '<nav class="zh-right">'
@@ -320,7 +320,7 @@ const VIEWPORT_JS = `<script>
   var MODES={
     open:{ ep:'/api/app/opportunity-map', title:'Open Opportunities', unit:'active opportunities' },
     recompete:{ ep:'/api/app/recompete-map', title:'Recompetes', unit:'expiring contracts' },
-    contractor:{ ep:'', title:'Contractors', unit:'contractors' }
+    contractor:{ ep:'', title:'Contacts', unit:'contacts' }
   };
   var MODE='open'; window.__mapMode='open';
   var HIDE_FSC=false, TOTAL=0, CAPPED=false, busy=false, t=null, t2=null, Q='';
@@ -356,7 +356,7 @@ const VIEWPORT_JS = `<script>
   var _render=render; render=function(){ _render(); updateHeader(); };
   function fetchView(){
     if(busy)return;
-    if(MODE==='contractor'){ OPPS=[]; render(); var f=document.getElementById('feed'); if(f)f.innerHTML='<div class="empty"><h4>Contractors map — coming next</h4><p>Wiring the contractor dataset (firm HQ locations) onto the map.</p></div>'; return; }
+    if(MODE==='contractor'){ OPPS=[]; render(); var f=document.getElementById('feed'); if(f)f.innerHTML='<div class="empty"><h4>Contacts map — coming next</h4><p>Buyers (contracting officers &amp; POCs) and companies, mapped by location.</p></div>'; return; }
     busy=true;
     var url=MODES[MODE].ep+'?bbox='+bbox()+(MODE==='open'?('&status=active'+(HIDE_FSC?'&hideCommodity=1':'')):'')+(Q?'&q='+encodeURIComponent(Q):'');
     // Append active server filters. Top-bar single-selects and deep-panel multi-selects
