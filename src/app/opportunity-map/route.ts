@@ -59,7 +59,17 @@ const MORE_FILTERS = '<div class="mfwrap">'
   + '<div class="mf-sec">Buyer</div>'
   + '<div class="mf-grid2">'
   +   '<label class="mf-field"><span>Agency</span><input class="mf-in" id="mfAgency" placeholder="e.g. Navy" autocomplete="off"></label>'
+  +   '<label class="mf-field"><span>Sub-agency</span><input class="mf-in" id="mfSubAgency" placeholder="e.g. Army" autocomplete="off"></label>'
+  + '</div>'
+  + '<div class="mf-sec">Location</div>'
+  + '<div class="mf-grid2">'
   +   '<label class="mf-field"><span>State</span><input class="mf-in mf-st" id="mfState" placeholder="e.g. FL" maxlength="2" autocomplete="off"></label>'
+  +   '<label class="mf-field"><span>Country</span><select class="mf-in" id="mfCountry"><option value="">Anywhere</option><option value="us">United States</option><option value="oconus">Overseas (OCONUS)</option></select></label>'
+  + '</div>'
+  + '<div class="mf-sec">Only show</div>'
+  + '<div class="mf-checks">'
+  +   '<label class="mf-chk"><input type="checkbox" id="mfHasDocs">With documents</label>'
+  +   '<label class="mf-chk"><input type="checkbox" id="mfHasContact">With a contact</label>'
   + '</div>'
   + '<div class="mf-sec">Set-aside <em>(any selected)</em></div>'
   + '<div class="mf-checks">' + SETASIDE_CHECKS + '</div>'
@@ -328,7 +338,8 @@ const VIEWPORT_JS = `<script>
   // sends them as query params so the filter is applied by the DB for the current
   // viewport — and survives panning, instead of hiding already-fetched pins.
   var FILT={ scope:'all', noticeType:'', setAside:'', closingDays:'', agency:'', state:'',
-    naics:'', psc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'' };
+    naics:'', psc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'',
+    subAgency:'', country:'', hasDocs:'', hasContact:'' };
   try{ var zt=document.querySelector('.ztop'), zf=document.querySelector('.fbar');
     if(zt&&zf){ zt.appendChild(zf); setTimeout(function(){try{map.invalidateSize();}catch(e){}},80); } }catch(e){}
   function clean(d){ return (d||'').replace(/,?\\s*DEPARTMENT OF( THE)?/i,'').replace(/DEPARTMENT OF( THE)?\\s*/i,'').trim().replace(/\\b([A-Z])([A-Z0-9'&.\\/-]*)/g,function(_,a,b){return a+b.toLowerCase();})||d; }
@@ -376,6 +387,10 @@ const VIEWPORT_JS = `<script>
       if(FILT.naics)url+='&naics='+encodeURIComponent(FILT.naics);
       if(FILT.psc)url+='&psc='+encodeURIComponent(FILT.psc);
       if(FILT.postedDays)url+='&postedDays='+encodeURIComponent(FILT.postedDays);
+      if(FILT.subAgency)url+='&subAgency='+encodeURIComponent(FILT.subAgency);
+      if(FILT.country)url+='&country='+encodeURIComponent(FILT.country);
+      if(FILT.hasDocs)url+='&hasDocs=1';
+      if(FILT.hasContact)url+='&hasContact=1';
     }
     // Value range — Recompetes only for now (real USASpending ceilings). The recompete-map
     // endpoint accepts min/max; hidden on Open until the doc-scan backfills estimated value.
@@ -421,16 +436,20 @@ const VIEWPORT_JS = `<script>
     FILT.setAsideMulti=_checked('.mf-set');
     FILT.noticeMulti=_checked('.mf-notice');
     FILT.valueRange=(document.getElementById('mfValue')||{}).value||'';
-    var active=!!(FILT.naics||FILT.psc||FILT.agency||FILT.state||FILT.postedDays||FILT.setAsideMulti||FILT.noticeMulti||FILT.valueRange);
+    FILT.subAgency=(document.getElementById('mfSubAgency')||{}).value||'';
+    FILT.country=(document.getElementById('mfCountry')||{}).value||'';
+    FILT.hasDocs=(document.getElementById('mfHasDocs')||{}).checked?'1':'';
+    FILT.hasContact=(document.getElementById('mfHasContact')||{}).checked?'1':'';
+    var active=!!(FILT.naics||FILT.psc||FILT.agency||FILT.state||FILT.postedDays||FILT.setAsideMulti||FILT.noticeMulti||FILT.valueRange||FILT.subAgency||FILT.country||FILT.hasDocs||FILT.hasContact);
     var mbEl=document.getElementById('moreBtn'); if(mbEl)mbEl.classList.toggle('hasfilt',active);
   }
   var _apply=document.getElementById('mfApply');
   if(_apply)_apply.onclick=function(){ readDeep(); var mp2=document.getElementById('morePanel'); if(mp2)mp2.classList.remove('show'); fetchView(); };
   var _mfclr=document.getElementById('mfClear');
   if(_mfclr)_mfclr.onclick=function(){
-    ['mfNaics','mfPsc','mfAgency','mfState'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
-    var mvp=document.getElementById('mfPosted'); if(mvp)mvp.value='';
-    var mvv=document.getElementById('mfValue'); if(mvv)mvv.value='';
+    ['mfNaics','mfPsc','mfAgency','mfState','mfSubAgency'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
+    ['mfPosted','mfValue','mfCountry'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
+    ['mfHasDocs','mfHasContact'].forEach(function(id){var e=document.getElementById(id);if(e)e.checked=false;});
     document.querySelectorAll('.mf-set,.mf-notice').forEach(function(c){c.checked=false;});
     readDeep(); fetchView();
   };

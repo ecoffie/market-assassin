@@ -17,7 +17,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { getMapOpportunities, SET_GROUPS, setGroupKey, SET_LABEL, naicsCategory } from '@/lib/opportunities/map-data';
-import { applyMapFilters, multiVal, type MapFilters } from '@/lib/opportunities/map-filters';
+import { applyMapFilters, multiVal, parseMapFilters, type MapFilters } from '@/lib/opportunities/map-filters';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 
 export const dynamic = 'force-dynamic';
@@ -102,20 +102,10 @@ export async function GET(request: NextRequest) {
     if (email) { const prof = await loadProfile(email); profileNaics = prof.naics; profileStates = prof.states; }
   }
 
-  const f: Filters = {
-    status: (p.get('status') || 'active').toLowerCase(),
-    search: p.get('q') || p.get('search') || '',
-    noticeType: p.get('noticeType') || '',
-    agency: p.get('agency') || '',
-    setAside: p.get('setAside') || '',
-    naics: p.get('naics') || '',
-    psc: p.get('psc') || '',
-    state: p.get('state') || '',
-    hideCommodity: p.get('hideCommodity') === '1' || p.get('hideCommodity') === 'true',
-    closingDays: Math.max(0, parseInt(p.get('closingDays') || '0', 10) || 0),
-    postedDays: Math.max(0, parseInt(p.get('postedDays') || '0', 10) || 0),
-    profileNaics, profileStates,
-  };
+  // Use the SHARED parser (map-filters.ts) so this API and the saved-search cron never
+  // drift — the whole point of the shared lib. (This block used to duplicate it, which is
+  // exactly how the 4 new filters went missing here.)
+  const f: Filters = parseMapFilters((k) => p.get(k), { profileNaics, profileStates });
 
   try {
     const db = sb();
