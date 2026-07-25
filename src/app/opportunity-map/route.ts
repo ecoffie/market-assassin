@@ -78,9 +78,19 @@ const EARLY_INJECT = '<script>function setColorFor(o){if(o&&o.set===\'HUBZone\')
 // Achieved by re-gridding .app into areas and moving the filter bar into the top bar (JS). All
 // of the template's render()/markers/filters/cards logic is untouched — only containers move.
 const ZLAYOUT_CSS = '<style>'
-  + '.app{grid-template-columns:58px minmax(0,1fr) 404px!important;grid-template-rows:auto minmax(0,1fr)!important;'
-  + 'grid-template-areas:"zrail ztop ztop" "zrail zmap zcards"!important;transition:none!important}'
+  // Brand font: match the Mindy app (Inter) — drop the template's Space Grotesk display face.
+  + ':root{--disp:"Inter",system-ui,-apple-system,sans-serif!important}'
+  + '.snapt,.osec-h,.brand{font-family:"Inter",system-ui,-apple-system,sans-serif!important;letter-spacing:-.01em}'
+  // Grid gains a full-width top HEADER row for the Mindy logo, above the search/filter row.
+  + '.app{grid-template-columns:58px minmax(0,1fr) 404px!important;grid-template-rows:52px auto minmax(0,1fr)!important;'
+  + 'grid-template-areas:"zhead zhead zhead" "zrail ztop ztop" "zrail zmap zcards"!important;transition:none!important}'
   + '.app.collapsed{grid-template-columns:58px minmax(0,1fr) 0px!important}'
+  // Mindy header bar
+  + '.zhead{grid-area:zhead;display:flex;align-items:center;gap:12px;padding:0 18px;border-bottom:1px solid var(--line);background:#fff;z-index:20}'
+  + '.zhead img{height:27px;width:auto;display:block}'
+  + '.zhead .zh-sep{width:1px;height:22px;background:var(--line)}'
+  + '.zhead .zh-t{font:600 14px "Inter",system-ui,sans-serif;color:var(--ink)}'
+  + '.zhead .zh-live{margin-left:auto;font:600 11px "Inter",system-ui,sans-serif;color:#22a06b;display:inline-flex;align-items:center;gap:6px;letter-spacing:.02em}'
   // far-left icon rail
   + '.zrail{grid-area:zrail;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:2px;padding:14px 0;z-index:10}'
   + '.zrail a{display:flex;flex-direction:column;align-items:center;gap:3px;font:600 9px/1.1 Inter,system-ui,sans-serif;color:var(--sub);text-decoration:none;padding:9px 3px;border-radius:9px;width:48px;text-align:center}'
@@ -112,6 +122,11 @@ const ZRAIL_HTML = '<nav class="zrail">'
 const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
   + '<svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>'
   + '<input id="zsearchInput" placeholder="Search opportunities, agencies, keywords…" autocomplete="off"></div></div>';
+// Mindy brand header bar (top, full width) — the wordmark + product name, Zillow-style.
+const ZHEAD_HTML = '<header class="zhead">'
+  + '<a href="/app" title="Mindy"><img src="/brand/mindy-logo-wordmark.svg" alt="Mindy AI"/></a>'
+  + '<span class="zh-sep"></span><span class="zh-t">Federal Opportunity Map</span>'
+  + '<span class="zh-live">● Live · SAM.gov</span></header>';
 
 // Set-aside color legend overlaid on the map (so color = eligibility is self-explanatory).
 const LEGEND_HTML = '<div class="setlegend"><div class="sl-t">Set-aside eligibility</div>'
@@ -205,9 +220,9 @@ const DRAWER_CSS = '<style>'
   + '.viewdet{color:var(--sub);font-weight:600;font-size:12px}'
   // Drawer fills the MAP area (between the 58px icon rail and the 404px cards column) and slides
   // in from the left — so the card list stays visible and clicking another card updates it.
-  + '.oppbd{position:fixed;top:0;left:58px;right:404px;bottom:0;background:rgba(17,28,38,.06);z-index:1400;opacity:0;pointer-events:none;transition:opacity .2s}'
+  + '.oppbd{position:fixed;top:52px;left:58px;right:404px;bottom:0;background:rgba(17,28,38,.06);z-index:1400;opacity:0;pointer-events:none;transition:opacity .2s}'
   + '.oppbd.show{opacity:1}'
-  + '.oppdrawer{position:fixed;top:0;left:58px;right:404px;height:100vh;height:100dvh;background:#fff;z-index:1500;'
+  + '.oppdrawer{position:fixed;top:52px;left:58px;right:404px;height:calc(100vh - 52px);height:calc(100dvh - 52px);background:#fff;z-index:1500;'
   + 'box-shadow:8px 0 40px rgba(0,0,0,.14);transform:translateX(-104%);transition:transform .28s cubic-bezier(.4,0,.2,1);'
   + 'overflow-y:auto;display:flex;flex-direction:column}'
   + '.oppdrawer.show{transform:none}'
@@ -419,7 +434,7 @@ export async function GET(request: NextRequest) {
     html = html.replace('</head>', PAGE_CSS + ZLAYOUT_CSS + DRAWER_CSS + '</head>');
     // Zillow layout: inject the icon rail + top search bar as the first children of .app
     // (the grid areas place them; VIEWPORT_JS moves the filter bar up into the top bar).
-    html = html.replace('<div class="app">', '<div class="app">' + ZRAIL_HTML + ZTOP_HTML);
+    html = html.replace('<div class="app">', '<div class="app">' + ZHEAD_HTML + ZRAIL_HTML + ZTOP_HTML);
     // Load setColorFor right after leaflet.js (before the template's map script).
     html = html.replace('<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>',
       '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>' + EARLY_INJECT);
