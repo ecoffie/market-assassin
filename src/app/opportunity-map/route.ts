@@ -184,7 +184,9 @@ const PAGE_CSS = '<style>'
   + '.railbtn{display:none!important}'
   // "More filters" dropdown panel (Zillow's Filters catch-all).
   + '.mfwrap{position:relative}'
-  + '.mfpanel{display:none;position:absolute;top:calc(100% + 8px);left:0;z-index:900;background:#fff;'
+  // Anchor to the RIGHT edge of the Filters button (it sits near the right of the bar, so
+  // a left-anchored 320px panel would overflow off-screen). z-index high within .ztop.
+  + '.mfpanel{display:none;position:absolute;top:calc(100% + 8px);right:0;z-index:1200;background:#fff;'
   + 'border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.15);padding:13px 15px;min-width:300px}'
   + '.mfpanel.show{display:block}'
   + '.mf-sec{font:700 10px "Inter",system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin-bottom:11px}'
@@ -235,7 +237,9 @@ const ZLAYOUT_CSS = '<style>'
   // top bar (search + the moved filters)
   // Bar stays ONE row like Zillow — nowrap so items SHRINK instead of the search
   // wrapping onto its own line. overflow stays visible so the Filters dropdown escapes.
-  + '.ztop{grid-area:ztop;position:relative;display:flex;flex-wrap:nowrap;align-items:center;gap:8px;padding:10px 18px;border-bottom:1px solid var(--line);background:#fff;z-index:9;min-width:0}'
+  // z-index MUST beat Leaflet's map panes (tile 200 … popup 700) or the Filters dropdown,
+  // which is a child of this bar, renders BEHIND the map and "won't display" when clicked.
+  + '.ztop{grid-area:ztop;position:relative;display:flex;flex-wrap:nowrap;align-items:center;gap:8px;padding:10px 18px;border-bottom:1px solid var(--line);background:#fff;z-index:1001;min-width:0}'
   // Pills don\'t shrink (keep their label); the search absorbs the squeeze first.
   + '.ztop .fbar,.fsel,.savesearch{flex:none}'
   + '.zsearch{flex:1 1 240px;min-width:150px;max-width:340px;display:flex;align-items:center;gap:8px;border:1px solid #d1d5db;border-radius:8px;padding:0 13px;height:40px;background:#fff}'
