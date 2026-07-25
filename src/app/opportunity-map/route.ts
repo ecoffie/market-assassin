@@ -32,9 +32,15 @@ function cleanAgency(dept: string): string {
   return d.replace(/\b([A-Z])([A-Z0-9'&./-]*)/g, (_, a, b) => a + b.toLowerCase()) || dept;
 }
 
-// A "Commodity buys" toggle injected into the filter bar (no self-filtering — default SHOWS
-// all; the user opts to hide FSC micro-buys). Sits alongside the template's own filters.
-const FSC_TOGGLE = '<button class="fbtn" id="fscToggle" title="FSC parts/commodity micro-buys">Commodity buys: shown</button>';
+// "More filters" dropdown (Zillow's Filters catch-all) — the long-tail filters live here, off
+// the top row. Starts with the Commodity-buys toggle (no self-filtering: default SHOWS all).
+const MORE_FILTERS = '<div class="mfwrap">'
+  + '<button class="fbtn" id="moreBtn">More filters ▾</button>'
+  + '<div class="mfpanel" id="morePanel">'
+  + '<div class="mf-sec">Refine this view</div>'
+  + '<div class="mf-row"><span>Commodity buys<br><em>parts &amp; supply micro-buys</em></span>'
+  + '<button class="mf-toggle" id="fscToggle">Shown</button></div>'
+  + '</div></div>';
 
 // Full-page CSS overrides (kept out of the verbatim template): (1) sheet-label readability
 // — grid items default to min-width:auto so nowrap labels overflow their cell; let them wrap.
@@ -63,6 +69,16 @@ const PAGE_CSS = '<style>'
   // Old list-collapse toggle (.railbtn) was pinned to the old left-panel edge (left:392px) and
   // floated in the middle of the map in the new layout — remove it (cards stay always-visible).
   + '.railbtn{display:none!important}'
+  // "More filters" dropdown panel (Zillow's Filters catch-all).
+  + '.mfwrap{position:relative}'
+  + '.mfpanel{display:none;position:absolute;top:calc(100% + 8px);left:0;z-index:900;background:#fff;'
+  + 'border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.15);padding:13px 15px;min-width:300px}'
+  + '.mfpanel.show{display:block}'
+  + '.mf-sec{font:700 10px "Inter",system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin-bottom:11px}'
+  + '.mf-row{display:flex;align-items:center;justify-content:space-between;gap:16px;font:600 13px "Inter",system-ui,sans-serif;color:var(--ink)}'
+  + '.mf-row em{font-style:normal;font-weight:400;font-size:11.5px;color:var(--sub)}'
+  + '.mf-toggle{flex:none;font:600 12px "Inter",system-ui,sans-serif;padding:6px 14px;border-radius:8px;border:1px solid var(--line);background:#fff;cursor:pointer;color:var(--ink)}'
+  + '.mf-toggle.off{color:var(--sub);background:var(--wash)}'
   + '</style>';
 
 // Loaded right after leaflet.js (before the template's map script): setColorFor(). It MUST be a
@@ -209,7 +225,7 @@ const VIEWPORT_JS = `<script>
   }
   window.setMapMode=function(mode){ if(!MODES[mode]||mode===MODE)return; MODE=mode; window.__mapMode=mode;
     var tabs=document.querySelectorAll('.zh-mode'); for(var i=0;i<tabs.length;i++)tabs[i].classList.toggle('on',tabs[i].getAttribute('data-mode')===mode);
-    var fsc=document.getElementById('fscToggle'); if(fsc)fsc.style.display=(mode==='open')?'':'none';
+    var mw=document.querySelector('.mfwrap'); if(mw)mw.style.display=(mode==='open')?'':'none';
     Q=''; var zsi=document.getElementById('zsearchInput'); if(zsi)zsi.value='';
     fetchView();
   };
@@ -217,7 +233,11 @@ const VIEWPORT_JS = `<script>
   var zsi=document.getElementById('zsearchInput');
   if(zsi)zsi.addEventListener('input',function(){ clearTimeout(t2); t2=setTimeout(function(){ Q=zsi.value.trim(); fetchView(); },400); });
   var tg=document.getElementById('fscToggle');
-  if(tg)tg.onclick=function(){ HIDE_FSC=!HIDE_FSC; tg.classList.toggle('active',HIDE_FSC); tg.textContent=HIDE_FSC?'Commodity buys: hidden':'Commodity buys: shown'; fetchView(); };
+  if(tg)tg.onclick=function(){ HIDE_FSC=!HIDE_FSC; tg.classList.toggle('off',HIDE_FSC); tg.textContent=HIDE_FSC?'Hidden':'Shown'; fetchView(); };
+  // More-filters dropdown open/close.
+  var mb=document.getElementById('moreBtn'), mp=document.getElementById('morePanel');
+  if(mb&&mp){ mb.onclick=function(e){ e.stopPropagation(); mp.classList.toggle('show'); };
+    document.addEventListener('click',function(e){ if(mp.classList.contains('show')&&!e.target.closest('.mfwrap'))mp.classList.remove('show'); }); }
   setTimeout(fetchView,300);
 })();
 </script>`;
@@ -493,7 +513,7 @@ export async function GET(request: NextRequest) {
     html = html.replace('<div id="map"></div>', '<div id="map"></div>' + LEGEND_HTML);
     // Commodity-buys toggle in the filter bar.
     html = html.replace('<button class="clr" id="clrAll">Clear all</button>',
-      FSC_TOGGLE + '<button class="clr" id="clrAll">Clear all</button>');
+      MORE_FILTERS + '<button class="clr" id="clrAll">Clear all</button>');
     // CARD (#1 Snapshot): NO action buttons on the card face (Eric). The card is the clickable
     // snapshot; Save/Draft live in the detail drawer. Card actions → a "View details →" hint.
     html = html.replace('<a class="act" href="${samURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">SAM.gov</a>',
