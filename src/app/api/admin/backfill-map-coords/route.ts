@@ -73,18 +73,18 @@ export async function POST(req: NextRequest) {
     if (error) return NextResponse.json({ success: false, error: error.message, processed, updated, nextCursor: cursor }, { status: 500 });
     if (!data || data.length === 0) { done = true; break; }
 
-    const updates: { notice_id: string; lat: number; lng: number }[] = [];
+    const updates: { notice_id: string; lat: number; lng: number; src: string }[] = [];
     for (const r of data as Array<Record<string, unknown>>) {
       cursor = String(r.notice_id);
       processed++;
       const c = resolvePinCoord(r as Parameters<typeof resolvePinCoord>[0]);
-      if (c) updates.push({ notice_id: String(r.notice_id), lat: c.lat, lng: c.lng });
+      if (c) updates.push({ notice_id: String(r.notice_id), lat: c.lat, lng: c.lng, src: c.source });
     }
     // Write coords one UPDATE per row (only the placeable ones). Un-geocodable rows stay
     // NULL — but the cursor moved past them, so the sweep still terminates.
     for (const u of updates) {
       const { error: uerr } = await db.from('sam_opportunities')
-        .update({ map_lat: u.lat, map_lng: u.lng }).eq('notice_id', u.notice_id);
+        .update({ map_lat: u.lat, map_lng: u.lng, map_loc_source: u.src }).eq('notice_id', u.notice_id);
       if (uerr) return NextResponse.json({ success: false, error: uerr.message, processed, updated, nextCursor: cursor }, { status: 500 });
       updated++;
     }

@@ -72,7 +72,8 @@ const LEGEND_HTML = '<div class="setlegend"><div class="sl-t">Set-aside eligibil
   + '<span><i style="background:#8b5cf6"></i>8(a)</span>'
   + '<span><i style="background:#ef4444"></i>WOSB</span>'
   + '<span><i style="background:#f59e0b"></i>HUBZone</span>'
-  + '<span><i style="background:#64748b"></i>Open</span></div>';
+  + '<span><i style="background:#64748b"></i>Open</span>'
+  + '<span style="width:100%;color:var(--sub);font-size:10px;gap:5px"><i style="background:#fff;border:1.5px solid #94a3b8"></i>hollow = buying office (place of performance not specified)</span></div>';
 
 // Viewport-driven data layer (Airbnb/Google): the template ships a static SSR pin set; this
 // swaps it for a live bbox fetch on every pan/zoom against /api/app/opportunity-map. Reuses
@@ -85,7 +86,7 @@ const VIEWPORT_JS = `<script>
   var SETMAP={SDVOSB:'SDVOSB',SB:'SB','8A':'8(a)',WOSB:'WOSB',HZ:'HUBZone',OTHER:'Other',NONE:'None'};
   var HIDE_FSC=false, TOTAL=0, CAPPED=false, busy=false, t=null;
   function clean(d){ return (d||'').replace(/,?\\s*DEPARTMENT OF( THE)?/i,'').replace(/DEPARTMENT OF( THE)?\\s*/i,'').trim().replace(/\\b([A-Z])([A-Z0-9'&.\\/-]*)/g,function(_,a,b){return a+b.toLowerCase();})||d; }
-  function toRow(p){ return {src:'SAM',naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng}; }
+  function toRow(p){ return {src:'SAM',naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc}; }
   function bbox(){ var b=map.getBounds(); return [b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].map(function(n){return n.toFixed(4);}).join(','); }
   function updateHeader(){
     if(!TOTAL)return;
@@ -134,6 +135,7 @@ export async function GET(request: NextRequest) {
       uiLink: o.uiLink,
       lat: o.lat,
       lng: o.lng,
+      locSrc: o.locSrc,
     }));
   } catch {
     opps = [];
@@ -153,6 +155,17 @@ export async function GET(request: NextRequest) {
       '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>' + EARLY_INJECT);
     // Color pins by SET-ASIDE eligibility (fixes the all-gray category mismatch).
     html = html.split('catColor(o.cat)').join('setColorFor(o)');
+    // Office-vs-PoP honesty: a pin whose location is the BUYING OFFICE (SAM omitted place of
+    // performance) renders HOLLOW — white fill, colored ring — so it's not read as confirmed PoP.
+    html = html.replace("color:'#ffffff',weight:2,",
+      "color:o.locSrc==='office'?col:'#ffffff',weight:o.locSrc==='office'?2.5:2,");
+    html = html.replace("fillColor:col,fillOpacity:o.src==='RECOMPETE'?.72:.95",
+      "fillColor:o.locSrc==='office'?'#ffffff':col,fillOpacity:o.locSrc==='office'?0.9:(o.src==='RECOMPETE'?.72:.95)");
+    // Honesty label in the popup + list card.
+    html = html.replace('<div class="pvmeta"><b>${agency}</b> · ${o.loc}</div>',
+      '<div class="pvmeta"><b>${agency}</b> · ${o.loc}${o.locSrc===\'office\'?\' <span style=\"color:#94a3b8\">· buying office (place of performance not specified)</span>\':\'\'}</div>');
+    html = html.replace('<span class="loc">${o.loc}</span>',
+      '<span class="loc">${o.loc}${o.locSrc===\'office\'?\' · office\':\'\'}</span>');
     // Set-aside color legend on the map.
     html = html.replace('<div id="map"></div>', '<div id="map"></div>' + LEGEND_HTML);
     // Commodity-buys toggle in the filter bar.

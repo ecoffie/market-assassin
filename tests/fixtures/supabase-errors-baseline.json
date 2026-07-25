@@ -92,7 +92,7 @@
     "src/app/api/cron/sam-sync-watchdog/route.ts:73 (sam_sync_runs)",
     "src/app/api/cron/send-briefings-fast/route.ts:124 (briefing_log)",
     "src/app/api/cron/snapshot-multisite/route.ts:258 (aggregated_opportunities)",
-    "src/app/api/cron/sync-sam-opportunities/route.ts:270 (sam_sync_runs)",
+    "src/app/api/cron/sync-sam-opportunities/route.ts:271 (sam_sync_runs)",
     "src/app/api/cron/sync-usaspending-awards/route.ts:217 (usaspending_awards)",
     "src/app/api/market-scanner/route.ts:528 (agency_forecasts) [count-null]",
     "src/app/api/sbir/route.ts:97 (aggregated_opportunities) [count-null]"

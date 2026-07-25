@@ -255,6 +255,7 @@ function mapToDbRecord(opp: SamOpportunity) {
   });
   record.map_lat = coord ? coord.lat : null;
   record.map_lng = coord ? coord.lng : null;
+  record.map_loc_source = coord ? coord.source : null;
 
   return record;
 }

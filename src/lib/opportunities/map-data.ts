@@ -30,12 +30,16 @@ function cityJitter([lat, lng]: [number, number], seed: number): [number, number
 /** Resolve a real coordinate for an opp, most-precise source first:
  *  place-of-performance city → buying-office ZIP → buying-office city. Returns the
  *  matched city label + state so the pin's text agrees with its location. */
+// 'pop' = the coordinate is the actual place of performance (incl. overseas); 'office' = we
+// fell back to the BUYING OFFICE because SAM omitted the place of performance (~64% of notices).
+// The UI labels/styles these differently so an office-fallback pin isn't read as confirmed PoP.
+export type LocSource = 'pop' | 'office';
 export function geocode(
   popCity: string, popState: string | null,
   office: { city?: string; state?: string; zipcode?: string } | null,
   popZip?: string | null,
   popCountry?: string | null,
-): { coord: [number, number] | null; city: string; state: string | null } {
+): { coord: [number, number] | null; city: string; state: string | null; source: LocSource | null } {
   // OCONUS: when place-of-performance is a FOREIGN country, resolve to its real location —
   // never fall through to the US buying office (that put Rome/Jeddah/Vienna in Washington DC).
   const iso3 = (popCountry || '').toUpperCase().trim();
@@ -43,34 +47,36 @@ export function geocode(
     const iso2 = ISO3_TO_ISO2[iso3];
     if (popCity && iso2) {
       const wc = WORLD_CITY[`${popCity.toUpperCase().trim()}|${iso2}`];
-      if (wc) return { coord: wc, city: popCity.trim(), state: iso3 };
+      if (wc) return { coord: wc, city: popCity.trim(), state: iso3, source: 'pop' };
     }
     const cc = COUNTRY_CENTROID[iso3];
-    if (cc) return { coord: cc, city: popCity ? popCity.trim() : '', state: iso3 };
+    if (cc) return { coord: cc, city: popCity ? popCity.trim() : '', state: iso3, source: 'pop' };
     // Foreign but unknown country → no pin (honest; do NOT place on US soil).
-    return { coord: null, city: '', state: null };
+    return { coord: null, city: '', state: null, source: null };
   }
   if (popCity && popState) {
     const c = CITY_COORDS[`${popCity.toUpperCase()}|${popState}`];
-    if (c) return { coord: c, city: popCity, state: popState };
+    if (c) return { coord: c, city: popCity, state: popState, source: 'pop' };
   }
   // Place-of-performance ZIP — more precise than the buying office, so it comes next.
   if (popZip) {
     const z = String(popZip).replace(/\D/g, '').slice(0, 5);
     const c = ZIP_COORDS[z];
-    if (c) return { coord: c, city: popCity.trim(), state: popState };
+    if (c) return { coord: c, city: popCity.trim(), state: popState, source: 'pop' };
   }
   const oState = normalizeStateCode(office?.state || '');
   if (office?.zipcode) {
     const z = String(office.zipcode).replace(/\D/g, '').slice(0, 5);
     const c = ZIP_COORDS[z];
-    if (c) return { coord: c, city: (office.city || '').trim(), state: oState };
+    if (c) return { coord: c, city: (office.city || '').trim(), state: oState, source: 'office' };
   }
   if (office?.city && oState) {
     const c = CITY_COORDS[`${office.city.trim().toUpperCase()}|${oState}`];
-    if (c) return { coord: c, city: office.city.trim(), state: oState };
+    if (c) return { coord: c, city: office.city.trim(), state: oState, source: 'office' };
   }
-  return { coord: null, city: '', state: popState || oState };
+  // No coord match → state-centroid fallback in resolvePinCoord. Source follows the state we'll
+  // use: the pop state (performed-in-state) if we have it, else the office state.
+  return { coord: null, city: '', state: popState || oState, source: popState ? 'pop' : (oState ? 'office' : null) };
 }
 
 /** Stable small integer seed from a string (notice_id) — so a row's jittered coordinate is
@@ -89,22 +95,23 @@ export function resolvePinCoord(row: {
   pop_city?: string | null; pop_state?: string | null; pop_zip?: string | null;
   pop_country?: string | null;
   office_address?: { city?: string; state?: string; zipcode?: string } | null;
-}): { lat: number; lng: number; state: string; city: string } | null {
+}): { lat: number; lng: number; state: string; city: string; source: LocSource } | null {
   const popState = normalizeStateCode((row.pop_state as string) || '');
   const popCity = ((row.pop_city as string) || '').trim();
   const office = (row.office_address as { city?: string; state?: string; zipcode?: string } | null) || null;
   const g = geocode(popCity, popState, office, row.pop_zip || null, row.pop_country || null);
   const state = g.state;
   if (!state) return null;
+  const source: LocSource = g.source ?? 'office';
   const seed = stableSeed(String(row.notice_id ?? row.title ?? ''));
   if (g.coord) {
     const [lat, lng] = cityJitter(g.coord, seed);
-    return { lat, lng, state, city: g.city };
+    return { lat, lng, state, city: g.city, source };
   }
   const base = STATE_CENTROIDS[state];
   if (!base) return null;
   const [lat, lng] = jitter(base, seed);
-  return { lat, lng, state, city: g.city };
+  return { lat, lng, state, city: g.city, source };
 }
 
 /** Set-aside groups — key, display label, pin color. Colors mirror the prototype's palette. */
@@ -147,7 +154,7 @@ export function naicsCategory(naics: string | null | undefined): string {
 export type MapOpp = {
   id: string; title: string; agency: string; set: string; setLabel: string;
   naics: string; cat: string; loc: string; close: string | null; sol: string;
-  uiLink: string | null; lat: number; lng: number; src: 'SAM';
+  uiLink: string | null; lat: number; lng: number; src: 'SAM'; locSrc: LocSource;
 };
 
 /**
@@ -199,7 +206,7 @@ export async function getMapOpportunities(limit = 600): Promise<MapOpp[]> {
       close: (r.response_deadline as string) || null,
       sol: String(r.solicitation_number ?? ''),
       uiLink: (r.ui_link as string) || null,
-      lat, lng, src: 'SAM',
+      lat, lng, src: 'SAM', locSrc: g.source ?? 'office',
     });
     if (out.length >= limit) break;
   }

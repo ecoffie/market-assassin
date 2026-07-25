@@ -43,28 +43,28 @@ async function main() {
     if (!data || data.length === 0) break;
     batches++;
 
-    const rows: { id: string; lat: number; lng: number }[] = [];
+    const rows: { id: string; lat: number; lng: number; src: string }[] = [];
     for (const r of data as Array<Record<string, unknown>>) {
       cursor = String(r.notice_id);
       processed++;
       const c = resolvePinCoord(r as Parameters<typeof resolvePinCoord>[0]);
       if (!c) { unplaced++; continue; }
       placed++;
-      rows.push({ id: String(r.notice_id), lat: c.lat, lng: c.lng });
+      rows.push({ id: String(r.notice_id), lat: c.lat, lng: c.lng, src: c.source });
     }
 
     if (pg && rows.length) {
-      // Bulk: UPDATE ... FROM (VALUES ($1,$2,$3), ...) — one round-trip per page.
+      // Bulk: UPDATE ... FROM (VALUES ($1,$2,$3,$4), ...) — one round-trip per page.
       const vals: string[] = [];
       const params: (string | number)[] = [];
       rows.forEach((r, i) => {
-        const b = i * 3;
-        vals.push(`($${b + 1}, $${b + 2}::float8, $${b + 3}::float8)`);
-        params.push(r.id, r.lat, r.lng);
+        const b = i * 4;
+        vals.push(`($${b + 1}, $${b + 2}::float8, $${b + 3}::float8, $${b + 4})`);
+        params.push(r.id, r.lat, r.lng, r.src);
       });
       await pg.query(
-        `UPDATE sam_opportunities AS s SET map_lat = v.lat, map_lng = v.lng
-         FROM (VALUES ${vals.join(',')}) AS v(notice_id, lat, lng)
+        `UPDATE sam_opportunities AS s SET map_lat = v.lat, map_lng = v.lng, map_loc_source = v.src
+         FROM (VALUES ${vals.join(',')}) AS v(notice_id, lat, lng, src)
          WHERE s.notice_id = v.notice_id`, params);
     }
     if (batches % 5 === 0) {

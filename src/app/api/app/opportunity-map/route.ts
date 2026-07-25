@@ -23,7 +23,7 @@ import { normalizeStateCode } from '@/lib/utils/us-states';
 export const dynamic = 'force-dynamic';
 
 const MAX_PINS = 1000; // PostgREST hard-caps a response at 1000; clustering handles density.
-const PIN_COLS = 'notice_id, title, department, naics_code, set_aside_code, set_aside_description, response_deadline, ui_link, solicitation_number, pop_state, pop_city, office_address, map_lat, map_lng';
+const PIN_COLS = 'notice_id, title, department, naics_code, set_aside_code, set_aside_description, response_deadline, ui_link, solicitation_number, pop_state, pop_city, office_address, map_lat, map_lng, map_loc_source';
 // FSC commodity micro-buy title: 1–4 leading digits then "--" ("48--VALVE,GLOBE").
 const FSC_REGEX = '^[0-9]{1,4}--';
 
@@ -86,6 +86,7 @@ function toPin(r: Record<string, any>) {
     sol: String(r.solicitation_number ?? ''),
     uiLink: (r.ui_link as string) || null,
     lat: Number(r.map_lat), lng: Number(r.map_lng), src: 'SAM' as const,
+    locSrc: (r.map_loc_source as string) === 'office' ? 'office' : 'pop',
   };
 }
 
