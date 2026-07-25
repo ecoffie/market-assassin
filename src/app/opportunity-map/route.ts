@@ -854,6 +854,14 @@ export async function GET(request: NextRequest) {
       '<button class="mpill" id="fitBtn">Fit to results</button>\n      <button class="mpill" id="basemapBtn">Terrain</button>',
       '<button class="mpill" id="drawBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>Draw area</button>'
       + '<button class="mpill" id="drawClear" style="display:none">✕ Clear area</button>');
+    // We removed the fitBtn + basemapBtn buttons — null-guard the template's now-orphaned
+    // handlers so `null.onclick` doesn't THROW and abort the map init script (which killed
+    // ALL pin rendering). Same class of fix as the deleted filter pills.
+    html = html
+      .replace("document.getElementById('basemapBtn').onclick=()=>{\n  provIdx=(provIdx+1)%PROVIDERS.length;mountTiles(provIdx);\n};",
+        "var _bm=document.getElementById('basemapBtn'); if(_bm)_bm.onclick=function(){ provIdx=(provIdx+1)%PROVIDERS.length; mountTiles(provIdx); };")
+      .replace("document.getElementById('fitBtn').onclick=()=>fitView();",
+        "var _fb=document.getElementById('fitBtn'); if(_fb)_fb.onclick=function(){ fitView(); };");
     // Viewport-driven data + dynamic header + save-to-pursuits + detail drawer + draw-area (last, after globals).
     html = html.replace('</body>', DRAWER_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + '</body>');
   }
