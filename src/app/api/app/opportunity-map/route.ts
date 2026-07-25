@@ -33,9 +33,16 @@ function sb() {
 
 type Filters = {
   status: string; search: string; noticeType: string; agency: string; setAside: string;
-  naics: string; state: string; hideCommodity: boolean; closingDays: number;
+  naics: string; psc: string; state: string; hideCommodity: boolean; closingDays: number; postedDays: number;
   profileNaics: string[]; profileStates: string[];
 };
+
+// Split a comma-separated multi-value param into a clean, deduped list. The deep
+// "More filters" panel lets a user pick several set-asides / agencies / notice types
+// at once (Zillow lets you check multiple home types), sent as "a,b,c".
+function multi(v: string): string[] {
+  return [...new Set((v || '').split(',').map((s) => s.trim()).filter(Boolean))];
+}
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function applyFilters(query: any, f: Filters) {
@@ -46,21 +53,53 @@ function applyFilters(query: any, f: Filters) {
 
   const isActiveSearch = Boolean(f.search && f.search.trim());
   if (isActiveSearch) query = query.or(buildSearchOr(f.search));
-  if (f.noticeType) query = query.eq('notice_type', f.noticeType);
-  if (f.agency) query = query.ilike('department', `%${f.agency}%`);
-  // Set-aside filters by GROUP, not exact code: "WOSB" must catch WOSB + EDWOSB, etc.
-  // Widen the exact-code .eq() to .in() over the group's code list (SET_GROUPS). A
-  // value that isn't a known group key falls back to matching it as a literal code.
-  if (f.setAside) {
-    const group = SET_GROUPS.find((g) => g.key === f.setAside);
-    query = query.in('set_aside_code', group ? group.codes : [f.setAside]);
+
+  // Notice type — multi-select: "Solicitation,Sources Sought" → .in(...).
+  const noticeTypes = multi(f.noticeType);
+  if (noticeTypes.length) query = query.in('notice_type', noticeTypes);
+
+  // Agency — multi-select. ilike per agency OR'd together (department is a free-text label).
+  const agencies = multi(f.agency);
+  if (agencies.length) {
+    query = query.or(agencies.map((a) => `department.ilike.%${a.replace(/[%,]/g, '')}%`).join(','));
   }
-  if (f.naics) query = query.or(`naics_code.eq.${f.naics},naics_code.like.${f.naics.substring(0, 3)}%`);
+
+  // Set-aside — multi-select, by GROUP not exact code ("WOSB" catches WOSB + EDWOSB).
+  // Each selected group expands to its code list; a non-group value matches literally.
+  const setAsides = multi(f.setAside);
+  if (setAsides.length) {
+    const codes = [...new Set(setAsides.flatMap((k) => {
+      const group = SET_GROUPS.find((g) => g.key === k);
+      return group ? group.codes : [k];
+    }))];
+    query = query.in('set_aside_code', codes);
+  }
+
+  // NAICS — multi-select. ≤4 chars = prefix match; 6-digit = exact. OR'd across codes.
+  const naicsList = multi(f.naics);
+  if (naicsList.length) {
+    const conds = naicsList.map((c) => (c.length <= 4 ? `naics_code.like.${c}%` : `naics_code.eq.${c}`));
+    query = query.or(conds.join(','));
+  }
+
+  // PSC — multi-select. ≤2 chars = prefix (the PSC category letter/2-char); else exact.
+  const pscList = multi(f.psc);
+  if (pscList.length) {
+    const conds = pscList.map((c) => { const t = c.toUpperCase(); return t.length <= 2 ? `psc_code.like.${t}%` : `psc_code.eq.${t}`; });
+    query = query.or(conds.join(','));
+  }
+
   if (f.hideCommodity) query = query.not('title', 'imatch', FSC_REGEX);
+
   // Urgency / closing window: only notices whose deadline is within the next N days.
   if (f.closingDays > 0) {
     const until = new Date(Date.now() + f.closingDays * 86400_000).toISOString();
     query = query.lte('response_deadline', until);
+  }
+  // Posted date: only notices posted within the last N days (new opportunities).
+  if (f.postedDays > 0) {
+    const since = new Date(Date.now() - f.postedDays * 86400_000).toISOString();
+    query = query.gte('posted_date', since);
   }
 
   const explicitState = f.state ? normalizeStateCode(f.state) : null;
@@ -151,9 +190,11 @@ export async function GET(request: NextRequest) {
     agency: p.get('agency') || '',
     setAside: p.get('setAside') || '',
     naics: p.get('naics') || '',
+    psc: p.get('psc') || '',
     state: p.get('state') || '',
     hideCommodity: p.get('hideCommodity') === '1' || p.get('hideCommodity') === 'true',
     closingDays: Math.max(0, parseInt(p.get('closingDays') || '0', 10) || 0),
+    postedDays: Math.max(0, parseInt(p.get('postedDays') || '0', 10) || 0),
     profileNaics, profileStates,
   };
 

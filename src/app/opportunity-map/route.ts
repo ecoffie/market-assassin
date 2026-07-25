@@ -34,12 +34,46 @@ function cleanAgency(dept: string): string {
 
 // "More filters" dropdown (Zillow's Filters catch-all) — the long-tail filters live here, off
 // the top row. Starts with the Commodity-buys toggle (no self-filtering: default SHOWS all).
+// Multi-select set-aside checkboxes (by GROUP) for the deep panel.
+const SETASIDE_CHECKS = SET_GROUPS
+  .filter((g) => g.key !== 'NONE')
+  .map((g) => `<label class="mf-chk"><input type="checkbox" class="mf-set" value="${g.key}"><i style="background:${g.color}"></i>${g.label}</label>`)
+  .join('');
+const NOTICE_CHECKS = [
+  ['Solicitation', 'Solicitation'], ['Combined Synopsis/Solicitation', 'Combined Synopsis'],
+  ['Presolicitation', 'Presolicitation'], ['Sources Sought', 'Sources Sought'], ['Special Notice', 'Special Notice'],
+].map(([v, l]) => `<label class="mf-chk"><input type="checkbox" class="mf-notice" value="${v}">${l}</label>`).join('');
+
+// Deep "More filters" panel — Zillow's advanced filter drawer. The quick pills stay on the
+// top bar; the long-tail + multi-select filters live here. NAICS/PSC = the "what kind"
+// (property-type) axis; set-aside & notice-type are multi-select. Value-range is mode-aware
+// (real data on Recompetes; hidden on Open until the doc-scan backfills estimated value).
 const MORE_FILTERS = '<div class="mfwrap">'
   + '<button class="fbtn" id="moreBtn">More filters ▾</button>'
-  + '<div class="mfpanel" id="morePanel">'
-  + '<div class="mf-sec">Refine this view</div>'
+  + '<div class="mfpanel mfpanel-deep" id="morePanel">'
+  + '<div class="mf-sec">Codes</div>'
+  + '<div class="mf-grid2">'
+  +   '<label class="mf-field"><span>NAICS</span><input class="mf-in" id="mfNaics" placeholder="e.g. 236220" autocomplete="off"></label>'
+  +   '<label class="mf-field"><span>PSC</span><input class="mf-in" id="mfPsc" placeholder="e.g. R408 or R" autocomplete="off"></label>'
+  + '</div>'
+  + '<div class="mf-sec">Set-aside <em>(any selected)</em></div>'
+  + '<div class="mf-checks">' + SETASIDE_CHECKS + '</div>'
+  + '<div class="mf-sec">Notice type <em>(any selected)</em></div>'
+  + '<div class="mf-checks">' + NOTICE_CHECKS + '</div>'
+  + '<div class="mf-sec">Posted</div>'
+  + '<select class="mf-in" id="mfPosted"><option value="">Any time</option><option value="3">Last 3 days</option><option value="7">Last 7 days</option><option value="14">Last 14 days</option><option value="30">Last 30 days</option></select>'
+  // Value range — real on Recompetes (USASpending ceilings); hidden on Open until scan backfills.
+  + '<div class="mf-sec mf-value" id="mfValueSec" style="display:none">Contract value</div>'
+  + '<select class="mf-in mf-value" id="mfValue" style="display:none">'
+  +   '<option value="">Any value</option><option value="0-1000000">Under $1M</option>'
+  +   '<option value="1000000-5000000">$1M–$5M</option><option value="5000000-10000000">$5M–$10M</option>'
+  +   '<option value="10000000-25000000">$10M–$25M</option><option value="25000000-100000000">$25M–$100M</option>'
+  +   '<option value="100000000-">$100M+</option>'
+  + '</select>'
+  + '<div class="mf-sec">Refine</div>'
   + '<div class="mf-row"><span>Commodity buys<br><em>parts &amp; supply micro-buys</em></span>'
   + '<button class="mf-toggle" id="fscToggle">Shown</button></div>'
+  + '<div class="mf-foot"><button class="mf-clear" id="mfClear">Clear advanced</button><button class="mf-apply" id="mfApply">Apply</button></div>'
   + '</div></div>';
 
 // Server-wired filter controls (the reorg). These replace the old client-side pills
@@ -94,6 +128,25 @@ const PAGE_CSS = '<style>'
   + 'background-repeat:no-repeat;background-position:right 9px center}'
   + '.fsel:focus,.finp:focus{border-color:var(--jan);box-shadow:0 0 0 3px rgba(59,130,246,.14)}'
   + '.fsel.on,.finp.on{border-color:var(--jan);background-color:#eff5ff;color:var(--jan)}'
+  // Deep "More filters" panel.
+  + '.mfpanel-deep{width:320px;max-height:70vh;overflow-y:auto;padding:14px 16px}'
+  + '.mfpanel-deep .mf-sec{font:700 10.5px Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--sub);margin:12px 0 6px}'
+  + '.mfpanel-deep .mf-sec:first-child{margin-top:0}.mfpanel-deep .mf-sec em{font-weight:500;text-transform:none;letter-spacing:0;color:var(--faint)}'
+  + '.mf-grid2{display:grid;grid-template-columns:1fr 1fr;gap:8px}'
+  + '.mf-field{display:flex;flex-direction:column;gap:3px}.mf-field span{font:600 11px Inter,system-ui,sans-serif;color:var(--ink)}'
+  + '.mf-in{font:500 13px Inter,system-ui,sans-serif;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 9px;width:100%;outline:none}'
+  + '.mf-in:focus{border-color:var(--jan);box-shadow:0 0 0 3px rgba(59,130,246,.12)}'
+  + '.mf-checks{display:flex;flex-wrap:wrap;gap:6px}'
+  + '.mf-chk{display:inline-flex;align-items:center;gap:5px;font:500 12px Inter,system-ui,sans-serif;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:5px 9px;cursor:pointer;user-select:none}'
+  + '.mf-chk:hover{background:var(--wash)}.mf-chk input{margin:0;cursor:pointer}'
+  + '.mf-chk i{width:8px;height:8px;border-radius:50%;display:inline-block}'
+  + '.mf-chk:has(input:checked){border-color:var(--jan);background:#eff5ff;color:var(--jan)}'
+  + '.mf-foot{display:flex;gap:8px;margin-top:14px;padding-top:12px;border-top:1px solid var(--hair)}'
+  + '.mf-clear{flex:1;font:600 12.5px Inter,system-ui,sans-serif;color:var(--sub);background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px;cursor:pointer}'
+  + '.mf-apply{flex:1;font:600 12.5px Inter,system-ui,sans-serif;color:#fff;background:var(--jan);border:0;border-radius:8px;padding:8px;cursor:pointer}'
+  + '.mf-clear:hover{background:var(--wash)}.mf-apply:hover{filter:brightness(.95)}'
+  // "More filters" pill shows a dot when advanced filters are active.
+  + '#moreBtn.hasfilt::after{content:"";width:6px;height:6px;border-radius:50%;background:var(--jan);display:inline-block;margin-left:5px;vertical-align:middle}'
   // Filters wrap (no more horizontal-scroll hiding Set-aside & beyond).
   + '.fscroll{flex-wrap:wrap!important;overflow-x:visible!important;row-gap:7px}'
   // Set-aside color legend, bottom-left of the map.
@@ -239,7 +292,8 @@ const VIEWPORT_JS = `<script>
   // Server-wired filter state (the reorg). Every control writes here, then fetchView()
   // sends them as query params so the filter is applied by the DB for the current
   // viewport — and survives panning, instead of hiding already-fetched pins.
-  var FILT={ scope:'all', noticeType:'', setAside:'', closingDays:'', agency:'', state:'' };
+  var FILT={ scope:'all', noticeType:'', setAside:'', closingDays:'', agency:'', state:'',
+    naics:'', psc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'' };
   try{ var zt=document.querySelector('.ztop'), zf=document.querySelector('.fbar');
     if(zt&&zf){ zt.appendChild(zf); setTimeout(function(){try{map.invalidateSize();}catch(e){}},80); } }catch(e){}
   function clean(d){ return (d||'').replace(/,?\\s*DEPARTMENT OF( THE)?/i,'').replace(/DEPARTMENT OF( THE)?\\s*/i,'').trim().replace(/\\b([A-Z])([A-Z0-9'&.\\/-]*)/g,function(_,a,b){return a+b.toLowerCase();})||d; }
@@ -264,15 +318,28 @@ const VIEWPORT_JS = `<script>
     if(MODE==='contractor'){ OPPS=[]; render(); var f=document.getElementById('feed'); if(f)f.innerHTML='<div class="empty"><h4>Contractors map — coming next</h4><p>Wiring the contractor dataset (firm HQ locations) onto the map.</p></div>'; return; }
     busy=true;
     var url=MODES[MODE].ep+'?bbox='+bbox()+(MODE==='open'?('&status=active'+(HIDE_FSC?'&hideCommodity=1':'')):'')+(Q?'&q='+encodeURIComponent(Q):'');
-    // Append active server filters. Both the open + recompete endpoints accept
-    // setAside/agency; the open endpoint also accepts noticeType/state/closingDays/scope.
-    if(FILT.setAside)url+='&setAside='+encodeURIComponent(FILT.setAside);
+    // Append active server filters. Top-bar single-selects and deep-panel multi-selects
+    // feed the SAME comma-separated params (merged + deduped). Both endpoints accept
+    // setAside/agency; the open endpoint also accepts noticeType/state/closingDays/scope/
+    // naics/psc/postedDays.
+    function _merge(a,b){ return [a,b].filter(Boolean).join(','); }
+    var _sa=_merge(FILT.setAside, FILT.setAsideMulti);
+    if(_sa)url+='&setAside='+encodeURIComponent(_sa);
     if(FILT.agency)url+='&agency='+encodeURIComponent(FILT.agency);
     if(MODE==='open'){
       if(FILT.scope==='profile'){ var _pe=_uemail(); if(_pe)url+='&scope=profile&email='+encodeURIComponent(_pe); }
-      if(FILT.noticeType)url+='&noticeType='+encodeURIComponent(FILT.noticeType);
+      var _nt=_merge(FILT.noticeType, FILT.noticeMulti);
+      if(_nt)url+='&noticeType='+encodeURIComponent(_nt);
       if(FILT.state)url+='&state='+encodeURIComponent(FILT.state);
       if(FILT.closingDays)url+='&closingDays='+encodeURIComponent(FILT.closingDays);
+      if(FILT.naics)url+='&naics='+encodeURIComponent(FILT.naics);
+      if(FILT.psc)url+='&psc='+encodeURIComponent(FILT.psc);
+      if(FILT.postedDays)url+='&postedDays='+encodeURIComponent(FILT.postedDays);
+    }
+    // Value range — Recompetes only for now (real USASpending ceilings). The recompete-map
+    // endpoint accepts min/max; hidden on Open until the doc-scan backfills estimated value.
+    if(MODE==='recompete' && FILT.valueRange){
+      var _vr=FILT.valueRange.split('-'); if(_vr[0])url+='&minValue='+_vr[0]; if(_vr[1])url+='&maxValue='+_vr[1];
     }
     fetch(url).then(function(r){return r.json();}).then(function(d){ busy=false;
       if(!d||!d.success)return;
@@ -283,7 +350,9 @@ const VIEWPORT_JS = `<script>
   }
   window.setMapMode=function(mode){ if(!MODES[mode]||mode===MODE)return; MODE=mode; window.__mapMode=mode;
     var tabs=document.querySelectorAll('.zh-mode'); for(var i=0;i<tabs.length;i++)tabs[i].classList.toggle('on',tabs[i].getAttribute('data-mode')===mode);
-    var mw=document.querySelector('.mfwrap'); if(mw)mw.style.display=(mode==='open')?'':'none';
+    // More-filters panel shows on open + recompete (recompete gets value-range); hide on contractor.
+    var mw=document.querySelector('.mfwrap'); if(mw)mw.style.display=(mode==='contractor')?'none':'';
+    syncValueVis();
     Q=''; var zsi=document.getElementById('zsearchInput'); if(zsi)zsi.value='';
     fetchView();
   };
@@ -300,14 +369,43 @@ const VIEWPORT_JS = `<script>
   function markActive(el,v){ el.classList.toggle('on',!!v && v!=='all'); }
   bindSel('fltScope','scope'); bindSel('fltNotice','noticeType'); bindSel('fltSetAside','setAside'); bindSel('fltUrgency','closingDays');
   bindInp('fltAgency','agency'); bindInp('fltState','state',function(v){return v.toUpperCase().slice(0,2);});
+
+  // ── Deep "More filters" panel ──────────────────────────────────────────
+  function _checked(cls){ return Array.prototype.slice.call(document.querySelectorAll(cls)).filter(function(c){return c.checked;}).map(function(c){return c.value;}).join(','); }
+  function readDeep(){
+    FILT.naics=(document.getElementById('mfNaics')||{}).value||'';
+    FILT.psc=(document.getElementById('mfPsc')||{}).value||'';
+    FILT.postedDays=(document.getElementById('mfPosted')||{}).value||'';
+    FILT.setAsideMulti=_checked('.mf-set');
+    FILT.noticeMulti=_checked('.mf-notice');
+    FILT.valueRange=(document.getElementById('mfValue')||{}).value||'';
+    var active=!!(FILT.naics||FILT.psc||FILT.postedDays||FILT.setAsideMulti||FILT.noticeMulti||FILT.valueRange);
+    var mbEl=document.getElementById('moreBtn'); if(mbEl)mbEl.classList.toggle('hasfilt',active);
+  }
+  var _apply=document.getElementById('mfApply');
+  if(_apply)_apply.onclick=function(){ readDeep(); var mp2=document.getElementById('morePanel'); if(mp2)mp2.classList.remove('show'); fetchView(); };
+  var _mfclr=document.getElementById('mfClear');
+  if(_mfclr)_mfclr.onclick=function(){
+    ['mfNaics','mfPsc'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
+    var mvp=document.getElementById('mfPosted'); if(mvp)mvp.value='';
+    var mvv=document.getElementById('mfValue'); if(mvv)mvv.value='';
+    document.querySelectorAll('.mf-set,.mf-notice').forEach(function(c){c.checked=false;});
+    readDeep(); fetchView();
+  };
+  // Value range is meaningful only where we have real $ data → show on Recompetes, hide on Open.
+  function syncValueVis(){ var show=(MODE==='recompete'); document.querySelectorAll('.mf-value').forEach(function(e){e.style.display=show?'':'none';}); }
+  syncValueVis();
+
   // Clear all: reset the server filters + their controls, then refetch. (Runs in
   // addition to the template's own clrAll handler, which now only clears dead client sets.)
   var _clr=document.getElementById('clrAll');
   if(_clr)_clr.addEventListener('click',function(){
-    FILT={ scope:'all', noticeType:'', setAside:'', closingDays:'', agency:'', state:'' };
+    FILT={ scope:'all', noticeType:'', setAside:'', closingDays:'', agency:'', state:'',
+      naics:'', psc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'' };
     ['fltScope','fltNotice','fltSetAside','fltUrgency','fltAgency','fltState'].forEach(function(id){
       var el=document.getElementById(id); if(!el)return; el.value=(id==='fltScope')?'all':''; el.classList.remove('on');
     });
+    if(_mfclr)_mfclr.onclick();
     fetchView();
   });
   // More-filters dropdown open/close.
