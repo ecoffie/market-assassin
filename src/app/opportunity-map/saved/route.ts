@@ -76,7 +76,7 @@ const PAGE = `<!DOCTYPE html><html lang="en"><head>
     if(f.valueRange)parts.push('$'+f.valueRange.replace('-','–'));
     return parts.length?parts.join(' · '):'All opportunities';
   }
-  if(!t||!em){ list.innerHTML='<div class="signin">Please <a href="/app">sign in</a> to see your saved searches.</div>'; return; }
+  if(!t||!em){ list.innerHTML='<div class="signin">Please <a href="/app?next=%2Fopportunity-map%2Fsaved">sign in</a> to see your saved searches.</div>'; return; }
   function hdrs(){ return {'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em}; }
 
   function render(rows){

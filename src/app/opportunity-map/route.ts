@@ -433,7 +433,7 @@ const VIEWPORT_JS = `<script>
   if(_ss)_ss.onclick=function(){
     var t=null; try{ t=localStorage.getItem('mi_beta_auth_token'); }catch(e){}
     var em=_uemail();
-    if(!t||!em){ _ssMsg('Sign in to save'); return; }
+    if(!t||!em){ if(confirm('Sign in to save this search and get alerts?'))location.href='/app?next=%2Fopportunity-map'; return; }
     var name=window.prompt('Name this saved search (you\\'ll get alerts on new matches):',
       (FILT.setAside||FILT.naics||Q||'My opportunities')+' — '+(MODE==='recompete'?'Recompetes':'Open'));
     if(!name)return;
