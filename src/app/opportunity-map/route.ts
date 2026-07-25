@@ -137,7 +137,7 @@ const VIEWPORT_JS = `<script>
   try{ var zt=document.querySelector('.ztop'), zf=document.querySelector('.fbar');
     if(zt&&zf){ zt.appendChild(zf); setTimeout(function(){try{map.invalidateSize();}catch(e){}},80); } }catch(e){}
   function clean(d){ return (d||'').replace(/,?\\s*DEPARTMENT OF( THE)?/i,'').replace(/DEPARTMENT OF( THE)?\\s*/i,'').trim().replace(/\\b([A-Z])([A-Z0-9'&.\\/-]*)/g,function(_,a,b){return a+b.toLowerCase();})||d; }
-  function toRow(p){ return {src:'SAM',naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc}; }
+  function toRow(p){ return {src:'SAM',naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc}; }
   function bbox(){ var b=map.getBounds(); return [b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].map(function(n){return n.toFixed(4);}).join(','); }
   function updateHeader(){
     if(!TOTAL)return;
@@ -198,6 +198,78 @@ const SAVE_JS = `<script>
 })();
 </script>`;
 
+// Opportunity detail DRAWER (Zillow card → detail page). Section #1 Snapshot for now; sections
+// #2–14 (AI Pursuit Brief, Where, Contacts, Requirements, History, …) will render below it.
+// Fetches /api/app/opportunity-detail?id=<notice_id>. Card click opens it (see the onclick swap).
+const DRAWER_CSS = '<style>'
+  + '.viewdet{color:var(--sub);font-weight:600;font-size:12px}'
+  + '.oppbd{position:fixed;inset:0;background:rgba(17,28,38,.32);z-index:1400;opacity:0;pointer-events:none;transition:opacity .2s}'
+  + '.oppbd.show{opacity:1;pointer-events:auto}'
+  + '.oppdrawer{position:fixed;top:0;right:0;height:100vh;height:100dvh;width:560px;max-width:94vw;background:#fff;z-index:1500;'
+  + 'box-shadow:-8px 0 40px rgba(0,0,0,.16);transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);'
+  + 'overflow-y:auto;display:flex;flex-direction:column}'
+  + '.oppdrawer.show{transform:none}'
+  + '.oppx{position:sticky;top:12px;align-self:flex-end;margin:12px 14px 0;width:34px;height:34px;border-radius:50%;'
+  + 'border:1px solid var(--line);background:#fff;cursor:pointer;font-size:15px;z-index:2;display:grid;place-items:center;flex:none}'
+  + '.oppbody{padding:2px 26px 44px}'
+  + '.oppload{padding:70px 26px;text-align:center;color:var(--sub);font-size:14px}'
+  + '.snaphero{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}'
+  + '.badge-nt{display:inline-block;font:700 10.5px Inter,system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase;padding:4px 9px;border-radius:6px;background:var(--wash);color:var(--sub)}'
+  + '.badge-dl{display:inline-block;font:700 11px Inter,system-ui,sans-serif;padding:4px 9px;border-radius:6px;background:#fef2f2;color:#d92d20}'
+  + '.badge-dl.cool{background:#f0fdf7;color:#22a06b}'
+  + '.snapt{font:700 22px/1.28 "Space Grotesk",Inter,system-ui,sans-serif;color:var(--ink);margin:8px 0 5px}'
+  + '.snapmeta{color:var(--sub);font-size:13.5px;margin-bottom:15px}.snapmeta b{color:var(--ink);font-weight:600}'
+  + '.snapgrid{display:grid;grid-template-columns:1fr 1fr;gap:12px 16px;border:1px solid var(--line);border-radius:12px;padding:15px 17px}'
+  + '.snapgrid .k{font:700 10.5px Inter,system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}'
+  + '.snapgrid .v{font-size:14px;font-weight:600;color:var(--ink);margin-top:2px}'
+  + '.oppsoon{margin-top:22px;color:var(--faint);font-size:12px;border-top:1px dashed var(--line);padding-top:14px}'
+  + '</style>';
+
+const DRAWER_HTML = '<div class="oppbd" id="oppBd"></div>'
+  + '<aside class="oppdrawer" id="oppDrawer"><button class="oppx" id="oppX" aria-label="Close">\u2715</button>'
+  + '<div class="oppbody" id="oppBody"></div></aside>';
+
+const DRAWER_JS = `<script>
+(function(){
+  var bd=document.getElementById('oppBd'), dr=document.getElementById('oppDrawer'), body=document.getElementById('oppBody'), xb=document.getElementById('oppX');
+  function close(){ dr.classList.remove('show'); bd.classList.remove('show'); }
+  if(xb)xb.onclick=close; if(bd)bd.onclick=close;
+  document.addEventListener('keydown',function(e){ if(e.key==='Escape')close(); });
+  function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function due(d){ if(!d)return ''; var n=Math.ceil((new Date(d)-new Date())/86400000); if(n<0)return 'closed'; if(n===0)return 'due today'; if(n===1)return '1 day left'; return n+' days left'; }
+  function longDate(d){ if(!d)return '\\u2014'; try{ return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }catch(e){return d;} }
+  function snapshot(o){
+    var n=o.deadline?Math.ceil((new Date(o.deadline)-new Date())/86400000):null;
+    var cls=(n!=null&&n<=7)?'badge-dl':'badge-dl cool';
+    var loc=(o.location.city?o.location.city+', ':'')+(o.location.state||o.location.country||'');
+    var cue=o.location.source==='office'?' <span style="color:#94a3b8">\\u00b7 buying office (PoP not specified)</span>':'';
+    return '<div class="snaphero">'
+      + (o.noticeType?'<span class="badge-nt">'+esc(o.noticeType)+'</span>':'')
+      + (o.deadline?'<span class="'+cls+'">'+esc(due(o.deadline))+'</span>':'')
+      + '</div>'
+      + '<div class="snapt">'+esc(o.title)+'</div>'
+      + '<div class="snapmeta"><b>'+esc(o.department||'')+'</b>'+(o.subTier?' \\u00b7 '+esc(o.subTier):'')+(loc.trim()?' \\u00b7 '+esc(loc):'')+cue+'</div>'
+      + '<div class="snapgrid">'
+      + '<div><div class="k">Set-aside</div><div class="v">'+esc(o.setAsideLabel||'Open')+'</div></div>'
+      + '<div><div class="k">NAICS</div><div class="v">'+esc(o.naics||'\\u2014')+(o.category?' \\u00b7 '+esc(o.category):'')+'</div></div>'
+      + '<div><div class="k">PSC</div><div class="v">'+esc(o.psc||'\\u2014')+'</div></div>'
+      + '<div><div class="k">Response due</div><div class="v">'+longDate(o.deadline)+'</div></div>'
+      + '<div><div class="k">Posted</div><div class="v">'+longDate(o.posted)+'</div></div>'
+      + '<div><div class="k">Solicitation</div><div class="v" style="font-family:var(--mono,monospace);font-size:12.5px">'+esc(o.solicitation||'\\u2014')+'</div></div>'
+      + '</div>'
+      + '<div class="oppsoon">Synopsis, AI Pursuit Brief, Points of Contact, Scope of Work, past-contract history & more coming to this view.</div>';
+  }
+  window.openOppDrawer=function(nid){
+    if(!nid)return;
+    body.innerHTML='<div class="oppload">Loading\\u2026</div>';
+    bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
+    fetch('/api/app/opportunity-detail?id='+encodeURIComponent(nid)).then(function(r){return r.json();}).then(function(d){
+      body.innerHTML=(d&&d.success&&d.opp)?snapshot(d.opp):'<div class="oppload">Couldn\\u2019t load this opportunity.</div>';
+    }).catch(function(){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; });
+  };
+})();
+</script>`;
+
 export async function GET(request: NextRequest) {
   const embed = new URL(request.url).searchParams.get('embed');
   let opps: unknown[] = [];
@@ -213,6 +285,7 @@ export async function GET(request: NextRequest) {
       loc: o.loc,
       close: (o.close || '').slice(0, 10),
       sol: o.sol,
+      nid: o.id,
       uiLink: o.uiLink,
       lat: o.lat,
       lng: o.lng,
@@ -230,7 +303,7 @@ export async function GET(request: NextRequest) {
     // Full page: add a way back to the app (the standalone template has none).
     html = html.replace('<div class="phead">',
       '<div class="phead"><a href="/home-v5" style="display:inline-flex;align-items:center;gap:5px;font:600 12.5px Inter,system-ui,sans-serif;color:#6b7787;text-decoration:none;margin-bottom:9px">← Back to Mindy</a>');
-    html = html.replace('</head>', PAGE_CSS + ZLAYOUT_CSS + '</head>');
+    html = html.replace('</head>', PAGE_CSS + ZLAYOUT_CSS + DRAWER_CSS + '</head>');
     // Zillow layout: inject the icon rail + top search bar as the first children of .app
     // (the grid areas place them; VIEWPORT_JS moves the filter bar up into the top bar).
     html = html.replace('<div class="app">', '<div class="app">' + ZRAIL_HTML + ZTOP_HTML);
@@ -255,15 +328,20 @@ export async function GET(request: NextRequest) {
     // Commodity-buys toggle in the filter bar.
     html = html.replace('<button class="clr" id="clrAll">Clear all</button>',
       FSC_TOGGLE + '<button class="clr" id="clrAll">Clear all</button>');
-    // Card/popup actions (#4): rename to "Draft proposal", add "Save to pursuits" (wired to the
-    // user's pipeline), demote the SAM link to a small "↗".
-    html = html.split('>Start drafting</a>').join('>Draft proposal</a>');
+    // CARD (#1 Snapshot): NO action buttons on the card face (Eric). The card is the clickable
+    // snapshot; Save/Draft live in the detail drawer. Card actions → a "View details →" hint.
     html = html.replace('<a class="act" href="${samURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">SAM.gov</a>',
-      '<button class="act savep" data-sol="${o.sol}" onclick="event.stopPropagation();savePursuit(this)">Save to pursuits</button><a class="act samlink" href="${samURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">SAM ↗</a>');
+      '<span class="viewdet">View details →</span>');
+    html = html.replace('<a class="act pri" href="${draftURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Start drafting</a>', '');
+    // POPUP (map-pin quick peek): keep Save to pursuits + Draft proposal + a small SAM link.
     html = html.replace('<a class="pva" href="${samURL(o)}" target="_blank" rel="noopener">View on SAM.gov</a>',
       '<button class="pva savep" data-sol="${o.sol}" onclick="savePursuit(this)">Save to pursuits</button><a class="pva samlink" href="${samURL(o)}" target="_blank" rel="noopener">View on SAM ↗</a>');
-    // Viewport-driven data + dynamic header + save-to-pursuits (last, after template globals exist).
-    html = html.replace('</body>', VIEWPORT_JS + SAVE_JS + '</body>');
+    html = html.replace('<a class="pva pri" href="${draftURL(o)}" target="_blank" rel="noopener">Start drafting</a>',
+      '<a class="pva pri" href="${draftURL(o)}" target="_blank" rel="noopener">Draft proposal</a>');
+    // Card click opens the detail drawer (was: flyTo + popup). Uses the notice_id (o.nid).
+    html = html.replace('c.onclick=()=>select(o.sol,true);', 'c.onclick=()=>openOppDrawer(o.nid||o.sol);');
+    // Viewport-driven data + dynamic header + save-to-pursuits + detail drawer (last, after globals).
+    html = html.replace('</body>', DRAWER_HTML + VIEWPORT_JS + SAVE_JS + DRAWER_JS + '</body>');
   }
   return new NextResponse(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }
