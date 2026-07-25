@@ -614,6 +614,20 @@ const DRAWER_CSS = '<style>'
   + '.sim-t{font-weight:700;font-size:14.5px;color:var(--ink);margin-bottom:3px;line-height:1.3}'
   + '.sim-m{color:var(--sub);font-size:12.5px}'
   + '.sim-sa{display:inline-block;margin-top:8px;background:var(--hair);color:var(--sub);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600}'
+  // AI Analysis (Go/No-Go).
+  + '.ai-run{display:inline-flex;align-items:center;font:600 14px Inter,system-ui,sans-serif;color:#fff;background:#111c26;border:0;border-radius:9px;padding:11px 16px;cursor:pointer;transition:filter .15s}'
+  + '.ai-run:hover{filter:brightness(1.15)}.ai-run.ai-loading{background:var(--wash);color:var(--sub);cursor:default}'
+  + '.ai-note{color:var(--sub);font-size:12.5px;margin-top:9px}'
+  + '.ai-verdict{display:flex;align-items:center;gap:12px;border:2px solid;border-radius:12px;padding:12px 16px;margin-bottom:12px}'
+  + '.ai-badge{color:#fff;font-weight:800;font-size:13px;letter-spacing:.04em;padding:4px 12px;border-radius:20px}'
+  + '.ai-score{color:var(--ink);font-weight:700;font-size:14px}'
+  + '.ai-next{background:var(--wash);border-radius:9px;padding:11px 14px;font-size:13.5px;margin-bottom:12px}'
+  + '.ai-lab{font:700 11px Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--sub);margin:12px 0 5px}'
+  + '.ai-ul{margin:0 0 4px;padding-left:18px}.ai-ul li{font-size:13.5px;margin-bottom:4px;line-height:1.4}'
+  + '.ai-ul.pos li{color:#12805c}.ai-ul.neg li{color:#b54708}'
+  + '.ai-upsell{background:linear-gradient(135deg,#1e3a8a,#7c3aed);color:#fff;border-radius:12px;padding:18px 20px}'
+  + '.ai-upsell-h{font-weight:700;font-size:15px;margin-bottom:6px}.ai-upsell p{font-size:13px;opacity:.92;margin-bottom:14px;line-height:1.45}'
+  + '.ai-upgrade{display:inline-block;background:#fff;color:#1e3a8a;font-weight:700;font-size:13.5px;padding:9px 18px;border-radius:8px;text-decoration:none}'
   // detail sections
   + '.osec{margin-top:26px}'
   + '.osec-h{font:700 15px "Space Grotesk",Inter,system-ui,sans-serif;color:var(--ink);margin-bottom:11px}'
@@ -760,6 +774,41 @@ const DRAWER_JS = `<script>
     var rows=facts.map(function(f){ return '<div class="bf-row"><div class="bf-k">'+esc(f.k)+'</div><div class="bf-v">'+esc(f.v)+'</div></div>'; }).join('');
     return sec('Bid facts','<div class="bf-grid">'+rows+'</div>');
   }
+  // AI Analysis (Go/No-Go) — on-demand (it's an LLM call, Pro-gated). Reuses the existing
+  // /api/analyst/bid-no-bid engine (PURSUE/WATCH/SKIP + score + why/concerns/next step).
+  function aiSec(o){
+    return sec('AI analysis \\u00b7 Go / No-Go',
+      '<div id="aiBox"><button class="ai-run" onclick="runAI(\\''+esc(o.id)+'\\')">'
+      + '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" style="vertical-align:-2px;margin-right:6px"><path d="M12 3l1.9 5.8H20l-4.9 3.6L17 18l-5-3.7L7 18l1.9-5.6L4 8.8h6.1z"/></svg>'
+      + 'Should I bid on this? \\u2014 run AI analysis</button>'
+      + '<div class="ai-note">Mindy weighs your fit vs. the requirement and gives a bid / no-bid call.</div></div>');
+  }
+  window.runAI=function(nid){
+    var box=document.getElementById('aiBox'); if(!box)return;
+    var t=null,em=''; try{ t=localStorage.getItem('mi_beta_auth_token'); }catch(e){}
+    try{ var s=(t||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); em=(j&&j.email||'').toLowerCase(); }catch(e){}
+    if(!t||!em){ box.innerHTML='<div class="ai-note">Please <a href="/app?next=%2Fopportunity-map" style="color:#006aff;font-weight:600">sign in</a> to run AI analysis.</div>'; return; }
+    box.innerHTML='<div class="ai-run ai-loading">Analyzing this opportunity\\u2026</div>';
+    fetch('/api/analyst/bid-no-bid',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},body:JSON.stringify({noticeId:nid,email:em})})
+      .then(function(r){ return r.json().then(function(d){ return {status:r.status,d:d}; }); })
+      .then(function(res){
+        if(res.status===402||( res.d&&res.d.teaser)){
+          box.innerHTML='<div class="ai-upsell"><div class="ai-upsell-h">\\ud83d\\udd12 AI Go/No-Go is a Pro feature</div><p>Get a bid/no-bid call, win-drivers, concerns, likely competitors and your next step \\u2014 per opportunity.</p><a class="ai-upgrade" href="'+((res.d&&res.d.upgrade_url)||'/market-intelligence')+'">Upgrade to Pro</a></div>'; return;
+        }
+        var a=res.d&&res.d.analysis; if(!a){ box.innerHTML='<div class="ai-note">Couldn\\u2019t analyze this one. Try again shortly.</div>'; return; }
+        var rec=(a.recommendation||'watch').toLowerCase();
+        var col=rec==='pursue'?'#12805c':rec==='skip'?'#e5484d':'#b54708';
+        var label=rec==='pursue'?'PURSUE':rec==='skip'?'SKIP':'WATCH';
+        function list(items,cls){ if(!items||!items.length)return ''; return '<ul class="ai-ul '+cls+'">'+items.slice(0,5).map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>'; }
+        box.innerHTML='<div class="ai-verdict" style="border-color:'+col+'"><span class="ai-badge" style="background:'+col+'">'+label+'</span>'
+          + (typeof a.score==='number'?'<span class="ai-score">Fit '+a.score+'/100</span>':'')+'</div>'
+          + (a.next_step?'<div class="ai-next"><strong>Next step:</strong> '+esc(a.next_step)+'</div>':'')
+          + (a.why_pursue&&a.why_pursue.length?'<div class="ai-lab">Why pursue</div>'+list(a.why_pursue,'pos'):'')
+          + (a.concerns&&a.concerns.length?'<div class="ai-lab">Concerns</div>'+list(a.concerns,'neg'):'')
+          + (a.competitors_likely&&a.competitors_likely.length?'<div class="ai-lab">Likely competitors</div>'+list(a.competitors_likely,''):'')
+          + (a.effort_estimate?'<div class="ai-note">Effort: '+esc(a.effort_estimate)+'</div>':'');
+      }).catch(function(){ box.innerHTML='<div class="ai-note">Couldn\\u2019t analyze this one. Try again shortly.</div>'; });
+  };
   // Similar opportunities — the Zillow "Nearby homes" flywheel. Clicking one opens its drawer.
   function similarSec(sims){
     if(!sims||!sims.length)return '';
@@ -776,9 +825,9 @@ const DRAWER_JS = `<script>
   function render(o,extra){
     CUR=o;
     extra=extra||{};
-    return snapshot(o)+bidFactsSec(extra.bidFacts)+orgSec(o)+descSec(o)+sowSec(o)+contactsSec(o)+docsSec(o)+vendorsSec(o)
+    return snapshot(o)+bidFactsSec(extra.bidFacts)+aiSec(o)+orgSec(o)+descSec(o)+sowSec(o)+contactsSec(o)+docsSec(o)+vendorsSec(o)
       + similarSec(extra.similar)
-      + '<div class="oppsoon">Coming next: AI Pursuit Brief \\u00b7 Go/No-Go \\u00b7 expected value range \\u00b7 M-Win score.</div>'
+      + '<div class="oppsoon">Coming next: expected value range \\u00b7 M-Win score.</div>'
       + actions(o);
   }
   window.openOppDrawer=function(nid){
