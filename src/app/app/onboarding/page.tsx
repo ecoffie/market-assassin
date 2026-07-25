@@ -425,6 +425,11 @@ export default function OnboardingPage() {
           const data = await res.json();
           const codes: string[] = data?.data?.naicsCodes || [];
           if (codes.length > 0) {
+            // Honor ?next= so a returning user lands back where they started sign-in
+            // (e.g. /opportunity-map), not always /app. Same-site paths only (open-redirect guard).
+            const rawNext = new URLSearchParams(window.location.search).get('next') || '';
+            const safeNext = rawNext.startsWith('/') && !rawNext.startsWith('//') ? rawNext : '';
+            if (safeNext) { router.push(safeNext); return; }
             router.push(`/app?email=${encodeURIComponent(userEmail)}`);
             return;
           }
