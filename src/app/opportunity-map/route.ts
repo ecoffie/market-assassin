@@ -138,10 +138,9 @@ const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
 // Zillow-style top nav: left nav links · CENTER logo · right nav + account.
 const ZHEAD_HTML = '<header class="zhead">'
   + '<nav class="zh-left">'
-  + '<a class="on">Opportunities</a>'
-  + '<a href="/app?panel=contractors">Contractors</a>'
-  + '<a href="/app?panel=agencies">Agencies</a>'
-  + '<a href="/app?panel=forecasts">Forecasts</a>'
+  + '<a class="zh-mode on" data-mode="open" onclick="setMapMode(\'open\')">Open Opportunities</a>'
+  + '<a class="zh-mode" data-mode="recompete" onclick="setMapMode(\'recompete\')">Recompetes</a>'
+  + '<a class="zh-mode" data-mode="contractor" onclick="setMapMode(\'contractor\')">Contractors</a>'
   + '</nav>'
   + '<a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.svg" alt=""/><span>Mindy</span></a>'
   + '<nav class="zh-right">'
@@ -169,28 +168,38 @@ const LEGEND_HTML = '<div class="setlegend"><div class="sl-t">Set-aside eligibil
 const VIEWPORT_JS = `<script>
 (function(){
   var SETMAP={SDVOSB:'SDVOSB',SB:'SB','8A':'8(a)',WOSB:'WOSB',HZ:'HUBZone',OTHER:'Other',NONE:'None'};
+  // Zillow-style dataset modes (For Sale / Rent / Sold). Each = a distinct corpus + endpoint.
+  var MODES={
+    open:{ ep:'/api/app/opportunity-map', title:'Open Opportunities', unit:'active opportunities' },
+    recompete:{ ep:'/api/app/recompete-map', title:'Recompetes', unit:'expiring contracts' },
+    contractor:{ ep:'', title:'Contractors', unit:'contractors' }
+  };
+  var MODE='open'; window.__mapMode='open';
   var HIDE_FSC=false, TOTAL=0, CAPPED=false, busy=false, t=null, t2=null, Q='';
-  // Zillow layout: move the filter bar up into the top search bar, then re-measure the map.
   try{ var zt=document.querySelector('.ztop'), zf=document.querySelector('.fbar');
     if(zt&&zf){ zt.appendChild(zf); setTimeout(function(){try{map.invalidateSize();}catch(e){}},80); } }catch(e){}
   function clean(d){ return (d||'').replace(/,?\\s*DEPARTMENT OF( THE)?/i,'').replace(/DEPARTMENT OF( THE)?\\s*/i,'').trim().replace(/\\b([A-Z])([A-Z0-9'&.\\/-]*)/g,function(_,a,b){return a+b.toLowerCase();})||d; }
-  function toRow(p){ return {src:'SAM',naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc}; }
+  function toRow(p){
+    if(MODE==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,agency:clean(p.agency),naics:p.naics,set:SETMAP[p.set]||'None',value:p.value,exp:(p.exp||'').slice(0,10),loc:p.loc,sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng};
+    return {src:'SAM',naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc};
+  }
   function bbox(){ var b=map.getBounds(); return [b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].map(function(n){return n.toFixed(4);}).join(','); }
   function updateHeader(){
+    var brand=document.querySelector('.brand'); if(brand)brand.textContent=MODES[MODE].title;
     if(!TOTAL)return;
     var shown=(typeof rows!=='undefined'&&rows)?rows.length:OPPS.length;
     var sum=document.getElementById('sumline');
-    if(sum)sum.innerHTML=shown.toLocaleString()+' <span style="color:var(--sub);font-weight:400">of '+TOTAL.toLocaleString()+' active opportunities'+(CAPPED?' (zoom in for more)':'')+'</span>';
-    var sd=0,soon=0;
-    for(var i=0;i<OPPS.length;i++){var o=OPPS[i];if(setKey(o.set)==='SDVOSB')sd++;var d=daysOut(o);if(d>=0&&d<=7)soon++;}
-    var rc=document.getElementById('rescount');
-    if(rc)rc.innerHTML='<span style="font-weight:400;color:var(--sub)">'+sd+' SDVOSB \\u00b7 '+soon+' closing this week</span>';
+    if(sum)sum.innerHTML=shown.toLocaleString()+' <span style="color:var(--sub);font-weight:400">of '+TOTAL.toLocaleString()+' '+MODES[MODE].unit+(CAPPED?' (zoom in for more)':'')+'</span>';
+    var rc=document.getElementById('rescount'); if(!rc)return;
+    if(MODE==='open'){ var sd=0,soon=0; for(var i=0;i<OPPS.length;i++){var o=OPPS[i];if(setKey(o.set)==='SDVOSB')sd++;var d=daysOut(o);if(d>=0&&d<=7)soon++;} rc.innerHTML='<span style="font-weight:400;color:var(--sub)">'+sd+' SDVOSB \\u00b7 '+soon+' closing this week</span>'; }
+    else rc.innerHTML='';
   }
-  // Wrap render() so the header refreshes after every draw (pan AND client-side filter).
   var _render=render; render=function(){ _render(); updateHeader(); };
   function fetchView(){
-    if(busy)return; busy=true;
-    var url='/api/app/opportunity-map?bbox='+bbox()+'&status=active'+(HIDE_FSC?'&hideCommodity=1':'')+(Q?'&q='+encodeURIComponent(Q):'');
+    if(busy)return;
+    if(MODE==='contractor'){ OPPS=[]; render(); var f=document.getElementById('feed'); if(f)f.innerHTML='<div class="empty"><h4>Contractors map — coming next</h4><p>Wiring the contractor dataset (firm HQ locations) onto the map.</p></div>'; return; }
+    busy=true;
+    var url=MODES[MODE].ep+'?bbox='+bbox()+(MODE==='open'?('&status=active'+(HIDE_FSC?'&hideCommodity=1':'')):'')+(Q?'&q='+encodeURIComponent(Q):'');
     fetch(url).then(function(r){return r.json();}).then(function(d){ busy=false;
       if(!d||!d.success)return;
       TOTAL=d.totalForFilters||0; CAPPED=!!d.capped;
@@ -198,12 +207,18 @@ const VIEWPORT_JS = `<script>
       render();
     }).catch(function(){busy=false;});
   }
+  window.setMapMode=function(mode){ if(!MODES[mode]||mode===MODE)return; MODE=mode; window.__mapMode=mode;
+    var tabs=document.querySelectorAll('.zh-mode'); for(var i=0;i<tabs.length;i++)tabs[i].classList.toggle('on',tabs[i].getAttribute('data-mode')===mode);
+    var fsc=document.getElementById('fscToggle'); if(fsc)fsc.style.display=(mode==='open')?'':'none';
+    Q=''; var zsi=document.getElementById('zsearchInput'); if(zsi)zsi.value='';
+    fetchView();
+  };
   map.on('moveend',function(){ clearTimeout(t); t=setTimeout(fetchView,450); });
   var zsi=document.getElementById('zsearchInput');
   if(zsi)zsi.addEventListener('input',function(){ clearTimeout(t2); t2=setTimeout(function(){ Q=zsi.value.trim(); fetchView(); },400); });
   var tg=document.getElementById('fscToggle');
   if(tg)tg.onclick=function(){ HIDE_FSC=!HIDE_FSC; tg.classList.toggle('active',HIDE_FSC); tg.textContent=HIDE_FSC?'Commodity buys: hidden':'Commodity buys: shown'; fetchView(); };
-  setTimeout(fetchView,300); // first live load replaces the SSR set with the true viewport + real total
+  setTimeout(fetchView,300);
 })();
 </script>`;
 
@@ -411,6 +426,7 @@ const DRAWER_JS = `<script>
   }
   window.openOppDrawer=function(nid){
     if(!nid)return;
+    if(window.__mapMode&&window.__mapMode!=='open')return; // detail drawer is open-opps only for now
     body.innerHTML='<div class="oppload">Loading\\u2026</div>';
     bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
     fetch('/api/app/opportunity-detail?id='+encodeURIComponent(nid)).then(function(r){return r.json();}).then(function(d){
