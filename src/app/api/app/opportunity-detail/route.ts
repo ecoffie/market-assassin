@@ -11,12 +11,58 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { setGroupKey, SET_LABEL } from '@/lib/opportunities/map-data';
+import { findPredecessorAward } from '@/lib/usaspending/find-predecessor';
+import { getUnifiedAgencyIntelligence } from '@/lib/agency-intelligence';
+import { getPricingIntel } from '@/mcp/tools/pricing-intel';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
+}
+
+// Reused-intelligence block for the drawer — runs the existing engines in PARALLEL and
+// FAIL-SOFT (a slow/failed tool returns null, never blocks the drawer). Loaded on-demand
+// via ?intel=1 so the base detail stays fast. Every field is real data from those tools.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+async function buildIntel(naics: string | null, agency: string | null, title: string | null) {
+  const guard = <T>(p: Promise<T>): Promise<T | null> => p.then((v) => v).catch(() => null);
+  const [predecessor, agencyIntel, pricing] = await Promise.all([
+    guard(findPredecessorAward({ naicsCode: naics || undefined, agencyName: agency || undefined, keyword: title || undefined })),
+    agency ? guard(getUnifiedAgencyIntelligence(agency)) : Promise.resolve(null),
+    naics ? guard(getPricingIntel({ naics })) : Promise.resolve(null),
+  ]);
+
+  const fmt = (n?: number | null) => (typeof n === 'number' && n > 0)
+    ? (n >= 1e9 ? `$${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : `$${Math.round(n).toLocaleString()}`) : null;
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pred = predecessor as any;
+  return {
+    predecessor: pred ? {
+      incumbent: pred.recipientName || null,
+      incumbentState: pred.recipientState || null,
+      value: fmt(pred.baseAndAllOptionsValue ?? pred.obligatedAmount ?? pred.potentialTotalValue),
+      expires: pred.periodOfPerformanceEnd ? String(pred.periodOfPerformanceEnd).slice(0, 10) : null,
+      vehicle: pred.parentAwardId || null,
+      confidence: pred.matchConfidence || null,
+    } : null,
+    agency: agencyIntel ? {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      painPoints: ((agencyIntel as any).painPoints || []).slice(0, 4).map((x: any) => (typeof x === 'string' ? x : x.text || x.title)).filter(Boolean),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      priorities: ((agencyIntel as any).priorities || []).slice(0, 3).map((x: any) => (typeof x === 'string' ? x : x.text || x.title)).filter(Boolean),
+    } : null,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    pricing: (pricing && (pricing as any)._meta?.grounded) ? {
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      rates: ((pricing as any).labor_rates || (pricing as any).rates || []).slice(0, 4),
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      summary: (pricing as any).summary || null,
+    } : null,
+  };
 }
 
 const DETAIL_COLS = 'notice_id, solicitation_number, title, description, naics_code, psc_code, department, sub_tier, office, agency_hierarchy, posted_date, response_deadline, set_aside_code, set_aside_description, notice_type, pop_city, pop_state, pop_country, ui_link, attachments, points_of_contact, office_address, has_sow_doc, sow_text, sow_filename, additional_info_link, additional_info_text, map_loc_source';
@@ -67,6 +113,13 @@ export async function GET(request: NextRequest) {
   if (!data) return NextResponse.json({ success: false, error: 'not found' }, { status: 404 });
 
   const opp = shapeOpp(data);
+
+  // ?intel=1 → return ONLY the reused-intelligence block (predecessor/agency/pricing).
+  // Loaded on-demand by the drawer as a SECOND fetch so the base detail stays instant.
+  if (request.nextUrl.searchParams.get('intel') === '1') {
+    const intel = await buildIntel(opp.naics, opp.department, opp.title);
+    return NextResponse.json({ success: true, intel });
+  }
 
   // Bid Facts — the "Facts & features" grid. All real columns.
   const bidFacts = [
