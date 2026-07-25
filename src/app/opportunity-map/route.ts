@@ -86,13 +86,15 @@ const ZLAYOUT_CSS = '<style>'
   + 'grid-template-areas:"zhead zhead zhead" "zrail ztop ztop" "zrail zmap zcards"!important;transition:none!important}'
   + '.app.collapsed{grid-template-columns:50px minmax(0,1fr) 0px!important}'
   // Mindy header bar
-  + '.zhead{grid-area:zhead;display:flex;align-items:center;gap:12px;padding:0 18px;border-bottom:1px solid var(--line);background:#fff;z-index:20}'
-  + '.zh-logo{display:flex;align-items:center;gap:8px;text-decoration:none}'
+  + '.zhead{grid-area:zhead;position:relative;display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--line);background:#fff;z-index:20}'
+  + '.zh-left,.zh-right{display:flex;align-items:center;gap:22px}'
+  + '.zh-left a,.zh-right a{font:600 13.5px "Inter",system-ui,sans-serif;color:var(--ink);text-decoration:none;cursor:pointer;white-space:nowrap}'
+  + '.zh-left a:hover,.zh-right a:hover{color:var(--jan)}.zh-left a.on{color:var(--jan)}'
+  + '.zh-acct{display:flex;align-items:center;justify-content:center;width:34px;height:34px;border-radius:50%;border:1px solid var(--line);color:var(--sub)}'
+  + '.zh-logo{position:absolute;left:50%;transform:translateX(-50%);display:flex;align-items:center;gap:8px;text-decoration:none}'
   + '.zh-logo img{height:25px;width:auto;display:block}'
-  + '.zh-logo span{font:700 18px "Inter",system-ui,sans-serif;color:var(--ink);letter-spacing:-.02em}'
-  + '.zhead .zh-sep{width:1px;height:22px;background:var(--line)}'
-  + '.zhead .zh-t{font:600 14px "Inter",system-ui,sans-serif;color:var(--ink)}'
-  + '.zhead .zh-live{margin-left:auto;font:600 11px "Inter",system-ui,sans-serif;color:#22a06b;display:inline-flex;align-items:center;gap:6px;letter-spacing:.02em}'
+  + '.zh-logo span{font:700 19px "Inter",system-ui,sans-serif;color:var(--ink);letter-spacing:-.02em}'
+  + '@media(max-width:1000px){.zh-left,.zh-right{gap:14px}.zh-left a:nth-child(n+3),.zh-right a:first-child{display:none}}'
   // far-left icon rail — PINNED (position:fixed) so grid/overflow can never push it off-screen.
   // The 50px grid column stays as its reserved space (kept empty; the fixed rail sits over it).
   + '.zrail{position:fixed;left:0;top:52px;width:50px;height:calc(100vh - 52px);height:calc(100dvh - 52px);'
@@ -133,10 +135,20 @@ const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
   + '<svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>'
   + '<input id="zsearchInput" placeholder="Search opportunities, agencies, keywords…" autocomplete="off"></div></div>';
 // Mindy brand header bar (top, full width) — the wordmark + product name, Zillow-style.
+// Zillow-style top nav: left nav links · CENTER logo · right nav + account.
 const ZHEAD_HTML = '<header class="zhead">'
+  + '<nav class="zh-left">'
+  + '<a class="on">Opportunities</a>'
+  + '<a href="/app?panel=contractors">Contractors</a>'
+  + '<a href="/app?panel=agencies">Agencies</a>'
+  + '<a href="/app?panel=forecasts">Forecasts</a>'
+  + '</nav>'
   + '<a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.svg" alt=""/><span>Mindy</span></a>'
-  + '<span class="zh-sep"></span><span class="zh-t">Federal Opportunity Map</span>'
-  + '<span class="zh-live">● Live · SAM.gov</span></header>';
+  + '<nav class="zh-right">'
+  + '<a href="/pricing">Pricing</a>'
+  + '<a href="/app?panel=pursuits">My Pursuits</a>'
+  + '<a href="/app" title="Account" class="zh-acct">' + '<svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="8" r="4"/><path d="M4 21c0-4 4-6 8-6s8 2 8 6"/></svg></a>'
+  + '</nav></header>';
 
 // Set-aside color legend overlaid on the map (so color = eligibility is self-explanatory).
 const LEGEND_HTML = '<div class="setlegend"><div class="sl-t">Set-aside eligibility</div>'
