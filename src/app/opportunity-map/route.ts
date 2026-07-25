@@ -849,8 +849,8 @@ const DRAWER_JS = `<script>
     }
     var pr=intel.pricing;
     if(pr&&pr.rates&&pr.rates.length){
-      var rows=pr.rates.map(function(r){ var lbl=r.labor_category||r.category||r.title||'Rate'; var rate=r.hourly_rate||r.rate||r.mean||r.avg; return '<div class="bf-row"><div class="bf-k">'+esc(lbl)+'</div><div class="bf-v">'+esc(rate?('$'+rate+'/hr'):'')+'</div></div>'; }).join('');
-      out+=sec('Pricing intel \\u00b7 labor rates for this work','<div class="bf-grid">'+rows+'</div>'+(pr.summary?'<div class="ai-note">'+esc(pr.summary)+'</div>':''));
+      var rows=pr.rates.map(function(r){ var lbl=(r.labor_category||'Vendor')+(r.size?' \\u00b7 '+r.size:''); var rate=r.hourly_rate; return '<div class="bf-row"><div class="bf-k">'+esc(lbl)+'</div><div class="bf-v">'+esc(rate?('$'+rate+'/hr avg'):'')+'</div></div>'; }).join('');
+      out+=sec('Pricing intel \\u00b7 what vendors charge here','<div class="bf-grid">'+rows+'</div>'+(pr.summary?'<div class="ai-note">'+esc(pr.summary)+'</div>':''));
     }
     return out;
   }

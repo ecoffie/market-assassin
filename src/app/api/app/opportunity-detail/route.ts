@@ -14,6 +14,7 @@ import { setGroupKey, SET_LABEL } from '@/lib/opportunities/map-data';
 import { findPredecessorAward } from '@/lib/usaspending/find-predecessor';
 import { getUnifiedAgencyIntelligence } from '@/lib/agency-intelligence';
 import { getPricingIntel } from '@/mcp/tools/pricing-intel';
+import { normalizeAgencyKey } from '@/lib/gov-contacts/agency-key';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -29,38 +30,49 @@ function sb() {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 async function buildIntel(naics: string | null, agency: string | null, title: string | null) {
   const guard = <T>(p: Promise<T>): Promise<T | null> => p.then((v) => v).catch(() => null);
+  // Agency intel matches on the CORE agency word ("DEPT OF DEFENSE" → "DEFENSE"); the raw
+  // uppercase-comma form doesn't match the maintained list.
+  const agencyKey = agency ? normalizeAgencyKey(agency) : '';
   const [predecessor, agencyIntel, pricing] = await Promise.all([
     guard(findPredecessorAward({ naicsCode: naics || undefined, agencyName: agency || undefined, keyword: title || undefined })),
-    agency ? guard(getUnifiedAgencyIntelligence(agency)) : Promise.resolve(null),
+    agencyKey ? guard(getUnifiedAgencyIntelligence(agencyKey)) : Promise.resolve(null),
     naics ? guard(getPricingIntel({ naics })) : Promise.resolve(null),
   ]);
 
   const fmt = (n?: number | null) => (typeof n === 'number' && n > 0)
     ? (n >= 1e9 ? `$${(n / 1e9).toFixed(1)}B` : n >= 1e6 ? `$${(n / 1e6).toFixed(1)}M` : `$${Math.round(n).toLocaleString()}`) : null;
 
+  // Field names validated against real tool output (see intel-probe).
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const pred = predecessor as any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const ai = agencyIntel as any;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const pr = pricing as any;
+  const topVendors = (pr && pr._meta?.grounded && pr.pricing?.topVendors) ? pr.pricing.topVendors : [];
+  const asText = (x: unknown): string | null => (typeof x === 'string' ? x : (x && typeof x === 'object' ? ((x as Record<string, string>).text || (x as Record<string, string>).title || (x as Record<string, string>).description) : null)) || null;
+
   return {
-    predecessor: pred ? {
+    predecessor: (pred && pred.recipientName) ? {
       incumbent: pred.recipientName || null,
       incumbentState: pred.recipientState || null,
-      value: fmt(pred.baseAndAllOptionsValue ?? pred.obligatedAmount ?? pred.potentialTotalValue),
-      expires: pred.periodOfPerformanceEnd ? String(pred.periodOfPerformanceEnd).slice(0, 10) : null,
-      vehicle: pred.parentAwardId || null,
+      value: fmt(pred.ceiling ?? pred.currentValue ?? pred.obligated),
+      expires: (pred.popPotentialEnd || pred.popEnd) ? String(pred.popPotentialEnd || pred.popEnd).slice(0, 10) : null,
+      vehicle: pred.parentIdvPiid || null,
       confidence: pred.matchConfidence || null,
     } : null,
-    agency: agencyIntel ? {
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      painPoints: ((agencyIntel as any).painPoints || []).slice(0, 4).map((x: any) => (typeof x === 'string' ? x : x.text || x.title)).filter(Boolean),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      priorities: ((agencyIntel as any).priorities || []).slice(0, 3).map((x: any) => (typeof x === 'string' ? x : x.text || x.title)).filter(Boolean),
+    agency: ai ? {
+      painPoints: (ai.painPoints || []).slice(0, 4).map(asText).filter(Boolean),
+      priorities: (ai.priorities || []).slice(0, 3).map(asText).filter(Boolean),
     } : null,
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    pricing: (pricing && (pricing as any)._meta?.grounded) ? {
+    pricing: topVendors.length ? {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      rates: ((pricing as any).labor_rates || (pricing as any).rates || []).slice(0, 4),
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      summary: (pricing as any).summary || null,
+      rates: topVendors.slice(0, 4).map((v: any) => ({
+        labor_category: v.name,
+        hourly_rate: (typeof v.avgRate === 'number') ? Math.round(v.avgRate) : null,
+        size: v.businessSize || null,
+      })),
+      summary: `${pr.pricing.topVendors.length} vendors analyzed via GSA CALC`,
     } : null,
   };
 }
