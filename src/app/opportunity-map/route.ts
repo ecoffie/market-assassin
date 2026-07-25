@@ -252,6 +252,9 @@ const ZLAYOUT_CSS = '<style>'
   // Map controls (Fit to results / Terrain) → floated INSIDE the map top-right, like Zillow\'s
   // Schools/Draw. Was pinned top-CENTER in the dead strip between the bar and the map.
   + '.maptop{left:auto!important;right:14px!important;top:14px!important;transform:none!important}'
+  // Draw button active state (drawing / area set).
+  + '.mpill.on{background:#006aff!important;color:#fff!important;border-color:#006aff!important}'
+  + '#drawClear{color:#006aff;border-color:#9cc4ff}'
   + '.panel{grid-area:zcards!important;border-right:0!important;border-left:1px solid var(--line)!important}'
   // the filter bar, once moved into the top bar: strip its panel chrome, keep on one row
   + '.ztop .fbar{border:0!important;padding:0!important;margin:0!important;background:transparent!important;flex:0 1 auto;min-width:0}'
@@ -333,7 +336,13 @@ const VIEWPORT_JS = `<script>
     if(MODE==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,agency:clean(p.agency),naics:p.naics,set:SETMAP[p.set]||'None',value:p.value,exp:(p.exp||'').slice(0,10),loc:p.loc,sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng};
     return {src:'SAM',naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc};
   }
-  function bbox(){ var b=map.getBounds(); return [b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].map(function(n){return n.toFixed(4);}).join(','); }
+  function bbox(){
+    // When the user has drawn an area (Draw button), query THAT rectangle instead of the
+    // full viewport — Zillow's draw-to-filter. window.__drawBounds is set by DRAW_JS.
+    var b = (window.__drawBounds) ? window.__drawBounds : map.getBounds();
+    return [b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].map(function(n){return n.toFixed(4);}).join(',');
+  }
+  window.__mapRefetch = fetchViewLater; function fetchViewLater(){ try{ fetchView(); }catch(e){} }
   function updateHeader(){
     var brand=document.querySelector('.brand'); if(brand)brand.textContent=MODES[MODE].title;
     if(!TOTAL)return;
@@ -477,6 +486,42 @@ const VIEWPORT_JS = `<script>
       mp.classList.toggle('show'); };
     document.addEventListener('click',function(e){ if(mp.classList.contains('show')&&!e.target.closest('.mfwrap'))mp.classList.remove('show'); }); }
   setTimeout(fetchView,300);
+})();
+</script>`;
+
+// Draw area (Zillow's "Draw") — drag a rectangle on the map to filter opportunities to
+// inside it. Sets window.__drawBounds (read by bbox()) + calls window.__mapRefetch. While
+// an area is active, map panning is disabled so the drawn box stays the query region.
+const DRAW_JS = `<script>
+(function(){
+  var drawBtn=document.getElementById('drawBtn'), clearBtn=document.getElementById('drawClear');
+  if(!drawBtn||typeof map==='undefined')return;
+  var drawing=false, startLL=null, rect=null, active=false;
+  function setPanning(on){ try{ if(on){map.dragging.enable();}else{map.dragging.disable();} }catch(e){} }
+  function enterDraw(){ drawing=true; drawBtn.classList.add('on'); drawBtn.textContent='Draw a box on the map…';
+    map.getContainer().style.cursor='crosshair'; setPanning(false); }
+  function exitDrawMode(){ drawing=false; drawBtn.classList.remove('on');
+    drawBtn.innerHTML='<svg width=\\"14\\" height=\\"14\\" viewBox=\\"0 0 24 24\\" fill=\\"none\\" stroke=\\"currentColor\\" stroke-width=\\"2\\" stroke-linecap=\\"round\\" stroke-linejoin=\\"round\\" style=\\"vertical-align:-2px;margin-right:5px\\"><path d=\\"M12 19l7-7 3 3-7 7-3-3z\\"/><path d=\\"M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z\\"/><path d=\\"M2 2l7.586 7.586\\"/><circle cx=\\"11\\" cy=\\"11\\" r=\\"2\\"/></svg>Draw area';
+    map.getContainer().style.cursor=''; }
+  function clearArea(){
+    if(rect){ try{map.removeLayer(rect);}catch(e){} rect=null; }
+    window.__drawBounds=null; active=false; clearBtn.style.display='none';
+    setPanning(true); exitDrawMode(); if(window.__mapRefetch)window.__mapRefetch();
+  }
+  drawBtn.onclick=function(){ if(active){ clearArea(); return; } if(drawing){ exitDrawMode(); setPanning(true); return; } enterDraw(); };
+  clearBtn.onclick=clearArea;
+  map.on('mousedown',function(e){ if(!drawing)return; startLL=e.latlng;
+    if(rect){try{map.removeLayer(rect);}catch(x){}rect=null;}
+    rect=L.rectangle([startLL,startLL],{color:'#006aff',weight:2,fillColor:'#006aff',fillOpacity:.08,interactive:false}).addTo(map);
+  });
+  map.on('mousemove',function(e){ if(!drawing||!startLL||!rect)return; rect.setBounds(L.latLngBounds(startLL,e.latlng)); });
+  map.on('mouseup',function(e){ if(!drawing||!startLL)return;
+    var b=L.latLngBounds(startLL,e.latlng); startLL=null;
+    // Ignore tiny accidental clicks.
+    if(b.getNorth()-b.getSouth()<0.02 && b.getEast()-b.getWest()<0.02){ clearArea(); return; }
+    window.__drawBounds=b; active=true; exitDrawMode(); setPanning(true);
+    clearBtn.style.display=''; if(window.__mapRefetch)window.__mapRefetch();
+  });
 })();
 </script>`;
 
@@ -803,8 +848,14 @@ export async function GET(request: NextRequest) {
       '<a class="pva pri" href="${draftURL(o)}" target="_blank" rel="noopener">Draft proposal</a>');
     // Card click opens the detail drawer (was: flyTo + popup). Uses the notice_id (o.nid).
     html = html.replace('c.onclick=()=>select(o.sol,true);', 'c.onclick=()=>openOppDrawer(o.nid||o.sol);');
-    // Viewport-driven data + dynamic header + save-to-pursuits + detail drawer (last, after globals).
-    html = html.replace('</body>', DRAWER_HTML + VIEWPORT_JS + SAVE_JS + DRAWER_JS + '</body>');
+    // Swap the map controls: drop Fit-to-results + Terrain, add a "Draw area" button
+    // (Zillow's Draw — drag a rectangle on the map to filter opportunities to inside it).
+    html = html.replace(
+      '<button class="mpill" id="fitBtn">Fit to results</button>\n      <button class="mpill" id="basemapBtn">Terrain</button>',
+      '<button class="mpill" id="drawBtn"><svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align:-2px;margin-right:5px"><path d="M12 19l7-7 3 3-7 7-3-3z"/><path d="M18 13l-1.5-7.5L2 2l3.5 14.5L13 18l5-5z"/><path d="M2 2l7.586 7.586"/><circle cx="11" cy="11" r="2"/></svg>Draw area</button>'
+      + '<button class="mpill" id="drawClear" style="display:none">✕ Clear area</button>');
+    // Viewport-driven data + dynamic header + save-to-pursuits + detail drawer + draw-area (last, after globals).
+    html = html.replace('</body>', DRAWER_HTML + VIEWPORT_JS + DRAW_JS + SAVE_JS + DRAWER_JS + '</body>');
   }
   return new NextResponse(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }
