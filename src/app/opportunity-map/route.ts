@@ -184,10 +184,12 @@ const PAGE_CSS = '<style>'
   + '.railbtn{display:none!important}'
   // "More filters" dropdown panel (Zillow's Filters catch-all).
   + '.mfwrap{position:relative}'
-  // Anchor to the RIGHT edge of the Filters button (it sits near the right of the bar, so
-  // a left-anchored 320px panel would overflow off-screen). z-index high within .ztop.
-  + '.mfpanel{display:none;position:absolute;top:calc(100% + 8px);right:0;z-index:1200;background:#fff;'
-  + 'border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.15);padding:13px 15px;min-width:300px}'
+  // position:FIXED (not absolute) so the panel ESCAPES the .fscroll overflow-x:auto
+  // ancestor that was CLIPPING it — the panel opened (display:block) but was hidden by
+  // the scroll container. Anchored under the bar (~62px) toward the right; JS aligns it
+  // to the Filters button on open. High z-index beats the map.
+  + '.mfpanel{display:none;position:fixed;top:62px;right:28px;z-index:3000;background:#fff;'
+  + 'border:1px solid var(--line);border-radius:12px;box-shadow:0 12px 34px rgba(0,0,0,.18);padding:13px 15px;min-width:300px}'
   + '.mfpanel.show{display:block}'
   + '.mf-sec{font:700 10px "Inter",system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:var(--faint);margin-bottom:11px}'
   + '.mf-row{display:flex;align-items:center;justify-content:space-between;gap:16px;font:600 13px "Inter",system-ui,sans-serif;color:var(--ink)}'
@@ -468,7 +470,11 @@ const VIEWPORT_JS = `<script>
   });
   // More-filters dropdown open/close.
   var mb=document.getElementById('moreBtn'), mp=document.getElementById('morePanel');
-  if(mb&&mp){ mb.onclick=function(e){ e.stopPropagation(); mp.classList.toggle('show'); };
+  if(mb&&mp){ mb.onclick=function(e){ e.stopPropagation();
+      // Fixed panel → align it under the Filters button (right-edge aligned, on-screen).
+      var r=mb.getBoundingClientRect(); mp.style.top=(r.bottom+8)+'px';
+      var right=Math.max(12, window.innerWidth-r.right); mp.style.right=right+'px'; mp.style.left='auto';
+      mp.classList.toggle('show'); };
     document.addEventListener('click',function(e){ if(mp.classList.contains('show')&&!e.target.closest('.mfwrap'))mp.classList.remove('show'); }); }
   setTimeout(fetchView,300);
 })();
