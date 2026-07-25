@@ -203,15 +203,18 @@ const SAVE_JS = `<script>
 // Fetches /api/app/opportunity-detail?id=<notice_id>. Card click opens it (see the onclick swap).
 const DRAWER_CSS = '<style>'
   + '.viewdet{color:var(--sub);font-weight:600;font-size:12px}'
-  + '.oppbd{position:fixed;inset:0;background:rgba(17,28,38,.32);z-index:1400;opacity:0;pointer-events:none;transition:opacity .2s}'
-  + '.oppbd.show{opacity:1;pointer-events:auto}'
-  + '.oppdrawer{position:fixed;top:0;right:0;height:100vh;height:100dvh;width:560px;max-width:94vw;background:#fff;z-index:1500;'
-  + 'box-shadow:-8px 0 40px rgba(0,0,0,.16);transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);'
+  // Drawer fills the MAP area (between the 58px icon rail and the 404px cards column) and slides
+  // in from the left — so the card list stays visible and clicking another card updates it.
+  + '.oppbd{position:fixed;top:0;left:58px;right:404px;bottom:0;background:rgba(17,28,38,.06);z-index:1400;opacity:0;pointer-events:none;transition:opacity .2s}'
+  + '.oppbd.show{opacity:1}'
+  + '.oppdrawer{position:fixed;top:0;left:58px;right:404px;height:100vh;height:100dvh;background:#fff;z-index:1500;'
+  + 'box-shadow:8px 0 40px rgba(0,0,0,.14);transform:translateX(-104%);transition:transform .28s cubic-bezier(.4,0,.2,1);'
   + 'overflow-y:auto;display:flex;flex-direction:column}'
   + '.oppdrawer.show{transform:none}'
-  + '.oppx{position:sticky;top:12px;align-self:flex-end;margin:12px 14px 0;width:34px;height:34px;border-radius:50%;'
+  + '@media(max-width:1100px){.oppdrawer,.oppbd{left:0;right:0}}'
+  + '.oppx{position:sticky;top:12px;align-self:flex-end;margin:12px 18px 0;width:34px;height:34px;border-radius:50%;'
   + 'border:1px solid var(--line);background:#fff;cursor:pointer;font-size:15px;z-index:2;display:grid;place-items:center;flex:none}'
-  + '.oppbody{padding:2px 26px 44px}'
+  + '.oppbody{padding:2px 30px 44px;max-width:800px;width:100%}'
   + '.oppload{padding:70px 26px;text-align:center;color:var(--sub);font-size:14px}'
   + '.snaphero{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:6px}'
   + '.badge-nt{display:inline-block;font:700 10.5px Inter,system-ui,sans-serif;letter-spacing:.04em;text-transform:uppercase;padding:4px 9px;border-radius:6px;background:var(--wash);color:var(--sub)}'
@@ -227,6 +230,7 @@ const DRAWER_CSS = '<style>'
   + '.osec{margin-top:26px}'
   + '.osec-h{font:700 15px "Space Grotesk",Inter,system-ui,sans-serif;color:var(--ink);margin-bottom:11px}'
   + '.osec-b{font-size:13.5px;line-height:1.6;color:#374151;white-space:pre-wrap;word-break:break-word}'
+  + '.osec-empty{font-size:13px;color:var(--faint)}'
   + '.osec-b.clamp{max-height:210px;overflow:hidden;-webkit-mask-image:linear-gradient(#000 74%,transparent);mask-image:linear-gradient(#000 74%,transparent)}'
   + '.osec-more{margin-top:9px;font:600 12.5px Inter,system-ui,sans-serif;color:var(--jan);background:none;border:0;cursor:pointer;padding:0}'
   + '.ocontact{border:1px solid var(--line);border-radius:11px;padding:12px 14px;margin-top:9px}'
@@ -256,6 +260,7 @@ const DRAWER_JS = `<script>
   function due(d){ if(!d)return ''; var n=Math.ceil((new Date(d)-new Date())/86400000); if(n<0)return 'closed'; if(n===0)return 'due today'; if(n===1)return '1 day left'; return n+' days left'; }
   function longDate(d){ if(!d)return '\\u2014'; try{ return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }catch(e){return d;} }
   function sec(title,inner){ return '<div class="osec"><div class="osec-h">'+title+'</div>'+inner+'</div>'; }
+  function empty(msg){ return '<div class="osec-empty">'+msg+'</div>'; }
 
   function snapshot(o){
     var n=o.deadline?Math.ceil((new Date(o.deadline)-new Date())/86400000):null;
@@ -278,20 +283,20 @@ const DRAWER_JS = `<script>
       + '</div>';
   }
   function synopsisSec(o){
-    if(!o.synopsis)return '';
+    if(!o.synopsis)return sec('Synopsis',empty('No synopsis was included in this notice.'));
     var long=o.synopsis.length>620;
     return sec('Synopsis','<div class="osec-b'+(long?' clamp':'')+'" id="synBody">'+esc(o.synopsis)+'</div>'
       + (long?'<button class="osec-more" onclick="var b=document.getElementById(\\'synBody\\');b.classList.remove(\\'clamp\\');this.remove()">Show more</button>':''));
   }
   function sowSec(o){
-    if(!(o.sow&&o.sow.text))return '';
+    if(!(o.sow&&o.sow.text))return sec('Scope of work',empty('No statement of work is attached to this notice.'));
     var long=o.sow.text.length>620;
     return sec('Scope of work'+(o.sow.filename?' \\u00b7 <span style="font-weight:400;color:var(--sub);font-size:12px">'+esc(o.sow.filename)+'</span>':''),
       '<div class="osec-b'+(long?' clamp':'')+'" id="sowBody">'+esc(o.sow.text)+'</div>'
       + (long?'<button class="osec-more" onclick="var b=document.getElementById(\\'sowBody\\');b.classList.remove(\\'clamp\\');this.remove()">Show more</button>':''));
   }
   function contactsSec(o){
-    if(!o.contacts||!o.contacts.length)return '';
+    if(!o.contacts||!o.contacts.length)return sec('Points of contact',empty('No point of contact was listed on this notice.'));
     var rows=o.contacts.map(function(c){
       return '<div class="ocontact"><div class="nm">'+esc(c.name||'Contact')+'</div>'
         + (c.title?'<div class="ti">'+esc(c.title)+'</div>':'')
