@@ -1,6 +1,37 @@
 # Opportunity Map — full explorer (Airbnb/Google map⇄list) — SCOPE (2026-07-24)
 
 ---
+## 🧱 ZILLOW-DEPTH BUILD (2026-07-25, in progress on feat/logged-in-home-v2)
+
+The quick-filter bar reorg SHIPPED (commit aa02b0f6 — 6 server-wired controls: scope/
+notice-type/set-aside/urgency/agency/state, + search + hide-commodity). Verified live on
+the PR #409 preview: filters apply server-side + survive panning (Solicitation+SDVOSB →
+142/142 all-green pins).
+
+**Eric's depth asks (all 4, verify-as-we-build):** (1) fix crowded top bar, (2) advanced
+"More filters" deep panel = the missing Zillow "property-type" dropdowns, (3) Save this
+search + alerts (the retention killer), (4) label the left sidebar (unlabeled icons today).
+
+**Deep panel — DATA-GROUNDED scope (measured 2026-07-25 on active sam_opportunities):**
+- ✅ NAICS 96% · PSC 97% · notice_type 100% · posted_date 100% · set_aside 57% → BUILD
+- ❌ **Contract value $-range: `award_amount` is 100% NULL on active opps** (nothing's
+  awarded yet — these are open solicitations). The ONLY value column; no estimated field.
+  DO NOT ship a dead $-filter on Open (the stub trap).
+
+**VALUE FILTER DECISION (Eric):** don't drop it. Wire the REAL $-range on **Recompetes mode**
+(USASpending contract ceilings — real data). Make it **mode-aware**: shows on Recompetes,
+hidden/"estimated (coming)" on Open. Then build an ESTIMATED value for open opps — 3 viable
+approaches to pick from later (Zillow's Zestimate is also a model, so this is legit):
+  1. PSC/NAICS historical award range ("this NAICS typically awards $500K–$5M") — model/estimate, labeled.
+  2. Parse est. value/ceiling from notice `description` body (now captured) — partial but real.
+  3. Predecessor/incumbent contract ceiling (already computed via the Award Intelligence spine) — strong proxy.
+TRACKED, not forgotten. Do NOT let the $-range on Open ship as a null control.
+
+**Build order (commit + open each):** (1) top-bar fix + sidebar labels [fast] → (2) deep
+panel: NAICS/PSC/multi-set-aside/multi-agency/multi-notice-type/posted-date + $-range on
+Recompetes → (3) Save search + alerts.
+
+---
 ## ⏯️ HANDOFF / NEXT STEP (as of 2026-07-25 — resumed on laptop)
 
 **Branch:** `feat/logged-in-home-v2` — pushed, in sync at `67ee8a7f` (`git pull` to grab it).
