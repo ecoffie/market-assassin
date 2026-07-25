@@ -82,9 +82,9 @@ const ZLAYOUT_CSS = '<style>'
   + ':root{--disp:"Inter",system-ui,-apple-system,sans-serif!important}'
   + '.snapt,.osec-h,.brand{font-family:"Inter",system-ui,-apple-system,sans-serif!important;letter-spacing:-.01em}'
   // Grid gains a full-width top HEADER row for the Mindy logo, above the search/filter row.
-  + '.app{grid-template-columns:58px minmax(0,1fr) 404px!important;grid-template-rows:52px auto minmax(0,1fr)!important;'
+  + '.app{grid-template-columns:50px minmax(0,1fr) 404px!important;grid-template-rows:52px auto minmax(0,1fr)!important;'
   + 'grid-template-areas:"zhead zhead zhead" "zrail ztop ztop" "zrail zmap zcards"!important;transition:none!important}'
-  + '.app.collapsed{grid-template-columns:58px minmax(0,1fr) 0px!important}'
+  + '.app.collapsed{grid-template-columns:50px minmax(0,1fr) 0px!important}'
   // Mindy header bar
   + '.zhead{grid-area:zhead;display:flex;align-items:center;gap:12px;padding:0 18px;border-bottom:1px solid var(--line);background:#fff;z-index:20}'
   + '.zhead img{height:27px;width:auto;display:block}'
@@ -98,14 +98,18 @@ const ZLAYOUT_CSS = '<style>'
   + '.zrail svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}'
   // top bar (search + the moved filters)
   + '.ztop{grid-area:ztop;position:relative;display:flex;align-items:center;gap:10px;padding:10px 18px;border-bottom:1px solid var(--line);background:#fff;z-index:9;min-width:0}'
-  + '.zsearch{flex:none;width:330px;max-width:32vw;display:flex;align-items:center;gap:8px;border:1.5px solid var(--line);border-radius:11px;padding:0 12px;height:42px;background:#fff}'
+  + '.zsearch{flex:0 1 330px;min-width:170px;max-width:32vw;display:flex;align-items:center;gap:8px;border:1.5px solid var(--line);border-radius:11px;padding:0 12px;height:42px;background:#fff}'
   + '.zsearch svg{width:16px;height:16px;stroke:var(--sub);fill:none;stroke-width:2;flex:none}'
   + '.zsearch input{border:0;outline:0;flex:1;min-width:0;font:500 13.5px Inter,system-ui,sans-serif;background:transparent;color:var(--ink)}'
   + '.mapwrap{grid-area:zmap!important}'
   + '.panel{grid-area:zcards!important;border-right:0!important;border-left:1px solid var(--line)!important}'
   // the filter bar, once moved into the top bar: strip its panel chrome, keep on one row
   + '.ztop .fbar{border:0!important;padding:0!important;margin:0!important;background:transparent!important;flex:0 1 auto;min-width:0}'
-  + '.ztop .fbar .fscroll{flex-wrap:nowrap!important;overflow-x:auto;row-gap:0}'
+  + '.ztop .fbar .fscroll{flex-wrap:nowrap!important;overflow-x:auto!important;row-gap:0;min-width:0}'
+  // Hard overflow guard: the filter bar must scroll inside its area, never widen the page and
+  // push the left rail off-screen. Reduced rail (Eric).
+  + 'html,body{overflow-x:hidden!important}'
+  + '.app{max-width:100vw!important;overflow:hidden!important}'
   // filter sheets become dropdown overlays (a top bar can't push content down like the old panel)
   + '.ztop .fbar .sheet{position:absolute!important;top:calc(100% + 6px);left:18px;z-index:900;background:#fff;'
   + 'border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 34px rgba(0,0,0,.14);padding:14px 16px;'
@@ -218,11 +222,11 @@ const SAVE_JS = `<script>
 // Fetches /api/app/opportunity-detail?id=<notice_id>. Card click opens it (see the onclick swap).
 const DRAWER_CSS = '<style>'
   + '.viewdet{color:var(--sub);font-weight:600;font-size:12px}'
-  // Drawer fills the MAP area (between the 58px icon rail and the 404px cards column) and slides
+  // Drawer fills the MAP area (between the 50px icon rail and the 404px cards column) and slides
   // in from the left — so the card list stays visible and clicking another card updates it.
-  + '.oppbd{position:fixed;top:52px;left:58px;right:404px;bottom:0;background:rgba(17,28,38,.06);z-index:1400;opacity:0;pointer-events:none;transition:opacity .2s}'
+  + '.oppbd{position:fixed;top:52px;left:50px;right:404px;bottom:0;background:rgba(17,28,38,.06);z-index:1400;opacity:0;pointer-events:none;transition:opacity .2s}'
   + '.oppbd.show{opacity:1}'
-  + '.oppdrawer{position:fixed;top:52px;left:58px;right:404px;height:calc(100vh - 52px);height:calc(100dvh - 52px);background:#fff;z-index:1500;'
+  + '.oppdrawer{position:fixed;top:52px;left:50px;right:404px;height:calc(100vh - 52px);height:calc(100dvh - 52px);background:#fff;z-index:1500;'
   + 'box-shadow:8px 0 40px rgba(0,0,0,.14);transform:translateX(-104%);transition:transform .28s cubic-bezier(.4,0,.2,1);'
   + 'overflow-y:auto;display:flex;flex-direction:column}'
   + '.oppdrawer.show{transform:none}'
