@@ -18,14 +18,37 @@ search + alerts (the retention killer), (4) label the left sidebar (unlabeled ic
   awarded yet — these are open solicitations). The ONLY value column; no estimated field.
   DO NOT ship a dead $-filter on Open (the stub trap).
 
-**VALUE FILTER DECISION (Eric):** don't drop it. Wire the REAL $-range on **Recompetes mode**
-(USASpending contract ceilings — real data). Make it **mode-aware**: shows on Recompetes,
-hidden/"estimated (coming)" on Open. Then build an ESTIMATED value for open opps — 3 viable
-approaches to pick from later (Zillow's Zestimate is also a model, so this is legit):
-  1. PSC/NAICS historical award range ("this NAICS typically awards $500K–$5M") — model/estimate, labeled.
-  2. Parse est. value/ceiling from notice `description` body (now captured) — partial but real.
-  3. Predecessor/incumbent contract ceiling (already computed via the Award Intelligence spine) — strong proxy.
-TRACKED, not forgotten. Do NOT let the $-range on Open ship as a null control.
+**VALUE FILTER DECISION (Eric) — RESOLVED with real data (2026-07-25):** value ranges DO
+exist; measured across all three modes:
+  - **Forecasts:** `agency_forecasts.estimated_value_min/max` (bigint) + `estimated_value_range`
+    (text) are **99.8% populated (9,953/9,973)** — ALREADY PARSED at import. Build the filter NOW.
+  - **Recompetes:** real USASpending contract ceilings. Build NOW.
+  - **Open opps (active SAM):** `award_amount` 100% NULL (nothing awarded yet), BUT value bands
+    live IN THE SOLICITATION DOCS. Eric's screenshots proved forecast/workload PDFs carry a
+    standard **"Estimated Dollar Value" / "PROJECT RANGE"** column with the canonical federal
+    bands: `<$1M · $1M–$5M · $5M–$10M · $10M–$25M · $25M–$100M · $100M+` (+ "Over $X", "Share Capacity").
+    → PHASE 2: a resumable SCAN job over `sam_opportunities.description` body + attachments
+    that regex-extracts those bands → stamp new `estimated_value_min/max` cols on sam_opportunities
+    ([[bulk_backfill_use_local_runner]] pattern). Then the SAME filter lights up on Open.
+**Build phasing:** value-range filter ships NOW on Forecasts + Recompetes (real data), mode-aware
+hidden on Open until the scan backfills it. Filter buckets = the 6 standard federal bands above.
+NOT forgotten, NOT shipped dead.
+
+**MORE doc-derived signals (Eric's Section-M + solicitation screenshots, 2026-07-25) — the scan
+job should extract ALL of these, not just value:**
+- **Precise contract ceiling** — solicitations state it verbatim ("$71,875,939.00 combined overall
+  contract ceiling"). Google Gemini auto-extracted it from the PDF → extraction is very doable.
+- **FAR 36.204 magnitude band** — construction solicitations state "the magnitude of construction
+  for this project is between $1,000,000 and $5,000,000" — the exact value band, in body text.
+- **Bonding-capacity → confidence scale** (Section M eval factors): govt publishes RATING→$ bands
+  (Substantial $10M single/$20M+ agg · Satisfactory $6–9.9M · Neutral $3–5.9M · Limited $1–2.9M ·
+  None $0–900K). DERIVE: (a) the project's expected contractor SIZE (proxy for magnitude), and
+  (b) a NEW qualification filter "opps I'm bonded for" (user enters their bonding capacity → filter).
+- **Size standard** ("$45 Million"), min order ("$5,000/awardee"), liquidated-damages threshold —
+  all in the body, all filterable/derivable.
+→ The doc-scan (Phase 2) becomes a broader "solicitation intelligence extractor": value band +
+ceiling + bonding/confidence + size standard, stamped as structured cols. Bonding filter is a
+genuinely differentiated feature (no competitor filters by "what you're bonded for").
 
 **Build order (commit + open each):** (1) top-bar fix + sidebar labels [fast] → (2) deep
 panel: NAICS/PSC/multi-set-aside/multi-agency/multi-notice-type/posted-date + $-range on
