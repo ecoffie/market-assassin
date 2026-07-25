@@ -69,6 +69,45 @@ const EARLY_INJECT = '<script>function setColorFor(o){if(o&&o.set===\'HUBZone\')
   + 'try{for(var i=0;i<SETGROUPS.length;i++){if(SETGROUPS[i].match(o.set))return cv(SETGROUPS[i].col);}}catch(e){}'
   + 'return (typeof cv===\'function\')?cv(\'--sec\'):\'#64748b\';}</script>';
 
+// Zillow-style layout: top search+filters bar, thin far-left icon rail, center map, right cards.
+// Achieved by re-gridding .app into areas and moving the filter bar into the top bar (JS). All
+// of the template's render()/markers/filters/cards logic is untouched — only containers move.
+const ZLAYOUT_CSS = '<style>'
+  + '.app{grid-template-columns:58px minmax(0,1fr) 404px!important;grid-template-rows:auto minmax(0,1fr)!important;'
+  + 'grid-template-areas:"zrail ztop ztop" "zrail zmap zcards"!important;transition:none!important}'
+  + '.app.collapsed{grid-template-columns:58px minmax(0,1fr) 0px!important}'
+  // far-left icon rail
+  + '.zrail{grid-area:zrail;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:2px;padding:14px 0;z-index:10}'
+  + '.zrail a{display:flex;flex-direction:column;align-items:center;gap:3px;font:600 9px/1.1 Inter,system-ui,sans-serif;color:var(--sub);text-decoration:none;padding:9px 3px;border-radius:9px;width:48px;text-align:center}'
+  + '.zrail a:hover{background:var(--wash);color:var(--ink)}.zrail a.on{color:var(--ink)}'
+  + '.zrail svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}'
+  // top bar (search + the moved filters)
+  + '.ztop{grid-area:ztop;position:relative;display:flex;align-items:center;gap:10px;padding:10px 18px;border-bottom:1px solid var(--line);background:#fff;z-index:9;min-width:0}'
+  + '.zsearch{flex:none;width:330px;max-width:32vw;display:flex;align-items:center;gap:8px;border:1.5px solid var(--line);border-radius:11px;padding:0 12px;height:42px;background:#fff}'
+  + '.zsearch svg{width:16px;height:16px;stroke:var(--sub);fill:none;stroke-width:2;flex:none}'
+  + '.zsearch input{border:0;outline:0;flex:1;min-width:0;font:500 13.5px Inter,system-ui,sans-serif;background:transparent;color:var(--ink)}'
+  + '.mapwrap{grid-area:zmap!important}'
+  + '.panel{grid-area:zcards!important;border-right:0!important;border-left:1px solid var(--line)!important}'
+  // the filter bar, once moved into the top bar: strip its panel chrome, keep on one row
+  + '.ztop .fbar{border:0!important;padding:0!important;margin:0!important;background:transparent!important;flex:0 1 auto;min-width:0}'
+  + '.ztop .fbar .fscroll{flex-wrap:nowrap!important;overflow-x:auto;row-gap:0}'
+  // filter sheets become dropdown overlays (a top bar can't push content down like the old panel)
+  + '.ztop .fbar .sheet{position:absolute!important;top:calc(100% + 6px);left:18px;z-index:900;background:#fff;'
+  + 'border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 34px rgba(0,0,0,.14);padding:14px 16px;'
+  + 'min-width:300px;max-width:540px;margin-top:0!important;max-height:62vh;overflow-y:auto}'
+  + '</style>';
+
+// Icon rail + top search bar. The template's .fbar (filters) is appended into .ztop by JS.
+const ZRAIL_HTML = '<nav class="zrail">'
+  + '<a href="/app" title="Back to Mindy"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg>Mindy</a>'
+  + '<a class="on" title="Opportunity Map"><svg viewBox="0 0 24 24"><path d="M9 4L3 6.5v14L9 18l6 2.5 6-2.5v-14L15 6.5 9 4z"/><path d="M9 4v14M15 6.5v14"/></svg>Map</a>'
+  + '<a href="/app?panel=pursuits" title="My Pursuits"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg>Pursuits</a>'
+  + '<a href="/app?panel=alerts" title="Alerts"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg>Alerts</a>'
+  + '</nav>';
+const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
+  + '<svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>'
+  + '<input id="zsearchInput" placeholder="Search opportunities, agencies, keywords…" autocomplete="off"></div></div>';
+
 // Set-aside color legend overlaid on the map (so color = eligibility is self-explanatory).
 const LEGEND_HTML = '<div class="setlegend"><div class="sl-t">Set-aside eligibility</div>'
   + '<span><i style="background:#22a06b"></i>SDVOSB</span>'
@@ -88,7 +127,10 @@ const LEGEND_HTML = '<div class="setlegend"><div class="sl-t">Set-aside eligibil
 const VIEWPORT_JS = `<script>
 (function(){
   var SETMAP={SDVOSB:'SDVOSB',SB:'SB','8A':'8(a)',WOSB:'WOSB',HZ:'HUBZone',OTHER:'Other',NONE:'None'};
-  var HIDE_FSC=false, TOTAL=0, CAPPED=false, busy=false, t=null;
+  var HIDE_FSC=false, TOTAL=0, CAPPED=false, busy=false, t=null, t2=null, Q='';
+  // Zillow layout: move the filter bar up into the top search bar, then re-measure the map.
+  try{ var zt=document.querySelector('.ztop'), zf=document.querySelector('.fbar');
+    if(zt&&zf){ zt.appendChild(zf); setTimeout(function(){try{map.invalidateSize();}catch(e){}},80); } }catch(e){}
   function clean(d){ return (d||'').replace(/,?\\s*DEPARTMENT OF( THE)?/i,'').replace(/DEPARTMENT OF( THE)?\\s*/i,'').trim().replace(/\\b([A-Z])([A-Z0-9'&.\\/-]*)/g,function(_,a,b){return a+b.toLowerCase();})||d; }
   function toRow(p){ return {src:'SAM',naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc}; }
   function bbox(){ var b=map.getBounds(); return [b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].map(function(n){return n.toFixed(4);}).join(','); }
@@ -106,7 +148,7 @@ const VIEWPORT_JS = `<script>
   var _render=render; render=function(){ _render(); updateHeader(); };
   function fetchView(){
     if(busy)return; busy=true;
-    var url='/api/app/opportunity-map?bbox='+bbox()+'&status=active'+(HIDE_FSC?'&hideCommodity=1':'');
+    var url='/api/app/opportunity-map?bbox='+bbox()+'&status=active'+(HIDE_FSC?'&hideCommodity=1':'')+(Q?'&q='+encodeURIComponent(Q):'');
     fetch(url).then(function(r){return r.json();}).then(function(d){ busy=false;
       if(!d||!d.success)return;
       TOTAL=d.totalForFilters||0; CAPPED=!!d.capped;
@@ -115,6 +157,8 @@ const VIEWPORT_JS = `<script>
     }).catch(function(){busy=false;});
   }
   map.on('moveend',function(){ clearTimeout(t); t=setTimeout(fetchView,450); });
+  var zsi=document.getElementById('zsearchInput');
+  if(zsi)zsi.addEventListener('input',function(){ clearTimeout(t2); t2=setTimeout(function(){ Q=zsi.value.trim(); fetchView(); },400); });
   var tg=document.getElementById('fscToggle');
   if(tg)tg.onclick=function(){ HIDE_FSC=!HIDE_FSC; tg.classList.toggle('active',HIDE_FSC); tg.textContent=HIDE_FSC?'Commodity buys: hidden':'Commodity buys: shown'; fetchView(); };
   setTimeout(fetchView,300); // first live load replaces the SSR set with the true viewport + real total
@@ -181,7 +225,10 @@ export async function GET(request: NextRequest) {
     // Full page: add a way back to the app (the standalone template has none).
     html = html.replace('<div class="phead">',
       '<div class="phead"><a href="/home-v5" style="display:inline-flex;align-items:center;gap:5px;font:600 12.5px Inter,system-ui,sans-serif;color:#6b7787;text-decoration:none;margin-bottom:9px">← Back to Mindy</a>');
-    html = html.replace('</head>', PAGE_CSS + '</head>');
+    html = html.replace('</head>', PAGE_CSS + ZLAYOUT_CSS + '</head>');
+    // Zillow layout: inject the icon rail + top search bar as the first children of .app
+    // (the grid areas place them; VIEWPORT_JS moves the filter bar up into the top bar).
+    html = html.replace('<div class="app">', '<div class="app">' + ZRAIL_HTML + ZTOP_HTML);
     // Load setColorFor right after leaflet.js (before the template's map script).
     html = html.replace('<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>',
       '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>' + EARLY_INJECT);
