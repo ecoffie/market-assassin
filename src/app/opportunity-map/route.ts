@@ -58,6 +58,8 @@ const PAGE_CSS = '<style>'
   + '.act.savep,.pva.savep{cursor:pointer;font:inherit;font-weight:600}'
   + '.savep.saved{color:#22a06b!important;border-color:#22a06b!important;background:#f0fdf7!important}'
   + '.act.samlink,.pva.samlink{color:var(--sub);font-size:11px;font-weight:500}'
+  // Progress/gamification widget removed for now (Eric, 2026-07-25).
+  + '.sbtoggle,.sb{display:none!important}'
   + '</style>';
 
 // Loaded right after leaflet.js (before the template's map script): setColorFor(). It MUST be a
