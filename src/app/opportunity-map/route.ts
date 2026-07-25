@@ -233,7 +233,11 @@ const ZLAYOUT_CSS = '<style>'
   + '.zrail svg{width:21px;height:21px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}'
   + '.zrail a span{font:600 10px Inter,system-ui,sans-serif;letter-spacing:.01em;line-height:1}'
   // top bar (search + the moved filters)
-  + '.ztop{grid-area:ztop;position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:8px 8px;padding:10px 18px;border-bottom:1px solid var(--line);background:#fff;z-index:9;min-width:0}'
+  // Bar stays ONE row like Zillow — nowrap so items SHRINK instead of the search
+  // wrapping onto its own line. overflow stays visible so the Filters dropdown escapes.
+  + '.ztop{grid-area:ztop;position:relative;display:flex;flex-wrap:nowrap;align-items:center;gap:8px;padding:10px 18px;border-bottom:1px solid var(--line);background:#fff;z-index:9;min-width:0}'
+  // Pills don\'t shrink (keep their label); the search absorbs the squeeze first.
+  + '.ztop .fbar,.fsel,.savesearch{flex:none}'
   + '.zsearch{flex:1 1 240px;min-width:150px;max-width:340px;display:flex;align-items:center;gap:8px;border:1px solid #d1d5db;border-radius:8px;padding:0 13px;height:40px;background:#fff}'
   + '.zsearch:focus-within{border-color:#006aff;box-shadow:0 0 0 3px rgba(0,106,255,.12)}'
   + '.zsearch svg{width:16px;height:16px;stroke:var(--sub);fill:none;stroke-width:2;flex:none}'
@@ -487,8 +491,11 @@ const DRAWER_CSS = '<style>'
   + '.oppbd.show{opacity:1}'
   + '.oppdrawer{position:fixed;top:52px;left:72px;right:404px;height:calc(100vh - 52px);height:calc(100dvh - 52px);background:#fff;z-index:1500;'
   + 'box-shadow:8px 0 40px rgba(0,0,0,.14);transform:translateX(-104%);transition:transform .28s cubic-bezier(.4,0,.2,1);'
-  + 'overflow-y:auto;display:flex;flex-direction:column}'
-  + '.oppdrawer.show{transform:none}'
+  + 'overflow-y:auto;display:flex;flex-direction:column;'
+  // Closed = fully hidden so nothing (esp. the sticky ✕ close button) bleeds over the
+  // rail/map. visibility+pointer-events are cleared on .show.
+  + 'visibility:hidden;pointer-events:none}'
+  + '.oppdrawer.show{transform:none;visibility:visible;pointer-events:auto}'
   + '@media(max-width:1100px){.oppdrawer,.oppbd{left:0;right:0}}'
   + '.oppx{position:sticky;top:12px;align-self:flex-end;margin:12px 18px 0;width:34px;height:34px;border-radius:50%;'
   + 'border:1px solid var(--line);background:#fff;cursor:pointer;font-size:15px;z-index:2;display:grid;place-items:center;flex:none}'
