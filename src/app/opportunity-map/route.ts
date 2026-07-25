@@ -247,6 +247,9 @@ const ZLAYOUT_CSS = '<style>'
   + '.zsearch svg{width:16px;height:16px;stroke:var(--sub);fill:none;stroke-width:2;flex:none}'
   + '.zsearch input{border:0;outline:0;flex:1;min-width:0;font:500 13.5px Inter,system-ui,sans-serif;background:transparent;color:var(--ink)}'
   + '.mapwrap{grid-area:zmap!important}'
+  // Map controls (Fit to results / Terrain) → floated INSIDE the map top-right, like Zillow\'s
+  // Schools/Draw. Was pinned top-CENTER in the dead strip between the bar and the map.
+  + '.maptop{left:auto!important;right:14px!important;top:14px!important;transform:none!important}'
   + '.panel{grid-area:zcards!important;border-right:0!important;border-left:1px solid var(--line)!important}'
   // the filter bar, once moved into the top bar: strip its panel chrome, keep on one row
   + '.ztop .fbar{border:0!important;padding:0!important;margin:0!important;background:transparent!important;flex:0 1 auto;min-width:0}'
