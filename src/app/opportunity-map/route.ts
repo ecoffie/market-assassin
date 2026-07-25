@@ -59,7 +59,17 @@ const MORE_FILTERS = '<div class="mfwrap">'
   + '<div class="mf-sec">Buyer</div>'
   + '<div class="mf-grid2">'
   +   '<label class="mf-field"><span>Agency</span><input class="mf-in" id="mfAgency" placeholder="e.g. Navy" autocomplete="off"></label>'
+  +   '<label class="mf-field"><span>Sub-agency</span><input class="mf-in" id="mfSubAgency" placeholder="e.g. Army" autocomplete="off"></label>'
+  + '</div>'
+  + '<div class="mf-sec">Location</div>'
+  + '<div class="mf-grid2">'
   +   '<label class="mf-field"><span>State</span><input class="mf-in mf-st" id="mfState" placeholder="e.g. FL" maxlength="2" autocomplete="off"></label>'
+  +   '<label class="mf-field"><span>Country</span><select class="mf-in" id="mfCountry"><option value="">Anywhere</option><option value="us">United States</option><option value="oconus">Overseas (OCONUS)</option></select></label>'
+  + '</div>'
+  + '<div class="mf-sec">Only show</div>'
+  + '<div class="mf-checks">'
+  +   '<label class="mf-chk"><input type="checkbox" id="mfHasDocs">With documents</label>'
+  +   '<label class="mf-chk"><input type="checkbox" id="mfHasContact">With a contact</label>'
   + '</div>'
   + '<div class="mf-sec">Set-aside <em>(any selected)</em></div>'
   + '<div class="mf-checks">' + SETASIDE_CHECKS + '</div>'
@@ -328,7 +338,8 @@ const VIEWPORT_JS = `<script>
   // sends them as query params so the filter is applied by the DB for the current
   // viewport — and survives panning, instead of hiding already-fetched pins.
   var FILT={ scope:'all', noticeType:'', setAside:'', closingDays:'', agency:'', state:'',
-    naics:'', psc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'' };
+    naics:'', psc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'',
+    subAgency:'', country:'', hasDocs:'', hasContact:'' };
   try{ var zt=document.querySelector('.ztop'), zf=document.querySelector('.fbar');
     if(zt&&zf){ zt.appendChild(zf); setTimeout(function(){try{map.invalidateSize();}catch(e){}},80); } }catch(e){}
   function clean(d){ return (d||'').replace(/,?\\s*DEPARTMENT OF( THE)?/i,'').replace(/DEPARTMENT OF( THE)?\\s*/i,'').trim().replace(/\\b([A-Z])([A-Z0-9'&.\\/-]*)/g,function(_,a,b){return a+b.toLowerCase();})||d; }
@@ -376,6 +387,10 @@ const VIEWPORT_JS = `<script>
       if(FILT.naics)url+='&naics='+encodeURIComponent(FILT.naics);
       if(FILT.psc)url+='&psc='+encodeURIComponent(FILT.psc);
       if(FILT.postedDays)url+='&postedDays='+encodeURIComponent(FILT.postedDays);
+      if(FILT.subAgency)url+='&subAgency='+encodeURIComponent(FILT.subAgency);
+      if(FILT.country)url+='&country='+encodeURIComponent(FILT.country);
+      if(FILT.hasDocs)url+='&hasDocs=1';
+      if(FILT.hasContact)url+='&hasContact=1';
     }
     // Value range — Recompetes only for now (real USASpending ceilings). The recompete-map
     // endpoint accepts min/max; hidden on Open until the doc-scan backfills estimated value.
@@ -421,16 +436,20 @@ const VIEWPORT_JS = `<script>
     FILT.setAsideMulti=_checked('.mf-set');
     FILT.noticeMulti=_checked('.mf-notice');
     FILT.valueRange=(document.getElementById('mfValue')||{}).value||'';
-    var active=!!(FILT.naics||FILT.psc||FILT.agency||FILT.state||FILT.postedDays||FILT.setAsideMulti||FILT.noticeMulti||FILT.valueRange);
+    FILT.subAgency=(document.getElementById('mfSubAgency')||{}).value||'';
+    FILT.country=(document.getElementById('mfCountry')||{}).value||'';
+    FILT.hasDocs=(document.getElementById('mfHasDocs')||{}).checked?'1':'';
+    FILT.hasContact=(document.getElementById('mfHasContact')||{}).checked?'1':'';
+    var active=!!(FILT.naics||FILT.psc||FILT.agency||FILT.state||FILT.postedDays||FILT.setAsideMulti||FILT.noticeMulti||FILT.valueRange||FILT.subAgency||FILT.country||FILT.hasDocs||FILT.hasContact);
     var mbEl=document.getElementById('moreBtn'); if(mbEl)mbEl.classList.toggle('hasfilt',active);
   }
   var _apply=document.getElementById('mfApply');
   if(_apply)_apply.onclick=function(){ readDeep(); var mp2=document.getElementById('morePanel'); if(mp2)mp2.classList.remove('show'); fetchView(); };
   var _mfclr=document.getElementById('mfClear');
   if(_mfclr)_mfclr.onclick=function(){
-    ['mfNaics','mfPsc','mfAgency','mfState'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
-    var mvp=document.getElementById('mfPosted'); if(mvp)mvp.value='';
-    var mvv=document.getElementById('mfValue'); if(mvv)mvv.value='';
+    ['mfNaics','mfPsc','mfAgency','mfState','mfSubAgency'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
+    ['mfPosted','mfValue','mfCountry'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
+    ['mfHasDocs','mfHasContact'].forEach(function(id){var e=document.getElementById(id);if(e)e.checked=false;});
     document.querySelectorAll('.mf-set,.mf-notice').forEach(function(c){c.checked=false;});
     readDeep(); fetchView();
   };
@@ -584,6 +603,17 @@ const DRAWER_CSS = '<style>'
   + '.snapgrid .k{font:700 10.5px Inter,system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:var(--faint)}'
   + '.snapgrid .v{font-size:14px;font-weight:600;color:var(--ink);margin-top:2px}'
   + '.oppsoon{margin-top:26px;color:var(--faint);font-size:12px;border-top:1px dashed var(--line);padding-top:14px}'
+  // Bid facts grid (Zillow "Facts & features").
+  + '.bf-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 32px}'
+  + '.bf-row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--hair)}'
+  + '.bf-k{color:var(--sub);font-size:13px}.bf-v{color:var(--ink);font-size:13px;font-weight:600;text-align:right}'
+  // Similar opportunities (Zillow "Nearby homes" flywheel).
+  + '.sim-list{display:flex;flex-direction:column;gap:10px}'
+  + '.sim-card{display:block;width:100%;text-align:left;background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;cursor:pointer;transition:box-shadow .15s,border-color .15s}'
+  + '.sim-card:hover{box-shadow:0 2px 12px rgba(16,24,40,.08);border-color:#cfd6de}'
+  + '.sim-t{font-weight:700;font-size:14.5px;color:var(--ink);margin-bottom:3px;line-height:1.3}'
+  + '.sim-m{color:var(--sub);font-size:12.5px}'
+  + '.sim-sa{display:inline-block;margin-top:8px;background:var(--hair);color:var(--sub);border-radius:6px;padding:2px 8px;font-size:11px;font-weight:600}'
   // detail sections
   + '.osec{margin-top:26px}'
   + '.osec-h{font:700 15px "Space Grotesk",Inter,system-ui,sans-serif;color:var(--ink);margin-bottom:11px}'
@@ -724,10 +754,31 @@ const DRAWER_JS = `<script>
       + (o.uiLink?'<a class="b" href="'+esc(o.uiLink)+'" target="_blank" rel="noopener">View on SAM \\u2197</a>':'')
       + '</div>';
   }
-  function render(o){
+  // Bid Facts — the Zillow "Facts & features" grid. Real columns from the detail API.
+  function bidFactsSec(facts){
+    if(!facts||!facts.length)return '';
+    var rows=facts.map(function(f){ return '<div class="bf-row"><div class="bf-k">'+esc(f.k)+'</div><div class="bf-v">'+esc(f.v)+'</div></div>'; }).join('');
+    return sec('Bid facts','<div class="bf-grid">'+rows+'</div>');
+  }
+  // Similar opportunities — the Zillow "Nearby homes" flywheel. Clicking one opens its drawer.
+  function similarSec(sims){
+    if(!sims||!sims.length)return '';
+    var cards=sims.map(function(s){
+      var meta=[s.agency,s.location,(s.deadline?'due '+s.deadline:'')].filter(Boolean).join(' \\u00b7 ');
+      return '<button class="sim-card" onclick="openOppDrawer(\\''+esc(s.id)+'\\')">'
+        + '<div class="sim-t">'+esc(s.title)+'</div>'
+        + '<div class="sim-m">'+esc(meta)+'</div>'
+        + (s.setAside?'<span class="sim-sa">'+esc(s.setAside)+'</span>':'')
+        + '</button>';
+    }).join('');
+    return sec('Similar opportunities','<div class="sim-list">'+cards+'</div>');
+  }
+  function render(o,extra){
     CUR=o;
-    return snapshot(o)+orgSec(o)+descSec(o)+sowSec(o)+contactsSec(o)+docsSec(o)+vendorsSec(o)
-      + '<div class="oppsoon">Coming next to this view: AI Pursuit Brief \\u00b7 past-contract history \\u00b7 expected value range \\u00b7 agency intel \\u00b7 likely teaming partners.</div>'
+    extra=extra||{};
+    return snapshot(o)+bidFactsSec(extra.bidFacts)+orgSec(o)+descSec(o)+sowSec(o)+contactsSec(o)+docsSec(o)+vendorsSec(o)
+      + similarSec(extra.similar)
+      + '<div class="oppsoon">Coming next: AI Pursuit Brief \\u00b7 Go/No-Go \\u00b7 expected value range \\u00b7 M-Win score.</div>'
       + actions(o);
   }
   window.openOppDrawer=function(nid){
@@ -736,7 +787,7 @@ const DRAWER_JS = `<script>
     body.innerHTML='<div class="oppload">Loading\\u2026</div>';
     bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
     fetch('/api/app/opportunity-detail?id='+encodeURIComponent(nid)).then(function(r){return r.json();}).then(function(d){
-      body.innerHTML=(d&&d.success&&d.opp)?render(d.opp):'<div class="oppload">Couldn\\u2019t load this opportunity.</div>';
+      body.innerHTML=(d&&d.success&&d.opp)?render(d.opp,{bidFacts:d.bidFacts,similar:d.similar}):'<div class="oppload">Couldn\\u2019t load this opportunity.</div>';
     }).catch(function(){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; });
   };
 })();

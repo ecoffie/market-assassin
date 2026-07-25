@@ -13,6 +13,11 @@ export const FSC_REGEX = '^[0-9]{1,4}--';
 export type MapFilters = {
   status: string; search: string; noticeType: string; agency: string; setAside: string;
   naics: string; psc: string; state: string; hideCommodity: boolean; closingDays: number; postedDays: number;
+  // Zillow-parity additions (all backed by populated columns):
+  country: string;      // '' | 'us' | 'oconus' — CONUS vs overseas (pop_country)
+  subAgency: string;    // sub_tier ilike (Army/Navy/… under a dept)
+  hasDocs: boolean;     // only opps with attachments/SOW to respond to
+  hasContact: boolean;  // only opps with a named POC
   profileNaics: string[]; profileStates: string[];
 };
 
@@ -38,6 +43,10 @@ export function parseMapFilters(
     hideCommodity: get('hideCommodity') === '1' || get('hideCommodity') === 'true',
     closingDays: Math.max(0, parseInt(get('closingDays') || '0', 10) || 0),
     postedDays: Math.max(0, parseInt(get('postedDays') || '0', 10) || 0),
+    country: (get('country') || '').toLowerCase(),
+    subAgency: get('subAgency') || '',
+    hasDocs: get('hasDocs') === '1' || get('hasDocs') === 'true',
+    hasContact: get('hasContact') === '1' || get('hasContact') === 'true',
     profileNaics: opts?.profileNaics || [],
     profileStates: opts?.profileStates || [],
   };
@@ -96,6 +105,22 @@ export function applyMapFilters(query: any, f: MapFilters) {
     const since = new Date(Date.now() - f.postedDays * 86400_000).toISOString();
     query = query.gte('posted_date', since);
   }
+
+  // Country — CONUS vs overseas (pop_country is ISO3; 'USA' = domestic).
+  if (f.country === 'us') query = query.eq('pop_country', 'USA');
+  else if (f.country === 'oconus') query = query.neq('pop_country', 'USA');
+
+  // Sub-agency — narrow within a department (Army/Navy/… under DoD). Free-text ilike.
+  const subs = multiVal(f.subAgency);
+  if (subs.length) {
+    query = query.or(subs.map((s) => `sub_tier.ilike.%${s.replace(/[%,]/g, '')}%`).join(','));
+  }
+
+  // Has documents — only opps carrying an attachment/SOW to actually respond to.
+  if (f.hasDocs) query = query.or('has_sow_doc.eq.true,attachments.neq.[]');
+
+  // Has a named contact — only opps with a POC to reach out to.
+  if (f.hasContact) query = query.neq('points_of_contact', '[]');
 
   const explicitState = f.state ? normalizeStateCode(f.state) : null;
   if (explicitState) {
