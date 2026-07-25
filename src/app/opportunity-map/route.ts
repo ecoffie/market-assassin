@@ -263,6 +263,7 @@ const ZLAYOUT_CSS = '<style>'
 const ZRAIL_HTML = '<nav class="zrail">'
   + '<a href="/app" title="Back to Mindy"><svg viewBox="0 0 24 24"><path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/></svg><span>Home</span></a>'
   + '<a class="on" title="Opportunity Map"><svg viewBox="0 0 24 24"><path d="M9 4L3 6.5v14L9 18l6 2.5 6-2.5v-14L15 6.5 9 4z"/><path d="M9 4v14M15 6.5v14"/></svg><span>Map</span></a>'
+  + '<a href="/opportunity-map/saved" title="Saved searches"><svg viewBox="0 0 24 24"><path d="M19 21l-7-4-7 4V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg><span>Saved</span></a>'
   + '<a href="/app?panel=pursuits" title="My Pursuits"><svg viewBox="0 0 24 24"><rect x="3" y="7" width="18" height="13" rx="2"/><path d="M8 7V5a2 2 0 012-2h4a2 2 0 012 2v2"/></svg><span>Pursuits</span></a>'
   + '<a href="/app?panel=alerts" title="Alerts"><svg viewBox="0 0 24 24"><path d="M18 8a6 6 0 10-12 0c0 7-3 9-3 9h18s-3-2-3-9z"/><path d="M13.7 21a2 2 0 01-3.4 0"/></svg><span>Alerts</span></a>'
   + '</nav>';
@@ -441,7 +442,8 @@ const VIEWPORT_JS = `<script>
       headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
       body:JSON.stringify({email:em,name:name.slice(0,80),mode:MODE,filters:filters,bbox:b})})
       .then(function(r){return r.json();}).then(function(d){
-        _ssMsg(d&&d.success?'✓ Saved — we\\'ll alert you':'Couldn\\'t save');
+        if(d&&d.success){ _ss.textContent='✓ Saved — alerts on'; setTimeout(function(){ if(confirm('Saved! We\\'ll email you when new opportunities match. View your saved searches?'))location.href='/opportunity-map/saved'; else _ssReset(); },400); }
+        else _ssMsg('Couldn\\'t save');
       }).catch(function(){ _ssMsg('Couldn\\'t save'); });
   };
 
