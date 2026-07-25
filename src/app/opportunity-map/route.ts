@@ -54,6 +54,10 @@ const PAGE_CSS = '<style>'
   + '.setlegend .sl-t{width:100%;font-weight:700;color:var(--sub);text-transform:uppercase;letter-spacing:.05em;font-size:9.5px;margin-bottom:1px}'
   + '.setlegend span{display:inline-flex;align-items:center;gap:4px;color:var(--ink)}'
   + '.setlegend i{width:9px;height:9px;border-radius:50%;display:inline-block}'
+  // "Save to pursuits" button (styled like the template's .act/.pva anchors) + demoted SAM link.
+  + '.act.savep,.pva.savep{cursor:pointer;font:inherit;font-weight:600}'
+  + '.savep.saved{color:#22a06b!important;border-color:#22a06b!important;background:#f0fdf7!important}'
+  + '.act.samlink,.pva.samlink{color:var(--sub);font-size:11px;font-weight:500}'
   + '</style>';
 
 // Loaded right after leaflet.js (before the template's map script): setColorFor(). It MUST be a
@@ -117,6 +121,34 @@ const VIEWPORT_JS = `<script>
 })();
 </script>`;
 
+// "Save to pursuits" — capture an opp into the user's My Pursuits pipeline. The map page is
+// same-origin as the app, so it reads the MI auth token from localStorage (x-mi-auth-token) and
+// the token's own email (which /api/pipeline validates against) then POSTs /api/pipeline. Degrades
+// to "Sign in to save" if there's no session. GOS thesis: capture the customer.
+const SAVE_JS = `<script>
+(function(){
+  function tok(){ try{return localStorage.getItem('mi_beta_auth_token');}catch(e){return null;} }
+  function decodeEmail(t){ try{ var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); return (j.email||'').toLowerCase().trim(); }catch(e){return '';} }
+  function email(t){ var e=decodeEmail(t); if(e)return e; try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){return '';} }
+  window.savePursuit=function(btn){
+    if(btn.dataset.saved==='1')return;
+    var t=tok(); var em=t?email(t):'';
+    if(!t||!em){ btn.textContent='Sign in to save'; return; }
+    var sol=btn.dataset.sol, o=null;
+    try{ o=(OPPS||[]).find(function(x){return x.sol===sol;}); }catch(e){}
+    if(!o)return;
+    btn.textContent='Saving\\u2026'; btn.disabled=true;
+    fetch('/api/pipeline',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},
+      body:JSON.stringify({user_email:em,title:o.title,notice_id:o.sol,solicitation_number:o.sol,agency:o.agency,naics_code:o.naics,response_deadline:o.close,source:'opportunity_map'})})
+    .then(function(r){return r.json().catch(function(){return {};});}).then(function(d){
+      var dup=d&&d.error&&/alread|exist|duplicate/i.test(d.error);
+      if((d&&!d.error)||dup){ btn.textContent=dup?'\\u2713 In pursuits':'\\u2713 Saved'; btn.classList.add('saved'); btn.dataset.saved='1'; }
+      else { btn.textContent='Try again'; btn.disabled=false; }
+    }).catch(function(){ btn.textContent='Try again'; btn.disabled=false; });
+  };
+})();
+</script>`;
+
 export async function GET(request: NextRequest) {
   const embed = new URL(request.url).searchParams.get('embed');
   let opps: unknown[] = [];
@@ -171,8 +203,15 @@ export async function GET(request: NextRequest) {
     // Commodity-buys toggle in the filter bar.
     html = html.replace('<button class="clr" id="clrAll">Clear all</button>',
       FSC_TOGGLE + '<button class="clr" id="clrAll">Clear all</button>');
-    // Viewport-driven data + dynamic header (must be last, after template globals exist).
-    html = html.replace('</body>', VIEWPORT_JS + '</body>');
+    // Card/popup actions (#4): rename to "Draft proposal", add "Save to pursuits" (wired to the
+    // user's pipeline), demote the SAM link to a small "↗".
+    html = html.split('>Start drafting</a>').join('>Draft proposal</a>');
+    html = html.replace('<a class="act" href="${samURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">SAM.gov</a>',
+      '<button class="act savep" data-sol="${o.sol}" onclick="event.stopPropagation();savePursuit(this)">Save to pursuits</button><a class="act samlink" href="${samURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">SAM ↗</a>');
+    html = html.replace('<a class="pva" href="${samURL(o)}" target="_blank" rel="noopener">View on SAM.gov</a>',
+      '<button class="pva savep" data-sol="${o.sol}" onclick="savePursuit(this)">Save to pursuits</button><a class="pva samlink" href="${samURL(o)}" target="_blank" rel="noopener">View on SAM ↗</a>');
+    // Viewport-driven data + dynamic header + save-to-pursuits (last, after template globals exist).
+    html = html.replace('</body>', VIEWPORT_JS + SAVE_JS + '</body>');
   }
   return new NextResponse(html, { headers: { 'content-type': 'text/html; charset=utf-8', 'cache-control': 'no-store' } });
 }
