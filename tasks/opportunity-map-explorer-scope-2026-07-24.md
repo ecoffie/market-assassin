@@ -1,5 +1,37 @@
 # Opportunity Map — full explorer (Airbnb/Google map⇄list) — SCOPE (2026-07-24)
 
+---
+## ⏯️ HANDOFF / NEXT STEP (as of 2026-07-25 — resumed on laptop)
+
+**Branch:** `feat/logged-in-home-v2` — pushed, in sync at `67ee8a7f` (`git pull` to grab it).
+**All map/OCONUS/Zillow-nav/drawer/dataset-mode work is committed & deployed.** The one open
+task is the **filter reorg** — this file's "Shared filter bar" (line ~53) is the spec.
+
+**The problem:** `/opportunity-map` still shows the EVC template's OWN leftover filter pills —
+**Source · Service line · Set-aside · Closing ≤7 days** — which are CLIENT-SIDE (they hide
+pins already in view, then reset on every pan-refetch → look dead). "Source" and "Service
+line" were NEVER in the plan; "Closing ≤7 days" belongs inside More filters as urgency.
+
+**NEXT (build to the doc, not to chat improv):**
+1. DELETE the 4 leftover template pills in `src/app/opportunity-map/route.ts` — the
+   `data-sheet="src"` (Source), `data-sheet="cat"` (Service line), `data-sheet="set"`
+   (Set-aside), and `id="f-soon"` (Closing ≤7 days) buttons.
+2. BUILD the 8 planned controls as REAL server filters wired into `fetchView`:
+   **notice type · set-aside · agency · state · urgency · keyword search · hide-commodity
+   toggle · Your Profile ⇄ All SAM**. The viewport API already accepts every one of these
+   params (`noticeType, setAside, agency, state, hideCommodity, q, scope`; recompete API
+   accepts `setAside, agency, naics`). urgency = a closing-window param (add to API if absent).
+3. Set-aside dropdown must filter by set-aside GROUP (SDVOSB/SB/8a/WOSB/HUBZone → code list),
+   not a single exact `set_aside_code` — the open API currently does `.eq(set_aside_code)`;
+   widen to `.in(...)` using `SET_GROUPS` codes in `src/lib/opportunities/map-data.ts`.
+4. Filters must re-query per active mode (open vs recompete endpoint).
+
+⚠️ NOTE: the "Set-aside · Agency · Industry · More filters" grouping mentioned earlier was
+chat improv, NOT in this doc. The doc's 8-control list above is the source of truth unless
+Eric revises it.
+---
+
+
 **Goal:** the complete active-SAM dataset (all 11,068, nothing self-filtered) shown as a
 synchronized **map + list** explorer, viewport-driven, the way Airbnb/Google do it: a
 compact teaser on the inner home that opens into a full-screen explorer.
