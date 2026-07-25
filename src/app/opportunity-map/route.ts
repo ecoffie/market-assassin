@@ -49,7 +49,7 @@ const NOTICE_CHECKS = [
 // (property-type) axis; set-aside & notice-type are multi-select. Value-range is mode-aware
 // (real data on Recompetes; hidden on Open until the doc-scan backfills estimated value).
 const MORE_FILTERS = '<div class="mfwrap">'
-  + '<button class="fbtn" id="moreBtn">More filters ▾</button>'
+  + '<button class="fsel fsel-btn" id="moreBtn"><svg viewBox="0 0 24 24" class="fico"><path d="M3 5h18M7 12h10M11 19h2"/></svg>Filters</button>'
   + '<div class="mfpanel mfpanel-deep" id="morePanel">'
   + '<div class="mf-sec">Codes</div>'
   + '<div class="mf-grid2">'
@@ -138,6 +138,10 @@ const PAGE_CSS = '<style>'
   + '.fsel:hover{border-color:#9aa5b3}'
   + '.fsel:focus{border-color:#006aff;box-shadow:0 0 0 3px rgba(0,106,255,.14)}'
   + '.fsel.on{border-color:#006aff;color:#006aff;background-color:#f0f6ff}'
+  // "Filters" is a BUTTON not a select — same pill look, no chevron bg, with a slider icon.
+  + '.fsel-btn{background-image:none;padding:0 15px;display:inline-flex;align-items:center;gap:7px}'
+  + '.fsel-btn .fico{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}'
+  + '.fsel-btn.hasfilt{border-color:#006aff;color:#006aff;background-color:#f0f6ff}'
   // Save search — Zillow's solid-blue anchor button on the bar.
   + '.savesearch{font-family:Inter,system-ui,sans-serif;font-size:14.5px;font-weight:700;color:#fff;background:#006aff;'
   + 'border:0;border-radius:8px;height:40px;padding:0 18px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:filter .15s}'
@@ -160,8 +164,6 @@ const PAGE_CSS = '<style>'
   + '.mf-clear{flex:1;font:600 12.5px Inter,system-ui,sans-serif;color:var(--sub);background:#fff;border:1px solid var(--line);border-radius:8px;padding:8px;cursor:pointer}'
   + '.mf-apply{flex:1;font:600 12.5px Inter,system-ui,sans-serif;color:#fff;background:var(--jan);border:0;border-radius:8px;padding:8px;cursor:pointer}'
   + '.mf-clear:hover{background:var(--wash)}.mf-apply:hover{filter:brightness(.95)}'
-  // "More filters" pill shows a dot when advanced filters are active.
-  + '#moreBtn.hasfilt::after{content:"";width:6px;height:6px;border-radius:50%;background:var(--jan);display:inline-block;margin-left:5px;vertical-align:middle}'
   // Filters wrap (no more horizontal-scroll hiding Set-aside & beyond).
   + '.fscroll{flex-wrap:wrap!important;overflow-x:visible!important;row-gap:7px}'
   // Set-aside color legend, bottom-left of the map.
@@ -232,7 +234,8 @@ const ZLAYOUT_CSS = '<style>'
   + '.zrail a span{font:600 10px Inter,system-ui,sans-serif;letter-spacing:.01em;line-height:1}'
   // top bar (search + the moved filters)
   + '.ztop{grid-area:ztop;position:relative;display:flex;flex-wrap:wrap;align-items:center;gap:8px 8px;padding:10px 18px;border-bottom:1px solid var(--line);background:#fff;z-index:9;min-width:0}'
-  + '.zsearch{flex:0 1 330px;min-width:170px;max-width:32vw;display:flex;align-items:center;gap:8px;border:1.5px solid var(--line);border-radius:11px;padding:0 12px;height:42px;background:#fff}'
+  + '.zsearch{flex:1 1 240px;min-width:150px;max-width:340px;display:flex;align-items:center;gap:8px;border:1px solid #d1d5db;border-radius:8px;padding:0 13px;height:40px;background:#fff}'
+  + '.zsearch:focus-within{border-color:#006aff;box-shadow:0 0 0 3px rgba(0,106,255,.12)}'
   + '.zsearch svg{width:16px;height:16px;stroke:var(--sub);fill:none;stroke-width:2;flex:none}'
   + '.zsearch input{border:0;outline:0;flex:1;min-width:0;font:500 13.5px Inter,system-ui,sans-serif;background:transparent;color:var(--ink)}'
   + '.mapwrap{grid-area:zmap!important}'
