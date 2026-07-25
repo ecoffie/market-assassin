@@ -60,6 +60,9 @@ const PAGE_CSS = '<style>'
   + '.act.samlink,.pva.samlink{color:var(--sub);font-size:11px;font-weight:500}'
   // Progress/gamification widget removed for now (Eric, 2026-07-25).
   + '.sbtoggle,.sb{display:none!important}'
+  // Old list-collapse toggle (.railbtn) was pinned to the old left-panel edge (left:392px) and
+  // floated in the middle of the map in the new layout — remove it (cards stay always-visible).
+  + '.railbtn{display:none!important}'
   + '</style>';
 
 // Loaded right after leaflet.js (before the template's map script): setColorFor(). It MUST be a
