@@ -1,0 +1,723 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Federal Opportunity Map — Mindy</title>
+<link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=Inter:wght@400;500;600;700&family=IBM+Plex+Mono:wght@500;600&display=swap');
+  :root{
+    --ink:#111c26; --sub:#6b7787; --faint:#9aa5b3;
+    --line:#e6eaef; --hair:#f0f3f7; --bg:#fff; --wash:#f7f9fb;
+    --jan:#3b82f6; --grnd:#22a06b; --fac:#8b5cf6; --maint:#f59e0b;
+    --con:#ef4444; --ae:#0ea5e9; --it:#14b8a6; --sec:#64748b;
+    --train:#a855f7; --health:#ec4899; --heavy:#78716c; --dla:#0284c7;
+    --paint:#e11d48; --pest:#84cc16; --fence:#0891b2; --demo:#b45309;
+    --sam:#137a4e; --recomp:#b45309; --dlac:#0369a1;
+    --hot:#d92d20; --warm:#b54708; --cool:#175cd3;
+    --score:#0f2233; --gold:#f5b400; --pos:#12805c; --fire:#ff7a45;
+    --disp:"Space Grotesk",system-ui,sans-serif; --ui:"Inter",system-ui,sans-serif;
+    --mono:"IBM Plex Mono",ui-monospace,monospace;
+    --sh1:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.1);
+    --sh2:0 4px 8px -2px rgba(16,24,40,.1),0 2px 4px -2px rgba(16,24,40,.06);
+    --sh3:0 12px 16px -4px rgba(16,24,40,.08),0 4px 6px -2px rgba(16,24,40,.03);
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{height:100%;min-height:100%}
+  body{font-family:var(--ui);color:var(--ink);background:var(--bg);overflow:hidden;
+    -webkit-font-smoothing:antialiased}
+  button{font-family:inherit}
+  .app{display:grid;grid-template-columns:392px minmax(0,1fr);
+    grid-template-rows:minmax(0,1fr);
+    height:100vh;height:100dvh;min-height:560px;overflow:hidden;
+    transition:grid-template-columns .26s cubic-bezier(.4,0,.2,1)}
+  .app.collapsed{grid-template-columns:0px minmax(0,1fr)}
+  .app.collapsed .panel{opacity:0;pointer-events:none}
+  .panel{transition:opacity .18s}
+  /* sidebar collapse handle — sits above the map, outside Leaflet's panes */
+  .railbtn{position:fixed;top:50%;transform:translateY(-50%);z-index:1200;
+    left:392px;width:28px;height:56px;border:1px solid var(--line);border-left:none;
+    border-radius:0 10px 10px 0;background:#fff;color:var(--ink);cursor:pointer;
+    font-size:18px;line-height:1;box-shadow:var(--sh2);display:grid;place-items:center;
+    padding:0;transition:left .26s cubic-bezier(.4,0,.2,1),background .13s}
+  .railbtn:hover{background:var(--wash)}
+  .app.collapsed ~ .railbtn,.railbtn.collapsed{left:0}
+
+  /* ============ LEFT PANEL ============ */
+  .panel{display:flex;flex-direction:column;border-right:1px solid var(--line);min-width:0;background:#fff}
+
+  /* header */
+  .phead{padding:16px 20px 0;flex:none}
+  .brandrow{display:flex;align-items:baseline;justify-content:space-between;gap:10px}
+  .brand{font-family:var(--disp);font-weight:700;font-size:19px;letter-spacing:-.35px}
+  .badge-sd{font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.1em;
+    color:var(--sam);background:#e7f4ee;border:1px solid #bfe3d3;padding:3px 7px;border-radius:5px}
+  .sumline{font-size:13px;color:var(--sub);margin-top:5px}
+  .sumline b{color:var(--ink);font-weight:600}
+
+  /* filter bar (sticky, Airbnb-style pills) */
+  .fbar{padding:12px 20px 10px;flex:none;border-bottom:1px solid var(--line);background:#fff}
+  .fscroll{display:flex;gap:7px;overflow-x:auto;padding-bottom:2px;scrollbar-width:none}
+  .fscroll::-webkit-scrollbar{display:none}
+  .fbtn{flex:none;display:inline-flex;align-items:center;gap:6px;font-size:12.5px;font-weight:500;
+    color:var(--ink);background:#fff;border:1px solid #d5dbe3;border-radius:999px;padding:7px 13px;
+    cursor:pointer;transition:.13s;white-space:nowrap}
+  .fbtn:hover{border-color:var(--ink);box-shadow:var(--sh1)}
+  .fbtn.active{background:var(--ink);border-color:var(--ink);color:#fff}
+  .fbtn .cnt{font-family:var(--mono);font-size:10.5px;opacity:.65}
+  .fbtn .car{font-size:9px;opacity:.5;transition:.2s}
+  .fbtn.open .car{transform:rotate(180deg)}
+  .clr{flex:none;font-size:12.5px;font-weight:500;color:var(--sub);background:none;border:none;
+    text-decoration:underline;cursor:pointer;padding:7px 4px;white-space:nowrap}
+  .clr:hover{color:var(--ink)}
+
+  /* dropdown sheet */
+  .sheet{display:none;padding:12px 0 4px;border-top:1px solid var(--hair);margin-top:11px}
+  .sheet.show{display:block}
+  .sheet h5{font-size:11px;font-weight:600;letter-spacing:.07em;text-transform:uppercase;
+    color:var(--faint);margin:0 0 9px}
+  .optgrid{display:grid;grid-template-columns:1fr 1fr;gap:2px 10px}
+  .opt{display:flex;align-items:center;gap:9px;padding:6px 4px;border-radius:7px;cursor:pointer;
+    font-size:13px;transition:.1s;user-select:none}
+  .opt:hover{background:var(--wash)}
+  .cbx{width:16px;height:16px;border-radius:4px;border:1.5px solid #cbd3dc;flex:none;
+    display:grid;place-items:center;transition:.12s;background:#fff}
+  .opt.on .cbx{background:var(--ink);border-color:var(--ink)}
+  .cbx svg{width:10px;height:10px;stroke:#fff;stroke-width:3;fill:none;opacity:0;transition:.1s}
+  .opt.on .cbx svg{opacity:1}
+  .opt .swatch{width:8px;height:8px;border-radius:50%;flex:none}
+  .opt .lbl{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .opt .n{font-family:var(--mono);font-size:11px;color:var(--faint)}
+  .sheetfoot{display:flex;gap:8px;padding:10px 0 2px;border-top:1px solid var(--hair);margin-top:8px}
+  .sfb{flex:1;font-size:12.5px;font-weight:600;padding:8px;border-radius:8px;cursor:pointer;border:1px solid var(--line);background:#fff;color:var(--ink)}
+  .sfb.pri{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+  /* sort row */
+  .sortrow{display:flex;align-items:center;justify-content:space-between;gap:10px;
+    padding:10px 20px;flex:none;border-bottom:1px solid var(--line)}
+  .rescount{font-size:13px;font-weight:600}
+  .rescount span{font-weight:400;color:var(--sub)}
+  .sortsel{font-family:var(--ui);font-size:12.5px;font-weight:500;color:var(--ink);border:1px solid #d5dbe3;
+    border-radius:8px;padding:6px 26px 6px 10px;cursor:pointer;background:#fff url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path d='M3 4.5L6 8l3-3.5' stroke='%236b7787' stroke-width='1.5' fill='none' stroke-linecap='round'/></svg>") no-repeat right 8px center;
+    -webkit-appearance:none;appearance:none}
+
+  /* ============ LISTING CARDS ============ */
+  .feed{flex:1;overflow-y:auto;padding:12px 16px 28px;scroll-behavior:smooth}
+  .card{background:#fff;border:1px solid var(--line);border-radius:14px;overflow:hidden;
+    margin-bottom:12px;cursor:pointer;transition:box-shadow .16s,border-color .16s,transform .16s}
+  .card:hover,.card.hot-hover{box-shadow:var(--sh3);border-color:#cfd7e0;transform:translateY(-1px)}
+  .card.sel{border-color:var(--ink);box-shadow:0 0 0 2px rgba(17,28,38,.09),var(--sh2)}
+
+  /* accent strip = category */
+  .cstrip{height:3px;width:100%}
+
+  .cbody{padding:13px 15px 14px}
+  /* row 1: source chip + deadline pill */
+  .crow1{display:flex;align-items:center;gap:7px;margin-bottom:9px;flex-wrap:wrap}
+  .chip{font-family:var(--mono);font-size:9.5px;font-weight:600;letter-spacing:.07em;
+    padding:3px 7px;border-radius:5px;text-transform:uppercase}
+  .chip.SAM{background:#e7f4ee;color:var(--sam)}
+  .chip.RECOMPETE{background:#fdf1e3;color:var(--recomp)}
+  .chip.DLA{background:#e4f1fb;color:var(--dlac)}
+  .chip.docs{background:#eef0f3;color:var(--sub)}
+  .dl{display:inline-flex;align-items:center;gap:4px;font-size:11.5px;font-weight:600;
+    padding:3px 8px;border-radius:999px;margin-left:auto}
+  .dl.hot{background:#fef3f2;color:var(--hot)}
+  .dl.warm{background:#fffaeb;color:var(--warm)}
+  .dl.cool{background:#eff8ff;color:var(--cool)}
+  .dl.dead{background:#f2f4f7;color:var(--faint)}
+  .dl i{width:5px;height:5px;border-radius:50%;background:currentColor;display:block}
+
+  /* title */
+  .ctitle{font-family:var(--disp);font-weight:600;font-size:15.5px;line-height:1.32;
+    letter-spacing:-.2px;margin-bottom:7px;
+    display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+
+  /* agency + location line */
+  .cmeta{display:flex;align-items:center;gap:6px;font-size:13px;color:var(--sub);margin-bottom:11px}
+  .cmeta .ag{font-weight:600;color:var(--ink)}
+  .cmeta .dot{width:3px;height:3px;border-radius:50%;background:#cbd3dc;flex:none}
+  .cmeta .loc{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+
+  /* the value strip — Zillow-style stat row */
+  .stats{display:flex;align-items:stretch;gap:0;background:var(--wash);border:1px solid var(--hair);
+    border-radius:10px;overflow:hidden;margin-bottom:11px}
+  .st{flex:1;padding:8px 10px;min-width:0}
+  .st + .st{border-left:1px solid #e8edf2}
+  .st .k{font-family:var(--mono);font-size:9px;letter-spacing:.09em;text-transform:uppercase;
+    color:var(--faint);margin-bottom:3px}
+  .st .v{font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .st .v.sd{color:var(--sam)}
+  .st .v.money{font-family:var(--disp);font-size:15px}
+  .st .v.hi{color:var(--pos)} .st .v.med{color:var(--warm)}
+
+  /* footer: solicitation + actions */
+  .cfoot{display:flex;align-items:center;gap:8px}
+  .solno{font-family:var(--mono);font-size:11px;color:var(--faint);flex:1;min-width:0;
+    overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+  .act{font-size:12px;font-weight:600;padding:7px 11px;border-radius:8px;text-decoration:none;
+    border:1px solid var(--line);color:var(--ink);background:#fff;transition:.12s;white-space:nowrap;cursor:pointer}
+  .act:hover{border-color:var(--ink);background:var(--wash)}
+  .act.pri{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .act.pri:hover{background:#233240}
+
+  .empty{text-align:center;padding:48px 24px;color:var(--sub)}
+  .empty h4{font-family:var(--disp);font-size:16px;color:var(--ink);margin-bottom:6px}
+  .empty p{font-size:13.5px;line-height:1.5}
+  .empty button{margin-top:14px;font-size:13px;font-weight:600;padding:9px 16px;border-radius:9px;
+    background:var(--ink);color:#fff;border:none;cursor:pointer}
+
+  /* ============ MAP ============ */
+  .mapwrap{position:relative;min-width:0;min-height:0;display:flex;overflow:hidden}
+  /* Map is a flex child with explicit sizing — no percentage-height chain to break. */
+  #map{flex:1 1 auto;width:100%;min-height:0;align-self:stretch;background:#e8eef2}
+  .leaflet-container{width:100%;height:100%;background:#e8eef2}
+  .maptop{position:absolute;top:14px;left:50%;transform:translateX(-50%);z-index:500;
+    display:flex;gap:8px;align-items:center}
+  .mpill{background:#fff;border:1px solid var(--line);border-radius:999px;padding:8px 15px;
+    font-size:12.5px;font-weight:600;box-shadow:var(--sh2);cursor:pointer;transition:.13s;white-space:nowrap}
+  .mpill:hover{box-shadow:var(--sh3)}
+  .mpill.on{background:var(--ink);color:#fff;border-color:var(--ink)}
+
+  /* tile load status */
+  .tilestatus{position:absolute;bottom:16px;left:50%;transform:translateX(-50%);z-index:520;
+    background:#fff;border:1px solid var(--line);border-radius:9px;padding:8px 14px;
+    font-size:12.5px;font-weight:500;color:var(--sub);box-shadow:var(--sh2);max-width:78%;
+    text-align:center;display:none}
+  .tilestatus.err{color:#b42318;border-color:#fecdc9;background:#fffbfa}
+
+  .marker-hover{z-index:1000!important}
+
+  /* popup — Google Maps style */
+  .leaflet-popup-content-wrapper{border-radius:14px;box-shadow:var(--sh3);padding:0;overflow:hidden;border:1px solid var(--line)}
+  .leaflet-popup-content{margin:0!important;width:296px!important;line-height:1.45}
+  .leaflet-popup-tip{box-shadow:var(--sh2)}
+  .pv{font-family:var(--ui)}
+  .pv .pvstrip{height:4px}
+  .pv .pvbody{padding:14px 15px 15px}
+  .pv .pvchips{display:flex;align-items:center;gap:6px;margin-bottom:9px;flex-wrap:wrap}
+  .pv .pvt{font-family:var(--disp);font-weight:700;font-size:16.5px;line-height:1.28;
+    letter-spacing:-.25px;color:var(--ink);margin-bottom:8px}
+  .pv .pvmeta{font-size:13px;color:var(--sub);margin-bottom:12px}
+  .pv .pvmeta b{color:var(--ink);font-weight:600}
+  .pv .grid2{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-bottom:12px}
+  .pv .fld{background:var(--wash);border:1px solid var(--hair);border-radius:9px;padding:8px 10px}
+  .pv .fld .k{font-family:var(--mono);font-size:9px;letter-spacing:.09em;text-transform:uppercase;color:var(--faint);margin-bottom:3px}
+  .pv .fld .v{font-size:13px;font-weight:600;color:var(--ink)}
+  .pv .fld .v.sd{color:var(--sam)}
+  .pv .fld.wide{grid-column:1/-1}
+  .pv .pvacts{display:flex;gap:8px}
+  .pv .pva{flex:1;text-align:center;font-size:12.5px;font-weight:600;padding:10px;border-radius:9px;
+    text-decoration:none;border:1px solid var(--line);color:var(--ink);background:#fff;transition:.12s}
+  .pv .pva:hover{background:var(--wash);border-color:var(--ink)}
+  .pv .pva.pri{background:var(--ink);color:#fff;border-color:var(--ink)}
+  .pv .pva.pri:hover{background:#233240}
+
+  /* ============ SCOREBOARD (slide-over) ============ */
+  .sbtoggle{position:absolute;top:14px;right:14px;z-index:500;background:var(--score);color:#fff;
+    border:none;border-radius:999px;padding:9px 16px;font-size:12.5px;font-weight:600;cursor:pointer;
+    box-shadow:var(--sh2);display:flex;align-items:center;gap:8px}
+  .sbtoggle b{font-family:var(--disp);color:var(--gold)}
+  .sb{position:absolute;top:0;right:0;bottom:0;width:300px;background:var(--score);color:#fff;
+    z-index:600;padding:20px;overflow-y:auto;transform:translateX(100%);transition:transform .28s cubic-bezier(.4,0,.2,1);
+    box-shadow:-8px 0 24px rgba(16,24,40,.18)}
+  .sb.open{transform:translateX(0)}
+  .sbx{position:absolute;top:14px;right:16px;background:none;border:none;color:#8fb0c9;font-size:19px;cursor:pointer;line-height:1}
+  .sb .lvl{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:#8fb0c9;text-transform:uppercase}
+  .sb .pts{font-family:var(--disp);font-weight:700;font-size:38px;line-height:1;margin-top:4px}
+  .sb .pts small{font-size:13px;color:#8fb0c9;font-weight:500;margin-left:6px}
+  .nb{margin-top:15px}
+  .nb .row{display:flex;justify-content:space-between;font-size:11.5px;color:#b9cdde;margin-bottom:6px}
+  .track{height:6px;background:#1c3a52;border-radius:99px;overflow:hidden}
+  .track>i{display:block;height:100%;background:linear-gradient(90deg,var(--gold),#ffd76a);border-radius:99px;transition:.4s}
+  .quad{display:grid;grid-template-columns:1fr 1fr;gap:9px;margin-top:15px}
+  .qb{background:#12293c;border:1px solid #1f3e57;border-radius:11px;padding:12px;text-align:center}
+  .qb .n{font-family:var(--disp);font-weight:700;font-size:22px;line-height:1}
+  .qb .n.fire{color:var(--fire)}
+  .qb .l{font-family:var(--mono);font-size:9px;letter-spacing:.09em;color:#8fb0c9;text-transform:uppercase;margin-top:5px}
+  .lgt{font-family:var(--mono);font-size:10.5px;letter-spacing:.14em;color:#8fb0c9;text-transform:uppercase;margin:20px 0 9px}
+  .lact{display:flex;justify-content:space-between;align-items:center;background:#12293c;border:1px solid #1f3e57;
+    border-radius:10px;padding:11px 13px;margin-bottom:7px;cursor:pointer;transition:.12s}
+  .lact:hover{background:#173247}
+  .lact .an{font-weight:600;font-size:13px}
+  .lact .av{font-family:var(--disp);font-weight:700;font-size:13.5px;color:#4ade80}
+  .rst{width:100%;background:none;border:none;color:#6f8aa0;font-family:var(--mono);font-size:10.5px;
+    letter-spacing:.1em;padding:13px 0 4px;cursor:pointer}
+  .rst:hover{color:#b9cdde}
+
+  @media(max-width:1000px){
+    .app{grid-template-columns:1fr;grid-template-rows:52vh 48vh}
+    .panel{order:2;border-right:none;border-top:1px solid var(--line)}
+    .mapwrap{order:1}
+    .sb{width:100%}
+  }
+  @media(prefers-reduced-motion:reduce){*{transition:none!important;animation:none!important}}
+  :focus-visible{outline:2px solid #2f6fed;outline-offset:2px}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- ========== LEFT PANEL ========== -->
+  <section class="panel">
+    <div class="phead">
+      <div class="brandrow">
+        <div class="brand">Federal Opportunities</div>
+        <span class="badge-sd">Live · SAM.gov</span>
+      </div>
+      <div class="sumline" id="sumline"></div>
+    </div>
+
+    <div class="fbar">
+      <div class="fscroll">
+        <button class="fbtn" data-sheet="src">Source <span class="cnt" id="c-src"></span> <span class="car">▼</span></button>
+        <button class="fbtn" data-sheet="cat">Service line <span class="cnt" id="c-cat"></span> <span class="car">▼</span></button>
+        <button class="fbtn" data-sheet="set">Set-aside <span class="cnt" id="c-set"></span> <span class="car">▼</span></button>
+        <button class="fbtn" id="f-sd">SDVOSB only</button>
+        <button class="fbtn" id="f-soon">Closing ≤7 days</button>
+        <button class="clr" id="clrAll">Clear all</button>
+      </div>
+      <div class="sheet" id="sheet"></div>
+    </div>
+
+    <div class="sortrow">
+      <div class="rescount" id="rescount"></div>
+      <select class="sortsel" id="sort">
+        <option value="deadline">Deadline: soonest</option>
+        <option value="deadline-far">Deadline: latest</option>
+        <option value="value">Contract value: high to low</option>
+        <option value="az">Title: A–Z</option>
+      </select>
+    </div>
+
+    <div class="feed" id="feed"></div>
+  </section>
+
+  <!-- ========== MAP ========== -->
+  <div class="mapwrap">
+    <div id="map"></div>
+    <div class="maptop">
+      <button class="mpill" id="fitBtn">Fit to results</button>
+      <button class="mpill" id="basemapBtn">Terrain</button>
+    </div>
+    <button class="sbtoggle" id="sbOpen">Progress <b id="ptsMini">0</b></button>
+
+    <aside class="sb" id="sb">
+      <button class="sbx" id="sbClose">✕</button>
+      <div class="lvl" id="lvlName">EMERGING</div>
+      <div class="pts"><span id="ptsVal">0</span><small>PTS</small></div>
+      <div class="nb">
+        <div class="row"><span id="nextName">Next: Active Bidder</span><span id="nextGap">250 to go</span></div>
+        <div class="track"><i id="lvlFill" style="width:0%"></i></div>
+      </div>
+      <div class="quad">
+        <div class="qb"><div class="n" id="weekPts">0</div><div class="l">This week</div></div>
+        <div class="qb"><div class="n" id="goalTxt">0/500</div><div class="l">Weekly goal</div></div>
+        <div class="qb"><div class="n fire" id="streak">0🔥</div><div class="l">Day streak</div></div>
+        <div class="qb"><div class="n" id="best">0</div><div class="l">Best week</div></div>
+      </div>
+      <div class="lgt">Log an action</div>
+      <div class="lact" data-p="1"><span class="an">Reviewed an opportunity</span><span class="av">+1</span></div>
+      <div class="lact" data-p="25"><span class="an">Recruited a subcontractor</span><span class="av">+25</span></div>
+      <div class="lact" data-p="50"><span class="an">Submitted a bid</span><span class="av">+50</span></div>
+      <div class="lact" data-p="500"><span class="an">Won an award</span><span class="av">+500</span></div>
+      <button class="rst" id="resetProg">RESET PROGRESS</button>
+    </aside>
+  </div>
+</div>
+<button class="railbtn" id="railBtn" title="Hide list" aria-label="Hide list">‹</button>
+
+<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+<script>
+
+// EVC Opportunity Map dataset — Jul 21, 2026
+// Sources: SAM (open/biddable), DLA (supply/parts), RECOMPETE (expiring targets)
+// Coords are approximate city-level lat/lng for map pins.
+
+const OPPS = __OPPS_JSON__;
+
+
+
+
+</script>
+<script>
+const TODAY=new Date('2026-07-21T00:00');
+
+// ---------- lookups ----------
+const CATCOL={"Janitorial":"--jan","Grounds/Landscaping":"--grnd","Facility Support":"--fac",
+ "Facility Maint":"--maint","Construction/Reno":"--con","Engineering/A&E":"--ae",
+ "HVAC/Mechanical":"--maint","Roofing/Exterior":"--con","Electrical":"--ae","IT Services":"--it",
+ "Security Guard":"--sec","Training":"--train","Healthcare":"--health","Heavy Civil":"--heavy",
+ "DLA Supply/Parts":"--dla","Painting":"--paint","Pest Control":"--pest",
+ "Fencing/Security":"--fence","Demolition/Abatement":"--demo"};
+const AGENCY={VA:"Veterans Affairs",DoD:"Dept of Defense",GSA:"General Services Admin",
+ USDA:"Dept of Agriculture",DHS:"Homeland Security",DOI:"Dept of the Interior",
+ DOE:"Dept of Energy",DOJ:"Dept of Justice",DOT:"Dept of Transportation",
+ HHS:"Health & Human Services","HHS/FDA":"HHS — FDA",State:"Dept of State",AF:"Air Force",
+ Navy:"Navy",Army:"Army",USACE:"Army Corps of Engineers",USSF:"Space Force",DLA:"Defense Logistics",
+ Commerce:"Dept of Commerce",AOC:"Architect of the Capitol",IBWC:"Intl Boundary & Water Comm",
+ USAGM:"US Agency for Global Media","DoD/Army":"Dept of Defense — Army",SSA:"Social Security Admin",
+ "DHS/USCG":"Homeland Security — Coast Guard","USDA/FS":"Agriculture — Forest Service",
+ DoDEA:"DoD Education Activity","DOI/NPS":"Interior — National Park Service"};
+const SETFULL={SDVOSB:"Service-Disabled Veteran-Owned",SB:"Small Business",
+ "8(a)":"8(a) Competed",EDWOSB:"Economically Disadv. WOSB",WOSB:"Women-Owned Small Business",
+ "Veteran SA":"Veteran-Owned",ISBEE:"Indian Small Business",
+ "Buy Indian":"Buy Indian Set-Aside",None:"Open / unrestricted","":"—"};
+const SETGROUPS=[
+ {key:"SDVOSB",label:"SDVOSB",col:"--grnd",match:s=>s==="SDVOSB"||s==="Veteran SA"},
+ {key:"SB",label:"Small Business",col:"--jan",match:s=>s==="SB"},
+ {key:"8(a)",label:"8(a)",col:"--fac",match:s=>s==="8(a)"},
+ {key:"EDWOSB",label:"WOSB / EDWOSB",col:"--con",match:s=>s==="EDWOSB"||s==="WOSB"},
+ {key:"Other",label:"Other set-aside",col:"--train",match:s=>["ISBEE","Buy Indian"].includes(s)},
+ {key:"None",label:"Unrestricted",col:"--sec",match:s=>s==="None"||s===""}];
+const SRCLABEL={SAM:"Open on SAM",RECOMPETE:"Recompete target",DLA:"DLA supply"};
+
+function cv(v){return getComputedStyle(document.documentElement).getPropertyValue(v).trim();}
+function catColor(c){return cv(CATCOL[c]||"--sec");}
+function setKey(s){for(const g of SETGROUPS)if(g.match(s))return g.key;return "None";}
+function dueDate(o){return o.src==='RECOMPETE'?o.exp:o.close;}
+function daysOut(o){return Math.round((new Date(dueDate(o)+'T00:00')-TODAY)/864e5);}
+function valNum(o){ // for sorting
+  if(!o.value)return -1;
+  const m=o.value.match(/([\d.]+)\s*([KM])/i);if(!m)return -1;
+  return parseFloat(m[1])*(m[2].toUpperCase()==='M'?1e6:1e3);
+}
+function fmtDays(d){
+  if(d<0)return{t:'Closed',c:'dead'};
+  if(d===0)return{t:'Due today',c:'hot'};
+  if(d===1)return{t:'1 day left',c:'hot'};
+  if(d<=3)return{t:d+' days left',c:'hot'};
+  if(d<=7)return{t:d+' days left',c:'warm'};
+  return{t:d+' days left',c:'cool'};
+}
+function longDate(d){return new Date(d+'T00:00').toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'});}
+function samURL(o){return 'https://sam.gov/search/?keywords='+encodeURIComponent(o.sol);}
+function draftURL(o){
+  const p=o.src==='RECOMPETE'
+   ?`Help me prepare an my small business capture strategy for an expiring federal contract I want to recompete. Incumbent: ${o.title}. Agency: ${o.agency}. Location: ${o.loc}. Current value: ${o.value||'n/a'}. Expiration: ${o.exp}. Prior solicitation #: ${o.sol}. NAICS ${o.naics}. Find the likely follow-on solicitation, assess win probability, and outline a teaming + differentiation plan.`
+   :`Help me draft a federal bid response for my small business. Opportunity: ${o.title}. Agency: ${o.agency}. Set-aside: ${o.set}. Location: ${o.loc}. NAICS ${o.naics}. Solicitation #: ${o.sol}. Response due ${o.close}. Pull the solicitation, build a compliance matrix, and draft our approach.`;
+  return 'https://claude.ai/new?q='+encodeURIComponent(p);
+}
+
+// ---------- state ----------
+const CATS=[...new Set(OPPS.map(o=>o.cat))].sort((a,b)=>cnt('cat',b)-cnt('cat',a));
+function cnt(k,v){return OPPS.filter(o=>k==='cat'?o.cat===v:k==='src'?o.src===v:setKey(o.set)===v).length;}
+const F={src:new Set(["SAM","RECOMPETE","DLA"]),cat:new Set(CATS),set:new Set(SETGROUPS.map(g=>g.key)),
+         sdOnly:false,soon:false,sort:'deadline'};
+let rows=[],markers=new Map(),selected=null;
+
+// ---------- filter sheets ----------
+const sheet=document.getElementById('sheet');
+let openSheet=null;
+document.querySelectorAll('.fbtn[data-sheet]').forEach(b=>{
+  b.onclick=()=>{const k=b.dataset.sheet;
+    if(openSheet===k){closeSheet();return;}
+    document.querySelectorAll('.fbtn[data-sheet]').forEach(x=>x.classList.remove('open'));
+    b.classList.add('open');openSheet=k;renderSheet(k);sheet.classList.add('show');};
+});
+function closeSheet(){openSheet=null;sheet.classList.remove('show');
+  document.querySelectorAll('.fbtn[data-sheet]').forEach(x=>x.classList.remove('open'));}
+function renderSheet(k){
+  let items,title;
+  if(k==='src'){title='Where it came from';
+    items=["SAM","RECOMPETE","DLA"].map(v=>({v,label:SRCLABEL[v],col:v==='SAM'?'--sam':v==='DLA'?'--dlac':'--recomp',n:cnt('src',v)}));}
+  else if(k==='cat'){title='Service line';
+    items=CATS.map(v=>({v,label:v,col:CATCOL[v],n:cnt('cat',v)}));}
+  else{title='Set-aside eligibility';
+    items=SETGROUPS.map(g=>({v:g.key,label:g.label,col:g.col,n:cnt('set',g.key)})).filter(i=>i.n>0);}
+  sheet.innerHTML=`<h5>${title}</h5><div class="optgrid">`+
+    items.map(i=>`<div class="opt ${F[k].has(i.v)?'on':''}" data-v="${i.v}">
+      <span class="cbx"><svg viewBox="0 0 12 12"><path d="M2 6.5l2.5 2.5L10 3.5"/></svg></span>
+      <span class="swatch" style="background:${cv(i.col)}"></span>
+      <span class="lbl">${i.label}</span><span class="n">${i.n}</span></div>`).join('')+
+    `</div><div class="sheetfoot">
+      <button class="sfb" data-all="0">Clear</button>
+      <button class="sfb pri" data-all="1">Select all</button></div>`;
+  sheet.querySelectorAll('.opt').forEach(el=>{
+    el.onclick=()=>{const v=el.dataset.v;
+      F[k].has(v)?F[k].delete(v):F[k].add(v);el.classList.toggle('on');render();};
+  });
+  sheet.querySelectorAll('.sfb').forEach(b=>{
+    b.onclick=()=>{F[k].clear();
+      if(b.dataset.all==='1')items.forEach(i=>F[k].add(i.v));
+      renderSheet(k);render();};
+  });
+}
+document.getElementById('f-sd').onclick=e=>{F.sdOnly=!F.sdOnly;e.target.classList.toggle('active',F.sdOnly);render();};
+document.getElementById('f-soon').onclick=e=>{F.soon=!F.soon;e.target.classList.toggle('active',F.soon);render();};
+document.getElementById('clrAll').onclick=()=>{
+  F.src=new Set(["SAM","RECOMPETE","DLA"]);F.cat=new Set(CATS);F.set=new Set(SETGROUPS.map(g=>g.key));
+  F.sdOnly=false;F.soon=false;
+  document.getElementById('f-sd').classList.remove('active');
+  document.getElementById('f-soon').classList.remove('active');
+  if(openSheet)renderSheet(openSheet);render();};
+document.getElementById('sort').onchange=e=>{F.sort=e.target.value;render();};
+
+// ---------- map ----------
+const map=L.map('map',{scrollWheelZoom:true,zoomControl:false,worldCopyJump:true,
+  zoomSnap:.5}).setView([38,-96],4.5);
+L.control.zoom({position:'bottomright'}).addTo(map);
+// Tile providers, ordered most- to least-reliable inside sandboxed frames.
+const PROVIDERS=[
+  {name:'Simple', url:'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png',
+   sub:'abcd', attr:'&copy; OpenStreetMap, &copy; CARTO'},
+  {name:'Terrain', url:'https://{s}.tile.opentopomap.org/{z}/{x}/{y}.png',
+   sub:'abc', attr:'&copy; OpenTopoMap, &copy; OpenStreetMap'},
+  {name:'Streets', url:'https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png',
+   sub:'abc', attr:'&copy; OpenStreetMap contributors'},
+];
+let provIdx=0, tiles=null, okTiles=0;
+
+function mountTiles(i){
+  const p=PROVIDERS[i];
+  if(tiles)map.removeLayer(tiles);
+  okTiles=0;
+  setTileStatus('Loading '+p.name+' tiles…','load');
+  tiles=L.tileLayer(p.url,{maxZoom:19,subdomains:p.sub,attribution:p.attr});
+  let errs=0;
+  tiles.on('tileload',()=>{okTiles++;if(okTiles===1)setTileStatus('','ok');});
+  tiles.on('tileerror',()=>{
+    errs++;
+    if(errs>=6 && okTiles===0){
+      if(i+1<PROVIDERS.length){provIdx=i+1;mountTiles(provIdx);}
+      else setTileStatus('Map tiles blocked by your network. Pins still work — try the basemap button.','err');
+    }
+  });
+  tiles.addTo(map);
+  const b=document.getElementById('basemapBtn');
+  if(b)b.textContent=PROVIDERS[(i+1)%PROVIDERS.length].name;
+}
+function setTileStatus(msg,kind){
+  let el=document.getElementById('tileStatus');
+  if(!el){el=document.createElement('div');el.id='tileStatus';el.className='tilestatus';
+    document.querySelector('.mapwrap').appendChild(el);}
+  el.textContent=msg;
+  el.className='tilestatus'+(kind==='err'?' err':'');
+  el.style.display=msg?'block':'none';
+}
+mountTiles(0);
+document.getElementById('basemapBtn').onclick=()=>{
+  provIdx=(provIdx+1)%PROVIDERS.length;mountTiles(provIdx);
+};
+// Robust sizing. Percentage-height chains break inside grid/flex in some browsers,
+// so we measure the wrapper and set an explicit pixel height on #map.
+const mapEl=document.getElementById('map'),wrapEl=document.querySelector('.mapwrap');
+function resize(){
+  const h=wrapEl.clientHeight||wrapEl.getBoundingClientRect().height;
+  const w=wrapEl.clientWidth||wrapEl.getBoundingClientRect().width;
+  if(h>0)mapEl.style.height=h+'px';
+  else mapEl.style.height=Math.max(400,window.innerHeight-0)+'px'; // last-resort fallback
+  if(w>0)mapEl.style.width=w+'px';
+  map.invalidateSize({animate:false});
+}
+[0,50,120,250,450,800,1400].forEach(t=>setTimeout(resize,t));
+window.addEventListener('load',()=>{resize();setTimeout(()=>{resize();fitView();},140);});
+window.addEventListener('resize',resize);
+if(window.ResizeObserver){
+  new ResizeObserver(resize).observe(wrapEl);
+}
+const layer=L.layerGroup().addTo(map);
+document.getElementById('fitBtn').onclick=()=>fitView();
+function fitView(){const ms=[...markers.values()];if(!ms.length)return;
+  const s=map.getSize();
+  if(s.x<50||s.y<50){setTimeout(fitView,200);return;} // map not laid out yet
+  map.fitBounds(L.featureGroup(ms).getBounds().pad(.16),{animate:false});}
+
+// ---------- popup (Google-Maps style) ----------
+function popupHTML(o){
+  const d=daysOut(o),f=fmtDays(d),col=o.src==='RECOMPETE'?cv('--recomp'):catColor(o.cat);
+  const agency=AGENCY[o.agency]||o.agency;
+  const fields=o.src==='RECOMPETE'
+   ?`<div class="fld"><div class="k">Contract value</div><div class="v">${o.value||'—'}</div></div>
+     <div class="fld"><div class="k">Win probability</div><div class="v ${o.prob==='high'?'sd':''}">${(o.prob||'—').replace(/^./,c=>c.toUpperCase())}</div></div>
+     <div class="fld"><div class="k">Expires</div><div class="v">${longDate(o.exp)}</div></div>
+     <div class="fld"><div class="k">Service line</div><div class="v">${o.cat}</div></div>
+     <div class="fld wide"><div class="k">Current incumbent</div><div class="v">${o.title}</div></div>`
+   :`<div class="fld"><div class="k">Set-aside</div><div class="v ${o.set==='SDVOSB'?'sd':''}">${SETFULL[o.set]||o.set}</div></div>
+     <div class="fld"><div class="k">Response due</div><div class="v">${longDate(o.close)}</div></div>
+     <div class="fld"><div class="k">NAICS code</div><div class="v">${o.naics}</div></div>
+     <div class="fld"><div class="k">Service line</div><div class="v">${o.cat}</div></div>`;
+  return `<div class="pv"><div class="pvstrip" style="background:${col}"></div><div class="pvbody">
+    <div class="pvchips">
+      <span class="chip ${o.src}">${SRCLABEL[o.src]}</span>
+      ${o.docs?'<span class="chip docs">Docs pulled</span>':''}
+      <span class="dl ${f.c}"><i></i>${f.t}</span>
+    </div>
+    <div class="pvt">${o.src==='RECOMPETE'?o.cat+' recompete':o.title}</div>
+    <div class="pvmeta"><b>${agency}</b> · ${o.loc}</div>
+    <div class="grid2">${fields}</div>
+    <div class="pvmeta" style="font-family:var(--mono);font-size:11px;margin-bottom:11px">Solicitation ${o.sol}</div>
+    <div class="pvacts">
+      <a class="pva" href="${samURL(o)}" target="_blank" rel="noopener">View on SAM.gov</a>
+      <a class="pva pri" href="${draftURL(o)}" target="_blank" rel="noopener">Start drafting</a>
+    </div></div></div>`;
+}
+
+// ---------- listing card ----------
+function cardHTML(o){
+  const d=daysOut(o),f=fmtDays(d),col=o.src==='RECOMPETE'?cv('--recomp'):catColor(o.cat);
+  const agency=AGENCY[o.agency]||o.agency;
+  const stats=o.src==='RECOMPETE'
+   ?`<div class="st"><div class="k">Contract value</div><div class="v money">${o.value||'—'}</div></div>
+     <div class="st"><div class="k">Win odds</div><div class="v ${o.prob==='high'?'hi':'med'}">${(o.prob||'—').replace(/^./,c=>c.toUpperCase())}</div></div>
+     <div class="st"><div class="k">Expires</div><div class="v">${longDate(o.exp).replace(', 2026','')}</div></div>`
+   :`<div class="st"><div class="k">Set-aside</div><div class="v ${o.set==='SDVOSB'?'sd':''}">${o.set==='None'?'Open':o.set}</div></div>
+     <div class="st"><div class="k">NAICS</div><div class="v">${o.naics}</div></div>
+     <div class="st"><div class="k">Due</div><div class="v">${longDate(o.close).replace(', 2026','')}</div></div>`;
+  return `<div class="cstrip" style="background:${col}"></div><div class="cbody">
+    <div class="crow1">
+      <span class="chip ${o.src}">${SRCLABEL[o.src]}</span>
+      ${o.docs?'<span class="chip docs">Docs</span>':''}
+      <span class="dl ${f.c}"><i></i>${f.t}</span>
+    </div>
+    <div class="ctitle">${o.src==='RECOMPETE'?o.cat+' — incumbent: '+o.title:o.title}</div>
+    <div class="cmeta"><span class="ag">${agency}</span><span class="dot"></span><span class="loc">${o.loc}</span></div>
+    <div class="stats">${stats}</div>
+    <div class="cfoot">
+      <span class="solno">${o.sol}</span>
+      <a class="act" href="${samURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">SAM.gov</a>
+      <a class="act pri" href="${draftURL(o)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">Start drafting</a>
+    </div></div>`;
+}
+
+// ---------- filtering + render ----------
+function pass(o){
+  if(!F.src.has(o.src))return false;
+  if(!F.cat.has(o.cat))return false;
+  if(!F.set.has(setKey(o.set)))return false;
+  if(F.sdOnly&&setKey(o.set)!=='SDVOSB')return false;
+  if(F.soon){const d=daysOut(o);if(d<0||d>7)return false;}
+  return true;
+}
+function sortRows(a,b){
+  switch(F.sort){
+    case 'deadline-far':return dueDate(b).localeCompare(dueDate(a));
+    case 'value':return valNum(b)-valNum(a);
+    case 'az':return a.title.localeCompare(b.title);
+    default:return dueDate(a).localeCompare(dueDate(b));
+  }
+}
+function render(){
+  rows=OPPS.filter(pass).sort(sortRows);
+  // map
+  layer.clearLayers();markers.clear();
+  rows.forEach(o=>{
+    const col=o.src==='RECOMPETE'?cv('--recomp'):catColor(o.cat);
+    const m=L.circleMarker([o.lat,o.lng],{
+      radius:o.src==='RECOMPETE'?7.5:6,
+      color:'#ffffff',weight:2,
+      fillColor:col,fillOpacity:o.src==='RECOMPETE'?.72:.95
+    }).bindPopup(popupHTML(o),{maxWidth:300,closeButton:true});
+    m.on('click',()=>select(o.sol,false));
+    m.on('mouseover',()=>{m.setStyle({radius:o.src==='RECOMPETE'?11:9.5,weight:3});highlight(o.sol,true);});
+    m.on('mouseout',()=>{m.setStyle({radius:o.src==='RECOMPETE'?7.5:6,weight:2});highlight(o.sol,false);});
+    m.addTo(layer);markers.set(o.sol,m);
+  });
+  // counts on filter buttons
+  document.getElementById('c-src').textContent=F.src.size===3?'':F.src.size;
+  document.getElementById('c-cat').textContent=F.cat.size===CATS.length?'':F.cat.size;
+  document.getElementById('c-set').textContent=F.set.size===SETGROUPS.length?'':F.set.size;
+  document.querySelectorAll('.fbtn[data-sheet]').forEach(b=>{
+    const k=b.dataset.sheet,full=k==='src'?3:k==='cat'?CATS.length:SETGROUPS.length;
+    b.classList.toggle('active',F[k].size!==full&&F[k].size>0);
+  });
+  // summary
+  const sd=rows.filter(o=>setKey(o.set)==='SDVOSB').length;
+  const urgent=rows.filter(o=>{const d=daysOut(o);return d>=0&&d<=7;}).length;
+  document.getElementById('sumline').innerHTML=
+    `<b>${sd}</b> SDVOSB-eligible · <b>${urgent}</b> closing this week`;
+  document.getElementById('rescount').innerHTML=
+    `${rows.length} <span>of ${OPPS.length} opportunities</span>`;
+  drawFeed();
+}
+function drawFeed(){
+  const feed=document.getElementById('feed');
+  if(!rows.length){
+    feed.innerHTML=`<div class="empty"><h4>No opportunities match</h4>
+      <p>Try removing a filter or widening your service lines.</p>
+      <button onclick="document.getElementById('clrAll').click()">Clear all filters</button></div>`;
+    return;
+  }
+  feed.innerHTML='';
+  rows.forEach(o=>{
+    const c=document.createElement('article');
+    c.className='card';c.dataset.sol=o.sol;c.tabIndex=0;
+    c.innerHTML=cardHTML(o);
+    c.onclick=()=>select(o.sol,true);
+    c.onkeydown=e=>{if(e.key==='Enter')select(o.sol,true);};
+    c.onmouseenter=()=>highlight(o.sol,true,true);
+    c.onmouseleave=()=>highlight(o.sol,false,true);
+    feed.appendChild(c);
+  });
+}
+// list <-> map sync
+function highlight(sol,on,fromCard){
+  const m=markers.get(sol);
+  if(m&&fromCard&&m.setStyle){
+    const rec=m.options.fillOpacity<.8;
+    m.setStyle({radius:on?(rec?11:9.5):(rec?7.5:6),weight:on?3:2});
+    if(on&&m.bringToFront)m.bringToFront();
+  }
+  if(!fromCard){
+    const c=document.querySelector(`.card[data-sol="${CSS.escape(sol)}"]`);
+    if(c)c.classList.toggle('hot-hover',on);
+  }
+}
+function select(sol,fly){
+  selected=sol;
+  document.querySelectorAll('.card').forEach(c=>c.classList.toggle('sel',c.dataset.sol===sol));
+  const m=markers.get(sol);
+  if(m){
+    if(fly)map.flyTo(m.getLatLng(),Math.max(map.getZoom(),7),{duration:.6});
+    m.openPopup();
+  }
+  const c=document.querySelector(`.card[data-sol="${CSS.escape(sol)}"]`);
+  if(c&&!fly)c.scrollIntoView({block:'nearest'});
+}
+
+// ---------- sidebar collapse ----------
+const appEl=document.querySelector('.app'),railBtn=document.getElementById('railBtn');
+railBtn.onclick=()=>{
+  const hid=appEl.classList.toggle('collapsed');
+  railBtn.classList.toggle('collapsed',hid);
+  railBtn.textContent=hid?'›':'‹';
+  railBtn.title=railBtn.ariaLabel=hid?'Show list':'Hide list';
+  // let the grid transition finish, then re-measure the map
+  [80,180,300,420].forEach(t=>setTimeout(resize,t));
+};
+
+// ---------- progress ----------
+const LEVELS=[["Emerging",0],["Active Bidder",250],["Contender",750],["Prime Ready",2000],["Award Winner",5000]];
+let PROG={pts:0,week:0,streak:0,best:0,goal:500};
+const sb=document.getElementById('sb');
+document.getElementById('sbOpen').onclick=()=>sb.classList.add('open');
+document.getElementById('sbClose').onclick=()=>sb.classList.remove('open');
+function paintScore(){
+  let i=0;for(let k=0;k<LEVELS.length;k++)if(PROG.pts>=LEVELS[k][1])i=k;
+  const cur=LEVELS[i],nxt=LEVELS[Math.min(i+1,LEVELS.length-1)];
+  document.getElementById('lvlName').textContent=cur[0].toUpperCase();
+  document.getElementById('ptsVal').textContent=PROG.pts;
+  document.getElementById('ptsMini').textContent=PROG.pts;
+  document.getElementById('nextName').textContent=i<LEVELS.length-1?`Next: ${nxt[0]}`:'Max level';
+  document.getElementById('nextGap').textContent=i<LEVELS.length-1?`${Math.max(0,nxt[1]-PROG.pts)} to go`:'—';
+  document.getElementById('lvlFill').style.width=Math.min(100,((PROG.pts-cur[1])/((nxt[1]-cur[1])||1))*100)+'%';
+  document.getElementById('weekPts').textContent=PROG.week;
+  document.getElementById('goalTxt').textContent=`${PROG.week}/${PROG.goal}`;
+  document.getElementById('streak').innerHTML=`${PROG.streak}🔥`;
+  document.getElementById('best').textContent=PROG.best;
+}
+document.querySelectorAll('.lact').forEach(a=>{
+  a.onclick=()=>{const p=+a.dataset.p;PROG.pts+=p;PROG.week+=p;
+    if(PROG.week>PROG.best)PROG.best=PROG.week;if(!PROG.streak)PROG.streak=1;paintScore();};
+});
+document.getElementById('resetProg').onclick=()=>{PROG={pts:0,week:0,streak:0,best:0,goal:500};paintScore();};
+
+document.addEventListener('click',e=>{
+  if(openSheet&&!e.target.closest('.fbar'))closeSheet();
+});
+
+render();paintScore();fitView();
+</script>
+</body>
+</html>

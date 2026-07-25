@@ -22,6 +22,8 @@ const CODE_TO_NAME: Record<string, string> = {
   SD: 'South Dakota', TN: 'Tennessee', TX: 'Texas', UT: 'Utah', VT: 'Vermont',
   VA: 'Virginia', WA: 'Washington', WV: 'West Virginia', WI: 'Wisconsin', WY: 'Wyoming',
   DC: 'District of Columbia', PR: 'Puerto Rico',
+  // US territories — real place-of-performance for some federal work; STATE_CENTROIDS has them.
+  GU: 'Guam', VI: 'U.S. Virgin Islands', AS: 'American Samoa', MP: 'Northern Mariana Islands',
 };
 
 // Reverse: normalized name → code. Built once at module load.

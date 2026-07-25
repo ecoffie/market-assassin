@@ -115,26 +115,37 @@ function AppDashboard() {
   const [signUpEmail, setSignUpEmail] = useState('');
   const [signUpSent, setSignUpSent] = useState(false);
 
+  // Build the post-OAuth redirectTo, preserving a same-site ?next= so sign-in returns
+  // the user to where they started (e.g. /opportunity-map) instead of always /app.
+  // Onboarding reads this next and honors it for returning users. Open-redirect guarded.
+  const oauthRedirectTo = useCallback((): string | undefined => {
+    if (typeof window === 'undefined') return undefined;
+    const raw = new URLSearchParams(window.location.search).get('next') || '';
+    const safe = raw.startsWith('/') && !raw.startsWith('//') ? raw : '';
+    const base = `${window.location.origin}/app/onboarding`;
+    return safe ? `${base}?next=${encodeURIComponent(safe)}` : base;
+  }, []);
+
   const handleGoogleSignIn = useCallback(async () => {
     setOauthLoading('google');
     setAuthError(null);
-    const result = await signInWithGoogle();
+    const result = await signInWithGoogle(oauthRedirectTo());
     if (!result.success) {
       setAuthError(result.error || 'Could not connect with Google');
       setOauthLoading(null);
     }
-    // success path: Supabase redirects to Google → /app/onboarding → /app
-  }, []);
+    // success path: Supabase → Google → /app/onboarding?next=… → next (or /app)
+  }, [oauthRedirectTo]);
 
   const handleMicrosoftSignIn = useCallback(async () => {
     setOauthLoading('microsoft');
     setAuthError(null);
-    const result = await signInWithMicrosoft();
+    const result = await signInWithMicrosoft(oauthRedirectTo());
     if (!result.success) {
       setAuthError(result.error || 'Could not connect with Microsoft');
       setOauthLoading(null);
     }
-  }, []);
+  }, [oauthRedirectTo]);
   // Apple sign-in disabled until Apple OAuth provider is connected — handler removed;
   // restore it + signInWithApple import + the button when configured.
   const activePanelRef = useRef<AppPanel>('dashboard');
