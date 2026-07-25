@@ -1,6 +1,25 @@
 # Opportunity Map — full explorer (Airbnb/Google map⇄list) — SCOPE (2026-07-24)
 
 ---
+## 🏷️ NAMING: "M-Win" = the win-probability score (Eric, 2026-07-25)
+
+Zillow has the **Zestimate** (a predicted home value). Mindy's equivalent PREDICTIVE layer is
+**"M-Win"** (M = Mindy + Win) = the **win-probability score** shown per opportunity — "how likely
+are YOU to win this?" — provided per the GOS (GovCon Operating System) when we surface probability
+scores. Use the name **M-Win** consistently in UI/code/docs for that score.
+
+⚠️ Keep DISTINCT from ESTIMATED VALUE:
+- **M-Win** = predictive WIN-PROBABILITY score (0–100 / tiered). The differentiated intelligence
+  play — no competitor scores a user's win odds per opp. (Ties to the existing win-probability
+  scoring in `src/lib/briefings/win-probability.ts` — that's the engine; M-Win is the product name.)
+- **Estimated contract value** = the $ range (Zestimate's actual analogue for value), from the
+  doc-scan / forecast / recompete ceiling. Separate concept; still needs its own display name.
+
+On the map, M-Win would render as a per-pin/per-card score badge (like Zillow shows price on a pin).
+NOT built yet — naming + concept locked here so every future build uses "M-Win".
+
+
+---
 ## 🧱 ZILLOW-DEPTH BUILD (2026-07-25, in progress on feat/logged-in-home-v2)
 
 The quick-filter bar reorg SHIPPED (commit aa02b0f6 — 6 server-wired controls: scope/
