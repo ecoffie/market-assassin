@@ -29,6 +29,7 @@ type SavedSearch = {
   id: string; user_email: string; name: string; mode: string;
   filters: Record<string, unknown>; alert_frequency: string;
   last_seen_notice_ids: string[]; total_alerts_sent: number;
+  last_alerted_at: string | null;
 };
 
 // Weekly searches fire only on Mondays (UTC); daily every run; paused never.
@@ -77,7 +78,7 @@ export async function GET(request: NextRequest) {
   // Enabled searches, least-recently-alerted first (fair drain, resumable).
   const { data: searches, error } = await db
     .from('saved_searches')
-    .select('id, user_email, name, mode, filters, alert_frequency, last_seen_notice_ids, total_alerts_sent')
+    .select('id, user_email, name, mode, filters, alert_frequency, last_seen_notice_ids, total_alerts_sent, last_alerted_at')
     .eq('alerts_enabled', true)
     .order('last_alerted_at', { ascending: true, nullsFirst: true })
     .limit(limit);
@@ -109,6 +110,24 @@ export async function GET(request: NextRequest) {
 
       const seen = new Set(Array.isArray(s.last_seen_notice_ids) ? s.last_seen_notice_ids : []);
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const allNoticeIds = (opps || []).map((o: any) => o.notice_id).filter(Boolean);
+
+      // FIRST RUN (never alerted): snapshot the current matches as "seen" WITHOUT emailing —
+      // else a brand-new saved search blasts every current match (200) as "new". Only opps
+      // that appear AFTER this baseline are alerts. (Same pattern as pursuit-changes.)
+      if (!s.last_alerted_at && seen.size === 0) {
+        if (!preview) {
+          await db.from('saved_searches').update({
+            last_alerted_at: new Date().toISOString(),
+            last_seen_notice_ids: [...new Set(allNoticeIds)].slice(0, 500),
+            updated_at: new Date().toISOString(),
+          }).eq('id', s.id);
+        }
+        results.noMatches++; // counted as "baselined this run, nothing to send"
+        continue;
+      }
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const fresh = (opps || []).filter((o: any) => o.notice_id && !seen.has(o.notice_id));
 
       if (fresh.length === 0) { results.noMatches++; continue; }
@@ -125,9 +144,7 @@ export async function GET(request: NextRequest) {
       });
 
       // Stamp seen ids (cap the stored list so it can't grow unbounded) + timestamps.
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const allIds = [...(opps || []).map((o: any) => o.notice_id).filter(Boolean), ...seen];
-      const cappedSeen = [...new Set(allIds)].slice(0, 500);
+      const cappedSeen = [...new Set([...allNoticeIds, ...seen])].slice(0, 500);
       await db.from('saved_searches').update({
         last_alerted_at: new Date().toISOString(),
         last_seen_notice_ids: cappedSeen,
