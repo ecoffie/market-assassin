@@ -56,6 +56,11 @@ const MORE_FILTERS = '<div class="mfwrap">'
   +   '<label class="mf-field"><span>NAICS</span><input class="mf-in" id="mfNaics" placeholder="e.g. 236220" autocomplete="off"></label>'
   +   '<label class="mf-field"><span>PSC</span><input class="mf-in" id="mfPsc" placeholder="e.g. R408 or R" autocomplete="off"></label>'
   + '</div>'
+  + '<div class="mf-sec">Buyer</div>'
+  + '<div class="mf-grid2">'
+  +   '<label class="mf-field"><span>Agency</span><input class="mf-in" id="mfAgency" placeholder="e.g. Navy" autocomplete="off"></label>'
+  +   '<label class="mf-field"><span>State</span><input class="mf-in mf-st" id="mfState" placeholder="e.g. FL" maxlength="2" autocomplete="off"></label>'
+  + '</div>'
   + '<div class="mf-sec">Set-aside <em>(any selected)</em></div>'
   + '<div class="mf-checks">' + SETASIDE_CHECKS + '</div>'
   + '<div class="mf-sec">Notice type <em>(any selected)</em></div>'
@@ -75,6 +80,11 @@ const MORE_FILTERS = '<div class="mfwrap">'
   + '<button class="mf-toggle" id="fscToggle">Shown</button></div>'
   + '<div class="mf-foot"><button class="mf-clear" id="mfClear">Clear advanced</button><button class="mf-apply" id="mfApply">Apply</button></div>'
   + '</div></div>';
+
+// Save-search anchor button (Zillow's blue CTA) — turns the current filters + viewport into
+// a saved search / alert. Sits at the right end of the filter bar.
+const SAVE_SEARCH_BTN = '<button class="savesearch" id="saveSearchBtn" title="Save this search & get alerts">'
+  + '<svg viewBox="0 0 24 24"><path d="M19 21l-7-4-7 4V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>Save search</button>';
 
 // Server-wired filter controls (the reorg). These replace the old client-side pills
 // (Source / Service line / Set-aside / SDVOSB / Closing≤7d) that filtered the
@@ -106,9 +116,9 @@ const SERVER_FILTERS =
   +   '<option value="7">Closing ≤7 days</option>'
   +   '<option value="14">Closing ≤14 days</option>'
   +   '<option value="30">Closing ≤30 days</option>'
-  + '</select>'
-  + '<input class="finp" id="fltAgency" placeholder="Agency" title="Filter by agency" autocomplete="off">'
-  + '<input class="finp fst" id="fltState" placeholder="State" maxlength="2" title="2-letter state" autocomplete="off">';
+  + '</select>';
+// Agency + State moved OFF the top row into the deep panel (Zillow keeps the bar to a
+// few uniform dropdown pills; long-tail text filters live inside "Filters").
 
 // Full-page CSS overrides (kept out of the verbatim template): (1) sheet-label readability
 // — grid items default to min-width:auto so nowrap labels overflow their cell; let them wrap.
@@ -119,15 +129,19 @@ const PAGE_CSS = '<style>'
   + '.opt .cbx,.opt .swatch{margin-top:2px}'
   + '.opt .lbl{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.25;word-break:break-word}'
   + '.sheet{max-height:48vh;overflow-y:auto}'
-  // Server-wired filter controls (the reorg): selects + inputs styled to match the .fbtn pills.
-  + '.fsel,.finp{font:inherit;font-size:12.5px;font-weight:600;color:var(--ink);background:#fff;'
-  + 'border:1px solid var(--line);border-radius:9px;padding:7px 10px;height:34px;cursor:pointer;'
-  + 'appearance:none;-webkit-appearance:none;transition:border-color .15s,box-shadow .15s;outline:none}'
-  + '.finp{cursor:text;font-weight:500;min-width:120px}.finp.fst{min-width:64px;width:64px;text-transform:uppercase}'
-  + '.fsel{padding-right:26px;background-image:url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'6\' viewBox=\'0 0 10 6\'><path d=\'M1 1l4 4 4-4\' stroke=\'%236b7787\' stroke-width=\'1.6\' fill=\'none\' stroke-linecap=\'round\'/></svg>");'
-  + 'background-repeat:no-repeat;background-position:right 9px center}'
-  + '.fsel:focus,.finp:focus{border-color:var(--jan);box-shadow:0 0 0 3px rgba(59,130,246,.14)}'
-  + '.fsel.on,.finp.on{border-color:var(--jan);background-color:#eff5ff;color:var(--jan)}'
+  // Filter pills — Zillow-exact: white, hairline border, BOLD near-black label, uniform 40px.
+  + '.fsel{font-family:Inter,system-ui,sans-serif;font-size:14.5px;font-weight:700;color:#2a2a33;background:#fff;'
+  + 'border:1px solid #d1d5db;border-radius:8px;padding:0 34px 0 15px;height:40px;line-height:38px;cursor:pointer;'
+  + 'appearance:none;-webkit-appearance:none;transition:border-color .15s,box-shadow .15s;outline:none;'
+  + 'background-image:url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'11\' height=\'7\' viewBox=\'0 0 11 7\'><path d=\'M1 1l4.5 4.5L10 1\' stroke=\'%232a2a33\' stroke-width=\'1.8\' fill=\'none\' stroke-linecap=\'round\'/></svg>");'
+  + 'background-repeat:no-repeat;background-position:right 12px center}'
+  + '.fsel:hover{border-color:#9aa5b3}'
+  + '.fsel:focus{border-color:#006aff;box-shadow:0 0 0 3px rgba(0,106,255,.14)}'
+  + '.fsel.on{border-color:#006aff;color:#006aff;background-color:#f0f6ff}'
+  // Save search — Zillow's solid-blue anchor button on the bar.
+  + '.savesearch{font-family:Inter,system-ui,sans-serif;font-size:14.5px;font-weight:700;color:#fff;background:#006aff;'
+  + 'border:0;border-radius:8px;height:40px;padding:0 18px;cursor:pointer;display:inline-flex;align-items:center;gap:6px;transition:filter .15s}'
+  + '.savesearch:hover{filter:brightness(.94)}.savesearch svg{width:15px;height:15px;stroke:#fff;fill:none;stroke-width:2}'
   // Deep "More filters" panel.
   + '.mfpanel-deep{width:320px;max-height:70vh;overflow-y:auto;padding:14px 16px}'
   + '.mfpanel-deep .mf-sec{font:700 10.5px Inter,system-ui,sans-serif;text-transform:uppercase;letter-spacing:.05em;color:var(--sub);margin:12px 0 6px}'
@@ -136,6 +150,7 @@ const PAGE_CSS = '<style>'
   + '.mf-field{display:flex;flex-direction:column;gap:3px}.mf-field span{font:600 11px Inter,system-ui,sans-serif;color:var(--ink)}'
   + '.mf-in{font:500 13px Inter,system-ui,sans-serif;color:var(--ink);background:#fff;border:1px solid var(--line);border-radius:8px;padding:7px 9px;width:100%;outline:none}'
   + '.mf-in:focus{border-color:var(--jan);box-shadow:0 0 0 3px rgba(59,130,246,.12)}'
+  + '.mf-in.mf-st{text-transform:uppercase}'
   + '.mf-checks{display:flex;flex-wrap:wrap;gap:6px}'
   + '.mf-chk{display:inline-flex;align-items:center;gap:5px;font:500 12px Inter,system-ui,sans-serif;color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:5px 9px;cursor:pointer;user-select:none}'
   + '.mf-chk:hover{background:var(--wash)}.mf-chk input{margin:0;cursor:pointer}'
@@ -368,25 +383,26 @@ const VIEWPORT_JS = `<script>
   function bindInp(id,key,norm){ var el=document.getElementById(id); if(!el)return; el.oninput=function(){ clearTimeout(el._t); el._t=setTimeout(function(){ var v=el.value.trim(); if(norm)v=norm(v); FILT[key]=v; markActive(el,v); fetchView(); },400); }; }
   function markActive(el,v){ el.classList.toggle('on',!!v && v!=='all'); }
   bindSel('fltScope','scope'); bindSel('fltNotice','noticeType'); bindSel('fltSetAside','setAside'); bindSel('fltUrgency','closingDays');
-  bindInp('fltAgency','agency'); bindInp('fltState','state',function(v){return v.toUpperCase().slice(0,2);});
 
   // ── Deep "More filters" panel ──────────────────────────────────────────
   function _checked(cls){ return Array.prototype.slice.call(document.querySelectorAll(cls)).filter(function(c){return c.checked;}).map(function(c){return c.value;}).join(','); }
   function readDeep(){
     FILT.naics=(document.getElementById('mfNaics')||{}).value||'';
     FILT.psc=(document.getElementById('mfPsc')||{}).value||'';
+    FILT.agency=(document.getElementById('mfAgency')||{}).value||'';
+    FILT.state=((document.getElementById('mfState')||{}).value||'').toUpperCase().slice(0,2);
     FILT.postedDays=(document.getElementById('mfPosted')||{}).value||'';
     FILT.setAsideMulti=_checked('.mf-set');
     FILT.noticeMulti=_checked('.mf-notice');
     FILT.valueRange=(document.getElementById('mfValue')||{}).value||'';
-    var active=!!(FILT.naics||FILT.psc||FILT.postedDays||FILT.setAsideMulti||FILT.noticeMulti||FILT.valueRange);
+    var active=!!(FILT.naics||FILT.psc||FILT.agency||FILT.state||FILT.postedDays||FILT.setAsideMulti||FILT.noticeMulti||FILT.valueRange);
     var mbEl=document.getElementById('moreBtn'); if(mbEl)mbEl.classList.toggle('hasfilt',active);
   }
   var _apply=document.getElementById('mfApply');
   if(_apply)_apply.onclick=function(){ readDeep(); var mp2=document.getElementById('morePanel'); if(mp2)mp2.classList.remove('show'); fetchView(); };
   var _mfclr=document.getElementById('mfClear');
   if(_mfclr)_mfclr.onclick=function(){
-    ['mfNaics','mfPsc'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
+    ['mfNaics','mfPsc','mfAgency','mfState'].forEach(function(id){var e=document.getElementById(id);if(e)e.value='';});
     var mvp=document.getElementById('mfPosted'); if(mvp)mvp.value='';
     var mvv=document.getElementById('mfValue'); if(mvv)mvv.value='';
     document.querySelectorAll('.mf-set,.mf-notice').forEach(function(c){c.checked=false;});
@@ -396,13 +412,26 @@ const VIEWPORT_JS = `<script>
   function syncValueVis(){ var show=(MODE==='recompete'); document.querySelectorAll('.mf-value').forEach(function(e){e.style.display=show?'':'none';}); }
   syncValueVis();
 
+  // Save search — captures the current filters + viewport into a shareable URL (the
+  // full "save + alert me on new matches" backend lands next). For now it copies a
+  // deep-link and confirms, so the button is real, not dead.
+  var _ss=document.getElementById('saveSearchBtn');
+  if(_ss)_ss.onclick=function(){
+    var qp=[]; for(var k in FILT){ if(FILT[k]&&FILT[k]!=='all')qp.push(k+'='+encodeURIComponent(FILT[k])); }
+    if(Q)qp.push('q='+encodeURIComponent(Q));
+    qp.push('mode='+MODE);
+    var link=location.origin+location.pathname+'?'+qp.join('&');
+    try{ navigator.clipboard.writeText(link); }catch(e){}
+    var o=_ss.textContent; _ss.textContent='✓ Link copied'; setTimeout(function(){_ss.innerHTML='<svg viewBox="0 0 24 24"><path d="M19 21l-7-4-7 4V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg>Save search';},1600);
+  };
+
   // Clear all: reset the server filters + their controls, then refetch. (Runs in
   // addition to the template's own clrAll handler, which now only clears dead client sets.)
   var _clr=document.getElementById('clrAll');
   if(_clr)_clr.addEventListener('click',function(){
     FILT={ scope:'all', noticeType:'', setAside:'', closingDays:'', agency:'', state:'',
       naics:'', psc:'', postedDays:'', setAsideMulti:'', noticeMulti:'', valueRange:'' };
-    ['fltScope','fltNotice','fltSetAside','fltUrgency','fltAgency','fltState'].forEach(function(id){
+    ['fltScope','fltNotice','fltSetAside','fltUrgency'].forEach(function(id){
       var el=document.getElementById(id); if(!el)return; el.value=(id==='fltScope')?'all':''; el.classList.remove('on');
     });
     if(_mfclr)_mfclr.onclick();
@@ -688,7 +717,7 @@ export async function GET(request: NextRequest) {
     // "More filters" dropdown in the filter bar; drop the redundant standalone "SDVOSB only"
     // pill (the Set-aside dropdown already covers every set-aside, SDVOSB included).
     html = html.replace('<button class="clr" id="clrAll">Clear all</button>',
-      MORE_FILTERS + '<button class="clr" id="clrAll">Clear all</button>');
+      MORE_FILTERS + SAVE_SEARCH_BTN + '<button class="clr" id="clrAll">Clear all</button>');
     // Filter reorg: replace the old client-side pill row (Source / Service line /
     // Set-aside / SDVOSB / Closing≤7d) with the server-wired controls. One replace
     // spanning all five leftover buttons removes them + their throw-prone count badges.
