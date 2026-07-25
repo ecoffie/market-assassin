@@ -91,8 +91,10 @@ const ZLAYOUT_CSS = '<style>'
   + '.zhead .zh-sep{width:1px;height:22px;background:var(--line)}'
   + '.zhead .zh-t{font:600 14px "Inter",system-ui,sans-serif;color:var(--ink)}'
   + '.zhead .zh-live{margin-left:auto;font:600 11px "Inter",system-ui,sans-serif;color:#22a06b;display:inline-flex;align-items:center;gap:6px;letter-spacing:.02em}'
-  // far-left icon rail
-  + '.zrail{grid-area:zrail;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:2px;padding:14px 0;z-index:10}'
+  // far-left icon rail — PINNED (position:fixed) so grid/overflow can never push it off-screen.
+  // The 50px grid column stays as its reserved space (kept empty; the fixed rail sits over it).
+  + '.zrail{position:fixed;left:0;top:52px;width:50px;height:calc(100vh - 52px);height:calc(100dvh - 52px);'
+  + 'background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;gap:2px;padding:14px 0;z-index:30;overflow:hidden}'
   + '.zrail a{display:flex;flex-direction:column;align-items:center;gap:3px;font:600 9px/1.1 Inter,system-ui,sans-serif;color:var(--sub);text-decoration:none;padding:9px 3px;border-radius:9px;width:48px;text-align:center}'
   + '.zrail a:hover{background:var(--wash);color:var(--ink)}.zrail a.on{color:var(--ink)}'
   + '.zrail svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round}'
