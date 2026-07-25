@@ -607,6 +607,8 @@ const DRAWER_CSS = '<style>'
   + '.bf-grid{display:grid;grid-template-columns:1fr 1fr;gap:0 32px}'
   + '.bf-row{display:flex;justify-content:space-between;gap:12px;padding:9px 0;border-bottom:1px solid var(--hair)}'
   + '.bf-k{color:var(--sub);font-size:13px}.bf-v{color:var(--ink);font-size:13px;font-weight:600;text-align:right}'
+  + '.bf-ul{margin:0 0 6px;padding-left:18px}.bf-ul li{font-size:13.5px;color:var(--ink);margin-bottom:4px;line-height:1.4}'
+  + '.intel-load{color:var(--faint);font-size:12.5px;padding:6px 0}'
   // Similar opportunities (Zillow "Nearby homes" flywheel).
   + '.sim-list{display:flex;flex-direction:column;gap:10px}'
   + '.sim-card{display:block;width:100%;text-align:left;background:#fff;border:1px solid var(--line);border-radius:12px;padding:14px 16px;cursor:pointer;transition:box-shadow .15s,border-color .15s}'
@@ -822,10 +824,42 @@ const DRAWER_JS = `<script>
     }).join('');
     return sec('Similar opportunities','<div class="sim-list">'+cards+'</div>');
   }
+  // Reused-intelligence sections (predecessor history / agency intel / pricing) — filled by
+  // a second on-demand fetch (?intel=1). Placeholder shows a subtle "loading intel" line.
+  function ul(items){ return '<ul class="bf-ul">'+items.map(function(x){return '<li>'+esc(x)+'</li>';}).join('')+'</ul>'; }
+  function renderIntel(intel){
+    if(!intel)return '';
+    var out='';
+    var p=intel.predecessor;
+    if(p&&(p.incumbent||p.value)){
+      var facts=[];
+      if(p.incumbent)facts.push({k:'Likely incumbent',v:p.incumbent+(p.incumbentState?' ('+p.incumbentState+')':'')});
+      if(p.value)facts.push({k:'Prior contract value',v:p.value});
+      if(p.expires)facts.push({k:'Expires',v:p.expires});
+      if(p.vehicle)facts.push({k:'Vehicle / parent IDV',v:p.vehicle});
+      if(p.confidence)facts.push({k:'Match confidence',v:p.confidence});
+      out+=sec('Contract history \\u00b7 who holds this now','<div class="bf-grid">'+facts.map(function(f){return '<div class="bf-row"><div class="bf-k">'+esc(f.k)+'</div><div class="bf-v">'+esc(f.v)+'</div></div>';}).join('')+'</div>');
+    }
+    var a=intel.agency;
+    if(a&&((a.painPoints&&a.painPoints.length)||(a.priorities&&a.priorities.length))){
+      var inner='';
+      if(a.priorities&&a.priorities.length)inner+='<div class="ai-lab">Agency priorities</div>'+ul(a.priorities);
+      if(a.painPoints&&a.painPoints.length)inner+='<div class="ai-lab">Known pain points</div>'+ul(a.painPoints);
+      out+=sec('Know your buyer \\u00b7 agency intel',inner);
+    }
+    var pr=intel.pricing;
+    if(pr&&pr.rates&&pr.rates.length){
+      var rows=pr.rates.map(function(r){ var lbl=(r.labor_category||'Vendor')+(r.size?' \\u00b7 '+r.size:''); var rate=r.hourly_rate; return '<div class="bf-row"><div class="bf-k">'+esc(lbl)+'</div><div class="bf-v">'+esc(rate?('$'+rate+'/hr avg'):'')+'</div></div>'; }).join('');
+      out+=sec('Pricing intel \\u00b7 what vendors charge here','<div class="bf-grid">'+rows+'</div>'+(pr.summary?'<div class="ai-note">'+esc(pr.summary)+'</div>':''));
+    }
+    return out;
+  }
   function render(o,extra){
     CUR=o;
     extra=extra||{};
-    return snapshot(o)+bidFactsSec(extra.bidFacts)+aiSec(o)+orgSec(o)+descSec(o)+sowSec(o)+contactsSec(o)+docsSec(o)+vendorsSec(o)
+    return snapshot(o)+bidFactsSec(extra.bidFacts)+aiSec(o)
+      + '<div id="intelBox"><div class="intel-load">Loading market intelligence\\u2026</div></div>'
+      + orgSec(o)+descSec(o)+sowSec(o)+contactsSec(o)+docsSec(o)+vendorsSec(o)
       + similarSec(extra.similar)
       + '<div class="oppsoon">Coming next: expected value range \\u00b7 M-Win score.</div>'
       + actions(o);
@@ -836,7 +870,14 @@ const DRAWER_JS = `<script>
     body.innerHTML='<div class="oppload">Loading\\u2026</div>';
     bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
     fetch('/api/app/opportunity-detail?id='+encodeURIComponent(nid)).then(function(r){return r.json();}).then(function(d){
-      body.innerHTML=(d&&d.success&&d.opp)?render(d.opp,{bidFacts:d.bidFacts,similar:d.similar}):'<div class="oppload">Couldn\\u2019t load this opportunity.</div>';
+      if(!(d&&d.success&&d.opp)){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; return; }
+      body.innerHTML=render(d.opp,{bidFacts:d.bidFacts,similar:d.similar});
+      // Second, on-demand fetch for the reused-intelligence sections (fail-soft).
+      fetch('/api/app/opportunity-detail?intel=1&id='+encodeURIComponent(nid)).then(function(r){return r.json();}).then(function(x){
+        var box=document.getElementById('intelBox'); if(!box)return;
+        var h=(x&&x.success)?renderIntel(x.intel):'';
+        box.innerHTML=h||''; // nothing found → collapse silently (no dead section)
+      }).catch(function(){ var box=document.getElementById('intelBox'); if(box)box.innerHTML=''; });
     }).catch(function(){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; });
   };
 })();

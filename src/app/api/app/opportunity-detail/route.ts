@@ -11,15 +11,19 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { setGroupKey, SET_LABEL } from '@/lib/opportunities/map-data';
+import { buildOppIntel, intelHasContent } from '@/lib/opportunities/opp-intel';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
+export const maxDuration = 30;
 
 function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 }
 
-const DETAIL_COLS = 'notice_id, solicitation_number, title, description, naics_code, psc_code, department, sub_tier, office, agency_hierarchy, posted_date, response_deadline, set_aside_code, set_aside_description, notice_type, pop_city, pop_state, pop_country, ui_link, attachments, points_of_contact, office_address, has_sow_doc, sow_text, sow_filename, additional_info_link, additional_info_text, map_loc_source';
+// buildOppIntel now lives in the shared lib (reused by the precompute backfill/cron).
+
+const DETAIL_COLS = 'notice_id, solicitation_number, title, description, naics_code, psc_code, department, sub_tier, office, agency_hierarchy, posted_date, response_deadline, set_aside_code, set_aside_description, notice_type, pop_city, pop_state, pop_country, ui_link, attachments, points_of_contact, office_address, has_sow_doc, sow_text, sow_filename, additional_info_link, additional_info_text, map_loc_source, intel_predecessor, intel_agency, intel_pricing, intel_computed_at';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function shapeOpp(r: any) {
@@ -67,6 +71,30 @@ export async function GET(request: NextRequest) {
   if (!data) return NextResponse.json({ success: false, error: 'not found' }, { status: 404 });
 
   const opp = shapeOpp(data);
+
+  // ?intel=1 → the reused-intelligence block. READ the precomputed columns first (instant);
+  // only fall back to live tools when this opp hasn't been computed yet — and self-warm by
+  // storing the result so the next open is instant too. (The backfill/cron precompute the rest.)
+  if (request.nextUrl.searchParams.get('intel') === '1') {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const row = data as any;
+    if (row.intel_computed_at) {
+      return NextResponse.json({ success: true, cached: true, intel: {
+        predecessor: row.intel_predecessor || null,
+        agency: row.intel_agency || null,
+        pricing: row.intel_pricing || null,
+      } });
+    }
+    // Not precomputed yet → compute live, return it, and store it (best-effort).
+    const intel = await buildOppIntel(opp.naics, opp.department, opp.title);
+    if (intelHasContent(intel)) {
+      db.from('sam_opportunities').update({
+        intel_predecessor: intel.predecessor, intel_agency: intel.agency,
+        intel_pricing: intel.pricing, intel_computed_at: new Date().toISOString(),
+      }).eq('notice_id', opp.id).then(() => {}, () => {});
+    }
+    return NextResponse.json({ success: true, cached: false, intel });
+  }
 
   // Bid Facts — the "Facts & features" grid. All real columns.
   const bidFacts = [
