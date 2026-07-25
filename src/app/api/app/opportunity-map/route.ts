@@ -33,7 +33,7 @@ function sb() {
 
 type Filters = {
   status: string; search: string; noticeType: string; agency: string; setAside: string;
-  naics: string; state: string; hideCommodity: boolean;
+  naics: string; state: string; hideCommodity: boolean; closingDays: number;
   profileNaics: string[]; profileStates: string[];
 };
 
@@ -48,9 +48,20 @@ function applyFilters(query: any, f: Filters) {
   if (isActiveSearch) query = query.or(buildSearchOr(f.search));
   if (f.noticeType) query = query.eq('notice_type', f.noticeType);
   if (f.agency) query = query.ilike('department', `%${f.agency}%`);
-  if (f.setAside) query = query.eq('set_aside_code', f.setAside);
+  // Set-aside filters by GROUP, not exact code: "WOSB" must catch WOSB + EDWOSB, etc.
+  // Widen the exact-code .eq() to .in() over the group's code list (SET_GROUPS). A
+  // value that isn't a known group key falls back to matching it as a literal code.
+  if (f.setAside) {
+    const group = SET_GROUPS.find((g) => g.key === f.setAside);
+    query = query.in('set_aside_code', group ? group.codes : [f.setAside]);
+  }
   if (f.naics) query = query.or(`naics_code.eq.${f.naics},naics_code.like.${f.naics.substring(0, 3)}%`);
   if (f.hideCommodity) query = query.not('title', 'imatch', FSC_REGEX);
+  // Urgency / closing window: only notices whose deadline is within the next N days.
+  if (f.closingDays > 0) {
+    const until = new Date(Date.now() + f.closingDays * 86400_000).toISOString();
+    query = query.lte('response_deadline', until);
+  }
 
   const explicitState = f.state ? normalizeStateCode(f.state) : null;
   if (explicitState) {
@@ -142,6 +153,7 @@ export async function GET(request: NextRequest) {
     naics: p.get('naics') || '',
     state: p.get('state') || '',
     hideCommodity: p.get('hideCommodity') === '1' || p.get('hideCommodity') === 'true',
+    closingDays: Math.max(0, parseInt(p.get('closingDays') || '0', 10) || 0),
     profileNaics, profileStates,
   };
 

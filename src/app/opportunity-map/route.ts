@@ -5,7 +5,7 @@
  * is rebuilt.
  */
 import { NextRequest, NextResponse } from 'next/server';
-import { getMapOpportunities } from '@/lib/opportunities/map-data';
+import { getMapOpportunities, SET_GROUPS } from '@/lib/opportunities/map-data';
 import { OPPORTUNITY_MAP_TEMPLATE } from './template-html';
 
 export const dynamic = 'force-dynamic';
@@ -42,6 +42,40 @@ const MORE_FILTERS = '<div class="mfwrap">'
   + '<button class="mf-toggle" id="fscToggle">Shown</button></div>'
   + '</div></div>';
 
+// Server-wired filter controls (the reorg). These replace the old client-side pills
+// (Source / Service line / Set-aside / SDVOSB / Closing≤7d) that filtered the
+// already-fetched pins in the browser and reset on every pan. Each control below sets
+// a param on the viewport fetch, so filters survive panning (Zillow-style). Set-aside
+// filters by GROUP (the API widens to the group's code list). Profile⇄All SAM and the
+// closing-window ("urgency") are here too. Wiring lives in VIEWPORT_JS (window.__mapFilters).
+const SET_GROUP_OPTS = SET_GROUPS
+  .filter((g) => g.key !== 'NONE')
+  .map((g) => `<option value="${g.key}">${g.label}</option>`)
+  .join('');
+const SERVER_FILTERS =
+    '<select class="fsel" id="fltScope" title="Which opportunities to show">'
+  +   '<option value="all">All SAM</option><option value="profile">Your profile</option>'
+  + '</select>'
+  + '<select class="fsel" id="fltNotice" title="Notice type">'
+  +   '<option value="">Notice type</option>'
+  +   '<option value="Solicitation">Solicitation</option>'
+  +   '<option value="Combined Synopsis/Solicitation">Combined Synopsis</option>'
+  +   '<option value="Presolicitation">Presolicitation</option>'
+  +   '<option value="Sources Sought">Sources Sought</option>'
+  +   '<option value="Special Notice">Special Notice</option>'
+  + '</select>'
+  + '<select class="fsel" id="fltSetAside" title="Set-aside">'
+  +   '<option value="">Set-aside</option>' + SET_GROUP_OPTS
+  + '</select>'
+  + '<select class="fsel" id="fltUrgency" title="Closing window">'
+  +   '<option value="">Any deadline</option>'
+  +   '<option value="7">Closing ≤7 days</option>'
+  +   '<option value="14">Closing ≤14 days</option>'
+  +   '<option value="30">Closing ≤30 days</option>'
+  + '</select>'
+  + '<input class="finp" id="fltAgency" placeholder="Agency" title="Filter by agency" autocomplete="off">'
+  + '<input class="finp fst" id="fltState" placeholder="State" maxlength="2" title="2-letter state" autocomplete="off">';
+
 // Full-page CSS overrides (kept out of the verbatim template): (1) sheet-label readability
 // — grid items default to min-width:auto so nowrap labels overflow their cell; let them wrap.
 // (2) filter bar WRAPS to a 2nd row instead of hiding filters off-screen behind a scroll.
@@ -51,6 +85,15 @@ const PAGE_CSS = '<style>'
   + '.opt .cbx,.opt .swatch{margin-top:2px}'
   + '.opt .lbl{white-space:normal;overflow:visible;text-overflow:clip;line-height:1.25;word-break:break-word}'
   + '.sheet{max-height:48vh;overflow-y:auto}'
+  // Server-wired filter controls (the reorg): selects + inputs styled to match the .fbtn pills.
+  + '.fsel,.finp{font:inherit;font-size:12.5px;font-weight:600;color:var(--ink);background:#fff;'
+  + 'border:1px solid var(--line);border-radius:9px;padding:7px 10px;height:34px;cursor:pointer;'
+  + 'appearance:none;-webkit-appearance:none;transition:border-color .15s,box-shadow .15s;outline:none}'
+  + '.finp{cursor:text;font-weight:500;min-width:120px}.finp.fst{min-width:64px;width:64px;text-transform:uppercase}'
+  + '.fsel{padding-right:26px;background-image:url("data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'10\' height=\'6\' viewBox=\'0 0 10 6\'><path d=\'M1 1l4 4 4-4\' stroke=\'%236b7787\' stroke-width=\'1.6\' fill=\'none\' stroke-linecap=\'round\'/></svg>");'
+  + 'background-repeat:no-repeat;background-position:right 9px center}'
+  + '.fsel:focus,.finp:focus{border-color:var(--jan);box-shadow:0 0 0 3px rgba(59,130,246,.14)}'
+  + '.fsel.on,.finp.on{border-color:var(--jan);background-color:#eff5ff;color:var(--jan)}'
   // Filters wrap (no more horizontal-scroll hiding Set-aside & beyond).
   + '.fscroll{flex-wrap:wrap!important;overflow-x:visible!important;row-gap:7px}'
   // Set-aside color legend, bottom-left of the map.
@@ -192,6 +235,10 @@ const VIEWPORT_JS = `<script>
   };
   var MODE='open'; window.__mapMode='open';
   var HIDE_FSC=false, TOTAL=0, CAPPED=false, busy=false, t=null, t2=null, Q='';
+  // Server-wired filter state (the reorg). Every control writes here, then fetchView()
+  // sends them as query params so the filter is applied by the DB for the current
+  // viewport — and survives panning, instead of hiding already-fetched pins.
+  var FILT={ scope:'all', noticeType:'', setAside:'', closingDays:'', agency:'', state:'' };
   try{ var zt=document.querySelector('.ztop'), zf=document.querySelector('.fbar');
     if(zt&&zf){ zt.appendChild(zf); setTimeout(function(){try{map.invalidateSize();}catch(e){}},80); } }catch(e){}
   function clean(d){ return (d||'').replace(/,?\\s*DEPARTMENT OF( THE)?/i,'').replace(/DEPARTMENT OF( THE)?\\s*/i,'').trim().replace(/\\b([A-Z])([A-Z0-9'&.\\/-]*)/g,function(_,a,b){return a+b.toLowerCase();})||d; }
@@ -216,6 +263,16 @@ const VIEWPORT_JS = `<script>
     if(MODE==='contractor'){ OPPS=[]; render(); var f=document.getElementById('feed'); if(f)f.innerHTML='<div class="empty"><h4>Contractors map — coming next</h4><p>Wiring the contractor dataset (firm HQ locations) onto the map.</p></div>'; return; }
     busy=true;
     var url=MODES[MODE].ep+'?bbox='+bbox()+(MODE==='open'?('&status=active'+(HIDE_FSC?'&hideCommodity=1':'')):'')+(Q?'&q='+encodeURIComponent(Q):'');
+    // Append active server filters. Both the open + recompete endpoints accept
+    // setAside/agency; the open endpoint also accepts noticeType/state/closingDays/scope.
+    if(FILT.setAside)url+='&setAside='+encodeURIComponent(FILT.setAside);
+    if(FILT.agency)url+='&agency='+encodeURIComponent(FILT.agency);
+    if(MODE==='open'){
+      if(FILT.scope==='profile'){ var _pe=_uemail(); if(_pe)url+='&scope=profile&email='+encodeURIComponent(_pe); }
+      if(FILT.noticeType)url+='&noticeType='+encodeURIComponent(FILT.noticeType);
+      if(FILT.state)url+='&state='+encodeURIComponent(FILT.state);
+      if(FILT.closingDays)url+='&closingDays='+encodeURIComponent(FILT.closingDays);
+    }
     fetch(url).then(function(r){return r.json();}).then(function(d){ busy=false;
       if(!d||!d.success)return;
       TOTAL=d.totalForFilters||0; CAPPED=!!d.capped;
@@ -234,6 +291,24 @@ const VIEWPORT_JS = `<script>
   if(zsi)zsi.addEventListener('input',function(){ clearTimeout(t2); t2=setTimeout(function(){ Q=zsi.value.trim(); fetchView(); },400); });
   var tg=document.getElementById('fscToggle');
   if(tg)tg.onclick=function(){ HIDE_FSC=!HIDE_FSC; tg.classList.toggle('off',HIDE_FSC); tg.textContent=HIDE_FSC?'Hidden':'Shown'; fetchView(); };
+  // Server-wired filter controls → write FILT + refetch (no client-side hide). scope=profile
+  // needs the signed-in email (same localStorage token the save/drawer flows read).
+  function _uemail(){ try{ var t=localStorage.getItem('mi_beta_auth_token')||''; var s=t.split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); if(j&&j.email)return String(j.email).toLowerCase(); }catch(e){} try{ var b=localStorage.getItem('briefings_access_email'); return b?b.toLowerCase().trim():''; }catch(e2){return '';} }
+  function bindSel(id,key){ var el=document.getElementById(id); if(!el)return; el.onchange=function(){ FILT[key]=el.value; markActive(el,el.value); fetchView(); }; }
+  function bindInp(id,key,norm){ var el=document.getElementById(id); if(!el)return; el.oninput=function(){ clearTimeout(el._t); el._t=setTimeout(function(){ var v=el.value.trim(); if(norm)v=norm(v); FILT[key]=v; markActive(el,v); fetchView(); },400); }; }
+  function markActive(el,v){ el.classList.toggle('on',!!v && v!=='all'); }
+  bindSel('fltScope','scope'); bindSel('fltNotice','noticeType'); bindSel('fltSetAside','setAside'); bindSel('fltUrgency','closingDays');
+  bindInp('fltAgency','agency'); bindInp('fltState','state',function(v){return v.toUpperCase().slice(0,2);});
+  // Clear all: reset the server filters + their controls, then refetch. (Runs in
+  // addition to the template's own clrAll handler, which now only clears dead client sets.)
+  var _clr=document.getElementById('clrAll');
+  if(_clr)_clr.addEventListener('click',function(){
+    FILT={ scope:'all', noticeType:'', setAside:'', closingDays:'', agency:'', state:'' };
+    ['fltScope','fltNotice','fltSetAside','fltUrgency','fltAgency','fltState'].forEach(function(id){
+      var el=document.getElementById(id); if(!el)return; el.value=(id==='fltScope')?'all':''; el.classList.remove('on');
+    });
+    fetchView();
+  });
   // More-filters dropdown open/close.
   var mb=document.getElementById('moreBtn'), mp=document.getElementById('morePanel');
   if(mb&&mp){ mb.onclick=function(e){ e.stopPropagation(); mp.classList.toggle('show'); };
@@ -515,7 +590,35 @@ export async function GET(request: NextRequest) {
     // pill (the Set-aside dropdown already covers every set-aside, SDVOSB included).
     html = html.replace('<button class="clr" id="clrAll">Clear all</button>',
       MORE_FILTERS + '<button class="clr" id="clrAll">Clear all</button>');
-    html = html.replace('<button class="fbtn" id="f-sd">SDVOSB only</button>', '');
+    // Filter reorg: replace the old client-side pill row (Source / Service line /
+    // Set-aside / SDVOSB / Closing≤7d) with the server-wired controls. One replace
+    // spanning all five leftover buttons removes them + their throw-prone count badges.
+    html = html.replace(
+      '<button class="fbtn" data-sheet="src">Source <span class="cnt" id="c-src"></span> <span class="car">▼</span></button>\n'
+      + '        <button class="fbtn" data-sheet="cat">Service line <span class="cnt" id="c-cat"></span> <span class="car">▼</span></button>\n'
+      + '        <button class="fbtn" data-sheet="set">Set-aside <span class="cnt" id="c-set"></span> <span class="car">▼</span></button>\n'
+      + '        <button class="fbtn" id="f-sd">SDVOSB only</button>\n'
+      + '        <button class="fbtn" id="f-soon">Closing ≤7 days</button>',
+      SERVER_FILTERS,
+    );
+    // The deleted pills leave orphaned template JS that null-derefs now that the
+    // buttons are gone. Null-guard each throw-prone getElementById so the page's own
+    // scripts don't crash before VIEWPORT_JS runs. (The .fbtn[data-sheet] loop,
+    // renderSheet/closeSheet, and pass()'s F.* checks are harmless no-ops once the
+    // buttons/sheets don't exist, so they need no change.)
+    html = html
+      .replace("document.getElementById('c-src').textContent=F.src.size===3?'':F.src.size;",
+        "var _cs=document.getElementById('c-src');if(_cs)_cs.textContent=F.src.size===3?'':F.src.size;")
+      .replace("document.getElementById('c-cat').textContent=F.cat.size===CATS.length?'':F.cat.size;",
+        "var _cc=document.getElementById('c-cat');if(_cc)_cc.textContent=F.cat.size===CATS.length?'':F.cat.size;")
+      .replace("document.getElementById('c-set').textContent=F.set.size===SETGROUPS.length?'':F.set.size;",
+        "var _ce=document.getElementById('c-set');if(_ce)_ce.textContent=F.set.size===SETGROUPS.length?'':F.set.size;")
+      .replace("document.getElementById('f-soon').onclick=e=>{F.soon=!F.soon;e.target.classList.toggle('active',F.soon);render();};",
+        "")
+      .replace("document.getElementById('f-sd').onclick=e=>{F.sdOnly=!F.sdOnly;e.target.classList.toggle('active',F.sdOnly);render();};",
+        "")
+      .replace("document.getElementById('f-sd').classList.remove('active');\n  document.getElementById('f-soon').classList.remove('active');",
+        "");
     // Recompete cards/popups showed a "Win odds"/"Win probability" column — that's win-probability
     // scoring, which is permanently killed. Replace with the Set-aside (a real, unscored fact).
     html = html.replace('<div class="st"><div class="k">Win odds</div><div class="v ${o.prob===\'high\'?\'hi\':\'med\'}">${(o.prob||\'—\').replace(/^./,c=>c.toUpperCase())}</div></div>',
