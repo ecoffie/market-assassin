@@ -250,7 +250,7 @@ function mapToDbRecord(opp: SamOpportunity) {
   const coord = resolvePinCoord({
     notice_id: record.notice_id as string, title: record.title as string,
     pop_city: record.pop_city as string, pop_state: record.pop_state as string,
-    pop_zip: record.pop_zip as string,
+    pop_zip: record.pop_zip as string, pop_country: record.pop_country as string,
     office_address: record.office_address as { city?: string; state?: string; zipcode?: string } | null,
   });
   record.map_lat = coord ? coord.lat : null;

@@ -22,7 +22,7 @@ const { getDatabaseUrl } = require('./lib/db-url.js');
 const db = createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 const ACTIVE = process.argv.includes('--active');
 const GO = process.argv.includes('--go');
-const COLS = 'notice_id, title, pop_city, pop_state, pop_zip, office_address';
+const COLS = 'notice_id, title, pop_city, pop_state, pop_zip, pop_country, office_address';
 
 async function main() {
   const pg = GO ? new Client({ connectionString: getDatabaseUrl() }) : null;

@@ -26,7 +26,7 @@ function sb() {
   return createClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY!);
 }
 
-const ROW_COLS = 'notice_id, title, pop_city, pop_state, pop_zip, office_address';
+const ROW_COLS = 'notice_id, title, pop_city, pop_state, pop_zip, pop_country, office_address';
 
 export async function GET(req: NextRequest) {
   if (!authed(req)) return NextResponse.json({ error: 'unauthorized' }, { status: 401 });

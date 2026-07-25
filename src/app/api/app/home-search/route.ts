@@ -13,10 +13,10 @@ import { normalizeStateCode } from '@/lib/utils/us-states';
 
 export const dynamic = 'force-dynamic';
 
-const OPP_COLS = 'notice_id, title, department, naics_code, response_deadline, set_aside_code, set_aside_description, notice_type, ui_link, pop_state, pop_city, office_address';
+const OPP_COLS = 'notice_id, title, department, naics_code, response_deadline, set_aside_code, set_aside_description, notice_type, ui_link, pop_state, pop_city, pop_zip, pop_country, office_address';
 
 function mapOpp(r: Record<string, unknown>) {
-  const g = geocode((r.pop_city as string) || '', normalizeStateCode((r.pop_state as string) || ''), r.office_address as { city?: string; state?: string; zipcode?: string } | null);
+  const g = geocode((r.pop_city as string) || '', normalizeStateCode((r.pop_state as string) || ''), r.office_address as { city?: string; state?: string; zipcode?: string } | null, (r.pop_zip as string) || null, (r.pop_country as string) || null);
   return {
     notice_id: r.notice_id, title: r.title, department: r.department, naics_code: r.naics_code,
     response_deadline: r.response_deadline, set_aside_description: r.set_aside_description,

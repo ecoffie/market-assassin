@@ -8,11 +8,18 @@ import { STATE_CENTROIDS, jitter } from '@/lib/geo/state-centroids';
 import { normalizeStateCode } from '@/lib/utils/us-states';
 import cityCoordsRaw from '@/data/us-city-coords.json';
 import zipCoordsRaw from '@/data/us-zip-coords.json';
+import worldCityRaw from '@/data/world-city-coords.json';
+import countryCentroidRaw from '@/data/country-centroids.json';
+import iso3to2Raw from '@/data/iso3-to-iso2.json';
 
 // Real coords from GeoNames (public domain). ZIP is the cleanest, most-complete key
 // (office zip ~99.5% filled); city covers place-of-performance where we only have a name.
 const CITY_COORDS = cityCoordsRaw as unknown as Record<string, [number, number]>;
 const ZIP_COORDS = zipCoordsRaw as unknown as Record<string, [number, number]>;
+// OCONUS: foreign place-of-performance. City key "NAME|ISO2"; else the country centroid (ISO3).
+const WORLD_CITY = worldCityRaw as unknown as Record<string, [number, number]>;
+const COUNTRY_CENTROID = countryCentroidRaw as unknown as Record<string, [number, number]>;
+const ISO3_TO_ISO2 = iso3to2Raw as unknown as Record<string, string>;
 
 // Tiny deterministic offset (~1km) so multiple opps at the same point don't perfectly stack.
 function cityJitter([lat, lng]: [number, number], seed: number): [number, number] {
@@ -27,7 +34,22 @@ export function geocode(
   popCity: string, popState: string | null,
   office: { city?: string; state?: string; zipcode?: string } | null,
   popZip?: string | null,
+  popCountry?: string | null,
 ): { coord: [number, number] | null; city: string; state: string | null } {
+  // OCONUS: when place-of-performance is a FOREIGN country, resolve to its real location —
+  // never fall through to the US buying office (that put Rome/Jeddah/Vienna in Washington DC).
+  const iso3 = (popCountry || '').toUpperCase().trim();
+  if (iso3 && iso3 !== 'USA' && iso3 !== 'US') {
+    const iso2 = ISO3_TO_ISO2[iso3];
+    if (popCity && iso2) {
+      const wc = WORLD_CITY[`${popCity.toUpperCase().trim()}|${iso2}`];
+      if (wc) return { coord: wc, city: popCity.trim(), state: iso3 };
+    }
+    const cc = COUNTRY_CENTROID[iso3];
+    if (cc) return { coord: cc, city: popCity ? popCity.trim() : '', state: iso3 };
+    // Foreign but unknown country → no pin (honest; do NOT place on US soil).
+    return { coord: null, city: '', state: null };
+  }
   if (popCity && popState) {
     const c = CITY_COORDS[`${popCity.toUpperCase()}|${popState}`];
     if (c) return { coord: c, city: popCity, state: popState };
@@ -65,12 +87,13 @@ function stableSeed(s: string): number {
 export function resolvePinCoord(row: {
   notice_id?: string | null; title?: string | null;
   pop_city?: string | null; pop_state?: string | null; pop_zip?: string | null;
+  pop_country?: string | null;
   office_address?: { city?: string; state?: string; zipcode?: string } | null;
 }): { lat: number; lng: number; state: string; city: string } | null {
   const popState = normalizeStateCode((row.pop_state as string) || '');
   const popCity = ((row.pop_city as string) || '').trim();
   const office = (row.office_address as { city?: string; state?: string; zipcode?: string } | null) || null;
-  const g = geocode(popCity, popState, office, row.pop_zip || null);
+  const g = geocode(popCity, popState, office, row.pop_zip || null, row.pop_country || null);
   const state = g.state;
   if (!state) return null;
   const seed = stableSeed(String(row.notice_id ?? row.title ?? ''));
@@ -136,7 +159,7 @@ export async function getMapOpportunities(limit = 600): Promise<MapOpp[]> {
   const today = new Date().toISOString().slice(0, 10);
   const { data, error } = await sb
     .from('sam_opportunities')
-    .select('notice_id, title, department, naics_code, set_aside_code, set_aside_description, response_deadline, ui_link, solicitation_number, pop_state, pop_city, office_address')
+    .select('notice_id, title, department, naics_code, set_aside_code, set_aside_description, response_deadline, ui_link, solicitation_number, pop_state, pop_city, pop_zip, pop_country, office_address')
     .eq('active', true)
     .gte('response_deadline', today)
     .order('response_deadline', { ascending: true })
@@ -152,7 +175,7 @@ export async function getMapOpportunities(limit = 600): Promise<MapOpp[]> {
     const office = r.office_address as { city?: string; state?: string; zipcode?: string } | null;
     const popState = normalizeStateCode((r.pop_state as string) || '');
     const popCity = ((r.pop_city as string) || '').trim();
-    const g = geocode(popCity, popState, office);
+    const g = geocode(popCity, popState, office, (r.pop_zip as string) || null, (r.pop_country as string) || null);
     const state = g.state;
     if (!state) continue; // no location → no pin (honest; not placed at 0,0)
     let lat: number, lng: number;
