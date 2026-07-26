@@ -1213,8 +1213,8 @@ export async function GET(request: NextRequest) {
       + '<option value="newest">Newest posted</option>'
       + '<option value="setaside">Set-aside opps first</option>'
       + '<option value="deadline-far">Deadline (latest)</option>'
-      + '<option value="value">Contract value (high\\u2192low)</option>'
-      + '<option value="az">Title (A\\u2013Z)</option>');
+      + '<option value="value">Contract value (high to low)</option>'
+      + '<option value="az">Title (A-Z)</option>');
     // Set-aside color legend on the map.
     html = html.replace('<div id="map"></div>', '<div id="map"></div>' + LEGEND_HTML);
     // "More filters" dropdown in the filter bar; drop the redundant standalone "SDVOSB only"
