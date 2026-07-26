@@ -1424,6 +1424,17 @@ const DRAWER_CSS = '<style>'
   + '.rc-to-loc{font:500 12.5px Inter,system-ui,sans-serif;color:var(--sub);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}'
   + '.rc-to-loc.approx{font-style:italic}'
   + '.rc-to-loading{color:var(--faint);font-size:12.5px;padding:10px 0}'
+  // Task-order spend OVER TIME — the payout rhythm. Same plain-CSS-bar approach as the
+  // M-Estimate distribution chart (.vr-chart), but each bar is one task order positioned in
+  // time-order (earliest → latest), height scaled to the max obligation. No chart library.
+  + '.rc-tochart-lab{font:700 11px Inter,system-ui,sans-serif;letter-spacing:.03em;text-transform:uppercase;color:#5b6b7a;margin:2px 0 8px}'
+  + '.rc-tochart{display:flex;align-items:flex-end;gap:3px;height:64px}'
+  + '.rc-tobar{flex:1;background:linear-gradient(180deg,#22a06b,#12805c);border-radius:3px 3px 0 0;min-height:3px;transition:filter .15s}'
+  + '.rc-tobar:hover{filter:brightness(1.12)}'
+  + '.rc-tochart-axis{display:flex;justify-content:space-between;font:500 11px Inter,system-ui,sans-serif;color:var(--faint);margin-top:6px}'
+  // Collapsed remainder of the dated ledger (past the first ~8) + its toggle.
+  + '.rc-to-rest{display:none}.rc-to-rest.open{display:block}'
+  + '.rc-to-more{margin-top:10px;font:700 13px Inter,system-ui,sans-serif;color:#12805c;background:none;border:0;cursor:pointer;padding:0}'
   + '</style>';
 
 const DRAWER_HTML = '<div class="oppbd" id="oppBd"></div>'
@@ -1946,6 +1957,47 @@ const DRAWER_JS = `<script>
       for(var i=0;i<arr.length;i++){ var o=arr[i]; if(o&&(String(o.nid)===key||String(o.sol)===key))return o; } }
     return null;
   }
+  // "Similar recompetes" peer-card flywheel — the Awarded drawer's analog of the open-opp
+  // drawer's similarSec() / the company drawer's companySimilarSec(). Cheap CLIENT-SIDE filter
+  // of the recompete rows already loaded in rows/OPPS: same service line (cat) OR same agency,
+  // self excluded (by nid AND sol), first ~6. No new fetch. rcSimilarRows() is the pure filter,
+  // unit-tested via rc-similar.unit.test.ts.
+  function rcSimilarRows(o,pools,limit){
+    limit=limit||6;
+    var self=String((o&&o.nid)||''), selfSol=String((o&&o.sol)||'');
+    var cat=(o&&o.cat)?String(o.cat).toLowerCase():'', ag=(o&&o.agency)?String(o.agency).toLowerCase():'';
+    var out=[], seen={};
+    for(var p=0;p<(pools||[]).length;p++){ var arr=pools[p]||[];
+      for(var i=0;i<arr.length;i++){ var r=arr[i];
+        if(!r||r.src!=='RECOMPETE')continue;
+        var rid=String(r.nid||''), rsol=String(r.sol||'');
+        if((self&&rid===self)||(selfSol&&rsol===selfSol))continue; // never list itself
+        var key=rid||rsol; if(!key||seen[key])continue;            // dedupe by id
+        var rc=r.cat?String(r.cat).toLowerCase():'', ra=r.agency?String(r.agency).toLowerCase():'';
+        var match=(cat&&rc===cat)||(ag&&ra===ag);                  // same service line OR agency
+        if(!match)continue;
+        seen[key]=1; out.push(r);
+        if(out.length>=limit)return out;
+      }
+    }
+    return out;
+  }
+  function recompeteSimilarSec(o){
+    var pools=[]; try{ if(typeof rows!=='undefined'&&rows&&rows.length)pools.push(rows); }catch(e){}
+    try{ if(typeof OPPS!=='undefined'&&OPPS&&OPPS.length)pools.push(OPPS); }catch(e){}
+    var sims=rcSimilarRows(o,pools,6); if(!sims.length)return '';
+    var cards=sims.map(function(s){
+      var key=String(s.nid||s.sol||'');
+      var setLabel=(!s.set||s.set==='None')?'Open':s.set;
+      return '<button class="sim-card" onclick="openRecompeteDrawer(\\''+esc(key)+'\\')">'
+        + '<span class="sim-sa'+(setLabel==='Open'?' open':'')+'">'+esc(setLabel)+'</span>'
+        + '<div class="sim-t">'+esc(s.title||(s.cat?s.cat+' recompete':'Recompete'))+'</div>'
+        + '<div class="sim-ag">'+esc(s.agency||'')+'</div>'
+        + '<div class="sim-m">'+esc([mMoney(s.value),(s.exp?'expires '+longDate(s.exp):'')].filter(Boolean).join(' \\u00b7 '))+'</div>'
+        + '</button>';
+    }).join('');
+    return sec('Similar recompetes','<div class="sim-grid">'+cards+'</div>','similar');
+  }
   function recompeteRender(o){
     // o = the toRow() recompete shape: {src:'RECOMPETE',title(incumbent),cat(service line),
     // agency,naics,set,value,exp,loc,sol,nid,...}. CUR mirrors the open-opp drawer's CUR so the
@@ -2002,6 +2054,7 @@ const DRAWER_JS = `<script>
       + histSec
       + '<div id="rcIntelBox"><div class="intel-load">Loading market intelligence\\u2026</div></div>'
       + aiSec(CUR)                                // "Should I bid?" — runAI accepts the row id (nid)
+      + recompeteSimilarSec(o)                    // peer flywheel → other recompetes in this line/agency
       + '<div class="oppsoon">This is an expiring contract due for recompete. Value, incumbent and expiry are from USASpending award records; the solicitation may post 6\\u201318 months before it expires.</div>';
   }
   // Agency intel + pricing for the Awarded drawer — mirrors the open-opp drawer's renderIntel(),
@@ -2036,9 +2089,41 @@ const DRAWER_JS = `<script>
         loadRoster(o.agency,'rcIntelBox'); // OTHER agency contacts to network with (BD roster)
       }).catch(function(){ box.innerHTML=''; loadRoster(o.agency,'rcIntelBox'); });
   }
-  // Renders the "Actually obligated: $Y across N task orders (ceiling $X)" summary +
-  // the dated ledger ($ · date · city). Ceiling comes from the row already in hand
+  // Bar-chart-over-time DATA PREP (pure — unit-tested via rc-task-order-chart.unit.test.ts).
+  // Task orders are a TIME SERIES: each is a bar positioned by action_date (x = time,
+  // earliest\\u2192latest), height = obligation $ scaled to the max. Only positive-$, dated rows
+  // become bars (null-$ / undated rows stay in the list below but can't be plotted). Returns
+  // null when there are <3 plottable bars \\u2014 a 1- or 2-bar chart is noise, skip it.
+  function rcChartData(txns){
+    var pts=[];
+    for(var i=0;i<(txns||[]).length;i++){
+      var t=txns[i]; if(!t)continue;
+      var amt=Number(t.obligation);
+      if(!isFinite(amt)||amt<=0)continue;   // skip null / \\u2014 / non-positive obligations
+      var ts=t.actionDate?Date.parse(t.actionDate):NaN;
+      if(!isFinite(ts))continue;            // undated rows can't be placed on a time axis
+      pts.push({ts:ts,amt:amt,date:t.actionDate});
+    }
+    if(pts.length<3)return null;            // <3 bars \\u2192 a chart is silly, skip it
+    pts.sort(function(a,b){return a.ts-b.ts;}); // chronological (earliest \\u2192 latest)
+    var max=0; for(var j=0;j<pts.length;j++){ if(pts[j].amt>max)max=pts[j].amt; }
+    return { points:pts, max:max, first:pts[0].date, last:pts[pts.length-1].date };
+  }
+  function rcTaskOrderChart(txns){
+    var cd=rcChartData(txns); if(!cd)return '';
+    var bars=cd.points.map(function(p){
+      var pct=Math.max(4,Math.round(p.amt/cd.max*100));
+      return '<div class="rc-tobar" style="height:'+pct+'%" title="'+esc(mMoney(p.amt)||'')+' \\u00b7 '+esc(longDate(p.date))+'"></div>';
+    }).join('');
+    return '<div class="rc-tochart-lab">Task-order payouts over time</div>'
+      + '<div class="rc-tochart">'+bars+'</div>'
+      + '<div class="rc-tochart-axis"><span>'+esc(longDate(cd.first))+'</span><span>'+esc(longDate(cd.last))+'</span></div>';
+  }
+  // Renders the summary card + a BAR-CHART-OVER-TIME (the payout rhythm) + the dated ledger
+  // ($ \\u00b7 date \\u00b7 city), capped to the most recent ~9 with the rest behind a "show all"
+  // expander (188 rows is too long inline). Ceiling comes from the row already in hand
   // (o.value, the parent's potential_total_value) — actual comes from the fetch.
+  var RC_TO_VISIBLE=9;
   function taskOrderStreamHTML(o,d){
     var txns=(d&&d.txns)||[];
     if(!d||!d.grounded||!txns.length){
@@ -2049,7 +2134,7 @@ const DRAWER_JS = `<script>
         : 'Task-order detail isn\\u2019t available for this contract right now.';
       return empty(why);
     }
-    var rows=txns.map(function(t){
+    function row(t){
       var amt=mMoney(t.obligation);
       var date=t.actionDate?longDate(t.actionDate):'\\u2014';
       var loc=t.popCity?(t.popCity+', '+(t.popState||'')):(t.popState||'\\u2014');
@@ -2057,14 +2142,27 @@ const DRAWER_JS = `<script>
       return '<div class="rc-to-row"><div class="rc-to-amt">'+esc(amt||'\\u2014')+'</div>'
         + '<div class="rc-to-date">'+esc(date)+'</div>'
         + '<div class="rc-to-loc'+(approx?' approx':'')+'">'+esc(loc)+(approx?' (approx.)':'')+'</div></div>';
-    }).join('');
+    }
+    // List shows the most RECENT orders first; cap to RC_TO_VISIBLE, collapse the rest.
+    var ordered=txns.slice().sort(function(a,b){
+      var ta=a&&a.actionDate?Date.parse(a.actionDate):0, tb=b&&b.actionDate?Date.parse(b.actionDate):0;
+      return (tb||0)-(ta||0);
+    });
+    var head=ordered.slice(0,RC_TO_VISIBLE).map(row).join('');
+    var restRows=ordered.slice(RC_TO_VISIBLE);
+    var restHtml='';
+    if(restRows.length){
+      restHtml='<div class="rc-to-rest" id="rcToRest">'+restRows.map(row).join('')+'</div>'
+        + '<button class="rc-to-more" onclick="var r=document.getElementById(\\'rcToRest\\');var o=r.classList.toggle(\\'open\\');this.textContent=o?\\'\\u25be Show fewer\\':\\'\\u25b8 Show all '+txns.length+' task orders\\';">\\u25b8 Show all '+txns.length+' task orders</button>';
+    }
     var actualLabel=mMoney(d.totalActual)||'\\u2014';
     var ceilLabel=o.value||'\\u2014';
     var summary='<div class="rc-actual">'
       + '<div><div class="rc-actual-v">'+esc(actualLabel)+'</div><div class="rc-actual-k">Actually obligated \\u00b7 '+txns.length+' task order'+(txns.length===1?'':'s')+(d.distinctCities?' \\u00b7 '+d.distinctCities+' location'+(d.distinctCities===1?'':'s'):'')+'</div></div>'
       + '<div class="rc-ceil"><div class="rc-ceil-v">'+esc(ceilLabel)+'</div><div class="rc-ceil-k">Contract ceiling</div></div>'
       + '</div>';
-    return summary+'<div class="rc-to-list">'+rows+'</div>';
+    // Chart leads (below the summary, above the list); rcTaskOrderChart() returns '' for <3 bars.
+    return summary+rcTaskOrderChart(txns)+'<div class="rc-to-list">'+head+restHtml+'</div>';
   }
   function loadTaskOrders(o){
     var box=document.getElementById('rcTaskOrders'); if(!box)return;

@@ -5201,3 +5201,50 @@ needed NO code change — it already prefers a live-geocoded real city over the 
 reports `locPrecision` honestly, so the backfilled rows upgrade automatically. The `--go` bulk write (~134K
 rows, real BigQuery cost) was intentionally NOT run in this pass — DRY-run only, scoped and reported for
 sign-off first.
+
+---
+
+## Awarded/Recompete drawer — task-order spend chart + "Similar recompetes" flywheel (2026-07-26)
+
+**What:** Two additions to the AWARDED/Recompete detail drawer on the Opportunity Map
+(`/opportunity-map` → Awarded/Recompetes mode).
+
+1. **Task-order spend, now as a bar chart over time.** The "Actual task-order spend" section already
+   showed a summary card (actually-obligated $ vs contract ceiling · N task orders · locations) and a
+   dated list of every obligation. The obligations are a TIME SERIES, so the section now LEADS with a
+   compact bar-chart-over-time: each task order is a bar positioned earliest→latest (x = action date),
+   height scaled to the largest obligation, with the date range labeled on the axis. The dated list stays
+   below but is capped to the 9 most-recent orders with the rest ("▸ show all N task orders") behind an
+   expander — a 188-row contract no longer dumps its whole ledger inline. Same plain-CSS-bar approach as
+   the M-Estimate distribution chart (no chart library). Reads the SAME data already fetched for the
+   section (no new request); a contract with fewer than 3 plottable orders skips the chart (a 1–2-bar
+   chart is noise); null-dollar and undated rows are excluded from the chart but stay in the list.
+
+2. **"Similar recompetes" peer cards.** The Open-opportunity drawer has "Similar opportunities" and the
+   Company drawer has "Similar companies" — the AWARDED drawer was missing its equivalent. It now ends
+   with a "Similar recompetes" section of clickable peer cards (incumbent · contract value · expires ·
+   agency); clicking one opens that recompete's own drawer. "Similar" = other recompete contracts in the
+   same service line OR the same agency, drawn from the rows already loaded client-side on the map (no
+   extra fetch), self excluded, up to 6.
+
+Plus a one-word card-tag trim: the Awarded list-card tag "Recompete target" → "Target" (the
+Awarded/Recompetes dataset selection already establishes these are recompetes — dropping the redundant
+word).
+
+**Why:** The task-order stream is the moat made visible — the REAL money an incumbent actually drew down
+against the ceiling, contract by contract. As plain text it read as a ledger; as a chart it reads as a
+payout rhythm at a glance (front-loaded vs steady vs tapering), which is what a challenger needs to judge
+the recompete. "Similar recompetes" is the peer flywheel that keeps a contractor exploring adjacent
+displacement targets without leaving the drawer — the same "keep discovering" pattern Zillow uses with
+"similar homes," applied to expiring federal contracts.
+
+**SEO/positioning:** internal member surface (`/opportunity-map`, Awarded mode) — no public SEO page.
+Positioning: every bar and every peer card is a real USASpending award record, not a synthesized estimate.
+
+**Proof:** `rcChartData` (chart data-prep: dates→bars, skips null-$ and undated rows, returns null below
+3 bars) and `rcSimilarRows` (same-line/agency filter, self-excluded by nid AND sol, recompete-rows-only,
+deduped, capped) are pure functions unit-tested by `rc-task-order-chart.unit.test.ts` (4 cases) and
+`rc-similar.unit.test.ts` (5 cases), extracted and eval'd straight from the shipped `route.ts` so the
+tests track the real source. The summary card + the on-demand `recompete-task-orders` fetch were left
+untouched. `npx tsc --noEmit` clean; full unit suite 65/65 files, 629/629 tests pass; the
+`filter-bar-overflow` guard stays green.
