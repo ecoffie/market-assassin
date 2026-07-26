@@ -112,12 +112,15 @@ const SET_GROUP_OPTS = SET_GROUPS
   .map((g) => `<option value="${g.key}">${g.label}</option>`)
   .join('');
 const SERVER_FILTERS =
-    // Dataset dropdown = the STATE selector (Zillow's "For Sale ▾"). The top nav says the plain
-    // noun (Open · Past Awarded · Contacts); the dropdown says the state (Active · Awarded · Contacts).
+    // Dataset dropdown = the STATE selector (Zillow's "For Sale ▾"). 4 FLAT choices (2026-07-26):
+    // Open · Awarded · Companies · Gov Buyers. The old Companies|Buyers segmented sub-toggle is
+    // gone — it kept landing in awkward spots (filter row → under the count → cut off as "Bu…").
+    // Each is switched the same way as Open/Awarded, no sub-control.
     '<select class="fsel fsel-mode" id="fltDataset" title="What to explore" onchange="onDatasetChange(this.value)">'
   +   '<option value="open">Active</option>'
   +   '<option value="recompete">Awarded</option>'
-  +   '<option value="contractor">Contacts</option>'
+  +   '<option value="companies">Companies</option>'
+  +   '<option value="buyers">Gov Buyers</option>'
   + '</select>'
   + '<select class="fsel" id="fltNotice" title="Notice type">'
   +   '<option value="">Notice type</option>'
@@ -151,16 +154,10 @@ const SERVER_FILTERS =
 // Agency + State moved OFF the top row into the deep panel (Zillow keeps the bar to a
 // few uniform dropdown pills; long-tail text filters live inside "Filters").
 
-// Companies / Buyers segmented control — lives in the RIGHT-PANEL header (next to the result
-// count / sort control), NOT the top filter row. Menu-consistency fix (Eric, 2026-07-26): the
-// top row previously swapped Notice type/Set-aside/NAICS/Filters out for this toggle in Contacts
-// mode, so users had to relearn the menu switching modes. The dataset dropdown + the standard
-// filter controls now stay in the SAME positions across Active/Awarded/Contacts; this toggle
-// gets its own small sub-row under the result count instead, shown ONLY in Contacts mode.
-const CT_SEG_HTML = '<div class="ctseg" id="ctSeg" style="display:none">'
-  +   '<button type="button" class="ctseg-btn on" data-ct="companies">Companies</button>'
-  +   '<button type="button" class="ctseg-btn" data-ct="buyers">Buyers</button>'
-  + '</div>';
+// Companies / Buyers segmented control — REMOVED (2026-07-26). It kept getting shoved into
+// awkward spots (top filter row → under the result count → cut off as "Bu…"). Companies and
+// Gov Buyers are now first-class datasets in the dropdown itself (SERVER_FILTERS above), same
+// as Open/Awarded — no sub-toggle to relearn.
 
 // Full-page CSS overrides (kept out of the verbatim template): (1) sheet-label readability
 // — grid items default to min-width:auto so nowrap labels overflow their cell; let them wrap.
@@ -180,13 +177,6 @@ const PAGE_CSS = '<style>'
   + '.fsel:hover{border-color:#9aa5b3}'
   + '.fsel:focus{border-color:#006aff;box-shadow:0 0 0 3px rgba(0,106,255,.14)}'
   + '.fsel.on{border-color:#006aff;color:#006aff;background-color:#f0f6ff}'
-  // Companies / Buyers segmented control (Contacts mode). Two pills sharing one bordered
-  // track, styled to match the other filter pills; the active half is Zillow-blue-filled.
-  + '.ctseg{display:inline-flex;flex:none;height:40px;border:1px solid #d1d5db;border-radius:8px;overflow:hidden;background:#fff}'
-  + '.ctseg-btn{font:700 14px Inter,system-ui,sans-serif;color:#2a2a33;background:#fff;border:0;padding:0 15px;height:100%;cursor:pointer;transition:background .12s,color .12s}'
-  + '.ctseg-btn+.ctseg-btn{border-left:1px solid #d1d5db}'
-  + '.ctseg-btn:hover{background:#f0f6ff}'
-  + '.ctseg-btn.on{background:#006aff;color:#fff}'
   // "Filters" is a BUTTON not a select — same pill look, no chevron bg, with a slider icon.
   + '.fsel-btn{background-image:none;padding:0 15px;display:inline-flex;align-items:center;gap:7px}'
   + '.fsel-btn .fico{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}'
@@ -401,10 +391,6 @@ const ZLAYOUT_CSS = '<style>'
   // rescount ("N results") sits bold on the left of the sort row.
   + '.sortrow{padding:14px 20px 12px!important;position:relative}'
   + '.sortrow .rescount{font:600 15px Inter,system-ui,sans-serif;color:var(--ink)}'
-  // Result-count + Companies/Buyers toggle stack in one column (keeps .sortrow's existing
-  // 2-child space-between layout intact — see the CT_SEG_HTML injection comment).
-  + '.rescount-wrap{display:flex;flex-direction:column;gap:8px;min-width:0}'
-  + '.rescount-wrap .ctseg{display:none}' // JS flips to inline-flex only in Contacts mode
   // Standard filter controls DISABLED (not removed) when they don't apply to the current
   // dataset — greyed + inert, but present in the SAME slot so the bar never reflows switching
   // Active/Awarded/Contacts (menu-consistency fix, Eric 2026-07-26).
@@ -504,7 +490,9 @@ const ZHEAD_HTML = '<header class="zhead">'
   + '<nav class="zh-left">'
   + '<a class="zh-mode on" data-mode="open" onclick="setMapMode(\'open\')">Open</a>'
   + '<a class="zh-mode" data-mode="recompete" onclick="setMapMode(\'recompete\')">Past</a>'
-  + '<a class="zh-mode" data-mode="contractor" onclick="setMapMode(\'contractor\')">Contacts</a>'
+  // "Contacts" nav link groups into the Companies dataset (the default of the two Contacts
+  // datasets); Gov Buyers is reachable via the dropdown pill, same as every other dataset.
+  + '<a class="zh-mode" data-mode="companies" onclick="setMapMode(\'companies\')">Contacts</a>'
   + '<a href="/bid">Bid with confidence</a>'
   + '</nav>'
   + '<a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>'
@@ -538,15 +526,17 @@ const VIEWPORT_JS = `<script>
   var SET_CHIP_COLOR={SDVOSB:'#22a06b',SB:'#3b82f6','8A':'#8b5cf6',WOSB:'#ef4444',HZ:'#f59e0b'};
   var SET_CHIP_LABEL={SDVOSB:'SDVOSB',SB:'Small Biz','8A':'8(a)',WOSB:'WOSB',HZ:'HUBZone'};
   // Zillow-style dataset modes (For Sale / Rent / Sold). Each = a distinct corpus + endpoint.
+  // Companies + Gov Buyers (2026-07-26): 4 FLAT datasets — no more Companies|Buyers sub-toggle.
+  // Both still hit /api/app/contacts-map (?type=companies|buyers), just selected via the
+  // dataset dropdown/nav directly instead of a nested control.
   var MODES={
     open:{ ep:'/api/app/opportunity-map', title:'Open Opportunities', unit:'active opportunities' },
     recompete:{ ep:'/api/app/recompete-map', title:'Recompetes', unit:'expiring contracts' },
-    contractor:{ ep:'/api/app/contacts-map', title:'Contacts', unit:'contacts' }
+    companies:{ ep:'/api/app/contacts-map', ctype:'companies', title:'Companies', unit:'companies' },
+    buyers:{ ep:'/api/app/contacts-map', ctype:'buyers', title:'Gov Buyers', unit:'buyers' }
   };
   var MODE='open'; window.__mapMode='open';
-  // Contacts sub-dataset (companies = contractors, buyers = gov POCs). Toggled by the
-  // Companies/Buyers segmented control that appears only in Contacts mode.
-  var CONTACT_TYPE='companies';
+  function isContactMode(m){ return m==='companies'||m==='buyers'; }
   var CONTACT_COLOR='#7c3aed'; // purple — distinct from the set-aside pin colors
   var HIDE_FSC=false, TOTAL=0, CAPPED=false, INVIEW=0, busy=false, t=null, t2=null, Q='';
   // Server-wired filter state (the reorg). Every control writes here, then fetchView()
@@ -559,16 +549,18 @@ const VIEWPORT_JS = `<script>
     if(zt&&zf){ zt.appendChild(zf); setTimeout(function(){try{map.invalidateSize();}catch(e){}},80); } }catch(e){}
   function clean(d){ return (d||'').replace(/,?\\s*DEPARTMENT OF( THE)?/i,'').replace(/DEPARTMENT OF( THE)?\\s*/i,'').trim().replace(/\\b([A-Z])([A-Z0-9'&.\\/-]*)/g,function(_,a,b){return a+b.toLowerCase();})||d; }
   function toRow(p){
-    if(MODE==='contractor'){
+    if(isContactMode(MODE)){
       // Contacts pins. companies = a contractor firm; buyers = a gov POC. Both keyed by id
       // (used as the marker key + card data-sol). loc = "City, ST" (or just state).
+      // locPrecision ('city'|'state') comes straight from the shared geocoder — 'state' means
+      // this pin is an honest state-centroid approximation, not a confirmed city hit.
       var loc = p.city ? (p.city+', '+p.state) : (p.state||'');
-      if(CONTACT_TYPE==='buyers'){
-        return {src:'CONTACT',ctype:'buyers',title:p.name,agency:clean(p.agency||''),role:p.title||'',office:clean(p.office||''),loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng};
+      if(MODE==='buyers'){
+        return {src:'CONTACT',ctype:'buyers',title:p.name,agency:clean(p.agency||''),role:p.title||'',office:clean(p.office||''),loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,locPrecision:p.locPrecision||'city'};
       }
-      return {src:'CONTACT',ctype:'companies',title:p.name,agency:'',meta:p.meta||'',loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,setAsides:p.setAsides||[]};
+      return {src:'CONTACT',ctype:'companies',title:p.name,agency:'',meta:p.meta||'',loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,setAsides:p.setAsides||[],locPrecision:p.locPrecision||'city'};
     }
-    if(MODE==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,agency:clean(p.agency),naics:p.naics,set:SETMAP[p.set]||'None',value:p.value,exp:(p.exp||'').slice(0,10),loc:p.loc,sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng};
+    if(MODE==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,agency:clean(p.agency),naics:p.naics,set:SETMAP[p.set]||'None',value:p.value,exp:(p.exp||'').slice(0,10),loc:p.loc,sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng,locSrc:p.locPrecision==='city'?'pop':'office'};
     return {src:'SAM',naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10)};
   }
   function bbox(){
@@ -585,7 +577,8 @@ const VIEWPORT_JS = `<script>
   function updateSourceBadge(){
     var b=document.getElementById('sourceBadge'); if(!b)return;
     if(MODE==='recompete'){ b.textContent='USASpending · Award history'; return; }
-    if(MODE==='contractor'){ b.textContent=(CONTACT_TYPE==='companies')?'BigQuery · Award history':'Live · SAM.gov'; return; }
+    if(MODE==='companies'){ b.textContent='BigQuery · Award history'; return; }
+    if(MODE==='buyers'){ b.textContent='Live · SAM.gov'; return; }
     b.textContent='Live · SAM.gov';
   }
   function updateHeader(){
@@ -655,21 +648,26 @@ const VIEWPORT_JS = `<script>
     }).join('');
   }
   function contactPopup(o){
+    // Honest precision cue (mirrors the Open-opps "buying office" hollow-marker convention):
+    // locPrecision==='state' means this pin is a state-centroid APPROXIMATION (the real city
+    // wasn't in the geocoder's table) — never presented as a confirmed city hit.
+    var approx = o.locPrecision==='state' ? ' <span style="color:#94a3b8;font-weight:400;font-size:11px">(approx. location)</span>' : '';
     var sub = o.ctype==='buyers'
-      ? '<div class="pvmeta"><b>'+esc0(o.agency)+'</b>'+(o.loc?' \\u00b7 '+esc0(o.loc):'')+'</div>'
+      ? '<div class="pvmeta"><b>'+esc0(o.agency)+'</b>'+(o.loc?' \\u00b7 '+esc0(o.loc):'')+approx+'</div>'
         + (o.role?'<div class="pvmeta">'+esc0(o.role)+'</div>':'')
         + (o.office?'<div class="pvmeta" style="color:var(--sub)">'+esc0(o.office)+'</div>':'')
-      : '<div class="pvmeta">'+(o.loc?esc0(o.loc):'')+'</div>'
+      : '<div class="pvmeta">'+(o.loc?esc0(o.loc):'')+approx+'</div>'
         + (o.meta?'<div class="pvmeta" style="color:var(--sub)">'+esc0(o.meta)+'</div>':'');
     return '<div class="pv"><div class="pvstrip" style="background:'+CONTACT_COLOR+'"></div><div class="pvbody">'
       + '<div class="pvchips"><span class="chip" style="background:'+CONTACT_COLOR+';color:#fff">'+(o.ctype==='buyers'?'Government buyer':'Contractor')+'</span>'+(o.ctype==='companies'?setAsideChips(o.setAsides):'')+'</div>'
       + '<div class="pvt">'+esc0(o.title)+'</div>'+sub+'</div></div>';
   }
   function contactCard(o){
+    var approx = o.locPrecision==='state' ? ' <span style="color:#94a3b8;font-weight:400;font-size:11px">(approx.)</span>' : '';
     var line2 = o.ctype==='buyers'
-      ? '<div class="cmeta"><span class="ag">'+esc0(o.agency||'Government')+'</span>'+(o.loc?'<span class="dot"></span><span class="loc">'+esc0(o.loc)+'</span>':'')+'</div>'
+      ? '<div class="cmeta"><span class="ag">'+esc0(o.agency||'Government')+'</span>'+(o.loc?'<span class="dot"></span><span class="loc">'+esc0(o.loc)+'</span>':'')+approx+'</div>'
         + (o.role?'<div class="cmeta" style="margin-top:2px"><span class="loc">'+esc0(o.role)+'</span></div>':'')
-      : '<div class="cmeta">'+(o.loc?'<span class="loc">'+esc0(o.loc)+'</span>':'')+(o.meta?'<span class="dot"></span><span class="loc">'+esc0(o.meta)+'</span>':'')+'</div>';
+      : '<div class="cmeta">'+(o.loc?'<span class="loc">'+esc0(o.loc)+'</span>':'')+(o.meta?'<span class="dot"></span><span class="loc">'+esc0(o.meta)+'</span>':'')+approx+'</div>';
     return '<div class="cstrip" style="background:'+CONTACT_COLOR+'"></div><div class="cbody">'
       + '<div class="crow1"><span class="chip" style="background:'+CONTACT_COLOR+';color:#fff">'+(o.ctype==='buyers'?'Buyer':'Company')+'</span>'+(o.ctype==='companies'?setAsideChips(o.setAsides):'')+'</div>'
       + '<div class="ctitle">'+esc0(o.title)+'</div>'+line2+'</div>';
@@ -678,7 +676,10 @@ const VIEWPORT_JS = `<script>
     rows=OPPS.slice();
     layer.clearLayers(); markers.clear();
     rows.forEach(function(o){
-      var m=L.circleMarker([o.lat,o.lng],{radius:6,color:'#ffffff',weight:2,fillColor:CONTACT_COLOR,fillOpacity:.95})
+      // Hollow marker for a state-centroid approximation (same visual language as the Open-opps
+      // "buying office" fallback) — a real city hit stays solid-filled.
+      var isApprox = o.locPrecision==='state';
+      var m=L.circleMarker([o.lat,o.lng],{radius:6,color:isApprox?CONTACT_COLOR:'#ffffff',weight:isApprox?2.5:2,fillColor:isApprox?'#ffffff':CONTACT_COLOR,fillOpacity:isApprox?0.9:.95})
         .bindPopup(contactPopup(o),{maxWidth:300,closeButton:true,autoClose:false,closeOnClick:false});
       m.on('click',function(){ select(o.sol,false); });
       m.on('mouseover',function(){ m.setStyle({radius:9.5,weight:3}); });
@@ -686,12 +687,12 @@ const VIEWPORT_JS = `<script>
       m.addTo(layer); markers.set(o.sol,m);
     });
     var feed=document.getElementById('feed'); if(feed){
-      if(!rows.length){ feed.innerHTML='<div class="empty"><h4>No contacts in view</h4><p>Pan or zoom to a region, or switch between Companies and Buyers.</p></div>'; }
+      if(!rows.length){ feed.innerHTML='<div class="empty"><h4>No contacts in view</h4><p>Pan or zoom to a region, or switch to the Companies or Gov Buyers dataset.</p></div>'; }
       else { feed.innerHTML=''; rows.forEach(function(o){ var c=document.createElement('article'); c.className='card'; c.dataset.sol=o.sol; c.tabIndex=0; c.innerHTML=contactCard(o); c.onclick=function(){ select(o.sol,true); }; feed.appendChild(c); }); }
     }
   }
   var _render=render; render=function(){
-    if(MODE==='contractor'){ renderContacts(); updateHeader(); maybeAutoFit(); return; }
+    if(isContactMode(MODE)){ renderContacts(); updateHeader(); maybeAutoFit(); return; }
     _render(); updateHeader(); maybeAutoFit();
     try{ if(typeof selected!=='undefined' && selected){ var mm=markers.get(selected); if(mm && !mm.isPopupOpen()) mm.openPopup(); } }catch(e){}
   };
@@ -701,16 +702,16 @@ const VIEWPORT_JS = `<script>
   try{ map.on('click', function(){ try{ selected=null; map.closePopup(); document.querySelectorAll('.card.sel').forEach(function(c){c.classList.remove('sel');}); }catch(e){} }); }catch(e){}
   function fetchView(){
     if(busy)return;
-    // ── Contacts mode: companies (contractors) or buyers (gov POCs), by location. ──
-    if(MODE==='contractor'){
+    // ── Companies / Gov Buyers: 2 flat datasets, by location, both hitting contacts-map. ──
+    if(isContactMode(MODE)){
       busy=true;
       var em=_uemail(); var tk=''; try{ tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
       // Set-aside applies to Companies (real per-firm eligibility) — NOT to Buyers (a gov POC has
       // no set-aside). Sort likewise: companies sort by $ won / awards / A-Z, never "deadline"
       // (meaningless for a firm) — F.sort's opp-only values fall back server-side.
-      var _ctSa=(CONTACT_TYPE==='companies')?_merge(FILT.setAside, FILT.setAsideMulti):'';
-      var _ctSort=(CONTACT_TYPE==='companies'&&window.__companySort)?window.__companySort:'';
-      var curl='/api/app/contacts-map?bbox='+bbox()+'&type='+CONTACT_TYPE
+      var _ctSa=(MODE==='companies')?_merge(FILT.setAside, FILT.setAsideMulti):'';
+      var _ctSort=(MODE==='companies'&&window.__companySort)?window.__companySort:'';
+      var curl='/api/app/contacts-map?bbox='+bbox()+'&type='+MODES[MODE].ctype
         +(FILT.state?'&state='+encodeURIComponent(FILT.state):'')
         +(Q?'&search='+encodeURIComponent(Q):'')
         +(_ctSa?'&setAside='+encodeURIComponent(_ctSa):'')
@@ -774,7 +775,7 @@ const VIEWPORT_JS = `<script>
   // it's the one control that stays FULLY ACTIVE in Contacts mode — everything else that has no
   // meaning for companies/buyers (Notice type, NAICS, the deep Filters panel) is disabled in
   // place rather than hidden.
-  function disabledIdsFor(mode){ return mode==='contractor' ? ['fltNotice','naicsBtn','moreBtn'] : []; }
+  function disabledIdsFor(mode){ return isContactMode(mode) ? ['fltNotice','naicsBtn','moreBtn'] : []; }
   function applyModeDisabled(mode){
     var disabled=disabledIdsFor(mode);
     ['fltNotice','naicsBtn','moreBtn'].forEach(function(id){
@@ -794,12 +795,9 @@ const VIEWPORT_JS = `<script>
     // to the current dataset are disabled IN PLACE (see applyModeDisabled) so switching modes
     // never makes users relearn where things are.
     applyModeDisabled(mode);
-    // Companies/Buyers toggle: its own small sub-row under the result count (right panel), shown
-    // ONLY in Contacts mode — this does NOT touch the shared top filter row.
-    var ctSeg=document.getElementById('ctSeg'); if(ctSeg)ctSeg.style.display=(mode==='contractor')?'inline-flex':'none';
     // Sort menu: Companies get their own option set ($ won / awards / name / set-aside-first) —
     // "Deadline (soonest)" is meaningless for a firm. Buyers/Open/Awarded keep the opp menu.
-    if(typeof window.__setSortScope==='function')window.__setSortScope((mode==='contractor'&&CONTACT_TYPE==='companies')?'company':'opp');
+    if(typeof window.__setSortScope==='function')window.__setSortScope(mode==='companies'?'company':'opp');
     syncValueVis();
     Q=''; var zsi=document.getElementById('zsearchInput'); if(zsi)zsi.value='';
     _didAutoFit=false; // re-frame the view to the new dataset's footprint on its next render
@@ -818,19 +816,9 @@ const VIEWPORT_JS = `<script>
   function bindInp(id,key,norm){ var el=document.getElementById(id); if(!el)return; el.oninput=function(){ clearTimeout(el._t); el._t=setTimeout(function(){ var v=el.value.trim(); if(norm)v=norm(v); FILT[key]=v; markActive(el,v); fetchView(); },400); }; }
   function markActive(el,v){ el.classList.toggle('on',!!v && v!=='all'); }
   bindSel('fltNotice','noticeType');
-  // Companies / Buyers segmented control (Contacts mode) — switch CONTACT_TYPE + refetch.
-  (function(){
-    var seg=document.getElementById('ctSeg'); if(!seg)return;
-    Array.prototype.forEach.call(seg.querySelectorAll('.ctseg-btn'),function(b){
-      b.onclick=function(){ var ct=b.getAttribute('data-ct'); if(ct===CONTACT_TYPE)return; CONTACT_TYPE=ct;
-        Array.prototype.forEach.call(seg.querySelectorAll('.ctseg-btn'),function(x){ x.classList.toggle('on',x===b); });
-        // Companies get the $/awards/name/set-aside sort menu; Buyers has no sensible analog for
-        // any of those, so fall back to the opportunity sort menu (harmless — Buyers cards don't
-        // read F.sort anyway; this just keeps the button label sane if the user peeks at it).
-        if(typeof window.__setSortScope==='function')window.__setSortScope(ct==='companies'?'company':'opp');
-        if(MODE==='contractor')fetchView(); };
-    });
-  })();
+  // Companies / Buyers segmented control — REMOVED (2026-07-26): Companies and Gov Buyers are
+  // now switched via the dataset dropdown/nav directly (setMapMode), same as every other
+  // dataset — no nested sub-toggle to bind.
   // Set-aside MULTI-select dropdown (replaces the old single-select pill + the deadline pill).
   (function(){
     var btn=document.getElementById('saselBtn'), pan=document.getElementById('saselPanel'), lbl=document.getElementById('saselLabel');
@@ -1830,9 +1818,9 @@ const SORT_EXTRA_JS = `<script>(function(){
   }
   var sel=document.getElementById('sort'); if(sel)sel.addEventListener('change',function(){
     try{
-      // Companies (Contacts mode) sort is computed SERVER-SIDE (companiesPins ranks by $/awards/
-      // name/set-aside) — a 'co-' prefixed value means re-fetch, not a client re-sort.
-      if(String(sel.value).indexOf('co-')===0 && typeof window.__mapMode!=='undefined' && window.__mapMode==='contractor'){
+      // Companies sort is computed SERVER-SIDE (companiesPins ranks by $/awards/name/set-aside)
+      // — a 'co-' prefixed value means re-fetch, not a client re-sort. (Buyers has no analog.)
+      if(String(sel.value).indexOf('co-')===0 && typeof window.__mapMode!=='undefined' && window.__mapMode==='companies'){
         window.__companySort=sel.value.slice(3);
         if(typeof window.__mapRefetch==='function')window.__mapRefetch();
         return;
@@ -2099,11 +2087,14 @@ export async function GET(request: NextRequest) {
       "color:o.locSrc==='office'?col:'#ffffff',weight:o.locSrc==='office'?2.5:2,");
     html = repl(html, "fillColor:col,fillOpacity:o.src==='RECOMPETE'?.72:.95",
       "fillColor:o.locSrc==='office'?'#ffffff':col,fillOpacity:o.locSrc==='office'?0.9:(o.src==='RECOMPETE'?.72:.95)");
-    // Honesty label in the popup + list card.
+    // Honesty label in the popup + list card. Recompete pins with locSrc==='office' are a
+    // state-centroid APPROXIMATION (city not recovered from USASpending — see recompete-map's
+    // doc comment), a different situation from Open opps falling back to the buying office —
+    // so the wording branches on src to stay accurate for each dataset.
     html = repl(html, '<div class="pvmeta"><b>${agency}</b> · ${o.loc}</div>',
-      '<div class="pvmeta"><b>${agency}</b> · ${o.loc}${o.locSrc===\'office\'?\' <span style=\"color:#94a3b8\">· buying office (place of performance not specified)</span>\':\'\'}</div>');
+      '<div class="pvmeta"><b>${agency}</b> · ${o.loc}${o.locSrc===\'office\'?\' <span style=\"color:#94a3b8\">· \'+(o.src===\'RECOMPETE\'?\'approx. location\':\'buying office (place of performance not specified)\')+\'</span>\':\'\'}</div>');
     html = repl(html, '<span class="loc">${o.loc}</span>',
-      '<span class="loc">${o.loc}${o.locSrc===\'office\'?\' · office\':\'\'}</span>');
+      '<span class="loc">${o.loc}${o.locSrc===\'office\'?(o.src===\'RECOMPETE\'?\' · approx.\':\' · office\'):\'\'}</span>');
     // Replace the native <select> with a CUSTOM Zillow-style sort menu: a blue "Sort: <label> ▾"
     // trigger that opens a clean white rounded panel of option rows (checkmark on the active one).
     // A HIDDEN <select id="sort"> is kept so SORT_EXTRA_JS's existing change→render wiring is
@@ -2128,15 +2119,6 @@ export async function GET(request: NextRequest) {
       + '        <button class="fbtn" id="f-soon">Closing ≤7 days</button>',
       SERVER_FILTERS,
     );
-    // Companies / Buyers toggle lives in the right-panel header, under the result count — NOT
-    // the top filter row (menu-consistency fix, see CT_SEG_HTML comment). Wrapped together with
-    // rescount in one flex column so .sortrow's existing 2-child space-between layout (left
-    // group vs. the sort control) is unaffected — the toggle stacks under the count instead of
-    // becoming a 3rd flex item that would reflow the sort control.
-    html = repl(html, '<div class="rescount" id="rescount"></div>',
-      '<div class="rescount-wrap">' +
-      '<div class="rescount" id="rescount"></div>' + CT_SEG_HTML +
-      '</div>');
     // The deleted pills leave orphaned template JS that null-derefs now that the
     // buttons are gone. Null-guard each throw-prone getElementById so the page's own
     // scripts don't crash before VIEWPORT_JS runs. (The .fbtn[data-sheet] loop,

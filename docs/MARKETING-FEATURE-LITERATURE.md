@@ -4773,3 +4773,63 @@ in `src/app/opportunity-map/route.ts` `updateHeader()`, reading the API's real `
 the capped loaded length. `npx tsc --noEmit` clean; 536/536 unit tests pass (incl. the
 `filter-bar-overflow` invariant). Phase 0 fixes everything except the densest national views,
 which remain limited to the loaded set until Phase 2 (server-side geo-grid clustering).
+
+---
+
+## Opportunity Map — real city-level geocoding board-wide + Companies/Gov Buyers as flat datasets (2026-07-26)
+
+**What:** Two fixes to the Federal Opportunity Map (`/opportunity-map`). (1) The dataset picker
+is now **4 flat choices — Open · Awarded · Companies · Gov Buyers** — replacing the old
+Companies|Buyers sub-toggle that kept landing in awkward spots (top filter row → under the
+result count → cut off as "Bu…"). Each is switched the same way, in the same menu position,
+same as clicking Open or Awarded — nothing to relearn. (2) Every map surface now places pins by
+their REAL CITY, not a decorative ring around a state's geographic center. A new shared
+`geocodeCity()` (`src/lib/geo/city-geocode.ts`) resolves a city+state to its exact coordinate
+from a bundled ~29.5K-city US table (GeoNames, public domain — the same table the Open
+Opportunities map already used internally, now the ONE canonical lookup every surface shares)
+and falls back to the honest state centroid only when the city isn't in the table — a fallback
+that's now labeled, never presented as an exact hit. Companies (award-winning federal
+contractors) and Government Buyers (contracting officers/POCs) both route through it; a
+Louisville, KY firm now sits on real Louisville (38.19, -85.68), not Kentucky's center
+(37.5, -85.3).
+
+**Why:** The cards on the Companies/Buyers panel already showed the real city — "Louisville KY,"
+"Pascagoula MS," "Marietta GA" — but the PIN wasn't placed there; every firm in a state was
+jittered around that state's single centroid, so a whole state's worth of companies scattered
+into a fake ring with no relationship to where they actually are. That's the opposite of what
+Zillow, Redfin, or any real map product does — the map is supposed to be the proof the location
+data is real, not a decorative approximation. Once pins land on real cities, the marker
+clustering that just shipped (Phase 0) becomes meaningful too: clusters now group firms by
+actual geographic proximity, not by which state-ring jitter seed they happened to land near.
+
+**Honesty, not overclaim:** the same shared geocoder was also wired into
+`/api/app/recompete-map` (Awarded/expiring contracts) — but a direct measurement found
+`place_of_performance_city` is empty on **all 143,527** `recompete_opportunities` rows today
+(not "many," literally zero), so every recompete pin still resolves to precision:`'state'` until
+a separate USASpending re-fetch recovers the missing city column. The route and the map UI both
+carry that fact explicitly: pins missing a real city render **hollow** (white fill, colored
+ring) with an "(approx.)" label in the popup and card — the exact same honest visual language
+the Open-opps map already used for "buying office, place of performance not specified" pins, now
+extended everywhere a fallback fires, so a state-centroid guess is never mistaken for a
+confirmed address. A resumable `scripts/backfill-recompete-map-latlng.ts` is ready (DRY-run
+verified, 0 recoverable rows today) to re-geocode the moment city recovery lands.
+
+**SEO/positioning:** "Every company and buyer on Mindy's map sits on its real city" — Companies
+and Government Buyers are first-class datasets on the Federal Opportunity Map, geocoded to their
+actual city from a 29.5K-city US table, not a state-wide approximation.
+
+**Proof:** `src/lib/geo/city-geocode.ts` (`geocodeCity()`, 9 passing unit tests in
+`city-geocode.unit.test.ts` — real-city hit, state fallback, precision flag, case-insensitivity,
+jitter-on-collision). Live proof: BigQuery `recipients_rollup_merged` firm **Humana Government
+Business Inc** (Louisville, KY) → `geocodeCity('LOUISVILLE','KY')` → `{lat: 38.189, lng:
+-85.6768, precision: 'city'}` — real Louisville, not the Kentucky state centroid (37.5, -85.3).
+`recompete_opportunities` measurement: 143,527 total rows, 0 with `place_of_performance_city`,
+125,692 with a stored (state-level) `map_lat`. `sam_opportunities` measurement: 30,131 active
+rows, 28,381 (94%) already carry a pin, 10,587 (35%) from a real place-of-performance city
+(already city-accurate — e.g. Richmond VA → 37.4483/-77.4238, Minneapolis MN → 45.0743/-93.2761
+— both genuine city coordinates from the pre-existing `map-data.ts` geocoder, now reading its
+city table from the same shared `city-geocode.ts` module). `npx tsc --noEmit` clean; 556/556
+unit tests pass. Dataset dropdown, contact card/popup honesty labels, and marker fill verified
+on a live local render (`/opportunity-map` HTTP 200, all 11 inline `<script>` blocks parse as
+valid JS post-injection, dropdown shows Open/Awarded/Companies/Gov Buyers with zero `ctseg`
+references remaining in the served HTML).

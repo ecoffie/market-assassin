@@ -5,8 +5,12 @@
  */
 import { getReadClient } from '@/lib/supabase/server-clients';
 import { STATE_CENTROIDS, jitter } from '@/lib/geo/state-centroids';
+// CITY_COORDS is the shared board-wide table (also backs contacts-map + recompete-map via
+// `geocodeCity()`) — imported from the ONE shared lib so every map surface reads the same
+// ~29.5K-city GeoNames data, not a duplicate copy. This module keeps its OWN richer precedence
+// chain (ZIP → OCONUS → office fallback) that the simpler shared `geocodeCity()` doesn't need.
+import { CITY_COORDS } from '@/lib/geo/city-geocode';
 import { normalizeStateCode } from '@/lib/utils/us-states';
-import cityCoordsRaw from '@/data/us-city-coords.json';
 import zipCoordsRaw from '@/data/us-zip-coords.json';
 import worldCityRaw from '@/data/world-city-coords.json';
 import countryCentroidRaw from '@/data/country-centroids.json';
@@ -14,7 +18,6 @@ import iso3to2Raw from '@/data/iso3-to-iso2.json';
 
 // Real coords from GeoNames (public domain). ZIP is the cleanest, most-complete key
 // (office zip ~99.5% filled); city covers place-of-performance where we only have a name.
-const CITY_COORDS = cityCoordsRaw as unknown as Record<string, [number, number]>;
 const ZIP_COORDS = zipCoordsRaw as unknown as Record<string, [number, number]>;
 // OCONUS: foreign place-of-performance. City key "NAME|ISO2"; else the country centroid (ISO3).
 const WORLD_CITY = worldCityRaw as unknown as Record<string, [number, number]>;
