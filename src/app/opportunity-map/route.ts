@@ -631,7 +631,7 @@ const VIEWPORT_JS = `<script>
       // won = $ obligated (real per-firm total_obligated) → the value tag. Buyers get no $ (dot).
       return {src:'CONTACT',ctype:'companies',title:p.name,agency:'',meta:p.meta||'',won:p.totalObligated||0,loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,setAsides:p.setAsides||[],locPrecision:p.locPrecision||'city'};
     }
-    if(MODE==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,agency:clean(p.agency),naics:p.naics,set:SETMAP[p.set]||'None',value:p.value,exp:(p.exp||'').slice(0,10),loc:p.loc,sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng,locSrc:p.locPrecision==='city'?'pop':'office'};
+    if(MODE==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,agency:clean(p.agency),naics:p.naics,set:SETMAP[p.set]||'None',value:p.value,exp:(p.exp||'').slice(0,10),loc:p.loc,sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng,locSrc:p.locPrecision==='city'?'pop':'office',uei:p.uei||null};
     // est = M-Estimate median (intel_value_range.median) → the value tag; null → a neutral dot.
     return {src:'SAM',naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10),est:p.est||0};
   }
@@ -1294,6 +1294,24 @@ const DRAWER_CSS = '<style>'
   + '.rc-inc-ic svg{width:22px;height:22px;stroke:#b45309;fill:none;stroke-width:2}'
   + '.rc-inc-k{font:700 10.5px Inter,system-ui,sans-serif;letter-spacing:.05em;text-transform:uppercase;color:#b45309}'
   + '.rc-inc-v{font:700 17px Inter,system-ui,sans-serif;color:var(--ink);margin-top:2px;line-height:1.25}'
+  // ── Task-order spend stream (the real money, not the ceiling). "Actually obligated"
+  // summary line + a dated ledger of task orders (each: $ · date · city). Fetched
+  // on-demand when the drawer opens (GET /api/app/recompete-task-orders).
+  + '.rc-actual{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;'
+  + 'border:1px solid #d1e9dd;border-radius:12px;background:#f0fdf7;padding:13px 16px;margin-bottom:14px}'
+  + '.rc-actual-v{font:700 19px Inter,system-ui,sans-serif;color:#0f7a4f}'
+  + '.rc-actual-k{font:600 12px Inter,system-ui,sans-serif;color:#12805c;margin-top:1px}'
+  + '.rc-ceil{text-align:right}'
+  + '.rc-ceil-v{font:700 15px Inter,system-ui,sans-serif;color:var(--sub)}'
+  + '.rc-ceil-k{font:600 10.5px Inter,system-ui,sans-serif;letter-spacing:.03em;text-transform:uppercase;color:var(--faint)}'
+  + '.rc-to-list{display:flex;flex-direction:column}'
+  + '.rc-to-row{display:flex;align-items:center;justify-content:space-between;gap:10px;padding:10px 0;border-bottom:1px solid var(--hair)}'
+  + '.rc-to-row:last-child{border-bottom:0}'
+  + '.rc-to-amt{font:700 14px Inter,system-ui,sans-serif;color:var(--ink);flex:none;min-width:64px}'
+  + '.rc-to-date{font:500 12.5px Inter,system-ui,sans-serif;color:var(--sub);flex:none}'
+  + '.rc-to-loc{font:500 12.5px Inter,system-ui,sans-serif;color:var(--sub);text-align:right;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;flex:1;min-width:0}'
+  + '.rc-to-loc.approx{font-style:italic}'
+  + '.rc-to-loading{color:var(--faint);font-size:12.5px;padding:10px 0}'
   + '</style>';
 
 const DRAWER_HTML = '<div class="oppbd" id="oppBd"></div>'
@@ -1316,7 +1334,29 @@ const DRAWER_JS = `<script>
 (function(){
   var bd=document.getElementById('oppBd'), dr=document.getElementById('oppDrawer'), body=document.getElementById('oppBody');
   var CUR=null;
-  function close(){ dr.classList.remove('show'); bd.classList.remove('show'); }
+  // Task-order pins: an ON-DEMAND enhancement layer, separate from the main viewport
+  // pin (which stays contract-level — see toRow()/RECOMPETE — so MAX_PINS/viewport-bbox
+  // is untouched). Drawn only for the ONE contract whose drawer is open; cleared on
+  // close so it never leaks into the general map view. Reuses mkPin (hoisted from
+  // PIN_JS) so a task-order pin looks like every other value-tag pin on the board.
+  function taskOrderLayer(){ try{ if(!window.__rcToLayer)window.__rcToLayer=L.layerGroup().addTo(map); return window.__rcToLayer; }catch(e){ return null; } }
+  function clearTaskOrderPins(){ var l=taskOrderLayer(); if(l)l.clearLayers(); }
+  function drawTaskOrderPins(txns){
+    var l=taskOrderLayer(); if(!l)return;
+    l.clearLayers();
+    (txns||[]).forEach(function(t){
+      if(t.lat==null||t.lng==null)return;
+      var amt=(typeof mMoney==='function')?mMoney(t.obligation):'';
+      var approx=t.locPrecision==='state';
+      if(typeof mkPin!=='function')return;
+      var m=mkPin({lat:t.lat,lng:t.lng},'#b45309',amt,approx);
+      var when=t.actionDate?longDate(t.actionDate):'';
+      var where=t.popCity?(t.popCity+', '+(t.popState||'')):(t.popState||'');
+      m.bindPopup('<div style="font:600 13px Inter,system-ui,sans-serif;padding:4px 2px">'+esc(amt||'')+'<br><span style="font-weight:400;color:#6b7787">'+esc(when)+(where?' \\u00b7 '+esc(where):'')+'</span></div>',{maxWidth:220,closeButton:true});
+      m.addTo(l);
+    });
+  }
+  function close(){ dr.classList.remove('show'); bd.classList.remove('show'); clearTaskOrderPins(); }
   if(bd)bd.onclick=close;
   document.addEventListener('keydown',function(e){ if(e.key==='Escape')close(); });
   // Action bar: Back (close) · Save (→pursuits) · Share (copy link) · Hide (dismiss + hide card) · More.
@@ -1791,17 +1831,68 @@ const DRAWER_JS = `<script>
       + (o.exp?'<span class="badge-dl cool">Expires '+longDate(o.exp)+'</span>':'')+'</div>'
       + '<div class="snapt">'+esc(o.cat?o.cat+' \\u2014 recompete':'Recompete target')+'</div>'
       + '<div class="snapmeta">'+(o.agency?'<b>'+esc(o.agency)+'</b>':'')+(o.agency&&o.loc?' \\u00b7 ':'')+(o.loc?esc(o.loc):'')+'</div>';
+    // Task-order spend stream — the ACTUAL money, fetched on-demand right after this
+    // renders (see loadTaskOrders below). Placeholder shows a loading state; a
+    // no-UEI / collapsed-vehicle row skips the fetch entirely (never shows a spinner
+    // that can't resolve) and the section quietly stays absent — the ceiling in
+    // "Recompete facts" above is still the honest number either way.
+    var toBlock = (o.uei && o.sol && !/\\(\\+\\d+\\s*more\\)\\s*$/i.test(o.sol))
+      ? sec('Actual task-order spend','<div id=\"rcTaskOrders\" class=\"rc-to-loading\">Checking USASpending for real task-order activity\\u2026</div>','taskorders')
+      : '';
     return '<section class="osec" id="osec-overview">'+head+(incBlock?'<div style="margin-top:12px">'+incBlock+'</div>':'')+'</section>'
       + sec('Recompete facts','<div class="bf-grid">'+factRows+'</div>','facts')
+      + toBlock
       + aiSec(CUR)                                // "Should I bid?" — runAI accepts the row id (nid)
       + '<div class="oppsoon">This is an expiring contract due for recompete. Value, incumbent and expiry are from USASpending award records; the solicitation may post 6\\u201318 months before it expires.</div>';
+  }
+  // Renders the "Actually obligated: $Y across N task orders (ceiling $X)" summary +
+  // the dated ledger ($ · date · city). Ceiling comes from the row already in hand
+  // (o.value, the parent's potential_total_value) — actual comes from the fetch.
+  function taskOrderStreamHTML(o,d){
+    var txns=(d&&d.txns)||[];
+    if(!d||!d.grounded||!txns.length){
+      // Honest no-data states — never a dead spinner. A genuine "no task orders found"
+      // still leaves the ceiling visible up in Recompete facts.
+      var why = (d&&d.reason==='no_task_orders')
+        ? 'No task-order activity found under this PIID in USASpending yet.'
+        : 'Task-order detail isn\\u2019t available for this contract right now.';
+      return empty(why);
+    }
+    var rows=txns.map(function(t){
+      var amt=mMoney(t.obligation);
+      var date=t.actionDate?longDate(t.actionDate):'\\u2014';
+      var loc=t.popCity?(t.popCity+', '+(t.popState||'')):(t.popState||'\\u2014');
+      var approx=t.locPrecision==='state';
+      return '<div class="rc-to-row"><div class="rc-to-amt">'+esc(amt||'\\u2014')+'</div>'
+        + '<div class="rc-to-date">'+esc(date)+'</div>'
+        + '<div class="rc-to-loc'+(approx?' approx':'')+'">'+esc(loc)+(approx?' (approx.)':'')+'</div></div>';
+    }).join('');
+    var actualLabel=mMoney(d.totalActual)||'\\u2014';
+    var ceilLabel=o.value||'\\u2014';
+    var summary='<div class="rc-actual">'
+      + '<div><div class="rc-actual-v">'+esc(actualLabel)+'</div><div class="rc-actual-k">Actually obligated \\u00b7 '+txns.length+' task order'+(txns.length===1?'':'s')+(d.distinctCities?' \\u00b7 '+d.distinctCities+' location'+(d.distinctCities===1?'':'s'):'')+'</div></div>'
+      + '<div class="rc-ceil"><div class="rc-ceil-v">'+esc(ceilLabel)+'</div><div class="rc-ceil-k">Contract ceiling</div></div>'
+      + '</div>';
+    return summary+'<div class="rc-to-list">'+rows+'</div>';
+  }
+  function loadTaskOrders(o){
+    var box=document.getElementById('rcTaskOrders'); if(!box)return;
+    fetch('/api/app/recompete-task-orders?piid='+encodeURIComponent(o.sol||'')+'&uei='+encodeURIComponent(o.uei||''))
+      .then(function(r){return r.json();})
+      .then(function(d){
+        box.outerHTML='<div id=\"rcTaskOrders\">'+taskOrderStreamHTML(o,d)+'</div>'; buildTabs();
+        if(d&&d.grounded&&d.txns&&d.txns.length)drawTaskOrderPins(d.txns); // per-task-order pins at their REAL cities
+      })
+      .catch(function(){ box.outerHTML='<div id=\"rcTaskOrders\">'+empty('Task-order detail isn\\u2019t available for this contract right now.')+'</div>'; });
   }
   window.openRecompeteDrawer=function(key){
     var o=findRecompeteRow(key); if(!o){ return; }
     if(window.__resetOppSave)window.__resetOppSave();
+    clearTaskOrderPins(); // opening a new contract — drop the previous one's task-order pins first
     body.innerHTML=recompeteRender(o);
     bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
     buildTabs();
+    if(document.getElementById('rcTaskOrders'))loadTaskOrders(o);
   };
   window.openOppDrawer=function(nid){
     if(!nid)return;
@@ -1809,6 +1900,7 @@ const DRAWER_JS = `<script>
     if(window.__mapMode&&window.__mapMode==='recompete'){ window.openRecompeteDrawer(nid); return; }
     if(window.__mapMode&&window.__mapMode!=='open')return; // detail drawer is open-opps only for the other modes
     if(window.__resetOppSave)window.__resetOppSave(); // clear any stale "Saved" from the previous opp
+    clearTaskOrderPins();
     body.innerHTML='<div class="oppload">Loading\\u2026</div>';
     bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
     fetch('/api/app/opportunity-detail?id='+encodeURIComponent(nid)).then(function(r){return r.json();}).then(function(d){
