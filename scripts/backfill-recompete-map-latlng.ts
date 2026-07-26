@@ -278,14 +278,31 @@ async function resetApprox(columnExists: boolean) {
   }
 
   console.log(`\n--go: NULLing map_loc_source on ${count} state_approx rows…`);
-  // PostgREST caps an UPDATE-returning-representation response, but we're not returning rows;
-  // an UPDATE with a WHERE affects every matching row server-side in one statement.
-  const { error: upErr } = await db
-    .from('recompete_opportunities')
-    .update({ map_loc_source: null })
-    .is('quality_flag', null)
-    .eq('map_loc_source', 'state_approx');
-  if (upErr) { console.error('reset UPDATE failed:', upErr.message); process.exit(1); }
+  // A single UPDATE across ~89K rows exceeds the Postgres statement timeout (it rolls back).
+  // Batch it: pull a slice of state_approx contract_ids, NULL them by .in(), repeat until none
+  // remain. Each batch is a small, fast, independent statement — no timeout, resumable if interrupted.
+  const RESET_BATCH = 150; // small: contract_ids are long strings; a big .in() list overflows the PostgREST URL → "Bad Request"
+  let totalReset = 0;
+  for (;;) {
+    const { data: slice, error: selErr } = await db
+      .from('recompete_opportunities')
+      .select('contract_id')
+      .is('quality_flag', null)
+      .eq('map_loc_source', 'state_approx')
+      .limit(RESET_BATCH);
+    if (selErr) { console.error('reset SELECT failed:', selErr.message); process.exit(1); }
+    if (!slice || slice.length === 0) break;
+    const ids = slice.map((r: { contract_id: string }) => r.contract_id);
+    const { error: upErr } = await db
+      .from('recompete_opportunities')
+      .update({ map_loc_source: null })
+      .in('contract_id', ids);
+    if (upErr) { console.error('reset UPDATE failed:', upErr.message); process.exit(1); }
+    totalReset += ids.length;
+    console.log(`  reset ${totalReset}/${count}…`);
+    if (slice.length < RESET_BATCH) break;
+  }
+  console.log(`  reset complete: ${totalReset} rows NULLed.`);
 
   const { count: after, error: afterErr } = await db
     .from('recompete_opportunities')
