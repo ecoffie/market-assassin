@@ -1320,6 +1320,10 @@ const DRAWER_JS = `<script>
   if(_save)_save.onclick=function(){ if(!CUR)return; var a=_auth(); if(!a.t||!a.em){ if(confirm('Sign in to save this to your pursuits?'))location.href='/app?next=%2Fopportunity-map'; return; }
     _save.classList.add('done'); _save.querySelector('span').textContent='Saved';
     fetch('/api/pipeline',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},body:JSON.stringify({noticeId:CUR.id,email:a.em,title:CUR.title,agency:CUR.department})}).catch(function(){}); };
+  // The Save button is PERSISTENT action-bar DOM (built once, reused for every opp the drawer opens).
+  // So its "Saved"/done state carries over to the NEXT opp unless we reset it on open — the "I clicked
+  // once but they all look saved" bug. Every drawer open MUST call this first.
+  window.__resetOppSave=function(){ var b=document.getElementById('oppSave'); if(b){ b.classList.remove('done'); var s=b.querySelector('span'); if(s)s.textContent='Save'; } };
   var _share=document.getElementById('oppShare');
   if(_share)_share.onclick=function(){ if(!CUR)return; var url=location.origin+'/opportunity-map?opp='+encodeURIComponent(CUR.id);
     var done=function(){ _share.querySelector('span').textContent='Copied!'; setTimeout(function(){ _share.querySelector('span').textContent='Share'; },1600); };
@@ -1788,6 +1792,7 @@ const DRAWER_JS = `<script>
   }
   window.openRecompeteDrawer=function(key){
     var o=findRecompeteRow(key); if(!o){ return; }
+    if(window.__resetOppSave)window.__resetOppSave();
     body.innerHTML=recompeteRender(o);
     bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
     buildTabs();
@@ -1797,6 +1802,7 @@ const DRAWER_JS = `<script>
     // Awarded (recompete) mode: build the detail from the row in hand (no SAM opp-intel fetch).
     if(window.__mapMode&&window.__mapMode==='recompete'){ window.openRecompeteDrawer(nid); return; }
     if(window.__mapMode&&window.__mapMode!=='open')return; // detail drawer is open-opps only for the other modes
+    if(window.__resetOppSave)window.__resetOppSave(); // clear any stale "Saved" from the previous opp
     body.innerHTML='<div class="oppload">Loading\\u2026</div>';
     bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
     fetch('/api/app/opportunity-detail?id='+encodeURIComponent(nid)).then(function(r){return r.json();}).then(function(d){
