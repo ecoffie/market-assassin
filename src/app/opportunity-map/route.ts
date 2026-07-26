@@ -119,11 +119,6 @@ const SERVER_FILTERS =
   +   '<option value="recompete">Awarded</option>'
   +   '<option value="contractor">Contacts</option>'
   + '</select>'
-  // Companies / Buyers segmented control — shown ONLY in Contacts mode (JS toggles display).
-  + '<div class="ctseg" id="ctSeg" style="display:none">'
-  +   '<button type="button" class="ctseg-btn on" data-ct="companies">Companies</button>'
-  +   '<button type="button" class="ctseg-btn" data-ct="buyers">Buyers</button>'
-  + '</div>'
   + '<select class="fsel" id="fltNotice" title="Notice type">'
   +   '<option value="">Notice type</option>'
   +   '<option value="Solicitation">Solicitation</option>'
@@ -155,6 +150,17 @@ const SERVER_FILTERS =
   + '</div>';
 // Agency + State moved OFF the top row into the deep panel (Zillow keeps the bar to a
 // few uniform dropdown pills; long-tail text filters live inside "Filters").
+
+// Companies / Buyers segmented control — lives in the RIGHT-PANEL header (next to the result
+// count / sort control), NOT the top filter row. Menu-consistency fix (Eric, 2026-07-26): the
+// top row previously swapped Notice type/Set-aside/NAICS/Filters out for this toggle in Contacts
+// mode, so users had to relearn the menu switching modes. The dataset dropdown + the standard
+// filter controls now stay in the SAME positions across Active/Awarded/Contacts; this toggle
+// gets its own small sub-row under the result count instead, shown ONLY in Contacts mode.
+const CT_SEG_HTML = '<div class="ctseg" id="ctSeg" style="display:none">'
+  +   '<button type="button" class="ctseg-btn on" data-ct="companies">Companies</button>'
+  +   '<button type="button" class="ctseg-btn" data-ct="buyers">Buyers</button>'
+  + '</div>';
 
 // Full-page CSS overrides (kept out of the verbatim template): (1) sheet-label readability
 // — grid items default to min-width:auto so nowrap labels overflow their cell; let them wrap.
@@ -395,6 +401,14 @@ const ZLAYOUT_CSS = '<style>'
   // rescount ("N results") sits bold on the left of the sort row.
   + '.sortrow{padding:14px 20px 12px!important;position:relative}'
   + '.sortrow .rescount{font:600 15px Inter,system-ui,sans-serif;color:var(--ink)}'
+  // Result-count + Companies/Buyers toggle stack in one column (keeps .sortrow's existing
+  // 2-child space-between layout intact — see the CT_SEG_HTML injection comment).
+  + '.rescount-wrap{display:flex;flex-direction:column;gap:8px;min-width:0}'
+  + '.rescount-wrap .ctseg{display:none}' // JS flips to inline-flex only in Contacts mode
+  // Standard filter controls DISABLED (not removed) when they don't apply to the current
+  // dataset — greyed + inert, but present in the SAME slot so the bar never reflows switching
+  // Active/Awarded/Contacts (menu-consistency fix, Eric 2026-07-26).
+  + '.fsel.mode-disabled{opacity:.42;pointer-events:none;cursor:default}'
   // ── Custom Zillow sort menu: blue "Sort: X ▾" trigger + white rounded option panel. ──
   + '.sortmenu-wrap{position:relative}'
   + '.sortmenu-btn{display:inline-flex;align-items:center;gap:6px;border:0;background:none;cursor:pointer;'
@@ -452,15 +466,32 @@ const SORT_OPTIONS: Array<[string, string]> = [
   ['value', 'Contract value (high to low)'],
   ['az', 'Title (A-Z)'],
 ];
+// Companies (Contacts mode) sort by something sensible for a FIRM, not a deadline — $ won,
+// award count, name, or set-aside firms first (reuses the 'setaside' value; the server ranks
+// firms WITH a set-aside first, see companiesPins). Rendered as a SECOND menu, toggled by JS
+// alongside SORT_OPTIONS depending on the active mode — "Sort: Deadline (soonest)" made no
+// sense for companies (Eric, 2026-07-26).
+const COMPANY_SORT_OPTIONS: Array<[string, string]> = [
+  ['value', 'Contract $ won (high to low)'],
+  ['setaside', 'Set-aside firms first'],
+  ['awards', 'Award count (high to low)'],
+  ['az', 'Company name (A-Z)'],
+];
 const SORT_MENU_HTML =
     '<select id="sort" style="display:none">'
   + SORT_OPTIONS.map(([v]) => `<option value="${v}"></option>`).join('')
+  + COMPANY_SORT_OPTIONS.map(([v]) => `<option value="co-${v}"></option>`).join('')
   + '</select>'
   + '<div class="sortmenu-wrap">'
   +   '<button type="button" class="sortmenu-btn" id="sortBtn"><span class="sortmenu-pre">Sort:</span> <span id="sortBtnLabel">Deadline (soonest)</span>'
   +   '<svg viewBox="0 0 12 12" width="12" height="12" class="sortmenu-car"><path d="M3 4.5L6 8l3-3.5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg></button>'
-  +   '<div class="sortmenu" id="sortMenu">'
-  +     SORT_OPTIONS.map(([v, l], i) => `<button type="button" class="sortmenu-item${i === 0 ? ' on' : ''}" data-sort="${v}"><span class="sortmenu-check">✓</span>${l}</button>`).join('')
+  +   '<div class="sortmenu" id="sortMenu" data-scope="opp">'
+  +     SORT_OPTIONS.map(([v, l], i) => `<button type="button" class="sortmenu-item${i === 0 ? ' on' : ''}" data-sort="${v}">`
+        + `<span class="sortmenu-check">✓</span>${l}</button>`).join('')
+  +   '</div>'
+  +   '<div class="sortmenu" id="sortMenuCo" data-scope="company" style="display:none">'
+  +     COMPANY_SORT_OPTIONS.map(([v, l], i) => `<button type="button" class="sortmenu-item${i === 0 ? ' on' : ''}" data-sort="co-${v}">`
+        + `<span class="sortmenu-check">✓</span>${l}</button>`).join('')
   +   '</div>'
   + '</div>';
 
@@ -502,6 +533,10 @@ const LEGEND_HTML = '<div class="setlegend"><div class="sl-t">Set-aside eligibil
 const VIEWPORT_JS = `<script>
 (function(){
   var SETMAP={SDVOSB:'SDVOSB',SB:'SB','8A':'8(a)',WOSB:'WOSB',HZ:'HUBZone',OTHER:'Other',NONE:'None'};
+  // Company set-aside chip colors — reuses the map's existing legend palette exactly (see
+  // LEGEND_HTML): SDVOSB green, Small Biz blue, 8(a) purple, WOSB red, HUBZone amber.
+  var SET_CHIP_COLOR={SDVOSB:'#22a06b',SB:'#3b82f6','8A':'#8b5cf6',WOSB:'#ef4444',HZ:'#f59e0b'};
+  var SET_CHIP_LABEL={SDVOSB:'SDVOSB',SB:'Small Biz','8A':'8(a)',WOSB:'WOSB',HZ:'HUBZone'};
   // Zillow-style dataset modes (For Sale / Rent / Sold). Each = a distinct corpus + endpoint.
   var MODES={
     open:{ ep:'/api/app/opportunity-map', title:'Open Opportunities', unit:'active opportunities' },
@@ -531,7 +566,7 @@ const VIEWPORT_JS = `<script>
       if(CONTACT_TYPE==='buyers'){
         return {src:'CONTACT',ctype:'buyers',title:p.name,agency:clean(p.agency||''),role:p.title||'',office:clean(p.office||''),loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng};
       }
-      return {src:'CONTACT',ctype:'companies',title:p.name,agency:'',meta:p.meta||'',loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng};
+      return {src:'CONTACT',ctype:'companies',title:p.name,agency:'',meta:p.meta||'',loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng,setAsides:p.setAsides||[]};
     }
     if(MODE==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,agency:clean(p.agency),naics:p.naics,set:SETMAP[p.set]||'None',value:p.value,exp:(p.exp||'').slice(0,10),loc:p.loc,sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng};
     return {src:'SAM',naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10)};
@@ -543,8 +578,19 @@ const VIEWPORT_JS = `<script>
     return [b.getWest(),b.getSouth(),b.getEast(),b.getNorth()].map(function(n){return n.toFixed(4);}).join(',');
   }
   window.__mapRefetch = fetchViewLater; function fetchViewLater(){ try{ fetchView(); }catch(e){} }
+  // Dataset-aware source badge — "Live · SAM.gov" is only true for Open/Active. Awarded
+  // (Recompete) rows come from USASpending AWARD HISTORY, not a live SAM feed; Contacts/
+  // Companies come from BigQuery (award history), Contacts/Buyers from SAM POC data. A static
+  // "Live · SAM.gov" badge on every dataset was simply wrong outside Open mode (Eric 2026-07-26).
+  function updateSourceBadge(){
+    var b=document.getElementById('sourceBadge'); if(!b)return;
+    if(MODE==='recompete'){ b.textContent='USASpending · Award history'; return; }
+    if(MODE==='contractor'){ b.textContent=(CONTACT_TYPE==='companies')?'BigQuery · Award history':'Live · SAM.gov'; return; }
+    b.textContent='Live · SAM.gov';
+  }
   function updateHeader(){
     var brand=document.querySelector('.brand'); if(brand)brand.textContent=MODES[MODE].title;
+    updateSourceBadge();
     if(!TOTAL)return;
     var shown=(typeof rows!=='undefined'&&rows)?rows.length:OPPS.length;
     var sum=document.getElementById('sumline');
@@ -583,6 +629,15 @@ const VIEWPORT_JS = `<script>
   // Contacts flow through the SAME markers/layer/rows/feed globals + select() path, but with
   // contact-specific pins (a fixed purple), popups, and right-panel cards.
   function esc0(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  // Company set-aside chips — up to 2, reusing the map's existing set-aside color legend. A firm
+  // with no set-aside award renders NO chip (never a fabricated "Open"/"None").
+  function setAsideChips(setAsides){
+    if(!setAsides||!setAsides.length)return '';
+    return setAsides.slice(0,2).map(function(k){
+      var col=SET_CHIP_COLOR[k]; if(!col)return '';
+      return '<span class="chip" style="background:'+col+';color:#fff;margin-left:4px">'+esc0(SET_CHIP_LABEL[k]||k)+'</span>';
+    }).join('');
+  }
   function contactPopup(o){
     var sub = o.ctype==='buyers'
       ? '<div class="pvmeta"><b>'+esc0(o.agency)+'</b>'+(o.loc?' \\u00b7 '+esc0(o.loc):'')+'</div>'
@@ -591,7 +646,7 @@ const VIEWPORT_JS = `<script>
       : '<div class="pvmeta">'+(o.loc?esc0(o.loc):'')+'</div>'
         + (o.meta?'<div class="pvmeta" style="color:var(--sub)">'+esc0(o.meta)+'</div>':'');
     return '<div class="pv"><div class="pvstrip" style="background:'+CONTACT_COLOR+'"></div><div class="pvbody">'
-      + '<div class="pvchips"><span class="chip" style="background:'+CONTACT_COLOR+';color:#fff">'+(o.ctype==='buyers'?'Government buyer':'Contractor')+'</span></div>'
+      + '<div class="pvchips"><span class="chip" style="background:'+CONTACT_COLOR+';color:#fff">'+(o.ctype==='buyers'?'Government buyer':'Contractor')+'</span>'+(o.ctype==='companies'?setAsideChips(o.setAsides):'')+'</div>'
       + '<div class="pvt">'+esc0(o.title)+'</div>'+sub+'</div></div>';
   }
   function contactCard(o){
@@ -600,7 +655,7 @@ const VIEWPORT_JS = `<script>
         + (o.role?'<div class="cmeta" style="margin-top:2px"><span class="loc">'+esc0(o.role)+'</span></div>':'')
       : '<div class="cmeta">'+(o.loc?'<span class="loc">'+esc0(o.loc)+'</span>':'')+(o.meta?'<span class="dot"></span><span class="loc">'+esc0(o.meta)+'</span>':'')+'</div>';
     return '<div class="cstrip" style="background:'+CONTACT_COLOR+'"></div><div class="cbody">'
-      + '<div class="crow1"><span class="chip" style="background:'+CONTACT_COLOR+';color:#fff">'+(o.ctype==='buyers'?'Buyer':'Company')+'</span></div>'
+      + '<div class="crow1"><span class="chip" style="background:'+CONTACT_COLOR+';color:#fff">'+(o.ctype==='buyers'?'Buyer':'Company')+'</span>'+(o.ctype==='companies'?setAsideChips(o.setAsides):'')+'</div>'
       + '<div class="ctitle">'+esc0(o.title)+'</div>'+line2+'</div>';
   }
   function renderContacts(){
@@ -634,9 +689,16 @@ const VIEWPORT_JS = `<script>
     if(MODE==='contractor'){
       busy=true;
       var em=_uemail(); var tk=''; try{ tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
+      // Set-aside applies to Companies (real per-firm eligibility) — NOT to Buyers (a gov POC has
+      // no set-aside). Sort likewise: companies sort by $ won / awards / A-Z, never "deadline"
+      // (meaningless for a firm) — F.sort's opp-only values fall back server-side.
+      var _ctSa=(CONTACT_TYPE==='companies')?_merge(FILT.setAside, FILT.setAsideMulti):'';
+      var _ctSort=(CONTACT_TYPE==='companies'&&window.__companySort)?window.__companySort:'';
       var curl='/api/app/contacts-map?bbox='+bbox()+'&type='+CONTACT_TYPE
         +(FILT.state?'&state='+encodeURIComponent(FILT.state):'')
         +(Q?'&search='+encodeURIComponent(Q):'')
+        +(_ctSa?'&setAside='+encodeURIComponent(_ctSa):'')
+        +(_ctSort?'&sort='+encodeURIComponent(_ctSort):'')
         +(em?'&email='+encodeURIComponent(em):'');
       var ch={}; if(tk)ch['x-mi-auth-token']=tk; if(em)ch['x-user-email']=em;
       fetch(curl,{headers:ch}).then(function(r){return r.json();}).then(function(d){ busy=false;
@@ -689,21 +751,45 @@ const VIEWPORT_JS = `<script>
     if(v==='bid'){ var ds=document.getElementById('fltDataset'); if(ds)ds.value=window.__mapMode||'open'; location.href='/bid'; return; }
     setMapMode(v);
   };
+  // Which standard filter-row controls are DISABLED (greyed + inert, but present in the SAME
+  // slot — never removed/hidden) for the current mode. Menu-consistency fix (Eric 2026-07-26):
+  // the row must look identical across Active/Awarded/Contacts so users never relearn it.
+  // Set-aside now applies to Companies too (real per-firm eligibility, derived from awards), so
+  // it's the one control that stays FULLY ACTIVE in Contacts mode — everything else that has no
+  // meaning for companies/buyers (Notice type, NAICS, the deep Filters panel) is disabled in
+  // place rather than hidden.
+  function disabledIdsFor(mode){ return mode==='contractor' ? ['fltNotice','naicsBtn','moreBtn'] : []; }
+  function applyModeDisabled(mode){
+    var disabled=disabledIdsFor(mode);
+    ['fltNotice','naicsBtn','moreBtn'].forEach(function(id){
+      var el=document.getElementById(id); if(!el)return;
+      var on=disabled.indexOf(id)>=0;
+      el.classList.toggle('mode-disabled',on);
+      el.disabled=on&&el.tagName==='SELECT'; // native <select> honors .disabled; buttons use pointer-events via CSS
+      el.setAttribute('aria-disabled',on?'true':'false');
+    });
+  }
   window.setMapMode=function(mode){ if(!MODES[mode]||mode===MODE)return; MODE=mode; window.__mapMode=mode;
     var tabs=document.querySelectorAll('.zh-mode'); for(var i=0;i<tabs.length;i++)tabs[i].classList.toggle('on',tabs[i].getAttribute('data-mode')===mode);
     // Keep the Zillow-style dataset pill in sync (nav tab ↔ pill both drive setMapMode).
     var dsel=document.getElementById('fltDataset'); if(dsel&&dsel.value!==mode)dsel.value=mode;
-    // More-filters panel shows on open + recompete (recompete gets value-range); hide on contractor.
-    var mw=document.querySelector('.mfwrap'); if(mw)mw.style.display=(mode==='contractor')?'none':'';
-    // Notice-type + set-aside pills are opportunity-only — hide them in Contacts mode; show the
-    // Companies/Buyers segmented control instead.
+    // The top filter row (dataset dropdown, Notice type, Set-aside, NAICS, Filters) stays
+    // IDENTICAL in every mode now — nothing here is hidden/reflowed. Controls that don't apply
+    // to the current dataset are disabled IN PLACE (see applyModeDisabled) so switching modes
+    // never makes users relearn where things are.
+    applyModeDisabled(mode);
+    // Companies/Buyers toggle: its own small sub-row under the result count (right panel), shown
+    // ONLY in Contacts mode — this does NOT touch the shared top filter row.
     var ctSeg=document.getElementById('ctSeg'); if(ctSeg)ctSeg.style.display=(mode==='contractor')?'inline-flex':'none';
-    ['fltNotice','saselBtn','naicsBtn'].forEach(function(id){ var el=document.getElementById(id); var wrap=el&&(el.closest?el.closest('.saselwrap,.naicswrap'):null); var target=wrap||el; if(target)target.style.display=(mode==='contractor')?'none':''; });
+    // Sort menu: Companies get their own option set ($ won / awards / name / set-aside-first) —
+    // "Deadline (soonest)" is meaningless for a firm. Buyers/Open/Awarded keep the opp menu.
+    if(typeof window.__setSortScope==='function')window.__setSortScope((mode==='contractor'&&CONTACT_TYPE==='companies')?'company':'opp');
     syncValueVis();
     Q=''; var zsi=document.getElementById('zsearchInput'); if(zsi)zsi.value='';
     _didAutoFit=false; // re-frame the view to the new dataset's footprint on its next render
     fetchView();
   };
+  applyModeDisabled(MODE); // initial state (default mode = 'open', nothing disabled)
   map.on('moveend',function(){ clearTimeout(t); t=setTimeout(fetchView,450); });
   var zsi=document.getElementById('zsearchInput');
   if(zsi)zsi.addEventListener('input',function(){ clearTimeout(t2); t2=setTimeout(function(){ Q=zsi.value.trim(); fetchView(); },400); });
@@ -722,6 +808,10 @@ const VIEWPORT_JS = `<script>
     Array.prototype.forEach.call(seg.querySelectorAll('.ctseg-btn'),function(b){
       b.onclick=function(){ var ct=b.getAttribute('data-ct'); if(ct===CONTACT_TYPE)return; CONTACT_TYPE=ct;
         Array.prototype.forEach.call(seg.querySelectorAll('.ctseg-btn'),function(x){ x.classList.toggle('on',x===b); });
+        // Companies get the $/awards/name/set-aside sort menu; Buyers has no sensible analog for
+        // any of those, so fall back to the opportunity sort menu (harmless — Buyers cards don't
+        // read F.sort anyway; this just keeps the button label sane if the user peeks at it).
+        if(typeof window.__setSortScope==='function')window.__setSortScope(ct==='companies'?'company':'opp');
         if(MODE==='contractor')fetchView(); };
     });
   })();
@@ -1168,6 +1258,43 @@ const DRAWER_JS = `<script>
   var _more=document.getElementById('oppMore');
   if(_more)_more.onclick=function(){ if(CUR&&CUR.uiLink)window.open(CUR.uiLink,'_blank','noopener'); };
   function esc(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  // Attachment row builder — SHARED by every attachment render site (bidFactsSec + the legacy
+  // docsSec), so the fix lives in ONE place. Stored attachments entries come in TWO shapes:
+  // a bare URL string (current prod data — SAM's list endpoint gives us no filename, only the
+  // download URL) or an object {name?, url?} (older/richer rows). Either way, SAM's URL itself
+  // carries no filename — the real name only exists in the file's Content-Disposition header,
+  // resolved lazily via GET /api/sam-attachment/metadata?url=... (same endpoint
+  // SamAttachmentLinks.tsx already uses for the React surfaces). Render immediately with a
+  // placeholder + a working download link; the label's id lets resolveAttachmentNames() swap
+  // in the real filename once the metadata fetch resolves (fail-soft: leave the placeholder on
+  // a miss, never show "undefined").
+  var _attRowSeq=0;
+  function attRow(a,cls,linkCls){
+    var url = (typeof a==='string') ? a : ((a&&a.url)||'');
+    var name = (typeof a==='object' && a && a.name) ? a.name : '';
+    var id='att-'+(_attRowSeq++);
+    if(name){
+      // Already have a real name (rare with current data, but honor it) — no fetch needed.
+      return linkCls
+        ? '<a class="'+linkCls+'" '+(url?'href="'+esc(url)+'" target="_blank" rel="noopener"':'')+'>\\ud83d\\udcc4 '+esc(name)+'</a>'
+        : '<div class="'+cls+'">\\ud83d\\udcc4 '+(url?'<a href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(name)+'</a>':esc(name))+'</div>';
+    }
+    var label='<span id="'+id+'" data-att-url="'+esc(url)+'">Document</span>';
+    return linkCls
+      ? '<a class="'+linkCls+'" '+(url?'href="'+esc(url)+'" target="_blank" rel="noopener"':'')+'>\\ud83d\\udcc4 '+label+'</a>'
+      : '<div class="'+cls+'">\\ud83d\\udcc4 '+(url?'<a href="'+esc(url)+'" target="_blank" rel="noopener">'+label+'</a>':label)+'</div>';
+  }
+  // After the drawer's attachment rows are in the DOM, resolve each placeholder's real filename
+  // via SAM's Content-Disposition lookup (fail-soft — a miss just leaves "Document"). Fires once
+  // per drawer render; ≤20 attachments per opp (render already slices to 20).
+  function resolveAttachmentNames(){
+    var els=document.querySelectorAll('[data-att-url]');
+    Array.prototype.forEach.call(els,function(el){
+      var url=el.getAttribute('data-att-url'); if(!url)return;
+      fetch('/api/sam-attachment/metadata?url='+encodeURIComponent(url)).then(function(r){return r.json().catch(function(){return {};});})
+        .then(function(d){ if(d&&d.filename)el.textContent=d.filename; }).catch(function(){});
+    });
+  }
   function due(d){ if(!d)return ''; var n=Math.ceil((new Date(d)-new Date())/86400000); if(n<0)return 'closed'; if(n===0)return 'due today'; if(n===1)return '1 day left'; return n+' days left'; }
   function longDate(d){ if(!d)return '\\u2014'; try{ return new Date(d).toLocaleDateString('en-US',{month:'short',day:'numeric',year:'numeric'}); }catch(e){return d;} }
   // sec() now takes an optional anchor id (3rd arg) so the sticky tabs can jump to it. Every
@@ -1296,10 +1423,7 @@ const DRAWER_JS = `<script>
     var links=[], atts=[];
     if(o.additionalInfo&&o.additionalInfo.link)links.push('<div class="odoc">\\ud83d\\udd17 <a href="'+esc(o.additionalInfo.link)+'" target="_blank" rel="noopener">Additional information</a></div>');
     if(o.uiLink)links.push('<div class="odoc">\\ud83d\\udd17 <a href="'+esc(o.uiLink)+'" target="_blank" rel="noopener">View the full notice on SAM.gov</a></div>');
-    (o.attachments||[]).slice(0,20).forEach(function(a){
-      var name=(a&&a.name)||'Attachment', url=(a&&a.url)||'';
-      atts.push('<div class="odoc">\\ud83d\\udcc4 '+(url?'<a href="'+esc(url)+'" target="_blank" rel="noopener">'+esc(name)+'</a>':esc(name))+'</div>');
-    });
+    (o.attachments||[]).slice(0,20).forEach(function(a){ atts.push(attRow(a,'odoc')); });
     var inner='<div class="osec-sub">Links</div>'+(links.length?links.join(''):empty('No links have been added to this opportunity.'))
       + '<div class="osec-sub" style="margin-top:16px">Attachments</div>'+(atts.length?atts.join(''):empty('No attachments have been added to this opportunity.'));
     return sec('Attachments / links',inner);
@@ -1353,8 +1477,7 @@ const DRAWER_JS = `<script>
     var docs=[];
     if(o.additionalInfo&&o.additionalInfo.link)docs.push('<a class="bf-doc" href="'+esc(o.additionalInfo.link)+'" target="_blank" rel="noopener">\\ud83d\\udd17 Additional information</a>');
     if(o.uiLink)docs.push('<a class="bf-doc" href="'+esc(o.uiLink)+'" target="_blank" rel="noopener">\\ud83d\\udd17 View the full notice on SAM.gov</a>');
-    (o.attachments||[]).slice(0,20).forEach(function(a){ var name=(a&&a.name)||'Attachment', url=(a&&a.url)||'';
-      docs.push('<a class="bf-doc" '+(url?'href="'+esc(url)+'" target="_blank" rel="noopener"':'')+'>\\ud83d\\udcc4 '+esc(name)+'</a>'); });
+    (o.attachments||[]).slice(0,20).forEach(function(a){ docs.push(attRow(a,null,'bf-doc')); });
     var docBlock=docs.length?'<div class="bf-docs"><div class="osec-sub">Documents &amp; links</div>'+docs.join('')+'</div>':'';
     return sec('Bid facts','<div class="bf-grid">'+rows+'</div>'+docBlock,'facts');
   }
@@ -1609,6 +1732,7 @@ const DRAWER_JS = `<script>
       if(!(d&&d.success&&d.opp)){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; return; }
       body.innerHTML=render(d.opp,{bidFacts:d.bidFacts,similar:d.similar});
       buildTabs();
+      resolveAttachmentNames(); // lazily swap "Document" placeholders for real filenames
       // Second, on-demand fetch for the reused-intelligence sections (fail-soft). Also carries
       // cardFacts (SOW card facts, Tier 1) in the SAME response — one round trip for both.
       fetch('/api/app/opportunity-detail?intel=1&id='+encodeURIComponent(nid)).then(function(r){return r.json();}).then(function(x){
@@ -1678,33 +1802,72 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;</scr
 // Extend the template's sortRows to handle the new sort options (Newest posted, Set-aside first).
 // Reassigns sortRows (shared global lexical scope) + re-renders when the sort changes.
 const SORT_EXTRA_JS = `<script>(function(){
-  if(typeof sortRows!=='function') return;
-  var _sr=sortRows;
-  sortRows=function(a,b){
-    switch(F.sort){
-      case 'newest': return String((b.posted||'')).localeCompare(String(a.posted||''));
-      case 'setaside': { var sa=(a.set&&a.set!=='None')?0:1, sb=(b.set&&b.set!=='None')?0:1; if(sa!==sb)return sa-sb; return dueDate(a).localeCompare(dueDate(b)); }
-      default: return _sr(a,b);
-    }
-  };
-  var sel=document.getElementById('sort'); if(sel)sel.addEventListener('change',function(){ try{ if(typeof render==='function')render(); }catch(e){} });
-  // Custom Zillow-style sort menu: trigger opens a white panel; picking a row sets the hidden
-  // <select> value + fires its 'change' (reusing the render wiring above), updates the label + ✓.
+  if(typeof sortRows==='function'){
+    var _sr=sortRows;
+    sortRows=function(a,b){
+      switch(F.sort){
+        case 'newest': return String((b.posted||'')).localeCompare(String(a.posted||''));
+        case 'setaside': { var sa=(a.set&&a.set!=='None')?0:1, sb=(b.set&&b.set!=='None')?0:1; if(sa!==sb)return sa-sb; return dueDate(a).localeCompare(dueDate(b)); }
+        default: return _sr(a,b);
+      }
+    };
+  }
+  var sel=document.getElementById('sort'); if(sel)sel.addEventListener('change',function(){
+    try{
+      // Companies (Contacts mode) sort is computed SERVER-SIDE (companiesPins ranks by $/awards/
+      // name/set-aside) — a 'co-' prefixed value means re-fetch, not a client re-sort.
+      if(String(sel.value).indexOf('co-')===0 && typeof window.__mapMode!=='undefined' && window.__mapMode==='contractor'){
+        window.__companySort=sel.value.slice(3);
+        if(typeof window.__mapRefetch==='function')window.__mapRefetch();
+        return;
+      }
+      if(typeof render==='function')render();
+    }catch(e){}
+  });
+  // Custom Zillow-style sort menu: TWO menus share one trigger — #sortMenu (opportunities) and
+  // #sortMenuCo (companies) — swapped by mode (see window.__setSortScope, called from
+  // setMapMode). Picking a row in EITHER sets the hidden <select> value + fires its 'change'
+  // (reusing the wiring above), updates the label + ✓ within that menu.
   var wrap=document.querySelector('.sortmenu-wrap'), btn=document.getElementById('sortBtn'),
-      menu=document.getElementById('sortMenu'), lbl=document.getElementById('sortBtnLabel');
-  if(wrap&&btn&&menu&&sel){
-    btn.onclick=function(e){ e.stopPropagation(); var open=!menu.classList.contains('show'); menu.classList.toggle('show',open); wrap.classList.toggle('open',open); };
+      menuOpp=document.getElementById('sortMenu'), menuCo=document.getElementById('sortMenuCo'),
+      lbl=document.getElementById('sortBtnLabel'), sel2=document.getElementById('sort');
+  function wireMenu(menu){
+    if(!menu||!sel2)return;
     Array.prototype.forEach.call(menu.querySelectorAll('.sortmenu-item'),function(it){
       it.onclick=function(){ var v=it.getAttribute('data-sort');
-        sel.value=v; sel.dispatchEvent(new Event('change',{bubbles:true}));           // → F.sort + render
-        // Label = the item text WITHOUT the leading ✓ check span.
+        sel2.value=v; sel2.dispatchEvent(new Event('change',{bubbles:true}));
         if(lbl){ var t=(it.textContent||'').replace(/^\\s*\\u2713\\s*/,'').trim(); lbl.textContent=t; }
         Array.prototype.forEach.call(menu.querySelectorAll('.sortmenu-item'),function(x){ x.classList.toggle('on', x===it); });
-        menu.classList.remove('show'); wrap.classList.remove('open');
+        if(menuOpp)menuOpp.classList.remove('show'); if(menuCo)menuCo.classList.remove('show');
+        if(wrap)wrap.classList.remove('open');
       };
     });
-    document.addEventListener('click',function(e){ if(!e.target.closest('.sortmenu-wrap')){ menu.classList.remove('show'); wrap.classList.remove('open'); } });
   }
+  wireMenu(menuOpp); wireMenu(menuCo);
+  if(wrap&&btn){
+    btn.onclick=function(e){ e.stopPropagation();
+      var active=(menuCo&&menuCo.style.display!=='none')?menuCo:menuOpp; if(!active)return;
+      var open=!active.classList.contains('show'); active.classList.toggle('show',open); wrap.classList.toggle('open',open); };
+    document.addEventListener('click',function(e){ if(!e.target.closest('.sortmenu-wrap')){ if(menuOpp)menuOpp.classList.remove('show'); if(menuCo)menuCo.classList.remove('show'); wrap.classList.remove('open'); } });
+  }
+  // Called from setMapMode: swap which sort menu is visible + reset the label/selection to that
+  // scope's default so the button never shows a stale opportunity-only label ("Deadline") while
+  // Contacts/Companies is active.
+  window.__setSortScope=function(scope){
+    if(!menuOpp||!menuCo||!sel2)return;
+    if(scope==='company'){
+      menuOpp.style.display='none'; menuCo.style.display='';
+      var first=menuCo.querySelector('.sortmenu-item');
+      if(first){ Array.prototype.forEach.call(menuCo.querySelectorAll('.sortmenu-item'),function(x){x.classList.toggle('on',x===first);});
+        var v=first.getAttribute('data-sort'); sel2.value=v; window.__companySort=v.slice(3);
+        if(lbl)lbl.textContent=(first.textContent||'').replace(/^\\s*\\u2713\\s*/,'').trim(); }
+    } else {
+      menuCo.style.display='none'; menuOpp.style.display='';
+      var onItem=menuOpp.querySelector('.sortmenu-item.on')||menuOpp.querySelector('.sortmenu-item');
+      if(onItem){ sel2.value=onItem.getAttribute('data-sort');
+        if(lbl)lbl.textContent=(onItem.textContent||'').replace(/^\\s*\\u2713\\s*/,'').trim(); }
+    }
+  };
 })();
 </script>`;
 
@@ -1949,6 +2112,15 @@ export async function GET(request: NextRequest) {
       + '        <button class="fbtn" id="f-soon">Closing ≤7 days</button>',
       SERVER_FILTERS,
     );
+    // Companies / Buyers toggle lives in the right-panel header, under the result count — NOT
+    // the top filter row (menu-consistency fix, see CT_SEG_HTML comment). Wrapped together with
+    // rescount in one flex column so .sortrow's existing 2-child space-between layout (left
+    // group vs. the sort control) is unaffected — the toggle stacks under the count instead of
+    // becoming a 3rd flex item that would reflow the sort control.
+    html = repl(html, '<div class="rescount" id="rescount"></div>',
+      '<div class="rescount-wrap">' +
+      '<div class="rescount" id="rescount"></div>' + CT_SEG_HTML +
+      '</div>');
     // The deleted pills leave orphaned template JS that null-derefs now that the
     // buttons are gone. Null-guard each throw-prone getElementById so the page's own
     // scripts don't crash before VIEWPORT_JS runs. (The .fbtn[data-sheet] loop,
