@@ -119,6 +119,11 @@ const SERVER_FILTERS =
   +   '<option value="recompete">Awarded</option>'
   +   '<option value="contractor">Contacts</option>'
   + '</select>'
+  // Companies / Buyers segmented control — shown ONLY in Contacts mode (JS toggles display).
+  + '<div class="ctseg" id="ctSeg" style="display:none">'
+  +   '<button type="button" class="ctseg-btn on" data-ct="companies">Companies</button>'
+  +   '<button type="button" class="ctseg-btn" data-ct="buyers">Buyers</button>'
+  + '</div>'
   + '<select class="fsel" id="fltNotice" title="Notice type">'
   +   '<option value="">Notice type</option>'
   +   '<option value="Solicitation">Solicitation</option>'
@@ -169,6 +174,13 @@ const PAGE_CSS = '<style>'
   + '.fsel:hover{border-color:#9aa5b3}'
   + '.fsel:focus{border-color:#006aff;box-shadow:0 0 0 3px rgba(0,106,255,.14)}'
   + '.fsel.on{border-color:#006aff;color:#006aff;background-color:#f0f6ff}'
+  // Companies / Buyers segmented control (Contacts mode). Two pills sharing one bordered
+  // track, styled to match the other filter pills; the active half is Zillow-blue-filled.
+  + '.ctseg{display:inline-flex;flex:none;height:40px;border:1px solid #d1d5db;border-radius:8px;overflow:hidden;background:#fff}'
+  + '.ctseg-btn{font:700 14px Inter,system-ui,sans-serif;color:#2a2a33;background:#fff;border:0;padding:0 15px;height:100%;cursor:pointer;transition:background .12s,color .12s}'
+  + '.ctseg-btn+.ctseg-btn{border-left:1px solid #d1d5db}'
+  + '.ctseg-btn:hover{background:#f0f6ff}'
+  + '.ctseg-btn.on{background:#006aff;color:#fff}'
   // "Filters" is a BUTTON not a select — same pill look, no chevron bg, with a slider icon.
   + '.fsel-btn{background-image:none;padding:0 15px;display:inline-flex;align-items:center;gap:7px}'
   + '.fsel-btn .fico{width:15px;height:15px;stroke:currentColor;fill:none;stroke-width:2;stroke-linecap:round}'
@@ -478,9 +490,13 @@ const VIEWPORT_JS = `<script>
   var MODES={
     open:{ ep:'/api/app/opportunity-map', title:'Open Opportunities', unit:'active opportunities' },
     recompete:{ ep:'/api/app/recompete-map', title:'Recompetes', unit:'expiring contracts' },
-    contractor:{ ep:'', title:'Contacts', unit:'contacts' }
+    contractor:{ ep:'/api/app/contacts-map', title:'Contacts', unit:'contacts' }
   };
   var MODE='open'; window.__mapMode='open';
+  // Contacts sub-dataset (companies = contractors, buyers = gov POCs). Toggled by the
+  // Companies/Buyers segmented control that appears only in Contacts mode.
+  var CONTACT_TYPE='companies';
+  var CONTACT_COLOR='#7c3aed'; // purple — distinct from the set-aside pin colors
   var HIDE_FSC=false, TOTAL=0, CAPPED=false, busy=false, t=null, t2=null, Q='';
   // Server-wired filter state (the reorg). Every control writes here, then fetchView()
   // sends them as query params so the filter is applied by the DB for the current
@@ -492,6 +508,15 @@ const VIEWPORT_JS = `<script>
     if(zt&&zf){ zt.appendChild(zf); setTimeout(function(){try{map.invalidateSize();}catch(e){}},80); } }catch(e){}
   function clean(d){ return (d||'').replace(/,?\\s*DEPARTMENT OF( THE)?/i,'').replace(/DEPARTMENT OF( THE)?\\s*/i,'').trim().replace(/\\b([A-Z])([A-Z0-9'&.\\/-]*)/g,function(_,a,b){return a+b.toLowerCase();})||d; }
   function toRow(p){
+    if(MODE==='contractor'){
+      // Contacts pins. companies = a contractor firm; buyers = a gov POC. Both keyed by id
+      // (used as the marker key + card data-sol). loc = "City, ST" (or just state).
+      var loc = p.city ? (p.city+', '+p.state) : (p.state||'');
+      if(CONTACT_TYPE==='buyers'){
+        return {src:'CONTACT',ctype:'buyers',title:p.name,agency:clean(p.agency||''),role:p.title||'',office:clean(p.office||''),loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng};
+      }
+      return {src:'CONTACT',ctype:'companies',title:p.name,agency:'',meta:p.meta||'',loc:loc,sol:String(p.id),nid:String(p.id),lat:p.lat,lng:p.lng};
+    }
     if(MODE==='recompete') return {src:'RECOMPETE',title:p.title,cat:p.cat,agency:clean(p.agency),naics:p.naics,set:SETMAP[p.set]||'None',value:p.value,exp:(p.exp||'').slice(0,10),loc:p.loc,sol:p.sol,nid:p.id,lat:p.lat,lng:p.lng};
     return {src:'SAM',naics:p.naics,cat:p.cat,title:p.title,agency:clean(p.agency),set:SETMAP[p.set]||'None',loc:p.loc,close:(p.close||'').slice(0,10),sol:p.sol||p.id,nid:p.id,uiLink:p.uiLink,lat:p.lat,lng:p.lng,locSrc:p.locSrc,subAgency:clean(p.subAgency||''),office:p.office||'',noticeType:p.noticeType||'',docs:!!p.docs,pocs:p.pocs||0,posted:(p.posted||'').slice(0,10)};
   }
@@ -516,7 +541,49 @@ const VIEWPORT_JS = `<script>
   // After a marker rebuild (render clears+recreates all markers on every refetch), RE-OPEN the
   // popup for the currently-selected opp — otherwise a background refetch destroys the popup the
   // user just opened (the "flash"). The popup now stays until the user clicks off it / another dot.
-  var _render=render; render=function(){ _render(); updateHeader();
+  // Contacts renderer — bypasses the template's pass()/cardHTML/popupHTML (all opp-shaped).
+  // Contacts flow through the SAME markers/layer/rows/feed globals + select() path, but with
+  // contact-specific pins (a fixed purple), popups, and right-panel cards.
+  function esc0(s){ return (s==null?'':String(s)).replace(/[&<>"]/g,function(c){return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]; }); }
+  function contactPopup(o){
+    var sub = o.ctype==='buyers'
+      ? '<div class="pvmeta"><b>'+esc0(o.agency)+'</b>'+(o.loc?' \\u00b7 '+esc0(o.loc):'')+'</div>'
+        + (o.role?'<div class="pvmeta">'+esc0(o.role)+'</div>':'')
+        + (o.office?'<div class="pvmeta" style="color:var(--sub)">'+esc0(o.office)+'</div>':'')
+      : '<div class="pvmeta">'+(o.loc?esc0(o.loc):'')+'</div>'
+        + (o.meta?'<div class="pvmeta" style="color:var(--sub)">'+esc0(o.meta)+'</div>':'');
+    return '<div class="pv"><div class="pvstrip" style="background:'+CONTACT_COLOR+'"></div><div class="pvbody">'
+      + '<div class="pvchips"><span class="chip" style="background:'+CONTACT_COLOR+';color:#fff">'+(o.ctype==='buyers'?'Government buyer':'Contractor')+'</span></div>'
+      + '<div class="pvt">'+esc0(o.title)+'</div>'+sub+'</div></div>';
+  }
+  function contactCard(o){
+    var line2 = o.ctype==='buyers'
+      ? '<div class="cmeta"><span class="ag">'+esc0(o.agency||'Government')+'</span>'+(o.loc?'<span class="dot"></span><span class="loc">'+esc0(o.loc)+'</span>':'')+'</div>'
+        + (o.role?'<div class="cmeta" style="margin-top:2px"><span class="loc">'+esc0(o.role)+'</span></div>':'')
+      : '<div class="cmeta">'+(o.loc?'<span class="loc">'+esc0(o.loc)+'</span>':'')+(o.meta?'<span class="dot"></span><span class="loc">'+esc0(o.meta)+'</span>':'')+'</div>';
+    return '<div class="cstrip" style="background:'+CONTACT_COLOR+'"></div><div class="cbody">'
+      + '<div class="crow1"><span class="chip" style="background:'+CONTACT_COLOR+';color:#fff">'+(o.ctype==='buyers'?'Buyer':'Company')+'</span></div>'
+      + '<div class="ctitle">'+esc0(o.title)+'</div>'+line2+'</div>';
+  }
+  function renderContacts(){
+    rows=OPPS.slice();
+    layer.clearLayers(); markers.clear();
+    rows.forEach(function(o){
+      var m=L.circleMarker([o.lat,o.lng],{radius:6,color:'#ffffff',weight:2,fillColor:CONTACT_COLOR,fillOpacity:.95})
+        .bindPopup(contactPopup(o),{maxWidth:300,closeButton:true,autoClose:false,closeOnClick:false});
+      m.on('click',function(){ select(o.sol,false); });
+      m.on('mouseover',function(){ m.setStyle({radius:9.5,weight:3}); });
+      m.on('mouseout',function(){ m.setStyle({radius:6,weight:2}); });
+      m.addTo(layer); markers.set(o.sol,m);
+    });
+    var feed=document.getElementById('feed'); if(feed){
+      if(!rows.length){ feed.innerHTML='<div class="empty"><h4>No contacts in view</h4><p>Pan or zoom to a region, or switch between Companies and Buyers.</p></div>'; }
+      else { feed.innerHTML=''; rows.forEach(function(o){ var c=document.createElement('article'); c.className='card'; c.dataset.sol=o.sol; c.tabIndex=0; c.innerHTML=contactCard(o); c.onclick=function(){ select(o.sol,true); }; feed.appendChild(c); }); }
+    }
+  }
+  var _render=render; render=function(){
+    if(MODE==='contractor'){ renderContacts(); updateHeader(); return; }
+    _render(); updateHeader();
     try{ if(typeof selected!=='undefined' && selected){ var mm=markers.get(selected); if(mm && !mm.isPopupOpen()) mm.openPopup(); } }catch(e){}
   };
   // Zillow: the popup stays through refetches (closeOnClick:false) but closes when the user
@@ -525,7 +592,23 @@ const VIEWPORT_JS = `<script>
   try{ map.on('click', function(){ try{ selected=null; map.closePopup(); document.querySelectorAll('.card.sel').forEach(function(c){c.classList.remove('sel');}); }catch(e){} }); }catch(e){}
   function fetchView(){
     if(busy)return;
-    if(MODE==='contractor'){ OPPS=[]; render(); var f=document.getElementById('feed'); if(f)f.innerHTML='<div class="empty"><h4>Contacts map — coming next</h4><p>Buyers (contracting officers &amp; POCs) and companies, mapped by location.</p></div>'; return; }
+    // ── Contacts mode: companies (contractors) or buyers (gov POCs), by location. ──
+    if(MODE==='contractor'){
+      busy=true;
+      var em=_uemail(); var tk=''; try{ tk=localStorage.getItem('mi_beta_auth_token')||''; }catch(e){}
+      var curl='/api/app/contacts-map?bbox='+bbox()+'&type='+CONTACT_TYPE
+        +(FILT.state?'&state='+encodeURIComponent(FILT.state):'')
+        +(Q?'&search='+encodeURIComponent(Q):'')
+        +(em?'&email='+encodeURIComponent(em):'');
+      var ch={}; if(tk)ch['x-mi-auth-token']=tk; if(em)ch['x-user-email']=em;
+      fetch(curl,{headers:ch}).then(function(r){return r.json();}).then(function(d){ busy=false;
+        if(!d||!d.success){ OPPS=[]; TOTAL=0; CAPPED=false; render();
+          var fe=document.getElementById('feed'); if(fe&&(!d||d.error))fe.innerHTML='<div class="empty"><h4>Sign in to see contacts</h4><p>Companies and government buyers, mapped by location, are available to signed-in users.</p></div>'; return; }
+        TOTAL=d.totalForFilters||0; CAPPED=false;
+        OPPS=(d.pins||[]).map(toRow); render();
+      }).catch(function(){ busy=false; });
+      return;
+    }
     busy=true;
     var url=MODES[MODE].ep+'?bbox='+bbox()+(MODE==='open'?('&status=active'+(HIDE_FSC?'&hideCommodity=1':'')):'')+(Q?'&q='+encodeURIComponent(Q):'');
     // Append active server filters. Top-bar single-selects and deep-panel multi-selects
@@ -574,6 +657,10 @@ const VIEWPORT_JS = `<script>
     var dsel=document.getElementById('fltDataset'); if(dsel&&dsel.value!==mode)dsel.value=mode;
     // More-filters panel shows on open + recompete (recompete gets value-range); hide on contractor.
     var mw=document.querySelector('.mfwrap'); if(mw)mw.style.display=(mode==='contractor')?'none':'';
+    // Notice-type + set-aside pills are opportunity-only — hide them in Contacts mode; show the
+    // Companies/Buyers segmented control instead.
+    var ctSeg=document.getElementById('ctSeg'); if(ctSeg)ctSeg.style.display=(mode==='contractor')?'inline-flex':'none';
+    ['fltNotice','saselBtn','naicsBtn'].forEach(function(id){ var el=document.getElementById(id); var wrap=el&&(el.closest?el.closest('.saselwrap,.naicswrap'):null); var target=wrap||el; if(target)target.style.display=(mode==='contractor')?'none':''; });
     syncValueVis();
     Q=''; var zsi=document.getElementById('zsearchInput'); if(zsi)zsi.value='';
     fetchView();
@@ -590,6 +677,15 @@ const VIEWPORT_JS = `<script>
   function bindInp(id,key,norm){ var el=document.getElementById(id); if(!el)return; el.oninput=function(){ clearTimeout(el._t); el._t=setTimeout(function(){ var v=el.value.trim(); if(norm)v=norm(v); FILT[key]=v; markActive(el,v); fetchView(); },400); }; }
   function markActive(el,v){ el.classList.toggle('on',!!v && v!=='all'); }
   bindSel('fltNotice','noticeType');
+  // Companies / Buyers segmented control (Contacts mode) — switch CONTACT_TYPE + refetch.
+  (function(){
+    var seg=document.getElementById('ctSeg'); if(!seg)return;
+    Array.prototype.forEach.call(seg.querySelectorAll('.ctseg-btn'),function(b){
+      b.onclick=function(){ var ct=b.getAttribute('data-ct'); if(ct===CONTACT_TYPE)return; CONTACT_TYPE=ct;
+        Array.prototype.forEach.call(seg.querySelectorAll('.ctseg-btn'),function(x){ x.classList.toggle('on',x===b); });
+        if(MODE==='contractor')fetchView(); };
+    });
+  })();
   // Set-aside MULTI-select dropdown (replaces the old single-select pill + the deadline pill).
   (function(){
     var btn=document.getElementById('saselBtn'), pan=document.getElementById('saselPanel'), lbl=document.getElementById('saselLabel');

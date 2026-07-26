@@ -4426,3 +4426,37 @@ returned by `/api/app/opportunity-map`. Default view reads the user's `location_
 `user_notification_settings` via `/api/app/map-home` (MI-token authed). Badge count is
 live-computed from the same filter engine the `saved-search-alerts` cron uses — new matches
 not yet in `last_seen_notice_ids`.
+
+
+## Opportunity Map — Contacts mode (companies + government buyers)
+
+**What:** The Zillow-style Opportunity Map (`/opportunity-map`) gains a third dataset —
+**Contacts** — alongside Active (open opps) and Awarded (recompetes). A Companies / Buyers
+segmented control (shown only in Contacts mode) switches between two map layers: **Companies**
+(award-winning federal contractors) and **Buyers** (government contracting officers & POCs),
+each dropped as a purple pin on the map with a matching right-panel card list (name, company
+or agency, location).
+
+**Why:** BD is relationships. Once a contractor knows WHERE the work is, the next question is
+WHO — which primes to team with in a region, and which government buyers run the offices
+nearby. Putting both on the same map they already use for opportunities keeps the whole
+capture motion in one surface instead of bouncing between the Contractors panel and the
+contacts directory.
+
+**SEO / positioning:** "federal contractors near me", "government contracting officers by
+state", "who buys [X] in [state]", "teaming partners map" — a geographic entry point into the
+same contractor + buyer intelligence Mindy already indexes.
+
+**Proof (real data, no fabrication):**
+- **Companies** come from BigQuery `searchRecipients` (317,106 award-winning recipients) —
+  each firm carries real city/state + contract totals (e.g. Lockheed Martin, Fort Worth TX,
+  4,850 awards / $221.0B won). Placed at the state centroid + deterministic jitter so firms
+  in one state fan out instead of stacking.
+- **Buyers** come from `federal_contacts` (~98K gov POCs) joined to `sam_opportunities` by
+  solicitation number to recover the place-of-performance (or buying-office) state — 231,591
+  contact-notice rows carry a real state. A pin is placed ONLY when a real 2-letter state
+  exists; rows with no location are skipped, never invented.
+- API: `GET /api/app/contacts-map?type=companies|buyers&bbox=&state=&search=` (MI-token authed).
+  Verified live: companies 317,106 total / buyers 98,024 total; `state=FL` returns FL-only pins.
+- Verified in a headless browser: switching to Contacts mode renders purple pins + contact
+  cards (companies + buyers), toggle works, zero JS errors.
