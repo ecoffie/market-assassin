@@ -13,6 +13,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { requireMIAuthSession } from '@/lib/two-factor-session';
 import { getBuyerDetail } from '@/lib/gov-contacts/buyer-detail';
+import { computeBuyerBehavior } from '@/lib/opportunities/buyer-behavior';
 
 export const dynamic = 'force-dynamic';
 
@@ -33,7 +34,11 @@ export async function GET(request: NextRequest) {
     if (!buyer) {
       return NextResponse.json({ success: false, error: 'Buyer not found' }, { status: 404 });
     }
-    return NextResponse.json({ success: true, buyer });
+    // "How this buyer buys" (GOS #11) — the agency's contract_type mix as a small-business-fit signal.
+    // Keyed on the DISPLAY agency ("Department of Defense") which is how recompete_opportunities stores
+    // awarding_agency/sub_agency. Fail-soft: grounded:false → the drawer shows an honest placeholder.
+    const behavior = await computeBuyerBehavior(buyer.agency);
+    return NextResponse.json({ success: true, buyer: { ...buyer, behavior: behavior.grounded ? behavior : null } });
   } catch (e) {
     console.error('[buyer-detail] error:', (e as Error).message);
     return NextResponse.json({ success: false, error: (e as Error).message }, { status: 500 });

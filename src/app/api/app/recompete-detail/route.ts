@@ -20,6 +20,7 @@
  */
 import { NextRequest, NextResponse } from 'next/server';
 import { buildOppIntel } from '@/lib/opportunities/opp-intel';
+import { computeBuyerBehavior } from '@/lib/opportunities/buyer-behavior';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -33,22 +34,31 @@ export async function GET(request: NextRequest) {
 
   // Nothing to key on → an honest empty intel (drawer collapses the sections), not an error.
   if (!naics && !agency) {
-    return NextResponse.json({ success: true, intel: { agency: null, pricing: null } });
+    return NextResponse.json({ success: true, intel: { agency: null, pricing: null, behavior: null } });
   }
 
   try {
     // buildOppIntel returns { predecessor, agency, pricing, valueRange }. The Awarded drawer only
     // wants agency + pricing — the incumbent + contract value are already on the row in hand, so
     // predecessor/valueRange are dropped here (GOS #9c: consciously N/A for an awarded contract).
-    const intel = await buildOppIntel(naics, agency, title);
+    // `behavior` = "How this buyer buys" (GOS #11) — the agency's contract_type mix as a small-business
+    // -fit signal (PO=SAP-friendly, delivery-order=vehicle-gated). Computed in parallel, fail-soft.
+    const [intel, behavior] = await Promise.all([
+      buildOppIntel(naics, agency, title),
+      computeBuyerBehavior(agency, naics),
+    ]);
     return NextResponse.json({
       success: true,
-      intel: { agency: intel.agency || null, pricing: intel.pricing || null },
+      intel: {
+        agency: intel.agency || null,
+        pricing: intel.pricing || null,
+        behavior: behavior.grounded ? behavior : null,
+      },
     });
   } catch (err) {
     // Fail-soft: surface nothing rather than a 500 — the drawer's ceiling/incumbent/task-order
     // sections are still fully rendered from the row in hand.
     console.error('[recompete-detail] intel build failed:', err);
-    return NextResponse.json({ success: true, intel: { agency: null, pricing: null } });
+    return NextResponse.json({ success: true, intel: { agency: null, pricing: null, behavior: null } });
   }
 }

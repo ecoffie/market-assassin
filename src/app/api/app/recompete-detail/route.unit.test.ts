@@ -5,8 +5,9 @@
  * it replicates the market-intelligence sections (agency intel + pricing) via this endpoint,
  * plus a Contract-history/incumbent section + task-order spend from the row in hand. This test
  * pins:
- *   1. the endpoint returns ONLY { agency, pricing } — NOT predecessor/valueRange (GOS #9c: a
- *      recompete already carries a real incumbent + contract value, so an M-Estimate is N/A);
+ *   1. the endpoint returns { agency, pricing, behavior } — NOT predecessor/valueRange (GOS #9c: a
+ *      recompete already carries a real incumbent + contract value, so an M-Estimate is N/A).
+ *      `behavior` = "How this buyer buys" (GOS #11), the agency's contract_type mix as an SB-fit signal;
  *   2. it fails soft (a thrown intel build → success:true + null sections, never a 500);
  *   3. no key → an honest empty intel (not an error);
  *   4. the drawer wiring survives: rcIntelBox placeholder, loadRecompeteIntel is called from
@@ -16,21 +17,27 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 
-// Mock the shared intel engine so the test is hermetic (no USASpending / GSA CALC calls).
+// Mock the shared intel engine + behavior compute so the test is hermetic (no USASpending / GSA
+// CALC / Supabase calls).
 vi.mock('@/lib/opportunities/opp-intel', () => ({ buildOppIntel: vi.fn() }));
+vi.mock('@/lib/opportunities/buyer-behavior', () => ({ computeBuyerBehavior: vi.fn() }));
 
 import { GET } from './route';
 import { buildOppIntel as buildOppIntelImport } from '@/lib/opportunities/opp-intel';
+import { computeBuyerBehavior as computeBuyerBehaviorImport } from '@/lib/opportunities/buyer-behavior';
 const buildOppIntel = vi.mocked(buildOppIntelImport);
+const computeBuyerBehavior = vi.mocked(computeBuyerBehaviorImport);
+// Default: not grounded → the endpoint maps it to behavior:null (its own cases override).
+const notGrounded = { grounded: false } as Awaited<ReturnType<typeof computeBuyerBehaviorImport>>;
 
 function req(qs: string) {
   return { nextUrl: new URL(`https://x.test/api/app/recompete-detail?${qs}`) } as unknown as import('next/server').NextRequest;
 }
 
 describe('recompete-detail endpoint', () => {
-  beforeEach(() => buildOppIntel.mockReset());
+  beforeEach(() => { buildOppIntel.mockReset(); computeBuyerBehavior.mockReset(); computeBuyerBehavior.mockResolvedValue(notGrounded); });
 
-  it('returns ONLY agency + pricing, dropping predecessor/valueRange (GOS #9c)', async () => {
+  it('returns agency + pricing + behavior, dropping predecessor/valueRange (GOS #9c)', async () => {
     buildOppIntel.mockResolvedValue({
       predecessor: { incumbent: 'ACME', value: '$10M' },
       valueRange: { low: 1, median: 2, high: 3, label: 'x', source: 'predecessor' },
@@ -41,11 +48,21 @@ describe('recompete-detail endpoint', () => {
     const body = await res.json();
     expect(res.status).toBe(200);
     expect(body.success).toBe(true);
-    expect(Object.keys(body.intel).sort()).toEqual(['agency', 'pricing']);
+    expect(Object.keys(body.intel).sort()).toEqual(['agency', 'behavior', 'pricing']);
     expect(body.intel).not.toHaveProperty('predecessor');
     expect(body.intel).not.toHaveProperty('valueRange');
     expect(body.intel.agency.priorities).toContain('modernize');
     expect(body.intel.pricing.rates[0].hourly_rate).toBe(120);
+  });
+
+  it('surfaces a grounded behavior profile as intel.behavior (GOS #11)', async () => {
+    buildOppIntel.mockResolvedValue({ predecessor: null, valueRange: null, agency: null, pricing: null });
+    const profile = { grounded: true, poPct: 36, deliveryPct: 20, sampleSize: 100, verdict: { tone: 'friendly', label: 'Small-business friendly', detail: '36% purchase orders' } };
+    computeBuyerBehavior.mockResolvedValue(profile as Awaited<ReturnType<typeof computeBuyerBehaviorImport>>);
+    const res = await GET(req('naics=541512&agency=Defense+Logistics+Agency'));
+    const body = await res.json();
+    expect(body.intel.behavior.grounded).toBe(true);
+    expect(body.intel.behavior.poPct).toBe(36);
   });
 
   it('is keyed on naics+agency (passes them to buildOppIntel)', async () => {
@@ -59,7 +76,7 @@ describe('recompete-detail endpoint', () => {
     const body = await res.json();
     expect(res.status).toBe(200);
     expect(body.success).toBe(true);
-    expect(body.intel).toEqual({ agency: null, pricing: null });
+    expect(body.intel).toEqual({ agency: null, pricing: null, behavior: null });
     expect(buildOppIntel).not.toHaveBeenCalled();
   });
 
@@ -70,7 +87,7 @@ describe('recompete-detail endpoint', () => {
     const body = await res.json();
     expect(res.status).toBe(200);
     expect(body.success).toBe(true);
-    expect(body.intel).toEqual({ agency: null, pricing: null });
+    expect(body.intel).toEqual({ agency: null, pricing: null, behavior: null });
     errSpy.mockRestore();
   });
 });
@@ -93,6 +110,12 @@ describe('Awarded drawer wiring (full-parity, do-not-disturb invariants)', () =>
     expect(routeSrc).toContain("'agencyintel'");
     expect(routeSrc).toContain('Know your buyer');
     expect(routeSrc).toContain('Pricing intel');
+  });
+
+  it('renders the "How this buyer buys" behavior section (GOS #11) on the Awarded drawer', () => {
+    expect(routeSrc).toContain('function behaviorSec');
+    expect(routeSrc).toContain('How this buyer buys');
+    expect(routeSrc).toContain('behaviorSec(intel.behavior)'); // wired into renderRecompeteIntel
   });
 
   it('DOES NOT disturb the task-order spend section (#472) — still fetched via loadTaskOrders', () => {

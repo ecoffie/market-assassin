@@ -5397,3 +5397,29 @@ gates green.
 **SEO/positioning:** internal member surface (`/opportunity-map`) — no public SEO page. The
 positioning line: *connective intelligence — the only GovCon tool that turns any opportunity into a
 teaming target and any award into a bid target, in one click.*
+
+---
+
+## "How this buyer buys" — the small-business-fit signal (2026-07-26)
+
+**What:** A "How this buyer buys" section on the Opportunity Map's **Awarded Contracts** and
+**Government Buyers** drawers. It reads a buyer's real award history and tells a small business, in
+plain English, whether they can win here — a green "🟢 Small-business friendly" badge when the agency
+buys a lot via **purchase orders** (simplified-acquisition buys with a low past-performance wall), a
+"🔒 Vehicle-gated" badge when most awards are **delivery/task orders** under existing contract vehicles
+(a teaming/sub play), plus the mix as a bar and the typical award size.
+
+**Why:** GOS Invariant #11 — every field is a signal; reveal the pattern, tell the story. `contract_type`
+is not metadata, it's a buying-behavior tell. Incumbents (GovWin/SweetSpot/HigherGov) show a contract
+list; nobody translates the *pattern* into "you can walk in and win a small buy here" vs "get on the
+vehicle first." That translation is the value a small business actually needs.
+
+**SEO/positioning:** internal member surface — no public SEO page. Positioning line: *we don't just
+list a buyer's contracts — we read how they buy and tell you if you can win.*
+
+**Proof (real data, measured 2026-07-26):** purchase-order share varies **14%–36%** across agencies —
+Defense Logistics Agency **36%** (very SB-friendly), Veterans Affairs **25%**, NASA **15%**, Army **14%**
+(more vehicle-heavy) — a 2.5× spread, a genuine differentiating signal, not noise. Computed live from
+`recompete_opportunities` (129K+ real per-contract award rows). Set-aside friendliness is intentionally
+NOT claimed on awarded contracts (the USASpending award feed omits set-aside) — shown honestly as
+"not tracked on awards," never fabricated.
