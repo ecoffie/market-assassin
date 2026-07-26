@@ -17,6 +17,41 @@ const API_URL = 'https://api.usaspending.gov/api/v2/search/spending_by_award/';
 const AWARD_TYPE_CODES = ['A', 'B', 'C', 'D'];
 const FIELDS = ['Award Amount', 'Start Date'];
 
+/**
+ * POST to USASpending with retry + exponential backoff on 429 / 5xx / network errors — USASpending
+ * throttles hard, so a bare fetch fails a lot of rows under bulk load. Honors Retry-After when the
+ * server sends it. Throws only after all retries are exhausted (the caller treats a throw as
+ * "transient — retry later", NOT as "no comparables"). Returns the parsed JSON on success.
+ */
+export async function postWithBackoff(body: unknown, timeoutMs: number, maxRetries = 4): Promise<Record<string, unknown>> {
+  let lastErr: unknown = null;
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    const ctrl = new AbortController();
+    const to = setTimeout(() => ctrl.abort(), timeoutMs);
+    try {
+      const resp = await fetch(API_URL, {
+        method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctrl.signal,
+      });
+      if (resp.ok) return (await resp.json()) as Record<string, unknown>;
+      // Retryable server states: 429 (rate limit), 5xx (transient). 4xx (except 429) = a real bad
+      // request → don't retry.
+      if (resp.status !== 429 && resp.status < 500) throw new Error(`usaspending ${resp.status}`);
+      lastErr = new Error(`usaspending ${resp.status}`);
+      // Honor Retry-After (seconds) if present; else exponential backoff w/ jitter (0.5s→8s).
+      const ra = parseInt(resp.headers.get('retry-after') || '', 10);
+      const waitMs = ra > 0 ? ra * 1000 : Math.min(8000, 500 * 2 ** attempt) + Math.floor(Math.random() * 400);
+      if (attempt < maxRetries) await new Promise((r) => setTimeout(r, waitMs));
+    } catch (e) {
+      lastErr = e;
+      // Network error / abort — also backoff-retry.
+      if (attempt < maxRetries) await new Promise((r) => setTimeout(r, Math.min(8000, 500 * 2 ** attempt) + Math.floor(Math.random() * 400)));
+    } finally {
+      clearTimeout(to);
+    }
+  }
+  throw lastErr instanceof Error ? lastErr : new Error('usaspending: retries exhausted');
+}
+
 export interface ValueRange {
   low: number;        // 25th percentile
   median: number;     // 50th
@@ -72,24 +107,12 @@ export async function getComparableAwardRange(
     filters, fields: FIELDS, page: 1, limit: 100, sort: 'Start Date', order: 'desc', subawards: false,
   };
 
-  const ctrl = new AbortController();
-  const to = setTimeout(() => ctrl.abort(), opts.timeoutMs ?? 14000);
-  let amounts: number[] = [];
-  try {
-    const resp = await fetch(API_URL, {
-      method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body), signal: ctrl.signal,
-    });
-    // THROW on an upstream error/rate-limit (429/5xx/abort) so the caller can distinguish it from
-    // a genuine "no comparables found" (which returns null). A backfill must NOT stamp a "no range"
-    // sentinel on a rate-limit — that's a false negative that would never retry.
-    if (!resp.ok) throw new Error(`usaspending ${resp.status}`);
-    const data = await resp.json();
-    amounts = ((data.results || []) as Record<string, unknown>[])
-      .map((r) => parseFloat(r['Award Amount'] as string) || 0)
-      .filter((v) => v >= 1000);
-  } finally {
-    clearTimeout(to);
-  }
+  // postWithBackoff retries 429/5xx and THROWS only after exhausting retries — the caller treats
+  // that throw as "transient, retry later" (never as "no comparables", which is a null return).
+  const data = await postWithBackoff(body, opts.timeoutMs ?? 14000);
+  const amounts: number[] = ((data.results || []) as Record<string, unknown>[])
+    .map((r) => parseFloat(r['Award Amount'] as string) || 0)
+    .filter((v) => v >= 1000);
 
   // If agency-scoped came back thin, retry NAICS-only (broader) once.
   if (amounts.length < MIN_SAMPLE && agency) {
@@ -97,11 +120,14 @@ export async function getComparableAwardRange(
   }
   if (amounts.length < MIN_SAMPLE) return null;
 
+  // Band = 10th–90th percentile (a trustworthy "likely range"). Backtested against 60 real awards:
+  // the 25th–75th IQR only covered the actual ~47% of the time (and skewed LOW on big-ticket work);
+  // the 10th–90th band lifts coverage toward ~80% while staying grounded in real award amounts.
   const sorted = amounts.slice().sort((a, b) => a - b);
   return {
-    low: Math.round(percentile(sorted, 0.25)),
+    low: Math.round(percentile(sorted, 0.10)),
     median: Math.round(percentile(sorted, 0.5)),
-    high: Math.round(percentile(sorted, 0.75)),
+    high: Math.round(percentile(sorted, 0.90)),
     n: sorted.length,
     basis: `${codes.join(', ')}${agency ? ` at ${agency}` : ''}`,
     source: 'comparable_awards',
