@@ -363,17 +363,26 @@ const ZLAYOUT_CSS = '<style>'
   + 'border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 34px rgba(0,0,0,.14);padding:14px 16px;'
   + 'min-width:300px;max-width:540px;margin-top:0!important;max-height:62vh;overflow-y:auto}'
   // Sort — Zillow-style blue text link (not a bordered form select). Borderless, blue, bold,
-  // with a "Sort:" prefix + a blue chevron. rescount ("N results") sits bold on the left.
-  + '.sortrow{padding:14px 20px 12px!important}'
+  // rescount ("N results") sits bold on the left of the sort row.
+  + '.sortrow{padding:14px 20px 12px!important;position:relative}'
   + '.sortrow .rescount{font:600 15px Inter,system-ui,sans-serif;color:var(--ink)}'
-  + '.sortsel{border:0!important;background-color:transparent!important;color:#006aff!important;'
-  + 'font:700 14.5px Inter,system-ui,sans-serif!important;padding:6px 22px 6px 0!important;cursor:pointer;'
-  + "background-image:url(\"data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 12 12'><path d='M3 4.5L6 8l3-3.5' stroke='%23006aff' stroke-width='1.8' fill='none' stroke-linecap='round'/></svg>\")!important;"
-  + 'background-repeat:no-repeat!important;background-position:right center!important}'
-  + '.sortsel:hover{text-decoration:underline}'
-  // "Sort:" prefix label before the select.
-  + '.sortlabel{font:700 14.5px Inter,system-ui,sans-serif;color:#006aff;margin-right:1px}'
-  + '.sortwrap{display:inline-flex;align-items:center}'
+  // ── Custom Zillow sort menu: blue "Sort: X ▾" trigger + white rounded option panel. ──
+  + '.sortmenu-wrap{position:relative}'
+  + '.sortmenu-btn{display:inline-flex;align-items:center;gap:6px;border:0;background:none;cursor:pointer;'
+  + 'font:700 14.5px Inter,system-ui,sans-serif;color:#006aff;padding:4px 2px}'
+  + '.sortmenu-btn:hover{text-decoration:underline}'
+  + '.sortmenu-pre{font-weight:700}'
+  + '.sortmenu-car{transition:transform .15s}.sortmenu-wrap.open .sortmenu-car{transform:rotate(180deg)}'
+  + '.sortmenu{position:absolute;top:calc(100% + 8px);right:0;min-width:250px;background:#fff;'
+  + 'border:1px solid var(--line);border-radius:14px;box-shadow:0 16px 40px rgba(16,24,40,.18);'
+  + 'padding:8px;z-index:1200;display:none}'
+  + '.sortmenu.show{display:block}'
+  + '.sortmenu-item{display:flex;align-items:center;gap:10px;width:100%;text-align:left;border:0;background:none;'
+  + 'cursor:pointer;font:500 15px Inter,system-ui,sans-serif;color:var(--ink);padding:11px 12px;border-radius:9px}'
+  + '.sortmenu-item:hover{background:#f0f6ff}'
+  + '.sortmenu-item.on{color:#006aff;font-weight:700}'
+  + '.sortmenu-check{width:16px;flex:none;color:#006aff;font-weight:800;visibility:hidden}'
+  + '.sortmenu-item.on .sortmenu-check{visibility:visible}'
   + '</style>';
 
 // Icon rail + top search bar. The template's .fbar (filters) is appended into .ztop by JS.
@@ -390,6 +399,30 @@ const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
   + '<svg viewBox="0 0 24 24" fill="none"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg>'
   + '<input id="zsearchInput" placeholder="Search opportunities, agencies, keywords…" autocomplete="off">'
   + '<div class="zsp" id="searchPanel"></div></div></div>';
+
+// Custom Zillow-style sort menu. SORT_OPTIONS is the single source of truth (value → label).
+// Rendered as: a HIDDEN native <select id="sort"> (keeps SORT_EXTRA_JS's change→render wiring) +
+// a blue "Sort: <label> ▾" trigger + a white rounded menu of rows (✓ on the active one).
+const SORT_OPTIONS: Array<[string, string]> = [
+  ['deadline', 'Deadline (soonest)'],
+  ['newest', 'Newest posted'],
+  ['setaside', 'Set-aside opps first'],
+  ['deadline-far', 'Deadline (latest)'],
+  ['value', 'Contract value (high to low)'],
+  ['az', 'Title (A-Z)'],
+];
+const SORT_MENU_HTML =
+    '<select id="sort" style="display:none">'
+  + SORT_OPTIONS.map(([v]) => `<option value="${v}"></option>`).join('')
+  + '</select>'
+  + '<div class="sortmenu-wrap">'
+  +   '<button type="button" class="sortmenu-btn" id="sortBtn"><span class="sortmenu-pre">Sort:</span> <span id="sortBtnLabel">Deadline (soonest)</span>'
+  +   '<svg viewBox="0 0 12 12" width="12" height="12" class="sortmenu-car"><path d="M3 4.5L6 8l3-3.5" stroke="currentColor" stroke-width="1.8" fill="none" stroke-linecap="round"/></svg></button>'
+  +   '<div class="sortmenu" id="sortMenu">'
+  +     SORT_OPTIONS.map(([v, l], i) => `<button type="button" class="sortmenu-item${i === 0 ? ' on' : ''}" data-sort="${v}"><span class="sortmenu-check">✓</span>${l}</button>`).join('')
+  +   '</div>'
+  + '</div>';
+
 // Mindy brand header bar (top, full width) — the wordmark + product name, Zillow-style.
 // Zillow-style top nav: left nav links · CENTER logo · right nav + account.
 const ZHEAD_HTML = '<header class="zhead">'
@@ -1098,6 +1131,22 @@ const SORT_EXTRA_JS = `<script>(function(){
     }
   };
   var sel=document.getElementById('sort'); if(sel)sel.addEventListener('change',function(){ try{ if(typeof render==='function')render(); }catch(e){} });
+  // Custom Zillow-style sort menu: trigger opens a white panel; picking a row sets the hidden
+  // <select> value + fires its 'change' (reusing the render wiring above), updates the label + ✓.
+  var wrap=document.querySelector('.sortmenu-wrap'), btn=document.getElementById('sortBtn'),
+      menu=document.getElementById('sortMenu'), lbl=document.getElementById('sortBtnLabel');
+  if(wrap&&btn&&menu&&sel){
+    btn.onclick=function(e){ e.stopPropagation(); var open=!menu.classList.contains('show'); menu.classList.toggle('show',open); wrap.classList.toggle('open',open); };
+    Array.prototype.forEach.call(menu.querySelectorAll('.sortmenu-item'),function(it){
+      it.onclick=function(){ var v=it.getAttribute('data-sort');
+        sel.value=v; sel.dispatchEvent(new Event('change',{bubbles:true}));           // → F.sort + render
+        if(lbl)lbl.textContent=it.textContent.trim();
+        Array.prototype.forEach.call(menu.querySelectorAll('.sortmenu-item'),function(x){ x.classList.toggle('on', x===it); });
+        menu.classList.remove('show'); wrap.classList.remove('open');
+      };
+    });
+    document.addEventListener('click',function(e){ if(!e.target.closest('.sortmenu-wrap')){ menu.classList.remove('show'); wrap.classList.remove('open'); } });
+  }
 })();
 </script>`;
 
@@ -1247,21 +1296,13 @@ export async function GET(request: NextRequest) {
       '<div class="pvmeta"><b>${agency}</b> · ${o.loc}${o.locSrc===\'office\'?\' <span style=\"color:#94a3b8\">· buying office (place of performance not specified)</span>\':\'\'}</div>');
     html = repl(html, '<span class="loc">${o.loc}</span>',
       '<span class="loc">${o.loc}${o.locSrc===\'office\'?\' · office\':\'\'}</span>');
-    // Fuller Sort menu (Zillow-style): add "Newest posted" + "Set-aside opps first" and clearer
-    // labels. sortRows is extended in SORT_EXTRA_JS below to handle the new values.
-    html = repl(html, 
-      '<option value="deadline">Deadline: soonest</option>\n        <option value="deadline-far">Deadline: latest</option>\n        <option value="value">Contract value: high to low</option>\n        <option value="az">Title: A–Z</option>',
-      '<option value="deadline">Deadline (soonest)</option>'
-      + '<option value="newest">Newest posted</option>'
-      + '<option value="setaside">Set-aside opps first</option>'
-      + '<option value="deadline-far">Deadline (latest)</option>'
-      + '<option value="value">Contract value (high to low)</option>'
-      + '<option value="az">Title (A-Z)</option>');
-    // Prefix the sort select with a Zillow-style "Sort:" label (blue link look via CSS).
-    html = repl(html, '<select class="sortsel" id="sort">',
-      '<span class="sortwrap"><span class="sortlabel">Sort:&nbsp;</span><select class="sortsel" id="sort">');
-    html = repl(html, '<option value="az">Title (A-Z)</option>\n      </select>',
-      '<option value="az">Title (A-Z)</option></select></span>');
+    // Replace the native <select> with a CUSTOM Zillow-style sort menu: a blue "Sort: <label> ▾"
+    // trigger that opens a clean white rounded panel of option rows (checkmark on the active one).
+    // A HIDDEN <select id="sort"> is kept so SORT_EXTRA_JS's existing change→render wiring is
+    // untouched; the custom menu sets its value + fires 'change'. Options are the single source.
+    html = repl(html,
+      '<select class="sortsel" id="sort">\n        <option value="deadline">Deadline: soonest</option>\n        <option value="deadline-far">Deadline: latest</option>\n        <option value="value">Contract value: high to low</option>\n        <option value="az">Title: A–Z</option>\n      </select>',
+      SORT_MENU_HTML);
     // Set-aside color legend on the map.
     html = repl(html, '<div id="map"></div>', '<div id="map"></div>' + LEGEND_HTML);
     // "More filters" dropdown in the filter bar; drop the redundant standalone "SDVOSB only"
