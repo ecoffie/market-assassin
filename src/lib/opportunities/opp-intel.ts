@@ -24,7 +24,7 @@ export type OppIntel = {
   valueRange: { low: number; median: number; high: number; label: string; source: 'predecessor' | 'comparable_awards' } | null;
 };
 
-export async function buildOppIntel(naics: string | null, agency: string | null, title: string | null, perToolMs = 14000): Promise<OppIntel> {
+export async function buildOppIntel(naics: string | null, agency: string | null, title: string | null, perToolMs = 14000, subAgency: string | null = null): Promise<OppIntel> {
   const guard = <T>(p: Promise<T>, ms = perToolMs): Promise<T | null> => Promise.race([
     p.then((v) => v).catch(() => null),
     new Promise<null>((res) => setTimeout(() => res(null), ms)),
@@ -34,7 +34,7 @@ export async function buildOppIntel(naics: string | null, agency: string | null,
     guard(findPredecessorAward({ naicsCode: naics || undefined, agencyName: agency || undefined, keyword: title || undefined })),
     agencyKey ? guard(getUnifiedAgencyIntelligence(agencyKey)) : Promise.resolve(null),
     naics ? guard(getPricingIntel({ naics })) : Promise.resolve(null),
-    naics ? guard(getComparableAwardRange(naics, agency, { timeoutMs: perToolMs })) : Promise.resolve(null),
+    naics ? guard(getComparableAwardRange(naics, agency, { subAgency, timeoutMs: perToolMs })) : Promise.resolve(null),
   ]);
 
   const fmt = (n?: number | null) => (typeof n === 'number' && n > 0)
