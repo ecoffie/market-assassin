@@ -4993,3 +4993,54 @@ drawn on `window.__rcToLayer` matching the 188 transactions in the drawer, scree
 "$842M actually obligated" / "$837.8M contract ceiling" summary line + dated ledger render
 correctly. `npx tsc --noEmit` clean; 583/583 unit tests pass (10 new, covering the join-key
 guard, the geocode mapping, and every graceful-degrade path); all pre-push gates green.
+
+---
+
+## Company detail drawer — the full contractor profile, one click from the map (2026-07-26)
+
+**What:** Clicking any company on the Opportunity Map's **Companies** dataset — its list card OR its
+$-won value-tag pin — now opens a rich, multi-section **company detail drawer**, the same drawer
+shell the Open-opportunity drawer uses (Back · Save · Share · Hide · More action bar, sticky section
+tabs, the same card layout and styles). Sections: **company header** (name · city/state · set-aside
+chips · $ won · # awards · # agencies · # NAICS), **Award history — what they've won** (recent
+awards with agency · $ · date, deep-linked to USASpending), **Top agencies they sell to** ($ + share
+bars), **What they do — NAICS**, **Set-asides they hold**, and **Similar companies** (a clickable
+flywheel to peer firms' drawers). The heart on the popup card and the Save button in the drawer both
+save the company to the user's saved set, exactly like the opportunity hearts. A `?company=<UEI>`
+share link reopens any firm's drawer directly.
+
+**Why:** The map could pin companies but a click did nothing — companies were the one dataset with no
+detail view (the Awarded drawer had been shipped as a 1-section stub; this build does NOT repeat that
+mistake). A contractor researching who wins in their market, who to team with, or who the incumbent
+is needs the firm's real record — not just a dot. The drawer answers "who is this company, what have
+they won, who do they sell to, are they a small business, who's like them" without leaving the map.
+
+**How it replicates (COMPOUND, GOS #9):** the company drawer reuses the opportunity drawer's exact
+shell + `sec()`/`buildTabs()` section machinery + Save/Share/Hide/More bar, then swaps only the
+CONTENT for accuracy. Sections genuinely N/A for a firm (Bid facts, SOW facts, Estimated value,
+"Should I bid?") are consciously dropped; the primary CTA becomes company-appropriate — **View full
+profile** (→ `/contractors/[slug]`), **Add to targets**, **Find their contacts**.
+
+**SEO/positioning:** "Every company on the map is a full dossier, one click deep" — Mindy turns a map
+pin into who-they-are, what-they've-won, who-they-sell-to, and who's-like-them, so a small business
+can size up an incumbent or a teaming partner in seconds.
+
+**Proof:** ONE call to `GET /api/app/company-detail?uei=` (MI-token authed, mirrors how
+`opportunity-detail` feeds the opp drawer) → `src/lib/bigquery/company-detail.ts` (`getCompanyDetail`)
+composes the EXISTING BigQuery recipient functions (`getBqContractorHistory` for profile + top
+agencies + NAICS + recent awards, `getRecipientByUei` for HQ city/state/CAGE, `getSetAsidesForRecipients`
+for real award-derived eligibility, `getSimilarRecipients` for peers) — every dollar / agency / NAICS /
+set-aside traces to USASpending award records, never an LLM guess; a firm with no set-aside award
+returns NO set-aside (never a fabricated "Open"/"None"), and an unresolved UEI returns an honest 404.
+Save reuses the same `/api/opportunities/save` endpoint the opp hearts use (UEI as the id,
+`source='company_map'`). `npx tsc --noEmit` clean; 591/591 unit tests pass (11 new: composition,
+honest-miss, set-aside labels, location/approx logic, and every graceful-degrade path); silent-failure
++ rank-then-filter gates green.
+
+**Board-wide location-honesty consolidation (same PR):** all value-tag pins now render **solid**
+regardless of location precision (the dashed "approximate" pin style was dropped — it made the
+state-centroid pile-up look worse). The single **"(approximate — based on state, not a confirmed
+address)"** disclosure now lives ONLY in each dataset's **detail drawer** (Companies · Open · Awarded)
+— never on the pins, list cards, or popups, so the compact surfaces stay clean while the honesty
+signal has one authoritative home. The stale "hollow = buying office" map legend line was removed to
+match.

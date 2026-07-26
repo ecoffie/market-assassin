@@ -314,9 +314,10 @@ const PIN_JS = '<script>'
   + 'if(o.src===\'RECOMPETE\')return mMoney(o.value);'
   + 'return mMoney(o.est);}'
   // Build the Leaflet marker for a row. text present → a value TAG (divIcon pill); else a small
-  // neutral DOT. approx (state-centroid / buying-office fallback) → dashed border, muted, so an
-  // approximate location is never read as a confirmed hit. Selected/hover raise z-index + scale
-  // via a CSS class toggled on the icon element (divIcon has no setStyle).
+  // neutral DOT. `approx` (state-centroid / buying-office fallback) still tags the pin
+  // .vtag-approx, but ALL pins now render SOLID (the dashed style was dropped — Eric 2026-07-26);
+  // the location honesty lives in the card/drawer "approx." WORDS, not the border. Selected/hover
+  // raise z-index + scale via a CSS class toggled on the icon element (divIcon has no setStyle).
   + 'function mkPin(o,col,text,approx){'
   + 'var cls=\'vtag\'+(approx?\' vtag-approx\':\'\')+(text?\'\':\' vtag-dot\');'
   + 'var style=\'--vc:\'+col+\';\'+(text?(\'border-color:\'+col+\';color:\'+col):(\'background:\'+col));'
@@ -342,7 +343,11 @@ const VTAG_CSS = '<style>'
   + 'transition:transform .08s ease,box-shadow .08s ease;letter-spacing:-.2px}'
   + '.vtag.on,.vtag.sel{transform:scale(1.12);box-shadow:0 6px 14px -3px rgba(16,24,40,.28),0 3px 6px -2px rgba(16,24,40,.14);'
   + 'background:var(--vc,#64748b);color:#fff!important;border-color:#fff}'
-  + '.vtag-approx{border-style:dashed;opacity:.82}'
+  // ALL value-tag pins render SOLID regardless of location precision (Eric 2026-07-26: the dashed
+  // approximate style made the state-centroid pile-up look worse; he prefers the clean solid look).
+  // The location HONESTY moved OFF the pins/list/popup entirely — the single "(approximate)"
+  // disclosure now lives ONLY in each dataset's DETAIL DRAWER (place-of-performance line). So the
+  // .vtag-approx class stays applied by mkPin (harmless) but carries NO dashed/muted styling.
   + '.vtag-dot{width:13px;height:13px;padding:0;border-radius:50%;border:2px solid #fff;'
   + 'box-shadow:0 1px 2px rgba(16,24,40,.2);background:#64748b}'
   + '.vtag-dot.on,.vtag-dot.sel{transform:scale(1.4)}'
@@ -580,7 +585,10 @@ const LEGEND_HTML = '<div class="setlegend"><div class="sl-t">Set-aside eligibil
   + '<span><i style="background:#ef4444"></i>WOSB</span>'
   + '<span><i style="background:#f59e0b"></i>HUBZone</span>'
   + '<span><i style="background:#64748b"></i>Open</span>'
-  + '<span style="width:100%;color:var(--sub);font-size:10px;gap:5px"><i style="background:#fff;border:1.5px solid #94a3b8"></i>hollow = buying office (place of performance not specified)</span></div>';
+  // The "hollow = buying office" legend line was REMOVED (Eric 2026-07-26): all value-tag pins
+  // render SOLID regardless of location precision, so there is no hollow/approximate pin style to
+  // legend anymore. The state-level "(approximate)" honesty now lives ONLY in the detail drawer.
+  + '</div>';
 
 // Viewport-driven data layer (Airbnb/Google): the template ships a static SSR pin set; this
 // swaps it for a live bbox fetch on every pan/zoom against /api/app/opportunity-map. Reuses
@@ -720,26 +728,51 @@ const VIEWPORT_JS = `<script>
     }).join('');
   }
   function contactPopup(o){
-    // Honest precision cue (mirrors the Open-opps "buying office" hollow-marker convention):
-    // locPrecision==='state' means this pin is a state-centroid APPROXIMATION (the real city
-    // wasn't in the geocoder's table) — never presented as a confirmed city hit.
-    var approx = o.locPrecision==='state' ? ' <span style="color:#94a3b8;font-weight:400;font-size:11px">(approx. location)</span>' : '';
+    // Location honesty (state-centroid approximation) is disclosed ONLY in the detail DRAWER now,
+    // NOT on this compact popup (Eric 2026-07-26: one home for the "approximate" note, no clutter
+    // on pins/list/popups). So the popup just shows the location text — no "· approx." here.
     var sub = o.ctype==='buyers'
-      ? '<div class="pvmeta"><b>'+esc0(o.agency)+'</b>'+(o.loc?' \\u00b7 '+esc0(o.loc):'')+approx+'</div>'
+      ? '<div class="pvmeta"><b>'+esc0(o.agency)+'</b>'+(o.loc?' \\u00b7 '+esc0(o.loc):'')+'</div>'
         + (o.role?'<div class="pvmeta">'+esc0(o.role)+'</div>':'')
         + (o.office?'<div class="pvmeta" style="color:var(--sub)">'+esc0(o.office)+'</div>':'')
-      : '<div class="pvmeta">'+(o.loc?esc0(o.loc):'')+approx+'</div>'
+      : '<div class="pvmeta">'+(o.loc?esc0(o.loc):'')+'</div>'
         + (o.meta?'<div class="pvmeta" style="color:var(--sub)">'+esc0(o.meta)+'</div>':'');
-    return '<div class="pv"><div class="pvstrip" style="background:'+CONTACT_COLOR+'"></div><div class="pvbody">'
+    // Company popup gets the SAME 1-click Save HEART the opp popups have (COMPOUND parity) +
+    // a "View company \u2192" CTA that opens the detail drawer (mirrors the opp popup's "Should I
+    // bid?"). Buyers get neither yet (no drawer / no company save). data-nid=UEI drives toggleCompanyFav.
+    var heart = o.ctype==='companies'
+      ? '<button class="pv-heart" data-nid="'+esc0(o.sol)+'" data-title="'+esc0(o.title)+'" data-agency="" onclick="toggleCompanyFav(this)" title="Save to Favorites" aria-label="Save to Favorites"><svg viewBox="0 0 24 24"><path d="M12 21C5.6 16.5 3 12.9 3 9.1A5 5 0 0112 6a5 5 0 019 3.1c0 3.8-2.6 7.4-9 11.9z"/></svg></button>'
+      : '';
+    var cta = o.ctype==='companies'
+      ? '<div class="pvacts"><button class="pva pri" onclick="window.openCompanyDrawer&&openCompanyDrawer(\\''+esc0(o.sol)+'\\')">View company \\u2192</button></div>'
+      : '';
+    return '<div class="pv"><div class="pvstrip" style="background:'+CONTACT_COLOR+'"></div>'+heart+'<div class="pvbody">'
       + '<div class="pvchips"><span class="chip" style="background:'+CONTACT_COLOR+';color:#fff">'+(o.ctype==='buyers'?'Government buyer':'Contractor')+'</span>'+(o.ctype==='companies'?setAsideChips(o.setAsides):'')+'</div>'
-      + '<div class="pvt">'+esc0(o.title)+'</div>'+sub+'</div></div>';
+      + '<div class="pvt">'+esc0(o.title)+'</div>'+sub+cta+'</div></div>';
   }
+  // Company popup heart → the SAME /api/opportunities/save endpoint the opp hearts use
+  // (source=company_map, UEI as noticeId), so a hearted company lands in the user's saved set
+  // exactly like a hearted opp. Optimistic toggle; DELETE on un-heart. Mirrors toggleFav.
+  var _companyFavs={};
+  window.toggleCompanyFav=function(btn){
+    var t=null,em=''; try{ t=localStorage.getItem('mi_beta_auth_token'); var s=(t||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); em=(j&&j.email||'').toLowerCase(); }catch(e){}
+    var uei=btn.getAttribute('data-nid');
+    if(!t||!em){ if(confirm('Sign in to save this company to your Favorites?'))location.href='/app?next=%2Fopportunity-map'; return; }
+    var on=btn.classList.contains('on'); btn.classList.toggle('on',!on); _companyFavs[uei]=!on;
+    var body={email:em,noticeId:uei};
+    if(!on){ body.requestPursuitBrief=false; body.source='company_map';
+      body.opportunityData={noticeId:uei,entityType:'company',uei:uei,title:btn.getAttribute('data-title')||''}; }
+    fetch('/api/opportunities/save',{method:on?'DELETE':'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':t,'x-user-email':em},body:JSON.stringify(body)})
+      .then(function(r){ if(!r.ok&&r.status!==409){ btn.classList.toggle('on',on); _companyFavs[uei]=on; } })
+      .catch(function(){ btn.classList.toggle('on',on); _companyFavs[uei]=on; });
+  };
   function contactCard(o){
-    var approx = o.locPrecision==='state' ? ' <span style="color:#94a3b8;font-weight:400;font-size:11px">(approx.)</span>' : '';
+    // No "· approx." on the compact list card — the approximate-location note lives ONLY in the
+    // detail drawer now (Eric 2026-07-26: one authoritative disclosure, no clutter on list cards).
     var line2 = o.ctype==='buyers'
-      ? '<div class="cmeta"><span class="ag">'+esc0(o.agency||'Government')+'</span>'+(o.loc?'<span class="dot"></span><span class="loc">'+esc0(o.loc)+'</span>':'')+approx+'</div>'
+      ? '<div class="cmeta"><span class="ag">'+esc0(o.agency||'Government')+'</span>'+(o.loc?'<span class="dot"></span><span class="loc">'+esc0(o.loc)+'</span>':'')+'</div>'
         + (o.role?'<div class="cmeta" style="margin-top:2px"><span class="loc">'+esc0(o.role)+'</span></div>':'')
-      : '<div class="cmeta">'+(o.loc?'<span class="loc">'+esc0(o.loc)+'</span>':'')+(o.meta?'<span class="dot"></span><span class="loc">'+esc0(o.meta)+'</span>':'')+approx+'</div>';
+      : '<div class="cmeta">'+(o.loc?'<span class="loc">'+esc0(o.loc)+'</span>':'')+(o.meta?'<span class="dot"></span><span class="loc">'+esc0(o.meta)+'</span>':'')+'</div>';
     return '<div class="cstrip" style="background:'+CONTACT_COLOR+'"></div><div class="cbody">'
       + '<div class="crow1"><span class="chip" style="background:'+CONTACT_COLOR+';color:#fff">'+(o.ctype==='buyers'?'Buyer':'Company')+'</span>'+(o.ctype==='companies'?setAsideChips(o.setAsides):'')+'</div>'
       + '<div class="ctitle">'+esc0(o.title)+'</div>'+line2+'</div>';
@@ -749,19 +782,26 @@ const VIEWPORT_JS = `<script>
     layer.clearLayers(); markers.clear();
     rows.forEach(function(o){
       // Zillow value-tag pins for Contacts. Companies → a $-won TAG (real per-firm total_obligated).
-      // Gov Buyers → a labeled DOT (a POC has NO dollar value — never a fabricated price). A
-      // state-centroid approximation (locPrecision==='state') renders a dashed/muted tag.
+      // Gov Buyers → a labeled DOT (a POC has NO dollar value — never a fabricated price). All pins
+      // render SOLID now (dashed dropped 2026-07-26); the state-centroid approximation is disclosed
+      // ONLY in the detail drawer's location line, not on the pin. isApprox kept for mkPin's class.
       var isApprox = o.locPrecision==='state';
       var txt = (typeof pinMoney==='function') ? pinMoney(o) : '';
       var m=(typeof mkPin==='function')
         ? mkPin(o,CONTACT_COLOR,txt,isApprox).bindPopup(contactPopup(o),{maxWidth:300,closeButton:true,autoClose:false,closeOnClick:false})
         : L.circleMarker([o.lat,o.lng],{radius:6,color:'#ffffff',weight:2,fillColor:CONTACT_COLOR,fillOpacity:.95}).bindPopup(contactPopup(o),{maxWidth:300,closeButton:true,autoClose:false,closeOnClick:false});
-      m.on('click',function(){ select(o.sol,false); });
+      // Companies pin → the company DETAIL DRAWER (COMPOUND parity with opps, whose pins open the
+      // drawer). Still selects (opens the popup card too). Buyers have no drawer yet → select only.
+      (function(row){ m.on('click',function(){ select(row.sol,false); if(row.ctype==='companies'&&window.openCompanyDrawer)openCompanyDrawer(row.sol); }); })(o);
       m.addTo(layer); markers.set(o.sol,m);
     });
     var feed=document.getElementById('feed'); if(feed){
       if(!rows.length){ feed.innerHTML='<div class="empty"><h4>No contacts in view</h4><p>Pan or zoom to a region, or switch to the Companies or Gov Buyers dataset.</p></div>'; }
-      else { feed.innerHTML=''; rows.forEach(function(o){ var c=document.createElement('article'); c.className='card'; c.dataset.sol=o.sol; c.tabIndex=0; c.innerHTML=contactCard(o); c.onclick=function(){ select(o.sol,true); }; feed.appendChild(c); }); }
+      else { feed.innerHTML=''; rows.forEach(function(o){ var c=document.createElement('article'); c.className='card'; c.dataset.sol=o.sol; c.tabIndex=0; c.innerHTML=contactCard(o);
+        // Company feed card → the detail DRAWER (COMPOUND parity: opp cards open openOppDrawer).
+        // Buyers have no drawer yet → keep the select() highlight behavior.
+        c.onclick=(o.ctype==='companies')?(function(row){return function(){ if(window.openCompanyDrawer)openCompanyDrawer(row.sol); else select(row.sol,true); };})(o):(function(row){return function(){ select(row.sol,true); };})(o);
+        feed.appendChild(c); }); }
     }
   }
   var _render=render; render=function(){
@@ -1363,15 +1403,26 @@ const DRAWER_JS = `<script>
   var _back=document.getElementById('oppBack'); if(_back)_back.onclick=close;
   function _auth(){ var t=null,em=''; try{ t=localStorage.getItem('mi_beta_auth_token'); }catch(e){} try{ var s=(t||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); em=(j&&j.email||'').toLowerCase(); }catch(e){} return {t:t,em:em}; }
   var _save=document.getElementById('oppSave');
-  if(_save)_save.onclick=function(){ if(!CUR)return; var a=_auth(); if(!a.t||!a.em){ if(confirm('Sign in to save this to your pursuits?'))location.href='/app?next=%2Fopportunity-map'; return; }
+  if(_save)_save.onclick=function(){ if(!CUR)return; var a=_auth(); if(!a.t||!a.em){ if(confirm('Sign in to save this?'))location.href='/app?next=%2Fopportunity-map'; return; }
     _save.classList.add('done'); _save.querySelector('span').textContent='Saved';
+    // Company drawer save (COMPOUND parity): a hearted company saves via the SAME
+    // /api/opportunities/save endpoint the map hearts use — the UEI stands in for
+    // noticeId, source='company_map', with a snapshot so the Favorites page can
+    // render it without a sam_opportunities hydration hit. Opps/recompetes keep the
+    // pursuits save (a company isn't a pursuit).
+    if(CUR.kind==='company'){
+      fetch('/api/opportunities/save',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},
+        body:JSON.stringify({email:a.em,noticeId:CUR.id,requestPursuitBrief:false,source:'company_map',
+          opportunityData:{noticeId:CUR.id,entityType:'company',uei:CUR.id,title:CUR.title,department:CUR.department,agency:CUR.department}})}).catch(function(){});
+      return;
+    }
     fetch('/api/pipeline',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},body:JSON.stringify({noticeId:CUR.id,email:a.em,title:CUR.title,agency:CUR.department})}).catch(function(){}); };
   // The Save button is PERSISTENT action-bar DOM (built once, reused for every opp the drawer opens).
   // So its "Saved"/done state carries over to the NEXT opp unless we reset it on open — the "I clicked
   // once but they all look saved" bug. Every drawer open MUST call this first.
   window.__resetOppSave=function(){ var b=document.getElementById('oppSave'); if(b){ b.classList.remove('done'); var s=b.querySelector('span'); if(s)s.textContent='Save'; } };
   var _share=document.getElementById('oppShare');
-  if(_share)_share.onclick=function(){ if(!CUR)return; var url=location.origin+'/opportunity-map?opp='+encodeURIComponent(CUR.id);
+  if(_share)_share.onclick=function(){ if(!CUR)return; var url=location.origin+'/opportunity-map?'+(CUR.kind==='company'?'company':'opp')+'='+encodeURIComponent(CUR.id);
     var done=function(){ _share.querySelector('span').textContent='Copied!'; setTimeout(function(){ _share.querySelector('span').textContent='Share'; },1600); };
     if(navigator.clipboard&&navigator.clipboard.writeText){ navigator.clipboard.writeText(url).then(done,function(){ prompt('Copy this link:',url); }); } else { prompt('Copy this link:',url); } };
   var _hide=document.getElementById('oppHide');
@@ -1590,7 +1641,11 @@ const DRAWER_JS = `<script>
     if(o.department)org.push({k:'Department / agency',v:o.department});
     if(o.subTier)org.push({k:'Sub-agency',v:o.subTier});
     if(o.office)org.push({k:'Office',v:o.office});
-    org.push({k:'Place of performance',v:loc||'Not specified'});
+    // The SINGLE authoritative "(approximate)" location disclosure (Eric 2026-07-26: it lives ONLY
+    // in the drawer, never on pins/list/popups). When the location came from the BUYING OFFICE
+    // (place of performance not stated), the drawer says so plainly here.
+    var popApprox=o.location.source==='office'?' (approximate — based on buying office, place of performance not specified)':'';
+    org.push({k:'Place of performance',v:(loc||'Not specified')+popApprox});
     var seen={}; facts.forEach(function(f){ seen[f.k]=1; });
     var merged=facts.concat(org.filter(function(f){ return !seen[f.k]; }));
     var rows=merged.map(function(f){ return '<div class="bf-row"><div class="bf-k">'+esc(f.k)+'</div><div class="bf-v">'+esc(f.v)+'</div></div>'; }).join('');
@@ -1821,7 +1876,10 @@ const DRAWER_JS = `<script>
     if(o.naics)facts.push({k:'NAICS',v:o.naics});
     if(o.cat)facts.push({k:'Service line',v:o.cat});
     if(o.agency)facts.push({k:'Agency',v:o.agency});
-    if(o.loc)facts.push({k:'Place of performance',v:o.loc});
+    // The SINGLE authoritative "(approximate)" location disclosure for the Awarded/Recompete
+    // dataset (Eric 2026-07-26: drawer-only, never on pins/list/popup). locSrc==='office' means
+    // the city wasn't recovered from USASpending → the location is a state-level approximation.
+    if(o.loc)facts.push({k:'Place of performance',v:o.loc+(o.locSrc==='office'?' (approximate — based on state, not a confirmed address)':'')});
     facts.push({k:'Solicitation / PIID',v:o.sol||'\\u2014'});
     var factRows=facts.map(function(f){ return '<div class="bf-row"><div class="bf-k">'+esc(f.k)+'</div><div class="bf-v">'+esc(f.v)+'</div></div>'; }).join('');
     // Incumbent highlight block (the "who holds this now" hook — the recompete's core value).
@@ -1919,6 +1977,149 @@ const DRAWER_JS = `<script>
       }).catch(function(){ var box=document.getElementById('intelBox'); if(box)box.innerHTML=''; loadRoster(d.opp.department); });
     }).catch(function(){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this opportunity.</div>'; });
   };
+
+  // ── Company (Contractor) detail ─────────────────────────────────────────────────────────
+  // COMPOUND (GOS #9): the company drawer REPLICATES the opp drawer's shell (same action bar,
+  // same sec()/buildTabs() section machinery, same sticky tabs, same Save/Share/Hide/More) and
+  // modifies only the CONTENT for accuracy — award history, top agencies, NAICS, set-asides,
+  // location, similar firms. Sections that are genuinely N/A for a firm (Bid facts / SOW facts /
+  // Estimated value / Should-I-bid) are consciously DROPPED (GOS #9c); the primary CTA becomes a
+  // company-appropriate one (View full profile / Add to targets / Find their contacts).
+  // Data: ONE call to /api/app/company-detail?uei=, mirroring how opportunity-detail feeds opps.
+  function companyMoney(n){ if(typeof n!=='number'||n<=0)return '\\u2014'; return n>=1e9?('$'+(n/1e9).toFixed(1)+'B'):n>=1e6?('$'+(n/1e6).toFixed(1)+'M'):n>=1e3?('$'+Math.round(n/1e3)+'K'):('$'+Math.round(n)); }
+  function pct(n){ if(typeof n!=='number'||n<=0)return ''; var v=n<=1?n*100:n; return v<1?'<1%':(Math.round(v)+'%'); }
+  var COMPANY_SA_COLOR={SDVOSB:'#10b981',SB:'#3b82f6','8A':'#a855f7',WOSB:'#ef4444',HZ:'#f59e0b'};
+  // Company header — name, location, set-aside chips, $ won / # awards / # agencies (all real).
+  function companyHead(c){
+    var chips=(c.setAsides||[]).map(function(k,i){ var col=COMPANY_SA_COLOR[k]||'#7c3aed'; var lbl=(c.setAsideLabels&&c.setAsideLabels[i])||k;
+      return '<span class="ws-tag" style="background:'+col+';color:#fff;border-color:transparent">'+esc(lbl)+'</span>'; }).join('');
+    // The SINGLE authoritative "(approximate)" location disclosure for the Companies dataset
+    // (Eric 2026-07-26: drawer-only, never on the pin/list/popup). locApprox is true when the map
+    // placed this firm at its STATE centroid (no confirmed city) — disclosed plainly here.
+    var locApprox = c.locApprox && c.location;
+    var head='<div class="snaphero"><span class="badge-nt" style="background:#f3eefe;color:#7c3aed">Contractor</span>'
+      + (c.location?'<span class="badge-dl cool" style="background:#f0fdf7;color:#22a06b">'+esc(c.location)+'</span>':'')+'</div>'
+      + '<div class="snapt">'+esc(c.name)+'</div>'
+      + '<div class="snapmeta">'+(c.cageCode?'CAGE '+esc(c.cageCode)+' \\u00b7 ':'')+'UEI '+esc(c.uei)+'</div>'
+      + (locApprox?'<div class="ai-note" style="margin-top:6px">Location: '+esc(c.location)+' \\u2014 approximate (based on state, not a confirmed address).</div>':'')
+      + (chips?'<div class="whatspecial" style="margin-top:10px">'+chips+'</div>':'')
+      + '<div class="snapgrid" style="margin-top:12px">'
+      + '<div><div class="k">Total won</div><div class="v">'+esc(companyMoney(c.totalObligated))+'</div></div>'
+      + '<div><div class="k">Awards</div><div class="v">'+esc((c.awardCount||0).toLocaleString())+'</div></div>'
+      + '<div><div class="k">Agencies sold to</div><div class="v">'+esc((c.distinctAgencyCount||0).toLocaleString())+'</div></div>'
+      + '<div><div class="k">NAICS worked</div><div class="v">'+esc((c.distinctNaicsCount||0).toLocaleString())+'</div></div>'
+      + '</div>';
+    return '<section class="osec" id="osec-overview">'+head+'</section>';
+  }
+  // Top agencies they sell to — the agency breakdown ($ + share bar), reused from the drawer's
+  // rateChart/scoreBar visual language (horizontal bars scaled to the top agency's $).
+  function companyAgenciesSec(c){
+    var ags=(c.topAgencies||[]).slice(0,8); if(!ags.length)return '';
+    var max=Math.max.apply(null,ags.map(function(a){return a.amount||0;}).concat([1]));
+    var rows=ags.map(function(a){ var w=Math.max(6,Math.round((a.amount||0)/max*100));
+      return '<div class="rc-row"><div class="rc-lbl">'+esc(a.agency||'\\u2014')+(a.share?' <span class="rc-sz">'+esc(pct(a.share))+'</span>':'')+'</div>'
+        + '<div class="rc-bar"><i style="width:'+w+'%;background:#7c3aed"></i></div>'
+        + '<div class="rc-val">'+esc(companyMoney(a.amount))+'</div></div>'; }).join('');
+    return sec('Top agencies they sell to','<div class="ratechart">'+rows+'</div>','agencies');
+  }
+  // NAICS / what they do — the firm's top codes by $ (name, not just number).
+  function companyNaicsSec(c){
+    var ns=(c.topNaics||[]).slice(0,8); if(!ns.length)return '';
+    var rows=ns.map(function(n){ return '<div class="bf-row"><div class="bf-k">'+esc(n.naics)+(n.description?' \\u00b7 '+esc(n.description):'')+'</div><div class="bf-v">'+esc(companyMoney(n.amount))+'</div></div>'; }).join('');
+    return sec('What they do \\u00b7 NAICS','<div class="bf-grid">'+rows+'</div>','naics');
+  }
+  // Set-asides they hold — real award-derived eligibility (never a fabricated "Open"/"None").
+  function companySetAsideSec(c){
+    var sa=c.setAsides||[]; if(!sa.length)return '';
+    var chips=sa.map(function(k,i){ var col=COMPANY_SA_COLOR[k]||'#7c3aed'; var lbl=(c.setAsideLabels&&c.setAsideLabels[i])||k;
+      return '<span class="ws-tag" style="background:'+col+';color:#fff;border-color:transparent">'+esc(lbl)+'</span>'; }).join('');
+    return sec('Set-asides they hold','<div class="whatspecial">'+chips+'</div><div class="ai-note">Derived from set-aside awards this firm has actually won (USASpending) \\u2014 real eligibility, not a registration claim.</div>','setasides');
+  }
+  // Award history · what they've won — the recent awards timeline (title · agency · $ · date).
+  function companyAwardsSec(c){
+    var aw=(c.recentAwards||[]).slice(0,12); if(!aw.length)return sec('Award history \\u00b7 what they\\u2019ve won',empty('No award records on file for this firm.'),'awards');
+    var rows=aw.map(function(a){
+      var meta=[a.agency,(a.startDate?longDate(a.startDate):'')].filter(Boolean).join(' \\u00b7 ');
+      var t=a.url?('<a href="'+esc(a.url)+'" target="_blank" rel="noopener">'+esc(a.title||'Award')+'</a>'):esc(a.title||'Award');
+      return '<div class="ocontact"><div class="nm">'+t+'</div>'
+        + '<div class="ti">'+esc(meta)+(a.naicsDescription?' \\u00b7 '+esc(a.naicsDescription):'')+'</div>'
+        + '<div class="row"><b>'+esc(companyMoney(a.amount))+'</b></div></div>';
+    }).join('');
+    return sec('Award history \\u00b7 what they\\u2019ve won',rows,'awards');
+  }
+  // Similar companies — the opp drawer's "Similar opportunities" analog (same clickable-card
+  // flywheel), wired to open THIS drawer for the peer firm.
+  function companySimilarSec(c){
+    var sims=(c.similar||[]).slice(0,6); if(!sims.length)return '';
+    var cards=sims.map(function(s){
+      return '<button class="sim-card" onclick="openCompanyDrawer(\\''+esc(s.uei)+'\\')">'
+        + '<span class="sim-sa">Contractor</span>'
+        + '<div class="sim-t">'+esc(s.name)+'</div>'
+        + '<div class="sim-m">'+esc(companyMoney(s.totalObligated))+' won</div>'
+        + '</button>';
+    }).join('');
+    return sec('Similar companies','<div class="sim-grid">'+cards+'</div>','similar');
+  }
+  // Primary actions (replaces the opp drawer's Save-to-pursuits / Draft): View full profile
+  // (\u2192 /contractors/[slug]) · Add to targets · Find their contacts (the agencies they sell to).
+  function companyActions(c){
+    return '<div class="oact">'
+      + '<a class="b pri" href="/contractors/'+encodeURIComponent(c.slug)+'" target="_blank" rel="noopener">View full profile \\u2197</a>'
+      + '<button class="b" onclick="saveCurrentCompany(this)">Add to targets</button>'
+      + (c.topAgencies&&c.topAgencies.length?'<a class="b" href="/app?panel=contacts&agency='+encodeURIComponent(c.topAgencies[0].agency||'')+'" target="_blank" rel="noopener">Find their contacts</a>':'')
+      + '</div>';
+  }
+  // "Add to targets" secondary button — mirrors the opp drawer's saveCurrentOpp, but saves the
+  // company via /api/opportunities/save (source=company_map). Idempotent + optimistic label.
+  window.saveCurrentCompany=function(btn){
+    if(!CUR||CUR.kind!=='company'||btn.dataset.saved==='1')return;
+    var a=_auth(); if(!a.t||!a.em){ btn.textContent='Sign in to save'; return; }
+    btn.textContent='Saving\\u2026';
+    fetch('/api/opportunities/save',{method:'POST',headers:{'Content-Type':'application/json','x-mi-auth-token':a.t,'x-user-email':a.em},
+      body:JSON.stringify({email:a.em,noticeId:CUR.id,requestPursuitBrief:false,source:'company_map',
+        opportunityData:{noticeId:CUR.id,entityType:'company',uei:CUR.id,title:CUR.title,department:CUR.department,agency:CUR.department}})})
+      .then(function(r){return r.json().catch(function(){return {};});}).then(function(d){
+        var dup=d&&d.error&&/alread|exist|duplicate/i.test(d.error);
+        if((d&&!d.error)||dup){ btn.textContent=dup?'\\u2713 In targets':'\\u2713 Added'; btn.classList.add('saved'); btn.dataset.saved='1'; }
+        else btn.textContent='Try again';
+      }).catch(function(){ btn.textContent='Try again'; });
+  };
+  function companyRender(c){
+    // CUR mirrors the opp drawer's CUR so the shared action bar (Save/Share/Hide/More) works.
+    // kind='company' routes Save → /api/opportunities/save; uiLink → the full contractor profile
+    // (so "More" opens it); title/department feed the save snapshot + "Find their contacts".
+    CUR={ kind:'company', id:c.uei, title:c.name, department:(c.topAgencies&&c.topAgencies[0]&&c.topAgencies[0].agency)||'',
+      solicitation:'', naics:(c.topNaics&&c.topNaics[0]&&c.topNaics[0].naics)||'', deadline:'', sol:c.uei,
+      uiLink:'/contractors/'+encodeURIComponent(c.slug) };
+    return companyHead(c)
+      + companyAwardsSec(c)      // what they've won (the headline value)
+      + companyAgenciesSec(c)    // who they sell to
+      + companyNaicsSec(c)       // what they do
+      + companySetAsideSec(c)    // eligibility they hold
+      + companySimilarSec(c)     // the flywheel — peer firms
+      + companyActions(c);
+  }
+  window.openCompanyDrawer=function(uei){
+    if(!uei)return;
+    if(window.__mapMode&&window.__mapMode!=='companies')return; // company drawer is Companies-dataset only
+    if(window.__resetOppSave)window.__resetOppSave(); // clear any stale "Saved" from a prior entity
+    clearTaskOrderPins();
+    // Pass the pin's geocoded city/state through (fallback location when the BQ profile row is
+    // blank). Look the row up in the live set by its id (=UEI).
+    var city='',state='';
+    try{ var o=(typeof OPPS!=='undefined'&&OPPS)?OPPS.find(function(x){return x&&(String(x.nid)===String(uei)||String(x.sol)===String(uei));}):null;
+      if(o&&o.loc){ var parts=String(o.loc).split(','); if(parts.length===2){ city=parts[0].trim(); state=parts[1].trim(); } else { state=parts[0].trim(); } } }catch(e){}
+    var em=''; try{ var t=localStorage.getItem('mi_beta_auth_token'); var s=(t||'').split('.')[0].replace(/-/g,'+').replace(/_/g,'/'); while(s.length%4)s+='='; var j=JSON.parse(atob(s)); em=(j&&j.email||'').toLowerCase(); }catch(e){}
+    body.innerHTML='<div class="oppload">Loading\\u2026</div>';
+    bd.classList.add('show'); dr.classList.add('show'); dr.scrollTop=0;
+    var url='/api/app/company-detail?uei='+encodeURIComponent(uei)+(city?'&city='+encodeURIComponent(city):'')+(state?'&state='+encodeURIComponent(state):'')+(em?'&email='+encodeURIComponent(em):'');
+    var ch={}; try{ var tk=localStorage.getItem('mi_beta_auth_token')||''; if(tk)ch['x-mi-auth-token']=tk; }catch(e){} if(em)ch['x-user-email']=em;
+    fetch(url,{headers:ch}).then(function(r){return r.json();}).then(function(d){
+      if(!(d&&d.success&&d.company)){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this company.</div>'; return; }
+      body.innerHTML=companyRender(d.company);
+      buildTabs();
+    }).catch(function(){ body.innerHTML='<div class="oppload">Couldn\\u2019t load this company.</div>'; });
+  };
 })();
 </script>`;
 
@@ -1966,6 +2167,12 @@ const BOOT_VIEW_JS = '<script>window.__STATE_CENTROIDS=__STATE_CENTROIDS__;</scr
   // the Share link + the Favorites page). Retries until openOppDrawer is defined.
   (function(){ try{ var m=(location.search||'').match(/[?&]opp=([^&]+)/); if(!m)return; var nid=decodeURIComponent(m[1]);
     var tries=0; (function go(){ if(window.openOppDrawer){ window.openOppDrawer(nid); } else if(tries++<40){ setTimeout(go,150); } })(); }catch(e){} })();
+  // Deep-link: /opportunity-map?company=<uei> switches to the Companies dataset and opens that
+  // firm's drawer (used by the company Share link + a saved company). Switches mode first (so the
+  // guard in openCompanyDrawer passes), then opens the drawer keyed by UEI directly (no need to
+  // wait for the pin to be in view — the drawer fetches its own data by UEI).
+  (function(){ try{ var m=(location.search||'').match(/[?&]company=([^&]+)/); if(!m)return; var uei=decodeURIComponent(m[1]);
+    var tries=0; (function go(){ if(window.setMapMode&&window.openCompanyDrawer){ if(window.__mapMode!=='companies')window.setMapMode('companies'); setTimeout(function(){ window.openCompanyDrawer(uei); },200); } else if(tries++<40){ setTimeout(go,150); } })(); }catch(e){} })();
 })();
 </script>`;
 
@@ -2252,18 +2459,14 @@ export async function GET(request: NextRequest) {
       '<script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>' + EARLY_INJECT + PIN_JS);
     // Color pins by SET-ASIDE eligibility (fixes the all-gray category mismatch).
     html = html.split('catColor(o.cat)').join('setColorFor(o)');
-    // Office-vs-PoP honesty for the VALUE-TAG pin is now handled inside mkPin (PIN_JS): a pin
-    // whose location is the BUYING OFFICE / a state-centroid approximation (o.locSrc==='office')
-    // renders with a DASHED, muted tag so an approximate location is never read as confirmed PoP.
-    // (Replaces the old circleMarker hollow-ring patch — the circleMarker call no longer exists.)
-    // Honesty label in the popup + list card. Recompete pins with locSrc==='office' are a
-    // state-centroid APPROXIMATION (city not recovered from USASpending — see recompete-map's
-    // doc comment), a different situation from Open opps falling back to the buying office —
-    // so the wording branches on src to stay accurate for each dataset.
-    html = repl(html, '<div class="pvmeta"><b>${agency}</b> · ${o.loc}</div>',
-      '<div class="pvmeta"><b>${agency}</b> · ${o.loc}${o.locSrc===\'office\'?\' <span style=\"color:#94a3b8\">· \'+(o.src===\'RECOMPETE\'?\'approx. location\':\'buying office (place of performance not specified)\')+\'</span>\':\'\'}</div>');
-    html = repl(html, '<span class="loc">${o.loc}</span>',
-      '<span class="loc">${o.loc}${o.locSrc===\'office\'?(o.src===\'RECOMPETE\'?\' · approx.\':\' · office\'):\'\'}</span>');
+    // Office-vs-PoP location honesty is disclosed ONLY in the detail DRAWER now (Eric 2026-07-26:
+    // ONE authoritative "(approximate)" note per dataset, in that dataset's drawer — never on the
+    // pins/list/popup). So the Open-opp / Recompete popup + list card show the plain location text
+    // (no "· approx." / "· buying office"); the drawer's place-of-performance line carries the
+    // "(approximate location — based on state, not a confirmed address)" disclosure when
+    // locSrc==='office'. All value-tag pins render SOLID regardless of precision (dashed dropped).
+    // Buyer-office/approx text injections into the popup + list card were intentionally REMOVED
+    // here — the template's plain `${o.loc}` stands.
     // Replace the native <select> with a CUSTOM Zillow-style sort menu: a blue "Sort: <label> ▾"
     // trigger that opens a clean white rounded panel of option rows (checkmark on the active one).
     // A HIDDEN <select id="sort"> is kept so SORT_EXTRA_JS's existing change→render wiring is
