@@ -112,13 +112,14 @@ const SET_GROUP_OPTS = SET_GROUPS
   .map((g) => `<option value="${g.key}">${g.label}</option>`)
   .join('');
 const SERVER_FILTERS =
-    // Zillow's bold "For sale ▾" pill = the DATASET toggle. Ours switches the three corpora
-    // (Open Opportunities / Recompetes / Contacts). Wired to setMapMode via onchange. The
-    // all-vs-profile SCOPE filter moved into the More-filters panel (mfScope).
-    '<select class="fsel fsel-mode" id="fltDataset" title="What to explore" onchange="setMapMode(this.value)">'
+    // Zillow's bold "For sale ▾" pill = the DATASET toggle, mirroring Buy / Rent / Sell:
+    //  Open Opportunities (SAM active → map) · Past Opportunities (USASpending awards → map) ·
+    //  Bid (→ the /bid landing page, NOT a map — like Zillow's Sell page). onDatasetChange
+    //  routes 'bid' to /bid and everything else to setMapMode. Contacts lives in the top nav.
+    '<select class="fsel fsel-mode" id="fltDataset" title="What to explore" onchange="onDatasetChange(this.value)">'
   +   '<option value="open">Open Opportunities</option>'
-  +   '<option value="recompete">Recompetes</option>'
-  +   '<option value="contractor">Contacts</option>'
+  +   '<option value="recompete">Past Opportunities</option>'
+  +   '<option value="bid">Bid</option>'
   + '</select>'
   + '<select class="fsel" id="fltNotice" title="Notice type">'
   +   '<option value="">Notice type</option>'
@@ -239,13 +240,11 @@ const ZLAYOUT_CSS = '<style>'
   + ':root{--disp:"Inter",system-ui,-apple-system,sans-serif!important}'
   + '.snapt,.osec-h,.brand{font-family:"Inter",system-ui,-apple-system,sans-serif!important;letter-spacing:-.01em}'
   // Grid gains a full-width top HEADER row for the Mindy logo, above the search/filter row.
-  + '.app{grid-template-columns:64px minmax(0,1fr) 748px!important;grid-template-rows:52px auto minmax(0,1fr)!important;'
+  + '.app{grid-template-columns:64px minmax(0,1fr) 460px!important;grid-template-rows:52px auto minmax(0,1fr)!important;'
   + 'grid-template-areas:"zhead zhead zhead" "zrail ztop ztop" "zrail zmap zcards"!important;transition:none!important}'
   + '.app.collapsed{grid-template-columns:64px minmax(0,1fr) 0px!important}'
-  // Cards column is a 2-up grid (Zillow): compact cards, image-less, money/urgency hook on top.
-  + '.feed{display:grid!important;grid-template-columns:1fr 1fr!important;gap:14px!important;align-content:start!important;padding:14px 16px 28px!important}'
-  + '.feed .empty{grid-column:1/-1}'
-  + '@media(max-width:1180px){.app{grid-template-columns:64px minmax(0,1fr) 420px!important}.feed{grid-template-columns:1fr!important}}'
+  // Cards = a SINGLE wide column (real Zillow): one card per row, full-width, room to breathe.
+  + '.feed{display:flex!important;flex-direction:column!important;gap:12px!important;padding:14px 16px 28px!important}'
   // Mindy header bar
   + '.zhead{grid-area:zhead;position:relative;display:flex;align-items:center;justify-content:space-between;padding:0 22px;border-bottom:1px solid var(--line);background:#fff;z-index:20}'
   + '.zh-left,.zh-right{display:flex;align-items:center;gap:22px}'
@@ -325,7 +324,6 @@ const ZLAYOUT_CSS = '<style>'
   + '.zc-meta .zsep{width:3px;height:3px;border-radius:50%;background:#cbd3dc;flex:none}'
   + '.zc-nt{font:600 9.5px "IBM Plex Mono",monospace;letter-spacing:.05em;text-transform:uppercase;padding:2px 6px;border-radius:5px;background:#eef2f7;color:#475467}'
   + '.zc-nt.rfp{background:#e7f4ee;color:#137a4e}.zc-nt.ss{background:#f4f0fe;color:#7c3aed}'
-  + '@media(max-width:1180px){.zc-title{-webkit-line-clamp:1;min-height:0}}'
   + '</style>';
 
 // Icon rail + top search bar. The template's .fbar (filters) is appended into .ztop by JS.
@@ -344,9 +342,11 @@ const ZTOP_HTML = '<div class="ztop"><div class="zsearch">'
 // Mindy brand header bar (top, full width) — the wordmark + product name, Zillow-style.
 // Zillow-style top nav: left nav links · CENTER logo · right nav + account.
 const ZHEAD_HTML = '<header class="zhead">'
+  // Top nav mirrors Zillow's Buy / Rent / Sell (+ a util link), same words as the dataset pill.
   + '<nav class="zh-left">'
   + '<a class="zh-mode on" data-mode="open" onclick="setMapMode(\'open\')">Open Opportunities</a>'
-  + '<a class="zh-mode" data-mode="recompete" onclick="setMapMode(\'recompete\')">Recompetes</a>'
+  + '<a class="zh-mode" data-mode="recompete" onclick="setMapMode(\'recompete\')">Past Opportunities</a>'
+  + '<a href="/bid">Bid</a>'
   + '<a class="zh-mode" data-mode="contractor" onclick="setMapMode(\'contractor\')">Contacts</a>'
   + '</nav>'
   + '<a href="/app" title="Mindy" class="zh-logo"><img src="/brand/mindy-logo-icon.png" alt=""/><span>Mindy</span></a>'
@@ -453,6 +453,12 @@ const VIEWPORT_JS = `<script>
       render();
     }).catch(function(){busy=false;});
   }
+  // Dataset pill router — like Zillow's Buy/Rent/Sell: 'bid' is NOT a map, it navigates to the
+  // /bid landing page ("Bid with confidence"); everything else switches the map corpus.
+  window.onDatasetChange=function(v){
+    if(v==='bid'){ var ds=document.getElementById('fltDataset'); if(ds)ds.value=window.__mapMode||'open'; location.href='/bid'; return; }
+    setMapMode(v);
+  };
   window.setMapMode=function(mode){ if(!MODES[mode]||mode===MODE)return; MODE=mode; window.__mapMode=mode;
     var tabs=document.querySelectorAll('.zh-mode'); for(var i=0;i<tabs.length;i++)tabs[i].classList.toggle('on',tabs[i].getAttribute('data-mode')===mode);
     // Keep the Zillow-style dataset pill in sync (nav tab ↔ pill both drive setMapMode).
@@ -635,9 +641,9 @@ const DRAWER_CSS = '<style>'
   + '.viewdet{color:var(--sub);font-weight:600;font-size:12px}'
   // Drawer fills the MAP area (between the 50px icon rail and the 404px cards column) and slides
   // in from the left — so the card list stays visible and clicking another card updates it.
-  + '.oppbd{position:fixed;top:52px;left:64px;right:748px;bottom:0;background:rgba(17,28,38,.06);z-index:1400;opacity:0;pointer-events:none;transition:opacity .2s}'
+  + '.oppbd{position:fixed;top:52px;left:64px;right:460px;bottom:0;background:rgba(17,28,38,.06);z-index:1400;opacity:0;pointer-events:none;transition:opacity .2s}'
   + '.oppbd.show{opacity:1}'
-  + '.oppdrawer{position:fixed;top:52px;left:64px;right:748px;height:calc(100vh - 52px);height:calc(100dvh - 52px);background:#fff;z-index:1500;'
+  + '.oppdrawer{position:fixed;top:52px;left:64px;right:460px;height:calc(100vh - 52px);height:calc(100dvh - 52px);background:#fff;z-index:1500;'
   + 'box-shadow:8px 0 40px rgba(0,0,0,.14);transform:translateX(-104%);transition:transform .28s cubic-bezier(.4,0,.2,1);'
   + 'overflow-y:auto;display:flex;flex-direction:column;'
   // Closed = fully hidden so nothing (esp. the sticky ✕ close button) bleeds over the
