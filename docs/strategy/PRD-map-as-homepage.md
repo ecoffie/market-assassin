@@ -1,5 +1,15 @@
 # PRD — The Opportunity Map as the getmindy.ai homepage (the Zillow model)
 
+> # ⛔⛔ OFF THE TABLE — DO NOT IMPLEMENT ⛔⛔
+> **Eric (Jul 26): "take the homepage flip off the table so we don't accidentally flip it."**
+> This PRD is a PARKED PROPOSAL only. **DO NOT** change the getmindy.ai root rewrite in `next.config.ts`
+> (it points to `/mindy-landing` — leave it). **DO NOT** build the free-browse/Pro-gating flip. No agent
+> or session should act on this doc until **Eric explicitly says "flip the homepage" AFTER his QC pass.**
+> If you're reading this while planning work: this is NOT a task — skip it. The map stays at
+> `/opportunity-map`; getmindy.ai stays on the landing page until Eric personally green-lights the flip.
+
+
+
 **Vision (Eric, Jul 26):** getmindy.ai's homepage becomes the **opportunity map**, exactly like
 Zillow. You arrive and immediately browse federal opportunities for FREE — no signup wall. You only
 hit "sign in" when you want to **save** (heart / alerts / pursuits) or use a **paid** feature (AI
