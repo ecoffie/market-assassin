@@ -1140,7 +1140,8 @@ const SORT_EXTRA_JS = `<script>(function(){
     Array.prototype.forEach.call(menu.querySelectorAll('.sortmenu-item'),function(it){
       it.onclick=function(){ var v=it.getAttribute('data-sort');
         sel.value=v; sel.dispatchEvent(new Event('change',{bubbles:true}));           // → F.sort + render
-        if(lbl)lbl.textContent=it.textContent.trim();
+        // Label = the item text WITHOUT the leading ✓ check span.
+        if(lbl){ var t=(it.textContent||'').replace(/^\\s*\\u2713\\s*/,'').trim(); lbl.textContent=t; }
         Array.prototype.forEach.call(menu.querySelectorAll('.sortmenu-item'),function(x){ x.classList.toggle('on', x===it); });
         menu.classList.remove('show'); wrap.classList.remove('open');
       };
