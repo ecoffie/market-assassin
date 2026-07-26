@@ -4733,3 +4733,43 @@ the two places a real `valueRange` is actually served to the map's detail drawer
 starts at zero rows and only grows from real production traffic after deploy — there is no
 seed/backfill, by design, because the whole point is that every row from here forward is a real
 prediction made in the wild.
+
+---
+
+## Opportunity Map — dense-map clustering + honest in-view count (Phase 0, 2026-07-26)
+
+**What:** The Federal Opportunity Map (`/opportunity-map`) now collapses dense clusters of
+pins into count-bubbles that split apart as you zoom in, instead of overplotting hundreds of
+overlapping dots or silently truncating a region to the first 1,000. Added
+`Leaflet.markercluster` (client-side clustering, loaded from the same unpkg CDN as Leaflet) over
+the pins the viewport API already returns — so a metro packed with opportunities reads as one
+labeled bubble ("47") that expands into individual pins the moment you zoom. Clustering works
+across every pin dataset the map serves: Open opportunities, Awarded/recompete targets, and the
+Contacts layer (companies + government buyers). The right-panel header was also made honest:
+when a viewport holds more matches than the map loaded, it now reads "1,000+ of N in view — zoom
+in to resolve," where N is the true count of matching opportunities in the current bounds, never
+the loaded slice masquerading as the total.
+
+**Why:** The map used to render raw pins in a plain layer with no clustering and a hard 1,000-pin
+cap ordered by deadline — so dense national views either overplotted into an unreadable blob or
+quietly dropped everything past the first thousand, and the header could present that capped
+thousand as if it were "the market." That's the one thing Zillow, Redfin, Airbnb, and Google Maps
+never do: they aggregate density into count-bubbles and always state the true count in view.
+Clustering removes the need to choose which pins to hide — everything in the viewport is
+represented; density decides bubble-vs-pin, not dollar amount — so a small-dollar recompete in
+Ohio is no longer invisible next to a $400M IT vehicle in DC.
+
+**SEO/positioning:** "See every federal opportunity on the map, not just the biggest thousand" —
+Mindy's opportunity map clusters like Zillow: dense regions become count-bubbles that expand on
+zoom, and the header always tells you the real number of opportunities in view, so you never
+mistake a truncated list for the whole market.
+
+**Proof:** `Leaflet.markercluster@1.5.3` loaded via CDN alongside `leaflet@1.9.4` in
+`src/app/opportunity-map/template.html` + its served mirror `template-html.ts`; the map's pin
+container switched from `L.layerGroup()` to `L.markerClusterGroup({ chunkedLoading: true, … })`
+(with a graceful fallback to a plain layer if the plugin is network-blocked). Honest count wired
+in `src/app/opportunity-map/route.ts` `updateHeader()`, reading the API's real `totalInView` /
+`capped` fields (returned by `/api/app/opportunity-map` and `/api/app/recompete-map`) instead of
+the capped loaded length. `npx tsc --noEmit` clean; 536/536 unit tests pass (incl. the
+`filter-bar-overflow` invariant). Phase 0 fixes everything except the densest national views,
+which remain limited to the loaded set until Phase 2 (server-side geo-grid clustering).
