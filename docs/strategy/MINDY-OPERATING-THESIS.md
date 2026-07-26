@@ -63,6 +63,34 @@ Everything below is a lens on that sentence.
   instance of "private history compounds into the moat": we log every estimate we make, harvest the
   realized award, and tighten over time. Backtestable against 54M historical awards *today*; the live
   loop keeps it honest forward. Branded as OURS (not the government's number) — principle #3 made legal.
+- **Dense-map rendering** (`DENSE-MAP-RENDERING-RESEARCH.md`) — show ALL points, never a $-ranked
+  subset (that's the rank-then-filter bug). Viewport-bounded fetch + clustering + zoom-to-resolve.
+
+## Map rendering rule — VALUE-ON-THE-PIN (Zillow price tags), NOT clustering (Eric, Jul 26)
+
+**Zillow does NOT cluster — it shows a dense field of PRICE-TAG pins overlapping each other, on
+purpose. The number ON the pin IS the pin, and the wall of numbers triggers the emotion/comparison
+($4.5M next to $335K). That is the model. We initially reached for marker clustering (the generic
+"too many dots" answer) — that was an OVER-CORRECTION. The right answer is to make each pin carry its
+VALUE.**
+
+- **The pin shows the number, not a plain dot.** A value-tag pin stays legible and comparison-inducing
+  even when pins overlap — which is exactly why Zillow lets them overlap instead of clustering. Overlap
+  is the FEATURE (a scannable wall of numbers), not a bug to de-clutter.
+- **What number per dataset (the emotion trigger):**
+  - **Opportunities / Awarded** → the **M-Estimate™** or contract value ("$222K", "$1.3M") — "I could win that."
+  - **Companies** → **$ won** ("$65.7B", "$25.8B") — instant sense of the big players.
+  - Pick the metric that makes the user FEEL something; the value-on-pin is the model, per Eric:
+    "I like using the price on top as a factor."
+- **Clustering is demoted to the EDGE case only** — a light count-bubble ("340 here" / Zillow's
+  "9 New Homes") ONLY at far-out country/region zoom where even tags can't fit; it releases to
+  value-tag pins as you zoom to metro/street. Do NOT cluster-first. (The `markercluster` added in the
+  Phase-0 PR is being replaced by value-tag pins; keep only the far-zoom count-bubble.)
+- **Density is still viewport-based, not dataset-size-based** — the map loads the viewport's pins
+  (bbox-bounded, ~1,000 cap), so a 9K and a 317K dataset both render a viewport's worth. But the fix
+  for "too many" is value-tag legibility + overlap (Zillow), not collapsing to dots/bubbles.
+- **Prerequisite: pins at REAL locations.** Value tags in a fake state-centroid ring is a wall of
+  numbers in the wrong place. Real-city geocoding (the board-wide `geocodeCity` lib) must land first.
 
 ---
 
