@@ -4427,6 +4427,7 @@ returned by `/api/app/opportunity-map`. Default view reads the user's `location_
 live-computed from the same filter engine the `saved-search-alerts` cron uses — new matches
 not yet in `last_seen_notice_ids`.
 
+---
 
 ## Opportunity Map — Contacts mode (companies + government buyers)
 
@@ -4460,3 +4461,53 @@ same contractor + buyer intelligence Mindy already indexes.
   Verified live: companies 317,106 total / buyers 98,024 total; `state=FL` returns FL-only pins.
 - Verified in a headless browser: switching to Contacts mode renders purple pins + contact
   cards (companies + buyers), toggle works, zero JS errors.
+
+---
+
+## SOW card facts (Tier 1) — the solicitation warns you before you read it (2026-07-26)
+
+**What:** Mindy already extracts and stores the full SOW/Statement-of-Work text for every
+opportunity that carries one (2,502 active opps). Tier 1 reads that stored text and surfaces
+three facts most small businesses would otherwise miss by skimming a 20-40 page PDF:
+
+1. **🚩 Brand-name / brand-name-or-equal flag** — a wired-buy warning. If the solicitation says
+   "equal to Pollstar," "BRAND-NAME STRATASYS," or "salient characteristics," Mindy flags it on
+   the map card and names the brand when one is stated. This is the single clearest signal that
+   an incumbent is already favored — worth seeing before spending hours on a bid.
+2. **Evaluation basis chip** — `Best Value`, `LPTA` (Lowest Price Technically Acceptable), or
+   `Trade-off`. Changes the entire bid strategy: LPTA means price alone wins among technically
+   acceptable offers; Best Value/Trade-off means past performance and technical approach can
+   beat a lower price.
+3. **Set-aside from the SOW text** — the eligibility category as literally stated in the
+   document body, filling the ~22% of opps where the structured SAM `set_aside_code` field is
+   null, and flagging the rare case where the posted code and the SOW's own words disagree.
+
+**Why:** SAM.gov shows the structured metadata (NAICS, set-aside code, deadline) but the real
+qualifying signals — is this wired for an incumbent, can I win on price — are buried in the SOW
+body text that almost nobody reads end-to-end before deciding to bid. Mindy already has this
+text stored; Tier 1 turns it into a 2-second card-level decision aid instead of a 30-page PDF
+nobody opens until they've already committed hours.
+
+**How it's built (ground_in_real_data):** every fact returned carries the verbatim SOW span
+that produced it — brand-name and set-aside are resolved with tight, hand-tuned regex (validated
+against a real 50-opportunity sample, catching and fixing five real false-positive classes:
+generic "equal to X" spec language, SF-1449 checklist-legend forms that list every category
+without selecting one, unchecked FAR-clause checkboxes, and FAR 52.212-3 boilerplate definitions
+clauses that discuss a category without asserting it applies). Evaluation basis resolves via
+regex first and escalates to exactly one gpt-4o-mini call ONLY when the text contains genuinely
+conflicting signals (both LPTA and Best Value language) — never a blanket LLM pass, so the vast
+majority of the corpus is labeled for free. Nothing is ever invented: a fact with no real text
+to point to is null, not guessed.
+
+**SEO/positioning:** "Read the fine print for you" — Mindy doesn't just list solicitations, she
+tells you what the solicitation's own words mean for your odds, before you commit to reading it.
+
+**Proof:** Measured on the real `sam_opportunities` corpus — 2,502 active opps carry SOW text
+over 200 characters (the addressable set). Regex-probed prevalence: brand-name/or-equal
+language in ~8% of SOWs, evaluation-basis language in ~10%, set-aside language in ~20% (a floor
+— extraction finds more on the full corpus than the probe). On the accuracy-validation sample,
+final hit rates were brand-name 24%, eval-basis 38%, set-aside-from-text 44% (the sample was
+deliberately bucketed toward hits for validation, not representative of the full 8/10/20% base
+rates). Stored in `sam_opportunities.sow_card_facts` (JSONB), computed by the same shared
+`extractSowCardFacts()` the precompute cron, the detail API, and the backfill script all call —
+one implementation, one source of truth.

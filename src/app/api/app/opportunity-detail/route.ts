@@ -12,6 +12,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@supabase/supabase-js';
 import { setGroupKey, SET_LABEL } from '@/lib/opportunities/map-data';
 import { buildOppIntel, intelHasContent } from '@/lib/opportunities/opp-intel';
+import { extractSowCardFacts, sowCardFactsHasContent, type SowCardFacts } from '@/lib/opportunities/sow-card-facts';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,6 +25,13 @@ function sb() {
 // buildOppIntel now lives in the shared lib (reused by the precompute backfill/cron).
 
 const DETAIL_COLS = 'notice_id, solicitation_number, title, description, naics_code, psc_code, department, sub_tier, office, agency_hierarchy, posted_date, response_deadline, set_aside_code, set_aside_description, notice_type, pop_city, pop_state, pop_country, ui_link, attachments, points_of_contact, office_address, has_sow_doc, sow_text, sow_filename, additional_info_link, additional_info_text, map_loc_source, intel_predecessor, intel_agency, intel_pricing, intel_value_range, intel_computed_at';
+// sow_card_facts (Tier 1 — brand-name/or-equal flag, eval basis, set-aside-from-text) is
+// selected SEPARATELY, not folded into DETAIL_COLS: a single .select() naming a column that
+// doesn't exist yet fails the WHOLE query silently ([[postgrest_missing_column_nulls]]), and
+// this column's migration (20260726_sow_card_facts.sql) may not be run yet. The second query
+// below tries it and degrades to null on ANY error (including 42703 undefined-column) rather
+// than risk the whole detail route 500ing pre-migration.
+const CARD_FACTS_COL = 'sow_card_facts';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function shapeOpp(r: any) {
@@ -57,6 +65,41 @@ function shapeOpp(r: any) {
   };
 }
 
+/**
+ * Read (or compute + self-warm) SOW card facts for one opp. Kept OFF the main DETAIL_COLS
+ * query (see the comment above CARD_FACTS_COL) — this is a small separate query, tolerant of
+ * the column not existing yet (pre-migration), which returns null rather than surfacing an
+ * error to the caller (this is a supplementary fact block, not the core opp detail).
+ */
+async function fetchCardFacts(
+  db: ReturnType<typeof sb>,
+  noticeId: string,
+  sowText: string | null,
+  setAsideCode: string | null,
+): Promise<SowCardFacts | null> {
+  const { data, error } = await db.from('sam_opportunities')
+    .select(`${CARD_FACTS_COL}, sow_card_facts_computed_at`)
+    .eq('notice_id', noticeId).limit(1).maybeSingle();
+  if (error || !data) return null; // column not migrated yet, or a transient error — degrade silently
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const row = data as any;
+  if (row.sow_card_facts_computed_at) return row.sow_card_facts || null;
+  // Not precomputed yet (new opp ahead of the cron/backfill) → compute live + self-warm, same
+  // pattern as the intel block below. Only worth it when there's real SOW text to extract from.
+  if (!sowText || sowText.length <= 200) return null;
+  try {
+    const facts = await extractSowCardFacts(sowText, setAsideCode);
+    if (sowCardFactsHasContent(facts)) {
+      db.from('sam_opportunities')
+        .update({ sow_card_facts: facts, sow_card_facts_computed_at: new Date().toISOString() })
+        .eq('notice_id', noticeId).then(() => {}, () => {});
+    }
+    return facts;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(request: NextRequest) {
   const id = request.nextUrl.searchParams.get('id')?.trim();
   if (!id) return NextResponse.json({ success: false, error: 'id is required' }, { status: 400 });
@@ -78,13 +121,17 @@ export async function GET(request: NextRequest) {
   if (request.nextUrl.searchParams.get('intel') === '1') {
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const row = data as any;
+    // SOW card facts — fetched/computed independently of the intel_computed_at cursor above
+    // (own column, own cursor, own migration) so it works regardless of which precompute has
+    // run for this opp. Degrades to null on any error (pre-migration, transient, etc).
+    const cardFacts = await fetchCardFacts(db, opp.id, opp.sow?.text || null, row.set_aside_code || null);
     if (row.intel_computed_at) {
       return NextResponse.json({ success: true, cached: true, intel: {
         predecessor: row.intel_predecessor || null,
         agency: row.intel_agency || null,
         pricing: row.intel_pricing || null,
         valueRange: row.intel_value_range || null,
-      } });
+      }, cardFacts });
     }
     // Not precomputed yet → compute live, return it, and store it (best-effort). The value_range
     // column may not exist yet (hand-run migration) — store it separately so a missing column
@@ -99,7 +146,7 @@ export async function GET(request: NextRequest) {
         db.from('sam_opportunities').update({ intel_value_range: intel.valueRange }).eq('notice_id', opp.id).then(() => {}, () => {});
       }
     }
-    return NextResponse.json({ success: true, cached: false, intel });
+    return NextResponse.json({ success: true, cached: false, intel, cardFacts });
   }
 
   // Bid Facts — the "Facts & features" grid. All real columns.
